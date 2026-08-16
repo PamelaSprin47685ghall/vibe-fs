@@ -98,6 +98,11 @@ module EnforcerRepair =
 
             kind = "tool" && name = "chronicle"
 
+    let chronicleCallCount (rawMessages: obj list) : int =
+        match EnforcerCycleDecode.lastAssistantStep rawMessages with
+        | None -> 0
+        | Some(_, parts, _) -> parts |> List.filter isBlogToolPart |> List.length
+
     let private blogPartStatus (part: obj) : string option =
         if isNull part || isNull part?state then
             None
@@ -119,7 +124,14 @@ module EnforcerRepair =
                    | Some "running" -> true
                    | _ -> false)
 
-    /// Any blog tool part on the last assistant (completed/error/pending/running).
+    let hasCompletedBlogTool (rawMessages: obj list) : bool =
+        match EnforcerCycleDecode.lastAssistantStep rawMessages with
+        | None -> false
+        | Some(_, parts, _) ->
+            parts
+            |> List.exists (fun part -> isBlogToolPart part && blogPartStatus part = Some "completed")
+
+    /// Any blog tool part on the last assistant (completed/error/pending/running/statusless).
     /// Host cleanup after abort marks hanging tools status=error + interrupted=true
     /// and sets assistant time.completed — that is NOT ENFORCER-060 pure prose.
     let hasAnyBlogToolPart (rawMessages: obj list) : bool =

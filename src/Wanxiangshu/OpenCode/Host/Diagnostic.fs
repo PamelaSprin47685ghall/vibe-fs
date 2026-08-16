@@ -39,8 +39,6 @@ module Diagnostic =
               "result"
               "provider_error"
               "duration"
-              // ENFORCER-042 protocol-violation
-              "call_count"
               // LOOP-010
               "weighted_distinct_token_count"
               "detector_step" ]

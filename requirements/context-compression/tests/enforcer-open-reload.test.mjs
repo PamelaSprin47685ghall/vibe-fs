@@ -372,7 +372,7 @@ const seedEntryFrame = async ({ journal, scope, run, blogStep, mainSession }) =>
 const squashRun = async ({ journal, scope, run, blogStep, mainSession, squash }) => {
   parkedTransform.setCurrentRequest(scope, BLOG, squash)
   const before = mainSession().BloggerCycles.ByProviderRun.size
-  const out = await run(blogStep('asst-sq', 'c-sq', 'squash body'))
+  const out = await withImmediatePark(scope, () => run(blogStep('asst-sq', 'c-sq', 'squash body')))
   assert.equal(caseOf(out), 'StopPhysicalRun')
   assert.equal(out.fields[1], 'stale-cycle-catch-up-complete')
   assert.equal(mainSession().BloggerCycles.ByProviderRun.size, before, 'no receipt written')

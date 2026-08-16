@@ -120,13 +120,18 @@ module BloggerRecoveryProbe =
                 // on the next *new* pure-prose terminal (issuedRun <> terminalRun).
                 BloggerToolRecovery.InteractionNudgeIssued(ProviderRunIdentity.create claimed)
 
-    let private hasBlogToolCall (parts: MessagePart array) : bool =
-        parts
-        |> Array.exists (function
-            | MessagePart.ToolCall(_, name, _) when name = "blog" -> true
-            | _ -> false)
+    let private isCompletedChronicle (part: SessionToolPart) =
+        part.ToolName = "chronicle"
+        && match part.State with
+           | SnapshotToolPartState.Completed _ -> true
+           | _ -> false
 
-    /// Completed assistant terminals: (message id = ProviderRunIdentity, has blog tool call).
+    let private hasExactlyOneCompletedChronicle (parts: SessionToolPart array) =
+        match parts |> Array.filter (fun part -> part.ToolName = "chronicle") with
+        | [| part |] -> isCompletedChronicle part
+        | _ -> false
+
+    /// Completed assistant terminals: (message id = ProviderRunIdentity, exact-one chronicle success).
     let private completedAssistantEvidence (messages: SessionMessage list) : (string * bool) list =
         messages
         |> List.choose (fun m ->
@@ -135,7 +140,7 @@ module BloggerRecoveryProbe =
                 && m.Completed
                 && not (System.String.IsNullOrWhiteSpace m.Id)
             then
-                Some(m.Id, hasBlogToolCall m.Parts)
+                Some(m.Id, hasExactlyOneCompletedChronicle m.ToolParts)
             else
                 None)
 

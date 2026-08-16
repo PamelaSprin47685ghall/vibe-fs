@@ -303,9 +303,10 @@ upper bound、target sequence 或等价截止线。drain 期间新到且满足 c
 
 当前暂时无 material（caught-up / quiet）**不是完成条件**。在当前物理执行仍存活、main 未被 durable
 seal 或其它已有合法终止语义关闭时，Blogger continuation 必须先进入 parked wait；material 到达后恢复
-同一 catch-up，并再次从最新 Current 派生下一块。禁止以 caught-up、quiet、当前 XTrace head 已覆盖为由
-直接结束该连续 drain。park waiter 自身既有的 cancel / physical lifetime 解除语义保持不变；它们是
-物理等待边界，不是“caught-up 已完成”的业务证据。**进程死亡不属于这里的“等待未来”**：按
+同一 catch-up，并再次从最新 Current 派生下一块。该规则覆盖 normal commit、idempotent receipt replay、
+stale-cycle catch-up 与 protocol-repair 后的重入；任何 recovery/re-entry 分支都不得把 quiet 直接映射为
+`StopPhysicalRun`。禁止以 caught-up、quiet、当前 XTrace head 已覆盖为由直接结束该连续 drain。park waiter
+自身既有的 cancel / physical lifetime 解除语义保持不变；它们是物理等待边界，不是“caught-up 已完成”的业务证据。**进程死亡不属于这里的“等待未来”**：按
 CRASH-017/018，旧 tool/continuation 已中断，新 Host 不得自动恢复、重放或补 terminal；显式 `/continue`
 也只能公开断点并重新登记 surviving child，不能续跑旧 Blogger tool invocation。
 

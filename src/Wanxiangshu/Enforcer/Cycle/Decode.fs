@@ -59,8 +59,9 @@ module EnforcerCycleDecode =
     /// C4: commit-path UTF-8 safety bounds.
     let MaxBlogTextBytes = 512 * 1024
     let MaxEvidenceBytes = 128 * 1024
-    /// ENFORCER-042: defensive multi-call cap (protocol violation still merged).
-    let MaxMergedToolCalls = 32
+
+    [<Literal>]
+    let EmptyTextError = "blog cycle text is empty after canonicalisation (ENFORCER-043)"
 
     let private optUnboxString (value: obj) : string option =
         if isNull value then None else Some(unbox<string> value)
@@ -220,56 +221,34 @@ module EnforcerCycleDecode =
 
             Some(messageId, calls, completed)
 
-    let private emitMultiCallIfNeeded
-        (merged: EnforcerCycle.MergedCycle)
-        (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
-        =
-        if merged.MultiCall then
-            // ENFORCER-042: multi-call is a protocol violation; still merge defensively.
-            Diagnostic.emit
-                "enforcer-protocol-violation"
-                [ "result", "multiple blog calls in one provider step; tip = first by PartOrdinal (ENFORCER-025)"
-                  "call_count", string (List.length calls) ]
-
-    let private validateMergedBounds
-        (merged: EnforcerCycle.MergedCycle)
-        (callIds: ToolCallId list)
-        : Result<EnforcerCycle.MergedCycle * ToolCallId list, string> =
-        if not (EnforcerCycle.isValidCycle merged) then
-            Error "blog cycle merged text is empty after canonicalisation (ENFORCER-043)"
-        elif SyntheticToml.byteCount merged.MergedText > MaxBlogTextBytes then
+    let private validateBounds
+        (cycle: EnforcerCycle.CanonicalCycle)
+        (callId: ToolCallId)
+        : Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string> =
+        if not (EnforcerCycle.isValidCycle cycle) then
+            Error EmptyTextError
+        elif SyntheticToml.byteCount cycle.MergedText > MaxBlogTextBytes then
             Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
-        elif SyntheticToml.byteCount merged.MergedEvidence > MaxEvidenceBytes then
+        elif SyntheticToml.byteCount cycle.MergedEvidence > MaxEvidenceBytes then
             Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
         else
-            Ok(merged, callIds)
+            Ok(cycle, [ callId ])
 
-    let private validateMergedCycle
+    let private validateSingleCall
         (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
-        : Result<EnforcerCycle.MergedCycle * ToolCallId list, string> =
-        let callIds = calls |> List.map (fun (_, callId, _) -> callId)
+        : Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string> =
+        match calls with
+        | [ (_, callId, call) ] -> validateBounds (EnforcerCycle.ofCall call) callId
+        | [] -> Error "blog cycle has no completed chronicle call (ENFORCER-043)"
+        | _ -> Error "blog cycle must contain exactly one chronicle call (ENFORCER-042)"
 
-        if List.length (List.distinct callIds) <> List.length calls then
-            Error "blog cycle has duplicate ToolCallIds (ENFORCER-043)"
-        else
-            let merged =
-                EnforcerCycle.mergeCalls (calls |> List.map (fun (ordinal, _, call) -> ordinal, call))
-
-            emitMultiCallIfNeeded merged calls
-            validateMergedBounds merged callIds
-
-    /// ENFORCER-043: a cycle is valid when the provider run is provable, at
-    /// least one call exists, the merged text is non-empty, and every
-    /// ToolCallId is unique. Tip is required on each call (decode already).
+    /// ENFORCER-043: after the raw exact-one gate, the provider run and one
+    /// canonical chronicle call must both be provable; canonical text is non-empty.
     let validateCycle
         (messageId: string)
         (calls: (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list)
-        : Result<EnforcerCycle.MergedCycle * ToolCallId list, string> =
+        : Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string> =
         if String.IsNullOrWhiteSpace messageId then
             Error "blog cycle has no provable provider run (ENFORCER-043)"
-        elif List.isEmpty calls then
-            Error "blog cycle has no completed blog calls (ENFORCER-043)"
-        elif List.length calls > MaxMergedToolCalls then
-            Error(sprintf "blog cycle exceeds MaxMergedToolCalls=%d" MaxMergedToolCalls)
         else
-            validateMergedCycle calls
+            validateSingleCall calls

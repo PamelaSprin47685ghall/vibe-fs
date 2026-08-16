@@ -232,7 +232,7 @@ test('ENFORCER_precheck_stale_ingest_abandons_then_catchup', async () => {
     })
     parkedTransform.setCurrentRequest(scope, BLOG, stale)
 
-    const out = await run(blogStep('asst-2', 'c2', 'second window'))
+    const out = await withImmediatePark(scope, () => run(blogStep('asst-2', 'c2', 'second window')))
     assert.equal(stopReason(out), 'stale-cycle-catch-up-complete')
     assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 3, 'no double commit')
     assert.equal(mainSession().Enforcement.ByProviderRun.size, 1, 'only the first run committed')
@@ -264,7 +264,7 @@ test('ENFORCER_precheck_cutoff_mismatch_abandons', async () => {
     })
     parkedTransform.setCurrentRequest(scope, BLOG, stale)
 
-    const out = await run(blogStep('asst-2', 'c2', 'window two'))
+    const out = await withImmediatePark(scope, () => run(blogStep('asst-2', 'c2', 'window two')))
     assert.equal(stopReason(out), 'stale-cycle-catch-up-complete')
     assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 3)
     assert.equal(mainSession().Enforcement.ByProviderRun.size, 1)
@@ -311,7 +311,7 @@ test('ENFORCER_precheck_epoch_mismatch_after_squash_abandons', async () => {
     })
     parkedTransform.setCurrentRequest(scope, BLOG, staleEpoch)
 
-    const out = await run(blogStep('asst-3', 'c3', 'window three'))
+    const out = await withImmediatePark(scope, () => run(blogStep('asst-3', 'c3', 'window three')))
     assert.equal(stopReason(out), 'stale-cycle-catch-up-complete')
     assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 3)
     assert.equal(mainSession().Enforcement.ByProviderRun.size, 1, 'epoch-stale entry not committed')

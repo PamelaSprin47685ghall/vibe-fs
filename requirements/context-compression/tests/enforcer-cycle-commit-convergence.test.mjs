@@ -169,6 +169,21 @@ const withImmediatePark = async (scope, fn) => {
   }
 }
 
+const withObservedImmediatePark = async (scope, fn) => {
+  const host = parkedTransform.host(scope)
+  const original = host.ParkTransform
+  let calls = 0
+  host.ParkTransform = (_sessionId, _lifetime) => {
+    calls += 1
+    return Promise.resolve(false)
+  }
+  try {
+    return { outcome: await fn(), calls }
+  } finally {
+    host.ParkTransform = original
+  }
+}
+
 const stopReason = (outcome) => {
   assert.equal(caseOf(outcome), 'StopPhysicalRun')
   return outcome.fields[1]
@@ -237,10 +252,15 @@ test('ENFORCER_same_run_after_squash_rejected_as_known_not_committed', async () 
     })
     parkedTransform.setCurrentRequest(scope, BLOG, mainCtx)
 
-    const out = await run(blogStep('asst-sq', 'c-sq', 'same run again'))
+    const replay = await withObservedImmediatePark(scope, () =>
+      run(blogStep('asst-sq', 'c-sq', 'same run again')),
+    )
     // ENFORCER-154: the unified receipt (Squash kind) already binds this
     // provider run — the replay drains instead of re-committing as an Entry.
-    assert.equal(stopReason(out), 'idempotent-receipt-catch-up-complete')
+    // CTX-018: temporary quiet must cross the SAME park boundary as normal commit;
+    // only the simulated physical park expiry may stop the run.
+    assert.equal(replay.calls, 1, 'idempotent receipt quiet must park before physical stop')
+    assert.equal(stopReason(replay.outcome), 'idempotent-receipt-catch-up-complete')
     assert.equal(Number(mainSession().Blog.Coverage.IngestedThroughSequence), 3, 'no entry commit')
     assert.equal(mainSession().Enforcement.ByProviderRun.size, 1, 'only the first entry remains')
     },

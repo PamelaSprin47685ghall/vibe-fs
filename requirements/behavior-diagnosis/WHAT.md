@@ -93,36 +93,36 @@ decode 面无 `Scores` / `parseScore` / 数值严重度 surface；额外 numeric
 
 ## C. Cycle 归并与有效性
 
-### BD-009 多调用确定性归并
+### BD-009 每个 provider run 恰好一次 `chronicle`
 
-一次 provider run 出现多个 `chronicle` 调用时：按 provider-visible PartOrdinal
-升序排列；`entry` 按 PartOrdinal 以 `"\n\n"` 稳定合并；canonical tip = PartOrdinal
-最早的有效 tip（不合并、不 max、不按 lexical ordinal / 严重度二级排序）；evidence
-按 PartOrdinal 收集、完全相同的文本去重、`"; "` 拼接；>1 调用标记 `MultiCall`。
+一个 Blogger provider run 只有在 raw assistant step 中**恰好出现一次** `chronicle`
+调用时才有资格形成 cycle。0 次或 2+ 次都属于协议违约，不得合并、不提交
+`BlogObservationCommitted`、不推进 coverage。assistant 尚未 terminal 时只等待 Host 把 tool parts
+收敛，禁止看到第二个 pending call 就抢先 nudge；terminal 后统一进入 BD-017 的
+InteractionRepair → AABB 有界修复。
 
-- 含义：协议违约（多调用）不丢 coverage，但 tip 选择必须确定且唯一
-  （ENFORCER-025/042）。lexical ordinal 只描述装载顺序，不参与 tip 优先级。
-- 证据：`cycle-nudge.test.mjs` `ENFORCER_042_*`、`ENFORCER_025_*`；REUSE
-  `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_15`；`PROOF.md` 行 18。
+- 含义：`chronicle` 是一次观察的原子提交口，不是可 map/reduce 的批量接口。多调用若被防御性
+  merge，会把「模型没遵守 exactly-once 协议」伪装成成功，并让后续 nudge/AABB 时序失去唯一失败点。
+- 证据：`enforcer-cycle-protocol.test.mjs` `ENFORCER_042_multi_call_*`；`PROOF.md` 行 18。
 
 ### BD-010 Cycle 身份 fail-closed
 
-Cycle 有效要求可证明的 ProviderRunIdentity（非空 messageId）且 ToolCallId 唯一：
-空/缺失 messageId → `enforcer-cycle-failed` fatal；重复 ToolCallId → 同一 fatal。
-多调用（distinct callID、tip/text 有效）不是 fail-closed 情形——仍归并提交单
-cycle 并标记 protocol violation。
+通过 BD-009 cardinality gate 后，Cycle 仍要求可证明的 ProviderRunIdentity（非空 messageId）：
+空/缺失 messageId → `enforcer-cycle-failed` fatal。缺失/非法 ToolCallId 使该唯一 raw invocation 无法形成
+canonical call，按 BD-017 作为无效 cycle 修复；身份不足的 provider run 不得进入提交。多调用已由
+BD-009 在 commit 前转入协议修复，不再以 deterministic merge 兜底。
 
-- 含义：身份不足不得进入领域合并（ENFORCER-041/043）；「防御性归并」只救违约，
-  不救身份缺失。
-- 证据：`identity-fail-closed.test.mjs` `ENFORCER_043_*`、`ENFORCER_042_multi_call_*`；
-  `cycle-nudge.test.mjs` `ENFORCER_043_valid_cycle_requires_nonempty_text`；
-  `PROOF.md` 行 19。
+- 含义：cardinality violation 是可修复的模型协议失败；身份缺失是无法证明事实归属的存储边界失败，
+  两者不得混成同一种 fatal/merge 行为。
+- 证据：`identity-fail-closed.test.mjs` `ENFORCER_043_*`；
+  `enforcer-cycle-protocol.test.mjs` `ENFORCER_042_multi_call_*`；`PROOF.md` 行 19。
 
 ### BD-011 fail-closed 硬界
 
-合并路径硬界（fail closed，`enforcer-cycle-failed` fatal）：合并 tool call 数
-> 32；合并 text > 512 KiB UTF-8；合并 evidence > 128 KiB UTF-8。这些是实现安全界，
-  不重新演化成业务 score/severity 参数。
+通过 exact-one cardinality gate 的单 cycle 内容硬界（fail closed，`enforcer-cycle-failed` fatal）：
+canonical text > 512 KiB UTF-8；evidence > 128 KiB UTF-8。tool call 数不再有第二个“≤32 可 merge”
+区间：任何 2+ 已由 BD-009 进入有界协议修复。这些是实现安全界，不重新演化成业务
+score/severity 参数。
 
 - 含义：防拒绝服务与不可控提交（ENFORCER-042 §13.2）；界是硬墙不是启发式。
 - 证据：`bounds.test.mjs`（4 条，驱动真实 `handleContinuation`）；`PROOF.md` 行 20。
@@ -199,12 +199,13 @@ squash（`BlogObservationsSquashed`）把最老 K 个 frame 折叠为一个 Squa
 
 ### BD-017 无有效 cycle → 有界协议修复，不另造预算
 
-无有效 `chronicle`（纯散文 / 缺 tip / 空 entry）→ 进入 InteractionRepair/nudge
-路径：每个逻辑请求至多一次 Nudge；同一 terminal run 重放幂等（同一观察重放，
-不发送、不推进）；新 terminal 再次无效才证明 repair 失败 → 统一 Fallback；
-abort 清理残留只注入一次 repair、不推进主 cursor、不消耗 AABB 预算；
-`BloggerToolRecovery` 从 durable claim + provider-visible evidence 派生，不退化成
-整数计数器。
+无有效 cycle（`chronicle` 0 次 / 2+ 次、纯散文、缺 tip、空 entry）→ 进入
+InteractionRepair/nudge 路径：每个逻辑请求至多一次 Nudge；同一 terminal run 重放幂等（同一观察
+重放，不发送、不推进）；新 terminal 再次无效才证明 repair 失败 → 统一 Fallback/AABB；abort 清理
+残留只注入一次 repair、不推进主 cursor、不消耗 AABB 预算。恢复重判必须从 durable claim +
+provider-visible `SessionToolPart` 证据派生，且只有 terminal 中**恰好一个 completed `chronicle`** 才能
+证明 repair 后协议恢复；不得从丢失 tool name 的 `MessagePart.ToolResult` 猜测，也不得保留旧工具名
+`blog` alias。`BloggerToolRecovery` 不退化成整数计数器。
 
 - 含义：诊断机制自己不变成第二控制循环；修复机会有界（ENFORCER-060/061/062/063/
   065/066/067/068/153）。

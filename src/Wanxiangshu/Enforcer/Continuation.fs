@@ -360,17 +360,16 @@ module EnforcerContinuation =
         | Some live -> decideErroredRecovery ctx sessionKey currentCtx live
         | None -> Task.FromResult(ctx.Stop "unowned-errored-blog-without-CurrentRequest")
 
-    /// Evidence → Decision: pure-prose recovery stage → nudge / AABB / exhaust.
-    let private decidePureProseRecovery
+    let private decideProtocolRecovery
         (ctx: Context)
         (sessionKey: string)
         (currentCtx: BloggerRequestContext option)
         (live: BloggerRequestContext)
         (terminalRun: ProviderRunIdentity)
+        (reason: string)
         : Task<ContinuationOutcome> =
         match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
-        | BloggerToolRecovery.NoRecovery ->
-            interactionNudge ctx sessionKey currentCtx live terminalRun "no completed blog calls (ENFORCER-060)"
+        | BloggerToolRecovery.NoRecovery -> interactionNudge ctx sessionKey currentCtx live terminalRun reason
         | BloggerToolRecovery.InteractionNudgeIssued issuedRun when issuedRun = terminalRun ->
             Diagnostic.emit
                 "enforcer-cycle-nudge-pending"
@@ -379,22 +378,50 @@ module EnforcerContinuation =
 
             Task.FromResult(ctx.Project ctx.RawMessages)
         | BloggerToolRecovery.InteractionNudgeIssued _ ->
-            aabbRepair ctx sessionKey currentCtx live "nudge semantic failure; pure prose again (ENFORCER-067)"
+            aabbRepair ctx sessionKey currentCtx live ("nudge semantic failure; " + reason)
         | BloggerToolRecovery.AabbRepairConsumed ->
             fatalProjectRaw ctx sessionKey currentCtx "protocol-repair-exhausted (ENFORCER-060)"
 
-    /// Evidence → Decision: live cycle for completed pure prose → recovery or stop.
-    let private decidePureProse
+    let private decideInvalidTerminal
         (ctx: Context)
         (sessionKey: string)
         (currentCtx: BloggerRequestContext option)
         (liveCtx: BloggerRequestContext option)
+        (reason: string)
         : Task<ContinuationOutcome> =
         let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-prose-run"
 
         match liveCtx with
-        | None -> Task.FromResult(ctx.Stop "unowned-completed-prose-without-CurrentRequest")
-        | Some live -> decidePureProseRecovery ctx sessionKey currentCtx live terminalRun
+        | None -> Task.FromResult(ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest")
+        | Some live -> decideProtocolRecovery ctx sessionKey currentCtx live terminalRun reason
+
+    let invalidCardinalityBranch
+        (ctx: Context)
+        (messageId: string)
+        (callCount: int)
+        (assistantCompleted: bool)
+        : Task<ContinuationOutcome> =
+        task {
+            let sessionKey = key ctx
+            let! currentCtx = peekOrResolveCycleContext ctx sessionKey
+
+            if not assistantCompleted then
+                let! rebuilt = rebuildFromOption ctx currentCtx
+                return ctx.Project rebuilt
+            elif String.IsNullOrWhiteSpace messageId then
+                return! fatalProjectRaw ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
+            else
+                let liveCtx =
+                    EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
+
+                return!
+                    decideInvalidTerminal
+                        ctx
+                        sessionKey
+                        currentCtx
+                        liveCtx
+                        (sprintf "chronicle call count = %d; expected exactly one (ENFORCER-042)" callCount)
+        }
 
     /// Branch 1 — empty completed-blog list. Host transform msgs do NOT include
     /// the newly created outbound assistant (prompt.ts: updateMessage then
@@ -420,6 +447,14 @@ module EnforcerContinuation =
                 return! decideInterruptedBlog ctx sessionKey currentCtx liveCtx
             elif EnforcerRepair.hasErroredBlogAttempt ctx.RawMessages then
                 return! decideErroredBlog ctx sessionKey currentCtx liveCtx
+            elif EnforcerRepair.hasCompletedBlogTool ctx.RawMessages then
+                return!
+                    decideInvalidTerminal
+                        ctx
+                        sessionKey
+                        currentCtx
+                        liveCtx
+                        "completed chronicle call did not produce one valid cycle (ENFORCER-060)"
             elif EnforcerRepair.hasAnyBlogToolPart ctx.RawMessages then
                 let! rebuilt = rebuildFromOption ctx currentCtx
                 return ctx.Project rebuilt
@@ -427,7 +462,13 @@ module EnforcerContinuation =
                 let! rebuilt = rebuildFromOption ctx currentCtx
                 return ctx.Project rebuilt
             else
-                return! decidePureProse ctx sessionKey currentCtx liveCtx
+                return!
+                    decideInvalidTerminal
+                        ctx
+                        sessionKey
+                        currentCtx
+                        liveCtx
+                        "no completed chronicle call (ENFORCER-060)"
         }
 
     let private resumeWithContext (ctx: Context) (live: BloggerRequestContext) =
@@ -450,19 +491,95 @@ module EnforcerContinuation =
             return ctx.Project rebuilt
         }
 
-    /// Evidence → Decision: catch-up refresh None → seal-or-clear stop.
+    let private refreshGapAfterPark
+        (ctx: Context)
+        (mainSessionId: SessionId)
+        (sessionKey: string)
+        (caughtUpReason: string)
+        : Task<ContinuationOutcome> =
+        task {
+            match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
+            | Some live -> return! resumeCatchUpWithLive ctx sessionKey live
+            | None -> return ctx.Stop caughtUpReason
+        }
+
+    let private afterParkNotResumed
+        (ctx: Context)
+        (mainSessionId: SessionId)
+        (sessionKey: string)
+        (caughtUpReason: string)
+        : Task<ContinuationOutcome> =
+        task {
+            if mainBlocks ctx mainSessionId sessionKey then
+                BloggerRuntimeHost.forceSealRuntime ctx.Scope sessionKey
+                return ctx.Stop "park-ended-main-sealed"
+            else
+                return! refreshGapAfterPark ctx mainSessionId sessionKey caughtUpReason
+        }
+
+    let private projectAfterParkWake
+        (ctx: Context)
+        (mainSessionId: SessionId)
+        (sessionKey: string)
+        (live: BloggerRequestContext)
+        : Task<ContinuationOutcome> =
+        task {
+            if mainBlocks ctx mainSessionId sessionKey then
+                BloggerRuntimeHost.forceSealRuntime ctx.Scope sessionKey
+                return ctx.Stop "park-resumed-main-sealed"
+            elif ctx.Scope.HasFlight sessionKey then
+                let! rebuilt = resumeWithContext ctx live
+                return ctx.Project rebuilt
+            else
+                ctx.Scope.SetCurrentRequest(sessionKey, live)
+                let! rebuilt = resumeWithContext ctx live
+                return ctx.Project rebuilt
+        }
+
+    let private afterParkResumed
+        (ctx: Context)
+        (mainSessionId: SessionId)
+        (sessionKey: string)
+        : Task<ContinuationOutcome> =
+        task {
+            ctx.Scope.TryTakePendingOffer sessionKey |> ignore
+
+            match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
+            | Some live -> return! projectAfterParkWake ctx mainSessionId sessionKey live
+            | None -> return ctx.Project ctx.RawMessages
+        }
+
+    let private parkAfterCatchUpClear
+        (ctx: Context)
+        (mainSessionId: SessionId)
+        (sessionKey: string)
+        (caughtUpReason: string)
+        : Task<ContinuationOutcome> =
+        task {
+            let! resumed = ctx.Scope.ParkTransform(sessionKey, ctx.ParkedTransformLifetime)
+
+            if resumed then
+                return! afterParkResumed ctx mainSessionId sessionKey
+            else
+                return! afterParkNotResumed ctx mainSessionId sessionKey caughtUpReason
+        }
+
+    /// Evidence → Decision: catch-up refresh None → seal or park until a physical boundary.
     let private resumeCatchUpWhenNone
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
         (caughtUpReason: string)
-        : ContinuationOutcome =
-        if AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections then
-            BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
-        else
-            ctx.Scope.ClearCurrentRequest sessionKey
-
-        ctx.Stop caughtUpReason
+        : Task<ContinuationOutcome> =
+        task {
+            if AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections then
+                BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
+                ctx.Scope.ClearCurrentRequest sessionKey
+                return ctx.Stop caughtUpReason
+            else
+                ctx.Scope.ClearCurrentRequest sessionKey
+                return! parkAfterCatchUpClear ctx mainSessionId sessionKey caughtUpReason
+        }
 
     /// Evidence → Decision: refresh after unblock → live project or caught-up stop.
     let private resumeCatchUpAfterUnblocked
@@ -476,7 +593,7 @@ module EnforcerContinuation =
 
             match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
             | Some live -> return! resumeCatchUpWithLive ctx sessionKey live
-            | None -> return resumeCatchUpWhenNone ctx mainSessionId sessionKey caughtUpReason
+            | None -> return! resumeCatchUpWhenNone ctx mainSessionId sessionKey caughtUpReason
         }
 
     /// Evidence → Decision: main blocks → seal stop; else catch-up drain.
@@ -636,7 +753,7 @@ module EnforcerContinuation =
         (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
-        (merged: EnforcerCycle.MergedCycle)
+        (merged: EnforcerCycle.CanonicalCycle)
         (main: BloggerMainRequestContext)
         : Task<CycleDisposition> =
         task {
@@ -669,7 +786,7 @@ module EnforcerContinuation =
         (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
-        (merged: EnforcerCycle.MergedCycle)
+        (merged: EnforcerCycle.CanonicalCycle)
         (main: BloggerMainRequestContext)
         : Task<CycleDisposition> =
         let tomlDigest = BlobDigest.create (HostDigest.sha256Hex main.Toml)
@@ -694,7 +811,7 @@ module EnforcerContinuation =
         (sessionKey: string)
         (liveCtx: BloggerRequestContext option)
         (providerRun: ProviderRunIdentity)
-        (merged: EnforcerCycle.MergedCycle)
+        (merged: EnforcerCycle.CanonicalCycle)
         (toolCallIds: ToolCallId list)
         : Task<CycleDisposition> =
         match liveCtx with
@@ -786,81 +903,6 @@ module EnforcerContinuation =
             | None -> return ctx.Project ctx.RawMessages
         }
 
-    /// Evidence → Decision: post-park refresh → live project or catch-up stop.
-    let private refreshGapAfterPark
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        : Task<ContinuationOutcome> =
-        task {
-            match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
-            | Some live -> return! resumeCatchUpWithLive ctx sessionKey live
-            | None -> return ctx.Stop "park-ended-catch-up-complete"
-        }
-
-    /// Evidence → Decision: park ended without resume → seal stop or refresh gap.
-    let private afterParkNotResumed
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        : Task<ContinuationOutcome> =
-        task {
-            if mainBlocks ctx mainSessionId sessionKey then
-                BloggerRuntimeHost.forceSealRuntime ctx.Scope sessionKey
-                return ctx.Stop "park-ended-main-sealed"
-            else
-                return! refreshGapAfterPark ctx mainSessionId sessionKey
-        }
-
-    /// Evidence → Decision: park wake live → seal / flight / set-and-project.
-    let private projectAfterParkWake
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        (live: BloggerRequestContext)
-        : Task<ContinuationOutcome> =
-        task {
-            if mainBlocks ctx mainSessionId sessionKey then
-                BloggerRuntimeHost.forceSealRuntime ctx.Scope sessionKey
-                return ctx.Stop "park-resumed-main-sealed"
-            elif ctx.Scope.HasFlight sessionKey then
-                let! rebuilt = resumeWithContext ctx live
-                return ctx.Project rebuilt
-            else
-                ctx.Scope.SetCurrentRequest(sessionKey, live)
-                let! rebuilt = resumeWithContext ctx live
-                return ctx.Project rebuilt
-        }
-
-    /// Evidence → Decision: park resumed refresh → project wake or raw.
-    let private afterParkResumed
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        : Task<ContinuationOutcome> =
-        task {
-            ctx.Scope.TryTakePendingOffer sessionKey |> ignore
-
-            match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
-            | Some live -> return! projectAfterParkWake ctx mainSessionId sessionKey live
-            | None -> return ctx.Project ctx.RawMessages
-        }
-
-    /// Evidence → Decision: park transform resumed flag → not-resumed or wake path.
-    let private parkAfterCatchUpClear
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        : Task<ContinuationOutcome> =
-        task {
-            let! resumed = ctx.Scope.ParkTransform(sessionKey, ctx.ParkedTransformLifetime)
-
-            if not resumed then
-                return! afterParkNotResumed ctx mainSessionId sessionKey
-            else
-                return! afterParkResumed ctx mainSessionId sessionKey
-        }
-
     /// Evidence → Decision: durable seal after catch-up → stop; else park wait.
     let private finishCaughtUpAfterCommit
         (ctx: Context)
@@ -876,7 +918,7 @@ module EnforcerContinuation =
                 return ctx.Stop "main-sealed-caught-up"
             else
                 ctx.Scope.ClearCurrentRequest sessionKey
-                return! parkAfterCatchUpClear ctx mainSessionId sessionKey
+                return! parkAfterCatchUpClear ctx mainSessionId sessionKey "park-ended-catch-up-complete"
         }
 
     /// Evidence → Decision: post-commit refresh × afterSquashMain → drain or catch-up.

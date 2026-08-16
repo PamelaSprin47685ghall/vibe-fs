@@ -232,6 +232,16 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
     transcript = [...transcript, ...outcomeMessages(out)]
     return out
   }
+  const runWithImmediatePark = async (messages) => {
+    const host = parkedTransform.host(scope)
+    const original = host.ParkTransform
+    host.ParkTransform = (_sessionId, _lifetime) => Promise.resolve(false)
+    try {
+      return await run(messages)
+    } finally {
+      host.ParkTransform = original
+    }
+  }
 
   try {
     await fn({
@@ -245,6 +255,7 @@ const withHarness = async (fn, { portMode = 'ok' } = {}) => {
       capturedSends,
       sessionPort,
       run,
+      runWithImmediatePark,
     })
   } finally {
     console.error = origError
@@ -340,6 +351,26 @@ const interruptedBlog = (id, callId) =>
   )
 
 const pureProse = (id, text) => assistantStep(id, [{ type: 'text', text }], { completed: true })
+
+const multiChronicle = (id, firstCallId = 'c-a', secondCallId = 'c-b') =>
+  assistantStep(
+    id,
+    [
+      {
+        type: 'tool',
+        tool: 'chronicle',
+        callID: firstCallId,
+        state: { status: 'completed', input: { tip: DEFAULT_TIP, entry: 'first observation' } },
+      },
+      {
+        type: 'tool',
+        tool: 'chronicle',
+        callID: secondCallId,
+        state: { status: 'completed', input: { tip: DEFAULT_TIP, entry: 'second observation' } },
+      },
+    ],
+    { completed: true },
+  )
 
 /**
  * ENFORCER-065 ToolExecutionError: the blog call itself failed. `status: 'error'`
@@ -611,6 +642,47 @@ test('ENFORCER_060_pure_prose_second_terminal_triggers_aabb', async () => {
     assert.equal(hasRepairMessage(out), true, 'second pure prose is AABB')
     assert.equal(isAabb(messagesOf(out)), true)
     assert.equal(capturedSends.length, 1, 'must not send a second nudge')
+    assert.equal(fatals.length, 0)
+  })
+})
+
+test('ENFORCER_042_multi_call_first_terminal_issues_one_nudge_and_does_not_commit', async () => {
+  await withHarness(async ({ journal, scope, fatals, runWithImmediatePark, capturedSends }) => {
+    const out = await runWithImmediatePark(multiChronicle('asst-multi-1'))
+    const main = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+
+    assert.equal(hasRepairMessage(out), false, 'first cardinality violation uses nudge before AABB')
+    assert.equal(capturedSends.length, 1, 'exactly one interaction nudge')
+    assert.equal(isNudgeFromJournal(journal), true)
+    assert.equal(main?.Enforcement?.ByProviderRun?.size ?? 0, 0, '2+ chronicle must not commit a cycle')
+    assert.equal(hasFlight(scope), true, 'repair keeps the original cycle live')
+    assert.equal(fatals.length, 0)
+  })
+})
+
+test('ENFORCER_042_multi_call_same_terminal_reentry_is_idempotent', async () => {
+  await withHarness(async ({ scope, fatals, runWithImmediatePark, capturedSends }) => {
+    await runWithImmediatePark(multiChronicle('asst-multi-same'))
+    const out = await runWithImmediatePark(multiChronicle('asst-multi-same'))
+
+    assert.equal(hasRepairMessage(out), false, 'same terminal observation must not spend AABB')
+    assert.equal(capturedSends.length, 1, 'same terminal must not send a second nudge')
+    assert.equal(hasFlight(scope), true)
+    assert.equal(fatals.length, 0)
+  })
+})
+
+test('ENFORCER_042_second_multi_call_terminal_after_nudge_triggers_aabb', async () => {
+  await withHarness(async ({ journal, scope, fatals, runWithImmediatePark, capturedSends }) => {
+    await runWithImmediatePark(multiChronicle('asst-multi-a'))
+    const out = await runWithImmediatePark(multiChronicle('asst-multi-b', 'c-c', 'c-d'))
+    const main = fold.session(AgentJournalModule_snapshot(journal), MAIN)
+
+    assert.equal(hasRepairMessage(out), true, 'new cardinality violation after nudge spends AABB')
+    assert.equal(isAabb(messagesOf(out)), true)
+    assert.equal(capturedSends.length, 1, 'AABB replaces a second nudge')
+    assert.equal(main?.Enforcement?.ByProviderRun?.size ?? 0, 0, 'invalid cardinality never commits')
+    assert.equal(hasFlight(scope), true)
     assert.equal(fatals.length, 0)
   })
 })

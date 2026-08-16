@@ -1,12 +1,10 @@
 // tests/unit/enforcer/bounds.test.mjs — docs/what/enforcer.md §13.2 / ENFORCER-042/043.
 //
-// Fail-closed size/count bounds on the commit/merge path (EnforcerHost.validateCycle):
-//   - >32 merged tool calls → Error
-//   - merged text > 512 KiB UTF-8 → Error
-//   - merged evidence > 128 KiB UTF-8 → Error
+// Fail-closed content bounds on the exact-one commit path (EnforcerHost.validateCycle):
+//   - canonical text > 512 KiB UTF-8 → Error
+//   - canonical evidence > 128 KiB UTF-8 → Error
 //
-// These gates live in EnforcerHost.fs (MaxMergedToolCalls / MaxBlogTextBytes /
-// MaxEvidenceBytes) and fire on the real continuation transform. This suite drives
+// These gates live in EnforcerHost.fs / EnforcerCycleDecode and fire on the real continuation transform. This suite drives
 // the ACTUAL production gate handleContinuation with oversized provider steps and
 // asserts the fail-closed Diagnostic.fatal (operation enforcer-cycle-failed) carries
 // the matching bound reason. VERIFY-003: fake Host trajectory against real dist.
@@ -146,7 +144,6 @@ const withHarness = async (parts, fn) => {
 }
 
 // Bound constants mirrored from EnforcerHost.fs (values the gate compares against).
-const MAX_MERGED_TOOL_CALLS = 32
 const MAX_BLOG_TEXT_BYTES = 512 * 1024
 const MAX_EVIDENCE_BYTES = 128 * 1024
 
@@ -158,22 +155,9 @@ const blogCall = (callId, input) => ({
   state: { status: 'completed', input: { tip: 'primitive-obsession', ...input } },
 })
 
-// ── merged tool-call count > 32 → fail closed (ENFORCER-042) ─────────────────
-
-test('ENFORCER_042_more_than_32_merged_tool_calls_fails_closed', async () => {
-  const parts = Array.from({ length: MAX_MERGED_TOOL_CALLS + 1 }, (_, i) =>
-    blogCall(`c${i}`, { text: `entry-${i}` }),
-  )
-  await withHarness(parts, async ({ fatals, lastFatal }) => {
-    assert.ok(fatals.length >= 1, 'over-limit cycle must fail closed with a fatal')
-    assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
-    assert.match(lastFatal()?.result ?? '', /MaxMergedToolCalls=32/)
-  })
-})
-
 // ── merged text > 512 KiB UTF-8 → fail closed ────────────────────────────────
 
-test('ENFORCER_042_merged_text_over_512KiB_fails_closed', async () => {
+test('ENFORCER_043_canonical_text_over_512KiB_fails_closed', async () => {
   const bigText = 'a'.repeat(MAX_BLOG_TEXT_BYTES + 1) // 524289 bytes, > 512 KiB
   const parts = [blogCall('c-text', { text: bigText })]
   await withHarness(parts, async ({ fatals, lastFatal }) => {
@@ -185,7 +169,7 @@ test('ENFORCER_042_merged_text_over_512KiB_fails_closed', async () => {
 
 // ── merged evidence > 128 KiB UTF-8 → fail closed ────────────────────────────
 
-test('ENFORCER_042_merged_evidence_over_128KiB_fails_closed', async () => {
+test('ENFORCER_043_canonical_evidence_over_128KiB_fails_closed', async () => {
   const bigEvidence = 'b'.repeat(MAX_EVIDENCE_BYTES + 1) // 131073 bytes, > 128 KiB
   const parts = [blogCall('c-evidence', { text: 'work', evidence: bigEvidence })]
   await withHarness(parts, async ({ fatals, lastFatal }) => {

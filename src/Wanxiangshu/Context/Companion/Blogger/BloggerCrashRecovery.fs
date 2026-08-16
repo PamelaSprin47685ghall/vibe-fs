@@ -193,15 +193,20 @@ module BloggerCrashRecovery =
         |> Map.toList
         |> List.choose (fun (_, session) -> tryReceiptedIdle host session)
 
-    let private partSignalsCompletedBlog (part: MessagePart) =
-        match part with
-        | MessagePart.ToolCall(_, name, _) when name = "blog" -> true
-        | MessagePart.ToolResult(_, _) -> true
-        | _ -> false
+    let private partSignalsCompletedChronicle (part: SessionToolPart) =
+        part.ToolName = "chronicle"
+        && match part.State with
+           | SnapshotToolPartState.Completed _ -> true
+           | _ -> false
 
     let private messagesHaveCompletedBlog (messages: SessionMessage list) =
         messages
-        |> List.exists (fun m -> m.Role = "assistant" && m.Parts |> Array.exists partSignalsCompletedBlog)
+        |> List.rev
+        |> List.tryFind (fun message -> message.Role = "assistant")
+        |> Option.exists (fun message ->
+            match message.ToolParts |> Array.filter (fun part -> part.ToolName = "chronicle") with
+            | [| part |] -> partSignalsCompletedChronicle part
+            | _ -> false)
 
     let private outcomeAfterRestore (hasCompletedBlog: bool) (bloggerSessionId: SessionId) =
         if hasCompletedBlog then

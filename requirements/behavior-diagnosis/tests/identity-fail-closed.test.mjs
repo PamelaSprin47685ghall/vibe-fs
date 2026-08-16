@@ -1,19 +1,6 @@
-// tests/unit/enforcer/identity-fail-closed.test.mjs — docs/what/enforcer.md §13.2 /
-// ENFORCER-043 identity fail-closed + ENFORCER-042 multi-call protocol-violation.
-//
-// Two fail-closed identity gates on the commit/merge path (EnforcerHost.validateCycle):
-//   - empty/missing messageId → Error "no provable provider run" (ENFORCER-043)
-//   - duplicate ToolCallIds    → Error "duplicate ToolCallIds"          (ENFORCER-043)
-//
-// And one diagnostic side-effect gate:
-//   - multi-call (distinct callIDs, valid) is a protocol violation that still
-//     COMMITS a single cycle (NOT fail-closed); the "enforcer-protocol-violation"
-//     Diagnostic.emit is silent by design (HOST-007: emit never prints), so this
-//     suite asserts the observable contract — no enforcer-cycle-failed fatal AND the
-//     coverage advances to a committed BlogObservationCommitted. The emit's own validity is
-//     locked separately in tests/unit/context/ctx014.test.mjs
-//     (CTX_014_enforcer_protocol_violation_fields_are_whitelisted), which guarantees
-//     the multi-call emit does not throw.
+// behavior-diagnosis: ENFORCER-043 provider-run identity fail-closed.
+// Multi-call cardinality is a recoverable protocol failure and is covered by
+// enforcer-cycle-protocol.test.mjs before commit identity validation.
 //
 // VERIFY-003: fake Host trajectory against real dist (same pattern as bounds.test.mjs).
 
@@ -185,20 +172,6 @@ const blogCall = (callId, input) => ({
   state: { status: 'completed', input: { tip: 'primitive-obsession', ...input } },
 })
 
-// ── duplicate ToolCallIds → fail closed (ENFORCER-043) ───────────────────────
-
-test('ENFORCER_043_duplicate_tool_call_ids_fails_closed', async () => {
-  // Two completed blog calls sharing ONE ToolCallId: identity is not provable, so
-  // the cycle must fail closed — never merge under an ambiguous provider run.
-  const parts = [blogCall('same-call', { text: 'first' }), blogCall('same-call', { text: 'second' })]
-  await withHarness(async ({ run, fatals, lastFatal }) => {
-    await run(parts)
-    assert.ok(fatals.length >= 1, 'duplicate ToolCallIds must fail closed with a fatal')
-    assert.equal(lastFatal()?.operation, 'enforcer-cycle-failed')
-    assert.match(lastFatal()?.result ?? '', /duplicate ToolCallIds/)
-  })
-})
-
 // ── empty / missing messageId → fail closed (ENFORCER-043) ───────────────────
 
 test('ENFORCER_043_no_provable_provider_run_fails_closed', async () => {
@@ -214,26 +187,4 @@ test('ENFORCER_043_no_provable_provider_run_fails_closed', async () => {
     },
     { messageId: '' },
   )
-})
-
-// ── multi-call = protocol violation, still commits (NOT fail-closed) ─────────
-
-test('ENFORCER_042_multi_call_commits_single_cycle_with_protocol_violation', async () => {
-  // Distinct callIDs, valid tips/text: multi-call is a protocol violation but must
-  // NOT fail closed. It still merges defensively (single canonical BlogObservationCommitted)
-  // and emits the silent "enforcer-protocol-violation" diagnostic (HOST-007).
-  // The observable contract asserted here: no enforcer-cycle-failed fatal, and the
-  // coverage advances (commit happened). The diagnostic's own field validity is locked
-  // by ctx014 CTX_014_enforcer_protocol_violation_fields_are_whitelisted.
-  const parts = [blogCall('c-a', { text: 'first' }), blogCall('c-b', { text: 'second' })]
-  await withHarness(async ({ runOwnedCommit, fatals, mainSessionCoverage, enforcementReceiptCount }) => {
-    await runOwnedCommit(parts)
-
-    // Multi-call alone must NOT fail closed.
-    assert.equal(fatals.length, 0, JSON.stringify(fatals))
-    // Single cycle still commits: coverage advances 0 → 1 and one enforcement receipt.
-    assert.equal(Number(mainSessionCoverage().IngestedThroughSequence), 1)
-    assert.equal(Number(mainSessionCoverage().CoverableTurnCutoffExclusive), 1)
-    assert.equal(enforcementReceiptCount(), 1, 'one BlogObservationCommitted receipt by ProviderRun')
-  })
 })

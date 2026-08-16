@@ -503,8 +503,9 @@ test('ENFORCER_host_completed_blog_second_pass_same_run_is_idempotent', async ()
     assert.equal(fatals.length, 0)
 
     // Replay same ProviderRun (Host re-transform / restart). Must not double-commit.
-    // alreadyEntry short-circuits before park when no further material.
-    await run(historicalBlog('asst-idem', 'call-idem', { text: 'once' }))
+    // CTX-018: idempotent receipt + quiet still crosses ParkTransform; this test
+    // simulates the physical park expiry immediately rather than waiting 10 minutes.
+    await runOwnedCommit(scope, run, historicalBlog('asst-idem', 'call-idem', { text: 'once' }))
 
     assert.equal(fatals.length, 0)
     const session = fold.session(AgentJournalModule_snapshot(journal), MAIN)

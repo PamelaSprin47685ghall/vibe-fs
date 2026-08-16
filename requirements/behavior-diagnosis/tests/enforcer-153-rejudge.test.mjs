@@ -9,6 +9,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { caseOf } from '../../verification-system/tests/support/domain.mjs'
+import { snapshotRejudgeChronicleCardinality } from './support/blogger-recovery.mjs'
 
 const ROOT = new URL('../../../', import.meta.url).pathname
 const recoverySrc = readFileSync(
@@ -108,6 +109,20 @@ test('ENFORCER_153_claim_plus_valid_blog_after_nudge_rejudges_to_NoRecovery', as
   ])
   const out = rejudge('asst-p1', terminals)
   assert.equal(caseOf(out), 'NoRecovery')
+})
+
+test('ENFORCER_153_snapshot_rejudge_recognizes_exactly_one_completed_chronicle', async () => {
+  const result = await snapshotRejudgeChronicleCardinality()
+
+  assert.equal(result.one, 'NoRecovery')
+  assert.equal(result.two, 'InteractionNudgeIssued', '2+ completed chronicle calls must not prove protocol recovery')
+  assert.equal(result.mixed, 'InteractionNudgeIssued', 'one completed plus one failed chronicle is still 2 raw calls')
+})
+
+test('ENFORCER_153_snapshot_rejudge_uses_named_chronicle_toolparts', async () => {
+  const probeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'), 'utf8')
+  assert.match(probeSrc, /ToolParts/, 'snapshot recovery must use named SessionToolPart evidence')
+  assert.doesNotMatch(probeSrc, /name = "blog"/, 'legacy blog tool alias must not drive recovery')
 })
 
 test('ENFORCER_153_claim_with_missing_terminal_in_transcript_keeps_nudge_not_aabb', async () => {

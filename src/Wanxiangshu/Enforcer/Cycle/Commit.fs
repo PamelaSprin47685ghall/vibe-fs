@@ -198,7 +198,7 @@ module EnforcerCycleCommit =
         (bloggerSessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
-        (merged: EnforcerCycle.MergedCycle)
+        (merged: EnforcerCycle.CanonicalCycle)
         (coverage: BloggerMainRequestContext)
         : Task<CycleCommitOutcome> =
         task {
@@ -260,7 +260,7 @@ module EnforcerCycleCommit =
         (bloggerSessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (toolCallIds: ToolCallId list)
-        (merged: EnforcerCycle.MergedCycle)
+        (merged: EnforcerCycle.CanonicalCycle)
         (declared: BloggerMainRequestContext option)
         : Task<CycleCommitOutcome> =
         task {

@@ -98,8 +98,6 @@ module EnforcerHost =
     /// C4: commit-path UTF-8 safety bounds.
     let MaxBlogTextBytes = 512 * 1024
     let MaxEvidenceBytes = 128 * 1024
-    /// ENFORCER-042: defensive multi-call cap (protocol violation still merged).
-    let MaxMergedToolCalls = 32
 
     /// Prefer non-empty preferred; else fallback. Never invent a blank list when
     /// either side has content. Both empty is an invariant break: blanking Host
@@ -136,7 +134,7 @@ module EnforcerHost =
     /// leaves CoveredPrefixDigest empty, so CTX-011 probes never arm.
 
     let private isEmptyTextCycleFailure (reason: string) : bool =
-        reason.IndexOf("merged text is empty", StringComparison.Ordinal) >= 0
+        reason = EnforcerCycleDecode.EmptyTextError
 
     /// Rebuild provider-semantic turns from durable XTrace (AABB refresh source).
     /// Current reanchor generation only: Host turn indices restart after HOST-006,
@@ -378,7 +376,16 @@ module EnforcerHost =
                   IsEmptyTextCycleFailure = isEmptyTextCycleFailure
                   ParkedTransformLifetime = ParkedTransformLifetime }
 
+            let chronicleCallCount = EnforcerRepair.chronicleCallCount rawMessages
+
             match journal, mainSessionId, EnforcerCycleDecode.extractCalls rawMessages with
+            | Some durable, Some owner, Some(messageId, _, assistantCompleted) when chronicleCallCount > 1 ->
+                return!
+                    EnforcerContinuation.invalidCardinalityBranch
+                        (mkCtx durable owner)
+                        messageId
+                        chronicleCallCount
+                        assistantCompleted
             | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
                 return! EnforcerContinuation.emptyCallsBranch (mkCtx durable owner) assistantCompleted
             | Some durable, Some owner, Some(messageId, calls, assistantCompleted) ->

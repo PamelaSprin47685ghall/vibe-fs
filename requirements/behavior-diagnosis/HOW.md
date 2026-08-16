@@ -39,15 +39,11 @@ type CanonicalBlogCall = { Text: string option; Evidence: string option; Tip: En
 > 128 KiB）。本包按当前世界记录：evidence 不改变 occurrence 身份（BD-009），
 > 「evidence 删除」是文档与代码之间的漂移，见 §7 弃权。
 
-### 1.3 `src/Wanxiangshu/Domain/EnforcerCycle.fs`（BD-009）
+### 1.3 `src/Wanxiangshu/Enforcer/Cycle/Model.fs`（BD-009）
 
-```fsharp
-type MergedCycle = { MergedText: string; CanonicalTip: EnforcerTip; MergedEvidence: string; MultiCall: bool }
-```
-
-- `mergeCalls`：按 PartOrdinal 升序；text 以 `"\n\n"` 拼接；canonical tip =
-  排序后第一个；evidence 精确去重后 `"; "` 拼接；`MultiCall = length > 1`。
-- `isValidCycle`：合并后 text trim 非空。
+Provider cycle 的 cardinality gate 位于 Host continuation 边界：raw assistant step 必须恰好一个
+`chronicle` part。0 次与 2+ 次不进入 merge/commit；terminal 后直接复用 BD-017 的 protocol repair。
+`EnforcerCycle` 只处理已通过该 gate 的单调用 canonical value，不再承担多调用业务归并语义。
 
 ### 1.4 `src/Wanxiangshu/Domain/RulebookObservation.fs`（BD-015）
 
@@ -74,9 +70,11 @@ type MergedCycle = { MergedText: string; CanonicalTip: EnforcerTip; MergedEviden
 
 ### 3.1 校验：`src/Wanxiangshu/Session/EnforcerCycleDecode.fs`
 
-- 常量：`MaxMergedToolCalls = 32`、`MaxBlogTextBytes = 512 * 1024`、
-  `MaxEvidenceBytes = 128 * 1024`（`EnforcerHost.fs` 镜像同一常量）。
-- 身份/边界校验（BD-010/011）：空 messageId / 重复 ToolCallId / 越界 →
+- 内容硬界：`MaxBlogTextBytes = 512 * 1024`、`MaxEvidenceBytes = 128 * 1024`。不存在
+  多调用 merge cap：2+ raw `chronicle` 在 canonical cycle 构造前已转 protocol repair。
+- cardinality（BD-009）：先按 raw assistant parts 计 `chronicle` 调用数；terminal 时必须 =1。
+  0/2+ → protocol repair，不进入 `validateCycle`/commit。
+- 身份/边界校验（BD-010/011）：通过 cardinality 后，空 messageId / 越界 →
   `Diagnostic.fatal "enforcer-cycle-failed"`（fail closed）。`EnforcerHost` 同名的
   `MaxBlogTextBytes` 等常量必须与 Decode 保持一致（单一来源是 Decode）。
 
@@ -95,8 +93,11 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
 ### 3.3 协调：`src/Wanxiangshu/Session/EnforcerHost.fs` + `EnforcerContinuation.fs`
 
 - `handleContinuation`：薄分发（emptyCallsBranch / commitBranch / firstRequestBranch）。
-- `EnforcerContinuation`：三分支 + `CycleDisposition`；成功提交后 Park 或注入；
-  nudge/repair/AABB/Fallback 决策表（BD-017，ENFORCER-065 固定表驱动）。
+- `EnforcerContinuation`：三分支 + `CycleDisposition`；成功提交后 Park 或注入；0/2+ chronicle 与
+  completed-but-invalid 单调用共用 nudge/repair/AABB/Fallback 决策表（BD-017）。同一 terminal 重放
+  只投影，不重复 nudge；下一 invalid terminal 才进入 AABB。
+- cold/reconcile recovery 只从 `SessionMessage.ToolParts` 读取 `ToolName=chronicle` + completed state；
+  `MessagePart.ToolResult` 已丢 tool name，禁止用于判断修复是否成功。
 - `EnforcerFrameRecovery.fs`：`tryLiveCycleContext`（commit 只用 live InFlight）、
   `tryReloadRequestContext`（durable open materialization 恢复）、
   `lastCoveredSequence` / `coveredPrefixDigest`（出生门，BD-013）。
@@ -117,7 +118,7 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
 |---|---|---|
 | 新增规则后 `catalog.test.mjs` 失败 | BD-003 | `EnforcerCatalog.validate` 或目录/叶子 |
 | 未知 tip 被接受 | BD-007 | `tryFindByField` 是否被改成 fuzzy |
-| 多调用选了「更严重」的 tip | BD-009 | `mergeCalls` 是否被加二级排序 |
+| 2+ `chronicle` 仍然提交/推进 coverage | BD-009 | raw cardinality gate 是否在 commit 前被绕过 |
 | 重复 ToolCallId 竟提交了 | BD-010 | `EnforcerCycleDecode` 身份校验 |
 | frame 与 coverage 不同步 | BD-012 | `EnforcerCycleCommit.commitCycle` 原子性 |
 | squash 后 tips 独立存活 | BD-016 | `EnforcementProjection.applySquash` / Fold 接线 |

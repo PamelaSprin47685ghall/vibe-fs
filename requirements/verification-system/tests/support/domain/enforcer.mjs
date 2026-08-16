@@ -364,7 +364,7 @@ export const enforcer = (() => {
     'hasValidText',
     'unknownTipError',
   ])
-  const cycle = bind(EnforcerCycleModule, 'EnforcerCycle', ['mergeCalls', 'isValidCycle'])
+  const cycle = bind(EnforcerCycleModule, 'EnforcerCycle', ['ofCall', 'isValidCycle'])
 
   // Explicit load: module import no longer reads package resources (0.5.3).
   const catalogRules = listItems(catalog.load())
@@ -428,43 +428,32 @@ export const enforcer = (() => {
       return codec.hasValidText(decoded)
     },
 
-    /**
-     * ENFORCER-042/025: multi-call merge → single CanonicalTip (first by PartOrdinal).
-     * `calls` is `[[ordinal, { text, tipField, evidence? }], ...]`.
-     */
-    mergeCalls: (calls) => {
-      const list = toList(
-        calls.map(([ordinal, call]) => {
-          const tipField = call.tipField ?? call.tip ?? call.Tip?.FieldName
-          const decoded = resultOf(
-            codec.decodeCall(
-              toList(catalogRules),
-              mapOf({
-                text: call.text ?? call.Text ?? '',
-                tip: tipField,
-                ...(call.evidence != null || call.Evidence != null
-                  ? { evidence: call.evidence ?? call.Evidence }
-                  : {}),
-              }),
-            ),
-          )
-          if (!decoded.ok) {
-            throw new Error(`mergeCalls fixture tip decode failed: ${decoded.error}`)
-          }
-          return [ordinal, decoded.value]
-        }),
+    canonicalCycle: (call) => {
+      const tipField = call.tipField ?? call.tip ?? call.Tip?.FieldName
+      const decoded = resultOf(
+        codec.decodeCall(
+          toList(catalogRules),
+          mapOf({
+            text: call.text ?? call.Text ?? '',
+            tip: tipField,
+            ...(call.evidence != null || call.Evidence != null
+              ? { evidence: call.evidence ?? call.Evidence }
+              : {}),
+          }),
+        ),
       )
-      const merged = cycle.mergeCalls(list)
-      const tip = {
-        ruleId: merged.CanonicalTip.RuleId,
-        fieldName: merged.CanonicalTip.FieldName,
-        lexicalOrder: merged.CanonicalTip.LexicalOrder,
+      if (!decoded.ok) {
+        throw new Error(`canonicalCycle fixture tip decode failed: ${decoded.error}`)
       }
+      const value = cycle.ofCall(decoded.value)
       return {
-        mergedText: merged.MergedText,
-        tip,
-        mergedEvidence: merged.MergedEvidence,
-        multiCall: merged.MultiCall,
+        mergedText: value.MergedText,
+        tip: {
+          ruleId: value.CanonicalTip.RuleId,
+          fieldName: value.CanonicalTip.FieldName,
+          lexicalOrder: value.CanonicalTip.LexicalOrder,
+        },
+        mergedEvidence: value.MergedEvidence,
       }
     },
     isValidCycle: (merged) => {

@@ -1,8 +1,8 @@
 // Split from tests/unit/enforcer/tip-v2-contract.test.mjs (cutover Wave 2a); owner: behavior-diagnosis.
 //
-// 12 tip-v2 contract items (ENFORCER-020..026, 030, 070/071, 170): BD-001 catalog
-// surface, BD-007 codec, BD-008 no score path, BD-009 PartOrdinal-first merge,
-// BD-014 RecentTips, BD-016 squash co-move. The delivery-half (ENFORCER_TIP_13/14)
+// tip-v2 contract items (ENFORCER-020..026, 030, 070/071, 170): BD-001 catalog
+// surface, BD-007 codec, BD-008 no score path, BD-014 RecentTips, BD-016 squash co-move.
+// The delivery-half (ENFORCER_TIP_13/14)
 // moved to guidance-delivery (tip-v2-delivery.test.mjs).
 //
 // Facade + resource contracts only (no Host). Items that need Host schema enum
@@ -278,19 +278,4 @@ test('ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
   assert.equal(tips[0].fieldName, f1)
   // Squash replaces oldest K frames in-place with one Squash frame at the front.
   assert.deepEqual(blog.frameKinds(s.Blog), ['Squash', 'Entry'])
-})
-
-// ── 15. multi-call canonical tip by PartOrdinal ─────────────────────────────
-
-test('ENFORCER_TIP_15_multi_call_canonical_tip_is_first_by_part_ordinal', () => {
-  const a = enforcer.fieldNames()[0]
-  const b = enforcer.fieldNames()[1]
-  const merged = enforcer.mergeCalls([
-    [2, { text: 'third', tipField: b }],
-    [0, { text: 'first', tipField: a }],
-    [1, { text: 'second', tipField: b }],
-  ])
-  assert.equal(merged.tip.fieldName, a)
-  assert.equal(merged.mergedText, 'first\n\nsecond\n\nthird')
-  assert.equal(merged.multiCall, true)
 })

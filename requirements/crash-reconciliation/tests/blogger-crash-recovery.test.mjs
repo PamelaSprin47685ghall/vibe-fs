@@ -122,6 +122,13 @@ test('C5_window_D_never_forces_parked_without_a_waiter', () => {
   )
 })
 
+test('C5_snapshot_tool_evidence_uses_latest_assistant_and_exactly_one_chronicle', () => {
+  assert.match(recoverySrc, /List\.rev/, 'recovery must judge the latest assistant, not stale historical tool calls')
+  assert.match(recoverySrc, /ToolParts/, 'recovery must preserve named tool identity')
+  assert.match(recoverySrc, /Array\.filter[^\n]*ToolName = "chronicle"/, 'raw chronicle cardinality must be counted')
+  assert.match(recoverySrc, /\[\| part \|\]/, 'only exact-one raw chronicle may prove completion')
+})
+
 test('C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
   // PR7 Slice 3: window windows use physical flight ownership.
   // Forbidden: match live.State / BloggerRuntimeState.InFlight as restore authority.

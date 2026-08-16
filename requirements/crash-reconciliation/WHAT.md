@@ -125,7 +125,10 @@ agent/title 冲突、多个匹配或查询失败 → fail closed。登记顺序�
 
 `BloggerCrashRecovery.reconcile` 对 open request 窗口分类（unsent / tool-present /
 in-flight），只从 durable 与 Host snapshot 判据得出 `WindowOutcome`；snapshot 不可读 →
-`Unreadable` → `SessionRecovery.Blocked`。恢复机会经 `HostTurnObserver` 观察，不自行发消息。
+`Unreadable` → `SessionRecovery.Blocked`。`tool-present` 只由 snapshot **最新 assistant** 的具名
+`SessionToolPart` 证明：raw `chronicle` 总数必须恰好 1，且该唯一 part 必须 `Completed`；历史旧
+chronicle、2+ raw chronicle、pending/failed/statusless 都不得把 open request 误判为已 recommit。
+恢复机会经 `HostTurnObserver` 观察，不自行发消息。
 
 ## CRASH-017：工具中断不恢复；未来 session 续传必须显式
 

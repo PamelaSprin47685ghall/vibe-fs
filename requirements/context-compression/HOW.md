@@ -54,8 +54,9 @@
   超过 park 前 XTrace head 的 material 仍属于同一连续 catch-up，必须立即进入下一 cycle。
 - 这条路径使用 F# CE `let!`/`match!` 直接表达等待与继续；不维护 Stage/PC，不构造 drain state machine，
   不扫描/重放 Journal。业务读取只用 canonical Integrator 已维护的 Current（DURABLE-EVENTS-019）。
-- quiet 不是直接 stop：在同一存活执行内必须先进入 parked wait。durable seal / cancel 与 park waiter
-  既有 physical lifetime 可解除等待；这些是既存终止/物理边界，不得被解释成“caught-up 已完成”的业务判据。
+- quiet 不是直接 stop：normal commit、idempotent receipt、stale catch-up、protocol-repair re-entry 必须汇合到
+  同一个 `ParkTransform` 边界。在同一存活执行内先 park，只有 durable seal / cancel 或 park waiter 既有
+  physical lifetime 才能解除等待；这些是既存终止/物理边界，不得被解释成“caught-up 已完成”的业务判据。
 - process death 直接中断旧 tool/continuation；普通 Host restart 不重新挂起这个 waiter、不 replay 旧 cycle、
   不补 terminal。跨进程语义完全服从 CRASH-017/018；显式 `/continue` 也不续跑旧 Blogger invocation。
 
