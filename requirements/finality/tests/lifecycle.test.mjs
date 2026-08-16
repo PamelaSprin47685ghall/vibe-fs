@@ -28,7 +28,7 @@ import {
   stream,
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
-import { lifeProjection } from './support/finality-contract.mjs'
+import * as finalitySurface from './support/finality-surface.mjs'
 
 const SESSION = sessionId('ses_a')
 const LIFE = managerLifeId('life-1')
@@ -219,9 +219,21 @@ test('WHAT[FINALITY-017] the second suicide is the rest: LifeCompleted archives 
   assert.equal(archived.ActiveFinality.Resolution.name, 'Blessed')
 })
 
-const ManagerLifecycleProjectionLike = {
-  empty: () => ({ CurrentLife: undefined, CompletedLives: [] }),
+// PR 6: isLifeArchived now answers against a FinalitySurface world — the JS
+// test expresses lifecycle history as events; the surface folds them through
+// production and answers the GLORY-070 primitive.
+const surfaceWorldOf = (events) => {
+  const out = finalitySurface.project(events)
+  assert.equal(out.ok, true, JSON.stringify(out.error))
+  return out.world
 }
+
+const S = 'ses_a'
+const baseEvents = (extra = []) => [
+  { kind: 'life-opened', sessionId: S, lifeId: 'life-1', openingUserMessageId: 'msg-open-1', openingTextRef: 'blob-1', openingTextDigest: 'd-1', openingCursorSequence: 1 },
+  { kind: 'work-activated', sessionId: S, lifeId: 'life-1', activationPromptKey: 'key-1', protectedPrefixEndSequence: 42 },
+  ...extra,
+]
 
 test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
   // GLORY-070: an idle earns encouragement for any Life state EXCEPT a completed
@@ -230,39 +242,33 @@ test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
   // (archived) and took the generic Manager idle branch. This is the pure
   // decision primitive: a Life is "done" only when it was archived by
   // LifeCompleted (CurrentLife cleared AND CompletedLives non-empty).
-  const archived = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityBlessed()),
-    lifecycleEnv(lifeCompleted()),
-  ])
-  assert.equal(archived.ok, true, JSON.stringify(archived.error))
-  assert.equal(lifeProjection.isLifeArchived(life(archived.value)), true)
+  const archived = surfaceWorldOf(
+    baseEvents([
+      { kind: 'finality-requested', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', lastWordsRef: 'blob-1', lastWordsDigest: 'd-1', providerRun: 'run-1', toolCallId: 'call-1' },
+      { kind: 'finality-reviewer-enlisted', sessionId: S, lifeId: 'life-1', requestId: 'req-1', reviewerSessionId: 'ses-reviewer', reviewerOrdinal: 1, barrierId: 'bar-1', gitTreeHash: 'tree-1', isNewReviewer: true },
+      { kind: 'finality-blessed', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', workRecordBundleRef: 'blob-1', workRecordBundleDigest: 'd-1' },
+      { kind: 'life-completed', sessionId: S, lifeId: 'life-1', requestId: 'req-1', terminalRef: 'blob-1', terminalDigest: 'd-1' },
+    ]),
+  )
+  assert.equal(finalitySurface.isLifeArchived(archived), true)
 
-  // A fresh session that never opened a Life is NOT done (CurrentLife None but
-  // CompletedLives empty) — it must keep working.
-  assert.equal(lifeProjection.isLifeArchived(ManagerLifecycleProjectionLike.empty()), false)
+  // A fresh session that never opened a Life is NOT done (no session history).
+  const fresh = surfaceWorldOf([])
+  assert.equal(finalitySurface.isLifeArchived(fresh), false)
 
   // An open / activated-but-unfinished Life is NOT done.
-  const open = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-  ])
-  assert.equal(open.ok, true, JSON.stringify(open.error))
-  assert.equal(lifeProjection.isLifeArchived(life(open.value)), false)
+  const open = surfaceWorldOf(baseEvents())
+  assert.equal(finalitySurface.isLifeArchived(open), false)
 
   // A blessed Life is still open until the second suicide (GLORY-061/062).
-  const blessed = fold.apply(fold.empty, [
-    lifecycleEnv(lifeOpened()),
-    lifecycleEnv(workActivated()),
-    lifecycleEnv(finalityRequested()),
-    lifecycleEnv(finalityReviewerEnlisted()),
-    lifecycleEnv(finalityBlessed()),
-  ])
-  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
-  assert.equal(lifeProjection.isLifeArchived(life(blessed.value)), false)
+  const blessed = surfaceWorldOf(
+    baseEvents([
+      { kind: 'finality-requested', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', lastWordsRef: 'blob-1', lastWordsDigest: 'd-1', providerRun: 'run-1', toolCallId: 'call-1' },
+      { kind: 'finality-reviewer-enlisted', sessionId: S, lifeId: 'life-1', requestId: 'req-1', reviewerSessionId: 'ses-reviewer', reviewerOrdinal: 1, barrierId: 'bar-1', gitTreeHash: 'tree-1', isNewReviewer: true },
+      { kind: 'finality-blessed', sessionId: S, lifeId: 'life-1', requestId: 'req-1', gitTreeHash: 'tree-1', workRecordBundleRef: 'blob-1', workRecordBundleDigest: 'd-1' },
+    ]),
+  )
+  assert.equal(finalitySurface.isLifeArchived(blessed), false)
 })
 
 test('WHAT[FINALITY-026] FinalityUndecided closes the request without a wound record', () => {
