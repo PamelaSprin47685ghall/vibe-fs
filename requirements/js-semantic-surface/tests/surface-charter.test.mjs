@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
 import { walk } from '../../../scripts/lib/walk.mjs'
-import { scanAll } from '../../../scripts/lib/test-surface-scan.mjs'
+import { scanAll, SURFACE_MANIFEST } from '../../../scripts/lib/test-surface-scan.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -101,6 +101,48 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry', 
       proof,
       new RegExp(`JS-SEMANTIC-SURFACE-${id}\\b`),
       `PROOF must carry a landing row for JS-SEMANTIC-SURFACE-${id}`,
+    )
+  }
+})
+
+// ── 003 manifest: 每个注册 surface 的 owner/laws/source 必须真实存在 ──────────
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_binds_law_owner_source', () => {
+  // PR 4 (TASK.md §10): registration is a manifest, not a string allowlist.
+  // The gate must mechanically prove: owner package exists, every law exists
+  // in that owner's WHAT.md, the production source file exists, and the
+  // surface is imported by its contract test.
+  const manifest = SURFACE_MANIFEST
+  assert.ok(manifest.length >= 2, `expected at least the two pilots registered, found ${manifest.length}`)
+
+  const requirementsRoot = join(ROOT, 'requirements')
+  const testFiles = walk(requirementsRoot, ['.test.mjs']).filter((f) => !f.includes('/e2e/') && !f.includes('/integration/'))
+  const allSources = testFiles.map((f) => readFileSync(f, 'utf8'))
+  const proof = read('requirements/js-semantic-surface/PROOF.md')
+
+  for (const entry of manifest) {
+    const label = entry.module
+    // Owner package must exist with a WHAT.md.
+    assert.ok(existsSync(join(requirementsRoot, entry.owner, 'WHAT.md')), `${label}: owner package ${entry.owner} must exist`)
+    const ownerWhat = readFileSync(join(requirementsRoot, entry.owner, 'WHAT.md'), 'utf8')
+    const ownerProof = readFileSync(join(requirementsRoot, entry.owner, 'PROOF.md'), 'utf8')
+    // Every governing law must exist in the owner's WHAT.md and have a
+    // landing row in the owner's PROOF.md.
+    for (const law of entry.laws) {
+      assert.match(ownerWhat, new RegExp(`^## ${law}[:：]`, 'm'), `${label}: law ${law} must exist in ${entry.owner} WHAT.md`)
+      assert.match(ownerProof, new RegExp(`${law}\\b`), `${label}: ${entry.owner} PROOF must carry a landing row for ${law}`)
+    }
+    // Production source must exist.
+    assert.ok(existsSync(join(ROOT, entry.source)), `${label}: production source ${entry.source} must exist`)
+    // Representation must be a declared kind.
+    assert.ok(['json', 'opaque-capability'].includes(entry.representation), `${label}: representation must be json or opaque-capability`)
+    assert.ok(['pure', 'resource'].includes(entry.kind), `${label}: kind must be pure or resource`)
+    // A contract test must import the surface.
+    const imported = allSources.some((src) => src.includes(`dist/${entry.module}`))
+    assert.equal(
+      imported,
+      true,
+      `${label}: no contract test imports it — registration without a contract test is a test-convenience entry, not a surface`,
     )
   }
 })
@@ -193,12 +235,9 @@ test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_cont
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_every_registered_surface_has_a_contract_test', () => {
   // A registered surface is a legal entry point ONLY because a contract test
   // pins it (JS-SEMANTIC-SURFACE-003: surface exists because a component owns
-  // a contract, never because a test wants access). Every entry in the scanner
-  // allowlist must be imported by at least one semantic test file.
-  const scannerSource = read('scripts/lib/test-surface-scan.mjs')
-  const block = scannerSource.match(/SURFACE_MODULES = \[[\s\S]*?\]/)
-  assert.ok(block, 'scanner must declare SURFACE_MODULES')
-  const registered = [...block[0].matchAll(/'([^']+\.js)'/g)].map((m) => m[1])
+  // a contract, never because a test wants access). Every manifest entry must
+  // be imported by at least one semantic test file.
+  const registered = SURFACE_MANIFEST.map((entry) => entry.module)
   assert.ok(registered.length >= 2, `expected the two pilots registered, found ${registered.length}`)
 
   const testsRoot = join(ROOT, 'requirements')
@@ -221,18 +260,14 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002b_registered_surfaces_exist_in
   // Wanxiangshu.fsproj. A bogus entry is a silent debt exemption.
   // (The check is intentionally a file-path match, not a module-name match:
   // ToolResultBound.js legitimately lives in the Host.Contract module.)
-  const scannerSource = read('scripts/lib/test-surface-scan.mjs')
-  const block = scannerSource.match(/SURFACE_MODULES = \[[\s\S]*?\]/)
-  const registered = [...block[0].matchAll(/'([^']+\.js)'/g)].map((m) => m[1])
-
   const fsproj = read('src/Wanxiangshu/Wanxiangshu.fsproj')
 
-  for (const modulePath of registered) {
-    const stem = modulePath.replace(/\.js$/, '')
+  for (const entry of SURFACE_MANIFEST) {
+    const stem = entry.module.replace(/\.js$/, '')
     const exact = `<Compile Include="${stem}.fs"/>`
     assert.ok(
       fsproj.includes(exact),
-      `registered surface ${modulePath} has no <Compile Include="${stem}.fs"/> in Wanxiangshu.fsproj — allowlist entry must name a real surface module`,
+      `registered surface ${entry.module} has no <Compile Include="${stem}.fs"/> in Wanxiangshu.fsproj — allowlist entry must name a real surface module`,
     )
   }
 })

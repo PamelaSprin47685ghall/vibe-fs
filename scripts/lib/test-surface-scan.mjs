@@ -47,22 +47,77 @@ export const BUILD_VERIFICATION_FILES = new Set([
 ])
 
 /**
- * Registered semantic-surface modules (JS-SEMANTIC-SURFACE-002/003).
+ * Registered semantic-surface manifest (JS-SEMANTIC-SURFACE-002/003).
  *
  * A semantic test may import a registered surface directly: the surface IS the
  * legal entry point (owner boundary translation, JSON-shaped in/out). Deep
  * imports of any other dist module remain debt. Register here when a surface
- * is established (P3 pilot: ForkChildPayloadSurface).
+ * is established — registration requires the full manifest below (owner
+ * package, governing laws, production source, representation, kind), so a
+ * surface exists because a semantic component owns a contract, never because
+ * a test wants access (TASK.md §9/§10, PR 4).
  */
-export const SURFACE_MODULES = [
-  'Context/Companion/Blogger/TomlSurface.js',
-  'Execution/Delegation/DelegatedToolEstimateSurface.js',
-  'Execution/Delegation/Fork/Surface.js',
-  'Foundation/RolesSurface.js',
-  'Foundation/SyntheticTomlSurface.js',
-  'Host/Contract/ToolResultBound.js',
-  'OpenCode/Host/QuiescenceSurface.js',
+export const SURFACE_MANIFEST = [
+  {
+    module: 'Context/Companion/Blogger/TomlSurface.js',
+    owner: 'provider-projection',
+    laws: ['PROVIDER-PROJECTION-009'],
+    source: 'src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Execution/Delegation/DelegatedToolEstimateSurface.js',
+    owner: 'delegation',
+    laws: ['DELEG-022'],
+    source: 'src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Execution/Delegation/Fork/Surface.js',
+    owner: 'delegation',
+    laws: ['DELEG-019'],
+    source: 'src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Foundation/RolesSurface.js',
+    owner: 'capability-enforcement',
+    laws: ['ENF-002'],
+    source: 'src/Wanxiangshu/Foundation/RolesSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Foundation/SyntheticTomlSurface.js',
+    owner: 'provider-projection',
+    laws: ['PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-010', 'PROVIDER-PROJECTION-012'],
+    source: 'src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Host/Contract/ToolResultBound.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-015'],
+    source: 'src/Wanxiangshu/Host/Contract/ToolResultBound.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'OpenCode/Host/QuiescenceSurface.js',
+    owner: 'crash-reconciliation',
+    laws: ['CRASH-001', 'CRASH-006', 'CRASH-008'],
+    source: 'src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
 ]
+
+/** Flat module-path allowlist derived from the manifest (scanner regex input). */
+export const SURFACE_MODULES = SURFACE_MANIFEST.map((entry) => entry.module)
 
 const SURFACE_ALT = SURFACE_MODULES.map((m) => m.replace(/[.]/g, '\\.')).join('|')
 
