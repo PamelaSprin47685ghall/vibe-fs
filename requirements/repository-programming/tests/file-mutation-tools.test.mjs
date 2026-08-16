@@ -43,7 +43,7 @@ const parseTomlFields = (text) =>
 
 const isDirectory = (path) => existsSync(path) && statSync(path).isDirectory()
 
-test('FILEMUT_specs_carry_names_descriptions_and_arguments', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_specs_carry_names_descriptions_and_arguments', () => {
   const mv = mvSpec(factory)
   const rm = rmSpec(factory)
   assert.equal(mv.Name, 'mv')
@@ -60,7 +60,7 @@ test('FILEMUT_specs_carry_names_descriptions_and_arguments', () => {
   )
 })
 
-test('FILEMUT_mv_moves_a_file', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_moves_a_file', async () => {
   const { dir, cleanup } = sandbox()
   const source = join(dir, 'alpha.txt')
   const destination = join(dir, 'beta.txt')
@@ -77,7 +77,7 @@ test('FILEMUT_mv_moves_a_file', async () => {
   cleanup()
 })
 
-test('FILEMUT_mv_renames_a_directory_with_contents', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_renames_a_directory_with_contents', async () => {
   const { dir, cleanup } = sandbox()
   const source = join(dir, 'old-dir')
   const destination = join(dir, 'new-dir')
@@ -95,7 +95,7 @@ test('FILEMUT_mv_renames_a_directory_with_contents', async () => {
   cleanup()
 })
 
-test('FILEMUT_mv_missing_source_returns_error', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_missing_source_returns_error', async () => {
   const { dir, cleanup } = sandbox()
   const result = await mvSpec(factory).Execute(
     makeArgs({ source: join(dir, 'nope.txt'), destination: join(dir, 'x.txt') }),
@@ -106,7 +106,7 @@ test('FILEMUT_mv_missing_source_returns_error', async () => {
   cleanup()
 })
 
-test('FILEMUT_mv_requires_source_and_destination', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_requires_source_and_destination', async () => {
   const { dir, cleanup } = sandbox()
   const spec = mvSpec(factory)
 
@@ -121,7 +121,7 @@ test('FILEMUT_mv_requires_source_and_destination', async () => {
   cleanup()
 })
 
-test('FILEMUT_rm_removes_a_file', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_removes_a_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'trash.txt')
   writeFileSync(path, 'payload')
@@ -133,7 +133,7 @@ test('FILEMUT_rm_removes_a_file', async () => {
   cleanup()
 })
 
-test('FILEMUT_rm_removes_an_empty_directory', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_removes_an_empty_directory', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'empty-dir')
   mkdirSync(path)
@@ -145,7 +145,7 @@ test('FILEMUT_rm_removes_an_empty_directory', async () => {
   cleanup()
 })
 
-test('FILEMUT_rm_refuses_a_non_empty_directory', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_refuses_a_non_empty_directory', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'non-empty-dir')
   mkdirSync(path)
@@ -160,7 +160,7 @@ test('FILEMUT_rm_refuses_a_non_empty_directory', async () => {
   cleanup()
 })
 
-test('FILEMUT_rm_missing_path_returns_error', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_missing_path_returns_error', async () => {
   const { dir, cleanup } = sandbox()
   const result = await rmSpec(factory).Execute(
     makeArgs({ path: join(dir, 'nope.txt') }),
@@ -170,14 +170,14 @@ test('FILEMUT_rm_missing_path_returns_error', async () => {
   cleanup()
 })
 
-test('FILEMUT_rm_requires_a_path', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_rm_requires_a_path', async () => {
   const { dir, cleanup } = sandbox()
   const result = await rmSpec(factory).Execute(makeArgs({}), context('ses-rm-req'))
   assert.match(result, /path is required/)
   cleanup()
 })
 
-test('FILEMUT_mv_rename_failure_surfaces_os_message', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-020] FILEMUT_mv_rename_failure_surfaces_os_message', async () => {
   const { dir, cleanup } = sandbox()
   const source = join(dir, 'a.txt')
   writeFileSync(source, 'payload')

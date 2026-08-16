@@ -23,18 +23,34 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 const LOCALES = ['en', 'zh-CN']
 
+/** Gate C high-risk minimum set (ARCH-016): every name must be anchored. */
+const HIGH_RISK_TOOLS = Object.freeze([
+  'commission',
+  'establish-behavior',
+  'fork',
+  'inspect',
+  'query-shell',
+  'repair-behavior',
+  'run',
+])
+
 const readTool = (tool, locale) => read(`resources/provider/tool/${tool}/description/${locale}.md`)
 
 test('WHAT[ACTION-AFFORDANCE-002] AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog', () => {
-  assert.deepEqual(
-    Object.keys(TOOL_DESCRIPTION_ANCHORS).sort(),
-    ['commission', 'establish-behavior', 'fork', 'inspect', 'query-shell', 'repair-behavior', 'run'].sort(),
-    'Gate C high-risk minimum set must be anchored',
+  for (const tool of HIGH_RISK_TOOLS) {
+    assert.ok(tool in TOOL_DESCRIPTION_ANCHORS, `Gate C high-risk minimum set must include ${tool}`)
+  }
+  assert.equal(
+    Object.getOwnPropertyNames(TOOL_DESCRIPTION_ANCHORS).length,
+    HIGH_RISK_TOOLS.length,
+    'Gate C anchor catalog must contain exactly the high-risk minimum set',
   )
 })
 
 test('WHAT[ACTION-AFFORDANCE-001] AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales', () => {
-  for (const [tool, anchors] of Object.entries(TOOL_DESCRIPTION_ANCHORS)) {
+  for (const tool of HIGH_RISK_TOOLS) {
+    const anchors = TOOL_DESCRIPTION_ANCHORS[tool]
+    assert.ok(Array.isArray(anchors) && anchors.length > 0, `${tool} must carry at least one anchor`)
     for (const locale of LOCALES) {
       const text = readTool(tool, locale)
       for (const { id, en, zh } of anchors) {

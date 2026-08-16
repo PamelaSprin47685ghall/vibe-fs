@@ -13,7 +13,9 @@ import {
   BuiltinToolDescriptionHook_validateRecommendation as validateRecommendation,
   BuiltinToolDescriptionHook_BuiltinFilesystemTools as builtinTools,
   JsDescriptionAssets_load as loadJsProse,
+  JsToolSpec_create as createSpec,
 } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
+import { ToolHostCodec_factory as codecFactory, ToolHostCodec_register as codecRegister } from '../../../dist/OpenCode/Codec/ToolHostCodec.js'
 import { JsToolGenerator_generate as generate } from '../../../dist/Repository/Programming/Js/Surface.js'
 import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
 import { ToolPermission } from '../../../dist/Foundation/Roles.js'
@@ -32,7 +34,7 @@ const coderCaps = FsSet.ofArray(
   permissionComparer,
 )
 
-test('JS003_builtin_fallback_descriptions_are_left_untouched', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_builtin_fallback_descriptions_are_left_untouched', () => {
   assert.deepEqual([...builtinTools].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
   for (const name of builtinTools) {
     const original = `${name} primitive fallback`
@@ -43,20 +45,18 @@ test('JS003_builtin_fallback_descriptions_are_left_untouched', () => {
   assert.equal(annotate('join', 'Join a session', 'js-coder'), 'Join a session')
 })
 
-test('JS003_hook_must_not_recommend_invisible_tools', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS003_hook_must_not_recommend_invisible_tools', () => {
   assert.equal(resultOf(validateRecommendation('js-coder', stringSet(['js-coder', 'read']))).ok, true)
   const denied = resultOf(validateRecommendation('js-coder', stringSet(['read'])))
   assert.equal(denied.ok, false)
   assert.equal(denied.error.includes('not provider-visible'), true)
 })
 
-test('JS073_spec_executes_program_and_renders_result', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-005] JS073_spec_carries_generated_name_and_honest_description', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const surface = generate('Coder', coderCaps, jsProse())
     // Build the spec with the real Host tool factory, like ToolRegistry does.
-    const codec = await import('../../../dist/OpenCode/Codec/ToolHostCodec.js')
     const tool = (definition) => definition
     tool.schema = {
       string: () => ({
@@ -64,15 +64,35 @@ test('JS073_spec_executes_program_and_renders_result', async () => {
         describe: (description) => ({ type: 'string', description }),
       }),
     }
-    const factory = codec.ToolHostCodec_factory({ tool })
-    const { JsToolSpec_create: create } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js')
-    const spec = create(factory, surface, dir, undefined)
-    const registered = codec.ToolHostCodec_register(factory, spec)
+    const factory = codecFactory({ tool })
+    const spec = createSpec(factory, surface, dir, undefined)
+    const registered = codecRegister(factory, spec)
 
     assert.equal(spec.Name, 'js-coder')
     assert.equal(spec.Description.includes('class JsProgram'), true)
     assert.equal(spec.Description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
     assert.equal(spec.Description.includes('_api'), false)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-016] JS073_spec_executes_program_and_renders_result', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const surface = generate('Coder', coderCaps, jsProse())
+    // Build the spec with the real Host tool factory, like ToolRegistry does.
+    const tool = (definition) => definition
+    tool.schema = {
+      string: () => ({
+        type: 'string',
+        describe: (description) => ({ type: 'string', description }),
+      }),
+    }
+    const factory = codecFactory({ tool })
+    const spec = createSpec(factory, surface, dir, undefined)
+    const registered = codecRegister(factory, spec)
 
     const program = `class Js extends JsProgram {
   async run() {

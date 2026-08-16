@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { roles } from '../../verification-system/tests/support/domain.mjs'
 import { permissions } from '../../../dist/Foundation/RolesSurface.js'
-import { ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
+import { ROLE_ANCHOR_DIRS, ROLE_SEMANTIC_ANCHORS } from '../../../scripts/checks/semantic-anchors.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const rolePath = (role, locale) => join(root, 'resources/provider/role', role, locale)
@@ -22,18 +22,18 @@ const rolePath = (role, locale) => join(root, 'resources/provider/role', role, l
 const readRole = (role, locale) => readFileSync(rolePath(role, locale), 'utf8')
 
 test('WHAT[COGNITIVE-ENVIRONMENT-002] PROMPT_depth_EN_role_laws_carry_cognition_anchors', () => {
-  for (const [role, anchors] of Object.entries(ROLE_SEMANTIC_ANCHORS)) {
+  for (const role of ROLE_ANCHOR_DIRS) {
     const text = readRole(role, 'en.md')
-    for (const { id, en } of anchors) {
+    for (const { id, en } of ROLE_SEMANTIC_ANCHORS[role]) {
       assert.match(text, en, `${role}/en.md missing semantic anchor: ${id}`)
     }
   }
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-002] PROMPT_depth_ZH_role_laws_carry_matching_cognition_anchors', () => {
-  for (const [role, anchors] of Object.entries(ROLE_SEMANTIC_ANCHORS)) {
+  for (const role of ROLE_ANCHOR_DIRS) {
     const text = readRole(role, 'zh-CN.md')
-    for (const { id, zh } of anchors) {
+    for (const { id, zh } of ROLE_SEMANTIC_ANCHORS[role]) {
       assert.match(text, zh, `${role}/zh-CN.md missing semantic anchor: ${id}`)
     }
   }
@@ -56,7 +56,7 @@ test('WHAT[COGNITIVE-ENVIRONMENT-012] PROMPT_depth_Inquiry_Sphinx_capability_req
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-012] PROMPT_depth_no_universal_closing_report_schema_in_role_laws', () => {
-  for (const role of Object.keys(ROLE_SEMANTIC_ANCHORS)) {
+  for (const role of ROLE_ANCHOR_DIRS) {
     const en = readRole(role, 'en.md')
     assert.doesNotMatch(
       en,

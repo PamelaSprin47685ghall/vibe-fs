@@ -11,7 +11,7 @@ const call = (id, name, args) => new MessagePart(2, [id, name, args])
 const result = (id, value) => new MessagePart(3, [id, value])
 const activity = (kind) => new MessagePart(4, [kind])
 
-test('STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping', () => {
+test('WHAT[SPEC-INV-007] STRENGTH_007_provider_output_evidence_is_not_host_bookkeeping', () => {
   assert.equal(caseOf(Evidence.classifyParts([])), 'NoOutput')
   assert.equal(caseOf(Evidence.classifyParts([activity('step-start')])), 'TransportOnly')
   assert.equal(caseOf(Evidence.classifyParts([result('c1', 'result')])), 'TransportOnly')

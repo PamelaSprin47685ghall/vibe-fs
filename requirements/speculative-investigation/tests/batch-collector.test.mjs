@@ -11,7 +11,7 @@ const result = (id, body) => new Provider.WirePart(3, [Id.ToolCallIdModule_creat
 const text = (body) => new Provider.WirePart(0, [body])
 const msg = (role, parts) => ({ Role: role, Parts: toList(parts) })
 
-test('STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order', () => {
+test('WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order', () => {
   const messages = toList([
     msg('user', [text('root')]),
     msg('assistant', [call('c1', 'read', '{"a":1}'), call('c2', 'grep', '{"b":2}')]),
@@ -28,7 +28,7 @@ test('STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurre
   assert.equal(batches[1].RequestOrdinal, 2)
 })
 
-test('STRENGTH_005_incomplete_batch_and_results_after_next_provider_message_are_not_collected', () => {
+test('WHAT[SPEC-INV-003] STRENGTH_005_incomplete_batch_and_results_after_next_provider_message_are_not_collected', () => {
   const incomplete = toList([
     msg('assistant', [call('c1', 'read', '{}'), call('c2', 'grep', '{}')]),
     msg('tool', [result('c1', 'one')]),

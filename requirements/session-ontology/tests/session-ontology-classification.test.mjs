@@ -13,6 +13,7 @@ import test from 'node:test'
 import {
   attachmentKind,
   caseOf,
+  idValue,
   sessionAssociation,
   sessionExecutionClass,
   sessionId,
@@ -59,7 +60,7 @@ const classify = (session, current) => {
   }
 }
 
-test('HOST_008_orthogonal_execution_class_and_ownership_are_derived_from_the_durable_link', () => {
+test('WHAT[SESSION-ONTOLOGY-001] HOST_008_orthogonal_execution_class_and_ownership_are_derived_from_the_durable_link', () => {
   const { main, blogger, current } = linkedPair()
 
   const mainView = classify(main, current)
@@ -69,12 +70,30 @@ test('HOST_008_orthogonal_execution_class_and_ownership_are_derived_from_the_dur
   const bloggerView = classify(blogger, current)
   assert.equal(bloggerView.executionClass, 'InternalLeaf')
   assert.equal(bloggerView.ownership, 'Attached')
+})
+
+test('WHAT[SESSION-ONTOLOGY-004] HOST_008_a_companion_is_internal_leaf_attached_with_owner_and_kind', () => {
+  const { blogger, current } = linkedPair()
+
+  const bloggerView = classify(blogger, current)
+  assert.equal(bloggerView.executionClass, 'InternalLeaf')
+  assert.equal(bloggerView.ownership, 'Attached')
   // Attached(ownerSessionId, AttachmentKind): owner is the work session.
   assert.equal(bloggerView.ownershipFields[0].fields[0], 'ses_main')
   assert.equal(caseOf(bloggerView.ownershipFields[1]), 'Companion')
 })
 
-test('HOST_008_executionClassOf_maps_durable_kind_without_inventing_ownership', () => {
+test('WHAT[SESSION-ONTOLOGY-002] HOST_008_attached_ownership_carries_exactly_one_owner_and_one_kind', () => {
+  const { blogger, current } = linkedPair()
+
+  const bloggerView = classify(blogger, current)
+  // Attached(ownerSessionId, AttachmentKind): exactly one owner, exactly one kind.
+  assert.equal(bloggerView.ownership, 'Attached')
+  assert.equal(idValue.session(bloggerView.ownershipFields[0]), 'ses_main')
+  assert.equal(bloggerView.ownershipFields[1].name, 'Companion')
+})
+
+test('WHAT[SESSION-ONTOLOGY-007] HOST_008_executionClassOf_maps_durable_kind_without_inventing_ownership', () => {
   const { main, blogger, current } = linkedPair()
   const mainEntry = tryFind(main, current)
   const bloggerEntry = tryFind(blogger, current)
@@ -92,7 +111,7 @@ test('HOST_008_executionClassOf_maps_durable_kind_without_inventing_ownership', 
   assert.equal(caseOf(mainOwnership), 'Root')
 })
 
-test('EXEC_026_dedicated_sync_inspector_and_coder_are_work_plus_attached', () => {
+test('WHAT[SESSION-ONTOLOGY-003] EXEC_026_dedicated_sync_inspector_and_coder_are_work_plus_attached', () => {
   assert.equal(caseOf(dedicatedExecutionClass), 'Work')
 
   const inspector = dedicatedOwnership(sessionId('ses_owner'), syncDelegate.role('Inspector'))
@@ -108,21 +127,23 @@ test('EXEC_026_dedicated_sync_inspector_and_coder_are_work_plus_attached', () =>
   assert.equal(caseOf(syncDelegate.delegateRoleToAttachment(syncDelegate.role('Coder'))), 'SyncCoder')
 })
 
-test('HOST_008_strength_replica_is_universal_internal_leaf_attachment_never_satellite_kind', () => {
+test('WHAT[SESSION-ONTOLOGY-004] HOST_008_strength_replica_is_universal_internal_leaf_attachment', () => {
   assert.equal(caseOf(strengthExecutionClass), 'InternalLeaf')
 
   const replica = strengthOwnership(sessionId('ses_owner'))
   assert.equal(caseOf(replica), 'Attached')
   assert.equal(replica.fields[0].fields[0], 'ses_owner')
   assert.equal(caseOf(replica.fields[1]), 'StrengthReplica')
+})
 
+test('WHAT[SESSION-ONTOLOGY-011] HOST_008_strength_replica_is_never_a_satellite_kind', () => {
   assert.equal(isStrengthReplicaAttachment(AttachmentKind.StrengthReplica), true)
   assert.equal(isStrengthReplicaAttachment(attachmentKind.companion()), false)
   assert.equal(isStrengthReplicaAttachment(attachmentKind.syncInspector()), false)
   assert.equal(isStrengthReplicaAttachment(attachmentKind.bookkeeper('tx-1')), false)
 })
 
-test('HOST_008_root_and_attached_helpers_agree_with_the_type_model', () => {
+test('WHAT[SESSION-ONTOLOGY-002] HOST_008_root_and_attached_helpers_agree_with_the_type_model', () => {
   const root = sessionOwnership.root()
   assert.equal(caseOf(root), 'Root')
   assert.equal(sessionOwnership.tryOwner(root), undefined)
@@ -132,14 +153,16 @@ test('HOST_008_root_and_attached_helpers_agree_with_the_type_model', () => {
   assert.equal(caseOf(attached), 'Attached')
   assert.equal(sessionOwnership.tryOwner(attached).fields[0], 'ses_o')
   assert.equal(caseOf(sessionOwnership.attachmentKind(attached)), 'SyncCoder')
+})
 
+test('WHAT[SESSION-ONTOLOGY-001] HOST_008_execution_class_predicates_distinguish_work_from_internal_leaf', () => {
   assert.equal(sessionExecutionClass.isWork(sessionExecutionClass.of('Work')), true)
   assert.equal(sessionExecutionClass.isInternalLeaf(sessionExecutionClass.of('Work')), false)
   assert.equal(sessionExecutionClass.isWork(sessionExecutionClass.of('InternalLeaf')), false)
   assert.equal(sessionExecutionClass.isInternalLeaf(sessionExecutionClass.of('InternalLeaf')), true)
 })
 
-test('HOST_008_canonical_durable_role_label_is_stable_via_catalog_not_du_name', () => {
+test('WHAT[SESSION-ONTOLOGY-013] HOST_008_canonical_durable_role_label_is_stable_via_catalog_not_du_name', () => {
   assert.equal(roleName(Role.Manager), 'manager')
   assert.equal(roleName(Role.Coder), 'coder')
   assert.equal(roleName(Role.Orchestrator), 'orchestrator')

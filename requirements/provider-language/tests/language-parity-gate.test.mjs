@@ -21,6 +21,8 @@ import {
   scanPlaceholderParity,
   scanProviderResourcesHook,
   scanRepo,
+  scanSemanticAnchorCatalog,
+  scanSemanticAnchorParity,
 } from '../../../scripts/checks/language-parity-gate.mjs'
 
 const GOOD_HOOK = `
@@ -47,45 +49,45 @@ const makeProviderFixture = () => {
   }
 }
 
-test('gate_c_documents_locale_leaves', () => {
+test('WHAT[PROVIDER-LANGUAGE-006] locale leaves are en.md and zh-CN.md under the provider root', () => {
   assert.deepEqual(LOCALE_FILES, ['en.md', 'zh-CN.md'])
   assert.equal(PROVIDER_ROOT, 'resources/provider')
 })
 
-test('gate_c_parity_detects_missing_zh_cn', () => {
+test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing zh-CN leaf', () => {
   const providerAbs = '/tmp/provider'
   const violations = scanParity(['role/manager'], providerAbs)
   assert.ok(violations.some((v) => v.code === 'missing-en' || v.code === 'missing-zh-cn'))
 })
 
-test('gate_c_parity_detects_missing_en', () => {
+test('WHAT[PROVIDER-LANGUAGE-006] parity detects missing en leaf in the real tree', () => {
   const violations = scanParity(['role/manager'], resolve(process.cwd(), PROVIDER_ROOT))
   assert.equal(violations.length, 0)
 })
 
-test('gate_c_provider_resources_hook_required', () => {
+test('WHAT[PROVIDER-LANGUAGE-006] ProviderResources hook must require the language pair', () => {
   assert.equal(scanProviderResourcesHook(GOOD_HOOK).length, 0)
   assert.ok(scanProviderResourcesHook('module ProviderResources = let x = 1').some((v) => v.code === 'missing-require-language-pair'))
 })
 
-test('gate_c_repo_lists_role_semantic_dirs', () => {
+test('WHAT[PROVIDER-LANGUAGE-010] repo lists role semantic dirs for the catalog', () => {
   const root = resolve(process.cwd())
   const semanticDirs = listSemanticResourceDirs(resolve(root, PROVIDER_ROOT))
   assert.ok(semanticDirs.includes('role/manager'))
   assert.ok(semanticDirs.includes('role/coder'))
 })
 
-test('gate_c_repo_scan_is_green', () => {
+test('WHAT[PROVIDER-LANGUAGE-008] repo scan is green across every semantic surface', () => {
   const result = scanRepo()
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 
-test('ac20_extract_code_spans_skips_fenced_blocks', () => {
+test('WHAT[PROVIDER-LANGUAGE-011] code span extraction skips fenced blocks', () => {
   const text = 'Use `exit_code`.\n\n```\ntranslated_should_ignore\n```\nAlso `deadline_seconds`.'
   assert.deepEqual([...extractCodeSpans(text)].sort(), ['deadline_seconds', 'exit_code'])
 })
 
-test('ac20_identifier_parity_equal_spans_pass', () => {
+test('WHAT[PROVIDER-LANGUAGE-011] identifier parity passes when both locales keep the same spans', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -100,7 +102,7 @@ test('ac20_identifier_parity_equal_spans_pass', () => {
   }
 })
 
-test('ac20_identifier_parity_mismatch_reports_semantic_and_diff', () => {
+test('WHAT[PROVIDER-LANGUAGE-011] identifier parity mismatch reports semantic and diff', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -119,7 +121,7 @@ test('ac20_identifier_parity_mismatch_reports_semantic_and_diff', () => {
   }
 })
 
-test('ac20_tip_and_tool_catalog_hits_must_match', () => {
+test('WHAT[PROVIDER-LANGUAGE-011] tip and tool catalog hits must match across locales', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair(
@@ -148,7 +150,7 @@ test('ac20_tip_and_tool_catalog_hits_must_match', () => {
   }
 })
 
-test('ac20_extract_protocol_identifiers_unions_sources', () => {
+test('WHAT[PROVIDER-LANGUAGE-011] protocol identifier extraction unions sources', () => {
   const ids = extractProtocolIdentifiers('See `exit_code` then blind-edit via open-terminal.', {
     tipIdentities: ['blind-edit'],
     toolNames: ['open-terminal'],
@@ -156,7 +158,7 @@ test('ac20_extract_protocol_identifiers_unions_sources', () => {
   assert.deepEqual([...ids].sort(), ['blind-edit', 'exit_code', 'open-terminal'])
 })
 
-test('gate_c_placeholder_parity_equal_sets_pass', () => {
+test('WHAT[PROVIDER-LANGUAGE-007] placeholder parity passes on equal sets', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair('tool/demo', '{{byname}} has returned.', '{{byname}} 已经回来了。')
@@ -166,7 +168,7 @@ test('gate_c_placeholder_parity_equal_sets_pass', () => {
   }
 })
 
-test('gate_c_placeholder_parity_mismatch_reports_diff', () => {
+test('WHAT[PROVIDER-LANGUAGE-007] placeholder parity mismatch reports diff', () => {
   const fx = makeProviderFixture()
   try {
     fx.writePair('tool/demo', '{{byname}} carries {{charge}}.', '{{byname}} 承担托付。')
@@ -180,10 +182,47 @@ test('gate_c_placeholder_parity_mismatch_reports_diff', () => {
   }
 })
 
-test('gate_c_extract_placeholders', () => {
+test('WHAT[PROVIDER-LANGUAGE-007] placeholder extraction dedupes and skips plain text', () => {
   assert.deepEqual([...extractPlaceholders('{{byname}} / {{charge}} / {{byname}}')].sort(), [
     'byname',
     'charge',
   ])
   assert.deepEqual([...extractPlaceholders('no holes')].sort(), [])
+})
+
+test('WHAT[PROVIDER-LANGUAGE-010] semantic anchor parity detects missing zh id', () => {
+  const fx = makeProviderFixture()
+  try {
+    const catalog = {
+      manager: [{ id: 'arms-length-planning', en: /arm'?s[- ]length/i, zh: /一臂之距/ }],
+    }
+    fx.writePair('role/manager', "Arm's-length planning governs.", '一臂之距 规划。')
+    assert.deepEqual(scanSemanticAnchorParity(fx.providerAbs, catalog), [])
+
+    fx.writePair('role/manager', "Arm's-length planning governs.", '规划由依赖证明其正当。')
+    const red = scanSemanticAnchorParity(fx.providerAbs, catalog)
+    assert.equal(red.length, 1)
+    assert.equal(red[0].code, 'semantic-anchor')
+    assert.equal(red[0].path, 'resources/provider/role/manager/zh-CN.md')
+    assert.match(red[0].detail ?? '', /missing arms-length-planning/)
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('WHAT[PROVIDER-LANGUAGE-010] every role law directory must appear in the catalog', () => {
+  const fx = makeProviderFixture()
+  try {
+    fx.writePair('role/manager', 'x', 'y')
+    fx.writePair('role/uncatalogued', 'x', 'y')
+    const violations = scanSemanticAnchorCatalog(
+      ['role/manager', 'role/uncatalogued', 'tool/demo'],
+      { manager: [] },
+    )
+    assert.equal(violations.length, 1)
+    assert.equal(violations[0].code, 'semantic-anchor-catalog')
+    assert.equal(violations[0].path, 'resources/provider/role/uncatalogued')
+  } finally {
+    fx.dispose()
+  }
 })

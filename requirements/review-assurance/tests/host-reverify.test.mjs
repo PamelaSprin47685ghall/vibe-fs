@@ -25,7 +25,7 @@ import {
   liveOrchestrator,
 } from '../../verification-system/tests/support/orchestrator-host-harness.mjs'
 
-test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
+test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async () => {
   let live
   let barrierVisibleAtSend = false
   let reviewPrompt = ''
@@ -61,7 +61,7 @@ test('HOST_reverify_durably_opens_barrier_before_first_reviewer_prompt', async (
   }
 })
 
-test('HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal', async () => {
+test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal', async () => {
   const live = await liveOrchestrator({ journal: false })
   const worktree = gitDir('rvf')
   try {

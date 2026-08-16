@@ -15,12 +15,17 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   companionPrompt,
+  FsList,
   listItems,
   prefixEpochProjection as prefix,
   projectionAlgebra,
   projectionConstants,
   projectionIntent,
   projectionSnapshot,
+  ProjectionIntentModule,
+  ProjectionPlannerModule,
+  ProjectionRendererModule,
+  ProviderProj,
   providerProjection,
   reviewChallenge,
   toList,
@@ -36,7 +41,7 @@ const activation = (overrides = {}) => ({
 
 // ── PROJ-006: fail-closed conflicts, order-independent ─────────────────────
 
-test('PROJ_006_prefix_intents_are_mutually_exclusive_at_the_same_anchor', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_006_prefix_intents_are_mutually_exclusive_at_the_same_anchor', () => {
   const keep = projectionIntent.keepPhysicalPrefix
   const activate = projectionIntent.activatePrefixEpoch(activation())
 
@@ -55,7 +60,7 @@ test('PROJ_006_prefix_intents_are_mutually_exclusive_at_the_same_anchor', () => 
   assert.equal(reversed.second, 'KeepPhysicalPrefix')
 })
 
-test('PROJ_006_two_activations_of_the_same_anchor_are_a_conflict', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_006_two_activations_of_the_same_anchor_are_a_conflict', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.activatePrefixEpoch(activation({ DropLeading: 1 })),
     projectionIntent.activatePrefixEpoch(activation({ DropLeading: 3 })),
@@ -65,7 +70,7 @@ test('PROJ_006_two_activations_of_the_same_anchor_are_a_conflict', () => {
   assert.equal(result.conflict, 'ConflictingPrefixSelection')
 })
 
-test('PROJ_006_a_single_intent_or_none_plans_cleanly', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_006_a_single_intent_or_none_plans_cleanly', () => {
   const keep = projectionIntent.keepPhysicalPrefix
   const activate = projectionIntent.activatePrefixEpoch(activation())
 
@@ -76,7 +81,7 @@ test('PROJ_006_a_single_intent_or_none_plans_cleanly', () => {
 
 // ── PROJ-004: the canonical renderer ───────────────────────────────────────
 
-test('PROJ_004_renderer_maps_intents_to_writeback_instructions', () => {
+test('WHAT[PROVIDER-PROJECTION-001] PROJ_004_renderer_maps_intents_to_writeback_instructions', () => {
   // No intent and a plain keep both render to "send the physical prefix".
   assert.deepEqual(projectionAlgebra.renderPrefix([]), { name: 'PhysicalPrefix', activation: undefined })
   assert.deepEqual(projectionAlgebra.renderPrefix([projectionIntent.keepPhysicalPrefix]), {
@@ -89,7 +94,7 @@ test('PROJ_004_renderer_maps_intents_to_writeback_instructions', () => {
   assert.deepEqual(rendered.activation, activation())
 })
 
-test('PROJ_004_physical_prefix_renders_the_messages_unchanged', () => {
+test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_physical_prefix_renders_the_messages_unchanged', () => {
   const view = projectionAlgebra.renderMessages(
     providerProjection.decodeMessageView(toList([
       { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
@@ -104,7 +109,7 @@ test('PROJ_004_physical_prefix_renders_the_messages_unchanged', () => {
   ])
 })
 
-test('PROJ_004_synthetic_prefix_prepends_the_memory_and_drops_the_physical_cutoff', () => {
+test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_synthetic_prefix_prepends_the_memory_and_drops_the_physical_cutoff', () => {
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
     { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'second' }] },
@@ -122,7 +127,7 @@ test('PROJ_004_synthetic_prefix_prepends_the_memory_and_drops_the_physical_cutof
   ])
 })
 
-test('PROJ_004_a_cutoff_beyond_the_message_view_fails_closed', () => {
+test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_a_cutoff_beyond_the_message_view_fails_closed', () => {
   const messages = providerProjection.decodeMessageView(toList([
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
   ])).Messages
@@ -139,7 +144,7 @@ test('PROJ_004_a_cutoff_beyond_the_message_view_fails_closed', () => {
 
 // ── byte equality: the write-back path and the digest view are the same bytes ──
 
-test('PROJ_004_writeback_preserves_the_tail_objects_verbatim', () => {
+test('WHAT[PROVIDER-PROJECTION-004] PROJ_004_writeback_preserves_the_tail_objects_verbatim', () => {
   const tail = { info: { id: 'm3', role: 'user' }, parts: [{ type: 'text', text: 'third' }] }
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
@@ -162,7 +167,7 @@ test('PROJ_004_writeback_preserves_the_tail_objects_verbatim', () => {
   assert.equal(head.parts[0].text, activation().Memory)
 })
 
-test('PROJ_004_the_wire_view_and_the_written_back_bytes_decode_to_the_same_digest_input', () => {
+test('WHAT[PROVIDER-PROJECTION-003] PROJ_004_the_wire_view_and_the_written_back_bytes_decode_to_the_same_digest_input', () => {
   // The renderer's pure view is what a canonical digest is computed from; the
   // adapter's written-back object list is what the Host actually sends. They must
   // decode to identical wire views — otherwise the seal digests a different
@@ -186,7 +191,7 @@ test('PROJ_004_the_wire_view_and_the_written_back_bytes_decode_to_the_same_diges
   assert.deepEqual(pureView, writtenView)
 })
 
-test('PROJ_004_the_written_back_bytes_are_the_frozen_prefix_shape', () => {
+test('WHAT[PROVIDER-PROJECTION-003] PROJ_004_the_written_back_bytes_are_the_frozen_prefix_shape', () => {
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
     { info: { id: 'm2', role: 'user' }, parts: [{ type: 'text', text: 'second' }] },
@@ -216,7 +221,7 @@ const stage2Snapshot = (raw, committed = undefined) => ({
   CommittedPrefix: committed,
 })
 
-test('PROJ_002_the_snapshot_is_the_attempt_local_input_contract', () => {
+test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_snapshot_is_the_attempt_local_input_contract', () => {
   const snapshot = stage2Snapshot([
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
     { info: { id: 'm2', role: 'user' }, parts: [{ type: 'text', text: 'second' }] },
@@ -228,7 +233,7 @@ test('PROJ_002_the_snapshot_is_the_attempt_local_input_contract', () => {
   assert.equal(snapshot.CommittedPrefix, undefined, 'no committed prefix = send physical history')
 })
 
-test('PROJ_002_the_committed_prefix_in_the_snapshot_drives_the_prefix_decision', () => {
+test('WHAT[PROVIDER-PROJECTION-002] PROJ_002_the_committed_prefix_in_the_snapshot_drives_the_prefix_decision', () => {
   // XWire reads snapshot.CommittedPrefix into requiredBlob/forChoice — the field
   // is not decorative: it is the Domain form of ActivePrefixEpoch.Snapshot.
   const committed = prefix.snapshot({
@@ -283,7 +288,7 @@ const planNames = (intents) => {
 
 // ── single-intent smoke (plan Ok + render shape) ───────────────────────────
 
-test('PROJ_008_step3a_InsertBlogFrames_smoke_inserts_assistant_frame_bodies', () => {
+test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_InsertBlogFrames_smoke_inserts_assistant_frame_bodies', () => {
   const frames = [
     projectionSnapshot.blogFrame({ kind: 'Entry', digest: 'd0', body: 'frame-0' }),
     projectionSnapshot.blogFrame({ kind: 'Squash', digest: 'd1', body: 'frame-1' }),
@@ -308,7 +313,7 @@ test('PROJ_008_step3a_InsertBlogFrames_smoke_inserts_assistant_frame_bodies', ()
   )
 })
 
-test('PROJ_008_step3a_InsertRepair_smoke_appends_user_repair_instruction', () => {
+test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_InsertRepair_smoke_appends_user_repair_instruction', () => {
   const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'hello' }] }]
   const snapshot = stage3Snapshot(raw)
   const intent = projectionIntent.insertRepair({ RequestKey: 'repair-key-1' })
@@ -321,7 +326,7 @@ test('PROJ_008_step3a_InsertRepair_smoke_appends_user_repair_instruction', () =>
   assert.equal(last.parts[0]?.text, REPAIR_INSTRUCTION)
 })
 
-test('PROJ_008_step3a_SuppressTransportOnly_smoke_drops_transport_message_ids', () => {
+test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_drops_transport_message_ids', () => {
   const raw = [
     { info: { id: 'keep-1', role: 'user' }, parts: [{ type: 'text', text: 'keep' }] },
     { info: { id: 'drop-me', role: 'assistant' }, parts: [{ type: 'text', text: 'transport' }] },
@@ -359,7 +364,7 @@ test('PROJ_008_step3a_SuppressTransportOnly_smoke_drops_transport_message_ids', 
   )
 })
 
-test('PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () => {
+test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () => {
   const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
   const snapshot = stage3Snapshot(raw)
   const intent = projectionIntent.appendReviewChallenge({ TextVersion: reviewChallenge.textVersion })
@@ -375,7 +380,7 @@ test('PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () =>
   )
 })
 
-test('PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
+test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'before' }] },
     { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'after' }] },
@@ -397,7 +402,7 @@ test('PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
 
 // ── prefix mutual exclusion preserved ──────────────────────────────────────
 
-test('PROJ_008_step3a_prefix_mutual_exclusion_still_fails_closed', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_prefix_mutual_exclusion_still_fails_closed', () => {
   const either = projectionAlgebra.plan([
     projectionIntent.keepPhysicalPrefix,
     projectionIntent.activatePrefixEpoch(activation()),
@@ -408,7 +413,7 @@ test('PROJ_008_step3a_prefix_mutual_exclusion_still_fails_closed', () => {
 
 // ── canonical order: shuffled input → rank order ───────────────────────────
 
-test('PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order', () => {
   // Rank:
   // 0 Keep/Activate | 1 BlogFrames | 2 Repair | 3 Suppress | 4 Challenge | 5 Reanchor
   const shuffled = [
@@ -432,7 +437,7 @@ test('PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order',
 
 // ── idempotent merges ──────────────────────────────────────────────────────
 
-test('PROJ_008_step3a_duplicate_Suppress_Reanchor_merge_to_one', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_duplicate_Suppress_Reanchor_merge_to_one', () => {
   assert.deepEqual(
     planNames([
       projectionIntent.suppressTransportOnly,
@@ -449,7 +454,7 @@ test('PROJ_008_step3a_duplicate_Suppress_Reanchor_merge_to_one', () => {
   )
 })
 
-test('PROJ_008_step3a_same_RequestKey_Repair_is_idempotent', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_same_RequestKey_Repair_is_idempotent', () => {
   assert.deepEqual(
     planNames([
       projectionIntent.insertRepair({ RequestKey: 'same' }),
@@ -459,7 +464,7 @@ test('PROJ_008_step3a_same_RequestKey_Repair_is_idempotent', () => {
   )
 })
 
-test('PROJ_008_step3a_same_version_Challenge_is_idempotent', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_same_version_Challenge_is_idempotent', () => {
   assert.deepEqual(
     planNames([
       projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
@@ -469,7 +474,7 @@ test('PROJ_008_step3a_same_version_Challenge_is_idempotent', () => {
   )
 })
 
-test('PROJ_008_step3a_identical_BlogFrames_intents_merge_to_one', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_identical_BlogFrames_intents_merge_to_one', () => {
   assert.deepEqual(
     planNames([
       projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
@@ -481,7 +486,7 @@ test('PROJ_008_step3a_identical_BlogFrames_intents_merge_to_one', () => {
 
 // ── conflicts ──────────────────────────────────────────────────────────────
 
-test('PROJ_008_step3a_conflicting_BlogFrames_payloads_fail_closed', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_conflicting_BlogFrames_payloads_fail_closed', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
     projectionIntent.insertBlogFrames({ RequestKind: 'squash' }),
@@ -490,7 +495,7 @@ test('PROJ_008_step3a_conflicting_BlogFrames_payloads_fail_closed', () => {
   assert.equal(result.conflict, 'ConflictingBlogFrames')
 })
 
-test('PROJ_008_step3a_conflicting_Repair_keys_fail_closed', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_conflicting_Repair_keys_fail_closed', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.insertRepair({ RequestKey: 'a' }),
     projectionIntent.insertRepair({ RequestKey: 'b' }),
@@ -499,7 +504,7 @@ test('PROJ_008_step3a_conflicting_Repair_keys_fail_closed', () => {
   assert.equal(result.conflict, 'ConflictingRepair')
 })
 
-test('PROJ_008_step3a_Activate_plus_Reanchor_is_ConflictingPrefixLifecycle', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_Activate_plus_Reanchor_is_ConflictingPrefixLifecycle', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.activatePrefixEpoch(activation()),
     projectionIntent.reanchorAfterCompaction,
@@ -508,7 +513,7 @@ test('PROJ_008_step3a_Activate_plus_Reanchor_is_ConflictingPrefixLifecycle', () 
   assert.equal(result.conflict, 'ConflictingPrefixLifecycle')
 })
 
-test('PROJ_008_step3a_different_Challenge_versions_conflict', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_different_Challenge_versions_conflict', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
     projectionIntent.appendReviewChallenge({ TextVersion: 2 }),
@@ -517,7 +522,7 @@ test('PROJ_008_step3a_different_Challenge_versions_conflict', () => {
   assert.equal(result.conflict, 'ConflictingReviewChallenge')
 })
 
-test('PROJ_008_step3a_different_Challenge_prompts_conflict', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_different_Challenge_prompts_conflict', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: '# a\n' }),
     projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: '# b\n' }),
@@ -528,7 +533,7 @@ test('PROJ_008_step3a_different_Challenge_prompts_conflict', () => {
 
 // ── permutation independence ───────────────────────────────────────────────
 
-test('PROJ_008_step3a_plan_is_permutation_independent', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_plan_is_permutation_independent', () => {
   const a = projectionIntent.insertBlogFrames({ RequestKind: 'normal' })
   const b = projectionIntent.insertRepair({ RequestKey: 'k' })
   const c = projectionIntent.suppressTransportOnly
@@ -554,7 +559,7 @@ test('PROJ_008_step3a_plan_is_permutation_independent', () => {
 
 // ── multi-intent render: Activate then BlogFrames rank order ───────────────
 
-test('PROJ_008_step3a_Activate_then_BlogFrames_render_in_canonical_order', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_Activate_then_BlogFrames_render_in_canonical_order', () => {
   const frames = [projectionSnapshot.blogFrame({ body: 'historic' })]
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
@@ -581,7 +586,7 @@ test('PROJ_008_step3a_Activate_then_BlogFrames_render_in_canonical_order', () =>
 
 // ── KeepPhysicalPrefix + later intents coexist ─────────────────────────────
 
-test('PROJ_008_step3a_Keep_coexists_with_non_prefix_intents', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_Keep_coexists_with_non_prefix_intents', () => {
   assert.deepEqual(
     planNames([
       projectionIntent.insertRepair({ RequestKey: 'k' }),
@@ -594,7 +599,7 @@ test('PROJ_008_step3a_Keep_coexists_with_non_prefix_intents', () => {
 
 // ── empty BlogFrames: InsertBlogFrames is plan-ok, render no-op ────────────
 
-test('PROJ_008_step3a_empty_BlogFrames_is_render_noop', () => {
+test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_empty_BlogFrames_is_render_noop', () => {
   const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'only' }] }]
   const snapshot = stage3Snapshot(raw, { blogFrames: [] })
   const intent = projectionIntent.insertBlogFrames({ RequestKind: 'normal' })
@@ -604,7 +609,7 @@ test('PROJ_008_step3a_empty_BlogFrames_is_render_noop', () => {
 
 // ── PROJ-008 Step4/5/6: production-shape byte contracts (algebra half) ─────
 
-test('PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'physical' }] },
     { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'text', text: 'history' }] },
@@ -624,7 +629,7 @@ test('PROJ_008_step6_Reanchor_with_Keep_is_wire_noop_and_plan_ok', () => {
   )
 })
 
-test('PROJ_008_step6_Reanchor_conflicts_with_Activate_fail_closed', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step6_Reanchor_conflicts_with_Activate_fail_closed', () => {
   const result = projectionAlgebra.plan([
     projectionIntent.activatePrefixEpoch(activation()),
     projectionIntent.reanchorAfterCompaction,
@@ -633,7 +638,7 @@ test('PROJ_008_step6_Reanchor_conflicts_with_Activate_fail_closed', () => {
   assert.equal(result.conflict, 'ConflictingPrefixLifecycle')
 })
 
-test('PROJ_008_step6_Reanchor_is_idempotent_in_plan', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step6_Reanchor_is_idempotent_in_plan', () => {
   assert.deepEqual(
     planNames([
       projectionIntent.reanchorAfterCompaction,
@@ -643,9 +648,64 @@ test('PROJ_008_step6_Reanchor_is_idempotent_in_plan', () => {
   )
 })
 
-test('PROJ_008_step3a_two_KeepPhysicalPrefix_merge_idempotently', () => {
+test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_two_KeepPhysicalPrefix_merge_idempotently', () => {
   assert.deepEqual(
     planNames([projectionIntent.keepPhysicalPrefix, projectionIntent.keepPhysicalPrefix]),
     ['KeepPhysicalPrefix'],
   )
 })
+
+// ── PROVIDER-PROJECTION-007: DSL 不负责生命周期 ────────────────────────────
+//
+// 投影管线只负责 不可变快照 → 确定性 provider-visible projection。结构性
+// 守卫（与 ARCH_011 no-parser 同手法）：四个投影模块的 public 面不得出现
+// 生命周期动词——不启动/等待 Agent、不执行工具、不写 Journal、不恢复
+// Prompt、不管理 ProviderRunIdentity、不推进生命周期状态。
+
+test('WHAT[PROVIDER-PROJECTION-007] PROJ_007_projection_pipeline_owns_no_lifecycle_verbs', () => {
+  // domain.mjs facade 句柄即四个 dist 模块的命名空间（同一 Fable module 面），
+  // 无需直接 import dist 内部路径。
+  const modules = [ProjectionIntentModule, ProjectionPlannerModule, ProjectionRendererModule, ProviderProj]
+  const names = new Set(modules.flatMap((m) => Object.getOwnPropertyNames(m)))
+
+  // 正面：模块确实是纯代数面（plan + render），而非编排运行时。
+  assert.equal(typeof ProjectionPlannerModule.plan, 'function')
+  assert.equal(typeof ProjectionRendererModule.ProjectionRenderer_renderMessages, 'function')
+
+  // 负面：无生命周期动词导出（含子串防御，防 camelCase 拼写变体）。
+  const lifecycleVerbs = ['start', 'stop', 'wait', 'join', 'spawn', 'resume', 'abort', 'update', 'advance', 'execute']
+  for (const verb of lifecycleVerbs) {
+    assert.equal(
+      [...names].some((n) => n.toLowerCase().includes(verb)),
+      false,
+      `projection must not expose a lifecycle verb: ${verb}`,
+    )
+  }
+})
+
+// ── PROVIDER-PROJECTION-011: semantic equality ≠ wire equality；digest 从 Semantic 算 ──
+//
+// Semantic 去 ID（跨会话可比较）；Wire 含 ID、字节相等。同语义跨 ID 的对话
+// 必须产出同一 semantic 投影（canonical digest 的唯一输入），而 wire bytes
+// 必须不同——两者相等键不同，混用必错。
+
+test('WHAT[PROVIDER-PROJECTION-011] PROJ_003_semantic_equality_ignores_wire_ids_but_wire_bytes_differ', () => {
+  const build = (callId) =>
+    providerProjection.decodeMessageView(FsList.ofArray([
+      { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'first' }] },
+      { info: { id: 'm2', role: 'assistant' }, parts: [{ type: 'tool-call', callID: callId, name: 'read', args: '{"p":1}' }] },
+    ]))
+  const withCallA = build('call-a')
+  const withCallB = build('call-b')
+
+  const semanticA = providerProjection.toSemantic(withCallA)
+  const semanticB = providerProjection.toSemantic(withCallB)
+
+  // 语义相等：不同 wire id 的同一对话产出同一 semantic 投影（digest 唯一输入）。
+  assert.equal(providerProjection.renderSemantic(semanticA), providerProjection.renderSemantic(semanticB))
+  assert.equal(providerProjection.semanticallyEqual(semanticA, semanticB), true)
+
+  // wire 不等：id 属于 wire 层，字节形状不同不得进入 digest 判定。
+  assert.notEqual(providerProjection.renderWire(withCallA), providerProjection.renderWire(withCallB))
+})
+

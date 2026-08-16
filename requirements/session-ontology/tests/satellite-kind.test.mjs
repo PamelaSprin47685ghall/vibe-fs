@@ -9,7 +9,7 @@ import test from 'node:test'
 
 import { SatelliteKind } from '../../../dist/Execution/Session/Association.js'
 
-test('HOST_014_SatelliteKind_is_Companion_only', () => {
+test('WHAT[SESSION-ONTOLOGY-014] HOST_014_SatelliteKind_is_Companion_only', () => {
   assert.deepEqual(SatelliteKind.Companion.cases(), ['Companion'])
   assert.equal('Teacher' in SatelliteKind, false)
 })

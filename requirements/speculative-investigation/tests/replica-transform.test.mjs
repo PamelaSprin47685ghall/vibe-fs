@@ -77,7 +77,7 @@ const sessions = () => {
   }
 }
 
-test('STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_owner_mirror', async () => {
+test('WHAT[SPEC-INV-009] STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_owner_mirror', async () => {
   const runtime = registered('replica-initial', StrengthBudget.K1)
   const host = sessions()
   const output = rawOutput('replica-initial', [message('user', [text('Continue.')])])
@@ -95,7 +95,7 @@ test('STRENGTH_003_004_replica_initial_transform_replaces_bootstrap_with_frozen_
   assert.equal(messages[0].Parts.head.fields[0], 'owner mirror')
 })
 
-test('STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch', async () => {
+test('WHAT[SPEC-INV-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch', async () => {
   const runtime = registered('replica-k1', StrengthBudget.K1)
   const host = sessions()
   const output = rawOutput('replica-k1', [
@@ -117,7 +117,7 @@ test('STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch'
   assert.equal(caseOf(again), 'NotReplica')
 })
 
-test('STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', async () => {
+test('WHAT[SPEC-INV-003] STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', async () => {
   const runtime = registered('replica-host-k1', StrengthBudget.K1)
   const host = sessions()
   const output = {
@@ -171,7 +171,7 @@ test('STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', 
   assert.deepEqual(host.aborted, ['replica-host-k1'])
 })
 
-test('STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {
+test('WHAT[SPEC-INV-003] STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () => {
   const runtime = registered('replica-k2', StrengthBudget.K2)
   const host = sessions()
   const afterFirst = rawOutput('replica-k2', [
@@ -200,7 +200,7 @@ test('STRENGTH_003_K2_allows_request_2_then_aborts_before_request_3', async () =
   assert.deepEqual(host.aborted, ['replica-k2'])
 })
 
-test('STRENGTH_003_K2_counts_parallel_OpenCode_tool_parts_as_one_request_then_stops_before_request_3', async () => {
+test('WHAT[SPEC-INV-003] STRENGTH_003_K2_counts_parallel_OpenCode_tool_parts_as_one_request_then_stops_before_request_3', async () => {
   const runtime = registered('replica-host-k2', StrengthBudget.K2)
   const host = sessions()
   const output = {
@@ -252,7 +252,7 @@ test('STRENGTH_003_K2_counts_parallel_OpenCode_tool_parts_as_one_request_then_st
   assert.deepEqual(host.aborted, ['replica-host-k2'])
 })
 
-test('STRENGTH_003_005_transform_discards_incomplete_and_invalid_batches_then_stops_the_replica', async () => {
+test('WHAT[SPEC-INV-003] STRENGTH_003_005_transform_discards_incomplete_and_invalid_batches_then_stops_the_replica', async () => {
   // Discard-on-error at the transform program. Not a live Host provider-failure canary.
   // K2 so one complete illegal batch is below requestLimit and hits tryBuild,
   // not the K1 budget-reached shortcut.

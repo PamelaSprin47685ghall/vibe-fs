@@ -31,7 +31,7 @@ const {
 
 // ── OpencodeTypes records ────────────────────────────────────────────────────
 
-test('MISC_opencode_types_records_carry_fields', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_opencode_types_records_carry_fields', () => {
   const model = new OpencodeModel('anthropic', 'claude', 'fast')
   assert.equal(model.providerID, 'anthropic')
   assert.equal(model.modelID, 'claude')
@@ -53,7 +53,7 @@ test('MISC_opencode_types_records_carry_fields', () => {
   assert.equal(compact.overflow, false)
 })
 
-test('MISC_opencode_messages_and_hook_inputs', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_opencode_messages_and_hook_inputs', () => {
   const user = new OpencodeUserMessage('u1', 'user', 'ses-1', 'coder', null, [])
   assert.equal(user.id, 'u1')
   assert.equal(user.role, 'user')
@@ -82,7 +82,7 @@ test('MISC_opencode_messages_and_hook_inputs', () => {
 
 // ── HostMessageCodec decodePart ──────────────────────────────────────────────
 
-test('MISC_host_message_text_and_null', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_text_and_null', () => {
   assert.equal(decodePart(null), undefined)
   const text = decodePart({ type: 'text', text: 'hi' })
   assert.equal(caseOf(text), 'Text')
@@ -93,7 +93,7 @@ test('MISC_host_message_text_and_null', () => {
   assert.equal(payloadOf(up), 'up', 'type is case-insensitive')
 })
 
-test('MISC_host_message_reasoning_aliases', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_reasoning_aliases', () => {
   const viaText = decodePart({ type: 'reasoning', text: 'think' })
   assert.equal(caseOf(viaText), 'Reasoning')
   assert.equal(payloadOf(viaText), 'think')
@@ -104,7 +104,7 @@ test('MISC_host_message_reasoning_aliases', () => {
   assert.equal(decodePart({ type: 'reasoning' }), undefined)
 })
 
-test('MISC_host_message_tool_call_variants', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_tool_call_variants', () => {
   const snake = decodePart({ type: 'tool_call', callID: 'c1', tool: 'bash', args: { cmd: 'ls' } })
   assert.equal(caseOf(snake), 'ToolCall')
   assert.deepEqual(payloadOf(snake), ['c1', 'bash', '{"cmd":"ls"}'])
@@ -126,7 +126,7 @@ test('MISC_host_message_tool_call_variants', () => {
   assert.equal(decodePart({ type: 'tool-call', args: {} }), undefined)
 })
 
-test('MISC_host_message_session_tool_state_controls_call_vs_result', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_session_tool_state_controls_call_vs_result', () => {
   const pending = decodePart({
     type: 'tool',
     id: 'part-pending',
@@ -168,7 +168,7 @@ test('MISC_host_message_session_tool_state_controls_call_vs_result', () => {
   assert.deepEqual(payloadOf(failed), ['c-error', 'native failure'])
 })
 
-test('MISC_host_message_tool_result_variants', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_tool_result_variants', () => {
   const r = decodePart({ type: 'tool_result', callID: 'c1', result: { ok: true } })
   assert.equal(caseOf(r), 'ToolResult')
   assert.deepEqual(payloadOf(r), ['c1', '{"ok":true}'])
@@ -183,7 +183,7 @@ test('MISC_host_message_tool_result_variants', () => {
   assert.deepEqual(payloadOf(empty), ['c4', 'null'])
 })
 
-test('MISC_host_message_activity_kinds_normalize_underscores', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_activity_kinds_normalize_underscores', () => {
   assert.equal(payloadOf(decodePart({ type: 'patch' })), 'patch')
   assert.equal(payloadOf(decodePart({ type: 'step-start' })), 'step-start')
   assert.equal(payloadOf(decodePart({ type: 'step_finish' })), 'step-finish')
@@ -192,7 +192,7 @@ test('MISC_host_message_activity_kinds_normalize_underscores', () => {
   assert.equal(decodePart({ type: '' }), undefined)
 })
 
-test('MISC_host_message_decode_parts_filters_and_preserves_order', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_host_message_decode_parts_filters_and_preserves_order', () => {
   assert.deepEqual(decodeParts(null), [])
   assert.deepEqual(decodeParts([]), [])
   const parts = decodeParts([
@@ -210,7 +210,7 @@ test('MISC_host_message_decode_parts_filters_and_preserves_order', () => {
 
 // ── PromptIngressCodec decode ────────────────────────────────────────────────
 
-test('MISC_ingress_session_id_sources', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_session_id_sources', () => {
   const viaSession = ingressDecode({ session: 's1' }, {})
   assert.equal(viaSession.SessionId.fields[0], 's1')
   const viaSessionID = ingressDecode({ sessionID: 's2' }, {})
@@ -221,7 +221,7 @@ test('MISC_ingress_session_id_sources', () => {
   assert.equal(none.SessionId, undefined)
 })
 
-test('MISC_ingress_message_id_sources', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_message_id_sources', () => {
   const fromInput = ingressDecode({ messageID: 'm1' }, {})
   assert.equal(fromInput.PhysicalUserMessageId.fields[0], 'm1')
   const fromInputCamel = ingressDecode({ messageId: 'm2' }, {})
@@ -236,14 +236,14 @@ test('MISC_ingress_message_id_sources', () => {
   assert.equal(none.PhysicalUserMessageId, undefined)
 })
 
-test('MISC_ingress_agent_sources', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_agent_sources', () => {
   assert.equal(ingressDecode({ agent: 'coder' }, {}).ExplicitAgent, 'coder')
   assert.equal(ingressDecode({ message: { agent: 'reviewer' } }, {}).ExplicitAgent, 'reviewer')
   assert.equal(ingressDecode({}, { agent: 'planner' }).ExplicitAgent, 'planner')
   assert.equal(ingressDecode({}, {}).ExplicitAgent, undefined)
 })
 
-test('MISC_ingress_prompt_key_from_metadata', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_prompt_key_from_metadata', () => {
   const fromInput = ingressDecode({ metadata: { wanxiangshu_prompt_key: 'pk-1' } }, {})
   assert.equal(fromInput.PromptKey.fields[0], 'pk-1')
   const blankInput = ingressDecode({ metadata: { wanxiangshu_prompt_key: '   ' } }, {})
@@ -254,7 +254,7 @@ test('MISC_ingress_prompt_key_from_metadata', () => {
   assert.equal(none.PromptKey, undefined)
 })
 
-test('MISC_ingress_host_compaction_detection', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_host_compaction_detection', () => {
   assert.equal(ingressDecode({}, { parts: [{ type: 'compaction' }] }).IsHostCompaction, true)
   assert.equal(ingressDecode({}, { message: { summary: true } }).IsHostCompaction, true)
   assert.equal(ingressDecode({}, { message: { agent: 'compaction' } }).IsHostCompaction, true)
@@ -264,7 +264,7 @@ test('MISC_ingress_host_compaction_detection', () => {
   assert.equal(ingressDecode({}, null).IsHostCompaction, false)
 })
 
-test('MISC_ingress_text_joins_text_parts_and_filters_blanks', () => {
+test('WHAT[PROVIDER-PROJECTION-003] MISC_ingress_text_joins_text_parts_and_filters_blanks', () => {
   const msg = ingressDecode({}, { parts: [{ type: 'text', text: 'one' }, { type: 'text', text: '   ' }, { type: 'tool-call', tool: 'x' }, { type: 'text', text: 'two' }] })
   assert.equal(msg.Text, 'one\ntwo')
   assert.equal(ingressDecode({}, { parts: [{ type: 'text' }] }).Text, undefined)

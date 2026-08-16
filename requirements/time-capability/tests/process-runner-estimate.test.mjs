@@ -30,14 +30,14 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_cmd, _ct) 
 
 // ── estimate validation ──────────────────────────────────────────────────────
 
-test('EXEC_011_rejects_nan_runtime_estimate', async () => {
+test('WHAT[TIME-002] EXEC_011_rejects_nan_runtime_estimate', async () => {
   const result = await runWithLauncher(okLauncher(), cmd, estimate(NaN), CTX, liveToken())
   assert.equal(caseOf(result), 'Error')
   assert.equal(caseOf(payloadOf(result)), 'ExecutionFailed')
   assert.match(String(payloadOf(payloadOf(result))), /finite positive number/)
 })
 
-test('EXEC_011_rejects_zero_and_negative_runtime_estimate', async () => {
+test('WHAT[TIME-002] EXEC_011_rejects_zero_and_negative_runtime_estimate', async () => {
   for (const bad of [0, -5, -Infinity, Infinity]) {
     const result = await runWithLauncher(okLauncher(), cmd, estimate(bad), CTX, liveToken())
     assert.equal(caseOf(result), 'Error', String(bad))
@@ -45,7 +45,7 @@ test('EXEC_011_rejects_zero_and_negative_runtime_estimate', async () => {
   }
 })
 
-test('EXEC_011_rejects_negative_output_estimate', async () => {
+test('WHAT[TIME-002] EXEC_011_rejects_negative_output_estimate', async () => {
   const result = await runWithLauncher(okLauncher(), cmd, estimate(10, -1), CTX, liveToken())
   assert.equal(caseOf(result), 'Error')
   assert.match(String(payloadOf(payloadOf(result))), /non-negative/)

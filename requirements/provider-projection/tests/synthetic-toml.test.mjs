@@ -55,7 +55,7 @@ const syntaxLines = (document) => {
 
 // ── newline normalisation happens before anything else ──────────────────────
 
-test('ARCH_010_CRLF_and_lone_CR_normalise_to_LF', () => {
+test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_CRLF_and_lone_CR_normalise_to_LF', () => {
   // Without this, identical logical content renders as different bytes depending on which platform
   // produced it, and 「同一 semantic input 必须产生相同 bytes」 fails for a reason nobody can see.
   assert.equal(toml.normalizeNewlines('a\r\nb\rc\nd'), 'a\nb\nc\nd')
@@ -66,12 +66,12 @@ test('ARCH_010_CRLF_and_lone_CR_normalise_to_LF', () => {
 
 // ── string form selection ──────────────────────────────────────────────────
 
-test('ARCH_010_single_line_text_uses_a_basic_string', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_single_line_text_uses_a_basic_string', () => {
   assert.equal(toml.renderString('hello'), '"hello"')
   assert.equal(toml.renderString('修复了 fallback 的竞态'), '"修复了 fallback 的竞态"')
 })
 
-test('ARCH_010_basic_string_escapes_are_the_standard_set', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_basic_string_escapes_are_the_standard_set', () => {
   assert.equal(toml.renderString('say "hi"'), '"say \\"hi\\""')
   assert.equal(toml.renderString('a\\b'), '"a\\\\b"')
 
@@ -80,7 +80,7 @@ test('ARCH_010_basic_string_escapes_are_the_standard_set', () => {
   assert.equal(toml.renderString('tab\there'), '"tab\\there"')
 })
 
-test('ARCH_010_multiline_text_uses_a_literal_string_with_the_closing_delimiter_alone', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_multiline_text_uses_a_literal_string_with_the_closing_delimiter_alone', () => {
   const body = 'first\nsecond'
   assert.equal(toml.renderString(body), "'''\nfirst\nsecond\n'''")
 
@@ -90,7 +90,7 @@ test('ARCH_010_multiline_text_uses_a_literal_string_with_the_closing_delimiter_a
   assert.equal(valueOf(toml.renderString(body)), 'first\nsecond\n')
 })
 
-test('ARCH_010_a_multiline_body_with_backslashes_survives_verbatim', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_a_multiline_body_with_backslashes_survives_verbatim', () => {
   // The case that rules out `"""`. Inside a basic multi-line string `\d` is not a valid TOML escape
   // and `\n` would become a real newline; inside `'''` both are literal.
   const regex = 'match: \\d+\\.\\d+\nreplace: C:\\Users\\dev\\path'
@@ -103,7 +103,7 @@ test('ARCH_010_a_multiline_body_with_backslashes_survives_verbatim', () => {
   assert.equal(valueOf(rendered), `${regex}\n`)
 })
 
-test('ARCH_010_no_format_indentation_is_injected_into_a_multiline_body', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_no_format_indentation_is_injected_into_a_multiline_body', () => {
   // TOML does not de-indent a literal string, so a format indent would land IN the value — the
   // renderer corrupting data it promised to pass through. The motion originally specified four
   // spaces; this is the assertion that records why that was rejected.
@@ -114,7 +114,7 @@ test('ARCH_010_no_format_indentation_is_injected_into_a_multiline_body', () => {
   assert.equal(valueOf(rendered), `${body}\n`, "the body's own indentation is preserved exactly")
 })
 
-test('ARCH_010_multiline_text_containing_triple_single_quotes_falls_back_to_basic', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_multiline_text_containing_triple_single_quotes_falls_back_to_basic', () => {
   // `'''` inside a literal string would close it early and let the rest of the body escape into the
   // document structure. A fully escaped basic string is the only always-valid representation, so
   // this is not a delimiter choice: the body has no legal multi-line form at all.
@@ -129,7 +129,7 @@ test('ARCH_010_multiline_text_containing_triple_single_quotes_falls_back_to_basi
   assert.equal(valueOf(rendered), body)
 })
 
-test('ARCH_010_a_multiline_body_ending_in_a_single_quote_stays_a_literal_string', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_a_multiline_body_ending_in_a_single_quote_stays_a_literal_string', () => {
   // This case USED to fall back, because a closing delimiter written immediately after the last
   // content character formed `''''` and did not parse. ARCH-010 puts the delimiter on its own line,
   // so the collision cannot happen and the body stays verbatim. Asserted rather than deleted: it is
@@ -143,7 +143,7 @@ test('ARCH_010_a_multiline_body_ending_in_a_single_quote_stays_a_literal_string'
   assert.equal(valueOf(toml.renderString("a\nends with ''")), "a\nends with ''\n")
 })
 
-test('ARCH_010_control_characters_never_appear_raw', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_control_characters_never_appear_raw', () => {
   // TOML forbids raw control characters other than tab and newline, in both string forms. A NUL
   // reaching the wire would make the document unparseable.
   assert.equal(toml.renderString('before\u0000after'), '"before\\u0000after"')
@@ -156,7 +156,7 @@ test('ARCH_010_control_characters_never_appear_raw', () => {
 
 // ── instruction comments ───────────────────────────────────────────────────
 
-test('ARCH_010_a_multiline_instruction_becomes_several_comment_lines', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_a_multiline_instruction_becomes_several_comment_lines', () => {
   // Containment for the instruction side. A raw `\n` inside a comment would END the comment and
   // leave the remainder at top level as syntax, which is how an instruction turns into a malformed
   // document — or worse, into a field.
@@ -167,14 +167,14 @@ test('ARCH_010_a_multiline_instruction_becomes_several_comment_lines', () => {
   assert.equal(toml.comment('Do X.\n\nThen Y.'), '# Do X.\n#\n# Then Y.')
 })
 
-test('ARCH_010_field_pairs_a_name_with_an_already_rendered_value', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_field_pairs_a_name_with_an_already_rendered_value', () => {
   assert.equal(toml.field('status', toml.renderString('failed')), 'status = "failed"')
   assert.equal(toml.field('exit_code', '1'), 'exit_code = 1')
 })
 
 // ── the three legal document shapes ────────────────────────────────────────
 
-test('ARCH_010_instruction_and_data_are_separated_by_exactly_one_blank_line', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_instruction_and_data_are_separated_by_exactly_one_blank_line', () => {
   const document = toml.renderDocument(['Diagnose the first causal failure.'], [
     toml.field('tool', toml.renderString('dotnet')),
     toml.field('exit_code', '1'),
@@ -192,7 +192,7 @@ test('ARCH_010_instruction_and_data_are_separated_by_exactly_one_blank_line', ()
   assert.equal(document.includes('\n\n\n'), false, 'only the one header/body separator exists')
 })
 
-test('ARCH_010_a_data_only_document_carries_no_instruction', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_a_data_only_document_carries_no_instruction', () => {
   // 「不要求为了满足格式而补充无意义 instruction」. The first line is a field or table header.
   const document = toml.renderDocument([], [toml.field('status', toml.renderString('ok'))])
 
@@ -200,7 +200,7 @@ test('ARCH_010_a_data_only_document_carries_no_instruction', () => {
   assert.equal(document.startsWith('#'), false)
 })
 
-test('ARCH_010_an_instruction_only_document_carries_no_data', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_an_instruction_only_document_carries_no_data', () => {
   // 「不要求增加虚假的 data 字段」. First byte is `#`, and no separator is emitted for a body that
   // does not exist.
   const document = toml.renderDocument(['Continue the current logical run.', 'Do not create a replacement task.'], [])
@@ -210,7 +210,7 @@ test('ARCH_010_an_instruction_only_document_carries_no_data', () => {
   assert.equal(document.includes('\n\n'), false, 'no dangling separator for an absent body')
 })
 
-test('ARCH_010_a_table_array_entry_keeps_its_header_and_fields_together', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_a_table_array_entry_keeps_its_header_and_fields_together', () => {
   const entry = toml.tableArrayEntry('item', [
     toml.field('turn', '3'),
     toml.field('role', toml.renderString('assistant')),
@@ -224,7 +224,7 @@ test('ARCH_010_a_table_array_entry_keeps_its_header_and_fields_together', () => 
   assert.deepEqual(parseToml(entry).item, [{ turn: 3, role: 'assistant' }])
 })
 
-test('ARCH_010_bare_fields_are_emitted_before_table_arrays', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_bare_fields_are_emitted_before_table_arrays', () => {
   // A measured TOML semantic, and the reason this ordering is enforced rather than documented: a
   // bare `key = value` written AFTER a `[[table]]` header belongs to that table, not to the
   // document. Measured with smol-toml:
@@ -256,7 +256,7 @@ test('ARCH_010_bare_fields_are_emitted_before_table_arrays', () => {
   assert.equal(twoFields.startsWith('b = 2\na = 1\n[[t]]'), true, `stable order: ${twoFields}`)
 })
 
-test('ARCH_010_a_multiline_value_starting_with_a_bracket_is_still_a_field', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_a_multiline_value_starting_with_a_bracket_is_still_a_field', () => {
   // The classifier reads the block's FIRST LINE, not the block. A body beginning with `[` — a log
   // line, a JSON array, a rendered TOML table — renders as `key = '''`, so it must be read as a
   // field. Testing the whole block would misclassify exactly the payloads containment protects.
@@ -272,12 +272,12 @@ test('ARCH_010_a_multiline_value_starting_with_a_bracket_is_still_a_field', () =
   assert.deepEqual(parsed.item, [{ turn: 1 }], 'and does not become a second item')
 })
 
-test('ARCH_010_an_empty_payload_is_empty_not_a_bare_newline', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_an_empty_payload_is_empty_not_a_bare_newline', () => {
   assert.equal(toml.renderDocument([], []), '')
   assert.equal(toml.byteCount(toml.renderDocument([], [])), 0)
 })
 
-test('ARCH_010_no_top_level_comment_appears_after_the_data_body_begins', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_no_top_level_comment_appears_after_the_data_body_begins', () => {
   // The rule 「一旦 data 开始，后续不得再出现顶层 instruction comment」, checked over a payload whose
   // VALUES deliberately look like comments and table headers. The point is that the injected text is
   // string content, so `syntaxLines` sees none of it — which is simultaneously the containment
@@ -302,7 +302,7 @@ test('ARCH_010_no_top_level_comment_appears_after_the_data_body_begins', () => {
 
 // ── parseability over the whole input space ────────────────────────────────
 
-test('ARCH_010_every_rendered_string_parses_back_to_the_value_it_was_given', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_every_rendered_string_parses_back_to_the_value_it_was_given', () => {
   // The load-bearing test. The expectation reads the renderer's own choice instead of predicting it:
   // a multi-line literal carries one trailing newline, a single-line basic string carries none.
   // Which form each input takes is pinned by the dedicated tests above; this one asserts only that
@@ -343,7 +343,7 @@ test('ARCH_010_every_rendered_string_parses_back_to_the_value_it_was_given', () 
   }
 })
 
-test('ARCH_010_identical_input_renders_byte_identical_output', () => {
+test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_identical_input_renders_byte_identical_output', () => {
   const build = () =>
     toml.renderDocument(['Use the result below as evidence.'], [
       toml.field('tool', toml.renderString('shell')),
@@ -355,7 +355,7 @@ test('ARCH_010_identical_input_renders_byte_identical_output', () => {
 
 // ── UTF-8 byte counting is the measurement every limit uses ────────────────
 
-test('ARCH_010_byteCount_measures_UTF8_not_characters', () => {
+test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_byteCount_measures_UTF8_not_characters', () => {
   assert.equal(toml.byteCount('abc'), 3)
   assert.equal(toml.byteCount('é'), 2, 'U+00E9 is two bytes')
   assert.equal(toml.byteCount('中'), 3, 'CJK is three bytes')
@@ -370,7 +370,7 @@ test('ARCH_010_byteCount_measures_UTF8_not_characters', () => {
   assert.equal(toml.byteCount(cjk), 300)
 })
 
-test('ARCH_010_byteCount_agrees_with_the_platform_encoder', () => {
+test('WHAT[PROVIDER-PROJECTION-012] ARCH_010_byteCount_agrees_with_the_platform_encoder', () => {
   // The hand-rolled counter exists because Fable has no GetByteCount. It must agree with Node's
   // encoder on every shape, or a limit means one thing in tests and another in production.
   const encoder = new TextEncoder()
@@ -397,7 +397,7 @@ test('ARCH_010_byteCount_agrees_with_the_platform_encoder', () => {
   }
 })
 
-test('ARCH_010_value_tree_scalars_and_keys', () => {
+test('WHAT[PROVIDER-PROJECTION-008] ARCH_010_value_tree_scalars_and_keys', () => {
   assert.equal(toml.renderBool(true), 'true')
   assert.equal(toml.renderBool(false), 'false')
   assert.equal(toml.renderInt(42), '42')
@@ -406,7 +406,7 @@ test('ARCH_010_value_tree_scalars_and_keys', () => {
   assert.equal(toml.tableEntry('data', ['truncated = false']).startsWith('[data]'), true)
   assert.equal(toml.tableEntry('data', ['truncated = false']).includes('[['), false)
 })
-test('ARCH_011_renderer_exposes_no_parser', () => {
+test('WHAT[PROVIDER-PROJECTION-010] ARCH_011_renderer_exposes_no_parser', () => {
   // ARCH-010 明文「There is deliberately no parser」：业务不得反解析 synthetic TOML 回
   // 控制流（corrective.md §8「从结果 TOML 反向解析控制流」被拒）。support 包装面是
   // renderer 的完整 public 面——若出现 parse/decode/read，本命题立刻红。

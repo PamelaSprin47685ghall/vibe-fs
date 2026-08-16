@@ -26,7 +26,7 @@ const { XTraceProjection_parts: xTraceParts } = await import('../../../dist/Cont
 
 const managerSession = sessionId('ses_xtrace_locality')
 
-test('TODO-004 preserves a captured tool call identity on its durable XTrace range', () => {
+test('WHAT[SEMANTIC-TRACE-002] TODO-004 preserves a captured tool call identity on its durable XTrace range', () => {
   const folded = fold.one(
     fold.empty,
     envelope({
@@ -60,7 +60,7 @@ test('TODO-004 preserves a captured tool call identity on its durable XTrace ran
   assert.equal(Number(part.Cursor.Sequence), 7)
 })
 
-test('TODO-004 captures the SDK-visible assistant run and Host ToolPart without index inference', async () => {
+test('WHAT[SEMANTIC-TRACE-002] TODO-004 captures the SDK-visible assistant run and Host ToolPart without index inference', async () => {
   const created = await agentJournal.create({ directory: 'xtrace-locality-capture' })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
 
@@ -95,7 +95,7 @@ test('TODO-004 captures the SDK-visible assistant run and Host ToolPart without 
   }
 })
 
-test('TODO-004 joins the persisted ToolPart to its exact durable XTrace range', () => {
+test('WHAT[SEMANTIC-TRACE-006] TODO-004 joins the persisted ToolPart to its exact durable XTrace range', () => {
   const projection = fold.one(
     fold.empty,
     envelope({
@@ -143,7 +143,7 @@ test('TODO-004 joins the persisted ToolPart to its exact durable XTrace range', 
   assert.equal(localized.value.ToolPartOrdinal, 1)
 })
 
-test('TODO-004 localizes a pending before-hook ToolPart from snapshot before XTrace capture', () => {
+test('WHAT[SEMANTIC-TRACE-006] TODO-004 localizes a pending before-hook ToolPart from snapshot before XTrace capture', () => {
   const projection = fold.one(
     fold.empty,
     envelope({
@@ -199,7 +199,7 @@ test('TODO-004 localizes a pending before-hook ToolPart from snapshot before XTr
   assert.equal(localized.value.ToolPartOrdinal, 1)
 })
 
-test('TODO-004 pending before-hook ReviewFrontier includes last assistant text in the same message', () => {
+test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending before-hook ReviewFrontier includes last assistant text in the same message', () => {
   const projection = fold.one(
     fold.empty,
     envelope({
@@ -254,7 +254,7 @@ test('TODO-004 pending before-hook ReviewFrontier includes last assistant text i
   assert.equal(Number(localized.value.Range.EndExclusive.Sequence), 11)
 })
 
-test('TODO-008 ManagerCheckpointLWR range includes last assistant text before todowrite', async () => {
+test('WHAT[SEMANTIC-TRACE-006] TODO-008 ManagerCheckpointLWR range includes last assistant text before todowrite', async () => {
   const created = await agentJournal.create({ directory: 'xtrace-locality-lwr-last-text' })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))
 

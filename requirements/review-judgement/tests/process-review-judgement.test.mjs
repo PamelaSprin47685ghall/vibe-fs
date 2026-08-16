@@ -36,14 +36,14 @@ const life = managerLifeId('life-process-judgement')
 const write = magicTodo.todoWriteId(sha256, life, toolCallId('call-t1'))
 const review = magicTodo.todoReviewId(sha256, life, write)
 
-test('REVIEW_013_the_request_kind_is_typed_process_vs_finality', () => {
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_the_request_kind_is_typed_process_vs_finality', () => {
   // REVIEW-013 forbids guessing process vs Finality from `pendingChallenge`;
   // the assignment authority carries a typed kind instead.
   assert.equal(caseOf(ReviewRequestKind.TodoProcess), 'TodoProcess')
   assert.equal(caseOf(ReviewRequestKind.FinalityTerminal), 'FinalityTerminal')
 })
 
-test('REVIEW_013_ensure_review_stays_outstanding_until_concluded', () => {
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_ensure_review_stays_outstanding_until_concluded', () => {
   // Accepted ∧ ¬Concluded → Rk pending from any reentry site. Once Concluded
   // exists, no further ensureReview is needed — the verdict is terminal.
   assert.equal(needsEnsureReview(true, false), true)
@@ -52,7 +52,7 @@ test('REVIEW_013_ensure_review_stays_outstanding_until_concluded', () => {
   assert.equal(needsEnsureReview(false, true), false)
 })
 
-test('REVIEW_013_process_preamble_commands_exactly_one_verdict_and_disclaims_terminal_witness', () => {
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_preamble_commands_exactly_one_verdict_and_disclaims_terminal_witness', () => {
   const preamble = providerResources.readText(providerLanguage.english, 'lifecycle/magic-todo/process-reviewer-preamble')
 
   // One judgement, one tool call. Process PERFECT is explicitly NOT a terminal
@@ -68,7 +68,7 @@ test('REVIEW_013_process_preamble_commands_exactly_one_verdict_and_disclaims_ter
   }
 })
 
-test('REVIEW_013_process_assignment_is_request_range_bounded_without_confirmation_vocabulary', () => {
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_assignment_is_request_range_bounded_without_confirmation_vocabulary', () => {
   const preamble = providerResources.readText(providerLanguage.english, 'lifecycle/magic-todo/process-reviewer-preamble')
   const request = {
     TodoReviewId: review,
@@ -102,7 +102,7 @@ test('REVIEW_013_process_assignment_is_request_range_bounded_without_confirmatio
   assert.equal(renderObligationListWire(toList([])), '[]')
 })
 
-test('REVIEW_013_a_process_verdict_never_becomes_a_confirmed_witness_by_itself', () => {
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_a_process_verdict_never_becomes_a_confirmed_witness_by_itself', () => {
   // One durable judge is terminal for the checkpoint: recording a PERFECT
   // verdict in the reviewer guard counts the attempt but yields NoReview —
   // confirmation requires the full challenge+seal chain (review-assurance),

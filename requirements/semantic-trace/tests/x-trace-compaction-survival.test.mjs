@@ -64,7 +64,7 @@ const foldOk = (envelopes) => {
   return fold.session(result.value, SESSION)
 }
 
-test('SEMANTIC_TRACE_reanchor_preserves_xtrace_parts_and_opening', () => {
+test('WHAT[SEMANTIC-TRACE-009] SEMANTIC_TRACE_reanchor_preserves_xtrace_parts_and_opening', () => {
   const base = [openingFact(), partFact({ sequence: 1, role: 'user' }), partFact({ sequence: 2, role: 'assistant' })]
 
   const before = foldOk(base)
@@ -80,7 +80,7 @@ test('SEMANTIC_TRACE_reanchor_preserves_xtrace_parts_and_opening', () => {
   assert.deepEqual(after.XTrace.Opening.AuthoritativeRequirements, ['r1'])
 })
 
-test('SEMANTIC_TRACE_reanchor_does_not_reset_the_cursor_sequence', () => {
+test('WHAT[SEMANTIC-TRACE-009] SEMANTIC_TRACE_reanchor_does_not_reset_the_cursor_sequence', () => {
   const s = foldOk([
     partFact({ sequence: 1 }),
     partFact({ sequence: 2 }),

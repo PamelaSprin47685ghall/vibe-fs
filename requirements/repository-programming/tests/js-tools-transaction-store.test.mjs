@@ -43,7 +43,7 @@ const prepared = (id, root, mutations) => ({
 
 const current = (store) => store.TryCurrent('JsTransaction')
 
-test('JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
   const local = createLocalEventStore()
   try {
     const p = prepared('tx-1', '/ws', [mutation('a.txt', 'old', 'new')])
@@ -57,7 +57,7 @@ test('JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
   }
 })
 
-test('JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
   const local = createLocalEventStore()
   try {
     const p = prepared('tx-2', '/ws', [mutation('a.txt', 'old', 'new'), mutation('b.txt', null, 'fresh')])
@@ -71,7 +71,7 @@ test('JS015_prepared_without_committed_is_interrupted_tool_evidence', async () =
   }
 })
 
-test('JS015_reopening_store_never_undoes_an_interrupted_tool', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_reopening_store_never_undoes_an_interrupted_tool', async () => {
   const { dir, cleanup } = sandbox()
   const common = mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
   try {
@@ -96,7 +96,7 @@ test('JS015_reopening_store_never_undoes_an_interrupted_tool', async () => {
   }
 })
 
-test('JS015_store_source_has_no_manual_history_reader', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_store_source_has_no_manual_history_reader', async () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|scanUncommitted|OpenSnapshot|readStreams/)
   assert.doesNotMatch(source, /recoverCurrent|undoIfMatches/)

@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { paretoFrontier } from '../../../dist/Sphinx/Representation.js'
-import { createStore, start, resume, state, assessWhy, fsharpList } from './support.mjs'
+import { paretoFrontier, createStore, start, resume, state, assessWhy, fsharpList } from './support.mjs'
 
 test('WHAT[EPI-011] wire_equivalence_hint_cannot_force_kernel_merge', () => {
   const store = createStore()

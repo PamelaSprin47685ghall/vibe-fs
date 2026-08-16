@@ -76,7 +76,7 @@ const confirmOn = (guard, { challengeDigest = CHALLENGE_DIGEST, secondInputDiges
 
 // ── REVIEW-003: the fixed challenge is one fact viewed three ways ─────────────
 
-test('REVIEW_003_the_challenge_text_and_its_version_are_pinned', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_the_challenge_text_and_its_version_are_pinned', () => {
   // English canonical bytes are the historical EN seal. A new locale is not a
   // new TextVersion; bump only when the English sentence itself changes.
   assert.equal(reviewChallenge.path, 'review/challenge')
@@ -87,7 +87,7 @@ test('REVIEW_003_the_challenge_text_and_its_version_are_pinned', () => {
   assert.equal(reviewChallenge.textVersion, 1)
 })
 
-test('REVIEW_003_the_challenge_digest_is_the_digest_of_that_exact_text', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_the_challenge_digest_is_the_digest_of_that_exact_text', () => {
   // Derived through the tool-result digest, not hashed locally. The challenge IS
   // a tool result, so sealing it necessarily produces this value; a second hash
   // spelled elsewhere would agree only by coincidence, and any drift would refuse
@@ -101,7 +101,7 @@ test('REVIEW_003_the_challenge_digest_is_the_digest_of_that_exact_text', () => {
   assert.equal(idValue.sealDigest(reviewChallenge.contentDigest(H)), CHALLENGE_DIGEST_TEXT)
 })
 
-test('REVIEW_003_challenge_follows_session_language', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_challenge_follows_session_language', () => {
   const en = providerResources.readText(providerLanguage.english, reviewChallenge.path)
   const zh = providerResources.readText(
     providerLanguage.simplifiedChinese,
@@ -119,7 +119,7 @@ test('REVIEW_003_challenge_follows_session_language', () => {
 
 // ── REVIEW-004: one provider run counts once ─────────────────────────────────
 
-test('REVIEW_004_the_attempt_identity_names_all_five_components', () => {
+test('WHAT[REVIEW-ASSURANCE-003] REVIEW_004_the_attempt_identity_names_all_five_components', () => {
   // Five components joined with `\u001f`. Dropping ToolCallId would make parallel
   // PERFECT calls in one assistant message indistinguishable; dropping the tree
   // would let a confirmation for an old tree count for a new one.
@@ -129,7 +129,7 @@ test('REVIEW_004_the_attempt_identity_names_all_five_components', () => {
   )
 })
 
-test('REVIEW_003_two_attempts_are_distinct_only_when_run_AND_call_both_differ', () => {
+test('WHAT[REVIEW-ASSURANCE-001] REVIEW_003_two_attempts_are_distinct_only_when_run_AND_call_both_differ', () => {
   // Conditions 1-5: same reviewer, same barrier, same tree, DIFFERENT run,
   // DIFFERENT call. Each negative case below removes exactly one.
   const distinct = (a, b) => reviewWitness.isDistinctAttempt(BARRIER, a, b)
@@ -149,7 +149,7 @@ test('REVIEW_003_two_attempts_are_distinct_only_when_run_AND_call_both_differ', 
   )
 })
 
-test('REVIEW_004_a_repeated_attempt_is_refused_as_a_duplicate', () => {
+test('WHAT[REVIEW-ASSURANCE-003] REVIEW_004_a_repeated_attempt_is_refused_as_a_duplicate', () => {
   const guard = reviewProjection.startBarrier(BARRIER, TREE, reviewProjection.empty)
   const attempt = witnessAt({ run: 'run_1', call: 'call_1' })
 
@@ -168,7 +168,7 @@ test('REVIEW_004_a_repeated_attempt_is_refused_as_a_duplicate', () => {
   assert.equal(reviewProjection.hasObservedAttempt(witnessAt({ run: 'run_9', call: 'call_9' }), applied.value), false)
 })
 
-test('REVIEW_004_the_attempt_window_is_bounded', () => {
+test('WHAT[REVIEW-ASSURANCE-003] REVIEW_004_the_attempt_window_is_bounded', () => {
   // PERSIST-008. The window only has to recognise repeats within the current
   // barrier, so it does not grow with history.
   let guard = reviewProjection.empty
@@ -188,7 +188,7 @@ test('REVIEW_004_the_attempt_window_is_bounded', () => {
 
 // ── REVIEW-005: confirmation is a witness state, never a stored flag ─────────
 
-test('REVIEW_005_an_empty_guard_is_NoReview_and_satisfies_nothing', () => {
+test('WHAT[REVIEW-ASSURANCE-004] REVIEW_005_an_empty_guard_is_NoReview_and_satisfies_nothing', () => {
   const guard = reviewProjection.empty
 
   assert.deepEqual(reviewProjection.read(guard), {
@@ -208,7 +208,7 @@ test('REVIEW_005_an_empty_guard_is_NoReview_and_satisfies_nothing', () => {
   assert.equal(isSome(reviewWitness.gitTreeHash(reviewWitness.noReview)), false)
 })
 
-test('REVIEW_005_a_first_PERFECT_becomes_a_pending_witness_the_fold_can_produce', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_005_a_first_PERFECT_becomes_a_pending_witness_the_fold_can_produce', () => {
   // The regression this pins: a previous version stored only `PendingChallenge`,
   // so `isPerfectPending` was never true and both of its readers waited for a
   // state the fold could not produce. A first PERFECT looked like no review.
@@ -237,7 +237,7 @@ test('REVIEW_005_a_first_PERFECT_becomes_a_pending_witness_the_fold_can_produce'
   })
 })
 
-test('REVIEW_005_recording_a_PERFECT_verdict_alone_does_not_make_it_pending', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_005_recording_a_PERFECT_verdict_alone_does_not_make_it_pending', () => {
   // `applyVerdict` counts the attempt (REVIEW-004); the challenge is a separate
   // fact. Confirmation must never be reachable by recording a verdict alone.
   const guard = reviewProjection.startBarrier(BARRIER, TREE, reviewProjection.empty)
@@ -254,7 +254,7 @@ test('REVIEW_005_recording_a_PERFECT_verdict_alone_does_not_make_it_pending', ()
   })
 })
 
-test('REVIEW_002_a_REVISE_clears_an_unfinished_confirmation', () => {
+test('WHAT[REVIEW-ASSURANCE-001] REVIEW_002_a_REVISE_clears_an_unfinished_confirmation', () => {
   const pending = reviewProjection.applyChallengeIssued(
     issuedChallenge(),
     reviewProjection.startBarrier(BARRIER, TREE, reviewProjection.empty),
@@ -272,7 +272,7 @@ test('REVIEW_002_a_REVISE_clears_an_unfinished_confirmation', () => {
 
 // ── REVIEW-010: the seal is the causal evidence ──────────────────────────────
 
-test('REVIEW_010_a_seal_records_the_tool_result_digests_the_run_actually_saw', () => {
+test('WHAT[REVIEW-ASSURANCE-007] REVIEW_010_a_seal_records_the_tool_result_digests_the_run_actually_saw', () => {
   const guard = reviewProjection.applySeal(
     providerInputSeal({ session: REVIEWER, run: 'run_2', digest: 'seal_2', included: [CHALLENGE_DIGEST_TEXT] }),
     reviewProjection.empty,
@@ -281,7 +281,7 @@ test('REVIEW_010_a_seal_records_the_tool_result_digests_the_run_actually_saw', (
   assert.equal(reviewProjection.read(guard).seals, 1)
 })
 
-test('REVIEW_010_the_seal_window_is_bounded', () => {
+test('WHAT[REVIEW-ASSURANCE-003] REVIEW_010_the_seal_window_is_bounded', () => {
   // Seals matter only until the verdict that consumes them, so the window is
   // small and keyed by provider run (PERSIST-008).
   let guard = reviewProjection.empty
@@ -298,7 +298,7 @@ test('REVIEW_010_the_seal_window_is_bounded', () => {
 
 // ── REVIEW-003 + REVIEW-006: the confirmed witness and its evidence ─────────
 
-test('REVIEW_006_a_confirmed_witness_answers_every_identity_question_inline', () => {
+test('WHAT[REVIEW-ASSURANCE-005] REVIEW_006_a_confirmed_witness_answers_every_identity_question_inline', () => {
   const confirmed = confirmOn(afterChallengeAndSeal())
   assert.equal(confirmed.ok, true, confirmed.ok ? '' : confirmed.error)
 
@@ -318,7 +318,7 @@ test('REVIEW_006_a_confirmed_witness_answers_every_identity_question_inline', ()
   assert.equal(reviewProjection.satisfiesGuard(TREE, confirmed.value), true)
 })
 
-test('REVIEW_006_the_witness_has_no_authority_root_field_at_all', () => {
+test('WHAT[REVIEW-ASSURANCE-005] REVIEW_006_the_witness_has_no_authority_root_field_at_all', () => {
   // REVIEW-003 forbids confirming on a shared authority root. Carrying the field
   // "for context" is how that comes back: once it exists, comparing it is one
   // line away. So the record must not have one.
@@ -350,7 +350,7 @@ test('REVIEW_006_the_witness_has_no_authority_root_field_at_all', () => {
   )
 })
 
-test('REVIEW_003_confirmation_requires_two_distinct_attempts', () => {
+test('WHAT[REVIEW-ASSURANCE-001] REVIEW_003_confirmation_requires_two_distinct_attempts', () => {
   // Conditions 1-5 are enforced at confirmation time, not merely documented. The
   // second witness here reuses the first run, which is the exact shape a reviewer
   // emitting two PERFECT calls in one assistant message produces.
@@ -370,7 +370,7 @@ test('REVIEW_003_confirmation_requires_two_distinct_attempts', () => {
   assert.equal(reviewProjection.read(guard).witness, 'PerfectPending', 'the guard is unchanged')
 })
 
-test('REVIEW_003_the_witness_carries_the_digests_rather_than_a_boolean', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_the_witness_carries_the_digests_rather_than_a_boolean', () => {
   // `confirm` takes the two digests, not a `proven: bool`. A boolean would leave
   // `SecondProviderInputDigest` to be fetched again by whoever builds the
   // witness — a second lookup that can disagree with the first.
@@ -389,7 +389,7 @@ test('REVIEW_003_the_witness_carries_the_digests_rather_than_a_boolean', () => {
   assert.equal(reviewWitness.confirm(BARRIER, CHALLENGE_DIGEST, sealDigest('seal_2'), first, first), undefined)
 })
 
-test('REVIEW_005_confirmedReviewer_is_derived_from_the_witness_not_stored_beside_it', () => {
+test('WHAT[REVIEW-ASSURANCE-004] REVIEW_005_confirmedReviewer_is_derived_from_the_witness_not_stored_beside_it', () => {
   const confirmed = confirmOn(afterChallengeAndSeal())
 
   assert.equal(idValue.session(reviewWitness.confirmedReviewer(confirmed.value.Witness)), REVIEWER)
@@ -405,7 +405,7 @@ test('REVIEW_005_confirmedReviewer_is_derived_from_the_witness_not_stored_beside
   assert.equal(isSome(reviewWitness.confirmedReviewer(reviewWitness.noReview)), false)
 })
 
-test('REVIEW_007_a_started_barrier_is_mirrored_to_the_manager_guard', () => {
+test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_started_barrier_is_mirrored_to_the_manager_guard', () => {
   const reviewer = sessionId(REVIEWER)
   const manager = sessionId('ses_manager')
   const result = fold.one(fold.empty, envelope({
@@ -424,7 +424,7 @@ test('REVIEW_007_a_started_barrier_is_mirrored_to_the_manager_guard', () => {
 
 // ── REVIEW-008: a tree change invalidates without deleting ──────────────────
 
-test('REVIEW_008_a_tree_change_makes_a_confirmed_witness_insufficient', () => {
+test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_a_tree_change_makes_a_confirmed_witness_insufficient', () => {
   const confirmed = confirmOn(afterChallengeAndSeal()).value
 
   assert.equal(reviewProjection.satisfiesGuard(TREE, confirmed), true)
@@ -438,7 +438,7 @@ test('REVIEW_008_a_tree_change_makes_a_confirmed_witness_insufficient', () => {
   assert.equal(reviewWitness.isValidForTree(OTHER_TREE, confirmed.Witness), false)
 })
 
-test('REVIEW_008_a_new_barrier_clears_the_pending_challenge_but_keeps_the_witness', () => {
+test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_a_new_barrier_clears_the_pending_challenge_but_keeps_the_witness', () => {
   const confirmed = confirmOn(afterChallengeAndSeal()).value
   const next = reviewProjection.startBarrier(reviewBarrierId('bar_2'), OTHER_TREE, confirmed)
 
@@ -456,7 +456,7 @@ test('REVIEW_008_a_new_barrier_clears_the_pending_challenge_but_keeps_the_witnes
   assert.equal(reviewProjection.satisfiesGuard(OTHER_TREE, next), false)
 })
 
-test('REVIEW_008_a_new_barrier_invalidates_a_witness_even_when_the_tree_hash_is_unchanged', () => {
+test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_a_new_barrier_invalidates_a_witness_even_when_the_tree_hash_is_unchanged', () => {
   const confirmed = confirmOn(afterChallengeAndSeal()).value
   const next = reviewProjection.startBarrier(reviewBarrierId('bar_2'), TREE, confirmed)
 
@@ -464,7 +464,7 @@ test('REVIEW_008_a_new_barrier_invalidates_a_witness_even_when_the_tree_hash_is_
   assert.equal(reviewProjection.satisfiesGuard(TREE, next), false, 'the new barrier requires two new PERFECT attempts')
 })
 
-test('REVIEW_008_a_late_confirmation_cannot_rewind_the_current_barrier', () => {
+test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_a_late_confirmation_cannot_rewind_the_current_barrier', () => {
   const newer = reviewProjection.startBarrier(reviewBarrierId('bar_2'), TREE, reviewProjection.empty)
   const late = confirmOn(newer).value
 
@@ -473,7 +473,7 @@ test('REVIEW_008_a_late_confirmation_cannot_rewind_the_current_barrier', () => {
   assert.equal(reviewProjection.satisfiesGuard(TREE, late), false)
 })
 
-test('REVIEW_008_re_entering_the_same_barrier_changes_nothing', () => {
+test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_re_entering_the_same_barrier_changes_nothing', () => {
   // Idempotent, because the Guard re-checks on every assistant terminal. If this
   // reset the attempt window, a second PERFECT in the same barrier would stop
   // being recognised as a repeat.
@@ -483,7 +483,7 @@ test('REVIEW_008_re_entering_the_same_barrier_changes_nothing', () => {
   assert.deepEqual(reviewProjection.read(again), reviewProjection.read(confirmed))
 })
 
-test('REVIEW_008_every_witness_state_reports_the_tree_it_belongs_to', () => {
+test('WHAT[REVIEW-ASSURANCE-006] REVIEW_008_every_witness_state_reports_the_tree_it_belongs_to', () => {
   // The Guard's question is always "for the CURRENT tree", so a state without a
   // tree could never be validated — and `NoReview` is exactly that state.
   const pending = reviewProjection.applyChallengeIssued(
@@ -507,7 +507,7 @@ test('REVIEW_008_every_witness_state_reports_the_tree_it_belongs_to', () => {
 
 // ── REVIEW-007: the requirement a human prompt creates ──────────────────────
 
-test('REVIEW_007_a_requirement_is_keyed_by_authority_root_and_deduped', () => {
+test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_requirement_is_keyed_by_authority_root_and_deduped', () => {
   // Keyed by Authority Root rather than physical message: the requirement is
   // about the task a human asked for, and PROMPT-002 makes the root that task's
   // identity. Keying by the wire message would also force converting one identity
@@ -523,7 +523,7 @@ test('REVIEW_007_a_requirement_is_keyed_by_authority_root_and_deduped', () => {
   assert.equal(listItems(requirements.HumanPromptInputs).length, 2)
 })
 
-test('REVIEW_007_a_confirmed_review_clears_the_requirements_it_covered', () => {
+test('WHAT[REVIEW-ASSURANCE-013] REVIEW_007_a_confirmed_review_clears_the_requirements_it_covered', () => {
   let requirements = reviewRequirements.addRequirement(
     sessionId('ses_m'),
     authorityRoot('msg_1'),

@@ -27,7 +27,7 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-test('FILETOOLS_read_returns_content_for_existing_file', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_returns_content_for_existing_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'note.txt')
   writeFileSync(path, 'hello world')
@@ -41,7 +41,7 @@ test('FILETOOLS_read_returns_content_for_existing_file', async () => {
   cleanup()
 })
 
-test('FILETOOLS_read_reports_missing_file', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_reports_missing_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'nope.txt')
 
@@ -52,7 +52,7 @@ test('FILETOOLS_read_reports_missing_file', async () => {
   cleanup()
 })
 
-test('FILETOOLS_read_accepts_a_bare_string_payload', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_accepts_a_bare_string_payload', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'bare.txt')
   writeFileSync(path, 'bare payload')
@@ -64,7 +64,7 @@ test('FILETOOLS_read_accepts_a_bare_string_payload', async () => {
   cleanup()
 })
 
-test('FILETOOLS_read_falls_back_to_raw_payload_when_not_json', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] FILETOOLS_read_falls_back_to_raw_payload_when_not_json', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'raw.txt')
   writeFileSync(path, 'raw content')
@@ -76,7 +76,7 @@ test('FILETOOLS_read_falls_back_to_raw_payload_when_not_json', async () => {
   cleanup()
 })
 
-test('FILETOOLS_write_creates_file_and_reports_size', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_creates_file_and_reports_size', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'out.txt')
 
@@ -92,7 +92,7 @@ test('FILETOOLS_write_creates_file_and_reports_size', async () => {
   cleanup()
 })
 
-test('FILETOOLS_write_refuses_unparseable_payload', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_write_refuses_unparseable_payload', async () => {
   const { dir, cleanup } = sandbox()
   const tool = fileWriteTool()
   const output = await tool.Execute(context(dir), input('not json at all'))
@@ -101,7 +101,7 @@ test('FILETOOLS_write_refuses_unparseable_payload', async () => {
   cleanup()
 })
 
-test('FILETOOLS_edit_replaces_exact_match', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_replaces_exact_match', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'edit.txt')
   writeFileSync(path, 'alpha beta gamma')
@@ -117,7 +117,7 @@ test('FILETOOLS_edit_replaces_exact_match', async () => {
   cleanup()
 })
 
-test('FILETOOLS_edit_reports_missing_file', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_missing_file', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'missing.txt')
 
@@ -131,7 +131,7 @@ test('FILETOOLS_edit_reports_missing_file', async () => {
   cleanup()
 })
 
-test('FILETOOLS_edit_reports_absent_old_string', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_reports_absent_old_string', async () => {
   const { dir, cleanup } = sandbox()
   const path = join(dir, 'no-match.txt')
   writeFileSync(path, 'nothing to replace')
@@ -147,7 +147,7 @@ test('FILETOOLS_edit_reports_absent_old_string', async () => {
   cleanup()
 })
 
-test('FILETOOLS_edit_refuses_unparseable_payload', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-010] FILETOOLS_edit_refuses_unparseable_payload', async () => {
   const { dir, cleanup } = sandbox()
   const tool = fileEditTool()
   const output = await tool.Execute(context(dir), input('{broken'))

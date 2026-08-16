@@ -27,7 +27,7 @@ const frame = () => resultOf(Frame.StrengthFrame_tryBuild(
   toList([batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')])]),
 )).value
 
-test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', async () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the_same_bundle', async () => {
   const local = createLocalEventStore()
   const durability = Durability.create(local.store)
   const bundle = frame()
@@ -69,7 +69,7 @@ test('STRENGTH_006_008_durability_port_publishes_payload_closure_and_reloads_the
   local.close()
 })
 
-test('STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_durability_port_rejects_conflicting_Prepared_identity', async () => {
   const local = createLocalEventStore()
   const durability = Durability.create(local.store)
   const first = frame()

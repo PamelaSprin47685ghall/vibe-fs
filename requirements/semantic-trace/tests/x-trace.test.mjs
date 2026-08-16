@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { xTrace } from '../../verification-system/tests/support/domain.mjs'
 
-test('XTRACE_cursor_is_strictly_monotonic', () => {
+test('WHAT[SEMANTIC-TRACE-003] XTRACE_cursor_is_strictly_monotonic', () => {
   const origin = xTrace.originCursor
   const second = xTrace.next(origin)
   const third = xTrace.next(second)
@@ -21,7 +21,7 @@ test('XTRACE_cursor_is_strictly_monotonic', () => {
   assert.equal(xTrace.isAfter(second, second), false)
 })
 
-test('XTRACE_slice_between_is_half_open_and_order_preserving', () => {
+test('WHAT[SEMANTIC-TRACE-006] XTRACE_slice_between_is_half_open_and_order_preserving', () => {
   const items = [
     xTrace.item({ sequence: 0, part: xTrace.text('a') }),
     xTrace.item({ sequence: 1, part: xTrace.text('b') }),
@@ -33,7 +33,7 @@ test('XTRACE_slice_between_is_half_open_and_order_preserving', () => {
   assert.deepEqual(middle.map((item) => item.Cursor.Sequence), [1, 2])
 })
 
-test('XTRACE_slice_from_takes_suffix_to_head', () => {
+test('WHAT[SEMANTIC-TRACE-006] XTRACE_slice_from_takes_suffix_to_head', () => {
   const items = [
     xTrace.item({ sequence: 0, part: xTrace.text('a') }),
     xTrace.item({ sequence: 1, part: xTrace.text('b') }),
@@ -44,14 +44,14 @@ test('XTRACE_slice_from_takes_suffix_to_head', () => {
   assert.deepEqual(suffix.map((item) => item.Cursor.Sequence), [1, 2])
 })
 
-test('XTRACE_head_is_after_last_item_and_origin_for_empty', () => {
+test('WHAT[SEMANTIC-TRACE-006] XTRACE_head_is_after_last_item_and_origin_for_empty', () => {
   assert.equal(xTrace.head([]).Sequence, 0)
 
   const items = [xTrace.item({ sequence: 4, part: xTrace.text('x') })]
   assert.equal(xTrace.head(items).Sequence, 5)
 })
 
-test('XTRACE_flatten_is_the_single_semantic_source', () => {
+test('WHAT[SEMANTIC-TRACE-007] XTRACE_flatten_is_the_single_semantic_source', () => {
   const turns = [
     { role: 'user', parts: [xTrace.text('Fix the race.'), xTrace.toolCall('read', '{"path":"a"}')] },
     { role: 'assistant', parts: [xTrace.reasoning('considered'), xTrace.text('done')] },
@@ -66,7 +66,7 @@ test('XTRACE_flatten_is_the_single_semantic_source', () => {
   assert.equal(flat[2].part.tag, xTrace.reasoning('x').tag)
 })
 
-test('XTRACE_render_is_deterministic_and_never_emits_provenance', () => {
+test('WHAT[SEMANTIC-TRACE-005] XTRACE_render_is_deterministic_and_never_emits_provenance', () => {
   const items = [
     xTrace.item({ sequence: 0, role: 'user', provenance: 'run-1/msg-1', part: xTrace.text('Fix the race.') }),
     xTrace.item({ sequence: 1, role: 'assistant', provenance: 'run-1/msg-1', part: xTrace.reasoning('hidden consideration') }),
@@ -87,11 +87,11 @@ test('XTRACE_render_is_deterministic_and_never_emits_provenance', () => {
   assert.equal(first.includes('msg-1'), false)
 })
 
-test('XTRACE_empty_render_is_empty_string', () => {
+test('WHAT[SEMANTIC-TRACE-005] XTRACE_empty_render_is_empty_string', () => {
   assert.equal(xTrace.render(xTrace.toItems([])), '')
 })
 
-test('XTRACE_forWorkRecord_drops_raw_tools_keeps_text_reasoning_media', () => {
+test('WHAT[SEMANTIC-TRACE-007] XTRACE_forWorkRecord_drops_raw_tools_keeps_text_reasoning_media', () => {
   // COMPANION-003: XTrace 全量可含 tool；LWR 投影剔除 raw tool。
   const items = [
     xTrace.item({ sequence: 0, role: 'user', part: xTrace.text('task') }),

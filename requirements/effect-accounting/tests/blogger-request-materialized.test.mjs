@@ -11,12 +11,12 @@ import {
   fact,
   fold,
   frameEpochId,
+  FsList,
   prefixEpochId,
   promptKey,
   providerRun,
   sessionId,
   stream,
-  toList,
 } from '../../verification-system/tests/support/domain.mjs'
 
 const session = sessionId('ses-main')
@@ -51,7 +51,7 @@ const materialize = ({ requestId = 'req-1', kind = 'main', n = 1, run } = {}) =>
       PreviousIngestedThroughSequence: 0n,
       NextIngestedThroughSequence: kind === 'main' ? 1n : 0n,
       FrameEpochId: frameEpochId(0),
-      SelectedFrameDigests: toList([]),
+      SelectedFrameDigests: FsList.ofArray([]),
       PromptKey: undefined,
     }),
     run,
@@ -162,7 +162,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_fill_in_after_send',
       PreviousIngestedThroughSequence: 0n,
       NextIngestedThroughSequence: 1n,
       FrameEpochId: frameEpochId(0),
-      SelectedFrameDigests: toList([]),
+      SelectedFrameDigests: FsList.ofArray([]),
       PromptKey: promptKey('pk-blog-1'),
     }),
   )
@@ -184,7 +184,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_cannot_rebind', () =
       PreviousIngestedThroughSequence: 0n,
       NextIngestedThroughSequence: 1n,
       FrameEpochId: frameEpochId(0),
-      SelectedFrameDigests: toList([]),
+      SelectedFrameDigests: FsList.ofArray([]),
       PromptKey: promptKey('pk-a'),
     }),
   )
@@ -200,7 +200,7 @@ test('WHAT[EFFECT-ACCOUNTING-008] C5_materialize_prompt_key_cannot_rebind', () =
       PreviousIngestedThroughSequence: 0n,
       NextIngestedThroughSequence: 1n,
       FrameEpochId: frameEpochId(0),
-      SelectedFrameDigests: toList([]),
+      SelectedFrameDigests: FsList.ofArray([]),
       PromptKey: promptKey('pk-b'),
     }),
   )

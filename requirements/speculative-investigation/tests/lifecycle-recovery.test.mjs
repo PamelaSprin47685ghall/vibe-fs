@@ -54,7 +54,7 @@ const promoted = (frame, decisionId = 'd1', target = 'run-1') => Events.Strength
 
 const apply = (state, event) => resultOf(Projection.StrengthProjectionModule_apply(state, event)).value
 
-test('STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_output', () => {
+test('WHAT[SPEC-INV-007] STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_output', () => {
   const frame = bundle()
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
 
@@ -83,7 +83,7 @@ test('STRENGTH_007_lifecycle_promotes_only_exact_target_with_real_provider_outpu
   assert.equal(Lifecycle.StrengthLifecycle_reconcileEvent(projection, realTurn), undefined)
 })
 
-test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', async () => {
+test('WHAT[SPEC-INV-008] STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_exact_target_anchor', async () => {
   const frame = bundle()
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   const messages = toList([{ id: 'user-1' }, { id: 'run-1' }, { id: 'user-2' }])
@@ -119,7 +119,7 @@ test('STRENGTH_006_008_replay_excludes_Prepared_and_rebuilds_only_Promoted_at_ex
   assert.match(missingAnchor.error, /target anchor is absent/i)
 })
 
-test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', async () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', async () => {
   const frame = bundle()
   const projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   assert.equal(Projection.StrengthProjectionModule_isPromoted(decision('d1'), projection), false)
@@ -141,7 +141,7 @@ test('STRENGTH_006_008_prepared_candidate_cannot_be_traced_or_raw_replayed', asy
   assert.equal(listItems(replay.value).length, 0)
 })
 
-test('STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', async () => {
+test('WHAT[SPEC-INV-008] STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage', async () => {
   const frame = bundle()
   let projection = apply(Projection.StrengthProjectionModule_empty, prepared(frame))
   projection = apply(projection, promoted(frame))
@@ -160,7 +160,7 @@ test('STRENGTH_008_compaction_does_not_retire_raw_replay_without_xtrace_coverage
   assert.equal(Lifecycle.StrengthLifecycle_needsRawReplay(43n, plan), false)
 })
 
-test('STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
+test('WHAT[SPEC-INV-008] STRENGTH_008_trace_recovery_requires_one_exact_contiguous_canonical_match', () => {
   const frame = bundle()
   const expected = listItems(TraceRecovery.StrengthTraceRecovery_expectedParts(frame))
   assert.equal(expected.length, 4)

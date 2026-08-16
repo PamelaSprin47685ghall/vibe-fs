@@ -62,25 +62,25 @@ const foldOk = (envelopes) => {
   return fold.session(result.value, SESSION)
 }
 
-test('PERSIST_010_opening_is_captured_verbatim_and_idempotent', () => {
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_opening_is_captured_verbatim_and_idempotent', () => {
   const s = foldOk([openingFact(), openingFact()])
   assert.equal(s.XTrace.Opening.AssignmentText, 'first task')
   assert.deepEqual(s.XTrace.Opening.AuthoritativeRequirements, [])
 })
 
-test('PERSIST_010_a_different_opening_is_refused', () => {
+test('WHAT[SEMANTIC-TRACE-010] PERSIST_010_a_different_opening_is_refused', () => {
   const result = fold.apply(fold.empty, [openingFact(), openingFact({ assignment: 'second task' })])
   assert.equal(result.ok, false)
   assert.equal(result.error.Fact, 'OpeningPromptCaptured')
   assert.match(result.error.Reason, /already captured with different text/)
 })
 
-test('PERSIST_010_opening_preserves_authoritative_requirement_order', () => {
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_opening_preserves_authoritative_requirement_order', () => {
   const s = foldOk([openingFact({ requirements: ['r1', 'r2', 'r3'] })])
   assert.deepEqual(s.XTrace.Opening.AuthoritativeRequirements, ['r1', 'r2', 'r3'])
 })
 
-test('PERSIST_010_parts_append_in_strict_cursor_order', () => {
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_parts_append_in_strict_cursor_order', () => {
   const s = foldOk([
     partFact({ sequence: 1, turn: 0, partIndex: 0 }),
     partFact({ sequence: 2, turn: 0, partIndex: 1 }),
@@ -99,21 +99,21 @@ test('PERSIST_010_parts_append_in_strict_cursor_order', () => {
   )
 })
 
-test('PERSIST_010_a_duplicate_cursor_is_refused', () => {
+test('WHAT[SEMANTIC-TRACE-003] PERSIST_010_a_duplicate_cursor_is_refused', () => {
   const result = fold.apply(fold.empty, [partFact({ sequence: 1 }), partFact({ sequence: 1 })])
   assert.equal(result.ok, false)
   assert.equal(result.error.Fact, 'XTracePartAppended')
   assert.match(result.error.Reason, /cursor 1 is not after the head 1/)
 })
 
-test('PERSIST_010_a_retreating_cursor_is_refused', () => {
+test('WHAT[SEMANTIC-TRACE-003] PERSIST_010_a_retreating_cursor_is_refused', () => {
   const result = fold.apply(fold.empty, [partFact({ sequence: 5 }), partFact({ sequence: 3 })])
   assert.equal(result.ok, false)
   assert.equal(result.error.Fact, 'XTracePartAppended')
   assert.match(result.error.Reason, /cursor 3 is not after the head 5/)
 })
 
-test('PERSIST_010_parts_carry_turn_part_and_tool_name', () => {
+test('WHAT[SEMANTIC-TRACE-002] PERSIST_010_parts_carry_turn_part_and_tool_name', () => {
   const s = foldOk([
     partFact({ sequence: 1, kind: 'tool_call', toolName: 'read', turn: 2, partIndex: 3 }),
   ])
@@ -125,12 +125,12 @@ test('PERSIST_010_parts_carry_turn_part_and_tool_name', () => {
   assert.equal(parts[0].Role, 'user')
 })
 
-test('PERSIST_010_terminal_is_captured_once_and_idempotent', () => {
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_terminal_is_captured_once_and_idempotent', () => {
   const s = foldOk([terminalFact(), terminalFact()])
   assert.deepEqual(s.XTrace.Terminal[0].fields[0], 'blob-term')
 })
 
-test('PERSIST_010_a_second_different_terminal_overwrites_for_reuse', () => {
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_a_second_different_terminal_overwrites_for_reuse', () => {
   const result = fold.apply(fold.empty, [terminalFact(), terminalFact({ ref: 'blob-term-2', digest: 'sha-term-2' })])
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
   const s = fold.session(result.value, SESSION)
@@ -139,7 +139,7 @@ test('PERSIST_010_a_second_different_terminal_overwrites_for_reuse', () => {
   assert.deepEqual(s.XTrace.Terminal[0].fields[0], 'blob-term-2')
 })
 
-test('PERSIST_010_xtrace_facts_survive_NDJSON_and_still_fold', () => {
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_xtrace_facts_survive_NDJSON_and_still_fold', () => {
   const result = fold.replay([
     openingFact(),
     partFact({ sequence: 1 }),

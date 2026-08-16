@@ -37,7 +37,7 @@ const openCodePort = (createdParents, aborts) => ({
   },
 })
 
-test('HOST_015_child_of_child_is_physically_parented_to_family_root', async () => {
+test('WHAT[SESSION-ONTOLOGY-006] HOST_015_child_of_child_is_physically_parented_to_family_root', async () => {
   const createdParents = []
   const port = createPort(openCodePort(createdParents, []), eventPort)
   const root = sessionId('root')
@@ -66,7 +66,7 @@ test('HOST_015_child_of_child_is_physically_parented_to_family_root', async () =
   assert.equal(port.FamilyRootOf(root).fields[0], 'root')
 })
 
-test('HOST_015_family_root_resolves_through_restored_journal_parents', async () => {
+test('WHAT[SESSION-ONTOLOGY-006] HOST_015_family_root_resolves_through_restored_journal_parents', async () => {
   const createdParents = []
   // After a restart the in-memory registry is empty; the logical parent chain
   // restored from durable HandleLinked facts still finds the family root.

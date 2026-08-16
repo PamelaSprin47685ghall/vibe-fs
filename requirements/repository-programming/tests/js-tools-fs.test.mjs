@@ -45,7 +45,7 @@ const unwrap = (result) => {
   return r.value
 }
 
-test('JS005_readUtf8_reads_and_classifies', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_readUtf8_reads_and_classifies', () => {
   const { dir, cleanup } = sandbox()
   try {
     const file = join(dir, 'a.txt')
@@ -60,7 +60,7 @@ test('JS005_readUtf8_reads_and_classifies', () => {
   }
 })
 
-test('JS006_findAnchor_ordered_string_and_regex', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_findAnchor_ordered_string_and_regex', () => {
   const text = 'a b a b a'
   // exact, occurrence 1/2/3
   assert.deepEqual(unwrap(findAnchor(text, exact('a'), 1)), [0, 1])
@@ -75,14 +75,14 @@ test('JS006_findAnchor_ordered_string_and_regex', () => {
   assert.equal(codeOf(findAnchor(text, regex('('), 1)), 'INVALID_ANCHOR_PATTERN')
 })
 
-test('JS006_requireUnique_refuses_ambiguous_anchors', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_requireUnique_refuses_ambiguous_anchors', () => {
   const text = 'x y x'
   assert.deepEqual(unwrap(requireUnique(text, exact('y'))), [2, 3])
   assert.equal(codeOf(requireUnique(text, exact('x'))), 'ANCHOR_NOT_UNIQUE')
   assert.equal(codeOf(requireUnique(text, exact('z'))), 'ANCHOR_NOT_FOUND')
 })
 
-test('JS007_glob_deterministic_enumeration', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_deterministic_enumeration', () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -106,7 +106,7 @@ test('JS007_glob_deterministic_enumeration', () => {
   }
 })
 
-test('JS007_glob_gitignore_skips_git_and_ignored', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-008] JS007_glob_gitignore_skips_git_and_ignored', () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, '.git', 'objects'), { recursive: true })
@@ -135,7 +135,7 @@ test('JS007_glob_gitignore_skips_git_and_ignored', () => {
   }
 })
 
-test('JS020_grep_returns_line_column_and_skips_ignored', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-009] JS020_grep_returns_line_column_and_skips_ignored', () => {
   const { dir, cleanup } = sandbox()
   try {
     mkdirSync(join(dir, 'src'))
@@ -157,7 +157,7 @@ test('JS020_grep_returns_line_column_and_skips_ignored', () => {
   }
 })
 
-test('JS013_commitPlan_all_or_nothing', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_all_or_nothing', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -174,7 +174,7 @@ test('JS013_commitPlan_all_or_nothing', () => {
   }
 })
 
-test('JS013_commitPlan_aborts_before_write_when_snapshot_fails', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_aborts_before_write_when_snapshot_fails', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -191,7 +191,7 @@ test('JS013_commitPlan_aborts_before_write_when_snapshot_fails', () => {
   }
 })
 
-test('JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -208,7 +208,7 @@ test('JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
   }
 })
 
-test('JS015_rollbackPlan_restores_originals_and_removes_creates', () => {
+test('WHAT[REPOSITORY-PROGRAMMING-015] JS015_rollbackPlan_restores_originals_and_removes_creates', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')

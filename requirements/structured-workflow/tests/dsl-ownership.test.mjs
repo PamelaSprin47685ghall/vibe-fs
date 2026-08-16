@@ -23,59 +23,70 @@ const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.
 const NEGATIVES = [
   {
     gate: 'mutable',
+    title: 'mutable_bare_let',
     source: ['module Sample', 'let mutable counter = 0'].join('\n'),
     line: 2,
   },
   {
     gate: 'flow-lift',
+    title: 'flow_lift',
     source: ['module Sample', 'let escape t = Flow.create t'].join('\n'),
     line: 2,
   },
   {
     gate: 'second-runtime-protocol',
+    title: 'second_runtime_protocol',
     source: ['module Sample', 'type WorkflowCommand =', '    | ReadSnapshot'].join('\n'),
     line: 2,
   },
   {
     gate: 'business-interpreter',
+    title: 'business_interpreter',
     source: ['module Sample', 'module WorkflowInterpreter =', '    let run program = program'].join('\n'),
     line: 2,
   },
   {
     gate: 'infrastructure-leak',
+    title: 'infrastructure_leak',
     source: ['module Sample', 'open Wanxiangshu.Infrastructure'].join('\n'),
     line: 2,
   },
   {
     gate: 'program-counter',
+    title: 'program_counter_dirty',
     source: ['module Sample', 'type Flags = { Dirty: bool }'].join('\n'),
     line: 2,
   },
   {
     gate: 'program-counter',
+    title: 'program_counter_current_stage',
     source: ['module Sample', 'type Runtime = { CurrentStage: bool }'].join('\n'),
     line: 2,
   },
   {
     gate: 'bool-loop',
+    title: 'bool_loop_agent',
     file: 'Agent/Negative_bool_loop.fs',
     source: ['module Sample', 'let mutable armed = false', 'let mutable spent = false', 'while not done do', '    ()'].join('\n'),
     line: 2,
   },
   {
     gate: 'dup-cases',
+    title: 'dup_cases_child_recovery',
     file: 'Session/ChildRecovery.fs',
     source: ['module Sample', 'type Alpha =', '    | First', '    | Second', 'type ChildResolution =', '    | First', '    | Second'].join('\n'),
     line: 2,
   },
   {
     gate: 'bool-loop',
+    title: 'bool_loop_process',
     file: 'src/Wanxiangshu/Process/Negative_bool_loop.fs',
     source: ['module Sample', 'let mutable a = false', 'let mutable b = false', 'while x do', '    ()'].join('\n'),
     line: 2,
   },
   {
     gate: 'behaviour-bool',
+    title: 'behaviour_bool_has_pending_completion',
     source: ['module Sample', 'type State = { HasPendingCompletion: bool }'].join('\n'),
     line: 2,
   },
@@ -90,7 +101,7 @@ const CLEAN = [
   '}',
 ].join('\n')
 
-test('DSL_OWNERSHIP_large_du_without_class_annotation_is_reported', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_large_du_without_class_annotation_is_reported', () => {
   const src = ['module Sample', 'type Big =', '    | C01', '    | C02', '    | C03', '    | C04', '    | C05', '    | C06', '    | C07', '    | C08', '    | C09', '    | C10'].join('\n')
   const reported = scanLargeDus(src, 'Agent/Large.fs')
   assert.equal(reported.length, 1)
@@ -98,7 +109,7 @@ test('DSL_OWNERSHIP_large_du_without_class_annotation_is_reported', () => {
   assert.equal(reported[0].cases, 10)
 })
 
-test('DSL_OWNERSHIP_large_du_with_class_annotation_is_clean', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_large_du_with_class_annotation_is_clean', () => {
   const src = [
     'module Sample',
     '/// DSL-class: Vocabulary — fixed catalog.',
@@ -117,7 +128,7 @@ test('DSL_OWNERSHIP_large_du_with_class_annotation_is_clean', () => {
   assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
 })
 
-test('DSL_OWNERSHIP_large_du_class_annotation_across_attribute_is_clean', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_large_du_class_annotation_across_attribute_is_clean', () => {
   // Roles.fs shape: `/// DSL-class:` separated from `type` by a
   // `[<RequireQualifiedAccess>]` attribute must still be matched (the lookback
   // skips attribute/blank lines while collecting `///` doc lines).
@@ -140,7 +151,7 @@ test('DSL_OWNERSHIP_large_du_class_annotation_across_attribute_is_clean', () => 
   assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
 })
 
-test('DSL_OWNERSHIP_large_du_class_annotation_across_attribute_and_blank_is_clean', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_large_du_class_annotation_across_attribute_and_blank_is_clean', () => {
   // Attribute plus blank lines between doc and `type` are skipped too.
   const src = [
     'module Sample',
@@ -163,7 +174,7 @@ test('DSL_OWNERSHIP_large_du_class_annotation_across_attribute_and_blank_is_clea
   assert.deepEqual(scanLargeDus(src, 'Agent/Large.fs'), [])
 })
 
-test('DSL_OWNERSHIP_large_du_unclassified_still_reported_behind_attribute', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_large_du_unclassified_still_reported_behind_attribute', () => {
   // A large DU with no DSL-class annotation is still reported even when an
   // attribute sits between the doc area and the type declaration.
   const src = [
@@ -188,12 +199,12 @@ test('DSL_OWNERSHIP_large_du_unclassified_still_reported_behind_attribute', () =
   assert.equal(reported[0].cases, 10)
 })
 
-test('DSL_OWNERSHIP_small_du_is_never_reported', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_small_du_is_never_reported', () => {
   const src = ['module Sample', 'type Small =', '    | A', '    | B'].join('\n')
   assert.deepEqual(scanLargeDus(src, 'Agent/Small.fs'), [])
 })
 
-test('DSL_OWNERSHIP_exports_nine_named_gates', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_exports_nine_named_gates', () => {
   assert.deepEqual(GATE_NAMES, [
     'mutable',
     'flow-lift',
@@ -209,39 +220,69 @@ test('DSL_OWNERSHIP_exports_nine_named_gates', () => {
   assert.equal(FORBIDDEN.length, 10)
 })
 
-for (const sample of NEGATIVES) {
-  if (sample.gate === 'bool-loop' || sample.gate === 'dup-cases') continue
-  test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
-    const file = sample.file ?? `Agent/Negative_${sample.gate}.fs`
-    const hits = scanText(sample.source, file)
-    const ofGate = hits.filter((v) => v.gate === sample.gate)
+// 一 test 一 WHAT：NEGATIVES 按命题归属拆分，checker 只认静态标题里的 WHAT[<ID>]。
+const assertNegativeGate = (sample) => {
+  const file = sample.file ?? `Agent/Negative_${sample.gate}.fs`
+  const hits = scanText(sample.source, file)
+  const ofGate = hits.filter((v) => v.gate === sample.gate)
+  assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
+  assert.equal(ofGate[0].line, sample.line)
+  assert.equal(ofGate[0].file, file)
+}
+
+const assertNegativeGateFiles = (sample) => {
+  const hits = scanFiles([{ file: sample.file, text: sample.source }])
+  const ofGate = hits.filter((v) => v.gate === sample.gate)
+  if (sample.file.endsWith('ChildRecovery.fs')) {
+    // DUP_CASES_EXEMPT registers ChildRecovery.fs:ChildResolution; a DU with
+    // that exact basename:name must not fire.
+    assert.equal(ofGate.length, 0, 'registered exemption does not fire')
+  } else {
     assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
     assert.equal(ofGate[0].line, sample.line)
-    assert.equal(ofGate[0].file, file)
-  })
+  }
 }
 
-for (const sample of NEGATIVES.filter((s) => s.gate === 'bool-loop' || s.gate === 'dup-cases')) {
-  test(`DSL_OWNERSHIP_negative_${sample.gate}_goes_red`, () => {
-    const hits = scanFiles([{ file: sample.file, text: sample.source }])
-    const ofGate = hits.filter((v) => v.gate === sample.gate)
-    if (sample.file.endsWith('ChildRecovery.fs')) {
-      // DUP_CASES_EXEMPT registers ChildRecovery.fs:ChildResolution; a DU with
-      // that exact basename:name must not fire.
-      assert.equal(ofGate.length, 0, 'registered exemption does not fire')
-    } else {
-      assert.ok(ofGate.length >= 1, `expected gate ${sample.gate} to fire`)
-      assert.equal(ofGate[0].line, sample.line)
-    }
-  })
-}
+const negGate = (gate, title) => NEGATIVES.find((s) => s.gate === gate && s.title === title)
 
-test('DSL_OWNERSHIP_clean_source_stays_green', () => {
+// STRUCTURED-WORKFLOW-002：禁止第二业务运行时（second-runtime-protocol / business-interpreter / flow-lift）。
+test('WHAT[STRUCTURED-WORKFLOW-002] DSL_OWNERSHIP_negative_second-runtime-protocol_goes_red', () =>
+  assertNegativeGate(negGate('second-runtime-protocol', 'second_runtime_protocol')))
+test('WHAT[STRUCTURED-WORKFLOW-002] DSL_OWNERSHIP_negative_business-interpreter_goes_red', () =>
+  assertNegativeGate(negGate('business-interpreter', 'business_interpreter')))
+test('WHAT[STRUCTURED-WORKFLOW-002] DSL_OWNERSHIP_negative_flow-lift_goes_red', () =>
+  assertNegativeGate(negGate('flow-lift', 'flow_lift')))
+
+// STRUCTURED-WORKFLOW-003：状态标签只表示物理/领域真实事物（program-counter / behaviour-bool / bool-loop）。
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_negative_program-counter_goes_red', () =>
+  assertNegativeGate(negGate('program-counter', 'program_counter_dirty')))
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_negative_program-counter-current-stage_goes_red', () =>
+  assertNegativeGate(negGate('program-counter', 'program_counter_current_stage')))
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_negative_behaviour-bool_goes_red', () =>
+  assertNegativeGate(negGate('behaviour-bool', 'behaviour_bool_has_pending_completion')))
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_negative_bool-loop-agent_goes_red', () =>
+  assertNegativeGateFiles(negGate('bool-loop', 'bool_loop_agent')))
+
+// STRUCTURED-WORKFLOW-006：单一真理源（dup-cases 跨文件重复；ChildRecovery 注册豁免不 fire）。
+test('WHAT[STRUCTURED-WORKFLOW-006] DSL_OWNERSHIP_negative_dup-cases_goes_red', () =>
+  assertNegativeGateFiles(negGate('dup-cases', 'dup_cases_child_recovery')))
+
+// STRUCTURED-WORKFLOW-007：纯决策与效果按 owner 成树（infrastructure-leak）。
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_negative_infrastructure-leak_goes_red', () =>
+  assertNegativeGate(negGate('infrastructure-leak', 'infrastructure_leak')))
+
+// STRUCTURED-WORKFLOW-008：mutable/ref 只承载物理资源或局部纯实现（mutable / bool-loop 物理路径）。
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_negative_mutable_goes_red', () =>
+  assertNegativeGate(negGate('mutable', 'mutable_bare_let')))
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_negative_bool-loop-process_goes_red', () =>
+  assertNegativeGateFiles(negGate('bool-loop', 'bool_loop_process')))
+
+test('WHAT[STRUCTURED-WORKFLOW-001] DSL_OWNERSHIP_clean_source_stays_green', () => {
   const hits = scanText(CLEAN, 'Domain/Clean.fs')
   assert.deepEqual(hits, [])
 })
 
-test('DSL_OWNERSHIP_domain_pending_evidence_is_not_behaviour_bool', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_domain_pending_evidence_is_not_behaviour_bool', () => {
   const source = [
     'module Sample',
     'type Witness = | PerfectPending of unit | StillPending of bool | ConflictPending of unit',
@@ -253,7 +294,7 @@ test('DSL_OWNERSHIP_domain_pending_evidence_is_not_behaviour_bool', () => {
   assert.deepEqual(hits, [])
 })
 
-test('DSL_OWNERSHIP_verb_named_function_ending_Pending_is_not_behaviour_bool', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_verb_named_function_ending_Pending_is_not_behaviour_bool', () => {
   // A verb-named function that ends in a nominal suffix is a pure operation,
   // not a stored stage latch. `clearStalePending` / `tryClaimStartupProbe` are
   // names of work being performed, not fields recording "which step we are at".
@@ -272,7 +313,7 @@ test('DSL_OWNERSHIP_verb_named_function_ending_Pending_is_not_behaviour_bool', (
   )
 })
 
-test('DSL_OWNERSHIP_physical_pending_latch_and_estimate_fields_are_not_behaviour_bool', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_physical_pending_latch_and_estimate_fields_are_not_behaviour_bool', () => {
   // Cat-C false positives: physical abort set, runtime estimate field, recovery
   // probe type alias, and fold-rejection tokens that merely end in Already/Pending.
   const source = [
@@ -290,7 +331,7 @@ test('DSL_OWNERSHIP_physical_pending_latch_and_estimate_fields_are_not_behaviour
   )
 })
 
-test('DSL_OWNERSHIP_field_named_HasPendingCompletion_still_fires_behaviour_bool', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_field_named_HasPendingCompletion_still_fires_behaviour_bool', () => {
   // The residual exact-name block is the authority for stage latches: a
   // stored boolean completion slot must keep firing.
   const source = ['module Sample', 'type State = { HasPendingCompletion: bool }'].join('\n')
@@ -301,7 +342,7 @@ test('DSL_OWNERSHIP_field_named_HasPendingCompletion_still_fires_behaviour_bool'
   )
 })
 
-test('DSL_OWNERSHIP_pascal_member_Pending_still_fires_behaviour_bool', () => {
+test('WHAT[STRUCTURED-WORKFLOW-004] DSL_OWNERSHIP_pascal_member_Pending_still_fires_behaviour_bool', () => {
   // A PascalCase property named as a stage latch (CompactionProbePending) is a
   // stored control slot and must fire even though verb-named functions are now
   // allowed.
@@ -313,7 +354,7 @@ test('DSL_OWNERSHIP_pascal_member_Pending_still_fires_behaviour_bool', () => {
   )
 })
 
-test('DSL_OWNERSHIP_business_stage_bool_suffix_still_fires_behaviour_bool', () => {
+test('WHAT[STRUCTURED-WORKFLOW-004] DSL_OWNERSHIP_business_stage_bool_suffix_still_fires_behaviour_bool', () => {
   // Residual suffix must still catch true business stage bools that are not
   // domain evidence / physical allowlist entries.
   const source = ['module Sample', 'type Flags = { isRunning: bool; repairSpent: bool }'].join('\n')
@@ -324,7 +365,7 @@ test('DSL_OWNERSHIP_business_stage_bool_suffix_still_fires_behaviour_bool', () =
   )
 })
 
-test('DSL_OWNERSHIP_qualified_infrastructure_reference_is_leak_outside_infra', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_qualified_infrastructure_reference_is_leak_outside_infra', () => {
   const source = [
     'module Sample',
     'let prompts () = Wanxiangshu.Infrastructure.Resources.RuntimeResources.current().Prompts',
@@ -336,7 +377,7 @@ test('DSL_OWNERSHIP_qualified_infrastructure_reference_is_leak_outside_infra', (
   )
 })
 
-test('DSL_OWNERSHIP_qualified_process_reference_is_leak_outside_infra', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_qualified_process_reference_is_leak_outside_infra', () => {
   const source = [
     'module Sample',
     'let run () = Wanxiangshu.Process.ProcessRunner.run cmd est ctx ct',
@@ -348,7 +389,7 @@ test('DSL_OWNERSHIP_qualified_process_reference_is_leak_outside_infra', () => {
   )
 })
 
-test('DSL_OWNERSHIP_namespace_OpenCode_declaration_is_not_infrastructure_leak', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_namespace_OpenCode_declaration_is_not_infrastructure_leak', () => {
   // A `namespace Wanxiangshu.OpenCode` line declares the module's own home, not
   // a dependency on the infrastructure layer — it must not fire
   // infrastructure-leak (C-class false positive).
@@ -357,13 +398,13 @@ test('DSL_OWNERSHIP_namespace_OpenCode_declaration_is_not_infrastructure_leak', 
   assert.ok(!hits.some((h) => h.gate === 'infrastructure-leak'))
 })
 
-test('DSL_OWNERSHIP_namespace_Process_declaration_is_not_infrastructure_leak', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_namespace_Process_declaration_is_not_infrastructure_leak', () => {
   const source = 'namespace Wanxiangshu.Process\nmodule Sample =\n    let x = 1'
   const hits = scanText(source, 'src/Wanxiangshu/Application/Reconciliation/Sample.fs')
   assert.ok(!hits.some((h) => h.gate === 'infrastructure-leak'))
 })
 
-test('DSL_OWNERSHIP_qualified_process_reference_is_clean_inside_infra', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_qualified_process_reference_is_clean_inside_infra', () => {
   // Infrastructure may use Process FQN without leaking across the boundary.
   const hits = scanText(
     'module Sample\nlet x = Wanxiangshu.Process.ProcessRunner.run',
@@ -373,7 +414,7 @@ test('DSL_OWNERSHIP_qualified_process_reference_is_clean_inside_infra', () => {
 })
 
 
-test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
   const hits = scanFiles([
     { file: 'a.fs', text: NEGATIVES[0].source },
     { file: 'b.fs', text: CLEAN },
@@ -389,7 +430,7 @@ test('DSL_OWNERSHIP_scanFiles_aggregates_entries', () => {
 })
 
 
-test('DSL_OWNERSHIP_mutable_requires_dsl_mutable_declaration', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_mutable_requires_dsl_mutable_declaration', () => {
   // Domain/Session/Application/Process/Kernel.Parallel: a bare `let mutable`
   // is a violation; the preceding 1-2 lines must carry `// DSL-MUTABLE:`.
   const bare = ['module Sample', 'let scratch () =', '    let mutable acc = 0', '    acc'].join('\n')
@@ -439,7 +480,7 @@ test('DSL_OWNERSHIP_mutable_requires_dsl_mutable_declaration', () => {
   )
 })
 
-test('DSL_OWNERSHIP_unknown_mutable_category_is_rejected', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_unknown_mutable_category_is_rejected', () => {
   const source = [
     'module Sample',
     'let scratch () =',
@@ -450,7 +491,7 @@ test('DSL_OWNERSHIP_unknown_mutable_category_is_rejected', () => {
   assert.ok(scanText(source, 'src/Wanxiangshu/Domain/Sample.fs').some((h) => h.gate === 'mutable'))
 })
 
-test('DSL_OWNERSHIP_control_state_class_is_a_program_counter', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_control_state_class_is_a_program_counter', () => {
   const source = [
     'module Sample',
     '/// DSL-class: ControlState',
@@ -461,7 +502,7 @@ test('DSL_OWNERSHIP_control_state_class_is_a_program_counter', () => {
   assert.ok(scanText(source, 'src/Wanxiangshu/Session/Sample.fs').some((h) => h.gate === 'program-counter'))
 })
 
-test('DSL_OWNERSHIP_renamed_record_state_axes_are_reported', () => {
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_renamed_record_state_axes_are_reported', () => {
   const hits = scanText(readFixture('state-axes-illegal.fs'), 'src/Wanxiangshu/Domain/StateAxes.fs')
   assert.ok(
     hits.some((hit) => hit.gate === 'state-product'),
@@ -472,7 +513,7 @@ test('DSL_OWNERSHIP_renamed_record_state_axes_are_reported', () => {
 // DSL-005/007: a record carrying `mutable foo:` state fields must produce a
 // state-product violation. A
 // production file with this fixture is therefore rejected by the CLI gate.
-test('DSL_OWNERSHIP_mutable_record_program_counter_fires_state_product', () => {
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_mutable_record_program_counter_fires_state_product', () => {
   const hits = scanText(
     readFixture('mutable-record-program-counter.fs'),
     'src/Wanxiangshu/Session/StudentRunCell.fs',
@@ -483,7 +524,7 @@ test('DSL_OWNERSHIP_mutable_record_program_counter_fires_state_product', () => {
   )
 })
 
-test('DSL_OWNERSHIP_mutable_record_program_counter_fires_mutable_record_field', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_mutable_record_program_counter_fires_mutable_record_field', () => {
   const hits = scanText(
     readFixture('mutable-record-program-counter.fs'),
     'src/Wanxiangshu/Session/StudentRunCell.fs',
@@ -494,7 +535,7 @@ test('DSL_OWNERSHIP_mutable_record_program_counter_fires_mutable_record_field', 
   )
 })
 
-test('DSL_OWNERSHIP_ref_record_program_counter_fires_mutable_record_field', () => {
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_ref_record_program_counter_fires_mutable_record_field', () => {
   const hits = scanText(
     readFixture('ref-record-program-counter.fs'),
     'src/Wanxiangshu/Session/StudentRunCell.fs',
@@ -509,7 +550,7 @@ test('DSL_OWNERSHIP_ref_record_program_counter_fires_mutable_record_field', () =
   )
 })
 
-test('DSL_OWNERSHIP_joint_registry_match_with_effect_fires_registry_joint_branch', () => {
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_joint_registry_match_with_effect_fires_registry_joint_branch', () => {
   const hits = scanText(
     readFixture('registry-joint-branch.fs'),
     'src/Wanxiangshu/Session/SyncDelegateRuntime.fs',
@@ -520,7 +561,7 @@ test('DSL_OWNERSHIP_joint_registry_match_with_effect_fires_registry_joint_branch
   )
 })
 
-test('DSL_OWNERSHIP_physical_state_record_mutable_fields_are_allowed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_physical_state_record_mutable_fields_are_allowed', () => {
   const hits = scanText(readFixture('state-axes-physical.fs'), 'src/Wanxiangshu/Process/StateAxes.fs')
   assert.ok(
     hits.every((hit) => hit.gate !== 'mutable-record-field'),
@@ -528,7 +569,7 @@ test('DSL_OWNERSHIP_physical_state_record_mutable_fields_are_allowed', () => {
   )
 })
 
-test('DSL_OWNERSHIP_session_mutable_requires_physical_annotation', () => {
+test('WHAT[STRUCTURED-WORKFLOW-004] DSL_OWNERSHIP_session_mutable_requires_physical_annotation', () => {
   // Production-style multi-line record body (mirrors ChildRun / PtySession).
   const source = [
     'module Sample',
@@ -556,17 +597,17 @@ test('DSL_OWNERSHIP_session_mutable_requires_physical_annotation', () => {
   )
 })
 
-test('DSL_OWNERSHIP_domain_state_combination_is_explicitly_allowed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_domain_state_combination_is_explicitly_allowed', () => {
   const hits = scanText(readFixture('state-axes-domain.fs'), 'src/Wanxiangshu/Domain/StateAxes.fs')
   assert.deepEqual(hits, [])
 })
 
-test('DSL_OWNERSHIP_physical_state_combination_is_explicitly_allowed', () => {
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_physical_state_combination_is_explicitly_allowed', () => {
   const hits = scanText(readFixture('state-axes-physical.fs'), 'src/Wanxiangshu/Process/StateAxes.fs')
   assert.deepEqual(hits, [])
 })
 
-test('DSL_OWNERSHIP_control_state_requires_structured_reason', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_control_state_requires_structured_reason', () => {
   const source = [
     'module Sample',
     '/// DSL-class: ControlState',
@@ -579,7 +620,7 @@ test('DSL_OWNERSHIP_control_state_requires_structured_reason', () => {
 })
 
 
-test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   const source = ['module Sample', 'open Wanxiangshu.OpenCode', 'open Wanxiangshu.Process'].join('\n')
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('HostForkRuntime.fs'))
   assert.ok(HOST_BOUNDARY_OPEN_BASENAMES.has('SatelliteRuntime.fs'))
@@ -601,12 +642,12 @@ test('DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   assert.ok(scanText(source, 'src/Wanxiangshu/Agent/Sample.fs').some((h) => h.gate === 'infrastructure-leak'))
 })
 
-test('DSL_OWNERSHIP_comment_only_line_is_ignored', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_comment_only_line_is_ignored', () => {
   const source = ['module Sample', '// type HiddenCommand =', '// let mutable x = 1'].join('\n')
   assert.deepEqual(scanText(source), [])
 })
 
-test('DSL_OWNERSHIP_threshold_freeze_semantics', () => {
+test('WHAT[STRUCTURED-WORKFLOW-014] DSL_OWNERSHIP_threshold_freeze_semantics', () => {
   assert.equal(evaluateThreshold(0, -1).ok, true)
   assert.equal(evaluateThreshold(1, -1).ok, false)
   assert.equal(evaluateThreshold(317, 317).ok, true)
@@ -615,7 +656,7 @@ test('DSL_OWNERSHIP_threshold_freeze_semantics', () => {
   assert.equal(evaluateThreshold(318, 317).reason, 'exceeds-threshold')
 })
 
-test('DSL_OWNERSHIP_cross_file_duplicate_case_set_is_violation', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] DSL_OWNERSHIP_cross_file_duplicate_case_set_is_violation', () => {
   const hits = scanFiles([
     {
       file: 'src/Wanxiangshu/Domain/Alpha.fs',
@@ -630,7 +671,7 @@ test('DSL_OWNERSHIP_cross_file_duplicate_case_set_is_violation', () => {
   assert.ok(dup.length >= 1, 'cross-file duplicate case set must fire')
 })
 
-test('DSL_OWNERSHIP_single_file_duplicate_case_set_is_not_cross_file', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] DSL_OWNERSHIP_single_file_duplicate_case_set_is_not_cross_file', () => {
   // dup-cases is a cross-file gate (PR 9 E): the global case-set map is keyed
   // across files, and each DU is flushed when the next `type` begins (or at
   // end of file). Two DUs in the SAME file, even with an identical case set,
@@ -644,7 +685,7 @@ test('DSL_OWNERSHIP_single_file_duplicate_case_set_is_not_cross_file', () => {
   assert.ok(!hits.some((v) => v.gate === 'dup-cases'))
 })
 
-test('DSL_OWNERSHIP_infrastructure_declared_mutable_is_accepted', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_infrastructure_declared_mutable_is_accepted', () => {
   // Infrastructure is a production physical layer: a `let mutable` immediately
   // preceded by a valid `// DSL-MUTABLE: resource` declaration must be accepted
   // (declaration-based exemption, mirroring Domain/Session/Application/Process).
@@ -662,7 +703,7 @@ test('DSL_OWNERSHIP_infrastructure_declared_mutable_is_accepted', () => {
   )
 })
 
-test('DSL_OWNERSHIP_journal_declared_mutable_is_accepted', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_journal_declared_mutable_is_accepted', () => {
   // Journal is a production persistence layer: a `let mutable` immediately
   // preceded by a valid `// DSL-MUTABLE: resource` declaration must be accepted
   // (declaration-based exemption, mirroring Infrastructure and
@@ -681,7 +722,7 @@ test('DSL_OWNERSHIP_journal_declared_mutable_is_accepted', () => {
   )
 })
 
-test('DSL_OWNERSHIP_journal_bare_mutable_still_fires', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_journal_bare_mutable_still_fires', () => {
   // Fail-closed baseline: without the declaration the same Journal mutable
   // must still be reported.
   const bare = [
@@ -696,7 +737,7 @@ test('DSL_OWNERSHIP_journal_bare_mutable_still_fires', () => {
   )
 })
 
-test('DSL_OWNERSHIP_infrastructure_bare_mutable_still_fires', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] DSL_OWNERSHIP_infrastructure_bare_mutable_still_fires', () => {
   // Fail-closed baseline: without the declaration the same Infrastructure
   // mutable must still be reported.
   const bare = [
@@ -711,7 +752,7 @@ test('DSL_OWNERSHIP_infrastructure_bare_mutable_still_fires', () => {
   )
 })
 
-test('DSL_OWNERSHIP_cross_file_duplicate_case_set_exemption_stays_clean', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] DSL_OWNERSHIP_cross_file_duplicate_case_set_exemption_stays_clean', () => {
   const hits = scanFiles([
     {
       file: 'src/Wanxiangshu/Domain/PromptAuthority.fs',

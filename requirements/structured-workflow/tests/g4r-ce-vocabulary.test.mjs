@@ -20,7 +20,7 @@ import {
   scanRawTimeEntries,
 } from '../../../scripts/checks/g4r-ce-vocabulary.mjs'
 
-test('G4R_CE_S0_documents_obsolete_controller_paths', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_documents_obsolete_controller_paths', () => {
   assert.ok(OBSOLETE_CONTROLLER_PATHS.includes('Application/Reconciliation/TurnCompletionProgram.fs'))
   assert.ok(OBSOLETE_CONTROLLER_PATHS.includes('Infrastructure/OpenCode/Tools/FinalityController.fs'))
   assert.ok(OBSOLETE_CONTROLLER_PATHS.includes('Session/ReviewController.fs'))
@@ -32,7 +32,7 @@ test('G4R_CE_S0_documents_obsolete_controller_paths', () => {
   assert.equal(OBSOLETE_CONTROLLER_PATHS.length, 6)
 })
 
-test('G4R_CE_S0_documents_raw_time_tokens_and_layers', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_documents_raw_time_tokens_and_layers', () => {
   for (const token of [
     'DateTimeOffset.UtcNow',
     'DateTime.Now',
@@ -46,7 +46,7 @@ test('G4R_CE_S0_documents_raw_time_tokens_and_layers', () => {
   assert.deepEqual([...RAW_TIME_SCAN_LAYERS], ['Domain', 'Application', 'Session'])
 })
 
-test('G4R_CE_S0_obsolete_scanner_RED_on_synthetic_presence', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_obsolete_scanner_RED_on_synthetic_presence', () => {
   const present = new Set([
     'Application/Reconciliation/TurnCompletionProgram.fs',
     'Session/ReviewController.fs',
@@ -58,12 +58,12 @@ test('G4R_CE_S0_obsolete_scanner_RED_on_synthetic_presence', () => {
   assert.ok(hits.some((h) => h.path.includes('ReviewController')))
 })
 
-test('G4R_CE_S0_obsolete_scanner_GREEN_when_all_absent', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_obsolete_scanner_GREEN_when_all_absent', () => {
   const hits = scanObsoleteControllerAbsence(OBSOLETE_CONTROLLER_PATHS, () => false)
   assert.equal(hits.length, 0)
 })
 
-test('G4R_CE_S0_raw_time_scanner_RED_on_synthetic_tokens', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_RED_on_synthetic_tokens', () => {
   const dirty = scanRawTimeEntries([
     {
       file: 'Application/Reconciliation/Evil.fs',
@@ -87,7 +87,7 @@ test('G4R_CE_S0_raw_time_scanner_RED_on_synthetic_tokens', () => {
   }
 })
 
-test('G4R_CE_S0_raw_time_scanner_ignores_comment_only_mentions', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_scanner_ignores_comment_only_mentions', () => {
   const clean = scanRawTimeEntries([
     {
       file: 'Domain/Doc.fs',
@@ -97,7 +97,7 @@ test('G4R_CE_S0_raw_time_scanner_ignores_comment_only_mentions', () => {
   assert.equal(clean.length, 0)
 })
 
-test('G4R_CE_S0_raw_time_allowlist_hook_skips_physical_adapter', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_raw_time_allowlist_hook_skips_physical_adapter', () => {
   const file = 'Session/PhysicalClockAdapter.fs'
   assert.equal(isRawTimeAllowlisted(file, []), false)
   assert.equal(isRawTimeAllowlisted(file, ['Session/PhysicalClockAdapter.fs']), true)
@@ -116,7 +116,7 @@ test('G4R_CE_S0_raw_time_allowlist_hook_skips_physical_adapter', () => {
   assert.equal(unlisted.length, 1)
 })
 
-test('G4R_CE_S0_synthetic_tree_scan_proves_gate_can_fail', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_synthetic_tree_scan_proves_gate_can_fail', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'g4r-ce-s0-'))
   try {
     const prod = join(tmp, 'src/Wanxiangshu')
@@ -145,17 +145,31 @@ test('G4R_CE_S0_synthetic_tree_scan_proves_gate_can_fail', () => {
   }
 })
 
-test('G4R_CE_S0_parse_phase_defaults_to_soft', () => {
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_parse_phase_defaults_to_soft', () => {
   assert.equal(parsePhase([]), 's0-soft')
   assert.equal(parsePhase(['--phase=s0-soft']), 's0-soft')
   assert.equal(parsePhase(['--phase=hard']), 'hard')
   assert.throws(() => parsePhase(['--phase=nope']), /unknown --phase/)
 })
 
-test('G4R_CE_S14_production_is_clean_in_hard_phase', () => {
-  // Production tree is clean of obsolete controllers and raw-time tokens.
-  const { obsolete, rawTime, violations } = scanG4RCeVocabulary()
+test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S14_production_has_no_obsolete_controllers', () => {
+  // Production tree is clean of obsolete controllers (G4R-CE Exit).
+  const { obsolete, violations } = scanG4RCeVocabulary()
   assert.equal(obsolete.length, 0, 'all obsolete controllers must be deleted')
+  assert.ok(
+    violations.every((v) => v.kind !== 'obsolete-controller'),
+    `no obsolete-controller hit allowed; have: ${violations.map((v) => v.kind).join(', ')}`,
+  )
+})
+
+test('WHAT[TIME-004] G4R_CE_S14_production_is_clean_of_raw_time_in_hard_phase', () => {
+  // raw-time 禁止语义归 time-capability（TIME-004）；本扫描器机制归
+  // structured-workflow（HOW §3.3 MECHANISM 交叉）。此处只钉生产事实：
+  // Domain/Application/Session 三层无 raw wall-clock / timer token。
+  const { rawTime, violations } = scanG4RCeVocabulary()
   assert.equal(rawTime.length, 0, 'no raw wall-clock / timer tokens allowed in Domain/Application/Session')
-  assert.equal(violations.length, 0, 'production is clean under hard phase')
+  assert.ok(
+    violations.every((v) => v.kind !== 'raw-time'),
+    `no raw-time hit allowed; have: ${violations.map((v) => v.kind).join(', ')}`,
+  )
 })

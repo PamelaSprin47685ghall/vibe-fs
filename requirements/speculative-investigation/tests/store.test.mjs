@@ -32,7 +32,7 @@ const unwrap = (value) => {
 
 const writePayload = async (store, text) => unwrap(await store.WritePayload(new TextEncoder().encode(text)))
 
-test('STRENGTH_006_017_strength_event_types_are_authoritative_store_vocabulary', () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_017_strength_event_types_are_authoritative_store_vocabulary', () => {
   for (const name of [
     'StrengthCandidatePrepared',
     'StrengthCandidatePromoted',
@@ -43,7 +43,7 @@ test('STRENGTH_006_017_strength_event_types_are_authoritative_store_vocabulary',
   }
 })
 
-test('STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs', () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs', () => {
   const first = StrengthStore.toEnvelope(H, prepared())
   const conflicting = StrengthStore.toEnvelope(H, prepared(['payload-b'], 'frame-b'))
 
@@ -57,7 +57,7 @@ test('STRENGTH_006_store_envelope_puts_large_material_only_in_payload_refs', () 
   assert.equal(decoded.value.fields[0].FrameDigest, 'frame-a')
 })
 
-test('STRENGTH_006_same_decision_different_prepared_material_is_identity_collision', async () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_same_decision_different_prepared_material_is_identity_collision', async () => {
   const local = createLocalEventStore()
   try {
     const firstRef = await writePayload(local.store, 'first')
@@ -81,7 +81,7 @@ test('STRENGTH_006_same_decision_different_prepared_material_is_identity_collisi
   }
 })
 
-test('STRENGTH_007_promotion_without_prepared_is_missing_parent', async () => {
+test('WHAT[SPEC-INV-007] STRENGTH_007_promotion_without_prepared_is_missing_parent', async () => {
   const local = createLocalEventStore()
   try {
     const frameRef = await writePayload(local.store, 'frame')
@@ -97,7 +97,7 @@ test('STRENGTH_007_promotion_without_prepared_is_missing_parent', async () => {
   }
 })
 
-test('STRENGTH_006_payload_bytes_are_local_content_addressed_payloads', async () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_payload_bytes_are_local_content_addressed_payloads', async () => {
   const local = createLocalEventStore()
   try {
     const bytes = new Uint8Array([1, 2, 3, 4])
@@ -111,7 +111,44 @@ test('STRENGTH_006_payload_bytes_are_local_content_addressed_payloads', async ()
   }
 })
 
-test('STRENGTH_006_007_008_integrator_Current_tracks_projection_without_history_scan', async () => {
+test('WHAT[SPEC-INV-006] STRENGTH_006_integrator_Current_reflects_Prepared_binding_without_history_scan', async () => {
+  const local = createLocalEventStore()
+  try {
+    const frameRef = await writePayload(local.store, 'frame-material')
+    const p = Events.StrengthEvents_prepared(
+      session('owner'), decision('d1'), run('run-1'), session('replica'),
+      StrengthBudget.K1, 'anchor-a', 'frame-a', 14, [frameRef],
+    )
+
+    assert.equal((await StrengthStore.append(local.store, H, p)).toJSON()[0], 'Ok')
+    const projection = local.store.TryCurrent('Strength')
+    assert.equal(Id.StrengthDecisionIdModule_value(StrengthStore.tryDecisionForTarget(run('run-1'), projection)), 'd1')
+    assert.equal(StrengthStore.isPromoted(decision('d1'), projection), false)
+  } finally {
+    local.close()
+  }
+})
+
+test('WHAT[SPEC-INV-007] STRENGTH_007_integrator_Current_reflects_Promoted_without_history_scan', async () => {
+  const local = createLocalEventStore()
+  try {
+    const frameRef = await writePayload(local.store, 'frame-material')
+    const p = Events.StrengthEvents_prepared(
+      session('owner'), decision('d1'), run('run-1'), session('replica'),
+      StrengthBudget.K1, 'anchor-a', 'frame-a', 14, [frameRef],
+    )
+    const m = Events.StrengthEvents_promoted(session('owner'), decision('d1'), run('run-1'), 'frame-a', [frameRef])
+
+    assert.equal((await StrengthStore.append(local.store, H, p)).toJSON()[0], 'Ok')
+    assert.equal((await StrengthStore.append(local.store, H, m)).toJSON()[0], 'Ok')
+    const projection = local.store.TryCurrent('Strength')
+    assert.equal(StrengthStore.isPromoted(decision('d1'), projection), true)
+  } finally {
+    local.close()
+  }
+})
+
+test('WHAT[SPEC-INV-008] STRENGTH_008_integrator_Current_reflects_Traced_range_without_history_scan', async () => {
   const local = createLocalEventStore()
   try {
     const frameRef = await writePayload(local.store, 'frame-material')
@@ -125,7 +162,6 @@ test('STRENGTH_006_007_008_integrator_Current_tracks_projection_without_history_
     assert.equal(resultOf(await StrengthStore.append(local.store, H, p)).ok, true)
     assert.equal(resultOf(await StrengthStore.append(local.store, H, m)).ok, true)
     assert.equal(resultOf(await StrengthStore.append(local.store, H, t)).ok, true)
-
     const projection = local.store.TryCurrent('Strength')
     assert.equal(StrengthStore.isPromoted(decision('d1'), projection), true)
     const range = StrengthStore.tryTraceRange(decision('d1'), projection)

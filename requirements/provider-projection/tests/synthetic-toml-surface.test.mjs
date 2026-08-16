@@ -13,7 +13,7 @@ const toml = await import('../../../dist/Foundation/SyntheticTomlSurface.js')
 /** Parse a rendered value back with a real parser. The oracle, not a reimplementation. */
 const valueOf = (rendered) => parseToml(`x = ${rendered}`).x
 
-test('P6_TOML_SURFACE_exports_exact_writer_names', () => {
+test('WHAT[PROVIDER-PROJECTION-008] P6_TOML_SURFACE_exports_exact_writer_names', () => {
   assert.deepEqual(Object.getOwnPropertyNames(toml).sort(), [
     'byteCount',
     'comment',
@@ -29,7 +29,7 @@ test('P6_TOML_SURFACE_exports_exact_writer_names', () => {
   ])
 })
 
-test('P6_TOML_SURFACE_render_string_uses_basic_and_literal_forms', () => {
+test('WHAT[PROVIDER-PROJECTION-008] P6_TOML_SURFACE_render_string_uses_basic_and_literal_forms', () => {
   assertJsData(toml.renderString('hello'), 'renderString output')
   assert.equal(toml.renderString('hello'), '"hello"')
   assert.equal(toml.renderString('修复了 fallback 的竞态'), '"修复了 fallback 的竞态"')
@@ -40,7 +40,7 @@ test('P6_TOML_SURFACE_render_string_uses_basic_and_literal_forms', () => {
   assert.equal(valueOf(toml.renderString(body)), 'first\nsecond\n')
 })
 
-test('P6_TOML_SURFACE_document_lays_out_header_body_and_ordering', () => {
+test('WHAT[PROVIDER-PROJECTION-008] P6_TOML_SURFACE_document_lays_out_header_body_and_ordering', () => {
   const document = toml.renderDocument(['Diagnose the first causal failure.'], [
     toml.field('tool', toml.renderString('dotnet')),
     toml.field('exit_code', '1'),
@@ -58,7 +58,7 @@ test('P6_TOML_SURFACE_document_lays_out_header_body_and_ordering', () => {
   assert.deepEqual(parseToml(mixed).item, [{ turn: 1 }])
 })
 
-test('P6_TOML_SURFACE_byte_count_measures_utf8_not_characters', () => {
+test('WHAT[PROVIDER-PROJECTION-012] P6_TOML_SURFACE_byte_count_measures_utf8_not_characters', () => {
   assert.equal(toml.byteCount('abc'), 3)
   assert.equal(toml.byteCount('é'), 2)
   assert.equal(toml.byteCount('中'), 3)
@@ -66,7 +66,7 @@ test('P6_TOML_SURFACE_byte_count_measures_utf8_not_characters', () => {
   assert.equal(toml.byteCount(''), 0)
 })
 
-test('P6_TOML_SURFACE_renderer_exposes_no_parser', () => {
+test('WHAT[PROVIDER-PROJECTION-010] P6_TOML_SURFACE_renderer_exposes_no_parser', () => {
   const surface = new Set(Object.getOwnPropertyNames(toml))
   for (const forbidden of ['parse', 'decode', 'read']) {
     assert.equal(surface.has(forbidden), false, `SyntheticTomlSurface must not expose ${forbidden}`)

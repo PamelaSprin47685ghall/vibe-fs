@@ -9,78 +9,21 @@
 // branch ("Observation only. Keep pending run Active for a later proven terminal.").
 
 import assert from 'node:assert/strict'
-import { readdirSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
-import { agentCompletion, caseOf, pendingRunLifecycle, roles, sessionId } from '../../verification-system/tests/support/domain.mjs'
-
-const BUILD_ROOT = new URL('../../../dist/', import.meta.url).pathname
-
-const importDist = async (rel) => import(new URL(`../../../dist/${rel}`, import.meta.url).pathname)
+import {
+  EventsModule,
+  Outcome,
+  authorityRoot,
+  pendingRunLifecycle,
+  providerRun,
+  roles,
+  sessionId,
+  unionCase,
+} from '../../verification-system/tests/support/domain.mjs'
 
 // ── pending-runs dictionary + run helpers (mirror join-completion.test.mjs) ───
-
-async function loadDictionary() {
-  const fableLibDir = (() => {
-    const root = join(BUILD_ROOT, 'fable_modules')
-    const name = readdirSync(root).find((e) => e.startsWith('fable-library-js.'))
-    if (!name) throw new Error(`no fable-library-js.* under dist; run npm run format-build-test`)
-    return join(root, name)
-  })()
-  const candidates = ['MutableMap.js', 'System.Collections.Generic.js', 'MapUtil.js']
-  for (const file of candidates) {
-    try {
-      const mod = await import(join(fableLibDir, file))
-      const Ctor = mod.Dictionary ?? mod.default?.Dictionary
-      if (typeof Ctor === 'function') {
-        const util = await import(join(fableLibDir, 'Util.js'))
-        return {
-          Dictionary: Ctor,
-          comparer: { Equals: util.equals, GetHashCode: (x) => (util.safeHash(x) | 0) },
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-  const DictShim = class {
-    constructor() {
-      this._m = new Map()
-    }
-    set_Item(k, v) { this._m.set(k, v) }
-    get_Item(k) { return this._m.get(k) }
-    set(k, v) { this._m.set(k, v) }
-    get(k) { return this._m.get(k) }
-    has(k) { return this._m.has(k) }
-    TryGetValue(k) {
-      if (this._m.has(k)) return [true, this._m.get(k)]
-      return [false, null]
-    }
-    Remove(k) { return this._m.delete(k) }
-  }
-  return { Dictionary: DictShim }
-}
-
-function makePendingRuns(pendingRuns, run) {
-  if (typeof pendingRuns.set_Item === 'function') pendingRuns.set_Item(run.AgentId, run)
-  else if (typeof pendingRuns.set === 'function') pendingRuns.set(run.AgentId, run)
-  else pendingRuns[run.AgentId] = run
-  if (typeof pendingRuns.TryGetValue !== 'function') {
-    pendingRuns.TryGetValue = (key) => {
-      const has = typeof pendingRuns.has === 'function'
-        ? pendingRuns.has(key)
-        : pendingRuns.get?.(key) !== undefined
-      if (!has) return [false, null]
-      const value = typeof pendingRuns.get_Item === 'function'
-        ? pendingRuns.get_Item(key)
-        : pendingRuns.get(key)
-      return [true, value]
-    }
-  }
-  if (typeof pendingRuns.Remove !== 'function') {
-    pendingRuns.Remove = (key) => (typeof pendingRuns.delete === 'function' ? pendingRuns.delete(key) : false)
-  }
-}
+// `HostForkRunLifecycle.complete` only ever calls Map methods (has/get/set/delete),
+// so a plain JS Map is the JS-native dictionary for the pending-runs slot.
 
 function makeRun(agentId, childId) {
   const source = pendingRunLifecycle.completionSource()
@@ -95,57 +38,39 @@ function makeRun(agentId, childId) {
   }
 }
 
-// Fable union constructor for TerminalOutcome.Failed (tag 2).
+// TerminalOutcome.Completed carries an AgentRunResult; Failed carries a reason.
+const terminalOutcome = unionCase(EventsModule.TerminalOutcome, 'TerminalOutcome')
+
 async function failedOutcome(error) {
-  const Events = await importDist('OpenCode/Host/Events.js')
-  return new Events.TerminalOutcome(/* Failed */ 2, [error])
+  return terminalOutcome('Failed', [error])
 }
 
-// Fable Record constructor for AgentRunResult (dist/Foundation/Outcome.js).
-// Order: SessionId, AuthorityRootUserMessageId, ProviderRun, Role, Directory,
+// AgentRunResult record (dist/Foundation/Outcome.js) — field order:
+// SessionId, AuthorityRootUserMessageId, ProviderRun, Role, Directory,
 // TerminalText, TurnFormalText. TerminalText empty => IsValid=false.
 async function completedOutcome(terminalText) {
-  const [Outcome, Events, roots] = await Promise.all([
-    importDist('Foundation/Outcome.js'),
-    importDist('OpenCode/Host/Events.js'),
-    (async () => {
-      const Identity = await importDist('Foundation/Identity.js')
-      return {
-        session: sessionId,
-        authorityRoot: (v) => {
-          const id = Identity.AuthorityRootUserMessageId
-          return new id(v)
-        },
-        providerRun: (v) => {
-          const id = Identity.ProviderRunIdentity
-          return new id(v)
-        },
-      }
-    })(),
-  ])
   const result = new Outcome.AgentRunResult(
-    roots.session('ses_child'),
-    roots.authorityRoot('root_1'),
-    roots.providerRun('run_1'),
+    sessionId('ses_child'),
+    authorityRoot('root_1'),
+    providerRun('run_1'),
     roles.of('Coder'),
-    null, // Directory : string option -> null is None in Fable output
+    null, // Directory: string option -> null is None in Fable output
     terminalText,
     terminalText,
   )
-  return new Events.TerminalOutcome(/* Completed */ 0, [result])
+  return terminalOutcome('Completed', [result])
 }
 
 // ── MISSING_FINAL_REPORT is observation-only ─────────────────────────────────
 
 test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_MissingFinalReport_Failed_keeps_run_pending_not_failed', async () => {
-  const { Dictionary, comparer } = await loadDictionary()
-  const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
+  const pendingRuns = new Map()
   const gate = {}
   const agentId = 'agent-mfr'
   const child = sessionId('ses_mfr_child')
   const parent = sessionId('ses_mfr_parent')
   const run = makeRun(agentId, child)
-  makePendingRuns(pendingRuns, run)
+  pendingRuns.set(agentId, run)
 
   const mfrFailed = await failedOutcome('MISSING_FINAL_REPORT')
   pendingRunLifecycle.complete(gate, pendingRuns, undefined, parent, null, run, mfrFailed, undefined)
@@ -163,14 +88,13 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_MissingFinalReport_Failed_keeps_run_
 })
 
 test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_empty_Completed_keeps_run_pending_not_failed', async () => {
-  const { Dictionary, comparer } = await loadDictionary()
-  const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
+  const pendingRuns = new Map()
   const gate = {}
   const agentId = 'agent-empty'
   const child = sessionId('ses_empty_child')
   const parent = sessionId('ses_empty_parent')
   const run = makeRun(agentId, child)
-  makePendingRuns(pendingRuns, run)
+  pendingRuns.set(agentId, run)
 
   const emptyCompleted = await completedOutcome('')
   pendingRunLifecycle.complete(gate, pendingRuns, undefined, parent, null, run, emptyCompleted, undefined)
@@ -188,14 +112,13 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_empty_Completed_keeps_run_pending_no
 // ── genuine failures still settle the run ────────────────────────────────────
 
 test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_interaction_repair_exhausted_settles_the_run', async () => {
-  const { Dictionary, comparer } = await loadDictionary()
-  const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
+  const pendingRuns = new Map()
   const gate = {}
   const agentId = 'agent-repair-exhausted'
   const child = sessionId('ses_repair_exhausted_child')
   const parent = sessionId('ses_repair_exhausted_parent')
   const run = makeRun(agentId, child)
-  makePendingRuns(pendingRuns, run)
+  pendingRuns.set(agentId, run)
 
   const exhausted = await failedOutcome('INTERACTION_REPAIR_EXHAUSTED')
   pendingRunLifecycle.complete(gate, pendingRuns, undefined, parent, null, run, exhausted, undefined)
@@ -209,14 +132,13 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_interaction_repair_exhausted_settles
 })
 
 test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async () => {
-  const { Dictionary, comparer } = await loadDictionary()
-  const pendingRuns = comparer ? new Dictionary([], comparer) : new Dictionary()
+  const pendingRuns = new Map()
   const gate = {}
   const agentId = 'agent-real'
   const child = sessionId('ses_real_child')
   const parent = sessionId('ses_real_parent')
   const run = makeRun(agentId, child)
-  makePendingRuns(pendingRuns, run)
+  pendingRuns.set(agentId, run)
 
   const realFailed = await failedOutcome('provider timeout')
   pendingRunLifecycle.complete(gate, pendingRuns, undefined, parent, null, run, realFailed, undefined)
@@ -226,5 +148,5 @@ test('WHAT[EFFECT-ACCOUNTING-002] EXEC_join_real_Failed_still_claims_run', async
     run.Source.get_Task(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Source never completed')), 1000)),
   ])
-  assert.equal(caseOf(agentOutcome), 'AgentFailed')
+  assert.equal(agentOutcome.name, 'AgentFailed')
 })

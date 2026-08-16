@@ -10,7 +10,7 @@ import test from 'node:test'
 const { Role } = await import('../../../dist/Foundation/Roles.js')
 const { roleName } = await import('../../../dist/OpenCode/Host/TerminalPolicy.js')
 
-test('TPOL_roleName_lowercases_roles_and_handles_none', () => {
+test('WHAT[SESSION-ONTOLOGY-013] TPOL_roleName_lowercases_roles_and_handles_none', () => {
   assert.equal(roleName(Role.Manager), 'manager')
   assert.equal(roleName(Role.Coder), 'coder')
   assert.equal(roleName(Role.Orchestrator), 'orchestrator')

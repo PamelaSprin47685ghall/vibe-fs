@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import {
   agentFact,
   agentJournal,
-  caseOf,
   envelope,
   listItems,
   fact,
@@ -16,17 +15,15 @@ import {
   bloggerRequestId,
   prefixEpochId,
   providerRun,
-  resultOf,
   runtimeResources,
   sessionId,
   stream,
-  toList,
   toolCallId,
+  FsList,
 } from '../../verification-system/tests/support/domain.mjs'
 
 runtimeResources.installFromPackage()
 
-const { AgentJournalModule_appendAgent } = await import('../../../dist/Persistence/Journal/AgentJournal.js')
 const { EnforcerTipGuidance_latestTipNudge: latestTipNudge } = await import(
   '../../../dist/Enforcer/Guidance/Tip.js',
 )
@@ -40,8 +37,8 @@ const blogger = sessionId('ses-nudge-blogger')
 const journalStream = (id) => stream.session(id)
 
 const append = async (journal, id, value, run) => {
-  const result = await AgentJournalModule_appendAgent(journalStream(id), run, value, journal)
-  assert.equal(caseOf(result), 'Ok')
+  const result = await agentJournal.appendAgent(journalStream(id), run, value, journal)
+  assert.equal(result.ok, true)
 }
 
 const seed = async ({ withAssociation = true, withTip = true } = {}) => {
@@ -139,7 +136,7 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () 
 })
 
 const guideline = '# Pair programming auto-injected'
-const anchor = toList([{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }])
+const anchor = FsList.ofArray([{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }])
 const markerOutput = (messages) => {
   const items = listItems(messages)
   // pair sits before trailing user: completed -, user
@@ -148,14 +145,14 @@ const markerOutput = (messages) => {
 }
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
-  const result = resultOf(await tryInject(undefined, 'ses-auto-injected', guideline, anchor))
-  assert.equal(result.ok, true, result.error ?? '')
-  assert.equal(markerOutput(result.value), guideline)
+  const result = (await tryInject(undefined, 'ses-auto-injected', guideline, anchor)).toJSON()
+  assert.equal(result[0], 'Ok', result[1] ?? '')
+  assert.equal(markerOutput(result[1]), guideline)
 })
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const result = resultOf(await tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor))
-  assert.equal(result.ok, true, result.error ?? '')
-  assert.equal(markerOutput(result.value), `${nudge}\n\n${guideline}`)
+  const result = (await tryInject(undefined, 'ses-auto-injected-nudge', `${nudge}\n\n${guideline}`, anchor)).toJSON()
+  assert.equal(result[0], 'Ok', result[1] ?? '')
+  assert.equal(markerOutput(result[1]), `${nudge}\n\n${guideline}`)
 })

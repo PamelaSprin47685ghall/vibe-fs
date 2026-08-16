@@ -24,7 +24,7 @@ const withEnv = (name, value, run) => {
 const withCanary = (value, run) => withEnv('WANXIANGSHU_STRENGTH_HOST_CANARY', value, run)
 
 
-test('STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
+test('WHAT[SPEC-INV-011] STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
   withEnv('WANXIANGSHU_STRENGTH_MODE', undefined, () => {
     assert.equal(caseOf(Settings.load().Mode), 'Shadow')
   })
@@ -33,7 +33,7 @@ test('STRENGTH_011_dry_run_is_an_explicit_non_default_host_canary_mode', () => {
   })
 })
 
-test('STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in', () => {
+test('WHAT[SPEC-INV-011] STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary_opt_in', () => {
   withEnv('WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET', undefined, () => {
     assert.equal(caseOf(Settings.dryRunBudget()), 'K1')
   })
@@ -45,7 +45,7 @@ test('STRENGTH_011_dry_run_budget_defaults_to_k1_and_requires_explicit_k2_canary
   })
 })
 
-test('STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
+test('WHAT[SPEC-INV-001] STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k2_enablement', () => {
   // Default Host settings: Shadow, no cost template, canary unhealthy, 10%
   // control holdout kept. This is not a live Host canary and does not enable K2.
   withEnv('WANXIANGSHU_STRENGTH_MODE', undefined, () => {
@@ -61,7 +61,7 @@ test('STRENGTH_011_default_settings_are_shadow_k0_with_economic_holdout_and_no_k
   })
 })
 
-test('STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract', () => {
+test('WHAT[SPEC-INV-011] STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contract', () => {
   const expected = `opencode-ai@${packageJson.devDependencies['opencode-ai']}|@opencode-ai/plugin@${packageJson.peerDependencies['@opencode-ai/plugin']}|strength-host-canary-v1`
   assert.equal(Settings.HostCanaryFingerprint, expected)
 
@@ -71,7 +71,7 @@ test('STRENGTH_011_host_canary_is_bound_to_the_pinned_OpenCode_and_plugin_contra
   withCanary(Settings.HostCanaryFingerprint, () => assert.equal(Settings.hostCanaryHealthy(), true))
 })
 
-test('STRENGTH_011_process_fuse_is_first-failure-latched_and_cannot_be_cleared_by_a_session_cleanup', () => {
+test('WHAT[SPEC-INV-011] STRENGTH_011_process_fuse_is_first-failure-latched_and_cannot_be_cleared_by_a_session_cleanup', () => {
   const scope = StrengthScope.PluginStrengthScope_$ctor()
   assert.equal(StrengthScope.PluginStrengthScope__get_StrengthFuseReason(scope), undefined)
 

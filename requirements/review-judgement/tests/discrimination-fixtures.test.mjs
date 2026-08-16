@@ -40,7 +40,7 @@ const zh = (fixture, ...phrases) => {
   }
 }
 
-test('REVIEW_011_acceptance_and_rejection_must_both_be_earned', () => {
+test('WHAT[REVIEW-JUDGEMENT-002] REVIEW_011_acceptance_and_rejection_must_both_be_earned', () => {
   en(
     'earned-both-ways',
     'Acceptance must be earned. Rejection must also be earned.',
@@ -49,12 +49,12 @@ test('REVIEW_011_acceptance_and_rejection_must_both_be_earned', () => {
   zh('earned-both-ways', 'Acceptance 必须被赢得。', 'Rejection 同样必须被赢得。')
 })
 
-test('REVIEW_011_discrimination_is_the_craft_not_rejection_theatre', () => {
+test('WHAT[REVIEW-JUDGEMENT-002] REVIEW_011_discrimination_is_the_craft_not_rejection_theatre', () => {
   en('discrimination-not-rejection-theatre', 'Your purpose is discrimination, not rejection.', 'Rejection is not a pose of rigor.')
   zh('discrimination-not-rejection-theatre', '你的目的，是作出有区分力的判断，而不是追求拒绝。', '拒绝不是严谨的姿态。')
 })
 
-test('REVIEW_011_judgement_is_against_the_obligation_not_the_reviewer_mood', () => {
+test('WHAT[REVIEW-JUDGEMENT-003] REVIEW_011_judgement_is_against_the_obligation_not_the_reviewer_mood', () => {
   en(
     'judged-against-obligation-not-mood',
     'Judge the work that exists, by the obligation that exists, with the evidence that exists.',
@@ -63,7 +63,7 @@ test('REVIEW_011_judgement_is_against_the_obligation_not_the_reviewer_mood', () 
   zh('judged-against-obligation-not-mood', '根据真实存在的 obligation，使用真实存在的 evidence，判断真实存在的工作。', '它们不是情绪，也不是你严厉程度的量尺。')
 })
 
-test('REVIEW_011_blocking_vs_nonblocking_workmanship_are_distinguished', () => {
+test('WHAT[REVIEW-JUDGEMENT-004] REVIEW_011_blocking_vs_nonblocking_workmanship_are_distinguished', () => {
   en(
     'blocking-vs-nonblocking',
     'Blocking workmanship withholds acceptance.',
@@ -73,7 +73,7 @@ test('REVIEW_011_blocking_vs_nonblocking_workmanship_are_distinguished', () => {
   zh('blocking-vs-nonblocking', '阻断性做工扣住 acceptance。', '非阻断性做工不扣住 acceptance。')
 })
 
-test('REVIEW_011_a_minor_typo_never_purchases_revise', () => {
+test('WHAT[REVIEW-JUDGEMENT-004] REVIEW_011_a_minor_typo_never_purchases_revise', () => {
   en(
     'minor-typo-never-purchases-revise',
     'A minor typo, a clumsy name, a rough edge that does not touch the entrusted result',
@@ -83,7 +83,7 @@ test('REVIEW_011_a_minor_typo_never_purchases_revise', () => {
   zh('minor-typo-never-purchases-revise', '一个无关紧要的笔误、一个笨拙的命名、一处并不触碰 entrusted result 的毛边', '它们不能仅仅为了让审查显得严谨，就买到 REVISE。')
 })
 
-test('REVIEW_011_perfect_does_not_silence_a_true_minor_observation', () => {
+test('WHAT[REVIEW-JUDGEMENT-004] REVIEW_011_perfect_does_not_silence_a_true_minor_observation', () => {
   en(
     'perfect-does-not-silence-minor',
     'Suppressing a non-blocking observation because the verdict is PERFECT is also false.',
@@ -92,7 +92,7 @@ test('REVIEW_011_perfect_does_not_silence_a_true_minor_observation', () => {
   zh('perfect-does-not-silence-minor', '因为 verdict 是 PERFECT 就压制非阻断性观察，同样是虚假的。')
 })
 
-test('REVIEW_011_materiality_traces_consequence_not_edit_size', () => {
+test('WHAT[REVIEW-JUDGEMENT-004] REVIEW_011_materiality_traces_consequence_not_edit_size', () => {
   en(
     'materiality-traces-consequence-not-size',
     'Size of edit and materiality of consequence are different quantities.',
@@ -102,12 +102,12 @@ test('REVIEW_011_materiality_traces_consequence_not_edit_size', () => {
   )
 })
 
-test('REVIEW_011_perfect_is_not_literal_flawlessness', () => {
+test('WHAT[REVIEW-JUDGEMENT-005] REVIEW_011_perfect_is_not_literal_flawlessness', () => {
   en('perfect-not-flawless', 'It does not mean literal flawlessness.', 'It does not mean you imagined every possible future failure.')
   zh('perfect-not-flawless', '它并不意味着字面上的毫无瑕疵。')
 })
 
-test('REVIEW_011_rejection_must_purchase_a_materially_better_or_more_truthful_result', () => {
+test('WHAT[REVIEW-JUDGEMENT-005] REVIEW_011_rejection_must_purchase_a_materially_better_or_more_truthful_result', () => {
   en(
     'rejection-purchases',
     'It must purchase something: a materially better result, a more truthful account of what was delivered, or the repair of a concrete defect that matters to the entrusted result.',
@@ -116,7 +116,7 @@ test('REVIEW_011_rejection_must_purchase_a_materially_better_or_more_truthful_re
   zh('rejection-purchases', '拒绝必须买到东西：一个实质上更好的结果、对已交付之物更真实的陈述，或对一个真正影响 entrusted result 的具体缺陷的修复。')
 })
 
-test('REVIEW_011_acceptance_does_not_require_omniscience', () => {
+test('WHAT[REVIEW-JUDGEMENT-005] REVIEW_011_acceptance_does_not_require_omniscience', () => {
   en(
     'acceptance-not-omniscience',
     'Omniscience is not the standard. Proportionate discrimination is.',
@@ -125,7 +125,7 @@ test('REVIEW_011_acceptance_does_not_require_omniscience', () => {
   zh('acceptance-not-omniscience', '全知不是标准。', '相称的区分才是。')
 })
 
-test('REVIEW_011_evidence_must_be_proportional_to_the_claim', () => {
+test('WHAT[REVIEW-JUDGEMENT-006] REVIEW_011_evidence_must_be_proportional_to_the_claim', () => {
   en(
     'evidence-proportional-to-claim',
     'Evidence must be proportional to the claim.',
@@ -135,7 +135,7 @@ test('REVIEW_011_evidence_must_be_proportional_to_the_claim', () => {
   zh('evidence-proportional-to-claim', '证据必须与主张相称。', '一个通过的测试，只能证明这个测试本身有能力区分的事情，不能证明更多。')
 })
 
-test('REVIEW_011_unresolved_uncertainty_is_preserved_not_laundered_into_a_verdict', () => {
+test('WHAT[REVIEW-JUDGEMENT-006] REVIEW_011_unresolved_uncertainty_is_preserved_not_laundered_into_a_verdict', () => {
   en(
     'uncertainty-preserved-not-laundered',
     'preserve that uncertainty in your judgment.',
@@ -144,7 +144,7 @@ test('REVIEW_011_unresolved_uncertainty_is_preserved_not_laundered_into_a_verdic
   zh('uncertainty-preserved-not-laundered', '在 judgment 中保留这种不确定性。', '不要单靠修辞，把尚未解决的重要疑虑洗成 PERFECT 或 REVISE。')
 })
 
-test('REVIEW_011_the_ledger_is_a_judgement_direction_not_a_checklist', () => {
+test('WHAT[REVIEW-JUDGEMENT-007] REVIEW_011_the_ledger_is_a_judgement_direction_not_a_checklist', () => {
   en(
     'ledger-not-checklist',
     'The entries are not eight boxes to mark Pass.',
@@ -158,7 +158,7 @@ test('REVIEW_011_the_ledger_is_a_judgement_direction_not_a_checklist', () => {
   )
 })
 
-test('REVIEW_011_no_fixed_report_schema_or_eight_heading_template', () => {
+test('WHAT[REVIEW-JUDGEMENT-007] REVIEW_011_no_fixed_report_schema_or_eight_heading_template', () => {
   en(
     'no-fixed-report-schema',
     'It does not prescribe a report format.',
@@ -167,7 +167,7 @@ test('REVIEW_011_no_fixed_report_schema_or_eight_heading_template', () => {
   )
 })
 
-test('REVIEW_011_the_wound_must_be_clear_enough_to_purchase_the_repair', () => {
+test('WHAT[REVIEW-JUDGEMENT-009] REVIEW_011_the_wound_must_be_clear_enough_to_purchase_the_repair', () => {
   en(
     'wound-clear-enough-to-purchase',
     'make the wound clear enough that repairing it purchases that better or more truthful result.',
@@ -176,7 +176,7 @@ test('REVIEW_011_the_wound_must_be_clear_enough_to_purchase_the_repair', () => {
   zh('wound-clear-enough-to-purchase', '把真正的伤口说清楚，使修复它能够买到那个更好或更真实的结果。', '一个清晰的伤口，不会因为周围再画上一圈想象出来的淤青而变得更清晰。')
 })
 
-test('REVIEW_011_no_invented_obligations_to_look_careful', () => {
+test('WHAT[REVIEW-JUDGEMENT-009] REVIEW_011_no_invented_obligations_to_look_careful', () => {
   en(
     'no-invented-obligations',
     'Do not invent a requirement, risk, boundary, test, or hypothetical world that the actual obligation does not need.',
@@ -185,7 +185,7 @@ test('REVIEW_011_no_invented_obligations_to_look_careful', () => {
   zh('no-invented-obligations', '不要发明真实 obligation 并不需要的 requirement、risk、boundary、test 或 hypothetical world。', '为了显得仔细而发明要求，不是判断。')
 })
 
-test('REVIEW_011_judgement_does_not_reward_confidence_or_punish_unfamiliarity', () => {
+test('WHAT[REVIEW-JUDGEMENT-010] REVIEW_011_judgement_does_not_reward_confidence_or_punish_unfamiliarity', () => {
   en(
     'no-reward-for-confidence',
     'Do not reward confidence. Do not punish unfamiliarity.',
@@ -194,7 +194,7 @@ test('REVIEW_011_judgement_does_not_reward_confidence_or_punish_unfamiliarity', 
   )
 })
 
-test('REVIEW_011_novelty_and_style_preference_are_not_defects_by_themselves', () => {
+test('WHAT[REVIEW-JUDGEMENT-010] REVIEW_011_novelty_and_style_preference_are_not_defects_by_themselves', () => {
   en(
     'novelty-and-preference-not-defect',
     'But novelty is not a defect.',
@@ -203,17 +203,23 @@ test('REVIEW_011_novelty_and_style_preference_are_not_defects_by_themselves', ()
   )
 })
 
-test('REVIEW_011_a_match_is_an_observation_a_defect_is_a_judgement', () => {
+test('WHAT[REVIEW-JUDGEMENT-002] REVIEW_011_a_match_is_an_observation_a_defect_is_a_judgement', () => {
   en(
     'match-is-observation-defect-is-judgement',
     'A match is an observation. A defect is your judgment about what that observation means for the work.',
-    'A work record is evidence. A test result is evidence.',
-    'None of these, alone, is judgment.',
   )
   zh('match-is-observation-defect-is-judgement', '一次 match 是观察。', 'Defect 则是你对“这个观察对当前工作意味着什么”的判断。')
 })
 
-test('REVIEW_011_a_lens_may_narrow_sight_but_not_responsibility', () => {
+test('WHAT[REVIEW-JUDGEMENT-006] REVIEW_011_evidence_alone_is_not_judgement', () => {
+  en(
+    'evidence-alone-is-not-judgement',
+    'A work record is evidence. A test result is evidence.',
+    'None of these, alone, is judgment.',
+  )
+})
+
+test('WHAT[REVIEW-JUDGEMENT-003] REVIEW_011_a_lens_may_narrow_sight_but_not_responsibility', () => {
   en(
     'lens-narrows-sight-not-responsibility',
     'A lens may narrow sight. It may not narrow responsibility.',

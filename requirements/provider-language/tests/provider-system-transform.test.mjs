@@ -23,7 +23,7 @@ test.afterEach(() => {
   providerLanguage.clearAllForTests()
 })
 
-test('PROMPT_017_system_transform_localizes_only_wanxiangshu_owned_segment', async () => {
+test('WHAT[PROVIDER-LANGUAGE-005] system transform localizes only the wanxiangshu-owned segment', async () => {
   const sid = sessionId(SID)
   assert.equal(providerLanguage.bindOnce(sid, providerLanguage.simplifiedChinese).ok, true)
   bindBookkeeper(SID, 'tx-i18n', 'owner-i18n')
@@ -40,7 +40,7 @@ test('PROMPT_017_system_transform_localizes_only_wanxiangshu_owned_segment', asy
   assert.match(output.system[0], /^# 共同法/)
 })
 
-test('PROMPT_017_system_transform_is_stable_for_english_session', async () => {
+test('WHAT[PROVIDER-LANGUAGE-001] system transform is stable for an English session', async () => {
   const sid = sessionId(SID)
   assert.equal(providerLanguage.bindOnce(sid, providerLanguage.english).ok, true)
   bindBookkeeper(SID, 'tx-i18n', 'owner-i18n')

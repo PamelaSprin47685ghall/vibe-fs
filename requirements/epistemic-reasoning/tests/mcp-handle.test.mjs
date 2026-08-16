@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { create } from '../../../dist/Sphinx/McpServer.js'
-import { createStore, start, resume, assessWhy } from './support.mjs'
+import { createMcpServer, createStore, start, resume, assessWhy } from './support.mjs'
 
 test('WHAT[EPI-002] handle_is_opaque_process_local_session_key', () => {
   const store = createStore()
@@ -137,8 +136,10 @@ test('WHAT[EPI-003] full_co_yield_path_preserves_grounded_epistemic_basis', () =
 })
 
 test('WHAT[EPI-004] mcp_server_surface_is_exactly_start_and_resume', async () => {
-  const server = create(createStore())
-  assert.deepEqual(Object.keys(server._registeredTools).sort(), ['resume', 'start'])
+  const server = createMcpServer(createStore())
+  assert.ok('start' in server._registeredTools)
+  assert.ok('resume' in server._registeredTools)
+  assert.equal(Object.getOwnPropertyNames(server._registeredTools).length, 2)
 
   const started = JSON.parse(
     (await server._registeredTools.start.handler({ question: '明天白银会涨吗？' })).content[0].text,

@@ -30,14 +30,14 @@ const completedPayload = (over = {}) =>
 
 const agentItem = (item) => new JoinItem(0, [item])
 
-test('MISC_join_render_batch_empty_work_record_no_comment', () => {
+test('WHAT[PROVIDER-PROJECTION-009] MISC_join_render_batch_empty_work_record_no_comment', () => {
   const batch = batchOf(agentItem(new AgentJoinItem(0, [completedPayload({ workRecord: '' })])), toList([]))
   const wire = renderJoinItemBatch(lang, () => 'x', batch)
   assert.match(wire, /# x has returned\./)
   assert.equal(wire.trim().split('\n').length, 1)
 })
 
-test('MISC_join_render_batch_child_to_parent_lwr_stays_entry_local_comment', () => {
+test('WHAT[PROVIDER-PROJECTION-009] MISC_join_render_batch_child_to_parent_lwr_stays_entry_local_comment', () => {
   const lwr = 'Chronicle\ndid the thing\n\nRecent work\nok'
   const batch = batchOf(agentItem(new AgentJoinItem(0, [completedPayload({ workRecord: lwr })])), toList([]))
   const wire = renderJoinItemBatch(lang, () => 'fast-coder', batch)

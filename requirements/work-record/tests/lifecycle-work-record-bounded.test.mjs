@@ -115,7 +115,7 @@ const seedTwoInvocations = async (journal) => {
   return { s1, s2, inv1Through, inv2Through }
 }
 
-test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async () => {
+test('WHAT[WORK-RECORD-002] COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async () => {
   await withJournal(async (journal) => {
     const { s1, s2, inv1Through, inv2Through } = await seedTwoInvocations(journal)
     // CURRENT Y through == inv2 StartInclusive. Inclusive-through keeps it;
@@ -141,7 +141,26 @@ test('COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames', async
   })
 })
 
-test('COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', async () => {
+test('WHAT[WORK-RECORD-016] COMPANION_015_bounded_review_consumes_request_range_not_session_head', async () => {
+  await withJournal(async (journal) => {
+    const { s1, s2, inv1Through } = await seedTwoInvocations(journal)
+    await commitY(journal, { from: inv1Through, to: s1, body: 'CURRENT_Y_INV2', n: 2 })
+
+    // REVIEW-016 / GLORY-004：process review / Finality / SyncDelegate 消费的 LWR
+    // 一律 request-range bounded。同一 bounded 渲染不得混入 session head（prior invocation）。
+    const bounded = await lifecycleWorkRecordProjection.lifecycleWorkRecordBounded(journal, SEM, {
+      StartInclusive: { Sequence: s1 },
+      EndExclusive: { Sequence: s2 },
+    })
+    assert.equal(typeof bounded, 'string')
+    assert.match(bounded, /Chronicle\nCURRENT_Y_INV2/)
+    assert.doesNotMatch(bounded, /PRIOR_Y_INV1/)
+    assert.doesNotMatch(bounded, /inv1 work/)
+    assert.match(bounded, /inv2 work/)
+  })
+})
+
+test('WHAT[WORK-RECORD-004] COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', async () => {
   await withJournal(async (journal) => {
     const { s1, s2 } = await seedTwoInvocations(journal)
 

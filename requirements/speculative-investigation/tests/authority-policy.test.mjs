@@ -17,25 +17,25 @@ const permissionNames = (set) => [...set].map(caseName).sort()
 const exactReadonly = ['Glob', 'Grep', 'Read']
 
 for (const role of [Role.Coder, Role.Inspector, Role.DevOps, Role.Inquiry]) {
-  test(`STRENGTH_004_${caseName(role)}_replica_has_exact_readonly_capabilities`, () => {
+  test(`WHAT[SPEC-INV-004] STRENGTH_004_${caseName(role)}_replica_has_exact_readonly_capabilities`, () => {
     assert.deepEqual(permissionNames(toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica)), exactReadonly)
   })
 }
 
 for (const role of [Role.Manager, Role.Orchestrator, Role.Browser, Role.Reviewer, Role.Distiller, Role.Blogger]) {
-  test(`STRENGTH_004_${caseName(role)}_replica_is_fail_closed`, () => {
+  test(`WHAT[SPEC-INV-004] STRENGTH_004_${caseName(role)}_replica_is_fail_closed`, () => {
     assert.deepEqual(permissionNames(toolCapabilitiesFor(role, ProviderRequestKind.StrengthReplica)), [])
   })
 }
 
-test('STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence', () => {
+test('WHAT[SPEC-INV-004] STRENGTH_004_019_replica_is_never_owner_fallback_or_prefix_probe_evidence', () => {
   assert.equal(clearsFailureCountOnSuccess(ProviderRequestKind.StrengthReplica), false)
   assert.equal(mayCarryProbe(ProviderRequestKind.StrengthReplica), false)
   assert.equal(clearsFailureCountOnSuccess(ProviderRequestKind.WorkMain), true)
   assert.equal(mayCarryProbe(ProviderRequestKind.WorkMain), true)
 })
 
-test('STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk', () => {
   assert.equal(typeof Cost.StrengthCostModel_estimate, 'function')
 
   const estimate = Cost.StrengthCostModel_estimate(
@@ -61,7 +61,7 @@ test('STRENGTH_010_value_equations_charge_fast_bytes_delay_and_risk', () => {
   )
 })
 
-test('STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities', () => {
+test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_proven_deep_opportunities', () => {
   assert.equal(typeof Policy.StrengthPolicy_decideFromFacts, 'function')
 
   const base = {

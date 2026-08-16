@@ -10,7 +10,7 @@ import { toList } from '../../verification-system/tests/support/domain.mjs'
 
 const S = Predictor.StrengthPrimarySymbol
 
-test('STRENGTH_010_feature_key_has_no_replica_or_score_provenance', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_feature_key_has_no_replica_or_score_provenance', () => {
   const feature = Predictor.StrengthPredictor_feature(Role.Inspector, toList([S.ReadonlyBatch]), 100)
   assert.equal('ReplicaSessionId' in feature, false)
   assert.equal('DecisionId' in feature, false)
@@ -19,7 +19,7 @@ test('STRENGTH_010_feature_key_has_no_replica_or_score_provenance', () => {
   assert.deepEqual(Object.keys(feature).sort(), ['CanonicalRole', 'RecentPrimary', 'VisibleByteBucket'])
 })
 
-test('STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bounded_feature_key', () => {
   const feature = Predictor.StrengthPredictor_feature(
     Role.Coder,
     toList([S.ReadonlyBatch, S.TextOnly, S.MutatingOrExecuting, S.Other]),
@@ -56,7 +56,7 @@ test('STRENGTH_010_predictor_learns_only_explicit_primary_labels_and_keeps_a_bou
   assert.equal(prediction.EvidenceCount, 1)
 })
 
-test('STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_score_input', () => {
   const first = Policy.StrengthPolicy_controlBucket(HostDigest.sha256Hex, 'policy-v1', 'root-1', 'run-1')
   const restart = Policy.StrengthPolicy_controlBucket(HostDigest.sha256Hex, 'policy-v1', 'root-1', 'run-1')
   const otherRun = Policy.StrengthPolicy_controlBucket(HostDigest.sha256Hex, 'policy-v1', 'root-1', 'run-2')
@@ -67,7 +67,7 @@ test('STRENGTH_010_control_assignment_is_restart_stable_and_has_no_predictor_sco
   assert.equal(Policy.StrengthPolicy_isControlHoldout(0, first), false)
 })
 
-test('STRENGTH_010_rollout_uses_explicit_costs_and_shadow_never_means_treatment', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_rollout_uses_explicit_costs_and_shadow_never_means_treatment', () => {
   const prediction = { P1: 0.75, P2: 0.5, EvidenceCount: 100 }
   const costs = {
     SavedDeep1: 10,

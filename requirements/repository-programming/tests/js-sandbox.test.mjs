@@ -24,14 +24,14 @@ const PROGRAM = `class Js extends JsProgram {
   }
 }`
 
-test('JS011_program_runs_and_returns_json', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_program_runs_and_returns_json', async () => {
   const api = { js: { read: async (path) => ({ path, text: 'hello' }) } }
   const result = await runWrapped(wrapProgram(BASE, PROGRAM, Date.now() + 60_000), api)
   assert.equal(result.ok, true)
   assert.deepEqual(JSON.parse(result.value), { sum: 3, text: 'hello' })
 })
 
-test('JS011_api_is_the_only_authority_in_the_context', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-006] JS011_api_is_the_only_authority_in_the_context', async () => {
   // process / require / fs / globalThis.process must be undefined inside the vm.
   const probe = `class Js extends JsProgram {
   async run() {
@@ -53,7 +53,7 @@ test('JS011_api_is_the_only_authority_in_the_context', async () => {
   })
 })
 
-test('JS054_1_sync_infinite_loop_is_killed_by_vm_timeout', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_1_sync_infinite_loop_is_killed_by_vm_timeout', async () => {
   const loop = `class Js extends JsProgram {
   async run() { while (true) {} }
 }`
@@ -63,7 +63,7 @@ test('JS054_1_sync_infinite_loop_is_killed_by_vm_timeout', async () => {
   assert.equal(failureCode(result.error), 'PROGRAM_TIMEOUT')
 })
 
-test('JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () => {
   // deadline in the past → first api call throws __PROGRAM_TIMEOUT__ → wrapper
   // classifies it as a program failure carrying the timeout marker.
   const past = Date.now() - 1000
@@ -76,14 +76,14 @@ test('JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline', async () =>
   assert.equal(failureCode(result.error), 'PROGRAM_TIMEOUT')
 })
 
-test('JS019_invalid_javascript_is_invalid_program', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_invalid_javascript_is_invalid_program', async () => {
   const bad = `class Js extends JsProgram { async run() { return { broken: } } }`
   const result = await runWrapped(wrapProgram(BASE, bad, Date.now() + 60_000), { js: {} })
   assert.equal(result.ok, false)
   assert.equal(failureCode(result.error), 'INVALID_PROGRAM')
 })
 
-test('JS019_program_throw_is_program_failed', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_program_throw_is_program_failed', async () => {
   const throwing = `class Js extends JsProgram {
   async run() { throw new Error('boom'); }
 }`
@@ -92,7 +92,7 @@ test('JS019_program_throw_is_program_failed', async () => {
   assert.equal(failureCode(result.error), 'PROGRAM_FAILED')
 })
 
-test('JS010_circular_return_is_invalid_return_value', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_circular_return_is_invalid_return_value', async () => {
   const circular = `class Js extends JsProgram {
   async run() { const a = {}; a.self = a; return a; }
 }`
@@ -101,7 +101,7 @@ test('JS010_circular_return_is_invalid_return_value', async () => {
   assert.equal(failureCode(result.error), 'INVALID_RETURN_VALUE')
 })
 
-test('JS054_2_output_bound_rejects_oversized_results', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-006] JS054_2_output_bound_rejects_oversized_results', async () => {
   const big = `class Js extends JsProgram {
   async run() { return { data: 'x'.repeat(1000) }; }
 }`

@@ -29,7 +29,7 @@ const descriptor = () =>
 
 const activeCount = (registry) => listItems(registry.Snapshot().Active).length
 
-test('THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut', async () => {
+test('WHAT[TIME-006] THEOREM_untilSignalOrDeadline_deadline_without_material_is_WaitTimedOut', async () => {
   const registry = new CausalWaitRegistry()
   const { rawPort, advance } = timerPort.createVirtual()
   const handle = rawPort.Delay(100)

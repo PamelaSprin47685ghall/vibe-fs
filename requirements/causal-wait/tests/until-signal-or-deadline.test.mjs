@@ -11,7 +11,6 @@ import {
   causalAwait,
   causalWait,
   CausalWaitRegistry,
-  caseOf,
   listItems,
   timerPort,
 } from '../../verification-system/tests/support/domain.mjs'
@@ -41,8 +40,8 @@ test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tr
     () => 42,
     () => new Promise(() => {}),
   )
-  assert.equal(caseOf(result), 'Ok')
-  assert.equal(result.fields[0], 42)
+  assert.equal(result.name, 'Ok')
+  assert.equal(result.toJSON()[1], 42)
   assert.equal(activeCount(registry), 0)
 })
 
@@ -68,8 +67,8 @@ test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_signal_then_ready_cancels_d
   ready = true
   waiters[0]()
   const result = await pending
-  assert.equal(caseOf(result), 'Ok')
-  assert.equal(result.fields[0], 'material')
+  assert.equal(result.name, 'Ok')
+  assert.equal(result.toJSON()[1], 'material')
   advance(10_000)
   assert.equal(activeCount(registry), 0)
 })
@@ -101,7 +100,7 @@ test('WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_stale_signal_loops_until_de
   assert.equal(waiters.length, 3)
   advance(250)
   const result = await pending
-  assert.equal(caseOf(result), 'Error')
-  assert.equal(caseOf(result.fields[0]), 'WaitTimedOut')
+  assert.equal(result.name, 'Error')
+  assert.equal(result.toJSON()[1].name, 'WaitTimedOut')
   assert.ok(waiters.length >= 2, `expected ≥2 signal arms, got ${waiters.length}`)
 })

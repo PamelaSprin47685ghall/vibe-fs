@@ -21,7 +21,7 @@ const readLaw = (semanticPath, locale) => readFileSync(join(providerRoot, semant
 // contract is language-invariant (PROMPT-017 invariant face).
 const LOCALES = ['en', 'zh-CN']
 
-test('INVESTIGATE_inspect_law_pins_causal_readonly_witness_not_editor', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-005] INVESTIGATE_inspect_law_pins_causal_readonly_witness_not_editor', () => {
   for (const locale of LOCALES) {
     const law = readLaw('tool/inspect/description', locale)
     assert.match(law, /read-only in the causal sense|在因果意义上是只读的/, `${locale} causal readonly`)
@@ -37,7 +37,7 @@ test('INVESTIGATE_inspect_law_pins_causal_readonly_witness_not_editor', () => {
   }
 })
 
-test('INVESTIGATE_query_shell_law_is_observation_not_execution_and_inspector_only', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-005] INVESTIGATE_query_shell_law_is_observation_not_execution_and_inspector_only', () => {
   for (const locale of LOCALES) {
     const law = readLaw('tool/query-shell/description', locale)
     assert.match(law, /This is observation, not execution|这是观察，不是执行/, `${locale} observation not execution`)
@@ -49,18 +49,17 @@ test('INVESTIGATE_query_shell_law_is_observation_not_execution_and_inspector_onl
   }
 })
 
-test('INVESTIGATE_inspector_role_law_has_evidence_funnel_and_stop_rule', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-002] INVESTIGATE_inspector_role_law_makes_evidence_locatable_again', () => {
   for (const locale of LOCALES) {
     const law = readLaw('role/inspector', locale)
-    assert.match(law, /Observe without changing|不要为了观察而改变它/, `${locale} observe without changing`)
-    assert.match(law, /cheapest adequate observation|最便宜的充分观察/, `${locale} cheapest adequate observation`)
     assert.match(law, /locatable|再次被定位/, `${locale} locatability`)
-    assert.match(
-      law,
-      /If the first cheap observation ends the investigation, stop|第一次便宜的观察已经结束调查，就停下|第一个便宜的观察.*结束调查.*停止/,
-      `${locale} stop when sufficient`,
-    )
-    assert.match(law, /before the evidence becomes a verdict|在证据变成.*verdict.*之前停下/, `${locale} evidence is not verdict`)
+    assert.match(law, /keep only the evidence that makes the fact locatable again|再只保留足以让该事实再次被定位的证据/, `${locale} locatability funnel step`)
+  }
+})
+
+test('WHAT[REPOSITORY-INVESTIGATION-003] INVESTIGATE_inspector_role_law_layers_reasoning_below_evidence_acquisition', () => {
+  for (const locale of LOCALES) {
+    const law = readLaw('role/inspector', locale)
     // Reasoning/evidence layering: a mechanical trail of searches is not a
     // method — reasoning may decide WHAT to ask, it does not produce evidence.
     assert.match(
@@ -71,7 +70,27 @@ test('INVESTIGATE_inspector_role_law_has_evidence_funnel_and_stop_rule', () => {
   }
 })
 
-test('INVESTIGATE_warm_start_law_marks_hints_low_trust_and_charge_authoritative', () => {
+test('WHAT[REPOSITORY-INVESTIGATION-004] INVESTIGATE_inspector_role_law_has_evidence_funnel_and_stop_rule', () => {
+  for (const locale of LOCALES) {
+    const law = readLaw('role/inspector', locale)
+    assert.match(law, /cheapest adequate observation|最便宜的充分观察/, `${locale} cheapest adequate observation`)
+    assert.match(
+      law,
+      /If the first cheap observation ends the investigation, stop|第一次便宜的观察已经结束调查，就停下|第一个便宜的观察.*结束调查.*停止/,
+      `${locale} stop when sufficient`,
+    )
+    assert.match(law, /before the evidence becomes a verdict|在证据变成.*verdict.*之前停下/, `${locale} evidence is not verdict`)
+  }
+})
+
+test('WHAT[REPOSITORY-INVESTIGATION-005] INVESTIGATE_inspector_role_law_pins_observe_without_changing', () => {
+  for (const locale of LOCALES) {
+    const law = readLaw('role/inspector', locale)
+    assert.match(law, /Observe without changing|不要为了观察而改变它/, `${locale} observe without changing`)
+  }
+})
+
+test('WHAT[REPOSITORY-INVESTIGATION-001] INVESTIGATE_warm_start_law_marks_charge_authoritative', () => {
   for (const locale of LOCALES) {
     const envelope = readLaw('lifecycle/warm-start/charge-envelope', locale)
     assert.match(
@@ -80,6 +99,11 @@ test('INVESTIGATE_warm_start_law_marks_hints_low_trust_and_charge_authoritative'
       `${locale} hints not proof`,
     )
     assert.match(envelope, /The charge is authoritative|任务具有权威性/, `${locale} charge authoritative`)
+  }
+})
+
+test('WHAT[REPOSITORY-INVESTIGATION-006] INVESTIGATE_warm_start_law_marks_hints_low_trust_in_appendix', () => {
+  for (const locale of LOCALES) {
     const appendix = readLaw('lifecycle/warm-start/appendix', locale)
     assert.match(
       appendix,

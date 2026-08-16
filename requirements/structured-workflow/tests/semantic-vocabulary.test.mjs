@@ -8,6 +8,8 @@
 // Infrastructure adapter.
 
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 
 const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
@@ -29,7 +31,7 @@ const VOCABULARY_SURFACES = {
 /** DSL-013 rejected shapes: implementation-action names, not business promises. */
 const REJECTED_PREFIX = /^(execute|process|handle|do|retry|run|perform|with)[A-Z]/
 
-test('SW_011_named_vocabulary_surface_exists_in_Application', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_named_vocabulary_surface_exists_in_Application', async () => {
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
     const mod = await load(modulePath)
     for (const name of names) {
@@ -38,7 +40,7 @@ test('SW_011_named_vocabulary_surface_exists_in_Application', async () => {
   }
 })
 
-test('SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', async () => {
   const bad = []
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
     const mod = await load(modulePath)
@@ -49,7 +51,7 @@ test('SW_011_vocabulary_names_declare_business_promises_not_implementation_actio
   assert.deepEqual(bad, [], 'vocabulary names must not be implementation-action labels')
 })
 
-test('SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-013] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', async () => {
   // DSL-015: semantic decorators must be named Vocabulary or a named call
   // site. A global DecoratorBase / MiddlewarePipeline / IWorkflowDecorator
   // framework is banned. Assert the production vocabulary modules expose no
@@ -60,5 +62,48 @@ test('SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', async ()
     const names = Object.keys(mod).filter((n) => !n.endsWith('_$reflection'))
     const hits = names.filter((n) => frameworkShape.test(n))
     assert.deepEqual(hits, [], `${modulePath} must not export middleware-framework shapes`)
+  }
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real production definition', async () => {
+  // DSL-014 / STRUCTURED-WORKFLOW-012: compressed Semantic Vocabulary must be
+  // backed by its own temporal/behavioral proof. The proof obligation table
+  // (HOW §3.4) is that registration: each row names a compressed vocabulary
+  // and what it must prove. The machine floor is that the table is not a
+  // fiction — every registered vocabulary must have a real definition in the
+  // production tree (the compression actually happens at a named call site),
+  // and the table must cover exactly the vocabularies it registers. A row
+  // naming a nonexistent definition would be compression without proof.
+  const root = new URL('../../../', import.meta.url).pathname
+
+  const OBLIGATIONS = [
+    ['ManagerBackground.ensureSettled', 'Mission/Manager/Background.fs'],
+    ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs'],
+    ['ReviewerContinuation.ensurePerfectConfirmed', 'Mission/Review/Judgement/Continuation.fs'],
+    ['ReviewBarrierWorkflow.reverify', 'Mission/Review/Barrier/Reverify.fs'],
+    ['FallbackLedger.recordConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Ledger.fs'],
+    ['ProviderRecoveryWorkflow.continueAfterConfirmedFailure', 'Participant/Provider/Attempt/Fallback/Workflow.fs'],
+    ['FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed', 'Mission/Finality/Cohort.fs'],
+    ['SessionRecoveryWorkflow.recoverFamilyDirect', 'Execution/Session/Recovery/Workflow.fs'],
+    ['Orchestrator.publishEventually', 'Change/Program.fs'],
+  ]
+
+  // Table completeness: HOW §3.4 registers exactly these nine.
+  const how = readFileSync(join(root, 'requirements/structured-workflow/HOW.md'), 'utf8')
+  const tableSection = how.slice(how.indexOf('### 3.4'), how.indexOf('### 3.4.1'))
+  for (const [vocab] of OBLIGATIONS) {
+    assert.match(tableSection, new RegExp(`\\| \`${vocab.replace('.', '\\.')}\``), `HOW §3.4 must register ${vocab}`)
+  }
+
+  // Every registered vocabulary is a real definition in production, at the
+  // owner path the table names — the compression is observable, not fictional.
+  for (const [vocab, file] of OBLIGATIONS) {
+    const short = vocab.split('.').pop()
+    const production = readFileSync(join(root, `src/Wanxiangshu/${file}`), 'utf8')
+    assert.match(
+      production,
+      new RegExp(`\\blet(?: rec)?(?: private)? ${short}\\b`),
+      `${vocab} must exist in production (${file})`,
+    )
   }
 })

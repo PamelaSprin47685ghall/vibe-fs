@@ -52,7 +52,7 @@ const foldOk = (envelopes) => {
   return fold.session(result.value, SESSION)
 }
 
-test('SEMANTIC_TRACE_provider_run_segments_fold_projection', () => {
+test('WHAT[SEMANTIC-TRACE-004] SEMANTIC_TRACE_provider_run_segments_fold_projection', () => {
   const s = foldOk([
     partFact({ sequence: 1, run: 'run-a', provenance: 'g:0/turn:0/part:0' }),
     partFact({ sequence: 2, run: 'run-b', provenance: 'g:0/turn:1/part:0' }),
@@ -67,7 +67,7 @@ test('SEMANTIC_TRACE_provider_run_segments_fold_projection', () => {
   )
 })
 
-test('SEMANTIC_TRACE_reanchor_opens_a_new_provenance_generation', () => {
+test('WHAT[SEMANTIC-TRACE-004] SEMANTIC_TRACE_reanchor_opens_a_new_provenance_generation', () => {
   const s = foldOk([
     partFact({ sequence: 1, turn: 0, provenance: 'g:0/turn:0/part:0' }),
     reanchorFact(),

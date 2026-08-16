@@ -57,7 +57,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_escapes_render_distinctly_in_diagnostics', () 
     writeSnapshot(workspace, registry)
     const snap = readDiagnostic(workspace)
     assert.equal(snap.active.length, 1)
-    const tags = snap.active[0].escapes.map((e) => e.tag).sort()
+    const tags = snap.active[0].escapes.map(({ tag }) => tag).sort()
     assert.deepEqual(tags, ['cancelledBy', 'deadlineAt', 'openEndedExternal', 'processLifetime', 'sessionLifetime'])
   } finally {
     lease.Dispose()
@@ -81,7 +81,7 @@ test('WHAT[CAUSAL-006] CAUSAL_006_deadline_escape_carries_typed_instant', () => 
   try {
     writeSnapshot(workspace, registry)
     const escape = readDiagnostic(workspace).active[0].escapes[0]
-    assert.equal(escape.tag, 'deadlineAt')
+    assert.equal(escape['tag'], 'deadlineAt')
     assert.match(escape.at, /^2026-01-01T00:00:00(\.\d+)?(Z|\+00:00)$/)
   } finally {
     lease.Dispose()

@@ -4,7 +4,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  caseOf,
   causalAwait,
   causalWait,
   causalWaitHub,
@@ -27,8 +26,8 @@ const waitFor = (ownerId, producerId, waitKind = 'capability') =>
 
 const viewSnapshot = (snapshot) => {
   const history = listItems(snapshot.History).map((t) => ({
-    kind: caseOf(t.Kind),
-    exit: t.Exit == null ? undefined : caseOf(t.Exit),
+    kind: t.Kind.name,
+    exit: t.Exit == null ? undefined : t.Exit.name,
     ownerKey: causalWait.ownerKey(t.Wait.Owner),
     producerKey: causalWait.producerKey(t.Wait.Producer),
   }))
@@ -44,7 +43,7 @@ const lastExit = (snapshot) => {
   assert.ok(history.length > 0, 'expected history')
   const exit = history.at(-1).Exit
   assert.ok(exit != null, 'expected leave exit')
-  return caseOf(exit)
+  return exit.name
 }
 
 test('WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter', () => {

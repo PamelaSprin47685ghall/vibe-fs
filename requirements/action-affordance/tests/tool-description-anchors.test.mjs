@@ -53,17 +53,22 @@ test('WHAT[ACTION-AFFORDANCE-013] gate_c_tool_description_anchor_parity_detects_
 })
 
 test('WHAT[ACTION-AFFORDANCE-002] gate_c_tool_description_anchor_catalog_requires_high_risk_verbs', () => {
-  assert.deepEqual(
-    Object.keys(TOOL_DESCRIPTION_ANCHORS).sort(),
-    [
-      'commission',
-      'establish-behavior',
-      'fork',
-      'inspect',
-      'query-shell',
-      'repair-behavior',
-      'run',
-    ].sort(),
+  const highRisk = [
+    'commission',
+    'establish-behavior',
+    'fork',
+    'inspect',
+    'query-shell',
+    'repair-behavior',
+    'run',
+  ]
+  for (const tool of highRisk) {
+    assert.ok(tool in TOOL_DESCRIPTION_ANCHORS, `anchor catalog must include ${tool}`)
+  }
+  assert.equal(
+    Object.getOwnPropertyNames(TOOL_DESCRIPTION_ANCHORS).length,
+    highRisk.length,
+    'anchor catalog must contain exactly the high-risk minimum set',
   )
   assert.ok(TOOL_DESCRIPTION_ANCHORS.inspect.some((a) => a.id === 'no-implement-or-repair'))
   const violations = scanToolDescriptionAnchorCatalog(['tool/inspect/description'])

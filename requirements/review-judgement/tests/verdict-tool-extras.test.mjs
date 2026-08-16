@@ -89,14 +89,14 @@ const scopeFor = ({ journal, sessionParents = sessionMap([]), gitTreePort } = {}
 
 const run = async (tool, args, ctx) => tool.Execute(makeArgs(args), ctx)
 
-test('JUDGE_unknown_owner_fails_closed_without_internal_vocabulary', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_unknown_owner_fails_closed_without_internal_vocabulary', async () => {
   const tool = spec(factory, scopeFor({ journal: fakeJournal({ CurrentBarrierId: 'bar-1' }) }))
   const result = await run(tool, { verdict: 'REVISE' }, context())
   assert.match(result, /review context is incomplete/i)
   assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('JUDGE_missing_tree_fails_closed_without_internal_vocabulary', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_missing_tree_fails_closed_without_internal_vocabulary', async () => {
   const parents = sessionMap([['ses-reviewer', 'ses-manager']])
   const tool = spec(factory, scopeFor({ journal: fakeJournal({ CurrentBarrierId: 'bar-1' }), sessionParents: parents }))
   const result = await run(tool, { verdict: 'REVISE' }, context())
@@ -104,7 +104,7 @@ test('JUDGE_missing_tree_fails_closed_without_internal_vocabulary', async () => 
   assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('JUDGE_no_open_review_barrier_fails_closed_without_internal_vocabulary', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_no_open_review_barrier_fails_closed_without_internal_vocabulary', async () => {
   const parents = sessionMap([['ses-reviewer', 'ses-manager']])
   const tool = spec(
     factory,
@@ -119,7 +119,7 @@ test('JUDGE_no_open_review_barrier_fails_closed_without_internal_vocabulary', as
   assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('JUDGE_non_reviewer_role_is_refused_before_identity_checks', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_non_reviewer_role_is_refused_before_identity_checks', async () => {
   const tool = spec(factory, scopeFor())
   const result = await run(tool, { verdict: 'PERFECT' }, context({ sessionId: 'ses-coder' }))
   assert.match(result, /did not come from a Reviewer/i)

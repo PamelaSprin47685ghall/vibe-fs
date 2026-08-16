@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { JsToolWorkflow_run as workflowRun } from '../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js'
+import { JsToolWorkflow_run as workflowRun, JsToolsResult_render as render } from '../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js'
 import { JsToolGenerator_generate as generate } from '../../../dist/Repository/Programming/Js/Surface.js'
 import { JsDescriptionAssets_load as loadJsProse } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHost.js'
 import { ProviderLanguage } from '../../../dist/Participant/Provider/Language.js'
@@ -49,7 +49,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000 } = {}) => {
 
 const caseName = (outcome) => caseOf(outcome)
 
-test('JS085_workflow_reads_and_commits_rewrite', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_reads_and_commits_rewrite', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -70,7 +70,7 @@ test('JS085_workflow_reads_and_commits_rewrite', async () => {
   }
 })
 
-test('JS085_workflow_commits_create_and_reports', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-013] JS085_workflow_commits_create_and_reports', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const program = `class Js extends JsProgram {
@@ -89,7 +89,7 @@ test('JS085_workflow_commits_create_and_reports', async () => {
   }
 })
 
-test('JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'current text', 'utf8')
@@ -107,7 +107,7 @@ test('JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', asyn
   }
 })
 
-test('JS085_workflow_file_missing_fails_the_program', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-018] JS085_workflow_file_missing_fails_the_program', async () => {
   const { dir, cleanup } = sandbox()
   try {
     // a missing target is a typed result the program can inspect (JS-019:
@@ -120,7 +120,6 @@ test('JS085_workflow_file_missing_fails_the_program', async () => {
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const failed = parseToml(render(outcome))
     assert.equal(failed.code, 'FILE_NOT_FOUND')
     assert.equal(failed.reason.includes('missing.txt'), true)
@@ -129,7 +128,7 @@ test('JS085_workflow_file_missing_fails_the_program', async () => {
   }
 })
 
-test('JS085_workflow_program_error_fails_without_commit', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-019] JS085_workflow_program_error_fails_without_commit', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
@@ -145,7 +144,7 @@ test('JS085_workflow_program_error_fails_without_commit', async () => {
   }
 })
 
-test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-012] JS012_workflow_with_store_persists_prepare_and_commit', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   try {
@@ -171,7 +170,7 @@ test('JS012_workflow_with_store_persists_prepare_and_commit', async () => {
   }
 })
 
-test('JS016_result_renders_stable_toml_shapes', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-016] JS016_result_renders_stable_toml_shapes', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -184,7 +183,6 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const toml = render(outcome)
     assert.equal(toml.startsWith('# ok\n'), true)
     assert.equal(/(?:^|\n)status =/m.test(toml), false)
@@ -211,7 +209,7 @@ test('JS016_result_renders_stable_toml_shapes', async () => {
   }
 })
 
-test('JS010_016_query_object_has_data_and_no_fs', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_query_object_has_data_and_no_fs', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -222,7 +220,6 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const toml = render(outcome)
     const doc = parseToml(toml)
     assert.deepEqual(doc.data.paths, ['a.txt'])
@@ -234,7 +231,7 @@ test('JS010_016_query_object_has_data_and_no_fs', async () => {
   }
 })
 
-test('JS010_016_primitive_return_uses_data_field', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_primitive_return_uses_data_field', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const surface = generate('Coder', coderCaps, jsProse())
@@ -242,7 +239,6 @@ test('JS010_016_primitive_return_uses_data_field', async () => {
   async run() { return 42 }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const toml = render(outcome)
     assert.equal(parseToml(toml).data, 42)
   } finally {
@@ -250,7 +246,27 @@ test('JS010_016_primitive_return_uses_data_field', async () => {
   }
 })
 
-test('JS010_array_null_is_invalid_and_does_not_commit', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_array_null_is_invalid_return_value', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
+    const surface = generate('Coder', coderCaps, jsProse())
+    const program = `class Js extends JsProgram {
+  async run() {
+    this.rewrite('a.txt', 'new')
+    return [null]
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    assert.equal(caseName(outcome), 'Failed')
+    const failed = parseToml(render(outcome))
+    assert.equal(failed.code, 'INVALID_RETURN_VALUE')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-019] JS019_invalid_return_value_commits_nothing', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
@@ -264,15 +280,12 @@ test('JS010_array_null_is_invalid_and_does_not_commit', async () => {
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
-    const failed = parseToml(render(outcome))
-    assert.equal(failed.code, 'INVALID_RETURN_VALUE')
   } finally {
     cleanup()
   }
 })
 
-test('JS010_mixed_object_array_is_invalid', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_mixed_object_array_is_invalid', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const surface = generate('Coder', coderCaps, jsProse())
@@ -281,14 +294,13 @@ test('JS010_mixed_object_array_is_invalid', async () => {
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
     assert.equal(caseName(outcome), 'Failed')
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
   } finally {
     cleanup()
   }
 })
 
-test('JS006_019_missing_anchor_is_typed_and_names_the_pattern', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-018] JS019_missing_anchor_uses_stable_code', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -300,9 +312,26 @@ test('JS006_019_missing_anchor_is_typed_and_names_the_pattern', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const failed = parseToml(render(outcome))
     assert.equal(failed.code, 'ANCHOR_NOT_FOUND')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS006_missing_anchor_reason_names_declaration_path_and_pattern', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
+    const surface = generate('Coder', coderCaps, jsProse())
+    const program = `class Js extends JsProgram {
+  async run() {
+    await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
+    return { ok: true };
+  }
+}`
+    const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
+    const failed = parseToml(render(outcome))
     assert.equal(failed.reason.includes('anchor 1'), true)
     assert.equal(failed.reason.includes('a.txt'), true)
     assert.equal(failed.reason.includes('## JS-007 FileView.text()'), true)
@@ -311,7 +340,7 @@ test('JS006_019_missing_anchor_is_typed_and_names_the_pattern', async () => {
   }
 })
 
-test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_anchor_clips_to_closed_file_range', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
@@ -329,7 +358,6 @@ test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.window, 'hello ')
     assert.equal(doc.data.before, 'hello')
@@ -341,7 +369,7 @@ test('JS005_offset_anchor_clips_to_closed_file_range', async () => {
   }
 })
 
-test('JS005_offset_N_is_string_index_not_line_number', async () => {
+test('WHAT[REPOSITORY-PROGRAMMING-007] JS005_offset_N_is_string_index_not_line_number', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'ab\ncd\nef', 'utf8')
@@ -356,7 +384,6 @@ test('JS005_offset_N_is_string_index_not_line_number', async () => {
   }
 }`
     const outcome = await workflowRun(dir, surface.BaseClassSource, program, 2000, Date.now() + 60_000, 1 << 20)
-    const { JsToolsResult_render: render } = await import('../../../dist/Repository/Programming/Js/OpenCode/ToolWorkflow.js')
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.twoUnits, 'ab')
     assert.equal(doc.data.threeLen, 3)

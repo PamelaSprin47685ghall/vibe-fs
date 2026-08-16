@@ -45,7 +45,7 @@ const foldOk = (envelopes) => {
   return fold.session(result.value, SESSION)
 }
 
-test('SEMANTIC_TRACE_capture_boundary_excludes_transport_metadata', () => {
+test('WHAT[SEMANTIC-TRACE-002] SEMANTIC_TRACE_capture_boundary_excludes_transport_metadata', () => {
   const s = foldOk([
     partFact({ sequence: 1, kind: 'text' }),
     partFact({ sequence: 2, kind: 'tool_call', toolName: 'todowrite' }),
@@ -78,7 +78,7 @@ test('SEMANTIC_TRACE_capture_boundary_excludes_transport_metadata', () => {
   assert.equal(parts[1].ToolName, 'todowrite')
 })
 
-test('SEMANTIC_TRACE_appendable_xtrace_facts_are_exactly_three', () => {
+test('WHAT[SEMANTIC-TRACE-008] SEMANTIC_TRACE_appendable_xtrace_facts_are_exactly_three', () => {
   // CompanionFactFold is the only writer of the XTrace projection. Its apply
   // branches ARE the capture boundary: if a speculative/candidate fact family
   // could reach the trace, it would appear here as a fourth apply site.
@@ -100,7 +100,7 @@ test('SEMANTIC_TRACE_appendable_xtrace_facts_are_exactly_three', () => {
   }
 })
 
-test('SEMANTIC_TRACE_unknown_or_speculative_facts_leave_xtrace_untouched', () => {
+test('WHAT[SEMANTIC-TRACE-008] SEMANTIC_TRACE_unknown_or_speculative_facts_leave_xtrace_untouched', () => {
   // A folded fact that is not one of the three capture facts must not create or
   // mutate XTrace state. Fold an unrelated Companion/Context fact (opening link
   // machinery) and assert the trace stays empty.

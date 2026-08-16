@@ -55,7 +55,7 @@ const skipReason = (decision) => {
   return decision.fields[0]
 }
 
-test('STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven', () => {
+test('WHAT[SPEC-INV-001] STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven', () => {
   // Not the live Host upgrade canary. Policy-level: unknown canary/cost → K0.
   const unhealthy = decide({ ...eligibleOpportunity, HostCanaryHealthy: false })
   assert.equal(skipReason(unhealthy), 'host-canary-unhealthy')
@@ -70,7 +70,7 @@ test('STRENGTH_002_011_policy_k0_default_when_host_canary_or_cost_is_unproven', 
   assert.equal(caseOf(Policy.StrengthPolicy_budgetOf(shadow)), 'K0')
 })
 
-test('STRENGTH_002_013_review_finality_and_attached_internal_leaf_are_always_k0', () => {
+test('WHAT[SPEC-INV-002] STRENGTH_002_013_review_finality_and_attached_internal_leaf_are_always_k0', () => {
   // Not the live ReviewSeal-over-final-bytes Host canary. Policy-level: these
   // surfaces cannot speculate even when every other fact is green.
   const reviewer = decide({
@@ -95,7 +95,7 @@ test('STRENGTH_002_013_review_finality_and_attached_internal_leaf_are_always_k0'
   assert.equal(caseOf(Policy.StrengthPolicy_budgetOf(notRoot)), 'K0')
 })
 
-test('STRENGTH_002_003_target_unbound_and_replica_request_kind_are_k0', () => {
+test('WHAT[SPEC-INV-002] STRENGTH_002_003_target_unbound_and_replica_request_kind_are_k0', () => {
   // Not the live Host TargetProviderRun binding canary. Policy-level fail-closed.
   const unbound = decide({ ...eligibleOpportunity, TargetProviderRunBound: false })
   assert.equal(skipReason(unbound), 'target-provider-run-unbound')
@@ -106,7 +106,7 @@ test('STRENGTH_002_003_target_unbound_and_replica_request_kind_are_k0', () => {
   assert.equal(caseOf(Policy.StrengthPolicy_budgetOf(replicaKind)), 'K0')
 })
 
-test('STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_as_holdout', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_as_holdout', () => {
   const holdout = decide(eligibleOpportunity, true, false)
   assert.equal(caseOf(holdout), 'ControlHoldout')
   assert.equal(caseOf(Policy.StrengthPolicy_budgetOf(holdout)), 'K0')
@@ -116,7 +116,7 @@ test('STRENGTH_010_economic_holdout_is_not_skipped_and_ineligible_never_counts_a
   assert.notEqual(caseOf(ineligibleHoldout), 'ControlHoldout')
 })
 
-test('STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof', () => {
+test('WHAT[SPEC-INV-010] STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof', () => {
   // Gate only. This is not a K2 DONE claim and does not turn K2 on.
   const belowFloor = Policy.StrengthPolicy_decideFromFacts(
     eligibleOpportunity,
@@ -141,7 +141,7 @@ test('STRENGTH_010_k2_is_gated_and_not_enabled_by_this_proof', () => {
   assert.equal(caseOf(equalMargin.fields[0]), 'K1')
 })
 
-test('STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
+test('WHAT[SPEC-INV-004] STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
   // Not the live Host system-prompt canary. Domain prompt id is CanonicalRole
   // only; replica request kind cannot introduce a Strength identity string.
   const coderId = promptIdValue(systemPromptIdFor(Role.Coder))
@@ -153,7 +153,7 @@ test('STRENGTH_004_007_policy_same_role_prompt_has_no_replica_identity', () => {
   assert.doesNotMatch(prompt, /strength|replica|prefetch/i)
 })
 
-test('STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind', () => {
+test('WHAT[SPEC-INV-004] STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satellite_kind', () => {
   assert.deepEqual(SatelliteKind.Companion.cases(), ['Companion'])
   assert.equal('Replica' in SatelliteKind, false)
   assert.equal('StrengthReplica' in SatelliteKind, false)
@@ -171,7 +171,7 @@ test('STRENGTH_014_policy_strength_replica_is_internal_leaf_attached_not_satelli
   assert.equal(Association.StrengthReplicaAssociationHints_isStrengthReplicaAttachment(AttachmentKind.Companion), false)
 })
 
-test('STRENGTH_001_014_policy_nested_replica_cannot_speculate', () => {
+test('WHAT[SPEC-INV-001] STRENGTH_001_014_policy_nested_replica_cannot_speculate', () => {
   // Nested replica is ineligible. Live Host deadlock absence is the long-stroke
   // strength-canary dry-run, not this policy gate.
   const nested = decide({

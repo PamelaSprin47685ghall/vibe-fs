@@ -57,7 +57,7 @@ const parseToml = (text) =>
       }),
   )
 
-test('JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
   const tool = spec(factory, emptyScope())
 
   assert.equal(tool.Name, 'judge')
@@ -68,7 +68,7 @@ test('JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
   assert.deepEqual(payloadOf(args[0][1]).values, ['PERFECT', 'REVISE'])
 })
 
-test('JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
@@ -80,7 +80,7 @@ test('JUDGE_invalid_input_is_rejected_as_a_natural_consequence', async () => {
   })
 })
 
-test('JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
@@ -92,7 +92,7 @@ test('JUDGE_missing_input_is_rejected_as_a_natural_consequence', async () => {
   })
 })
 
-test('JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
   const result = await spec(factory, emptyScope()).Execute(
     makeArgs({ verdict: 'REVISE' }),
     context({ sessionId: 'ses-manager' }),
@@ -102,7 +102,7 @@ test('JUDGE_is_unavailable_to_non_reviewer_sessions', async () => {
   assert.doesNotMatch(result, /\berror\s*=/)
 })
 
-test('JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 
@@ -116,7 +116,7 @@ test('JUDGE_empty_session_is_rejected_before_role_resolution', async () => {
   })
 })
 
-test('JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_reviewer_requires_a_tool_call_id_before_review_submission', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
 

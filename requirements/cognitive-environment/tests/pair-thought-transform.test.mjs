@@ -4,9 +4,19 @@
 // anchor/replay 机制断言归 prefix-stability；Cursor wire 渲染归 provider-projection。
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-const { text } = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js')
+// The canonical pair-hint craft text lives at the provider resource
+// resources/provider/host/pair-programming-guideline/en.md; PairProgrammingThoughtTransform
+// renders that exact file (no {{placeholder}} substitution) for the English language.
+// Reading the resource directly is the JS-native surface: same bytes, no dist import.
+const text = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../../resources/provider/host/pair-programming-guideline/en.md'),
+  'utf8',
+)
 
 test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_needhelp_and_parallel_wave_without_global_N', () => {
   assert.match(text, /\[NEEDHELP\]/)

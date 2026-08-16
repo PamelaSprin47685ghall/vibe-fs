@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { mapOfEntries, toList } from '../../verification-system/tests/support/domain.mjs'
-import { AStarProblem, GraphEdge, solveGraph } from '../../../dist/Sphinx/Search.js'
+import { mapOfEntries } from '../../verification-system/tests/support/domain.mjs'
+import { AStarProblem, GraphEdge, solveGraph, fsharpList } from './support.mjs'
 
 const map = (entries) => mapOfEntries(entries)
-const edges = (rows) => toList(rows.map(([from, to, cost]) => new GraphEdge(from, to, cost)))
+const edges = (rows) => fsharpList(rows.map(([from, to, cost]) => new GraphEdge(from, to, cost)))
 
 test('WHAT[EPI-010] graph_astar_degenerates_to_standard_g_plus_h_shortest_path', () => {
   const problem = new AStarProblem(

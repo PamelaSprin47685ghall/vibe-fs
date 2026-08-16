@@ -185,6 +185,6 @@ test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_detached_continuation_same_claim_pa
 test('WHAT[DISPATCH-PROTOCOL-009] PROMPT_007_await_mode_constructors_exist', () => {
   const detached = promptDispatcher.awaitMode.detached()
   const await_ = promptDispatcher.awaitMode.await()
-  assert.equal(detached.cases()[detached.tag], 'Detached')
-  assert.equal(await_.cases()[await_.tag], 'Await')
+  assert.equal(detached.name, 'Detached')
+  assert.equal(await_.name, 'Await')
 })

@@ -1,57 +1,54 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { Role } from '../../../dist/Foundation/Roles.js'
-import { RootAuthorityKind } from '../../../dist/Interaction/Authority/Model.js'
 import {
-  ManagerLifeAdmission_ending,
-  ManagerLifeAdmission_tryHumanRootOpening,
-} from '../../../dist/Mission/Manager/Life/Admission.js'
-import {
-  PhysicalUserMessageIdModule_create as physicalUser,
-  PhysicalUserMessageIdModule_promoteToAuthorityRoot as promoteRoot,
-} from '../../../dist/Foundation/Identity.js'
-import { toList } from '../../verification-system/tests/support/domain/interop.mjs'
+  Authority,
+  FsList,
+  RolesModule,
+  physicalUser,
+  promoteToAuthorityRoot,
+} from '../../verification-system/tests/support/domain.mjs'
+import { lifeAdmission } from './support/finality-contract.mjs'
 
 const profile = (kind, root = 'root-1') => ({
-  CanonicalRole: Role.Manager,
+  CanonicalRole: RolesModule.Role.Manager,
   AuthorityKind: kind,
-  AuthorityRootUserMessageId: promoteRoot(physicalUser(root)),
+  AuthorityRootUserMessageId: promoteToAuthorityRoot(physicalUser(root)),
 })
 
 const lifecycle = ({ current, completed = [] } = {}) => ({
   CurrentLife: current,
-  CompletedLives: toList(completed),
+  CompletedLives: FsList.ofArray(completed),
 })
 
 test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life history', () => {
   const trace = { Opening: { AssignmentText: 'work' } }
 
-  const first = ManagerLifeAdmission_ending(
+  const first = lifeAdmission.ending(
     lifecycle(),
-    profile(RootAuthorityKind.AgentOwnerRoot),
+    profile(Authority.RootAuthorityKind.AgentOwnerRoot),
     trace,
   )
-  assert.equal(first.tag, 1, 'first AgentOwner ending may materialize one migration Life')
+  assert.equal(first.name, 'InitialAgentOwnerMigration', 'first AgentOwner ending may materialize one migration Life')
 
-  const afterCompletion = ManagerLifeAdmission_ending(
+  const afterCompletion = lifeAdmission.ending(
     lifecycle({ completed: [{}] }),
-    profile(RootAuthorityKind.AgentOwnerRoot),
+    profile(Authority.RootAuthorityKind.AgentOwnerRoot),
     trace,
   )
   assert.equal(
-    afterCompletion.tag,
-    2,
+    afterCompletion.name,
+    'NoLife',
     'CurrentLife=None after completion is terminal closure, never permission to rematerialize XTrace',
   )
 })
 
 test('WHAT[FINALITY-022] HumanRoot opening requires the exact authority root message id', () => {
-  const active = profile(RootAuthorityKind.HumanRoot, 'root-1')
+  const active = profile(Authority.RootAuthorityKind.HumanRoot, 'root-1')
 
-  const exact = ManagerLifeAdmission_tryHumanRootOpening(lifecycle(), active, physicalUser('root-1'))
+  const exact = lifeAdmission.tryHumanRootOpening(lifecycle(), active, physicalUser('root-1'))
   assert.ok(exact, 'the active authority-root message itself must open the Life')
 
-  const laterUser = ManagerLifeAdmission_tryHumanRootOpening(
+  const laterUser = lifeAdmission.tryHumanRootOpening(
     lifecycle(),
     active,
     physicalUser('later-user-shaped-message'),
