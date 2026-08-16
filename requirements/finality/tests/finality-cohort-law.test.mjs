@@ -46,6 +46,7 @@ import {
   toolCallId,
 } from '../../verification-system/tests/support/domain.mjs'
 import { finalityCohort } from './support/finality-contract.mjs'
+import * as finalitySurface from './support/finality-surface.mjs'
 import {
   DeterministicEventQueue,
   createDurableWorld,
@@ -69,6 +70,89 @@ const BAR1 = reviewBarrierId('bar-1')
 const BAR2 = reviewBarrierId('bar-2')
 const BAR_A = reviewBarrierId('bar-a')
 const BAR_B = reviewBarrierId('bar-b')
+
+// ── PR 6: JS lifecycle events (FinalitySurface input vocabulary) ────────────
+
+const mgrEvt = (evt) => ({ ...evt, sessionId: idValue.session(MGR) })
+
+const lifeOpenedEvt = () => ({
+  kind: 'life-opened',
+  lifeId: idValue.managerLife(LIFE),
+  openingUserMessageId: 'msg-open',
+  openingTextRef: idValue.blobRef(BLOB),
+  openingTextDigest: idValue.blobDigest(DIGEST),
+  openingCursorSequence: 1,
+})
+
+const workActivatedEvt = () => ({
+  kind: 'work-activated',
+  lifeId: idValue.managerLife(LIFE),
+  activationPromptKey: idValue.promptKey(KEY),
+  protectedPrefixEndSequence: 42,
+})
+
+const finalityRequestedEvt = (requestId, run, call) => ({
+  kind: 'finality-requested',
+  lifeId: idValue.managerLife(LIFE),
+  requestId: idValue.finalityRequest(requestId),
+  gitTreeHash: idValue.gitTree(TREE),
+  lastWordsRef: idValue.blobRef(BLOB),
+  lastWordsDigest: idValue.blobDigest(DIGEST),
+  providerRun: run,
+  toolCallId: call,
+})
+
+const enlistEvt = (requestId, reviewer, ordinal, barrier, isNew) => ({
+  kind: 'finality-reviewer-enlisted',
+  lifeId: idValue.managerLife(LIFE),
+  requestId: idValue.finalityRequest(requestId),
+  reviewerSessionId: idValue.session(reviewer),
+  reviewerOrdinal: ordinal,
+  barrierId: idValue.reviewBarrier(barrier),
+  gitTreeHash: idValue.gitTree(TREE),
+  isNewReviewer: isNew,
+})
+
+const finalityRejectedEvt = (requestId, reviewer, barrier) => ({
+  kind: 'finality-rejected',
+  lifeId: idValue.managerLife(LIFE),
+  requestId: idValue.finalityRequest(requestId),
+  rejectingReviewerSessionId: idValue.session(reviewer),
+  barrierId: idValue.reviewBarrier(barrier),
+  gitTreeHash: idValue.gitTree(TREE),
+  workRecordRef: idValue.blobRef(BLOB),
+  workRecordDigest: idValue.blobDigest(DIGEST),
+})
+
+const finalityBlessedEvt = (requestId) => ({
+  kind: 'finality-blessed',
+  lifeId: idValue.managerLife(LIFE),
+  requestId: idValue.finalityRequest(requestId),
+  gitTreeHash: idValue.gitTree(TREE),
+  workRecordBundleRef: idValue.blobRef(BLOB),
+  workRecordBundleDigest: idValue.blobDigest(DIGEST),
+})
+
+const confirmWitnessEvt = (reviewer, barrier) => [
+  mgrEvt({
+    kind: 'review-barrier-started',
+    reviewerSessionId: idValue.session(reviewer),
+    barrierId: idValue.reviewBarrier(barrier),
+    gitTreeHash: idValue.gitTree(TREE),
+  }),
+  mgrEvt({
+    kind: 'confirmed-review-witness',
+    barrierId: idValue.reviewBarrier(barrier),
+    challengeResultDigest: `chal-${idValue.session(reviewer)}`,
+    secondProviderInputDigest: `in-${idValue.session(reviewer)}`,
+    firstProviderRun: `rev1-${idValue.session(reviewer)}`,
+    firstToolCallId: `tc1-${idValue.session(reviewer)}`,
+    gitTreeHash: idValue.gitTree(TREE),
+    reviewerSessionId: idValue.session(reviewer),
+    secondProviderRun: `rev2-${idValue.session(reviewer)}`,
+    secondToolCallId: `tc2-${idValue.session(reviewer)}`,
+  }),
+]
 
 const mgrEnv = (lifecycleFact) => envelope({ stream: stream.session(MGR), fact: lifecycleFact })
 
@@ -203,26 +287,37 @@ const uniqueDirectory = (label) =>
   `temporal-finality-${label}-${process.hrtime.bigint().toString(16)}-${Math.random().toString(16).slice(2)}`
 
 // ── Theorem 1: roster algebra — ungraduated history + exactly one new ───────
+// PR 6: expressed as JS lifecycle events through FinalitySurface; the roster
+// answer is JS-shaped (agentId/reviewerSessionId/ordinal/isNew).
+
+const surface = finalitySurface
+
+const sv = (world) =>
+  surface.cohortRoster(world).map((slot) => ({
+    agentId: slot.agentId,
+    session: slot.reviewerSessionId,
+    ordinal: slot.ordinal,
+    isNew: slot.isNew,
+  }))
 
 test('WHAT[FINALITY-009] roster is ungraduated history plus exactly one new', () => {
   // Trace T0: open Life → request1 enlist hist-a → reject → request2 open.
-  // finalityCohort.rosterOf(request2) MUST be [hist-a reused, exactly one new slot].
-  const opened = fold.apply(fold.empty, [
-    mgrEnv(lifeOpened()),
-    mgrEnv(workActivated()),
-    mgrEnv(finalityRequested(REQ1, 'run-1', 'call-1')),
-    mgrEnv(enlist(REQ1, HIST_A, 0, BAR1, true)),
-    mgrEnv(finalityRejected(REQ1, HIST_A, BAR1)),
-    mgrEnv(finalityRequested(REQ2, 'run-2', 'call-2')),
+  // rosterOf(request2) MUST be [hist-a reused, exactly one new slot].
+  const opened = surface.project([
+    mgrEvt(lifeOpenedEvt()),
+    mgrEvt(workActivatedEvt()),
+    mgrEvt(finalityRequestedEvt(REQ1, 'run-1', 'call-1')),
+    mgrEvt(enlistEvt(REQ1, HIST_A, 0, BAR1, true)),
+    mgrEvt(finalityRejectedEvt(REQ1, HIST_A, BAR1)),
+    mgrEvt(finalityRequestedEvt(REQ2, 'run-2', 'call-2')),
   ])
-  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  assert.equal(opened.ok, true, JSON.stringify(opened.error))
 
-  const life = currentLife(opened.value)
-  const request = life.ActiveFinality
-  assert.equal(request.Resolution.name, 'Open')
-  assert.equal(mapEntries(request.Members).length, 0, 'new request starts with empty Members')
+  const view = surface.lifeView(opened.world)
+  assert.equal(view.activeFinality.resolution.kind, 'open')
+  assert.equal(view.activeFinality.members.length, 0, 'new request starts with empty Members')
 
-  const roster = slotView(finalityCohort.rosterOf(opened.value.AgentProjections, life, request))
+  const roster = sv(opened.world)
   assert.deepEqual(roster, [
     { agentId: 'finality-new-req-1', session: 'ses-hist-a', ordinal: 0, isNew: false },
     { agentId: 'finality-new-req-2', session: null, ordinal: 1, isNew: true },
@@ -230,35 +325,35 @@ test('WHAT[FINALITY-009] roster is ungraduated history plus exactly one new', ()
 
   // Exactly-once new-slot law: rosterOf is a pure function of durable facts —
   // calling it twice yields the same algebra (no ephemeral fork counter).
-  assert.deepEqual(slotView(finalityCohort.rosterOf(opened.value.AgentProjections, life, request)), roster)
+  assert.deepEqual(sv(opened.world), roster)
 })
 
 test('WHAT[FINALITY-010] graduated reviewer excluded from roster', () => {
   // Trace T1: same as T0, then ConfirmedReviewWitness on hist-a's enlisted barrier.
   // Graduation is DERIVED (GLORY-045); roster drops hist-a and keeps exactly one new.
-  const base = fold.apply(fold.empty, [
-    mgrEnv(lifeOpened()),
-    mgrEnv(workActivated()),
-    mgrEnv(finalityRequested(REQ1, 'run-1', 'call-1')),
-    mgrEnv(enlist(REQ1, HIST_A, 0, BAR1, true)),
-    mgrEnv(finalityRejected(REQ1, HIST_A, BAR1)),
-    mgrEnv(finalityRequested(REQ2, 'run-2', 'call-2')),
+  const base = surface.project([
+    mgrEvt(lifeOpenedEvt()),
+    mgrEvt(workActivatedEvt()),
+    mgrEvt(finalityRequestedEvt(REQ1, 'run-1', 'call-1')),
+    mgrEvt(enlistEvt(REQ1, HIST_A, 0, BAR1, true)),
+    mgrEvt(finalityRejectedEvt(REQ1, HIST_A, BAR1)),
+    mgrEvt(finalityRequestedEvt(REQ2, 'run-2', 'call-2')),
   ])
-  assert.equal(base.ok, true, base.ok ? '' : JSON.stringify(base.error))
+  assert.equal(base.ok, true, JSON.stringify(base.error))
 
-  const confirmed = fold.apply(base.value, confirmWitness(HIST_A, BAR1))
-  assert.equal(confirmed.ok, true, confirmed.ok ? '' : JSON.stringify(confirmed.error))
+  const confirmed = surface.applyEvents(base.world, confirmWitnessEvt(HIST_A, BAR1))
+  assert.equal(confirmed.ok, true, JSON.stringify(confirmed.error))
 
-  const life = currentLife(confirmed.value)
-  const standing = standingOf(life, HIST_A)
+  const life = surface.lifeView(confirmed.world)
+  const standing = life.enlistedReviewers.find((r) => r.sessionId === 'ses-hist-a')?.standing
   assert.ok(standing, 'hist-a standing must survive across requests')
   assert.equal(
-    finalityCohort.graduatedReviewer(confirmed.value.AgentProjections, HIST_A, standing),
+    surface.graduatedReviewer(confirmed.world, 'ses-hist-a'),
     true,
     'Confirmed witness on enlisted barrier graduates hist-a',
   )
 
-  const roster = slotView(finalityCohort.rosterOf(confirmed.value.AgentProjections, life, life.ActiveFinality))
+  const roster = sv(confirmed.world)
   assert.deepEqual(roster, [
     { agentId: 'finality-new-req-2', session: null, ordinal: 1, isNew: true },
   ])
@@ -268,25 +363,23 @@ test('WHAT[FINALITY-009] crash reentry reuses already created new slot exactly o
   // Trace T2 (GLORY-045 crash re-entry): after the new Reviewer is enlisted,
   // rosterOf must reuse that session under IsNew=false and MUST NOT invent a
   // second new slot (exactly-once new Reviewer per request).
-  const enlisted = fold.apply(fold.empty, [
-    mgrEnv(lifeOpened()),
-    mgrEnv(workActivated()),
-    mgrEnv(finalityRequested(REQ1, 'run-1', 'call-1')),
-    mgrEnv(enlist(REQ1, NEW, 0, BAR1, true)),
+  const enlisted = surface.project([
+    mgrEvt(lifeOpenedEvt()),
+    mgrEvt(workActivatedEvt()),
+    mgrEvt(finalityRequestedEvt(REQ1, 'run-1', 'call-1')),
+    mgrEvt(enlistEvt(REQ1, NEW, 0, BAR1, true)),
   ])
-  assert.equal(enlisted.ok, true, enlisted.ok ? '' : JSON.stringify(enlisted.error))
+  assert.equal(enlisted.ok, true, JSON.stringify(enlisted.error))
 
-  const life = currentLife(enlisted.value)
-  const roster = slotView(finalityCohort.rosterOf(enlisted.value.AgentProjections, life, life.ActiveFinality))
+  const roster = sv(enlisted.world)
   assert.deepEqual(roster, [
     { agentId: 'finality-new-req-1', session: 'ses-new', ordinal: 0, isNew: false },
   ])
 
   // Duplicate enlistment of the same reviewer+barrier is absorbed (exactly-once Members).
-  const replay = fold.apply(enlisted.value, [mgrEnv(enlist(REQ1, NEW, 0, BAR1, true))])
-  assert.equal(replay.ok, true, replay.ok ? '' : JSON.stringify(replay.error))
-  assert.deepEqual(membersView(currentLife(replay.value).ActiveFinality), membersView(life.ActiveFinality))
-  assert.equal(mapEntries(currentLife(replay.value).ActiveFinality.Members).length, 1)
+  const replay = surface.applyEvents(enlisted.world, [mgrEvt(enlistEvt(REQ1, NEW, 0, BAR1, true))])
+  assert.equal(replay.ok, true, JSON.stringify(replay.error))
+  assert.equal(surface.lifeView(replay.world).activeFinality.members.length, 1)
 })
 
 // ── Theorem 2: multi-historical enlistment order is confluent for roster ────
@@ -296,15 +389,15 @@ test('WHAT[FINALITY-009] historical enlist order confluent for roster', () => {
   // (enlist A, enlist B) must fold to the same Members and, after reject +
   // request2, the same rosterOf algebra. Enumerate traces explicitly.
   const prefix = [
-    mgrEnv(lifeOpened()),
-    mgrEnv(workActivated()),
-    mgrEnv(finalityRequested(REQ1, 'run-1', 'call-1')),
+    mgrEvt(lifeOpenedEvt()),
+    mgrEvt(workActivatedEvt()),
+    mgrEvt(finalityRequestedEvt(REQ1, 'run-1', 'call-1')),
   ]
-  const enlistA = mgrEnv(enlist(REQ1, HIST_A, 0, BAR_A, true))
-  const enlistB = mgrEnv(enlist(REQ1, HIST_B, 1, BAR_B, false))
+  const enlistA = mgrEvt(enlistEvt(REQ1, HIST_A, 0, BAR_A, true))
+  const enlistB = mgrEvt(enlistEvt(REQ1, HIST_B, 1, BAR_B, false))
   const suffix = [
-    mgrEnv(finalityRejected(REQ1, HIST_A, BAR_A)),
-    mgrEnv(finalityRequested(REQ2, 'run-2', 'call-2')),
+    mgrEvt(finalityRejectedEvt(REQ1, HIST_A, BAR_A)),
+    mgrEvt(finalityRequestedEvt(REQ2, 'run-2', 'call-2')),
   ]
 
   const traces = DeterministicEventQueue.interleavings([enlistA], [enlistB])
@@ -313,21 +406,21 @@ test('WHAT[FINALITY-009] historical enlist order confluent for roster', () => {
   const rosterViews = []
   const memberViews = []
   for (const mid of traces) {
-    const folded = fold.apply(fold.empty, [...prefix, ...mid, ...suffix])
-    assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-    const life = currentLife(folded.value)
+    const folded = surface.project([...prefix, ...mid, ...suffix])
+    assert.equal(folded.ok, true, JSON.stringify(folded.error))
+    const life = surface.lifeView(folded.world)
     // Round-1 Members are closed under Rejected request1; standing survives.
-    assert.equal(mapEntries(life.EnlistedReviewers).length, 2)
+    assert.equal(life.enlistedReviewers.length, 2)
     memberViews.push(
-      mapEntries(life.EnlistedReviewers)
-        .map(([sid, standing]) => ({
-          session: idValue.session(sid),
-          ordinal: standing.ReviewerOrdinal,
-          barriers: listItems(standing.Barriers).map(idValue.reviewBarrier).sort(),
+      life.enlistedReviewers
+        .map(({ sessionId, standing }) => ({
+          session: sessionId,
+          ordinal: standing.ordinal,
+          barriers: standing.barriers.slice().sort(),
         }))
         .sort((a, b) => a.session.localeCompare(b.session)),
     )
-    rosterViews.push(slotView(finalityCohort.rosterOf(folded.value.AgentProjections, life, life.ActiveFinality)))
+    rosterViews.push(sv(folded.world))
   }
 
   assert.deepEqual(memberViews[0], memberViews[1], 'enlist A;B vs B;A must converge standing')
@@ -346,23 +439,23 @@ test('WHAT[FINALITY-009] historical enlist order confluent for roster', () => {
 test('WHAT[FINALITY-016] blessed exactly once: second completion rejected', () => {
   // Trace T3: Open → enlist → Blessed. A second Blessed on the same request
   // must not flip / double-write LastBlessing (fold rejects; projection stable).
-  const blessed = fold.apply(fold.empty, [
-    mgrEnv(lifeOpened()),
-    mgrEnv(workActivated()),
-    mgrEnv(finalityRequested(REQ1, 'run-1', 'call-1')),
-    mgrEnv(enlist(REQ1, NEW, 0, BAR1, true)),
-    mgrEnv(finalityBlessed(REQ1)),
+  const blessed = surface.project([
+    mgrEvt(lifeOpenedEvt()),
+    mgrEvt(workActivatedEvt()),
+    mgrEvt(finalityRequestedEvt(REQ1, 'run-1', 'call-1')),
+    mgrEvt(enlistEvt(REQ1, NEW, 0, BAR1, true)),
+    mgrEvt(finalityBlessedEvt(REQ1)),
   ])
-  assert.equal(blessed.ok, true, blessed.ok ? '' : JSON.stringify(blessed.error))
-  const once = currentLife(blessed.value)
-  assert.equal(once.ActiveFinality.Resolution.name, 'Blessed')
-  assert.equal(idValue.finalityRequest(once.LastBlessing.RequestId), 'req-1')
+  assert.equal(blessed.ok, true, JSON.stringify(blessed.error))
+  const once = surface.lifeView(blessed.world)
+  assert.equal(once.activeFinality.resolution.kind, 'blessed')
+  assert.equal(once.lastBlessing.requestId, 'req-1')
 
-  const again = fold.apply(blessed.value, [mgrEnv(finalityBlessed(REQ1))])
+  const again = surface.applyEvents(blessed.world, [mgrEvt(finalityBlessedEvt(REQ1))])
   assert.equal(again.ok, false, 'second FinalityBlessed must be rejected by production fold')
   // Projection from the successful fold remains the sole completion evidence.
-  assert.equal(once.ActiveFinality.Resolution.name, 'Blessed')
-  assert.equal(idValue.finalityRequest(once.LastBlessing.RequestId), 'req-1')
+  assert.equal(surface.lifeView(blessed.world).activeFinality.resolution.kind, 'blessed')
+  assert.equal(surface.lifeView(blessed.world).lastBlessing.requestId, 'req-1')
 })
 
 // ── Theorem 4: dropEphemeral preserves durable finality; no second completion

@@ -372,7 +372,7 @@ module FinalitySurface =
             let standingView (standing: ReviewerStanding) =
                 box
                     {| ordinal = standing.ReviewerOrdinal
-                       barriers = standing.Barriers |> List.map ReviewBarrierId.value
+                       barriers = standing.Barriers |> List.map ReviewBarrierId.value |> List.toArray
                        agentId = standing.AgentId |}
 
             box
