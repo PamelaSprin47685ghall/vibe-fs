@@ -28,10 +28,9 @@ const checks = [
   join(root, 'checks/test-boundary.mjs'),
   join(root, 'checks/js-boundary-gate.mjs'),
   join(root, 'checks/e2e-watchdog-feed.mjs'),
-  // REQUIREMENT-SYSTEM-018: test↔WHAT bidirectional closure. Strict mode gates
-  // the dogfooded packages; the rest of the tree migrates package by package
-  // against requirement-trace-migration.json (only-shrink). Once every package
-  // is strict the ratchet is deleted (TASK.md trace roadmap item 9).
+  // REQUIREMENT-SYSTEM-018: test↔WHAT bidirectional closure. Hard cutover
+  // (2026-08-16): the migration ratchet is deleted; this gate is an absolute
+  // prohibition — any orphan/unknown/multi-primary/unproved test is RED.
   join(root, 'checks/requirement-trace.mjs'),
 ]
 
@@ -63,11 +62,6 @@ for (const script of checks) {
   // ARCH-016 Gate E: provider-visible prose ownership — counts must only shrink.
   if (script.endsWith('provider-prose-ownership.mjs')) {
     args.push(`--baseline=${join(root, 'checks/provider-prose-ownership-baseline.json')}`)
-  }
-  // REQUIREMENT-SYSTEM-018: dogfooded packages run strict; the rest of the tree
-  // is ratcheted by requirement-trace-migration.json (only-shrink).
-  if (script.endsWith('requirement-trace.mjs')) {
-    args.push('--strict=requirement-system,verification-system')
   }
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)
