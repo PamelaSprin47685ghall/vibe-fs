@@ -11,7 +11,7 @@ const assertClean = (wire, label) => {
   assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)
 }
 
-test('JOIN_SURFACE_completed_batch_is_natural_language_plus_work_record', () => {
+test('WHAT[PARTICIPANT-HORIZON-004] JOIN_SURFACE_completed_batch_is_natural_language_plus_work_record', () => {
   const runtime = joinResultRenderer.stubRuntime()
   const batch = nonEmptyBatch.ofHeadTail(agentCompletion.completedRun({
     runId: 'run-1',
@@ -26,7 +26,7 @@ test('JOIN_SURFACE_completed_batch_is_natural_language_plus_work_record', () => 
   assertClean(wire, 'completed')
 })
 
-test('JOIN_SURFACE_interrupt_and_fork_error_are_natural_language_only', async () => {
+test('WHAT[PARTICIPANT-HORIZON-003] JOIN_SURFACE_interrupt_and_fork_error_are_natural_language_only', async () => {
   const { ForkError } = await import('../../../dist/Execution/Delegation/Fork/Model.js')
   assertClean(joinResultRenderer.renderInterrupted(), 'operator abort')
   assertClean(joinResultRenderer.renderForkError(ForkError.NothingToJoin), 'nothing to join')

@@ -38,7 +38,7 @@ const current = (txId) => {
   return staged.value
 }
 
-test('js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
+test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
   const tool = spec(factory)
   assert.equal(tool.Name, 'js-bookkeeper')
   assert.deepEqual(listItems(tool.Arguments).map((pair) => pair[0]), ['program'])
@@ -50,7 +50,7 @@ test('js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
   assert.doesNotMatch(tool.Description, /Q\.md|A\.md|old_text|new_text|filesystem/i)
 })
 
-test('js_bookkeeper_program_reshapes_question_and_answer_atomically', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_reshapes_question_and_answer_atomically', async () => {
   const tx = 'tx-js-bookkeeper-both'
   const session = 'bk-js-bookkeeper-both'
   beginTransaction(tx, '## Goal\nkeep old goal\n## Constraints\nold constraint', '## Answer\nold answer\n## Evidence\nweak')
@@ -97,7 +97,7 @@ test('js_bookkeeper_program_reshapes_question_and_answer_atomically', async () =
 
 const currentCase = (question, answer) => [question, answer]
 
-test('js_bookkeeper_zero_mutation_is_legal', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_zero_mutation_is_legal', async () => {
   const tx = 'tx-js-bookkeeper-idle'
   const session = 'bk-js-bookkeeper-idle'
   beginTransaction(tx, 'Q', 'A')
@@ -121,7 +121,7 @@ test('js_bookkeeper_zero_mutation_is_legal', async () => {
   }
 })
 
-test('js_bookkeeper_duplicate_set_rolls_back_the_whole_program', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_duplicate_set_rolls_back_the_whole_program', async () => {
   const tx = 'tx-js-bookkeeper-duplicate'
   const session = 'bk-js-bookkeeper-duplicate'
   beginTransaction(tx, 'Q', 'A')
@@ -148,7 +148,7 @@ test('js_bookkeeper_duplicate_set_rolls_back_the_whole_program', async () => {
   }
 })
 
-test('js_bookkeeper_program_failure_rolls_back_staged_mutation', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_program_failure_rolls_back_staged_mutation', async () => {
   const tx = 'tx-js-bookkeeper-throw'
   const session = 'bk-js-bookkeeper-throw'
   beginTransaction(tx, 'Q', 'A')
@@ -173,7 +173,7 @@ test('js_bookkeeper_program_failure_rolls_back_staged_mutation', async () => {
   }
 })
 
-test('js_bookkeeper_unbound_session_cannot_change_a_case', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] js_bookkeeper_unbound_session_cannot_change_a_case', async () => {
   const result = await run(
     'no-such-session',
     `class Js extends JsProgram {

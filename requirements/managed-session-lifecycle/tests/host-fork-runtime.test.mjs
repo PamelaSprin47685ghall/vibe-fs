@@ -92,7 +92,7 @@ const batchItems = (batch) => [batch.fields[0], ...listItems(batch.fields[1])]
 
 // ── InstallRun / FailRun / MarkReady ─────────────────────────────────────────
 
-test('HFRT_install_run_registers_pending_run_and_child', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_install_run_registers_pending_run_and_child', async () => {
   const liveCtx = await live()
   const run = installRun(liveCtx.runtime, 'ag1', sessionId('ses_c1'), Role.Coder)
 
@@ -109,7 +109,7 @@ test('HFRT_install_run_registers_pending_run_and_child', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_mark_ready_is_noop_and_run_stays_pending', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_mark_ready_is_noop_and_run_stays_pending', async () => {
   const liveCtx = await live()
   const run = installRun(liveCtx.runtime, 'ag2', sessionId('ses_c2'), Role.Coder)
   markReady(liveCtx.runtime, run)
@@ -118,7 +118,7 @@ test('HFRT_mark_ready_is_noop_and_run_stays_pending', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_fail_run_writes_durable_failure_and_settles_source', async () => {
+test('WHAT[MANAGED-SESSION-007] HFRT_fail_run_writes_durable_failure_and_settles_source', async () => {
   const liveCtx = await live()
   await link(liveCtx.journal, 'ag3', sessionId('ses_c3'))
   const run = installRun(liveCtx.runtime, 'ag3', sessionId('ses_c3'), Role.Coder)
@@ -144,7 +144,7 @@ test('HFRT_fail_run_writes_durable_failure_and_settles_source', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_fail_run_cancelled_code_is_CANCELLED', async () => {
+test('WHAT[MANAGED-SESSION-007] HFRT_fail_run_cancelled_code_is_CANCELLED', async () => {
   const liveCtx = await live()
   await link(liveCtx.journal, 'ag4', sessionId('ses_c4'))
   const run = installRun(liveCtx.runtime, 'ag4', sessionId('ses_c4'), Role.Coder)
@@ -154,7 +154,7 @@ test('HFRT_fail_run_cancelled_code_is_CANCELLED', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_is_retired_handle_reflects_durable_projection', async () => {
+test('WHAT[MANAGED-SESSION-006] HFRT_is_retired_handle_reflects_durable_projection', async () => {
   const liveCtx = await live()
   await link(liveCtx.journal, 'ag5', sessionId('ses_c5'))
   assert.equal(isRetiredHandle(liveCtx.runtime, 'ag5'), false)
@@ -173,7 +173,7 @@ test('HFRT_is_retired_handle_reflects_durable_projection', async () => {
 
 // ── CancelAgent ──────────────────────────────────────────────────────────────
 
-test('HFRT_cancel_agent_fails_pending_run_and_aborts_child', async () => {
+test('WHAT[MANAGED-SESSION-009] HFRT_cancel_agent_fails_pending_run_and_aborts_child', async () => {
   const liveCtx = await live()
   await link(liveCtx.journal, 'ag6', sessionId('ses_c6'))
   const run = installRun(liveCtx.runtime, 'ag6', sessionId('ses_c6'), Role.Coder)
@@ -193,7 +193,7 @@ test('HFRT_cancel_agent_fails_pending_run_and_aborts_child', async () => {
   liveCtx.cleanup()
 })
 
-test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', async () => {
+test('WHAT[MANAGED-SESSION-009] HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', async () => {
   const liveCtx = await live()
   await link(liveCtx.journal, 'ag7', sessionId('ses_c7'))
   const run = installRun(liveCtx.runtime, 'ag7', sessionId('ses_c7'), Role.Coder)
@@ -209,7 +209,7 @@ test('HFRT_cancel_agent_after_run_settled_skips_fail_run_but_aborts_child', asyn
   liveCtx.cleanup()
 })
 
-test('MANAGED_SESSION_009_shutdown_cancel_drains_durable_abandon_before_return', async () => {
+test('WHAT[MANAGED-SESSION-009] MANAGED_SESSION_009_shutdown_cancel_drains_durable_abandon_before_return', async () => {
   assert.equal(typeof cancelAndDrain, 'function', 'HostForkRuntime must expose an awaitable parent-cancel drain')
   const liveCtx = await live()
   await link(liveCtx.journal, 'ag8', sessionId('ses_c8'))
@@ -230,7 +230,7 @@ test('MANAGED_SESSION_009_shutdown_cancel_drains_durable_abandon_before_return',
 
 // ── plain ForkRuntime surface ────────────────────────────────────────────────
 
-test('HFRT_fork_runtime_fork_created_then_list_records_busy', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_fork_runtime_fork_created_then_list_records_busy', async () => {
   const runtime = new ForkRuntime()
   const result = forkRun(runtime, 'fr1', Role.Coder, 'fast-coder', 'do it')
   assert.equal(caseOf(result), 'Created')
@@ -243,7 +243,7 @@ test('HFRT_fork_runtime_fork_created_then_list_records_busy', async () => {
   assert.equal(forkActiveRunCount(runtime), 1)
 })
 
-test('HFRT_fork_runtime_await_agent_returns_completion', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_fork_runtime_await_agent_returns_completion', async () => {
   const runtime = new ForkRuntime()
   forkRun(runtime, 'fr2', Role.Coder, 'fast-coder', 'do it')
   const result = await forkAwaitAgent(runtime, 'fr2')
@@ -253,7 +253,7 @@ test('HFRT_fork_runtime_await_agent_returns_completion', async () => {
   assert.equal(agentIdOf(completion), 'fr2')
 })
 
-test('HFRT_fork_runtime_await_agent_unknown_and_timeout_are_errors', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_fork_runtime_await_agent_unknown_and_timeout_are_errors', async () => {
   const runtime = new ForkRuntime()
   const unknown = await forkAwaitAgent(runtime, 'nope')
   assert.equal(unknown.tag, 1)
@@ -267,7 +267,7 @@ test('HFRT_fork_runtime_await_agent_unknown_and_timeout_are_errors', async () =>
   gate.resolve(undefined)
 })
 
-test('HFRT_fork_runtime_cancel_agent_marks_run_closed', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_fork_runtime_cancel_agent_marks_run_closed', async () => {
   const runtime = new ForkRuntime()
   forkRun(runtime, 'fr4', Role.Coder, 'fast-coder', 'do it')
   forkCancelAgent(runtime, 'fr4')
@@ -278,14 +278,14 @@ test('HFRT_fork_runtime_cancel_agent_marks_run_closed', async () => {
   assert.equal(forkActiveRunCount(runtime), 0)
 })
 
-test('HFRT_fork_runtime_cancel_then_fork_is_not_found', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_fork_runtime_cancel_then_fork_is_not_found', async () => {
   const runtime = new ForkRuntime()
   forkCancel(runtime)
   const result = forkRun(runtime, 'fr5', Role.Coder, 'fast-coder', 'do it')
   assert.equal(caseOf(result), 'NotFound')
 })
 
-test('HFRT_fork_runtime_busy_agent_nudges_not_created', async () => {
+test('WHAT[MANAGED-SESSION-012] HFRT_fork_runtime_busy_agent_nudges_not_created', async () => {
   const runtime = new ForkRuntime()
   forkRun(runtime, 'fr6', Role.Coder, 'fast-coder', 'do it')
   const second = forkRun(runtime, 'fr6', Role.Coder, 'fast-coder', 'more')

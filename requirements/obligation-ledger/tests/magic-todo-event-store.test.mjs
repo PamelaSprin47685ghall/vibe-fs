@@ -44,7 +44,7 @@ const resumeWriter = async (store) => {
   return mustOk(result, 'resumeOrCreate')
 }
 
-test('TODO-012 persists typed prepared identity through AgentJournal and EventStore boot', async () => {
+test('WHAT[OBLIGATION-LEDGER-018] persists typed prepared identity through AgentJournal and EventStore boot', async () => {
   const local = createLocalEventStore()
   const store = local.store
   const { writer, init } = await createWriter(store)

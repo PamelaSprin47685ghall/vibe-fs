@@ -48,12 +48,12 @@ const readObs = (enforcement, blogState) =>
     frameDigest: o.FrameDigest,
   }))
 
-test('OBS_PROJ_001_empty_halves_yield_empty_observations', () => {
+test('WHAT[BD-015] OBS_PROJ_001_empty_halves_yield_empty_observations', () => {
   assert.deepEqual(readObs(undefined, undefined), [])
   assert.deepEqual(readObs(enf.empty, blog.empty), [])
 })
 
-test('OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests', () => {
+test('WHAT[BD-012] OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests', () => {
   let blogState = blog.empty
   let enfState = enf.empty
 
@@ -80,7 +80,7 @@ test('OBS_PROJ_002_zip_recent_tips_with_blog_frame_digests', () => {
   ])
 })
 
-test('OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
+test('WHAT[BD-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
   // 1:1 Entry → tip. BlogObservationsSquashed collapses oldest K frames; Enforcement
   // applySquash drops oldest K tips — Observation history moves together.
   let blogState = blog.empty
@@ -128,7 +128,7 @@ test('OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
   assert.deepEqual(readObs(tipsOnly, squashedBlog.value), after)
 })
 
-test('OBS_PROJ_004_unpaired_tip_when_blog_lags', () => {
+test('WHAT[BD-015] OBS_PROJ_004_unpaired_tip_when_blog_lags', () => {
   let enfState = enf.empty
   const applied = enf.applyFromEntry(enfState, cycleRecord(1, 'solo-tip'))
   assert.equal(applied.ok, true)

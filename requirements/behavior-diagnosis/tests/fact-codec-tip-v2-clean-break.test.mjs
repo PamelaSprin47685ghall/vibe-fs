@@ -23,7 +23,7 @@ import {
   sessionId,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
+test('WHAT[BD-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const legacy = `{"${tag}":{"ScoreVectorRef":"sv-1","TipRuleId":"rule"}}`
     assert.equal(journal.containsLegacyScoreVectorEntry(legacy), true, tag)
@@ -34,14 +34,14 @@ test('ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
   }
 })
 
-test('ENFORCER_072_entry_without_tip_rule_id_is_legacy', () => {
+test('WHAT[BD-008] ENFORCER_072_entry_without_tip_rule_id_is_legacy', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const noTipRule = `{"${tag}":{"Entry":"e"}}`
     assert.equal(journal.containsLegacyScoreVectorEntry(noTipRule), true, tag)
   }
 })
 
-test('ENFORCER_072_modern_tip_v2_entry_passes_the_marker_check', () => {
+test('WHAT[BD-008] ENFORCER_072_modern_tip_v2_entry_passes_the_marker_check', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {
     const modern = `{"${tag}":{"TipRuleId":"rule-x","Entry":"e"}}`
     assert.equal(journal.containsLegacyScoreVectorEntry(modern), false, tag)
@@ -85,7 +85,7 @@ const observationsSquashed = () =>
     ProviderRun: providerRun('run-squash'),
   })
 
-test('PERSIST_005_observation_encode_writes_new_tags_only', () => {
+test('WHAT[BD-012] PERSIST_005_observation_encode_writes_new_tags_only', () => {
   const committed = journal.serializeFact(observationCommitted())
   assert.equal(committed.includes('"BlogObservationCommitted"'), true)
   assert.equal(committed.includes('"BlogEntryCommitted"'), false)
@@ -95,7 +95,7 @@ test('PERSIST_005_observation_encode_writes_new_tags_only', () => {
   assert.equal(squashed.includes('"BlogSquashCommitted"'), false)
 })
 
-test('PERSIST_005_legacy_observation_tags_dual_decode_to_new_names', () => {
+test('WHAT[BD-012] PERSIST_005_legacy_observation_tags_dual_decode_to_new_names', () => {
   const committed = journal.serializeFact(observationCommitted())
   const legacyCommitted = committed.replaceAll('"BlogObservationCommitted"', '"BlogEntryCommitted"')
   assert.equal(legacyCommitted.includes('"BlogEntryCommitted"'), true)

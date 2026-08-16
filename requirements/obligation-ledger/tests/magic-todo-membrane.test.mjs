@@ -86,7 +86,7 @@ const withJournal = async (body) => {
   }
 }
 
-test('HOST-019 before returns without waiting for snapshot or Journal IO', async () => {
+test('WHAT[OBLIGATION-LEDGER-025] before returns without waiting for snapshot or Journal IO', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-before-latency-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_magic_todo_before_latency' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))
@@ -130,7 +130,7 @@ test('HOST-019 before returns without waiting for snapshot or Journal IO', async
   }
 })
 
-test('TODO-004 malformed obligation shape is the provider-red class', async () => {
+test('WHAT[OBLIGATION-LEDGER-009] malformed obligation shape is the provider-red class', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-syntax-red-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_magic_todo_syntax_red' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))
@@ -166,7 +166,7 @@ test('TODO-004 malformed obligation shape is the provider-red class', async () =
   }
 })
 
-test('TODO-004 missing process-review runtime is infrastructure-fatal, not provider red', async () => {
+test('WHAT[OBLIGATION-LEDGER-009] missing process-review runtime is infrastructure-fatal, not provider red', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-runtime-fatal-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_magic_todo_runtime_fatal' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))
@@ -197,7 +197,7 @@ test('TODO-004 missing process-review runtime is infrastructure-fatal, not provi
   }
 })
 
-test('HOST-019 prepare rejects a pending ToolPart whose provider input is still empty', async () => {
+test('WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provider input is still empty', async () => {
   await withJournal(async (journal) => {
     const session = sessionId('ses-magic-todo-pending-input')
     const life = managerLifeId('life-magic-todo-pending-input')
@@ -242,7 +242,7 @@ const snapshotMessage = (call, inputCanonical) =>
     ],
   )
 
-test('HOST-019 before materializes the exact provider input including planComplete', () => {
+test('WHAT[OBLIGATION-LEDGER-025] before materializes the exact provider input including planComplete', () => {
   const call = toolCallId('call-magic-todo-await-input')
   const expected = magicTodoHost.canonicalInput({
     planComplete: false,
@@ -258,7 +258,7 @@ test('HOST-019 before materializes the exact provider input including planComple
   assert.equal(result.fields[0].InputCanonical, expected)
 })
 
-test('HOST-019 materialization fails closed when the provider input differs', () => {
+test('WHAT[OBLIGATION-LEDGER-025] materialization fails closed when the provider input differs', () => {
   const call = toolCallId('call-magic-todo-await-conflict')
 
   const result = materializeInput(
@@ -280,7 +280,7 @@ test('HOST-019 materialization fails closed when the provider input differs', ()
   assert.equal(result.fields[0].cases()[result.fields[0].tag], 'InputMismatch')
 })
 
-test('HOST-019 materialized snapshot input must still match tool.execute.before args', async () => {
+test('WHAT[OBLIGATION-LEDGER-025] materialized snapshot input must still match tool.execute.before args', async () => {
   await withJournal(async (journal) => {
     const session = sessionId('ses-magic-todo-conflicting-input')
     const life = managerLifeId('life-magic-todo-conflicting-input')
@@ -329,7 +329,24 @@ const checkpoint = async (journal, session, callText, obligations, planComplete 
   }
 }
 
-test('OBLIGATION-LEDGER-016 first accepted planComplete=false stays at the Planning Table without T1 revelation', async () => {
+const acceptPlanningFalseCheckpoint = async (journal, session, life, callText) => {
+  const planning = await checkpoint(journal, session, callText, [
+    { name: 'inspect-startup', work: 'Inspect startup paths so the implementation plan can be completed.' },
+  ], false)
+  assert.equal(planning.result.ok, true, planning.result.ok ? '' : planning.result.error.cases()[planning.result.error.tag])
+
+  const accepted = await magicTodoMembrane.accept(
+    journal,
+    planning.result.value,
+    magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+    planning.digest,
+    sha256Hex('planning-false-physical-output'),
+  )
+  assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+  return { planning, accepted }
+}
+
+test('WHAT[OBLIGATION-LEDGER-016] first accepted planComplete=false stays at the Planning Table without commitment', async () => {
   await withJournal(async (journal) => {
     const session = sessionId('ses-magic-todo-planning-false')
     const life = managerLifeId('life-magic-todo-planning-false')
@@ -339,20 +356,7 @@ test('OBLIGATION-LEDGER-016 first accepted planComplete=false stays at the Plann
     assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
 
     try {
-      const planning = await checkpoint(journal, session, 'call-magic-todo-planning-false', [
-        { name: 'inspect-startup', work: 'Inspect startup paths so the implementation plan can be completed.' },
-      ], false)
-      assert.equal(planning.result.ok, true, planning.result.ok ? '' : planning.result.error.cases()[planning.result.error.tag])
-
-      const accepted = await magicTodoMembrane.accept(
-        journal,
-        planning.result.value,
-        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-        planning.digest,
-        sha256Hex('planning-false-physical-output'),
-      )
-      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
-      assert.doesNotMatch(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
+      await acceptPlanningFalseCheckpoint(journal, session, life, 'call-magic-todo-planning-false')
 
       const lifeState = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life-magic-todo-planning-false')
       assert.equal(lifeState.FirstPlanCommitment, undefined)
@@ -362,7 +366,93 @@ test('OBLIGATION-LEDGER-016 first accepted planComplete=false stays at the Plann
   })
 })
 
-test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-closed Admission', async () => {
+test('WHAT[OBLIGATION-LEDGER-026] accepted planComplete=false carries no T1 entrustment revelation (revelation is reserved for the first accepted true)', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-planning-false')
+    const life = managerLifeId('life-magic-todo-planning-false')
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const { accepted } = await acceptPlanningFalseCheckpoint(journal, session, life, 'call-magic-todo-planning-false')
+      assert.doesNotMatch(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+const acceptT1Checkpoint = async (journal, session, life, callText) => {
+  const t1 = await checkpoint(journal, session, callText, [
+    { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+  ])
+  assert.equal(t1.result.ok, true, t1.result.ok ? '' : t1.result.error.cases()[t1.result.error.tag])
+
+  const accepted = await magicTodoMembrane.accept(
+    journal,
+    t1.result.value,
+    magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+    t1.digest,
+    sha256Hex('t1-physical-output'),
+  )
+  assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+  return { t1, accepted }
+}
+
+const concludePerfectReview = async (journal, session, life, callText, t1) => {
+  const write = magicTodo.todoWriteId(sha256Hex, life, toolCallId(callText))
+  const review = magicTodo.todoReviewId(sha256Hex, life, write)
+  const reviewer = magicTodo.dedicatedReviewerId(sha256Hex, life)
+  const reviewerSession = sessionId(`ses-todo-reviewer-${callText}`)
+  const cursor = (n) => new magicTodoJournal.XTraceCursor(BigInt(n))
+
+  const enlisted = new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession)
+  const assigned = new magicTodoJournal.TodoProcessReviewAssigned(
+    life,
+    write,
+    review,
+    reviewer,
+    reviewerSession,
+    cursor(8),
+    cursor(7),
+  )
+  const proposed = t1.result.value.Prepared
+  const reviewRecord = await agentJournal.writeBlob('R1 found no material issue.', journal)
+  assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : String(reviewRecord.error))
+  const concluded = new magicTodoJournal.TodoReviewConcluded(
+    life,
+    write,
+    review,
+    reviewer,
+    reviewerSession,
+    magicTodo.perfect,
+    reviewRecord.value.BlobRef,
+    reviewRecord.value.BlobDigest,
+    proposed.ProposedTodoRef,
+    proposed.ProposedTodoDigest,
+    cursor(10),
+    providerRun('reviewer-provider-run'),
+    toolCallId('reviewer-judge-call'),
+  )
+
+  for (const [caseName, payload] of [
+    ['DedicatedTodoReviewerEnlisted', enlisted],
+    ['TodoProcessReviewAssigned', assigned],
+    ['TodoReviewConcluded', concluded],
+  ]) {
+    const appended = await agentJournal.appendMagicTodo(
+      stream.session(session),
+      undefined,
+      magicTodoJournal.MagicTodoFact(caseName, [payload]),
+      journal,
+    )
+    assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
+  }
+}
+
+test('WHAT[OBLIGATION-LEDGER-012] T1 accept derives the process-review duties (SSOT = TodoWriteAccepted)', async () => {
   await withJournal(async (journal) => {
     const session = sessionId('ses-magic-todo-t1-t2-lag1')
     const life = managerLifeId('life-magic-todo-t1-t2-lag1')
@@ -372,32 +462,73 @@ test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-cl
     assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
 
     try {
-      const t1 = await checkpoint(journal, session, 'call-magic-todo-t1', [
-        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
-      ])
-      assert.equal(t1.result.ok, true, t1.result.ok ? '' : t1.result.error.cases()[t1.result.error.tag])
-
-      const accepted = await magicTodoMembrane.accept(
-        journal,
-        t1.result.value,
-        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-        t1.digest,
-        sha256Hex('t1-physical-output'),
-      )
-      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+      const { accepted } = await acceptT1Checkpoint(journal, session, life, 'call-magic-todo-t1')
       assert.equal(accepted.value.NeedsEnsureReview, true)
       assert.equal(accepted.value.NeedsDedicatedEnlist, true)
-      assert.match(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
 
       const snap = agentJournal.snapshot(journal)
       const lifeState = snap.AgentProjections.MagicTodo.ByLife.get('life-magic-todo-t1-t2-lag1')
       const checkpoints = mapEntries(lifeState.Checkpoints)
       assert.equal(checkpoints.length, 1)
       assert.equal(checkpoints[0][1].Accepted, true)
-      assert.equal(lifeState.CurrentObligationsRef[0].fields[0], t1.result.value.Prepared.ProposedTodoRef.fields[0])
-      assert.equal(lifeState.CurrentObligationsRef[1].fields[0], t1.result.value.Prepared.ProposedTodoDigest.fields[0])
       assert.equal(checkpoints[0][1].Assignment == null, true)
       assert.equal(checkpoints[0][1].Concluded == null, true)
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('WHAT[OBLIGATION-LEDGER-010] T1 accept makes the proposed account Current immediately, before any review', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-lag1')
+    const life = managerLifeId('life-magic-todo-t1-t2-lag1')
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const { t1 } = await acceptT1Checkpoint(journal, session, life, 'call-magic-todo-t1')
+
+      const lifeState = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get('life-magic-todo-t1-t2-lag1')
+      assert.equal(lifeState.CurrentObligationsRef[0].fields[0], t1.result.value.Prepared.ProposedTodoRef.fields[0])
+      assert.equal(lifeState.CurrentObligationsRef[1].fields[0], t1.result.value.Prepared.ProposedTodoDigest.fields[0])
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('WHAT[OBLIGATION-LEDGER-026] first accepted planComplete=true reveals entrustment in the enriched result', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-lag1')
+    const life = managerLifeId('life-magic-todo-t1-t2-lag1')
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const { accepted } = await acceptT1Checkpoint(journal, session, life, 'call-magic-todo-t1')
+      assert.match(accepted.value.EnrichedResult, /Manager who will carry it is you|The road is yours/i)
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('WHAT[OBLIGATION-LEDGER-013] T2 prepare while R1 is outstanding is a legal lag-1 wait, not a fail-closed Admission', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-lag1')
+    const life = managerLifeId('life-magic-todo-t1-t2-lag1')
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      await acceptT1Checkpoint(journal, session, life, 'call-magic-todo-t1')
 
       const t2 = await checkpoint(journal, session, 'call-magic-todo-t2', [
         { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
@@ -416,7 +547,7 @@ test('TODO-006 T1 accept succeeds then T2 prepare is a lag-1 wait, not a fail-cl
 })
 
 
-test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wait resolves, no invalidOp)', async () => {
+test('WHAT[OBLIGATION-LEDGER-014] T2 prepare is gated on a consumable TodoReviewConcluded, not on a mere verdict', async () => {
   await withJournal(async (journal) => {
     const session = sessionId('ses-magic-todo-t1-t2-resolve')
     const life = managerLifeId('life-magic-todo-t1-t2-resolve')
@@ -427,20 +558,7 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
     assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
 
     try {
-      // T1 accepted.
-      const t1 = await checkpoint(journal, session, callText, [
-        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
-      ])
-      assert.equal(t1.result.ok, true, t1.result.ok ? '' : t1.result.error.cases()[t1.result.error.tag])
-
-      const accepted = await magicTodoMembrane.accept(
-        journal,
-        t1.result.value,
-        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
-        t1.digest,
-        sha256Hex('t1-physical-output'),
-      )
-      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error.cases()[accepted.error.tag])
+      const { t1 } = await acceptT1Checkpoint(journal, session, life, callText)
 
       // T2 before the review concludes is a legal lag-1 wait, not invalidOp.
       const t2Early = await checkpoint(journal, session, 'call-magic-todo-t2', [
@@ -454,59 +572,44 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
         'T2 blocks on ConsumableReview while R1 is outstanding',
       )
 
-      // Complete the process review: enlist the dedicated reviewer, assign R1,
-      // and append ConsumableReview ≡ TodoReviewConcluded with a PERFECT verdict.
-      const write = magicTodo.todoWriteId(sha256Hex, life, toolCallId(callText))
-      const review = magicTodo.todoReviewId(sha256Hex, life, write)
-      const reviewer = magicTodo.dedicatedReviewerId(sha256Hex, life)
-      const reviewerSession = sessionId('ses-todo-reviewer-t1-t2-resolve')
-      const cursor = (n) => new magicTodoJournal.XTraceCursor(BigInt(n))
-
-      const enlisted = new magicTodoJournal.DedicatedTodoReviewerEnlisted(life, reviewer, reviewerSession)
-      const assigned = new magicTodoJournal.TodoProcessReviewAssigned(
-        life,
-        write,
-        review,
-        reviewer,
-        reviewerSession,
-        cursor(8),
-        cursor(7),
-      )
-      const proposed = t1.result.value.Prepared
-      const reviewRecord = await agentJournal.writeBlob('R1 found no material issue.', journal)
-      assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : String(reviewRecord.error))
-      const concluded = new magicTodoJournal.TodoReviewConcluded(
-        life,
-        write,
-        review,
-        reviewer,
-        reviewerSession,
-        magicTodo.perfect,
-        reviewRecord.value.BlobRef,
-        reviewRecord.value.BlobDigest,
-        proposed.ProposedTodoRef,
-        proposed.ProposedTodoDigest,
-        cursor(10),
-        providerRun('reviewer-provider-run'),
-        toolCallId('reviewer-judge-call'),
-      )
-
-      for (const [caseName, payload] of [
-        ['DedicatedTodoReviewerEnlisted', enlisted],
-        ['TodoProcessReviewAssigned', assigned],
-        ['TodoReviewConcluded', concluded],
-      ]) {
-        const appended = await agentJournal.appendMagicTodo(
-          stream.session(session),
-          undefined,
-          magicTodoJournal.MagicTodoFact(caseName, [payload]),
-          journal,
-        )
-        assert.equal(appended.ok, true, appended.ok ? '' : String(appended.error))
-      }
+      // Complete the process review: ConsumableReview ≡ TodoReviewConcluded.
+      await concludePerfectReview(journal, session, life, callText, t1)
 
       // T2 now proceeds: the lag-1 wait resolved because ConsumableReview is durable.
-      // PERFECT is silent; it does not gate or rewrite CurrentObligations.
+      const t2 = await checkpoint(journal, session, 'call-magic-todo-t2', [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+        { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
+      ])
+      assert.equal(t2.result.ok, true, t2.result.ok ? '' : t2.result.error.cases()[t2.result.error.tag])
+
+      const t2Accepted = await magicTodoMembrane.accept(
+        journal,
+        t2.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t2.digest,
+        sha256Hex('t2-physical-output'),
+      )
+      assert.equal(t2Accepted.ok, true, t2Accepted.ok ? '' : t2Accepted.error.cases()[t2Accepted.error.tag])
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('WHAT[OBLIGATION-LEDGER-026] enriched result after a concluded PERFECT review is silent about the previous review', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-resolve')
+    const life = managerLifeId('life-magic-todo-t1-t2-resolve')
+    const callText = 'call-magic-todo-t1'
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const { t1 } = await acceptT1Checkpoint(journal, session, life, callText)
+      await concludePerfectReview(journal, session, life, callText, t1)
+
       const t2 = await checkpoint(journal, session, 'call-magic-todo-t2', [
         { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
         { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
@@ -523,6 +626,40 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
       assert.equal(t2Accepted.ok, true, t2Accepted.ok ? '' : t2Accepted.error.cases()[t2Accepted.error.tag])
       assert.match(t2Accepted.value.EnrichedResult, /Keep working/)
       assert.doesNotMatch(t2Accepted.value.EnrichedResult, /Previous checkpoint review|R1 found no material issue/)
+    } finally {
+      providerLanguage.clearAllForTests()
+    }
+  })
+})
+
+test('WHAT[OBLIGATION-LEDGER-010] T2 accepted account supersedes CurrentObligations', async () => {
+  await withJournal(async (journal) => {
+    const session = sessionId('ses-magic-todo-t1-t2-resolve')
+    const life = managerLifeId('life-magic-todo-t1-t2-resolve')
+    const callText = 'call-magic-todo-t1'
+    await openLife(journal, session, life)
+    providerLanguage.clearAllForTests()
+    const bound = providerLanguage.bindOnce(session, providerLanguage.english)
+    assert.equal(bound.ok, true, bound.ok ? '' : String(bound.error))
+
+    try {
+      const { t1 } = await acceptT1Checkpoint(journal, session, life, callText)
+      await concludePerfectReview(journal, session, life, callText, t1)
+
+      const t2 = await checkpoint(journal, session, 'call-magic-todo-t2', [
+        { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+        { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
+      ])
+      assert.equal(t2.result.ok, true, t2.result.ok ? '' : t2.result.error.cases()[t2.result.error.tag])
+
+      const t2Accepted = await magicTodoMembrane.accept(
+        journal,
+        t2.result.value,
+        magicTodoJournal.PhysicalSuccessEvidence.LiveAfterSuccess,
+        t2.digest,
+        sha256Hex('t2-physical-output'),
+      )
+      assert.equal(t2Accepted.ok, true, t2Accepted.ok ? '' : t2Accepted.error.cases()[t2Accepted.error.tag])
 
       const afterT2 = agentJournal.snapshot(journal).AgentProjections.MagicTodo.ByLife.get(
         'life-magic-todo-t1-t2-resolve',
@@ -534,7 +671,7 @@ test('TODO-006 T2 prepare succeeds once T1 process review is Concluded (lag-1 wa
   })
 })
 
-test('TODO-005 REVISE is feedback only: next checkpoint sees the report and Current never rolls back', async () => {
+test('WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees the report and Current never rolls back', async () => {
   await withJournal(async (journal) => {
     const session = sessionId('ses-magic-todo-revise-feedback')
     const life = managerLifeId('life-magic-todo-revise-feedback')
@@ -650,7 +787,7 @@ test('TODO-005 REVISE is feedback only: next checkpoint sees the report and Curr
   })
 })
 
-test('HOST-021 snapshot infrastructure failure takes the process-fatal path, never a todowrite red path', async () => {
+test('WHAT[OBLIGATION-LEDGER-026] snapshot infrastructure failure takes the process-fatal path, never a todowrite red path', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-magic-todo-after-failclose-'))
   const created = await agentJournal.create({ directory, runtime: 'rt_magic_todo_after_failclose' })
   assert.equal(created.ok, true, created.ok ? '' : String(created.error))

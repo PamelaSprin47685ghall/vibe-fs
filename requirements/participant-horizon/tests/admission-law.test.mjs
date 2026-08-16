@@ -37,7 +37,7 @@ const MANAGER_VISIBLE_SURFACES = [
   'lifecycle/magic-todo/manager-guideline',
 ]
 
-test('PH_agent_008_internal_participants_absent_from_provider_visible_surfaces', () => {
+test('WHAT[PARTICIPANT-HORIZON-007] PH_agent_008_internal_participants_absent_from_provider_visible_surfaces', () => {
   const surfaces = [
     'role/manager',
     'tool/fork/description',
@@ -54,7 +54,7 @@ test('PH_agent_008_internal_participants_absent_from_provider_visible_surfaces',
   }
 })
 
-test('PH_agent_008_machine_binding_names_absent_from_provider_visible_surfaces', () => {
+test('WHAT[PARTICIPANT-HORIZON-002] PH_agent_008_machine_binding_names_absent_from_provider_visible_surfaces', () => {
   for (const surface of MANAGER_VISIBLE_SURFACES) {
     for (const locale of LOCALES) {
       const text = read(`resources/provider/${surface}/${locale}.md`)
@@ -63,7 +63,7 @@ test('PH_agent_008_machine_binding_names_absent_from_provider_visible_surfaces',
   }
 })
 
-test('PH_glory_002_030_manager_surface_hides_review_orchestration', () => {
+test('WHAT[PARTICIPANT-HORIZON-008] PH_glory_002_030_manager_surface_hides_review_orchestration', () => {
   for (const surface of MANAGER_VISIBLE_SURFACES) {
     for (const locale of LOCALES) {
       const text = read(`resources/provider/${surface}/${locale}.md`)
@@ -72,7 +72,7 @@ test('PH_glory_002_030_manager_surface_hides_review_orchestration', () => {
   }
 })
 
-test('PH_agent_009_fork_visible_set_is_exactly_the_five_forkable_offices', () => {
+test('WHAT[PARTICIPANT-HORIZON-010] PH_agent_009_fork_visible_set_is_exactly_the_five_forkable_offices', () => {
   const fiveOffices = [/Coder/i, /Scout|Investigator/i, /Technician|Operator/i, /Navigator|Researcher/i, /Analyst|Inquirer/i]
   for (const locale of LOCALES) {
     const fork = read(`resources/provider/tool/fork/description/${locale}.md`)
@@ -83,7 +83,7 @@ test('PH_agent_009_fork_visible_set_is_exactly_the_five_forkable_offices', () =>
   }
 })
 
-test('PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_descriptions', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_descriptions', () => {
   const dtoVocabulary = /\b(status|session_id|agent_id|pty_id|code|ordinal|kind|count)\b/i
   for (const tool of ['join', 'horizon']) {
     for (const locale of LOCALES) {
@@ -93,10 +93,24 @@ test('PH_exec_030_no_generic_state_dto_vocabulary_in_join_or_horizon_description
   }
 })
 
-test('PH_exec_005_horizon_description_declares_pull_only_and_hides_machinery', () => {
+test('WHAT[PARTICIPANT-HORIZON-001] PH_exec_005_horizon_description_declares_pull_only_and_hides_machinery', () => {
   for (const locale of LOCALES) {
     const text = read(`resources/provider/tool/horizon/description/${locale}.md`)
     assert.match(text, /pull-only|只在调用时主动读取一次|不?轮询|do not poll/i)
     assert.match(text, /hidden machinery|隐藏机|hidden machinery|不 dump 隐藏/i)
+  }
+})
+
+test('WHAT[PARTICIPANT-HORIZON-006] PH_exec_030_internal_machine_state_renders_as_consequence_not_dto', () => {
+  const machineStateVocabulary = /\b(lane|offset|spool|job\s*id)\b/i
+  for (const tool of ['join', 'horizon']) {
+    for (const locale of LOCALES) {
+      const text = read(`resources/provider/tool/${tool}/description/${locale}.md`)
+      assert.doesNotMatch(text, machineStateVocabulary, `${tool}/${locale}.md carries internal machine state`)
+    }
+  }
+  for (const locale of LOCALES) {
+    const join = read(`resources/provider/tool/join/description/${locale}.md`)
+    assert.match(join, /consequence|后果/i, `join/${locale}.md must frame outcomes as consequences`)
   }
 })

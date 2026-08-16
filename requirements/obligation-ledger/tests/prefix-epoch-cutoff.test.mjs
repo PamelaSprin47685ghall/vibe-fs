@@ -15,13 +15,13 @@ const sha256 = (value) => `digest:${value}`
 const life = managerLifeId('manager-life')
 const write = (call) => magicTodo.todoWriteId(sha256, life, toolCallId(call))
 
-test('OBLIGATION-LEDGER-021 committed cutoff is supplied by one previous locator, never by scanning Accepted history', () => {
+test('WHAT[OBLIGATION-LEDGER-021] committed cutoff is supplied by one previous locator, never by scanning Accepted history', () => {
   const t1 = write('t1-call')
   assert.equal(requiresLag1Rebase(undefined), false, 'T1 has no committed predecessor')
   assert.equal(requiresLag1Rebase(t1), true, 'a later committed checkpoint has exactly one lag-1 predecessor locator')
 })
 
-test('OBLIGATION-LEDGER-021 TodoCheckpoint evidence binds trigger plus O(1) previous committed locator', () => {
+test('WHAT[OBLIGATION-LEDGER-021] TodoCheckpoint evidence binds trigger plus O(1) previous committed locator', () => {
   const t1 = write('t1-call')
   const t2 = write('t2-call')
   const evidence = todoCheckpointEvidence(t2, t1)

@@ -308,7 +308,7 @@ const withHarness = async (fn) => {
   }
 }
 
-test('G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookkeeper_fetch', async () => {
   await withHarness(async ({ dir, runtime, scope, createCalls, prompts, bookkeeper }) => {
     const owner = 'ses_meditator_inspector_tool'
     const inspectorRole = roles.of('Inspector')

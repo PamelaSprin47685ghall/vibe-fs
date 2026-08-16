@@ -26,7 +26,7 @@ const sandbox = () => {
 }
 const record = (sessionId, q, a, observations) => ({ SessionId: sessionId, Q: q, A: a, Observations: toList(observations), LastAccessOrder: 0 })
 
-test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
@@ -60,7 +60,7 @@ test('CASE006_synthesis_refresh_publishes_refreshed_with_revised_a', async () =>
   }
 })
 
-test('CASE006_mechanical_refresh_no_case_is_noop', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_mechanical_refresh_no_case_is_noop', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   try {
@@ -73,7 +73,7 @@ test('CASE006_mechanical_refresh_no_case_is_noop', async () => {
   }
 })
 
-test('CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_mechanical_refresh_missing_file_still_publishes', async () => {
   const { dir, cleanup } = sandbox()
   const local = createLocalEventStore()
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()

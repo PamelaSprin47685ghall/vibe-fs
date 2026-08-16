@@ -13,7 +13,7 @@ const firstCheckpointSurfaces = [
   ['todowrite-description/zh-CN', 'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md'],
 ]
 
-test('OBLIGATION-LEDGER-016 planning checkpoints are allowed until the first irreversible true commitment', () => {
+test('WHAT[OBLIGATION-LEDGER-016] planning checkpoints are allowed until the first irreversible true commitment', () => {
   for (const [label, path] of firstCheckpointSurfaces) {
     const text = read(path)
     assert.match(text, /planComplete/i, `${label}: must expose the explicit commitment declaration`)
@@ -24,7 +24,7 @@ test('OBLIGATION-LEDGER-016 planning checkpoints are allowed until the first irr
   }
 })
 
-test('OBLIGATION-LEDGER-004 Manager Role Law distinguishes planning relation from entrusted mission without owning tool timing', () => {
+test('WHAT[OBLIGATION-LEDGER-004] Manager Role Law distinguishes planning relation from entrusted mission without owning tool timing', () => {
   for (const path of ['resources/provider/role/manager/en.md', 'resources/provider/role/manager/zh-CN.md']) {
     const text = read(path)
     assert.match(text, /Planning Table|规划桌/i)
@@ -35,7 +35,7 @@ test('OBLIGATION-LEDGER-004 Manager Role Law distinguishes planning relation fro
   }
 })
 
-test('OBLIGATION-LEDGER-005 empty placeholders remain invalid while concrete planning work is legal before commitment', () => {
+test('WHAT[OBLIGATION-LEDGER-005] empty placeholders remain invalid while concrete planning work is legal before commitment', () => {
   const surfaces = [
     ...firstCheckpointSurfaces,
     ['obligation-name/en', 'resources/provider/lifecycle/magic-todo/obligation-name-description/en.md'],
@@ -55,7 +55,7 @@ test('OBLIGATION-LEDGER-005 empty placeholders remain invalid while concrete pla
   assert.doesNotMatch(host, /placeholder:\s*planning|\bTBD\b/, 'Host must not classify natural-language placeholder keywords')
 })
 
-test('OBLIGATION-LEDGER-004 committed mode rejects planning-only debt by consequence, not keywords', () => {
+test('WHAT[OBLIGATION-LEDGER-004] committed mode rejects planning-only debt by consequence, not keywords', () => {
   for (const [label, path] of firstCheckpointSurfaces) {
     const text = read(path)
     assert.match(text, /planComplete/i)
@@ -68,7 +68,7 @@ test('OBLIGATION-LEDGER-004 committed mode rejects planning-only debt by consequ
   assert.doesNotMatch(host, /survey-startup-and-complexity|O\(N\^2\)|placeholder:\s*planning/, 'Host must not classify planning language')
 })
 
-test('OBLIGATION-LEDGER-012 process reviewer is told the effective planning-vs-mission relation', () => {
+test('WHAT[OBLIGATION-LEDGER-012] process reviewer is told the effective planning-vs-mission relation', () => {
   for (const path of [
     'resources/provider/lifecycle/magic-todo/process-reviewer-preamble/en.md',
     'resources/provider/lifecycle/magic-todo/process-reviewer-preamble/zh-CN.md',
@@ -83,12 +83,10 @@ test('OBLIGATION-LEDGER-012 process reviewer is told the effective planning-vs-m
   assert.match(request, /EffectivePlanComplete/, 'typed process-review request must carry the effective relation')
 })
 
-test('TODO-005 provider wording says Accepted becomes Current without reviewer settlement', () => {
+test('WHAT[OBLIGATION-LEDGER-010] provider wording says Accepted becomes Current without reviewer settlement', () => {
   for (const path of [
     'resources/provider/lifecycle/magic-todo/todowrite-description/en.md',
     'resources/provider/lifecycle/magic-todo/todowrite-description/zh-CN.md',
-    'resources/provider/lifecycle/magic-todo/manager-guideline/en.md',
-    'resources/provider/lifecycle/magic-todo/manager-guideline/zh-CN.md',
   ]) {
     const text = read(path)
     assert.match(text, /accepted|接受/, `${path}: must name the accepted boundary`)
@@ -97,7 +95,22 @@ test('TODO-005 provider wording says Accepted becomes Current without reviewer s
   }
 })
 
-test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
+test('WHAT[OBLIGATION-LEDGER-023] manager guideline freezes ledger discipline as Manager-only content', () => {
+  for (const path of [
+    'resources/provider/lifecycle/magic-todo/manager-guideline/en.md',
+    'resources/provider/lifecycle/magic-todo/manager-guideline/zh-CN.md',
+  ]) {
+    const text = read(path)
+    // keep while owed / remove when earned
+    assert.match(text, /keep|retain|保留|继续保留/, `${path}: must keep obligations while owed`)
+    assert.match(text, /remove|discharge|earned|移除|解除|earned|真正解除/, `${path}: must remove only when earned`)
+    // checkpoint continuity (lag-1) and no forged Activation (conversation relation, not persisted phase)
+    assert.match(text, /accepted account becomes Current|accepted account 都立即成为当前|Current/i, `${path}: accepted supersedes without reviewer settlement`)
+    assert.doesNotMatch(text, /Activation|WorkActivated/i, `${path}: must not forge Activation as a persisted phase`)
+  }
+})
+
+test('WHAT[OBLIGATION-LEDGER-009] failure triage keeps red for syntax and kills OpenCode on infrastructure faults', () => {
   const membrane = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
   const hostCodec = read('src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs')
 
@@ -111,7 +124,7 @@ test('TODO-004 failure triage keeps red for syntax and kills OpenCode on infrast
   assert.match(hostCodec, /output\.args is required[\s\S]*Diagnostic\.fatal|Diagnostic\.fatal[\s\S]*output\.args is required/)
 })
 
-test('TODO-003 clean break removes the legacy todo ontology from the production graph', () => {
+test('WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology from the production graph', () => {
   const algebra = read('src/Wanxiangshu/Mission/Obligation/Todo/Model.fs')
   const project = read('src/Wanxiangshu/Wanxiangshu.fsproj')
 
@@ -124,7 +137,7 @@ test('TODO-003 clean break removes the legacy todo ontology from the production 
   assert.match(project, /ObligationCodec\.fs/)
 })
 
-test('TODO-005 production checkpoint path has no reviewer settlement owner', () => {
+test('WHAT[OBLIGATION-LEDGER-011] production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
     'src/Wanxiangshu/Mission/Review/TodoProcess.fs',

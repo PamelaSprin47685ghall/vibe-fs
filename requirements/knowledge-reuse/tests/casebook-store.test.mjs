@@ -42,7 +42,7 @@ const casesOf = (store) => {
 
 const findCase = (store, sessionId) => mapEntries(casesOf(store)).find(([key]) => key === sessionId)?.[1]
 
-test('CASE007_captured_refreshed_round_trip_through_integrator_Current', async () => {
+test('WHAT[KNOWLEDGE-REUSE-007] CASE007_captured_refreshed_round_trip_through_integrator_Current', async () => {
   const local = createLocalEventStore()
   try {
     await unwrap(appendCaptured(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')])))
@@ -55,7 +55,7 @@ test('CASE007_captured_refreshed_round_trip_through_integrator_Current', async (
   }
 })
 
-test('CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan', async () => {
+test('WHAT[KNOWLEDGE-REUSE-007] CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan', async () => {
   const local = createLocalEventStore()
   try {
     await unwrap(appendCaptured(local.store, caseRec('s1', 'Q', 'A', [])))
@@ -69,14 +69,14 @@ test('CASE007_accessed_and_evicted_are_integrated_without_feature_history_scan',
   }
 })
 
-test('CASE007_store_has_no_loadEvents_project_or_history_reader', async () => {
+test('WHAT[KNOWLEDGE-REUSE-007] CASE007_store_has_no_loadEvents_project_or_history_reader', async () => {
   const { readFileSync } = await import('node:fs')
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /loadEvents|loadEnvelopes|project\s*\(|OpenSnapshot|readStreams/)
   assert.match(source, /tryDecodeEnvelope/)
 })
 
-test('CASE009_marker_gates_the_surface', async () => {
+test('WHAT[KNOWLEDGE-REUSE-009] CASE009_marker_gates_the_surface', async () => {
   const { CasebookFeature_isEnabled: isEnabled } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-cbmarker-'))
   try {
@@ -88,7 +88,23 @@ test('CASE009_marker_gates_the_surface', async () => {
   }
 })
 
-test('CASE004_005_workflow_archive_fetch_freshness_reads_Current_only', async () => {
+test('WHAT[KNOWLEDGE-REUSE-001] CASE004_005_workflow_archive_fetch_closed_loop_reads_Current_only', async () => {
+  const {
+    CasebookWorkflow_archiveInspectorResult: archive,
+    CasebookWorkflow_fetchCase: fetchCase,
+  } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
+  const local = createLocalEventStore()
+  try {
+    assert.equal(resultOf(await archive(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')]))).ok, true)
+    const fetched = resultOf(await fetchCase(local.store, 10, 's1'))
+    assert.equal(fetched.ok, true)
+    assert.equal(fetched.value.A, 'A1')
+  } finally {
+    local.close()
+  }
+})
+
+test('WHAT[KNOWLEDGE-REUSE-005] CASE004_005_freshness_check_is_hint_not_proof_reads_Current_only', async () => {
   const {
     CasebookWorkflow_archiveInspectorResult: archive,
     CasebookWorkflow_fetchCase: fetchCase,
@@ -99,7 +115,6 @@ test('CASE004_005_workflow_archive_fetch_freshness_reads_Current_only', async ()
     assert.equal(resultOf(await archive(local.store, caseRec('s1', 'Q1', 'A1', [fileRead('a.txt', 'h1')]))).ok, true)
     const fetched = resultOf(await fetchCase(local.store, 10, 's1'))
     assert.equal(fetched.ok, true)
-    assert.equal(fetched.value.A, 'A1')
     assert.equal(caseOf(checkFreshness(fetched.value, toList([fileRead('a.txt', 'h1')]))), 'Fresh')
     assert.equal(caseOf(checkFreshness(fetched.value, toList([fileRead('a.txt', 'h2')]))), 'Stale')
   } finally {
@@ -107,7 +122,7 @@ test('CASE004_005_workflow_archive_fetch_freshness_reads_Current_only', async ()
   }
 })
 
-test('CASE006_refresh_and_needsRefresh_use_the_same_Current', async () => {
+test('WHAT[KNOWLEDGE-REUSE-004] CASE004_refresh_and_needsRefresh_replay_the_same_Current', async () => {
   const {
     CasebookWorkflow_archiveInspectorResult: archive,
     CasebookWorkflow_fetchCase: fetchCase,
@@ -131,7 +146,7 @@ test('CASE006_refresh_and_needsRefresh_use_the_same_Current', async () => {
   }
 })
 
-test('CASE010_finalize_is_exactly_once_per_scope', async () => {
+test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_is_exactly_once_per_scope', async () => {
   const { CasebookWorkflow_finalizeCase: finalizeCase } = await import('../../../dist/Repository/Knowledge/Casebook/Workflow.js')
   const local = createLocalEventStore()
   try {

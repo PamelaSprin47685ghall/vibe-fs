@@ -248,7 +248,7 @@ function runPermutation(seed) {
   )
 }
 
-test('EXEC_property_every_started_run_reaches_exactly_one_terminal_within_deadline', () => {
+test('WHAT[MANAGED-SESSION-007] EXEC_property_every_started_run_reaches_exactly_one_terminal_within_deadline', () => {
   const ITERATIONS = 10_000
   for (let iter = 0; iter < ITERATIONS; iter += 1) {
     const seed = (0xc0ffee + iter) >>> 0

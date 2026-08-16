@@ -24,7 +24,7 @@ const estimate = (runtimeSeconds = 10, outputBytes = 1024, memory = 'Medium') =>
 
 // ── Large gate ───────────────────────────────────────────────────────────────
 
-test('EXEC_011_large_estimate_acquires_and_releases_the_gate', async () => {
+test('WHAT[DISTILL-011] EXEC_011_large_estimate_acquires_and_releases_the_gate', async () => {
   const { acquire, release, getCount } = await import('../../../dist/Process/LargeGate.js')
   // Drain to a known state.
   while (getCount() === 0) release()

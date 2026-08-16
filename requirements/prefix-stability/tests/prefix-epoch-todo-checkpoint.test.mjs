@@ -21,12 +21,12 @@ const { requiresLag1Rebase, buildTodoCheckpointCommit } = await import(
 
 const t = (id) => magicTodo.todoWriteIdCreate(id)
 
-test('PREFIX_STABILITY_lag1_rebase_consumes_one_previous_committed_locator', () => {
+test('WHAT[PREFIX-STABILITY-004] PREFIX_STABILITY_lag1_rebase_consumes_one_previous_committed_locator', () => {
   assert.equal(requiresLag1Rebase(undefined), false, 'T1 has no committed predecessor')
   assert.equal(requiresLag1Rebase(t('T1')), true, 'later committed checkpoints have one lag-1 predecessor')
 })
 
-test('PREFIX_STABILITY_todo_checkpoint_commit_uses_the_existing_epoch_contract', () => {
+test('WHAT[PREFIX-STABILITY-004] PREFIX_STABILITY_todo_checkpoint_commit_uses_the_existing_epoch_contract', () => {
   const snapshot = {
     FrozenRecordPrefixRef: blobRef('blob-frozen'),
     FrozenRecordPrefixDigest: blobDigest('frozen-1'),

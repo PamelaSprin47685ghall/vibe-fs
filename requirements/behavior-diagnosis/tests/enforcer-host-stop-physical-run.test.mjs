@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-test('ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
+test('WHAT[BD-017] ENFORCER_stopPhysicalRun_argument_order_is_messages_then_fallback', () => {
   // Definition: stopPhysicalRun (messages) (fallback) (reason).
   // Call sites must pass (rawMessages, fallback, reason), not swapped.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')

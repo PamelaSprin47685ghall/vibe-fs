@@ -36,7 +36,7 @@ const live = () => {
   return { creates, createChild }
 }
 
-test('EXEC_026_get_or_create_creates_and_binds_a_work_child_once', async () => {
+test('WHAT[MANAGED-SESSION-001] EXEC_026_get_or_create_creates_and_binds_a_work_child_once', async () => {
   const { creates, createChild } = live()
   const runtime = new AttachedSessionRuntime()
   const ready = []
@@ -57,7 +57,7 @@ test('EXEC_026_get_or_create_creates_and_binds_a_work_child_once', async () => {
   assert.equal(tryFindByScope(runtime, scope, syncDelegate.role('Inspector')).fields[0], 'ses_child_1')
 })
 
-test('EXEC_026_get_or_create_reuses_the_existing_binding_and_keeps_the_bound_agent', async () => {
+test('WHAT[MANAGED-SESSION-005] EXEC_026_get_or_create_reuses_the_existing_binding_and_keeps_the_bound_agent', async () => {
   const { creates, createChild } = live()
   const runtime = new AttachedSessionRuntime()
   const owner = sessionId('ses_owner')
@@ -77,7 +77,7 @@ test('EXEC_026_get_or_create_reuses_the_existing_binding_and_keeps_the_bound_age
   assert.equal(creates.length, 1, 'no second spawn')
 })
 
-test('EXEC_026_reuse_scope_is_the_serialization_key_across_sessions', async () => {
+test('WHAT[MANAGED-SESSION-005] EXEC_026_reuse_scope_is_the_serialization_key_across_sessions', async () => {
   const a = ofSession(sessionId('ses_owner_a'))
   const b = ofSession(sessionId('ses_owner_b'))
   const same = ofSession(sessionId('ses_owner_a'))
@@ -97,7 +97,7 @@ test('EXEC_026_reuse_scope_is_the_serialization_key_across_sessions', async () =
   assert.notEqual(inspector.fields[0][0].fields[0], coder.fields[0][0].fields[0])
 })
 
-test('EXEC_026_remove_and_remove_by_delegate_session_are_the_only_unbind_paths', async () => {
+test('WHAT[MANAGED-SESSION-001] EXEC_026_remove_and_remove_by_delegate_session_are_the_only_unbind_paths', async () => {
   const { createChild } = live()
   const runtime = new AttachedSessionRuntime()
   const owner = sessionId('ses_owner')
@@ -119,7 +119,7 @@ test('EXEC_026_remove_and_remove_by_delegate_session_are_the_only_unbind_paths',
   assert.equal(removeByDelegateSession(runtime, sessionId('ses_never')), false)
 })
 
-test('EXEC_026_unusable_binding_is_treated_as_absent_and_recreated', async () => {
+test('WHAT[MANAGED-SESSION-005] EXEC_026_unusable_binding_is_treated_as_absent_and_recreated', async () => {
   const { creates, createChild } = live()
   const runtime = new AttachedSessionRuntime(undefined, () => false)
   const owner = sessionId('ses_owner')

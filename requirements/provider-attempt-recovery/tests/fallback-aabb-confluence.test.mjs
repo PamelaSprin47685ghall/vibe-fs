@@ -113,7 +113,7 @@ const fallbackOf = (projection, sessionIdStr) => {
 // "owner failure vs blogger interruption" when they land on different runs —
 // but proved here at pure Fold level without spawning Host.
 
-test('THEOREM_fallback_independent_sessions_commute_pure_projection', () => {
+test('WHAT[PAR-015] THEOREM_fallback_independent_sessions_commute_pure_projection', () => {
   const a0 = fallbackProjection.forAuthority(RUN_L, ROOT_A)
   const b0 = fallbackProjection.forAuthority(RUN_M, ROOT_B)
 
@@ -144,7 +144,7 @@ test('THEOREM_fallback_independent_sessions_commute_pure_projection', () => {
   })
 })
 
-test('THEOREM_fold_independent_sessions_confluent_across_interleavings', () => {
+test('WHAT[PAR-001] THEOREM_fold_independent_sessions_confluent_across_interleavings', () => {
   // Four envelopes: root+advance for ses_a, root+advance for ses_b.
   // Any interleaving of the two per-session sequences must fold to the same
   // global projection (per-session cursors identical). We enumerate a subset
@@ -191,7 +191,7 @@ test('THEOREM_fold_independent_sessions_confluent_across_interleavings', () => {
 // ProviderRun twice converges to count==1, regardless of interleaving with an
 // unrelated independent event.
 
-test('THEOREM_fallback_exactly_once_same_provider_run_advances_once', () => {
+test('WHAT[PAR-003] THEOREM_fallback_exactly_once_same_provider_run_advances_once', () => {
   const start = fallbackProjection.forAuthority(RUN_L, ROOT_A)
   const run = 'run_dup'
 
@@ -218,7 +218,7 @@ test('THEOREM_fallback_exactly_once_same_provider_run_advances_once', () => {
   assert.deepEqual(fallbackProjection.read(validAfterStale.value), fallbackProjection.read(first.value))
 })
 
-test('THEOREM_fold_duplicate_absorbed_not_double_counted', () => {
+test('WHAT[PAR-003] THEOREM_fold_duplicate_absorbed_not_double_counted', () => {
   // At Fold level, a duplicate FallbackCursorAdvanced line is absorbed (fold stays ok, projection unchanged).
   // Two distinct traces that both contain the same ProviderRun twice must converge to failures==1.
   const root = envelope({ seq: 1, stream: stream.session(SESSION_A), fact: rootFact(SES_A, 'run_L', 'msg_u1') })
@@ -248,7 +248,7 @@ test('THEOREM_fold_duplicate_absorbed_not_double_counted', () => {
 // Exactly one wins; the other is InvalidTransition. The final offset/count is
 // deterministic (1 failure) regardless of which contender won.
 
-test('THEOREM_fallback_precedence_one_winner_for_one_cursor', () => {
+test('WHAT[PAR-003] THEOREM_fallback_precedence_one_winner_for_one_cursor', () => {
   const start = fallbackProjection.forAuthority(RUN_L, ROOT_A)
   const attemptA = identityFor(SESSION_A, RUN_L, ROOT_A, 'run_a')
   const attemptB = identityFor(SESSION_A, RUN_L, ROOT_A, 'run_b')
@@ -278,7 +278,7 @@ test('THEOREM_fallback_precedence_one_winner_for_one_cursor', () => {
 //
 // G4R §12: world1 → durable facts F, DROP EPHEMERAL, world2 := recover(F) → same cursor, no resurrection.
 
-test('THEOREM_drop_ephemeral_preserves_fallback_cursor', async () => {
+test('WHAT[PAR-007] THEOREM_drop_ephemeral_preserves_fallback_cursor', async () => {
   const dir = `temporal-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`
 
   // Pure algebra: envelopes prove confluence/dedupe at Fold level.

@@ -20,7 +20,7 @@ const fakeSchema = {
 }
 const factory = ToolHostCodec_factory({ tool: { schema: fakeSchema } })
 
-test('CASE006_bookkeeper_provider_contract_is_one_program', () => {
+test('WHAT[KNOWLEDGE-REUSE-006] CASE006_bookkeeper_provider_contract_is_one_program', () => {
   const tool = spec(factory)
   assert.equal(tool.Name, 'js-bookkeeper')
   assert.deepEqual(listItems(tool.Arguments).map((pair) => pair[0]), ['program'])

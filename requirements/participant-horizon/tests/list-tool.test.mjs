@@ -135,14 +135,14 @@ const liveRuntime = ({ agents = [], ptys = [] } = {}) => {
 
 const run = async (runtimeScope, session = 'ses_list') => spec(runtimeScope).Execute({}, context(session))
 
-test('HORIZON_no_journal_reports_projection_unavailable', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_no_journal_reports_projection_unavailable', async () => {
   const scope = scopeFor(undefined, liveRuntime())
   const text = await run(scope)
   assert.match(text, /horizon is unavailable/i)
   assert.ok(!/\berror\s*=/.test(text))
 })
 
-test('HORIZON_runtime_error_is_surfaced', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_runtime_error_is_surfaced', async () => {
   const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime())
   scope.disposed = true
   const text = await run(scope)
@@ -150,7 +150,7 @@ test('HORIZON_runtime_error_is_surfaced', async () => {
   assert.ok(!/\berror\s*=/.test(text))
 })
 
-test('HORIZON_lists_active_agent_by_byname_and_open_terminals_in_natural_language', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_lists_active_agent_by_byname_and_open_terminals_in_natural_language', async () => {
   const handles = linked(handleId.agent('ag-1'), sessionId('child-1'), 'fast-coder', 'Coder', 'Ada')
   const scope = scopeFor(
     fakeJournal(handles),
@@ -168,7 +168,7 @@ test('HORIZON_lists_active_agent_by_byname_and_open_terminals_in_natural_languag
   assert.ok(!FORBIDDEN.test(text))
 })
 
-test('HORIZON_completed_awaiting_join_reports_returned', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_completed_awaiting_join_reports_returned', async () => {
   const handles = completed(linked(handleId.agent('ag-1'), sessionId('child-1'), 'fast-coder', 'Coder'), handleId.agent('ag-1'))
   const scope = scopeFor(fakeJournal(handles), liveRuntime())
   const text = await run(scope)
@@ -176,7 +176,7 @@ test('HORIZON_completed_awaiting_join_reports_returned', async () => {
   assert.ok(!FORBIDDEN.test(text))
 })
 
-test('HORIZON_active_agent_without_runtime_defaults_to_still_away', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_active_agent_without_runtime_defaults_to_still_away', async () => {
   const handles = linked(handleId.agent('ag-2'), sessionId('child-2'), 'fast-coder', 'Coder')
   const scope = scopeFor(fakeJournal(handles), liveRuntime())
   const text = await run(scope)
@@ -184,7 +184,7 @@ test('HORIZON_active_agent_without_runtime_defaults_to_still_away', async () => 
   assert.ok(!FORBIDDEN.test(text))
 })
 
-test('HORIZON_unmanaged_target_agent_renders_bare_identity', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_unmanaged_target_agent_renders_bare_identity', async () => {
   const handles = linked(handleId.agent('ag-3'), sessionId('child-3'), 'some-raw-agent', 'DevOps')
   const scope = scopeFor(fakeJournal(handles), liveRuntime())
   const text = await run(scope)
@@ -192,14 +192,14 @@ test('HORIZON_unmanaged_target_agent_renders_bare_identity', async () => {
   assert.ok(!FORBIDDEN.test(text))
 })
 
-test('HORIZON_empty_journal_lists_only_ptys', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_empty_journal_lists_only_ptys', async () => {
   const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime({ ptys: [ptyRecord('pty-9', 'watch logs')] }))
   const text = await run(scope)
   assert.match(text, /# watch logs remains open\./)
   assert.ok(!text.includes('fast-coder'))
 })
 
-test('HORIZON_empty_roster_has_quiet_instruction', async () => {
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_empty_roster_has_quiet_instruction', async () => {
   const scope = scopeFor(fakeJournal(handleProjection.empty), liveRuntime())
   const text = await run(scope)
   assert.match(text, /Nothing beyond your immediate sight/)

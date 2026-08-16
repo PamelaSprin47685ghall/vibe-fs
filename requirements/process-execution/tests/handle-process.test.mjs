@@ -16,7 +16,7 @@ import {
   processRequest,
 } from '../../verification-system/tests/support/domain.mjs'
 
-test('EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
+test('WHAT[PROC-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
   // After SIGKILL, wait must not use MaxTimerWaitMs (~24.8d) or unbounded Exit.Task.
   // KillAckGraceMs is the management bound; TimedOut + ExitCode=-1 when close never comes.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -37,7 +37,7 @@ test('EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs', () => {
   assert.match(waitSrc, /KillNotAcknowledged/, 'kill-ack expiry exits the wait loop')
 })
 
-test('EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
+test('WHAT[PROC-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
   // OneShotAgentTool must not await completion.Task unbounded.
   const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
   const oneshot = readFileSync(
@@ -66,7 +66,7 @@ test('EXEC_oneshot_completion_wait_is_bounded_by_management_deadline', () => {
 
 // ── EXEC-010: a process request carries the full executor estimate ─────────────
 
-test('EXEC_010_process_request_carries_all_fields', () => {
+test('WHAT[PROC-005] EXEC_010_process_request_carries_all_fields', () => {
   const cmd = processRequest.command({
     fileName: 'sh',
     args: ['-lc', 'echo hi'],

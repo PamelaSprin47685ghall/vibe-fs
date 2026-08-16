@@ -25,7 +25,7 @@ const link = (handle, child, targetAgent, role, current) => {
     : { ok: false, error: result.fields[0].cases()[result.fields[0].tag] }
 }
 
-test('EXEC_016_listable_handles_are_outstanding_for_manager', () => {
+test('WHAT[MANAGED-SESSION-006] EXEC_016_listable_handles_are_outstanding_for_manager', () => {
   // Durable half of outstandingBackground for Manager/DevOps: listable = Active ∪ CompletedAwaitingJoin.
   let projection = handleProjection.empty
   const handle = handleId.agent('child-1')

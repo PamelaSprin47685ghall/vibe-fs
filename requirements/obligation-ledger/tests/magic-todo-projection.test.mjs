@@ -97,26 +97,32 @@ const foldMagic = (state, magicFact, envelopeEventId = undefined) => {
   return magicTodoJournal.fold(ref, state, magicFact)
 }
 
-test('TODO-005 Accepted supersedes Current immediately and REVISE conclusion cannot roll it back', () => {
+test('WHAT[OBLIGATION-LEDGER-010] Accepted supersedes Current immediately', () => {
   let state = magicTodoJournal.empty
   state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
   state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
 
-  let lifeState = state.ByLife.get('manager-life')
+  const lifeState = state.ByLife.get('manager-life')
   assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list')
   assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest')
+})
+
+test('WHAT[OBLIGATION-LEDGER-011] REVISE conclusion cannot roll back CurrentObligations', () => {
+  let state = magicTodoJournal.empty
+  state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
+  state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
 
   state = ok(foldMagic(state, fact('DedicatedTodoReviewerEnlisted', enlisted)))
   state = ok(foldMagic(state, fact('TodoProcessReviewAssigned', assigned)))
   state = ok(foldMagic(state, fact('TodoReviewConcluded', concluded)))
 
-  lifeState = state.ByLife.get('manager-life')
+  const lifeState = state.ByLife.get('manager-life')
   assert.equal(lifeState.CurrentObligationsRef[0].fields[0], 'proposal-list')
   assert.equal(lifeState.CurrentObligationsRef[1].fields[0], 'proposal-digest')
   assert.equal(lifeState.Checkpoints.get(magicTodo.todoWriteIdValue(write)).Concluded.Verdict, magicTodo.revise)
 })
 
-test('TODO-006 rejects a conclusion with no matching assignment', () => {
+test('WHAT[OBLIGATION-LEDGER-012] rejects a conclusion with no matching assignment', () => {
   let state = magicTodoJournal.empty
   state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
   state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
@@ -125,7 +131,7 @@ test('TODO-006 rejects a conclusion with no matching assignment', () => {
   assert.equal(rejected.cases()[rejected.tag], 'AssignmentWithoutAccepted')
 })
 
-test('TODO-008 rejects process assignment before dedicated enlistment', () => {
+test('WHAT[OBLIGATION-LEDGER-020] rejects process assignment before dedicated enlistment', () => {
   let state = magicTodoJournal.empty
   state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
   state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
@@ -134,7 +140,7 @@ test('TODO-008 rejects process assignment before dedicated enlistment', () => {
   assert.equal(rejected.cases()[rejected.tag], 'DedicatedMissingForAssign')
 })
 
-test('TODO-004 rejects Accepted when it names another Prepared envelope', () => {
+test('WHAT[OBLIGATION-LEDGER-008] rejects Accepted when it names another Prepared envelope', () => {
   const mismatched = new magicTodoJournal.TodoWriteAccepted(
     life,
     write,
@@ -150,7 +156,7 @@ test('TODO-004 rejects Accepted when it names another Prepared envelope', () => 
   assert.equal(rejected.cases()[rejected.tag], 'IdentityCorruption')
 })
 
-test('TODO-006 treats an exact durable conclusion replay as idempotent', () => {
+test('WHAT[OBLIGATION-LEDGER-013] treats an exact durable conclusion replay as idempotent', () => {
   let state = magicTodoJournal.empty
   state = ok(foldMagic(state, fact('TodoWritePrepared', prepared)))
   state = ok(foldMagic(state, fact('TodoWriteAccepted', accepted)))
@@ -162,7 +168,7 @@ test('TODO-006 treats an exact durable conclusion replay as idempotent', () => {
   assert.equal(replayed.ByLife.get('manager-life').CurrentObligationsRef[0].fields[0], 'proposal-list')
 })
 
-test('TODO-006 rejects a new prepare until the preceding review concludes', () => {
+test('WHAT[OBLIGATION-LEDGER-013] rejects a new prepare until the preceding review concludes', () => {
   const nextCall = toolCallId('todo-call-2')
   const nextWrite = magicTodo.todoWriteId(sha256, life, nextCall)
   const nextPrepared = new magicTodoJournal.TodoWritePrepared(
@@ -188,7 +194,7 @@ test('TODO-006 rejects a new prepare until the preceding review concludes', () =
   assert.equal(rejected.cases()[rejected.tag], 'OutstandingReviewBeforePrepare')
 })
 
-test('TODO-011 rejects a legacy seed after the first Magic provider request', () => {
+test('WHAT[OBLIGATION-LEDGER-019] rejects a legacy seed after the first Magic provider request', () => {
   const legacySeed = new magicTodoJournal.LegacyTodoSeedAdopted(
     managerSession,
     life,
@@ -200,7 +206,7 @@ test('TODO-011 rejects a legacy seed after the first Magic provider request', ()
   assert.equal(rejected.cases()[rejected.tag], 'LegacySeedAfterCheckpoint')
 })
 
-test('TODO-012 legacy conclusion locator remains replayable but is not a Current writer', () => {
+test('WHAT[OBLIGATION-LEDGER-014] legacy conclusion locator remains replayable but is not a Current writer', () => {
   const encoded = magicTodoJournal.encode(fact('TodoReviewConcluded', concluded))
   const decoded = ok(magicTodoJournal.tryDecode(encoded))
   const payload = decoded.fields[0]
@@ -216,7 +222,7 @@ test('TODO-012 legacy conclusion locator remains replayable but is not a Current
   assert.equal(state.ByLife.get('manager-life').CurrentObligationsRef[0].fields[0], 'proposal-list')
 })
 
-test('TODO-012 stores typed Magic Todo bytes in the canonical Fact envelope', () => {
+test('WHAT[OBLIGATION-LEDGER-018] stores typed Magic Todo bytes in the canonical Fact envelope', () => {
   const typed = magicTodoJournal.encode(fact('TodoReviewConcluded', concluded))
   const encoded = FactCodec.serializeFact(magicTodoFactEnvelope(typed))
   const decoded = ok(FactCodec.deserializeFact(encoded))
@@ -227,14 +233,14 @@ test('TODO-012 stores typed Magic Todo bytes in the canonical Fact envelope', ()
   assert.equal(replayed.cases()[replayed.tag], 'TodoReviewConcluded')
 })
 
-test('OBLIGATION-LEDGER-018 legacy Prepared without planComplete decodes as committed true', () => {
+test('WHAT[OBLIGATION-LEDGER-018] legacy Prepared without planComplete decodes as committed true', () => {
   const encoded = magicTodoJournal.encode(fact('TodoWritePrepared', prepared))
   const legacy = encoded.replace(/,"PlanCompleteDeclared":false/, '')
   const decoded = ok(magicTodoJournal.tryDecode(legacy))
   assert.equal(decoded.fields[0].PlanCompleteDeclared, true, 'legacy protocol already meant complete-plan commitment')
 })
 
-test('TODO-012 rejects forward Magic Todo payloads without throwing through boot fold', () => {
+test('WHAT[OBLIGATION-LEDGER-018] rejects forward Magic Todo payloads without throwing through boot fold', () => {
   const encoded = magicTodoJournal.encode(fact('TodoWritePrepared', prepared))
   const forward = encoded.replace('TodoWritePrepared', 'FutureMagicTodoCase')
 
@@ -242,7 +248,7 @@ test('TODO-012 rejects forward Magic Todo payloads without throwing through boot
   assert.equal(magicTodoJournal.tryDecode(forward).tag, 1)
 })
 
-test('TODO-012 folds a typed Magic Todo envelope into the one canonical projection', () => {
+test('WHAT[OBLIGATION-LEDGER-018] folds a typed Magic Todo envelope into the one canonical projection', () => {
   const typed = magicTodoJournal.encode(fact('TodoWritePrepared', prepared))
   const folded = fold.one(
     fold.empty,
@@ -261,7 +267,7 @@ test('TODO-012 folds a typed Magic Todo envelope into the one canonical projecti
   assert.equal(checkpoints[0][1].ProposedTodoDigest.fields[0], 'proposal-digest')
 })
 
-test('TODO-004 rejects a replay whose frozen prepared identity differs', () => {
+test('WHAT[OBLIGATION-LEDGER-008] rejects a replay whose frozen prepared identity differs', () => {
   const collision = new magicTodoJournal.TodoWritePrepared(
     managerSession,
     life,
@@ -283,7 +289,7 @@ test('TODO-004 rejects a replay whose frozen prepared identity differs', () => {
   assert.equal(rejected.cases()[rejected.tag], 'IdentityCorruption')
 })
 
-test('OBLIGATION-LEDGER-018 reviewer reverse locator is maintained on enlist and replacement', () => {
+test('WHAT[OBLIGATION-LEDGER-018] reviewer reverse locator is maintained on enlist and replacement', () => {
   const replacementSession = sessionId('reviewer-session-replacement')
   let state = ok(foldMagic(magicTodoJournal.empty, fact('DedicatedTodoReviewerEnlisted', enlisted)))
 
@@ -314,7 +320,7 @@ test('OBLIGATION-LEDGER-018 reviewer reverse locator is maintained on enlist and
   )
 })
 
-test('OBLIGATION-LEDGER-016 projection latches the first true commitment and never reopens it', () => {
+test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment and never reopens it', () => {
   const makeCheckpoint = (suffix, declared, baseName, proposalName, frontier) => {
     const cpCall = toolCallId(`todo-${suffix}`)
     const cpWrite = magicTodo.todoWriteId(sha256, life, cpCall)

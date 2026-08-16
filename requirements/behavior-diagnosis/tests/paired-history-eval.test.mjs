@@ -126,7 +126,7 @@ const readObservations = (projected) =>
 const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 const isHistoricFrame = (text) => text.includes('historic_frame')
 
-test('A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_real_directories', () => {
+test('WHAT[BD-016] A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_real_directories', () => {
   const dirs = packageTipNames()
   assert.equal(dirs.length, 120)
   assert.equal(enforcer.ruleCount, 120)
@@ -146,7 +146,7 @@ test('A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_real_directories', 
   // delivery is proved below through the typed observation/projection path.
 })
 
-test('A42_PAIRED_HISTORY_002_observations_a_and_b_carry_real_historical_tip_ids', () => {
+test('WHAT[BD-016] A42_PAIRED_HISTORY_002_observations_a_and_b_carry_real_historical_tip_ids', () => {
   requireRealTip(TIP_X)
   requireRealTip(TIP_Y)
 
@@ -174,7 +174,7 @@ test('A42_PAIRED_HISTORY_002_observations_a_and_b_carry_real_historical_tip_ids'
   assert.equal(decodedY.value.tip.fieldName, TIP_Y)
 })
 
-test('A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembles_a', () => {
+test('WHAT[BD-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembles_a', () => {
   const projected = foldPairedHistory()
   const observations = readObservations(projected)
   assert.equal(observations[0].tipName, TIP_X)
@@ -232,7 +232,7 @@ test('A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembl
   assert.equal(stillSelectable.ok, true, 'catalog must still admit tip X for a possible true repeat')
 })
 
-test('A42_PAIRED_HISTORY_004_proved_vs_still_human', async () => {
+test('WHAT[BD-016] A42_PAIRED_HISTORY_004_proved_vs_still_human', async () => {
   const host = await import('../../../dist/Enforcer/Host.js')
   assert.equal(host.trueRepeat, undefined)
   assert.equal(host.isTrueRepeat, undefined)

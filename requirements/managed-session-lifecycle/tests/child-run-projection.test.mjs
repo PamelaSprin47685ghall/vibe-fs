@@ -40,14 +40,14 @@ const complete = (run, outcome) => {
 
 // ── ChildRun lifecycle ───────────────────────────────────────────────────────
 
-test('VERIFY_009_child_run_starts_active', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_child_run_starts_active', () => {
   const run = makeRun()
   assert.equal(ChildRunModule_isActive(run), true)
   assert.equal(ChildRunModule_isCompleted(run), false)
   assert.equal(ChildRunModule_isCancelled(run), false)
 })
 
-test('VERIFY_009_child_run_cancel_flips_active_and_cancelled', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_child_run_cancel_flips_active_and_cancelled', () => {
   const run = makeRun()
   ChildRunModule_cancel(run)
   assert.equal(ChildRunModule_isCancelled(run), true)
@@ -55,7 +55,7 @@ test('VERIFY_009_child_run_cancel_flips_active_and_cancelled', () => {
   assert.equal(ChildRunModule_isCompleted(run), false)
 })
 
-test('VERIFY_009_child_run_bind_session_records_child_session', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_child_run_bind_session_records_child_session', () => {
   const run = makeRun()
   assert.equal(run.ChildSessionId, undefined)
   ChildRunModule_bindSession(run, new SessionId('ses-child-9'))
@@ -63,7 +63,7 @@ test('VERIFY_009_child_run_bind_session_records_child_session', () => {
   assert.equal(run.ChildSessionId.fields[0], 'ses-child-9')
 })
 
-test('VERIFY_009_child_run_completion_cell_is_single_assignment', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_child_run_completion_cell_is_single_assignment', () => {
   const run = makeRun()
   const first = complete(run, AgentCompletion_ofSimpleText('agent-1', 'run-1', Role.Manager, 'done'))
   assert.equal(ChildRunModule_tryComplete(run, first), false, 'second write must be refused')
@@ -71,7 +71,7 @@ test('VERIFY_009_child_run_completion_cell_is_single_assignment', () => {
   assert.equal(ChildRunModule_isActive(run), false)
 })
 
-test('VERIFY_009_child_run_make_failed_carries_error_outcome', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_child_run_make_failed_carries_error_outcome', () => {
   const run = makeRun()
   const completion = ChildRunModule_makeFailed(run, 'boom')
   assert.equal(ChildRunModule_tryComplete(run, completion), true)
@@ -81,37 +81,37 @@ test('VERIFY_009_child_run_make_failed_carries_error_outcome', () => {
 
 // ── status ───────────────────────────────────────────────────────────────────
 
-test('VERIFY_009_projection_status_busy_while_running', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_busy_while_running', () => {
   const run = makeRun()
   assert.equal(caseOf(status(false, run)), 'Busy')
 })
 
-test('VERIFY_009_projection_status_closed_on_cancel_or_runtime_cancel', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_closed_on_cancel_or_runtime_cancel', () => {
   const run = makeRun()
   ChildRunModule_cancel(run)
   assert.equal(caseOf(status(false, run)), 'Closed')
   assert.equal(caseOf(status(true, makeRun())), 'Closed')
 })
 
-test('VERIFY_009_projection_status_interrupted_on_interrupt_code', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_interrupted_on_interrupt_code', () => {
   const run = makeRun()
   complete(run, AgentCompletion_failed('agent-1', 'run-1', Role.Manager, undefined, 'INTERRUPTED', 'interrupted by user'))
   assert.equal(caseOf(status(false, run)), 'Interrupted')
 })
 
-test('VERIFY_009_projection_status_closed_on_abandon', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_closed_on_abandon', () => {
   const run = makeRun()
   complete(run, AgentCompletion_abandoned('agent-1', 'gave up'))
   assert.equal(caseOf(status(false, run)), 'Closed')
 })
 
-test('VERIFY_009_projection_status_idle_on_clean_completion', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_idle_on_clean_completion', () => {
   const run = makeRun()
   complete(run, AgentCompletion_ofSimpleText('agent-1', 'run-1', Role.Manager, 'done'))
   assert.equal(caseOf(status(false, run)), 'Idle')
 })
 
-test('VERIFY_009_projection_status_idle_for_other_failures', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_status_idle_for_other_failures', () => {
   const run = makeRun()
   complete(run, AgentCompletion_failed('agent-1', 'run-1', Role.Manager, undefined, 'TIMEOUT', 'too slow'))
   assert.equal(caseOf(status(false, run)), 'Idle')
@@ -119,7 +119,7 @@ test('VERIFY_009_projection_status_idle_for_other_failures', () => {
 
 // ── toRecord ─────────────────────────────────────────────────────────────────
 
-test('VERIFY_009_projection_to_record_running_state', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_to_record_running_state', () => {
   const run = makeRun()
   const record = toRecord(false, 'agent-1', run)
   assert.equal(record.AgentId, 'agent-1')
@@ -132,7 +132,7 @@ test('VERIFY_009_projection_to_record_running_state', () => {
   assert.equal(record.ChildSessionId, undefined)
 })
 
-test('VERIFY_009_projection_to_record_interrupted_label_is_message', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_to_record_interrupted_label_is_message', () => {
   const run = makeRun()
   complete(run, AgentCompletion_failed('agent-1', 'run-1', Role.Manager, undefined, 'INTERRUPTED', 'stop now'))
   const record = toRecord(false, 'agent-1', run)
@@ -142,7 +142,7 @@ test('VERIFY_009_projection_to_record_interrupted_label_is_message', () => {
   assert.equal(caseOf(record.Status), 'Interrupted')
 })
 
-test('VERIFY_009_projection_to_record_abandoned_label_is_reason', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_to_record_abandoned_label_is_reason', () => {
   const run = makeRun()
   complete(run, AgentCompletion_abandoned('agent-1', 'no longer joinable'))
   const record = toRecord(false, 'agent-1', run)
@@ -150,7 +150,7 @@ test('VERIFY_009_projection_to_record_abandoned_label_is_reason', () => {
   assert.equal(caseOf(record.Status), 'Closed')
 })
 
-test('VERIFY_009_projection_to_record_completed_label_is_status_text', () => {
+test('WHAT[MANAGED-SESSION-012] VERIFY_009_projection_to_record_completed_label_is_status_text', () => {
   const run = makeRun()
   complete(run, AgentCompletion_ofSimpleText('agent-1', 'run-1', Role.Manager, 'done'))
   const record = toRecord(false, 'agent-1', run)

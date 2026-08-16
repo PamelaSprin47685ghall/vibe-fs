@@ -238,7 +238,7 @@ const settlePendingInvoke = async (runtime, { appendAssistantFromReturn, xtraceM
   assert.equal(handled, true)
 }
 
-test('G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
+test('WHAT[PREFIX-STABILITY-001] G2_inspector_Q1_Q2_Q3_provider_wire_append_only_prefix', async () => {
   await withHarness(async (harness) => {
     const { runtime, dispatcher, prompts, createCalls, captures } = harness
     const owner = 'ses_owner_g2_wire'

@@ -63,7 +63,7 @@ const tierAndRoleOf = (name) => {
 
 // ── AGENT-001: Canonical Role and Agent Tier ─────────────────────────────────
 
-test('AGENT_001_catalog_has_exactly_ten_canonical_roles_and_two_tiers', () => {
+test('WHAT[PID-001] catalog_has_exactly_ten_canonical_roles_and_two_tiers', () => {
   const all = managedAgentCatalog.allRoles()
   assert.equal(all.length, 10)
   assert.deepEqual(new Set(all), new Set(EXPECTED_ROLES))
@@ -92,15 +92,13 @@ test('AGENT_001_catalog_has_exactly_ten_canonical_roles_and_two_tiers', () => {
 
 // ── AGENT-002: the 22 required agents ────────────────────────────────────────
 
-test('AGENT_002_required_names_are_exactly_ten_roles_times_two_tiers_plus_bookkeeper', () => {
+test('WHAT[PID-001] required_names_are_exactly_ten_roles_times_two_tiers', () => {
   const names = managedAgentCatalog.requiredNames()
   assert.equal(names.length, 22)
   assert.equal(new Set(names).size, 22)
 
   const roleNames = names.filter((n) => !n.endsWith('-bookkeeper'))
-  const bookkeeperNames = names.filter((n) => n.endsWith('-bookkeeper'))
   assert.equal(roleNames.length, 20)
-  assert.deepEqual(new Set(bookkeeperNames), new Set(['fast-bookkeeper', 'deep-bookkeeper']))
 
   // two names per role label (one fast, one deep)
   const byRole = new Map()
@@ -120,14 +118,6 @@ test('AGENT_002_required_names_are_exactly_ten_roles_times_two_tiers_plus_bookke
     assert.equal(parsed.ok, true, `'${name}' must parse as a managed agent`)
   }
 
-  // Bookkeeper pair is catalog-only (no Role.Bookkeeper); peer still exists
-  for (const name of bookkeeperNames) {
-    const peer = managedAgentCatalog.bookkeeperPeerName(name)
-    assert.ok(peer, `'${name}' must have a bookkeeper peer`)
-    assert.equal(bookkeeperNames.includes(peer), true)
-    assert.equal(managedAgentCatalog.bookkeeperPeerName(peer), name)
-  }
-
   // Role names are catalog formulas, not a separate table
   const derived = []
   for (const tierName of TIER_NAMES) {
@@ -135,15 +125,38 @@ test('AGENT_002_required_names_are_exactly_ten_roles_times_two_tiers_plus_bookke
       derived.push(managedAgentCatalog.nameOf(roles.tier(tierName), roles.of(role)))
     }
   }
-  for (const tierName of TIER_NAMES) {
-    derived.push(managedAgentCatalog.bookkeeperNameOf(roles.tier(tierName)))
+  assert.deepEqual(new Set(roleNames), new Set(derived))
+})
+
+test('WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role', () => {
+  const names = managedAgentCatalog.requiredNames()
+  const bookkeeperNames = names.filter((n) => n.endsWith('-bookkeeper'))
+  assert.deepEqual(new Set(bookkeeperNames), new Set(['fast-bookkeeper', 'deep-bookkeeper']))
+
+  // Bookkeeper pair is catalog-only: it is not among the 10 canonical roles
+  // and never enters the public Role DU (PID-009 identity side).
+  const allRoles = managedAgentCatalog.allRoles()
+  assert.equal(allRoles.includes('Bookkeeper'), false)
+  assert.equal(managedAgentCatalog.allPublicRoles().includes('Bookkeeper'), false)
+
+  // Bookkeeper names are catalog formulas, not a separate table
+  const derivedBookkeepers = TIER_NAMES.map((tierName) =>
+    managedAgentCatalog.bookkeeperNameOf(roles.tier(tierName)),
+  )
+  assert.deepEqual(new Set(bookkeeperNames), new Set(derivedBookkeepers))
+
+  // Bookkeeper pair still has a symmetric peer (PID-007 same law)
+  for (const name of bookkeeperNames) {
+    const peer = managedAgentCatalog.bookkeeperPeerName(name)
+    assert.ok(peer, `'${name}' must have a bookkeeper peer`)
+    assert.equal(bookkeeperNames.includes(peer), true)
+    assert.equal(managedAgentCatalog.bookkeeperPeerName(peer), name)
   }
-  assert.deepEqual(new Set(names), new Set(derived))
 })
 
 // ── AGENT-003: Peer computation ──────────────────────────────────────────────
 
-test('AGENT_003_peer_is_same_role_opposite_tier_and_symmetric', () => {
+test('WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric', () => {
   const names = managedAgentCatalog.requiredNames()
   const nameSet = new Set(names)
   const peerOf = (name) => {
@@ -157,7 +170,7 @@ test('AGENT_003_peer_is_same_role_opposite_tier_and_symmetric', () => {
   for (const name of names) {
     const peer = peerOf(name)
 
-    // AGENT-003: the peer must exist among the required names (proved at startup)
+    // the peer must exist among the required names (proved at startup)
     assert.equal(nameSet.has(peer), true, `peer '${peer}' of '${name}' must be a required name`)
 
     // peer is the same role with the opposite tier
@@ -173,7 +186,7 @@ test('AGENT_003_peer_is_same_role_opposite_tier_and_symmetric', () => {
 
 // ── AGENT-004: legacy names are refused ──────────────────────────────────────
 
-test('AGENT_004_all_legacy_bare_names_are_rejected', () => {
+test('WHAT[PID-002] all_legacy_bare_names_are_rejected', () => {
   const legacy = managedAgentCatalog.legacyAgentNames()
   assert.deepEqual(new Set(legacy), new Set(EXPECTED_LEGACY))
 
@@ -184,7 +197,7 @@ test('AGENT_004_all_legacy_bare_names_are_rejected', () => {
     assert.equal(caseOf(parsed.error), 'LegacyAgentName')
   }
 
-  // forbidden shapes, not just the exact list (AGENT-004: no alias, no autocomplete)
+  // forbidden shapes, not just the exact list (no alias, no autocomplete)
   for (const shape of ['reviewer-fast', 'fast_reviewer']) {
     assert.equal(managedAgentCatalog.isLegacyAgentName(shape), true, `'${shape}' must be a legacy shape`)
     const parsed = authority.parseAgentName(shape)
@@ -198,7 +211,7 @@ test('AGENT_004_all_legacy_bare_names_are_rejected', () => {
   }
 })
 
-test('AGENT_004_rejection_prose_is_version_agnostic', () => {
+test('WHAT[PID-002] rejection_prose_is_version_agnostic', () => {
   const supported = managedAgentCatalog.formatLegacyNameNotSupported('coder')
   const inConfig = managedAgentCatalog.formatLegacyNameInConfig('coder')
 

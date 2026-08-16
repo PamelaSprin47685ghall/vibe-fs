@@ -43,7 +43,7 @@ const BLOG = sessionId('ses-blog')
 
 const semantic = (messages) => xTraceCapture.semantic({ messages })
 
-test('ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', async () => {
+test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', async () => {
   await withJournal(async (journal) => {
     // Two turns captured → sequences 1,2. Coverage already at head (2).
     const messages = [
@@ -96,7 +96,7 @@ test('ENFORCER_045_mainContext_refuses_when_next_sequence_cannot_advance', async
   })
 })
 
-test('ENFORCER_045_mainContext_refuses_unmapped_next_cursor', async () => {
+test('WHAT[BD-013] ENFORCER_045_mainContext_refuses_unmapped_next_cursor', async () => {
   await withJournal(async (journal) => {
     const messages = [{ role: 'user', parts: [xTraceCapture.text('only')] }]
     const xTrace = await xTraceCapture.captureProjection(journal, MAIN, semantic(messages))
@@ -160,7 +160,7 @@ test('ENFORCER_045_mainContext_refuses_unmapped_next_cursor', async () => {
   })
 })
 
-test('ENFORCER_045_mainContext_accepts_strict_advance', async () => {
+test('WHAT[BD-013] ENFORCER_045_mainContext_accepts_strict_advance', async () => {
   await withJournal(async (journal) => {
     const messages = [
       { role: 'user', parts: [xTraceCapture.text('task')] },

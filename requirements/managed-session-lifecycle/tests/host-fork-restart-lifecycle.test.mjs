@@ -94,7 +94,7 @@ const recoveredOf = (result) => {
 
 // ── journal-only walk (no live runtime) ──────────────────────────────────────
 
-test('HFR_restart_abandoned_handle_recovered_abandoned', async () => {
+test('WHAT[MANAGED-SESSION-013] HFR_restart_abandoned_handle_recovered_abandoned', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'ab1', CHILD, 'abandon-agent')
     const abandoned = await handleController.recordAbandon(j, PARENT, 'ab1', 'DeadlineExceeded')
@@ -109,7 +109,7 @@ test('HFR_restart_abandoned_handle_recovered_abandoned', async () => {
   })
 })
 
-test('HFR_restart_retired_handle_recovered_retired', async () => {
+test('WHAT[MANAGED-SESSION-013] HFR_restart_retired_handle_recovered_retired', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'rt1', CHILD, 'retire-agent')
     await completeTerminal(j, 'rt1', CHILD)
@@ -128,7 +128,7 @@ test('HFR_restart_retired_handle_recovered_retired', async () => {
   })
 })
 
-test('HFR_restart_host_owned_hidden_handle_is_filtered_out', async () => {
+test('WHAT[MANAGED-SESSION-013] HFR_restart_host_owned_hidden_handle_is_filtered_out', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'hidden1', CHILD, 'fast-reviewer', HandleOwnership.HostOwnedHidden)
 
@@ -139,7 +139,7 @@ test('HFR_restart_host_owned_hidden_handle_is_filtered_out', async () => {
 
 // ── live-runtime walk: children re-enlisted, runtime restored ────────────────
 
-test('HFR_restart_active_handle_recovers_active', async () => {
+test('WHAT[MANAGED-SESSION-013] HFR_restart_active_handle_recovers_active', async () => {
   await withJournal(async (j) => {
     await linkDurable(j, 'act1', CHILD, 'fast-coder')
 
@@ -156,7 +156,7 @@ test('HFR_restart_active_handle_recovers_active', async () => {
   })
 })
 
-test('HFR_restart_recovery_commit_failure_blocks', async () => {
+test('WHAT[MANAGED-SESSION-013] HFR_restart_recovery_commit_failure_blocks', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-restart-'))
   const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true)

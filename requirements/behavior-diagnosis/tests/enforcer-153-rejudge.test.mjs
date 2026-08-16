@@ -61,7 +61,7 @@ const toEvidenceList = async (pairs) => {
 
 // ── ENFORCER-153 rejudge table (pure evidence → BloggerToolRecovery) ─────────
 
-test('ENFORCER_153_no_claim_rejudges_to_NoRecovery', async () => {
+test('WHAT[BD-017] ENFORCER_153_no_claim_rejudges_to_NoRecovery', async () => {
   const rejudge = await rejudgeFromEvidence()
   const terminals = await toEvidenceList([
     ['asst-p1', false],
@@ -71,7 +71,7 @@ test('ENFORCER_153_no_claim_rejudges_to_NoRecovery', async () => {
   assert.equal(caseOf(out), 'NoRecovery')
 })
 
-test('ENFORCER_153_claim_plus_pure_prose_terminal_rejudges_to_InteractionNudgeIssued', async () => {
+test('WHAT[BD-017] ENFORCER_153_claim_plus_pure_prose_terminal_rejudges_to_InteractionNudgeIssued', async () => {
   const rejudge = await rejudgeFromEvidence()
   const terminals = await toEvidenceList([['asst-p1', false]])
   const out = rejudge('asst-p1', terminals)
@@ -82,7 +82,7 @@ test('ENFORCER_153_claim_plus_pure_prose_terminal_rejudges_to_InteractionNudgeIs
   assert.equal(idValue.providerRun(run), 'asst-p1')
 })
 
-test('ENFORCER_153_claim_plus_second_pure_prose_rejudges_to_InteractionNudgeIssued', async () => {
+test('WHAT[BD-017] ENFORCER_153_claim_plus_second_pure_prose_rejudges_to_InteractionNudgeIssued', async () => {
   // Second pure prose after claim is the *trigger* for aabbRepair (ENFORCER-067),
   // not its receipt. AABB is memory-only (markAabbRepairConsumed + transform
   // injection, no journal fact), so cold rejudge must not invent AabbRepairConsumed:
@@ -101,7 +101,7 @@ test('ENFORCER_153_claim_plus_second_pure_prose_rejudges_to_InteractionNudgeIssu
   assert.equal(idValue.providerRun(run), 'asst-p1')
 })
 
-test('ENFORCER_153_claim_plus_valid_blog_after_nudge_rejudges_to_NoRecovery', async () => {
+test('WHAT[BD-017] ENFORCER_153_claim_plus_valid_blog_after_nudge_rejudges_to_NoRecovery', async () => {
   const rejudge = await rejudgeFromEvidence()
   const terminals = await toEvidenceList([
     ['asst-p1', false],
@@ -111,7 +111,7 @@ test('ENFORCER_153_claim_plus_valid_blog_after_nudge_rejudges_to_NoRecovery', as
   assert.equal(caseOf(out), 'NoRecovery')
 })
 
-test('ENFORCER_153_snapshot_rejudge_recognizes_exactly_one_completed_chronicle', async () => {
+test('WHAT[BD-017] ENFORCER_153_snapshot_rejudge_recognizes_exactly_one_completed_chronicle', async () => {
   const result = await snapshotRejudgeChronicleCardinality()
 
   assert.equal(result.one, 'NoRecovery')
@@ -119,13 +119,13 @@ test('ENFORCER_153_snapshot_rejudge_recognizes_exactly_one_completed_chronicle',
   assert.equal(result.mixed, 'InteractionNudgeIssued', 'one completed plus one failed chronicle is still 2 raw calls')
 })
 
-test('ENFORCER_153_snapshot_rejudge_uses_named_chronicle_toolparts', async () => {
+test('WHAT[BD-017] ENFORCER_153_snapshot_rejudge_uses_named_chronicle_toolparts', async () => {
   const probeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'), 'utf8')
   assert.match(probeSrc, /ToolParts/, 'snapshot recovery must use named SessionToolPart evidence')
   assert.doesNotMatch(probeSrc, /name = "blog"/, 'legacy blog tool alias must not drive recovery')
 })
 
-test('ENFORCER_153_claim_with_missing_terminal_in_transcript_keeps_nudge_not_aabb', async () => {
+test('WHAT[BD-017] ENFORCER_153_claim_with_missing_terminal_in_transcript_keeps_nudge_not_aabb', async () => {
   // Claimed run not in Host snapshot: never invent AABB (conservative).
   const rejudge = await rejudgeFromEvidence()
   const terminals = await toEvidenceList([])
@@ -133,7 +133,7 @@ test('ENFORCER_153_claim_with_missing_terminal_in_transcript_keeps_nudge_not_aab
   assert.equal(caseOf(out), 'InteractionNudgeIssued')
 })
 
-test('ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
+test('WHAT[BD-017] ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
   // DSL-003: the recovery stage is derived on every read (BloggerRecoveryProbe).
   // BloggerRuntimeState.fs must not define a cell/State DU or mark* writers;
   // restoreRuntime does not store rejudged recovery.
@@ -150,7 +150,7 @@ test('ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
   assert.doesNotMatch(recoverySrc, /Recovery = recovery/)
 })
 
-test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
+test('WHAT[BD-017] ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
   // Transcript evidence alone still cannot invent AABB. The idle path now writes
   // a durable blogger-aabb InteractionRepair claim, so rejudgeToolRecovery may
   // restore AabbRepairConsumed only when that claim exists.
@@ -165,7 +165,7 @@ test('ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
   assert.match(probeSrc, /aabbClaimed[\s\S]*?BloggerToolRecovery\.AabbRepairConsumed/)
 })
 
-test('ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
+test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
   // The hot path injects a synthetic repair message with info.requestKey; the next
   // transform uses its presence (not a mutable flag) to decide AabbRepairConsumed.
   assert.match(repairSrc, /requestKey[\s\S]*?interaction-repair/)
@@ -173,7 +173,7 @@ test('ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
   assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairConsumed[\s\S]*?fatalEnd/)
 })
 
-test('ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run', async () => {
+test('WHAT[BD-017] ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run', async () => {
   // Hot path derivation: a claim on terminal A + a NEW pure-prose terminal B
   // must read as InteractionNudgeIssued(A) — handleContinuation then takes the
   // AABB branch (issued run != current terminal), never a second nudge.

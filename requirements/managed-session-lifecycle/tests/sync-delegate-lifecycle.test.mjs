@@ -162,7 +162,7 @@ const settlePendingInvoke = async (runtime, delegateKey, role, answer, runId = '
   assert.equal(handled, true)
 }
 
-test('EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => {
+test('WHAT[MANAGED-SESSION-004] EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_reuse'
     const first = invoke(runtime, owner, SyncDelegateRole.Inspector, 'pass one')
@@ -186,7 +186,7 @@ test('EXEC_026_sync_delegate_reuses_session_after_full_completion', async () => 
   })
 })
 
-test('G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_scope_close', async () => {
+test('WHAT[MANAGED-SESSION-014] G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_scope_close', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_g6_cascade'
     const inspectorRole = roles.of('Inspector')
@@ -224,7 +224,7 @@ test('G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_sco
   })
 })
 
-test('G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child', async () => {
+test('WHAT[MANAGED-SESSION-009] G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_g2_cancel'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'inspect then cancel')
@@ -248,7 +248,7 @@ test('G2_inspector_cancel_owner_fails_pending_invoke_no_extra_child', async () =
   })
 })
 
-test('EXEC_027_dispose_fails_unsettled_sync_delegate_call_scope', async () => {
+test('WHAT[MANAGED-SESSION-004] EXEC_027_dispose_fails_unsettled_sync_delegate_call_scope', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_dispose'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'waiting to be disposed')
@@ -261,7 +261,7 @@ test('EXEC_027_dispose_fails_unsettled_sync_delegate_call_scope', async () => {
   })
 })
 
-test('EXEC_027_cancel_before_completion_fails_pending_invoke', async () => {
+test('WHAT[MANAGED-SESSION-004] EXEC_027_cancel_before_completion_fails_pending_invoke', async () => {
   await withHarness(async ({ runtime, prompts, createCalls }) => {
     const owner = 'ses_owner_cancel'
     const pending = invoke(runtime, owner, SyncDelegateRole.Inspector, 'cancel before completion')

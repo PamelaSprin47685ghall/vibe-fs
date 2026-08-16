@@ -5,14 +5,14 @@ import test from 'node:test'
 
 const { PtySessionModule_create } = await import('../../../dist/Process/PtySession.js')
 
-test('PTY_SESSION_create_sets_id_and_backend', () => {
+test('WHAT[PROC-009] PTY_SESSION_create_sets_id_and_backend', () => {
   const backend = { pid: 1234 }
   const s = PtySessionModule_create('pty-abc', backend)
   assert.equal(s.PtyId, 'pty-abc')
   assert.equal(s.Backend, backend)
 })
 
-test('PTY_SESSION_create_defaults_open_empty_and_pending', () => {
+test('WHAT[PROC-009] PTY_SESSION_create_defaults_open_empty_and_pending', () => {
   const s = PtySessionModule_create('pty-def', null)
   assert.equal(s.Backend, null)
   assert.equal(s.Closed, false)
@@ -20,7 +20,7 @@ test('PTY_SESSION_create_defaults_open_empty_and_pending', () => {
   assert.equal(s.Pending.length, 0)
 })
 
-test('PTY_SESSION_exit_completion_starts_unresolved', async () => {
+test('WHAT[PROC-009] PTY_SESSION_exit_completion_starts_unresolved', async () => {
   const s = PtySessionModule_create('pty-ghi', null)
   const winner = await Promise.race([
     s.ExitCompletion.get_Task().then(() => 'exit'),
@@ -29,7 +29,7 @@ test('PTY_SESSION_exit_completion_starts_unresolved', async () => {
   assert.equal(winner, 'still-pending')
 })
 
-test('PTY_SESSION_mutable_state_roundtrips', () => {
+test('WHAT[PROC-009] PTY_SESSION_mutable_state_roundtrips', () => {
   const s = PtySessionModule_create('pty-jkl', null)
   assert.equal(s.OutputBuffer.toString(), '')
 

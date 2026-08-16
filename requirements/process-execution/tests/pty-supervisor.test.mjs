@@ -73,7 +73,7 @@ const waitExit = (c) =>
 
 // ── session registry ─────────────────────────────────────────────────────────
 
-test('SUPERVISOR_add_tryGet_get_roundtrip', () => {
+test('WHAT[PROC-007] SUPERVISOR_add_tryGet_get_roundtrip', () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-a', null)
   PtySupervisorModule_add(s, id('pty-a'), session)
@@ -81,13 +81,13 @@ test('SUPERVISOR_add_tryGet_get_roundtrip', () => {
   assert.equal(PtySupervisorModule_get(s, id('pty-a')), session)
 })
 
-test('SUPERVISOR_tryGet_missing_returns_none_and_get_throws', () => {
+test('WHAT[PROC-007] SUPERVISOR_tryGet_missing_returns_none_and_get_throws', () => {
   const s = PtySupervisorModule_create()
   assert.equal(PtySupervisorModule_tryGet(s, id('pty-missing')), undefined)
   assert.throws(() => PtySupervisorModule_get(s, id('pty-missing')), /Unknown PTY id: pty-missing/)
 })
 
-test('SUPERVISOR_remove_drops_the_session', () => {
+test('WHAT[PROC-007] SUPERVISOR_remove_drops_the_session', () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-r', null)
   PtySupervisorModule_add(s, id('pty-r'), session)
@@ -95,7 +95,7 @@ test('SUPERVISOR_remove_drops_the_session', () => {
   assert.equal(PtySupervisorModule_tryGet(s, id('pty-r')), undefined)
 })
 
-test('SUPERVISOR_list_returns_added_ids_only', () => {
+test('WHAT[PROC-007] SUPERVISOR_list_returns_added_ids_only', () => {
   const s = PtySupervisorModule_create()
   PtySupervisorModule_add(s, id('pty-1'), PtySessionModule_create('pty-1', null))
   PtySupervisorModule_add(s, id('pty-2'), PtySessionModule_create('pty-2', null))
@@ -107,7 +107,7 @@ test('SUPERVISOR_list_returns_added_ids_only', () => {
 
 // ── signal name codec ────────────────────────────────────────────────────────
 
-test('SUPERVISOR_signalName_maps_every_signal_to_a_kill_name', () => {
+test('WHAT[PROC-001] SUPERVISOR_signalName_maps_every_signal_to_a_kill_name', () => {
   assert.equal(PtySupervisorModule_signalName(PtySignal.Terminate), 'SIGTERM')
   assert.equal(PtySupervisorModule_signalName(PtySignal.Kill), 'SIGKILL')
   assert.equal(PtySupervisorModule_signalName(PtySignal.Interrupt), 'SIGINT')
@@ -119,7 +119,7 @@ test('SUPERVISOR_signalName_maps_every_signal_to_a_kill_name', () => {
 
 // ── spawn loader ─────────────────────────────────────────────────────────────
 
-test('SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without_bun_pty', async () => {
+test('WHAT[PROC-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without_bun_pty', async () => {
   const s = PtySupervisorModule_create()
   const first = PtySupervisorModule_ensureSpawn(s)
   const second = PtySupervisorModule_ensureSpawn(s)
@@ -129,12 +129,12 @@ test('SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without_bun_pty', asyn
   assert.throws(() => PtySupervisorModule_spawnSync(s, 'echo hi', ''), /bun-pty is not loaded/)
 })
 
-test('SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran', () => {
+test('WHAT[PROC-001] SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran', () => {
   const s = PtySupervisorModule_create()
   assert.throws(() => PtySupervisorModule_spawnSync(s, 'echo hi', ''), /bun-pty is not loaded/)
 })
 
-test('SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () => {
+test('WHAT[PROC-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () => {
   const s = PtySupervisorModule_create()
   let seen
   s.SpawnFn = (sh, args, options) => {
@@ -151,7 +151,7 @@ test('SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () => {
   assert.equal(seen[2].cwd, '/tmp/work')
 })
 
-test('SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
+test('WHAT[PROC-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
   const s = PtySupervisorModule_create()
   let seenCwd
   s.SpawnFn = (sh, args, options) => {
@@ -164,7 +164,7 @@ test('SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
 
 // ── pending queue ────────────────────────────────────────────────────────────
 
-test('SUPERVISOR_takePending_returns_and_clears_the_queue', () => {
+test('WHAT[PROC-007] SUPERVISOR_takePending_returns_and_clears_the_queue', () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-q', null)
   session.Pending.push(['first', null])
@@ -178,12 +178,12 @@ test('SUPERVISOR_takePending_returns_and_clears_the_queue', () => {
   assert.deepEqual([...PtySupervisorModule_takePending(s, id('pty-q'))], [])
 })
 
-test('SUPERVISOR_takePending_unknown_id_is_empty', () => {
+test('WHAT[PROC-007] SUPERVISOR_takePending_unknown_id_is_empty', () => {
   const s = PtySupervisorModule_create()
   assert.deepEqual([...PtySupervisorModule_takePending(s, id('pty-nope'))], [])
 })
 
-test('SUPERVISOR_drop_removes_session_and_returns_pending', () => {
+test('WHAT[PROC-007] SUPERVISOR_drop_removes_session_and_returns_pending', () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-d', null)
   session.Pending.push(['queued', null])
@@ -195,7 +195,7 @@ test('SUPERVISOR_drop_removes_session_and_returns_pending', () => {
   assert.deepEqual([...PtySupervisorModule_drop(s, id('pty-d'))], [])
 })
 
-test('SUPERVISOR_failPending_resolves_every_tcs_with_the_reason', async () => {
+test('WHAT[PROC-003] SUPERVISOR_failPending_resolves_every_tcs_with_the_reason', async () => {
   const a = tcs()
   const entries = [
     ['write', a],
@@ -209,7 +209,7 @@ test('SUPERVISOR_failPending_resolves_every_tcs_with_the_reason', async () => {
 
 // ── applyLive ────────────────────────────────────────────────────────────────
 
-test('SUPERVISOR_applyLive_closed_session_short_circuits_ok', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_closed_session_short_circuits_ok', async () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-c', null)
   session.Closed = true
@@ -218,7 +218,7 @@ test('SUPERVISOR_applyLive_closed_session_short_circuits_ok', async () => {
   assert.equal(result.ok, true)
 })
 
-test('SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async () => {
   const s = PtySupervisorModule_create()
   const writes = []
   const backend = { write: (t) => writes.push(t) }
@@ -232,7 +232,7 @@ test('SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async () => {
   assert.deepEqual(writes, ['héllo'])
 })
 
-test('SUPERVISOR_applyLive_write_backend_error_becomes_error_result', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_write_backend_error_becomes_error_result', async () => {
   const s = PtySupervisorModule_create()
   const backend = {
     write: () => {
@@ -247,7 +247,7 @@ test('SUPERVISOR_applyLive_write_backend_error_becomes_error_result', async () =
   assert.equal(result.error, 'EPIPE')
 })
 
-test('SUPERVISOR_applyLive_read_drains_buffer_into_port', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_read_drains_buffer_into_port', async () => {
   const s = PtySupervisorModule_create()
   const p = portWith('pty-re')
   const session = PtySessionModule_create('pty-re', {})
@@ -265,7 +265,7 @@ test('SUPERVISOR_applyLive_read_drains_buffer_into_port', async () => {
   assert.deepEqual([readResult.ok, readResult.value[0], readResult.value[1]], [true, 'after', false])
 })
 
-test('SUPERVISOR_applyLive_signal_kills_the_real_process_group_or_process', async () => {
+test('WHAT[PROC-002] SUPERVISOR_applyLive_signal_kills_the_real_process_group_or_process', async () => {
   const c = child()
   try {
     const s = PtySupervisorModule_create()
@@ -281,7 +281,7 @@ test('SUPERVISOR_applyLive_signal_kills_the_real_process_group_or_process', asyn
   }
 })
 
-test('SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
+test('WHAT[PROC-002] SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
   const s = PtySupervisorModule_create()
   PtySupervisorModule_add(s, id('pty-ku'), PtySessionModule_create('pty-ku', { pid: 2147483647 }))
   const result = resultOf(
@@ -291,7 +291,7 @@ test('SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
   assert.match(result.error, /ESRCH/)
 })
 
-test('SUPERVISOR_applyLive_resize_swallows_backend_errors', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_resize_swallows_backend_errors', async () => {
   const s = PtySupervisorModule_create()
   const resizes = []
   const backend = {
@@ -308,7 +308,7 @@ test('SUPERVISOR_applyLive_resize_swallows_backend_errors', async () => {
   assert.deepEqual(resizes, [[120, 40]])
 })
 
-test('SUPERVISOR_applyLive_spawn_on_live_backend_is_a_noop', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_spawn_on_live_backend_is_a_noop', async () => {
   const s = PtySupervisorModule_create()
   PtySupervisorModule_add(s, id('pty-sp'), PtySessionModule_create('pty-sp', {}))
   const result = resultOf(
@@ -317,7 +317,7 @@ test('SUPERVISOR_applyLive_spawn_on_live_backend_is_a_noop', async () => {
   assert.equal(result.ok, true)
 })
 
-test('SUPERVISOR_applyLive_write_without_backend_parks_until_resolved', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_write_without_backend_parks_until_resolved', async () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-p', null)
   PtySupervisorModule_add(s, id('pty-p'), session)
@@ -332,7 +332,7 @@ test('SUPERVISOR_applyLive_write_without_backend_parks_until_resolved', async ()
   assert.equal(result.ok, true)
 })
 
-test('SUPERVISOR_applyLive_parked_write_resolves_with_error', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_parked_write_resolves_with_error', async () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-pe', null)
   PtySupervisorModule_add(s, id('pty-pe'), session)
@@ -345,7 +345,7 @@ test('SUPERVISOR_applyLive_parked_write_resolves_with_error', async () => {
   assert.equal(result.error, 'backend vanished')
 })
 
-test('SUPERVISOR_applyLive_non_write_commands_without_backend_return_ok_immediately', async () => {
+test('WHAT[PROC-001] SUPERVISOR_applyLive_non_write_commands_without_backend_return_ok_immediately', async () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-nb', null)
   PtySupervisorModule_add(s, id('pty-nb'), session)
@@ -385,7 +385,7 @@ const portWith = (pid) => {
   return p
 }
 
-test('SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', async () => {
+test('WHAT[PROC-007] SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', async () => {
   const c = child()
   try {
     const s = PtySupervisorModule_create()
@@ -405,7 +405,7 @@ test('SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', a
   }
 })
 
-test('SUPERVISOR_attach_onData_ignored_after_session_closed', async () => {
+test('WHAT[PROC-007] SUPERVISOR_attach_onData_ignored_after_session_closed', async () => {
   const s = PtySupervisorModule_create()
   const term = fakeTerm(9999)
   PtySupervisorModule_attach(s, portWith('pty-ic'), id('pty-ic'), term, tcs())
@@ -415,7 +415,7 @@ test('SUPERVISOR_attach_onData_ignored_after_session_closed', async () => {
   assert.equal(session.OutputBuffer.toString(), '')
 })
 
-test('SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session', async () => {
+test('WHAT[PROC-003] SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session', async () => {
   const s = PtySupervisorModule_create()
   const term = fakeTerm(9999)
   const exit = tcs()
@@ -437,7 +437,7 @@ test('SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session
   assert.equal(exitInfo.Closed, true)
 })
 
-test('SUPERVISOR_attach_onExit_publishes_residual_output', async () => {
+test('WHAT[PROC-003] SUPERVISOR_attach_onExit_publishes_residual_output', async () => {
   const s = PtySupervisorModule_create()
   const term = fakeTerm(9999)
   const exit = tcs()
@@ -453,7 +453,7 @@ test('SUPERVISOR_attach_onExit_publishes_residual_output', async () => {
   assert.equal(payloadOf(completions[0]).Outcome, 'final words')
 })
 
-test('SUPERVISOR_attach_onExit_fails_pending_writes_and_parked_read', async () => {
+test('WHAT[PROC-003] SUPERVISOR_attach_onExit_fails_pending_writes_and_parked_read', async () => {
   const s = PtySupervisorModule_create()
   const parkedWrite = tcs()
   const term = fakeTerm(9999)
@@ -479,7 +479,7 @@ test('SUPERVISOR_attach_onExit_fails_pending_writes_and_parked_read', async () =
   assert.equal(writeResult.error, 'PTY exited before command was applied')
 })
 
-test('SUPERVISOR_attach_without_port_entry_kills_the_term', async () => {
+test('WHAT[PROC-006] SUPERVISOR_attach_without_port_entry_kills_the_term', async () => {
   const c = child()
   try {
     const s = PtySupervisorModule_create()
@@ -493,7 +493,7 @@ test('SUPERVISOR_attach_without_port_entry_kills_the_term', async () => {
   }
 })
 
-test('SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend', async () => {
+test('WHAT[PROC-007] SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend', async () => {
   const s = PtySupervisorModule_create()
   const session = PtySessionModule_create('pty-rp', null)
   PtySupervisorModule_add(s, id('pty-rp'), session)
@@ -512,7 +512,7 @@ test('SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend', async () 
   assert.deepEqual(term.writes, ['early'])
 })
 
-test('SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_session', async () => {
+test('WHAT[PROC-003] SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_session', async () => {
   const s = PtySupervisorModule_create()
   const term = fakeTerm(9999)
   const exit = tcs()
@@ -526,7 +526,7 @@ test('SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_session', async
   assert.equal(completions.length, 1, 'no duplicate completion')
 })
 
-test('SUPERVISOR_attach_onExit_noop_when_session_already_closed', async () => {
+test('WHAT[PROC-003] SUPERVISOR_attach_onExit_noop_when_session_already_closed', async () => {
   const s = PtySupervisorModule_create()
   const term = fakeTerm(9999)
   const completions = []
@@ -541,7 +541,7 @@ test('SUPERVISOR_attach_onExit_noop_when_session_already_closed', async () => {
 
 // ── cancelAll ────────────────────────────────────────────────────────────────
 
-test('SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends', async () => {
+test('WHAT[PROC-006] SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends', async () => {
   const c = child()
   try {
     const s = PtySupervisorModule_create()

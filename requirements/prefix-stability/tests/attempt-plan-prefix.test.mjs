@@ -31,7 +31,7 @@ const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
 
 const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => prefixProbe({ id, candidate: snapshotAt(cutoff) })
 
-test('CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
+test('WHAT[PREFIX-STABILITY-003] CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
   // The absence of a rollback, seen from the planner: a failed probe attempt produces
   // no promotable probe, and the next slot's plan reads the same committed snapshot.
   const committed = snapshotAt(4)
@@ -52,7 +52,7 @@ test('CTX_010_a_discarded_probe_leaves_the_committed_epoch_in_place', () => {
 
 // ── COMPANION-009 / CTX-010: the prefix plan ──────────────────────────────
 
-test('COMPANION_009_no_snapshot_means_send_raw_history', () => {
+test('WHAT[PREFIX-STABILITY-002] COMPANION_009_no_snapshot_means_send_raw_history', () => {
   const plan = xPrefix.forSnapshot(undefined, 'unused')
 
   assert.equal(plan.replacesPrefix, false)
@@ -60,7 +60,7 @@ test('COMPANION_009_no_snapshot_means_send_raw_history', () => {
   assert.equal(plan.memoryId, undefined)
 })
 
-test('HOST_006_a_retired_snapshot_and_a_never_promoted_one_produce_the_same_plan', () => {
+test('WHAT[PREFIX-STABILITY-006] HOST_006_a_retired_snapshot_and_a_never_promoted_one_produce_the_same_plan', () => {
   // The two histories are different but the instruction is identical, which is why
   // `Snapshot = None` carries both.
   const retired = prefix.applyReanchor(
@@ -71,7 +71,7 @@ test('HOST_006_a_retired_snapshot_and_a_never_promoted_one_produce_the_same_plan
   assert.deepEqual(xPrefix.forSnapshot(retired.Snapshot, 'x'), xPrefix.forSnapshot(prefix.empty.Snapshot, 'x'))
 })
 
-test('COMPANION_010_the_memory_is_wrapped_as_low_trust_context', () => {
+test('WHAT[PREFIX-STABILITY-008] COMPANION_010_the_memory_is_wrapped_as_low_trust_context', () => {
   const plan = xPrefix.forSnapshot(snapshotAt(3), 'THE WORK LOG')
 
   assert.equal(plan.replacesPrefix, true)
@@ -80,7 +80,7 @@ test('COMPANION_010_the_memory_is_wrapped_as_low_trust_context', () => {
   assert.equal(plan.memoryText.includes('<work-log>\nTHE WORK LOG\n</work-log>'), true)
 })
 
-test('COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id', () => {
+test('WHAT[PREFIX-STABILITY-015] COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id', () => {
   // Not re-derived. That id was fixed when the candidate was built and is what the
   // provider has already seen for this epoch; a second derivation site would make any
   // drift a cold boundary on every later request.
@@ -89,7 +89,7 @@ test('COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id', () => {
   assert.equal(xPrefix.forSnapshot(snapshot, 'body').memoryId, 'synthetic-seal-fixed')
 })
 
-test('CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
+test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
   // A probe is not a different kind of request — it is the same request with a
   // candidate prefix. Separate code paths would let the two drift, and CTX-012 requires
   // a promoted probe to be byte-identical to what the successful attempt sent.
@@ -101,7 +101,7 @@ test('CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
   assert.deepEqual(asProbe, asCommitted)
 })
 
-test('CTX_010_the_required_blob_follows_the_choice_not_the_committed_state', () => {
+test('WHAT[PREFIX-STABILITY-003] CTX_010_the_required_blob_follows_the_choice_not_the_committed_state', () => {
   // The failure this prevents: reading the COMMITTED snapshot's blob for a probe
   // attempt injects the old FrozenRecordPrefix under the candidate's synthetic id. The provider
   // sees a changed prefix, and no fold can detect it — both halves are individually

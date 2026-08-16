@@ -5,6 +5,11 @@
 // DISTILL-013 (不返回 chunk 统计仪表盘): the spooled map/reduce account carries no
 // chunk_count / total_bytes / spool_path; overflow degrades to a partial report
 // carried as instructions rather than a thrown exception.
+//
+// The wire prose assertions are language-sensitive; pin the provider language
+// before any module import so the account renders in English (HOST-026 binding).
+
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -77,7 +82,7 @@ const run = (runtimeScope, args, ctx = context()) => runSpec(factory, runtimeSco
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('RUN_spooled_output_runs_distillation_without_chunk_statistics', async () => {
+test('WHAT[DISTILL-013] RUN_spooled_output_runs_distillation_without_chunk_statistics', async () => {
   const runtimeScope = scope()
   // First permit request (the tool's own gate) waits; every later request from
   // the map/reduce runtime hard-blocks so chunk forks/awaits fail fast into a

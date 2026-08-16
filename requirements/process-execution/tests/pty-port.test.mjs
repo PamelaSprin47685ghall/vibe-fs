@@ -52,7 +52,7 @@ const forkDefault = (p, pidValue, command = 'echo hi') =>
 
 // ── constructor ──────────────────────────────────────────────────────────────
 
-test('PORT_ctor_defaults_are_safe_and_functional', async () => {
+test('WHAT[PROC-001] PORT_ctor_defaults_are_safe_and_functional', async () => {
   const p = new PtyPort()
   assert.equal(PtyPort__get_MailboxSender(p), undefined)
   assert.equal([...PtyPort__get_AgentProvider(p)()].length, 0)
@@ -61,7 +61,7 @@ test('PORT_ctor_defaults_are_safe_and_functional', async () => {
   assert.equal(r.ok, true)
 })
 
-test('PORT_ctor_keeps_supplied_sender_handler_and_agent_provider', async () => {
+test('WHAT[PROC-001] PORT_ctor_keeps_supplied_sender_handler_and_agent_provider', async () => {
   const sender = () => {}
   const handler = async () => okResult(undefined)
   const provider = () => [agent]
@@ -72,7 +72,7 @@ test('PORT_ctor_keeps_supplied_sender_handler_and_agent_provider', async () => {
   assert.equal(r.ok, true)
 })
 
-test('PORT_AddMailboxSender_reaches_every_registered_sender', () => {
+test('WHAT[PROC-003] PORT_AddMailboxSender_reaches_every_registered_sender', () => {
   const p = new PtyPort()
   const got = []
   PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(caseOf(item)))
@@ -84,7 +84,7 @@ test('PORT_AddMailboxSender_reaches_every_registered_sender', () => {
 
 // ── Fork ─────────────────────────────────────────────────────────────────────
 
-test('PORT_fork_generates_pty_id_and_dispatches_spawn', () => {
+test('WHAT[PROC-001] PORT_fork_generates_pty_id_and_dispatches_spawn', () => {
   const seen = []
   const p = new PtyPort(undefined, async (pid, cmd) => {
     seen.push([PtyId__get_Value(pid), cmd.tag, cmd.fields])
@@ -97,7 +97,7 @@ test('PORT_fork_generates_pty_id_and_dispatches_spawn', () => {
   assert.equal(PtyPort__Exists_Z33F80F6F(p, pid), true)
 })
 
-test('PORT_fork_honors_explicit_id_and_cwd', () => {
+test('WHAT[PROC-001] PORT_fork_honors_explicit_id_and_cwd', () => {
   const seen = []
   const p = new PtyPort(undefined, async (pid, cmd) => {
     seen.push([PtyId__get_Value(pid), cmd.fields])
@@ -108,7 +108,7 @@ test('PORT_fork_honors_explicit_id_and_cwd', () => {
   assert.deepEqual(seen, [['pty-custom', ['ls -la', '/srv']]])
 })
 
-test('PORT_fork_twice_on_same_id_replaces_the_handle', () => {
+test('WHAT[PROC-001] PORT_fork_twice_on_same_id_replaces_the_handle', () => {
   const p = new PtyPort()
   forkDefault(p, 'pty-rf', 'first')
   forkDefault(p, 'pty-rf', 'second')
@@ -119,7 +119,7 @@ test('PORT_fork_twice_on_same_id_replaces_the_handle', () => {
 
 // ── Exists / Known ───────────────────────────────────────────────────────────
 
-test('PORT_exists_and_known_track_active_and_closed', () => {
+test('WHAT[PROC-001] PORT_exists_and_known_track_active_and_closed', () => {
   const p = new PtyPort()
   assert.equal(PtyPort__Exists_Z33F80F6F(p, id('pty-ne')), false)
   assert.equal(PtyPort__Known_Z33F80F6F(p, id('pty-ne')), false)
@@ -135,7 +135,7 @@ test('PORT_exists_and_known_track_active_and_closed', () => {
 
 // ── Send ─────────────────────────────────────────────────────────────────────
 
-test('PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons', async () => {
+test('WHAT[PROC-001] PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons', async () => {
   const p = new PtyPort()
   const unknown = resultOf(await PtyPort__Send_Z13021A56(p, id('pty-un'), write))
   assert.equal(unknown.ok, false)
@@ -148,7 +148,7 @@ test('PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons', async () => 
   assert.equal(closed.error, 'PTY closed')
 })
 
-test('PORT_send_forwards_command_and_propagates_handler_outcomes', async () => {
+test('WHAT[PROC-001] PORT_send_forwards_command_and_propagates_handler_outcomes', async () => {
   const seen = []
   const p = new PtyPort(
     undefined,
@@ -175,7 +175,7 @@ test('PORT_send_forwards_command_and_propagates_handler_outcomes', async () => {
   assert.deepEqual(seen, ['Resize', 'Write', 'Signal'])
 })
 
-test('PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => {
+test('WHAT[PROC-002] PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => {
   for (const sig of [PtySignal.Terminate, PtySignal.Kill, PtySignal.Interrupt]) {
     const p = new PtyPort()
     const got = []
@@ -188,7 +188,7 @@ test('PORT_send_term_kill_int_marks_abort_for_the_next_completion', async () => 
   }
 })
 
-test('PORT_send_plain_signal_does_not_abort_the_completion', async () => {
+test('WHAT[PROC-003] PORT_send_plain_signal_does_not_abort_the_completion', async () => {
   const p = new PtyPort()
   const got = []
   PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
@@ -200,14 +200,14 @@ test('PORT_send_plain_signal_does_not_abort_the_completion', async () => {
 
 // ── Read plumbing ────────────────────────────────────────────────────────────
 
-test('PORT_read_unknown_id_is_an_error', async () => {
+test('WHAT[PROC-001] PORT_read_unknown_id_is_an_error', async () => {
   const p = new PtyPort()
   const r = resultOf(await PtyPort__Read_Z33F80F6F(p, id('pty-ru')))
   assert.equal(r.ok, false)
   assert.equal(r.error, 'Unknown PTY id: pty-ru')
 })
 
-test('PORT_read_after_close_returns_empty_closed_without_handling', async () => {
+test('WHAT[PROC-001] PORT_read_after_close_returns_empty_closed_without_handling', async () => {
   const seen = []
   const p = new PtyPort(undefined, async (pid, cmd) => {
     if (cmd.tag !== 0) seen.push(caseOf(cmd))
@@ -220,7 +220,7 @@ test('PORT_read_after_close_returns_empty_closed_without_handling', async () => 
   assert.deepEqual(seen, [], 'no Read command sent after close')
 })
 
-test('PORT_read_parks_waiter_and_read_result_resolves_it', async () => {
+test('WHAT[PROC-001] PORT_read_parks_waiter_and_read_result_resolves_it', async () => {
   const seen = []
   const p = new PtyPort(undefined, async (pid, cmd) => {
     if (cmd.tag !== 0) seen.push(caseOf(cmd))
@@ -234,7 +234,7 @@ test('PORT_read_parks_waiter_and_read_result_resolves_it', async () => {
   assert.deepEqual([r.ok, r.value], [true, ['buffered', false]])
 })
 
-test('PORT_read_result_can_report_closed_and_reparks_after_resolution', async () => {
+test('WHAT[PROC-001] PORT_read_result_can_report_closed_and_reparks_after_resolution', async () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-pr2')
   const first = PtyPort__Read_Z33F80F6F(p, pid)
@@ -248,7 +248,7 @@ test('PORT_read_result_can_report_closed_and_reparks_after_resolution', async ()
   assert.deepEqual(r2.value, ['again', false])
 })
 
-test('PORT_concurrent_read_fails_fast_without_unparking', async () => {
+test('WHAT[PROC-001] PORT_concurrent_read_fails_fast_without_unparking', async () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-cc')
   const first = PtyPort__Read_Z33F80F6F(p, pid)
@@ -261,7 +261,7 @@ test('PORT_concurrent_read_fails_fast_without_unparking', async () => {
   assert.deepEqual(r1.value, ['kept', false], 'first waiter still resolves')
 })
 
-test('PORT_fail_read_resolves_parked_reader_with_error', async () => {
+test('WHAT[PROC-001] PORT_fail_read_resolves_parked_reader_with_error', async () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-fr')
   const read = PtyPort__Read_Z33F80F6F(p, pid)
@@ -271,7 +271,7 @@ test('PORT_fail_read_resolves_parked_reader_with_error', async () => {
   assert.equal(r.error, 'backend died')
 })
 
-test('PORT_read_result_and_fail_read_without_waiter_are_noops', () => {
+test('WHAT[PROC-001] PORT_read_result_and_fail_read_without_waiter_are_noops', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-nw')
   PtyPort__ReadResult_3DD67D20(p, pid, 'orphan', false)
@@ -287,7 +287,7 @@ const completedItem = (p, pid, outcome) => {
   return got[0]
 }
 
-test('PORT_complete_default_publishes_pty_exited_closed', () => {
+test('WHAT[PROC-003] PORT_complete_default_publishes_pty_exited_closed', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-cd')
   const item = completedItem(p, pid, undefined)
@@ -299,7 +299,7 @@ test('PORT_complete_default_publishes_pty_exited_closed', () => {
   )
 })
 
-test('PORT_complete_ok_publishes_exited_with_outcome_text', () => {
+test('WHAT[PROC-003] PORT_complete_ok_publishes_exited_with_outcome_text', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-ok')
   const item = completedItem(p, pid, okResult('script output'))
@@ -307,7 +307,7 @@ test('PORT_complete_ok_publishes_exited_with_outcome_text', () => {
   assert.equal(payloadOf(item).Outcome, 'script output')
 })
 
-test('PORT_complete_error_publishes_failed_with_code_and_message', () => {
+test('WHAT[PROC-003] PORT_complete_error_publishes_failed_with_code_and_message', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-err')
   const item = completedItem(p, pid, errorResult('PTY spawn failed: boom'))
@@ -318,7 +318,7 @@ test('PORT_complete_error_publishes_failed_with_code_and_message', () => {
   assert.equal(info.Closed, true)
 })
 
-test('PORT_complete_after_terminate_publishes_aborted', async () => {
+test('WHAT[PROC-003] PORT_complete_after_terminate_publishes_aborted', async () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-ab')
   await PtyPort__Send_Z13021A56(p, pid, signalOf(PtySignal.Terminate))
@@ -328,7 +328,7 @@ test('PORT_complete_after_terminate_publishes_aborted', async () => {
   assert.deepEqual([info.Code, info.Message, info.Closed], ['PTY_ABORTED', 'PTY aborted', true])
 })
 
-test('PORT_complete_abort_with_error_outcome_carries_the_error_text', async () => {
+test('WHAT[PROC-003] PORT_complete_abort_with_error_outcome_carries_the_error_text', async () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-ab2')
   await PtyPort__Send_Z13021A56(p, pid, signalOf(PtySignal.Kill))
@@ -337,7 +337,7 @@ test('PORT_complete_abort_with_error_outcome_carries_the_error_text', async () =
   assert.equal(payloadOf(item).Message, 'owner SIGKILLed')
 })
 
-test('PORT_complete_on_inactive_id_publishes_nothing', () => {
+test('WHAT[PROC-003] PORT_complete_on_inactive_id_publishes_nothing', () => {
   const p = new PtyPort()
   const got = []
   PtyPort__AddMailboxSender_6A484C48(p, (item) => got.push(item))
@@ -345,7 +345,7 @@ test('PORT_complete_on_inactive_id_publishes_nothing', () => {
   assert.equal(got.length, 0)
 })
 
-test('PORT_complete_isolates_failing_senders', () => {
+test('WHAT[PROC-003] PORT_complete_isolates_failing_senders', () => {
   const p = new PtyPort()
   const got = []
   PtyPort__AddMailboxSender_6A484C48(p, () => {
@@ -357,7 +357,7 @@ test('PORT_complete_isolates_failing_senders', () => {
   assert.deepEqual(got.map(caseOf), ['PtyExited'])
 })
 
-test('PORT_complete_removes_the_exit_task_entry', async () => {
+test('WHAT[PROC-003] PORT_complete_removes_the_exit_task_entry', async () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-et')
   PtyPort__RegisterExitTask_3971C262(p, pid, tcs().get_Task())
@@ -368,7 +368,7 @@ test('PORT_complete_removes_the_exit_task_entry', async () => {
 
 // ── CompleteAborted ──────────────────────────────────────────────────────────
 
-test('PORT_complete_aborted_forces_abort_without_terminate_mark', () => {
+test('WHAT[PROC-003] PORT_complete_aborted_forces_abort_without_terminate_mark', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-cab')
   const item = completedItem(p, pid, undefined)
@@ -384,7 +384,7 @@ test('PORT_complete_aborted_forces_abort_without_terminate_mark', () => {
   assert.deepEqual([info.Code, info.Message], ['PTY_ABORTED', 'owner interrupt'])
 })
 
-test('PORT_complete_aborted_defaults_message_and_clears_active', () => {
+test('WHAT[PROC-003] PORT_complete_aborted_defaults_message_and_clears_active', () => {
   const p = new PtyPort()
   const pid = forkDefault(p, 'pty-cab2')
   const got = []
@@ -396,7 +396,7 @@ test('PORT_complete_aborted_defaults_message_and_clears_active', () => {
 
 // ── Close / CloseAll ─────────────────────────────────────────────────────────
 
-test('PORT_close_requests_terminate_but_keeps_the_session_live', async () => {
+test('WHAT[PROC-007] PORT_close_requests_terminate_but_keeps_the_session_live', async () => {
   const seen = []
   const p = new PtyPort(undefined, async (pid, cmd) => {
     if (cmd.tag !== 0) seen.push([PtyId__get_Value(pid), caseOf(cmd), cmd.fields[0].tag])
@@ -411,12 +411,12 @@ test('PORT_close_requests_terminate_but_keeps_the_session_live', async () => {
   assert.equal(got.length, 0, 'close does not publish completion')
 })
 
-test('PORT_close_all_with_no_sessions_resolves', async () => {
+test('WHAT[PROC-007] PORT_close_all_with_no_sessions_resolves', async () => {
   const p = new PtyPort()
   await PtyPort__CloseAll_71136F3F(p, 0)
 })
 
-test('PORT_close_all_awaits_exit_task_when_it_resolves_in_grace', async () => {
+test('WHAT[PROC-007] PORT_close_all_awaits_exit_task_when_it_resolves_in_grace', async () => {
   const seen = []
   const exit = tcs()
   const p = new PtyPort(undefined, async (pid, cmd) => {
@@ -431,7 +431,7 @@ test('PORT_close_all_awaits_exit_task_when_it_resolves_in_grace', async () => {
   assert.deepEqual(seen, ['Signal'], 'only TERM, no KILL escalation')
 })
 
-test('PORT_close_all_escalates_to_kill_after_grace', async () => {
+test('WHAT[PROC-007] PORT_close_all_escalates_to_kill_after_grace', async () => {
   const seen = []
   const exit = tcs()
   const p = new PtyPort(undefined, async (pid, cmd) => {
@@ -445,7 +445,7 @@ test('PORT_close_all_escalates_to_kill_after_grace', async () => {
   assert.deepEqual(seen, ['Signal', 'Signal'], 'TERM then KILL')
 })
 
-test('PORT_close_all_kill_failure_propagates', async () => {
+test('WHAT[PROC-007] PORT_close_all_kill_failure_propagates', async () => {
   const exit = tcs()
   const p = new PtyPort(undefined, async (pid, cmd) => {
     if (cmd.tag === 3 && cmd.fields[0].tag === 1) return errorResult('no such process')
@@ -459,7 +459,7 @@ test('PORT_close_all_kill_failure_propagates', async () => {
   )
 })
 
-test('PORT_close_all_skips_ids_without_exit_task', async () => {
+test('WHAT[PROC-007] PORT_close_all_skips_ids_without_exit_task', async () => {
   const seen = []
   const p = new PtyPort(undefined, async (pid, cmd) => {
     if (cmd.tag !== 0) seen.push(caseOf(cmd))
@@ -472,7 +472,7 @@ test('PORT_close_all_skips_ids_without_exit_task', async () => {
 
 // ── List ─────────────────────────────────────────────────────────────────────
 
-test('PORT_list_reports_agents_and_active_handles', () => {
+test('WHAT[PROC-007] PORT_list_reports_agents_and_active_handles', () => {
   const p = new PtyPort(undefined, undefined, () => [agent])
   const pid = forkDefault(p, 'pty-ls', 'tail -f')
   const [agents, ptys] = PtyPort__List(p)
@@ -488,7 +488,7 @@ test('PORT_list_reports_agents_and_active_handles', () => {
   assert.equal([...PtyPort__List(p)[1]].length, 0, 'completed pty leaves the list')
 })
 
-test('PORT_list_without_provider_returns_empty_agents', () => {
+test('WHAT[PROC-007] PORT_list_without_provider_returns_empty_agents', () => {
   const p = new PtyPort()
   forkDefault(p, 'pty-le')
   const [agents, ptys] = PtyPort__List(p)

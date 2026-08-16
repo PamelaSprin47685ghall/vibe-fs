@@ -11,40 +11,40 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { enforcer } from '../../verification-system/tests/support/domain.mjs'
 
-test('ENFORCER_170_catalog_has_exactly_120_rules', () => {
+test('WHAT[BD-001] ENFORCER_170_catalog_has_exactly_120_rules', () => {
   assert.equal(enforcer.ruleCount, 120)
 })
 
-test('ENFORCER_170_rule_ids_are_unique', () => {
+test('WHAT[BD-002] ENFORCER_170_rule_ids_are_unique', () => {
   const ids = enforcer.rules.map((r) => r.RuleId)
   assert.equal(new Set(ids).size, 120)
 })
 
-test('ENFORCER_170_field_names_are_unique', () => {
+test('WHAT[BD-002] ENFORCER_170_field_names_are_unique', () => {
   const fields = enforcer.rules.map((r) => r.FieldName)
   assert.equal(new Set(fields).size, 120)
 })
 
-test('ENFORCER_170_tip_name_equals_rule_id_and_field', () => {
+test('WHAT[BD-001] ENFORCER_170_tip_name_equals_rule_id_and_field', () => {
   for (const rule of enforcer.rules) {
     assert.equal(rule.Name, rule.RuleId, `Name/RuleId mismatch for ${rule.Name}`)
     assert.equal(rule.Name, rule.FieldName, `Name/FieldName mismatch for ${rule.Name}`)
   }
 })
 
-test('ENFORCER_170_catalog_ordinals_are_contiguous_from_1', () => {
+test('WHAT[BD-002] ENFORCER_170_catalog_ordinals_are_contiguous_from_1', () => {
   const orders = enforcer.rules.map((r) => r.LexicalOrder).sort((a, b) => a - b)
   assert.deepEqual(orders, Array.from({ length: 120 }, (_, i) => i + 1))
 })
 
-test('ENFORCER_170_all_main_and_enforcer_texts_are_nonempty', () => {
+test('WHAT[BD-002] ENFORCER_170_all_main_and_enforcer_texts_are_nonempty', () => {
   for (const rule of enforcer.rules) {
     assert.ok(rule.EnforcerText.trim().length > 0, `rule ${rule.RuleId} has empty enforcer.md`)
     assert.ok(rule.MainText.trim().length > 0, `rule ${rule.RuleId} has empty main.md`)
   }
 })
 
-test('ENFORCER_170_no_bridge_fields_on_rule', () => {
+test('WHAT[BD-008] ENFORCER_170_no_bridge_fields_on_rule', () => {
   for (const rule of enforcer.rules) {
     assert.equal(rule.ScoreWhen, undefined, `rule ${rule.RuleId} still has ScoreWhen`)
     assert.equal(rule.Nudge, undefined, `rule ${rule.RuleId} still has Nudge`)
@@ -53,7 +53,7 @@ test('ENFORCER_170_no_bridge_fields_on_rule', () => {
   }
 })
 
-test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
+test('WHAT[BD-001] ENFORCER_172_field_names_match_the_rfc_spelling', () => {
   // Spot-check a few known TipNames (directory basenames).
   const fields = new Set(enforcer.fieldNames())
   for (const expected of [
@@ -68,7 +68,7 @@ test('ENFORCER_172_field_names_match_the_rfc_spelling', () => {
   }
 })
 
-test('ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
+test('WHAT[BD-002] ENFORCER_170_catalog_is_stable_and_not_corrupted', () => {
   // Regression: last tip main guidance must stay short and domain-specific.
   const l10 = enforcer.rules.find((r) => r.FieldName === 'incidental-complexity-dominates')
   assert.ok(l10, 'incidental-complexity-dominates must exist')

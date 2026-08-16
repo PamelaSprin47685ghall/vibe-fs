@@ -15,8 +15,10 @@ import test from 'node:test'
 import {
   agentFact,
   agentJournal,
+  asFact,
   bootSnapshot,
   caseOf,
+  envelope,
   fold,
   listItems,
   payloadOf,
@@ -120,7 +122,7 @@ const durablePairCount = (journal, session) => {
 
 // ── H13-01: the canonical multi-tool sequence ───────────────────────────────
 
-test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () => {
+test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () => {
   const session = 'h13-01'
   const round1Real = [
     toolCall('c1', 'bash', 't1'),
@@ -158,7 +160,7 @@ test('H13_01_canonical_multi_tool_sequence_is_an_append_only_prefix', async () =
 
 // ── H13-02: history never relocates with the current placement ──────────────
 
-test('H13_02_historical_pair_never_relocates_to_current_batch', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_02_historical_pair_never_relocates_to_current_batch', async () => {
   const session = 'h13-02'
 
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
@@ -179,7 +181,7 @@ test('H13_02_historical_pair_never_relocates_to_current_batch', async () => {
 
 // ── H13-03: same placement re-entry appends nothing ─────────────────────────
 
-test('H13_03_same_placement_reentry_appends_no_pair', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_03_same_placement_reentry_appends_no_pair', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1303-'))
   const opened = await openJournal(dir)
   try {
@@ -203,7 +205,7 @@ test('H13_03_same_placement_reentry_appends_no_pair', async () => {
 
 // ── H13-04: restart replay is byte-identical ────────────────────────────────
 
-test('H13_04_restart_replay_is_byte_identical', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_04_restart_replay_is_byte_identical', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1304-'))
   const session = 'h13-04'
   const raw = [
@@ -245,7 +247,7 @@ test('H13_04_restart_replay_is_byte_identical', async () => {
 // AbortSession would kill the recovery slot. The durable fact stays; only
 // placeable pairs render. When the full transcript returns, anchors reappear.
 
-test('H13_05_missing_anchor_pair_is_omitted_not_relocated', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_05_missing_anchor_pair_is_omitted_not_relocated', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305-'))
   const opened = await openJournal(dir)
   try {
@@ -301,7 +303,7 @@ test('H13_05_missing_anchor_pair_is_omitted_not_relocated', async () => {
 
 // X-B regression: after a durable pair on the opening user, XWire drops that
 // user for the recovery continue. tryInject must still commit (not Abort).
-test('H13_05b_xwire_drop_leading_continue_still_commits', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_05b_xwire_drop_leading_continue_still_commits', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1305b-'))
   const opened = await openJournal(dir)
   try {
@@ -344,7 +346,7 @@ test('H13_05b_xwire_drop_leading_continue_still_commits', async () => {
 
 // ── H13-06: prior tip only affects the new pair ─────────────────────────────
 
-test('H13_06_prior_tip_only_affects_the_new_pair', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_06_prior_tip_only_affects_the_new_pair', async () => {
   const session = 'h13-06'
 
   const wire1 = await inject(undefined, session, [userMsg('u1')], 'guideline')
@@ -381,8 +383,7 @@ const mulberry32 = (seed) => {
   }
 }
 
-test('H13_08_n_round_property_prefix_law_holds', async () => {
-  const rand = mulberry32(0x1357)
+test('WHAT[PREFIX-STABILITY-001] H13_08_n_round_property_prefix_law_holds', async () => {  const rand = mulberry32(0x1357)
   const session = 'h13-08'
   const rounds = 8
 
@@ -418,5 +419,49 @@ test('H13_08_n_round_property_prefix_law_holds', async () => {
     history = wire
     previousWire = wire
     previousPairCount = pairCount
+  }
+})
+
+// ── H13 / PREFIX-STABILITY-014: pair 正文不进 trace 系 ──────────────────────
+//
+// HOST-013 行为约束 4：pair 正文不得进入 XTrace / Companion decode / Blogger
+// delta / work record / compaction input；仅 pair 的 durable 投影事实
+// （PairProgrammingGuidelineAnchored → Guidelines）参与 HOST-013 恢复。
+// 行为断言：fold 一个 anchored pair 事实只长出 Guidelines，XTrace / Blog /
+// 其它 trace 系投影保持不存在（None = undefined）。
+
+test('WHAT[PREFIX-STABILITY-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections', () => {
+  const session = sessionId('h13-014')
+  const markerBody = 'SECRET synthetic marker body'
+  const anchored = agentFact('PairProgrammingGuidelineAnchored', {
+    SessionId: session,
+    Ordinal: 1n,
+    CallId: toolCallId(stableCallId('h13-014', 1n)),
+    MarkerText: markerBody,
+    CallGap: transcriptGap.after(transcriptAddress.create('msg_7')),
+    ResultGap: transcriptGap.after(transcriptAddress.create('msg_7')),
+  })
+
+  // `fold.apply` folds top-level Fact envelopes; wrap the AgentFact in the Fact
+  // union exactly as `fact()` does (the production append path does the same).
+  const result = fold.apply(fold.empty, [
+    envelope({ seq: 1, stream: stream.session(session), fact: asFact(anchored) }),
+  ])
+  assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
+
+  const s = fold.session(result.value, 'h13-014')
+  assert.ok(s, 'session projection must exist after the anchored fact')
+
+  // The only projection the pair fact may grow is Guidelines (HOST-013 recovery).
+  assert.ok(s.Guidelines, 'the anchored fact must land in Guidelines')
+
+  // HOST-013 行为约束 4: no trace-family projection may be created or touched.
+  // (LifecycleWorkRecord is materialized FROM the XTrace, so an absent XTrace
+  // also means the work record can never carry pair bytes.)
+  for (const [key, label] of [
+    ['XTrace', 'XTrace'],
+    ['Blog', 'Companion frame sequence (Blogger delta)'],
+  ]) {
+    assert.equal(s[key], undefined, `${label} must not be created by the pair fact`)
   }
 })

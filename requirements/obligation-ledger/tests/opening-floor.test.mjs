@@ -13,7 +13,7 @@ import { lifecycleWorkRecord, magicTodo, xTrace } from '../../verification-syste
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 
-test('AC15 Pre-T1: effectiveOpeningFloor tracks XTrace head (Opening never enters Y)', () => {
+test('WHAT[OBLIGATION-LEDGER-017] Pre-T1: effectiveOpeningFloor tracks XTrace head (Opening never enters Y)', () => {
   const floor = magicTodo.effectiveOpeningFloor(true, false, 1, undefined, undefined, 7, [
     { sequence: 1, kind: 'text' },
     { sequence: 7, kind: 'text' },
@@ -23,11 +23,11 @@ test('AC15 Pre-T1: effectiveOpeningFloor tracks XTrace head (Opening never enter
   assert.equal(magicTodo.bloggerEffectiveStart(3, floor), 7)
 })
 
-test('AC15 Pre-T1: no CurrentLife → no floor', () => {
+test('WHAT[OBLIGATION-LEDGER-017] Pre-T1: no CurrentLife → no floor', () => {
   assert.equal(magicTodo.effectiveOpeningFloor(false, false, 1, undefined, undefined, 4, []), undefined)
 })
 
-test('AC15 false planning checkpoints do not close Opening; first true commitment nails WorkRecordStart', () => {
+test('WHAT[OBLIGATION-LEDGER-016] false planning checkpoints do not close Opening; first true commitment nails WorkRecordStart', () => {
   const callId = 't1-call'
   const parts = [
     { sequence: 1, kind: 'text' },
@@ -48,7 +48,7 @@ test('AC15 false planning checkpoints do not close Opening; first true commitmen
   assert.equal(magicTodo.bloggerEffectiveStart(10, floor), 10)
 })
 
-test('AC16: T1 constitutive body renders in Opening, not Recent', () => {
+test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not Recent', () => {
   const openingCharge = lifecycleWorkRecord.opening({ assignment: 'Ship the bridge.' })
   const constitutive = [
     xTrace.item({
@@ -89,7 +89,7 @@ test('AC16: T1 constitutive body renders in Opening, not Recent', () => {
   assert.doesNotMatch(recentSection, /The Manager who will carry it is you/)
 })
 
-test('AC16: XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
+test('WHAT[OBLIGATION-LEDGER-016] XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
   const items = [
     xTrace.item({ sequence: 5, role: 'assistant', part: xTrace.toolCall('todowrite', '{}') }),
     xTrace.item({ sequence: 6, role: 'tool', part: xTrace.toolResult('entrusted') }),
@@ -98,7 +98,7 @@ test('AC16: XTrace.forOpening keeps T1 tools; forWorkRecord drops them', () => {
   assert.equal(xTrace.forWorkRecord(items).length, 0)
 })
 
-test('AC15 static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs', () => {
+test('WHAT[OBLIGATION-LEDGER-017] static: BloggerCoordinator + CompanionTransform zero ProtectedPrefixEnd refs', () => {
   for (const rel of [
     'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
     'src/Wanxiangshu/Context/Companion/Transform.fs',

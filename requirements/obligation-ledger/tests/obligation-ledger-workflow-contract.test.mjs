@@ -8,17 +8,17 @@ const read = (path) => readFileSync(join(root, path), 'utf8')
 
 const workflowPath = 'src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs'
 
-test('OBLIGATION_LEDGER_018 business sequencing is a direct F# CE, not a second runtime', () => {
+test('WHAT[OBLIGATION-LEDGER-018] business sequencing is a direct F# CE, not a second runtime', () => {
   assert.equal(existsSync(join(root, workflowPath)), true, `${workflowPath} must own the business workflow`)
   const source = read(workflowPath)
 
-  assert.match(source, /task\s*\{/)
+  assert.match(source, /taskResult\s*\{|task\s*\{/, 'business sequencing is a direct F# CE (task/taskResult), not a second runtime')
   assert.match(source, /let!|match!|return!/)
   assert.doesNotMatch(source, /type\s+\w*(Command|Reply|Stage|Phase|NextAction|ProgramCounter)\b/)
   assert.doesNotMatch(source, /module\s+\w*Interpreter\b|\binterpret\b|\bfromTask\b|Flow\.lift/)
 })
 
-test('OBLIGATION_LEDGER_018 hot-path queries use incremental projection facts, never AcceptedOrder replay', () => {
+test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection facts, never AcceptedOrder replay', () => {
   const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
   for (const field of [
     'FirstAcceptedCheckpoint',
@@ -46,7 +46,7 @@ test('OBLIGATION_LEDGER_018 hot-path queries use incremental projection facts, n
   }
 })
 
-test('OBLIGATION_LEDGER_018 recovery contract is fact reentry, not a resumable workflow position', () => {
+test('WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resumable workflow position', () => {
   const facts = read('src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs')
   const projection = read('src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs')
 

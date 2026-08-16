@@ -49,7 +49,7 @@ const host = (children, created = []) => ({
   FamilyRootOf: () => sessionId('root'),
 })
 
-test('HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_flat_root', async () => {
   const linked = []
   const created = []
   // Physical parent is 'root', not the owner — reuse must not depend on parentID.
@@ -64,7 +64,7 @@ test('HOST_015_companion_satellite_recovery_reuses_journal_linked_child_under_fl
   assert.deepEqual(linked, [['work', 'blogger-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_companion_satellite_recovery_creates_an_explicit_replacement_when_the_old_child_is_gone', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_creates_an_explicit_replacement_when_the_old_child_is_gone', async () => {
   const linked = []
   const created = []
   const runtime = createRuntime(host([], created))
@@ -78,7 +78,7 @@ test('HOST_015_companion_satellite_recovery_creates_an_explicit_replacement_when
   assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_child_conflicts', async () => {
   const linked = []
   const created = []
   // Journal links blogger-1, but the Host child with that id carries a
@@ -93,7 +93,7 @@ test('HOST_015_companion_satellite_recovery_fails_closed_when_journal_linked_chi
   assert.deepEqual(linked, [])
 })
 
-test('HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
+test('WHAT[MANAGED-SESSION-003] HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_without_journal_link', async () => {
   const linked = []
   const created = []
   // A same-agent/title child sits under the shared flat root (it belongs to
@@ -110,7 +110,7 @@ test('HOST_015_companion_satellite_recovery_never_adopts_same_agent_sibling_with
   assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent_sibling', async () => {
   const linked = []
   const created = []
   // Journal links blogger-old (gone from the Host); blogger-other is another
@@ -127,7 +127,7 @@ test('HOST_015_companion_satellite_recovery_replaces_without_adopting_same_agent
   assert.deepEqual(linked, [['work', 'created-1', COMPANION_AGENT]])
 })
 
-test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', async () => {
+test('WHAT[MANAGED-SESSION-002] HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', async () => {
   const created = []
   let createCalls = 0
   let releaseCreate
@@ -158,7 +158,7 @@ test('HOST_014_concurrent_first_ensure_is_single_flight_and_creates_one_child', 
   assert.deepEqual(created, ['created-1'])
 })
 
-test('HOST_014_children_query_failure_does_not_guess_or_create', async () => {
+test('WHAT[MANAGED-SESSION-011] HOST_014_children_query_failure_does_not_guess_or_create', async () => {
   const created = []
   const sessions = host([], created)
   sessions.ListChildren = async () => errorResult('children unavailable')

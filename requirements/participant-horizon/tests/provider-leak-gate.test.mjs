@@ -34,23 +34,30 @@ module JoinResultRenderer =
         SessionId.value sid
 `
 
-test('gate_b_documents_forbidden_vocabulary', () => {
+test('WHAT[PARTICIPANT-HORIZON-002] gate_b_documents_forbidden_machine_tokens', () => {
   assert.ok(FORBIDDEN_TOKENS.includes('SessionId'))
   assert.ok(FORBIDDEN_TOKENS.includes('pty_id'))
+})
+
+test('WHAT[PARTICIPANT-HORIZON-003] gate_b_documents_forbidden_dto_patterns', () => {
   assert.ok(FORBIDDEN_DTO_PATTERNS.some((p) => p.id === 'field-status'))
 })
 
-test('gate_b_clean_horizon_fixture_is_green', () => {
+test('WHAT[PARTICIPANT-HORIZON-001] gate_b_clean_horizon_fixture_is_green', () => {
   assert.equal(scanText('HorizonTool.fs', CLEAN_HORIZON).length, 0)
 })
 
-test('gate_b_leaky_renderer_fixture_is_red', () => {
+test('WHAT[PARTICIPANT-HORIZON-003] gate_b_leaky_renderer_fixture_is_red_for_dto_fields', () => {
   const hits = scanText('JoinResultRenderer.fs', LEAKY_JOIN)
   assert.ok(hits.some((h) => h.id === 'field-status'))
+})
+
+test('WHAT[PARTICIPANT-HORIZON-002] gate_b_leaky_renderer_fixture_is_red_for_machine_tokens', () => {
+  const hits = scanText('JoinResultRenderer.fs', LEAKY_JOIN)
   assert.ok(hits.some((h) => h.id.startsWith('token:SessionId') || h.id === 'token:pty_id'))
 })
 
-test('gate_b_scan_entries_aggregates', () => {
+test('WHAT[PARTICIPANT-HORIZON-002] gate_b_scan_entries_aggregates', () => {
   const hits = scanEntries([
     { file: 'HorizonTool.fs', text: CLEAN_HORIZON },
     { file: 'JoinResultRenderer.fs', text: LEAKY_JOIN },
@@ -58,14 +65,14 @@ test('gate_b_scan_entries_aggregates', () => {
   assert.ok(hits.length >= 2)
 })
 
-test('gate_b_baseline_ratchet_blocks_regression', () => {
+test('WHAT[PARTICIPANT-HORIZON-002] gate_b_baseline_ratchet_blocks_regression', () => {
   const current = countByFile(scanEntries([{ file: 'JoinResultRenderer.fs', text: LEAKY_JOIN }]))
   const { ok, regressions } = compareBaseline({ 'JoinResultRenderer.fs': 1 }, current)
   assert.equal(ok, false)
   assert.ok(regressions[0].current > regressions[0].baseline)
 })
 
-test('gate_b_repo_scan_with_baseline_is_green', () => {
+test('WHAT[PARTICIPANT-HORIZON-002] gate_b_repo_scan_with_baseline_is_green', () => {
   const baseline = JSON.parse(
     readFileSync(new URL('../../../scripts/checks/provider-leak-gate-baseline.json', import.meta.url), 'utf8'),
   )
@@ -73,7 +80,7 @@ test('gate_b_repo_scan_with_baseline_is_green', () => {
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 
-test('gate_b_repo_scan_without_baseline_is_zero', () => {
+test('WHAT[PARTICIPANT-HORIZON-002] gate_b_repo_scan_without_baseline_is_zero', () => {
   const result = scanRepo(process.cwd())
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
   assert.deepEqual(result.counts, {})

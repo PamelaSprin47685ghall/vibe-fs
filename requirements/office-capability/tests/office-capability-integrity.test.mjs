@@ -75,12 +75,12 @@ const FIVE_OFFICES = [
   },
 ]
 
-test('OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices', () => {
+test('WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices', () => {
   const names = managedAgentCatalog.managerForkableRoles().map((r) => caseOf(roles.of(r)))
   assert.deepEqual(names, ['Coder', 'Inspector', 'DevOps', 'Browser', 'Inquiry'])
 })
 
-test('OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {
+test('WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales', () => {
   const surfaces = {
     managerEn: read('role/manager/en.md'),
     managerZh: read('role/manager/zh-CN.md'),
@@ -98,14 +98,14 @@ test('OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_b
   }
 })
 
-test('OFF_002_each_office_role_law_carries_its_entitled_consequence', () => {
+test('WHAT[OFF-002] OFF_002_each_office_role_law_carries_its_entitled_consequence', () => {
   for (const office of FIVE_OFFICES) {
     assert.match(read(`role/${office.id.split('-')[0]}/en.md`), office.lawEn, `${office.id} law en`)
     assert.match(read(`role/${office.id.split('-')[0]}/zh-CN.md`), office.lawZh, `${office.id} law zh`)
   }
 })
 
-test('OFF_006_offices_are_not_interchangeable_general_purpose_agents', () => {
+test('WHAT[OFF-006] OFF_006_offices_are_not_interchangeable_general_purpose_agents', () => {
   const managerEn = read('role/manager/en.md')
   const managerZh = read('role/manager/zh-CN.md')
   assert.match(managerEn, /Do not treat these offices as interchangeable/i)
@@ -117,7 +117,7 @@ test('OFF_006_offices_are_not_interchangeable_general_purpose_agents', () => {
   assert.doesNotMatch(read('tool/fork/description/en.md'), /Commission another witness/i)
 })
 
-test('OFF_003_two_calling_names_differ_in_persona_and_depth_not_authority', () => {
+test('WHAT[OFF-003] OFF_003_two_calling_names_differ_in_persona_and_depth_not_authority', () => {
   assert.match(
     read('tool/fork/description/en.md'),
     /differ in persona and reasoning depth,\s*not in the office's authority/i,
@@ -128,7 +128,7 @@ test('OFF_003_two_calling_names_differ_in_persona_and_depth_not_authority', () =
   )
 })
 
-test('OFF_001_office_capability_is_consequence_not_tool_whitelist', () => {
+test('WHAT[OFF-001] OFF_001_office_capability_is_consequence_not_tool_whitelist', () => {
   // The manager law names offices by what they can establish or change,
   // not by their instruments (ARCH-017: "not a list of names").
   const managerEn = read('role/manager/en.md')

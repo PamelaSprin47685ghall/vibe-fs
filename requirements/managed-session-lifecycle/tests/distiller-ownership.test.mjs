@@ -40,7 +40,7 @@ const fakeSessions = () => ({
   ListChildren: async () => ({ tag: 0, fields: [{ tag: 0, fields: [] }] }),
 })
 
-test('EXEC_014_distiller_fork_is_host_owned_hidden_and_parent_invisible', async () => {
+test('WHAT[MANAGED-SESSION-010] EXEC_014_distiller_fork_is_host_owned_hidden_and_parent_invisible', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-dist-'))
   const created = await agentJournal.create({ directory: dir })
   assert.equal(created.ok, true, created.ok ? '' : JSON.stringify(created.error))

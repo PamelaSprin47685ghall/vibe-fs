@@ -66,7 +66,7 @@ const run = async (tool, args, ctx) => tool.Execute(makeArgs(args), ctx)
 
 // ── pure gates ──────────────────────────────────────────────────────────────
 
-test('CHRONICLE_canonical_text_trims_and_rejects_empty', () => {
+test('WHAT[BD-006] CHRONICLE_canonical_text_trims_and_rejects_empty', () => {
   const ok = tryCanonicalText('  work entry  ')
   assert.equal(ok.tag, 0)
   assert.equal(ok.fields[0], 'work entry')
@@ -80,14 +80,14 @@ test('CHRONICLE_canonical_text_trims_and_rejects_empty', () => {
   assert.equal(nil.fields[0], 'CHRONICLE_EMPTY_ENFORCER_061')
 })
 
-test('CHRONICLE_live_cycle_requires_a_host_with_a_flight', () => {
+test('WHAT[BD-010] CHRONICLE_live_cycle_requires_a_host_with_a_flight', () => {
   assert.equal(hasLiveCycle(undefined, 'ses-blog'), false)
   assert.equal(hasLiveCycle(parkedHost(false), 'ses-blog'), false)
   assert.equal(hasLiveCycle(parkedHost(true), 'ses-blog'), true)
   assert.equal(hasLiveCycle(parkedHost(true), 'ses-other'), true, 'flight is per host query, session passed through')
 })
 
-test('CHRONICLE_tip_enum_equals_catalog_field_names', () => {
+test('WHAT[BD-001] CHRONICLE_tip_enum_equals_catalog_field_names', () => {
   const fields = listItems(tipFieldNames())
   assert.equal(fields.length, 120)
   assert.ok(fields.includes('primitive-obsession'))
@@ -95,7 +95,7 @@ test('CHRONICLE_tip_enum_equals_catalog_field_names', () => {
 
 // ── execute: gate first, then canonical text, then tip validation ───────────
 
-test('CHRONICLE_no_live_cycle_rejects_and_aborts_the_session', async () => {
+test('WHAT[BD-010] CHRONICLE_no_live_cycle_rejects_and_aborts_the_session', async () => {
   const { scope: s, calls } = scope()
   const tool = spec(factory, s, undefined)
   await assert.rejects(() => run(tool, { entry: 'x', tip: 'primitive-obsession' }, context()), {
@@ -104,7 +104,7 @@ test('CHRONICLE_no_live_cycle_rejects_and_aborts_the_session', async () => {
   assert.deepEqual(calls, [['AbortSession', sessionId('ses-blog')]], 'the doomed blogger session must be aborted')
 })
 
-test('CHRONICLE_no_live_cycle_does_not_abort_a_blank_session', async () => {
+test('WHAT[BD-010] CHRONICLE_no_live_cycle_does_not_abort_a_blank_session', async () => {
   const { scope: s, calls } = scope()
   const tool = spec(factory, s, undefined)
   await assert.rejects(() => run(tool, { entry: 'x', tip: 'primitive-obsession' }, context({ sessionId: '' })), (error) => {
@@ -114,25 +114,25 @@ test('CHRONICLE_no_live_cycle_does_not_abort_a_blank_session', async () => {
   assert.deepEqual(calls, [], 'blank session must not be aborted')
 })
 
-test('CHRONICLE_empty_canonical_text_returns_public_consequence', async () => {
+test('WHAT[BD-017] CHRONICLE_empty_canonical_text_returns_public_consequence', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
   const text = await run(tool, { entry: '   ', tip: 'primitive-obsession' }, context())
   assert.match(text, /no occurrence here to remember/)
 })
 
-test('CHRONICLE_missing_tip_returns_rulebook_consequence', async () => {
+test('WHAT[BD-006] CHRONICLE_missing_tip_returns_rulebook_consequence', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
   const text = await run(tool, { entry: 'entry' }, context())
   assert.match(text, /Rulebook|missing required argument: tip/i)
 })
 
-test('CHRONICLE_unknown_tip_is_rejected_at_runtime', async () => {
+test('WHAT[BD-007] CHRONICLE_unknown_tip_is_rejected_at_runtime', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
   const text = await run(tool, { entry: 'entry', tip: 'not-a-field' }, context())
   assert.match(text, /not in the Rulebook/)
 })
 
-test('CHRONICLE_valid_entry_with_identity_returns_fixed_ok', async () => {
+test('WHAT[BD-009] CHRONICLE_valid_entry_with_identity_returns_fixed_ok', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
   const text = await run(
     tool,
@@ -142,7 +142,7 @@ test('CHRONICLE_valid_entry_with_identity_returns_fixed_ok', async () => {
   assert.match(text, /The Chronicle remembers this\./)
 })
 
-test('CHRONICLE_valid_entry_without_tool_identity_still_returns_ok', async () => {
+test('WHAT[BD-009] CHRONICLE_valid_entry_without_tool_identity_still_returns_ok', async () => {
   const tool = spec(factory, scope().scope, parkedHost(true))
   assert.match(
     await run(tool, { entry: 'entry', tip: 'primitive-obsession' }, context()),

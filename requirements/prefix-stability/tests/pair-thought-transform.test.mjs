@@ -71,7 +71,7 @@ const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.parts[0].state.output, markerText)
 }
 
-test('PPT_source_is_the_frozen_side_channel_identity', () => {
+test('WHAT[PREFIX-STABILITY-014] PPT_source_is_the_frozen_side_channel_identity', () => {
   assert.equal(source, 'pair-programming-auto-injected')
   assert.ok(text.length > 0, 'frozen thought text must be non-empty')
   assert.equal(isPairProgrammingThought(null), false)
@@ -81,7 +81,7 @@ test('PPT_source_is_the_frozen_side_channel_identity', () => {
   assert.equal(isPairProgrammingThought({ parts: [] }), false, 'no info.source means not a marker')
 })
 
-test('PPT_tryInject_appends_pair_on_empty_history_at_start_gap', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_appends_pair_on_empty_history_at_start_gap', async () => {
   const out = await inject('ses_empty', [])
   assert.ok(out, 'empty history must still append one pair')
   assert.equal(out.length, 1)
@@ -89,7 +89,7 @@ test('PPT_tryInject_appends_pair_on_empty_history_at_start_gap', async () => {
   assertPairShape(out[0], callId, text)
 })
 
-test('PPT_tryInject_places_pair_before_trailing_user', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user', async () => {
   const raw = [userMsg('msg_1')]
   const out = await inject('ses_1', raw)
   assert.ok(out)
@@ -99,7 +99,7 @@ test('PPT_tryInject_places_pair_before_trailing_user', async () => {
   assert.deepEqual(out[1], raw[0], 'trailing user stays last')
 })
 
-test('PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', async () => {
   const raw = [userMsg('u1'), assistantText('a1'), userMsg('u2', 'steer')]
   const out = await inject('ses_assistant', raw)
   assert.ok(out)
@@ -111,7 +111,7 @@ test('PPT_tryInject_places_pair_before_trailing_user_with_prior_assistant', asyn
   assert.deepEqual(out[3], raw[2], 'steer user remains after pair')
 })
 
-test('PPT_tryInject_merges_into_tool_batches_before_user', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_user', async () => {
   const raw = [
     toolCall('c1', 'bash', 't1'),
     toolCall('c2', 'read', 't2'),
@@ -137,7 +137,7 @@ test('PPT_tryInject_merges_into_tool_batches_before_user', async () => {
   assert.deepEqual(out[5], raw[4])
 })
 
-test('PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async () => {
   const once = await inject('ses_append', [userMsg('msg_1')])
   assert.ok(once)
   assert.equal(once.length, 2)
@@ -155,13 +155,13 @@ test('PPT_tryInject_second_pass_of_same_placement_replays_existing_pair', async 
   assert.deepEqual(twice, once, 'replay must be byte-identical')
 })
 
-test('PPT_tryInject_call_id_is_stable_per_session_and_ordinal', () => {
+test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_call_id_is_stable_per_session_and_ordinal', () => {
   assert.equal(stableCallId('ses_1', 1n), stableCallId('ses_1', 1n))
   assert.notEqual(stableCallId('ses_1', 1n), stableCallId('ses_1', 2n))
   assert.notEqual(stableCallId('ses_1', 1n), stableCallId('ses_2', 1n))
 })
 
-test('PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
+test('WHAT[PREFIX-STABILITY-015] PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
   const out = await inject(undefined, [])
   assert.ok(out)
   assert.equal(out.length, 1)
@@ -169,7 +169,7 @@ test('PPT_tryInject_without_session_id_still_appends_stable_pair', async () => {
   assertPairShape(out[0], callId, text)
 })
 
-test('PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => {
+test('WHAT[PREFIX-STABILITY-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => {
   const raw = [userMsg('msg_1', text)]
   const out = await inject('ses_quote', raw)
   assert.equal(isPairProgrammingThought(out[1]), false, 'matching text alone must not classify as marker')
@@ -177,7 +177,7 @@ test('PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker', async () => 
   assert.equal(out[1].info.role, 'user')
 })
 
-test('PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     delete process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
@@ -209,7 +209,7 @@ test('PPT_skip_auto_injected_env_blocks_new_pair_but_replays_history', async () 
   }
 })
 
-test('PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', async () => {
+test('WHAT[PREFIX-STABILITY-010] PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', async () => {
   const previous = process.env.WANXIANGSHU_SKIP_AUTO_INJECTED
   try {
     process.env.WANXIANGSHU_SKIP_AUTO_INJECTED = '1'
@@ -222,7 +222,7 @@ test('PPT_skip_auto_injected_env_keeps_empty_transcript_without_pair', async () 
   }
 })
 
-test('C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', async () => {
+test('WHAT[PREFIX-STABILITY-010] C_PH_ordinary_cursor_ordinary_suppresses_then_restores_same_occurrence', async () => {
   const session = 'ses_cursor_transition'
   const ordinary = await inject(session, [userMsg('u1')])
   const ordinaryCallId = stableCallId(session, 1n)
