@@ -161,7 +161,7 @@
     <Compile Include="Mission/Review/Barrier/Projection.fs"/>
     <Compile Include="Enforcer/Projection.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/CycleProjection.fs"/>
-    <Compile Include="Composition/Durable/GuidelineProjection.fs"/>
+    <Compile Include="OpenCode/Host/PairProgramming/GuidelineProjection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
