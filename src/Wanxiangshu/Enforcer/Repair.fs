@@ -206,9 +206,15 @@ module EnforcerRepair =
     /// ENFORCER-060/061: InteractionRepair via Projection algebra (PROJ-008 Step4).
     ///
     /// 消息正文 / 顺序来自 `InsertRepair` → plan → renderMessagesWithIntents。
-    /// Host `createObj` 只写回 id / source / requestKey 侧信道；id 规则保持
+    /// Host `createObj` 只写回 id / source / requestKey / repairTerminalRun 侧信道；
+    /// terminal identity makes AABB re-entry idempotent instead of degrading to a
+    /// LogicalRun-wide consumed bit. id 规则保持
     /// `enforcer-repair-` + sha256(requestKey + "|" + RepairInstruction).Substring(0, 24)。
-    let withRepairInstruction (rawMessages: obj list) (requestKey: string) : obj list =
+    let withRepairInstruction
+        (rawMessages: obj list)
+        (requestKey: string)
+        (repairTerminalRun: ProviderRunIdentity)
+        : obj list =
         let baseWire = rawMessages |> List.choose ProviderWireCapture.decodeMessage
 
         let emptyCurrent: ProviderProjection.ProviderSemanticProjection =
@@ -260,7 +266,8 @@ module EnforcerRepair =
                                 "role", box "user"
                                 "synthetic", box true
                                 "source", box "interaction-repair"
-                                "requestKey", box requestKey ]
+                                "requestKey", box requestKey
+                                "repairTerminalRun", box (ProviderRunIdentity.value repairTerminalRun) ]
                       )
                       "parts", box [| createObj [ "type", box "text"; "text", box repairText ] |] ]
 

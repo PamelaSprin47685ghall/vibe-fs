@@ -96,16 +96,19 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
 
 - `handleContinuation`：薄分发（emptyCallsBranch / commitBranch / firstRequestBranch）。
 - `EnforcerContinuation`：三分支 + `CycleDisposition`；成功提交后 Park 或注入；0/2+ chronicle 与
-  completed-but-invalid 单调用共用 nudge/repair/AABB/Fallback 决策表（BD-017）。同一 terminal 重放
-  只投影，不重复 nudge；下一 invalid terminal 才进入 AABB。
+  completed-but-invalid 单调用共用 nudge/repair/AABB/Fallback 决策表（BD-017）。Nudge 与 AABB 都绑定
+  exact `ProviderRunIdentity`：同一 terminal 在任一阶段重放都只投影，不重复发送、不推进预算；只有
+  nudge 后的下一 invalid terminal 才进入 AABB，只有 AABB 后再出现一个新的 invalid terminal 才 fatal。
 - `HostTurnObserver`：`Role.Blogger` 的 zero-tool idle terminal 不再进入 ordinary
   `MissingClosingReport`。它调用 `InteractionRepairWorkflow.repairBloggerProtocol`：第一次 invalid
   terminal 通过 fresh idle permit 发送 `blogger-missing-tool` nudge；同 terminal 重放幂等；新的
   invalid terminal 消费 fresh idle permit、由 `FallbackLedger` 推进一步并发送 `blogger-aabb` repair；
-  AABB durable claim 已存在后再失败则终止该 Blogger cycle，不再自动提示。
+  `blogger-aabb` claim 保留它修复的 terminal id，同 terminal 的重复 idle/transform 幂等；只有不同的新
+  invalid terminal 在该 AABB 之后再次出现才终止 Blogger cycle，不再自动提示。
 - cold/reconcile recovery 只从 `SessionMessage.ToolParts` 读取 `ToolName=chronicle` + completed state；
   `MessagePart.ToolResult` 已丢 tool name，禁止用于判断修复是否成功。`blogger-aabb` claim 是 idle AABB
-  的 durable 阶段证据；纯 transcript `rejudgeFromEvidence` 仍不得凭空发明 AABB。
+  的 durable 阶段证据并携带 target terminal；transform 注入的 synthetic repair 也写回同一 target
+  terminal 侧信道。纯 completed-assistant transcript `rejudgeFromEvidence` 仍不得凭空发明 AABB。
 - `EnforcerFrameRecovery.fs`：`tryLiveCycleContext`（commit 只用 live InFlight）、
   `tryReloadRequestContext`（durable open materialization 恢复）、
   `lastCoveredSequence` / `coveredPrefixDigest`（出生门，BD-013）。

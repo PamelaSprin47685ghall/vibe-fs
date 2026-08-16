@@ -687,6 +687,32 @@ test('WHAT[BD-009] ENFORCER_042_second_multi_call_terminal_after_nudge_triggers_
   })
 })
 
+test('WHAT[BD-017] ENFORCER_060_same_terminal_reentry_after_aabb_is_idempotent', async () => {
+  await withHarness(async ({ scope, fatals, run, capturedSends }) => {
+    await run(pureProse('asst-aabb-same-p1', 'no tools'))
+    await run(pureProse('asst-aabb-same-p2', 'still no')) // AABB targets p2
+
+    const out = await run(pureProse('asst-aabb-same-p2', 'same terminal replay after AABB'))
+
+    assert.equal(fatals.length, 0, 'AABB must be scoped to its terminal; replaying that terminal is idempotent')
+    assert.equal(capturedSends.length, 1, 'same terminal replay must not send another nudge')
+    assert.equal(hasFlight(scope), true, 'same-terminal replay must keep the live cycle available for the AABB response')
+    assert.equal(outcomeTag(out), 'ProjectMessages')
+  })
+})
+
+test('WHAT[BD-017] ENFORCER_061_same_empty_text_terminal_reentry_after_aabb_is_idempotent', async () => {
+  await withHarness(async ({ scope, fatals, run }) => {
+    await run(liveBlog('asst-empty-aabb-same', 'c-empty-aabb-same', { text: '' }))
+
+    const out = await run(liveBlog('asst-empty-aabb-same', 'c-empty-aabb-same', { text: '' }))
+
+    assert.equal(fatals.length, 0, 'empty-text AABB replay of the same terminal must not exhaust protocol repair')
+    assert.equal(hasFlight(scope), true)
+    assert.equal(outcomeTag(out), 'ProjectMessages')
+  })
+})
+
 test('WHAT[BD-017] ENFORCER_060_pure_prose_after_aabb_fatals', async () => {
   await withHarness(async ({ journal, scope, fatals, lastFatal, run, blog }) => {
     const out1 = await run(pureProse('asst-p1', 'no tools'))

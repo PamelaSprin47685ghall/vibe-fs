@@ -206,9 +206,7 @@ InteractionRepair/nudge 路径：每个逻辑请求至多一次 Nudge；同一 t
 “下一次 provider transform”才能开始修复**：它没有 tool loop，自然也没有下一次 transform；Host
 `SessionIdle` 的 reconciled turn 是该失败后的可靠唤醒点，必须直接驱动 Blogger 专用 nudge，而不是
 ordinary `MissingClosingReport`（后者会错误要求 Blogger 继续输出自然语言）。若 nudge 后新的 0-call
-terminal 再次 idle，则该 idle 机会消费一次 Fallback/AABB 并发出 AABB repair；AABB 阶段用 durable
-`blogger-aabb` InteractionRepair claim 记录，使 crash/re-entry 能恢复“预算已花掉”，第三次无效不得
-继续自动 nudge/AABB。恢复重判必须从 durable claim + provider-visible `SessionToolPart` 证据派生，且
+terminal 再次 idle，则该 idle 机会消费一次 Fallback/AABB 并发出 AABB repair；AABB 阶段必须保留**它所针对的 terminal ProviderRunIdentity**：同一 terminal 的 transform/idle 重放幂等，不得因为 AABB marker/claim 已存在就被误判成“第三次失败”；只有 AABB 后出现一个**新的**无效 terminal 才能证明协议修复耗尽并 fatal。durable `blogger-aabb` InteractionRepair claim 与 provider-visible synthetic repair evidence 都必须恢复该 terminal identity，而不是退化成 LogicalRun 级 `AABB consumed` 布尔。恢复重判必须从 durable claim + provider-visible `SessionToolPart` 证据派生，且
 只有 terminal 中**恰好一个 completed `chronicle`** 才能证明 repair 后协议恢复；不得从丢失 tool name
 的 `MessagePart.ToolResult` 猜测，也不得保留旧工具名 `blog` alias。`BloggerToolRecovery` 不退化成整数计数器。
 

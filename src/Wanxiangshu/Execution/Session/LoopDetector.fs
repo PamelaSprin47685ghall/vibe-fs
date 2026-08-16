@@ -19,7 +19,7 @@ module LoopDetector =
     let HalfLife = 64.0
     let Lambda = Math.Pow(2.0, -1.0 / HalfLife)
 
-    let NormalWeightedDistinctCount = 18.396683004353807
+    let NormalWeightedDistinctCount = 19.260533967298734
     let TheoreticalLoopWeightedDistinctCount = 1.0
 
     let LoopWeightedDistinctThreshold =

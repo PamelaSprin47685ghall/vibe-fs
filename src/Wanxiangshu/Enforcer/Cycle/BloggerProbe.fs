@@ -98,10 +98,10 @@ module BloggerRecoveryProbe =
     ///   InteractionNudgeIssued claimed
     /// - claim + valid blog after claim → NoRecovery (cycle completed / success)
     ///
-    /// Pure transcript evidence never derives AabbRepairConsumed. Idle-issued
+    /// Pure transcript evidence never derives AabbRepairIssued. Idle-issued
     /// AABB has a separate durable `blogger-aabb` InteractionRepair claim; the
-    /// journal-aware probes below may restore that stage, but this pure function
-    /// must never invent it from prose terminals alone.
+    /// journal-aware probes below may restore that stage with the exact terminal
+    /// identity, but this pure function must never invent it from prose terminals alone.
     let rejudgeFromEvidence
         (claimedTerminalRun: string option)
         (completedAssistants: (string * bool) list)
@@ -123,8 +123,7 @@ module BloggerRecoveryProbe =
             if hasBlogAfter then
                 BloggerToolRecovery.NoRecovery
             else
-                // No durable AABB evidence exists (AABB = memory mark + transform
-                // injection only): never invent AabbRepairConsumed. Restore as
+                // No durable AABB evidence exists here: never invent AabbRepairIssued. Restore as
                 // InteractionNudgeIssued claimed; the hot path re-runs aabbRepair
                 // on the next *new* pure-prose terminal (issuedRun <> terminalRun).
                 BloggerToolRecovery.InteractionNudgeIssued(ProviderRunIdentity.create claimed)
@@ -230,8 +229,9 @@ module BloggerRecoveryProbe =
     let private claimedRunFromSequences journal bloggerSessionId =
         claimedRunFromSequencesFor BloggerMissingToolRepairKind journal bloggerSessionId
 
-    let private aabbClaimed journal bloggerSessionId =
-        claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId |> Option.isSome
+    let private aabbClaimedRun journal bloggerSessionId =
+        claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId
+        |> Option.map ProviderRunIdentity.create
 
     /// Invalid-terminal stage preserves WHICH terminal received the AABB. Idle
     /// may be delivered repeatedly for one terminal, so stage identity is part
@@ -256,7 +256,7 @@ module BloggerRecoveryProbe =
         function
         | InvalidTerminalRepairState.NoRecovery -> BloggerToolRecovery.NoRecovery
         | InvalidTerminalRepairState.InteractionNudgeIssued run -> BloggerToolRecovery.InteractionNudgeIssued run
-        | InvalidTerminalRepairState.AabbRepairIssued _ -> BloggerToolRecovery.AabbRepairConsumed
+        | InvalidTerminalRepairState.AabbRepairIssued run -> BloggerToolRecovery.AabbRepairIssued run
 
     /// ENFORCER-153: rejudge BloggerToolRecovery from claim + Host transcript.
     let rejudgeToolRecovery
@@ -281,34 +281,42 @@ module BloggerRecoveryProbe =
             | Some _ as hit -> hit
             | None -> claimedRunFromSequences journal bloggerSessionId
 
-        if aabbClaimed journal bloggerSessionId then
-            BloggerToolRecovery.AabbRepairConsumed
-        else
-            rejudgeFromEvidence claimedTerminalRun terminals
+        match aabbClaimedRun journal bloggerSessionId with
+        | Some run -> BloggerToolRecovery.AabbRepairIssued run
+        | None -> rejudgeFromEvidence claimedTerminalRun terminals
 
-    /// True when a raw Host message is an AABB repair instruction we injected for `requestKey`.
-    let private aabbRepairInjected (requestKey: string) (rawMessages: obj list) : bool =
+    let private providerRunFromHostValue (value: obj) : ProviderRunIdentity option =
+        let runIdOpt = if isNull value then None else Some(unbox<string> value)
+
+        match runIdOpt with
+        | Some runId when not (System.String.IsNullOrWhiteSpace runId) -> Some(ProviderRunIdentity.create runId)
+        | _ -> None
+
+    let private hostInfo (message: obj) =
+        if isNull message then None
+        elif isNull message?info then Some message
+        else Some message?info
+
+    let private repairMarkerTargetRun (requestKey: string) (message: obj) : ProviderRunIdentity option =
+        hostInfo message
+        |> Option.bind (fun info ->
+            let matches =
+                not (isNull info)
+                && not (isNull info?source)
+                && unbox<string> info?source = "interaction-repair"
+                && not (isNull info?synthetic)
+                && unbox<bool> info?synthetic
+                && not (isNull info?requestKey)
+                && unbox<string> info?requestKey = requestKey
+
+            if matches then providerRunFromHostValue info?repairTerminalRun else None)
+
+    /// Exact terminal targeted by a raw Host AABB repair instruction injected for `requestKey`.
+    /// The marker is provider-visible evidence, but its terminal identity is Host-only metadata.
+    let private aabbRepairTargetRun (requestKey: string) (rawMessages: obj list) : ProviderRunIdentity option =
         rawMessages
-        |> List.choose (fun m ->
-            if isNull m then
-                None
-            else
-                let info = if isNull m?info then m else m?info
-
-                if
-                    not (isNull info)
-                    && not (isNull info?source)
-                    && unbox<string> info?source = "interaction-repair"
-                    && not (isNull info?synthetic)
-                    && unbox<bool> info?synthetic
-                    && not (isNull info?requestKey)
-                    && unbox<string> info?requestKey = requestKey
-                then
-                    Some()
-                else
-                    None)
-        |> List.isEmpty
-        |> not
+        |> List.rev
+        |> List.tryPick (repairMarkerTargetRun requestKey)
 
     /// ENFORCER-153 hot path: derive recovery state from durable claim + visible
     /// transcript. No mutable runtime field is consulted.
@@ -325,8 +333,8 @@ module BloggerRecoveryProbe =
         (terminalRun: ProviderRunIdentity)
         (rawMessages: obj list)
         : BloggerToolRecovery =
-        if aabbRepairInjected requestKey rawMessages then
-            BloggerToolRecovery.AabbRepairConsumed
-        else
+        match aabbRepairTargetRun requestKey rawMessages with
+        | Some run -> BloggerToolRecovery.AabbRepairIssued run
+        | None ->
             repairStateForInvalidTerminal journal bloggerSessionId terminalRun
             |> toolRecoveryOfInvalidTerminal

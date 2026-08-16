@@ -84,10 +84,9 @@ test('WHAT[BD-017] ENFORCER_153_claim_plus_pure_prose_terminal_rejudges_to_Inter
 
 test('WHAT[BD-017] ENFORCER_153_claim_plus_second_pure_prose_rejudges_to_InteractionNudgeIssued', async () => {
   // Second pure prose after claim is the *trigger* for aabbRepair (ENFORCER-067),
-  // not its receipt. AABB is memory-only (markAabbRepairConsumed + transform
-  // injection, no journal fact), so cold rejudge must not invent AabbRepairConsumed:
-  // deriving it here would let the hot path fatalEnd without ever injecting the
-  // AABB repair (budget stolen across a crash).
+  // not its receipt. Cold transcript rejudge therefore must not invent
+  // AabbRepairIssued: deriving it here would let the hot path exhaust without ever
+  // issuing an AABB repair (budget stolen across a crash).
   const rejudge = await rejudgeFromEvidence()
   const terminals = await toEvidenceList([
     ['asst-p1', false],
@@ -145,32 +144,35 @@ test('WHAT[BD-017] ENFORCER_153_runtime_carries_no_recovery_mirror', () => {
   assert.doesNotMatch(runtimeSrc, /BloggerRuntimeCell\b/, 'no BloggerRuntimeCell')
   assert.doesNotMatch(runtimeSrc, /Recovery: BloggerToolRecovery/)
   assert.doesNotMatch(runtimeSrc, /markInteractionNudgeIssued/)
-  assert.doesNotMatch(runtimeSrc, /markAabbRepairConsumed/)
+  assert.doesNotMatch(runtimeSrc, /markAabbRepairIssued/)
   // restoreRuntime no longer takes a rejudged recovery: nothing to store.
   assert.doesNotMatch(recoverySrc, /Recovery = recovery/)
 })
 
-test('WHAT[BD-017] ENFORCER_153_cold_rejudge_never_invents_AabbRepairConsumed', () => {
-  // Transcript evidence alone still cannot invent AABB. The idle path now writes
-  // a durable blogger-aabb InteractionRepair claim, so rejudgeToolRecovery may
-  // restore AabbRepairConsumed only when that claim exists.
+test('WHAT[BD-017] ENFORCER_153_cold_rejudge_never_invents_AabbRepairIssued', () => {
+  // Completed-assistant transcript evidence alone still cannot invent AABB. The
+  // idle path writes a durable blogger-aabb InteractionRepair claim, so
+  // rejudgeToolRecovery may restore AabbRepairIssued only with that claim's exact
+  // terminal identity.
   const probeSrc = readFileSync(
     join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'),
     'utf8',
   )
   const pureRejudge = probeSrc.match(/let rejudgeFromEvidence[\s\S]*?let private isCompletedChronicle/)
   assert.ok(pureRejudge)
-  assert.doesNotMatch(pureRejudge[0], /BloggerToolRecovery\.AabbRepairConsumed/)
+  assert.doesNotMatch(pureRejudge[0], /BloggerToolRecovery\.AabbRepairIssued/)
   assert.match(probeSrc, /BloggerAabbRepairKind = "blogger-aabb"/)
-  assert.match(probeSrc, /aabbClaimed[\s\S]*?BloggerToolRecovery\.AabbRepairConsumed/)
+  assert.match(probeSrc, /aabbClaimedRun[\s\S]*?BloggerToolRecovery\.AabbRepairIssued run/)
 })
 
-test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_infers_from_visible_transcript', () => {
-  // The hot path injects a synthetic repair message with info.requestKey; the next
-  // transform uses its presence (not a mutable flag) to decide AabbRepairConsumed.
-  assert.match(repairSrc, /requestKey[\s\S]*?interaction-repair/)
+test('WHAT[BD-017] ENFORCER_153_hot_path_aabb_preserves_target_terminal_identity', () => {
+  // The hot path injects a synthetic repair message with requestKey plus the exact
+  // terminal it repairs. Re-entry of that same terminal is idempotent; only a
+  // different invalid terminal after AABB may exhaust the protocol.
+  assert.match(repairSrc, /requestKey[\s\S]*?repairTerminalRun[\s\S]*?interaction-repair/)
   assert.match(enforcerSrc, /BloggerToolRecovery\.InteractionNudgeIssued _[\s\S]*?aabbRepair/)
-  assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairConsumed[\s\S]*?fatalEnd/)
+  assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairIssued issuedRun when issuedRun = terminalRun/)
+  assert.match(enforcerSrc, /BloggerToolRecovery\.AabbRepairIssued _[\s\S]*?protocol-repair-exhausted/)
 })
 
 test('WHAT[BD-017] ENFORCER_153_repairState_old_claim_new_terminal_is_nudge_with_claimed_run', async () => {

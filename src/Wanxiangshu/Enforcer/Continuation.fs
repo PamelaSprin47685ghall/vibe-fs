@@ -230,11 +230,15 @@ module EnforcerContinuation =
                 ctx.Scope.SetCurrentRequest(sessionKey, fresh)
                 Diagnostic.emit "enforcer-cycle-repair" [ "session_id", sessionKey; "result", reason ]
                 let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
+                let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-repair-run"
                 let! rebuilt = EnforcerFrameRecovery.tryRebuildFromContext ctx.Durable ctx.BloggerSessionId fresh
 
                 return
                     ctx.Project(
-                        EnforcerRepair.withRepairInstruction (rebuilt |> Option.defaultValue ctx.RawMessages) requestKey
+                        EnforcerRepair.withRepairInstruction
+                            (rebuilt |> Option.defaultValue ctx.RawMessages)
+                            requestKey
+                            terminalRun
                     )
         }
 
@@ -314,6 +318,19 @@ module EnforcerContinuation =
                 return! afterNudgeSent ctx sessionKey currentCtx live reason sent
         }
 
+    let private sameAabbTerminalReentry
+        (ctx: Context)
+        (sessionKey: string)
+        (issuedRun: ProviderRunIdentity)
+        (terminalRun: ProviderRunIdentity)
+        : Task<ContinuationOutcome> =
+        Diagnostic.emit
+            "enforcer-cycle-aabb-pending"
+            [ "session_id", sessionKey
+              "result", sprintf "same terminal re-entry after AABB (%s)" (ProviderRunIdentity.value issuedRun) ]
+
+        Task.FromResult(ctx.Project ctx.RawMessages)
+
     /// Evidence → Decision: interrupted-blog recovery stage → fatal or inject repair.
     let private decideInterruptedRecovery
         (ctx: Context)
@@ -321,9 +338,13 @@ module EnforcerContinuation =
         (currentCtx: BloggerRequestContext option)
         (live: BloggerRequestContext)
         : Task<ContinuationOutcome> =
+        let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-interrupted-run"
+
         match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
-        | BloggerToolRecovery.AabbRepairConsumed ->
-            fatalProjectRaw ctx sessionKey currentCtx "blog tool interrupted; repair already consumed"
+        | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
+            sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
+        | BloggerToolRecovery.AabbRepairIssued _ ->
+            fatalProjectRaw ctx sessionKey currentCtx "blog tool interrupted; aabb exhausted"
         | _ -> projectRepairInstruction ctx sessionKey live "blog tool interrupted without completed call"
 
     /// Evidence → Decision: live cycle for interrupted blog → recovery or stop.
@@ -344,8 +365,12 @@ module EnforcerContinuation =
         (currentCtx: BloggerRequestContext option)
         (live: BloggerRequestContext)
         : Task<ContinuationOutcome> =
+        let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-errored-run"
+
         match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
-        | BloggerToolRecovery.AabbRepairConsumed ->
+        | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
+            sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
+        | BloggerToolRecovery.AabbRepairIssued _ ->
             fatalProjectRaw ctx sessionKey currentCtx "blog tool error; aabb exhausted"
         | _ -> aabbRepair ctx sessionKey currentCtx live "blog tool error without completed call"
 
@@ -379,7 +404,9 @@ module EnforcerContinuation =
             Task.FromResult(ctx.Project ctx.RawMessages)
         | BloggerToolRecovery.InteractionNudgeIssued _ ->
             aabbRepair ctx sessionKey currentCtx live ("nudge semantic failure; " + reason)
-        | BloggerToolRecovery.AabbRepairConsumed ->
+        | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
+            sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
+        | BloggerToolRecovery.AabbRepairIssued _ ->
             fatalProjectRaw ctx sessionKey currentCtx "protocol-repair-exhausted (ENFORCER-060)"
 
     let private decideInvalidTerminal
@@ -641,11 +668,24 @@ module EnforcerContinuation =
         else
             projectUnownedLiveAuthority ctx mainSessionId sessionKey
 
-    let private aabbConsumedOf (ctx: Context) (liveCtx: BloggerRequestContext option) =
-        match liveCtx with
-        | Some live ->
-            (ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live) = BloggerToolRecovery.AabbRepairConsumed
-        | None -> false
+    let private classifyAabbForTerminal (terminalRun: ProviderRunIdentity) (recovery: BloggerToolRecovery) =
+        recovery
+        |> box
+        |> Option.ofObj
+        |> Option.map unbox<BloggerToolRecovery>
+        |> Option.bind (function
+            | BloggerToolRecovery.AabbRepairIssued issuedRun -> Some(issuedRun = terminalRun)
+            | _ -> None)
+
+    let private aabbIssuedForTerminal
+        (ctx: Context)
+        (liveCtx: BloggerRequestContext option)
+        (terminalRun: ProviderRunIdentity)
+        : bool option =
+        liveCtx
+        |> Option.bind (fun live ->
+            ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live
+            |> classifyAabbForTerminal terminalRun)
 
     /// Evidence → Decision: AABB refresh Option → inject disposition or fatal reason.
     let private dispositionAfterEmptyTextRefresh
@@ -832,20 +872,26 @@ module EnforcerContinuation =
         (providerRun: ProviderRunIdentity)
         : Task<CycleDisposition> =
         task {
-            let consumed = aabbConsumedOf ctx liveCtx
+            let aabbForTerminal = aabbIssuedForTerminal ctx liveCtx providerRun
+            let validation = EnforcerCycleDecode.validateCycle messageId calls
 
-            match EnforcerCycleDecode.validateCycle messageId calls with
-            | Error reason when
+            match validation, aabbForTerminal with
+            | Error reason, None when
                 ctx.IsEmptyTextCycleFailure reason
-                && not consumed
                 && not (EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages)
                 ->
                 let! refreshed = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
                 return! dispositionAfterEmptyTextRefresh ctx sessionKey liveCtx refreshed reason
-            | Error reason when ctx.IsEmptyTextCycleFailure reason && consumed ->
+            | Error reason, Some true when ctx.IsEmptyTextCycleFailure reason ->
+                Diagnostic.emit
+                    "enforcer-cycle-aabb-pending"
+                    [ "session_id", sessionKey; "result", "same empty-text terminal re-entry after AABB" ]
+
+                return CycleDisposition.Working
+            | Error reason, Some false when ctx.IsEmptyTextCycleFailure reason ->
                 return! fatalClearWorking ctx mainSessionId sessionKey liveCtx "protocol-repair-exhausted"
-            | Error reason -> return! fatalClearWorking ctx mainSessionId sessionKey liveCtx reason
-            | Ok(merged, toolCallIds) ->
+            | Error reason, _ -> return! fatalClearWorking ctx mainSessionId sessionKey liveCtx reason
+            | Ok(merged, toolCallIds), _ ->
                 return! dispositionForValidatedCycle ctx mainSessionId sessionKey liveCtx providerRun merged toolCallIds
         }
 
@@ -890,8 +936,9 @@ module EnforcerContinuation =
                 return failwith "unreachable: fatalEnd ends the cycle"
             | _ ->
                 let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId live)
+                let terminalRun = ProviderRunIdentity.create messageId
                 let! rebuilt = resumeWithContext ctx live
-                return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey)
+                return ctx.Project(EnforcerRepair.withRepairInstruction rebuilt requestKey terminalRun)
         }
 
     let private finishWorking (ctx: Context) (liveCtx: BloggerRequestContext option) : Task<ContinuationOutcome> =

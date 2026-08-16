@@ -54,7 +54,7 @@ open Wanxiangshu.Foundation.Identity
 type BloggerToolRecovery =
     | NoRecovery
     | InteractionNudgeIssued of ProviderRunIdentity
-    | AabbRepairConsumed
+    | AabbRepairIssued of ProviderRunIdentity
 
 /// One drain-window opening. Module-private constructor: only the reactivation
 /// path (a new Authority Root arriving on the main) can mint it, so no caller
