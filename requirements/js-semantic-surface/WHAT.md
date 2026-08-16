@@ -37,8 +37,12 @@ owner 分布，不集中成 god facade；「测试需要，所以 export interna
 
 **边界**：编译产物验证测试（`VERIFY_008_every_emitted_module_actually_loads` 一类）的
 subject 就是编译产物，有资格知道 `dist`；它们归 compiler/build verification quarantine，
-不算 semantic tests。当前 transition 入口 `domain.mjs` 是迁移载体（HOW），其退场路径见
-本包 HOW「domain.mjs 退场」。
+不算 semantic tests。**quarantine 只存在于 compiler/build verification**——产品包的
+`tests/support` 不是第二 quarantine；把 forbidden knowledge 从 test 文件搬进 support 不
+减少债务，只是给 white-box 加一层布。当前 transition 入口 `domain.mjs` 是迁移载体
+（HOW），其退场路径见本包 HOW「domain.mjs 退场」；`domain.mjs` 及其子层、以及现存
+package-local `*-contract.mjs` 只在 js-boundary-gate baseline 内合法（只减不增），禁止
+新增任何新的 package-local contract 访问 internal dist。
 
 **证据指针**：→ PROOF.md L14。
 

@@ -47,6 +47,11 @@ assertOpaque(value)  只允许 create → pass back → dispose；拒绝读 fiel
 `VERIFY_008_every_emitted_module_actually_loads` 一类测试的 subject 是编译产物，有资格
 知道 `dist` 与 Fable 形状。它们不是 semantic tests，不受 002/006 约束。
 
+**quarantine 边界（TASK.md §PR 2）**：Fable quarantine 只存在于 compiler/build
+verification。产品包的 `tests/support`、`tests/fixtures`、`*-contract.mjs` 不是第二
+quarantine——scanner（PR 1）覆盖整个 semantic-test zone，`js-boundary-gate` baseline
+对它们同样只减不增。
+
 ## domain.mjs 退场
 
 当前 `requirements/verification-system/tests/support/domain.mjs` 是大量测试的
@@ -61,6 +66,30 @@ anti-corruption boundary，Fable mechanics 在 `domain/interop.mjs`。退场分�
 ```
 
 删除 helpers 不因为它们写得不好——它们成功完成了迁移任务，以后普通测试已到不了危险区域。
+
+## package-local contract 冻结（TASK.md §PR 3）
+
+以下模式进入 migration debt，现存只能减少，**禁止新增**：
+
+```text
+requirements/<package>/tests/support/*-contract.mjs
+requirements/<package>/tests/support.mjs
+（deep-import dist / 使用 interop helpers / re-export Fable 形状）
+```
+
+现存清单（baseline 内合法，必须单调减少）：
+
+```text
+finality/tests/support/finality-contract.mjs
+knowledge-reuse/tests/support/casebook-contract.mjs
+output-distillation/tests/support/distiller-contract.mjs
+intra-participant-parallelism/tests/support/fission-contract.mjs
+epistemic-reasoning/tests/support.mjs
+（PR 6/7/8 各 vertical slice 逐一消除）
+```
+
+support 可以是纯 fixture（`userMessage`、`fakeClock` 之类），禁止的是「support 必须调用
+production 时越过 registered surface 直连 internal dist」。
 
 ## 历史与弃权
 
