@@ -43,7 +43,19 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_documents_raw_time_tokens_and_laye
   ]) {
     assert.ok(RAW_TIME_TOKENS.includes(token), `missing token ${token}`)
   }
-  assert.deepEqual([...RAW_TIME_SCAN_LAYERS], ['Domain', 'Application', 'Session'])
+  assert.deepEqual([...RAW_TIME_SCAN_LAYERS], [
+    'Execution',
+    'Mission',
+    'Interaction',
+    'Context',
+    'Participant',
+    'Repository',
+    'Strength',
+    'Foundation',
+    'Change',
+    'Enforcer',
+    'Composition',
+  ])
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_obsolete_scanner_RED_on_synthetic_presence', () => {
@@ -121,14 +133,17 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_synthetic_tree_scan_proves_gate_ca
   try {
     const prod = join(tmp, 'src/Wanxiangshu')
     const turnDir = join(prod, 'Application/Reconciliation')
-    const sessionDir = join(prod, 'Session')
+    const execDir = join(prod, 'Execution')
     mkdirSync(turnDir, { recursive: true })
-    mkdirSync(sessionDir, { recursive: true })
+    mkdirSync(execDir, { recursive: true })
     writeFileSync(
       join(turnDir, 'TurnCompletionProgram.fs'),
-      'module TurnCompletionProgram\nlet x = DateTimeOffset.UtcNow\n',
+      'module TurnCompletionProgram\nlet x = 1\n',
     )
-    writeFileSync(join(sessionDir, 'Clean.fs'), 'module Clean\nlet x = 1\n')
+    writeFileSync(
+      join(execDir, 'Dirty.fs'),
+      'module Dirty\nlet x = DateTimeOffset.UtcNow\n',
+    )
 
     const { obsolete, rawTime, violations } = scanG4RCeVocabulary(tmp)
     assert.ok(
@@ -137,7 +152,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] G4R_CE_S0_synthetic_tree_scan_proves_gate_ca
     )
     assert.ok(
       rawTime.some((h) => h.token === 'DateTimeOffset.UtcNow'),
-      'expected raw-time hit in synthetic Application file',
+      'expected raw-time hit in synthetic Execution file',
     )
     assert.ok(violations.length >= 2)
   } finally {

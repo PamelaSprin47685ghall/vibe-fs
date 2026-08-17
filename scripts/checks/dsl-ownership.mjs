@@ -530,7 +530,20 @@ const BUSINESS_MUTABLE_FIELD_RE =
 
 const isDomainOrApplicationPath = (file) => {
   const rel = norm(String(file))
-  return rel.includes('/Domain/') || rel.includes('/Application/')
+  return (
+    (rel.includes('/Domain/') ||
+      rel.includes('/Application/') ||
+      rel.includes('/Foundation/') ||
+      rel.includes('/Participant/') ||
+      rel.includes('/Interaction/') ||
+      rel.includes('/Mission/') ||
+      rel.includes('/Context/') ||
+      rel.includes('/Change/') ||
+      rel.includes('/Enforcer/') ||
+      rel.includes('/Strength/')) &&
+    !rel.includes('/OpenCode/') &&
+    !rel.includes('/Host/')
+  )
 }
 
 /**

@@ -25,7 +25,7 @@ open Wanxiangshu.Foundation.Identity
 
 /// HOST-008 / EXEC-026: in-process bindings for Work+Attached SyncDelegate sessions.
 /// Keyed by `(OwnerReuseScopeId, SyncDelegateRole)` — at most one live dedicated Session.
-/// Does not use SatelliteRuntime / SatelliteKind (those remain Companion/Teacher only).
+/// Does not use SatelliteRuntime / SatelliteKind (those remain Companion only).
 type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?isUsable: SessionId -> bool) =
     let gate = obj ()
     let bindings = Dictionary<string, SessionId * string>()

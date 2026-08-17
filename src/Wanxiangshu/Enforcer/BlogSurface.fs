@@ -452,6 +452,7 @@ module BlogSurface =
             not (isNullish value?nudgeSucceeded) && unbox<bool> value?nudgeSucceeded
 
         let sameTerminal = text value?repairTerminalRun = terminal
+
         let fallbackExhausted =
             not (isNullish value?fallbackExhausted) && unbox<bool> value?fallbackExhausted
 

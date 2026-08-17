@@ -65,5 +65,17 @@ test('WHAT[TIME-004] business_layer_scan_is_not_vacuous_across_a_clean_tree', ()
 
   // The production layers scanned for TIME-004 are exactly the three business
   // layers (physical adapters in Process/Infrastructure are out of scope).
-  assert.deepEqual([...RAW_TIME_SCAN_LAYERS], ['Domain', 'Application', 'Session'])
+  assert.deepEqual([...RAW_TIME_SCAN_LAYERS], [
+    'Execution',
+    'Mission',
+    'Interaction',
+    'Context',
+    'Participant',
+    'Repository',
+    'Strength',
+    'Foundation',
+    'Change',
+    'Enforcer',
+    'Composition',
+  ])
 })

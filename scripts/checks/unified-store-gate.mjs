@@ -543,7 +543,7 @@ export const collectProductionEntries = (root = PRODUCTION_ROOT) => {
  */
 export const collectNoMigratorExtraEntries = () => {
   const roots = [
-    { dir: 'tests', exts: ['.mjs', '.js', '.fs'] },
+    { dir: 'requirements', exts: ['.mjs', '.js'] },
     { dir: 'scripts', exts: ['.mjs', '.js'] },
   ]
   const entries = []

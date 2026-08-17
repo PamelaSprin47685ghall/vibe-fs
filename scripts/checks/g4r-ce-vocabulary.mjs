@@ -51,7 +51,19 @@ export const OBSOLETE_CONTROLLER_PATHS = Object.freeze([
  * Layers where raw wall-clock / timer primitives are forbidden (§24.2).
  * Infrastructure / Process physical adapters are outside this scan.
  */
-export const RAW_TIME_SCAN_LAYERS = Object.freeze(['Domain', 'Application', 'Session'])
+export const RAW_TIME_SCAN_LAYERS = Object.freeze([
+  'Execution',
+  'Mission',
+  'Interaction',
+  'Context',
+  'Participant',
+  'Repository',
+  'Strength',
+  'Foundation',
+  'Change',
+  'Enforcer',
+  'Composition',
+])
 
 /**
  * Forbidden raw-time tokens in Domain / Application / Session.
@@ -77,8 +89,15 @@ export const RAW_TIME_TOKENS = Object.freeze([
  * Process/ + Infrastructure/ are already outside RAW_TIME_SCAN_LAYERS.
  */
 export const RAW_TIME_ALLOWLIST = Object.freeze([
-  // G4R-5: Session CompletedAt/CreatedAt/timers sink to IClockPort/ITimerPort.
-  // Keep empty; re-add only with explicit physical-adapter justification.
+  // Physical OpenCode / Host / Surface / Stdio adapter subdirectories
+  'Execution/Delegation/Fork/OpenCode/',
+  'Execution/Delegation/SyncDelegate/Surface.fs',
+  'Mission/Finality/OpenCode/',
+  'Repository/Investigation/Semble/Stdio.fs',
+  'Repository/Knowledge/Casebook/BookkeeperRuntime.fs',
+  'Repository/Programming/Js/OpenCode/',
+  'Change/Host/',
+  'Enforcer/Guidance/TipSurface.fs',
 ])
 
 export const PHASES = Object.freeze(['s0-soft', 'hard'])

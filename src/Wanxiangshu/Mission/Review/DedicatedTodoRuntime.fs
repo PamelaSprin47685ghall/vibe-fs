@@ -141,7 +141,8 @@ module DedicatedTodoReviewerRuntime =
                     { MagicTodoLwr.BoundedRange.StartInclusive = start
                       MagicTodoLwr.BoundedRange.EndExclusive = reviewFrontier }
 
-                let! record = LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
+                let! record =
+                    LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
 
                 return Ok(record |> Option.defaultValue "")
         }

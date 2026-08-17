@@ -83,11 +83,7 @@ module SessionExecutionBinding =
         && left.variant = right.variant
 
     let private modelText (model: OpencodeModel) =
-        sprintf
-            "%s/%s[%s]"
-            model.providerID
-            model.modelID
-            (model.variant |> Option.defaultValue "<missing>")
+        sprintf "%s/%s[%s]" model.providerID model.modelID (model.variant |> Option.defaultValue "<missing>")
 
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
         lock gate (fun () ->
