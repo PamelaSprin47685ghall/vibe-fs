@@ -10,7 +10,7 @@ open Wanxiangshu.Foundation.Identity
 /// Long-lived association is no longer a single `SatelliteKind` axis. Dedicated
 /// SyncInspector/SyncCoder are Work+Attached (MAY hold a Companion); Companion /
 /// Bookkeeper / StrengthReplica are InternalLeaf+Attached. StrengthReplica is
-/// NEVER a `SatelliteKind` case. Student/Teacher are absent after the G3 clean break.
+/// NEVER a `SatelliteKind` case.
 /// HOST-008: whether the session is ordinary work or an internal leaf.
 [<RequireQualifiedAccess>]
 type SessionExecutionClass =
