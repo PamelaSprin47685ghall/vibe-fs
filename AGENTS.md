@@ -116,7 +116,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 在本次任务中，你的上下文和时间都是无限的。
 本文件是需求，也是台账。每解决一部分，就编辑本文件改成一部分完成时，然后 git commit。要并发工作，不需要按次序工作。
 
-## 台账 — 2026-08-18 十一轮无限清剿完成时
+## 台账 — 2026-08-18 十二轮无限清剿完成时
 
 - [x] Fractal CE 一统：Fact 外层路由 44 行，53 构造器归 8 所属，630:630 无漂移（b973b08b1）
 - [x] Ghostbuster：Top-10 GHOST 7 EXORCISED + 5 KEEP 物理（HasFlight/CAS），pyramid 0，dsl 0（9c5486bb0+cab8c0876）
@@ -131,6 +131,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [x] 第九轮再验：DSL 326→328 2 ref 尾批，20/20 Surface 二次 0 消费者，新增死码 0，双 horizon 7 步深化，18 墓碑再验（0552e5f10）
 - [x] 第十轮深绞：DSL 373/373 1-2行窗口 100%（2 member val 窗口修），新增死码三通道 0，Surface 143/143 三方封闭，18 墓碑+6 scanner 护栏再验（dc4135b37）
 - [x] 第十一轮绞杀：Batch C 21 死绑（C-1 7零导出+C-2 1+C-3 13）+ Batch A/B 已 42，共 63 高置信删除；DSL 373/373 + Surface 143 再验（c2c2a7caa）
+- [x] 第十二轮再验：DSL 373 0回补+Surface 143封闭+死码0增量四通道+双horizon可观测深化，18墓碑+6 scanner再验一致
 - [x] 门禁：check.mjs 0，build 668/143 ok，structured-workflow 115，p0 52，pyramid 0，spec 244/18
 - [ ] 剩余有界债 horizon 到期后自删：005 FactCodec 4 探测器（外部 census 0），006 Host TodoTable（Host V1 退役）；台账与 cleanup 自删之日即归零
 
