@@ -6920,7 +6920,7 @@ requirements/<owner>/WHAT.md
 
 当前 working tree 在本次集成提交后保持 clean；以下数字由本次实际运行的 gate、build、proof 与 integration 命令得到，不是历史估计：
 
-- `node scripts/check.mjs` 全部通过：architecture 619 files；manifest 143 registered surfaces；requirement-trace 666 WHAT / 3198 tests，closure complete；所有 wired gates green。
+- `node scripts/check.mjs` 全部通过：architecture 619 files；manifest 143 registered surfaces；requirement-trace 666 WHAT / 3201 tests，closure complete；所有 wired gates green。
 - `node scripts/test-surface-inventory.mjs` 报告 0 semantic test files carry debt、0 violating lines；仅 9 个 build-verification files 保留 Fable-aware quarantine。
 - `js-boundary-gate` 报告 0 debt line、0 debt file、baseline absent、0 frozen package-local `*-contract.mjs`；`test-boundary` 报告除 build verification 外无 direct Fable-module import。
 - `node scripts/build.mjs` 通过：Fable 5.13.0 解析 657 source files，assembly 生成成功。
@@ -6952,10 +6952,10 @@ violating lines                     = 0
 build-verification quarantine files = 9
 requirement-trace findings          = 0
 WHAT propositions                   = 666
-traced test cases                   = 3198
+traced test cases                   = 3201
 registered surfaces                 = 143
 Fable build                        = green (657 source files parsed)
-verification proof                 = 3182 passed, 0 failed
+verification proof                 = 3185 passed, 0 failed
 integration proof                  = 275 passed, 0 failed
 ```
 
