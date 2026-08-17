@@ -61,7 +61,10 @@ module JournalAppendFailure =
         | WriteUnknown(eventId, FlushFailed reason) ->
             sprintf "append outcome unknown for %s: flush failed: %s" (EventId.value eventId) reason
         | WriterUnavailable(eventId, WriterPoisoned firstFailure) ->
-            sprintf "append not attempted for %s: writer poisoned by prior failure: %s" (EventId.value eventId) firstFailure
+            sprintf
+                "append not attempted for %s: writer poisoned by prior failure: %s"
+                (EventId.value eventId)
+                firstFailure
         | WriterUnavailable(eventId, WriterClosing) ->
             sprintf "append not attempted for %s: writer is closing" (EventId.value eventId)
         | WriterUnavailable(eventId, WriterDisposed) ->

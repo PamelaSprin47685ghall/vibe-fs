@@ -3,8 +3,8 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as promptResources from '../../../../dist/Resources/PromptSurface.js'
-import * as providerLanguage from '../../../../dist/Participant/Provider/LanguageSurface.js'
+import * as promptResources from '../../../../../dist/Resources/PromptSurface.js'
+import * as providerLanguage from '../../../../../dist/Participant/Provider/LanguageSurface.js'
 
 const english = 'English'
 const simplifiedChinese = 'SimplifiedChinese'
@@ -24,7 +24,7 @@ const PROMPT_FIELDS = [
 
 const promptEntries = (catalog) => PROMPT_FIELDS.map((field) => [field, catalog[field]])
 
-
+const assertTenNonEmpty = (catalog, label) => {
   for (const field of PROMPT_FIELDS) {
     assert.equal(typeof catalog[field], 'string', `${label}: ${field}`)
     assert.ok(catalog[field].trim().length > 0, `${label}: ${field} non-empty`)
@@ -32,6 +32,7 @@ const promptEntries = (catalog) => PROMPT_FIELDS.map((field) => [field, catalog[
   assert.equal(catalog.StudentSystemPrompt, undefined)
   assert.equal(catalog.TeacherSystemPrompt, undefined)
 }
+
 
 const inOrder = (text, needles) => {
   let cursor = -1

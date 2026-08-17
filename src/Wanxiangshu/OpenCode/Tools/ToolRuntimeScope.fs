@@ -132,8 +132,7 @@ type ToolRuntimeScope
         }
 
     let recordOwnedWorkFailure (failure: exn) =
-        lock ownedWorkGate (fun () ->
-            ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
+        lock ownedWorkGate (fun () -> ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
 
     let captureOwnedWorkFailure (start: unit -> Task) : Task<exn option> =
         task {
@@ -504,7 +503,9 @@ type ToolRuntimeScope
                     ownedWorkCount <- ownedWorkCount + 1
                     true)
 
-        if admitted then observeOwnedWork start |> ignore
+        if admitted then
+            observeOwnedWork start |> ignore
+
         admitted
 
     member _.DisposeExecutorRuntime(sessionId: string) : Task =

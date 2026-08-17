@@ -107,11 +107,7 @@ module SharedAgentJournal =
     let releaseAsync (journal: AgentJournal option) : Task =
         match journal with
         | None -> Task.FromResult(()) :> Task
-        | Some target when releaseTarget target ->
-            task {
-                do! (target :> IAsyncDisposable).DisposeAsync()
-            }
-            :> Task
+        | Some target when releaseTarget target -> task { do! (target :> IAsyncDisposable).DisposeAsync() } :> Task
         | Some _ -> Task.FromResult(()) :> Task
 
     let release (journal: AgentJournal option) = releaseAsync journal |> ignore

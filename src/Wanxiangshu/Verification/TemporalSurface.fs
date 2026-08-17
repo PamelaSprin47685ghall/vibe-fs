@@ -439,8 +439,11 @@ module TemporalSurface =
     /// waits for the already-started pass, and refuses later kicks.
     let reconcileSchedulerStopDrainScenario () : Task<obj> =
         task {
-            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let entered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let release =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — scenario snapshot-read counter.
             let mutable snapshotReads = 0
             // DSL-MUTABLE: algorithm-scratch — scenario scheduler-drain completion observation.
@@ -496,8 +499,11 @@ module TemporalSurface =
     /// cannot start another reconcile pass even while the first pass is blocked.
     let reconcileSchedulerDurableUnavailableScenario () : Task<obj> =
         task {
-            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let entered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let release =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — scenario snapshot-read counter.
             let mutable snapshotReads = 0
             // DSL-MUTABLE: algorithm-scratch — scenario durable availability switch.
@@ -546,10 +552,17 @@ module TemporalSurface =
     /// both reconcile and already-admitted Host background work before returning.
     let pluginScopeStopDrainScenario () : Task<obj> =
         task {
-            let reconcileEntered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let releaseReconcile = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let backgroundEntered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let releaseBackground = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let reconcileEntered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let releaseReconcile =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let backgroundEntered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let releaseBackground =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — scenario scope-disposal observation.
             let mutable disposed = false
             // DSL-MUTABLE: algorithm-scratch — scenario rejected-background observation.
@@ -602,8 +615,11 @@ module TemporalSurface =
     /// drains the task, closes further admission, then returns the original error.
     let pluginScopeBackgroundFailureScenario () : Task<obj> =
         task {
-            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let entered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let release =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — scenario rejected-background observation.
             let mutable lateBackgroundStarted = false
             let scope = new PluginRuntimeScope(None)
