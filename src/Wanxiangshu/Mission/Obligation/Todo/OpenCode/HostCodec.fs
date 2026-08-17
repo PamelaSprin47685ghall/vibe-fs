@@ -114,6 +114,7 @@ module MagicTodoHostCodec =
         (acc: MagicTodo.Obligation list)
         : Result<MagicTodo.TodoWriteInput, string> =
         let obligations = List.rev acc
+
         let decoded: MagicTodo.TodoWriteInput =
             { PlanComplete = unbox<bool> args?planComplete
               WorkingOn = MagicTodo.normalizeWorkingOn workingOn obligations

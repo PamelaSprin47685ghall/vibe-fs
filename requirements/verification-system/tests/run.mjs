@@ -20,7 +20,7 @@
 // so integration/package share the same verdict-silence criterion (VERIFY-004).
 // UNIT_VERDICT_SILENCE_MS remains the unit budget.
 
-import { statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -69,6 +69,10 @@ const checkBuildFreshness = () => {
 
   // fable_modules holds vendored library output that Fable does not rewrite on every build;
   // comparing against it would mask a stale project build.
+  // dist is a build artifact; guard existence explicitly before walk (fail-closed walker).
+  if (!existsSync(BUILD_ROOT)) {
+    return { ok: false, reason: `${BUILD_ROOT}/ does not exist — run: npm run format-build-test` }
+  }
   const artifacts = walk(BUILD_ROOT, ['.js']).filter((file) => !file.includes('fable_modules'))
   if (artifacts.length === 0) {
     return { ok: false, reason: `${BUILD_ROOT}/ has no compiled output — run: npm run format-build-test` }

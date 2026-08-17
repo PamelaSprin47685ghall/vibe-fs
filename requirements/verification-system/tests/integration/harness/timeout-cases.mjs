@@ -36,7 +36,7 @@ const watchdogUrl = new URL('../../e2e/support/watchdog.js', import.meta.url).hr
 const budgetUrl = new URL('../../e2e/support/time-budget.js', import.meta.url).href;
 const driverUrl = new URL('../../e2e/support/scenario-driver.mjs', import.meta.url).href;
 const gateFactsUrl = new URL('./event-store-gate-facts.mjs', import.meta.url).href;
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 
 /**
  * Run a module source as a child and report how it ended.
@@ -200,7 +200,7 @@ const CAUSAL_LANE = ['publish', 'main', 'manager', 'turn-1'].join('/');
 function runNoWildcardEventAwait() {
   const WILDCARD_AWAIT = /awaitEvent\(\s*\(?[\w$,\s]*\)?\s*=>\s*(?:true|1)\b/;
   const offenders = [];
-  for (const file of walk(join(REPO_ROOT, 'tests/e2e'), ['.js', '.mjs'])) {
+  for (const file of walk(join(REPO_ROOT, 'requirements/verification-system/tests/e2e'), ['.js', '.mjs'])) {
     const rel = relative(REPO_ROOT, file);
     readFileSync(file, 'utf8').split('\n').forEach((text, index) => {
       if (WILDCARD_AWAIT.test(text)) offenders.push(`${rel}:${index + 1} ${text.trim()}`);

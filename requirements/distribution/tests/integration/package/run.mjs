@@ -11,15 +11,18 @@ import { fileURLToPath } from 'node:url'
 
 import { WATCHDOG_TIMEOUT_MS } from '../../../../verification-system/tests/e2e/support/time-budget.js'
 import { superviseNodeTest } from '../../../../verification-system/tests/e2e/support/supervise-node-test.mjs'
+import { discoverSuiteTests } from '../../../../verification-system/tests/support/discover-suite-tests.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
-const suites = [
-  'contents.test.mjs',
-  'install.test.mjs',
-  'import.test.mjs',
-  'resources.test.mjs',
-]
+// VERIFICATION-SYSTEM-009: suites are discovered, not hardcoded, so an added or
+// renamed *.test.mjs is supervised automatically and the parent entry (which
+// reads the same discovery) cannot drift away from what this runner executes.
+const suites = discoverSuiteTests(here)
+if (suites.length === 0) {
+  console.error(`package integration: no *.test.mjs suites discovered in ${here}`)
+  process.exit(1)
+}
 
 for (const name of suites) {
   const file = path.join(here, name)

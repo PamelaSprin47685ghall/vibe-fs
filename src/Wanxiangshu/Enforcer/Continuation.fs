@@ -337,9 +337,7 @@ module EnforcerContinuation =
             // a session nudge here can only race that loop and become a queued
             // user message. Leave the terminal untouched; a true no-tool terminal
             // is repaired from reconciled SessionIdle after quiescence instead.
-            Diagnostic.emit
-                "enforcer-cycle-nudge-deferred-to-idle"
-                [ "session_id", sessionKey; "result", reason ]
+            Diagnostic.emit "enforcer-cycle-nudge-deferred-to-idle" [ "session_id", sessionKey; "result", reason ]
 
             Task.FromResult(ctx.Project ctx.RawMessages)
         | BloggerToolRecovery.InteractionNudgeIssued issuedRun when issuedRun = terminalRun ->

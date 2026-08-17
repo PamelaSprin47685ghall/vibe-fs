@@ -8,10 +8,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Outcome
 
-/// Byte-offset frontier keyed by runtime (legacy NDJSON boot field retained for
-/// `RuntimeSnapshot` shape; production durability is EventStore-only after Phase 5).
-type Frontier = Map<RuntimeId, int64>
-
 type BlobWriteReceipt =
     { BlobRef: BlobRef
       BlobDigest: BlobDigest }
@@ -26,7 +22,6 @@ type IBlobWriter =
 type IJournalWriter =
     abstract RuntimeId: RuntimeId
     abstract BlobWriter: IBlobWriter
-    abstract FilePath: string
     abstract LocalSeq: int64
     abstract LastCommittedLocalSeq: int64
     abstract IsPoisoned: bool

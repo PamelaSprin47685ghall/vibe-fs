@@ -13,7 +13,7 @@
 // Do not require e2e/cases/; missing or empty cases/ is fine.
 // e2e/support/* are the allowed feeders and are never flagged.
 
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -21,9 +21,16 @@ import { fileURLToPath } from 'node:url'
 // so runCli works regardless of the caller's cwd.
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
-// Only top-level e2e *.test.mjs files are forbidden by ce.md §11.1 under One World.
+// Only top-level e2e/*.test.mjs files are forbidden by ce.md §11.1 under One World.
 // Support files are the allowed causal feeders and must never be flagged.
 export const WATCHDOG_FEED_PATTERN = /\bwatchdog\??\.\s*advance\s*\(/
+
+// One World: the verification-system package has exactly one real E2E entry.
+// The e2e root must exist and contain this sole top-level entry; a missing or
+// unreadable root, or a missing entry, is a fail-closed condition (never green
+// with zero files). cases/ may be absent or empty (not required, not walked).
+export const E2E_ROOT_REL = 'requirements/verification-system/tests/e2e'
+export const SOLE_ENTRY = 'entry.test.mjs'
 
 const norm = (p) => p.replace(/\\/g, '/')
 
@@ -49,24 +56,68 @@ export const scanE2EWatchdogFeed = (files) => {
 /**
  * Build the One World file list: top-level tests/e2e/*.test.mjs only.
  * Does not recurse into cases/ or support/. Missing or empty cases/ is ignored.
- * Paths are resolved against ROOT.
+ *
+ * Fail-closed invariants (ce.md §11.1 / One World sole entry):
+ *   - The e2e root must exist, be readable, and be a directory — otherwise
+ *     this throws (never returns [] to mask a missing/unreadable root).
+ *   - The sole top-level entry {@link SOLE_ENTRY} must be present — otherwise
+ *     this throws (never reports green with zero files).
+ * Traversal/read errors are propagated, never swallowed.
+ *
+ * @param {string} [root=ROOT] Repo root to resolve the e2e root against.
+ *   Injectable so tests can exercise fail-closed paths without mutating the repo.
+ * @returns {string[]} Resolved, sorted top-level e2e *.test.mjs paths.
  */
-export const e2eTestCaseFiles = () => {
-  const dir = join(ROOT, 'requirements/verification-system/tests/e2e')
+export const e2eTestCaseFiles = (root = ROOT) => {
+  const dir = resolve(root, E2E_ROOT_REL)
+
+  let stat
+  try {
+    stat = statSync(dir)
+  } catch (cause) {
+    throw new Error(
+      `e2e-watchdog-feed: e2e root missing or unreadable: ${norm(dir)}`,
+      { cause },
+    )
+  }
+  if (!stat.isDirectory()) {
+    throw new Error(`e2e-watchdog-feed: e2e root is not a directory: ${norm(dir)}`)
+  }
+
   let names
   try {
     names = readdirSync(dir)
-  } catch {
-    return []
+  } catch (cause) {
+    throw new Error(
+      `e2e-watchdog-feed: e2e root unreadable: ${norm(dir)}`,
+      { cause },
+    )
   }
-  return names
+
+  const files = names
     .filter((name) => name.endsWith('.test.mjs'))
     .map((name) => norm(join(dir, name)))
     .sort()
+
+  const entryPath = norm(join(dir, SOLE_ENTRY))
+  if (!files.includes(entryPath)) {
+    throw new Error(
+      `e2e-watchdog-feed: missing sole top-level e2e entry ${SOLE_ENTRY} in ${norm(dir)}`,
+    )
+  }
+
+  return files
 }
 
 const runCli = () => {
-  const files = e2eTestCaseFiles()
+  let files
+  try {
+    files = e2eTestCaseFiles()
+  } catch (err) {
+    console.error(err.message)
+    process.exit(1)
+  }
+
   const violations = scanE2EWatchdogFeed(files)
 
   if (violations.length === 0) {

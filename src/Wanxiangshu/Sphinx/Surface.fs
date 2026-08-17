@@ -210,9 +210,10 @@ module SphinxSurface =
     let private decodeResult (result: Result<Observation, string>) : obj =
         match result with
         | Ok observation ->
-            box {| ok = true; observationType = observationTypeName observation |}
-        | Error error ->
-            box {| ok = false; error = error |}
+            box
+                {| ok = true
+                   observationType = observationTypeName observation |}
+        | Error error -> box {| ok = false; error = error |}
 
     let decode (raw: obj) : obj =
         ObservationCodec.decode raw |> decodeResult

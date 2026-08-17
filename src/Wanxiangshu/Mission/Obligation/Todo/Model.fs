@@ -80,21 +80,18 @@ module MagicTodo =
                 | rightCharacter :: remainingCharacters, previousAbove :: remainingPrevious ->
                     let insertion = leftValue + 1
                     let deletion = previousAbove + 1
-                    let substitution = previousDiagonal + if leftCharacter = rightCharacter then 0 else 1
+
+                    let substitution =
+                        previousDiagonal + if leftCharacter = rightCharacter then 0 else 1
+
                     let value = min insertion (min deletion substitution)
 
-                    build
-                        value
-                        previousAbove
-                        remainingPrevious
-                        remainingCharacters
-                        (value :: reversed)
+                    build value previousAbove remainingPrevious remainingCharacters (value :: reversed)
                 | [], [] -> List.rev reversed
                 | _ -> failwith "levenshtein row shape mismatch"
 
             match previous with
-            | previousHead :: previousTail ->
-                build rowIndex previousHead previousTail rightCharacters [ rowIndex ]
+            | previousHead :: previousTail -> build rowIndex previousHead previousTail rightCharacters [ rowIndex ]
             | [] -> failwith "levenshtein requires an initial column"
 
         let _, finalRow =
@@ -103,7 +100,7 @@ module MagicTodo =
                 (fun (rowIndex, previous) leftCharacter ->
                     let nextIndex = rowIndex + 1
                     nextIndex, nextRow nextIndex leftCharacter previous)
-                (0, [ 0..right.Length ])
+                (0, [ 0 .. right.Length ])
 
         finalRow |> List.last
 

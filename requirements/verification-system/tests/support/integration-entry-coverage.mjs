@@ -11,19 +11,22 @@ const duplicatesOf = (values) => {
 }
 
 /**
- * VERIFY-004/009: every non-child-owned integration test must be reachable from
- * the authoritative integration entry exactly once, and every wired path must
- * resolve to a discovered integration test.
+ * VERIFY-004/009: every integration test must be reachable from the
+ * authoritative integration entry exactly once, and every wired path must
+ * resolve to a discovered integration test. Tests owned by a child entrypoint
+ * are declared as an exact set (`childOwnedTests`) — not a broad prefix — so
+ * the parent delegates only the tests the child actually runs, and a missing,
+ * stale, or duplicate child test makes the entry fail closed.
  */
 export const assessIntegrationEntryCoverage = ({
   discoveredTests,
   wiredTests,
-  childOwnedPrefixes = [],
+  childOwnedTests = [],
 }) => {
-  const prefixes = childOwnedPrefixes.map(normalize)
+  const childOwned = new Set(childOwnedTests.map(normalize))
   const discovered = discoveredTests
     .map(normalize)
-    .filter((file) => !prefixes.some((prefix) => file.startsWith(prefix)))
+    .filter((file) => !childOwned.has(file))
     .sort()
   const wired = wiredTests.map(normalize).sort()
   const discoveredSet = new Set(discovered)

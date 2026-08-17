@@ -45,9 +45,6 @@ module SessionRecoveryWorkflow =
           RestoreHandles: SessionId -> Task<HandleFamilyRecovery>
           RecoverJobs: SessionId -> Task<JobFamilyRecovery> }
 
-    /// Alias kept for existing call sites (AttachFamilyRecoveryPorts).
-    type Ports = SessionRecoveryPorts
-
     let private emptyReceipt (sessionId: SessionId) (sequence: int64) =
         RecoveryReceipt.create sessionId sequence None [] []
 

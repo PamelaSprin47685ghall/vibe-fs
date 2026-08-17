@@ -118,6 +118,8 @@ module MagicTodoProjectionSurface =
                proposedTodoRef = BlobRef.value checkpoint.ProposedTodoRef
                proposedTodoDigest = BlobDigest.value checkpoint.ProposedTodoDigest
                accepted = checkpoint.Accepted
+               inputDigest = checkpoint.InputDigest |> optionString
+               outputDigest = checkpoint.OutputDigest |> optionString
                assignment = assignment
                concluded = concluded |}
 

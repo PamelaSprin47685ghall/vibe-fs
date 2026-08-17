@@ -420,7 +420,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_L prepare without accept does not create an
     assert.equal(snapshot.checkpoints[0].accepted, false)
     assert.equal(snapshot.checkpoints[0].concluded, null)
     // L: current obligations did not roll forward to proposed
-    assert.equal(snapshot.currentObligations.reference, null)
+    assert.equal(snapshot.currentObligations, null)
   })
 })
 
@@ -524,17 +524,23 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_P recovery accept reads from Journal, not f
       { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
     ])
     const prepared = assertOk(t1.result)
-    // P: accept with RecoveredCompletedToolPart proves the Journal is the
-    //    canonical source — no in-memory bridge is needed for recovery.
-    const accepted = await accept(
-      handle, prepared.bridge, t1.digest, sha256Hex('canary-p-recovery-output'),
-      'RecoveredCompletedToolPart',
+    const outputDigest = sha256Hex('canary-p-recovery-output')
+    const firstAccepted = await accept(handle, prepared.bridge, t1.digest, outputDigest, 'LiveAfterSuccess')
+    assert.equal(firstAccepted.ok, true)
+
+    // P: a second prepare reconstructs the accepted bridge from Journal state;
+    //    the old in-memory bridge is intentionally not reused.
+    const replay = assertOk((await prepare(handle, session, 'call-canary-p', [
+      { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
+    ])).result)
+    const recovered = await accept(
+      handle, replay.bridge, t1.digest, outputDigest, 'RecoveredCompletedToolPart',
     )
-    assert.equal(accepted.ok, true)
-    // P: the accepted checkpoint is durable in the Journal snapshot
+    assert.equal(recovered.ok, true)
+    // P: the accepted checkpoint and output digest are durable Journal state.
     const snapshot = membrane.MagicTodoMembraneSurface_snapshot(handle, life)
     assert.equal(snapshot.checkpoints[0].accepted, true)
-    assert.equal(snapshot.checkpoints[0].outputDigest, sha256Hex('canary-p-recovery-output'))
+    assert.equal(snapshot.checkpoints[0].outputDigest, outputDigest)
   })
 })
 
@@ -627,18 +633,14 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_Q todowrite description contains tagged/lag
 // ── Canary F: execute throw — physical boundary ──────────────────────────
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_F execute throw is a physical integration boundary (not unit-testable)', () => {
-  // F: the protocol does not depend on after running when the executor throws.
-  //    This is a real-host-only physical contract: the builtin executor's
-  //    throw behavior and whether tool.execute.after fires afterward can only
-  //    be proven through integration with the real Host runtime.
-  //
-  //    The membrane's accept function takes PhysicalSuccessEvidence which
-  //    distinguishes LiveAfterSuccess (after ran) from RecoveredCompletedToolPart
-  //    (after did not run — recovery). This dual-path design is the structural
-  //    proof that the protocol does not assume after always runs.
-  //
-  //    See CANARY_G above for the dual-path admissibility proof.
-  assert.ok(true, 'F is a physical integration boundary — structural proof via CANARY_G dual path')
+  // F is proven at the real Host boundary, but the production membrane must
+  // retain both evidence branches so recovery never assumes `after` ran.
+  const source = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
+  const boundary = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs')
+  assert.match(source, /PhysicalSuccessEvidence/, 'accept must classify physical success evidence')
+  assert.match(boundary, /LiveAfterSuccess/, 'live after-hook evidence must remain explicit')
+  assert.match(boundary, /RecoveredCompletedToolPart/, 'recovered completion evidence must remain explicit')
+  assert.match(boundary, /physicalResult/, 'host input must fail closed at the physical evidence boundary')
 })
 
 // ── Canary file integrity: prevent silent shrinking ──────────────────────

@@ -225,7 +225,6 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
 
     member _.RuntimeId = runtimeId
     member _.BlobWriter = blobWriter
-    member _.FilePath = ""
     member _.LocalSeq = lock gate (fun () -> currentSeq)
 
     member _.LastCommittedLocalSeq =
@@ -492,7 +491,6 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
     interface IJournalWriter with
         member this.RuntimeId = this.RuntimeId
         member this.BlobWriter = this.BlobWriter
-        member this.FilePath = this.FilePath
         member this.LocalSeq = this.LocalSeq
         member this.LastCommittedLocalSeq = this.LastCommittedLocalSeq
         member this.IsPoisoned = this.IsPoisoned

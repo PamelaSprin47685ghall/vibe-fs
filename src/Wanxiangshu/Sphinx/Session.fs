@@ -18,23 +18,20 @@ type SessionLifecycle =
     | Active
     | Answered of CanonicalAnswer
 
-type SessionEntry = {
-    State: EpistemicState
-    Lifecycle: SessionLifecycle
-}
+type SessionEntry =
+    { State: EpistemicState
+      Lifecycle: SessionLifecycle }
 
-type SessionSuccess = {
-    Handle: string
-    State: EpistemicState
-    Result: InquiryResult
-}
+type SessionSuccess =
+    { Handle: string
+      State: EpistemicState
+      Result: InquiryResult }
 
 /// DSL-state-combination: domain
-type SessionFailureView = {
-    Handle: string option
-    State: EpistemicState option
-    Failure: SessionFailure
-}
+type SessionFailureView =
+    { Handle: string option
+      State: EpistemicState option
+      Failure: SessionFailure }
 
 [<RequireQualifiedAccess>]
 type SessionOutcome =
@@ -69,10 +66,8 @@ module private SessionWire =
 
     let startOutcomeToObj (outcome: StartOutcome) : obj =
         match outcome with
-        | StartOutcome.Rejected message ->
-            result None (InquiryResult.Error message)
-        | StartOutcome.Started (handle, _, inquiryResult) ->
-            result (Some handle) inquiryResult
+        | StartOutcome.Rejected message -> result None (InquiryResult.Error message)
+        | StartOutcome.Started(handle, _, inquiryResult) -> result (Some handle) inquiryResult
 
     let failureMessage (f: SessionFailure) : string =
         match f with
@@ -84,36 +79,65 @@ module private SessionWire =
 
     let sessionOutcomeToObj (outcome: SessionOutcome) : obj =
         match outcome with
-        | SessionOutcome.Success success ->
-            result (Some success.Handle) success.Result
-        | SessionOutcome.Failure failure ->
-            result failure.Handle (InquiryResult.Error (failureMessage failure.Failure))
+        | SessionOutcome.Success success -> result (Some success.Handle) success.Result
+        | SessionOutcome.Failure failure -> result failure.Handle (InquiryResult.Error(failureMessage failure.Failure))
 
-    let applyResumeResult (handle: string) (entry: SessionEntry) (nextState: EpistemicState) (result: InquiryResult) (sessions: Dictionary<string, SessionEntry>) : SessionOutcome =
+    let applyResumeResult
+        (handle: string)
+        (entry: SessionEntry)
+        (nextState: EpistemicState)
+        (result: InquiryResult)
+        (sessions: Dictionary<string, SessionEntry>)
+        : SessionOutcome =
         match result with
         | InquiryResult.Error message ->
-            SessionOutcome.Failure { Handle = Some handle; State = Some entry.State; Failure = SessionFailure.KernelRejected message }
+            SessionOutcome.Failure
+                { Handle = Some handle
+                  State = Some entry.State
+                  Failure = SessionFailure.KernelRejected message }
         | InquiryResult.Yield _ ->
-            sessions[handle] <- { State = nextState; Lifecycle = SessionLifecycle.Active }
-            SessionOutcome.Success { Handle = handle; State = nextState; Result = result }
-        | InquiryResult.Answered answer ->
-            sessions[handle] <- { State = nextState; Lifecycle = SessionLifecycle.Answered answer }
-            SessionOutcome.Success { Handle = handle; State = nextState; Result = result }
+            sessions[handle] <-
+                { State = nextState
+                  Lifecycle = SessionLifecycle.Active }
 
-    let resumeActive (handle: string) (entry: SessionEntry) (observation: Observation) (sessions: Dictionary<string, SessionEntry>) : SessionOutcome =
+            SessionOutcome.Success
+                { Handle = handle
+                  State = nextState
+                  Result = result }
+        | InquiryResult.Answered answer ->
+            sessions[handle] <-
+                { State = nextState
+                  Lifecycle = SessionLifecycle.Answered answer }
+
+            SessionOutcome.Success
+                { Handle = handle
+                  State = nextState
+                  Result = result }
+
+    let resumeActive
+        (handle: string)
+        (entry: SessionEntry)
+        (observation: Observation)
+        (sessions: Dictionary<string, SessionEntry>)
+        : SessionOutcome =
         match entry.Lifecycle with
         | SessionLifecycle.Answered _ ->
-            SessionOutcome.Failure { Handle = Some handle; State = Some entry.State; Failure = SessionFailure.AlreadyAnswered }
+            SessionOutcome.Failure
+                { Handle = Some handle
+                  State = Some entry.State
+                  Failure = SessionFailure.AlreadyAnswered }
         | SessionLifecycle.Active ->
             let nextState, result = Policy.resume entry.State observation
             applyResumeResult handle entry nextState result sessions
 
-    let decodeAndResume (resumeFn: string * Observation -> SessionOutcome) (handle: string) (rawObservation: obj) : obj =
+    let decodeAndResume
+        (resumeFn: string * Observation -> SessionOutcome)
+        (handle: string)
+        (rawObservation: obj)
+        : obj =
         match Codec.decodeObservation rawObservation with
-        | Error error ->
-            result (Some handle) (InquiryResult.Error error)
-        | Ok observation ->
-            resumeFn (handle, observation) |> sessionOutcomeToObj
+        | Error error -> result (Some handle) (InquiryResult.Error error)
+        | Ok observation -> resumeFn (handle, observation) |> sessionOutcomeToObj
 
 module private SessionInterop =
 
@@ -134,33 +158,41 @@ type SessionStore() =
         let state, result = Policy.start question
 
         match result with
-        | InquiryResult.Error message ->
-            StartOutcome.Rejected message
+        | InquiryResult.Error message -> StartOutcome.Rejected message
         | _ ->
             let handle = SessionInterop.randomUUID ()
-            sessions[handle] <- { State = state; Lifecycle = SessionLifecycle.Active }
+
+            sessions[handle] <-
+                { State = state
+                  Lifecycle = SessionLifecycle.Active }
+
             StartOutcome.Started(handle, state, result)
 
     member _.ResumeObservation(handle: string, observation: Observation) : SessionOutcome =
         let isBlank = String.IsNullOrWhiteSpace handle
+
         match isBlank, sessions.TryGetValue handle with
         | true, _ ->
-            SessionOutcome.Failure { Handle = None; State = None; Failure = SessionFailure.MissingHandle }
+            SessionOutcome.Failure
+                { Handle = None
+                  State = None
+                  Failure = SessionFailure.MissingHandle }
         | false, (false, _) ->
-            SessionOutcome.Failure { Handle = Some handle; State = None; Failure = SessionFailure.UnknownHandle }
-        | false, (true, entry) ->
-            SessionWire.resumeActive handle entry observation sessions
+            SessionOutcome.Failure
+                { Handle = Some handle
+                  State = None
+                  Failure = SessionFailure.UnknownHandle }
+        | false, (true, entry) -> SessionWire.resumeActive handle entry observation sessions
 
     member this.Start(question: string) : obj =
         this.StartTyped(question) |> SessionWire.startOutcomeToObj
 
     member this.Resume(handle: string, rawObservation: obj) : obj =
         let isBlank = String.IsNullOrWhiteSpace handle
+
         match isBlank, sessions.TryGetValue handle with
-        | true, _ ->
-            SessionWire.result None (InquiryResult.Error "missing handle")
-        | false, (false, _) ->
-            SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
+        | true, _ -> SessionWire.result None (InquiryResult.Error "missing handle")
+        | false, (false, _) -> SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
         | false, (true, _) ->
             let resumeFn (h, obs) = this.ResumeObservation(h, obs)
             SessionWire.decodeAndResume resumeFn handle rawObservation

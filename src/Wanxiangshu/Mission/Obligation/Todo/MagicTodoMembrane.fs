@@ -196,7 +196,8 @@ module MagicTodoMembrane =
                   ProviderInputDigest = checkpoint.ProviderInputDigest
                   BaseTodoDigest = BlobDigest.value checkpoint.BaseTodoDigest
                   ToolPartOrdinal = checkpoint.ToolPartOrdinal }
-              TodoWriteId = checkpoint.TodoWriteId })
+              TodoWriteId = checkpoint.TodoWriteId
+              Accepted = checkpoint.Accepted })
 
     let private preparedFromCheckpoint
         (lifeId: ManagerLifeId)

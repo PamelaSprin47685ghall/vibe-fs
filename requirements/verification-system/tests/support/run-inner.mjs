@@ -27,6 +27,13 @@ import { run } from 'node:test'
 import { spec } from 'node:test/reporters'
 
 import { PER_TEST_TIMEOUT_MS, SUITE_BACKSTOP_MS } from '../e2e/support/time-budget.js'
+import {
+  COVERAGE_EXCLUDE_GLOBS,
+  parseCoverageThreshold,
+  selectProductionModules,
+  preImportModules,
+  evaluateCoverage,
+} from './coverage-policy.mjs'
 
 // Fatal semantics stay physical in production. The verification child opts out
 // explicitly so tests can inspect the fatal classification and durable aftermath
@@ -54,13 +61,13 @@ if (files.length === 0) {
 
 const withCoverage = process.env.NODE_TEST_COVERAGE === '1'
 const coverageSummaryPath = process.env.COVERAGE_SUMMARY_PATH
-const coverageLineThreshold = withCoverage ? Number(process.env.COVERAGE_LINE_THRESHOLD ?? 80) : null
+let coverageLineThreshold = null
 
 if (withCoverage) {
-  if (!Number.isFinite(coverageLineThreshold) || coverageLineThreshold <= 0) {
-    console.error(
-      `run-inner: COVERAGE_LINE_THRESHOLD must be a positive finite number, got ${process.env.COVERAGE_LINE_THRESHOLD}`,
-    )
+  try {
+    coverageLineThreshold = parseCoverageThreshold(process.env.COVERAGE_LINE_THRESHOLD)
+  } catch (error) {
+    console.error(`run-inner: ${error.message}`)
     process.exit(2)
   }
   if (!coverageSummaryPath) {
@@ -69,23 +76,20 @@ if (withCoverage) {
   }
 
   const { walk } = await import('../../../scripts/lib/walk.mjs')
-  const modules = walk('dist', ['.js']).filter((file) => !file.includes('fable_modules'))
-  let failures = 0
-  for (const file of modules) {
-    try {
-      await import(pathToFileURL(file).href)
-    } catch (error) {
-      failures += 1
-      console.error(`coverage: pre-import failed ${file}: ${error.message}`)
-    }
+  const modules = selectProductionModules(walk('dist', ['.js']))
+  const preImport = await preImportModules(modules, (file) => import(pathToFileURL(file).href))
+  for (const { file, message } of preImport.failedFiles) {
+    console.error(`coverage: pre-import failed ${file}: ${message}`)
   }
   // A module that failed to load is counted only up to its failure point — a dishonest denominator.
   // Fail closed rather than report a percent over a partial world.
-  if (failures > 0) {
-    console.error(`coverage: ${failures}/${modules.length} production modules failed pre-import — aborting`)
+  if (preImport.failures > 0) {
+    console.error(
+      `coverage: ${preImport.failures}/${preImport.total} production modules failed pre-import — aborting`,
+    )
     process.exit(1)
   }
-  console.error(`coverage: pre-imported ${modules.length} production modules (excluding fable_modules)`)
+  console.error(`coverage: pre-imported ${preImport.total} production modules (excluding fable_modules)`)
 }
 
 // Default: full in-process parallelism (one dist load). Unit-runner renew probes
@@ -108,12 +112,7 @@ const stream = run({
         // The report must describe production bytes only: the runner, support files and tests
         // themselves, the Fable runtime (fable_modules), vendored packages and repo tooling
         // (scripts/ — checker scripts some tests import) are noise.
-        coverageExcludeGlobs: [
-          '**/node_modules/**',
-          '**/fable_modules/**',
-          '**/tests/**',
-          '**/scripts/**',
-        ],
+        coverageExcludeGlobs: COVERAGE_EXCLUDE_GLOBS,
       }
     : {}),
 })
@@ -163,12 +162,11 @@ await new Promise((resolve) => {
 })
 
 if (withCoverage) {
-  const totals = coverageSummary?.totals
-  if (totals) {
+  const result = evaluateCoverage(coverageSummary, coverageLineThreshold)
+  if (result.totals) {
     mkdirSync(dirname(coverageSummaryPath), { recursive: true })
     writeFileSync(coverageSummaryPath, JSON.stringify(coverageSummary, null, 2))
-    const percent = totals.coveredLinePercent
-    const ok = percent >= coverageLineThreshold
+    const { percent, totals, ok } = result
     console.error(
       `coverage: ${percent.toFixed(2)}% lines (${totals.coveredLineCount}/${totals.totalLineCount}) — ` +
         `threshold ${coverageLineThreshold}% → ${ok ? 'PASS' : 'FAIL'}`,

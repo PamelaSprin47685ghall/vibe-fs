@@ -48,7 +48,8 @@ module MagicTodoAdmission =
     /// Optional frozen Prepared for same-ToolCallId replay.
     type ExistingPrepared =
         { Identity: PreparedIdentity
-          TodoWriteId: TodoWriteId }
+          TodoWriteId: TodoWriteId
+          Accepted: bool }
 
     /// Result of Magic before admission prior to mutating Host args / appending Prepared.
     /// The control algebra is identical for historical and clean-break plans; only
@@ -77,7 +78,27 @@ module MagicTodoAdmission =
               BaseTodoDigest = MagicTodo.obligationListDigest sha256 settledCurrent
               ToolPartOrdinal = localized.ToolPartOrdinal }
 
-        match MagicTodo.checkPreparedReplay existing.Identity observed with
+        let acceptedReplayCheck () =
+            // Accepted checkpoints may have advanced Current, so their frozen
+            // BaseTodoDigest is historical evidence rather than current input.
+            // Keep the durable call identity checks; do not compare that stale
+            // base against the post-accept projection.
+            match
+                existing.Identity.ManagerLifeId = observed.ManagerLifeId,
+                existing.Identity.ProviderInputDigest = observed.ProviderInputDigest,
+                existing.Identity.ToolPartOrdinal = observed.ToolPartOrdinal
+            with
+            | false, _, _ -> Error(MagicTodoReject.IdentityCorruption "ManagerLifeId")
+            | true, false, _ -> Error(MagicTodoReject.IdentityCorruption "ProviderInputDigest")
+            | true, true, false -> Error(MagicTodoReject.IdentityCorruption "ToolPartOrdinal")
+            | true, true, true -> Ok()
+
+        let replayCheck =
+            match existing.Accepted with
+            | true -> acceptedReplayCheck ()
+            | false -> MagicTodo.checkPreparedReplay existing.Identity observed
+
+        match replayCheck with
         | Error e -> AdmissionOutcome.Rejected e
         | Ok() -> AdmissionOutcome.IdempotentReplay writeId
 

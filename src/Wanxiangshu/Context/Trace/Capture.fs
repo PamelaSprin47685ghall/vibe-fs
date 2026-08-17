@@ -317,11 +317,7 @@ module XTraceCapture =
                 let provenance =
                     match source.HostPartId with
                     | Some partId ->
-                        sprintf
-                            "g:%d/msg:%s/host-part:%s"
-                            generation
-                            messageId
-                            (HostMessagePartId.value partId)
+                        sprintf "g:%d/msg:%s/host-part:%s" generation messageId (HostMessagePartId.value partId)
                     | None -> sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
 
                 { Message = message
@@ -709,7 +705,10 @@ module XTraceCapture =
             message.Parts
             |> Array.mapi (fun index part ->
                 let hostPartId =
-                    if index < message.PartIds.Length then message.PartIds.[index] else None
+                    if index < message.PartIds.Length then
+                        message.PartIds.[index]
+                    else
+                        None
 
                 part, hostPartId)
             |> Array.toList
@@ -733,8 +732,7 @@ module XTraceCapture =
                           HostPartId =
                             hostPartId
                             |> Option.orElseWith (fun () ->
-                                hostToolPartId
-                                |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
+                                hostToolPartId |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
                           HostToolPartId = hostToolPartId }
                 | MessagePart.ToolResult(callId, result) ->
                     let hostToolPartId = Map.tryFind callId hostToolByCall
@@ -744,8 +742,7 @@ module XTraceCapture =
                           HostPartId =
                             hostPartId
                             |> Option.orElseWith (fun () ->
-                                hostToolPartId
-                                |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
+                                hostToolPartId |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
                           HostToolPartId = hostToolPartId }
                 | MessagePart.Activity _ -> None) }
 

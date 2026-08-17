@@ -39,9 +39,7 @@ module ProviderWireCapture =
             let hostToolPartId =
                 match wirePart with
                 | WireToolCall _
-                | WireToolResult _ ->
-                    hostPartId
-                    |> Option.map (HostMessagePartId.value >> HostToolPartId.create)
+                | WireToolResult _ -> hostPartId |> Option.map (HostMessagePartId.value >> HostToolPartId.create)
                 | _ -> None
 
             { WirePart = wirePart
