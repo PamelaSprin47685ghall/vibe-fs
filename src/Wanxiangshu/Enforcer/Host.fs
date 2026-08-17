@@ -186,6 +186,7 @@ module EnforcerHost =
                         |> Option.map (fun p -> p.Role)
                         |> Option.defaultValue "user"
 
+                    // DSL-MUTABLE: algorithm-scratch — semantic part accumulator
                     let semanticParts = ResizeArray<_>()
 
                     for part in ordered do
@@ -207,6 +208,7 @@ module EnforcerHost =
                     | None -> ()
                 }
 
+            // DSL-MUTABLE: algorithm-scratch — message accumulator
             let messages = ResizeArray<_>()
 
             for turn in byTurn do

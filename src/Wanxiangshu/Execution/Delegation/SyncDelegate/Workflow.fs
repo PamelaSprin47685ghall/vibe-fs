@@ -98,6 +98,7 @@ module internal SyncDelegateWorkflow =
 
     let private prepareAllPrompts (invocations: SyncDelegateInvocation list) : Task<string list> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — prompt result accumulator
             let results = ResizeArray<string>()
 
             for item in invocations do

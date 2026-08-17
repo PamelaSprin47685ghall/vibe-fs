@@ -71,6 +71,7 @@ type ObservationCollector() =
         match buffers.TryGetValue sessionId with
         | true, buffer -> buffer.Add observation
         | false, _ ->
+            // DSL-MUTABLE: algorithm-scratch — new observation buffer for dictionary insert
             let buffer = ResizeArray<Observation>()
             buffer.Add observation
             buffers.[sessionId] <- buffer

@@ -13,6 +13,7 @@ module JsRuntimeSurface =
         member _.Staging = staging
 
     let createApi (root: string) : obj =
+        // DSL-MUTABLE: buffer — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
         let api = JsToolsBindings.createApi root staging
         box (JsBindingsHandle(api, staging))

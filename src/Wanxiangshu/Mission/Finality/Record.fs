@@ -239,6 +239,7 @@ module RecordWorkflow =
             task {
                 let snapshot, revision = AgentJournal.snapshotWithRevision journal
 
+                // DSL-MUTABLE: algorithm-scratch — enlisted member readiness accumulator
                 let states = ResizeArray<EnlistedMember * RecordReadiness>()
 
                 for memberInfo in ordered do

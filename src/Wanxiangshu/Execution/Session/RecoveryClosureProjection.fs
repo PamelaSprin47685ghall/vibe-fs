@@ -119,6 +119,7 @@ module RecoveryClosureProjection =
 
     /// Discover durable recovery dependency closure for a parent session.
     let discover (root: SessionId) (projection: AgentProjectionSet) (journalSequence: int64) : RecoveryClosure =
+        // DSL-MUTABLE: algorithm-scratch — recovery node accumulator
         let nodes = ResizeArray<RecoveryNode>()
         // DSL-MUTABLE: algorithm-scratch — local walk visited set
         let seen = System.Collections.Generic.HashSet<string>()

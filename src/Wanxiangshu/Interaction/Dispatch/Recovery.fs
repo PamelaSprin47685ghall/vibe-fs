@@ -160,6 +160,7 @@ module PromptRecovery =
 
     let private reconcileUnsettledClaims runtime snapshot unsettledClaims =
         task {
+            // DSL-MUTABLE: algorithm-scratch — reconciled result accumulator
             let results = ResizeArray<Reconciled>()
 
             for sessionId, claim in unsettledClaims do

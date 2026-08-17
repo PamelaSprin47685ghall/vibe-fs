@@ -93,6 +93,7 @@ type JoinAttemptRegistry() =
                 match active.TryGetValue key with
                 | true, list -> list.Add lease
                 | false, _ ->
+                    // DSL-MUTABLE: algorithm-scratch — new lease list for dictionary insert
                     let list = ResizeArray<JoinAttemptLease>()
                     list.Add lease
                     active.[key] <- list)

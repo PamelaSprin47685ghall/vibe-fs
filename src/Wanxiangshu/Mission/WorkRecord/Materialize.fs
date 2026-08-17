@@ -77,6 +77,7 @@ module LifecycleWorkRecordProjection =
     /// Resolve Y-compressed Chronicle frames from blobs, oldest first.
     let private resolveFrames (durable: AgentJournal) (frames: BlogFrame list) : Task<string list> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — resolved frame accumulator
             let resolved = ResizeArray<string>()
 
             for frame in frames do
@@ -123,6 +124,7 @@ module LifecycleWorkRecordProjection =
                     && part.Generation = latest.Generation
                     && (part.Kind = "text" || part.Kind = "reasoning"))
 
+            // DSL-MUTABLE: algorithm-scratch — part body accumulator
             let bodies = ResizeArray<string>()
 
             for part in relevant do
@@ -238,6 +240,7 @@ module LifecycleWorkRecordProjection =
     /// that fails its digest check is dropped, matching the canonical path).
     let private resolveTrace (durable: AgentJournal) (xTrace: XTraceProjectionState) : Task<XTraceItem list> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — resolved trace item accumulator
             let resolved = ResizeArray<XTraceItem>()
 
             for part in XTraceProjection.parts xTrace do

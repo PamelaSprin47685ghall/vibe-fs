@@ -168,6 +168,7 @@ module SyncDelegateSurface =
     let create (directory: string) : Task<obj> =
         task {
             let! journal = createJournal directory
+            // DSL-MUTABLE: resource — session id backing registry for SessionPort
             let children = ResizeArray<SessionId>()
             let sessions = SessionPort(children) :> ISessionHostPort
             let dispatcher = PromptDispatcher.Runtime(journal)

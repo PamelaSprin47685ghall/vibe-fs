@@ -570,8 +570,11 @@ module HostForkRestart =
                 )
                 |> Option.defaultValue []
 
+            // DSL-MUTABLE: algorithm-scratch — recovered handle accumulator
             let recovered = ResizeArray<RecoveredHandle>()
+            // DSL-MUTABLE: algorithm-scratch — waiting handle accumulator
             let waiting = ResizeArray<HandleRecoveryWait>()
+            // DSL-MUTABLE: algorithm-scratch — blocked handle accumulator
             let blocked = ResizeArray<HandleRecoveryBlock>()
 
             for record in records do

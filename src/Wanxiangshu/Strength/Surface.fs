@@ -1394,6 +1394,7 @@ module StrengthSurface =
                    aborted = abortedIds |}
 
     let transformApply (sha256: string -> string) (runtime: obj) (output: obj) : Task<obj> =
+        // DSL-MUTABLE: algorithm-scratch — aborted id accumulator
         let aborted = ResizeArray<string>()
 
         task {

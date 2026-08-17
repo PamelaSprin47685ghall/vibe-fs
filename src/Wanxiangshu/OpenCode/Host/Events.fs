@@ -38,6 +38,7 @@ module Events =
           mutable Live: bool }
 
     type HostEventPort() as this =
+        // DSL-MUTABLE: resource — listener registry
         let listeners = ResizeArray<ListenerRegistration>()
         let lockObj = obj ()
         // DSL-MUTABLE: resource — last completed run cache per session

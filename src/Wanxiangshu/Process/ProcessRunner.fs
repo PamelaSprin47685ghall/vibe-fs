@@ -210,6 +210,7 @@ module ProcessRunner =
             task {
                 let cts = new CancellationTokenSource()
                 let exitTcs = TaskCompletionSource<int>()
+                // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
                 let onExited = ResizeArray<unit -> unit>()
                 // DSL-MUTABLE: cancellation — launcher child exit flag.
                 // DSL-MUTABLE: cancellation — process exited flag

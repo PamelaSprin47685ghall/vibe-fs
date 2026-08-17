@@ -67,7 +67,9 @@ type ManagerJob =
 /// EXEC-019: FIFO batch drain, MaxJoinBatch ceiling.
 type VerdictMailbox() =
     let gate = obj ()
+    // DSL-MUTABLE: resource — verdict FIFO queue
     let verdicts = Queue<OrchestratorVerdict>()
+    // DSL-MUTABLE: resource — waiter queue
     let waiters = Queue<TaskCompletionSource<unit>>()
     // DSL-MUTABLE: single-flight — count of in-flight manager jobs under the gate
     let mutable active = 0

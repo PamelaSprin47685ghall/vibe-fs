@@ -191,6 +191,7 @@ module NodeProcessHost =
         (ct: CancellationToken)
         =
         let exitTcs = TaskCompletionSource<int>()
+        // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
         let onExited = ResizeArray<unit -> unit>()
         // DSL-MUTABLE: cancellation — child process exit flag.
         let exitedRef = ref false

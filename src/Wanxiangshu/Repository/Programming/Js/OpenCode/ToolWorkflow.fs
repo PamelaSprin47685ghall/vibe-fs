@@ -276,6 +276,7 @@ module JsToolWorkflow =
         task {
             let! outcome =
                 taskResult {
+                    // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
                     let staging = ResizeArray<JsStagedMutation>()
                     let api = JsToolsBindings.createApi root staging
 

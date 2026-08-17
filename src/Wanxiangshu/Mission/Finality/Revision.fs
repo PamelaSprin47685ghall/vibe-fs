@@ -141,6 +141,7 @@ module RevisionWorkflow =
         : Task<JournalRevision * (SessionId * ReviewBarrierId * RecordReadiness) list> =
         task {
             let snapshot, revision = AgentJournal.snapshotWithRevision journal
+            // DSL-MUTABLE: algorithm-scratch — sibling readiness accumulator
             let states = ResizeArray<SessionId * ReviewBarrierId * RecordReadiness>()
 
             for sid, barrierId in siblings do

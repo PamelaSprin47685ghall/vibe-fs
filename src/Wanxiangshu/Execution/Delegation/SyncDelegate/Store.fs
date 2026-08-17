@@ -136,6 +136,7 @@ module private SyncDelegateStoreOps =
         match callsByOwnerScope.TryGetValue ownerKey with
         | true, list -> list
         | false, _ ->
+            // DSL-MUTABLE: algorithm-scratch — new call list for dictionary insert
             let list = ResizeArray<SyncDelegateCall>()
             callsByOwnerScope.[ownerKey] <- list
             list

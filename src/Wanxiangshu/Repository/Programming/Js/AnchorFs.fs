@@ -124,6 +124,7 @@ module JsAnchorFs =
     /// 每行起始偏移索引。lineOffsets[0]=0；每个 '\n' 之后紧跟下一行起始。
     /// 只认 '\n'（不做 CRLF 修正），与历史 lineColumn 计法一致。
     let private lineOffsets (text: string) : int array =
+        // DSL-MUTABLE: algorithm-scratch — line offset accumulator
         let offsets = ResizeArray<int>()
         offsets.Add 0
 

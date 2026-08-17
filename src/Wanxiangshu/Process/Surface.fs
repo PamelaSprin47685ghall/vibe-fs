@@ -603,6 +603,7 @@ module ProcessSurface =
     let spoolBytesWritten (spool: obj) : float = float (spoolOf spool).BytesWritten
 
     let spoolRead (spool: obj) : Task<obj array> =
+        // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
         let chunks = ResizeArray<obj>()
 
         task {
@@ -1059,6 +1060,7 @@ module ProcessSurface =
             exitTcs
 
     let spoolReadPath (path: string) : Task<obj array> =
+        // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
         let chunks = ResizeArray<obj>()
 
         task {

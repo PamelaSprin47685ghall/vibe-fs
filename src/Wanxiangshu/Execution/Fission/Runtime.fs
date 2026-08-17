@@ -119,6 +119,7 @@ module FissionRuntime =
                 match groupResources.TryGetValue groupId with
                 | true, current -> current
                 | false, _ ->
+                    // DSL-MUTABLE: algorithm-scratch — new resource list for dictionary insert
                     let created = ResizeArray<IDisposable>()
                     groupResources.[groupId] <- created
                     created

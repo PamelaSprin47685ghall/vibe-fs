@@ -538,6 +538,7 @@ type ToolRuntimeScope
     member _.DisposeSession(sessionId: string) : Task =
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
+                // DSL-MUTABLE: algorithm-scratch — owned runtime accumulator for dispose
                 let owned = ResizeArray<HostForkRuntime>()
 
                 match runtimes.TryGetValue sessionId with

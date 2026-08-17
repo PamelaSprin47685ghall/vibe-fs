@@ -94,8 +94,11 @@ module JoinInterrupt =
 /// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
 /// PTY channel: physical PtyJoinItem queue — backend onExit sole writer (EXEC-015).
 type CompletionMailbox(gate: obj) =
+    // DSL-MUTABLE: resource — agent wake queue
     let agentWakes = Queue<AgentHandleId>()
+    // DSL-MUTABLE: resource — pty completion queue
     let ptyCompletions = Queue<PtyJoinItem>()
+    // DSL-MUTABLE: resource — waiter queue
     let waiters = Queue<TaskCompletionSource<MailboxWakeReason>>()
     // DSL-MUTABLE: cancellation — mailbox cancelled latch
     let mutable cancelled = false

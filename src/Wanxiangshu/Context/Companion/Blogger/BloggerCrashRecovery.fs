@@ -296,6 +296,7 @@ module BloggerCrashRecovery =
         (snapshotOpt: ISessionSnapshotPort option)
         : Task<WindowOutcome list> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — window outcome accumulator
             let results = ResizeArray<WindowOutcome>()
 
             for _, openReq in openRequests journal do

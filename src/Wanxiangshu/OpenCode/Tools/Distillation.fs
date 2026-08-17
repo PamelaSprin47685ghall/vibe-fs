@@ -321,6 +321,7 @@ module Distillation =
 
     let reduceOnline (mergeDistillations: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — distillation level accumulator
             let levels = ResizeArray<ResizeArray<string>>()
 
             for summary in summaries do
@@ -421,12 +422,14 @@ module Distillation =
     /// Agent waits go through IDistillationRuntime.AwaitAgentWithPermit (fresh permit each wait).
     let distillSpool (runtime: IDistillationRuntime) (spoolPath: string) (lang: ProviderLanguage) =
         task {
+            // DSL-MUTABLE: cancellation — forked agent id list for cancel cleanup
             let forkedIds = ResizeArray<string>()
 
             let cancelOwned () =
                 for id in forkedIds do
                     runtime.CancelAgent id
 
+            // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
             let chunks = ResizeArray<int * byte[]>()
             // DSL-MUTABLE: algorithm-scratch — spool chunk index counter
             let mutable index = 0
@@ -464,6 +467,7 @@ module Distillation =
                     | Choice2Of2 value -> Some value
                     | Choice1Of2 _ -> None)
 
+            // DSL-MUTABLE: algorithm-scratch — distillation level accumulator
             let levels = ResizeArray<ResizeArray<string>>()
             let merge = mergeDistillations runtime forkedIds lang
             return! reduceOrPartial cancelOwned merge levels successes failures lang chunks

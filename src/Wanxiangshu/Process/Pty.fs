@@ -145,6 +145,7 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
     =
     let handler = defaultArg handler (fun _ _ -> Task.FromResult(Ok()))
     let agentProvider = defaultArg agentProvider (fun () -> [])
+    // DSL-MUTABLE: resource — mailbox sender callback registry
     let mailboxSenders = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()
     // DSL-MUTABLE: resource — active PTY handle registry by PtyId.

@@ -330,7 +330,9 @@ module JsGlobFs =
             classifyVisibleEntry rules rel dir entry |> applyVisibleEntry files walk
 
     let private collectVisibleFiles (root: string) : string list =
+        // DSL-MUTABLE: algorithm-scratch — visible file accumulator
         let files = ResizeArray<string>()
+        // DSL-MUTABLE: algorithm-scratch — ignore rule accumulator
         let rules = ResizeArray<IgnoreRule>()
 
         let rec walk (dir: string) (rel: string) =

@@ -208,6 +208,7 @@ module HorizonTool =
                 let runtimeByAgentId =
                     agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
 
+                // DSL-MUTABLE: algorithm-scratch — agent line accumulator
                 let agentLines = ResizeArray<string>()
                 do! appendHandleLinesForRoster language journal snapshot runtimeByAgentId agentLines durableHandles
 

@@ -482,6 +482,7 @@ module PairProgrammingThoughtTransform =
         match table.TryGetValue key with
         | true, entries -> entries.Add pair
         | false, _ ->
+            // DSL-MUTABLE: algorithm-scratch — new entry list for dictionary insert
             let entries = ResizeArray<PairProgrammingGuidelineWire>()
             entries.Add pair
             table.[key] <- entries
@@ -568,6 +569,7 @@ module PairProgrammingThoughtTransform =
             pairs
             |> List.filter (fun pair -> gapPresent addressSet pair.CallGap && gapPresent addressSet pair.ResultGap)
 
+        // DSL-MUTABLE: algorithm-scratch — placeable pair start accumulator
         let starts = ResizeArray<PairProgrammingGuidelineWire>()
         // DSL-MUTABLE: algorithm-scratch — before-gap pair bucket
         let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
@@ -579,6 +581,7 @@ module PairProgrammingThoughtTransform =
         for pair in placeable do
             registerPlaceablePair providerId starts before after cursorAfter pair
 
+        // DSL-MUTABLE: algorithm-scratch — output pair accumulator
         let output = ResizeArray<obj>()
         emitPairs output starts
 
@@ -684,6 +687,7 @@ module PairProgrammingThoughtTransform =
         match memoryLedger.TryGetValue key with
         | true, pairs -> pairs.Add pair
         | false, _ ->
+            // DSL-MUTABLE: algorithm-scratch — new pair list for dictionary insert
             let pairs = ResizeArray<PairProgrammingGuidelineWire>()
             pairs.Add pair
             memoryLedger.[key] <- pairs

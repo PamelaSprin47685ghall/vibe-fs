@@ -246,6 +246,7 @@ module FissionHost =
     let private aggregateWorkRecord (durable: AgentJournal) (group: FissionGroupProjection) =
         taskResult {
             let! ownerRecord = readVerified durable group.OwnerWorkRecordRef group.OwnerWorkRecordDigest
+            // DSL-MUTABLE: algorithm-scratch — work record block accumulator
             let blocks = ResizeArray<string>()
             blocks.Add "[[fission_convergence]]"
             blocks.Add(sprintf "lane_count = %d" group.LaneCount)

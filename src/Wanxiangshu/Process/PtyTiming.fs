@@ -107,6 +107,7 @@ module PtyTiming =
         // DSL-MUTABLE: resource — monotonic handle id counter
         let mutable nextId = 0
         // (id, fireAtMs, tcs, cancelled ref)
+        // DSL-MUTABLE: resource — timer entry registry
         let entries = ResizeArray<int * int * TaskCompletionSource<unit> * bool ref>()
 
         let removeId (id: int) =

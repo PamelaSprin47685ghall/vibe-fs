@@ -85,6 +85,7 @@ module EnforcerCatalogResource =
         (rules: EnforcerRule list)
         : string =
         let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
+        // DSL-MUTABLE: algorithm-scratch — prompt part accumulator
         let parts = ResizeArray<string>()
 
         let baseText = if isNull basePrompt then "" else basePrompt.TrimEnd()
