@@ -12,7 +12,7 @@
 #
 #   Birth (Orchestrator)
 #     ↓
-#   commission / ManagerJobCreated (AgentOwnerRoot; WorkActivated at first suicide)
+#   commission / ManagerJobCreated (AgentOwnerRoot; first suicide migrates Life)
 #     ↓
 #   Manager forks coder; join blocked; child held incomplete
 #     ↓
@@ -20,7 +20,7 @@
 #     ↓
 #   harvest → sole provider-error → FallbackCursorAdvanced eq 1
 #     ↓
-#   first legal suicide → migration WorkActivated → Host finality REVISE → FinalityRejected
+#   first legal suicide → migration Life opened → Host finality REVISE → FinalityRejected
 #     ↓
 #   repair fork → dual PERFECT → FinalityBlessed → last_words → LifeCompleted
 #     ↓
@@ -47,8 +47,8 @@
 # Yield / hang risks (estimated):
 #   - FinalityBlessed waitFact: widen via renewOn; journal noise without renew can trip silence
 #   - ConflictDetected / Published: rebase+barrier lag; timeouts mirror orch-unhappy (60–90s caps)
-#   - AgentOwnerRoot WorkActivated is migration-written on first suicide (FinalityTool
-#     ensureMigrationLife), NOT at fork — never waitFact WorkActivated before manager-idle suicide
+#   - AgentOwnerRoot migration Life is opened on first suicide (FinalityTool
+#     ensureMigrationLife), NOT at fork — the lifecycle is proven by LifeCompleted later
 #   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
 #   - REVISE→PERFECT uses one Reviewer protocol: the first unified barrier verdict is REVISE,
 #     then bindFinalityReviseThenPerfect flips later barrier verdicts to PERFECT; no alternate surface
@@ -155,7 +155,6 @@ flow = [
   # Host evidence (StaticTools.knownToolNames + Manager permission matrix) does not
   # advertise builtin todowrite on Manager provider tools — requiring tools=["todowrite"]
   # here fails toolsGate. A/E/G/H assert uses wire evidence.
-  # WorkActivated for AgentOwnerRoot arrives later (first suicide migration) — see manager-idle.
   # All Manager prompts MUST use session="child" (bindChild); default session is Orchestrator.
   { wait = "manager.0" },
   { wait = "manager.1" },
@@ -181,7 +180,6 @@ flow = [
   { wait = "continue" },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
   { wait = "manager-idle.0" },
-  { waitFact = { name = "WorkActivated", eq = 1 } },
   { waitFact = { name = "FinalityRejected", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "BlogObservationCommitted"] }, timeoutMs = 60000 },
 
   # Same physical ManagerIdle turn repairs, then seeks dual-PERFECT blessing.

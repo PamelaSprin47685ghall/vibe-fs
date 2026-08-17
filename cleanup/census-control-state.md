@@ -158,3 +158,54 @@ Ghost severity distribution: severity 10 ×1, 9 ×1, 8 ×1, 6 ×1, 5 ×1, 4 ×1,
 The codebase already self-annotates mutable state with `DSL-MUTABLE:` categories (`single-flight` / `resource` / `algorithm-scratch` / `buffer` / `cancellation` / `subscription`). These annotations correctly classify the vast majority of mutable state as physical resource or algorithm scratch. The 10 Ghosts are the residual control state that encodes "where in a workflow" and should be replaced by `taskResult {}` CE closure (`let!`/`do!`/`return!`/`match!`) or by durable fact folds.
 
 The top 3 Ghosts (severity 8–10) are the highest-value exorcism targets: InFlight re-arming, CanonicalIntegrator.generation, and WriterState — all on the durable/crash-recovery boundary.
+
+---
+
+## Appendix: Round-3 Re-Verification (2026-08-17)
+
+Full-tree re-scan of `src/Wanxiangshu` for the same pattern set (`let mutable` / `Dictionary` / `HashSet` / `TryGet` / `ContainsKey` / `State|Stage|Phase|Step|Armed|Pending|InFlight`). Every `let mutable` field across all 61+ files is annotated with a `DSL-MUTABLE:` category (`single-flight` / `resource` / `algorithm-scratch` / `buffer` / `cancellation` / `subscription`). No unannotated mutable state found.
+
+### Delta Ledger — Former Top-10 Ghosts
+
+| # | Former Ghost | Severity | Round-3 Verdict | Evidence |
+|---|---|---|---|---|
+| 1 | InFlight re-arming (`BloggerCrashRecovery.restoreRuntime` → `SetCurrentRequest`) | 10 | **EXORCISED** | `restoreRuntime` now guards re-arm with `if not (host.HasFlight key)` — idempotent fold. Comment (line 132): "CE rebuild step: idempotent fold of BloggerRequestMaterialized into the physical flight registry. The durable fact is the authority; SetCurrentRequest is only called when the live process does not already hold flight ownership." Drain stays `Closed` — no shadow state re-authored. |
+| 2 | `CanonicalIntegrator.generation` (numeric publication PC) | 9 | **EXORCISED** | `let mutable generation = 0L` is GONE — zero matches for `generation` in `CanonicalIntegrator.fs`. Remaining mutable fields (`state`, `loadedCommonDir`, `fullReplayUsed`) annotated `DSL-MUTABLE: resource` / `algorithm-scratch`. |
+| 3 | `WriterState` DU (Open/Poisoned/Closing/Closed) | 8 | **EXORCISED** | 4-state lifecycle DU is GONE — zero matches for `WriterState` in `EventStoreJournalWriter.fs`. Replaced by three independent resource latches: `firstFailure: string option` (poison), `closed: bool` (terminal close), `closeTask: Task option` (close drain). All annotated `DSL-MUTABLE: resource`. Poison = `Result` error short-circuit (`WriterPoisoned` in append result). |
+| 4 | `Scheduler.generations` + `active`/`queued` Dictionaries | 6 | **KEEP — PhysicalResource** | `generations` Dictionary reclassified (line 113): "external invalidation authority that ClearSession mutates, not a drain-pass program counter." Drain pass generation is now a recursion parameter through `Drain/RunPass/DrainAfterPass`. `active`/`queued` annotated `DSL-MUTABLE: resource — per-session single-flight admission queue/latch`. |
+| 5 | `PluginRecoveryScope.RecoveryArming` Dictionary | 5 | **KEEP — PhysicalResource** | Process-local single-flight latch (line 71): "One armed slot produces at most one recovery attempt (FALLBACK-011). Process-local only: RecoverySlot.afterRestart = NotArmed, so the latch intentionally forgets." `ArmRecovery` → `TryRecoveryArming` → `ClearRecovery` one-shot consumption. |
+| 6 | `LoopDetector.Step` (mutable numeric counter) + `State` DU | 4 | **EXORCISED** | `Step` is now an immutable field in `Detector` record (no `mutable`). `pushText` returns `Detector * Evaluation` (pure fold). Comment (line 39): "Detector is pure data: Step and WeightedDistinctTokenCount are immutable fold state threaded through pushText." `LastSeenTokenStep` is algorithm scratch (token decay Dictionary). `State` DU (Normal/Loop) is derived classification from pure fold output. |
+| 7 | `PluginRecoveryScope.AttemptPlans` Dictionary | 3 | **KEEP — PhysicalResource** | Annotated `DSL-MUTABLE: single-flight — per-provider-run attempt plan memo` (line 94). Consumed exactly once on terminal outcome. `RecordAttemptPlan` → `TryAttemptPlan` → `ClearAttemptPlansFor` one-shot consumption. |
+| 8 | `NeedHelpSensor.armed` HashSet | 2 | **KEEP — PhysicalResource** | Process-local one-shot abort ownership latch. Comment (line 51): "HOST-027: process-local exact-sentinel sensor… It owns only stream part identity, rolling suffixes, and armed attempt identities." `TryArm` returns true exactly once; `DropAttempt`/`DropSession` removes it. |
+| 9 | `LoopSensor.armed` HashSet | 2 | **KEEP — PhysicalResource** | Process-local one-shot loop-kill armed mark. Comment (line 67): "LOOP-006: claim the armed mark. True exactly once per session until ClearArmed / DropSession." `TryArm` returns true exactly once; `ClearArmed`/`DropSession` removes it. |
+| 10 | `Strength.strengthPendingFirst/Second` + `strengthFuseReason` | 2 | **EXORCISED** | `strengthPendingFirst`/`strengthPendingSecond` dictionaries GONE — zero matches. Replaced by `counterfactualAwait = Dictionary<string, CounterfactualAwait>()` with DU (`AwaitFirst` | `AwaitSecond`) + pure fold transition (`advanceCounterfactual`). Comment (line 72): "replaces the former strengthPendingFirst/strengthPendingSecond dictionary pair. One dictionary holds a single DU value; the transition is a pure fold, not two separate mutable dictionaries with implicit step logic encoded by lookup order." `strengthFuseReason: string option` GONE — replaced by `strengthFuse: Result<unit, string>` latch (`DSL-MUTABLE: resource`). |
+
+### Additional Exorcisms Verified
+
+| Former Ghost | Verdict | Evidence |
+|---|---|---|
+| Sphinx `SessionLifecycle` DU (Active/Answered) — ledger #10 | **EXORCISED** | `SessionLifecycle` DU is GONE. `SessionEntry` now stores `{ State: EpistemicState; LastResult: InquiryResult }` — domain fact directly. Comment (Session.fs line 16): "The lifecycle projection (active vs answered) is a pure fold of LastResult, not a separate mutable state machine — exorcised from the former SessionLifecycle DU that duplicated InquiryResult's shape." `statusOfEntry` is a pure function: `match entry.LastResult with Answered -> Answered | _ -> Active`. |
+| False-abort migration | **EXORCISED** | `LegacyFalseAbort` is DECODE-ONLY in `DurableCompletionDecode` — codec never constructs `RunCompletion` for legacy abort. `JoinDrain.reconcileFalseAborts` scans handle projection: unretired false aborts → `HandleFalseCompletionRejected` (fold reverts to Active); retired false aborts → fail-closed refuse. Pure fold over durable handle evidence, not mutable control state. |
+
+### New Ghosts Found
+
+**0.** No new ControlState-PC candidates found. The full-tree `let mutable` scan (all 61+ files, every page) shows every mutable field carries a `DSL-MUTABLE:` annotation. No unannotated mutable state. No new `State`/`Stage`/`Phase`/`Step`/`Armed`/`Pending`/`InFlight` type definitions that encode workflow position.
+
+New type definitions encountered during re-scan, all classified KEEP:
+- `PtySession` mutable fields (Backend/OutputBuffer/Closed/AwaitingFirstByte/ExitCompletion/ExitCompleted/Pending) — `DSL-state-combination: physical` — PTY I/O resource. Not in original ledger but matches PhysicalResource category (#34 family).
+- `SnapshotToolPartState` (Pending/Completed/Failed) — pure DU decoded from Host wire data via `toolStateOf` pure function. DomainFact.
+- `RepresentationState` / `EpistemicState` (Sphinx) — immutable record types with Map fields. DomainFact.
+- `CounterfactualAwait` (AwaitFirst/AwaitSecond) — DU replacing former two-dictionary ghost. Pure fold transition. PhysicalResource (process-local cache).
+- `BloggerCycleProjectionState` / `XTraceProjectionState` / `EnforcementProjectionState` / `TipDeliveryProjectionState` / `FissionProjectionState` / `DelegatedToolEstimateProjectionState` / `GuidelineProjectionState` / `MagicTodoProjectionState` / `SessionStartedAtProjectionState` — all immutable projection records folded from durable facts. DurableEvidence.
+
+### Round-3 Summary
+
+| Category | Round-1 Count | Round-3 Count | Delta |
+|---|---|---|---|
+| DomainFact (KEEP) | 7 | 7+ | +0 (new DUs are pure domain/projection) |
+| DurableEvidence (KEEP) | 5 | 5+ | +0 (new projection states are same category) |
+| PhysicalResource (KEEP) | 83 | 89 | +6 (former ghosts #4/#5/#7/#8/#9 reclassified + CounterfactualAwait) |
+| AlgorithmScratch (KEEP) | 10 | 10 | 0 |
+| ControlState-PC (GHOST) | 10 | **0** | **−10** |
+
+**Result: 0 GHOST remains.** All 10 former top-ghosts are either EXORCISED (6: InFlight re-arming, CanonicalIntegrator.generation, WriterState, LoopDetector.Step, Strength fuse/pending, Sphinx lifecycle) or KEEP-proven PhysicalResource (4: Scheduler.generations, RecoveryArming, AttemptPlans, NeedHelp/Loop armed). False-abort migration is EXORCISED (decode-only + pure fold). No new ghosts introduced.

@@ -295,8 +295,8 @@ export async function assertProviderFallback(workDir, label = 'long-stroke') {
 
 /**
  * §21: join blocked then causally awakened — HandleCompleted after user_message wake.
- * WorkActivated for AgentOwnerRoot is asserted separately (migration on first suicide);
- * join-wake itself only requires the harvest fact.
+ * The join-wake itself only requires the harvest fact; the full agent lifecycle is
+ * proven later by FinalityBlessed + LifeCompleted (assertLaterSuccessfulFinality).
  */
 export async function assertJoinWakePath(workDir, label = 'long-stroke') {
   assert.ok(
@@ -381,10 +381,6 @@ export async function assertPublishReconcile(workDir, label = 'long-stroke') {
 
 /** §21: later successful finality — FinalityBlessed then LifeCompleted. */
 export function assertLaterSuccessfulFinality(workDir, label = 'long-stroke') {
-  assert.ok(
-    countFactCase(workDir, 'WorkActivated') >= 1,
-    `${label}: WorkActivated required (AgentOwnerRoot migration Life on first suicide)`,
-  );
   assert.ok(
     countFactCase(workDir, 'FinalityBlessed') >= 1,
     `${label}: FinalityBlessed required after resources converge`,
@@ -600,7 +596,6 @@ export async function oracleLongStroke(scenario, _ctx) {
 
 /** waitFact presets mirroring long-stroke.toml flow barriers. */
 export const PLANNED_WAIT_FACTS = Object.freeze({
-  workActivated: waitFactShape('WorkActivated', { eq: 1 }),
   handleCompleted: waitFactShape('HandleCompleted', { gte: 1 }),
   fallbackCursor: waitFactShape('FallbackCursorAdvanced', { eq: 1 }),
   finalityRejected: waitFactShape('FinalityRejected', { gte: 1 }),

@@ -123,27 +123,6 @@ module ManagerLifeWorkflow =
                 | Ok() -> return Ok()
         }
 
-    /// BOUNDED-COMPAT (LEGACY-010): AgentOwnerRoot migration Life still appends
-    /// legacy WorkActivated so the e2e long-stroke scenario (which waitFact
-    /// WorkActivated eq 1) replays identically. The fact is inert — it never
-    /// decides work, compression, or finality (TODO-001/GLORY-021).
-    /// Exit: long-stroke scenario updated to not require WorkActivated → delete
-    /// this function and its call in materializeInitialAgentOwnerLife.
-    let private appendLegacyMigrationWorkActivatedCompat
-        (journal: AgentJournal)
-        (sessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (protectedPrefixEndSequence: int64)
-        : Task<Result<unit, string>> =
-        appendLifecycle
-            journal
-            sessionId
-            (ManagerLifecycleFact.WorkActivated
-                {| SessionId = sessionId
-                   LifeId = lifeId
-                   ActivationPromptKey = PromptKey.create ""
-                   ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
-
     let private materializeInitialAgentOwnerLife
         (journal: AgentJournal)
         (sessionId: SessionId)
@@ -172,14 +151,6 @@ module ManagerLifeWorkflow =
                            OpeningTextRef = blob.BlobRef
                            OpeningTextDigest = blob.BlobDigest
                            OpeningCursorSequence = 0L |})
-
-            // BOUNDED-COMPAT (LEGACY-010): legacy WorkActivated for e2e long-stroke.
-            do!
-                appendLegacyMigrationWorkActivatedCompat
-                    journal
-                    sessionId
-                    lifeId
-                    (XTraceProjection.headSequence xTrace + 1L)
 
             return
                 AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections

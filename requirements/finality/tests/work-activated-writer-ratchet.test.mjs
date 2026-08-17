@@ -1,9 +1,9 @@
 // WHAT[FINALITY-021] Source ratchet: canonical production paths never write
-// WorkActivated. The only remaining writer is the named bounded-compat function
-// `appendLegacyMigrationWorkActivatedCompat` in Workflow.fs, called exclusively
-// from `materializeInitialAgentOwnerLife` for the e2e long-stroke scenario
-// (LEGACY-010). If `acceptActivation`, `applyAcceptedActivation`, or any other
-// ordinary production writer is reintroduced, this test fails.
+// WorkActivated. The LEGACY-010 compat writer
+// `appendLegacyMigrationWorkActivatedCompat` has been deleted (long-stroke oracle
+// no longer requires WorkActivated). WorkActivated remains only as an inert fact
+// case in Facts.fs + decode in Projection.fs (permanent decode-only legacy).
+// If any production writer of WorkActivated is reintroduced, this test fails.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -33,47 +33,21 @@ test('WHAT[FINALITY-021] ensureMigrated writes only LifeOpened (no WorkActivated
   assert.equal(body.includes('WorkActivated'), false, 'ensureMigrated must not append WorkActivated')
 })
 
-test('WHAT[FINALITY-021] the only WorkActivated writer in Workflow.fs is appendLegacyMigrationWorkActivatedCompat', () => {
+test('WHAT[FINALITY-021] appendLegacyMigrationWorkActivatedCompat is absent from Workflow.fs', () => {
   const src = read(WORKFLOW)
-  // Every occurrence of ManagerLifecycleFact.WorkActivated must be inside the
-  // compat function or its doc comment.
-  const compatStart = src.indexOf('appendLegacyMigrationWorkActivatedCompat')
-  assert.ok(compatStart > 0, 'compat function must exist')
-
-  const compatBodyStart = src.indexOf('appendLifecycle', compatStart)
-  const compatBodyEnd = src.indexOf('\n\n', compatBodyStart)
-  const compatBody = src.slice(compatStart, compatBodyEnd)
-
-  // The compat function body contains the WorkActivated fact.
-  assert.ok(
-    compatBody.includes('ManagerLifecycleFact.WorkActivated'),
-    'compat function must be the WorkActivated writer',
-  )
-
-  // No other function body in Workflow.fs may contain WorkActivated.
-  // Strip the compat function and its comment, then check the rest.
-  const commentStart = src.lastIndexOf('/// BOUNDED-COMPAT', compatStart)
-  const stripped = src.slice(0, commentStart) + src.slice(compatBodyEnd)
   assert.equal(
-    stripped.includes('ManagerLifecycleFact.WorkActivated'),
+    src.includes('appendLegacyMigrationWorkActivatedCompat'),
     false,
-    'no WorkActivated writer outside the compat function',
+    'LEGACY-010 compat writer must be deleted from Workflow.fs',
   )
 })
 
-test('WHAT[FINALITY-021] appendLegacyMigrationWorkActivatedCompat is called only from materializeInitialAgentOwnerLife', () => {
+test('WHAT[FINALITY-021] no WorkActivated writer exists anywhere in Workflow.fs', () => {
   const src = read(WORKFLOW)
-  const calls = [...src.matchAll(/appendLegacyMigrationWorkActivatedCompat/g)]
-  // One definition + one call site = 2 occurrences.
-  assert.equal(calls.length, 2, 'exactly one definition and one call site')
-
-  // The call site must be inside materializeInitialAgentOwnerLife.
-  const matStart = src.indexOf('let private materializeInitialAgentOwnerLife')
-  const matEnd = src.indexOf('\n    ///', matStart + 1)
-  const matBody = src.slice(matStart, matEnd)
-  assert.ok(
-    matBody.includes('appendLegacyMigrationWorkActivatedCompat'),
-    'compat call must be inside materializeInitialAgentOwnerLife',
+  assert.equal(
+    src.includes('ManagerLifecycleFact.WorkActivated'),
+    false,
+    'no production path in Workflow.fs may write WorkActivated',
   )
 })
 
