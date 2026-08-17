@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
@@ -110,7 +111,8 @@ module XWireSurface =
         | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
         | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
-        | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
+        | NoCandidateReason.CutoffProofFailed(expected, recomputed) ->
+            $"CutoffProofFailed:{expected}:{recomputed}"
 
     let private probeToJs (probe: PrefixProbe) : obj =
         let c = probe.Candidate
@@ -128,17 +130,22 @@ module XWireSurface =
                        syntheticId = c.SyntheticMessageId |}
             |}
 
-    // ── sha256: JS crypto, same as HostDigest.sha256Hex ─────────────────────
-
-    [<Emit("(() => {{ const {{createHash}} = require('node:crypto'); return (v) => createHash('sha256').update(String(v)).digest('hex'); }})()")>]
-    let private sha256Hex (value: string) : string = jsNative
-
     // ── The transform decision (mirrors XWire.applyTransform's logic) ───────
     //
     // Every branch delegates to the same pure production functions that
     // `applyTransform` calls. The surface extracts the async Host I/O
     // boundaries (journal blob reads, session-snapshot awaits, in-place
     // message replacement) and exposes the *decision* with JS-native I/O.
+
+    /// Return the canonical digest for a provider-visible prefix cutoff. This is
+    /// the same proof input used by `transform` when validating Companion coverage.
+    let coveredPrefixDigest (projection: obj) (cutoff: int) : string =
+        let typed = semanticProjectionOfJs projection
+        let truncated =
+            { typed with
+                Messages = typed.Messages |> List.truncate cutoff }
+
+        HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
 
     /// HOST-BOUNDARY-020/021: the X-wire transform decision.
     ///
@@ -164,7 +171,7 @@ module XWireSurface =
     ///   ok, noop, changed, consumed, promoted, probe, noProbeReason, error, output.
     let transform (input: obj) : obj =
         // ── HOST-BOUNDARY-021: no journal → no-op ──
-        let journal = not (isNullish input?journal)
+        let journal = not (isNullish input?journal) && (input?journal |> unbox<bool>)
 
         if not journal then
             box
@@ -224,7 +231,9 @@ module XWireSurface =
                                output = null |}
                     else
                         // ── HOST-BOUNDARY-020: armed + missing snapshot port → fail-closed ──
-                        let snapshotPort = not (isNullish input?snapshotPort)
+                        let snapshotPort =
+                            not (isNullish input?snapshotPort)
+                            && (input?snapshotPort |> unbox<bool>)
 
                         if not snapshotPort then
                             box
@@ -273,7 +282,7 @@ module XWireSurface =
                             let probeResult =
                                 if mayRecover then
                                     PrefixProbeSelection.select
-                                        sha256Hex
+                                        HostDigest.sha256Hex
                                         (SessionId.create sessionId)
                                         committedEpoch
                                         committedSnapshot

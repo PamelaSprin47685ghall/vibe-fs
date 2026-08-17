@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as XWireSurface from '../../../../dist/Context/Prefix/XWireSurface.js'
+import * as XWireSurface from '../../../dist/Context/Prefix/XWireSurface.js'
 
 // ── Test fixtures ───────────────────────────────────────────────────────
 //
@@ -28,7 +28,7 @@ const armedInput = (overrides = {}) => ({
   currentProjection: baseProjection,
   committedSnapshot: null,
   coverableCutoff: 2, // material exists (coverage ahead of request)
-  coveredDigest: 'abc123',
+  coveredDigest: XWireSurface.coveredPrefixDigest(baseProjection, 1),
   requestStartCutoff: 1,
   frozenRecordPrefixRef: 'blob/ref/frozen-1',
   frozenRecordPrefixDigest: 'sha256:frozen-1',

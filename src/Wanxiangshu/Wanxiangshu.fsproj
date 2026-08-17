@@ -314,6 +314,8 @@
     <Compile Include="OpenCode/Host/ModelRouting.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcpConfig.fs"/>
     <Compile Include="OpenCode/Host/SphinxMcpConfig.fs"/>
+    <Compile Include="OpenCode/Host/SphinxMcpConfigSurface.fs"/>
+    <Compile Include="OpenCode/Host/StealthBrowserMcpConfigSurface.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fs"/>
     <Compile Include="OpenCode/Codec/CanonicalJson.fs"/>
@@ -345,12 +347,15 @@
     <Compile Include="OpenCode/Signals/HostSignalAdapter.fs"/>
     <Compile Include="OpenCode/Host/HostSignalSurface.fs"/>
     <Compile Include="OpenCode/Signals/HostSignalSubscribe.fs"/>
+    <Compile Include="OpenCode/Host/HostSignalSubscribeSurface.fs"/>
     <Compile Include="Composition/Turn/Observation.fs"/>
     <Compile Include="Strength/TurnEvidence.fs"/>
     <Compile Include="Strength/Lifecycle.fs"/>
     <Compile Include="Strength/Replica/TraceRecovery.fs"/>
     <Compile Include="OpenCode/Host/SessionSnapshotPort.fs"/>
     <Compile Include="OpenCode/Host/ProviderRunBinding.fs"/>
+    <Compile Include="OpenCode/Host/SessionSnapshotSurface.fs"/>
+    <Compile Include="OpenCode/Host/ProviderRunBindingSurface.fs"/>
     <Compile Include="OpenCode/Host/OpenCodePort.fs"/>
     <Compile Include="OpenCode/Host/ModelRoutingSurface.fs"/>
     <Compile Include="OpenCode/Host/SessionExecutionBinding.fs"/>
@@ -435,6 +440,7 @@
     <Compile Include="Execution/Session/Recovery/Surface.fs"/>
     <Compile Include="Execution/Delegation/Join.fs"/>
     <Compile Include="OpenCode/Host/SharedState.fs"/>
+    <Compile Include="OpenCode/Host/SharedStateSurface.fs"/>
     <Compile Include="Context/Companion/Blogger/OpenCode/PluginScope.fs"/>
     <Compile Include="Strength/OpenCode/PluginScope.fs"/>
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
