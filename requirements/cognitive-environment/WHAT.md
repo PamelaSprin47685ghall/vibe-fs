@@ -114,8 +114,13 @@ Pair Programming Hint（HOST-013 occurrence 的正文）是一个 canonical sema
   指向此刻实际推进的 obligation。不得等阶段结束、用户追问或最后批量补记，自然语言宣称“已完成”或
   打算稍后更新不构成账本更新。account 与实际焦点都未变化时不得为了形式重复写。
 - 每次工具 turn 前寻找完整 parallel wave：已知、确有用、彼此独立的调用默认同一 assistant turn
-  一起发出，最小化 provider↔tool RTT；仅真实数据依赖/共享可变 owner/协议顺序/破坏性干扰/明确有限
-  容量可序列化；不猜未知参数、不制造无用调用、不写死全局并发数字（pair-parallel-tools §3-§14）。
+  一起发出，用满并发槽（通常十个甚至更多），最小化 provider↔tool RTT；无法证明依赖就默认独立——一起
+  发出；空并发槽是主动放弃的进度。仅真实数据依赖/共享可变 owner/协议顺序/破坏性干扰/明确有限容量可
+  序列化；不猜未知参数、不制造无用调用、不写死全局并发数字（pair-parallel-tools §3-§14）。
+- 先抽象再笃定：面对工作先在思考中抽象本质结构（独立/依赖/领域判断/机械执行），抽象完成后立刻笃定
+  选择并执行，不犹豫横跳。犹豫不产生新知识只产生新错误；抽象时掌握的信息在犹豫期间没有增加——动摇
+  等于说自己的抽象不可信，但没有新信息支撑。第一个经过充分抽象的决策几乎总是正确的；犹豫横跳的终点
+  是更差的答案和更少的时间。排除犹豫：没有新信息，犹豫不产生新知识，只产生新错误。
 - 该 hint 是 injection-only skill content；模型不得主动调用 `skill({ name: "" })` / `skill("")`
   尝试读取它。空 skill name 只作为 HOST-013 synthetic wire identity；真实 skill 工具及所有非空 skill name
   保持正常可用。

@@ -180,6 +180,27 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_parallel_wave_without
   }
 })
 
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrency_slots', () => {
+  for (const locale of ['en', 'zh-CN']) {
+    const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
+    assert.match(text, /并发槽|concurrency slot/i)
+    assert.match(text, /十个|ten/i)
+    assert.match(text, /用满|fill/i)
+  }
+})
+
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_abstract_then_commit_without_wavering', () => {
+  for (const locale of ['en', 'zh-CN']) {
+    const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
+    assert.match(text, /抽象|abstract/i)
+    assert.match(text, /笃定|commit/i)
+    assert.match(text, /犹豫|waver/i)
+    assert.match(text, /不产生新知识|produces no new knowledge/i)
+    assert.match(text, /新错误|new error/i)
+    assert.match(text, /多米诺|domino/i)
+  }
+})
+
 test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_reserves_empty_skill_name_without_disabling_real_skills', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
