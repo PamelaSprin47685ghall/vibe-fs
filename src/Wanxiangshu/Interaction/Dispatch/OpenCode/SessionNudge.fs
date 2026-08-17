@@ -479,16 +479,22 @@ module HostSessionNudge =
     type IdleContinuationOutcome =
         | Sent of PromptKey
         /// The idle occasion expired before the physical send (a newer provider
-        /// attempt began, or the session was dropped). Not an error, not a
-        /// terminal failure: nothing was claimed and nothing was sent — the
-        /// system is doing something fresher.
+        /// attempt/new physical message began, or the session was dropped). Not
+        /// an error and never a physical send. If supersession wins after durable
+        /// claim persistence, the dispatcher closes that audit trail with
+        /// `PluginPromptAbandoned(SupersededBeforePhysicalSend)`.
         | Superseded
         | Failed of string
 
-    /// The single idle-derived continuation helper: `TryConsume` first, then the
-    /// dispatcher chain immediately (no await in between), so the send boundary
-    /// is as tight as the claim/persist/send path allows. `Superseded` never
-    /// writes `PluginPromptClaimed` and never sends.
+    let private idleOutcomeOfDispatch =
+        function
+        | PromptDispatcher.SendAttemptOutcome.Sent key -> IdleContinuationOutcome.Sent key
+        | PromptDispatcher.SendAttemptOutcome.Superseded -> IdleContinuationOutcome.Superseded
+        | PromptDispatcher.SendAttemptOutcome.Failed error -> IdleContinuationOutcome.Failed error
+
+    /// The single generic idle-derived continuation helper. Preflight may await,
+    /// but the permit itself is consumed only inside PromptDispatcher immediately
+    /// before the real `SendPrompt` invocation.
     let trySendIdleContinuation
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
@@ -500,26 +506,67 @@ module HostSessionNudge =
         (journal: AgentJournal option)
         : Task<IdleContinuationOutcome> =
         task {
-            if not (quiescence.TryConsume permit) then
-                return IdleContinuationOutcome.Superseded
-            else
-                match!
-                    sendContinuationResult
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return IdleContinuationOutcome.Failed "Session is retired by Fission"
+            | false, None, _ ->
+                return IdleContinuationOutcome.Failed "No journal: a continuation cannot be claimed"
+            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                let agent = agentForActiveCursor journal sessionId profile
+                let rt = PromptDispatcher.forJournal durable
+
+                return!
+                    rt.SendIdleContinuation
                         sessionPort
                         sessionId
                         prompt
                         kind
-                        directory
-                        journal
+                        profile
+                        agent
+                        (liveDirectory directory)
                         PromptDispatcher.AwaitMode.Detached
                         None
-                with
-                | Ok key -> return IdleContinuationOutcome.Sent key
-                | Error error -> return IdleContinuationOutcome.Failed error
+                        (fun () -> quiescence.TryConsume permit)
+                    |> TaskValue.map idleOutcomeOfDispatch
         }
 
     /// HOST-004 + GLORY-029: idle-derived Manager encouragement with exact-terminal
     /// idempotency and no cross-terminal count limit.
+    let private sendIdleManagerWithProfile
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (lifeId: ManagerLifeId)
+        (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<IdleContinuationOutcome> =
+        let rt = PromptDispatcher.forJournal durable
+
+        if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
+            Task.FromResult(IdleContinuationOutcome.Failed "Manager idle encouragement already claimed for this terminal")
+        else
+            let agent = agentForActiveCursor journal sessionId profile
+
+            rt.SendIdleManagerIdleEncouragement
+                sessionPort
+                sessionId
+                prompt
+                lifeId
+                conditionKey
+                terminalProviderRun
+                profile
+                agent
+                (liveDirectory directory)
+                PromptDispatcher.AwaitMode.Detached
+                (fun () -> quiescence.TryConsume permit)
+            |> TaskValue.map idleOutcomeOfDispatch
+
     let trySendIdleManagerEncouragement
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
@@ -533,11 +580,16 @@ module HostSessionNudge =
         (terminalProviderRun: ProviderRunIdentity)
         : Task<IdleContinuationOutcome> =
         task {
-            if not (quiescence.TryConsume permit) then
-                return IdleContinuationOutcome.Superseded
-            else
-                match!
-                    trySendManagerIdleEncouragement
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return IdleContinuationOutcome.Failed "Session is retired by Fission"
+            | false, None, _ ->
+                return IdleContinuationOutcome.Failed "No journal: a manager idle encouragement cannot be claimed"
+            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendIdleManagerWithProfile
+                        quiescence
+                        permit
                         sessionPort
                         sessionId
                         prompt
@@ -546,9 +598,8 @@ module HostSessionNudge =
                         lifeId
                         conditionKey
                         terminalProviderRun
-                with
-                | Ok key -> return IdleContinuationOutcome.Sent key
-                | Error error -> return IdleContinuationOutcome.Failed error
+                        durable
+                        profile
         }
 
     [<RequireQualifiedAccess>]
@@ -559,21 +610,42 @@ module HostSessionNudge =
         | Retired
         | Failed of string
 
-    let private sendIdleRepairFamilyAfterPermit
+    let private idleRepairOutcomeOfDispatch =
+        function
+        | PromptDispatcher.SendAttemptOutcome.Sent key -> IdleRepairFamilyOutcome.Sent key
+        | PromptDispatcher.SendAttemptOutcome.Superseded -> IdleRepairFamilyOutcome.Superseded
+        | PromptDispatcher.SendAttemptOutcome.Failed error -> IdleRepairFamilyOutcome.Failed error
+
+    let private sendIdleRepairFamilyWithProfile
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
         (journal: AgentJournal option)
         (repairKind: string)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleRepairFamilyOutcome> =
-        task {
-            match! trySendRepairFamily sessionPort sessionId prompt directory journal repairKind with
-            | RepairFamilySendOutcome.Sent key -> return IdleRepairFamilyOutcome.Sent key
-            | RepairFamilySendOutcome.BudgetExhausted -> return IdleRepairFamilyOutcome.BudgetExhausted
-            | RepairFamilySendOutcome.Retired -> return IdleRepairFamilyOutcome.Retired
-            | RepairFamilySendOutcome.Failed error -> return IdleRepairFamilyOutcome.Failed error
-        }
+        let rt = PromptDispatcher.forJournal durable
+
+        if rt.RepairFamilyAlreadyClaimed profile repairKind then
+            Task.FromResult IdleRepairFamilyOutcome.BudgetExhausted
+        else
+            let agent = agentForActiveCursor journal sessionId profile
+
+            rt.SendIdleRepairFamily
+                sessionPort
+                sessionId
+                prompt
+                repairKind
+                profile
+                agent
+                (liveDirectory directory)
+                PromptDispatcher.AwaitMode.Detached
+                (fun () -> quiescence.TryConsume permit)
+            |> TaskValue.map idleRepairOutcomeOfDispatch
 
     /// Ordinary idle-derived repair: one send per LogicalRun + repair family.
     let trySendIdleRepairFamily
@@ -587,15 +659,64 @@ module HostSessionNudge =
         (repairKind: string)
         : Task<IdleRepairFamilyOutcome> =
         task {
-            if not (quiescence.TryConsume permit) then
-                return IdleRepairFamilyOutcome.Superseded
-            else
-                return! sendIdleRepairFamilyAfterPermit sessionPort sessionId prompt directory journal repairKind
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return IdleRepairFamilyOutcome.Retired
+            | false, None, _ ->
+                return IdleRepairFamilyOutcome.Failed "No journal: an interaction repair cannot be claimed"
+            | false, Some _, None -> return IdleRepairFamilyOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendIdleRepairFamilyWithProfile
+                        quiescence
+                        permit
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        repairKind
+                        durable
+                        profile
         }
 
     /// Blogger-request + terminal-scoped idle interaction repair. This narrower
     /// occasion identity distinguishes same-terminal re-entry from a new bad
     /// terminal without leaking repair budget across Blogger requests.
+    let private sendIdleInteractionRepairWithProfile
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (requestId: BloggerRequestId)
+        (terminalProviderRun: ProviderRunIdentity)
+        (repairKind: string)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<IdleContinuationOutcome> =
+        let rt = PromptDispatcher.forJournal durable
+
+        if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
+            Task.FromResult(IdleContinuationOutcome.Failed "Interaction repair already claimed for this provider run")
+        else
+            let agent = agentForActiveCursor journal sessionId profile
+
+            rt.SendIdleInteractionRepair
+                sessionPort
+                sessionId
+                prompt
+                requestId
+                terminalProviderRun
+                repairKind
+                profile
+                agent
+                (liveDirectory directory)
+                PromptDispatcher.AwaitMode.Await
+                (fun () -> quiescence.TryConsume permit)
+            |> TaskValue.map idleOutcomeOfDispatch
+
     let trySendIdleInteractionRepair
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
@@ -609,11 +730,16 @@ module HostSessionNudge =
         (repairKind: string)
         : Task<IdleContinuationOutcome> =
         task {
-            if not (quiescence.TryConsume permit) then
-                return IdleContinuationOutcome.Superseded
-            else
-                match!
-                    trySendInteractionRepair
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return IdleContinuationOutcome.Failed "Session is retired by Fission"
+            | false, None, _ ->
+                return IdleContinuationOutcome.Failed "No journal: an interaction repair cannot be claimed"
+            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendIdleInteractionRepairWithProfile
+                        quiescence
+                        permit
                         sessionPort
                         sessionId
                         prompt
@@ -622,7 +748,6 @@ module HostSessionNudge =
                         requestId
                         terminalProviderRun
                         repairKind
-                with
-                | Ok key -> return IdleContinuationOutcome.Sent key
-                | Error error -> return IdleContinuationOutcome.Failed error
+                        durable
+                        profile
         }
