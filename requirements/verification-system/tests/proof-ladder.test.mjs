@@ -85,6 +85,7 @@ const WIRED_ALLOWLIST = new Set([
   'spec-rules.mjs', // lib：被 spec.mjs import，不直接 spawn
   'semantic-anchors.mjs', // catalog：被各 gate import 的 anchor 清单，不直接 spawn
   'fsharp-control-pyramid-guide.mjs', // guide lib：被 fsharp-control-pyramid.mjs import
+  'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */

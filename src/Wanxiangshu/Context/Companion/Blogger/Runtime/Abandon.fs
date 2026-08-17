@@ -50,7 +50,6 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 

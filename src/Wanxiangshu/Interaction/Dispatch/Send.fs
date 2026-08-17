@@ -49,7 +49,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 
 /// PROMPT-005's four-fact send protocol, in one place.
 ///

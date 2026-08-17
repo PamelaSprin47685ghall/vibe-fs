@@ -27,7 +27,6 @@ open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable

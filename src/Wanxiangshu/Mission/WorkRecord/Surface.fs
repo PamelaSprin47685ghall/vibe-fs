@@ -3,7 +3,6 @@ namespace Wanxiangshu.Mission.WorkRecord
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection

@@ -3,6 +3,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
+import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
 
@@ -100,5 +102,11 @@ for (const leaf of ['world/common-law', 'library/ingress', 'library/closing']) {
 
 const sphinxEntry = path.join(dist, 'Sphinx', 'McpServer.js')
 if (!fs.existsSync(sphinxEntry)) fail(`missing sphinx entry: ${sphinxEntry}`)
+
+// JS-SEMANTIC-SURFACE-003/005: dist surface manifest validation (post-compile).
+// This gate requires emitted dist/ surfaces, so it runs here after fable
+// precompile — not in the pre-build check.mjs (which must pass with partial or
+// missing dist).
+if (runSurfaceManifest({ root }) !== 0) fail('js-surface-manifest: dist surface manifest validation failed')
 
 console.log('build ok')

@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Session
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal

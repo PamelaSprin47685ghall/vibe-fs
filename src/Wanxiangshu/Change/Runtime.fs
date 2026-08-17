@@ -21,7 +21,6 @@ open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
@@ -270,14 +269,6 @@ type Orchestrator
 
             do! manager.ResumeManager record.ManagerJobId record.WorktreePath prompt
             return record.WorktreePath
-        }
-
-    /// Compatibility single-result join (Empty when idle).
-    member _.JoinPublished() =
-        task {
-            match! mailbox.TryJoin() with
-            | Some verdict -> return verdict
-            | None -> return OrchestratorVerdict.Empty
         }
 
     /// EXEC-019: bounded FIFO batch with local interrupt (≠ lifecycle Cancel).

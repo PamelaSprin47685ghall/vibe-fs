@@ -16,7 +16,8 @@ const checks = [
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
-  join(root, 'checks/js-surface-manifest.mjs'),
+  // js-surface-manifest moved to build.mjs post-compile validation: it requires
+  // emitted dist/ surfaces and cannot pass pre-build with partial/missing dist.
   join(root, 'checks/capability-isomorphism-gate.mjs'),
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/tool-referential-integrity.mjs'),

@@ -63,6 +63,14 @@
     <Compile Include="OpenCode/Host/Facts.fs"/>
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
+    <Compile Include="Interaction/Authority/Fact.fs"/>
+    <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
+    <Compile Include="Mission/Review/Fact.fs"/>
+    <Compile Include="Execution/Delegation/Fact.fs"/>
+    <Compile Include="Context/Companion/Fact.fs"/>
+    <Compile Include="Execution/Fission/Fact.fs"/>
+    <Compile Include="Change/Fact.fs"/>
+    <Compile Include="OpenCode/Host/Fact.fs"/>
     <Compile Include="Foundation/Temporal.fs"/>
     <Compile Include="Participant/Persona/Catalog.fs"/>
     <Compile Include="Participant/Provider/Language.fs"/>

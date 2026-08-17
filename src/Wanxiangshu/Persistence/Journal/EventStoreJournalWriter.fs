@@ -200,13 +200,6 @@ module private JournalWriterDisposal =
     let asValueTask (operation: Task) = ValueTask(operation)
 #endif
 
-[<RequireQualifiedAccess>]
-type private WriterState =
-    | Open
-    | Poisoned of firstFailure: string
-    | Closing of firstFailure: string option
-    | Closed of firstFailure: string option
-
 /// Journal writer backed by the local process EventStore.
 /// It never enumerates history and never folds facts itself. CanonicalIntegrator
 /// owns both boot replay and live integration; this type only assigns journal
@@ -218,8 +211,11 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
     let mutable runtimeStartedCommitted = false
     // DSL-MUTABLE: resource — business facts start at LocalSeq 2 after lazy RuntimeStarted.
     let mutable currentSeq = 2L
-    // DSL-MUTABLE: resource — one mutually-exclusive physical writer lifecycle state.
-    let mutable state = WriterState.Open
+    // DSL-MUTABLE: resource — poison latch: first append failure short-circuits
+    // subsequent appends as Result error. None = healthy; set once, never cleared.
+    let mutable firstFailure: string option = None
+    // DSL-MUTABLE: resource — terminal close latch: drain completed, writer disposed.
+    let mutable closed = false
     // DSL-MUTABLE: resource — serialized process writer operations.
     let mutable serial = Task.FromResult(())
     // DSL-MUTABLE: resource — one close Task drains the accepted append prefix.
@@ -233,35 +229,19 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         lock gate (fun () -> if runtimeStartedCommitted then currentSeq - 1L else 0L)
 
     member _.IsPoisoned =
-        lock gate (fun () ->
-            match state with
-            | WriterState.Poisoned _
-            | WriterState.Closing(Some _)
-            | WriterState.Closed(Some _) -> true
-            | WriterState.Open
-            | WriterState.Closing None
-            | WriterState.Closed None -> false)
+        lock gate (fun () -> firstFailure.IsSome)
 
     member _.TryCurrent(key: string) = store.TryCurrent key
 
-    member private _.Poison(firstFailure: string) =
+    member private _.Poison(firstFailureReason: string) =
         lock gate (fun () ->
-            match state with
-            | WriterState.Open -> state <- WriterState.Poisoned firstFailure
-            | WriterState.Closing None -> state <- WriterState.Closing(Some firstFailure)
-            | WriterState.Poisoned _
-            | WriterState.Closing(Some _)
-            | WriterState.Closed _ -> ())
+            if firstFailure.IsNone && not closed then
+                firstFailure <- Some firstFailureReason)
 
     member private _.PriorPoison(eventId: EventId) : CommitResult<Envelope> option =
         lock gate (fun () ->
-            match state with
-            | WriterState.Poisoned firstFailure
-            | WriterState.Closing(Some firstFailure)
-            | WriterState.Closed(Some firstFailure) -> Some(NotAttempted(eventId, WriterPoisoned firstFailure))
-            | WriterState.Open
-            | WriterState.Closing None
-            | WriterState.Closed None -> None)
+            firstFailure
+            |> Option.map (fun f -> NotAttempted(eventId, WriterPoisoned f)))
 
     static member private formatAppendError(error: AppendError) : string =
         match error with
@@ -428,8 +408,13 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         let eventId = EventId.create (Guid.NewGuid().ToString("N"))
 
         lock gate (fun () ->
-            match state with
-            | WriterState.Open ->
+            if closed then
+                Task.FromResult(NotAttempted(eventId, WriterDisposed))
+            elif closeTask.IsSome then
+                Task.FromResult(NotAttempted(eventId, WriterClosing))
+            elif firstFailure.IsSome then
+                Task.FromResult(NotAttempted(eventId, WriterPoisoned firstFailure.Value))
+            else
                 let previous = serial
                 let running = this.RunAcceptedAppend previous eventId stream providerRun fact
 
@@ -439,23 +424,10 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
                         return ()
                     }
 
-                running
-            | WriterState.Poisoned firstFailure -> Task.FromResult(NotAttempted(eventId, WriterPoisoned firstFailure))
-            | WriterState.Closing _ -> Task.FromResult(NotAttempted(eventId, WriterClosing))
-            | WriterState.Closed _ -> Task.FromResult(NotAttempted(eventId, WriterDisposed)))
+                running)
 
     member private _.FinishClose() =
-        lock gate (fun () ->
-            match state with
-            | WriterState.Closing firstFailure -> state <- WriterState.Closed firstFailure
-            | _ -> ())
-
-    member private _.FirstFailureOfCurrentState() =
-        match state with
-        | WriterState.Poisoned reason -> Some reason
-        | WriterState.Open
-        | WriterState.Closing _
-        | WriterState.Closed _ -> None
+        lock gate (fun () -> closed <- true)
 
     member private this.DrainAcceptedPrefix(acceptedPrefix: Task) : Task =
         task {
@@ -467,20 +439,14 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         :> Task
 
     member private this.StartCloseLocked() : Task =
-        match state with
-        | WriterState.Closed _ -> Task.FromResult(()) :> Task
-        | WriterState.Open
-        | WriterState.Poisoned _ ->
-            let firstFailure = this.FirstFailureOfCurrentState()
-            state <- WriterState.Closing firstFailure
+        if closed || closeTask.IsSome then
+            // Already closed or closing: nothing new to admit.
+            Task.FromResult(()) :> Task
+        else
+            // Open or Poisoned: begin drain of the accepted append prefix.
             let running = this.DrainAcceptedPrefix serial
             closeTask <- Some running
             running
-        | WriterState.Closing _ ->
-            // Closing is only entered together with closeTask assignment under
-            // the same gate; reaching this branch means the close Task was read
-            // through a stale state and there is nothing new to admit.
-            Task.FromResult(()) :> Task
 
     member private this.BeginRelease() : Task =
         lock gate (fun () -> closeTask |> Option.defaultWith this.StartCloseLocked)

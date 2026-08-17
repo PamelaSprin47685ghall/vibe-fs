@@ -425,8 +425,6 @@ module CanonicalIntegrator =
         let gate = obj ()
         // DSL-MUTABLE: resource — the sole process Current owned by this Integrator.
         let mutable state = initialState
-        // DSL-MUTABLE: resource — physical publication generation; not domain state.
-        let mutable generation = 0L
         // DSL-MUTABLE: resource — last loaded local EventStore for the one allowed
         // process-wide full replay fallback when a business rule cannot infer a cut.
         let mutable loadedCommonDir: string option = None
@@ -595,7 +593,6 @@ module CanonicalIntegrator =
                         let! replayed = replay streams
                         state <- replayed
                         loadedCommonDir <- Some commonDir
-                        generation <- generation + 1L
                         return ()
                     })
 
@@ -603,20 +600,22 @@ module CanonicalIntegrator =
                 lock gate (fun () ->
                     result {
                         let! preparedState, durableEvents, cuts = prepareLive state events
-                        let expectedGeneration = generation
+                        // Optimistic concurrency: capture the current state reference.
+                        // A ReloadLocal or another commit creates a new IntegratorState
+                        // heap object, invalidating this prepare via reference inequality.
+                        let expectedState = state
 
                         return
                             { DurableEvents = durableEvents
                               Cuts = cuts
                               Commit =
-                                fun () ->
-                                    lock gate (fun () ->
-                                        if generation <> expectedGeneration then
-                                            failwith
-                                                "CanonicalIntegrator Current changed between prepare and durable append"
+                                  fun () ->
+                                      lock gate (fun () ->
+                                          if not (obj.ReferenceEquals(state, expectedState)) then
+                                              failwith
+                                                  "CanonicalIntegrator Current changed between prepare and durable append"
 
-                                        state <- preparedState
-                                        generation <- generation + 1L) }
+                                          state <- preparedState) }
                     })
 
             member _.TryCurrent(key) =

@@ -160,6 +160,7 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs',
   'src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs',
   'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
+  'src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs',
   'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs',

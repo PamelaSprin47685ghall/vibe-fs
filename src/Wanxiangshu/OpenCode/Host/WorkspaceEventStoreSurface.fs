@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Persistence.Journal
 
 /// Workspace-host-owned shared journal surface.

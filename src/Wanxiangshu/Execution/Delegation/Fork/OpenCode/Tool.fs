@@ -71,7 +71,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Enforcer

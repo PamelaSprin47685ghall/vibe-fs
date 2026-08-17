@@ -237,3 +237,28 @@ advisory 本身没有失败价值：不判红的「检查」只会让人以为�
 
 **证据指针**：`requirements/verification-system/tests/no-line-count-check.test.mjs`
 （结构性 absence：本包 tests 与 scripts/checks 内无行数检查指纹）；→ PROOF.md L19。
+
+## VERIFICATION-SYSTEM-013：JS 语义边界终态清零
+
+**规范陈述**：产品语义测试的 JS 边界债务（A 深层 dist 导入 / B 混淆导出发现 / C Fable 表示 /
+D 遗留 interop helper）必须为零——`scanAll()` 返回 `{}`，迁移台账（`js-boundary-baseline.json`）
+不存在。豁免仅限显式 allowlist：编译/构建验证（`BUILD_VERIFICATION_FILES`：emitted-surface pin、
+`domain.meta` 自契约、分发 pack-closure、表示校验器、覆盖率 runner）与物理 Host canary
+（`HOST_PHYSICAL_CANARY_FILES`：HOST-BOUNDARY-019 raw Host SDK snapshot）。过渡 facade
+（`interop.mjs` / `domain.mjs`）已完全删除——零残留文件、零导入。包本地 `*-contract.mjs` 适配器
+不得存在于 `verification-system` 之外。surface manifest 非空且封闭（每个注册 surface 有 owner、
+laws、production source、representation/kind）。
+
+**含义/动机**：语言边界物理性阻止测试触碰实现内部（VERIFY-008）。终态 = 产品语义测试只经
+registered owner surface 进入，无深层导入、无 Fable 表示泄漏、无遗留 interop helper、无过渡
+facade 残留。台账不存在是终态的标志，不是待修的缺口——零债务时删除台账是唯一合法操作。
+豁免通道 = 伪门（VERIFY-011 同理）：只有 subject 本身是编译产物或 raw Host 形状的文件才可豁免，
+且必须显式列举。
+
+**边界**：本命题管「JS 语义边界终态 invariants 的机器 pin」；具体 surface 注册内容归各产品包
+owner；覆盖率分母归 VERIFY-011；行数检查归 VERIFY-012。
+
+**证据指针**：`requirements/verification-system/tests/js-boundary-gate.test.mjs`
+（6 项终态 invariants：scanAll 零债务 / boundary gate 通过 / 无包本地 contract 适配器 /
+豁免仅限 compiler/distribution/host-canary / 无 interop/domain facade 导入 / surface manifest 非空）；
+→ PROOF.md L20。

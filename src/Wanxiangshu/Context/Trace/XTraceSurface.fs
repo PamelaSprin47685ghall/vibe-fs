@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Mission.Obligation.Todo

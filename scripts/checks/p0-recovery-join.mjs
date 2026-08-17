@@ -371,16 +371,18 @@ export const RULES = [
     positive: true,
   },
   {
-    // EXEC-022: compensation fact must remain in Kernel fact algebra (codec permanently replayable).
+    // EXEC-022: compensation fact must remain in Delegation fact algebra (codec permanently replayable).
+    // After Fact ownership rotation (2026-08-17), constructors live in Execution/Delegation/Fact.fs and
+    // cases live in Execution/Delegation/Facts.fs — not in every Fact.fs.
     id: 'false-completion-rejected-fact',
-    fileHint: 'Fact.fs',
+    fileHint: 'Delegation/Facts.fs|Delegation/Fact.fs',
     pattern: /HandleFalseCompletionRejected/,
     label: 'AgentFact must retain HandleFalseCompletionRejected for legacy abort compensation (EXEC-022)',
     positive: true,
   },
   {
     id: 'parent-join-correction-fact',
-    fileHint: 'Fact.fs',
+    fileHint: 'Delegation/Facts.fs|Delegation/Fact.fs',
     pattern: /ParentJoinCorrectionRequested/,
     label: 'AgentFact must retain ParentJoinCorrectionRequested for retired false-abort migration (EXEC-022)',
     positive: true,

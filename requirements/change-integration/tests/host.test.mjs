@@ -68,12 +68,6 @@ test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_workt
   assert.equal(continued.progress, 'CandidateReady')
 })
 
-test('WHAT[CHGINT-011] HOST_JoinPublished_renders_a_string', () => {
-  const rendered = 'Published: hostfw8'
-  assert.equal(typeof rendered, 'string')
-  assert.ok(rendered.length > 0)
-})
-
 test('WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {
   const result = await change.gitFreezeTargetBranch(change.createGit('/repo', () => Promise.resolve([128, '', 'bad repo'])))
   assert.equal(result.ok, false)

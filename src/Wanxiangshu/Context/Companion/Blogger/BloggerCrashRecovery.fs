@@ -129,25 +129,32 @@ module BloggerCrashRecovery =
         else
             Some(WindowOutcome.RestoredInFlight(SessionId.create "decision"))
 
-    /// Rebuild or clear physical flight ownership. Drain stays Closed.
-    /// Does not match cell.State: SetCurrentRequest / ClearCurrentRequest are
-    /// the flight authority; SetDrainWindow keeps the physical drain slot closed
+    /// CE rebuild step: idempotent fold of BloggerRequestMaterialized into the
+    /// physical flight registry. The durable fact (reloaded via
+    /// tryReloadMainContext) is the authority; SetCurrentRequest is only called
+    /// when the live process does not already hold flight ownership (HasFlight).
+    /// Drain stays Closed — SetDrainWindow keeps the physical drain slot closed
     /// without re-authoring any shadow state.
-    let private restoreRuntime
+    let private restoreFlight
         (host: IParkedTransformHost)
         (bloggerSessionId: SessionId)
-        (flight: BloggerRequestContext option)
+        (ctx: BloggerRequestContext)
         : unit =
         let key = SessionId.value bloggerSessionId
 
-        match flight with
-        | Some ctx ->
+        if not (host.HasFlight key) then
             host.SetCurrentRequest(key, ctx)
-            // Keep Drain Closed without re-authoring ownership via State match.
-            host.SetDrainWindow(key, DrainWindow.Closed)
-        | None ->
-            host.ClearCurrentRequest key
-            host.SetDrainWindow(key, DrainWindow.Closed)
+
+        host.SetDrainWindow(key, DrainWindow.Closed)
+
+    /// CE clear step: abandon physical flight ownership after durable abandon.
+    let private clearFlight
+        (host: IParkedTransformHost)
+        (bloggerSessionId: SessionId)
+        : unit =
+        let key = SessionId.value bloggerSessionId
+        host.ClearCurrentRequest key
+        host.SetDrainWindow(key, DrainWindow.Closed)
 
     /// C5: one reload path — EnforcerFrameRecovery.tryReloadRequestContext (full cutoff/digest).
     let private tryReloadMainContext
@@ -224,7 +231,10 @@ module BloggerCrashRecovery =
             match! tryReloadMainContext journal openReq with
             | None -> return WindowOutcome.Unreadable(openReq.BloggerSessionId, "context blob unreadable")
             | Some ctx ->
-                restoreRuntime host openReq.BloggerSessionId (Some ctx)
+                // Idempotent fold from BloggerRequestMaterialized: re-arm
+                // physical flight only if the live process does not already
+                // hold it (HasFlight guard in reconcileOpenRequest + restoreFlight).
+                restoreFlight host openReq.BloggerSessionId ctx
                 return outcomeAfterRestore (messagesHaveCompletedBlog messages) openReq.BloggerSessionId
         }
 
@@ -237,7 +247,7 @@ module BloggerCrashRecovery =
         task {
             // Cold crash: Host session unreadable → abandon window A.
             do! abandon journal openReq (sprintf "crash-window-A: host snapshot error: %s" reason)
-            restoreRuntime host openReq.BloggerSessionId None
+            clearFlight host openReq.BloggerSessionId
             return WindowOutcome.AbandonedUnsent openReq.RequestId
         }
 

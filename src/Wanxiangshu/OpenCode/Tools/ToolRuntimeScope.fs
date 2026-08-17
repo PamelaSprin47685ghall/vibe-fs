@@ -414,7 +414,7 @@ type ToolRuntimeScope
 
     member _.JoinAttempts = joinAttempts
 
-    /// P0-RECOVERY-JOIN-001: join / JoinPublished require FamilyReady. Missing attach → FamilyBlocked.
+    /// P0-RECOVERY-JOIN-001: join / JoinPublishedAvailable require FamilyReady. Missing attach → FamilyBlocked.
     member _.RequireFamilyRecovery(root: SessionId) : Task<FamilyRecovery> =
         task {
             match familyRecovery with

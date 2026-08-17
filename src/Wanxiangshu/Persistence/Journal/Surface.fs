@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.OpenCode.Host
 

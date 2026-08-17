@@ -45,7 +45,6 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]

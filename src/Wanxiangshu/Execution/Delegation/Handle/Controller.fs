@@ -20,7 +20,6 @@ open Wanxiangshu.Strength
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Delegation

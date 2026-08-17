@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Persistence.Journal

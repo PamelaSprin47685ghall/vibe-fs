@@ -48,7 +48,6 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]

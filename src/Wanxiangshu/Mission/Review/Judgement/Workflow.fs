@@ -48,7 +48,6 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Mission.Review.OpenCode

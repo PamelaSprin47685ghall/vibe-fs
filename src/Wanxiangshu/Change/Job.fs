@@ -159,13 +159,6 @@ type VerdictMailbox() =
         let cap = min (max 0 maxCount) JoinBatch.Max
         if cap <= 0 then Task.FromResult [] else joinWhenCapped cap
 
-    /// Compatibility single-result join.
-    member this.TryJoin() : Task<OrchestratorVerdict option> =
-        task {
-            let! batch = this.TryJoinBatch 1
-            return List.tryHead batch
-        }
-
     member private _.signalOrEnqueue(waiter: TaskCompletionSource<unit>) =
         lock gate (fun () ->
             if verdicts.Count > 0 || active = 0 then
@@ -175,7 +168,7 @@ type VerdictMailbox() =
 
     member private this.resolveEmptyDrain (waiter: TaskCompletionSource<unit>) (kind: int) (winner: obj) =
         if kind = 0 then
-            // Idle wake with empty queue → Empty sentinel (legacy JoinPublished).
+            // Idle wake with empty queue → Empty sentinel.
             ResultsAvailable(NonEmptyBatch.ofHeadTail OrchestratorVerdict.Empty [])
         else
             this.dropWaiter waiter

@@ -63,7 +63,6 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime

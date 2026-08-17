@@ -66,7 +66,7 @@ Fold 取每个活跃 Job 的最后事实，决定**唯一**恢复动作；Publis
 ### 编排运行时（`Application/Orchestration/Runtime.fs`）
 
 `forkManager`/`join`/`resumeManager`/`reverify`：通过 GitPort/ManagerPort 缝驱动真实引擎；
-`JoinPublished`/`NeedsReview` 结果分型；`WorktreeCreateRequested → WorktreeCreated → ManagerJobCreated`
+`JoinPublishedAvailable`/`NeedsReview` 结果分型；`WorktreeCreateRequested → WorktreeCreated → ManagerJobCreated`
 事实顺序（effect-accounting 消费）。
 
 ## 物理落点（CURRENT EVIDENCE）

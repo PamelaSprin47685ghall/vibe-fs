@@ -2,7 +2,6 @@ namespace Wanxiangshu.Mission.Review.Judgement
 
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Review

@@ -504,12 +504,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             DelegatedToolEstimateLedger.replace journal record.ManagerSessionId expected
         | _ -> task { return () }
 
-    let joinPublishedString (engine: Orchestrator) =
-        task {
-            let! verdict = engine.JoinPublished()
-            return sprintf "%A" verdict
-        }
-
     let joinPublishedBatchOnce
         (maxCount: int)
         (interrupt: Task<JoinInterruptReason>)
@@ -566,14 +560,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! engine = engine ()
             let! path = engine.ContinueManager(jobId, prompt)
             return WorktreePath.value path
-        }
-
-    /// Compatibility single-result join (stringified Empty/verdict). Prefer JoinPublishedAvailable.
-    member _.JoinPublished() : Task<string> =
-        task {
-            match! engine () with
-            | Error reason -> return sprintf "Orchestrator init failed: %s" reason
-            | Ok engine -> return! joinPublishedString engine
         }
 
     /// EXEC-019: FIFO batch + local interrupt (JoinTool renders wire).
