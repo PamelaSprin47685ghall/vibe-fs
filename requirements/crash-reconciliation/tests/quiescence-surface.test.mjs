@@ -59,6 +59,28 @@ test('WHAT[CRASH-006] Q04_new_attempt_own_idle_can_send_again', () => {
   assert.equal(quiescence.tryConsume(gate, bPermit), true, 'B must be able to send on its own idle')
 })
 
+test('WHAT[CRASH-006] Q05_new_physical_user_material_revokes_the_previous_idle_before_transform', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const oldPermit = quiescence.observeIdle(gate, S)
+
+  quiescence.observePhysicalMessage(gate, S, 'msg-new')
+
+  assert.equal(
+    quiescence.tryConsume(gate, oldPermit),
+    false,
+    'physical user admission must close the old idle-send window before messages.transform starts',
+  )
+
+  quiescence.beginAttempt(gate, S)
+  const newPermit = quiescence.observeIdle(gate, S)
+
+  // chat.message can be replayed for the same physical material. The ingress
+  // barrier is exact-message idempotent and must not revoke the live attempt.
+  quiescence.observePhysicalMessage(gate, S, 'msg-new')
+  assert.equal(quiescence.tryConsume(gate, newPermit), true, 'same physical message replay must be a no-op')
+})
+
 test('WHAT[CRASH-001] Q07_restart_gate_holds_no_permit', () => {
   const before = quiescence.create()
   quiescence.beginAttempt(before, S)
@@ -129,6 +151,7 @@ test('WHAT[CRASH-006] P4_SURFACE_exports_exact_capability_names', () => {
     'beginAttempt',
     'create',
     'dropSession',
+    'observePhysicalMessage',
     'observeIdle',
     'revoke',
     'tryConsume',

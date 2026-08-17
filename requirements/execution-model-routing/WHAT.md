@@ -82,6 +82,13 @@ active lease 的普通完成释放必须携带 **exact physical identity**：Hos
 
 `SessionIdle` 与 typed `AttemptAborted` 只带 SessionId，因此只能作为 wake / quiescence / abort observation，**不得直接删除 active model lease**；否则 A 的迟到 coarse signal 可以误删刚由 B 的 `chat.message` 建立的 lease。`SessionDeleted`、scope cleanup 与 plugin shutdown 因为销毁整个 owner，可按 SessionId 强制清理 current lease/pending。除此之外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution 被 supersede 的直接物理证据，必须在新 admission 内原子释放旧 lease，即使 Host 没有先发 exact terminal。每个实际 lease 删除一个 `running` occurrence，重复 cleanup 幂等，并触发 EMR-004 pending-demand 重算。
 
+同一 admission 还必须先使上一 terminal 的 idle-derived continuation permit 失效：`chat.message`
+已经证明新 physical material 存在，不能把旧 idle authority 保留到后续
+`experimental.chat.messages.transform`。否则旧 repair/encouragement 可在这段窗口发送一条新的
+physical user message，合法 supersede 刚建立的 model lease，随后原 execution 到 `chat.params` 时只剩
+exact binding 而无 lease。该 quiescence ingress barrier 由 CRASH-006 拥有；EMR 只消费其“不允许旧
+idle continuation 抢占新 physical execution”结论。
+
 业务层的 handle completed/retired/join/finality、Companion close 等**不得直接决定槽是否释放**：它们描述工作语义，不证明 provider execution 的物理状态。反过来，释放槽也不表示 session 永久结束；同一 SessionId 可继续 reuse/reopen。
 
 Host `ProviderRetry` / `ProviderFailure` 若仍处于同一物理 user execution，不提前释放；否则一次 upstream retry 会被误当成新 execution 并与旧 attempt 重叠计数。`chat.params` 对 exact binding 的复核必须在这种迟到 coarse signal 下保持稳定；不得用“取消 live lease 校验”来掩盖错误 release。

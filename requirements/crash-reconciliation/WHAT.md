@@ -60,6 +60,13 @@ closed（PERSIST-003）。Attached restore 中 journal 关联 id 匹配但 agent
 join；`QuiescencePermit` 在发送边界 fresh 才可发 idle-derived continuation（`TryConsume` 失败
 → Superseded，不写 claim 不发消息）。线性序：permit → join，禁止跳步（EXEC-023）。
 
+新的 physical user material 一旦在 `chat.message` 被 Host 接受，就已经否定上一 terminal 的
+idle-send 前提；因此必须在任何异步 routing / ingress / reconcile 之前按 exact
+`PhysicalUserMessageId` 幂等撤销旧 `QuiescencePermit`，不得等到后续
+`experimental.chat.messages.transform` 才标记 provider attempt。否则旧 idle continuation 可在
+admission→transform 窗口排入同一 session，并抢占新 execution 的 routing/authority。相同 physical
+message 的 hook replay 必须 no-op，不能反向撤销它已经开始的 provider attempt。
+
 ## CRASH-007：TurnUnknown 是 reconciliation 私有观测
 
 `TurnUnknown` 不得作为 `TurnOutcome` case 发布；`publishDecision` 在类型上不可接收它。

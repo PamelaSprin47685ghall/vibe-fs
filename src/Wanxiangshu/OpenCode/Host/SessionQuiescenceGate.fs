@@ -39,6 +39,13 @@ type SessionQuiescenceGate() =
     let mutable serials = Map.empty<string, int64>
     // DSL-MUTABLE: resource — per-session activity admission map under gate
     let mutable activities = Map.empty<string, Activity>
+    // DSL-MUTABLE: resource — exact physical user ingress dedupe. A new
+    // physical message closes the preceding idle-send window before the next
+    // provider transform starts; replay of the same message is inert.
+    let mutable physicalMessages = Map.empty<string, string>
+
+    let nextSerial key =
+        Map.tryFind key serials |> Option.defaultValue 0L |> fun current -> current + 1L
 
     /// 每次 provider request 开始构建（`experimental.chat.messages.transform`
     /// 最早同步位置）时调用：旧 idle permit 立即失效，而不是等 request 跑半天
@@ -46,14 +53,30 @@ type SessionQuiescenceGate() =
     member _.BeginProviderAttempt(sessionId: SessionId) : unit =
         lock gate (fun () ->
             let key = SessionId.value sessionId
-
-            let serial =
-                match Map.tryFind key serials with
-                | Some current -> current + 1L
-                | None -> 1L
+            let serial = nextSerial key
 
             serials <- Map.add key serial serials
             activities <- Map.add key (Activity.ProviderAttempt serial) activities)
+
+    /// A physical user message is stronger evidence than the preceding idle:
+    /// once new material has been admitted, an idle-derived continuation for the
+    /// previous terminal may no longer send, even if messages.transform has not
+    /// started yet. Exact message replay is idempotent so it cannot revoke the
+    /// provider attempt that this same material already started.
+    member _.ObservePhysicalUserMessage
+        (sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId)
+        : unit =
+        lock gate (fun () ->
+            let key = SessionId.value sessionId
+            let physical = PhysicalUserMessageId.value physicalUserMessageId
+
+            match Map.tryFind key physicalMessages with
+            | Some current when current = physical -> ()
+            | _ ->
+                let serial = nextSerial key
+                physicalMessages <- Map.add key physical physicalMessages
+                serials <- Map.add key serial serials
+                activities <- Map.add key (Activity.Revoked serial) activities)
 
     /// 收到 `SessionIdle` 时调用。只有本进程先观察到
     /// `BeginProviderAttempt(serial)` 才能转成 Idle(serial) 并得到可消费 permit。
@@ -95,18 +118,14 @@ type SessionQuiescenceGate() =
     member _.RevokeCurrentAttempt(sessionId: SessionId) : unit =
         lock gate (fun () ->
             let key = SessionId.value sessionId
-
-            let serial =
-                match Map.tryFind key serials with
-                | Some current -> current
-                | None -> 0L
-
-            serials <- Map.add key (serial + 1L) serials
-            activities <- Map.add key (Activity.Revoked(serial + 1L)) activities)
+            let serial = nextSerial key
+            serials <- Map.add key serial serials
+            activities <- Map.add key (Activity.Revoked serial) activities)
 
     /// `SessionDeleted` / session 清理时调用：旧 permit 永久失效。
     member _.DropSession(sessionId: SessionId) : unit =
         lock gate (fun () ->
             let key = SessionId.value sessionId
             serials <- Map.remove key serials
-            activities <- Map.remove key activities)
+            activities <- Map.remove key activities
+            physicalMessages <- Map.remove key physicalMessages)

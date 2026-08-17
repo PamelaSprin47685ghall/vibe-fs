@@ -597,6 +597,12 @@ module HostSignalBootstrap =
                         // message on the same reusable SessionId clears it here.
                         match decoded.SessionId, decoded.PhysicalUserMessageId with
                         | Some sessionId, Some physicalId ->
+                            // HOST-004 / CRASH-006: physical admission itself closes
+                            // the previous terminal's idle-send window. Waiting until
+                            // messages.transform leaves a race where an old idle repair
+                            // can enqueue after this message is accepted and supersede
+                            // its model-routing lease before chat.params.
+                            scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
                             ExplicitResumeSuppression.observePhysicalMaterial sessionId physicalId output
                         | _ -> ()
 
