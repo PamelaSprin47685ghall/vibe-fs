@@ -169,7 +169,8 @@ module Reconciler =
                 runningDrains <- runningDrains - 1
 
                 if not accepting && runningDrains = 0 then
-                    stopWaiter |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
+                    stopWaiter
+                    |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
 
         let currentWake (sessionId: SessionId) =
             lock gate (fun () ->
@@ -250,7 +251,11 @@ module Reconciler =
 
         member private _.RunPass(sessionId: SessionId, generation: int) : Task =
             task {
-                if isDurableUnavailable () || not (isCurrent sessionId generation) || isCleared sessionId then
+                if
+                    isDurableUnavailable ()
+                    || not (isCurrent sessionId generation)
+                    || isCleared sessionId
+                then
                     return ()
                 else
                     let wake = currentWake sessionId

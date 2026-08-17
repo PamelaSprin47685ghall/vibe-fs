@@ -33,6 +33,7 @@ const assertTenNonEmpty = (catalog, label) => {
   assert.equal(catalog.TeacherSystemPrompt, undefined)
 }
 
+
 const inOrder = (text, needles) => {
   let cursor = -1
   for (const needle of needles) {

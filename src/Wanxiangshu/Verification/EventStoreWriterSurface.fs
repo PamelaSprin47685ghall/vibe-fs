@@ -18,8 +18,13 @@ module EventStoreWriterSurface =
     type private ControlledEventStore(append: EventEnvelope list -> Task<Result<AppendReceipt, AppendError>>) =
         interface IEventStore with
             member _.Append events = append events
-            member _.WritePayload _ = Task.FromResult<Result<PayloadRef, string>>(Error "payload write unavailable")
-            member _.ReadPayload _ = Task.FromResult<Result<byte[] option, string>>(Ok None)
+
+            member _.WritePayload _ =
+                Task.FromResult<Result<PayloadRef, string>>(Error "payload write unavailable")
+
+            member _.ReadPayload _ =
+                Task.FromResult<Result<byte[] option, string>>(Ok None)
+
             member _.TryCurrent _ = None
             member _.TryEvent _ = None
             member _.TryHeads _ = []
@@ -43,8 +48,11 @@ module EventStoreWriterSurface =
     /// admitted while Open; later appends are known-not-attempted.
     let writerReleaseDrainScenario () : Task<obj> =
         task {
-            let appendEntered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-            let releaseAppend = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let appendEntered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let releaseAppend =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — controlled-store append call counter.
             let mutable appendCalls = 0
 

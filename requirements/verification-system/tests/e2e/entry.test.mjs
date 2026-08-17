@@ -91,7 +91,7 @@ const STRENGTH_HOST_CANARY_PROMPT =
   'STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path.';
 
 const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
-  const created = await scenario.client.createSession({});
+  const created = await scenario.client.createSession(agent ? { agent } : {});
   const sessionID = getSessionId(created);
   assert.ok(sessionID, `${lane} session creation failed: ${JSON.stringify(created)}`);
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
@@ -101,7 +101,6 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
     body: {
       parts: [{ type: 'text', text: prompt }],
-      ...(agent ? { agent } : {}),
     },
   });
   assert.ok(response.ok, `${lane} prompt failed: ${JSON.stringify(response.data)}`);
@@ -110,7 +109,7 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
 
 const runNeedHelpPreFlow = async (scenario) => {
   const holds = armNeedHelpCausalHolds(scenario);
-  const created = await scenario.client.createSession({});
+  const created = await scenario.client.createSession({ agent: 'fast-coder' });
   const sessionID = getSessionId(created);
   assert.ok(sessionID, `needhelp-owner session creation failed: ${JSON.stringify(created)}`);
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
@@ -119,7 +118,6 @@ const runNeedHelpPreFlow = async (scenario) => {
   const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
     body: {
       parts: [{ type: 'text', text: NEEDHELP_CANARY_PROMPT }],
-      agent: 'fast-coder',
     },
   });
   assert.ok(response.ok, `NEEDHELP pre-flow prompt failed: ${JSON.stringify(response.data)}`);

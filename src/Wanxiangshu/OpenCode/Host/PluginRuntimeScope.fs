@@ -311,8 +311,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.TrackSubscription(value: IDisposable option) = subscription <- value
 
-    member _.TrackReconcileShutdown(stopAndDrain: unit -> Task) =
-        reconcileShutdown <- Some stopAndDrain
+    member _.TrackReconcileShutdown(stopAndDrain: unit -> Task) = reconcileShutdown <- Some stopAndDrain
 
     member private _.AdmitBackgroundWork() : bool =
         lock backgroundGate (fun () ->
@@ -323,8 +322,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 true)
 
     member private _.RecordBackgroundFailure(failure: exn) =
-        lock backgroundGate (fun () ->
-            backgroundFailure <- Option.orElse backgroundFailure (Some failure))
+        lock backgroundGate (fun () -> backgroundFailure <- Option.orElse backgroundFailure (Some failure))
 
     member private _.FinishBackgroundWork() =
         lock backgroundGate (fun () ->
@@ -454,7 +452,9 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             // the first real failure, continue safe independent cleanup, rethrow last.
             // DSL-MUTABLE: algorithm-scratch — first teardown failure accumulator.
             let mutable firstFailure: exn option = None
-            let remember failure = firstFailure <- Option.orElse firstFailure failure
+
+            let remember failure =
+                firstFailure <- Option.orElse firstFailure failure
 
             // Close external admission first. Close both internal admissions before
             // awaiting either drain, so no durable work can enter during shutdown.

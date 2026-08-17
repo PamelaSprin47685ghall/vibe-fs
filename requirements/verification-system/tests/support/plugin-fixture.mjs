@@ -14,6 +14,8 @@ if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVID
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 }
 
+process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+
 const { default: plugin } = await import('wanxiangshu')
 const initSpikePlugin = plugin.server
 const { requiredNames: managedAgentNames } = await import('../../../../dist/Participant/Persona/Surface.js')

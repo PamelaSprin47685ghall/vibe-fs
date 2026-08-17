@@ -257,8 +257,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
             match state with
             | WriterState.Poisoned firstFailure
             | WriterState.Closing(Some firstFailure)
-            | WriterState.Closed(Some firstFailure) ->
-                Some(NotAttempted(eventId, WriterPoisoned firstFailure))
+            | WriterState.Closed(Some firstFailure) -> Some(NotAttempted(eventId, WriterPoisoned firstFailure))
             | WriterState.Open
             | WriterState.Closing None
             | WriterState.Closed None -> None)
@@ -366,7 +365,9 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         | Some cut -> Rejected(eventId, cut.Reason)
         | None -> Committed envelope
 
-    member private this.CommitBusinessEnvelopeLocked(eventId: EventId, envelope: Envelope) : Task<CommitResult<Envelope>> =
+    member private this.CommitBusinessEnvelopeLocked
+        (eventId: EventId, envelope: Envelope)
+        : Task<CommitResult<Envelope>> =
         task {
             match! EventStoreJournalWriter.commitEnvelope store envelope with
             | Ok receipt ->
@@ -386,8 +387,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         : Task<CommitResult<Envelope>> =
         task {
             match! this.EnsureRuntimeStartedLocked() with
-            | Error error ->
-                return NotAttempted(eventId, WriterPoisoned("RuntimeStarted append failed: " + error))
+            | Error error -> return NotAttempted(eventId, WriterPoisoned("RuntimeStarted append failed: " + error))
             | Ok() ->
                 let envelope: Envelope =
                     { RuntimeId = runtimeId
@@ -439,8 +439,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
                     }
 
                 running
-            | WriterState.Poisoned firstFailure ->
-                Task.FromResult(NotAttempted(eventId, WriterPoisoned firstFailure))
+            | WriterState.Poisoned firstFailure -> Task.FromResult(NotAttempted(eventId, WriterPoisoned firstFailure))
             | WriterState.Closing _ -> Task.FromResult(NotAttempted(eventId, WriterClosing))
             | WriterState.Closed _ -> Task.FromResult(NotAttempted(eventId, WriterDisposed)))
 
@@ -487,7 +486,8 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
 
     member this.Release() = this.BeginRelease() |> ignore
 
-    member this.ReleaseAsync() = JournalWriterDisposal.asValueTask (this.BeginRelease())
+    member this.ReleaseAsync() =
+        JournalWriterDisposal.asValueTask (this.BeginRelease())
 
     interface IJournalWriter with
         member this.RuntimeId = this.RuntimeId

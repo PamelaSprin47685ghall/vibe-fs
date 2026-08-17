@@ -110,8 +110,7 @@ type HostForkRuntime
                 |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
 
     let recordOwnedWorkFailure (failure: exn) =
-        lock ownedWorkGate (fun () ->
-            ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
+        lock ownedWorkGate (fun () -> ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
 
     let captureOwnedWorkFailure (work: unit -> Task) : Task<exn option> =
         task {
@@ -139,7 +138,10 @@ type HostForkRuntime
                     ownedWorkCount <- ownedWorkCount + 1
                     true)
 
-        if admitted then observeOwnedWork work else Task.FromResult(()) :> Task
+        if admitted then
+            observeOwnedWork work
+        else
+            Task.FromResult(()) :> Task
 
     let ownedWorkDrainTask () : Task =
         match ownedWorkDrainWaiter with

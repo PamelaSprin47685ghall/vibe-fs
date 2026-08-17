@@ -192,18 +192,26 @@ export const projectionCases = [
   {
     name: 'ARCH-004 a different tool set is a different exchange',
     fn: () => {
-      const forkOnly = body([SYSTEM, user('go')], ['fork']);
-      const forkAndJoin = body([SYSTEM, user('go')], ['fork', 'join']);
-      assertTrue(!sameBytes(forkOnly, forkAndJoin), 'tool-set changes must change provider wire identity');
+      assertTrue(
+        !sameBytes(
+          body([SYSTEM, user('go')], ['fork']),
+          body([SYSTEM, user('go')], ['fork', 'join']),
+        ),
+        'ARCH-004 a different tool set is a different wire exchange',
+      )
     },
   },
 
   {
     name: 'ARCH-004 tool order is part of the wire identity',
     fn: () => {
-      const forkThenJoin = body([SYSTEM, user('go')], ['fork', 'join']);
-      const joinThenFork = body([SYSTEM, user('go')], ['join', 'fork']);
-      assertTrue(!sameBytes(forkThenJoin, joinThenFork), 'tool order must remain part of exact provider wire identity');
+      assertTrue(
+        !sameBytes(
+          body([SYSTEM, user('go')], ['fork', 'join']),
+          body([SYSTEM, user('go')], ['join', 'fork']),
+        ),
+        'ARCH-004 tool order must change the wire exchange',
+      )
     },
   },
 
