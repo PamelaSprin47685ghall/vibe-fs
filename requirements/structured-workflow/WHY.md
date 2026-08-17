@@ -105,6 +105,23 @@ match A
 `Evidence → Decision` 边界。门禁故意允许 false positive，因为一次人工边界审查比永久
 容忍控制树更便宜。
 
+### 2.7 状态机也会逃到模块接缝
+
+更隐蔽的失败是：每个模块内部都已经改成 CE，但模块之间仍用 `Stage / NextAction /
+ResumeAt / InFlight / registry presence` 拼接。callee 返回“我执行到哪里”，caller 再
+`match` 这个 token 决定下一效果；或者 parent 反复调用 `Advance/Tick/Resume` 驱动 child。
+
+这种代码逐文件看都可能“没有状态机”，整条调用链却仍是一个分布式 interpreter：
+
+```text
+child program counter → seam token → parent branch → next effect
+```
+
+因此 STRUCTURED-WORKFLOW-017 要求组合闭包：父 CE 只能等待子 workflow 的领域结果、
+证据或 capability outcome；Semantic Vocabulary 展开后继续满足同一规则，直到纯决策或
+physical adapter。这样业务调用树才具有缩放不变性，而不是把 program counter 从文件内
+搬到文件间。
+
 ## 3. 备选与被拒（考古）
 
 | 备选 | 被拒理由 | 来源 |
@@ -118,6 +135,7 @@ match A
 | 独立 Loop 恢复机制 | 第二状态机；破坏 FALLBACK-003 唯一写入口；桥接 FallbackController 复用统一预算 | 历史 why/loop 条款（degeneration-guard 交叉） |
 | 大 `Decision` DU 压扁整个 workflow | 仍是程序计数器；只允许小型真实领域判断（ReviewWitness / ReviewerOutcome / PromptAcceptance / FamilyRecovery） | `ce-temporal-ownership.md` §2 |
 | `TurnCompletionProgram` 什么都管 | 第二运行时；拆成五个独立时序 owner + 薄 router | `ce-temporal-ownership.md` §3/§15 |
+| 全仓统一 `WorkflowBuilder` / `ReliableFlowBuilder` | 统一语法不等于结构闭包；若 builder 解释 AST/continuation，只是把第二 runtime 包装得更整齐 | STRUCTURED-WORKFLOW-002/017 |
 
 ## 4. 什么情况下世界 RED
 
@@ -129,6 +147,8 @@ match A
 4. 恢复恢复执行位置而不是重入普通流程；
 5. Semantic Vocabulary 名字不声明完整业务承诺，或被压缩的时序没有 proof；
 6. 可变存储承载跨调用业务流程位置而不是物理资源；
-7. branch/body 内继续长出第二层及更深 lexical decision，且新增债务超过 per-file baseline。
+7. branch/body 内继续长出第二层及更深 lexical decision，且新增债务超过 per-file baseline；
+8. 子 workflow 暴露执行位置或物理 presence，父 workflow 据此驱动下一业务效果，导致
+   Direct-CE 在模块接缝失去结构闭包。
 
 每条对应 WHAT.md 的命题；可执行证据见 PROOF.md。

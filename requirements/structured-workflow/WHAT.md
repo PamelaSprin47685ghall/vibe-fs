@@ -372,6 +372,45 @@ durable facts，禁止 Stage/布尔/时间猜）。
 
 ---
 
+## STRUCTURED-WORKFLOW-017：业务 workflow 组合具有结构闭包
+
+**规范陈述**：当一个业务 workflow 组合另一个 workflow 时，组合结果必须继续由宿主
+语言调用、CE bind/return、具名 Semantic Vocabulary、有界递归与有界高阶组合直接
+表达。调用者只能观察被调用 workflow 的 typed input/capability、领域结果、证据与
+能力结果；**不得观察或驱动其执行位置**。任何 Semantic Vocabulary 展开后必须递归满足
+同一规则，直到纯 `Evidence → Decision` 或真正接触 Git/process/timer/Host 的 physical
+adapter 叶。
+
+禁止把模块接缝变成新的 program-counter 总线，包括但不限于：
+
+```text
+child returns Stage/Phase/NextAction/ResumeAt/ContinueToken → caller match → next effect
+parent probes child registry/mutable cell presence → infer lifecycle stage → choose business effect
+Advance/Tick/Resume/Step API family → caller repeatedly drives child workflow
+normal path uses CE → recovery jumps into an internal child stage/continuation
+```
+
+**含义/动机**：STRUCTURED-WORKFLOW-001 规定“一个 workflow 怎样长”，本命题规定
+“workflow 与 workflow 接起来以后仍然怎样长”。局部 CE 改造若在边界重新暴露执行位置，
+只是把状态机从 callee 搬到 caller；模块内部看似 Direct-CE，整条调用链仍是手写第二
+runtime。结构闭包要求业务调用树具有缩放不变性：缩小是有业务名字与 law 的 operation，
+放大仍是 CE DSL，直到纯决策或物理世界才停止。
+
+**边界**：
+- 本命题不要求全仓只用一个 builder；相反，统一 `WorkflowBuilder` / `ReliableFlowBuilder`
+  若解释业务 AST 或 continuation，仍违反 STRUCTURED-WORKFLOW-002。
+- physical adapter 内部可以有真实资源 automaton、mutable waiter/permit/socket/process
+  handle；向上必须收敛成 typed capability/outcome/evidence，不得把物理 phase 暴露为业务
+  orchestration 输入。
+- 父 workflow 可以根据子 workflow 的**领域结果**穷尽 `match`；禁止的是匹配“子程序
+  运行到哪里”，不是禁止正常业务分支。
+- recovery 仍遵守 STRUCTURED-WORKFLOW-009：fold durable facts 后从 semantic entry
+  重入，不能以“组合”名义恢复内部 continuation。
+
+**证据**：PROOF.md §1 第 17 行。
+
+---
+
 ## 反向覆盖清单（COVERAGE.md 归属核对）
 
 | 源 Clause | 落点 |
@@ -383,5 +422,6 @@ durable facts，禁止 Stage/布尔/时间猜）。
 | ARCH-001 / 005 / 008 / 009 | STRUCTURED-WORKFLOW-001+003+008 / 009 / 004 / 010 |
 | GLORY-009（无持久程序计数器） | STRUCTURED-WORKFLOW-003 推论 |
 | EXEC-020 控制面/数据面 | STRUCTURED-WORKFLOW-015（outcome 分型本体 → `effect-accounting`） |
+| workflow composition closure（Fractal CE） | STRUCTURED-WORKFLOW-017（001 的跨 workflow 组合闭包；009/011/012/013 的 seam 推论） |
 | LOOP-001..008 | **不归本包** → `degeneration-guard`（LOOP-* 全部）；本包只提供其依赖的「无第二状态机 / 进程内局部事实」保证（LOOP-006 桥接 `continueAfterLoopKill` = structured recovery 词汇） |
 | ARCH-002/003/004/006/007/010/011/012/013/014/015/016/017、EXEC-001..032 其余、HOST-*、PERSIST-*、CTX-*、TODO-* | 各自身 owner（host-boundary / prefix-stability / action-affordance / capability-enforcement / provider-projection / participant-horizon / work-record / office-capability / delegation / process-execution / managed-session-lifecycle / effect-accounting / crash-reconciliation / obligation-ledger / review-* / semantic-trace / context-compression 等） |

@@ -2,7 +2,8 @@
 
 > 业务流程应该由宿主语言的控制结构直接表达（`task { }` / `let!` / `match!` / `return!` /
 > 有界递归），**不能在领域层再造第二程序计数器或第二 runtime**。状态标签只表示物理/领域
-> 真实事物；「程序下一步走到哪」永远由调用栈回答，不由可存储字段回答。
+> 真实事物；「程序下一步走到哪」永远由调用栈回答，不由可存储字段回答。workflow 与
+> workflow 组合后仍必须保持这一结构闭包，不能把程序计数器搬到模块接缝。
 
 ## 一句话 WHY
 
@@ -14,7 +15,7 @@ F# 调用栈已经是流程栈：`let!` 是等待，`match` 是分支，`return!
 变成「恢复协程指针」（不可序列化、假装透明续跑）、测试变成「断言枚举序数」、类型系统
 不再拦截非法态反而帮它们合法化。
 
-## WHAT 概览（15 条命题，见 WHAT.md）
+## WHAT 概览（17 条命题，见 WHAT.md）
 
 | 组 | 命题 | 一句话 |
 |---|---|---|
@@ -25,6 +26,8 @@ F# 调用栈已经是流程栈：`let!` 是等待，`match` 是分支，`return!
 | 有界 | STRUCTURED-WORKFLOW-010 | 循环与扇出必须有界（`mapBounded` 唯一并发原语） |
 | 词汇 | STRUCTURED-WORKFLOW-011/012/013 | Semantic Vocabulary 是领域事实词汇；压缩必须有 proof；decorator 必须具名 |
 | 验证 | STRUCTURED-WORKFLOW-014/015 | 流程正确性由可观察效果证明；取消是控制面，不是业务数据 |
+| 形状 | STRUCTURED-WORKFLOW-016 | 第二层及更深 lexical decision 为债务，控制树不得靠缩进继续生长 |
+| 组合 | STRUCTURED-WORKFLOW-017 | workflow ∘ workflow 仍由 CE + Semantic Vocabulary 直接表达；接缝只传语义，不传执行位置 |
 
 ## HOW 概览（见 HOW.md）
 
@@ -61,7 +64,7 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
 ## 阅读顺序
 
 1. `WHY.md` —— 为什么必须独立存在、历史上 RED 过什么（rabbit / ce-temporal-ownership 考古）
-2. `WHAT.md` —— 唯一 normative 合同：15 条编号命题 + 每条边界
+2. `WHAT.md` —— 唯一 normative 合同：17 条编号命题 + 每条边界
 3. `HOW.md` —— 实现模型：四层划分、模块地图、门禁机制、历史与弃权
 4. `PROOF.md` —— 每条命题的测试落点表、cutover 待办、anchor id
 
@@ -86,5 +89,6 @@ implementation coupling，不是定义前提；event-driven wake 与 deadline es
 
 ## RED 判定
 
-世界 RED 当且仅当：**领域模型开始保存程序位置、解释 AST、或依赖可变 stage 才知道下一步
-做什么。** 对应 WHAT 命题的失败模式见 WHY.md 与 PROOF.md 各落点。
+世界 RED 当且仅当：**领域模型开始保存程序位置、解释 AST、依赖可变 stage 才知道下一步
+做什么，或多个局部 Direct-CE 在模块接缝重新暴露执行位置。** 对应 WHAT 命题的失败模式
+见 WHY.md 与 PROOF.md 各落点。

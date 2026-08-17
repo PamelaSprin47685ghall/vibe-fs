@@ -19,6 +19,11 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（owner 的 Open
 不发明第二套 workflow framework，不造 AST / interpreter / `ReliableFlowBuilder` 黑盒，
 不把生产程序重新压成几十个 `Decision` case。
 
+组合原则：**Fractal CE / composition closure**。任意 Business CE 缩小后可以成为一个
+具名 Vocabulary operation；展开该 operation，仍应看到 CE bind/return、有界递归、
+高阶组合与更小的 Semantic Vocabulary。递归只在纯 `Evidence → Decision` 或 physical
+adapter 叶停止。parent 不读取 child 的 stage/phase/registry presence 来 drive child。
+
 ## 2. 模块地图（当前实现）
 
 ### 2.1 Kernel 类型（直接 CE 程序的领域事实）
@@ -249,7 +254,22 @@ materialize one bounded WorkRecord。provider 顺序第一项是 canonical invoc
 
 回答不出则 REVISE。
 
-### 3.6 其它机制（非本包 owner）
+### 3.6 Cross-module CE seam review（STRUCTURED-WORKFLOW-017）
+
+每次 workflow 重构除文件内 census 外，再沿调用链检查 seam：
+
+1. 返回值是否包含 `Stage/Phase/NextAction/ResumeAt/ContinueToken` 或等价执行位置？
+2. caller 是否 `match` 子模块控制 token 后决定下一业务 effect？
+3. parent 是否读取 child registry / mutable cell presence 推导 lifecycle stage？
+4. 是否存在 `Advance/Tick/Resume/Step` API family 由 caller 反复 drive？
+5. normal path 是否是 CE，但 recovery 会跳入 child 内部 stage/continuation？
+6. Semantic Vocabulary 展开后是否仍满足 CE + Vocabulary + bounded composition，直到纯
+   decision / physical adapter？
+
+命中 1–5 默认 REVISE。合法 physical presence 必须停留在 adapter/physical owner，向上
+收敛成 typed capability/outcome/evidence；合法 domain result 可以由 parent 穷尽 `match`。
+
+### 3.7 其它机制（非本包 owner）
 
 - `scripts/checks/architecture.mjs`（ARCH-001 分层、fsproj、资源读取位置）→
   verification-system MECHANISM。
