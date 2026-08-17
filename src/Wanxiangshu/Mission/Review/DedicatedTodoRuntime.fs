@@ -123,6 +123,16 @@ module DedicatedTodoReviewerRuntime =
             | _ -> return ""
         }
 
+    let private openingRawForReview
+        (journal: AgentJournal)
+        (life: LifeProjection)
+        (magicLife: MagicTodoProjection.LifeMagicTodoState)
+        : Task<string> =
+        if Option.isNone magicLife.LatestConcludedManagerReviewFrontier then
+            openingRaw journal life
+        else
+            Task.FromResult ""
+
     let private managerCheckpointLwr
         (journal: AgentJournal)
         (managerSessionId: SessionId)
@@ -557,7 +567,7 @@ module DedicatedTodoReviewerRuntime =
             let! proposed = readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
             let! capturedMessages = captureManagerSnapshot snapshot journal managerSessionId
             let! reviewFrontier = managerReviewFrontier journal managerSessionId checkpoint capturedMessages
-            let! opening = openingRaw journal managerLife |> TaskResultCE.ofTask
+            let! opening = openingRawForReview journal managerLife life |> TaskResultCE.ofTask
 
             let! checkpointLwr = managerCheckpointLwr journal managerSessionId managerLife life reviewFrontier
 

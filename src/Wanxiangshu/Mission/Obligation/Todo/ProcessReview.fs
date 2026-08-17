@@ -49,10 +49,15 @@ module MagicTodoProcessReview =
 
     /// `preamble` is already-localized ProcessReviewer prose (PROMPT-019).
     let renderAssignmentUserMessage (preamble: string) (req: ProcessReviewRequest) : string =
+        let openingSections =
+            if System.String.IsNullOrWhiteSpace req.OpeningRaw then
+                []
+            else
+                [ "=== OpeningRaw (task authority) ==="; req.OpeningRaw ]
+
         MagicTodoSurface.renderAssignmentUserMessage
             preamble
-            [ "=== OpeningRaw (task authority) ==="
-              req.OpeningRaw
+            [ yield! openingSections
               "=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ==="
               req.ManagerCheckpointLwr
               "=== ACCOUNT RELATION ==="

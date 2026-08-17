@@ -10,6 +10,7 @@ const recoverySrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/B
 const enforcerSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
 const repairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Repair.fs'), 'utf8')
 const interactionRepairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs'), 'utf8')
+const pluginTransformsSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
 const probeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'), 'utf8')
 const runtimeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs'), 'utf8')
 
@@ -105,4 +106,35 @@ test('WHAT[BD-017] ENFORCER_153_repairState_request_isolation_and_abandon_lifecy
   assert.deepEqual(blog.repairState({ requestId: 'req-1', claims: [claims[0]] }).state, 'InteractionNudgeIssued')
   assert.deepEqual(blog.repairState({ requestId: 'req-2', claims }).state, 'NoRecovery')
   assert.deepEqual(blog.repairState({ requestId: 'req-1', claims: [claims[2], claims[0]] }).state, 'InteractionNudgeIssued')
+})
+
+test('WHAT[BD-017] ENFORCER_065_chronicle_tool_error_defers_to_the_host_tool_loop_instead_of_repairing', () => {
+  assert.match(
+    enforcerSrc,
+    /hasErroredBlogAttempt[\s\S]{0,520}ctx\.Project ctx\.RawMessages/,
+    'an errored chronicle call is still inside the Host tool loop and must not spend repair/fallback',
+  )
+  assert.doesNotMatch(
+    enforcerSrc,
+    /hasErroredBlogAttempt[\s\S]{0,220}decideErroredBlog/,
+    'tool errors must not jump directly into Blogger repair',
+  )
+})
+
+test('WHAT[BD-017] ENFORCER_066_first_protocol_nudge_is_idle_owned_never_sent_from_transform', () => {
+  assert.match(
+    enforcerSrc,
+    /BloggerToolRecovery\.NoRecovery\s*->[\s\S]{0,520}ctx\.Project ctx\.RawMessages/,
+    'transform must leave the first invalid terminal untouched so Host idle can own the physical nudge',
+  )
+  assert.doesNotMatch(
+    enforcerSrc,
+    /BloggerToolRecovery\.NoRecovery\s*->\s*interactionNudge/,
+    'a transform-time interaction nudge can be queued behind the Host tool loop',
+  )
+  assert.doesNotMatch(
+    pluginTransformsSrc,
+    /trySendInteractionRepair/,
+    'the provider transform wiring must not possess a physical interaction-repair sender',
+  )
 })

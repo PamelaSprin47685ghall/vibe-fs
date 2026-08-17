@@ -74,7 +74,9 @@ open Wanxiangshu.Strength
 /// dispatcher (ENFORCER-044).
 ///
 /// Branch 1 (emptyCallsBranch): pending/running blog, abort cleanup, pure prose
-/// terminal, repair injection (AABB / nudge) — nothing is committed here.
+/// terminal, and AABB repair — nothing is committed here. The first physical
+/// protocol nudge is idle-owned; transform must never queue one behind a live
+/// Host tool loop.
 /// Branch 2 (commitBranch): ENFORCER-044 merge/commit on completed blog tool
 /// parts, then drain / park / inject-repair disposition.
 /// Branch 3 (firstRequestBranch): COMPANION-005 first request / non-tool step —
@@ -115,7 +117,6 @@ module EnforcerContinuation =
           Owner: SessionId
           BloggerSessionId: SessionId
           RawMessages: obj list
-          RepairNudge: InteractionRepairNudge option
           ConfirmedFailure: ConfirmedFailurePort option
           RecoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe
           Project: obj list -> ContinuationOutcome
@@ -281,59 +282,6 @@ module EnforcerContinuation =
                         (fun () -> projectRepairInstruction ctx sessionKey live reason)
         }
 
-    /// Evidence → Decision: nudge send Result → project / AABB.
-    let private afterNudgeSent
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (live: BloggerRequestContext)
-        (reason: string)
-        (sent: Result<PromptKey, string>)
-        : Task<ContinuationOutcome> =
-        match sent with
-        | Ok _ ->
-            Diagnostic.emit "enforcer-cycle-nudge" [ "session_id", sessionKey; "result", reason ]
-            Task.FromResult(ctx.Project ctx.RawMessages)
-        | Error err when err.IndexOf("already claimed", StringComparison.OrdinalIgnoreCase) >= 0 ->
-            Diagnostic.emit "enforcer-cycle-nudge-pending" [ "session_id", sessionKey; "result", err ]
-            Task.FromResult(ctx.Project ctx.RawMessages)
-        | Error err ->
-            Diagnostic.emit "enforcer-cycle-nudge-fail" [ "session_id", sessionKey; "result", err ]
-            aabbRepair ctx sessionKey currentCtx live true ("nudge-failed: " + err)
-
-    /// Evidence → Decision: repair nudge port → send or AABB.
-    let private interactionNudge
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (live: BloggerRequestContext)
-        (terminalRun: ProviderRunIdentity)
-        (reason: string)
-        : Task<ContinuationOutcome> =
-        task {
-            match ctx.RepairNudge with
-            | None ->
-                Diagnostic.emit
-                    "enforcer-cycle-nudge-fail"
-                    [ "session_id", sessionKey; "result", "no repair nudge port; " + reason ]
-
-                return! aabbRepair ctx sessionKey currentCtx live true ("nudge-no-port: " + reason)
-            | Some send ->
-                let requestId = BloggerRequestContext.requestId live
-
-                let! sent =
-                    send
-                        ctx.BloggerSessionId
-                        EnforcerRepair.RepairInstruction
-                        None
-                        ctx.Journal
-                        requestId
-                        terminalRun
-                        "blogger-missing-tool"
-
-                return! afterNudgeSent ctx sessionKey currentCtx live reason sent
-        }
-
     let private sameAabbTerminalReentry
         (ctx: Context)
         (sessionKey: string)
@@ -375,33 +323,6 @@ module EnforcerContinuation =
         | Some live -> decideInterruptedRecovery ctx sessionKey currentCtx live
         | None -> Task.FromResult(ctx.Stop "unowned-interrupted-blog-without-CurrentRequest")
 
-    /// Evidence → Decision: errored-blog recovery stage → AABB or exhaust.
-    let private decideErroredRecovery
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (live: BloggerRequestContext)
-        : Task<ContinuationOutcome> =
-        let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-errored-run"
-
-        match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
-        | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
-            sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
-        | BloggerToolRecovery.AabbRepairIssued _ ->
-            aabbRepair ctx sessionKey currentCtx live false "blog tool error after AABB"
-        | _ -> aabbRepair ctx sessionKey currentCtx live false "blog tool error without completed call"
-
-    /// Evidence → Decision: live cycle for errored blog → recovery or stop.
-    let private decideErroredBlog
-        (ctx: Context)
-        (sessionKey: string)
-        (currentCtx: BloggerRequestContext option)
-        (liveCtx: BloggerRequestContext option)
-        : Task<ContinuationOutcome> =
-        match liveCtx with
-        | Some live -> decideErroredRecovery ctx sessionKey currentCtx live
-        | None -> Task.FromResult(ctx.Stop "unowned-errored-blog-without-CurrentRequest")
-
     let private decideProtocolRecovery
         (ctx: Context)
         (sessionKey: string)
@@ -411,7 +332,16 @@ module EnforcerContinuation =
         (reason: string)
         : Task<ContinuationOutcome> =
         match ctx.RecoveryProbe ctx.Durable ctx.BloggerSessionId ctx.RawMessages live with
-        | BloggerToolRecovery.NoRecovery -> interactionNudge ctx sessionKey currentCtx live terminalRun reason
+        | BloggerToolRecovery.NoRecovery ->
+            // The transform hook runs inside the Host provider/tool-loop. Sending
+            // a session nudge here can only race that loop and become a queued
+            // user message. Leave the terminal untouched; a true no-tool terminal
+            // is repaired from reconciled SessionIdle after quiescence instead.
+            Diagnostic.emit
+                "enforcer-cycle-nudge-deferred-to-idle"
+                [ "session_id", sessionKey; "result", reason ]
+
+            Task.FromResult(ctx.Project ctx.RawMessages)
         | BloggerToolRecovery.InteractionNudgeIssued issuedRun when issuedRun = terminalRun ->
             Diagnostic.emit
                 "enforcer-cycle-nudge-pending"
@@ -491,7 +421,11 @@ module EnforcerContinuation =
             elif EnforcerRepair.hasAbortedBlogAttempt ctx.RawMessages then
                 return! decideInterruptedBlog ctx sessionKey currentCtx liveCtx
             elif EnforcerRepair.hasErroredBlogAttempt ctx.RawMessages then
-                return! decideErroredBlog ctx sessionKey currentCtx liveCtx
+                // A real chronicle call that failed schema/tool execution still
+                // has a Host-owned tool-result continuation. The Blogger gets the
+                // error and may correct its own hint on the next provider step.
+                // Repair here would race that continuation and surface as queued.
+                return ctx.Project ctx.RawMessages
             elif EnforcerRepair.hasCompletedBlogTool ctx.RawMessages then
                 return!
                     decideInvalidTerminal

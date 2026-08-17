@@ -199,8 +199,13 @@ squash（`BlogObservationsSquashed`）把最老 K 个 frame 折叠为一个 Squa
 
 ### BD-017 无有效 cycle → 有界协议修复，不另造预算
 
-无有效 cycle（`chronicle` 0 次 / 2+ 次、纯散文、缺 tip、空 entry）→ 进入
-InteractionRepair/nudge 路径：每个 exact `BloggerRequestId` 至多一次 Nudge；同一 terminal run 重放幂等（同一观察
+无有效 cycle（`chronicle` 0 次 / 2+ 次、纯散文、缺 tip、空 entry）最终可进入
+InteractionRepair/nudge 路径，但**第一次物理 Nudge 只能由真正 quiescent 的 idle terminal 拥有，transform
+不得发送 session nudge**。transform 正处在 Host provider/tool-loop 内，在那里发送 nudge 会与 Host 的自然
+continuation 竞争并形成 queued user message。尤其“恰好一次 chronicle，但参数/schema/tool execution 因错误
+tip/hint 失败”仍属于 Host tool-loop：先把 tool error 原样交回 Blogger，让它在下一 provider step 自己改正；
+这一失败本身不 claim repair、不记 confirmed failure、不消费 AABB。只有后续真正无 tool-loop 可继续的
+invalid terminal 才由 idle 立即发送 repair nudge。每个 exact `BloggerRequestId` 至多一次 Nudge；同一 terminal run 重放幂等（同一观察
 重放，不发送、不推进）；新 terminal 再次无效才证明 nudge repair 失败 → 统一 Fallback/AABB；abort 清理
 残留只注入一次 repair、不推进主 cursor、不消耗 AABB 预算。**0-call/pure-prose terminal 不得依赖
 “下一次 provider transform”才能开始修复**：它没有 tool loop，自然也没有下一次 transform；Host

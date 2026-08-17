@@ -345,7 +345,6 @@ module EnforcerHost =
     let handleContinuation
         (scope: IParkedTransformHost)
         (journal: AgentJournal option)
-        (repairNudge: InteractionRepairNudge option)
         (confirmedFailure: ConfirmedFailurePort option)
         (recoveryProbe: AgentJournal -> SessionId -> obj list -> EnforcerContinuation.RecoveryStageProbe)
         (bloggerSessionId: SessionId)
@@ -378,7 +377,6 @@ module EnforcerHost =
                   Owner = owner
                   BloggerSessionId = bloggerSessionId
                   RawMessages = rawMessages
-                  RepairNudge = repairNudge
                   ConfirmedFailure = confirmedFailure
                   RecoveryProbe = recoveryProbe
                   Project = project

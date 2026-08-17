@@ -1,6 +1,34 @@
-# Wanxiangshu
+# 万象术：让一万只大象一起跳舞
 
-OpenCode 上的结构化多 Agent 编排插件：Orchestrator / Manager 调度，Coder、Inspector、DevOps、Reviewer 等角色分工，Companion 提供会话级认知上下文，Fallback 与 Review 有明确写入口。
+写程序这件事，长久以来是一个人的手艺。一个工程师，一台电脑，一条思路，从需求走到代码，饿了吃饭，困了睡觉。后来 AI 来了，我们忽然有了一群不会疲倦的程序员。它们读代码，查资料，写功能，补测试，做代码审查；来自不同的厂商，用着不同的模型，脾气也各不相同——有的谨慎，有的激进；有的写起代码来像钟表匠，有的像推土机。而且，每一个都还在变聪明。
+
+于是有了一个新问题：如果一个智能体能写程序，一百个、一千个、一万个一起写，会怎么样？
+
+这件事，有点像让一万只大象跳舞。
+
+大象并不蠢。恰恰相反，它们聪明、有力、记性惊人，问题只在于太重。一只大象往左挪一步，那只是一步；一万只大象同时往左挪一步，地都要震。工程里也是如此：这边刚改完一个文件，那边的智能体已经把它覆盖了；这个还在查问题，那个已经按自己的理解动了手；有的以为任务做完了，有的还欠着测试；有的掉线，有的重试，有的忘了自己干过什么。要是再闯进来一个带着别家模型习惯的，场面就更热闹了。
+
+对付这样的场面，喊是喊不动的，给每头象拴一根更长的绳子也没用。现在不少智能体编程的做法，说到底还是一个指挥站在台中央，拼命挥棒子，指望几十头越来越有主见的象恰好踩在同一个小节上。两三头的时候，这法子看着不错；十头，开始手忙脚乱；一万头，指挥棒就成了道具。
+
+人们爱说，站在风口上，猪也能飞。风确实起来了：模型越来越强，价格越来越低，速度越来越快智能体越来越多。可是风托得起一只猪，托不起一万头没有队形的象。到了那个规模，能不能飞，不再取决于哪头象最聪明，而取决于地上有没有路，有没有红绿灯，有没有账本、分工和规矩；有人跌倒了，队伍还走不走；有人走散了，还能不能找回来；各支队伍能不能踩着自己的步子，在同一个世界里把同一件事做完。
+
+这就是我们做万象术的原因。“万象”，既是一万头象，也是世间万象。我们不想去造世界上最聪明的那头象，也不想把所有的象驯成同一个姿势。我们想做的事更笨一些，也更基础一些：让不同的智能体各尽其长，又能共同成事。今天最好的模型能来，明天更好的也能来。
+
+它们性格不同，能力不同，上下文不同，干活的法子也不同。但只要进了同一个工程，就知道自己是谁，正在做什么，能做什么、不能做什么；知道哪些事已经发生，哪些事还没有完成；知道什么时候可以并行，什么时候必须等待；知道怎样把手里的活交给另一个智能体—也知道，万一哪个智能体消失了，世界不该跟着失忆。
+
+这里没有永远正确的总指挥，也没有一根拴住所有象的绳子。有的只是一套基础设施，让协作这件事本身变得可靠。
+
+于是，一头象可以跑，一百头象可以协作，一万头象可以跳舞。而且跳的不是同一种舞：爵士、芭蕾、街舞，还有没人见过的新舞步——各有各的节奏，各有各的长处，谁也不踩谁的脚。
+
+这就是万象术：不是驯服智能的法术，而是驾驭智能规模的技术。我们相信，AI 编程的下一个时代，不属于拥有最强智能体的人，而属于能让无数不同的智能体自由加入、可靠协作、把真正复杂的工作做完的人——就像今天的进程、服务和机器那样。当智能成为充沛的资源，协同就是新的稀缺品。万象术想做的，就是这一层。
+
+让一万头大象一起跳舞。更快，更好，更省。
+
+万象皆可用，众智自成事。
+
+---
+
+OpenCode 上的结构化多智能体编排插件：Orchestrator / Manager 调度，Coder、Inspector、DevOps、Reviewer 等角色分工，Companion 提供会话级认知上下文，Fallback 与 Review 有明确写入口。
 
 Wanxiangshu is proprietary commercial software.
 Use, copying, modification, and distribution are governed by LICENSE.
@@ -75,14 +103,14 @@ Orchestrator
 
 Executor、Blogger 等由编排路径调用，不作为单独“安装角色”配置。
 
-### Agent 角色
+###智能体角色
 
 与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致（十个 system prompt 角色）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
 | Orchestrator | `fork-manager`, `join` | 顶层编排 |
-| Manager | `fork-agent`, `join`, `list` | 任务分解与子会话 |
+| Manager | `fork智能体, `join`, `list` | 任务分解与子会话 |
 | Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector` | 源码修改 |
 | Inspector | `read`, `glob`, `grep`, `executor` | 只读调查 |
 | DevOps | `fork-pty`, `executor`, 检索与 `inspector` 等 | 进程与环境 |
@@ -121,7 +149,7 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 | peer 依赖报错 | 安装与 Host 匹配的 `@opencode-ai/plugin` |
 | 行为与预期不符 | 对照 CHANGELOG 与 [requirements/README.md](requirements/README.md)；商业支持见下节 |
 
-源码排查见贡献者指南与 `AGENTS.md`。
+源码排查见贡献者指南与 智能体.md`。
 
 ### 商业许可与支持
 
@@ -164,7 +192,7 @@ dotnet tool restore
 npm run format-build-test
 ```
 
-请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 `package.json` / `AGENTS.md`）。
+请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 `package.json` / 智能体.md`）。
 
 ### 常用命令
 
@@ -194,7 +222,7 @@ npm run format-build-test
 - **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 
-导航：[requirements/README.md](requirements/README.md)。治理见 `AGENTS.md` 与归档文档。
+导航：[requirements/README.md](requirements/README.md)。治理见 智能体.md` 与归档文档。
 
 ### 运行时资源
 
@@ -242,4 +270,4 @@ Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · `AGENTS.md`
+更多：[requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · 智能体.md`

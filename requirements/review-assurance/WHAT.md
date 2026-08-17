@@ -127,7 +127,7 @@
 
 ## REVIEW-ASSURANCE-012：可消费证据 request-range bounded；session head 不能冒充
 
-**规范**：过程/终末审查的可消费证据唯一表示是 request-range bounded canonical LWR（`includeOpening=false`）。三个用途各用冻结 range：ManagerCheckpointLWR(k) = reviewer-known Manager start..assigned exact ManagerReviewFrontier(k)；ProcessReviewLWR(k) = ReviewWorkStartCursor..ReviewerRecordFrontier(k)；Finality reviewer LWR = FinalityReviewWorkStartCursor..FinalityVerdictFrontier。首个 Manager start 为 `next(Life.OpeningCursor)`，后续 start 为上一 concluded assignment 的 exact Manager frontier；当前 T1 acceptance 产生的 post-T1 global opening floor 不得 retroactively 参与当前 request。**禁止取 session 当前 head 冒充**任何一条有界 LWR；历史 process turns 不得整段塞进终末 LWR。
+**规范**：过程/终末审查的可消费证据唯一表示是 request-range bounded canonical LWR（`includeOpening=false`）。三个用途各用冻结 range：ManagerCheckpointLWR(k) = reviewer-known Manager start..assigned exact ManagerReviewFrontier(k)；ProcessReviewLWR(k) = ReviewWorkStartCursor..ReviewerRecordFrontier(k)；Finality reviewer LWR = FinalityReviewWorkStartCursor..FinalityVerdictFrontier。首个 Manager start 为 `next(Life.OpeningCursor)`，后续 start 为上一 concluded assignment 的 exact Manager frontier；同一 dedicated process reviewer 的 `OpeningRaw` 只在第一次 assignment 作为 authority bootstrap 发送，已有 concluded review 后的 continuation 不得重放 `OpeningRaw`。当前 T1 acceptance 产生的 post-T1 global opening floor 不得 retroactively 参与当前 request。**禁止取 session 当前 head 冒充**任何一条有界 LWR；历史 process turns 不得整段塞进终末 LWR。
 
 **含义/动机**：Dedicated session 跨多个 Rk 复用后，若取 session head，R4 报告会吞入 R1–R3。request 绑定（GLORY-051）要求每份 record 绑定 current request/checkpoint、member session、barrier（若有）、tree（若有）与 digest；不一致 fail closed。
 
