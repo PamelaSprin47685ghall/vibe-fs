@@ -30,7 +30,7 @@
 
 ---
 
-OpenCode 上的结构化多智能体编排插件：Orchestrator / Manager 调度，Coder、Inspector、DevOps、Reviewer 等角色分工，Companion 提供会话级认知上下文，Fallback 与 Review 有明确写入口。
+万象术以 OpenCode 插件形式落地。它不替换 Host 的对话模型，而是在其上叠加一层结构化编排：Orchestrator 统筹全局，Manager 分解任务并管理子会话，Coder 修改源码，Inspector 只读调查，DevOps 管控进程与环境，Reviewer 裁决质量。每个角色有自己的工具面与权限边界，Companion 在会话级提供认知上下文，Fallback 与 Review 各有明确写入口。智能体不必彼此信任，只需遵守同一套事实与边界。
 
 Wanxiangshu is proprietary commercial software.
 Use, copying, modification, and distribution are governed by LICENSE.
@@ -39,7 +39,7 @@ Use, copying, modification, and distribution are governed by LICENSE.
 
 ### 产品简介
 
-万象术（Wanxiangshu）作为 OpenCode 插件加载后，为 Host 会话提供多角色协作、任务分叉与汇合、审阅与恢复。公开入口：
+万象术作为 OpenCode 插件加载后，为 Host 会话提供多角色协作、任务分叉与汇合、审阅与恢复。公开入口：
 
 ```text
 import "wanxiangshu"
@@ -87,10 +87,11 @@ npm install wanxiangshu --registry <your-private-registry>
 
 ### 快速开始
 
+安装并在 OpenCode 注册插件后，Orchestrator 发起任务，Manager 分解并管理子会话，子角色按工具面分工：
+
 ```bash
 npm install ./wanxiangshu-0.8.2.tgz
 # 在 OpenCode 注册插件后启动会话
-# Orchestrator / Manager 发起任务；子角色按工具面分工
 ```
 
 ```text
@@ -99,59 +100,38 @@ Orchestrator
         ├── Coder
         ├── Inspector
         ├── DevOps
-        ├── Browser / Meditator
+        ├── Browser / Inquiry
         └── Reviewer
 ```
 
-Executor、Blogger 等由编排路径调用，不作为单独“安装角色”配置。
+Distiller、Blogger 等由编排路径调用，不作为单独“安装角色”配置。
 
-###智能体角色
+### 智能体角色
 
-与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致（十个 system prompt 角色）：
+十个 public Role，与 `requirements/participant-identity`、`requirements/cognitive-environment` 一致。工具面由 `Roles.permissions` 定义（`requirements/capability-enforcement` 四层同构）：
 
 | 角色 | 典型工具面 | 说明 |
 |------|------------|------|
-| Orchestrator | `fork-manager`, `join` | 顶层编排 |
-| Manager | `fork智能体, `join`, `list` | 任务分解与子会话 |
-| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspector` | 源码修改 |
-| Inspector | `read`, `glob`, `grep`, `executor` | 只读调查 |
-| DevOps | `fork-pty`, `executor`, 检索与 `inspector` 等 | 进程与环境 |
-| Browser | 检索与网络相关工具 | 浏览类任务 |
-| Meditator | 检索与 `inspector` | 分析类任务 |
-| Reviewer | 检索、`verdict` | 审阅与裁决 |
-| Executor | 无工具 | 内部执行/摘要 |
-| Blogger | `blog` | Companion 叶子，写认知上下文 |
+| Orchestrator | `fork-manager`, `join`, `horizon` | 顶层编排 |
+| Manager | `fork-manager`, `join`, `horizon`, `todowrite`, `fission` | 任务分解与子会话 |
+| Coder | `read`, `write`, `edit`, `glob`, `grep`, `inspect`, `fetch`, `fission` | 源码修改 |
+| Inspector | `read`, `glob`, `grep`, `query-shell`, `fetch`, `fission` | 只读调查 |
+| DevOps | `fork-pty`, `executor`, `inspect`, `behavior` 等 | 进程与环境 |
+| Browser | `read`, `glob`, `grep`, `stealth-browser-mcp`, `fission` | 浏览类任务 |
+| Inquiry | `inspect`, `sphinx`, `fission` | 语义调查与分析 |
+| Reviewer | `read`, `glob`, `grep`, `judge` | 审阅与裁决 |
+| Distiller | 无工具 | 输出蒸馏/摘要 |
+| Blogger | `chronicle` | Companion 叶子，写认知上下文 |
 
-每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
+Bookkeeper 是内部叶子角色（有独立 Role Law，不进 public Role DU）。每个 managed work session 配套叶子 Companion（Blogger）。精确权限见 `requirements/participant-identity` 与 `requirements/capability-enforcement`。
 
 ### 运行时数据
 
-- 领域事实写入 Git common directory 下插件私有 runtimes 路径中的 journal（按 runtime 的 NDJSON），不在业务 workspace 强制创建插件私有目录。
-- 随包资源：`resources/provider/`（Common Law / Role Law / Office Library；EN + zh-CN）；`resources/enforcer/<TipName>/{enforcer.md,main.md}`。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
+领域事实写入 Git common directory 下插件私有 runtimes 路径中的 journal（按 runtime 的 NDJSON），不在业务 workspace 强制创建插件私有目录。随包资源：
+
+- `resources/provider/`（Common Law / Role Law / Tool Law / Delegation Law / Office Library；EN + zh-CN）；`resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md`；`resources/git/wanxiang-hook.mjs`；`resources/wanxiangshu.mjs`（model routing 模板）。**无** `resources/prompts/*`；**无** `catalog.json` SSOT。
 - journal 与事实名默认冻结；升级前阅读 [CHANGELOG](CHANGELOG.md)。
 
-### 升级与兼容性
-
-- 0.5.3 无运行时协议变更：布局、资源打包与仓库整理为主，公开行为与 wire 语义与 0.5.2 产品合同一致。
-- 0.5.4：DSL 全面主导化与门禁收紧（控制流/测试 harness）；journal/wire 协议与 0.5.3 兼容。
-- 0.6.0：Causal CE / Finality / HOST-013 / Student–Teacher / Projection Algebra 收口；文档治理与 canary 可信度；相对 0.5.4 兼容方向见 CHANGELOG。
-- 0.8.2：持久化 / Git / session 工作流全面异步化，SyncDelegate 语义批处理与 Host/Fork/Magic Todo 行为收口；相对 0.8.1 的兼容性说明见 CHANGELOG。
-- 0.8.1：REVIEW-003 challenge 跟 session ProviderLanguage；英文 canonical 字节不变；相对 0.8.0 无 domain protocol 破坏，见 CHANGELOG。
-- 0.8.0：Provider-visible prose 全部经 ProviderLanguage（PROMPT-019）；Gate E 0；Gate C Role Law semantic-anchor 现行；相对 0.7.0 无 domain protocol 破坏，见 CHANGELOG。
-- 0.7.0：Kolmogorov 所有权二级拆分（LWR / ManagerLife / PluginTransforms / HostSignal / Reconciler）；G6/G9 Exit；Strength / JS tools / MCP；相对 0.6.0 无 domain protocol 破坏，见 CHANGELOG。
-- 升级：安装新版本 → 确认 Node ≥ 20 与 Host peer → 重启 OpenCode。
-- 破坏性变更见 CHANGELOG；跳版本时按条目顺序阅读。
-
-### 故障排查
-
-| 现象 | 处理方向 |
-|------|----------|
-| 插件无法加载 / import 失败 | 确认 `dist/.../Plugin.js` 存在；tarball 须含 `dist/` 与 `resources/` |
-| 启动即失败（资源） | 检查 `resources/provider/` 语言对与 `resources/enforcer/<tip>/` 完整合法 |
-| peer 依赖报错 | 安装与 Host 匹配的 `@opencode-ai/plugin` |
-| 行为与预期不符 | 对照 CHANGELOG 与 [requirements/README.md](requirements/README.md)；商业支持见下节 |
-
-源码排查见贡献者指南与 智能体.md`。
 
 ### 商业许可与支持
 
@@ -163,16 +143,17 @@ Executor、Blogger 等由编排路径调用，不作为单独“安装角色”�
 
 ## 贡献者指南
 
-面向维护者。法律上仍为专有商业软件。
+面向维护者。法律上仍为专有商业软件，内部工程纪律见 [AGENTS.md](AGENTS.md)。
 
 ### 仓库结构
 
 ```text
 src/           生产源码
 resources/     随包运行时资源
-requirements/  45 包 normative 语义树：每包 WHY/WHAT/HOW/PROOF + 包自有测试
+requirements/  48 包 normative 语义树：每包 WHY/WHAT/HOW/PROOF + 包自有测试
 proposals/     deferred 未来材料（用户管理）
 scripts/       构建与少量仓库检查
+cleanup/       退役追踪与 migration 报告
 dist/          最终编译输出，不提交
 artifacts/     中间产物与本地发布产物，不提交
 ```
@@ -194,7 +175,7 @@ dotnet tool restore
 npm run format-build-test
 ```
 
-请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 `package.json` / 智能体.md`）。
+请用 `npm ci`。`bun-pty` 经 `overrides` 固定（见 `package.json` / [AGENTS.md](AGENTS.md)）。
 
 ### 常用命令
 
@@ -212,7 +193,7 @@ npm run format-build-test
 
 | 层 | 入口 | 范围 |
 |----|------|------|
-| unit | `requirements/verification-system/tests/run.mjs` | 对 `dist/` 的契约；经 `requirements/verification-system/tests/support/domain.mjs` |
+| unit | `requirements/verification-system/tests/run.mjs` | 对 `dist/` 的契约；经 `requirements/verification-system/tests/support/` |
 | integration | `requirements/verification-system/tests/integration/run.mjs` | resources、plugin、persist、strength、package、harness（套件在 owner 包 `tests/integration/` 下） |
 | e2e | `requirements/verification-system/tests/e2e/entry.test.mjs` | `scenarios/long-stroke.toml` + `support/` oracles；单次连续生命周期 |
 
@@ -220,11 +201,13 @@ npm run format-build-test
 
 ### 规范与文档体系
 
-- **规范**：`requirements/<package>/{WHY,WHAT,HOW,PROOF}.md`（45 包 normative 树；WHAT 命题 ID 稳定寻址，每条有测试落点）。
+规范是万象术的语义根：每条行为命题有稳定 ID、测试落点和 owner 包。规范不跟踪实现进度，只定义正确性。
+
+- **规范**：`requirements/<package>/{WHY,WHAT,HOW,PROOF}.md`（48 包 normative 树；WHAT 命题 ID 稳定寻址，每条有测试落点）。
 - **历史 Clause 与变更记录**：2026-08-14 cutover 已归档（含 Kolmogorov 工程纪律与 completed change 考古；git 历史可回溯）。
 - 测试全部包自有（`requirements/<package>/tests/`），直接引用 WHAT 命题 ID。规范不跟踪实现进度。
 
-导航：[requirements/README.md](requirements/README.md)。治理见 智能体.md` 与归档文档。
+导航：[requirements/README.md](requirements/README.md)。治理见 [AGENTS.md](AGENTS.md) 与归档文档。
 
 ### 运行时资源
 
@@ -232,11 +215,19 @@ npm run format-build-test
 resources/provider/
   world/common-law/{en,zh-CN}.md
   role/<role>/{en,zh-CN}.md
-  library/...
-resources/enforcer/<TipName>/{enforcer.md,main.md}
+  tool/<tool>/{en,zh-CN}.md
+  delegation/<scenario>/{en,zh-CN}.md
+  host/<guideline>/{en,zh-CN}.md
+  lifecycle/<phase>/{en,zh-CN}.md
+  review/challenge/{en,zh-CN}.md
+  runtime/<scenario>/{en,zh-CN}.md
+  library/<office>/{en,zh-CN}.md
+resources/enforcer/<TipName>/{enforcer,main}{,.zh-CN}.md
+resources/git/wanxiang-hook.mjs
+resources/wanxiangshu.mjs
 ```
 
-加载：`Infrastructure/Resources/`（`PackageResources`、`ProviderResources`、`PromptResources`、`EnforcerCatalogResource`、`RuntimeResources`）；插件初始化 load/install 一次。
+加载：`Resources/`（`PackageResources`、`ProviderResources`、`PromptResources`、`EnforcerCatalogResource`、`RuntimeResources`）；插件初始化 load/install 一次。
 旧 `resources/prompts/*-system.md` 已删除；生产 system 仅由 Common Law → Role Law → Office Library 组成。
 
 ### 构建与打包
@@ -272,4 +263,4 @@ Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · 智能体.md`
+更多：[requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)
