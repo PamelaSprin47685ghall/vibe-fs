@@ -69,10 +69,3 @@ module StrengthRollout =
               Delay2 = costs.Delay2
               Risk1 = costs.Risk1
               Risk2 = costs.Risk2 }
-
-    let isShadow =
-        function
-        | StrengthRolloutMode.Shadow -> true
-        | StrengthRolloutMode.Off
-        | StrengthRolloutMode.DryRun
-        | StrengthRolloutMode.Treatment -> false

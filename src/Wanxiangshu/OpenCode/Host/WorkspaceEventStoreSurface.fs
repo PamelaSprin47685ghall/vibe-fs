@@ -65,29 +65,3 @@ module WorkspaceEventStoreSurface =
 
     let same (left: WorkspaceJournalHandle) (right: WorkspaceJournalHandle) : bool =
         obj.ReferenceEquals(left.Journal, right.Journal)
-
-    let appendClosed (handle: WorkspaceJournalHandle) (session: string) : Task<obj> =
-        task {
-            let fact =
-                CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create session |}
-
-            let! result = AgentJournal.appendAgent (StreamId.Session(SessionId.create session)) None fact handle.Journal
-
-            match result with
-            | Ok projection ->
-                let present =
-                    AgentProjection.tryFind (SessionId.create session) projection.AgentProjections
-                    |> Option.isSome
-
-                return box {| ok = true; session = present |}
-            | Error error ->
-                return
-                    box
-                        {| ok = false
-                           error = error.ToString() |}
-        }
-
-    let hasCurrent (commonDirectory: string) : bool =
-        match WorkspaceEventStore.tryCurrent commonDirectory with
-        | None -> false
-        | Some store -> store.TryCurrent("Journal") |> Option.isSome

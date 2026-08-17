@@ -55,6 +55,3 @@ module StrengthBudget =
         | StrengthBudget.K0 -> 0
         | StrengthBudget.K1 -> 1
         | StrengthBudget.K2 -> 2
-
-    /// Holdout-gated promotion: K1->K2 needs ExpectedValue(K2) > K2Margin where K2Margin > K1Margin.
-    let canPromoteToK2 (expectedValueK2: float) (k2Margin: float) : bool = expectedValueK2 > k2Margin

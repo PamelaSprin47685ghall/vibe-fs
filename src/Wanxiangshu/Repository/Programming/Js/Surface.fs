@@ -73,9 +73,6 @@ module JsToolGenerator =
     let renderBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
         JsCanonicalDescription.runtimeBaseClass prose capabilities
 
-    let renderPublicBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
-        JsCanonicalDescription.publicBaseClass prose capabilities
-
     let renderDescription
         (prose: JsCanonicalDescription.Prose)
         (roleName: string)

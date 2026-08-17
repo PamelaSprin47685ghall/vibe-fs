@@ -164,9 +164,3 @@ module StrengthPolicy =
         | StrengthDecision.Skip _
         | StrengthDecision.ControlHoldout -> StrengthBudget.K0
         | StrengthDecision.Speculate(budget, _) -> budget
-
-    let isSpeculate =
-        function
-        | StrengthDecision.Speculate _ -> true
-        | StrengthDecision.Skip _
-        | StrengthDecision.ControlHoldout -> false

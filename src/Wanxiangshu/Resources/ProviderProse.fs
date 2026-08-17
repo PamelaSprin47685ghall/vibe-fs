@@ -70,8 +70,8 @@ module ProviderProse =
     let private placeholderRe =
         Regex(@"\{\{([A-Za-z][A-Za-z0-9_]*)\}\}", RegexOptions.Compiled)
 
-    /// Bound session → that language. Unbound → English (HOST-026 first-touch /
-    /// PromptResources.languageForSession). Does not bind: session-create still
+    /// Bound session → that language. Unbound → English (HOST-026 first-touch).
+    /// Does not bind: session-create still
     /// owns the real preference write. Bound + missing resource still fail closed.
     let languageOf (sessionId: SessionId) : ProviderLanguage =
         match SessionProviderLanguage.tryGet sessionId with

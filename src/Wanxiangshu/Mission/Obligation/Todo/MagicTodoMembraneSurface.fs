@@ -24,18 +24,6 @@ module MagicTodoMembraneSurface =
     let private text (value: obj) =
         if isNull value then "" else string value
 
-    type private SnapshotPort(source: obj) =
-        interface ISessionSnapshotPort with
-            member _.GetMessages(_sessionId: SessionId) =
-                task {
-                    let! value = source?GetMessages ()
-
-                    if not (isNull (value?ok)) && not (unbox<bool> (value?ok)) then
-                        return Error(text (value?error))
-                    else
-                        return Ok []
-                }
-
     let private stateOf (value: obj) : SnapshotToolPartState =
         match if isNull value then 0 else unbox<int> value with
         | 1 -> SnapshotToolPartState.Completed ""
@@ -247,24 +235,3 @@ module MagicTodoMembraneSurface =
 
     let snapshot (handle: JournalHandle) (lifeId: string) : obj =
         ObligationJournalSurface.snapshotMagicTodo handle lifeId
-
-    let createHooks (handle: JournalHandle) (snapshot: obj) (processReview: obj) : obj =
-        let snapshotPort =
-            if isNull snapshot then
-                None
-            else
-                Some((SnapshotPort(snapshot) :> ISessionSnapshotPort))
-
-        let processReviewPort =
-            if isNull processReview then
-                None
-            else
-                Some(unbox<ProcessReviewPort> processReview)
-
-        let hooks =
-            MagicTodoHostHooks.create (Some handle.Journal) snapshotPort processReviewPort
-
-        createObj
-            [ "Definition", box hooks.Definition
-              "Before", box hooks.Before
-              "After", box hooks.After ]

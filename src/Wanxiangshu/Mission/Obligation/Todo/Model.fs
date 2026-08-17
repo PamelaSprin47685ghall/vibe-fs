@@ -126,11 +126,6 @@ module MagicTodo =
 
     module ProcessReviewVerdict =
 
-        let ofGuard (verdict: ReviewGuardVerdict) : ProcessReviewVerdict =
-            match verdict with
-            | ReviewGuardVerdict.Perfect -> ProcessReviewVerdict.Perfect
-            | ReviewGuardVerdict.Revise -> ProcessReviewVerdict.Revise
-
         let wire (verdict: ProcessReviewVerdict) : string =
             match verdict with
             | ProcessReviewVerdict.Perfect -> "PERFECT"

@@ -171,10 +171,4 @@ module MagicTodoProjectionSurface =
     let view (handle: MagicTodoProjectionHandle) (lifeId: string) : obj =
         lifeView handle.State (ManagerLifeId.create lifeId)
 
-    let reviewerLife (handle: MagicTodoProjectionHandle) (reviewerSessionId: string) : obj =
-        handle.State.ReviewerLifeBySession
-        |> Map.tryFind reviewerSessionId
-        |> Option.map (fun value -> box (ManagerLifeId.value value))
-        |> Option.toObj
-
     let state (handle: MagicTodoProjectionHandle) = handle.State

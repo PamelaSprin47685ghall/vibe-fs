@@ -109,9 +109,6 @@ module ManagedAgent =
     let peer (agent: ManagedAgent) : ManagedAgent =
         make (ManagedAgentCatalog.peerTier agent.Tier) agent.Role
 
-    let isPublic (agent: ManagedAgent) =
-        agent.Visibility = AgentVisibility.Public
-
     let isInternal (agent: ManagedAgent) =
         agent.Visibility = AgentVisibility.Internal
 

@@ -128,10 +128,6 @@ module PromptResources =
         |> List.map (fun text -> text.Trim())
         |> String.concat "\n\n---\n\n"
 
-    let roleLawFor (lang: ProviderLanguage) (role: Role) =
-        ensureParity ()
-        read lang (roleSemanticPath role)
-
     let systemForRole (lang: ProviderLanguage) (role: Role) =
         ensureParity ()
         let common = read lang "world/common-law"
@@ -172,16 +168,3 @@ module PromptResources =
 
     let load () : PromptCatalog =
         loadForLanguage ProviderLanguage.English
-
-    /// Bound → bound language. Unbound → English (HOST-026). Same rule as
-    /// `ProviderProse.languageOf`. Bound + missing resource still fail closed.
-    let languageForSession (sessionId: SessionId) : ProviderLanguage =
-        match SessionProviderLanguage.tryGet sessionId with
-        | Some lang -> lang
-        | None -> ProviderLanguage.English
-
-    let loadForSession (sessionId: SessionId) : PromptCatalog =
-        loadForLanguage (languageForSession sessionId)
-
-    let systemForSessionRole (sessionId: SessionId) (role: Role) =
-        systemForRole (languageForSession sessionId) role
