@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
@@ -197,19 +196,25 @@ module HandleFoldSurface =
     /// `{ ok: false, error: { Fact, Reason } }` (fold rejection) or
     /// `{ ok: false, error: { kind, value } }` (invalid input).
     let foldApply (state: FoldState) (envelopes: obj array) : obj =
-        let foldEnvelope current envelope =
-            result {
-                let! fact = buildFact envelope?fact
+        let rec foldAll current remaining =
+            match remaining with
+            | [] -> Ok current
+            | envelope :: tail ->
+                let factObj = envelope?fact
 
-                return!
-                    ExecutionFactFold.fold current fact
-                    |> Result.mapError (fun rejection ->
-                        box
-                            {| ok = false
-                               error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |})
-            }
+                match buildFact factObj with
+                | Error errorBox -> Error errorBox
+                | Ok fact ->
+                    match ExecutionFactFold.fold current fact with
+                    | Ok next -> foldAll next tail
+                    | Error rejection ->
+                        Error(
+                            box
+                                {| ok = false
+                                   error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |}
+                        )
 
-        match Array.fold (fun folded envelope -> Result.bind (fun current -> foldEnvelope current envelope) folded) (Ok state.Internal) envelopes with
+        match foldAll state.Internal (Array.toList envelopes) with
         | Ok current -> box {| ok = true; state = FoldState current |}
         | Error errorBox -> errorBox
 

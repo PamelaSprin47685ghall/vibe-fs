@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as host from '../../../dist/OpenCode/Host/HostBoundarySurface.js'
+import * as SessionSnapshotSurface from '../../../dist/OpenCode/Host/SessionSnapshotSurface.js'
+
+const projectMessages = SessionSnapshotSurface.projectMessages
+const locateToolCall = SessionSnapshotSurface.locateToolCall
+const toolPartStateAt = SessionSnapshotSurface.toolPartStateAt
 
 const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', callID = 'call_todo', status = 'pending' } = {}) => ({
   info: { id: messageID, role: 'assistant' },
@@ -8,25 +12,28 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
 })
 
 test('WHAT[HOST-BOUNDARY-012] TODO-004 resolves a tool callback through its persisted assistant run and Host ToolPart', () => {
-  const located = host.locateToolCall('call_todo', [assistantToolMessage({ status: 'completed' })])
+  const messages = projectMessages([assistantToolMessage({ status: 'completed' })])
+  const located = locateToolCall('call_todo', messages)
   assert.equal(located.ok, true)
   assert.equal(located.providerRun, 'asst_run')
   assert.equal(located.hostToolPartId, 'part_todo')
   assert.equal(located.toolCallId, 'call_todo')
-  assert.equal(located.state.kind, 'completed')
 })
 
 test('WHAT[HOST-BOUNDARY-006] HOST-004 keeps failed session tool state consistent across Parts and ToolParts', () => {
-  const located = host.locateToolCall('call_todo', [assistantToolMessage({ status: 'error' })])
-  assert.equal(located.ok, true)
-  assert.equal(located.state.kind, 'failed')
+  const messages = projectMessages([assistantToolMessage({ status: 'error' })])
+  const part = toolPartStateAt(messages, 0, 0)
+  assert.equal(part.ok, true)
+  assert.equal(part.state, 'failed')
 })
 
 test('WHAT[HOST-BOUNDARY-009] TODO-004 rejects a call id observed in more than one persisted ToolPart', () => {
-  const located = host.locateToolCall('call_todo', [
+  const messages = projectMessages([
     assistantToolMessage({ messageID: 'asst_1', partID: 'part_1' }),
     assistantToolMessage({ messageID: 'asst_2', partID: 'part_2' }),
   ])
+  const located = locateToolCall('call_todo', messages)
   assert.equal(located.ok, false)
   assert.equal(located.error, 'Ambiguous')
+  assert.equal(located.toolCallId, 'call_todo')
 })

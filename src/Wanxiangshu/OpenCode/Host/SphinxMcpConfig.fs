@@ -100,3 +100,33 @@ module SphinxMcpConfig =
 
     let apply (config: obj) (launch: Launch) : unit =
         if isNull config then () else applyNonNull config launch
+
+    // ── JS-native boundary for HOST-BOUNDARY-017 contract tests ────────────
+
+    /// The server identity this adapter owns.
+    let serverIdentity () : string = SphinxMcp.serverName
+
+    /// The local command for a given entry path.
+    let localCommandFor (entryPath: string) : string array = SphinxMcp.localCommand entryPath
+
+    /// Apply a launch decision to a config, preserving other MCP servers.
+    /// Returns the config object (mutated in place) for chaining.
+    let applyToConfig (config: obj) (launch: Launch) : obj =
+        if isNull config then config
+        else
+            applyNonNull config launch
+            config
+
+    /// Classify a launch decision as enabled/disabled for contract tests.
+    let launchEnabled (launch: Launch) : bool =
+        match launch with
+        | Launch.Disabled -> false
+        | Launch.Fixture _
+        | Launch.Local _ -> true
+
+    /// The reason a launch is disabled or enabled.
+    let launchReason (launch: Launch) : string =
+        match launch with
+        | Launch.Disabled -> "disabled"
+        | Launch.Fixture _ -> "fixture"
+        | Launch.Local _ -> "enabled"

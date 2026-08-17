@@ -6,11 +6,15 @@
 // location proof for canary H: the Host's persisted assistant run + ToolPart
 // uniquely locate a tool callback through (messageId, partId, callId).
 //
-// Uses the registered Host boundary surface over production snapshot locality.
+// Uses production SessionSnapshotSurface.locateToolCall — JS-native plain
+// objects only, no raw Fable representation.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as host from '../../../dist/OpenCode/Host/HostBoundarySurface.js'
+import * as SessionSnapshotSurface from '../../../dist/OpenCode/Host/SessionSnapshotSurface.js'
+
+const projectMessages = SessionSnapshotSurface.projectMessages
+const locateToolCall = SessionSnapshotSurface.locateToolCall
 
 const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', callID = 'call_todo', status = 'pending' } = {}) => ({
   info: { id: messageID, role: 'assistant' },
@@ -18,7 +22,8 @@ const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', ca
 })
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_H journal xtrace uniquely completes host carrier', () => {
-  const located = host.locateToolCall('call_todo', [assistantToolMessage({ status: 'completed' })])
+  const messages = projectMessages([assistantToolMessage({ status: 'completed' })])
+  const located = locateToolCall('call_todo', messages)
   assert.equal(located.ok, true)
   assert.equal(located.providerRun, 'asst_run')
   assert.equal(located.hostToolPartId, 'part_todo')
@@ -26,7 +31,8 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_H journal xtrace uniquely completes host ca
 })
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_H journal mapping fails closed on host part mismatch', () => {
-  const located = host.locateToolCall('call_missing', [{ info: { id: 'ses_x' }, parts: [{ type: 'text', text: 'not a tool' }] }])
+  const messages = projectMessages([{ info: { id: 'ses_x' }, parts: [{ type: 'text', text: 'not a tool' }] }])
+  const located = locateToolCall('call_missing', messages)
   assert.equal(located.ok, false)
   assert.equal(located.error, 'Missing')
 })

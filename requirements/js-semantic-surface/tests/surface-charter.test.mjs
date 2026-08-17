@@ -79,7 +79,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
   const fixtureSource = [
     'import { leak } ',
     'from ',
-    ["'../../../../", "dist/Mission/Finality/Workflow.js'"].join(''),
+    "'../../../../" + "dist/Mission/Finality/Workflow.js'",
     '\nexport const leak = (value) => value.',
     'f',
     'ields[0]\n',
@@ -167,7 +167,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
     writeFileSync(source, 'module Owner.Surface\n')
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
-    writeFileSync(testFile, ['import * as surface ', 'from ', "'../../../", "dist/Owner/Surface.js'\nvoid surface\n"].join(''))
+    writeFileSync(testFile, ['import * as surface ', 'from ', "'../../../dist/Owner/Surface.js'\nvoid surface\n"].join(''))
     const entry = {
       module: 'Owner/Surface.js',
       owner: 'owner',

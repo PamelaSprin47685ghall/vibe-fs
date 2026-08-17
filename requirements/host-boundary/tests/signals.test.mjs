@@ -1,9 +1,11 @@
+process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurface.js'
-import { hostSignalSubscribe, signalRouter } from './support/host-surface.mjs'
+import * as HostSignalSubscribeSurface from '../../../dist/OpenCode/Host/HostSignalSubscribeSurface.js'
 
-const hostSignals = { tryDecode: (raw) => HostSignalSurface.tryDecode(raw) ?? undefined }
+const hostSignals = { tryDecode: (raw) => HostSignalSurface.tryDecode(raw) ?? undefined, tryAdapt: (owned, raw) => HostSignalSurface.tryAdapt(owned, raw) ?? undefined }
 
 const idleRaw = (sessionId) => ({ type: 'session.status', sessionID: sessionId, properties: { status: { type: 'idle' } } })
 const dedicatedIdleRaw = (sessionId) => ({ type: 'session.idle', properties: { sessionID: sessionId } })
@@ -28,77 +30,99 @@ test('WHAT[HOST-BOUNDARY-002] MISC_signals_try_adapt_idle_retry_deleted_and_fail
 })
 
 test('WHAT[HOST-BOUNDARY-002] R3_abort_error_adapts_to_attempt_aborted_not_dropped', () => {
-  assert.equal(hostSignals.tryDecode(errorRaw('s', 'AbortError')).kind, 'AttemptAborted')
+  assert.equal(hostSignals.tryDecode(errorRaw('s1', 'AbortError')).kind, 'AttemptAborted')
 })
 
 test('WHAT[HOST-BOUNDARY-002] MISC_signals_try_adapt_ownership_gate', () => {
-  const received = []
-  const router = signalRouter([], (value) => received.push(value))
-  router.observe(idleRaw('s1'))
-  assert.equal(received.length, 0)
-  router.observe(errorRaw('s1'))
-  assert.equal(received.length, 1)
-  router.register('s1')
-  router.observe(idleRaw('s1'))
-  assert.equal(received.length, 2)
+  // Production tryAdapt: unowned session signals are dropped except
+  // ProviderFailure which always crosses (isOwned || signal is ProviderFailure).
+  assert.equal(hostSignals.tryAdapt([], idleRaw('s1')), undefined)
+  assert.notEqual(hostSignals.tryAdapt([], errorRaw('s1')), undefined)
+  assert.notEqual(hostSignals.tryAdapt(['s1'], idleRaw('s1')), undefined)
 })
 
 test('WHAT[HOST-BOUNDARY-002] MISC_signals_router_register_unregister', () => {
-  const received = []
-  const router = signalRouter([], (value) => received.push(value))
-  router.register('s1')
-  assert.equal(router.isOwned('s1'), true)
-  router.observe(idleRaw('s1'))
-  router.observe(retryRaw('s1'))
-  assert.deepEqual(received.map((value) => value.kind), ['SessionIdle', 'ProviderRetry'])
-  router.unregister('s1')
-  assert.equal(router.isOwned('s1'), false)
-  router.observe(idleRaw('s1'))
-  assert.equal(received.length, 2)
+  // Production tryAdapt uses the owned array as a set; register = add to
+  // array, unregister = remove. The ownership gate is the production
+  // adapter, not a test-side router.
+  assert.notEqual(hostSignals.tryAdapt(['s1'], idleRaw('s1')), undefined)
+  assert.notEqual(hostSignals.tryAdapt(['s1'], retryRaw('s1')), undefined)
+  assert.equal(hostSignals.tryAdapt([], idleRaw('s1')), undefined)
 })
 
 test('WHAT[HOST-BOUNDARY-001] MISC_signals_router_loop_delta_bypasses_adapt', () => {
-  const received = []
-  const router = signalRouter(['x'], (value) => received.push(value))
-  router.observe({ type: 'message.part.delta', properties: { sessionID: 'x' } })
-  assert.equal(received.length, 0)
-  router.observe(errorRaw('x'))
-  assert.equal(received.length, 1)
+  // Loop text deltas are not coarse session lifecycle signals — the codec
+  // drops them before adaptation. tryAdapt returns undefined.
+  assert.equal(hostSignals.tryAdapt(['x'], { type: 'message.part.delta', properties: { sessionID: 'x' } }), undefined)
+  // But a real signal for the same owned session does adapt.
+  assert.notEqual(hostSignals.tryAdapt(['x'], errorRaw('x')), undefined)
 })
+
+// ── HOST-BOUNDARY-003: signal subscribe lifecycle ────────────────────────
+//
+// HostSignalSubscribeSurface.trySubscribe is the JS-native owner surface.
+// It returns { ok: true, source, dispose } on success or
+// { ok: false, error } on failure — no Fable Result representation.
+
+const trySubscribe = async (input = {}) => HostSignalSubscribeSurface.trySubscribe(input, () => {}, null)
 
 test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_subscription_lifecycle', async () => {
   let disposed = false
-  const result = await hostSignalSubscribe.trySubscribe({ events: { listen: () => () => { disposed = true } } })
+  const result = await HostSignalSubscribeSurface.trySubscribe(
+    { events: { listen: () => () => { disposed = true } } },
+    () => {},
+    null,
+  )
   assert.equal(result.ok, true)
   assert.equal(result.source, 'events.listen')
-  result.subscription.dispose()
+  result.dispose()
   assert.equal(disposed, true)
 })
 
 test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_error_paths', async () => {
-  assert.equal((await hostSignalSubscribe.trySubscribe({ events: {} })).ok, false)
-  assert.match((await hostSignalSubscribe.trySubscribe({ events: {} })).error, /events\.listen unavailable/)
-  assert.match((await hostSignalSubscribe.trySubscribe({ events: { listen: () => null } })).error, /no subscription/)
-  assert.match((await hostSignalSubscribe.trySubscribe({ events: { listen: () => { throw new Error('listener boom') } } })).error, /listener boom/)
+  const noListen = await trySubscribe({ events: {} })
+  assert.equal(noListen.ok, false)
+  assert.match(noListen.error, /events\.listen unavailable/)
+
+  const nullSubscription = await trySubscribe({ events: { listen: () => null } })
+  assert.equal(nullSubscription.ok, false)
+  assert.match(nullSubscription.error, /no subscription/)
+
+  const throwingListen = await trySubscribe({ events: { listen: () => { throw new Error('listener boom') } } })
+  assert.equal(throwingListen.ok, false)
+  assert.match(throwingListen.error, /listener boom/)
 })
 
 test('WHAT[HOST-BOUNDARY-003] MISC_signals_default_input_resolves_to_local_event_hook', async () => {
-  const result = await hostSignalSubscribe.trySubscribe({})
+  const result = await trySubscribe({})
   assert.equal(result.ok, true)
   assert.equal(result.source, 'local-event-hook')
 })
 
 test('WHAT[HOST-BOUNDARY-003] MISC_signals_client_events_listen_fallback', async () => {
   let called = false
-  const result = await hostSignalSubscribe.trySubscribe({ client: { events: { listen: () => () => { called = true } } } })
+  const result = await HostSignalSubscribeSurface.trySubscribe(
+    { client: { events: { listen: () => () => { called = true } } } },
+    () => {},
+    null,
+  )
   assert.equal(result.ok, true)
   assert.equal(result.source, 'events.listen')
-  result.subscription.dispose()
+  result.dispose()
   assert.equal(called, true)
 })
 
 test('WHAT[HOST-BOUNDARY-003] MISC_signals_server_url_ignored_in_favor_of_local_hook', async () => {
-  const result = await hostSignalSubscribe.trySubscribe({ serverUrl: 'http://localhost:4096' })
+  const result = await trySubscribe({ serverUrl: 'http://localhost:4096' })
   assert.equal(result.ok, true)
   assert.equal(result.source, 'local-event-hook')
+})
+
+// ── Mutation sensitivity ─────────────────────────────────────────────────
+
+test('WHAT[HOST-BOUNDARY-002] mutation_canary_ProviderFailure_crosses_without_ownership', () => {
+  // ProviderFailure must always cross the boundary even for unowned sessions.
+  // If someone adds an ownership gate to ProviderFailure, this canary fails.
+  assert.notEqual(hostSignals.tryAdapt([], errorRaw('s1', 'OverloadedError')), undefined,
+    'mutation guard: ProviderFailure must cross without ownership')
 })

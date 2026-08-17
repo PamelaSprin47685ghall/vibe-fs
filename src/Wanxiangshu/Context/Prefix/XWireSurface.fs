@@ -114,7 +114,8 @@ module XWireSurface =
         | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
         | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
-        | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
+        | NoCandidateReason.CutoffProofFailed(expected, recomputed) ->
+            $"CutoffProofFailed:{expected}:{recomputed}"
 
     let private probeToJs (probe: PrefixProbe) : obj =
         let c = probe.Candidate
@@ -142,6 +143,16 @@ module XWireSurface =
     // `applyTransform` calls. The surface extracts the async Host I/O
     // boundaries (journal blob reads, session-snapshot awaits, in-place
     // message replacement) and exposes the *decision* with JS-native I/O.
+
+    /// Return the canonical digest for a provider-visible prefix cutoff. This is
+    /// the same proof input used by `transform` when validating Companion coverage.
+    let coveredPrefixDigest (projection: obj) (cutoff: int) : string =
+        let typed = semanticProjectionOfJs projection
+        let truncated =
+            { typed with
+                Messages = typed.Messages |> List.truncate cutoff }
+
+        ProviderProjection.renderSemantic truncated |> sha256Hex
 
     /// HOST-BOUNDARY-020/021: the X-wire transform decision.
     ///

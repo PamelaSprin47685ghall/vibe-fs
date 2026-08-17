@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
 import test from 'node:test'
 import * as XWireSurface from '../../../dist/Context/Prefix/XWireSurface.js'
 
@@ -19,17 +18,6 @@ const baseProjection = {
   ],
 }
 
-const coveredPrefixDigest = createHash('sha256')
-  .update(JSON.stringify({
-    provider: null,
-    model: null,
-    variant: null,
-    tools: [],
-    system: [],
-    messages: [baseProjection.messages[0]],
-  }))
-  .digest('hex')
-
 const armedInput = (overrides = {}) => ({
   journal: true,
   sessionId: 'ses_x',
@@ -40,7 +28,7 @@ const armedInput = (overrides = {}) => ({
   currentProjection: baseProjection,
   committedSnapshot: null,
   coverableCutoff: 2, // material exists (coverage ahead of request)
-  coveredDigest: coveredPrefixDigest,
+  coveredDigest: XWireSurface.coveredPrefixDigest(baseProjection, 1),
   requestStartCutoff: 1,
   frozenRecordPrefixRef: 'blob/ref/frozen-1',
   frozenRecordPrefixDigest: 'sha256:frozen-1',
