@@ -11,11 +11,13 @@ open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Text
+open System.Threading
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Process
 
 /// Hook-process Git transport helper. It is not a product-process remote API:
 /// OpenCode/Wanxiangshu never owns user fetch/pull/push triggers.
@@ -161,39 +163,41 @@ module GitGateway =
                 return! loop snapshot expected maxRetries
         }
 
-    [<Import("execFile", "node:child_process")>]
-    let private execFile
-        (file: string)
-        (args: string array)
-        (options: obj)
-        (callback: obj -> obj -> obj -> unit)
-        : unit =
-        jsNative
+    /// Estimate for hook-process Git transport (fetch / push / ls-remote).
+    /// 5-minute runtime budget under the 1-hour administrator ceiling — network
+    /// operations are slower than the local Orchestrator-side git verbs.
+    let private transportEstimate =
+        { EstimatedRuntime = RuntimeSeconds 300.0
+          EstimatedOutput = OutputBytes 65536L
+          EstimatedMemory = EstimatedMemory.Medium }
 
-    [<Emit("Buffer.isBuffer($0) ? $0.toString('utf8') : String($0 ?? '')")>]
-    let private asText (value: obj) : string = jsNative
-
-    [<Emit("($0 && typeof $0.code === 'number') ? $0.code : 1")>]
-    let private errorCode (error: obj) : int = jsNative
-
-    let private completeExec (tcs: TaskCompletionSource<int * string * string>) error stdout stderr =
-        if isNull error then
-            tcs.SetResult(0, asText stdout, asText stderr)
-        else
-            tcs.SetResult(errorCode error, asText stdout, asText stderr)
-
+    /// Production runner for the hook-process Git transport path.
+    ///
+    /// Routes through `ProcessRunner.run` (the canonical Process module entry)
+    /// instead of importing `node:child_process` directly, matching the
+    /// Orchestrator-side Git path (`OrchestratorGit.run`).  `WorkingDirectory`
+    /// replaces the previous `git -C <repoPath>` argv prefix — equivalent for
+    /// git, which resolves `.git` relative to the working directory.
     let createDefaultRunner (repoPath: string) : GitGatewayRunner =
         fun args ->
-            let tcs = TaskCompletionSource<int * string * string>()
-            let argv = Array.append [| "-C"; repoPath |] (List.toArray args)
+            task {
+                let cmd =
+                    { FileName = GitSubject.Executable
+                      Arguments = args
+                      WorkingDirectory = Some repoPath
+                      Environment = None
+                      Stdin = None
+                      Deadline = None
+                      PtyOptions = None }
 
-            let options =
-                createObj [ "encoding" ==> "utf8"; "maxBuffer" ==> (64 * 1024 * 1024) ]
+                let ctx =
+                    { WorkingDirectory = Some repoPath
+                      HardLimit = ProcessEstimate.DefaultHardLimit }
 
-            try
-                execFile GitSubject.Executable argv options (fun error stdout stderr ->
-                    completeExec tcs error stdout stderr)
-            with ex ->
-                tcs.SetResult(1, "", ex.Message)
+                let! res = ProcessRunner.run cmd transportEstimate ctx CancellationToken.None
 
-            tcs.Task
+                match res with
+                | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
+                | Ok(ProcessOutcome.Spooled(code, _, _, _)) -> return (code, "", "output spooled")
+                | Error err -> return (1, "", sprintf "%A" err)
+            }

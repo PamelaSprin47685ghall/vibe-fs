@@ -24,8 +24,6 @@ const {
   supervisorPendingEntries,
   pendingEntryView,
   pendingResolve,
-  resultTaskSourceCreate,
-  resultTask,
   sessionCreate,
   sessionView,
   sessionSetClosed,
@@ -44,8 +42,12 @@ const {
   ptyCommandSignal,
   ptyCommandResize,
   ptyCommandSpawn,
-  unitTaskSource,
 } = await import('../../../dist/Process/Surface.js')
+const {
+  resultTaskSourceCreate,
+  resultTask,
+  unitTaskSource,
+} = await import('../../../dist/Process/TestSurface.js')
 
 const id = (value) => ptyId(value)
 const port = () => createPtyPort({})

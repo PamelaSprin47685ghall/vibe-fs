@@ -324,6 +324,7 @@
     <Compile Include="OpenCode/Host/PairProgrammingCalibration.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingCalibrationSurface.fs"/>
     <Compile Include="Process/Surface.fs"/>
+    <Compile Include="Process/TestSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtTransform.fs"/>
     <Compile Include="OpenCode/Host/Diagnostic.fs"/>
     <Compile Include="Context/Companion/CompressionSurface.fs"/>

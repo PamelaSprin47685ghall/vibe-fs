@@ -389,6 +389,24 @@ type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
 
 [<RequireQualifiedAccess>]
 module ProcessGitRawStore =
+
+    // ── why this uses execFile, not the Process module ───────────────────────
+    //
+    // The Process module's typed `Command` protocol is text-oriented:
+    //   • `Command.Stdin`               is `string option`  — no binary stdin
+    //   • `ProcessOutcome.Completed.stdout` is `string` (UTF-8 decoded)
+    //
+    // ProcessGitRawStore needs **binary** I/O:
+    //   • `hash-object -w --stdin`  accepts arbitrary blob bytes (images, …)
+    //   • `cat-file blob <oid>`     returns arbitrary blob bytes
+    //
+    // Routing through `ProcessRunner.run` would corrupt non-UTF-8 blob content.
+    // Extending `Command` with a `StdinBytes` field and adding a binary-output
+    // variant of `ProcessRunner` would work but changes the stable public
+    // protocol for every `Command` construction site — a larger change than
+    // this routing task.  The `execFile` callback with `encoding: "buffer"`
+    // preserves raw bytes and is the correct tool for this store.
+
     [<Import("execFile", "node:child_process")>]
     let private execFile
         (fileName: string)

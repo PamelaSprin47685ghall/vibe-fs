@@ -75,16 +75,6 @@ module Reconciler =
         | Enqueued
         | Stopped
 
-    [<RequireQualifiedAccess>]
-    type private Work =
-        | Wake
-        | Drained
-
-    [<RequireQualifiedAccess>]
-    type private Release =
-        | ResumeDrain
-        | Released
-
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
 
@@ -114,7 +104,7 @@ module Reconciler =
         // DSL-MUTABLE: single-flight — shared waiter for scheduler shutdown drain.
         let mutable stopWaiter: TaskCompletionSource<unit> option = None
         // The wake of the most recent dispatch for a session. Never consumed:
-        // a ResumeDrain re-run needs the same wake, and a newer signal simply
+        // a drain-resume re-run needs the same wake, and a newer signal simply
         // overwrites it. A session with no recorded wake defaults to RetryWake
         // (no idle rights — the safe side).
         let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
@@ -195,15 +185,15 @@ module Reconciler =
 
             if isCurrent sessionId generation && isActive && isQueued then
                 queued.Remove(key) |> ignore
-                Work.Wake
+                true
             else
-                Work.Drained
+                false
 
         let takeWork (sessionId: SessionId) (generation: int) =
             lock gate (fun () ->
                 if isDurableUnavailable () then
                     closeAdmission ()
-                    Work.Drained
+                    false
                 else
                     takeQueuedWork sessionId generation)
 
@@ -223,18 +213,18 @@ module Reconciler =
                 && queuedGeneration = generation
                 && isCurrent sessionId generation
                 ->
-                Release.ResumeDrain
+                true
             | (true, activeGeneration), _ when activeGeneration = generation ->
                 active.Remove(key) |> ignore
-                Release.Released
-            | _ -> Release.Released
+                false
+            | _ -> false
 
         let releaseAfterPass (sessionId: SessionId) (generation: int) =
             lock gate (fun () ->
                 if isDurableUnavailable () then
                     closeAdmission ()
                     releaseActive (SessionId.value sessionId) generation
-                    Release.Released
+                    false
                 else
                     releaseAvailableAfterPass sessionId generation)
 
@@ -290,11 +280,11 @@ module Reconciler =
 
         member private this.Drain(sessionId: SessionId, generation: int) : Task =
             task {
-                match takeWork sessionId generation with
-                | Work.Drained -> return ()
-                | Work.Wake ->
+                if takeWork sessionId generation then
                     do! this.RunPass(sessionId, generation)
                     return! this.DrainAfterPass(sessionId, generation)
+                else
+                    return ()
             }
 
         member private this.Run(sessionId: SessionId, generation: int) : Task =
@@ -304,9 +294,10 @@ module Reconciler =
                 with error ->
                     logError "RECONCILE-SCHEDULER" error.Message
 
-                match releaseAfterPass sessionId generation with
-                | Release.ResumeDrain -> return! this.Run(sessionId, generation)
-                | Release.Released -> return ()
+                if releaseAfterPass sessionId generation then
+                    return! this.Run(sessionId, generation)
+                else
+                    return ()
             }
 
         member private this.RunTracked(sessionId: SessionId, generation: int) : Task =

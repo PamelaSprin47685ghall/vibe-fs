@@ -6947,23 +6947,29 @@ requirements/<owner>/WHAT.md
 
 当前 working tree clean；以下数字由本次实际运行的 gate、build、proof 与 integration 命令得到，不是历史估计：
 
-- `node scripts/check.mjs` 全部通过：architecture 612 files；manifest 131 registered surfaces；requirement-trace 665 WHAT / 3060 tests，closure complete；所有 wired gates green。
+- `node scripts/check.mjs` 全部通过：architecture 613 files；manifest 132 registered surfaces；requirement-trace 666 WHAT / 3073 tests，closure complete；所有 21 个 wired gates green。
 - `node scripts/test-surface-inventory.mjs` 报告 0 semantic test files carry debt、0 violating lines；仅 8 个 build-verification files 保留 Fable-aware quarantine。
 - `js-boundary-gate` 报告 0 debt line、0 debt file、baseline absent、0 frozen package-local `*-contract.mjs`；`test-boundary` 报告除 build verification 外无 direct Fable-module import。
-- `node scripts/build.mjs` 通过：Fable 5.13.0 解析 650 source files，assembly 生成成功。
-- `node requirements/verification-system/tests/run.mjs` 通过：3044/3044 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
-- `verification-system/tests/support/domain`、`glory.mjs` 与六个零引用 dead adapters 已删除；剩余 compatibility 仅限有明确生产债权人的 canonical projection、历史 durable decode 或 build-verification quarantine。`cleanup/legacy-ledger.md` 仍是临时工作台：LEGACY-004/005/006 为 bounded compatibility，LEGACY-007 仍待裁决。
+- `node scripts/build.mjs` 通过：Fable 5.13.0 解析 651 source files，assembly 生成成功。
+- `node requirements/verification-system/tests/run.mjs` 通过：3057/3057 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
+- `FinalitySurface` 合成信封（synthetic envelope）已消除：通过 `Fold.foldFact` 直接按 Fact 分发，移除了 `envelopeFor`、`streamOf`、`sessionOfStream` 及死载荷字段（RuntimeId, LocalSeq, ObservedAt, EventId, ProviderRun）。
+- `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；将测试工具原语（mockWaitChild, unitTaskSource 等）剥离至独立的 `ProcessTestSurface` 模块并在 manifest 中注册为 opaque-capability 资源表面，使生产表面仅保留生产语义。
+- `Scheduler` 控制状态机已消除：删除了 `Reconciler.Scheduler` 中的 `Work` 和 `Release` 控制令牌 DU，drain 循环改用直接的 CE 布尔流。
+- `Git` 钩子路径收敛：`Git/Gateway.fs` 现通过 `ProcessRunner.run` 的类型化 `Command` 抽象路由；`Git/Subject.fs`（同步内省）与 `ProcessGitRawStore.fs`（二进制 I/O）已记录架构留存理由。
+- `LEGACY-007` 裁定完成：在 `cleanup/legacy-ledger.md` 中裁定为 BOUNDED-COMPAT，明确具名债权人（历史持久化 journal 中的退休假中止 blob）、精确边界与退出条件。
+- `MagicTodo` 状态模式已核实：`MagicTodoLocalitySurface` 和 `MagicTodoMembraneSurface` 中的数字匹配（| 1 -> | 2 -> | _ ->）为类型转换编解码器边界，非程序计数器。
+- `P8` 效应所有权审查完成：PTY、Journal/EventStore、Host 会话生命周期拥有单一清晰所有者；Git 路径已收敛；定时器/时钟边界符合 `IClockPort` 契约（仅限 Domain/Application/Session 限制）。
 
 ```text
 semantic test files with debt       = 0
 violating lines                     = 0
 build-verification quarantine files = 8
 requirement-trace findings          = 0
-WHAT propositions                   = 665
-traced test cases                   = 3060
-registered surfaces                 = 131
-Fable build                        = green (650 source files parsed)
-verification proof                 = 3044 passed, 0 failed
+WHAT propositions                   = 666
+traced test cases                   = 3073
+registered surfaces                 = 132
+Fable build                        = green (651 source files parsed)
+verification proof                 = 3057 passed, 0 failed
 integration proof                  = 275 passed, 0 failed
 ```
 
@@ -6972,13 +6978,11 @@ integration proof                  = 275 passed, 0 failed
 ```text
 P6 — COMPLETE
 P7 — COMPLETE
-P8 — INTEGRATED, CLOSURE REVIEW REMAINS
+P8 — COMPLETE (effect ownership review & git routing closure done)
 P9 — COMPLETE
 P10 — COMPLETE
 P11 — COMPLETE
 ```
-
-仍需保留的工作不是边界债务清零，而是 P8 的独立 effect-ownership closure review；不得把 integration green 自动等同于该结构性判断。
 
 ---
 

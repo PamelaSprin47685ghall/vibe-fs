@@ -154,6 +154,26 @@ module Fold =
             { Fact = "ManagerLifecycle"
               Reason = "Manager lifecycle fact violates GLORY-012/037 (Life or request identity mismatch)" })
 
+    /// Fact-only fold for callers that do not need envelope metadata.
+    /// RuntimeStarted needs no envelope field (RuntimeId is in the payload).
+    /// MagicTodo requires an EventId and must go through foldEnvelope.
+    let foldFact (projection: ProjectionSet) (fact: Fact) : Result<ProjectionSet, FoldRejection> =
+        match fact with
+        | Runtime(RuntimeStarted runtime) ->
+            Ok
+                { projection with
+                    RuntimeId = Some runtime.RuntimeId
+                    AgentProjections =
+                        { projection.AgentProjections with
+                            RuntimeStartCount = projection.AgentProjections.RuntimeStartCount + 1 } }
+        | Agent fact ->
+            foldAgentFact projection.AgentProjections fact
+            |> Result.map (fun agents ->
+                { projection with
+                    AgentProjections = agents })
+        | ManagerLifecycle fact -> foldManagerLifecycle projection fact
+        | MagicTodo _ -> reject "MagicTodo" "foldFact does not support MagicTodo; use foldEnvelope with an EventId"
+
     let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
         | Runtime(RuntimeStarted runtime) ->

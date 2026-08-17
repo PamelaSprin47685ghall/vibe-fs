@@ -5,8 +5,8 @@ import test from 'node:test'
 
 const { create: createDeadline } = await import('../../../dist/Process/DeadlineSurface.js')
 const { killAckGraceMs } = await import('../../../dist/Process/Surface.js')
+const { mockWaitChild } = await import('../../../dist/Process/TestSurface.js')
 const {
-  mockWaitChild,
   childExit,
   childView,
   waitForExit,

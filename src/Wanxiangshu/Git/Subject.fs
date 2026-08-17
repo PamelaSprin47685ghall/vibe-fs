@@ -21,6 +21,20 @@ module GitSubject =
     [<Literal>]
     let Executable = "git"
 
+    // ── why this uses execFileSync, not the Process module ───────────────────
+    //
+    // The Process module (NodeProcessHost.spawn / ProcessRunner.run) is async-
+    // only: it spawns a child and returns Task<Result<…>>.  GitSubject answers
+    // synchronous callers — HookDispatcher installs hooks during activation,
+    // HookSync resolves the repository root / common-dir before entering the
+    // async converge loop, GitTree.dirtyPayload builds the tree-hash payload
+    // inside a synchronous commit-build path, and RuntimePath resolves the
+    // journal common-dir once per workspace.
+    //
+    // Converting these to Task would cascade async through every caller's
+    // signature for no ergonomic gain: each is a startup-time introspection
+    // call where blocking the event loop for ~2 ms is the point — the caller
+    // cannot proceed without the answer.  execFileSync is the correct tool.
     [<Import("execFileSync", "node:child_process")>]
     let private execFileSync (fileName: string) (arguments: string array) (options: obj) : string = jsNative
 

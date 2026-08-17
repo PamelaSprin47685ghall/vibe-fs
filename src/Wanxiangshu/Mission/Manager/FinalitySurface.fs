@@ -313,75 +313,56 @@ module FinalitySurface =
             )
         | other -> Error $"unknown finality event kind: {other}"
 
-    let private envelopeFor (seq: int64) (stream: StreamId) (fact: Fact) : Envelope =
-        { RuntimeId = RuntimeId.create "rt-finality-surface"
-          LocalSeq = LocalSeq.create seq
-          ObservedAt = DateTimeOffset(2026, 1, 1, 0, 0, 0, System.TimeSpan.Zero)
-          EventId = EventId.create (sprintf "e%04d" seq)
-          Stream = stream
-          ProviderRun = None
-          Fact = fact }
-
-    let private lifecycleSession (lifecycle: ManagerLifecycleFact) : SessionId =
-        match lifecycle with
-        | ManagerLifecycleFact.LifeOpened payload -> payload.SessionId
-        | ManagerLifecycleFact.WorkActivated payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityRequested payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityRejected payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalitySiblingSteered payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityBlessed payload -> payload.SessionId
-        | ManagerLifecycleFact.FinalityUndecided payload -> payload.SessionId
-        | ManagerLifecycleFact.LifeCompleted payload -> payload.SessionId
-
-    let private streamOf (fact: Fact) : StreamId =
+    let private sessionOfFact (fact: Fact) : SessionId option =
         match fact with
-        | Fact.ManagerLifecycle lifecycle -> StreamId.Session(lifecycleSession lifecycle)
+        | Fact.ManagerLifecycle lifecycle ->
+            match lifecycle with
+            | ManagerLifecycleFact.LifeOpened payload -> Some payload.SessionId
+            | ManagerLifecycleFact.WorkActivated payload -> Some payload.SessionId
+            | ManagerLifecycleFact.FinalityRequested payload -> Some payload.SessionId
+            | ManagerLifecycleFact.FinalityReviewerEnlisted payload -> Some payload.SessionId
+            | ManagerLifecycleFact.FinalityRejected payload -> Some payload.SessionId
+            | ManagerLifecycleFact.FinalitySiblingSteered payload -> Some payload.SessionId
+            | ManagerLifecycleFact.FinalityBlessed payload -> Some payload.SessionId
+            | ManagerLifecycleFact.FinalityUndecided payload -> Some payload.SessionId
+            | ManagerLifecycleFact.LifeCompleted payload -> Some payload.SessionId
         | Fact.Agent(AgentFact.Review(ReviewFactCases.ReviewBarrierStarted payload)) ->
-            StreamId.Session payload.ReviewerSessionId
+            Some payload.ReviewerSessionId
         | Fact.Agent(AgentFact.Review(ReviewFactCases.ConfirmedReviewWitness payload)) ->
-            StreamId.Session payload.ReviewerSessionId
+            Some payload.ReviewerSessionId
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleLinked payload)) ->
-            StreamId.Session payload.ParentSessionId
+            Some payload.ParentSessionId
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted payload)) ->
-            StreamId.Session payload.ParentSessionId
+            Some payload.ParentSessionId
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleRetired payload)) ->
-            StreamId.Session payload.ParentSessionId
-        | _ -> StreamId.Workspace
-
-    let private sessionOfStream (stream: StreamId) : SessionId option =
-        match stream with
-        | StreamId.Session session -> Some session
+            Some payload.ParentSessionId
         | _ -> None
 
     /// Keep the first manager session observed; later facts fold onto it.
-    let private firstSession (current: SessionId option) (stream: StreamId) : SessionId option =
+    let private firstSession (current: SessionId option) (fact: Fact) : SessionId option =
         match current with
         | Some _ -> current
-        | None -> sessionOfStream stream
+        | None -> sessionOfFact fact
 
-    /// Fold one event; `(seq, projection, session)` threaded immutably.
+    /// Fold one event through the fact-only fold (no synthetic envelope).
     let private foldOneEvent
-        (seq: int64)
         (projection: ProjectionSet)
         (managerSession: SessionId option)
         (event: obj)
-        : Result<int64 * ProjectionSet * SessionId option, string> =
+        : Result<ProjectionSet * SessionId option, string> =
         lifecycleEventOf event
         |> Result.bind (fun fact ->
-            let nextSeq = seq + 1L
-            let stream = streamOf fact
-            let session = firstSession managerSession stream
+            let session = firstSession managerSession fact
 
             let eventKind =
                 match str event?kind with
                 | "finality-requested" -> "FinalityRequested"
                 | other -> other
 
-            Fold.foldEnvelope projection (envelopeFor nextSeq stream fact)
+            Fold.foldFact projection fact
             |> Result.mapError (fun rejection ->
-                sprintf "fold rejected %s at lifecycle event %d (%A): %A" eventKind nextSeq stream rejection)
-            |> Result.map (fun next -> (nextSeq, next, session)))
+                sprintf "fold rejected %s: %A" eventKind rejection)
+            |> Result.map (fun next -> (next, session)))
 
     /// Fold a JS event list through the production fold, threading the
     /// projection immutably (no mutable accumulators, no nested decisions).
@@ -390,17 +371,17 @@ module FinalitySurface =
         (startSession: SessionId option)
         (events: obj list)
         : Result<World, string> =
-        let rec loop (seq: int64) (projection: ProjectionSet) (managerSession: SessionId option) (remaining: obj list) =
+        let rec loop (projection: ProjectionSet) (managerSession: SessionId option) (remaining: obj list) =
             match remaining with
             | [] ->
                 Ok
                     { Projection = projection
                       SessionId = managerSession }
             | event :: rest ->
-                foldOneEvent seq projection managerSession event
-                |> Result.bind (fun (nextSeq, next, session) -> loop nextSeq next session rest)
+                foldOneEvent projection managerSession event
+                |> Result.bind (fun (next, session) -> loop next session rest)
 
-        loop 0L startProjection startSession events
+        loop startProjection startSession events
 
     /// Fold JS lifecycle events through the production fold.
     /// Returns `{ ok: true, world }` or `{ ok: false, error }`.

@@ -45,7 +45,7 @@ module ProcessSurface =
     type private RegistrationHandle(registration: CancellationTokenRegistration) =
         member _.Registration = registration
 
-    type private ChildHandle(child: NodeProcessHost.ChildProcess, killCount: unit -> int) =
+    type internal ChildHandle(child: NodeProcessHost.ChildProcess, killCount: unit -> int) =
         member _.Child = child
         member _.KillCount = killCount
 
@@ -70,22 +70,19 @@ module ProcessSurface =
     type private PtySupervisorHandle(supervisor: PtySupervisor) =
         member _.Supervisor = supervisor
 
-    type private MailboxHandle(mailbox: CompletionMailbox) =
+    type internal MailboxHandle(mailbox: CompletionMailbox) =
         member _.Mailbox = mailbox
 
     type private JoinInterruptHandle(interrupt: JoinInterrupt) =
         member _.Interrupt = interrupt
 
-    type private TaskSourceHandle(source: TaskCompletionSource<obj>) =
-        member _.Source = source
-
     type private PendingHandle(entries: (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list) =
         member _.Entries = entries
 
-    type private UnitTaskHandle(source: TaskCompletionSource<unit>) =
+    type internal UnitTaskHandle(source: TaskCompletionSource<unit>) =
         member _.Source = source
 
-    type private ResultTaskHandle(source: TaskCompletionSource<Result<unit, string>>) =
+    type internal ResultTaskHandle(source: TaskCompletionSource<Result<unit, string>>) =
         member _.Source = source
 
     type private PendingEntryHandle(command: PtyCommand, completion: TaskCompletionSource<Result<unit, string>> option)
@@ -109,7 +106,7 @@ module ProcessSurface =
     let private call1 (fn: obj) (value: obj) : obj = jsNative
 
     [<Emit("$0()")>]
-    let private call0 (fn: obj) : obj = jsNative
+    let internal call0 (fn: obj) : obj = jsNative
 
     let private optionObj (value: 'T option) : obj =
         match value with
@@ -119,7 +116,7 @@ module ProcessSurface =
     let private undefinedObj: obj = emitJsExpr () "undefined"
 
     [<Emit("$0==null")>]
-    let private isNullish (value: obj) : bool = jsNative
+    let internal isNullish (value: obj) : bool = jsNative
 
     let private property (value: obj) (name: string) : obj = emitJsExpr (value, name) "$0?.[$1]"
 
@@ -507,29 +504,6 @@ module ProcessSurface =
 
     let run = runWithHost
 
-    let mockWaitChild (onKill: obj) : obj =
-        let exit = TaskCompletionSource<int>()
-        let exited = ref false
-        let callbacks = ResizeArray<unit -> unit>()
-        // DSL-MUTABLE: resource — mock child kill count
-        let mutable killCount = 0
-
-        let kill () =
-            killCount <- killCount + 1
-
-            if not (isNullish onKill) then
-                call0 onKill |> ignore
-
-        ChildHandle(
-            { Process = null
-              Exit = exit
-              Kill = kill
-              Exited = exited
-              OnExited = callbacks },
-            (fun () -> killCount)
-        )
-        :> obj
-
     let private childOf (value: obj) = (value :?> ChildHandle).Child
 
     let childExit (child: obj) (code: int) : unit =
@@ -619,23 +593,6 @@ module ProcessSurface =
     let spoolDelete (path: string) : unit = Spool.delete path
 
 
-    let taskSource () : obj =
-        TaskSourceHandle(TaskCompletionSource<obj>()) :> obj
-
-    let taskSourceCreate () : obj = taskSource ()
-
-    let private taskSourceOf (value: obj) = (value :?> TaskSourceHandle).Source
-
-    let taskResolve (source: obj) (value: obj) : unit =
-        AsyncSupport.trySetResult (taskSourceOf source) value |> ignore
-
-    let taskReject (source: obj) (reason: string) : unit =
-        taskSourceOf source |> fun tcs -> tcs.SetException(Exception reason)
-
-    let taskAwait (source: obj) : Task<obj> = (taskSourceOf source).Task
-
-    let taskResult (source: obj) : Task<obj> = taskAwait source
-
     let bytes (text: string) : obj = Pty.bytes text |> bytesView
 
     let newId () : obj = PtyIdHandle(Pty.newId ()) :> obj
@@ -697,7 +654,7 @@ module ProcessSurface =
                    width = width
                    height = height |}
 
-    let private completionViewItem (item: PtyJoinItem) : obj =
+    let internal completionViewItem (item: PtyJoinItem) : obj =
         match item with
         | PtyExited value ->
             box
@@ -947,35 +904,6 @@ module ProcessSurface =
                ptys = ptys |> List.map ptyHandleView |> List.toArray |}
 
 
-    let completionMailboxCreate () : obj =
-        MailboxHandle(CompletionMailbox(obj ())) :> obj
-
-    let private mailboxOf (value: obj) = (value :?> MailboxHandle).Mailbox
-
-    let completionMailboxPublishPty (mailbox: obj) (item: obj) : unit =
-        (mailboxOf mailbox).PublishPtyCompletion(unbox<PtyJoinItem> item)
-
-    let completionMailboxPulseAgent (mailbox: obj) (agentId: string) : unit =
-        (mailboxOf mailbox).PulseAgentHandle(AgentHandleId.create agentId)
-
-    let completionMailboxDrainPty (mailbox: obj) (maxCount: int) : obj array =
-        mailboxOf mailbox
-        |> fun value ->
-            value.DrainPtyCompletions maxCount
-            |> List.map completionViewItem
-            |> List.toArray
-
-    let completionMailboxDrainAgent (mailbox: obj) (maxCount: int) : string array =
-        mailboxOf mailbox
-        |> fun value -> value.DrainAgentWakes maxCount |> List.map AgentHandleId.value |> List.toArray
-
-    let completionMailboxCancel (mailbox: obj) : bool = (mailboxOf mailbox).Cancel()
-    let completionMailboxPendingCount (mailbox: obj) : int = (mailboxOf mailbox).PendingCount
-    let completionMailboxPendingPtyCount (mailbox: obj) : int = (mailboxOf mailbox).PendingPtyCount
-
-    let completionMailboxPendingAgentCount (mailbox: obj) : int =
-        (mailboxOf mailbox).PendingAgentWakeCount
-
     let maxJoinBatch = JoinBatch.MaxJoinBatch
 
 
@@ -1061,15 +989,6 @@ module ProcessSurface =
             return resultObject result (fun _ -> undefinedObj)
         }
 
-    let unitTaskSource () : obj =
-        UnitTaskHandle(TaskCompletionSource<unit>()) :> obj
-
-    let unitTaskResolve (source: obj) : unit =
-        (source :?> UnitTaskHandle).Source.SetResult()
-
-    let unitTask (source: obj) : Task =
-        (source :?> UnitTaskHandle).Source.Task :> Task
-
 
     let supervisorAttach (supervisor: obj) (port: obj) (id: obj) (term: obj) (exitTask: obj) : unit =
         PtySupervisor.attach
@@ -1149,15 +1068,6 @@ module ProcessSurface =
             {| command = ptyCommandView (PtyCommandHandle value.Command :> obj)
                hasCompletion = value.Completion.IsSome |}
 
-    let resultTask (source: obj) : Task<obj> =
-        task {
-            let! value = (source :?> ResultTaskHandle).Source.Task
-
-            match value with
-            | Ok() -> return box {| ok = true |}
-            | Error error -> return box {| ok = false; error = error |}
-        }
-
     let pendingResolve (pending: obj) (index: int) (result: obj) : unit =
         let entries = (pending :?> PendingHandle).Entries
         let _, completion = entries |> List.item index
@@ -1166,9 +1076,6 @@ module ProcessSurface =
         | Some source, Some(Ok _) -> source.SetResult(Ok())
         | Some source, Some(Error error) -> source.SetResult(Error error)
         | _ -> ()
-
-    let resultTaskSourceCreate () : obj =
-        ResultTaskHandle(TaskCompletionSource<Result<unit, string>>()) :> obj
 
     let renderPtyCompletion (label: string) (_id: string) (outcome: string) (exitCode: int) : string =
         sprintf "# %s has %s.\nexit_code = %d" label outcome exitCode

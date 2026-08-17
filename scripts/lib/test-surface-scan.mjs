@@ -1111,6 +1111,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Process/TestSurface.js',
+    owner: 'process-execution',
+    laws: ['PROC-001', 'PROC-006', 'PROC-010'],
+    source: 'src/Wanxiangshu/Process/TestSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Host/EventsSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-016'],
