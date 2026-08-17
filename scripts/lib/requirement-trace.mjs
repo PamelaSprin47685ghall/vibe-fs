@@ -472,6 +472,7 @@ const readProofRows = (requirementsRoot, tests) => {
 
   const proofIds = new Set()
   const proofEdges = []
+  const proseOnlyProof = []
   for (const file of proofFiles) {
     const packageName = file.split('/').slice(-2)[0]
     const whatFile = join(file, '..', 'WHAT.md')
@@ -482,6 +483,8 @@ const readProofRows = (requirementsRoot, tests) => {
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index]
       if (!line.startsWith('|')) continue
+      // Skip header separator rows (|---|---|) and column header rows.
+      if (/^\|[-:\s|]+\|?$/.test(line)) continue
       const cells = line.split('|')
       const rawCell1 = cells[1] ?? ''
       const rawCell2 = cells[2] ?? ''
@@ -499,12 +502,25 @@ const readProofRows = (requirementsRoot, tests) => {
       for (const match of cell1.matchAll(/(?:^|[\s,、/–—])([0-9]{3})(?=$|[\s,、/–—])/g)) {
         if (byTail.has(match[1])) ids.push(byTail.get(match[1]))
       }
-      for (const id of new Set(ids)) proofIds.add(`${packageName}:${id}`)
-      const rowText = `${rawCell1} | ${rawCell2}`
-      proofEdges.push(...proofEdgesForRow({ proofFile: file, proofLine: index + 1, rowText, whatIds: [...new Set(ids)], testsByFile, requirementsRoot }))
+      const uniqueIds = [...new Set(ids)]
+      // The full row text (all cells) is needed for pathReferences and
+      // anchor matching: PROOF.md formats vary, and test paths may appear in
+      // any column beyond the first two.
+      const rowText = cells.slice(1, -1).join(' | ').replace(/`/g, '')
+      const rawRowText = cells.slice(1, -1).join(' | ')
+      const refs = pathReferences(rawRowText, file, requirementsRoot)
+      // A PROOF row is executable evidence only when it references at least
+      // one .test.mjs path. A prose-only row (law ID + narrative, no test
+      // path) is not proof — it is a false green waiting to happen.
+      if (refs.length > 0) {
+        for (const id of uniqueIds) proofIds.add(`${packageName}:${id}`)
+      } else if (uniqueIds.length > 0) {
+        proseOnlyProof.push({ proofFile: file, proofLine: index + 1, whatIds: uniqueIds, rowText: rawRowText.trim() })
+      }
+      proofEdges.push(...proofEdgesForRow({ proofFile: file, proofLine: index + 1, rowText: rawRowText, whatIds: uniqueIds, testsByFile, requirementsRoot }))
     }
   }
-  return { proofIds, proofEdges }
+  return { proofIds, proofEdges, proseOnlyProof }
 }
 
 /**
@@ -561,6 +577,7 @@ export function buildTraceGraph(requirementsRoot) {
     unproved: unprovedWhats,
     proofMissing,
     danglingProof,
+    proseOnlyProof: proof.proseOnlyProof,
   }
 }
 

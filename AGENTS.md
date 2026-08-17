@@ -6361,7 +6361,7 @@ compiler/build tests
 
 > 物理世界是依赖对象，不自动获得业务代码的 ownership。
 
-现在最值得做的不是“第三次整体排布”，而是下面 **5 个局部旋转**。
+现在最值得做的不是“第三次整体排排”，而是下面 **5 个局部旋转**（2/3/4 已完成，1/5 仍待）。
 
 1. **最大的剩余错误根是 `Composition/Durable/Fact.fs`。** 文件虽然从 `Kernel` 搬出来了，但实际上还没有完成我们说的那次旋转：`PromptFactCases`、`ReviewFactCases` 等业务 fact family 仍然定义在这个中央文件里。   也就是说现在是：
 
@@ -6389,42 +6389,15 @@ compiler/build tests
 
    `Composition/Durable/Fact.fs` 最终只应该做 outer union / routing vocabulary。**Composition 可以认识所有人，但不应该替所有人定义自己的语言。** 这是当前最有价值的一刀。
 
-2. **`Foundation` 里还有两三个“假基础”。** 最明显的是 `Foundation/Flow.fs`。它里面有 `InvalidFork`、`ParentCancelled`、`CompanionError`、`CompanionContext`——这些显然不是宇宙级 primitive，而是 Execution/Companion 语义。 我会把它拆掉，而不是保留一个叫 `Flow` 的杂交根。比如 `InvalidFork/ParentCancelled` 靠近 `Execution`，`CompanionError/CompanionContext` 靠近 `Context/Companion`。相比之下 `Identity/Roles/Temporal/Parallel/TaskResult` 留 Foundation 很合理。
+2. ~~**`Foundation` 里还有两三个“假基础”。** 最明显的是 `Foundation/Flow.fs`。它里面有 `InvalidFork`、`ParentCancelled`、`CompanionError`、`CompanionContext`——这些显然不是宇宙级 primitive，而是 Execution/Companion 语义。~~ **已完成**：`Foundation/Flow.fs` 已删除；`Flow.lift`/`Flow.create` 被 `dsl-ownership.mjs` FORBIDDEN 列表禁止。`Identity/Roles/Temporal/Parallel/TaskResult` 留 Foundation 合理。
 
    `McpLaunch` 我倒没那么介意。它确实只是一个非常小的共享 launch vocabulary：`Disabled | Fixture | Uvx`。 它可以以后再判断是否值得变成 `Host/Mcp/Launch`，不是当前重点。
 
-3. **`Composition/Durable/GuidelineProjection.fs` 应该再旋出去。** 它不是 composition；它定义的是非常具体的 `PairProgrammingGuideline` durable state、ordinal、call/result transcript gap 及其 fold invariant。 我更倾向：
-
-   ```text
-   Host/
-     PairProgramming/
-       GuidelineProjection.fs
-   ```
-
-   或者如果你认为 cognitive environment 才是 owner，就在那里建对应节点。
+3. ~~**`Composition/Durable/GuidelineProjection.fs` 应该再旋出去。**~~ **已完成**：已移至 `src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs`。
 
    相反 `Composition/Durable/HostFactFold.fs` 留下是合理的。它本来就是一个认识很多 bounded contexts 的汇合/router，当前 imports 几乎覆盖整棵树，这在 Composition 节点反而符合职责。
 
-4. **现在最需要修的其实已经不是目录，而是 architecture gate。** `HOST_BOUNDARY_OPEN_BASENAMES` 仍然活着，而且已经膨胀到非常危险的程度：除了旧名字以外，现在连 `Host.fs`、`Runtime.fs`、`Workflow.fs`、`Types.fs`、`Recovery.fs`、`Repair.fs` 等通用 basename 都被放进去了；而 `isHostBoundaryOpenPath` 判断时真的只取 basename。 这意味着理论上：
-
-   ```text
-   Whatever/Runtime.fs
-   ```
-
-   仅仅因为叫 `Runtime.fs`，就可能获得本来不该有的物理边界权限。
-
-   这和现在已经形成的 ownership tree 是冲突的。第二轮以后应该反过来按**路径语义**授权，例如：
-
-   ```text
-   **/OpenCode/**
-   **/Host/**
-   OpenCode/**
-   Process/**
-   ```
-
-   再对极少数 bridge 精确列路径，而不是列 basename。
-
-   更明显的是，`dsl-ownership-ratchet-baseline.json` 还保存着上一轮的 `Feedback/Enforcer`、`OpenCode/Contract`、旧 `Composition` 等路径。 但你自己的 structured-workflow 文档已经把这个 ratchet 明确标记为 **cutover 后 DELETE**，只留下 `--threshold=0` 的 positive gate。 而现在 `check.mjs` 已经确实把主门设成了 `--threshold=0`。 所以这里应该收尾：**删掉 migration ratchet 和旧 baseline，而不是继续维护它。**
+4. ~~**现在最需要修的其实已经不是目录，而是 architecture gate。** `HOST_BOUNDARY_OPEN_BASENAMES` 仍然活着，而且已经膨胀到非常危险的程度……~~ **已完成**：`dsl-ownership.mjs` 的 `HOST_BOUNDARY_OPEN_PATHS` 已改为精确路径集合（`isHostBoundaryOpenPath` 做全路径匹配，不再取 basename）；`dsl-ownership-ratchet-baseline.json` 已删除，`check.mjs` 主门设为 `--threshold=0`（zero-tolerance positive gate）。
 
 5. **最后做一次“假依赖边清理”，再决定是否继续旋转。** 例如 `Foundation/SyntheticToml.fs` 一开头竟然 `open` 了 Composition、Context、Enforcer、Execution、Host、Mission、Participant 等大量上层 subtree。 可它自己的注释却明确说它“knows nothing about Blogger, forks, or any local schema”，只拥有 canonical TOML string/layout rules。 从实际实现看，前面的 `normalizeNewlines / renderString / comment / field / tableEntry` 也确实是纯格式算法。 
 
@@ -6440,11 +6413,11 @@ compiler/build tests
 这一版：
 ownership tree 已经成立
 → 不要再大改树
-→ 拆中央 Fact
-→ 清 Foundation 假基础
-→ 把具体 Projection 从 Composition 移走
-→ 删除迁移 whitelist / baseline
-→ 清 unused imports
+→ 拆中央 Fact（仍待）
+→ ~~清 Foundation 假基础~~（已完成：Flow.fs 已删）
+→ ~~把具体 Projection 从 Composition 移走~~（已完成：GuidelineProjection 已移至 Host/PairProgramming）
+→ ~~删除迁移 whitelist / baseline~~（已完成：ratchet baseline 已删，gate 改精确路径 + threshold=0）
+→ 清 unused imports（仍待）
 → 再根据真实 cross-tree edges 做少量 rotation
 ```
 
@@ -6953,7 +6926,7 @@ requirements/<owner>/WHAT.md
 - `node scripts/build.mjs` 通过：Fable 5.13.0 解析 647 source files，assembly 生成成功。
 - `node requirements/verification-system/tests/run.mjs` 通过：3120/3120 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
 - `FinalitySurface` 合成信封（synthetic envelope）已消除：通过 `Fold.foldFact` 直接按 Fact 分发，移除了 `envelopeFor`、`streamOf`、`sessionOfStream` 及死载荷字段（RuntimeId, LocalSeq, ObservedAt, EventId, ProviderRun）。
-- `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；将测试工具原语（mockWaitChild, unitTaskSource 等）剥离至独立的 `ProcessTestSurface` 模块并在 manifest 中注册为 opaque-capability 资源表面，使生产表面仅保留生产语义。
+- `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；测试驱动原语（childCreate, unitTaskSource, completionMailboxCreate 等）内联为 `ProcessSurface` 的合法物理能力（子进程句柄构造、延迟信号、PTY 完成邮箱），不再独立 `ProcessTestSurface` 模块或 manifest 条目，生产表面与测试入口统一。
 - `Scheduler` 控制状态机已消除：删除了 `Reconciler.Scheduler` 中的 `Work` 和 `Release` 控制令牌 DU，drain 循环改用直接的 CE 布尔流。
 - `Git` 钩子路径收敛：`Git/Gateway.fs` 现通过 `ProcessRunner.run` 的类型化 `Command` 抽象路由；`Git/Subject.fs`（同步内省）与 `ProcessGitRawStore.fs`（二进制 I/O）已记录架构留存理由。
 - `LEGACY-007` 裁定完成：在 `cleanup/legacy-ledger.md` 中裁定为 BOUNDED-COMPAT，明确具名债权人（历史持久化 journal 中的退休假中止 blob）、精确边界与退出条件。
@@ -6962,9 +6935,9 @@ requirements/<owner>/WHAT.md
 - `REQUIREMENT-SYSTEM-013` 已闭合：`activeBodyViolations` + `frozenOriginViolations` 纯验证器机械守住 Active origin、段白名单与跨版本原文冻结。
 - `ReconcilePass` 已删除 `MaterializeContinuation` 控制令牌；snapshot error/success 分支由直接 CE 函数与有界递归表达。
 - JS semantic scanner 已覆盖 template dist import 与 support→support 传递依赖；surface manifest 只接受真实 test binding 使用；P0 recovery/join 物理权限改为精确路径。
-- `P8` 效应所有权审查完成：PTY、Journal/EventStore、Host 会话生命周期拥有单一清晰所有者；Git 路径已收敛；定时器/时钟边界符合 `IClockPort` 契约（仅限 Domain/Application/Session 限制）。
+- `P8` 效应所有权审查完成：PTY、Journal/EventStore、Host 会话生命周期拥有单一清晰所有者；Git 路径已收敛；定时器/时钟边界符合 `IClockPort` 契约（定义于 `Foundation/Temporal.fs`，由 composition 点注入）。
 - 架构门禁深度强化与死检查清零：
-  - `architecture.mjs`：修复 Gate ⑪ 中字符串 replace 导致的正则失效（`replace(/\.fs$/, '')`），使 Reviewer 所有权门禁真正生效；检查 ④ 同步覆盖现代 `OpenCode/Tools/FinalityController.fs` 路径。
+  - `architecture.mjs`：修复 Gate ⑪ 中字符串 replace 导致的正则失效（`replace(/\.fs$/, '')`），使 Reviewer 所有权门禁真正生效；检查 ④ 同步覆盖现代 `Mission/Finality/` 路径。
   - `causal-wait-boundary.mjs`：重构静态路径判据为真实有界上下文目录，消除关键文件缺失时的静默 `continue` 跳过，缺文件立即 fail-closed。
   - `provider-leak-gate.mjs`：补全 `Fission/OpenCode/Tool.fs`、`Delegation/Handle/OpenCode/OneShotTool.fs`、`SyncDelegate/OpenCode/Tools.fs`、`Casebook/OpenCode/Tools.fs` 扫描根，消除扫描根缺失时的静默跳过。
   - `g4r-ce-vocabulary.mjs`：扫描层从失效路径重映射至 11 个活跃有界上下文目录，明确物理适配器白名单，杜绝盲门禁。

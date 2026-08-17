@@ -6,19 +6,19 @@
 
 | 模块 | 角色 | 对应命题 |
 |---|---|---|
-| `src/Wanxiangshu/Domain/SessionRecovery.fs` | recovery 纯代数：RecoveryNode/RecoveryClosure/validateClosurePure、SessionRecovery.combine、authorizeFamilyResume、FamilyRecoveryPermit（私有构造 + missingFrom） | CRASH-005/010/011/013/014 |
-| `src/Wanxiangshu/Execution/Session/SessionRecoveryWorkflow.fs` | family 恢复编排：SessionRecoveryPorts（全强制）、recoverFamilyDirect（child-first recoverNodes）、authorize | CRASH-002/005/006/010/011 |
-| `src/Wanxiangshu/Domain/ChildRecovery.fs` | child 恢复纯决策：DurableHandleEvidence / ChildSnapshotEvidence / HostObservation → resolveChild；JoinableCompletion（fromDecoded / tryFromProvenTerminal）；JoinRecoveryTrace | CRASH-005/009/010/011/012 |
+| `src/Wanxiangshu/Execution/Session/Recovery/Model.fs` | recovery 纯代数：RecoveryNode/RecoveryClosure/validateClosurePure、SessionRecovery.combine、authorizeFamilyResume、FamilyRecoveryPermit（私有构造 + missingFrom） | CRASH-005/010/011/013/014 |
+| `src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs` | family 恢复编排：SessionRecoveryPorts（全强制）、recoverFamilyDirect（child-first recoverNodes）、authorize | CRASH-002/005/006/010/011 |
+| `src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs` | child 恢复纯决策：DurableHandleEvidence / ChildSnapshotEvidence / HostObservation → resolveChild；JoinableCompletion（fromDecoded / tryFromProvenTerminal）；JoinRecoveryTrace | CRASH-005/009/010/011/012 |
 | `src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs` | resolveAndCommit：读 durable + snapshot → resolve → recordCompletion/recordAbandon → Pulse | CRASH-002/009/012 |
-| `src/Wanxiangshu/Session/HandleController.fs` | completion 单一 owner（recordCompletion/recordAbandon/retire/consume） | CRASH-009/012 |
-| `src/Wanxiangshu/Composition/Turn/ReconcilePass.fs` / `Reconciler.fs` / `ReconciledTurn.fs` | snapshot 观测 → wake evidence → publish；TurnUnknown 私有观测 | CRASH-003/007/008 |
-| `src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs` / `BloggerRecoveryProbe.fs` | Blogger 崩溃窗口分类与恢复探针 | CRASH-002/016 |
+| `src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs` | completion 单一 owner（recordCompletion/recordAbandon/retire/consume） | CRASH-009/012 |
+| `src/Wanxiangshu/Composition/Turn/ReconcilePass.fs` / `TurnReconcile.fs` | snapshot 观测 → wake evidence → publish；TurnUnknown 私有观测 | CRASH-003/007/008 |
+| `src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs` / `BloggerCrashSurface.fs` | Blogger 崩溃窗口分类与恢复探针 | CRASH-002/016 |
 | `src/Wanxiangshu/Interaction/Dispatch/Recovery.fs` | detached Prompt claim 物理证据核对（Proven / StillPending / Unreadable） | CRASH-005；普通 lifecycle 不接线 |
-| `src/Wanxiangshu/Session/HostForkRestart.fs` / `HostForkRunLifecycle.fs` / `ForkRecovery.fs` | restart 恢复 walk：restoreLinkedChildren、HostForkRestart 的证明结构（p0-recovery-join 正向模式） | CRASH-002/009/012 |
+| `src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs` / `Host/RunLifecycle.fs` / `Fork/Recovery.fs` | restart 恢复 walk：restoreLinkedChildren、HostForkRestart 的证明结构（p0-recovery-join 正向模式） | CRASH-002/009/012 |
 | `src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs` | 从 durable 关联发现 closure（child-first 序） | CRASH-002/014 |
-| `src/Wanxiangshu/Session/FamilyRecoveryCoordinator.fs` | 物理 single-flight runOnce（Session 层，非 Application） | CRASH-006 |
-| `src/Wanxiangshu/Session/CompletionMailbox.fs` / `JoinDrain.fs` / `Execution/Delegation/Join.fs` | agent Pulse vs PTY Publish 双通道；join 消费 v2 terminal | CRASH-011/012 |
-| `src/Wanxiangshu/Infrastructure/OpenCode/Host/PluginRuntimeScope.fs` / `PluginRecoveryScope.fs` | RequireFamilyRecovery 端口接线 | CRASH-006 |
+| `src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs` | 物理 single-flight runOnce（Session 层，非 Application） | CRASH-006 |
+| `src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs` / `Execution/Delegation/Handle/JoinDrain.fs` / `Execution/Delegation/Join.fs` | agent Pulse vs PTY Publish 双通道；join 消费 v2 terminal | CRASH-011/012 |
+| `src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs` / `PluginRecoveryScope.fs` | RequireFamilyRecovery 端口接线 | CRASH-006 |
 
 ## 当前进程内 family 校验路径
 

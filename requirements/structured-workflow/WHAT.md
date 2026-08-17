@@ -176,7 +176,7 @@ OpenCode Contract）。
 **边界**：
 - 领域操作必须通过**具名 capability** 调用副作用，每操作一种结果类型，禁止泛化
   `execute Command` 与大 Reply DU 吞掉不可能分支（FLOW-003）。
-- 测试对 Fable 产物形状的适配只属于 `requirements/verification-system/tests/support/domain.mjs`（DSL-011）；
+- 测试对 Fable 产物形状的适配只属于 registered owner surface（DSL-011）；
   不为测试便利新增生产 export。
 - Vocabulary 不得下沉 OpenCode tool adapter、不得上提为与 owner 无关的纯规则层。
 

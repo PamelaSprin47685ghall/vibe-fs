@@ -25,12 +25,10 @@ const {
   portClose,
   portCloseAll,
   portList,
-} = await import('../../../dist/Process/Surface.js')
-const {
   unitTaskSource,
   unitTaskResolve,
   unitTask,
-} = await import('../../../dist/Process/TestSurface.js')
+} = await import('../../../dist/Process/Surface.js')
 
 const agent = { Name: 'fast-distiller' }
 const bytes = new TextEncoder().encode('hi')

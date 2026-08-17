@@ -22,10 +22,10 @@ participant 自己认为 mission 完成 ≠ 世界允许不可逆结束。
 
 ## HOW 概览（→ HOW.md）
 
-- wiring：`src/Wanxiangshu/Application/Finality/{FinalityWorkflow,CohortWorkflow,BlessingWorkflow,RevisionWorkflow,RecordWorkflow,Ports,Types}.fs`、`Application/Manager/ManagerFinality.fs`
-- type：`src/Wanxiangshu/Domain/{FinalityPrompt,MagicTodoFinalityCohort}.fs`、`Composition/Bridges/FinalityReview/FinalityReviewCohort.fs`
+- wiring：`src/Wanxiangshu/Mission/Finality/{Workflow,Cohort,Blessing,Revision,Record,Ports,Types}.fs`、`Mission/Manager/Finality.fs`
+- type：`src/Wanxiangshu/Mission/Finality/Prompt.fs`、`Mission/Obligation/Todo/FinalityCohort.fs`、`Composition/Bridges/FinalityReview/FinalityReviewCohort.fs`
 - Life 事实：`Mission/Manager/Life/Facts.fs` + `Mission/Manager/Life/Projection.fs`
-- 终结工具：`Infrastructure/OpenCode/Tools/FinalityTool.fs`（`suicide` 唯一入口）
+- 终结工具：`OpenCode/Tools/StaticTools.fs`（`suicide` 唯一入口）
 
 ## proof 概览（→ PROOF.md）
 

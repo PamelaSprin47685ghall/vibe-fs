@@ -145,6 +145,20 @@ for (const edge of graph.danglingProof) {
   )
 }
 
+// A PROOF row that mentions a law ID but references no executable .test.mjs
+// path is prose, not proof. It must carry at least one test path with a
+// matching WHAT-tagged anchor to count as executable evidence.
+for (const row of graph.proseOnlyProof) {
+  const packageName = row.proofFile.split('/').slice(-2)[0]
+  if (!inScope(packageName)) continue
+  add(
+    rel(row.proofFile),
+    row.proofLine,
+    'TRACE_PROSE_ONLY_PROOF',
+    `${row.whatIds.join(', ')} PROOF row has no executable .test.mjs anchor: ${row.rowText.slice(0, 80)}`,
+  )
+}
+
 // ── output ───────────────────────────────────────────────────────────────────
 
 const sorted = [...failures].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)

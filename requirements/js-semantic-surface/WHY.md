@@ -31,7 +31,7 @@ fork/join 语义。它们各自有「这条产品规则怎么证明」的义务�
 
 `verification-system` 回答「怎么证明」（证据分层、可红性、fail-closed、时间确定性）。
 `js-semantic-surface` 回答「测试世界的边界是什么」（surface 是什么、JS-native 是什么、
-Fable representation 为什么不是 contract）。独立变化测试：把 `domain.mjs` 换成新的
+Fable representation 为什么不是 contract）。独立变化测试：把某个 owner surface 换成新的
 JS surface 全家——本包 HOW 变，verification-system 的 ladder/gate 机制不变；把 gate 从
 regex 扫描换成 AST 扫描——verification-system HOW 变，本包宪法不变。
 
