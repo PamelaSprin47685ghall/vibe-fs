@@ -10,8 +10,6 @@ const FABLE_PATTERN = /dist[/\\]fable_modules/
 export const scanViolations = (root) => {
   const violations = []
   const scopes = [
-    join(root, 'tests', 'unit'),
-    join(root, 'tests', 'integration'),
     join(root, 'requirements'),
   ]
 

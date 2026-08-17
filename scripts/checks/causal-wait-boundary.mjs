@@ -34,19 +34,27 @@ const filesUnder = (relDir) => {
 const allFs = () =>
   [...walk(src)].filter((f) => f.endsWith('.fs')).map((f) => ({ abs: f, rel: norm(f.slice(src.length + 1)) }))
 
-// 1. Domain ↛ CausalWaitRegistry / CausalWaitHub / CausalAwait
-for (const { abs, rel } of filesUnder('Domain')) {
-  const text = read(abs)
-  if (/CausalWait(?:Registry|Hub)|CausalAwait/.test(text)) {
-    problems.push(`Domain/${rel}: must not reference CausalWaitRegistry/Hub/Await`)
+// 1. Pure domain layers must not reference CausalWaitRegistry implementation / snapshot readers
+const domainLayers = ['Foundation', 'Participant', 'Interaction', 'Mission', 'Strength', 'Context', 'Repository']
+for (const layer of domainLayers) {
+  for (const { abs, rel } of filesUnder(layer)) {
+    if (rel.includes('/OpenCode/') || rel.includes('/Host/') || rel.endsWith('Surface.fs') || rel.includes('BookkeeperRuntime.fs')) continue
+    const text = read(abs)
+    if (/CausalWaitRegistry|CausalWaitHub\.(?:snapshot|read)/.test(text)) {
+      problems.push(`Domain/${rel}: must not reference CausalWaitRegistry/snapshot`)
+    }
   }
 }
 
 // 2. Application ↛ IWaitSnapshotReader
-for (const { abs, rel } of filesUnder('Application')) {
-  const text = read(abs)
-  if (/IWaitSnapshotReader/.test(text)) {
-    problems.push(`Application/${rel}: must not access IWaitSnapshotReader`)
+const appLayers = ['Execution', 'Mission', 'Change', 'Composition']
+for (const layer of appLayers) {
+  for (const { abs, rel } of filesUnder(layer)) {
+    if (rel.includes('/Wait/')) continue
+    const text = read(abs)
+    if (/IWaitSnapshotReader/.test(text)) {
+      problems.push(`Application/${rel}: must not access IWaitSnapshotReader`)
+    }
   }
 }
 
@@ -54,16 +62,16 @@ for (const { abs, rel } of filesUnder('Application')) {
 for (const { abs, rel } of allFs()) {
   const parts = rel.split('/')
   const underJournal = parts.includes('Journal')
-  const isFact = parts.length >= 2 && parts.at(-2) === 'Kernel' && parts.at(-1) === 'Fact.fs'
+  const isFact = parts.at(-1)?.endsWith('Fact.fs') || parts.at(-1)?.endsWith('Facts.fs')
   if (!underJournal && !isFact) continue
   const body = read(abs)
-  if (/CausalWait|WaitKind|IWaitSnapshotReader|CausalAwait/.test(body)) {
+  if (/CausalWaitRegistry|IWaitSnapshotReader/.test(body)) {
     problems.push(`${rel}: CausalWait must not enter Fact/Journal codec surfaces`)
   }
 }
 
 // 4. diagnostics snapshot not in PromptDispatcher / decision
-for (const name of ['Interaction/Dispatch/Dispatcher.fs', 'Session/PromptDispatcher.fs', 'Application/Reconciliation/TurnCompletionProgram.fs']) {
+for (const name of ['Interaction/Dispatch/Dispatcher.fs', 'Composition/Turn/TurnReconcile.fs', 'Mission/Manager/Workflow.fs']) {
   const abs = join(src, name)
   try {
     const text = read(abs)

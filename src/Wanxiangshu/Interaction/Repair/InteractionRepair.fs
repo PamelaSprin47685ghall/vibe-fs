@@ -234,8 +234,7 @@ module InteractionRepairWorkflow =
                 do! sendAabb ()
             | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
                 do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-            | Ok ConfirmedFailureOutcome.AlreadyRecorded when guaranteedFirstAabb ->
-                do! sendAabb ()
+            | Ok ConfirmedFailureOutcome.AlreadyRecorded when guaranteedFirstAabb -> do! sendAabb ()
             | Ok ConfirmedFailureOutcome.AlreadyRecorded when fallbackStillOpen () ->
                 // A racing observer may have advanced this exact terminal before
                 // the request-scoped AABB claim became visible. The claim itself

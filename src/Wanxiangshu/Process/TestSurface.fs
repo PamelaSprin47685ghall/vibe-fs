@@ -45,7 +45,8 @@ module ProcessTestSurface =
         ProcessSurface.MailboxHandle(CompletionMailbox(obj ())) :> obj
 
     let completionMailboxPublishPty (mailbox: obj) (item: obj) : unit =
-        (mailbox :?> ProcessSurface.MailboxHandle).Mailbox.PublishPtyCompletion(unbox<PtyJoinItem> item)
+        (mailbox :?> ProcessSurface.MailboxHandle)
+            .Mailbox.PublishPtyCompletion(unbox<PtyJoinItem> item)
 
     let completionMailboxDrainPty (mailbox: obj) (maxCount: int) : obj array =
         (mailbox :?> ProcessSurface.MailboxHandle).Mailbox

@@ -188,7 +188,10 @@ module HostEventCodec =
         if isNull raw then None else decodeHostSignal raw
 
     let private fieldText (value: obj) (name: string) =
-        if isNull value || isNull value?(name) then "" else string value?(name)
+        if isNull value || isNull value?(name) then
+            ""
+        else
+            string value?(name)
 
     let private nonEmptyFieldText value name =
         let text = fieldText value name
@@ -212,8 +215,7 @@ module HostEventCodec =
         let finalFinish =
             completed
             && (finish
-                |> Option.exists (fun reason ->
-                    not (String.Equals(reason, "tool-calls", StringComparison.Ordinal))))
+                |> Option.exists (fun reason -> not (String.Equals(reason, "tool-calls", StringComparison.Ordinal))))
 
         assistant && (failed || finalFinish)
 
@@ -228,14 +230,15 @@ module HostEventCodec =
     /// chat.message admission, so it cannot safely release model occupancy.
     /// A terminal assistant message carries parentID = the exact physical user
     /// message that caused that provider execution.
-    let tryDecodePhysicalExecutionEnd
-        (rawInput: obj)
-        : (SessionId * PhysicalUserMessageId) option =
+    let tryDecodePhysicalExecutionEnd (rawInput: obj) : (SessionId * PhysicalUserMessageId) option =
         let raw = unwrap rawInput
         let info = messageInfo raw
         let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"
         let isTerminal = terminalAssistantInfo info
-        let sessionId = tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+
+        let sessionId =
+            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+
         let physicalUserMessageId = physicalParentId info
 
         match isMessageUpdated, isTerminal, sessionId, physicalUserMessageId with

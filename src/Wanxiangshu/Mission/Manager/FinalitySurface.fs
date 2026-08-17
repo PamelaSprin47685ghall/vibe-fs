@@ -326,16 +326,11 @@ module FinalitySurface =
             | ManagerLifecycleFact.FinalityBlessed payload -> Some payload.SessionId
             | ManagerLifecycleFact.FinalityUndecided payload -> Some payload.SessionId
             | ManagerLifecycleFact.LifeCompleted payload -> Some payload.SessionId
-        | Fact.Agent(AgentFact.Review(ReviewFactCases.ReviewBarrierStarted payload)) ->
-            Some payload.ReviewerSessionId
-        | Fact.Agent(AgentFact.Review(ReviewFactCases.ConfirmedReviewWitness payload)) ->
-            Some payload.ReviewerSessionId
-        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleLinked payload)) ->
-            Some payload.ParentSessionId
-        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted payload)) ->
-            Some payload.ParentSessionId
-        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleRetired payload)) ->
-            Some payload.ParentSessionId
+        | Fact.Agent(AgentFact.Review(ReviewFactCases.ReviewBarrierStarted payload)) -> Some payload.ReviewerSessionId
+        | Fact.Agent(AgentFact.Review(ReviewFactCases.ConfirmedReviewWitness payload)) -> Some payload.ReviewerSessionId
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleLinked payload)) -> Some payload.ParentSessionId
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted payload)) -> Some payload.ParentSessionId
+        | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleRetired payload)) -> Some payload.ParentSessionId
         | _ -> None
 
     /// Keep the first manager session observed; later facts fold onto it.
@@ -360,8 +355,7 @@ module FinalitySurface =
                 | other -> other
 
             Fold.foldFact projection fact
-            |> Result.mapError (fun rejection ->
-                sprintf "fold rejected %s: %A" eventKind rejection)
+            |> Result.mapError (fun rejection -> sprintf "fold rejected %s: %A" eventKind rejection)
             |> Result.map (fun next -> (next, session)))
 
     /// Fold a JS event list through the production fold, threading the

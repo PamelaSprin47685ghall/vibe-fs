@@ -128,12 +128,11 @@ module MagicTodoLocality =
         |> Array.distinct
         |> Array.toList
 
-    let private assistantMessageForRun
-        (messages: SessionMessage list)
-        (providerRun: ProviderRunIdentity)
-        =
+    let private assistantMessageForRun (messages: SessionMessage list) (providerRun: ProviderRunIdentity) =
         let run = ProviderRunIdentity.value providerRun
-        messages |> List.filter (fun message -> message.Role = "assistant" && message.Id = run)
+
+        messages
+        |> List.filter (fun message -> message.Role = "assistant" && message.Id = run)
 
     let private resolveCapturedToolCall
         trace

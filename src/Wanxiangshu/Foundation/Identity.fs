@@ -131,7 +131,7 @@ module Identity =
     ///
     /// Proves "this session was observed idle at the moment this permit was
     /// minted". An idle-derived continuation (missing-final-report, interaction
-    /// repair, Manager/Teacher/Student nudges) may physically send only while a
+    /// repair, Manager/Companion nudges) may physically send only while a
     /// fresh permit still holds at the send boundary.
     ///
     /// NEVER written to the journal (HOST-007): a restart mints nothing, so a
