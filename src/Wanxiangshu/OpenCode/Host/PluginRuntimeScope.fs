@@ -73,8 +73,8 @@ open Wanxiangshu.Host
 /// exposing its concrete dictionaries to the plugin composition root.
 type ISessionRuntimeOwner =
     inherit IDisposable
-    abstract DisposeSession: string -> unit
-    abstract DisposeExecutorRuntime: string -> unit
+    abstract DisposeSession: string -> Task
+    abstract DisposeExecutorRuntime: string -> Task
     /// MANAGED-SESSION-009: plugin shutdown must await durable parent-cancel drain
     /// before the shared Journal/EventStore lifetime is released.
     abstract DisposeAsync: unit -> Task
@@ -99,10 +99,21 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: resource — shared terminal bus port handle
     let mutable sharedTerminalPort: Events.HostEventPort option = None
     let disposeGate = obj ()
+    let backgroundGate = obj ()
     // DSL-MUTABLE: resource — scope dispose latch
     let mutable disposed = false
     // DSL-MUTABLE: resource — one shutdown Task owns the Journal/store release sequence.
     let mutable disposeTask: Task option = None
+    // DSL-MUTABLE: resource — scheduler shutdown hook owned by this scope.
+    let mutable reconcileShutdown: (unit -> Task) option = None
+    // DSL-MUTABLE: resource — detached Host-work admission latch.
+    let mutable acceptingBackgroundWork = true
+    // DSL-MUTABLE: resource — in-flight detached Host-work count.
+    let mutable backgroundWorkCount = 0
+    // DSL-MUTABLE: single-flight — shared waiter for detached Host-work drain.
+    let mutable backgroundDrainWaiter: TaskCompletionSource<unit> option = None
+    // DSL-MUTABLE: resource — first detached Host-work failure for shutdown propagation.
+    let mutable backgroundFailure: exn option = None
 
     /// HOST-006: the first compaction setting the config hook could not establish.
     ///
@@ -148,6 +159,22 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             | Some active -> do! active.DisposeAsync()
             | None -> ()
         }
+
+    let captureTaskFailure (work: Task) : Task<exn option> =
+        task {
+            try
+                do! work
+                return None
+            with ex ->
+                return Some ex
+        }
+
+    let captureSyncFailure (work: unit -> unit) : exn option =
+        try
+            work ()
+            None
+        with ex ->
+            Some ex
 
     member _.Journal = journal
 
@@ -284,13 +311,85 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.TrackSubscription(value: IDisposable option) = subscription <- value
 
+    member _.TrackReconcileShutdown(stopAndDrain: unit -> Task) =
+        reconcileShutdown <- Some stopAndDrain
+
+    member private _.AdmitBackgroundWork() : bool =
+        lock backgroundGate (fun () ->
+            if not acceptingBackgroundWork then
+                false
+            else
+                backgroundWorkCount <- backgroundWorkCount + 1
+                true)
+
+    member private _.RecordBackgroundFailure(failure: exn) =
+        lock backgroundGate (fun () ->
+            backgroundFailure <- Option.orElse backgroundFailure (Some failure))
+
+    member private _.FinishBackgroundWork() =
+        lock backgroundGate (fun () ->
+            backgroundWorkCount <- backgroundWorkCount - 1
+
+            if not acceptingBackgroundWork && backgroundWorkCount = 0 then
+                backgroundDrainWaiter
+                |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
+
+    member private _.CaptureBackgroundFailure(start: unit -> Task) : Task<exn option> =
+        task {
+            try
+                do! start ()
+                return None
+            with ex ->
+                return Some ex
+        }
+
+    member private this.ObserveBackgroundWork(start: unit -> Task) : Task =
+        task {
+            let! failure = this.CaptureBackgroundFailure start
+            failure |> Option.iter this.RecordBackgroundFailure
+            this.FinishBackgroundWork()
+        }
+        :> Task
+
+    member this.RunBackground(start: unit -> Task) : unit =
+        if this.AdmitBackgroundWork() then
+            this.ObserveBackgroundWork(start) |> ignore
+
+    member private _.BackgroundDrainTask() : Task =
+        match backgroundDrainWaiter with
+        | Some waiter -> waiter.Task :> Task
+        | None ->
+            let waiter =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            backgroundDrainWaiter <- Some waiter
+            waiter.Task :> Task
+
+    member private this.StopBackgroundAndDrain() : Task<exn option> =
+        let waiting =
+            lock backgroundGate (fun () ->
+                acceptingBackgroundWork <- false
+
+                if backgroundWorkCount = 0 then
+                    Task.FromResult(()) :> Task
+                else
+                    this.BackgroundDrainTask())
+
+        task {
+            do! waiting
+            return lock backgroundGate (fun () -> backgroundFailure)
+        }
+
     member _.AttachSharedTerminal(key: string option, port: Events.HostEventPort option) =
         sharedTerminalKey <- key
         sharedTerminalPort <- port
 
-    member _.DisposeExecutorRuntime(sessionId: string) =
-        lock toolRuntimeGate (fun () ->
-            toolRuntime |> Option.iter (fun owner -> owner.DisposeExecutorRuntime sessionId))
+    member _.DisposeExecutorRuntime(sessionId: string) : Task =
+        let owner = lock toolRuntimeGate (fun () -> toolRuntime)
+
+        match owner with
+        | Some active -> active.DisposeExecutorRuntime sessionId
+        | None -> Task.FromResult(()) :> Task
 
     /// EXEC-016: live PTY probe for DevOps join guard.
     member _.HasLivePty(sessionId: string) : bool =
@@ -299,65 +398,106 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             | Some owner -> owner.HasLivePty sessionId
             | None -> false)
 
-    member this.DisposeSession(sessionId: string) =
-        lock toolRuntimeGate (fun () -> toolRuntime |> Option.iter (fun owner -> owner.DisposeSession sessionId))
+    member this.DisposeSession(sessionId: string) : Task =
+        task {
+            let owner = lock toolRuntimeGate (fun () -> toolRuntime)
 
-        // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
-        // deleted, cancel the linked Blogger's parked waiter + request slots too.
-        let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
-        sessions.ClearSession sessionId
-        recovery.ClearSession sessionId
-        strength.ClearSession sessionId
-        this.LoopSensor.DropSession(SessionId.create sessionId)
+            match owner with
+            | Some active -> do! active.DisposeSession sessionId
+            | None -> ()
 
-        // Always cancel the deleted id; also cancel linked Blogger keys.
-        let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct
+            // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
+            // deleted, cancel the linked Blogger's parked waiter + request slots too.
+            let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
+            sessions.ClearSession sessionId
+            recovery.ClearSession sessionId
+            strength.ClearSession sessionId
+            this.LoopSensor.DropSession(SessionId.create sessionId)
 
-        for key in cancelKeys do
-            (blogger :> IParkedTransformHost).CancelParked key
+            // Always cancel the deleted id; also cancel linked Blogger keys.
+            let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct
 
-            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove key |> ignore)
+            for key in cancelKeys do
+                (blogger :> IParkedTransformHost).CancelParked key
 
-            blogger.DropDrainWindow key
+                lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove key |> ignore)
 
-            recovery.ClearAttemptPlansFor key
+                blogger.DropDrainWindow key
+                recovery.ClearAttemptPlansFor key
+        }
+        :> Task
+
+    member private _.TakeReconcileDrain() : Task =
+        let shutdown = reconcileShutdown
+        reconcileShutdown <- None
+
+        match shutdown with
+        | Some stopAndDrain -> stopAndDrain ()
+        | None -> Task.FromResult(()) :> Task
+
+    member private _.TakeRuntimeOwner() : ISessionRuntimeOwner option =
+        lock toolRuntimeGate (fun () ->
+            let owner = toolRuntime
+            toolRuntime <- None
+            owner)
+
+    member private _.RethrowFirstFailure(firstFailure: exn option) =
+        match firstFailure with
+        | Some failure -> raise failure
+        | None -> ()
+
+    member private this.StartDisposeAsync() : Task =
+        disposed <- true
+
+        task {
+            // Teardown is best-effort-complete but never error-silent: remember
+            // the first real failure, continue safe independent cleanup, rethrow last.
+            // DSL-MUTABLE: algorithm-scratch — first teardown failure accumulator.
+            let mutable firstFailure: exn option = None
+            let remember failure = firstFailure <- Option.orElse firstFailure failure
+
+            // Close external admission first. Close both internal admissions before
+            // awaiting either drain, so no durable work can enter during shutdown.
+            remember (captureSyncFailure (fun () -> subscription |> Option.iter (fun active -> active.Dispose())))
+            subscription <- None
+
+            let reconcileDrain = this.TakeReconcileDrain()
+            let backgroundDrain = this.StopBackgroundAndDrain()
+
+            let! reconcileFailure = captureTaskFailure reconcileDrain
+            remember reconcileFailure
+
+            let! backgroundFailure = backgroundDrain
+            remember backgroundFailure
+
+            remember (captureSyncFailure (fun () -> blogger.Dispose()))
+
+            let! runtimeFailure = captureTaskFailure (disposeRuntimeOwner (this.TakeRuntimeOwner()))
+            remember runtimeFailure
+
+            remember (captureSyncFailure (fun () -> sessions.Dispose()))
+            remember (captureSyncFailure (fun () -> syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())))
+            syncDelegateRuntime <- None
+            remember (captureSyncFailure (fun () -> strength.Dispose()))
+
+            // MANAGED-SESSION-009: the shared durable substrate is the last owner
+            // released, after scheduler/background/durable parent-cancel drains.
+            let! journalFailure = captureTaskFailure (SharedAgentJournal.releaseAsync journal)
+            remember journalFailure
+            remember (captureSyncFailure (fun () -> SharedTerminalBus.release sharedTerminalKey sharedTerminalPort))
+            sharedTerminalKey <- None
+            sharedTerminalPort <- None
+
+            this.RethrowFirstFailure firstFailure
+        }
+        :> Task
 
     member this.DisposeAsync() : Task =
         lock disposeGate (fun () ->
             match disposeTask with
             | Some running -> running
             | None ->
-                disposed <- true
-
-                let running =
-                    task {
-                        subscription |> Option.iter (fun active -> active.Dispose())
-                        subscription <- None
-
-                        blogger.Dispose()
-
-                        let runtimeOwner =
-                            lock toolRuntimeGate (fun () ->
-                                let owner = toolRuntime
-                                toolRuntime <- None
-                                owner)
-
-                        do! disposeRuntimeOwner runtimeOwner
-
-                        sessions.Dispose()
-                        syncDelegateRuntime |> Option.iter (fun sd -> sd.Dispose())
-                        syncDelegateRuntime <- None
-                        strength.Dispose()
-
-                        // MANAGED-SESSION-009: the shared durable substrate is the
-                        // last owner released, after every parent-cancel drain.
-                        SharedAgentJournal.release journal
-                        SharedTerminalBus.release sharedTerminalKey sharedTerminalPort
-                        sharedTerminalKey <- None
-                        sharedTerminalPort <- None
-                    }
-                    :> Task
-
+                let running = this.StartDisposeAsync()
                 disposeTask <- Some running
                 running)
 

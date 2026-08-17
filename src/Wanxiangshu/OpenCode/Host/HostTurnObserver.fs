@@ -236,7 +236,7 @@ module HostTurnObserver =
             let isFissionOwner = isFissionOwnerSession journal turn.SessionId
             armRecoveryIfEligible scope isFissionOwner turn
             do! XWire.reconcileAttempt journal scope turn
-            TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
+            do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
             let! fissionHandled =
                 FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges turn

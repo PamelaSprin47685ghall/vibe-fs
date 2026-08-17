@@ -116,3 +116,4 @@ module ReconcileSupervisor =
 
         member _.RootBindings = scheduler.RootBindings
         member _.ClearSession(sessionId: SessionId) = scheduler.ClearSession(sessionId)
+        member _.StopAndDrain() = scheduler.StopAndDrain()

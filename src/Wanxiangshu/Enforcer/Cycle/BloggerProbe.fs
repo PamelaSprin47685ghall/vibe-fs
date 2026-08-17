@@ -114,28 +114,25 @@ module BloggerRecoveryProbe =
     /// AABB has a separate durable `blogger-aabb` InteractionRepair claim; the
     /// journal-aware probes below may restore that stage with the exact terminal
     /// identity, but this pure function must never invent it from prose terminals alone.
+    let private entriesAfterClaimed (claimed: string) (completedAssistants: (string * bool) list) =
+        match completedAssistants |> List.skipWhile (fun (id, _) -> id <> claimed) with
+        | _ :: rest -> rest
+        | [] ->
+            // Claimed run absent from transcript: keep nudge stage, never invent AABB.
+            []
+
+    let private recoveryForClaimedEvidence (claimed: string) (completedAssistants: (string * bool) list) =
+        match completedAssistants |> List.tryFind (fun (id, _) -> id = claimed) with
+        | Some(_, true) -> BloggerToolRecovery.NoRecovery
+        | _ -> recoveryAfterClaimed claimed (entriesAfterClaimed claimed completedAssistants)
+
     let rejudgeFromEvidence
         (claimedTerminalRun: string option)
         (completedAssistants: (string * bool) list)
         : BloggerToolRecovery =
-        let claimedEvidence =
-            claimedTerminalRun
-            |> Option.bind (fun claimed -> completedAssistants |> List.tryFind (fun (id, _) -> id = claimed))
-
-        match claimedTerminalRun, claimedEvidence with
-        | None, _ -> BloggerToolRecovery.NoRecovery
-        | Some _, Some(_, true) -> BloggerToolRecovery.NoRecovery
-        | Some claimed, _ ->
-            let afterClaimed =
-                completedAssistants
-                |> List.skipWhile (fun (id, _) -> id <> claimed)
-                |> function
-                    | _ :: rest -> rest
-                    | [] ->
-                        // Claimed run absent from transcript: keep nudge stage, never invent AABB.
-                        []
-
-            recoveryAfterClaimed claimed afterClaimed
+        match claimedTerminalRun with
+        | None -> BloggerToolRecovery.NoRecovery
+        | Some claimed -> recoveryForClaimedEvidence claimed completedAssistants
 
     let private isCompletedChronicle (part: SessionToolPart) =
         part.ToolName = "chronicle"

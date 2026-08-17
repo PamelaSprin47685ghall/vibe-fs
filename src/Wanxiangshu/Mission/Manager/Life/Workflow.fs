@@ -235,18 +235,25 @@ module ManagerLifeWorkflow =
         (providerRun: ProviderRunIdentity)
         (blob: BlobWriteReceipt)
         (terminalRecorded: bool)
-        =
-        if not terminalRecorded then
-            AgentJournal.appendAgent
-                (StreamId.Session sessionId)
-                (Some providerRun)
-                (CompanionFact.TerminalOutputCaptured
-                    {| SessionId = sessionId
-                       TextRef = blob.BlobRef
-                       TextDigest = blob.BlobDigest
-                       ProviderRun = providerRun |})
-                journal
-            |> ignore
+        : Task<Result<unit, string>> =
+        if terminalRecorded then
+            Task.FromResult(Ok())
+        else
+            task {
+                match!
+                    AgentJournal.appendAgent
+                        (StreamId.Session sessionId)
+                        (Some providerRun)
+                        (CompanionFact.TerminalOutputCaptured
+                            {| SessionId = sessionId
+                               TextRef = blob.BlobRef
+                               TextDigest = blob.BlobDigest
+                               ProviderRun = providerRun |})
+                        journal
+                with
+                | Ok _ -> return Ok()
+                | Error failure -> return Error(JournalAppendFailure.describe failure)
+            }
 
     let private captureLastWordsIfPresent
         (journal: AgentJournal)
@@ -290,15 +297,17 @@ module ManagerLifeWorkflow =
             with
             | Error error -> return Error error
             | Ok() ->
-                captureTerminalIfMissing journal sessionId providerRun blob terminalRecorded
-                do! captureLastWordsIfPresent journal sessionId lastWords providerRun blob
+                match! captureTerminalIfMissing journal sessionId providerRun blob terminalRecorded with
+                | Error error -> return Error error
+                | Ok() ->
+                    do! captureLastWordsIfPresent journal sessionId lastWords providerRun blob
 
-                let authorityRoot =
-                    PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
-                    |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
-                    |> Option.defaultValue (AuthorityRootUserMessageId.create "")
+                    let authorityRoot =
+                        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
+                        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+                        |> Option.defaultValue (AuthorityRootUserMessageId.create "")
 
-                return Ok(BlessedLifeCompletion.Completed authorityRoot)
+                    return Ok(BlessedLifeCompletion.Completed authorityRoot)
         }
 
     let private completeWithBlessingBlob

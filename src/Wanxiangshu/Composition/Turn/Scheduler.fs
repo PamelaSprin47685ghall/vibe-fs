@@ -73,6 +73,7 @@ module Reconciler =
     type private Dispatch =
         | Start of generation: int
         | Enqueued
+        | Stopped
 
     [<RequireQualifiedAccess>]
     type private Work =
@@ -95,6 +96,7 @@ module Reconciler =
             ?onDeleted: SessionId -> unit,
             ?projection: (SessionId -> AgentProjectionSet option),
             ?onSnapshot: SessionId -> SessionMessage list -> Task,
+            ?durableUnavailable: unit -> bool,
             ?maxCausalRereads: int,
             ?maxConsecutiveErrors: int
         ) as this =
@@ -105,6 +107,12 @@ module Reconciler =
         let cleared = HashSet<string>()
         let generations = Dictionary<string, int>()
         let published = Dictionary<string, ReconcileProgram.PublishMaps>()
+        // DSL-MUTABLE: resource — shutdown admission latch.
+        let mutable accepting = true
+        // DSL-MUTABLE: resource — count of already-started physical drain tasks.
+        let mutable runningDrains = 0
+        // DSL-MUTABLE: single-flight — shared waiter for scheduler shutdown drain.
+        let mutable stopWaiter: TaskCompletionSource<unit> option = None
         // The wake of the most recent dispatch for a session. Never consumed:
         // a ResumeDrain re-run needs the same wake, and a newer signal simply
         // overwrites it. A session with no recorded wake defaults to RetryWake
@@ -112,6 +120,7 @@ module Reconciler =
         let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
+        let isDurableUnavailable = defaultArg durableUnavailable (fun () -> false)
 
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
@@ -131,18 +140,36 @@ module Reconciler =
         let isCurrent (sessionId: SessionId) (generation: int) =
             currentGeneration sessionId = generation
 
+        let startOrEnqueue (key: string) (generation: int) =
+            if active.ContainsKey key then
+                Dispatch.Enqueued
+            else
+                active.[key] <- generation
+                runningDrains <- runningDrains + 1
+                Dispatch.Start generation
+
+        let closeAdmission () =
+            accepting <- false
+            queued.Clear()
+
         let dispatch (sessionId: SessionId) (wake: ReconcileProgram.ReconcileWake) =
             lock gate (fun () ->
-                let key = SessionId.value sessionId
-                let generation = currentGeneration sessionId
-                wakes.[key] <- wake
-                queued.[key] <- generation
-
-                if active.ContainsKey key then
-                    Dispatch.Enqueued
+                if not accepting || isDurableUnavailable () then
+                    closeAdmission ()
+                    Dispatch.Stopped
                 else
-                    active.[key] <- generation
-                    Dispatch.Start generation)
+                    let key = SessionId.value sessionId
+                    let generation = currentGeneration sessionId
+                    wakes.[key] <- wake
+                    queued.[key] <- generation
+                    startOrEnqueue key generation)
+
+        let finishDrain () =
+            lock gate (fun () ->
+                runningDrains <- runningDrains - 1
+
+                if not accepting && runningDrains = 0 then
+                    stopWaiter |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
 
         let currentWake (sessionId: SessionId) =
             lock gate (fun () ->
@@ -152,44 +179,63 @@ module Reconciler =
                 | true, wake -> wake
                 | false, _ -> ReconcileProgram.ReconcileWake.RetryWake)
 
+        let takeQueuedWork (sessionId: SessionId) (generation: int) =
+            let key = SessionId.value sessionId
+
+            let isActive =
+                match active.TryGetValue key with
+                | true, activeGeneration -> activeGeneration = generation
+                | false, _ -> false
+
+            let isQueued =
+                match queued.TryGetValue key with
+                | true, queuedGeneration -> queuedGeneration = generation
+                | false, _ -> false
+
+            if isCurrent sessionId generation && isActive && isQueued then
+                queued.Remove(key) |> ignore
+                Work.Wake
+            else
+                Work.Drained
+
         let takeWork (sessionId: SessionId) (generation: int) =
             lock gate (fun () ->
-                let key = SessionId.value sessionId
-
-                let isActive =
-                    match active.TryGetValue key with
-                    | true, activeGeneration -> activeGeneration = generation
-                    | false, _ -> false
-
-                let isQueued =
-                    match queued.TryGetValue key with
-                    | true, queuedGeneration -> queuedGeneration = generation
-                    | false, _ -> false
-
-                if isCurrent sessionId generation && isActive && isQueued then
-                    queued.Remove(key) |> ignore
-                    Work.Wake
+                if isDurableUnavailable () then
+                    closeAdmission ()
+                    Work.Drained
                 else
-                    Work.Drained)
+                    takeQueuedWork sessionId generation)
+
+        let releaseActive key generation =
+            match active.TryGetValue key with
+            | true, activeGeneration when activeGeneration = generation -> active.Remove(key) |> ignore
+            | _ -> ()
+
+        let releaseAvailableAfterPass (sessionId: SessionId) (generation: int) =
+            let key = SessionId.value sessionId
+            let activeState = active.TryGetValue key
+            let queuedState = queued.TryGetValue key
+
+            match activeState, queuedState with
+            | (true, activeGeneration), (true, queuedGeneration) when
+                activeGeneration = generation
+                && queuedGeneration = generation
+                && isCurrent sessionId generation
+                ->
+                Release.ResumeDrain
+            | (true, activeGeneration), _ when activeGeneration = generation ->
+                active.Remove(key) |> ignore
+                Release.Released
+            | _ -> Release.Released
 
         let releaseAfterPass (sessionId: SessionId) (generation: int) =
             lock gate (fun () ->
-                let key = SessionId.value sessionId
-
-                let activeState = active.TryGetValue key
-                let queuedState = queued.TryGetValue key
-
-                match activeState, queuedState with
-                | (true, activeGeneration), (true, queuedGeneration) when
-                    activeGeneration = generation
-                    && queuedGeneration = generation
-                    && isCurrent sessionId generation
-                    ->
-                    Release.ResumeDrain
-                | (true, activeGeneration), _ when activeGeneration = generation ->
-                    active.Remove(key) |> ignore
+                if isDurableUnavailable () then
+                    closeAdmission ()
+                    releaseActive (SessionId.value sessionId) generation
                     Release.Released
-                | _ -> Release.Released)
+                else
+                    releaseAvailableAfterPass sessionId generation)
 
         let mapsFor (sessionId: SessionId) =
             lock gate (fun () ->
@@ -204,7 +250,7 @@ module Reconciler =
 
         member private _.RunPass(sessionId: SessionId, generation: int) : Task =
             task {
-                if not (isCurrent sessionId generation) || isCleared sessionId then
+                if isDurableUnavailable () || not (isCurrent sessionId generation) || isCleared sessionId then
                     return ()
                 else
                     let wake = currentWake sessionId
@@ -258,10 +304,38 @@ module Reconciler =
                 | Release.Released -> return ()
             }
 
+        member private this.RunTracked(sessionId: SessionId, generation: int) : Task =
+            task {
+                try
+                    do! this.Run(sessionId, generation)
+                finally
+                    finishDrain ()
+            }
+
         member _.Kick(sessionId: SessionId, wake: ReconcileProgram.ReconcileWake) : unit =
             match dispatch sessionId wake with
-            | Dispatch.Start generation -> this.Run(sessionId, generation) |> ignore
-            | Dispatch.Enqueued -> ()
+            | Dispatch.Start generation -> this.RunTracked(sessionId, generation) |> ignore
+            | Dispatch.Enqueued
+            | Dispatch.Stopped -> ()
+
+        member private _.DrainWaitTask() : Task =
+            match stopWaiter with
+            | Some waiter -> waiter.Task :> Task
+            | None ->
+                let waiter =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                stopWaiter <- Some waiter
+                waiter.Task :> Task
+
+        member this.StopAndDrain() : Task =
+            lock gate (fun () ->
+                closeAdmission ()
+
+                if runningDrains = 0 then
+                    Task.FromResult(()) :> Task
+                else
+                    this.DrainWaitTask())
 
         member _.SignalIdle(sessionId: SessionId, permit: QuiescencePermit) : unit =
             this.Kick(sessionId, ReconcileProgram.ReconcileWake.IdleWake permit)

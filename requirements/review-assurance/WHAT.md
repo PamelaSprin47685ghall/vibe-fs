@@ -107,7 +107,7 @@
 
 ## REVIEW-ASSURANCE-010：基础设施失败永远不是 PERFECT/REVISE
 
-**规范**：下列失败**永远不是**过程/终末业务 PERFECT 或 REVISE，不伪造 settlement / semantic merge，不推进 ConsumableReview：dedicated create/resume、process assignment、Y/LWR materialization、Host contract 破坏、其它 infrastructure failure。处理：Accepted 派生的 Rk obligation 保持 outstanding；可证明可恢复 → event-driven ensureReview/ensureAssignment；不可证明/契约破坏 → typed infrastructure failure，Finality 不得越过该 outstanding Rk，下一 TodoWrite 继续阻塞。
+**规范**：下列失败**永远不是**过程/终末业务 PERFECT 或 REVISE，不伪造 settlement / semantic merge，不推进 ConsumableReview：dedicated create/resume、process assignment、Y/LWR materialization、Host contract 破坏、其它 infrastructure failure。处理：Accepted 派生的 Rk obligation 保持 outstanding；可证明可恢复 → event-driven ensureReview/ensureAssignment；不可证明/契约破坏 → typed infrastructure failure，Finality 不得越过该 outstanding Rk，下一 TodoWrite 继续阻塞。Finality Reviewer 的单次 `TurnFailed`，以及 LoopSensor 已 armed 的 `TurnAborted`，属于 provider-attempt-recovery 的子会话局部恢复机会：必须先走 AABB / `ProviderRetry`；只有恢复耗尽后发布的 `TerminalOutcome.Failed`，或确定性的非 loop `TerminalOutcome.Aborted`，才允许 ReviewBarrier 把 reviewer 终结交给 Finality 判定。
 
 **含义/动机**：伪装成 REVISE 会触发错误 semantic merge、推进虚假 ConsumableReview，并让 Manager 去「修复」系统故障。三态分离：tool 语法红 → `capability-enforcement`；语义 REVISE → `review-judgement`；infra fatal → `host-boundary`/`crash-reconciliation`。本包只拥有 review-side 的「不把 infra 伪装成 REVISE」负边界。
 

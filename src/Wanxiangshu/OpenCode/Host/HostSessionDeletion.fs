@@ -28,7 +28,7 @@ open Wanxiangshu.Strength
 module HostSessionDeletion =
 
     /// Sync prefix (DropSession + CancelOwner) runs before the returned Task starts
-    /// awaiting CaseFinalize. Bootstrap fire-and-forgets the Task via emitJsExpr.
+    /// awaiting CaseFinalize. PluginRuntimeScope owns and drains the returned Task.
     let private finalizeInspectorIfRoot
         (workspaceDirectory: string option)
         (finalizeInspector: string -> string -> Task<Result<unit, string>>)
@@ -119,6 +119,6 @@ module HostSessionDeletion =
 
             scope.Sessions.Quiescence.DropSession sessionId
             ExplicitResumeSuppression.dropSession sessionId
-            scope.DisposeSession(SessionId.value sessionId)
+            do! scope.DisposeSession(SessionId.value sessionId)
             signalReconciler signal
         }

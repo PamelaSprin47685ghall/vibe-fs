@@ -260,6 +260,7 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (childWorkRecordFor: SessionId -> Task<string option>)
+        (trackOwnedWork: (unit -> Task) -> unit)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -284,11 +285,12 @@ module HostForkRunLifecycle =
             sessions.SubscribeTerminal(
                 childId,
                 (fun _ outcome ->
-                    task {
-                        let! workRecord = terminalWorkRecord outcome
-                        do! complete gate pendingRuns journal parentId sessions run outcome workRecord
-                    }
-                    |> ignore)
+                    trackOwnedWork (fun () ->
+                        task {
+                            let! workRecord = terminalWorkRecord outcome
+                            do! complete gate pendingRuns journal parentId sessions run outcome workRecord
+                        }
+                        :> Task))
             )
 
         let disposeImmediately =

@@ -123,3 +123,61 @@ test('WHAT[VERIFICATION-SYSTEM-007] recorded provider port replays in enqueued o
   assert.deepEqual(second, { text: 'second' })
   assert.equal(port.pendingCount, 0)
 })
+
+// ── Resource-owner drain proofs ─────────────────────────────────────────────
+
+test('WHAT[VERIFICATION-SYSTEM-007] journal release drains accepted append prefix and rejects later admission', async () => {
+  const result = await temporal.writerReleaseDrainScenario()
+  assert.deepEqual(result, {
+    acceptedPrefix: 'Committed',
+    afterClose: 'WriterDisposed',
+    appendCalls: 2,
+    closeBlockedOnAcceptedAppend: true,
+    duringClose: 'WriterClosing',
+  })
+})
+
+test('WHAT[VERIFICATION-SYSTEM-007] journal poison preserves the first physical failure and stops storage traffic', async () => {
+  const result = await temporal.writerPoisonPreservesFirstFailureScenario()
+  assert.deepEqual(result, {
+    appendCalls: 2,
+    first: 'CommitUnknown:append failed: disk exploded',
+    second: 'WriterPoisoned:append failed: disk exploded',
+  })
+})
+
+test('WHAT[VERIFICATION-SYSTEM-007] reconcile shutdown closes admission and waits for the running pass', async () => {
+  const result = await temporal.reconcileSchedulerStopDrainScenario()
+  assert.deepEqual(result, {
+    blockedOnRunningPass: true,
+    drained: true,
+    rejectedKickDidNotRun: true,
+    snapshotReads: 1,
+  })
+})
+
+test('WHAT[VERIFICATION-SYSTEM-007] poisoned durable substrate rejects new reconcile admission', async () => {
+  const result = await temporal.reconcileSchedulerDurableUnavailableScenario()
+  assert.deepEqual(result, {
+    rejectedWhileFirstPassBlocked: true,
+    snapshotReads: 1,
+  })
+})
+
+test('WHAT[VERIFICATION-SYSTEM-007] plugin scope drains reconcile and admitted background work before disposal', async () => {
+  const result = await temporal.pluginScopeStopDrainScenario()
+  assert.deepEqual(result, {
+    blockedBeforeRelease: true,
+    disposed: true,
+    lateBackgroundRejected: true,
+    stillWaitingForReconcile: true,
+  })
+})
+
+test('WHAT[VERIFICATION-SYSTEM-007] plugin scope preserves detached background failure instead of swallowing it', async () => {
+  const result = await temporal.pluginScopeBackgroundFailureScenario()
+  assert.deepEqual(result, {
+    error: 'background exploded',
+    lateBackgroundRejected: true,
+  })
+})

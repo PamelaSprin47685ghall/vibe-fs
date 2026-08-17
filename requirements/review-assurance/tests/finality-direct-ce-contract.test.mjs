@@ -12,6 +12,7 @@ const verdict = () => read('src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs'
 const witness = () => read('src/Wanxiangshu/Mission/Review/Judgement/Witness.fs')
 const projection = () => read('src/Wanxiangshu/Mission/Review/Barrier/Projection.fs')
 const judgeTool = () => read('src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs')
+const turnWorkflow = () => read('src/Wanxiangshu/Composition/Turn/Workflow.fs')
 const project = () => read('src/Wanxiangshu/Wanxiangshu.fsproj')
 
 test('WHAT[REVIEW-ASSURANCE-002] REVIEW_CE_001_finality_dual_perfect_has_no_persisted_program_position', () => {
@@ -44,4 +45,15 @@ test('WHAT[REVIEW-ASSURANCE-001] REVIEW_CE_003_reverify_is_the_direct_ce_tempora
   assert.match(source, /secondAwait/)
   assert.match(source, /VerdictWorkflow\.recordConfirmation/)
   assert.doesNotMatch(source, /ReviewJudgementReply|SendChallenge|AgentJournal\.snapshot|readStatus|readOutcome|classifyGuard/)
+})
+
+test('WHAT[REVIEW-ASSURANCE-010] REVIEW_CE_004_transient_reviewer_failures_remain_in_provider_recovery', () => {
+  const source = turnWorkflow()
+
+  assert.match(source, /Some Role\.Reviewer, _, ReconcileProgram\.TurnCompleted ->/)
+  assert.match(source, /Some Role\.Reviewer, _, _ -> do! observeIdleOrdinary context/)
+  assert.match(
+    source,
+    /match turn\.Role, turn\.Outcome with[\s\S]*?\| Some Role\.Reviewer, ReconcileProgram\.TurnCompleted ->[\s\S]*?ReviewerWorkflow\.observe[\s\S]*?\| Some Role\.Reviewer, _ -> do! observeOrdinary context/,
+  )
 })

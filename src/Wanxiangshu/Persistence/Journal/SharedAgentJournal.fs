@@ -41,24 +41,26 @@ module SharedAgentJournal =
             | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> shared.Remove directory |> ignore
             | _ -> ())
 
-    let private releaseExisting (directory: string) (entry: SharedJournal) (target: AgentJournal) =
+    let private releaseExisting (directory: string) (entry: SharedJournal) =
         let remaining = entry.RefCount - 1
 
         if remaining <= 0 then
             shared.Remove directory |> ignore
-            (target :> IDisposable).Dispose()
+            true
         else
             entry.RefCount <- remaining
+            false
 
     let private releaseEntry (directory: string) (entry: SharedJournal) (target: AgentJournal) =
         match entry.Instance with
-        | Some instance when obj.ReferenceEquals(instance, target) -> releaseExisting directory entry target
-        | _ -> ()
+        | Some instance when obj.ReferenceEquals(instance, target) -> releaseExisting directory entry
+        | _ -> false
 
     let private releaseTarget (target: AgentJournal) =
         lock gate (fun () ->
-            for KeyValue(directory, entry) in shared |> Seq.toList do
-                releaseEntry directory entry target)
+            shared
+            |> Seq.toList
+            |> List.exists (fun (KeyValue(directory, entry)) -> releaseEntry directory entry target))
 
     /// PERSIST-004: an unfoldable journal stops startup.
     ///
@@ -102,7 +104,14 @@ module SharedAgentJournal =
                 return Error err
         }
 
-    let release (journal: AgentJournal option) =
+    let releaseAsync (journal: AgentJournal option) : Task =
         match journal with
-        | None -> ()
-        | Some target -> releaseTarget target
+        | None -> Task.FromResult(()) :> Task
+        | Some target when releaseTarget target ->
+            task {
+                do! (target :> IAsyncDisposable).DisposeAsync()
+            }
+            :> Task
+        | Some _ -> Task.FromResult(()) :> Task
+
+    let release (journal: AgentJournal option) = releaseAsync journal |> ignore

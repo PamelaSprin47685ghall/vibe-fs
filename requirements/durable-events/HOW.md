@@ -163,9 +163,9 @@ Git pack/delta 是 Git 内部优化；sync 每次可以为增长后的 writer fi
 
 ```text
 EventStoreJournalWriter（`Persistence/Journal/EventStoreJournalWriter.fs`）：只负责把 Journal Envelope 编成 universal EventEnvelope 并 append；
-                         boot projection 直接读取 CanonicalIntegrator.Current.Journal
+                         boot projection 直接读取 CanonicalIntegrator.Current.Journal；writer 生命周期为 Open → Poisoned/Closing → Closed，保留首个 physical failure；ReleaseAsync 关闭新准入并 drain 已准入 serial prefix
 Strength/Casebook/JsTransaction：只生产 EventEnvelope、注册 Integration.rule、读取自己的 Current 槽位
-AgentJournal.AppendEnvelope：local commit → Integrator integration；自己的 EventId 若出现在 cut receipt，则先 `FatalProcess.trip("journal-semantic-cut", ...)` 再返回 typed `FactRejected`（仅 node:test 能继续观察）；durable writer 不 poison，但生产当前进程不得继续 append/effect
+AgentJournal.AppendEnvelope：local commit → Integrator integration；自己的 EventId 若出现在 cut receipt，则先 `FatalProcess.trip("journal-semantic-cut", ...)` 再返回 typed `FactRejected`（仅 node:test 能继续观察）；durable writer 不 poison，但生产当前进程不得继续 append/effect；writer 生命周期拒绝映射为 `WriterUnavailable`（known-not-attempted），不映射成 `WriteUnknown`
 ```
 
 `Journal/CodecSurface.js` accepts a plain envelope descriptor and returns plain event/decode results;
@@ -188,8 +188,10 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
 ## 已知边界与相关实现
 
 - `EventStoreJournalWriter` 的 `CommitUnknown` 与 `AgentJournal.JournalAppendFailure.WriteUnknown`
-  是「结局未知」的机械面；**重试/reconcile 政策**（先核物理证据、禁盲重试）归
-  `effect-accounting`。
+  只表示**物理 append 已进入、但返回失败后结局需要 durable witness 判定**；`WriterPoisoned` /
+  `WriterClosing` / `WriterDisposed` 是 `NotAttempted → WriterUnavailable`，事件未进入 append boundary，
+  属 known-not-committed。poison 必须保留首个 physical failure 文本，后续拒绝不得把首错降级为
+  “poisoned or disposed”。**重试/reconcile 政策**（先核物理证据、禁盲重试）归 `effect-accounting`。
 - merge 的并发/收敛面（k-way merge 代数、DomainConflict 表达、dumb remote）归
   `durable-convergence`；本文件只描述单一 store 内的 append/CAS/fold。
 - 崩溃中的 tool 不自动重入；未完成 facts 保持坏历史。未来只有显式 `/continue` 可建立 session resume workflow，归 `crash-reconciliation`。

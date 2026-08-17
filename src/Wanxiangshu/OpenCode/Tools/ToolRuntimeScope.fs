@@ -67,6 +67,7 @@ type ToolRuntimeScope
     ) =
 
     let gate = obj ()
+    let ownedWorkGate = obj ()
     let runtimes = Dictionary<string, HostForkRuntime>()
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
     let treePorts = Dictionary<string, GitTreePort>()
@@ -80,6 +81,14 @@ type ToolRuntimeScope
     let finalityTimeoutMs = finalityReviewerTimeoutMs
     // DSL-MUTABLE: resource — tool runtime dispose latch
     let mutable disposed = false
+    // DSL-MUTABLE: resource — async tool-callback admission latch.
+    let mutable acceptingOwnedWork = true
+    // DSL-MUTABLE: resource — in-flight tool-owned callback count.
+    let mutable ownedWorkCount = 0
+    // DSL-MUTABLE: single-flight — shared waiter for tool-owned callback drain.
+    let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
+    // DSL-MUTABLE: resource — first tool-owned callback failure for shutdown propagation.
+    let mutable ownedWorkFailure: exn option = None
     /// P0-RECOVERY-JOIN-001: family recovery before join / publish consume.
     // DSL-MUTABLE: resource — family recovery callback attachment
     let mutable familyRecovery: (SessionId -> Task<FamilyRecovery>) option = None
@@ -88,6 +97,64 @@ type ToolRuntimeScope
     // DSL-MUTABLE: resource — join attempt registry attachment
     let mutable joinAttempts: IJoinAttemptRegistry =
         JoinAttemptRegistry() :> IJoinAttemptRegistry
+
+    let finishOwnedWork () =
+        lock ownedWorkGate (fun () ->
+            ownedWorkCount <- ownedWorkCount - 1
+
+            if not acceptingOwnedWork && ownedWorkCount = 0 then
+                ownedWorkDrainWaiter
+                |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
+
+    let ownedWorkDrainTask () : Task =
+        match ownedWorkDrainWaiter with
+        | Some waiter -> waiter.Task :> Task
+        | None ->
+            let waiter =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            ownedWorkDrainWaiter <- Some waiter
+            waiter.Task :> Task
+
+    let stopOwnedWorkAndDrain () : Task<exn option> =
+        let waiting =
+            lock ownedWorkGate (fun () ->
+                acceptingOwnedWork <- false
+
+                if ownedWorkCount = 0 then
+                    Task.FromResult(()) :> Task
+                else
+                    ownedWorkDrainTask ())
+
+        task {
+            do! waiting
+            return lock ownedWorkGate (fun () -> ownedWorkFailure)
+        }
+
+    let recordOwnedWorkFailure (failure: exn) =
+        lock ownedWorkGate (fun () ->
+            ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
+
+    let captureOwnedWorkFailure (start: unit -> Task) : Task<exn option> =
+        task {
+            try
+                do! start ()
+                return None
+            with ex ->
+                return Some ex
+        }
+
+    let observeOwnedWork (start: unit -> Task) : Task =
+        task {
+            let! failure = captureOwnedWorkFailure start
+            failure |> Option.iter recordOwnedWorkFailure
+            finishOwnedWork ()
+        }
+        :> Task
+
+    let addUniqueForkRuntime (owned: ResizeArray<HostForkRuntime>) (runtime: HostForkRuntime) =
+        if not (owned |> Seq.exists (fun current -> obj.ReferenceEquals(current, runtime))) then
+            owned.Add runtime
 
     let registerChild parentSid (_role: Role) childId =
         sessionParents.[SessionId.value childId] <- parentSid
@@ -428,13 +495,30 @@ type ToolRuntimeScope
     member _.MarkVerdictSubmitted(reviewerId: string) =
         lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
 
-    member _.DisposeExecutorRuntime(sessionId: string) =
-        lock gate (fun () ->
-            match executorRuntimes.TryGetValue sessionId with
-            | true, runtime ->
-                executorRuntimes.Remove sessionId |> ignore
-                runtime.Cancel()
-            | false, _ -> ())
+    member _.RunOwnedWork(start: unit -> Task) : bool =
+        let admitted =
+            lock ownedWorkGate (fun () ->
+                if not acceptingOwnedWork then
+                    false
+                else
+                    ownedWorkCount <- ownedWorkCount + 1
+                    true)
+
+        if admitted then observeOwnedWork start |> ignore
+        admitted
+
+    member _.DisposeExecutorRuntime(sessionId: string) : Task =
+        let runtime =
+            lock gate (fun () ->
+                match executorRuntimes.TryGetValue sessionId with
+                | true, active ->
+                    executorRuntimes.Remove sessionId |> ignore
+                    Some active
+                | false, _ -> None)
+
+        match runtime with
+        | Some active -> active.CancelAndDrain()
+        | None -> Task.FromResult(()) :> Task
 
     /// EXEC-016: live PTY on the parent fork runtime (not Executor runtime).
     member _.HasLivePty(sessionId: string) : bool =
@@ -445,18 +529,42 @@ type ToolRuntimeScope
                 not (List.isEmpty ptys)
             | _ -> false)
 
-    member this.DisposeSession(sessionId: string) =
-        lock gate (fun () ->
-            match runtimes.TryGetValue sessionId with
-            | true, runtime ->
-                runtimes.Remove sessionId |> ignore
-                runtime.Cancel()
-            | false, _ -> ()
+    member _.DisposeSession(sessionId: string) : Task =
+        let forkRuntimes, orchestrator =
+            lock gate (fun () ->
+                let owned = ResizeArray<HostForkRuntime>()
 
-            this.DisposeExecutorRuntime sessionId
+                match runtimes.TryGetValue sessionId with
+                | true, runtime ->
+                    runtimes.Remove sessionId |> ignore
+                    owned.Add runtime
+                | false, _ -> ()
 
-            orchestratorHosts.Remove sessionId |> ignore
-            treePorts.Remove sessionId |> ignore)
+                match executorRuntimes.TryGetValue sessionId with
+                | true, runtime ->
+                    executorRuntimes.Remove sessionId |> ignore
+                    addUniqueForkRuntime owned runtime
+                | false, _ -> ()
+
+                let host =
+                    match orchestratorHosts.TryGetValue sessionId with
+                    | true, current ->
+                        orchestratorHosts.Remove sessionId |> ignore
+                        Some current
+                    | false, _ -> None
+
+                treePorts.Remove sessionId |> ignore
+                owned |> Seq.toList, host)
+
+        task {
+            for runtime in forkRuntimes do
+                do! runtime.CancelAndDrain()
+
+            match orchestrator with
+            | Some host -> do! host.CancelAndDrain()
+            | None -> ()
+        }
+        :> Task
 
     member _.DisposeAsync() : Task =
         let forkRuntimes, orchestrators =
@@ -479,11 +587,17 @@ type ToolRuntimeScope
                     ownedForkRuntimes, ownedOrchestrators)
 
         task {
+            let! ownedFailure = stopOwnedWorkAndDrain ()
+
             for runtime in forkRuntimes do
                 do! runtime.CancelAndDrain()
 
             for host in orchestrators do
                 do! host.CancelAndDrain()
+
+            match ownedFailure with
+            | Some failure -> return raise failure
+            | None -> return ()
         }
         :> Task
 

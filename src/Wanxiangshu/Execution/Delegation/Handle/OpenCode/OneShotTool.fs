@@ -270,6 +270,38 @@ module OneShotAgentTool =
                 do! recoverMissingWorkRecord scope childId terminal succeed latch completion
         }
 
+    let private settleCompletedOwned
+        (scope: ToolRuntimeScope)
+        (childId: SessionId)
+        (terminal: AgentRunResult)
+        (succeed: string -> string option -> unit)
+        (fail: exn -> unit)
+        (latch: CompletionLatch)
+        (completion: TaskCompletionSource<Result<string * string option, string>>)
+        : Task =
+        task {
+            try
+                do! settleCompletedTerminal scope childId terminal succeed latch completion
+            with ex ->
+                fail ex
+        }
+        :> Task
+
+    let private admitCompletedTerminal
+        (scope: ToolRuntimeScope)
+        (childId: SessionId)
+        (terminal: AgentRunResult)
+        (succeed: string -> string option -> unit)
+        (fail: exn -> unit)
+        (latch: CompletionLatch)
+        (completion: TaskCompletionSource<Result<string * string option, string>>)
+        =
+        let admitted =
+            scope.RunOwnedWork(fun () -> settleCompletedOwned scope childId terminal succeed fail latch completion)
+
+        if not admitted then
+            fail (ObjectDisposedException "ToolRuntimeScope")
+
     let private onTerminal
         (roleLabel: string)
         (scope: ToolRuntimeScope)
@@ -288,8 +320,7 @@ module OneShotAgentTool =
         // reasoning stream as if it were the answer.
         // EXEC-028: Completed requires child LWR (includeOpening=false); missing → Error.
         | TerminalOutcome.Completed terminal ->
-            settleCompletedTerminal scope childId terminal succeed latch completion
-            |> ignore
+            admitCompletedTerminal scope childId terminal succeed fail latch completion
         | TerminalOutcome.Aborted reason -> fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
         | TerminalOutcome.Failed error -> fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
 

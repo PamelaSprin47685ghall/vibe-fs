@@ -157,6 +157,7 @@ module HostForkChildDispatch =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (childWorkRecordFor: SessionId -> Task<string option>)
+        (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
@@ -185,6 +186,7 @@ module HostForkChildDispatch =
                     parentId
                     sessions
                     childWorkRecordFor
+                    trackOwnedWork
                     agentId
                     childId
                     role
@@ -242,6 +244,7 @@ module HostForkChildDispatch =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (childWorkRecordFor: SessionId -> Task<string option>)
+        (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
@@ -274,6 +277,7 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         childWorkRecordFor
+                        trackOwnedWork
                         runtime
                         sendChildPrompt
                         onRunStarted

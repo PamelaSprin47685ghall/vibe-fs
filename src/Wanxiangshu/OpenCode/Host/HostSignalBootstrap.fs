@@ -351,8 +351,11 @@ module HostSignalBootstrap =
                     binding,
                     onTurn,
                     ?projection = Some resolveProjection,
-                    ?onSnapshot = Some onSnapshot
+                    ?onSnapshot = Some onSnapshot,
+                    ?durableUnavailable = Some(fun () -> journal |> Option.exists AgentJournal.isPoisoned)
                 )
+
+            do scope.TrackReconcileShutdown(fun () -> reconciler.StopAndDrain())
 
             let handleOrdinaryAbort sessionId signal =
                 if not (scope.NeedHelpSensor.HasArmedSession sessionId) then
@@ -411,8 +414,8 @@ module HostSignalBootstrap =
                     // continuation capability so the retired conversation never continues.
                     handleAttemptAborted sessionId signal
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
-                    (emitJsExpr
-                        (HostSessionDeletion.handle
+                    scope.RunBackground(fun () ->
+                        HostSessionDeletion.handle
                             scope
                             workspaceDirectory
                             finalizeInspector
@@ -420,8 +423,6 @@ module HostSignalBootstrap =
                             reconciler.Signal
                             sessionId
                             parentSessionIdOpt)
-                        "$0"
-                    : unit)
 
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed

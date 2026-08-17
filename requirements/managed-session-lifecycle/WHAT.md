@@ -107,9 +107,12 @@ completion 不可再返回。
 **规范**：`Abandoned`（含 `ParentCancelled` 等 reason）不可 join、不可回退；parent cancel 对每个
 owned agent 逐个写 `HandleAbandoned`，无批量 fact（EXEC-009）；operator abort → `TurnAborted`
 cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel）。任何随后会释放
-`AgentJournal` / EventStore / workspace 的 owner teardown，必须等待这次 parent cancel 完成 durable
-`HandleAbandoned` 与 physical child teardown 后才能返回；不得用 detached `Async.StartImmediate` 把
-cancel 留到 store/repository 已释放之后继续执行。
+`AgentJournal` / EventStore / workspace 的 owner teardown，必须先关闭新的异步工作准入，再等待
+**全部已准入的 durable 尾巴**结束：reconcile drain、Host `SessionDeleted` cleanup、fork terminal /
+`FailRun` callback、one-shot terminal 的 XTrace/WorkRecord 补写、per-session / executor / orchestrator `CancelAndDrain`，以及 parent cancel 的 durable
+`HandleAbandoned` 与 physical child teardown。runtime 从 owner registry 移除时也必须先取得并 await
+其 drain Task，禁止「remove → `Cancel() |> ignore`」使资源从最终 shutdown 的可达集合逃逸；不得用
+任何 detached `Async.StartImmediate` / ignored Task 把 Journal append 留到 store/repository 已释放后继续执行。若 durable writer 因首个 physical append failure 进入 poisoned，则 Host Reconciler 必须同步关闭新的 wake admission，并丢弃尚未开始的 queued reconcile；不得继续在 poisoned writer 上消费 durable effect。
 
 **含义/动机**：父取消 = 子全部止损；逐 child 使恢复与审计逐条可定位。
 

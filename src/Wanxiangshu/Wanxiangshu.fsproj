@@ -622,6 +622,7 @@
     <Compile Include="Interaction/Dispatch/DispatchSurface.fs"/>
     <Compile Include="Interaction/Dispatch/JoinGuardSurface.fs"/>
     <Compile Include="Interaction/Dispatch/RecoverySurface.fs"/>
+    <Compile Include="Verification/EventStoreWriterSurface.fs"/>
     <Compile Include="Verification/TemporalSurface.fs"/>
     <Compile Include="OpenCode/Plugin/Plugin.fs"/>
   </ItemGroup>

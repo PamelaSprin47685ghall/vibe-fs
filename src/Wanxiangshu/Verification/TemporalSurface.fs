@@ -6,7 +6,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Process
+open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
@@ -15,6 +17,7 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.OpenCode
 
 /// Narrow JS-native owner for deterministic temporal proofs.
 ///
@@ -425,6 +428,215 @@ module TemporalSurface =
     let journalPersistedEnvelopes (handle: obj) : obj array =
         let commonDir = (handle :?> JournalHandle).CommonDir
         persistedEnvelopes commonDir
+
+    let writerReleaseDrainScenario () : Task<obj> =
+        EventStoreWriterSurface.writerReleaseDrainScenario ()
+
+    let writerPoisonPreservesFirstFailureScenario () : Task<obj> =
+        EventStoreWriterSurface.writerPoisonPreservesFirstFailureScenario ()
+
+    /// Host lifecycle proof: scheduler shutdown closes admission immediately,
+    /// waits for the already-started pass, and refuses later kicks.
+    let reconcileSchedulerStopDrainScenario () : Task<obj> =
+        task {
+            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            // DSL-MUTABLE: algorithm-scratch — scenario snapshot-read counter.
+            let mutable snapshotReads = 0
+            // DSL-MUTABLE: algorithm-scratch — scenario scheduler-drain completion observation.
+            let mutable drainCompleted = false
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+                        Task.FromResult(Ok([]: SessionMessage list)) }
+
+            let observeSnapshot (_: SessionId) (_: SessionMessage list) : Task =
+                task {
+                    AsyncSupport.trySetResult entered () |> ignore
+                    do! release.Task
+                }
+                :> Task
+
+            let scheduler =
+                Reconciler.Scheduler(
+                    snapshot,
+                    TurnBinding.Store(),
+                    (fun (_: ReconciledTurnContext) -> Task.FromResult(()) :> Task),
+                    ?onSnapshot = Some observeSnapshot
+                )
+
+            scheduler.Kick(SessionId.create "scheduler-drain-running", ReconcileProgram.ReconcileWake.RetryWake)
+            do! entered.Task
+
+            let drain =
+                task {
+                    do! scheduler.StopAndDrain()
+                    drainCompleted <- true
+                }
+
+            let blockedOnRunningPass = not drainCompleted
+            let readsBeforeRejectedKick = snapshotReads
+            scheduler.Kick(SessionId.create "scheduler-drain-rejected", ReconcileProgram.ReconcileWake.RetryWake)
+            let rejectedKickDidNotRun = snapshotReads = readsBeforeRejectedKick
+
+            AsyncSupport.trySetResult release () |> ignore
+            do! drain
+
+            return
+                box
+                    {| blockedOnRunningPass = blockedOnRunningPass
+                       rejectedKickDidNotRun = rejectedKickDidNotRun
+                       drained = drainCompleted
+                       snapshotReads = snapshotReads |}
+        }
+
+    /// Poison proof: once the durable substrate becomes unavailable, a new wake
+    /// cannot start another reconcile pass even while the first pass is blocked.
+    let reconcileSchedulerDurableUnavailableScenario () : Task<obj> =
+        task {
+            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            // DSL-MUTABLE: algorithm-scratch — scenario snapshot-read counter.
+            let mutable snapshotReads = 0
+            // DSL-MUTABLE: algorithm-scratch — scenario durable availability switch.
+            let mutable unavailable = false
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+                        Task.FromResult(Ok([]: SessionMessage list)) }
+
+            let observeSnapshot (_: SessionId) (_: SessionMessage list) : Task =
+                task {
+                    AsyncSupport.trySetResult entered () |> ignore
+                    do! release.Task
+                }
+                :> Task
+
+            let scheduler =
+                Reconciler.Scheduler(
+                    snapshot,
+                    TurnBinding.Store(),
+                    (fun (_: ReconciledTurnContext) -> Task.FromResult(()) :> Task),
+                    ?onSnapshot = Some observeSnapshot,
+                    ?durableUnavailable = Some(fun () -> unavailable)
+                )
+
+            scheduler.Kick(SessionId.create "scheduler-poison-running", ReconcileProgram.ReconcileWake.RetryWake)
+            do! entered.Task
+
+            unavailable <- true
+            let readsBeforeRejectedKick = snapshotReads
+            scheduler.Kick(SessionId.create "scheduler-poison-rejected", ReconcileProgram.ReconcileWake.RetryWake)
+            let rejectedWhileFirstPassBlocked = snapshotReads = readsBeforeRejectedKick
+
+            AsyncSupport.trySetResult release () |> ignore
+            do! scheduler.StopAndDrain()
+
+            return
+                box
+                    {| rejectedWhileFirstPassBlocked = rejectedWhileFirstPassBlocked
+                       snapshotReads = snapshotReads |}
+        }
+
+    /// Plugin owner proof: disposal closes detached-work admission and awaits
+    /// both reconcile and already-admitted Host background work before returning.
+    let pluginScopeStopDrainScenario () : Task<obj> =
+        task {
+            let reconcileEntered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let releaseReconcile = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let backgroundEntered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let releaseBackground = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            // DSL-MUTABLE: algorithm-scratch — scenario scope-disposal observation.
+            let mutable disposed = false
+            // DSL-MUTABLE: algorithm-scratch — scenario rejected-background observation.
+            let mutable lateBackgroundStarted = false
+            let scope = new PluginRuntimeScope(None)
+
+            scope.TrackReconcileShutdown(fun () ->
+                task {
+                    AsyncSupport.trySetResult reconcileEntered () |> ignore
+                    do! releaseReconcile.Task
+                }
+                :> Task)
+
+            scope.RunBackground(fun () ->
+                task {
+                    AsyncSupport.trySetResult backgroundEntered () |> ignore
+                    do! releaseBackground.Task
+                }
+                :> Task)
+
+            do! backgroundEntered.Task
+
+            let disposing =
+                task {
+                    do! scope.DisposeAsync()
+                    disposed <- true
+                }
+
+            do! reconcileEntered.Task
+
+            scope.RunBackground(fun () ->
+                lateBackgroundStarted <- true
+                Task.FromResult(()) :> Task)
+
+            let blockedBeforeRelease = not disposed
+            AsyncSupport.trySetResult releaseBackground () |> ignore
+            let stillWaitingForReconcile = not disposed
+            AsyncSupport.trySetResult releaseReconcile () |> ignore
+            do! disposing
+
+            return
+                box
+                    {| blockedBeforeRelease = blockedBeforeRelease
+                       stillWaitingForReconcile = stillWaitingForReconcile
+                       lateBackgroundRejected = not lateBackgroundStarted
+                       disposed = disposed |}
+        }
+
+    /// Plugin owner proof: detached Host failures are not swallowed. Shutdown
+    /// drains the task, closes further admission, then returns the original error.
+    let pluginScopeBackgroundFailureScenario () : Task<obj> =
+        task {
+            let entered = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let release = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            // DSL-MUTABLE: algorithm-scratch — scenario rejected-background observation.
+            let mutable lateBackgroundStarted = false
+            let scope = new PluginRuntimeScope(None)
+
+            scope.RunBackground(fun () ->
+                task {
+                    AsyncSupport.trySetResult entered () |> ignore
+                    do! release.Task
+                    return raise (InvalidOperationException "background exploded")
+                }
+                :> Task)
+
+            do! entered.Task
+            let disposing = scope.DisposeAsync()
+            AsyncSupport.trySetResult release () |> ignore
+
+            // DSL-MUTABLE: algorithm-scratch — captured scenario failure text.
+            let mutable error = ""
+
+            try
+                do! disposing
+            with ex ->
+                error <- ex.Message
+
+            scope.RunBackground(fun () ->
+                lateBackgroundStarted <- true
+                Task.FromResult(()) :> Task)
+
+            return
+                box
+                    {| error = error
+                       lateBackgroundRejected = not lateBackgroundStarted |}
+        }
 
     // ── pure durable fold ───────────────────────────────────────────────────
 

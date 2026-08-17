@@ -116,8 +116,8 @@ module TurnWorkflow =
                                 hasLivePty
                                 quiescence
                                 context
-                    | Some Role.Reviewer, _, _ ->
-                        // A reviewer may have delivered its terminal observation on a
+                    | Some Role.Reviewer, _, ReconcileProgram.TurnCompleted ->
+                        // A completed reviewer may have delivered its terminal observation on a
                         // non-idle wake before the just-recorded verdict/challenge facts
                         // were visible. Re-evaluate the durable ReviewerEvidence on the
                         // fresh idle capability; Host nudge keys and terminal provider-run
@@ -129,6 +129,7 @@ module TurnWorkflow =
                                 journal
                                 turn
                                 (SessionId.value turn.SessionId)
+                    | Some Role.Reviewer, _, _ -> do! observeIdleOrdinary context
                     | _ -> do! observeIdleOrdinary context
                 }
 
@@ -152,8 +153,8 @@ module TurnWorkflow =
                     // once from durable linkage before bounded-context workflows consume the fact.
                     let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
 
-                    match turn.Role with
-                    | Some Role.Reviewer ->
+                    match turn.Role, turn.Outcome with
+                    | Some Role.Reviewer, ReconcileProgram.TurnCompleted ->
                         do!
                             ReviewerWorkflow.observe
                                 reviewerContinuationPort
@@ -161,7 +162,8 @@ module TurnWorkflow =
                                 journal
                                 turn
                                 (SessionId.value turn.SessionId)
-                    | Some Role.Manager ->
+                    | Some Role.Reviewer, _ -> do! observeOrdinary context
+                    | Some Role.Manager, _ ->
                         do!
                             ManagerWorkflow.observe
                                 sessionPort

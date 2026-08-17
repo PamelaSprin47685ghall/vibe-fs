@@ -78,6 +78,7 @@ module EnforcerCycleCommit =
     let private classifyAppendFailure (failure: JournalAppendFailure) : CycleCommitOutcome =
         match failure with
         | WriteUnknown(_, _) -> CycleCommitOutcome.CommitUnknown(JournalAppendFailure.describe failure)
+        | WriterUnavailable(_, _)
         | FactRejected(_, _) -> CycleCommitOutcome.KnownNotCommitted(JournalAppendFailure.describe failure)
 
     let private collapseOutcome (result: Result<CycleCommitOutcome, CycleCommitOutcome>) : CycleCommitOutcome =

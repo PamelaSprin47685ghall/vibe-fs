@@ -52,11 +52,13 @@ WorktreeCreateRequested → requestWorktree；WorktreeCreated → acceptWorktree
 ## outcome-unknown 机械面（`Persistence/Journal/EventStoreJournalWriter.fs` / `Persistence/Journal/AgentJournal.fs`）
 
 ```text
-EventStoreJournalWriter.AppendLocked：写失败 → poisoned <- true；返回
-  CommitUnknown(WriteFailed ...) —— 结局未知，不盲重试；已 poison → CommitUnknown("poisoned or disposed")
-AgentJournal.AppendEnvelope：commit → fold；fold 拒绝 → poison + FactRejected（行保持 durable）；
-  写失败 → JournalAppendFailure.WriteUnknown of EventId * JournalFailure
-JournalAppendFailure.describe：WriteUnknown = "runtime must reconcile"；FactRejected = "journal poisoned"
+EventStoreJournalWriter：physical append 已开始后失败 → 记录首个 poison 原因并返回
+  CommitUnknown(WriteFailed ...) —— 结局未知，不盲重试；之后 poisoned / closing / disposed 的新调用
+  返回 NotAttempted(WriterUnavailable)，因为该 EventId 从未进入 physical append boundary
+AgentJournal.AppendEnvelope：commit → fold；semantic cut → FactRejected（坏行 + cut durable，当前进程 fatal）；
+  physical 写失败 → JournalAppendFailure.WriteUnknown；writer 生命周期拒绝 → WriterUnavailable
+JournalAppendFailure.describe：WriteUnknown 保留 physical uncertainty；WriterUnavailable 明确 known-not-attempted 并携带首个 poison 根因
+Host Reconciler：由 composition 注入 `AgentJournal.isPoisoned` 作为 durable-unavailable admission predicate；一旦首个 physical failure poison writer，关闭新的 reconcile admission 并清掉尚未开始的 queued wake，当前 pass 退出后不得在 poisoned writer 上继续消费 durable effect。未知提交仍留给 crash-reconciliation 的 canonical witness 判定，禁止 same-process blind retry。
 判定手段（哪些 EventId 已 committed）由 durable-events 的 canonical root witness 提供。
 ```
 

@@ -514,6 +514,7 @@ module HostForkAgent =
                     runtime.ParentId
                     runtime.Sessions
                     runtime.ChildWorkRecordOf
+                    runtime.TrackOwnedWork
                     runtime.Runtime
                     runtime.SendChildPrompt
                     runtime.SendBusyNudge
@@ -613,6 +614,7 @@ module HostForkAgent =
                         runtime.ParentId
                         runtime.Sessions
                         runtime.ChildWorkRecordOf
+                        runtime.TrackOwnedWork
                         runtime.Runtime
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
@@ -657,6 +659,7 @@ module HostForkAgent =
                         runtime.ParentId
                         runtime.Sessions
                         runtime.ChildWorkRecordOf
+                        runtime.TrackOwnedWork
                         runtime.Runtime
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge

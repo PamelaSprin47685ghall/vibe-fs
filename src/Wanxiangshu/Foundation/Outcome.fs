@@ -84,11 +84,20 @@ module Outcome =
         | WriteFailed of reason: string
         | FlushFailed of reason: string
 
-    /// PERSIST-002: append has exactly two results. There is no partial write,
-    /// so there is no third case to represent one.
+    /// A writer that never attempted the caller's event. This is deliberately
+    /// distinct from CommitUnknown: lifecycle refusal is known-not-committed.
+    type JournalUnavailable =
+        | WriterPoisoned of firstFailure: string
+        | WriterClosing
+        | WriterDisposed
+
+    /// PERSIST-002: physical append is committed or uncertain. Semantic cuts and
+    /// lifecycle refusal are both known-not-committed and stay explicit instead
+    /// of being collapsed into physical uncertainty.
     type CommitResult<'e> =
         | Committed of 'e
         /// Bytes are durable, but the business rule cut this event and immediately
         /// wrote a durable reset fact. This invocation failed; the writer remains usable.
         | Rejected of EventId * reason: string
+        | NotAttempted of EventId * JournalUnavailable
         | CommitUnknown of EventId * JournalFailure

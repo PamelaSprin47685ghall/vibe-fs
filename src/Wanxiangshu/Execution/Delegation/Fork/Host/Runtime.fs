@@ -87,10 +87,88 @@ type HostForkRuntime
     let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()
     let cancelGate = obj ()
+    let ownedWorkGate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
     // DSL-MUTABLE: resource — one parent-cancel drain owns durable abandon + physical teardown.
     let mutable cancelDrainTask: Task option = None
+    // DSL-MUTABLE: resource — terminal/failure callback admission latch.
+    let mutable acceptingOwnedWork = true
+    // DSL-MUTABLE: resource — in-flight runtime-owned callback count.
+    let mutable ownedWorkCount = 0
+    // DSL-MUTABLE: single-flight — shared waiter for callback drain.
+    let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
+    // DSL-MUTABLE: resource — first runtime-owned callback failure for shutdown propagation.
+    let mutable ownedWorkFailure: exn option = None
+
+    let finishOwnedWork () =
+        lock ownedWorkGate (fun () ->
+            ownedWorkCount <- ownedWorkCount - 1
+
+            if not acceptingOwnedWork && ownedWorkCount = 0 then
+                ownedWorkDrainWaiter
+                |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
+
+    let recordOwnedWorkFailure (failure: exn) =
+        lock ownedWorkGate (fun () ->
+            ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
+
+    let captureOwnedWorkFailure (work: unit -> Task) : Task<exn option> =
+        task {
+            try
+                do! work ()
+                return None
+            with ex ->
+                return Some ex
+        }
+
+    let observeOwnedWork (work: unit -> Task) : Task =
+        task {
+            let! failure = captureOwnedWorkFailure work
+            failure |> Option.iter recordOwnedWorkFailure
+            finishOwnedWork ()
+        }
+        :> Task
+
+    let startOwnedWork (work: unit -> Task) : Task =
+        let admitted =
+            lock ownedWorkGate (fun () ->
+                if not acceptingOwnedWork then
+                    false
+                else
+                    ownedWorkCount <- ownedWorkCount + 1
+                    true)
+
+        if admitted then observeOwnedWork work else Task.FromResult(()) :> Task
+
+    let ownedWorkDrainTask () : Task =
+        match ownedWorkDrainWaiter with
+        | Some waiter -> waiter.Task :> Task
+        | None ->
+            let waiter =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            ownedWorkDrainWaiter <- Some waiter
+            waiter.Task :> Task
+
+    let stopOwnedWorkAndDrain () : Task =
+        let waiting =
+            lock ownedWorkGate (fun () ->
+                acceptingOwnedWork <- false
+
+                if ownedWorkCount = 0 then
+                    Task.FromResult(()) :> Task
+                else
+                    ownedWorkDrainTask ())
+
+        task {
+            do! waiting
+
+            match lock ownedWorkGate (fun () -> ownedWorkFailure) with
+            | Some failure -> return raise failure
+            | None -> return ()
+        }
+        :> Task
 
     // DSL-MUTABLE: resource — first prompts deferred until the review barrier
     // has durably opened (GLORY-040: barrier before assignment).
@@ -314,6 +392,7 @@ type HostForkRuntime
     member internal _.ChildCreatedDir = childCreatedDir
     member internal _.ParentWorkRecordOf = parentWorkRecordOf
     member internal _.ChildWorkRecordOf = childWorkRecordOf
+    member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
     member internal _.ParentAbortToken = parentAbortToken
@@ -334,13 +413,14 @@ type HostForkRuntime
             || HandleProjection.isAbandoned handle projection)
 
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
-        // Terminal delivery is a synchronous Host callback. Fetch the canonical
-        // child WorkRecord asynchronously, then hand the materialized value to the
-        // lifecycle completion path in-order.
-        task {
-            let! workRecord = workRecordForOutcome run outcome
-            do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
-        }
+        // Terminal delivery is a synchronous Host callback. The runtime owns the
+        // async tail so shutdown can drain it before releasing the Journal.
+        startOwnedWork (fun () ->
+            task {
+                let! workRecord = workRecordForOutcome run outcome
+                do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
+            }
+            :> Task)
         |> ignore
 
     member this.InstallRun(agentId: string, childId: SessionId, role: Role) =
@@ -354,6 +434,7 @@ type HostForkRuntime
                 parentId
                 sessions
                 childWorkRecordOf
+                (fun work -> startOwnedWork work |> ignore)
                 agentId
                 childId
                 role
@@ -362,8 +443,8 @@ type HostForkRuntime
         runStarted childId role (directoryOf agentId)
         run
 
-    member this.FailRun(run: PendingHostRun, error: string) =
-        HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error
+    member this.FailRun(run: PendingHostRun, error: string) : Task =
+        startOwnedWork (fun () -> HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error)
 
     member this.MarkReady(run: PendingHostRun) =
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.
@@ -375,24 +456,32 @@ type HostForkRuntime
             | Some drain -> drain
             | None ->
                 let drain =
-                    HostForkChildDispatch.cancelParent
-                        cancelSignals
-                        // GREEN-4: no second recovery ownership; cancel does not start restore.
-                        (fun () -> Task.FromResult(()))
-                        runtime
-                        ptyPortInstance
-                        parentKey
-                        parentAbortToken
-                        gate
-                        pendingRuns
-                        children
-                        sessions
-                        journal
-                        (journal
-                         |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
-                        parentId
-                        (fun run -> HostForkRunLifecycle.settleParentCancelled gate pendingRuns run)
-                        (clockPort.UtcNow())
+                    task {
+                        // Close terminal/failure callback admission first and let
+                        // callbacks that already observed a terminal settle their
+                        // durable completion before parent-cancel claims leftovers.
+                        do! stopOwnedWorkAndDrain ()
+
+                        do!
+                            HostForkChildDispatch.cancelParent
+                                cancelSignals
+                                // GREEN-4: no second recovery ownership; cancel does not start restore.
+                                (fun () -> Task.FromResult(()))
+                                runtime
+                                ptyPortInstance
+                                parentKey
+                                parentAbortToken
+                                gate
+                                pendingRuns
+                                children
+                                sessions
+                                journal
+                                (journal
+                                 |> Option.map (fun durable -> AgentJournal.handleProjection durable parentId))
+                                parentId
+                                (fun run -> HostForkRunLifecycle.settleParentCancelled gate pendingRuns run)
+                                (clockPort.UtcNow())
+                    }
                     :> Task
 
                 cancelDrainTask <- Some drain

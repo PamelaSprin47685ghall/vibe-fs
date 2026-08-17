@@ -87,7 +87,10 @@ retry handle 仍存活时提前完成。运行时 append **不得**创建 Git bl
 
 **规范陈述**：提交结局的 durable witness 是 canonical EventId 是否已经以相同 canonical bytes
 存在于本地 writer/history truth 中；不得用 Git ref、内存猜测、模型重试或进程退出码代替。
-同 EventId + 不同 bytes → IdentityCollision；同 EventId + 同 bytes → 已提交/幂等成功。
+同 EventId + 不同 bytes → IdentityCollision；同 EventId + 同 bytes → 已提交/幂等成功。物理 append
+真正开始后失败才可表达为 `CommitUnknown`；writer 已 poisoned / closing / disposed 时拒绝的新调用从未
+到达 append boundary，必须表达为 typed **known-not-attempted**，不得伪装成「结局未知」。writer 的
+async release 必须先关闭新准入，再 drain release 前已准入的 serial append prefix，之后才进入 disposed。
 
 **含义/动机**：remote 是否同步成功与“本地事实有没有发生”是两件事。把 Git ref 当 commit
 witness 会把网络/remote 可用性重新塞回本地 critical path。

@@ -32,6 +32,9 @@ type JournalAppendFailure =
     /// PERSIST-002 / PERSIST-003: the write did not complete cleanly. Whether it
     /// landed is unknown, so the runtime must fail closed and reconcile.
     | WriteUnknown of EventId * JournalFailure
+    /// The caller's event never reached the physical append boundary. This is
+    /// known-not-committed and must not masquerade as storage uncertainty.
+    | WriterUnavailable of EventId * JournalUnavailable
     /// The fact and its ProjectionCutTail reset are both durable. The writer may
     /// be reusable after restart, but the current process is no longer trusted:
     /// live append admission trips the process-level invariant fuse immediately.
@@ -57,6 +60,12 @@ module JournalAppendFailure =
             sprintf "append outcome unknown for %s: write failed: %s" (EventId.value eventId) reason
         | WriteUnknown(eventId, FlushFailed reason) ->
             sprintf "append outcome unknown for %s: flush failed: %s" (EventId.value eventId) reason
+        | WriterUnavailable(eventId, WriterPoisoned firstFailure) ->
+            sprintf "append not attempted for %s: writer poisoned by prior failure: %s" (EventId.value eventId) firstFailure
+        | WriterUnavailable(eventId, WriterClosing) ->
+            sprintf "append not attempted for %s: writer is closing" (EventId.value eventId)
+        | WriterUnavailable(eventId, WriterDisposed) ->
+            sprintf "append not attempted for %s: writer is disposed" (EventId.value eventId)
         | FactRejected(eventId, rejection) ->
             sprintf
                 "journal semantic cut at %s: fact '%s' rejected: %s"
@@ -284,6 +293,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
 
             match appended with
             | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure))
+            | NotAttempted(eventId, unavailable) -> return Error(WriterUnavailable(eventId, unavailable))
             | Rejected(eventId, reason) ->
                 let failure =
                     FactRejected(
