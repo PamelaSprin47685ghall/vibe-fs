@@ -87,6 +87,8 @@
 正式语义在 `requirements/<package>/`（每包 WHY/WHAT/HOW + 测试）。
 deferred 未来材料归 `proposals/`。
 Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由用户或负责人管理。
+- 普通小型修复、局部重构、测试或格式修复不要求创建 Change；能在一次修改内完整对齐
+  requirements 文档、实现与 proof 的工作直接闭合，不为流程制造空壳 Change。
 
 ## 修改纪律
 
@@ -109,7 +111,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - 禁止 typed domain fact 在 canonical durable core 中降成 `string/obj` 再解析回来。字符串/JS shape 只能存在于 codec/Host/JS physical boundary。
 - 禁止用一次性 shell、ignored script、人工抄数字作为完成证据。凡义务依赖 census/scan，scanner 与回归必须 tracked、可重放、能返回非零。
 - 每项完成前至少运行该项列出的 focused tests；最终删除本节前必须同时通过：
-  `node scripts/check.mjs`、`node scripts/build.mjs`、`node requirements/verification-system/tests/run.mjs`。当前 authoritative verification suite 基线是 3221 tests / 11 fail；**11→0 才算交付**，不得把失败标成“已知问题”后宣称完成。
+  `node scripts/check.mjs`、`node scripts/build.mjs`、`node requirements/verification-system/tests/run.mjs`。当前 authoritative verification suite 基线是 3226 tests / 11 fail；**11→0 才算交付**，不得把失败标成“已知问题”后宣称完成。
 
 ## OBL-001 — 先消灭当前 11 个 authoritative verification failures；禁止恢复旧 facade
 

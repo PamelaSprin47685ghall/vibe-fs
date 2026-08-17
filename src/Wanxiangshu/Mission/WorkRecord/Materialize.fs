@@ -149,12 +149,12 @@ module LifecycleWorkRecordProjection =
 
     let private withTerminalText
         (durable: AgentJournal)
-        (xTrace: XTraceProjectionState)
+        (ordered: XTracePartRef list)
+        (frontier: XTraceCursor)
         (trace: XTraceItem list)
         (terminalText: string)
         : Task<XTraceItem list> =
         task {
-            let ordered = XTraceProjection.parts xTrace
             let! alreadyCaptured = terminalAlreadyCaptured durable ordered terminalText
 
             if alreadyCaptured then
@@ -162,7 +162,7 @@ module LifecycleWorkRecordProjection =
             else
                 return
                     trace
-                    @ [ { Cursor = { Sequence = XTraceProjection.head xTrace }
+                    @ [ { Cursor = frontier
                           Provenance = "terminal-projection-fallback"
                           Role = "assistant"
                           Part = SemanticText terminalText } ]
@@ -170,17 +170,16 @@ module LifecycleWorkRecordProjection =
 
     let private appendTerminalFallback
         (durable: AgentJournal)
-        (xTrace: XTraceProjectionState)
+        (ordered: XTracePartRef list)
         (trace: XTraceItem list)
-        (terminalRef: BlobRef)
-        (terminalDigest: BlobDigest)
+        (terminal: XTraceTerminalRef)
         : Task<XTraceItem list> =
         task {
-            let! terminalOpt = readVerifiedTerminalText durable terminalRef terminalDigest
+            let! terminalOpt = readVerifiedTerminalText durable terminal.TextRef terminal.TextDigest
 
             match terminalOpt with
             | None -> return trace
-            | Some terminalText -> return! withTerminalText durable xTrace trace terminalText
+            | Some terminalText -> return! withTerminalText durable ordered terminal.Frontier trace terminalText
         }
 
     /// Full-lifecycle LWR fallback for Host-owned completion paths that consume a
@@ -195,18 +194,33 @@ module LifecycleWorkRecordProjection =
         (trace: XTraceItem list)
         : Task<XTraceItem list> =
         task {
-            match xTrace.Terminal with
+            match XTraceProjection.latestTerminal xTrace with
             | None -> return trace
-            | Some(terminalRef, terminalDigest) ->
-                return! appendTerminalFallback durable xTrace trace terminalRef terminalDigest
+            | Some terminal ->
+                return! appendTerminalFallback durable (XTraceProjection.parts xTrace) trace terminal
         }
 
     /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
     let private framesOverlappingRange (range: MagicTodoLwr.BoundedRange) (frames: BlogFrame list) =
         frames
         |> List.filter (fun frame ->
-            frame.CoveredFromSequence < range.EndExclusive.Sequence
+            frame.CoveredFromSequence + 1L < range.EndExclusive.Sequence
             && frame.CoveredThroughSequence >= range.StartInclusive.Sequence)
+
+    let private partsWithinRange (range: MagicTodoLwr.BoundedRange) (xTrace: XTraceProjectionState) =
+        XTraceProjection.parts xTrace
+        |> List.filter (fun part ->
+            part.Cursor.Sequence >= range.StartInclusive.Sequence
+            && part.Cursor.Sequence < range.EndExclusive.Sequence)
+
+    let private terminalForBoundedRange
+        (providerRun: ProviderRunIdentity option)
+        (range: MagicTodoLwr.BoundedRange)
+        (xTrace: XTraceProjectionState)
+        =
+        providerRun
+        |> Option.bind (fun run -> XTraceProjection.terminalForProviderRun run xTrace)
+        |> Option.filter (fun terminal -> terminal.Frontier = range.EndExclusive)
 
     let private semanticPart (kind: string) (body: string) (toolName: string option) =
         match kind with
@@ -355,6 +369,7 @@ module LifecycleWorkRecordProjection =
         (durable: AgentJournal)
         (session: SessionAgentProjection)
         (range: MagicTodoLwr.BoundedRange)
+        (terminalProviderRun: ProviderRunIdentity option)
         : Task<string option> =
         task {
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
@@ -370,8 +385,14 @@ module LifecycleWorkRecordProjection =
             // invocations never appear.
             let! resolvedTrace = resolveTrace durable xTrace
 
-            let trace =
+            let boundedTrace =
                 XTrace.sliceBetween range.StartInclusive range.EndExclusive resolvedTrace
+
+            let! trace =
+                match terminalForBoundedRange terminalProviderRun range xTrace with
+                | None -> Task.FromResult boundedTrace
+                | Some terminal ->
+                    appendTerminalFallback durable (partsWithinRange range xTrace) boundedTrace terminal
 
             match xTrace.Opening with
             | None -> return None
@@ -409,7 +430,20 @@ module LifecycleWorkRecordProjection =
         task {
             match AgentProjection.tryFind sessionId snapshot.AgentProjections with
             | None -> return None
-            | Some session -> return! materializeBoundedOpenedSession durable session range
+            | Some session -> return! materializeBoundedOpenedSession durable session range None
+        }
+
+    let lifecycleWorkRecordBoundedFromSnapshotForRun
+        (durable: AgentJournal)
+        (snapshot: ProjectionSet)
+        (sessionId: SessionId)
+        (range: MagicTodoLwr.BoundedRange)
+        (providerRun: ProviderRunIdentity)
+        : Task<string option> =
+        task {
+            match AgentProjection.tryFind sessionId snapshot.AgentProjections with
+            | None -> return None
+            | Some session -> return! materializeBoundedOpenedSession durable session range (Some providerRun)
         }
 
     let lifecycleWorkRecordBounded
@@ -420,3 +454,19 @@ module LifecycleWorkRecordProjection =
         match journal with
         | None -> Task.FromResult None
         | Some durable -> lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range
+
+    let lifecycleWorkRecordBoundedForRun
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (range: MagicTodoLwr.BoundedRange)
+        (providerRun: ProviderRunIdentity)
+        : Task<string option> =
+        match journal with
+        | None -> Task.FromResult None
+        | Some durable ->
+            lifecycleWorkRecordBoundedFromSnapshotForRun
+                durable
+                (AgentJournal.snapshot durable)
+                sessionId
+                range
+                providerRun

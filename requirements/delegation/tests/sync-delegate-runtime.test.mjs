@@ -34,6 +34,7 @@ for (const role of ['Inspector', 'Coder']) {
       assert.equal(await settle(h, 'owner-sync', role, `${role} answer`), true)
       const result = await pending
       assert.equal(result.ok, true)
+      assert.match(result.value, /Recent work/)
       assert.match(result.value, new RegExp(`${role} answer`))
     } finally { sync.dispose(h) }
   })
@@ -45,12 +46,19 @@ test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion',
     const first = sync.invoke(h, 'owner-sync', 'Inspector', 'first')
     const firstChild = await waitForChild(h, 'owner-sync', 'Inspector')
     assert.equal(await settle(h, 'owner-sync', 'Inspector', 'first answer', 'run-first'), true)
-    assert.equal((await first).ok, true)
+    const firstResult = await first
+    assert.equal(firstResult.ok, true)
+    assert.match(firstResult.value, /Recent work/)
+    assert.match(firstResult.value, /first answer/)
 
     const second = sync.invoke(h, 'owner-sync', 'Inspector', 'second')
     assert.equal(await waitForChild(h, 'owner-sync', 'Inspector'), firstChild)
     assert.equal(await settle(h, 'owner-sync', 'Inspector', 'second answer', 'run-second'), true)
-    assert.equal((await second).ok, true)
+    const secondResult = await second
+    assert.equal(secondResult.ok, true)
+    assert.match(secondResult.value, /Recent work/)
+    assert.match(secondResult.value, /second answer/)
+    assert.doesNotMatch(secondResult.value, /first answer/)
     assert.equal(sync.childCount(h), 1)
   } finally { sync.dispose(h) }
 })
@@ -114,7 +122,9 @@ test('WHAT[DELEG-012] SYNC_RUNTIME_first_provider_call_receives_canonical_record
     assert.equal(await settle(h, 'owner-canonical', 'Inspector', 'canonical WorkRecord', 'run-canonical'), true)
     const firstResult = await first
     const secondResult = await second
-    assert.deepEqual(firstResult, { kind: 'WorkRecord', value: 'canonical WorkRecord' })
+    assert.equal(firstResult.kind, 'WorkRecord')
+    assert.match(firstResult.value, /Recent work/)
+    assert.match(firstResult.value, /canonical WorkRecord/)
     assert.deepEqual(secondResult, { kind: 'MergedInto', canonical: 'call-first' })
   } finally { sync.dispose(h) }
 })

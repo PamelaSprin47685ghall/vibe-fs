@@ -137,13 +137,35 @@ test('WHAT[SEMANTIC-TRACE-002] PERSIST_010_parts_carry_turn_part_and_tool_name',
 test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_terminal_is_captured_once_and_idempotent', () => {
   const s = foldOk([terminalFact(), terminalFact()])
   assert.equal(s.xTrace.terminal.textRef, 'blob-term')
+  assert.equal(s.xTrace.terminal.providerRun, 'msg_term')
+  assert.equal(s.xTrace.terminal.frontier, 0)
+  assert.equal(s.xTrace.terminalCount, 1)
 })
 
-test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_a_second_different_terminal_overwrites_for_reuse', () => {
-  const result = xTrace.fold([terminalFact(), terminalFact({ ref: 'blob-term-2', digest: 'sha-term-2' })])
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_a_second_provider_run_gets_a_distinct_terminal_occurrence_for_reuse', () => {
+  const result = xTrace.fold([
+    terminalFact(),
+    terminalFact({ ref: 'blob-term-2', digest: 'sha-term-2', run: 'msg_term_2' }),
+  ])
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
   const s = xTrace.session(result.value, SESSION)
   assert.equal(s.xTrace.terminal.textRef, 'blob-term-2')
+  assert.equal(s.xTrace.terminal.providerRun, 'msg_term_2')
+  assert.equal(s.xTrace.terminalCount, 2)
+})
+
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_identical_terminal_bytes_are_fresh_when_provider_run_changes', () => {
+  const s = foldOk([terminalFact(), terminalFact({ run: 'msg_term_2' })])
+  assert.equal(s.xTrace.terminal.textRef, 'blob-term')
+  assert.equal(s.xTrace.terminal.providerRun, 'msg_term_2')
+  assert.equal(s.xTrace.terminalCount, 2)
+})
+
+test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_one_provider_run_cannot_publish_two_different_terminals', () => {
+  const result = xTrace.fold([terminalFact(), terminalFact({ ref: 'blob-term-2', digest: 'sha-term-2' })])
+  assert.equal(result.ok, false)
+  assert.equal(result.error.Fact, 'TerminalOutputCaptured')
+  assert.match(result.error.Reason, /terminal was already captured/i)
 })
 
 test('WHAT[SEMANTIC-TRACE-001] PERSIST_010_xtrace_facts_survive_NDJSON_and_still_fold', () => {

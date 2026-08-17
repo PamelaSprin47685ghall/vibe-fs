@@ -20,13 +20,14 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 
 ### 1.2 durable 投影（`src/Wanxiangshu/Context/Trace/Projection.fs`）
 
-`XTraceProjectionState = { Opening: OpeningMaterial option; Parts: XTracePartRef list; Terminal: (BlobRef*BlobDigest) option }`
+`XTraceProjectionState = { Opening: OpeningMaterial option; Parts: XTracePartRef list; Terminals: XTraceTerminalRef list }`
 
 - `Parts` 存储 newest-first（replay cons O(1)），`parts` 恢复 oldest-first。
 - 三个 fold 规则（PERSIST-010）：
   - `applyOpening`：同文本幂等；异文本 `OpeningAlreadyCaptured` 拒绝；
   - `applyPart`：cursor 必须严格大于 head；否则 `CursorNotAfterHead` 拒绝；
-  - `applyTerminal`：同 ref+digest 幂等；不同 terminal 覆盖（subagent reuse 每 work unit 一个 terminal，私有完成标记）。
+  - `applyTerminal`：幂等域 = ProviderRun；同 run + 同 ref/digest no-op，同 run + 不同 terminal 拒绝；
+    不同 run 追加独立 occurrence，并冻结当时 exclusive XTrace frontier。reusable child 不覆盖历史 terminal。
 - `provenanceGeneration` 解析 `g:N/...`（reanchor 后），legacy `turn:N/part:M` → 0。
 - `currentGenerationParts` 只取最新 generation，避免跨 reanchor 混用 Host turn 编号。
 
@@ -93,8 +94,9 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 - **UI delta / usage / cost / timestamp 的「计量格式」**：HOST-005 只要求它们不进 XTrace；
   它们是否别处该记、怎么记，不是本包命题（journal 诊断有独立 owner）。
 - **`TerminalOutputCaptured` 的「私有完成标记」语义**：terminal 不是 LWR 段、不经 Y ——
-  这个事实归 `work-record`（WORK-RECORD-011 边界）；本包只拥有「terminal 是 XTrace 的
-  第三事实且幂等捕获」。
+  这个事实归 `work-record`（WORK-RECORD-011 边界）；本包拥有「terminal 是 XTrace 的
+  第三事实族、按 ProviderRun 幂等、绑定捕获时 exclusive frontier」。不同 ProviderRun 即使正文
+  相同也必须保留独立 occurrence；同 ProviderRun 的不同正文 fail closed。
 - **Host compaction 的预防/收容两层机制**：`HostCompactionPolicy` 的 setting 清单与
   probe verdict 归 `context-compression`；本包只保留「XTrace 不删除」的结果。
 - **`WorkActivated` / Birth-Labor 等 legacy 措辞**（GLORY-016/017/023/024 的 GARBAGE 裁决）：

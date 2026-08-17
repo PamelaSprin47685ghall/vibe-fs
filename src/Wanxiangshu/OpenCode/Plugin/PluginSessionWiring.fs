@@ -143,8 +143,12 @@ module PluginSessionWiring =
                     ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,
                     ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector,
                     ?workRecordFor =
-                        Some(fun sessionId range ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some durable) sessionId range)
+                        Some(fun sessionId range providerRun ->
+                            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                                (Some durable)
+                                sessionId
+                                range
+                                providerRun)
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate

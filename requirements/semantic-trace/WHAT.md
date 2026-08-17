@@ -9,8 +9,10 @@
 
 **规范**：X（Work Session）的 lifecycle 语义轨迹是 append-only 的 `XTrace`
 （`Domain/XTrace.fs`），它是 X 的**唯一**原始语义历史。一个 X 生命期内：
-`Opening` 捕获一次且永不覆盖；`Parts` 按 cursor 严格增长；`Terminal` 捕获一次
-（同 ref+digest 的重放是幂等 no-op）。
+`Opening` 捕获一次且永不覆盖；`Parts` 按 cursor 严格增长；每个完成的 `ProviderRun` 最多捕获
+一个 `TerminalOutputCaptured` occurrence，并绑定捕获时的 exclusive XTrace frontier。
+同一 ProviderRun + 同 ref/digest 的重放是幂等 no-op；同一 ProviderRun 的不同 terminal 必须拒绝；
+reusable Session 上不同 ProviderRun 即使正文完全相同也仍是两个独立 occurrence，不得按文本去重。
 
 **含义/动机**：没有第二份「原始历史」。Host transcript 数组下标可被 compaction 重编号；
 任何基于 transcript 下标的历史都不是 canonical。

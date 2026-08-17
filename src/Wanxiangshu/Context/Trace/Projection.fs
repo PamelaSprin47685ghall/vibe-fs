@@ -40,7 +40,8 @@ open Wanxiangshu.Foundation.Identity
 /// COMPANION-003 / HOST-005: the XTrace's durable projection.
 ///
 /// Append-only within one lifecycle: `Opening` is captured once and never
-/// overwritten, `Parts` grow strictly by cursor, `Terminal` is captured once.
+/// overwritten, `Parts` grow strictly by cursor, terminal occurrences grow by
+/// ProviderRun as a reusable managed session completes successive work units.
 /// `RecordCoverage` (what Y has consumed) advances via `BlogObservationCommitted`,
 /// NOT here — this module holds the record itself, the Blog projection holds
 /// the ingest position, so the two can be validated against each other in the
@@ -59,8 +60,11 @@ type XTraceProjectionState =
         /// `XTraceProjection.parts` restores oldest-first cursor order.
         /// `Kind` is one of text / reasoning / tool_call / tool_result / media.
         Parts: XTracePartRef list
-        /// The terminal output blob reference. Text resolved at read boundary.
-        Terminal: (BlobRef * BlobDigest) option
+        /// Terminal occurrences, newest first. Reusable managed sessions may
+        /// complete many work units; each occurrence keeps the ProviderRun and
+        /// the XTrace part frontier at which that completion happened so a
+        /// bounded WorkRecord can project only its own formal statement.
+        Terminals: XTraceTerminalRef list
     }
 
 /// DSL-state-combination: domain — optional tool/provider/host identities are
@@ -87,6 +91,12 @@ and XTracePartRef =
         TextDigest: BlobDigest
     }
 
+and XTraceTerminalRef =
+    { TextRef: BlobRef
+      TextDigest: BlobDigest
+      ProviderRun: ProviderRunIdentity
+      Frontier: XTraceCursor }
+
 /// Why an XTrace line was refused (PERSIST-010).
 [<RequireQualifiedAccess>]
 type XTraceFoldRejection =
@@ -97,8 +107,8 @@ type XTraceFoldRejection =
     /// A part arrived with a cursor not after the projection's head. Either a
     /// duplicate (same cursor) or a reordering (older cursor after newer).
     | CursorNotAfterHead of expected: int64 * actual: int64
-    /// Terminal was already captured. Idempotent replay carries the same digest;
-    /// a different one is a second terminal for one lifecycle.
+    /// This ProviderRun already captured a different terminal. Idempotent replay
+    /// carries the same digest; another ProviderRun owns another occurrence.
     | TerminalAlreadyCaptured
 
 module XTraceProjection =
@@ -106,7 +116,7 @@ module XTraceProjection =
     let empty =
         { Opening = None
           Parts = []
-          Terminal = None }
+          Terminals = [] }
 
     /// Oldest-first cursor order. The stored field is newest-first.
     let parts (state: XTraceProjectionState) : XTracePartRef list = List.rev state.Parts
@@ -122,6 +132,12 @@ module XTraceProjection =
         match state.Parts with
         | part :: _ -> part.Cursor.Sequence + 1L
         | [] -> 0L
+
+    let latestTerminal (state: XTraceProjectionState) : XTraceTerminalRef option =
+        List.tryHead state.Terminals
+
+    let terminalForProviderRun (providerRun: ProviderRunIdentity) (state: XTraceProjectionState) =
+        state.Terminals |> List.tryFind (fun terminal -> terminal.ProviderRun = providerRun)
 
     let private parseGeneration (token: string) =
         match System.Int32.TryParse token with
@@ -215,21 +231,28 @@ module XTraceProjection =
                           TextDigest = textDigest }
                         :: state.Parts }
 
-    /// COMPANION-003 / EXEC-009: capture the terminal output reference.
-    /// Idempotent replay (same ref+digest) is a no-op; a different ref
-    /// overwrites — subagent reuse produces a new terminal per work unit
-    /// on the same child session (private completion marker, not an LWR section).
+    /// COMPANION-003 / EXEC-009: capture one terminal occurrence. Idempotency is
+    /// scoped to ProviderRun, not terminal bytes: two reused work units may
+    /// legitimately return identical prose and still need distinct bounded
+    /// completion evidence.
     let applyTerminal
         (textRef: BlobRef)
         (textDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
         (state: XTraceProjectionState)
         : Result<XTraceProjectionState, XTraceFoldRejection> =
-        match state.Terminal with
-        | Some(existingRef, existingDigest) when existingRef = textRef && existingDigest = textDigest -> Ok state
-        | _ ->
+        match terminalForProviderRun providerRun state with
+        | Some existing when existing.TextRef = textRef && existing.TextDigest = textDigest -> Ok state
+        | Some _ -> Error XTraceFoldRejection.TerminalAlreadyCaptured
+        | None ->
             Ok
                 { state with
-                    Terminal = Some(textRef, textDigest) }
+                    Terminals =
+                        { TextRef = textRef
+                          TextDigest = textDigest
+                          ProviderRun = providerRun
+                          Frontier = { Sequence = head state } }
+                        :: state.Terminals }
 
     /// Host turn indices restart per reanchor generation; XTrace Sequence does not.
     /// Turn/Part labels are only comparable within one generation.

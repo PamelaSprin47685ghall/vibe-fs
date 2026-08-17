@@ -200,7 +200,7 @@ module StrengthReplay =
         (durable: AgentJournal)
         (parts: XTracePartRef list)
         : Task<Result<StrengthTraceObservedPart list, string>> =
-        let rec loop remaining acc =
+        let rec loop (remaining: XTracePartRef list) (acc: StrengthTraceObservedPart list) =
             taskResult {
                 match remaining with
                 | [] -> return List.rev acc

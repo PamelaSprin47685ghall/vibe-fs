@@ -44,6 +44,12 @@ invocation send head；End 为 ReviewFrontier / invocation completion head。
 - `lifecycleWorkRecordBoundedFromSnapshot durable snapshot sessionId range`：bounded 物化。
   frames 按 `(Previous, Next]` 与 `[Start, End)` 重叠过滤；trace 按 range slice；
   coverage 夹到 range 内（`max(…, range start)` / `min(…, range end)`）；`includeOpening=false`。
+- `lifecycleWorkRecordBoundedFromSnapshotForRun ... providerRun`：completion consumer 使用的 bounded
+  物化。只选择 `ProviderRun` 匹配且 terminal occurrence 的 `Frontier = range.EndExclusive` 的
+  私有完成证据；自然 assistant parts 尚未含该正文时，把它仅作为 Recent work read-time fallback。
+  terminal 不占用 XTrace part cursor，不是第四段，也不会挤压下一 invocation 的首 part。
+- frame overlap 的离散区间按 `(CoveredFrom, CoveredThrough] ∩ [Start, End)` 判断；第一可覆盖
+  sequence 为 `CoveredFrom+1`，因此 later frame 的首 sequence 恰等于 `End` 时必须排除。
 - full 与 bounded 共用 `LifecycleWorkRecord.materialize` —— 单一 renderer（WORK-RECORD-010）。
 
 ### 1.4 floor（`src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs`）

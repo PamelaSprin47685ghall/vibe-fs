@@ -208,12 +208,16 @@ module XTraceSurface =
             {| opening = projection.Opening |> Option.map openingView |> Option.toObj
                parts = projection |> XTraceProjection.parts |> List.map partView |> List.toArray
                terminal =
-                projection.Terminal
-                |> Option.map (fun (reference, digest) ->
+                projection
+                |> XTraceProjection.latestTerminal
+                |> Option.map (fun terminal ->
                     box
-                        {| textRef = BlobRef.value reference
-                           textDigest = BlobDigest.value digest |})
+                        {| textRef = BlobRef.value terminal.TextRef
+                           textDigest = BlobDigest.value terminal.TextDigest
+                           providerRun = ProviderRunIdentity.value terminal.ProviderRun
+                           frontier = int terminal.Frontier.Sequence |})
                 |> Option.toObj
+               terminalCount = List.length projection.Terminals
                head = int (XTraceProjection.head projection) |}
 
     let private prefixEpochView (epoch: ActivePrefixEpoch) : obj =

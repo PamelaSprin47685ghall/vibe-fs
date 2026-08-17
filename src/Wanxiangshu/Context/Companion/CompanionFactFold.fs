@@ -152,12 +152,15 @@ module CompanionFactFold =
                     XTraceProjection.applyTerminal
                         payload.TextRef
                         payload.TextDigest
+                        payload.ProviderRun
                         (Option.defaultValue XTraceProjection.empty session.XTrace)
                     |> Result.map (fun updated -> { session with XTrace = Some updated }))
                 projection
             |> function
                 | Ok updated -> Ok(bindTerminalFrontier payload.SessionId payload.TextRef payload.TextDigest updated)
                 | Error XTraceFoldRejection.TerminalAlreadyCaptured ->
-                    reject "TerminalOutputCaptured" "terminal was already captured with a different blob (PERSIST-010)"
+                    reject
+                        "TerminalOutputCaptured"
+                        "terminal was already captured with a different blob for this ProviderRun (PERSIST-010)"
                 | Error rejection ->
                     reject "TerminalOutputCaptured" (sprintf "unexpected XTrace rejection: %A" rejection)

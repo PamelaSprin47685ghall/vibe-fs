@@ -55,7 +55,7 @@ suffix（经 `forWorkRecord` 投影，含最后一条助手文本）。两者是
 **规范**：`Reuse preserves memory; it does not enlarge the next WorkRecord`（COMPANION-015 ④）。
 Reusable SyncDelegate session 的跨调用记忆可留存，但每个语义 batch **只**物化当前
 `InvocationStartCursor..InvocationEndCursor` 内的 record；prior invocation 的 frames/trace
-不得进入本次。
+不得进入本次，later invocation 的 Chronicle/terminal 也不得反向污染已完成 range 的重物化。
 
 **含义/动机**：复用是成本优化，不是把多次 invocation 的历史合并进一份 record 的理由。
 
@@ -166,7 +166,10 @@ materializer（`LifecycleWorkRecord.materialize`），禁止第二套 work-recor
 **规范**：`WorkRecord = Opening? + Chronicle + Recent work`（COMPANION-003）。
 **无**独立 `Closing report` 段；Terminal 是私有完成标记，不是 LWR 段。正式陈述 =
 Recent work 中最后一条助手文本（散文 claim）。`inspect` 答案就是 bounded record 本身，
-不是额外 `answer` 字段（EXEC-031）。
+不是额外 `answer` 字段（EXEC-031）。若普通 XTrace parts 尚未来得及捕获最终 assistant 文本，
+但该 invocation 的 `TerminalOutputCaptured` 已 durable，则 bounded materialization 必须按
+ProviderRun + exact EndExclusive 只把**本 invocation** 的 terminal prose 投影进 Recent work；
+不得因 completion/transform 时序省略正式陈述，也不得把前后 invocation terminal 串错。
 
 **含义/动机**：独立 Closing = 第二通道 = 同一次 invocation 两个答案。最后一条助手文本
 是 participant 自己写下的最新声明，天然是正式陈述。

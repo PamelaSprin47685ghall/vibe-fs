@@ -177,10 +177,15 @@ module XTraceCapture =
             | Some durable -> do! captureOpeningWhenAbsent durable sessionId assignmentText authoritativeRequirements
         }
 
-    let private isReplayTerminal (durable: AgentJournal) (sessionId: SessionId) (text: string) : bool =
+    let private isReplayTerminal
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (text: string)
+        (providerRun: ProviderRunIdentity)
+        : bool =
         xTraceOf durable sessionId
-        |> fun existing -> existing.Terminal
-        |> Option.exists (fun (_, digest) -> HostDigest.sha256Hex text = BlobDigest.value digest)
+        |> XTraceProjection.terminalForProviderRun providerRun
+        |> Option.exists (fun terminal -> HostDigest.sha256Hex text = BlobDigest.value terminal.TextDigest)
 
     let private appendTerminalOutput
         (durable: AgentJournal)
@@ -211,7 +216,7 @@ module XTraceCapture =
         task {
             if String.IsNullOrWhiteSpace text then
                 return ()
-            elif isReplayTerminal durable sessionId text then
+            elif isReplayTerminal durable sessionId text providerRun then
                 return ()
             else
                 do! appendTerminalOutput durable sessionId text providerRun

@@ -82,14 +82,14 @@ type SyncDelegateRuntime
         /// (includeOpening=false). Injected from plugin wiring so Session does
         /// not depend on Finality compile order; range = the invocation's
         /// XTrace [StartInclusive, EndExclusive).
-        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> Task<string option>
+        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
-    let projectWorkRecord = defaultArg workRecordFor (fun _ _ -> Task.FromResult None)
+    let projectWorkRecord = defaultArg workRecordFor (fun _ _ _ -> Task.FromResult None)
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -196,7 +196,12 @@ type SyncDelegateRuntime
 
         popAll ()
 
-    let resolveWorkRecord (turnSessionId: SessionId) (call: SyncDelegateCall) endCursor =
+    let resolveWorkRecord
+        (turnSessionId: SessionId)
+        (call: SyncDelegateCall)
+        (endCursor: int64)
+        (providerRun: ProviderRunIdentity)
+        =
         match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
         | None -> Task.FromResult None
         | Some startCursor ->
@@ -204,6 +209,7 @@ type SyncDelegateRuntime
                 turnSessionId
                 { StartInclusive = { Sequence = startCursor }
                   EndExclusive = { Sequence = endCursor } }
+                providerRun
 
     let noteInspectorIfRole (call: SyncDelegateCall) turnSessionId record =
         if call.Role = SyncDelegateRole.Inspector then
@@ -233,7 +239,7 @@ type SyncDelegateRuntime
             // Exclusive range end = XTrace.head (one-past last part).
             let endCursor = xTraceHead turn.SessionId
 
-            let! workRecord = resolveWorkRecord turn.SessionId call endCursor
+            let! workRecord = resolveWorkRecord turn.SessionId call endCursor turn.ProviderRun
             return finishCompletedCall turn.SessionId call workRecord
         }
 

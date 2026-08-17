@@ -14,6 +14,7 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.EventStore
@@ -30,14 +31,12 @@ module SyncDelegateSurface =
             runtime: SyncDelegateRuntime,
             scope: ToolRuntimeScope,
             children: ResizeArray<SessionId>,
-            answers: Dictionary<string, string>,
             ownerPrefix: string
         ) =
         member _.Journal = journal
         member _.Runtime = runtime
         member _.Scope = scope
         member _.Children = children
-        member _.Answers = answers
         member _.OwnerSession(owner: string) = SessionId.create (ownerPrefix + owner)
 
         member _.Dispose() =
@@ -175,15 +174,16 @@ module SyncDelegateSurface =
             let attached = new AttachedSessionRuntime()
             let gate = new SessionQuiescenceGate()
 
-            // DSL-MUTABLE: resource — answer registry by session id
-            let answers = Dictionary<string, string>()
-
-            let workRecordFor (sessionId: SessionId) (_range: MagicTodoLwr.BoundedRange) =
-                task {
-                    match answers.TryGetValue(SessionId.value sessionId) with
-                    | true, value when not (String.IsNullOrWhiteSpace value) -> return Some value
-                    | _ -> return None
-                }
+            let workRecordFor
+                (sessionId: SessionId)
+                (range: MagicTodoLwr.BoundedRange)
+                (providerRun: ProviderRunIdentity)
+                =
+                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                    (Some journal)
+                    sessionId
+                    range
+                    providerRun
 
             let runtime =
                 new SyncDelegateRuntime(
@@ -218,7 +218,7 @@ module SyncDelegateSurface =
             let ownerPrefix =
                 sprintf "sync-delegate-surface-%s-" (ToolHostCodec.digest directory)
 
-            return box (Harness(journal, runtime, scope, children, answers, ownerPrefix))
+            return box (Harness(journal, runtime, scope, children, ownerPrefix))
         }
 
     /// Execute the real InspectorTool specification against the opaque scope and
@@ -277,6 +277,9 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
+                    let parts =
+                        if String.IsNullOrWhiteSpace answer then [||] else [| MessagePart.Text answer |]
+
                     let turn =
                         { SessionId = child
                           PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
@@ -284,14 +287,13 @@ module SyncDelegateSurface =
                           ProviderRun = ProviderRunIdentity.create runId
                           Role = Some(roleValue role)
                           Directory = None
-                          Parts = [||]
+                          Parts = parts
                           Finish = Some "stop"
                           ErrorName = None
                           Model = None
                           Outcome = ReconcileProgram.TurnCompleted
                           Observation = None }
 
-                    harness.Answers.[SessionId.value child] <- answer
                     return! harness.Runtime.HandleTurn(turn, None)
         }
 
@@ -313,8 +315,11 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
-                    if outcomeName = "TurnCompleted" then
-                        harness.Answers.[SessionId.value child] <- answer
+                    let parts =
+                        if outcomeName = "TurnCompleted" && not (String.IsNullOrWhiteSpace answer) then
+                            [| MessagePart.Text answer |]
+                        else
+                            [||]
 
                     let turn =
                         { SessionId = child
@@ -323,7 +328,7 @@ module SyncDelegateSurface =
                           ProviderRun = ProviderRunIdentity.create runId
                           Role = Some(roleValue role)
                           Directory = None
-                          Parts = [||]
+                          Parts = parts
                           Finish = Some "stop"
                           ErrorName = None
                           Model = None

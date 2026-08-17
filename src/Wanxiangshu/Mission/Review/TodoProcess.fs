@@ -197,11 +197,12 @@ module TodoProcessReviewProgram =
                   MagicTodoLwr.BoundedRange.EndExclusive = endExclusive }
 
             let! report =
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
+                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshotForRun
                     journal
                     snapshot
                     assignment.ReviewerSessionId
                     range
+                    attempt.ProviderRun
 
             match readyReport report with
             | None -> return ConcludeOutcome.Pending "process-review LWR not record-ready"

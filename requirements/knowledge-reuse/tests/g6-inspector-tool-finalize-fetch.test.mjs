@@ -88,7 +88,15 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
       lifecycle.notePrompt(delegateId, question)
       assert.equal(await settleUntilAccepted(runtime, owner, 'Inspector', answer, `asst_q${i + 1}`), true)
       const text = await pending
+      assert.match(text, /Recent work/, `Inspector Q${i + 1} must return the bounded Recent work section`)
       assert.match(text, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      for (let prior = 0; prior < i; prior += 1) {
+        assert.equal(
+          text.includes(QUESTIONS[prior][1]),
+          false,
+          `Inspector Q${i + 1} must not leak Q${prior + 1} terminal prose into its bounded record`,
+        )
+      }
       assert.equal(parseToml(text).error, undefined)
       lifecycle.noteAnswer(delegateId, answer)
     }

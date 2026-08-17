@@ -758,7 +758,7 @@ module FinalitySurface =
                                   AuthoritativeRequirements = []
                                   ConstitutiveBody = "" }
                           Parts = []
-                          Terminal = None }
+                          Terminals = [] }
 
             match ManagerLifeAdmission.ending lifecycle (Some profile) xTrace with
             | EndingLifeAdmission.ExistingLife _ -> box {| kind = "existing-life" |}

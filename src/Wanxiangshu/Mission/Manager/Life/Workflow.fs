@@ -234,7 +234,8 @@ module ManagerLifeWorkflow =
             let terminalRecorded =
                 AgentProjection.tryFind sessionId snapshot.AgentProjections
                 |> Option.bind (fun session -> session.XTrace)
-                |> Option.exists (fun state -> state.Terminal.IsSome)
+                |> Option.exists (fun state ->
+                    XTraceProjection.terminalForProviderRun providerRun state |> Option.isSome)
 
             match!
                 appendLifecycle

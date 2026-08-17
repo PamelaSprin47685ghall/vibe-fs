@@ -141,3 +141,101 @@ test('WHAT[WORK-RECORD-004] COMPANION_015_bounded_chronicle_heading_omitted_when
     assert.doesNotMatch(bounded, /^Opening\n/m)
   })
 })
+
+test('WHAT[WORK-RECORD-011] bounded terminal-only completion still yields Recent work after Chronicle covered every durable part', async () => {
+  await withJournal(async (handle) => {
+    await workRecord.captureOpening(handle, SEM, 'terminal race charge', [])
+    const captured = await workRecord.captureProjection(handle, SEM, {
+      messages: [
+        { role: 'user', parts: [{ kind: 'text', text: 'terminal race charge' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'work before final statement' }] },
+      ],
+    })
+    assert.equal(captured.lastSequence, 2)
+    await commitY(handle, { from: 0, to: 2, body: 'CURRENT_CHRONICLE', n: 10 })
+    await workRecord.captureTerminalText(handle, SEM, 'FINAL_STATEMENT_FROM_TERMINAL', 'run-terminal-race')
+
+    const bounded = await workRecord.lifecycleWorkRecordBounded(handle, SEM, {
+      StartInclusive: { Sequence: 0 },
+      EndExclusive: { Sequence: 3 },
+      ProviderRun: 'run-terminal-race',
+    })
+    assert.equal(typeof bounded, 'string')
+    assert.match(bounded, /Chronicle\nCURRENT_CHRONICLE/)
+    assert.match(bounded, /Recent work/)
+    assert.match(bounded, /FINAL_STATEMENT_FROM_TERMINAL/)
+  })
+})
+
+test('WHAT[WORK-RECORD-004] same terminal text in a reused child is a fresh occurrence when ProviderRun changes', async () => {
+  await withJournal(async (handle) => {
+    await workRecord.captureOpening(handle, SEM, 'reuse first', [])
+    const first = await workRecord.captureProjection(handle, SEM, {
+      messages: [
+        { role: 'user', parts: [{ kind: 'text', text: 'reuse first' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'first work' }] },
+      ],
+    })
+    assert.equal(first.lastSequence, 2)
+    await commitY(handle, { from: 0, to: 2, body: 'FIRST_CHRONICLE', n: 11 })
+    await workRecord.captureTerminalText(handle, SEM, 'SAME_FINAL_TEXT', 'run-reuse-1')
+
+    const second = await workRecord.captureProjection(handle, SEM, {
+      messages: [
+        { role: 'user', parts: [{ kind: 'text', text: 'reuse first' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'first work' }] },
+        { role: 'user', parts: [{ kind: 'text', text: 'reuse second' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'second work' }] },
+      ],
+    })
+    assert.equal(second.lastSequence, 4)
+    await commitY(handle, { from: 2, to: 4, body: 'SECOND_CHRONICLE', n: 12 })
+    await workRecord.captureTerminalText(handle, SEM, 'SAME_FINAL_TEXT', 'run-reuse-2')
+
+    const bounded = await workRecord.lifecycleWorkRecordBounded(handle, SEM, {
+      StartInclusive: { Sequence: 3 },
+      EndExclusive: { Sequence: 5 },
+      ProviderRun: 'run-reuse-2',
+    })
+    assert.equal(typeof bounded, 'string')
+    assert.match(bounded, /Chronicle\nSECOND_CHRONICLE/)
+    assert.doesNotMatch(bounded, /FIRST_CHRONICLE/)
+    assert.match(bounded, /Recent work/)
+    assert.match(bounded, /SAME_FINAL_TEXT/)
+  })
+})
+
+test('WHAT[WORK-RECORD-004] rematerializing an older bounded range never substitutes a later terminal', async () => {
+  await withJournal(async (handle) => {
+    await workRecord.captureOpening(handle, SEM, 'history first', [])
+    await workRecord.captureProjection(handle, SEM, {
+      messages: [
+        { role: 'user', parts: [{ kind: 'text', text: 'history first' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'first work' }] },
+      ],
+    })
+    await commitY(handle, { from: 0, to: 2, body: 'HISTORY_CHRONICLE_1', n: 13 })
+    await workRecord.captureTerminalText(handle, SEM, 'FIRST_FINAL', 'run-history-1')
+
+    await workRecord.captureProjection(handle, SEM, {
+      messages: [
+        { role: 'user', parts: [{ kind: 'text', text: 'history first' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'first work' }] },
+        { role: 'user', parts: [{ kind: 'text', text: 'history second' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'second work' }] },
+      ],
+    })
+    await commitY(handle, { from: 2, to: 4, body: 'HISTORY_CHRONICLE_2', n: 14 })
+    await workRecord.captureTerminalText(handle, SEM, 'SECOND_FINAL', 'run-history-2')
+
+    const firstBounded = await workRecord.lifecycleWorkRecordBounded(handle, SEM, {
+      StartInclusive: { Sequence: 0 },
+      EndExclusive: { Sequence: 3 },
+      ProviderRun: 'run-history-1',
+    })
+    assert.equal(typeof firstBounded, 'string')
+    assert.match(firstBounded, /FIRST_FINAL/)
+    assert.doesNotMatch(firstBounded, /SECOND_FINAL/)
+    assert.doesNotMatch(firstBounded, /HISTORY_CHRONICLE_2/)
+  })
+})

@@ -99,6 +99,21 @@ module WorkRecordSurface =
                 | Some state -> box {| lastSequence = int (Wanxiangshu.Context.Trace.XTraceProjection.head state) - 1 |}
         }
 
+    /// WORK-RECORD-011 fixture seam: capture the private completion evidence
+    /// through the canonical XTrace owner without exposing that owner to this
+    /// package's JS tests.
+    let captureTerminalText
+        (handle: JournalHandle)
+        (sessionId: string)
+        (value: string)
+        (providerRun: string)
+        : Task<unit> =
+        Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalText
+            (Some handle.Journal)
+            (SessionId.create sessionId)
+            value
+            (ProviderRunIdentity.create providerRun)
+
     /// COMPANION-015: append one Blogger observation commit from plain proof fields.
     let appendBlogObservation
         (handle: JournalHandle)
@@ -158,10 +173,18 @@ module WorkRecordSurface =
 
         task {
             let! rendered =
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBounded
-                    (Some handle.Journal)
-                    (SessionId.create sessionId)
-                    bounded
+                match optionalText range?ProviderRun with
+                | Some providerRun ->
+                    LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                        (Some handle.Journal)
+                        (SessionId.create sessionId)
+                        bounded
+                        (ProviderRunIdentity.create providerRun)
+                | None ->
+                    LifecycleWorkRecordProjection.lifecycleWorkRecordBounded
+                        (Some handle.Journal)
+                        (SessionId.create sessionId)
+                        bounded
 
             match rendered with
             | Some value -> return box value
