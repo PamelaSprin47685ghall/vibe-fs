@@ -118,6 +118,110 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 ---
 
+# Operation Fractal CE：F# CE DSL 一统天下
+
+Ghostbuster 只回答“一个显式状态机怎样消失”。仓库级重构还必须回答：多个已经改成 CE 的 workflow 接起来以后，组合结果长什么样。
+
+铁律：
+
+> **业务 workflow 必须具有缩放不变性：缩小，它是一个有业务名字与 law 的 operation；放大，它仍是由更小的 F# CE DSL workflow 组成。递归只在纯 `Evidence → Decision` 或真正接触 Git/process/timer/Host 的 physical leaf 停止。任何中间尺度都不得重新出现显式控制状态机。**
+
+这不是“全仓只准一个 builder”。禁止制造 `WanxiangWorkflowBuilder`、`ReliableFlowBuilder`、AST、Step continuation、Command/Reply interpreter 一类第二业务 runtime。所谓一统天下，是 **CE composition closure**：`workflow ∘ workflow` 之后仍由宿主调用、CE bind/return、Semantic Vocabulary、有界递归与高阶组合直接表达。正式 normative 落点：`STRUCTURED-WORKFLOW-017`。
+
+## 一、CE closure：任何尺度都闭合
+
+首选形态在所有尺度保持一致：
+
+```text
+typed evidence / capability
+→ semantic vocabulary
+→ CE bind / 有界递归 / 高阶组合
+→ domain outcome / effect
+```
+
+顶层 orchestration 是 CE；顶层调用的 Semantic Vocabulary 展开后仍是 CE；Vocabulary 调用的更细 workflow 展开后仍满足同一规则。不能在模块内部消灭 `Stage`，再在模块之间用 `NextAction` 把它拼回来。
+
+## 二、接缝只传语义，不传控制位置
+
+owner A 调 owner B，可以传：typed input、capability、evidence、domain outcome。
+
+禁止跨 seam 传递或观察：`Stage`、`Phase`、`NextAction`、`ResumeAt`、`ContinueToken`、`InFlight`、registry presence、mutable cell phase，以及任何等价“B 走到哪一步”的信号。
+
+> **模块边界不能成为新的 program-counter 总线。**
+
+## 三、父 CE 不 drive 子状态机
+
+禁止：
+
+```fsharp
+let! step = Child.advance childState
+
+match step.Next with
+| CallProvider -> ...
+| WaitReview -> ...
+| Persist -> ...
+```
+
+这只是把 `ChildState` 的 interpreter 搬到 caller。父级只能等待子 workflow 的**领域结果**，再继续自己的业务故事：
+
+```fsharp
+taskResult {
+    let! evidence = observe context
+
+    match decide evidence with
+    | NeedReview request ->
+        let! verdict = Review.reviewUntilSettled context request
+        do! recordVerdict verdict
+        return! run context
+
+    | NeedPublish publication ->
+        do! Publishing.publishEventually context publication
+        return! run context
+
+    | Complete result ->
+        return result
+}
+```
+
+继续放大 `reviewUntilSettled` / `publishEventually`，看到的仍应是 `task` / `taskResult` + `let!` / `do!` / `match` / `return!` + Semantic Vocabulary，而不是 `advance/tick/resume` 协议。
+
+## 四、Semantic Vocabulary 是缩放边界
+
+复杂 CE 可以在父层坍缩成一个业务词，但名字必须声明**完整承诺**。允许 `reviewUntilPerfect`、`publishEventually`、`recoverDurably`；拒绝 `process`、`handle`、`continue2`、`runReliable`。
+
+每次 semantic compression 都必须有自己的 temporal/behavioral proof。没有 law 的 abstraction 只是把状态机藏起来；有 law 的 Vocabulary 才是可缩放节点。
+
+## 五、Recovery 也必须闭合
+
+crash 后只允许 fold durable reality → typed facts/evidence → 重入同一个普通 CE semantic entry。禁止恢复内部 stage、continuation、program counter。子 workflow 需要恢复时，也从自己的 semantic entry 重入。
+
+系统只能有一棵业务调用树；禁止“一棵正常 CE 树 + 一棵恢复状态机树”。
+
+## 六、CE all the way down until physics
+
+semaphore permit、TaskCompletionSource、socket、process handle、mailbox waiter、真实 lease 可以 mutable，物理 adapter 内部也可以有 automaton；但这些只能存在于分形叶子。
+
+一旦 `Waiting / Armed / InFlight / Phase` 向上冒泡并驱动业务 orchestration，就越界。physical leaf 向上必须重新收敛成 typed capability / outcome / evidence。
+
+## 七、验收查整条 seam，不只查文件内部
+
+Ghostbuster census 之外，每次重构都必须做 **cross-module CE seam census**。至少查：
+
+- 函数返回 control token，caller `match` 后决定下一效果；
+- 跨 owner 的 `Stage / Phase / NextAction / Resume* / Continue*`；
+- 父模块读取子 registry / mutable cell presence 决定业务 effect；
+- `Advance / Tick / Resume / Step` API family 被当业务 workflow protocol；
+- 正常路径是 CE，但 recovery 从内部 stage 恢复；
+- Semantic Vocabulary 展开后落到另一套显式状态机。
+
+最终验收不是“每个文件内部没有状态机”，而是：
+
+> **随便在业务调用树上选一个节点。缩小，它是一个有 law 的领域动作；放大，它是一段 F# CE DSL；继续放大，仍然如此。只有缩到纯事实，或放大到物理世界，分形才停止。**
+
+Fractal CE 是母原则；Ghostbuster 是局部清除法。前者防止状态机逃到模块接缝，后者负责把已经显形的程序计数器消掉。
+
+---
+
 对，而且我认为这可能是这次 JS surface 迁移带来的**第二个、甚至更有价值的发现**：
 
 > 第一阶段把 Fable ABI 从测试世界剥掉；第二阶段会把“伪装成数据结构的控制流”从 F# 世界里剥出来。
@@ -6875,4 +6979,1661 @@ P11 — COMPLETE
 ```
 
 仍需保留的工作不是边界债务清零，而是 P8 的独立 effect-ownership closure review；不得把 integration green 自动等同于该结构性判断。
+
+---
+
+# Fractal CE / Ghostbuster 保姆级施工手册：从旧状态机逐行改成可组合 F# CE DSL
+
+本节只回答一个问题：**工程师拿到一段旧代码，具体从第一刀到最后一次验证应该怎么改。**
+
+不要先讨论“架构美感”。不要先造新 builder。不要先给 `State` 换漂亮名字。按下面顺序机械施工。
+
+适用范围：
+
+```text
+State / Stage / Phase / Step / NextAction / ResumeAt
+mutable bool cluster
+Command / Reply / Interpreter
+Advance / Tick / Resume / Continue / Step API
+registry presence 驱动业务分支
+recovery 恢复内部执行位置
+caller 驱动 child workflow
+多层 match/if/try 控制金字塔
+```
+
+最终目标只有一个：
+
+```text
+typed evidence / capability
+        ↓
+Semantic Vocabulary
+        ↓
+task / taskResult / result CE
+        ↓
+let! / do! / match / return!
+        ↓
+domain outcome / effect
+```
+
+沿调用树放大仍是这套形状；只有到纯 `Evidence → Decision` 或 physical adapter 才停止。
+
+对应正式合同：`STRUCTURED-WORKFLOW-001/002/003/005/007/008/009/010/011/012/013/014/015/016/017`。
+
+---
+
+## 0. 开工前先做这 8 件事，少一步都容易改歪
+
+### 0.1 找到真正 owner
+
+先回答：**删除这个文件后，哪个业务概念会不完整？**
+
+不要因为代码“看起来像 Domain/Application/Infrastructure”就按技术层搬家。当前仓库按 bounded owner 成树；CE、Vocabulary、Decorator、Physical Adapter 是 owner 内部代码性质，不是新的目录根。
+
+如果你不知道 owner，先停在调查阶段，不要开始抽象。
+
+### 0.2 找到所有入口和 caller
+
+对目标 symbol 做全引用搜索。至少列出：
+
+```text
+definition
+public/exported entrypoints
+direct callers
+callers of callers
+recovery caller
+tests
+serialization / journal / projection readers
+```
+
+状态机最常见的失败是只改 callee，caller 还在 drive 老协议。
+
+### 0.3 搜出所有控制状态
+
+对目标 owner 先做一次人工 census：
+
+```bash
+rg -n "State|Stage|Phase|Step|NextAction|ResumeAt|ContinueToken|InFlight|Armed|Pending|Should|Advance|Tick|Resume|Continue" src/Wanxiangshu/<owner>
+```
+
+这个搜索会有大量合法命中。目的不是“全删”，而是把候选列出来逐个分类。
+
+### 0.4 搜 mutable / ref / registry
+
+```bash
+rg -n "let mutable|ref<|: .* ref|Dictionary|ConcurrentDictionary|Has[A-Z]|TryGet|ContainsKey" src/Wanxiangshu/<owner>
+```
+
+问每一处：它保存的是物理资源，还是业务执行位置？
+
+### 0.5 搜 recovery
+
+```bash
+rg -n "recover|recovery|resume|ResumeAt|checkpoint|continuation|replay" src/Wanxiangshu/<owner>
+```
+
+正常路径改成 CE 而 recovery 仍跳 stage，等于没改完。
+
+### 0.6 搜第二 runtime
+
+```bash
+rg -n "Command|Reply|Interpreter|Program<|Suspend|Continuation|WorkflowBuilder|MiddlewarePipeline" src/Wanxiangshu/<owner>
+```
+
+如果业务层存在 `Command -> Reply -> next Command`、AST node、continuation interpreter，优先判定为 `STRUCTURED-WORKFLOW-002` 问题。
+
+### 0.7 找现有 WHAT / proof
+
+不要边改代码边猜语义。先读目标 owner 的：
+
+```text
+requirements/<owner>/WHY.md
+requirements/<owner>/WHAT.md
+requirements/<owner>/HOW.md
+requirements/<owner>/PROOF.md
+```
+
+再读 `requirements/structured-workflow/WHAT.md` 与 `HOW.md`。
+
+### 0.8 先写一张迁移表
+
+不需要新文件；review note 或工作记录里列清：
+
+```text
+旧字段 / 旧 API                 分类                     新归宿
+CurrentStage                    control state            DELETE
+RequestedReview                 durable fact             Journal/Projection
+reviewerWaiter                  physical resource        physical leaf
+ShouldPublish                   derived decision         pure decide function
+NextAction                      control token            DELETE
+ResumeAt                        recovery PC               DELETE
+ReviewOutcome                   domain outcome           KEEP
+```
+
+**没有完成这张表，不要开始改类型。**
+
+---
+
+## 1. 每个状态只允许落入 5 类；分类后动作是固定的
+
+### 1.1 Domain fact：保留
+
+判断：实现彻底重写后，产品语义里这个区别仍存在。
+
+```fsharp
+type ReviewOutcome =
+    | Approved of ReviewVerdict
+    | Rejected of ReviewReason
+```
+
+动作：
+
+```text
+KEEP
+必要时让它成为返回值 / durable fact
+caller 可以 match
+不要把它当“下一步指令”
+```
+
+### 1.2 Durable evidence：保留，但只描述已经发生的事
+
+```fsharp
+type ReviewFact =
+    | ReviewRequested of ReviewRequest
+    | ReviewCompleted of ReviewVerdict
+```
+
+动作：
+
+```text
+KEEP durable fact
+Journal fold → Projection/Evidence
+workflow 根据 Evidence 重新决策
+严禁保存 ResumeAt/Stage
+```
+
+### 1.3 Physical resource state：保留在叶子
+
+典型对象：
+
+```text
+TaskCompletionSource
+CancellationTokenRegistration
+semaphore permit
+socket/process handle
+physical lease
+waiter registry
+single-flight registry
+```
+
+动作：
+
+```text
+KEEP mutable if needed
+必须属于 physical owner / adapter
+向业务层只返回 typed capability / outcome / evidence
+禁止向上暴露 Waiting/Armed/InFlight/Phase 让 parent drive
+```
+
+### 1.4 Algorithm scratch：保留在局部函数
+
+例如 parser、binary search、buffer scan 的局部 `mutable index`。
+
+动作：
+
+```text
+KEEP local mutable
+不得跨调用、不得持久化、不得成为业务 API
+```
+
+### 1.5 Control state / program counter：删除
+
+典型：
+
+```fsharp
+type WorkflowState =
+    | Preparing
+    | CallingProvider
+    | WaitingReview
+    | Persisting
+    | Done
+```
+
+如果每个 case 的解释是“下一段代码去哪”，动作固定：
+
+```text
+DELETE type/case/field
+DELETE serializer/projection support
+DELETE advance/tick/resume dispatcher
+把顺序写进 CE 调用栈
+```
+
+不要做下面这种“伪修复”：
+
+```text
+int state → DU state
+bool pending → option PendingInfo
+Stage → WorkflowPosition
+NextAction → Decision
+```
+
+名字变了，若它仍回答“下一段代码跑什么”，仍然是 PC。
+
+---
+
+## 2. 把旧状态机拆成四张表，再开始写新代码
+
+拿到旧实现后，把内容拆成：
+
+```text
+Facts       世界已经是什么
+Decisions   根据 facts 现在该做什么业务判断
+Effects     真正调用 Host/Git/process/timer/port
+Sequence    effect 之间的先后关系
+```
+
+例如旧代码：
+
+```fsharp
+match state.Stage with
+| NeedSnapshot ->
+    let! snapshot = host.ReadSnapshot()
+    state <- { state with Snapshot = Some snapshot; Stage = NeedReview }
+
+| NeedReview ->
+    let! verdict = reviewer.Review state.Snapshot.Value
+    state <- { state with Verdict = Some verdict; Stage = NeedPersist }
+
+| NeedPersist ->
+    do! journal.Append state.Verdict.Value
+    state <- { state with Stage = Done }
+
+| Done ->
+    return state.Verdict.Value
+```
+
+先机械翻译成表：
+
+```text
+Facts:
+  Snapshot
+  ReviewVerdict
+
+Decisions:
+  无独立业务判断；只是顺序
+
+Effects:
+  host.ReadSnapshot
+  reviewer.Review
+  journal.Append
+
+Sequence:
+  read → review → append → return
+```
+
+然后直接写：
+
+```fsharp
+task {
+    let! snapshot = host.ReadSnapshot()
+    let! verdict = reviewer.Review snapshot
+    do! journal.Append verdict
+    return verdict
+}
+```
+
+**如果旧 Stage 只贡献 Sequence，它就不该进入新模型。**
+
+---
+
+## 3. 单模块状态机的标准拆法：按这个顺序改，不要倒过来
+
+### Step 1：先找最终业务返回值
+
+问：这个 workflow 完成后，caller 真正需要什么？
+
+坏答案：
+
+```fsharp
+Task<WorkflowState>
+Task<NextAction>
+Task<StepResult>
+```
+
+优先改成：
+
+```fsharp
+Task<ReviewOutcome>
+Task<Result<Publication, PublicationError>>
+Task<unit>
+```
+
+返回值必须是领域结果、能力结果或真实证据，不是控制 token。
+
+### Step 2：把“读取世界”单独命名成 Evidence
+
+旧代码常见：
+
+```fsharp
+if state.HasPending && registry.Contains id && not state.ReviewDone then ...
+```
+
+先收敛输入：
+
+```fsharp
+type ReviewEvidence =
+    { Request: ReviewRequest
+      ExistingVerdict: ReviewVerdict option
+      ReviewerAvailable: bool }
+```
+
+注意：只有字段真的描述领域/物理事实才进入 Evidence。不要把 `CurrentStage` 原样塞进去。
+
+### Step 3：把纯判断提成小 Decision
+
+```fsharp
+type ReviewDecision =
+    | AlreadyComplete of ReviewVerdict
+    | NeedReview of ReviewRequest
+    | CannotReview of ReviewReason
+
+let decide evidence =
+    match evidence.ExistingVerdict, evidence.ReviewerAvailable with
+    | Some verdict, _ -> AlreadyComplete verdict
+    | None, true -> NeedReview evidence.Request
+    | None, false -> CannotReview ReviewerUnavailable
+```
+
+Decision 必须是业务判断，不是：
+
+```fsharp
+| Step1
+| Step2
+| CallPort
+| Persist
+```
+
+### Step 4：把 effect 调用留在 CE
+
+```fsharp
+let run ports request =
+    task {
+        let! evidence = observe ports request
+
+        match decide evidence with
+        | AlreadyComplete verdict ->
+            return Approved verdict
+
+        | CannotReview reason ->
+            return Rejected reason
+
+        | NeedReview reviewRequest ->
+            let! verdict = ports.Reviewer.Review reviewRequest
+            do! ports.Journal.RecordReview verdict
+            return Approved verdict
+    }
+```
+
+### Step 5：删旧 `advance/tick/transition`
+
+不要保留一个 compatibility wrapper：
+
+```fsharp
+let advance state = run state |> convertBackToOldState
+```
+
+这会让旧协议继续活着。clean break 时直接迁 caller，然后删旧 API。
+
+### Step 6：删旧字段写入
+
+搜：
+
+```bash
+rg -n "CurrentStage|NextAction|ResumeAt|<旧字段名>" src/Wanxiangshu
+```
+
+目标不是只删定义；所有赋值、copy-update、serialize、decode、projection、test fixture 都要清掉。
+
+---
+
+## 4. `while + mutable stage` 怎么改
+
+### Before
+
+```fsharp
+let mutable stage = Start
+let mutable result = None
+
+while result.IsNone do
+    match stage with
+    | Start ->
+        do! prepare ()
+        stage <- CallProvider
+    | CallProvider ->
+        let! reply = provider.Call ()
+        stage <- if reply.NeedsReview then Review reply else Persist reply
+    | Review reply ->
+        let! reviewed = reviewer.Review reply
+        stage <- Persist reviewed
+    | Persist value ->
+        do! store value
+        result <- Some value
+
+return result.Value
+```
+
+### After
+
+```fsharp
+task {
+    do! prepare ()
+    let! reply = provider.Call ()
+
+    let! value =
+        if reply.NeedsReview then
+            reviewer.Review reply
+        else
+            Task.FromResult reply
+
+    do! store value
+    return value
+}
+```
+
+如果“是否 review”是领域判断，不要直接依赖裸 bool；先变成真实 Decision：
+
+```fsharp
+match ReviewPolicy.decide evidence with
+| ReviewNotRequired value -> ...
+| ReviewRequired request -> ...
+```
+
+---
+
+## 5. `NextAction` / `StepResult` 怎么改
+
+### Before
+
+```fsharp
+type NextAction =
+    | CallProvider of Request
+    | WaitReview of ReviewId
+    | Persist of Value
+    | Finish of Result
+
+let! action = child.next state
+
+match action with
+| CallProvider request -> ...
+| WaitReview reviewId -> ...
+| Persist value -> ...
+| Finish result -> ...
+```
+
+这是 interpreter protocol。
+
+### 改法
+
+1. 找出 `CallProvider/WaitReview/Persist` 各自真正 owner。
+2. 让 child 自己通过 capability 调用这些 effect。
+3. child 只返回最终 domain outcome。
+4. parent 只 match domain outcome。
+
+### After
+
+```fsharp
+let! outcome = ChildWorkflow.run capabilities input
+
+match outcome with
+| Completed result -> ...
+| Rejected reason -> ...
+```
+
+如果 parent 仍然知道 child 的“第 2 步是 review、第 3 步是 persist”，边界还没切干净。
+
+---
+
+## 6. 父模块 drive 子状态机怎么改
+
+### Before
+
+```fsharp
+let rec loop childState =
+    task {
+        let! step = Child.advance childState
+
+        match step.Next with
+        | InvokeProvider request ->
+            let! reply = provider.Call request
+            return! loop (Child.acceptProviderReply step.State reply)
+
+        | AwaitReviewer request ->
+            let! verdict = reviewer.Review request
+            return! loop (Child.acceptVerdict step.State verdict)
+
+        | Done value ->
+            return value
+    }
+```
+
+### After
+
+把 provider/reviewer 能力传给 child：
+
+```fsharp
+type ChildCapabilities =
+    { CallProvider: ProviderRequest -> Task<ProviderReply>
+      Review: ReviewRequest -> Task<ReviewVerdict>
+      Record: ChildFact -> Task<unit> }
+
+let run capabilities input =
+    task {
+        let! reply = capabilities.CallProvider (requestOf input)
+        let! verdict = capabilities.Review (reviewOf reply)
+        do! capabilities.Record (ReviewCompleted verdict)
+        return childOutcome verdict
+    }
+```
+
+parent：
+
+```fsharp
+let! childOutcome = Child.run childCapabilities input
+return ParentDecision.fromChildOutcome childOutcome
+```
+
+检查点：
+
+```text
+parent 不再 import ChildState
+parent 不再 import ChildNextAction
+parent 不再调用 Child.advance / acceptXxx
+child 不再把执行位置返回给 parent
+```
+
+---
+
+## 7. bool cluster 怎么改
+
+### Before
+
+```fsharp
+type Runtime =
+    { mutable Started: bool
+      mutable Pending: bool
+      mutable ReviewDone: bool
+      mutable Persisted: bool }
+```
+
+先不要急着变成 DU。逐字段分类：
+
+```text
+Started      世界事实？还是 run 已进入第一步？
+Pending      真有 pending physical resource？还是“还没完成”？
+ReviewDone   durable ReviewCompleted fact 是否已存在？
+Persisted    durable commit receipt 是否已存在？
+```
+
+典型结果：
+
+```text
+Started      DELETE（PC）
+Pending      如果是 physical pending slot → physical registry
+ReviewDone   DELETE bool，改由 ReviewCompleted fact/projection 推导
+Persisted    DELETE bool，改由 durable commit evidence 推导
+```
+
+不要把四个 bool 换成：
+
+```fsharp
+type RuntimeState =
+    | NotStarted
+    | Started
+    | WaitingReview
+    | Reviewed
+    | Persisted
+```
+
+那只是压缩后的 PC。
+
+---
+
+## 8. registry presence 驱动业务流程怎么改
+
+### Before
+
+```fsharp
+match active.TryGetValue id, pending.ContainsKey id with
+| true, _, false -> startWork ()
+| true, _, true -> wait ()
+| false, _, _ -> recover ()
+```
+
+问题不在 Dictionary；问题在 parent 用物理 presence 推导“业务走到哪一步”。
+
+### 合法改法 A：presence 只留在 physical leaf
+
+```fsharp
+type AcquireOutcome =
+    | Acquired of Permit
+    | Busy
+    | Gone
+
+let acquire id : Task<AcquireOutcome> =
+    // 内部可检查 registry
+    ...
+```
+
+业务层只看 `AcquireOutcome`，且其语义是资源能力结果，不是 workflow stage。
+
+### 合法改法 B：业务真相来自 durable evidence
+
+如果业务问题是“这项工作是否已经完成”，读 Journal/Projection 的 completion fact；不要用“registry 中还在不在”猜。
+
+### 必须删除的形态
+
+```text
+HasFlight && HasPending → Stage X
+!HasFlight && HasWaiter → Stage Y
+registry combination → next business effect
+```
+
+物理 presence 可以决定物理路由，不可以成为跨 owner program counter。
+
+---
+
+## 9. recovery 怎么改：绝不恢复执行位置
+
+### Before
+
+```fsharp
+type Checkpoint =
+    { Stage: WorkflowStage
+      Request: Request
+      PartialReply: Reply option }
+
+let resume checkpoint =
+    match checkpoint.Stage with
+    | WaitingReview -> ...
+    | Persisting -> ...
+```
+
+### Step 1：列出真正 durable facts
+
+例如：
+
+```text
+RequestAccepted
+ProviderReplyObserved
+ReviewCompleted
+PublicationCommitted
+```
+
+### Step 2：fold 成 Evidence
+
+```fsharp
+type RecoveryEvidence =
+    { Request: Request
+      ProviderReply: ProviderReply option
+      ReviewVerdict: ReviewVerdict option
+      Publication: PublicationReceipt option }
+```
+
+### Step 3：从普通 semantic entry 重入
+
+```fsharp
+let recover ports durableFacts =
+    task {
+        let evidence = RecoveryProjection.fold durableFacts
+        return! Workflow.runFromEvidence ports evidence
+    }
+```
+
+更理想的是普通 `run` 本身就先 observe/fold evidence，recovery 只负责取得 durable reality 后调用同一个入口。
+
+### Step 4：删除 recovery-only stage API
+
+删除：
+
+```text
+resumeAt
+resumeStage
+continueFromCheckpoint
+restoreContinuation
+restorePendingStep
+```
+
+保留的 `resume` 如果存在，必须表示**领域动作重新发起/重入**，而不是跳转 PC。名字是否保留要结合 owner 语义判断，不能只靠字符串机械删。
+
+### Step 5：补 crash/replay proof
+
+至少覆盖：
+
+```text
+crash before first effect
+effect happened but process died before next observation
+durable fact already exists → no duplicate semantic effect
+partial evidence → normal workflow derives next action
+terminal fact exists → reentry converges immediately
+```
+
+---
+
+## 10. retry / fallback / polling loop 怎么改
+
+### Before
+
+```fsharp
+let mutable retrying = true
+let mutable attempt = 0
+
+while retrying do
+    let! result = call ()
+    match result with
+    | Ok value -> retrying <- false
+    | Error _ -> attempt <- attempt + 1
+```
+
+### 如果是业务重试：必须有显式预算 + Semantic Vocabulary
+
+```fsharp
+let rec publishEventually budget publication =
+    taskResult {
+        let! attempt = publishOnce publication
+
+        match attempt with
+        | Published receipt ->
+            return receipt
+
+        | TargetMoved next when budget > 0 ->
+            return! publishEventually (budget - 1) next
+
+        | TargetMoved _ ->
+            return! Error PublishBudgetExhausted
+    }
+```
+
+要求：
+
+```text
+预算来自领域/系统规则，不是 while true
+名字声明完整承诺
+有 temporal/behavioral proof
+内部仍是普通 CE + bounded recursion
+```
+
+### 如果是物理等待：留在 causal-wait / physical owner
+
+物理 subscribe/recheck/timer 可以有自己的等待机制，但不要暴露 `PollingStage` 给业务层。
+
+---
+
+## 11. control pyramid 怎么改
+
+看到：
+
+```fsharp
+match a with
+| Some x ->
+    match b x with
+    | Ok y ->
+        if condition y then
+            try
+                ...
+```
+
+按这个优先级处理。
+
+### 11.1 `Result` / `Option` 传播 → CE bind
+
+Before：
+
+```fsharp
+match parse input with
+| Error e -> Error e
+| Ok parsed ->
+    match validate parsed with
+    | Error e -> Error e
+    | Ok value -> Ok value
+```
+
+After：
+
+```fsharp
+result {
+    let! parsed = parse input
+    let! value = validate parsed
+    return value
+}
+```
+
+异步 Result 使用仓库自己的 `taskResult` / `TaskResultCE` vocabulary；不要引用 FsToolkit 被 Fable 排除的 .NET-only Task API。
+
+### 11.2 多个独立值共同决定结果 → tuple match
+
+```fsharp
+match request, verdict, receipt with
+| Some request, None, _ -> ...
+| _, Some verdict, None -> ...
+| _, _, Some receipt -> ...
+```
+
+不要为了避 nested match 把状态切成三个 stage。
+
+### 11.3 prerequisite → guard / flat if-elif
+
+```fsharp
+if not authorized then
+    Unauthorized
+elif budget = 0 then
+    Exhausted
+else
+    Allowed
+```
+
+### 11.4 真正复杂领域判断 → 具名纯函数
+
+```fsharp
+let decision = ReviewPolicy.decide evidence
+
+match decision with
+| ...
+```
+
+不要只是把嵌套复制到 `helper2`。
+
+### 11.5 collection short-circuit → traverse / fold CE
+
+不要手写“循环 + mutable error + break flag”。使用项目已有 Result/TaskResult collection vocabulary。
+
+完成后跑：
+
+```bash
+node scripts/checks/fsharp-control-pyramid.mjs --root=src/Wanxiangshu --show-all
+```
+
+目标：0 nested decisions。
+
+---
+
+## 12. Semantic Vocabulary 怎么抽，避免抽成垃圾 helper
+
+当一段 CE 太长，不要按代码行数切 `step1/step2/helper3`。
+
+只在调用点能形成完整业务承诺时抽：
+
+```text
+reviewUntilPerfect
+publishEventually
+recoverDurably
+awaitChildrenSettled
+finalizeWhenSafe
+fallbackAcross
+```
+
+拒绝：
+
+```text
+process
+handle
+executeSafe
+doRetry
+runReliable
+continue2
+withPolicy
+```
+
+每个新 Vocabulary 必须回答五问：
+
+```text
+1. 名字声明什么业务承诺？
+2. 隐藏哪些时序？
+3. 哪个 temporal/behavioral proof 证明？
+4. 是否改变 trace 集？
+5. crash 后从什么 durable evidence 重入？
+```
+
+回答不出 → 不要抽。
+
+### 抽取标准模板
+
+Before：
+
+```fsharp
+taskResult {
+    let! head = readHead ()
+    let! rebased = rebase head candidate
+    let! verdict = review rebased
+    match verdict with
+    | TargetMoved newer -> ...
+    | Accepted value -> ...
+}
+```
+
+After：
+
+```fsharp
+taskResult {
+    let! publication = Publishing.publishEventually budget candidate
+    do! recordPublication publication
+    return publication
+}
+```
+
+前提：`publishEventually` 自己有 law + proof，而且展开后仍然是 CE，不是内部 interpreter。
+
+---
+
+## 13. Port / capability 怎么切，避免 child 把 effect 请求返回给 parent
+
+错误：
+
+```fsharp
+type ChildAction =
+    | NeedGitRead of Path
+    | NeedProviderCall of Prompt
+    | NeedTimer of Deadline
+```
+
+然后 parent interpreter：
+
+```fsharp
+match action with
+| NeedGitRead p -> git.Read p
+| NeedProviderCall p -> provider.Call p
+| NeedTimer d -> timer.Wait d
+```
+
+正确：把 capability 作为参数注入 child：
+
+```fsharp
+type ChildPorts =
+    { ReadGit: Path -> Task<GitSnapshot>
+      CallProvider: Prompt -> Task<ProviderReply>
+      WaitUntil: Deadline -> Task<WaitOutcome> }
+
+let run ports input =
+    task {
+        let! snapshot = ports.ReadGit input.Path
+        let! reply = ports.CallProvider (promptOf snapshot)
+        ...
+    }
+```
+
+Port 返回值要按**单一能力的真实结果**建模，禁止一个巨大 Reply DU 吞所有 capability。
+
+---
+
+## 14. Physical Adapter 怎么写，防止“CE 洁癖”误伤底层
+
+physical leaf 可以：
+
+```text
+mutable
+Dictionary
+TaskCompletionSource
+CancellationTokenRegistration
+resource automaton
+socket/process state
+```
+
+但出口必须收敛。
+
+### 好出口
+
+```fsharp
+type WaitOutcome =
+    | Signalled
+    | DeadlineReached
+    | Cancelled
+
+val wait : WaitRequest -> Task<WaitOutcome>
+```
+
+### 坏出口
+
+```fsharp
+type WaitState =
+    { Armed: bool
+      CallbackInstalled: bool
+      TimerRunning: bool
+      CurrentPhase: WaitPhase }
+```
+
+业务层不需要知道 waiter 内部装了几个 callback。
+
+判断 physical state 是否越界：
+
+> caller 是否根据这个状态决定“业务下一步做什么”？
+
+如果是，向上泄漏了。
+
+---
+
+## 15. Command/Reply/Interpreter 第二 runtime 怎么拆
+
+### Before
+
+```fsharp
+type WorkflowCommand =
+    | ReadSnapshot
+    | CallProvider of Prompt
+    | Persist of Fact
+
+type WorkflowReply =
+    | SnapshotRead of Snapshot
+    | ProviderCalled of Reply
+    | Persisted
+
+type Program<'result> =
+    | Pure of 'result
+    | Suspend of WorkflowCommand * (WorkflowReply -> Program<'result>)
+```
+
+### Step 1：按 capability 拆 port
+
+```fsharp
+type SnapshotPort = unit -> Task<Snapshot>
+type ProviderPort = Prompt -> Task<ProviderReply>
+type JournalPort = Fact -> Task<unit>
+```
+
+### Step 2：把 interpreter 分支搬回普通调用
+
+```fsharp
+task {
+    let! snapshot = readSnapshot ()
+    let! reply = callProvider (promptOf snapshot)
+    do! append (factOf reply)
+    return outcomeOf reply
+}
+```
+
+### Step 3：删 Program/Command/Reply/Interpreter
+
+顺序：
+
+```text
+migrate callers
+remove exported types
+remove interpreter
+remove AST tests
+replace with observable-effect tests
+```
+
+不要留下 `LegacyInterpreter`。
+
+---
+
+## 16. 跨模块 seam 必须逐条查，不能只看目标文件
+
+完成一个 workflow 后，从它向上至少查两层 caller，向下至少展开所有 Semantic Vocabulary 一层。
+
+每条 seam 做这张表：
+
+```text
+Seam                       输入                     输出                     合法？
+Parent → ReviewWorkflow    ReviewRequest + ports    ReviewOutcome            YES
+Parent → Child.advance     ChildState               NextAction               NO
+Workflow → WaitAdapter     WaitRequest              WaitOutcome              YES
+Parent → ChildRegistry     id                       HasFlight/HasPending      通常 NO：若驱动业务
+Recovery → Workflow       durable facts/evidence   DomainOutcome            YES
+Recovery → resumeAt       Stage                    internal continuation     NO
+```
+
+必须人工回答：
+
+```text
+1. 返回值是否包含执行位置？
+2. caller 是否 match control token 决定下一 effect？
+3. parent 是否读取 child registry/mutable cell 推断 lifecycle stage？
+4. 是否有 Advance/Tick/Resume/Step family 被 caller 反复 drive？
+5. recovery 是否跳 child 内部 stage？
+6. Vocabulary 展开后是否仍是 CE + Vocabulary + bounded composition？
+```
+
+命中 1–5 默认 REVISE。
+
+---
+
+## 17. 类型迁移顺序：防止编译器一次炸全仓
+
+大型重构不要先删类型定义。按依赖方向做 clean break：
+
+### 17.1 新增最终 domain outcome / evidence / capability
+
+先让新 API 可表达完整新世界。
+
+### 17.2 写新 CE entrypoint
+
+新 entrypoint 不返回旧 state/control token。
+
+### 17.3 迁最内层 caller
+
+从最接近 callee 的 caller 开始，改为直接 `let!` 新 workflow。
+
+### 17.4 一层层向上迁
+
+每迁一层，都删该层对旧 `State/NextAction/advance` 的 import。
+
+### 17.5 迁 recovery caller
+
+改成 facts/evidence → 普通 semantic entry。
+
+### 17.6 迁 tests
+
+测试从“内部 stage 到了 X”改为可观察行为：
+
+```text
+facts emitted
+port calls
+call order where semantically relevant
+domain outcome
+terminal projection
+replay convergence
+```
+
+### 17.7 最后删旧类型 / API / serializer
+
+此时删除：
+
+```text
+State/Stage/Phase
+NextAction/StepResult
+advance/tick/resumeAt
+old interpreter
+old checkpoint fields
+legacy converters
+```
+
+### 17.8 全仓搜旧 symbol = 0
+
+```bash
+rg -n "OldState|OldStage|NextAction|resumeAt|advance" src requirements
+```
+
+合法同名词要人工审查，不能因为搜索有结果就机械删除。
+
+---
+
+## 18. 测试怎么改：不要继续测试内部状态机
+
+### 删除这种测试
+
+```text
+after first tick stage = WaitingReview
+advance returns Persist
+resumeAt Stage3 calls append
+state.Pending flips false
+interpreter visits node 4
+```
+
+### 改成这种测试
+
+```text
+given evidence X → calls Reviewer once → records ReviewCompleted → returns Approved
+existing durable ReviewCompleted → does not review twice
+publish target moves → bounded retry → final receipt
+crash after durable commit → reentry does not duplicate commit
+child completion → parent observes domain outcome only
+physical Busy → no fake domain completion emitted
+```
+
+### 测试命名必须绑定 WHAT
+
+例如：
+
+```js
+test('WHAT[STRUCTURED-WORKFLOW-017] parent observes child domain outcome, never execution position', ...)
+```
+
+不要为了保留旧 test 随便找 WHAT 挂上去；如果旧 test 只证明 HOW，应该删或改成真正 contract。
+
+---
+
+## 19. 文档怎么同步改
+
+### 19.1 WHAT
+
+只有当产品/架构当前真理缺失时才新增/修改 WHAT。不要把施工细节塞进 WHAT。
+
+Fractal CE 的组合闭包已经由 `STRUCTURED-WORKFLOW-017` 定义；普通重构通常引用它，不需要重复造 `FOO-999`。
+
+### 19.2 HOW
+
+如果 owner 的实现模型、Vocabulary、physical boundary 发生变化，更新 HOW：
+
+```text
+新 CE entrypoint
+新 Semantic Vocabulary
+新 port/capability
+physical adapter 归属
+旧 state machine 已删除
+```
+
+### 19.3 PROOF
+
+新增或迁移 contract test 后，更新对应 proposition 的 proof 落点。
+
+### 19.4 AGENTS
+
+只有仓库级施工法/长期工程规则才写 AGENTS。具体业务语义仍归 `requirements/<owner>/`。
+
+---
+
+## 20. 每改完一个小块，立刻跑最小验证；不要等全仓最后一起炸
+
+### 20.1 Direct CE / second runtime / composition closure
+
+```bash
+node --test requirements/structured-workflow/tests/direct-ce-contract.test.mjs
+```
+
+### 20.2 Program counter / mutable / state product / registry joint branch
+
+```bash
+node --test requirements/structured-workflow/tests/dsl-ownership.test.mjs
+```
+
+### 20.3 Recovery
+
+```bash
+node --test requirements/structured-workflow/tests/recovery-reentry.test.mjs
+```
+
+### 20.4 Semantic Vocabulary
+
+```bash
+node --test requirements/structured-workflow/tests/semantic-vocabulary.test.mjs
+```
+
+### 20.5 Control pyramid
+
+```bash
+node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs
+node --test requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs
+```
+
+### 20.6 整个 structured-workflow 包
+
+```bash
+node --test requirements/structured-workflow/tests/*.test.mjs
+```
+
+### 20.7 仓库 gate
+
+```bash
+node scripts/check.mjs
+```
+
+### 20.8 Fable build
+
+本仓禁止 `dotnet build`。
+
+```bash
+node scripts/build.mjs
+```
+
+需要完整交付验证时：
+
+```bash
+npm run format-build-test
+```
+
+---
+
+## 21. gate 变红后，不要乱试；按错误名修
+
+### `second-runtime-protocol`
+
+你引入/保留了业务 `Command/Reply/Program/Step/Suspend` 协议。
+
+修：拆成 typed ports + direct CE；删 interpreter。
+
+### `business-interpreter`
+
+业务层还有 Interpreter。
+
+修：把 interpreter 的分支顺序搬回普通函数调用/CE。
+
+### `flow-lift`
+
+旧 Flow monad 面还活着。
+
+修：caller 直接进入 task/taskResult CE。
+
+### `program-counter`
+
+字段/类型仍在表达程序位置，或 `ControlState` 分类本身被判红。
+
+修：不要改名；删除 axis，用调用栈表达顺序。
+
+### `behaviour-bool`
+
+bool 名称/结构像行为阶段。
+
+修：判断它是 durable fact、physical fact 还是 PC；PC 删除，事实改由权威来源推导。
+
+### `state-product`
+
+record 中出现多个独立状态轴。
+
+修：
+
+```text
+业务轴 → 拆为真实 ADT / independent workflow / evidence
+物理轴 → 放回 physical owner 并显式证明
+PC 轴 → 删除
+```
+
+### `mutable`
+
+mutable 未声明或不属于允许类别。
+
+修：不要先补注释过门；先确认它是否真的 physical/local scratch。若承载业务流程位置，删除 mutable state。
+
+### `mutable-record-field`
+
+record mutable/ref 字段疑似业务 control state。
+
+修：把物理资源移到 physical owner；把业务 PC 删除。
+
+### `registry-joint-branch`
+
+两个 registry presence 被联合用于选择 effect。
+
+修：先问业务真相应来自 durable evidence 还是一个 physical capability outcome；不要让 parent 自己拼 presence。
+
+### `infrastructure-leak`
+
+纯语义 owner 直接引用 OpenCode/Process/Fable interop。
+
+修：定义具名 capability，physical adapter 实现它。
+
+### `fsharp-control-pyramid`
+
+存在第二层 lexical decision。
+
+修复优先级：
+
+```text
+bind
+→ tuple match
+→ guard
+→ named Evidence→Decision
+→ traverse/fold CE
+→ 重新切 workflow boundary
+```
+
+不要 suppression。
+
+---
+
+## 22. 常见“看起来改了，其实没改”的 12 种伪修复
+
+### 22.1 `int state` → DU
+
+仍是 PC。REVISE。
+
+### 22.2 `Stage` → `Mode`
+
+改名逃 gate。REVISE。
+
+### 22.3 `NextAction` → `Decision`
+
+如果 case 是 `Call/Wait/Persist`，仍是 opcode。REVISE。
+
+### 22.4 状态机塞进 `private` module
+
+封装不等于消除。REVISE。
+
+### 22.5 parent 不读 Stage 了，改读 registry presence
+
+PC 换载体。REVISE。
+
+### 22.6 normal path CE，recovery `resumeAt`
+
+第二棵恢复状态机还活着。REVISE。
+
+### 22.7 新建万能 `WorkflowBuilder`
+
+如果 builder 解释 AST/continuation，就是第二 runtime。REVISE。
+
+### 22.8 把每一步包装成 `step1/step2/step3`
+
+只是函数名版程序计数器。REVISE。
+
+### 22.9 大 `Decision` DU 接管整个 workflow
+
+如果 case 表示执行步骤，还是 PC。REVISE。
+
+### 22.10 保留旧 API “为了兼容”
+
+clean break 后旧协议继续有 caller 就是双世界。迁完 caller 后删除。
+
+### 22.11 为过 mutable gate 加 `DSL-MUTABLE` 注释
+
+annotation 不能把业务 PC 变成物理状态。先修语义。
+
+### 22.12 测试还在 assert internal stage
+
+说明 contract 仍绑旧实现。改成可观察效果。
+
+---
+
+## 23. 一个完整示例：从“父驱动 child + checkpoint”改到 Fractal CE
+
+### Before：旧世界
+
+```fsharp
+type ChildStage =
+    | NeedProvider
+    | NeedReview
+    | NeedPersist
+    | Complete
+
+type ChildState =
+    { Stage: ChildStage
+      Request: Request
+      Reply: ProviderReply option
+      Verdict: ReviewVerdict option }
+
+type ChildStep =
+    | CallProvider of Prompt
+    | CallReviewer of ReviewRequest
+    | Persist of ChildFact
+    | Done of ChildOutcome
+
+let next state =
+    match state.Stage with
+    | NeedProvider -> CallProvider(promptOf state.Request)
+    | NeedReview -> CallReviewer(reviewOf state.Reply.Value)
+    | NeedPersist -> Persist(factOf state.Verdict.Value)
+    | Complete -> Done(outcomeOf state.Verdict.Value)
+```
+
+parent：
+
+```fsharp
+let rec drive state =
+    task {
+        match Child.next state with
+        | CallProvider prompt ->
+            let! reply = provider.Call prompt
+            do! checkpoint.Save { state with Stage = NeedReview; Reply = Some reply }
+            return! drive { state with Stage = NeedReview; Reply = Some reply }
+
+        | CallReviewer request ->
+            let! verdict = reviewer.Review request
+            do! checkpoint.Save { state with Stage = NeedPersist; Verdict = Some verdict }
+            return! drive { state with Stage = NeedPersist; Verdict = Some verdict }
+
+        | Persist fact ->
+            do! journal.Append fact
+            return! drive { state with Stage = Complete }
+
+        | Done outcome ->
+            return outcome
+    }
+```
+
+recovery：
+
+```fsharp
+let resume checkpoint = drive checkpoint.State
+```
+
+### 第 1 刀：分类
+
+```text
+ChildStage      PC                     DELETE
+ChildState      Stage 是 PC            DELETE container；保留其中真实数据来源
+Request         domain input           KEEP
+Reply           evidence               不作为 checkpoint field；由 durable fact/observation 得到
+Verdict         domain evidence        durable ReviewCompleted
+ChildStep       interpreter opcode     DELETE
+checkpoint      保存执行位置            DELETE/改 durable facts
+```
+
+### 第 2 刀：定义真实 outcome
+
+```fsharp
+type ChildOutcome =
+    | Accepted of ReviewVerdict
+    | Rejected of ReviewReason
+```
+
+### 第 3 刀：定义 capability
+
+```fsharp
+type ChildPorts =
+    { CallProvider: Prompt -> Task<ProviderReply>
+      Review: ReviewRequest -> Task<ReviewVerdict>
+      AppendFact: ChildFact -> Task<unit>
+      ReadFacts: RequestId -> Task<ChildFact list> }
+```
+
+### 第 4 刀：把 durable reality fold 成 Evidence
+
+```fsharp
+type ChildEvidence =
+    { ProviderReply: ProviderReply option
+      ReviewVerdict: ReviewVerdict option
+      Completed: ChildOutcome option }
+```
+
+### 第 5 刀：普通 CE 根据已有 evidence 收敛
+
+```fsharp
+let rec run ports request =
+    task {
+        let! facts = ports.ReadFacts request.RequestId
+        let evidence = ChildProjection.fold facts
+
+        match evidence.Completed, evidence.ReviewVerdict, evidence.ProviderReply with
+        | Some outcome, _, _ ->
+            return outcome
+
+        | None, Some verdict, _ ->
+            let outcome = outcomeOf verdict
+            do! ports.AppendFact (ChildCompleted outcome)
+            return outcome
+
+        | None, None, Some reply ->
+            let! verdict = ports.Review (reviewOf reply)
+            do! ports.AppendFact (ReviewCompleted verdict)
+            return! run ports request
+
+        | None, None, None ->
+            let! reply = ports.CallProvider (promptOf request)
+            do! ports.AppendFact (ProviderReplyObserved reply)
+            return! run ports request
+    }
+```
+
+注意：这里 tuple match 是一个扁平 decision level；递归由 durable fact 推进，且必须受具体领域预算/幂等合同约束。若调用可能无限重复，继续补领域预算，不允许把 `run` 变成无限 retry 默认。
+
+### 第 6 刀：parent 只等待 domain outcome
+
+```fsharp
+let runParent childPorts request =
+    task {
+        let! childOutcome = ChildWorkflow.run childPorts request
+
+        match childOutcome with
+        | Accepted verdict ->
+            return ParentAccepted verdict
+        | Rejected reason ->
+            return ParentRejected reason
+    }
+```
+
+### 第 7 刀：recovery 不再有专用 stage
+
+```fsharp
+let recover childPorts request =
+    ChildWorkflow.run childPorts request
+```
+
+`run` 自己从 durable facts 观察当前世界。
+
+### 第 8 刀：删除旧世界
+
+删除：
+
+```text
+ChildStage
+ChildState
+ChildStep
+Child.next
+parent drive loop
+checkpoint.Stage
+checkpoint serializer/decode
+resume checkpoint.State
+stage-based tests
+```
+
+### 第 9 刀：补 proof
+
+至少：
+
+```text
+fresh request → provider → review → durable facts → Accepted
+ProviderReplyObserved 已存在 → provider 不重复调用
+ReviewCompleted 已存在 → reviewer 不重复调用
+ChildCompleted 已存在 → 直接收敛
+crash after ProviderReplyObserved → reentry 从 facts 继续
+parent 只观察 ChildOutcome
+```
+
+这才是完整迁移。只做到“第 5 刀 CE 看起来很好看”但没删 checkpoint/stage/caller protocol，不算完成。
+
+---
+
+## 24. 提交前逐项打勾；任何一项“否”都不要声称完成
+
+- [ ] 所有候选 `State/Stage/Phase/Step/Pending/Armed` 已分类为 Domain fact / Durable evidence / Physical state / Algorithm scratch / PC。
+- [ ] 所有 PC 字段、case、serializer、projection、fixture 已删除。
+- [ ] workflow 返回值只剩 domain outcome / evidence / capability result，不返回 control token。
+- [ ] caller 不再 drive `Advance/Tick/Resume/Step` API。
+- [ ] parent 不根据 child registry/mutable presence 推导业务 stage。
+- [ ] physical mutable state 全部停在 physical owner/adapter，向上收敛为 typed result。
+- [ ] recovery = durable facts/evidence → 普通 semantic entry；无内部 stage/continuation 恢复。
+- [ ] Semantic Vocabulary 名字声明完整承诺，并有 temporal/behavioral proof。
+- [ ] 不存在新 WorkflowBuilder / AST / Command-Reply interpreter。
+- [ ] control pyramid = 0；没有 suppression/allowlist 逃逸。
+- [ ] 旧 compatibility API 已删，不存在新旧双写/双读。
+- [ ] 测试断言 observable behavior，不断言内部 stage/node。
+- [ ] 新/迁移测试绑定正确 `WHAT[...]`。
+- [ ] owner HOW/PROOF 已同步。
+- [ ] `node --test requirements/structured-workflow/tests/*.test.mjs` 通过。
+- [ ] `node scripts/check.mjs` 通过。
+- [ ] `node scripts/build.mjs` 通过；未运行 `dotnet build`。
+
+最终人工验收只问两句话：
+
+> **在业务调用树任取一个节点：缩小是否是有名字、有 law 的领域动作？放大是否仍是普通 F# CE + Semantic Vocabulary，而不是显式状态机？**
+
+> **如果现在把所有 `Stage/NextAction/ResumeAt` 名字换掉，控制状态还能不能靠结构继续存在？如果能，说明还没改完。**
+
+两句都过，才算 Fractal CE 重构完成。
 

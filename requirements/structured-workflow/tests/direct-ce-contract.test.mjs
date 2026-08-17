@@ -31,3 +31,28 @@ test('WHAT[STRUCTURED-WORKFLOW-002] FLOW_006_second_runtime_patterns_are_rejecte
     )
   }
 })
+
+test('WHAT[STRUCTURED-WORKFLOW-017] FLOW_017_composition_keeps_domain_results_and_rejects_child_program_counters', () => {
+  const composed = [
+    'module ParentWorkflow',
+    'let run child = task {',
+    '    let! outcome = child ()',
+    '    match outcome with',
+    '    | Approved verdict -> return verdict',
+    '    | Rejected reason -> return raise (System.Exception reason)',
+    '}',
+  ].join('\n')
+
+  assert.deepEqual(scanText(composed, 'Mission/Parent/Workflow.fs'), [])
+
+  const leakedProgramCounter = [
+    'module ChildWorkflow',
+    'type ChildProgress = { CurrentStage: bool }',
+    'let advance state = state',
+  ].join('\n')
+
+  assert.ok(
+    scanText(leakedProgramCounter, 'Mission/Child/Workflow.fs').some(({ gate }) => gate === 'program-counter'),
+    'a child workflow must not expose execution position for its parent to drive',
+  )
+})
