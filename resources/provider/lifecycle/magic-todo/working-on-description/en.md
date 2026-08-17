@@ -1,0 +1,1 @@
+Name of the single obligation you are actively working on now. It must exactly match one `obligations[].name`. When `obligations` is empty, use the empty string. This is a current-focus pointer for the Host progress display, not an obligation status or completion signal. Change it whenever your actual active focus changes.

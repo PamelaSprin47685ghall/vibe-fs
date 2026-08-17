@@ -104,6 +104,8 @@ test('WHAT[OBLIGATION-LEDGER-023] manager guideline freezes ledger discipline as
     // keep while owed / remove when earned
     assert.match(text, /keep|retain|保留|继续保留/, `${path}: must keep obligations while owed`)
     assert.match(text, /remove|discharge|earned|移除|解除|earned|真正解除/, `${path}: must remove only when earned`)
+    assert.match(text, /workingOn/i, `${path}: must name the active focus pointer`)
+    assert.match(text, /focus|焦点|actively advancing|实际正在推进/i, `${path}: must require workingOn to follow actual work`)
     // checkpoint continuity (lag-1) and no forged Activation (conversation relation, not persisted phase)
     assert.match(text, /accepted account becomes Current|accepted account 都立即成为当前|Current/i, `${path}: accepted supersedes without reviewer settlement`)
     assert.doesNotMatch(text, /Activation|WorkActivated/i, `${path}: must not forge Activation as a persisted phase`)

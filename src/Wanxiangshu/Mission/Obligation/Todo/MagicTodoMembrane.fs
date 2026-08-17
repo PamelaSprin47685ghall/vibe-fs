@@ -75,8 +75,9 @@ open Wanxiangshu.Mission.Review
 
 /// Durable half of the GrandRewrite Magic Todo membrane.
 ///
-/// before: localize the persisted ToolPart, validate `{planComplete,obligations:[{name,work}]}`
-/// input, write canonical obligation bodies, append Prepared, then expose only
+/// before: localize the persisted ToolPart, validate
+/// `{planComplete,workingOn,obligations:[{name,work}]}` input, write canonical
+/// obligation bodies, append Prepared, then expose only
 /// legacy sink rows to the builtin executor. after/recovery proves physical
 /// success against that receipt before Accepted.
 module MagicTodoMembrane =
@@ -89,7 +90,6 @@ module MagicTodoMembrane =
           BaseObligations: ObligationList
           SubmittedObligations: ObligationList
           PreviousReview: PreviousReviewView option
-          CompatibilityRows: CompatibilityTodoRow list
           AlreadyAccepted: bool
           AcceptedOutputDigest: string option }
 
@@ -234,7 +234,6 @@ module MagicTodoMembrane =
           BaseObligations = baseObligations
           SubmittedObligations = proposal
           PreviousReview = previousReview
-          CompatibilityRows = obligationsToCompatibilityRows proposal
           AlreadyAccepted = alreadyAccepted
           AcceptedOutputDigest = acceptedOutputDigest }
 
@@ -853,7 +852,9 @@ module MagicTodoHostHooks =
             | Ok submittedInput ->
                 let obligations = submittedInput.Obligations
                 let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
-                MagicTodoHostCodec.replaceCompatibilityArgs output (obligationsToCompatibilityRows obligations)
+                MagicTodoHostCodec.replaceCompatibilityArgs
+                    output
+                    (obligationsToCompatibilityRows submittedInput.WorkingOn obligations)
 
                 bridges[bridgeKey sessionText callText] <-
                     prepareDeferredBridge

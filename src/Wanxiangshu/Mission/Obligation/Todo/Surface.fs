@@ -36,6 +36,9 @@ module MagicTodoSurface =
         let PlanCompleteDescription = "lifecycle/magic-todo/plan-complete-description"
 
         [<Literal>]
+        let WorkingOnDescription = "lifecycle/magic-todo/working-on-description"
+
+        [<Literal>]
         let ObligationNameDescription = "lifecycle/magic-todo/obligation-name-description"
 
         [<Literal>]
@@ -62,9 +65,10 @@ module MagicTodoSurface =
         """{
   "type": "object",
   "additionalProperties": false,
-  "required": ["planComplete", "obligations"],
+  "required": ["planComplete", "workingOn", "obligations"],
   "properties": {
     "planComplete": { "type": "boolean" },
+    "workingOn": { "type": "string" },
     "obligations": {
       "type": "array",
       "items": {
@@ -91,11 +95,11 @@ module MagicTodoSurface =
     /// GrandRewrite provider obligations projected into the Host's legacy TodoTable.
     /// The sink is optimistic UI state only; these fields never round-trip into
     /// canonical truth (TODO-007).
-    let obligationsToCompatibilityRows (items: ObligationList) : CompatibilityTodoRow list =
+    let obligationsToCompatibilityRows (workingOn: string) (items: ObligationList) : CompatibilityTodoRow list =
         items
         |> List.map (fun item ->
             { Content = item.Name + ": " + item.Work
-              Status = "in_progress"
+              Status = if item.Name = workingOn then "in_progress" else "pending"
               Priority = "medium" })
 
     // ── Canonical obligation wire (tool result / blob body) ────────────────

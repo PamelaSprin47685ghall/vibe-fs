@@ -33,16 +33,18 @@ Provider surface 的 schema 形态是当前实现（HOW），不是永久合同�
 **规范**：
 
 ```text
-todowrite(planComplete: bool, obligations: [{ name: string, work: string }])
+todowrite(planComplete: bool, workingOn: string, obligations: [{ name: string, work: string }])
 CurrentObligations = last accepted obligations list
 effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 ```
 
 `name` 在同一 obligation 存续期间稳定；`work` 是自然语言描述该义务仍欠什么。
-Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；
+`workingOn` 是当前实际工作焦点：非空 account 时必须精确等于其中一个 obligation `name`；空 account
+时必须是空字符串。它只决定 Host compatibility sink 的活动行，不是 obligation status，也不进入
+`CurrentObligations`。Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；
 不得在真正 discharge 后仅为「曾出现在计划中」而保留。
 
-**含义 / 动机**：wire 唯一语言是显式 `planComplete` + `{name, work}` account；`CurrentObligations`
+**含义 / 动机**：wire 唯一语言是显式 `planComplete` + `workingOn` + `{name, work}` account；`CurrentObligations`
 与 commitment latch 都由 Journal fold 从 Accepted/Prepared identity 纯推导，任何其它 writer 不得改动。
 
 **边界**：`name`/`work` 字段名与 schema 具体形态是当前 surface（HOW）；「accepted account 即当前」的
@@ -59,8 +61,8 @@ supersession 语义见 OBLIGATION-LEDGER-010。
 **含义 / 动机**：`status` 机器描述阶段，不是债务；一旦存在，模型会被诱导填写「现在在做什么」
 而不是「还欠什么」。
 
-**边界**：Host TodoTable 的 status 字段是 compatibility sink 投影（HOW，OBLIGATION-LEDGER-015），
-不得反推 canonical。
+**边界**：Host TodoTable 的 status 字段是 compatibility sink 投影（HOW，OBLIGATION-LEDGER-015）：
+`workingOn` 命中的 row → `in_progress`，其它 row → `pending`；不得反推 canonical obligation truth。
 
 **证据** → PROOF.md 行 O-3。
 
@@ -342,7 +344,7 @@ prompt 字节稳定属 `participant-identity` + `prefix-stability`；T1 文案�
 
 **规范**：Manager OpeningPolicy = BlindPlan。Pre-T1 = Planning Table：替将要扛路的另一 Manager 写
 诚实计划，可调查，**不得**开始执行所规划之路；可以反复用 `todowrite(planComplete=false, ...)`
-记录当前仍欠的 planning work。只有第一次 accepted `planComplete=true` 才进入 Living Mission。`planComplete=true` 表示**规划判断已经完成并愿意承诺其结论**，不表示一定存在 mission debt；当权威输入明确证明当前没有任务/交付物时，`planComplete=true, obligations=[]` 是合法的零工作 T1，随后仍须按 Finality 协议接受终局评审，不能因为账为空而永久停留在 Pre-T1。
+记录当前仍欠的 planning work。只有第一次 accepted `planComplete=true` 才进入 Living Mission。`planComplete=true` 表示**规划判断已经完成并愿意承诺其结论**，不表示一定存在 mission debt；当权威输入明确证明当前没有任务/交付物时，`planComplete=true, workingOn="", obligations=[]` 是合法的零工作 T1，随后仍须按 Finality 协议接受终局评审，不能因为账为空而永久停留在 Pre-T1。
 删除生产路径上的 planning-only → Activation 两阶段：`PlanningTail`、
 `WorkActivated` 业务资格、Birth/Labor compression floor、Activation-only suicide gate、
 Planning→Working system prompt 切换均非生产合同（TODO-001/GLORY-074）。
@@ -516,7 +518,7 @@ before live args → decode obligations → compatibility projection → executo
 ```
 
 `TodoWritePrepared` 冻结 provider 原始 `planComplete` + canonical
-`{planComplete,obligations:[{name,work}]}` `ProviderInputDigest` 与 BaseObligations / Submitted digests、
+`{planComplete,workingOn,obligations:[{name,work}]}` `ProviderInputDigest` 与 BaseObligations / Submitted digests、
 `ReviewFrontier`（本 tool-call 前 exclusive cursor，绑
 ManagerLifeId；pending before-hook 计入 next-assigned + 同 message 本 call 之前的可捕获 part 数）。
 `TodoWriteAccepted.PreparedFactRef` 必须是 append 对应 Prepared 返回的真实 Journal `EventId`，

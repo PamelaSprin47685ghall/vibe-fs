@@ -109,9 +109,10 @@ Pair Programming Hint（HOST-013 occurrence 的正文）是一个 canonical sema
 - 把 `[NEEDHELP]` 视为正常、可早用的协作请求——不是 failure、资源匮乏、羞辱或失败声明；
   provider-visible guidance 不暴露 fast/deep 内部身份（AGENT-031 / increase-strength §3）；
 - 当前 tool surface 暴露 `todowrite` 时，把它视为工作事实账本而非可选进度播报：只要现实变化使当前
-  account 不再准确（义务完成/解除、新义务出现、义务发生实质变化、确认不再需要），必须在继续下一段
-  实质工作或调用其它工作工具前先提交完整最新 account；不得等阶段结束、用户追问或最后批量补记，
-  自然语言宣称“已完成”或打算稍后更新不构成账本更新。account 未变化时不得为了形式重复写。
+  account 不再准确（义务完成/解除、新义务出现、义务发生实质变化、确认不再需要，或实际工作焦点切换），
+  必须在继续下一段实质工作或调用其它工作工具前先提交完整最新 account；有 `workingOn` 字段时必须精确
+  指向此刻实际推进的 obligation。不得等阶段结束、用户追问或最后批量补记，自然语言宣称“已完成”或
+  打算稍后更新不构成账本更新。account 与实际焦点都未变化时不得为了形式重复写。
 - 每次工具 turn 前寻找完整 parallel wave：已知、确有用、彼此独立的调用默认同一 assistant turn
   一起发出，最小化 provider↔tool RTT；仅真实数据依赖/共享可变 owner/协议顺序/破坏性干扰/明确有限
   容量可序列化；不猜未知参数、不制造无用调用、不写死全局并发数字（pair-parallel-tools §3-§14）。

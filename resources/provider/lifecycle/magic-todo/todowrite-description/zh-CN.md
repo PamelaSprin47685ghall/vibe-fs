@@ -1,4 +1,4 @@
-用 `planComplete` 加稳定的 `{name,work}` obligations 替换 Manager 当前完整的 owed-work account。
+用 `planComplete`、一个 `workingOn` 焦点名称和稳定的 `{name,work}` obligations 替换 Manager 当前完整的 owed-work account。
 
 道路仍在规划时，使用 `planComplete=false`。在这种关系下，obligations 可以诚实记录为了把计划做完仍欠的具体 planning work，例如调查、分析、分解或必须做出的决定。不要为了迎合账本而把规划伪装成 mission work。
 
@@ -8,6 +8,6 @@
 
 无论哪种关系，每项 obligation 都必须具体且可闭环。只占槽位的 label、裸阶段名、`placeholder`、`TBD`，或没有实际 owed work 的延后决定都不是 obligation。每个 obligation 都需要非空且在本 account 内唯一的 name。
 
-义务仍欠时保留它，只有工作已真正解除后才移除。每一次 accepted call 都立即成为当前 account。后续记账可以记录新的后果，但不能把已经 accepted 的 account 回滚掉。
+义务仍欠时保留它，只有工作已真正解除后才移除。非空 account 中，`workingOn` 必须精确命名你此刻实际正在推进的唯一 obligation；Host 视图里其它 obligation 都保持 pending。实际焦点切换时立即更新 `workingOn`。空 account 使用 `workingOn=""`。每一次 accepted call 都立即成为当前 account。后续记账可以记录新的后果，但不能把已经 accepted 的 account 回滚掉。
 
 同一 assistant message 中不得发出多个 todowrite；这种 batch 会整体被拒绝。

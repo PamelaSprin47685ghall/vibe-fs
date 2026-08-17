@@ -10,7 +10,7 @@ Manager 必须始终有一份持续诚实、可恢复、单一真相源的「当
 
 | 组 | 命题 | 保证 |
 |---|---|---|
-| 统一账本 | OBLIGATION-LEDGER-001/002/003 | Pre-T1 = planning owed work；Post-T1 = mission debt；wire = `planComplete` + `{name,work}`；无 status 枚举机 |
+| 统一账本 | OBLIGATION-LEDGER-001/002/003 | Pre-T1 = planning owed work；Post-T1 = mission debt；wire = `planComplete` + `workingOn` + `{name,work}`；`workingOn` 只指当前焦点，无 item status 枚举机 |
 | 诚实义务 | OBLIGATION-LEDGER-004/005/006 | planning work 只在 commitment 前合法；任何阶段都拒绝空 placeholder；identity 不靠文本猜 |
 | Admission | OBLIGATION-LEDGER-007/008/009 | 同 message 多 todowrite 全拒；replay 幂等；失败三态分型 |
 | 账本真相 | OBLIGATION-LEDGER-010/011/015 | Accepted 立即 supersede；REVISE 不拥有账本；canonical 单真相源 |

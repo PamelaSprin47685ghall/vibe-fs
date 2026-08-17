@@ -66,7 +66,7 @@ test('WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, a
   assert.equal(providerItem.properties.kind, undefined)
   assert.equal(providerItem.properties.status, undefined)
   assert.equal(providerItem.properties.priority, undefined)
-  assert.deepEqual(defined.jsonSchema.required, ['planComplete', 'obligations'])
+  assert.deepEqual(defined.jsonSchema.required, ['planComplete', 'workingOn', 'obligations'])
 
   const v1Row = {
     todos: [{ content: 'only-v1', status: 'pending', priority: 'low' }],
@@ -120,9 +120,9 @@ test('WHAT[OBLIGATION-LEDGER-015] obligations project to the original V1 decoder
   assert.equal('obligations' in beforeOutput.args, true, 'C: provider input remains materializable')
   assert.equal(Object.prototype.propertyIsEnumerable.call(beforeOutput.args, 'todos'), false, 'C: compatibility view stays off JSON persistence')
   assert.equal(JSON.stringify(beforeOutput.args), JSON.stringify(raw), 'C: JSON persistence remains provider obligations only')
-  for (const todo of beforeOutput.args.todos) {
+  for (const [index, todo] of beforeOutput.args.todos.entries()) {
     assert.equal(typeof todo.content, 'string')
-    assert.equal(todo.status, 'in_progress')
+    assert.equal(todo.status, index === 0 ? 'in_progress' : 'pending')
     assert.equal(todo.priority, 'medium')
   }
 
@@ -143,9 +143,10 @@ test('WHAT[OBLIGATION-LEDGER-015] projection helper mutates original args in pla
   assert.equal(result, originalArgs, 'C: projection mutates the args object in place')
   assert.equal('obligations' in args, true)
   assert.equal(Object.prototype.propertyIsEnumerable.call(args, 'todos'), false)
-  assert.equal(JSON.stringify(args), JSON.stringify({ planComplete: true, obligations: originalObligations }))
+  assert.equal(JSON.stringify(args), JSON.stringify({ planComplete: true, workingOn: 'membrane', obligations: originalObligations }))
   assert.equal(args.todos.length, originalObligations.length)
-  assert.equal(args.todos.every((t) => t.status === 'in_progress' && t.priority === 'medium'), true)
+  assert.deepEqual(args.todos.map((t) => t.status), ['in_progress', 'pending'])
+  assert.equal(args.todos.every((t) => t.priority === 'medium'), true)
 })
 
 // ── Canary F — after failure path ───────────────────────────────────────────

@@ -24,10 +24,10 @@ open Wanxiangshu.Foundation.Identity
 
 /// Magic Todo Checkpoint Protocol — GrandRewrite clean-break algebra.
 ///
-/// Provider truth is only a complete `{name, work}` obligation account.
-/// Accepted checkpoints own CurrentObligations immediately; process review owns
-/// only lag-1 semantic feedback. No Todo status/id/progress/settlement machine
-/// exists in this module.
+/// Provider truth is one complete `{name, work}` obligation account plus a
+/// `WorkingOn` focus pointer. Accepted checkpoints own CurrentObligations
+/// immediately; process review owns only lag-1 semantic feedback. No Todo
+/// status/id/progress/settlement machine exists in this module.
 module MagicTodo =
 
     // ── Checkpoint / review identity ────────────────────────────────────────
@@ -55,7 +55,7 @@ module MagicTodo =
 
     /// Semantic version frozen into Prepared / Accepted facts.
     [<Literal>]
-    let SemanticVersion = "magic-todo.v3"
+    let SemanticVersion = "magic-todo.v4"
 
     // ── Provider account ───────────────────────────────────────────────────
 
@@ -68,7 +68,20 @@ module MagicTodo =
     /// road being complete enough to entrust, not a workflow stage.
     type TodoWriteInput =
         { PlanComplete: bool
+          WorkingOn: string
           Obligations: ObligationList }
+
+    [<RequireQualifiedAccess>]
+    type WorkingOnValidationError =
+        | MustBeEmptyForEmptyAccount of actual: string
+        | MustMatchObligationName of actual: string
+
+    let validateWorkingOn (workingOn: string) (items: ObligationList) : Result<unit, WorkingOnValidationError> =
+        match items with
+        | [] when workingOn = "" -> Ok()
+        | [] -> Error(WorkingOnValidationError.MustBeEmptyForEmptyAccount workingOn)
+        | _ when items |> List.exists (fun item -> item.Name = workingOn) -> Ok()
+        | _ -> Error(WorkingOnValidationError.MustMatchObligationName workingOn)
 
     [<RequireQualifiedAccess>]
     type ProcessReviewVerdict =

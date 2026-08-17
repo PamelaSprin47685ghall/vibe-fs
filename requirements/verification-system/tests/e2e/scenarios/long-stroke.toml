@@ -468,7 +468,7 @@ internal = true
 user = "# The account is not yet ready to entrust."
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, obligations = [{ name = "long-stroke", work = "Run the long stroke through publish_proof.txt." }] } }
+  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
   respond = { type = "text", text = "Blind plan obligations recorded." }

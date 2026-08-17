@@ -18,6 +18,7 @@ module MagicTodoHostSurface =
     let private decodedInput (input: MagicTodo.TodoWriteInput) : obj =
         box
             {| planComplete = input.PlanComplete
+               workingOn = input.WorkingOn
                obligations =
                 input.Obligations
                 |> List.map (fun item -> box {| name = item.Name; work = item.Work |})
@@ -27,6 +28,19 @@ module MagicTodoHostSurface =
         match MagicTodoHostCodec.tryDecodeInput args with
         | Ok input -> box {| ok = true; value = decodedInput input |}
         | Error error -> box {| ok = false; error = error |}
+
+    let projectCompatibilityRows (workingOn: string) (obligations: obj array) : obj array =
+        obligations
+        |> Array.toList
+        |> List.map (fun row ->
+            let item: MagicTodo.Obligation =
+                { Name = text (row?name)
+                  Work = text (row?work) }
+
+            item)
+        |> MagicTodoSurface.obligationsToCompatibilityRows workingOn
+        |> List.map (fun row -> box {| content = row.Content; status = row.Status; priority = row.Priority |})
+        |> List.toArray
 
     let canonicalInput (args: obj) : string = MagicTodoHostCodec.canonicalInput args
 

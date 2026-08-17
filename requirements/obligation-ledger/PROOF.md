@@ -34,7 +34,7 @@
 | 命题 | 落点测试（文件 + 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
 | O-1 001 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-visible cold state`；`tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology...` | MOVE | `node --test requirements/obligation-ledger/tests/magic-todo.test.mjs` |
-| O-2 002 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/work with stable digest input`；`tests/magic-todo-host-codec.test.mjs` `WHAT[OBLIGATION-LEDGER-002] decodes required planComplete plus obligations` | MOVE | `node --test requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
+| O-2 002 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/work with stable digest input`；`tests/magic-todo-host-codec.test.mjs` `WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and obligations` | MOVE | `node --test requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
 | O-3 003 | `tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-003] clean break...`；`tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-001]` wire doesNotMatch | MOVE | 见 O-1 |
 | O-4 004 | `tests/magic-todo-provider-boundary.test.mjs`：Pre-T1 `planComplete=false` 明确允许 concrete planning work；effective true 后才启用 completion-counterfactual mission-debt 纪律；Host 无 planning 关键词分类 | REWRITE | `node --test requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
 | O-5 005 | 同文件：placeholder/TBD 等无 concrete owed work 的空槽位在 false/true 两侧都非法；具体 planning task 在 false 侧合法 | REWRITE | 见 O-4 |

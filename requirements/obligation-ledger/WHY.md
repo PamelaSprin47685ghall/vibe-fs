@@ -17,8 +17,10 @@ Manager 是长期 mission 的执行者。系统随时要回答同一个问题：
 
 **obligation-ledger 保证：当前 owed work 有一个唯一真相源（last `TodoWriteAccepted` 对应的完整
 account）。`planComplete=false` 时它可以诚实记录把计划做完仍欠的 planning work；第一次 accepted
-`planComplete=true` 是不可逆 commitment，此后同一账本只记录 mission debt。该单调关系由 Journal fold
-从 Accepted facts 纯推导，任何阶段机、reviewer settlement 或 Host UI 表都无权改写它。**
+`planComplete=true` 是不可逆 commitment，此后同一账本只记录 mission debt。`workingOn` 只指出这份完整
+account 中当前实际推进的一个 name，让 Host UI 能把一行投影为 `in_progress`、其余投影为 `pending`；它不把
+status 枚举带回 canonical obligation。该单调关系由 Journal fold 从 Accepted facts 纯推导，任何阶段机、
+reviewer settlement 或 Host UI 表都无权改写它。**
 
 ## 2. 独立存在测试（Independent Change Test）
 

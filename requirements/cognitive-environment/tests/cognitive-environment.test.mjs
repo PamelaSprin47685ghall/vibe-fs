@@ -165,6 +165,8 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_immediate_todowrite_
     assert.match(text, /继续.*之前|before (?:continuing|you continue)/i)
     assert.match(text, /阶段结束|最后.*补记|end of (?:a )?phase|batch.*later/i)
     assert.match(text, /不算更新|does not count as an update/i)
+    assert.match(text, /workingOn/i)
+    assert.match(text, /焦点|active focus/i)
     assert.match(text, /无变化|仍准确|still accurate|has not changed/i)
   }
 })

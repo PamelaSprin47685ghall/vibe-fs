@@ -67,8 +67,8 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 
 /// The only raw Host boundary for the GrandRewrite Magic Todo account.
-/// Provider input is `{ planComplete: bool, obligations: [{ name, work }] }`; the built-in Host
-/// executor still receives its legacy `{ todos: [{ content,status,priority }] }`
+/// Provider input is `{ planComplete: bool, workingOn: string, obligations: [{ name, work }] }`;
+/// the built-in Host executor still receives its legacy `{ todos: [{ content,status,priority }] }`
 /// sink shape. New provider semantics never round-trip through that sink.
 module MagicTodoHostCodec =
 
@@ -111,21 +111,35 @@ module MagicTodoHostCodec =
             Error "todowrite.planComplete is required"
         elif not (isBoolean args?planComplete) then
             Error "todowrite.planComplete must be a boolean"
+        elif isNull args?workingOn then
+            Error "todowrite.workingOn is required"
+        elif not (isString args?workingOn) then
+            Error "todowrite.workingOn must be a string"
         elif isNull args?obligations then
             Error "todowrite.obligations is required"
         elif not (isArray args?obligations) then
             Error "todowrite.obligations must be an array"
         else
+            let workingOn = unbox<string> args?workingOn
             let rows = unbox<obj array> args?obligations
 
             let rec decode remaining acc seen =
                 match remaining with
                 | [] ->
-                    let decoded: MagicTodo.TodoWriteInput =
-                        { PlanComplete = unbox<bool> args?planComplete
-                          Obligations = List.rev acc }
+                    let obligations = List.rev acc
 
-                    Ok decoded
+                    match MagicTodo.validateWorkingOn workingOn obligations with
+                    | Error(MagicTodo.WorkingOnValidationError.MustBeEmptyForEmptyAccount actual) ->
+                        Error(sprintf "todowrite.workingOn must be empty when obligations is empty; got '%s'" actual)
+                    | Error(MagicTodo.WorkingOnValidationError.MustMatchObligationName actual) ->
+                        Error(sprintf "todowrite.workingOn must match an obligation name; got '%s'" actual)
+                    | Ok() ->
+                        let decoded: MagicTodo.TodoWriteInput =
+                            { PlanComplete = unbox<bool> args?planComplete
+                              WorkingOn = workingOn
+                              Obligations = obligations }
+
+                        Ok decoded
                 | row :: tail ->
                     match decodeObligationRow row with
                     | Error error -> Error error
@@ -174,6 +188,9 @@ module MagicTodoHostCodec =
     let private applyDescriptions (lang: ProviderLanguage) (schema: obj) =
         schema?properties?planComplete?description <-
             box (ProviderProse.render lang MagicTodoSurface.Path.PlanCompleteDescription Map.empty)
+
+        schema?properties?workingOn?description <-
+            box (ProviderProse.render lang MagicTodoSurface.Path.WorkingOnDescription Map.empty)
 
         let items: obj = schema?properties?obligations?items
         let properties: obj = items?properties

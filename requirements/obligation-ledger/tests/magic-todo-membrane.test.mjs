@@ -38,7 +38,7 @@ const openLife = async (handle, session, life) => {
 }
 
 const prepare = (handle, session, call, obligations, planComplete = true, state = 0) => {
-  const args = { planComplete, obligations }
+  const args = { planComplete, workingOn: obligations[0]?.name ?? '', obligations }
   const canonical = host.canonicalInput(args)
   const digest = host.canonicalInputDigest(sha256Hex, args)
   return membrane.MagicTodoMembraneSurface_prepare(handle, session, call, canonical, digest, planComplete, obligations, state)
@@ -61,6 +61,14 @@ const append = async (handle, session, caseName, payload) => {
   return result
 }
 
+test('WHAT[OBLIGATION-LEDGER-025] accept rejects unknown physical success evidence', async () => {
+  await withJournal(async (handle) => {
+    const result = await membrane.MagicTodoMembraneSurface_accept(handle, null, 'UNKNOWN', 'input', 'output')
+    assert.equal(result.ok, false)
+    assert.equal(result.error.code, 'InvalidPhysicalEvidence')
+  })
+})
+
 test('WHAT[OBLIGATION-LEDGER-025] before returns without waiting for snapshot or Journal IO', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-before-latency-'))
   const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_before_latency', 4242, '2026-08-11T00:00:00Z')
@@ -72,6 +80,7 @@ test('WHAT[OBLIGATION-LEDGER-025] before returns without waiting for snapshot or
     const output = {
       args: {
         planComplete: false,
+        workingOn: 'diagnose',
         obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
       },
     }
@@ -86,6 +95,7 @@ test('WHAT[OBLIGATION-LEDGER-025] before returns without waiting for snapshot or
     assert.equal('obligations' in output.args, true)
     assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
     assert.equal(output.args.todos[0].content, 'diagnose: Fix the todowrite snapshot race.')
+    assert.equal(output.args.todos[0].status, 'in_progress')
   } finally {
     journal.JournalSurface_dispose(boot.journal)
     rmSync(directory, { recursive: true, force: true })
@@ -103,7 +113,7 @@ test('WHAT[OBLIGATION-LEDGER-009] malformed obligation shape is the provider-red
       () => hooks.Before(
         { tool: 'todowrite', sessionID: 'ses-syntax-red', callID: 'call-syntax-red' },
       )(
-        { args: { planComplete: false, obligations: [{ name: 'same', work: 'first' }, { name: 'same', work: 'second' }] } },
+        { args: { planComplete: false, workingOn: 'same', obligations: [{ name: 'same', work: 'first' }, { name: 'same', work: 'second' }] } },
       ),
       (error) => {
         const message = String(error && error.message ? error.message : error)
@@ -132,7 +142,7 @@ test('WHAT[OBLIGATION-LEDGER-009] missing process-review runtime is infrastructu
       () => hooks.Before(
         { tool: 'todowrite', sessionID: 'ses-runtime-fatal', callID: 'call-runtime-fatal' },
       )(
-        { args: { planComplete: true, obligations: [{ name: 'work', work: 'Do real mission work.' }] } },
+        { args: { planComplete: true, workingOn: 'work', obligations: [{ name: 'work', work: 'Do real mission work.' }] } },
       ),
       (error) => {
         const message = String(error && error.message ? error.message : error)
@@ -166,16 +176,16 @@ test('WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provi
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] before materializes the exact provider input including planComplete', () => {
-  const expected = host.canonicalInput({ planComplete: false, obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] })
+test('WHAT[OBLIGATION-LEDGER-025] before materializes the exact provider input including planComplete and workingOn', () => {
+  const expected = host.canonicalInput({ planComplete: false, workingOn: 'diagnose', obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] })
   const result = locality.materializeInput('call-magic-todo-await-input', '{}', 0, expected)
   assert.equal(result.ok, true)
   assert.equal(result.value.inputCanonical, expected)
 })
 
 test('WHAT[OBLIGATION-LEDGER-025] materialization fails closed when the provider input differs', () => {
-  const actual = host.canonicalInput({ planComplete: false, obligations: [{ name: 'other', work: 'Different provider input.' }] })
-  const expected = host.canonicalInput({ planComplete: false, obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] })
+  const actual = host.canonicalInput({ planComplete: false, workingOn: 'other', obligations: [{ name: 'other', work: 'Different provider input.' }] })
+  const expected = host.canonicalInput({ planComplete: false, workingOn: 'diagnose', obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] })
   const result = locality.materializeInput('call-magic-todo-await-conflict', actual, 1, expected)
   assert.equal(result.ok, false)
   assert.equal(result.error.code, 'InputMismatch')
@@ -185,7 +195,7 @@ test('WHAT[OBLIGATION-LEDGER-025] materialized snapshot input must still match t
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-conflicting-input'
     await openLife(handle, session, 'life-magic-todo-conflicting-input')
-    const input = host.canonicalInput({ planComplete: false, obligations: [{ name: 'other', work: 'Different provider input.' }] })
+    const input = host.canonicalInput({ planComplete: false, workingOn: 'other', obligations: [{ name: 'other', work: 'Different provider input.' }] })
     const submitted = [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }]
     const result = await membrane.MagicTodoMembraneSurface_prepare(handle, session, 'call-magic-todo-conflicting-input', input, 'provider-input-digest', false, submitted, 0)
     assert.equal(result.ok, false)
@@ -467,7 +477,7 @@ test('WHAT[OBLIGATION-LEDGER-026] snapshot infrastructure failure takes the proc
   try {
     const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
     const output = {
-      args: { planComplete: false, obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] },
+      args: { planComplete: false, workingOn: 'diagnose', obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] },
       output: 'builtin executor succeeded',
     }
     await hooks.Before({ tool: 'todowrite', sessionID: 'ses-after-failclose', callID: 'call-after-failclose' })(output)

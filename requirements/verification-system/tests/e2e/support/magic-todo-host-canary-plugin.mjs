@@ -68,8 +68,10 @@ const legacyProviderFields = ['id', 'kind', 'status', 'priority', 'content'];
 
 const argsCarryObligations = (args) =>
   typeof args?.planComplete === 'boolean'
+  && typeof args?.workingOn === 'string'
   && Array.isArray(args?.obligations)
   && args.obligations.length > 0
+  && args.obligations.some((row) => row?.name === args.workingOn)
   && args.obligations.every((row) =>
     row
     && typeof row === 'object'
@@ -89,9 +91,15 @@ const todosAreV1Compatibility = (todos) =>
     && !hasOwn(row, 'id')
     && !hasOwn(row, 'kind'));
 
-const argsCarryCompatibilityView = (args) =>
+const todosReflectWorkingOn = (args, todos) =>
   argsCarryObligations(args)
-  && todosAreV1Compatibility(args?.todos)
+  && todosAreV1Compatibility(todos)
+  && todos.length === args.obligations.length
+  && todos.every((row, index) =>
+    row.status === (args.obligations[index].name === args.workingOn ? 'in_progress' : 'pending'));
+
+const argsCarryCompatibilityView = (args) =>
+  todosReflectWorkingOn(args, args?.todos)
   && Object.prototype.propertyIsEnumerable.call(args, 'todos') === false;
 
 const taggedValue = (value) =>
@@ -422,7 +430,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!before) throw new Error('HOST_CANARY_A/H: missing before.json (todowrite before never observed)');
   if (!after) throw new Error('HOST_CANARY_E/G/H: missing after.json (todowrite after never observed)');
   if (definition.advertisesObligations !== true || definition.leaksLegacyProviderFields === true) {
-    throw new Error(`HOST_CANARY_B: production definition must expose planComplete:boolean plus obligations{name,work}: ${JSON.stringify(definition)}`);
+    throw new Error(`HOST_CANARY_B: production definition must expose planComplete:boolean + workingOn:string + obligations{name,work}: ${JSON.stringify(definition)}`);
   }
 
   // ── A: durable provider obligations vs executor compatibility args ────────
@@ -433,18 +441,18 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
     throw new Error('HOST_CANARY_A: production before must mutate the original args object in place');
   }
   if (!argsCarryObligations(before.preBeforeArgs)) {
-    throw new Error('HOST_CANARY_A: pre-before args must carry planComplete plus provider obligations{name,work}');
+    throw new Error('HOST_CANARY_A: pre-before args must carry planComplete + workingOn + provider obligations{name,work}');
   }
   if (
     !argsCarryObligations(before.postBeforeArgs)
-    || !todosAreV1Compatibility(before.postBeforeTodos)
+    || !todosReflectWorkingOn(before.postBeforeArgs, before.postBeforeTodos)
     || before.compatibilityViewIsHidden !== true
   ) {
     throw new Error('HOST_CANARY_A: post-before must preserve provider obligations and expose the non-enumerable Host V1 compatibility view');
   }
   if (
     !argsCarryObligations(after.executorArgs)
-    || !todosAreV1Compatibility(after.executorTodos)
+    || !todosReflectWorkingOn(after.executorArgs, after.executorTodos)
     || after.executorCompatibilityViewIsHidden !== true
   ) {
     throw new Error('HOST_CANARY_A: executor must receive provider obligations plus the non-enumerable V1 compatibility view');
@@ -595,8 +603,10 @@ export default {
             advertisesObligations:
               Array.isArray(hookOutput?.parameters?.required)
               && hookOutput.parameters.required.includes('planComplete')
+              && hookOutput.parameters.required.includes('workingOn')
               && hookOutput.parameters.required.includes('obligations')
               && hookOutput?.parameters?.properties?.planComplete?.type === 'boolean'
+              && hookOutput?.parameters?.properties?.workingOn?.type === 'string'
               && Array.isArray(item?.required)
               && item.required.includes('name')
               && item.required.includes('work'),

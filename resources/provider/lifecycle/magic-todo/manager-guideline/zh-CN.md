@@ -4,6 +4,6 @@
 
 当道路已经完整到可以托付时，用 `planComplete=true` 提交完整的 mission-debt account。本 Manager Life 中第一次 accepted true 是不可逆的；从那以后 effective planComplete 永久保持 true，即使后续调用又写 false，也仍按 true 处理。
 
-commitment 之后，让 living mission obligations 保持真实：仍欠的工作继续保留，只有真正解除后才移除；证据揭示新的 mission debt 时如实加入。每一份 accepted account 都立即成为当前（Current）account；process review 可以批评它，但无权决定它是否 Current。
+commitment 之后，让 living mission obligations 保持真实：仍欠的工作继续保留，只有真正解除后才移除；证据揭示新的 mission debt 时如实加入。每份非空 account 的 `workingOn` 都必须精确命名此刻实际正在推进的唯一 obligation；实际焦点一旦切换就立即同步更新。空 account 使用 `workingOn=""`。每一份 accepted account 都立即成为当前（Current）account；process review 可以批评它，但无权决定它是否 Current。
 
 无论哪种关系，都不要用空 placeholder、裸阶段名或延后内容的槽位冒充 obligation。

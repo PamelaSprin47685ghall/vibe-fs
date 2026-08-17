@@ -102,7 +102,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | 内容 | 裁决理由 |
 |---|---|
 | `settled` / `proposed` / `semanticMerge` 三态 + status min-merge | GrandRewrite clean break 删除；reviewer 不拥有账本写权（TODO-005）。源码 production path 不得出现（静态 proof 断言，PROOF O-11） |
-| provider `kind` / `id` / `status` / `priority` / `reviewing` 冷状态 | 删除；wire 只有 top-level `planComplete` + `{name,work}` obligations。`planComplete` 是单调业务承诺，不是 item progress state |
+| provider `kind` / `id` / `status` / `priority` / `reviewing` 冷状态 | 删除；wire 只有 top-level `planComplete` + `workingOn` + `{name,work}` obligations。`planComplete` 是单调业务承诺；`workingOn` 是单一当前焦点指针，不是 item status state |
 | `TodoPlanningStage` / `ReviewStage` / `AwaitingReview` bool / `TodoStage` PC | 程序计数器；恢复只从 durable facts（TODO-012） |
 | 生产 Activation 资格门 / `WorkActivated` 资格门 / `PlanningTail` / Birth/Labor floor | planning→Activation 两阶段删除；`WorkActivated` 仅 inert legacy decode（TODO-001/GLORY-018..021）。不在本包 WHAT 中写成命题 |
 | 第二套 PrefixEpoch / 平行 LWR renderer | 单一 SSOT（TODO-009/012） |
@@ -112,7 +112,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 
 | 内容 | 说明 |
 |---|---|
-| Host TodoTable compatibility sink（`content=name: work` / `status=in_progress` / `priority=medium`；reviewing 降级 in_progress） | **compatibility 不写成永久需求**。它是当前 Host V1 的兼容 UI 投影（HOST-023，canary D/I 冻结）；未来 sink 可整体替换，canonical 语义不变。sink 永不反推 canonical（OBLIGATION-LEDGER-015 是永久命题；sink 字段形态是 HOW） |
+| Host TodoTable compatibility sink（`content=name: work` / `status=(name=workingOn ? in_progress : pending)` / `priority=medium`） | **compatibility 不写成永久需求**。它是当前 Host V1 的兼容 UI 投影；未来 sink 可整体替换，canonical obligation 语义不变。sink 永不反推 canonical（OBLIGATION-LEDGER-015 是永久命题；sink 字段形态是 HOW） |
 | `todowrite` schema / `planComplete` / `name`/`work` 字段名 / T1 文案具体 wording | 当前 authoring surface；`provider-language` 拥有本地化字节，本包拥有 commitment 语义 |
 | `ReviewFrontier` / `ReviewWorkStartCursor` 的具体 cursor 算法 | 与 `semantic-trace`（cursor 表示）、`work-record`（LWR 有界）、`review-assurance`（assignment 范围）交界；本包只引用 |
 | bridge / `TodoWritePrepared` 的具体字段 | 当前事实形态；bridge 只可搬运一次 Host effect-shell 的 ephemeral 数据，不得保存业务 stage；语义合同以 WHAT 为准 |

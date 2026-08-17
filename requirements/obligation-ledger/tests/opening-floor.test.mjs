@@ -44,7 +44,7 @@ test('WHAT[OBLIGATION-LEDGER-016] false planning checkpoints do not close Openin
 test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive body renders in Opening, not Recent', () => {
   const openingCharge = opening.opening('Ship the bridge.', [], '')
   const constitutive = [
-    item(5, 'assistant', opening.toolCallPart('todowrite', '{"planComplete":true,"obligations":[]}')),
+    item(5, 'assistant', opening.toolCallPart('todowrite', '{"planComplete":true,"workingOn":"","obligations":[]}')),
     item(6, 'tool', opening.toolResultPart('The Manager who will carry it is you.')),
   ]
   const withT1 = opening.withConstitutive(openingCharge, constitutive)

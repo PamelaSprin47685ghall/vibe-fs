@@ -640,7 +640,7 @@ export const projectObligationsToV1TodoRows = (args) => {
   Object.defineProperty(args, 'todos', {
     value: args.obligations.map((obligation) => ({
       content: `${obligation.name}: ${obligation.work}`,
-      status: 'in_progress',
+      status: obligation.name === args.workingOn ? 'in_progress' : 'pending',
       priority: 'medium',
     })),
     enumerable: false,
@@ -695,6 +695,7 @@ export const hostTrigger = async (fn, input, output) => {
 /** Sample clean-break provider obligation account before sink projection. */
 export const sampleObligationTodoWriteArgs = () => ({
   planComplete: true,
+  workingOn: 'membrane',
   obligations: [
     { name: 'membrane', work: 'implement the production membrane' },
     { name: 'canaries', work: 'write permanent contract canaries' },
@@ -709,6 +710,7 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
     additionalProperties: false,
     properties: {
       planComplete: { type: 'boolean' },
+      workingOn: { type: 'string' },
       obligations: {
         type: 'array',
         items: {
@@ -722,7 +724,7 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
         },
       },
     },
-    required: ['planComplete', 'obligations'],
+    required: ['planComplete', 'workingOn', 'obligations'],
   },
   jsonSchema: {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -730,6 +732,7 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
     additionalProperties: false,
     properties: {
       planComplete: { type: 'boolean' },
+      workingOn: { type: 'string' },
       obligations: {
         type: 'array',
         items: {
@@ -743,7 +746,7 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
         },
       },
     },
-    required: ['planComplete', 'obligations'],
+    required: ['planComplete', 'workingOn', 'obligations'],
   },
 })
 
