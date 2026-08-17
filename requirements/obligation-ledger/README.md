@@ -20,12 +20,12 @@ Manager 必须始终有一份持续诚实、可恢复、单一真相源的「当
 
 ## HOW 概览（→ HOW.md）
 
-- 类型：`src/Wanxiangshu/Domain/{MagicTodo,MagicTodoAdmission,MagicTodoAfter,MagicTodoFacts,MagicTodoObligationCodec,MagicTodoProcessReview,MagicTodoSurface}.fs`
-- workflow：`src/Wanxiangshu/Application/Manager/ObligationLedgerWorkflow.fs`（目标形状：Direct `task {}` CE + 具名 capability；无 Command/Reply interpreter、无 durable stage）
-- Host effect shell：`src/Wanxiangshu/Infrastructure/OpenCode/**` 只 decode/materialize/调用 workflow/投影 compatibility，不拥有业务顺序；现有 `Mission/Obligation/Todo/MagicTodoMembrane.fs` 在本次大修中缩退/拆分
-- fact + O(1) projection：`src/Wanxiangshu/Journal/{MagicTodoProjection,MagicTodoFactCodec}.fs`；热路径只读增量字段，不扫描 Accepted 历史链
-- review：`src/Wanxiangshu/Application/Review/{TodoProcessReviewProgram,DedicatedTodoReviewerRuntime}.fs`
-- Host sink：`src/Wanxiangshu/Domain/MagicTodoSurface.fs`（compatibility TodoTable 投影；HOW 层，非永久需求）
+- 类型：`src/Wanxiangshu/Mission/Obligation/Todo/{Model,Admission,After,Facts,ObligationCodec,ProcessReview,Surface}.fs`
+- workflow：`src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs`（目标形状：Direct `task {}` CE + 具名 capability；无 Command/Reply interpreter、无 durable stage）
+- Host effect shell：`src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/**` 只 decode/materialize/调用 workflow/投影 compatibility，不拥有业务顺序；现有 `Mission/Obligation/Todo/MagicTodoMembrane.fs` 在本次大修中缩退/拆分
+- fact + O(1) projection：`src/Wanxiangshu/Mission/Obligation/Todo/{Projection,MagicTodoFactCodec}.fs`；热路径只读增量字段，不扫描 Accepted 历史链
+- review：`src/Wanxiangshu/Mission/Review/{TodoProcess,DedicatedTodoRuntime}.fs`
+- Host sink：`src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs`（compatibility TodoTable 投影；HOW 层，非永久需求）
 
 ## proof 概览（→ PROOF.md）
 

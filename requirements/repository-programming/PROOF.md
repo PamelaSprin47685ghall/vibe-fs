@@ -68,5 +68,5 @@ GAP：    0
 | 现有文件 | 当前 owner 混合 | cutover 动作 |
 |---|---|---|
 | `requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs` | `repository-programming`（mv/rm POSIX 语义断言：`AGENT_017_*`/`AGENT_018_*`）+ `office-capability`/`capability-enforcement`（角色门禁：`AGENT_016_mv_and_rm_are_denied_for_non_coder_roles`、`AGENT_016_mv_and_rm_are_denied_when_the_role_is_unresolved`） | **SPLIT**：POSIX 语义断言并入本包（integration 层）；角色门禁断言归 `office-capability`（consequence）/`capability-enforcement`（gate） |
-| `tests/integration/plugin/`（Host 工具调用串行执行面，REPOSITORY-PROGRAMMING-017 的 Host 侧） | Host 串行执行 = `host-boundary`（物理执行面）+ 本包（编程面合同） | **SPLIT**：模型侧合同断言并入本包；Host 物理串行语义归 `host-boundary` |
-| `scripts/checks/js-surface-gate.mjs` | MECHANISM（共享 checker）；语义唯一归本包（REPOSITORY-PROGRAMMING-021） | 门禁机制留在 `scripts/checks/`；其断言 owner 记为本包；cutover 后可移入本包 tests 或保留共享（机制可共享、断言不双 owner） |
+| `tests/integration/plugin/`（Host 工具调用串行执行面） | Host 串行执行 = `host-boundary`（物理执行面）+ 本包（编程面合同） | **SPLIT**：模型侧合同断言并入本包；Host 物理串行语义归 `host-boundary` |
+| `scripts/checks/js-surface-gate.mjs` | MECHANISM（共享 checker）；语义唯一归本包 | 门禁机制留在 `scripts/checks/`；其断言 owner 记为本包；cutover 后可移入本包 tests 或保留共享（机制可共享、断言不双 owner） |

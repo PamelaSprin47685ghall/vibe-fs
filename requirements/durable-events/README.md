@@ -54,19 +54,19 @@ PROOF.md  命题 → executable oracle；本轮新增/改写测试 FROZEN 未执
 
 | 概念 | 文件 |
 |---|---|
-| Domain envelope | `Domain/EventStore.fs` |
-| canonical bytes / identity | `Infrastructure/Persist/CanonicalEventCodec.fs` |
-| authoritative vocabulary | `Infrastructure/Persist/EventVocabulary.fs` |
-| local writer / payload truth | `Infrastructure/Persist/ProcessEventLog.fs` |
-| one k-way primitive | `Infrastructure/Persist/EventKWayMerge.fs` |
-| Integrator rule contract / structural frontier | `Infrastructure/Persist/IntegrationKernel.fs` |
-| local append boundary | `Infrastructure/Persist/EventStore.fs` |
-| sole history integrator CE | `Infrastructure/Persist/CanonicalIntegrator.fs` |
-| Git sync encoding | `Infrastructure/Persist/WriterStreamSync.fs` |
-| hook-process Git transport | `Infrastructure/Git/GitGateway.fs` |
-| standalone hook entry | `Infrastructure/Git/HookSync.fs` + `resources/git/wanxiang-hook.mjs` |
-| activation-time ensure | `Infrastructure/Git/HookDispatcher.fs` / durable activation owner |
-| Journal adapter | `Persistence/Journal/EventStoreJournalWriter.fs` / `Persistence/Journal/AgentJournal.fs` |
+| Domain envelope | `src/Wanxiangshu/Persistence/EventStore/Store.fs` |
+| canonical bytes / identity | `src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs` |
+| authoritative vocabulary | `src/Wanxiangshu/Persistence/EventStore/EventVocabulary.fs` |
+| local writer / payload truth | `src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs` |
+| one k-way primitive | `src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs` |
+| Integrator rule contract / structural frontier | `src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs` |
+| local append boundary | `src/Wanxiangshu/Persistence/EventStore/Store.fs` |
+| sole history integrator CE | `src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs` |
+| Git sync encoding | `src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs` |
+| hook-process Git transport | `src/Wanxiangshu/Git/Gateway.fs` |
+| standalone hook entry | `src/Wanxiangshu/Git/Hook/Sync.fs` + `resources/git/wanxiang-hook.mjs` |
+| activation-time ensure | `src/Wanxiangshu/Git/Hook/Dispatcher.fs` / durable activation owner |
+| Journal adapter | `src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs` / `src/Wanxiangshu/Persistence/Journal/AgentJournal.fs` |
 
 ## 关键红线
 

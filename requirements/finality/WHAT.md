@@ -25,7 +25,7 @@ compiled modules. The owner and executable contract evidence are registered in
 ## FINALITY-001：suicide 只属 Manager，且是终结的专门入口
 
 **规范**：`suicide(last_words)` 只属于 Manager；它不是 `verdict` 或普通 completion 的别名。
-仅 Manager 具有 `ToolPermission.Finality`。`Infrastructure/OpenCode/Tools/FinalityTool.fs` 是
+仅 Manager 具有 `ToolPermission.Finality`。`src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs` 是
 `suicide` 的唯一入口；`suicide` 的固定 description 由 `FinalityTool` 唯一拥有（GLORY-001/034/035/036）。
 
 **含义 / 动机**：终结请求与评审判断（`judge`）是不同因果身份；普通 completion 不拥有终结语义。

@@ -26,12 +26,10 @@
 
 ## 人工评审承接表（生命周期机制停用后仍有效的过程检查）
 
-| 检查 | 失败含义（对应条款） |
-|---|---|
-| Agent 未经用户指定启动 Proposed | REQUIREMENT-SYSTEM-011 |
-| Active 成为目标产品语义的唯一来源 | REQUIREMENT-SYSTEM-007/013 |
-| Completed 被用作当前实现依据 | REQUIREMENT-SYSTEM-010 |
-| Active 保存进度流水或未经批准的新设计 | REQUIREMENT-SYSTEM-013（进度流水段已机械承接；段内未经批准新设计仍人工） |
+- Agent 未经用户指定启动 Proposed → REQUIREMENT-SYSTEM-011
+- Active 成为目标产品语义的唯一来源 → REQUIREMENT-SYSTEM-007/013
+- Completed 被用作当前实现依据 → REQUIREMENT-SYSTEM-010
+- Active 保存进度流水或未经批准的新设计 → REQUIREMENT-SYSTEM-013（进度流水段已机械承接；段内未经批准新设计仍人工）
 
 ## 语义 anchor
 

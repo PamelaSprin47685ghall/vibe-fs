@@ -18,9 +18,7 @@
 
 ## 人工评审承接表
 
-| 检查 | 失败含义（对应条款） |
-|---|---|
-| 新增 semantic surface 但无 contract test pin 名字 | JS-SEMANTIC-SURFACE-003 |
-| 「测试需要」成为 export internal 的理由 | JS-SEMANTIC-SURFACE-002 |
-| surface 翻译在 owner boundary 之外（中央 god facade） | JS-SEMANTIC-SURFACE-003 |
-| Fable 升级破坏 semantic tests（quarantine 外） | JS-SEMANTIC-SURFACE-006 |
+- 新增 semantic surface 但无 contract test pin 名字 → JS-SEMANTIC-SURFACE-003
+- 「测试需要」成为 export internal 的理由 → JS-SEMANTIC-SURFACE-002
+- surface 翻译在 owner boundary 之外（中央 god facade） → JS-SEMANTIC-SURFACE-003
+- Fable 升级破坏 semantic tests（quarantine 外） → JS-SEMANTIC-SURFACE-006

@@ -48,7 +48,7 @@ node --test requirements/work-record/tests/work-record-sections.test.mjs
 | `requirements/finality/tests/lifecycle.test.mjs` | canonical LWR materializer、Opening preserved、request-range bound、无固定 report schema | SPLIT@cutover：finality 侧（cohort/blessing）归 finality；LWR 物化锚点归本包 |
 | `requirements/delegation/tests/join-tool-family.test.mjs`、~~`tests/unit/execution/sync-delegate.test.mjs`~~ | EXEC-028/031 bounded WorkRecord（includeOpening=false、无 answer 字段） | SPLIT@cutover：delegation 语义归 delegation；record 形状锚点归本包 |
 | `requirements/obligation-ledger/tests/magic-todo.test.mjs`、`requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` | TODO-008/009 coverage 分型、TODO-015 T1 constitutive | SPLIT@cutover：obligation-ledger 保留 checkpoint 语义；本包引用 LWR 形状 |
-| ~~`tests/unit/review/`~~（REVIEW-014/016 相关） | ProcessReviewLWR request-range bounded | 已 SPLIT（Wave 2a）：review-assurance 保留消费资格；本包拥有 record 表示 |
+| ~~`tests/unit/review/`~~（review-assurance 相关） | ProcessReviewLWR request-range bounded | 已 SPLIT（Wave 2a）：review-assurance 保留消费资格；本包拥有 record 表示 |
 | `requirements/durable-events/tests/fold-context-recovery.test.mjs` | LWR 相关 fold 语义（durable-events） | 归 durable-events |
 
 ## 5. semantic anchor id

@@ -16,6 +16,4 @@
 
 ## GAP
 
-| GAP | 缺口 | 状态 | 关闭证据 |
-|---|---|---|---|
-| GAP-016 | auto-bootstrap sole MJS scheduler / event-driven process-shared physical-execution lease / exact PhysicalUserMessageId binding / managed provider routing | CLOSED | production `a0886281`；上述 EMR-001..009 独立 oracle；真实 Host canary 已证明外部 placeholder model 被 MJS lease 覆盖并进入实际 provider wire |
+- **GAP-016**（auto-bootstrap sole MJS scheduler / event-driven process-shared physical-execution lease / exact PhysicalUserMessageId binding / managed provider routing）— CLOSED. 关闭证据：production `a0886281`；上述 EMR-001..009 独立 oracle；真实 Host canary 已证明外部 placeholder model 被 MJS lease 覆盖并进入实际 provider wire。

@@ -11,19 +11,19 @@
 | `src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs` | `rosterOf` / `graduatedReviewer`（纯函数） | 009/010 |
 | `src/Wanxiangshu/Mission/Manager/FinalitySurface.fs` | JS-native owner boundary: lifecycle/history fold, Life/cohort views, ending/labor decisions, background obligation and ManagerJob projection | 001-010/016-028 |
 | `src/Wanxiangshu/Mission/Finality/PromptSurface.fs` | JS-native owner boundary: Manager narrative projections, lifecycle/finality prompt documents, and role prompt resource text | 004/012/013/019/020/022/024 |
-| `src/Wanxiangshu/Application/Finality/FinalityWorkflow.fs` | 终结 CE：start / resume / undecided 收束 | 008/012/026 |
-| `src/Wanxiangshu/Application/Finality/CohortWorkflow.fs` | cohort 并发驱动（`concurrentAllOrShortCircuit`） | 008/011 |
-| `src/Wanxiangshu/Application/Finality/BlessingWorkflow.fs` | `blessIfTreeUnchanged`（tree 重读 + stable-ordinal bundle + `FinalityBlessed`） | 016 |
-| `src/Wanxiangshu/Application/Finality/RevisionWorkflow.fs` | REVISE 关闭 + record-ready 等待 + 双轨交付 | 011/012 |
-| `src/Wanxiangshu/Application/Finality/RecordWorkflow.fs` | rejection record 物化 | 011/012 |
-| `src/Wanxiangshu/Application/Finality/LifecycleWorkRecordProjection.fs` | canonical LWR 物化（process/Finality 共用；`includeOpening=false`；→ work-record） | 016/017 |
-| `src/Wanxiangshu/Application/Manager/ManagerFinality.fs` | `classifyEnding` / `admitLabor`（纯 disposition 代数） | 004-007/014/016-018 |
-| `src/Wanxiangshu/Application/Manager/ManagerWorkflow.fs` | Manager terminal sequencing：只判 join / finality / planning / handedOff | 019 |
+| `src/Wanxiangshu/Mission/Finality/Workflow.fs` | 终结 CE：start / resume / undecided 收束 | 008/012/026 |
+| `src/Wanxiangshu/Mission/Finality/Cohort.fs` | cohort 并发驱动（`concurrentAllOrShortCircuit`） | 008/011 |
+| `src/Wanxiangshu/Mission/Finality/Blessing.fs` | `blessIfTreeUnchanged`（tree 重读 + stable-ordinal bundle + `FinalityBlessed`） | 016 |
+| `src/Wanxiangshu/Mission/Finality/Revision.fs` | REVISE 关闭 + record-ready 等待 + 双轨交付 | 011/012 |
+| `src/Wanxiangshu/Mission/Finality/Record.fs` | rejection record 物化 | 011/012 |
+| `src/Wanxiangshu/Mission/WorkRecord/Materialize.fs` | canonical LWR 物化（process/Finality 共用；`includeOpening=false`；→ work-record） | 016/017 |
+| `src/Wanxiangshu/Mission/Manager/Finality.fs` | `classifyEnding` / `admitLabor`（纯 disposition 代数） | 004-007/014/016-018 |
+| `src/Wanxiangshu/Mission/Manager/Workflow.fs` | Manager terminal sequencing：只判 join / finality / planning / handedOff | 019 |
 | `src/Wanxiangshu/Mission/Manager/Idle.fs` | ordinary idle encouragement：从 MagicTodo plan commitment 派生 before/after commitment kind；process key + durable continuation claim 都绑定 exact terminal ProviderRun，Life/condition 只决定文案，不限制 fresh terminal 次数 | 019 |
-| `src/Wanxiangshu/Application/Manager/ManagerLifeWorkflow.fs` | `ensureOpening` / `completeBlessedLife`（rest 路径） | 017/022 |
-| `src/Wanxiangshu/Domain/FinalityPrompt.fs` | rejection / blessed / steer / undecided 文案（SyntheticToml 唯一渲染） | 012/013/026 |
-| `src/Wanxiangshu/Domain/MagicTodoFinalityCohort.fs` | Dedicated 首次 enlist 的 roster 输入 | 009 |
-| `src/Wanxiangshu/Infrastructure/OpenCode/Tools/FinalityTool.fs` | `suicide` 唯一入口：前置条件 + drain + FinalityOutcome 映射 | 001/003-008 |
+| `src/Wanxiangshu/Mission/Manager/Life/Workflow.fs` | `ensureOpening` / `completeBlessedLife`（rest 路径） | 017/022 |
+| `src/Wanxiangshu/Mission/Finality/Prompt.fs` | rejection / blessed / steer / undecided 文案（SyntheticToml 唯一渲染） | 012/013/026 |
+| `src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs` | Dedicated 首次 enlist 的 roster 输入 | 009 |
+| `src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs` | `suicide` 唯一入口：前置条件 + drain + FinalityOutcome 映射 | 001/003-008 |
 
 ## 2. JS semantic boundary
 
