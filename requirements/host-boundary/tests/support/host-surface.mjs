@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
+import * as HostSignalSurface from '../../../../dist/OpenCode/Host/HostSignalSurface.js'
 
-export const sha256Hex = (value) => createHash('sha256').update(String(value)).digest('hex')
+const sha256Hex = (value) => createHash('sha256').update(String(value)).digest('hex')
 
 export const wireProjection = {
   transform: ({ journal, sessionId, physicalUser, snapshot, armed = false, cutoff = 0 } = {}) => {
@@ -11,44 +12,10 @@ export const wireProjection = {
   },
 }
 
-export const hostCompaction = {
-  settingPaths: ['compaction.auto', 'compaction.prune', 'compaction.autocontinue'],
-  settings: [
-    { key: 'compaction.auto', value: false },
-    { key: 'compaction.prune', value: false },
-    { key: 'compaction.autocontinue', value: false },
-  ],
-  judgeFirstTurn: ({ pseudoRuns }) => (pseudoRuns === 0 ? { name: 'Satisfied' } : { name: 'Unsupported' }),
-  isContainableCompaction: (observed) => Boolean(observed),
-  nextReanchor: ({ handled, newest }) => (handled ? { kind: 'AlreadyHandled' } : { kind: 'ContextReanchored', newest }),
-}
-
-const signal = (kind, sessionId, extra = {}) => ({ kind, sessionId, ...extra })
-export const hostSignals = {
-  tryDecode: (raw) => {
-    const value = raw?.event ?? raw?.payload ?? raw
-    const sessionId = value?.properties?.sessionID ?? value?.sessionID ?? value?.properties?.sessionId ?? value?.sessionId ?? ''
-    const type = value?.type
-    if (!sessionId) return undefined
-    if (type === 'session.status' && value.properties?.status?.type === 'idle') return signal('SessionIdle', sessionId)
-    if (type === 'session.idle') return signal('SessionIdle', sessionId)
-    if (type === 'session.status' && value.properties?.status?.type === 'retry') return signal('ProviderRetry', sessionId, { attempt: String(value.properties.status.attempt ?? ''), reason: String(value.properties.status.reason ?? '') })
-    if (type === 'session.deleted') return signal('SessionDeleted', sessionId, { parentSessionId: value.properties?.parentID ?? null })
-    if (type === 'session.error') {
-      const name = value.properties?.error?.name ?? value.properties?.error?.message ?? ''
-      if (/aborted|abort/i.test(name)) return signal('AttemptAborted', sessionId)
-      return signal('ProviderFailure', sessionId, { reason: String(name) })
-    }
-    return undefined
-  },
-  sessionIdOf: (value) => value?.sessionId ?? '',
-  caseName: (value) => value?.kind,
-}
-
 export const signalRouter = (owned = new Set(), onSignal = () => {}) => {
   const ownedSessions = new Set(owned)
   const observe = (raw) => {
-    const decoded = hostSignals.tryDecode(raw)
+    const decoded = HostSignalSurface.tryDecode(raw) ?? undefined
     if (decoded && (ownedSessions.has(decoded.sessionId) || decoded.kind === 'ProviderFailure')) onSignal(decoded)
   }
   return {

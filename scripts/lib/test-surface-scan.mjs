@@ -306,6 +306,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Host/Contract/CompactionPolicySurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-007'],
+    source: 'src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'OpenCode/Host/QuiescenceSurface.js',
     owner: 'crash-reconciliation',
     laws: ['CRASH-001', 'CRASH-006', 'CRASH-008'],

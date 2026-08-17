@@ -106,6 +106,7 @@
     <Compile Include="Strength/Frame.fs"/>
     <Compile Include="Strength/Prediction/BatchCollector.fs"/>
     <Compile Include="Host/Contract/ToolResultBound.fs"/>
+    <Compile Include="Host/Contract/CompactionPolicySurface.fs"/>
     <Compile Include="Interaction/Dispatch/Nudge.fs"/>
     <Compile Include="Execution/Session/LoopDetector.fs"/>
     <Compile Include="Execution/Delegation/Fork/Payload.fs"/>
