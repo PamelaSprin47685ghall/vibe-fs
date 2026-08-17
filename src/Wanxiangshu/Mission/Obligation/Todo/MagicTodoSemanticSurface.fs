@@ -233,6 +233,16 @@ module MagicTodoSemanticSurface =
         MagicTodo.workRecordStart (cursor openingSequence)
         |> fun value -> int value.Sequence
 
+    let managerCheckpointLwrStart (openingSequence: int) (latestConcludedSequence: obj) : int =
+        let latest =
+            if isNull latestConcludedSequence then
+                None
+            else
+                Some(cursor (unbox<int> latestConcludedSequence))
+
+        MagicTodo.managerCheckpointLwrStart (cursor openingSequence) latest
+        |> fun value -> int value.Sequence
+
     let blindPlanOpeningBoundary
         (openingSequence: int)
         (t1CallSequence: int)

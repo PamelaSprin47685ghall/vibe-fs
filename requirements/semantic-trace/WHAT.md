@@ -105,7 +105,11 @@ tool 渲染为 `[tool call] name args`）。
 决定 LWR gap 起点，可落在 turn 中间。Host before-hook 若要冻结 `Before(Tk)`，必须先从 full snapshot
 定位 Tk 所在 provider run，再把**该 run 之前的完整 transcript prefix**同步到 XTrace；否则此前已发生但
 尚未 capture 的 assistant / join 材料会被错误排除在 review range 外。当前 provider run 自身不得在
-input 尚为 `{}` 时提前 durable capture；它由 pending locality 在 fresh prior-prefix head 上定位。Host 流式工具构造留下的 sibling
+input 尚为 `{}` 时提前 durable capture；before-hook pending locality 只能给 Prepared 一个 provisional
+boundary，并且必须扣除该 provider run 已经 durable capture 的 prefix，不能重复计数。tool success 后、
+process-review assignment 前必须从同一 Host snapshot 捕获 current run 并用 exact Host ToolPart/XTrace join
+重新证明最终 `ManagerReviewFrontier`；只有这个 exact frontier 才能成为 reviewer consumption coverage。
+Host 流式工具构造留下的 sibling
 `pending + {}` / null ToolPart 只是未 materialize transport identity，不得冒充第二个 semantic todowrite；
 已有真实 input / terminal state 的 sibling 仍保留其独立 ToolCallId。
 

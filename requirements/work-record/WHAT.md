@@ -260,10 +260,13 @@ RecordCoverage 推导可替换前缀，禁止用 PrefixCoverage 填 LWR gap。
 `includeOpening=false`。
 
 对于同一 Life 内复用的 dedicated process reviewer，`ManagerCheckpointLWR` 还必须按 reviewer 已知
-范围连续分段：第一份从 structural `WorkRecordStart` 起；后续份从上一 `TodoReviewConcluded` 对应的
-Manager review exclusive frontier 起，到当前 `Before(Tk)` 为止。不得因为 reviewer physical work-unit
-重新 link / continuation 就把起点重置到 Opening；range transport 可复用，但已交付的 manager history
-不重复发送。
+范围连续分段：第一份从 `next(Life.OpeningCursor)` 这个 checkpoint-time review floor 起；后续份从上一
+`TodoReviewConcluded` 实际消费的 assigned Manager review exclusive frontier 起。当前 end 必须在
+assignment 前由同一 Host snapshot/XTrace 对 exact tool boundary 再证明并冻结，不能继续使用 before-hook
+对尚未稳定 current-message parts 所作的 provisional cursor 估计。当前 checkpoint 若正是 T1，其 acceptance
+推进的全局 post-T1 OpeningBoundary 不得 retroactively 改写本次 range start。不得因为 reviewer physical
+work-unit 重新 link / continuation 就把起点重置到 Opening；range transport 可复用，但已交付的 manager
+history 不重复发送。
 
 **含义/动机**：session head 会混入其它 invocation / 未来工作；bounded range 让 review
 可证明「这份 record 恰好覆盖 Rk 的证据区间」。

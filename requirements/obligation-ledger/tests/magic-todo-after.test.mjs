@@ -78,10 +78,19 @@ test('WHAT[OBLIGATION-LEDGER-025] deferred prepare synchronizes the Host snapsho
 test('WHAT[OBLIGATION-LEDGER-020] persistent process reviewer receives only manager work after its last concluded frontier', () => {
   const source = readFileSync(runtimeSource, 'utf8')
   assert.match(source, /LatestConcludedManagerReviewFrontier/)
-  assert.match(source, /Option\.defaultValue structuralStart/)
+  assert.match(source, /managerCheckpointLwrStart/)
   assert.match(
     source,
     /StartInclusive = start[\s\S]{0,160}EndExclusive = reviewFrontier/,
     'manager checkpoint LWR must be the non-overlapping interval [last concluded frontier, current frontier)',
   )
+})
+
+test('WHAT[OBLIGATION-LEDGER-020] first T1 review start is frozen before its own commitment can move the global opening floor', () => {
+  assert.equal(
+    todo.managerCheckpointLwrStart(1, null),
+    2,
+    'the first review starts immediately after the Life opening, independent of the current checkpoint becoming T1',
+  )
+  assert.equal(todo.managerCheckpointLwrStart(1, 19), 19, 'later reviews continue from the exact concluded frontier')
 })

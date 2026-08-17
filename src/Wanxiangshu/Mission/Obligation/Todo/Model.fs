@@ -213,6 +213,19 @@ module MagicTodo =
 
     let workRecordStart (openingCursor: XTraceCursor) : XTraceCursor = XTrace.nextCursor openingCursor
 
+    /// Process-review consumption is a reviewer-knowledge frontier, not the
+    /// Manager's current compression/opening floor. The first checkpoint starts
+    /// immediately after the Life opening; later checkpoints continue from the
+    /// exact Manager frontier durably assigned to the last concluded review.
+    /// In particular, accepting the current checkpoint as T1 must not
+    /// retroactively move this request's start past Before(T1).
+    let managerCheckpointLwrStart
+        (openingCursor: XTraceCursor)
+        (latestConcludedManagerReviewFrontier: XTraceCursor option)
+        : XTraceCursor =
+        latestConcludedManagerReviewFrontier
+        |> Option.defaultValue (workRecordStart openingCursor)
+
     type TracePartAnchor =
         { Cursor: XTraceCursor
           Kind: string

@@ -421,10 +421,16 @@ adopt；同 session 后续新 Life 禁止再次从 Host TodoTable 反推 seed（
 
 - 首次 `TodoWriteAccepted` 时若尚不存在 → Host-owned hidden session 创建并 durable enlist；
 - 后续 checkpoint：同一 logical reviewer，优先同一 physical session；上一轮 Host-owned work-unit handle 已 `CompletedAwaitingJoin/Retired` 不等于 logical reviewer 丢失；在**新 assignment 尚未 durable**时必须为同一 physical reviewer 取得新的 Active work-unit/link，再发送 continuation；已 assigned 的旧 checkpoint 不得为掩盖 record-ready 缺口而复活 handle；
-- 同一 dedicated reviewer 已经读过的 Manager LWR 不重复发送：首个 checkpoint 从 structural
-  `WorkRecordStart` 起；每次 `TodoReviewConcluded` O(1) 推进 `LatestConcludedManagerReviewFrontier`，
-  下一 checkpoint 的 `ManagerCheckpointLWR` 必须使用
-  `[LatestConcludedManagerReviewFrontier, current ReviewFrontier)`；不得每轮从 Opening / WorkRecordStart
+- 同一 dedicated reviewer 已经读过的 Manager LWR 不重复发送：首个 checkpoint 从
+  `next(Life.OpeningCursor)` 这个 **checkpoint-time review floor** 起；它不是当前全局
+  `ManagerOpeningFloor`。尤其当前 checkpoint 自己成为 T1 后，T1 constitutive call/result 可以推进
+  全局 OpeningBoundary，但绝不能反向把本次 process-review start 推过已经冻结的 `Before(T1)`。
+  首次 assignment 前，after/ensureReview 用同一 Host snapshot 捕获 XTrace，并把当前 tool boundary
+  重新证明为 exact `TodoProcessReviewAssigned.ManagerReviewFrontier`；Prepared 的 before-hook
+  `ReviewFrontier` 只是 admission/locality identity，不得冒充 assignment 最终消费边界。每次
+  `TodoReviewConcluded` O(1) 从该 **assigned exact frontier** 推进
+  `LatestConcludedManagerReviewFrontier`，下一 checkpoint 的 `ManagerCheckpointLWR` 必须使用
+  `[LatestConcludedManagerReviewFrontier, current assigned ManagerReviewFrontier)`；不得每轮从 Opening
   重放旧工作，也不得扫描 checkpoint history 重建这个起点；
 - 仅 proven permanent loss 后 `DedicatedTodoReviewerReplaced`（logical id 不变）；不确定 → fail closed；
 - **Finality cohort membership 可 graduate，process-review duty / session 至少保留到

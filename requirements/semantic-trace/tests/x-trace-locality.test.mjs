@@ -336,6 +336,71 @@ test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending before-hook ReviewFrontier inclu
   assert.equal(value.range.endExclusive.sequence, 11)
 })
 
+test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending ReviewFrontier does not double-count a current-message prefix already captured in XTrace', () => {
+  const messages = [
+    {
+      info: { id: 'asst_pending_captured_prefix', role: 'assistant' },
+      parts: [
+        { type: 'reasoning', text: 'checking the current account' },
+        { type: 'text', text: 'I will update the plan.' },
+        {
+          id: 'part_pending_captured_prefix',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_pending_captured_prefix',
+          state: { status: 'pending', input: { obligations: [{ name: 'proof', work: 'ship it' }] } },
+        },
+      ],
+    },
+  ]
+  const localized = xTrace.resolveLocality(
+    managerSession,
+    messages,
+    [
+      tracePartEnvelope({
+        sequence: 8,
+        run: 'asst_prior_run',
+        turn: 3,
+        partIndex: 1,
+        kind: 'text',
+        toolName: undefined,
+        textRef: 'blobs/prior-text',
+        textDigest: 'digest:prior-text',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+      tracePartEnvelope({
+        sequence: 9,
+        run: 'asst_pending_captured_prefix',
+        turn: 4,
+        partIndex: 0,
+        kind: 'reasoning',
+        toolName: undefined,
+        textRef: 'blobs/current-reasoning',
+        textDigest: 'digest:current-reasoning',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+      tracePartEnvelope({
+        sequence: 10,
+        run: 'asst_pending_captured_prefix',
+        turn: 4,
+        partIndex: 1,
+        kind: 'text',
+        toolName: undefined,
+        textRef: 'blobs/current-text',
+        textDigest: 'digest:current-text',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+    ],
+    'call_pending_captured_prefix',
+  )
+  const value = assertLocality(localized)
+
+  assert.equal(value.reviewFrontier.sequence, 11, 'Before(Tk) is one-past the already captured semantic prefix')
+})
+
 test('WHAT[SEMANTIC-TRACE-006] TODO-008 ManagerCheckpointLWR range includes last assistant text before todowrite', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'xtrace-locality-lwr-'))
   const created = await journal.JournalSurface_boot(dir, 'rt_xtrace_locality_lwr', 4242, '2026-01-01T00:00:00Z')

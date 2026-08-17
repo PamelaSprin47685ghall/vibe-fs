@@ -53,6 +53,7 @@ module MagicTodoAfter =
         (prepared: TodoWritePrepared)
         (dedicated: DedicatedTodoReviewerEnlisted)
         (reviewWorkStart: XTraceCursor)
+        (managerReviewFrontier: XTraceCursor)
         : TodoProcessReviewAssigned =
         let reviewId =
             MagicTodo.todoReviewId sha256 prepared.ManagerLifeId prepared.TodoWriteId
@@ -63,4 +64,4 @@ module MagicTodoAfter =
           DedicatedReviewerId = dedicated.DedicatedReviewerId
           ReviewerSessionId = dedicated.ReviewerSessionId
           ReviewWorkStartCursor = reviewWorkStart
-          ManagerReviewFrontier = prepared.ReviewFrontier }
+          ManagerReviewFrontier = managerReviewFrontier }

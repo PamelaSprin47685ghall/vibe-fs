@@ -131,20 +131,8 @@ module DedicatedTodoReviewerRuntime =
         (reviewFrontier: XTraceCursor)
         : Task<Result<string, string>> =
         task {
-            let snapshot = AgentJournal.snapshot journal
-
-            let xTrace =
-                AgentProjection.tryFind managerSessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.XTrace)
-                |> Option.defaultValue XTraceProjection.empty
-
-            let structuralStart =
-                ManagerOpeningFloor.workRecordStart life (Some magicLife) xTrace
-                |> Option.defaultValue life.OpeningCursor
-
             let start =
-                magicLife.LatestConcludedManagerReviewFrontier
-                |> Option.defaultValue structuralStart
+                MagicTodo.managerCheckpointLwrStart life.OpeningCursor magicLife.LatestConcludedManagerReviewFrontier
 
             if start.Sequence > reviewFrontier.Sequence then
                 return Error "process-review manager LWR start exceeds current ReviewFrontier"
@@ -162,23 +150,48 @@ module DedicatedTodoReviewerRuntime =
         (port: ISessionSnapshotPort)
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        : Task<Result<unit, string>> =
+        : Task<Result<SessionMessage list, string>> =
         taskResult {
             let! messages =
                 port.GetMessages managerSessionId
                 |> TaskValue.map (Result.mapError (fun reason -> "snapshot unavailable: " + reason))
 
-            return! XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
+            do! XTraceCapture.captureSessionMessages (Some journal) managerSessionId messages
+            return messages
         }
 
     let private captureManagerSnapshot
         (snapshot: ISessionSnapshotPort option)
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        : Task<Result<unit, string>> =
+        : Task<Result<SessionMessage list option, string>> =
         match snapshot with
-        | None -> Task.FromResult(Ok())
-        | Some port -> capturePortMessages port journal managerSessionId
+        | None -> Task.FromResult(Ok None)
+        | Some port ->
+            taskResult {
+                let! messages = capturePortMessages port journal managerSessionId
+                return Some messages
+            }
+
+    let private managerReviewFrontier
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (checkpoint: MagicTodoProjection.CheckpointRecord)
+        (capturedMessages: SessionMessage list option)
+        : Result<XTraceCursor, string> =
+        match checkpoint.Assignment, capturedMessages with
+        | Some assigned, _ -> Ok assigned.ManagerReviewFrontier
+        | None, None -> Ok checkpoint.ReviewFrontier
+        | None, Some messages ->
+            match
+                MagicTodoLocality.resolve
+                    managerSessionId
+                    messages
+                    (AgentJournal.snapshot journal)
+                    checkpoint.ToolCallId
+            with
+            | Ok localized -> Ok localized.ReviewFrontier
+            | Error reason -> Error(sprintf "process-review manager frontier locality failed: %A" reason)
 
     let private treeHashFromRaw (raw: string) (fallback: GitTreeHash) =
         if String.IsNullOrWhiteSpace raw then
@@ -313,10 +326,16 @@ module DedicatedTodoReviewerRuntime =
         (prepared: TodoWritePrepared)
         (enlisted: DedicatedTodoReviewerEnlisted)
         (reviewWorkStart: XTraceCursor)
+        (managerReviewFrontier: XTraceCursor)
         : Task<Result<unit, string>> =
         taskResult {
             let assigned =
-                MagicTodoAfter.planEnsureReview HostDigest.sha256Hex prepared enlisted reviewWorkStart
+                MagicTodoAfter.planEnsureReview
+                    HostDigest.sha256Hex
+                    prepared
+                    enlisted
+                    reviewWorkStart
+                    managerReviewFrontier
 
             let! _ =
                 AgentJournal.appendMagicTodo
@@ -367,6 +386,7 @@ module DedicatedTodoReviewerRuntime =
         (checkpoint: MagicTodoProjection.CheckpointRecord)
         (prepared: TodoWritePrepared)
         (enlisted: DedicatedTodoReviewerEnlisted)
+        (managerReviewFrontier: XTraceCursor)
         : Task<Result<unit, string>> =
         match checkpoint.Assignment with
         | Some _ -> Task.FromResult(Ok())
@@ -377,6 +397,7 @@ module DedicatedTodoReviewerRuntime =
                 prepared
                 enlisted
                 { Sequence = reviewerHead journal enlisted.ReviewerSessionId }
+                managerReviewFrontier
 
     let private sendOwnerRootAssignment
         (sessions: ISessionHostPort)
@@ -533,11 +554,12 @@ module DedicatedTodoReviewerRuntime =
 
             let! oldItems = readObligations journal checkpoint.BaseTodoRef checkpoint.BaseTodoDigest
             let! proposed = readObligations journal checkpoint.ProposedTodoRef checkpoint.ProposedTodoDigest
-            do! captureManagerSnapshot snapshot journal managerSessionId
+            let! capturedMessages = captureManagerSnapshot snapshot journal managerSessionId
+            let! reviewFrontier = managerReviewFrontier journal managerSessionId checkpoint capturedMessages
             let! opening = openingRaw journal managerLife |> TaskResultCE.ofTask
 
             let! checkpointLwr =
-                managerCheckpointLwr journal managerSessionId managerLife life checkpoint.ReviewFrontier
+                managerCheckpointLwr journal managerSessionId managerLife life reviewFrontier
 
             let request: ProcessReviewRequest =
                 { TodoReviewId = reviewId
@@ -563,7 +585,7 @@ module DedicatedTodoReviewerRuntime =
             // dispatch: the LWR request range then covers everything
             // the reviewer produces for this checkpoint, including
             // the assignment prompt itself (REVIEW-016).
-            do! appendAssignedIfNeeded journal managerSessionId checkpoint prepared enlisted
+            do! appendAssignedIfNeeded journal managerSessionId checkpoint prepared enlisted reviewFrontier
 
             // Send admission from durable dispatch evidence:
             // Accepted = the payload landed; Pending = outcome

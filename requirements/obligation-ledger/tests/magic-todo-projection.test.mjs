@@ -330,6 +330,37 @@ test('WHAT[OBLIGATION-LEDGER-020] concluded manager review frontier advances onl
   assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).latestConcludedManagerReviewFrontier, 20)
 })
 
+test('WHAT[OBLIGATION-LEDGER-020] concluded manager coverage advances to the exact assigned frontier rather than the provisional prepared frontier', () => {
+  const handle = projection.MagicTodoProjectionSurface_create()
+  const exactCall = 'todo-review-exact-frontier'
+  const exactWrite = todo.todoWriteId(sha256, life, exactCall)
+  const exactReview = todo.todoReviewId(sha256, life, exactWrite)
+
+  ok(foldMagic(handle, preparedFact({
+    todoWriteId: exactWrite,
+    toolCallId: exactCall,
+    reviewFrontier: 18,
+  }), 'prepared-review-exact-frontier'))
+  ok(foldMagic(handle, acceptedFact({
+    todoWriteId: exactWrite,
+    toolCallId: exactCall,
+    preparedFactRef: 'prepared-review-exact-frontier',
+  })))
+  ok(foldMagic(handle, enlisted))
+  ok(foldMagic(handle, assignedFact({
+    todoWriteId: exactWrite,
+    todoReviewId: exactReview,
+    managerReviewFrontier: 19,
+  })))
+  ok(foldMagic(handle, concludedFact({ todoWriteId: exactWrite, todoReviewId: exactReview })))
+
+  assert.equal(
+    projection.MagicTodoProjectionSurface_view(handle, life).latestConcludedManagerReviewFrontier,
+    19,
+    'reviewer knowledge advances to the range actually assigned, not the before-hook estimate',
+  )
+})
+
 test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment and never reopens it', () => {
   const makeCheckpoint = (suffix, declared, baseName, proposalName, frontier) => {
     const cpCall = `todo-${suffix}`

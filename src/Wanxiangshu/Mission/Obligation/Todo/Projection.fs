@@ -403,6 +403,7 @@ module MagicTodoProjection =
     let private concludeCheckpoint
         (payload: TodoReviewConcluded)
         (cp: CheckpointRecord)
+        (assignment: TodoProcessReviewAssigned)
         (life: LifeMagicTodoState)
         (state: MagicTodoProjectionState)
         =
@@ -413,7 +414,7 @@ module MagicTodoProjection =
             { life with
                 Checkpoints = Map.add key cp life.Checkpoints
                 PendingReviewCheckpoint = None
-                LatestConcludedManagerReviewFrontier = Some cp.ReviewFrontier }
+                LatestConcludedManagerReviewFrontier = Some assignment.ManagerReviewFrontier }
             state
 
     let private requireReviewerIndexOwns
@@ -559,7 +560,7 @@ module MagicTodoProjection =
                 let! assignment = requireAssignmentForConclude cp key
                 do! requireAssignmentMatchesConcluded assignment payload
                 do! requirePendingMatchesConclude life payload
-                return concludeCheckpoint payload cp life state
+                return concludeCheckpoint payload cp assignment life state
             }
 
     let foldDedicatedEnlisted
