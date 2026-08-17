@@ -29,7 +29,12 @@ module RepositorySembleSurface =
 
     let private launchOf (value: obj) : McpLaunch =
         let kind = if isNull value then "Disabled" else string (value?kind)
-        let payload = if isNull value || isNull (value?value) then "" else string (value?value)
+
+        let payload =
+            if isNull value || isNull (value?value) then
+                ""
+            else
+                string (value?value)
 
         match kind with
         | "Fixture" -> McpLaunch.Fixture payload
@@ -45,7 +50,8 @@ module RepositorySembleSurface =
     let uvxCommand (gitRef: string) : string array = SembleMcp.uvxCommand gitRef
     let fixtureCommand (fixturePath: string) : string array = SembleMcp.fixtureCommand fixturePath
 
-    let launchFromVars (vars: obj) : obj = SembleMcpClient.launchFromVars vars |> launchView
+    let launchFromVars (vars: obj) : obj =
+        SembleMcpClient.launchFromVars vars |> launchView
 
     let parseText (text: string) : obj array =
         SembleSearchCodec.parseText text |> List.map hitView |> List.toArray

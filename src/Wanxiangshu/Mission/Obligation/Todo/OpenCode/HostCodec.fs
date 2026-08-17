@@ -111,7 +111,8 @@ module MagicTodoHostCodec =
     let private finalizeDecoded
         (args: obj)
         (workingOn: string)
-        (acc: MagicTodo.Obligation list) : Result<MagicTodo.TodoWriteInput, string> =
+        (acc: MagicTodo.Obligation list)
+        : Result<MagicTodo.TodoWriteInput, string> =
         let obligations = List.rev acc
 
         match MagicTodo.validateWorkingOn workingOn obligations with
@@ -132,7 +133,8 @@ module MagicTodoHostCodec =
         (workingOn: string)
         (remaining: obj list)
         (acc: MagicTodo.Obligation list)
-        (seen: Set<string>) : Result<MagicTodo.TodoWriteInput, string> =
+        (seen: Set<string>)
+        : Result<MagicTodo.TodoWriteInput, string> =
         match remaining with
         | [] -> finalizeDecoded args workingOn acc
         | row :: tail -> decodeNextRow args workingOn tail acc seen row
@@ -143,7 +145,8 @@ module MagicTodoHostCodec =
         (tail: obj list)
         (acc: MagicTodo.Obligation list)
         (seen: Set<string>)
-        (row: obj) =
+        (row: obj)
+        =
         match decodeObligationRow row with
         | Error error -> Error error
         | Ok obligation -> decodeRowWithUniqueness args workingOn tail acc seen obligation
@@ -154,7 +157,8 @@ module MagicTodoHostCodec =
         (tail: obj list)
         (acc: MagicTodo.Obligation list)
         (seen: Set<string>)
-        (obligation: MagicTodo.Obligation) =
+        (obligation: MagicTodo.Obligation)
+        =
         if Set.contains obligation.Name seen then
             Error(sprintf "todowrite duplicate obligation name '%s'" obligation.Name)
         else

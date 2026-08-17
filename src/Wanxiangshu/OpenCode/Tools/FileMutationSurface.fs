@@ -23,15 +23,19 @@ module FileMutationSurface =
         let registered = ToolHostCodec.register factory spec
         box (FileMutationHandle(spec, registered))
 
-    let createMv (toolModule: obj) : obj = create FileMutationTools.mvSpec toolModule
+    let createMv (toolModule: obj) : obj =
+        create FileMutationTools.mvSpec toolModule
 
-    let createRm (toolModule: obj) : obj = create FileMutationTools.rmSpec toolModule
+    let createRm (toolModule: obj) : obj =
+        create FileMutationTools.rmSpec toolModule
 
     let name (handle: obj) : string =
         (unbox<FileMutationHandle> handle).Spec.Name
 
     let argumentNames (handle: obj) : string array =
-        (unbox<FileMutationHandle> handle).Spec.Arguments |> List.map fst |> List.toArray
+        (unbox<FileMutationHandle> handle).Spec.Arguments
+        |> List.map fst
+        |> List.toArray
 
     let description (handle: obj) : string =
         (unbox<FileMutationHandle> handle).Spec.Description

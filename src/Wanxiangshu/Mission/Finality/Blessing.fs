@@ -69,7 +69,8 @@ module BlessingWorkflow =
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (members: EnlistedMember list)
-        (requestTree: GitTreeHash) =
+        (requestTree: GitTreeHash)
+        =
         taskResult {
             let! orderedRecords = RecordWorkflow.awaitCanonicalCohortRecords journal members
 
@@ -99,7 +100,8 @@ module BlessingWorkflow =
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (members: EnlistedMember list)
-        (requestTree: GitTreeHash) =
+        (requestTree: GitTreeHash)
+        =
         task {
             match! prepareBlessing treePort journal managerSessionId members requestTree with
             | Error _ -> return Error false
@@ -111,7 +113,8 @@ module BlessingWorkflow =
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (members: EnlistedMember list)
-        (requestTree: GitTreeHash) =
+        (requestTree: GitTreeHash)
+        =
         if not (treeUnchanged treePort managerSessionId requestTree) then
             Task.FromResult(Error true)
         else
@@ -147,19 +150,19 @@ module BlessingWorkflow =
             | Error true -> return! undecided ()
             | Error false -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
             | Ok(logs, blob) ->
-                    do!
-                        FinalityJournal.appendLifecycle
-                            journal
-                            (ManagerLifecycleFact.FinalityBlessed
-                                {| SessionId = managerSessionId
-                                   LifeId = lifeId
-                                   RequestId = requestId
-                                   GitTreeHash = requestTree
-                                   WorkRecordBundleRef = blob.BlobRef
-                                   WorkRecordBundleDigest = blob.BlobDigest |})
+                do!
+                    FinalityJournal.appendLifecycle
+                        journal
+                        (ManagerLifecycleFact.FinalityBlessed
+                            {| SessionId = managerSessionId
+                               LifeId = lifeId
+                               RequestId = requestId
+                               GitTreeHash = requestTree
+                               WorkRecordBundleRef = blob.BlobRef
+                               WorkRecordBundleDigest = blob.BlobDigest |})
 
-                    members
-                    |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
+                members
+                |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
 
-                    return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
+                return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
         }

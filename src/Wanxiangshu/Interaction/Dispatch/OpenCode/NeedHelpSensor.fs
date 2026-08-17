@@ -141,8 +141,7 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
 
     member private _.ReportAbortOutcome(sessionId: SessionId, outcome: Result<unit, string>) =
         match outcome with
-        | Ok() ->
-            Diagnostic.emit "needhelp" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
+        | Ok() -> Diagnostic.emit "needhelp" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
         | Error reason ->
             Diagnostic.emit
                 "needhelp"

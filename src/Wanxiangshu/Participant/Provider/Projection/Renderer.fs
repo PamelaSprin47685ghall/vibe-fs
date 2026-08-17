@@ -225,10 +225,7 @@ module ProjectionRenderer =
           HostMessageIds = headId :: List.skip drop acc.HostMessageIds
           HostIsPhysical = headPhysical :: List.skip drop acc.HostIsPhysical }
 
-    let private suppressTransport
-        (budget: int)
-        (acc: RenderedMessages)
-        : RenderedMessages =
+    let private suppressTransport (budget: int) (acc: RenderedMessages) : RenderedMessages =
         let rec loop
             (remaining: (ProviderProjection.WireMessage * string option * bool) list)
             (toDrop: int)

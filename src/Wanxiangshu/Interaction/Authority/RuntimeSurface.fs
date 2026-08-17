@@ -117,12 +117,14 @@ module RuntimeSurface =
     let private claimOf (value: obj) : PromptAuthority.PromptClaim =
         let kind = text value?origin
         let label = text value?originLabel
+
         { PromptKey = PromptKey.create (text value?promptKey)
           SessionId = SessionId.create (text value?session)
           Origin = originOf kind label
           LogicalRunId = optionalString value?logicalRun |> Option.map LogicalRunId.create
           AuthorityRootUserMessageId =
-            optionalString value?authorityRoot |> Option.map AuthorityRootUserMessageId.create
+            optionalString value?authorityRoot
+            |> Option.map AuthorityRootUserMessageId.create
           EffectiveAgent = optionalString value?effectiveAgent
           PayloadDigest = text value?payloadDigest
           Receipt = optionalString value?receipt |> Option.map TransportReceipt.create
@@ -136,7 +138,10 @@ module RuntimeSurface =
             Ok()
         else
             let validateProfile value =
-                if isNull value then Ok() else profileResult value |> Result.map (fun _ -> ())
+                if isNull value then
+                    Ok()
+                else
+                    profileResult value |> Result.map (fun _ -> ())
 
             match validateProfile value?lastAuthorityProfile, validateProfile value?activeLogicalRun with
             | Ok(), Ok() -> Ok()
@@ -167,9 +172,7 @@ module RuntimeSurface =
 
             let sequences =
                 arrayOf value?claimSequences
-                |> Array.fold
-                    (fun current item -> Map.add (text item?scope) (int (text item?count)) current)
-                    Map.empty
+                |> Array.fold (fun current item -> Map.add (text item?scope) (int (text item?count)) current) Map.empty
 
             { LastAuthorityProfile = profileOption value?lastAuthorityProfile
               ActiveLogicalRun = profileOption value?activeLogicalRun
@@ -180,14 +183,26 @@ module RuntimeSurface =
 
     let private projectionToJs (projection: PromptAuthority.PromptAuthorityProjection) : obj =
         box
-            {| lastAuthorityProfile = projection.LastAuthorityProfile |> Option.map profileToJs |> Option.defaultValue null
-               activeLogicalRun = projection.ActiveLogicalRun |> Option.map profileToJs |> Option.defaultValue null
-               pendingClaims = projection.PendingClaims |> Map.toList |> List.map (snd >> claimToJs) |> List.toArray
+            {| lastAuthorityProfile =
+                projection.LastAuthorityProfile
+                |> Option.map profileToJs
+                |> Option.defaultValue null
+               activeLogicalRun =
+                projection.ActiveLogicalRun
+                |> Option.map profileToJs
+                |> Option.defaultValue null
+               pendingClaims =
+                projection.PendingClaims
+                |> Map.toList
+                |> List.map (snd >> claimToJs)
+                |> List.toArray
                acceptedContinuations =
                 projection.AcceptedContinuationIds
                 |> Map.toList
                 |> List.map (fun (physical, kind) ->
-                    box {| physical = PhysicalUserMessageId.value physical; kind = PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation kind) |})
+                    box
+                        {| physical = PhysicalUserMessageId.value physical
+                           kind = PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation kind) |})
                 |> List.toArray
                claimSequences =
                 projection.ClaimSequences
@@ -195,7 +210,7 @@ module RuntimeSurface =
                 |> List.map (fun (scope, count) -> box {| scope = scope; count = count |})
                 |> List.toArray |}
 
-    let empty : obj = projectionToJs PromptAuthority.empty
+    let empty: obj = projectionToJs PromptAuthority.empty
 
     let promotePhysical (physical: string) : string =
         PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create physical)
@@ -213,7 +228,11 @@ module RuntimeSurface =
         (agent: string)
         : obj =
         match rootKindResult (box kind) with
-        | Error error -> box {| ok = false; value = null; error = error |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error |}
         | Ok authorityKind ->
             match
                 PromptAuthorityRun.createAuthorityRoot
@@ -224,8 +243,16 @@ module RuntimeSurface =
                     (PhysicalUserMessageId.create physical)
                     agent
             with
-            | Ok profile -> box {| ok = true; value = profileToJs profile; error = "" |}
-            | Error error -> box {| ok = false; value = null; error = error |}
+            | Ok profile ->
+                box
+                    {| ok = true
+                       value = profileToJs profile
+                       error = "" |}
+            | Error error ->
+                box
+                    {| ok = false
+                       value = null
+                       error = error |}
 
     let parseAgentName (agent: string) : obj =
         match PromptAuthority.parseAgentNameTyped agent with
@@ -246,14 +273,18 @@ module RuntimeSurface =
                     "LegacyAgentName", ManagedAgentCatalog.formatLegacyNameNotSupported name
                 | PromptAuthority.AgentNameRejection.UnknownManagedAgent _ ->
                     "UnknownManagedAgent", "Unknown tier or role. Use fast-* or deep-* ."
-                | PromptAuthority.AgentNameRejection.Malformed _ ->
-                    "Malformed", "Expected fast-ROLE or deep-ROLE."
+                | PromptAuthority.AgentNameRejection.Malformed _ -> "Malformed", "Expected fast-ROLE or deep-ROLE."
 
-            box {| ok = false; value = null; error = box {| kind = kind; message = message |} |}
+            box
+                {| ok = false
+                   value = null
+                   error = box {| kind = kind; message = message |} |}
 
     let registerAuthority (profile: obj) (projection: obj) : obj =
         match profileResult profile, projectionValidation projection with
-        | Ok profile, Ok() -> PromptAuthorityRun.registerAuthority profile (projectionOf projection) |> projectionToJs
+        | Ok profile, Ok() ->
+            PromptAuthorityRun.registerAuthority profile (projectionOf projection)
+            |> projectionToJs
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
@@ -278,12 +309,7 @@ module RuntimeSurface =
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
-    let claimAgentOwnerRoot
-        (promptKey: string)
-        (session: string)
-        (payloadDigest: string)
-        (agent: string)
-        : obj =
+    let claimAgentOwnerRoot (promptKey: string) (session: string) (payloadDigest: string) (agent: string) : obj =
         match
             PromptAuthorityRun.claimAgentOwnerRoot
                 (PromptKey.create promptKey)
@@ -291,13 +317,23 @@ module RuntimeSurface =
                 payloadDigest
                 agent
         with
-        | Ok claim -> box {| ok = true; value = claimToJs claim; error = "" |}
-        | Error error -> box {| ok = false; value = null; error = error |}
+        | Ok claim ->
+            box
+                {| ok = true
+                   value = claimToJs claim
+                   error = "" |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error |}
 
     let registerClaim (claim: obj) (projection: obj) : obj =
         match projectionValidation projection with
         | Error error -> box {| ok = false; error = error |}
-        | Ok() -> PromptAuthorityRun.registerClaim (claimOf claim) (projectionOf projection) |> projectionToJs
+        | Ok() ->
+            PromptAuthorityRun.registerClaim (claimOf claim) (projectionOf projection)
+            |> projectionToJs
 
     let acceptClaim (promptKey: string) (physical: string) (projection: obj) : obj =
         match projectionValidation projection with
@@ -312,7 +348,9 @@ module RuntimeSurface =
     let abandonClaim (promptKey: string) (projection: obj) : obj =
         match projectionValidation projection with
         | Error error -> box {| ok = false; error = error |}
-        | Ok() -> PromptAuthorityRun.abandonClaim (PromptKey.create promptKey) (projectionOf projection) |> projectionToJs
+        | Ok() ->
+            PromptAuthorityRun.abandonClaim (PromptKey.create promptKey) (projectionOf projection)
+            |> projectionToJs
 
     let nextClaimSequence (scope: string) (projection: obj) : int =
         match projectionValidation projection with
@@ -329,12 +367,7 @@ module RuntimeSurface =
                 (projectionOf projection)
             |> projectionToJs
 
-    let claimScopeDigest
-        (session: string)
-        (logicalRun: obj)
-        (origin: obj)
-        (payloadDigest: string)
-        : string =
+    let claimScopeDigest (session: string) (logicalRun: obj) (origin: obj) (payloadDigest: string) : string =
         PromptAuthority.claimScopeDigest
             (SessionId.create session)
             (optionalString logicalRun |> Option.map LogicalRunId.create)
@@ -364,7 +397,11 @@ module RuntimeSurface =
 
     let closeAuthority (logicalRun: string) (authorityRoot: string) (projection: obj) : obj =
         match projectionValidation projection with
-        | Error error -> box {| ok = false; value = null; error = error |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = null
+                   error = error |}
         | Ok() ->
             match
                 PromptAuthorityRun.closeAuthority
@@ -372,8 +409,16 @@ module RuntimeSurface =
                     (AuthorityRootUserMessageId.create authorityRoot)
                     (projectionOf projection)
             with
-            | Ok closed -> box {| ok = true; value = projectionToJs closed; error = "" |}
-            | Error error -> box {| ok = false; value = null; error = error |}
+            | Ok closed ->
+                box
+                    {| ok = true
+                       value = projectionToJs closed
+                       error = "" |}
+            | Error error ->
+                box
+                    {| ok = false
+                       value = null
+                       error = error |}
 
     let closeCompletedHumanRootManager (projection: obj) : obj =
         match projectionValidation projection with
@@ -383,23 +428,23 @@ module RuntimeSurface =
 
             match typed.ActiveLogicalRun with
             | Some profile when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot ->
-                match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId typed with
+                match
+                    PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId typed
+                with
                 | Ok closed -> projectionToJs closed
                 | Error _ -> projectionToJs typed
             | _ -> projectionToJs typed
 
-    let resolveKnownOrigin
-        (physical: string)
-        (promptKey: string)
-        (hostCompaction: bool)
-        (projection: obj)
-        : string =
+    let resolveKnownOrigin (physical: string) (promptKey: string) (hostCompaction: bool) (projection: obj) : string =
         match projectionValidation projection with
         | Error _ -> "UnknownOrigin"
         | Ok() ->
             PromptAuthorityRun.resolveKnownOrigin
                 (PhysicalUserMessageId.create physical)
-                (if System.String.IsNullOrWhiteSpace promptKey then None else Some(PromptKey.create promptKey))
+                (if System.String.IsNullOrWhiteSpace promptKey then
+                     None
+                 else
+                     Some(PromptKey.create promptKey))
                 hostCompaction
                 (projectionOf projection)
             |> originName
@@ -414,18 +459,19 @@ module RuntimeSurface =
 
     let originForContinuation (kind: string) : obj =
         let value = PromptAuthority.PromptOrigin.Continuation(continuationKindOf kind)
-        box {| kind = originName value; label = PromptAuthority.originLabel value |}
+
+        box
+            {| kind = originName value
+               label = PromptAuthority.originLabel value |}
 
     let tryParseContinuationKind (kind: string) : obj =
         PromptAuthority.tryParseContinuationKind kind
-        |> Option.map (fun value -> box {| kind = PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation value) |})
+        |> Option.map (fun value ->
+            box {| kind = PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation value) |})
         |> Option.defaultValue null
 
     let repairPayloadDigest (request: string) (terminal: string) (kind: string) : string =
-        PromptAuthority.repairPayloadDigest
-            (BloggerRequestId.create request)
-            (ProviderRunIdentity.create terminal)
-            kind
+        PromptAuthority.repairPayloadDigest (BloggerRequestId.create request) (ProviderRunIdentity.create terminal) kind
 
     let repairAlreadyClaimed
         (session: string)

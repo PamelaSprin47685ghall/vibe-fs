@@ -181,7 +181,8 @@ module HostSessionNudge =
 
     let private continuationTargetValidation
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        (effectiveAgent: string) : Result<unit, string> =
+        (effectiveAgent: string)
+        : Result<unit, string> =
         let pairValidation =
             if effectiveAgent <> profile.SelectedAgent && effectiveAgent <> profile.PeerAgent then
                 Error "Assistance target is outside the active Authority Root agent pair"

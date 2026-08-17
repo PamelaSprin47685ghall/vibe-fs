@@ -95,11 +95,11 @@ module SyncDelegateBatching =
         leftKeys.Length <= rightKeys.Length
         && leftKeys = (rightKeys |> List.take leftKeys.Length)
 
-    let private longerBatch
-        (observedBatch: SyncDelegateBatch)
-        (snapshotBatch: SyncDelegateBatch)
-        : SyncDelegateBatch =
-        if observedBatch.CallOrder.Length >= snapshotBatch.CallOrder.Length then observedBatch else snapshotBatch
+    let private longerBatch (observedBatch: SyncDelegateBatch) (snapshotBatch: SyncDelegateBatch) : SyncDelegateBatch =
+        if observedBatch.CallOrder.Length >= snapshotBatch.CallOrder.Length then
+            observedBatch
+        else
+            snapshotBatch
 
     let private moreCompleteBatch
         (observed: SyncDelegateBatch option)

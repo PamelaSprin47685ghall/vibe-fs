@@ -15,11 +15,8 @@ open Wanxiangshu.OpenCode
 /// supplies plain outcome observations and receives an opaque run capability;
 /// PendingHostRun, TerminalOutcome, AgentRunResult, the completion source, and
 /// the pending-runs dictionary never cross this boundary.
-type HostForkRunLifecycleHandle private
-    (gate: obj,
-     pendingRuns: Dictionary<string, PendingHostRun>,
-     parentId: SessionId,
-     run: PendingHostRun) =
+type HostForkRunLifecycleHandle
+    private (gate: obj, pendingRuns: Dictionary<string, PendingHostRun>, parentId: SessionId, run: PendingHostRun) =
 
     member _.Gate = gate
     member _.PendingRuns = pendingRuns
@@ -50,7 +47,11 @@ module HostForkRunLifecycleSurface =
 
     let private detail (value: obj) (fieldName: string) =
         let candidate = property value fieldName
-        if isNull candidate then text (property value "text") else text candidate
+
+        if isNull candidate then
+            text (property value "text")
+        else
+            text candidate
 
     let private terminal (handle: HostForkRunLifecycleHandle) (value: obj) : TerminalOutcome =
         let kind = text (property value "kind")
@@ -61,7 +62,8 @@ module HostForkRunLifecycleSurface =
 
             TerminalOutcome.Completed
                 { SessionId = handle.Run.ChildId
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (SessionId.value handle.Run.ChildId + "-root")
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (SessionId.value handle.Run.ChildId + "-root")
                   ProviderRun = ProviderRunIdentity.create ("run-" + handle.Run.AgentId)
                   Role = handle.Run.Role
                   Directory = None

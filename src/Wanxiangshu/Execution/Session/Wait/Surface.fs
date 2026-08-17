@@ -54,7 +54,9 @@ module CausalWaitSurface =
           Identity = pairsOf (property value "identity") }
 
     let private ownerObject (owner: CausalOwnerRef) : obj =
-        box {| kind = owner.Kind; identity = objectOfPairs owner.Identity |}
+        box
+            {| kind = owner.Kind
+               identity = objectOfPairs owner.Identity |}
 
     let private producerOf (value: obj) : CausalProducerRef =
         let kind = stringOf (property value "kind")
@@ -66,9 +68,15 @@ module CausalWaitSurface =
 
     let private producerObject (producer: CausalProducerRef) : obj =
         match producer with
-        | WorkflowProducer owner -> box {| kind = "workflow"; owner = ownerObject owner |}
+        | WorkflowProducer owner ->
+            box
+                {| kind = "workflow"
+                   owner = ownerObject owner |}
         | ExternalProducer(kind, identity) ->
-            box {| kind = "external"; producerKind = kind; identity = objectOfPairs identity |}
+            box
+                {| kind = "external"
+                   producerKind = kind
+                   identity = objectOfPairs identity |}
 
     let private escapeOf (value: obj) : WaitEscape =
         match stringOf (property value "kind") with
@@ -81,16 +89,24 @@ module CausalWaitSurface =
 
     let private escapeObject (escape: WaitEscape) : obj =
         match escape with
-        | DeadlineAt at -> box {| tag = "deadlineAt"; at = at.ToString("o") |}
-        | CancelledBy owner -> box {| tag = "cancelledBy"; owner = ownerObject owner |}
+        | DeadlineAt at ->
+            box
+                {| tag = "deadlineAt"
+                   at = at.ToString("o") |}
+        | CancelledBy owner ->
+            box
+                {| tag = "cancelledBy"
+                   owner = ownerObject owner |}
         | ProcessLifetime -> box {| tag = "processLifetime" |}
         | SessionLifetime -> box {| tag = "sessionLifetime" |}
         | OpenEndedExternal -> box {| tag = "openEndedExternal" |}
 
     let private waitOf (value: obj) : DiagnosticWait =
         let subject = pairsOf (property value "subject")
+
         let escapes =
             let rawEscapes = property value "escapes"
+
             if isNullish rawEscapes then
                 []
             else
@@ -139,9 +155,9 @@ module CausalWaitSurface =
         box
             {| sequence = transition.Sequence
                kind =
-                   match transition.Kind with
-                   | WaitTransitionKind.Entered -> "Entered"
-                   | WaitTransitionKind.Left -> "Left"
+                match transition.Kind with
+                | WaitTransitionKind.Entered -> "Entered"
+                | WaitTransitionKind.Left -> "Left"
                wait = waitObject transition.Wait
                exit = optionObj (transition.Exit |> Option.map exitName) |}
 
@@ -177,19 +193,28 @@ module CausalWaitSurface =
 
     let createRegistry (historyCapacity: obj) : obj =
         let capacity =
-            if isNullish historyCapacity then None else Some(int (string historyCapacity))
+            if isNullish historyCapacity then
+                None
+            else
+                Some(int (string historyCapacity))
 
         RegistryHandle(CausalWaitRegistry(?historyCapacity = capacity)) :> obj
 
     let createWait (descriptor: obj) : obj = descriptor
 
     let owner (kind: string) (identity: obj) : obj =
-        box {| kind = kind; identity = objectOfPairs (pairsOf identity) |}
+        box
+            {| kind = kind
+               identity = objectOfPairs (pairsOf identity) |}
 
     let externalProducer (kind: string) (identity: obj) : obj =
-        box {| kind = "external"; producerKind = kind; identity = objectOfPairs (pairsOf identity) |}
+        box
+            {| kind = "external"
+               producerKind = kind
+               identity = objectOfPairs (pairsOf identity) |}
 
-    let workflowProducer (owner: obj) : obj = box {| kind = "workflow"; owner = owner |}
+    let workflowProducer (owner: obj) : obj =
+        box {| kind = "workflow"; owner = owner |}
 
     let escape (kind: string) (value: obj) : obj =
         match kind with
@@ -204,8 +229,7 @@ module CausalWaitSurface =
     let markExit (lease: obj) (exit: string) : unit =
         (lease :?> LeaseHandle).Lease.MarkExit(exitOf exit)
 
-    let dispose (lease: obj) : unit =
-        (lease :?> LeaseHandle).Lease.Dispose()
+    let dispose (lease: obj) : unit = (lease :?> LeaseHandle).Lease.Dispose()
 
     let snapshot (registry: obj) : obj =
         let handle = registry :?> RegistryHandle
@@ -230,9 +254,7 @@ module CausalWaitSurface =
 
     let frontiersOfSnapshot (snapshot: obj) : obj array =
         let waits =
-            unbox<obj array> (property snapshot "active")
-            |> Array.toList
-            |> List.map waitOf
+            unbox<obj array> (property snapshot "active") |> Array.toList |> List.map waitOf
 
         let typed =
             { Active = waits
@@ -255,9 +277,11 @@ module CausalWaitSurface =
         : Task<obj> =
         let handle = registry :?> RegistryHandle
         let deadlineHandle = unbox<IDeadlineHandle> deadline
+
         let read () =
             let value = call0 tryRead
             if isNullish value then None else Some value
+
         let signal () : Task<unit> = unbox (asPromise (call0 awaitSignal))
 
         task {
@@ -285,7 +309,8 @@ module CausalWaitSurface =
     let hubEnter (descriptor: obj) : obj =
         LeaseHandle(CausalWaitHub.observer.Enter(waitOf descriptor)) :> obj
 
-    let hubSnapshot () : obj = snapshotObject (CausalWaitHub.snapshot ())
+    let hubSnapshot () : obj =
+        snapshotObject (CausalWaitHub.snapshot ())
 
     let hubWriteToWorkspace () : unit = CausalWaitHub.writeToWorkspace ()
 

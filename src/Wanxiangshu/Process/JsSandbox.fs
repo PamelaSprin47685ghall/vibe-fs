@@ -159,7 +159,10 @@ module JsSandbox =
         task {
             try
                 let context = createContext (createObj [ "api" ==> api ])
-                let promise = runInContext wrappedSource context (createObj [ "timeout" ==> deadlineMs ])
+
+                let promise =
+                    runInContext wrappedSource context (createObj [ "timeout" ==> deadlineMs ])
+
                 let! json = promise :?> Task<string>
                 return decodeRunResult json outputBoundBytes
             with ex ->

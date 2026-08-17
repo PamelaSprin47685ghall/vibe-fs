@@ -18,6 +18,4 @@ module OfficeCapabilitySurface =
 
     /// OFF-002 / ARCH-017: the canonical manager fork office consequence set.
     let managerForkableOffices () : string array =
-        ManagedAgentCatalog.managerForkableRoles
-        |> List.map officeName
-        |> List.toArray
+        ManagedAgentCatalog.managerForkableRoles |> List.map officeName |> List.toArray

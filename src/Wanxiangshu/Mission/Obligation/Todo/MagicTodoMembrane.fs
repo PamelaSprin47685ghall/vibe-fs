@@ -852,6 +852,7 @@ module MagicTodoHostHooks =
             | Ok submittedInput ->
                 let obligations = submittedInput.Obligations
                 let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
+
                 MagicTodoHostCodec.replaceCompatibilityArgs
                     output
                     (obligationsToCompatibilityRows submittedInput.WorkingOn obligations)

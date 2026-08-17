@@ -89,6 +89,7 @@ module internal CompanionHostBlogger =
         : BloggerRequestContext option =
         let m = List.length blog.Frames
         let k = coveredFrameCount m
+
         let selected =
             if k < 1 then
                 None

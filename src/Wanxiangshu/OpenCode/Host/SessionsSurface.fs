@@ -15,11 +15,15 @@ module SessionsSurface =
 
     let familyRoot (parents: obj) (session: string) : string =
         let rec resolve current visited =
-            if Set.contains current visited then current
+            if Set.contains current visited then
+                current
             else
                 parentsOf parents
                 |> Array.tryPick (fun pair ->
-                    if text pair?child = current then Some(text pair?parent) else None)
+                    if text pair?child = current then
+                        Some(text pair?parent)
+                    else
+                        None)
                 |> Option.map (fun parent -> resolve parent (Set.add current visited))
                 |> Option.defaultValue current
 

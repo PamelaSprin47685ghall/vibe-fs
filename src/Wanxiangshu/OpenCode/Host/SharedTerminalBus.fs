@@ -36,7 +36,11 @@ module SharedTerminalBus =
 
     let private updateRelease key (entry: SharedPort) =
         let remaining = entry.RefCount - 1
-        if remaining <= 0 then shared.Remove key |> ignore else entry.RefCount <- remaining
+
+        if remaining <= 0 then
+            shared.Remove key |> ignore
+        else
+            entry.RefCount <- remaining
 
     let private releaseTarget key target =
         lock gate (fun () ->

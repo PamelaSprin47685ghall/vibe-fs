@@ -15,7 +15,10 @@ module JsTransactionSurface =
         if isNull value then "" else string value
 
     let private failureResult failure =
-        box {| ok = false; code = JsFailure.code failure; reason = JsFailure.reason failure |}
+        box
+            {| ok = false
+               code = JsFailure.code failure
+               reason = JsFailure.reason failure |}
 
     let private unitResult result =
         match result with
@@ -24,13 +27,15 @@ module JsTransactionSurface =
 
     let private mutationOf (value: obj) : JsStagedMutation =
         match text (value?kind) with
-        | "rewrite" ->
-            JsStagedMutation.Rewrite(text (value?path), text (value?originalText), text (value?newText))
+        | "rewrite" -> JsStagedMutation.Rewrite(text (value?path), text (value?originalText), text (value?newText))
         | "create" -> JsStagedMutation.Create(text (value?path), text (value?text))
         | other -> invalidArg "kind" (sprintf "unknown staged mutation kind: %s" other)
 
     let private mutationsOf (value: obj) : JsStagedMutation list =
-        if isNull value then [] else unbox<obj array> value |> Array.toList |> List.map mutationOf
+        if isNull value then
+            []
+        else
+            unbox<obj array> value |> Array.toList |> List.map mutationOf
 
     let private declarationOf (value: obj) : AnchorDeclaration =
         let spec =
@@ -70,7 +75,11 @@ module JsTransactionSurface =
            JsFailure.TransactionCommitFailed, "TransactionCommitFailed"
            JsFailure.TransactionRecoveryRequired, "TransactionRecoveryRequired"
            JsFailure.UnknownMember, "UnknownMember" |]
-        |> Array.map (fun (failure, name) -> box {| name = name; code = JsFailure.code failure; reason = JsFailure.reason failure |})
+        |> Array.map (fun (failure, name) ->
+            box
+                {| name = name
+                   code = JsFailure.code failure
+                   reason = JsFailure.reason failure |})
 
     let validateAnchorDeclaration (declaration: obj) : obj =
         AnchorRules.validateDeclaration (declarationOf declaration) |> unitResult
@@ -84,33 +93,33 @@ module JsTransactionSurface =
     let private existsOf (paths: string array) path = paths |> Array.contains path
 
     let validateTargets (existing: string array) (mutations: obj array) : obj =
-        JsTransaction.validateTargets (existsOf existing) (mutationsOf (box mutations)) |> unitResult
+        JsTransaction.validateTargets (existsOf existing) (mutationsOf (box mutations))
+        |> unitResult
 
     let private currentOf (current: obj) path =
         if isNull current then None else optionText (current?(path))
 
     let validateFreshness (current: obj) (mutations: obj array) : obj =
-        JsTransaction.validateFreshness (currentOf current) (mutationsOf (box mutations)) |> unitResult
+        JsTransaction.validateFreshness (currentOf current) (mutationsOf (box mutations))
+        |> unitResult
 
     let preflight (existing: string array) (current: obj) (mutations: obj array) : obj =
-        JsTransaction.preflight
-            (existsOf existing)
-            (currentOf current)
-            (mutationsOf (box mutations))
+        JsTransaction.preflight (existsOf existing) (currentOf current) (mutationsOf (box mutations))
         |> unitResult
 
     let private pairToJs (path, value) = box [| box path; box value |]
 
     let commitPlan (mutations: obj array) : obj array =
-        JsTransaction.commitPlan (mutationsOf (box mutations)) |> List.map pairToJs |> List.toArray
+        JsTransaction.commitPlan (mutationsOf (box mutations))
+        |> List.map pairToJs
+        |> List.toArray
 
     let rollbackPlan (mutations: obj array) : obj array =
         JsTransaction.rollbackPlan (mutationsOf (box mutations))
         |> List.map (fun (path, value) -> box [| box path; value |> Option.map box |> Option.toObj |])
         |> List.toArray
 
-    let private eventStoreOf (handle: obj) : IEventStore =
-        (unbox<EventStoreHandle> handle).Store
+    let private eventStoreOf (handle: obj) : IEventStore = (unbox<EventStoreHandle> handle).Store
 
     let private durableMutationToJs (mutation: JsDurableMutation) =
         box
@@ -133,7 +142,11 @@ module JsTransactionSurface =
                 |> Array.toList
                 |> List.map (fun item ->
                     { Path = text (item?path)
-                      OriginalText = if isNull (item?originalText) then None else Some(text (item?originalText))
+                      OriginalText =
+                        if isNull (item?originalText) then
+                            None
+                        else
+                            Some(text (item?originalText))
                       NewText = text (item?newText) })
 
         { TransactionId = JsTransactionId.create (text (value?transactionId))
@@ -155,7 +168,9 @@ module JsTransactionSurface =
     /// Append Committed through the same transaction stream.
     let appendCommitted (store: obj) (transactionId: string) : Task<obj> =
         task {
-            let! result = JsToolsTransactionStore.appendCommitted (eventStoreOf store) (JsTransactionId.create transactionId)
+            let! result =
+                JsToolsTransactionStore.appendCommitted (eventStoreOf store) (JsTransactionId.create transactionId)
+
             return appendResult result
         }
 

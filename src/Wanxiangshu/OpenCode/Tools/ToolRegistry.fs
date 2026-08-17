@@ -270,9 +270,11 @@ module ToolRegistry =
                     Diagnostic.emit
                         "chronicle-gate"
                         [ "session_id", ctx.SessionId; "result", ChronicleTool.NoLiveCycleError ]
+
                     if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                         let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
                         ()
+
                     return raise (InvalidOperationException(ChronicleTool.NoLiveCycleError))
                 }
 
@@ -317,11 +319,13 @@ module ToolRegistry =
             fun args (ctx: HostToolContext) ->
                 task {
                     let allowed = rolePredicate spec.Name parkedHost ctx.SessionId
+
                     let isStrengthReplica =
                         match strengthRuntime with
                         | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
                             strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
                         | _ -> false
+
                     let isBookkeeper =
                         not (String.IsNullOrWhiteSpace ctx.SessionId)
                         && BookkeeperRuntime.isAttached ctx.SessionId

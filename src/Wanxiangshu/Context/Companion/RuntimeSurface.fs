@@ -29,6 +29,7 @@ module CompanionRuntimeSurface =
 
     let private scopeOf (value: obj) : Wanxiangshu.OpenCode.PluginRuntimeScope =
         unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value
+
     let private hostOf (value: obj) : IParkedTransformHost = (scopeOf value).ParkedTransformHost
     let private companionOf (value: obj) : Companion = unbox<Companion> value
 
@@ -42,7 +43,10 @@ module CompanionRuntimeSurface =
                   FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
                   CoveredFrameCount = intValue value?coveredFrameCount
                   FrameDigests =
-                    (if isNullish value?digests then [||] else unbox<string array> value?digests)
+                    (if isNullish value?digests then
+                         [||]
+                     else
+                         unbox<string array> value?digests)
                     |> Array.toList
                     |> List.map BlobDigest.create
                   ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
@@ -83,28 +87,114 @@ module CompanionRuntimeSurface =
     let main (value: obj) : obj =
         box
             {| kind = "Main"
-               requestId = if isNullish value?requestId then "request-main" else text value?requestId
-               mainSession = if isNullish value?mainSession then "ses-main" else text value?mainSession
-               bloggerSession = if isNullish value?bloggerSession then "ses-blog" else text value?bloggerSession
+               requestId =
+                if isNullish value?requestId then
+                    "request-main"
+                else
+                    text value?requestId
+               mainSession =
+                if isNullish value?mainSession then
+                    "ses-main"
+                else
+                    text value?mainSession
+               bloggerSession =
+                if isNullish value?bloggerSession then
+                    "ses-blog"
+                else
+                    text value?bloggerSession
                toml = text value?toml
-               previousIngested = int (if isNullish value?previousIngested then "0" else text value?previousIngested)
-               nextIngested = int (if isNullish value?nextIngested then "1" else text value?nextIngested)
-               previousCutoff = int (if isNullish value?previousCutoff then "0" else text value?previousCutoff)
-               nextCutoff = int (if isNullish value?nextCutoff then "0" else text value?nextCutoff)
-               nextDigest = if isNullish value?nextDigest then "" else text value?nextDigest
-               frameEpoch = int (if isNullish value?frameEpoch then "0" else text value?frameEpoch)
-               deltaDigest = if isNullish value?deltaDigest then "delta" else text value?deltaDigest
-               observedEpoch = int (if isNullish value?observedEpoch then "0" else text value?observedEpoch) |}
+               previousIngested =
+                int (
+                    if isNullish value?previousIngested then
+                        "0"
+                    else
+                        text value?previousIngested
+                )
+               nextIngested =
+                int (
+                    if isNullish value?nextIngested then
+                        "1"
+                    else
+                        text value?nextIngested
+                )
+               previousCutoff =
+                int (
+                    if isNullish value?previousCutoff then
+                        "0"
+                    else
+                        text value?previousCutoff
+                )
+               nextCutoff =
+                int (
+                    if isNullish value?nextCutoff then
+                        "0"
+                    else
+                        text value?nextCutoff
+                )
+               nextDigest =
+                if isNullish value?nextDigest then
+                    ""
+                else
+                    text value?nextDigest
+               frameEpoch =
+                int (
+                    if isNullish value?frameEpoch then
+                        "0"
+                    else
+                        text value?frameEpoch
+                )
+               deltaDigest =
+                if isNullish value?deltaDigest then
+                    "delta"
+                else
+                    text value?deltaDigest
+               observedEpoch =
+                int (
+                    if isNullish value?observedEpoch then
+                        "0"
+                    else
+                        text value?observedEpoch
+                ) |}
 
     let squash (value: obj) : obj =
         box
             {| kind = "Squash"
-               requestId = if isNullish value?requestId then "request-squash" else text value?requestId
-               mainSession = if isNullish value?mainSession then "ses-main" else text value?mainSession
-               bloggerSession = if isNullish value?bloggerSession then "ses-blog" else text value?bloggerSession
-               frameEpoch = int (if isNullish value?frameEpoch then "0" else text value?frameEpoch)
-               observedEpoch = int (if isNullish value?observedEpoch then "0" else text value?observedEpoch)
-               coveredFrameCount = int (if isNullish value?coveredFrameCount then "0" else text value?coveredFrameCount)
+               requestId =
+                if isNullish value?requestId then
+                    "request-squash"
+                else
+                    text value?requestId
+               mainSession =
+                if isNullish value?mainSession then
+                    "ses-main"
+                else
+                    text value?mainSession
+               bloggerSession =
+                if isNullish value?bloggerSession then
+                    "ses-blog"
+                else
+                    text value?bloggerSession
+               frameEpoch =
+                int (
+                    if isNullish value?frameEpoch then
+                        "0"
+                    else
+                        text value?frameEpoch
+                )
+               observedEpoch =
+                int (
+                    if isNullish value?observedEpoch then
+                        "0"
+                    else
+                        text value?observedEpoch
+                )
+               coveredFrameCount =
+                int (
+                    if isNullish value?coveredFrameCount then
+                        "0"
+                    else
+                        text value?coveredFrameCount
+                )
                digests = [||] |}
 
     let toml (value: obj) : string = text value?toml
@@ -117,18 +207,30 @@ module CompanionRuntimeSurface =
     let createParked (sessionId: string) (lifetimeMs: int) : obj =
         box (new ParkedTransform(sessionId, TimeSpan.FromMilliseconds(float lifetimeMs)))
 
-    let resume (value: obj) : unit = unbox<ParkedTransform> value |> fun parked -> parked.TryResume()
-    let cancel (value: obj) : unit = unbox<ParkedTransform> value |> fun parked -> parked.TryCancel()
-    let completion (value: obj) : Task<bool> = unbox<ParkedTransform> value |> fun parked -> parked.Completion
+    let resume (value: obj) : unit =
+        unbox<ParkedTransform> value |> fun parked -> parked.TryResume()
 
-    let dispose (scope: obj) : unit = (scopeOf scope :> IDisposable).Dispose()
+    let cancel (value: obj) : unit =
+        unbox<ParkedTransform> value |> fun parked -> parked.TryCancel()
+
+    let completion (value: obj) : Task<bool> =
+        unbox<ParkedTransform> value |> fun parked -> parked.Completion
+
+    let dispose (scope: obj) : unit =
+        (scopeOf scope :> IDisposable).Dispose()
 
     let park (scope: obj) (sessionId: string) (lifetimeMs: int) : Task<bool> =
-        hostOf scope |> fun host -> host.ParkTransform(sessionId, TimeSpan.FromMilliseconds(float lifetimeMs))
+        hostOf scope
+        |> fun host -> host.ParkTransform(sessionId, TimeSpan.FromMilliseconds(float lifetimeMs))
 
-    let resumeParked (scope: obj) (sessionId: string) : bool = hostOf scope |> fun host -> host.ResumeParked sessionId
-    let cancelParked (scope: obj) (sessionId: string) : unit = hostOf scope |> fun host -> host.CancelParked sessionId
-    let hasParked (scope: obj) (sessionId: string) : bool = hostOf scope |> fun host -> host.HasParked sessionId
+    let resumeParked (scope: obj) (sessionId: string) : bool =
+        hostOf scope |> fun host -> host.ResumeParked sessionId
+
+    let cancelParked (scope: obj) (sessionId: string) : unit =
+        hostOf scope |> fun host -> host.CancelParked sessionId
+
+    let hasParked (scope: obj) (sessionId: string) : bool =
+        hostOf scope |> fun host -> host.HasParked sessionId
 
     let offerMaterial (scope: obj) (sessionId: string) (context: obj) : bool =
         hostOf scope |> fun host -> host.SetPendingOffer(sessionId, contextOfJs context)
@@ -139,12 +241,14 @@ module CompanionRuntimeSurface =
         | Some value -> contextToJs value
 
     let setCurrentRequest (scope: obj) (sessionId: string) (context: obj) : unit =
-        hostOf scope |> fun host -> host.SetCurrentRequest(sessionId, contextOfJs context)
+        hostOf scope
+        |> fun host -> host.SetCurrentRequest(sessionId, contextOfJs context)
 
     let clearCurrentRequest (scope: obj) (sessionId: string) : unit =
         hostOf scope |> fun host -> host.ClearCurrentRequest sessionId
 
-    let hasFlight (scope: obj) (sessionId: string) : bool = hostOf scope |> fun host -> host.HasFlight sessionId
+    let hasFlight (scope: obj) (sessionId: string) : bool =
+        hostOf scope |> fun host -> host.HasFlight sessionId
 
     let currentRequest (scope: obj) (sessionId: string) : obj =
         match hostOf scope |> fun host -> host.TryPeekCurrentRequest sessionId with
@@ -164,9 +268,11 @@ module CompanionRuntimeSurface =
 
 
     let setDrainWindow (scope: obj) (sessionId: string) (window: obj) : unit =
-        hostOf scope |> fun host -> host.SetDrainWindow(sessionId, unbox<DrainWindow> window)
+        hostOf scope
+        |> fun host -> host.SetDrainWindow(sessionId, unbox<DrainWindow> window)
 
-    let isDrainOpen (scope: obj) (sessionId: string) : bool = hostOf scope |> fun host -> host.IsDrainOpen sessionId
+    let isDrainOpen (scope: obj) (sessionId: string) : bool =
+        hostOf scope |> fun host -> host.IsDrainOpen sessionId
 
     let blocksNewRequest (durableSealed: bool) (hasFlightValue: bool) (drainOpenValue: bool) : bool =
         BloggerRuntime.blocksNewRequest durableSealed hasFlightValue drainOpenValue
@@ -180,5 +286,8 @@ module CompanionRuntimeSurface =
     let createCompanion (sessionId: string) : obj =
         box (Companion(?sessionId = Some(SessionId.create sessionId)))
 
-    let startRecoveryOpportunity (value: obj) : Task = companionOf value |> fun companion -> companion.StartRecoveryOpportunity()
-    let offerRecoveryMaterial (value: obj) : bool = companionOf value |> fun companion -> companion.OfferRecoveryMaterial()
+    let startRecoveryOpportunity (value: obj) : Task =
+        companionOf value |> fun companion -> companion.StartRecoveryOpportunity()
+
+    let offerRecoveryMaterial (value: obj) : bool =
+        companionOf value |> fun companion -> companion.OfferRecoveryMaterial()

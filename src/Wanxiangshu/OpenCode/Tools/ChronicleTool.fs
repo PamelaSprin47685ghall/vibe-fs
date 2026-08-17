@@ -166,12 +166,12 @@ module ChronicleTool =
             [ "entry", ToolHostCodec.stringSchema factory
               "tip", ToolHostCodec.enumSchema fields factory ]
           Execute =
-                fun args ctx ->
-                    task {
-                        let language = lang ctx
+            fun args ctx ->
+                task {
+                    let language = lang ctx
 
-                        if hasLiveCycle parkedHost ctx.SessionId then
-                            return executeValidEntry language args
-                        else
-                            return! noLiveCycleResult runtime ctx
-                    } }
+                    if hasLiveCycle parkedHost ctx.SessionId then
+                        return executeValidEntry language args
+                    else
+                        return! noLiveCycleResult runtime ctx
+                } }

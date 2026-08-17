@@ -180,7 +180,11 @@ module Reconciler =
                 let queuedState = queued.TryGetValue key
 
                 match activeState, queuedState with
-                | (true, activeGeneration), (true, queuedGeneration) when activeGeneration = generation && queuedGeneration = generation && isCurrent sessionId generation ->
+                | (true, activeGeneration), (true, queuedGeneration) when
+                    activeGeneration = generation
+                    && queuedGeneration = generation
+                    && isCurrent sessionId generation
+                    ->
                     Release.ResumeDrain
                 | (true, activeGeneration), _ when activeGeneration = generation ->
                     active.Remove(key) |> ignore

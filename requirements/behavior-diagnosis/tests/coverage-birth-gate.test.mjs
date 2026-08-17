@@ -45,6 +45,6 @@ test('WHAT[BD-013] ENFORCER_045_mainContext_accepts_strict_advance', () => {
     nextCoveredPrefixDigest: 'd1',
   })
   assert.equal(context.ok, true)
-  assert.equal(context.ingestedThroughSequence, 1)
+  assert.equal(context.ingestedThroughSequence, 1n)
   assert.ok(context.coverableTurnCutoffExclusive > 0)
 })

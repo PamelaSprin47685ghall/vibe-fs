@@ -77,7 +77,10 @@ module ExecutionFactFold =
         | None -> projection
 
     let private canonicalByname byname targetAgent =
-        if System.String.IsNullOrWhiteSpace byname then targetAgent else byname
+        if System.String.IsNullOrWhiteSpace byname then
+            targetAgent
+        else
+            byname
 
     let fold (projection: AgentProjectionSet) (fact: ExecutionFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── execution handles ───────────────────────────────────────────────

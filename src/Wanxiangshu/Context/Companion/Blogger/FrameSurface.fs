@@ -59,7 +59,10 @@ module BlogFrameSurface =
 
     let private stateOfJs (value: obj) : BlogProjectionState =
         let frames =
-            (if isNullish value?frames then [||] else unbox<obj array> value?frames)
+            (if isNullish value?frames then
+                 [||]
+             else
+                 unbox<obj array> value?frames)
             |> Array.toList
             |> List.map frameOfJs
             |> List.rev
@@ -86,13 +89,16 @@ module BlogFrameSurface =
     let private resultToJs (ok: 'a -> obj) (result: Result<'a, BlogFoldRejection>) : obj =
         match result with
         | Ok value -> box {| ok = true; value = ok value |}
-        | Error rejection -> box {| ok = false; error = rejectionName rejection |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionName rejection |}
 
     /// Construct one frame from plain JSON data.
     let frame (value: obj) : obj = frameOfJs value |> frameToJs
 
     /// Empty durable frame projection.
-    let empty : obj = stateToJs BlogProjection.empty
+    let empty: obj = stateToJs BlogProjection.empty
 
     /// Apply one atomic BlogObservationCommitted projection line. `request.frame`
     /// carries the frame and the remaining fields are the frozen commit proof.
@@ -120,9 +126,11 @@ module BlogFrameSurface =
 
     /// Host compaction containment: retire PrefixCoverage while retaining frames
     /// and RecordCoverage.
-    let applyReanchor (state: obj) : obj = stateOfJs state |> BlogProjection.applyReanchor |> stateToJs
+    let applyReanchor (state: obj) : obj =
+        stateOfJs state |> BlogProjection.applyReanchor |> stateToJs
 
-    let frameCount (state: obj) : int = stateOfJs state |> BlogProjection.frameCount
+    let frameCount (state: obj) : int =
+        stateOfJs state |> BlogProjection.frameCount
 
     let frameEpochOf (state: obj) : int =
         stateOfJs state |> fun value -> int (FrameEpochId.value value.FrameEpochId)
@@ -157,6 +165,8 @@ module BlogFrameSurface =
                digest = value.CoveredPrefixDigest
                coverableFrames = value.CoverableFrameCount |}
 
-    let hasCoverage (state: obj) : bool = stateOfJs state |> BlogProjection.hasCoverage
+    let hasCoverage (state: obj) : bool =
+        stateOfJs state |> BlogProjection.hasCoverage
 
-    let squashWidth (state: obj) : int = stateOfJs state |> BlogProjection.squashWidth
+    let squashWidth (state: obj) : int =
+        stateOfJs state |> BlogProjection.squashWidth

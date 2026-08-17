@@ -24,7 +24,10 @@ module ReviewJournalSurface =
         if isNull value then "" else string value
 
     let private field (value: obj) (name: string) : obj =
-        if isNull value then null else Fable.Core.JsInterop.emitJsExpr (value, name) "$0[$1]"
+        if isNull value then
+            null
+        else
+            Fable.Core.JsInterop.emitJsExpr (value, name) "$0[$1]"
 
     let private strField value name = text (field value name)
 
@@ -34,10 +37,14 @@ module ReviewJournalSurface =
 
     let private identity fieldName value = text (field value fieldName)
 
-    let private streamOfSession (sessionId: string) = StreamId.Session(SessionId.create sessionId)
+    let private streamOfSession (sessionId: string) =
+        StreamId.Session(SessionId.create sessionId)
 
     let private runOf (value: obj) =
-        if isNull value then None else Some(ProviderRunIdentity.create (text value))
+        if isNull value then
+            None
+        else
+            Some(ProviderRunIdentity.create (text value))
 
     let private verdictOf value =
         match text value with
@@ -109,10 +116,12 @@ module ReviewJournalSurface =
                    GitTreeHash = GitTreeHash.create (strField payload "GitTreeHash")
                    FirstProviderRun = ProviderRunIdentity.create (strField payload "FirstProviderRun")
                    FirstToolCallId = ToolCallId.create (strField payload "FirstToolCallId")
-                   FirstPhysicalUserMessageId = PhysicalUserMessageId.create (strField payload "FirstPhysicalUserMessageId")
+                   FirstPhysicalUserMessageId =
+                    PhysicalUserMessageId.create (strField payload "FirstPhysicalUserMessageId")
                    SecondProviderRun = ProviderRunIdentity.create (strField payload "SecondProviderRun")
                    SecondToolCallId = ToolCallId.create (strField payload "SecondToolCallId")
-                   SecondPhysicalUserMessageId = PhysicalUserMessageId.create (strField payload "SecondPhysicalUserMessageId") |}
+                   SecondPhysicalUserMessageId =
+                    PhysicalUserMessageId.create (strField payload "SecondPhysicalUserMessageId") |}
         | other -> failwith $"ReviewJournalSurface: unknown Review fact '{other}'"
 
     let private promptFactOf (caseName: string) (payload: obj) : AgentFact =
@@ -121,7 +130,8 @@ module ReviewJournalSurface =
             PromptFact.AuthorityRootAccepted
                 {| SessionId = SessionId.create (strField payload "SessionId")
                    LogicalRunId = LogicalRunId.create (strField payload "LogicalRunId")
-                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (strField payload "AuthorityRootUserMessageId")
+                   AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (strField payload "AuthorityRootUserMessageId")
                    AuthorityKind = strField payload "AuthorityKind"
                    SelectedAgent = strField payload "SelectedAgent"
                    PeerAgent = strField payload "PeerAgent"
@@ -150,7 +160,10 @@ module ReviewJournalSurface =
                    Kind = completionKindOf (field payload "Kind")
                    CompletionRef = optionalText payload "CompletionRef" |> Option.map BlobRef.create
                    CompletionDigest = optionalText payload "CompletionDigest" |> Option.map BlobDigest.create |}
-        | "HandleRetired" -> ExecutionFact.HandleRetired {| ParentSessionId = parent; Handle = handle |}
+        | "HandleRetired" ->
+            ExecutionFact.HandleRetired
+                {| ParentSessionId = parent
+                   Handle = handle |}
         | other -> failwith $"ReviewJournalSurface: unknown Execution fact '{other}'"
 
     let private factOf (family: string) (caseName: string) (payload: obj) : AgentFact =
@@ -163,7 +176,10 @@ module ReviewJournalSurface =
     let private appendResult result =
         match result with
         | Ok _ -> box {| ok = true |}
-        | Error failure -> box {| ok = false; error = JournalAppendFailure.describe failure |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error = JournalAppendFailure.describe failure |}
 
     let appendAgent
         (handle: JournalHandle)
@@ -187,7 +203,13 @@ module ReviewJournalSurface =
                 return box {| ok = false; error = error.Message |}
         }
 
-    let appendReview (handle: JournalHandle) (sessionId: string) (providerRun: obj) (caseName: string) (payload: obj) : Task<obj> =
+    let appendReview
+        (handle: JournalHandle)
+        (sessionId: string)
+        (providerRun: obj)
+        (caseName: string)
+        (payload: obj)
+        : Task<obj> =
         appendAgent handle sessionId providerRun "Review" caseName payload
 
     let appendAuthorityRoot (handle: JournalHandle) (sessionId: string) (agent: string) : Task<obj> =
@@ -222,11 +244,15 @@ module ReviewJournalSurface =
                     | ReviewWitness.RevisionWitness _ -> "RevisionWitness"
                     | ReviewWitness.Confirmed _ -> "Confirmed"
 
-            let xTraceHead = session.XTrace |> Option.map XTraceProjection.head |> Option.defaultValue 0L
+            let xTraceHead =
+                session.XTrace |> Option.map XTraceProjection.head |> Option.defaultValue 0L
 
             let xTracePartKinds =
                 session.XTrace
-                |> Option.map (fun xTrace -> XTraceProjection.parts xTrace |> List.map (fun part -> part.Kind) |> List.toArray)
+                |> Option.map (fun xTrace ->
+                    XTraceProjection.parts xTrace
+                    |> List.map (fun part -> part.Kind)
+                    |> List.toArray)
                 |> Option.defaultValue [||]
 
             box
@@ -252,10 +278,10 @@ module ReviewJournalSurface =
             box
                 {| witness = witness
                    barrier =
-                       session.ReviewGuard
-                       |> Option.bind (fun guard -> guard.CurrentBarrierId)
-                       |> Option.map ReviewBarrierId.value
-                       |> Option.toObj |}
+                    session.ReviewGuard
+                    |> Option.bind (fun guard -> guard.CurrentBarrierId)
+                    |> Option.map ReviewBarrierId.value
+                    |> Option.toObj |}
 
     let xTraceHead (handle: JournalHandle) (sessionId: string) : int64 =
         let projection = AgentJournal.snapshot handle.Journal
@@ -270,5 +296,8 @@ module ReviewJournalSurface =
 
         AgentProjection.tryFind (SessionId.create sessionId) projection.AgentProjections
         |> Option.bind (fun session -> session.XTrace)
-        |> Option.map (fun xTrace -> XTraceProjection.parts xTrace |> List.map (fun part -> part.Kind) |> List.toArray)
+        |> Option.map (fun xTrace ->
+            XTraceProjection.parts xTrace
+            |> List.map (fun part -> part.Kind)
+            |> List.toArray)
         |> Option.defaultValue [||]

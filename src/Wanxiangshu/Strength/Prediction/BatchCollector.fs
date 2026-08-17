@@ -80,8 +80,7 @@ module StrengthBatchCollector =
         (index: int)
         (results: Map<string, string>)
         : Result<Map<string, string>, unit> =
-        resultParts all.[index]
-        |> List.fold (addResult callIds) (Ok results)
+        resultParts all.[index] |> List.fold (addResult callIds) (Ok results)
 
     let private collectResults
         (all: ProviderProjection.WireMessage array)

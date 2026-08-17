@@ -155,14 +155,14 @@ module FissionSurface =
             |> Array.fold
                 (fun state entry ->
                     let completionId = string (entry?completionId)
+
                     let laneIndices =
                         let raw = entry?laneIndices
 
                         if isNullish raw then
                             [||]
                         else
-                            unbox<obj array> raw
-                            |> Array.map intOf
+                            unbox<obj array> raw |> Array.map intOf
 
                     Map.add completionId (Set.ofArray laneIndices) state)
                 Map.empty
@@ -170,11 +170,15 @@ module FissionSurface =
         { LaneCount = intOf (value?laneCount)
           Delivered = delivered }
 
-    let deliveryEmpty (laneCount: int) : obj = FissionDelivery.empty laneCount |> deliveryToJs
+    let deliveryEmpty (laneCount: int) : obj =
+        FissionDelivery.empty laneCount |> deliveryToJs
 
     let deliveryMark (completionId: string) (laneIndex: int) (delivery: obj) : obj =
         match FissionDelivery.mark completionId laneIndex (deliveryOfJs delivery) with
-        | Ok next -> box {| ok = true; delivery = deliveryToJs next |}
+        | Ok next ->
+            box
+                {| ok = true
+                   delivery = deliveryToJs next |}
         | Error(FissionDeliveryError.InvalidLane index) ->
             box
                 {| ok = false
@@ -182,7 +186,8 @@ module FissionSurface =
                    laneIndex = index |}
 
     let deliveryPendingTargets (completionId: string) (delivery: obj) : int array =
-        FissionDelivery.pendingTargets completionId (deliveryOfJs delivery) |> List.toArray
+        FissionDelivery.pendingTargets completionId (deliveryOfJs delivery)
+        |> List.toArray
 
     let private bundleToJs (bundle: FissionWorkBundle) : obj =
         let entries =
@@ -213,11 +218,7 @@ module FissionSurface =
                 | Error(FissionBundleError.ConflictingLaneRecord(index, existing, proposed)) ->
                     invalidArg
                         "value"
-                        (sprintf
-                            "conflicting lane record %d: existing %s, proposed %s"
-                            index
-                            existing
-                            proposed))
+                        (sprintf "conflicting lane record %d: existing %s, proposed %s" index existing proposed))
             FissionWorkBundle.empty
 
     let workBundleEmpty: obj = FissionWorkBundle.empty |> bundleToJs
@@ -234,12 +235,18 @@ module FissionSurface =
 
     let workBundleAdd (laneIndex: int) (workRecordRef: string) (bundle: obj) : obj =
         match FissionWorkBundle.add laneIndex workRecordRef (bundleOfJs bundle) with
-        | Ok next -> box {| ok = true; bundle = bundleToJs next |}
+        | Ok next ->
+            box
+                {| ok = true
+                   bundle = bundleToJs next |}
         | Error error -> bundleErrorToJs error
 
     let workBundleMerge (left: obj) (right: obj) : obj =
         match FissionWorkBundle.merge (bundleOfJs left) (bundleOfJs right) with
-        | Ok next -> box {| ok = true; bundle = bundleToJs next |}
+        | Ok next ->
+            box
+                {| ok = true
+                   bundle = bundleToJs next |}
         | Error error -> bundleErrorToJs error
 
     let workBundleKeys (bundle: obj) : int array =
@@ -250,17 +257,8 @@ module FissionSurface =
         |> List.map (fun (index, workRef) -> box [| box index; box workRef |])
         |> List.toArray
 
-    let convergenceReady
-        (laneCount: int)
-        (completionIds: string array)
-        (bundle: obj)
-        (delivery: obj)
-        : bool =
-        FissionConvergence.ready
-            laneCount
-            (Array.toList completionIds)
-            (bundleOfJs bundle)
-            (deliveryOfJs delivery)
+    let convergenceReady (laneCount: int) (completionIds: string array) (bundle: obj) (delivery: obj) : bool =
+        FissionConvergence.ready laneCount (Array.toList completionIds) (bundleOfJs bundle) (deliveryOfJs delivery)
 
     /// A lane observation carries only semantic lane work. Physical session
     /// identity remains a Host-owned capability and never crosses this surface.

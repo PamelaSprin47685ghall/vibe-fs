@@ -62,7 +62,8 @@ module HostCompactionObserver =
         | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
 
     let private applyStartupVerdict (scope: PluginRuntimeScope) verdict =
-        if scope.TryClaimStartupProbe() then raiseOnStartupFailure verdict
+        if scope.TryClaimStartupProbe() then
+            raiseOnStartupFailure verdict
 
     let private runStartupProbe
         (scope: PluginRuntimeScope)
@@ -78,7 +79,8 @@ module HostCompactionObserver =
         (sessionId: SessionId)
         (messages: SessionMessage list)
         : unit =
-        if scope.IsStartupProbeOpen then runStartupProbe scope sessionId messages
+        if scope.IsStartupProbeOpen then
+            runStartupProbe scope sessionId messages
 
     let private observedCompactions messages =
         messages
@@ -95,7 +97,11 @@ module HostCompactionObserver =
 
     let private observeDurable journal sessionId messages : Task =
         let observed = observedCompactions messages
-        if List.isEmpty observed then task { return () } else reanchorObserved journal sessionId observed
+
+        if List.isEmpty observed then
+            task { return () }
+        else
+            reanchorObserved journal sessionId observed
 
     let observe
         (scope: PluginRuntimeScope)

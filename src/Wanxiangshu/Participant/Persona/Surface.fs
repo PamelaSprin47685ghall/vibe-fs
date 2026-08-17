@@ -52,6 +52,7 @@ module PersonaSurface =
             ManagedAgentCatalog.bookkeeperPeerName name |> Option.defaultValue ""
         else
             let separator = name.IndexOf('-')
+
             if separator <= 0 || separator = name.Length - 1 then
                 ""
             else
@@ -64,15 +65,19 @@ module PersonaSurface =
             true
         else
             let separator = name.IndexOf('-')
+
             separator > 0
             && separator < name.Length - 1
             && nameOf (name.Substring(0, separator)) (name.Substring(separator + 1)) <> ""
 
     let isLegacyName (name: string) : bool =
-        not (isNull name) && ManagedAgentCatalog.isLegacyAgentName(name.ToLowerInvariant())
+        not (isNull name)
+        && ManagedAgentCatalog.isLegacyAgentName (name.ToLowerInvariant())
 
     let roleName (roleLabel: string) : string =
-        roleOf roleLabel |> Option.map ManagedAgentCatalog.roleLabel |> Option.defaultValue ""
+        roleOf roleLabel
+        |> Option.map ManagedAgentCatalog.roleLabel
+        |> Option.defaultValue ""
 
     let persona (roleLabel: string) (tierLabel: string) : string =
         match tierOf tierLabel, roleOf roleLabel with

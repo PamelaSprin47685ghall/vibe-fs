@@ -25,7 +25,10 @@ module LoopDetectorSurface =
     let halfLife = LoopDetector.HalfLife
     let lambda = LoopDetector.Lambda
     let normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount
-    let theoreticalLoopWeightedDistinctCount = LoopDetector.TheoreticalLoopWeightedDistinctCount
+
+    let theoreticalLoopWeightedDistinctCount =
+        LoopDetector.TheoreticalLoopWeightedDistinctCount
+
     let loopWeightedDistinctThreshold = LoopDetector.LoopWeightedDistinctThreshold
 
     let constants () : obj =
@@ -57,7 +60,7 @@ module LoopDetectorSurface =
     let tryDecodeTextDelta (raw: obj) : obj =
         match Wanxiangshu.OpenCode.LoopEventCodec.tryDecodeTextDelta raw with
         | None -> null
-        | Some (delta: Wanxiangshu.OpenCode.LoopEventCodec.TextDelta) ->
+        | Some(delta: Wanxiangshu.OpenCode.LoopEventCodec.TextDelta) ->
             box
                 {| sessionId = SessionId.value delta.SessionId
                    messageId = delta.MessageId

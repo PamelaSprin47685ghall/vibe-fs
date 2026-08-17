@@ -145,10 +145,14 @@ module StaticTools =
         |> List.map (fun name -> name, Set.contains name allowedNames)
         |> Map.ofList
 
-    let private defaultPermission allowed name = if Set.contains name allowed then "allow" else "deny"
+    let private defaultPermission allowed name =
+        if Set.contains name allowed then "allow" else "deny"
 
     let private jsPermission role name =
-        if name = jsToolName role && hasFsCapability role then "allow" else "deny"
+        if name = jsToolName role && hasFsCapability role then
+            "allow"
+        else
+            "deny"
 
     let private permissionFor allowed role name =
         match name, role with

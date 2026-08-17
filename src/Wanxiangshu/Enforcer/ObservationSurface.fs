@@ -78,11 +78,7 @@ module ObservationSurface =
                    coverableFrameCount = coverage.CoverableFrameCount |} |}
 
     let private blogStateOfJs (value: obj) : BlogProjectionState =
-        let frames =
-            arrayOf value?frames
-            |> Array.toList
-            |> List.map frameOfJs
-            |> List.rev
+        let frames = arrayOf value?frames |> Array.toList |> List.map frameOfJs |> List.rev
 
         let coverage = value?coverage
 
@@ -128,6 +124,7 @@ module ObservationSurface =
             |> Array.toList
             |> List.map (fun item ->
                 let run = ProviderRunIdentity.create (text item?run)
+
                 run,
                 { MainSessionId = SessionId.create (text item?mainSessionId)
                   BloggerSessionId = SessionId.create (text item?bloggerSessionId)
@@ -152,7 +149,8 @@ module ObservationSurface =
                   FieldName = text item?fieldName
                   CycleId = text item?cycleId })
 
-        { ByProviderRun = records; RecentTips = tips }
+        { ByProviderRun = records
+          RecentTips = tips }
 
     let private resultToJs (ok: 'a -> obj) (error: 'e -> obj) (result: Result<'a, 'e>) : obj =
         match result with
@@ -210,16 +208,19 @@ module ObservationSurface =
             |> Array.toList
             |> List.map (fun item -> text item?tipName, text item?cycleId)
 
-        let unitValues = units |> Array.toList |> List.map (fun item ->
-            { TipName = optionalText item?tipName
-              FrameDigest = optionalText item?frameDigest
-              FrameBody = optionalText item?frameBody })
+        let unitValues =
+            units
+            |> Array.toList
+            |> List.map (fun item ->
+                { TipName = optionalText item?tipName
+                  FrameDigest = optionalText item?frameDigest
+                  FrameBody = optionalText item?frameBody })
 
         RulebookObservation.workLogFromUnits tipValues unitValues
         |> List.map workLogToJs
         |> List.toArray
 
-    let emptyEnforcement : obj = stateToJs EnforcementProjection.empty
+    let emptyEnforcement: obj = stateToJs EnforcementProjection.empty
 
     let applyEnforcementCycle (state: obj) (cycle: obj) : obj =
         EnforcementProjection.applyFromEntry (stateOfJs state) (cycleRecordOfJs cycle)
@@ -229,17 +230,21 @@ module ObservationSurface =
         EnforcementProjection.applySquash count (stateOfJs state) |> stateToJs
 
     let recentTips (state: obj) : obj array =
-        stateOfJs state |> EnforcementProjection.recentTips |> List.map tipToJs |> List.toArray
+        stateOfJs state
+        |> EnforcementProjection.recentTips
+        |> List.map tipToJs
+        |> List.toArray
 
-    let enforcementRecordCount (state: obj) : int = stateOfJs state |> fun value -> value.ByProviderRun.Count
+    let enforcementRecordCount (state: obj) : int =
+        stateOfJs state |> fun value -> value.ByProviderRun.Count
 
-    let emptyBlog : obj = blogStateToJs BlogProjection.empty
+    let emptyBlog: obj = blogStateToJs BlogProjection.empty
 
-    let blogFrame (value: obj) : obj =
-        value |> frameOfJs |> frameToJs
+    let blogFrame (value: obj) : obj = value |> frameOfJs |> frameToJs
 
     let applyBlogEntry (request: obj) (frame: obj) (state: obj) : obj =
         let input = blogStateOfJs state
+
         BlogProjection.applyEntry
             (FrameEpochId.create (int64 (text request?frameEpoch)))
             (int64 (text request?previousIngestedThroughSequence))
@@ -260,15 +265,20 @@ module ObservationSurface =
             (blogStateOfJs state)
         |> resultToJs blogStateToJs errorText
 
-    let frameCount (state: obj) : int = blogStateOfJs state |> BlogProjection.frameCount
+    let frameCount (state: obj) : int =
+        blogStateOfJs state |> BlogProjection.frameCount
 
     let frameKinds (state: obj) : string array =
         BlogProjection.frames (blogStateOfJs state)
-        |> List.map (fun frame -> match frame.Kind with | BlogFrameKind.Entry -> "Entry" | BlogFrameKind.Squash -> "Squash")
+        |> List.map (fun frame ->
+            match frame.Kind with
+            | BlogFrameKind.Entry -> "Entry"
+            | BlogFrameKind.Squash -> "Squash")
         |> List.toArray
 
     let coverage (state: obj) : obj =
         let value = (blogStateOfJs state).Coverage
+
         box
             {| ingestedThroughSequence = int value.IngestedThroughSequence
                coverableTurnCutoffExclusive = value.CoverableTurnCutoffExclusive
@@ -276,7 +286,12 @@ module ObservationSurface =
                coverableFrameCount = value.CoverableFrameCount |}
 
     let observationsOf (enforcement: obj) (blog: obj) : obj array =
-        let enforcementState = if isNullish enforcement then None else Some(stateOfJs enforcement)
+        let enforcementState =
+            if isNullish enforcement then
+                None
+            else
+                Some(stateOfJs enforcement)
+
         let blogState = if isNullish blog then None else Some(blogStateOfJs blog)
 
         ObservationProjection.observationsOf enforcementState blogState

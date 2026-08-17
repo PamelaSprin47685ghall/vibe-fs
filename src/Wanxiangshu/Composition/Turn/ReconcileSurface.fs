@@ -56,6 +56,7 @@ module ReconcileSurface =
 
     let private decisionToJs (decision: ReconcileProgram.ReconcileDecision) (rereadsRemaining: int) : obj =
         let name = ReconcileProgram.decisionName decision
+
         let rereads =
             match decision with
             | ReconcileProgram.ReconcileDecision.Reread(_, remaining) -> remaining
@@ -75,9 +76,14 @@ module ReconcileSurface =
             (ReconcileProgram.outcomeOf (stringOf (property value "outcome")))
 
     let private turnObject (session: string) (physical: string) (providerRun: string) (outcome: string) : obj =
-        box {| session = session; physical = physical; providerRun = providerRun; outcome = outcome |}
+        box
+            {| session = session
+               physical = physical
+               providerRun = providerRun
+               outcome = outcome |}
 
-    let empty () : obj = PublishMapsHandle(ReconcileProgram.publishMapsEmpty()) :> obj
+    let empty () : obj =
+        PublishMapsHandle(ReconcileProgram.publishMapsEmpty ()) :> obj
 
     let turnFixture (value: obj) : obj =
         turnObject
@@ -112,12 +118,12 @@ module ReconcileSurface =
     let isPublishableOutcome (outcomeName: string) : bool =
         outcomeName <> "TurnUnknown" && outcomeName <> "AbortWake"
 
-    let isSnapshotObservation (observationName: string) : bool =
-        observationName = "TurnUnknown"
+    let isSnapshotObservation (observationName: string) : bool = observationName = "TurnUnknown"
 
     let tryOutcome (outcomeName: string) : obj =
         try
             let outcome = ReconcileProgram.outcomeOf outcomeName
+
             let canonicalName =
                 match outcomeName with
                 | "TurnInProgress"
@@ -126,11 +132,18 @@ module ReconcileSurface =
                 | "TurnAborted"
                 | "TurnFailed" -> outcomeName
                 | _ ->
-                    if ReconcileProgram.isTerminalOutcome outcome then "TurnFailed" else "TurnInProgress"
+                    if ReconcileProgram.isTerminalOutcome outcome then
+                        "TurnFailed"
+                    else
+                        "TurnInProgress"
 
-            box {| accepted = true; name = canonicalName |}
+            box
+                {| accepted = true
+                   name = canonicalName |}
         with error ->
-            box {| accepted = false; error = error.Message |}
+            box
+                {| accepted = false
+                   error = error.Message |}
 
     // ── wake and evidence observations ───────────────────────────────────────
 
@@ -142,26 +155,38 @@ module ReconcileSurface =
                attemptSerial = attemptSerial |}
 
     let retryWake () : obj =
-        box {| kind = "RetryWake"; hasQuiescence = false |}
+        box
+            {| kind = "RetryWake"
+               hasQuiescence = false |}
 
     let failureWake () : obj =
-        box {| kind = "FailureWake"; hasQuiescence = false |}
+        box
+            {| kind = "FailureWake"
+               hasQuiescence = false |}
 
     let abortWake () : obj =
-        box {| kind = "AbortWake"; hasQuiescence = false |}
+        box
+            {| kind = "AbortWake"
+               hasQuiescence = false |}
 
     let evidenceSnapshotError (reason: string) : obj =
-        box {| kind = "SnapshotError"; reason = reason |}
+        box
+            {| kind = "SnapshotError"
+               reason = reason |}
 
     let evidenceNoTurn () : obj = box {| kind = "NoTurn" |}
 
     let evidenceProvisional (outcomeName: string) : obj =
-        box {| kind = "Provisional"; outcome = outcomeName |}
+        box
+            {| kind = "Provisional"
+               outcome = outcomeName |}
 
     let evidenceUnknown () : obj = box {| kind = "Unknown" |}
 
     let evidenceTerminal (outcomeName: string) : obj =
-        box {| kind = "Terminal"; outcome = outcomeName |}
+        box
+            {| kind = "Terminal"
+               outcome = outcomeName |}
 
     let evidenceSessionCleared () : obj = box {| kind = "SessionCleared" |}
 
@@ -178,14 +203,16 @@ module ReconcileSurface =
         ReconcileProgram.consumeKey (turnOf turn)
 
     let provisionalHas (maps: obj) (turn: obj) : bool =
-        (mapsOf maps).provisionalHas(turnOf turn)
+        (mapsOf maps).provisionalHas (turnOf turn)
 
-    let consumedHas (maps: obj) (turn: obj) : bool =
-        (mapsOf maps).consumedHas(turnOf turn)
+    let consumedHas (maps: obj) (turn: obj) : bool = (mapsOf maps).consumedHas (turnOf turn)
 
     let publishDecision (maps: obj) (turn: obj) : obj =
         let result = ReconcileProgram.publishDecision (mapsOf maps) (turnOf turn)
-        box {| shouldPublish = result.shouldPublish; maps = PublishMapsHandle(result.maps) :> obj |}
+
+        box
+            {| shouldPublish = result.shouldPublish
+               maps = PublishMapsHandle(result.maps) :> obj |}
 
     let clearProvisional (maps: obj) (session: string) : obj =
         PublishMapsHandle(ReconcileProgram.clearProvisional (mapsOf maps) session) :> obj

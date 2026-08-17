@@ -226,8 +226,7 @@ module PromptDispatcherSend =
 
                     Diagnostic.fatal
                         "detached-prompt-dispatch-failed"
-                        [ "session_id", SessionId.value sessionId
-                          "result", error ]
+                        [ "session_id", SessionId.value sessionId; "result", error ]
                 }
 
             task {

@@ -27,12 +27,6 @@ module JoinResultRendererSurface =
               Directory = None }
 
         let batch =
-            NonEmptyBatch.ofHeadTail
-                (JoinItem.AgentItem(AgentJoinItem.AgentCompletedItem payload))
-                []
+            NonEmptyBatch.ofHeadTail (JoinItem.AgentItem(AgentJoinItem.AgentCompletedItem payload)) []
 
-        JoinResultRenderer.renderJoinItemBatch
-            providerLanguage
-            (fun _ -> agentName)
-            batch
-            (fun _ -> agentName)
+        JoinResultRenderer.renderJoinItemBatch providerLanguage (fun _ -> agentName) batch (fun _ -> agentName)

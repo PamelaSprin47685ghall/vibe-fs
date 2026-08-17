@@ -83,12 +83,18 @@ module EnforcerRepair =
 
     let private isBlogToolPart (part: obj) : bool =
         let kind =
-            if isNull part || isNull part?``type`` then "" else unbox<string> part?``type``
+            if isNull part || isNull part?``type`` then
+                ""
+            else
+                unbox<string> part?``type``
 
         let name =
-            if not (isNull part) && not (isNull part?tool) then unbox<string> part?tool
-            elif not (isNull part) && not (isNull part?name) then unbox<string> part?name
-            else ""
+            if not (isNull part) && not (isNull part?tool) then
+                unbox<string> part?tool
+            elif not (isNull part) && not (isNull part?name) then
+                unbox<string> part?name
+            else
+                ""
 
         kind = "tool" && name = "chronicle"
 

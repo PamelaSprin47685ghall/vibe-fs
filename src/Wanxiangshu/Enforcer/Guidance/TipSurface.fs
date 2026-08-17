@@ -42,7 +42,10 @@ module TipSurface =
     let private appendResult (result: Result<ProjectionSet, JournalAppendFailure>) : obj =
         match result with
         | Ok _ -> box {| ok = true |}
-        | Error failure -> box {| ok = false; error = JournalAppendFailure.describe failure |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error = JournalAppendFailure.describe failure |}
 
     let private appendAgent
         (journal: obj)
@@ -52,7 +55,10 @@ module TipSurface =
         : Task<obj> =
         task {
             if isNullish journal then
-                return box {| ok = false; error = "journal required" |}
+                return
+                    box
+                        {| ok = false
+                           error = "journal required" |}
             else
                 let! result =
                     AgentJournal.appendAgent
@@ -67,25 +73,26 @@ module TipSurface =
     /// Boot a real EventStore journal behind an opaque capability.
     let createJournal (directory: string) : Task<obj> =
         task {
-            let! result =
-                JournalSurface.boot
-                    directory
-                    "tip-guidance-surface"
-                    0
-                    (DateTimeOffset.UtcNow.ToString("O"))
+            let! result = JournalSurface.boot directory "tip-guidance-surface" 0 (DateTimeOffset.UtcNow.ToString("O"))
 
             if isNullish result?ok || not (unbox<bool> result?ok) then
                 return result
             else
                 let handle = unbox<JournalHandle> result?journal
-                return box {| ok = true; journal = (JournalHandleBox handle :> obj) |}
+
+                return
+                    box
+                        {| ok = true
+                           journal = (JournalHandleBox handle :> obj) |}
         }
 
-    let disposeJournal (journal: obj) : unit = JournalSurface.dispose (journalHandleOf journal)
+    let disposeJournal (journal: obj) : unit =
+        JournalSurface.dispose (journalHandleOf journal)
 
     /// Link a Main session to its Blogger companion.
     let appendCompanionLink (journal: obj) (value: obj) : Task<obj> =
         let session = text value?session
+
         let fact =
             CompanionFact.CompanionBloggerLinked
                 {| SessionId = SessionId.create session
@@ -100,7 +107,10 @@ module TipSurface =
     let appendObservation (journal: obj) (value: obj) : Task<obj> =
         let session = text value?session
         let providerRun = ProviderRunIdentity.create (text value?providerRun)
-        let toolCallIds = stringArray value?toolCallIds |> Array.map ToolCallId.create |> Array.toList
+
+        let toolCallIds =
+            stringArray value?toolCallIds |> Array.map ToolCallId.create |> Array.toList
+
         let evidenceRef = optionalText value?evidenceRef |> Option.map BlobRef.create
 
         let fact =
@@ -129,6 +139,7 @@ module TipSurface =
     let appendContextReanchored (journal: obj) (value: obj) : Task<obj> =
         let session = text value?session
         let providerRun = ProviderRunIdentity.create (text value?observedCompactionRun)
+
         let fact =
             ContextFact.ContextReanchored
                 {| SessionId = SessionId.create session
@@ -142,9 +153,9 @@ module TipSurface =
         box
             {| tipName = guidance.TipName
                presentation =
-                   match guidance.Presentation with
-                   | Wanxiangshu.OpenCode.Host.TipPresentation.Full -> "Full"
-                   | Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly -> "IdentityOnly"
+                match guidance.Presentation with
+                | Wanxiangshu.OpenCode.Host.TipPresentation.Full -> "Full"
+                | Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly -> "IdentityOnly"
                text = guidance.Text |}
 
     /// Resolve one Main/Blogger session to the localized Full or Identity
@@ -152,6 +163,7 @@ module TipSurface =
     let resolve (journal: obj) (session: string) : Task<obj> =
         task {
             let! guidance = EnforcerTipGuidance.resolveTipGuidance (agentJournalOf journal) (SessionId.create session)
+
             match guidance with
             | Some value -> return box (guidanceToJs value)
             | None -> return null
@@ -160,6 +172,7 @@ module TipSurface =
     let latest (journal: obj) (session: string) : Task<obj> =
         task {
             let! value = EnforcerTipGuidance.latestTipGuidance (agentJournalOf journal) (SessionId.create session)
+
             match value with
             | Some text -> return box text
             | None -> return null
@@ -168,6 +181,7 @@ module TipSurface =
     let latestNudge (journal: obj) (session: string) : Task<obj> =
         task {
             let! value = EnforcerTipGuidance.latestTipNudge (agentJournalOf journal) (SessionId.create session)
+
             match value with
             | Some text -> return box text
             | None -> return null

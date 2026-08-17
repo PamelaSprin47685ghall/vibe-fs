@@ -260,6 +260,7 @@ module SessionRecovery =
                         w.ChildSession,
                         sprintf "handle %s waiting: %s" (AgentHandleId.value w.Handle) w.Reason
                     ))
+
             waitingRecovery sessionId reasons
         | HandleFamilyRecovery.HandlesBlocked blocks ->
             let reasons =
@@ -269,6 +270,7 @@ module SessionRecovery =
                         b.ChildSession,
                         sprintf "handle %s blocked: %s" (AgentHandleId.value b.Handle) b.Reason
                     ))
+
             blockedRecovery sessionId reasons
 
     /// Map job-family query into SessionRecovery.
@@ -319,7 +321,9 @@ module SessionRecovery =
         |> Option.orElse firstWaiting
         |> Option.orElse firstRecovered
         |> Option.orElse (Seq.tryHead outcomes)
-        |> Option.defaultValue (SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] []))
+        |> Option.defaultValue (
+            SessionRecovery.NoRecoveryRequired(RecoveryReceipt.create (SessionId.create "") 0L None [] [])
+        )
 
     let private sessionOfNode =
         function

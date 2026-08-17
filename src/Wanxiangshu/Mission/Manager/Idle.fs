@@ -129,7 +129,8 @@ module ManagerIdle =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (life: LifeProjection)
-        (kindKey: string) =
+        (kindKey: string)
+        =
         match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
         | Some durable, Some profile ->
             PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey turn.ProviderRun
@@ -144,7 +145,8 @@ module ManagerIdle =
         (journal: AgentJournal option)
         (life: LifeProjection)
         (kindKey: string)
-        (kind: IdleEncouragementKind) =
+        (kind: IdleEncouragementKind)
+        =
         task {
             match!
                 HostSessionNudge.trySendIdleManagerEncouragement
@@ -176,7 +178,8 @@ module ManagerIdle =
         (permit: QuiescencePermit)
         (kind: IdleEncouragementKind)
         (kindKey: string)
-        (processKey: string) =
+        (processKey: string)
+        =
         if idleClaimed journal turn life kindKey then
             AsyncSupport.completedTask ()
         else
@@ -201,16 +204,5 @@ module ManagerIdle =
 
         match context.Quiescence with
         | Some permit when not (nudgeSent.Contains processKey) ->
-            processQuiescent
-                sessionPort
-                eventPort
-                journal
-                nudgeSent
-                quiescence
-                turn
-                life
-                permit
-                kind
-                kindKey
-                processKey
+            processQuiescent sessionPort eventPort journal nudgeSent quiescence turn life permit kind kindKey processKey
         | _ -> AsyncSupport.completedTask ()

@@ -63,7 +63,7 @@ module LoopSensorSurface =
 
         fun sessionId ->
             task {
-                let! result = unbox<Task<obj>>(asPromise (apply1 value (box (SessionId.value sessionId))))
+                let! result = unbox<Task<obj>> (asPromise (apply1 value (box (SessionId.value sessionId))))
 
                 if isNullish result then
                     return Ok()
@@ -105,8 +105,8 @@ module LoopSensorSurface =
         box
             {| ``type`` = "message.part.delta"
                properties =
-                   {| sessionID = session
-                      messageID = "msg_a"
-                      partID = "prt_1"
-                      field = "text"
-                      delta = text |} |}
+                {| sessionID = session
+                   messageID = "msg_a"
+                   partID = "prt_1"
+                   field = "text"
+                   delta = text |} |}

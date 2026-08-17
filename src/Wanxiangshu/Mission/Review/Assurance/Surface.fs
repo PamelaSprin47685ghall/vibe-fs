@@ -38,7 +38,10 @@ module ReviewAssuranceSurface =
         if isNull value then "" else string value
 
     let private field (value: obj) (name: string) : obj =
-        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private firstField (value: obj) (names: string array) : obj =
         names
@@ -54,7 +57,9 @@ module ReviewAssuranceSurface =
     let private optionText (value: obj) =
         if isNull value then None else Some(text value)
 
-    let private physicalOf value = PhysicalUserMessageId.create (text value)
+    let private physicalOf value =
+        PhysicalUserMessageId.create (text value)
+
     let private sessionOf value = SessionId.create (text value)
     let private runOf value = ProviderRunIdentity.create (text value)
     let private callOf value = ToolCallId.create (text value)
@@ -78,7 +83,10 @@ module ReviewAssuranceSurface =
         match witness with
         | ReviewWitness.NoReview -> box {| state = "NoReview" |}
         | ReviewWitness.RevisionWitness revision ->
-            box {| state = "RevisionWitness"; report = revision.Report; tree = GitTreeHash.value revision.GitTreeHash |}
+            box
+                {| state = "RevisionWitness"
+                   report = revision.Report
+                   tree = GitTreeHash.value revision.GitTreeHash |}
         | ReviewWitness.Confirmed confirmed ->
             box
                 {| state = "Confirmed"
@@ -104,8 +112,10 @@ module ReviewAssuranceSurface =
                        First = witnessOf (field value "first")
                        Second = witnessOf (field value "second")
                        GitTreeHash = treeOf (field value "tree")
-                       FirstPhysicalUserMessageId = physicalOf (firstField value [| "FirstPhysicalUserMessageId"; "firstPhysical" |])
-                       SecondPhysicalUserMessageId = physicalOf (firstField value [| "SecondPhysicalUserMessageId"; "secondPhysical" |]) |}
+                       FirstPhysicalUserMessageId =
+                        physicalOf (firstField value [| "FirstPhysicalUserMessageId"; "firstPhysical" |])
+                       SecondPhysicalUserMessageId =
+                        physicalOf (firstField value [| "SecondPhysicalUserMessageId"; "secondPhysical" |]) |}
             | _ -> ReviewWitness.NoReview
 
     let private attemptView (attempt: ReviewAttemptIdentity) : obj =
@@ -129,8 +139,12 @@ module ReviewAssuranceSurface =
         | _ -> invalidArg "value" "ReviewAssuranceSurface: expected a review guard handle"
 
     let private guardProjectionView (guard: ReviewGuardProjection) : obj =
-        let barrier = guard.CurrentBarrierId |> Option.map ReviewBarrierId.value |> Option.toObj
-        let manager = guard.CurrentManagerSessionId |> Option.map SessionId.value |> Option.toObj
+        let barrier =
+            guard.CurrentBarrierId |> Option.map ReviewBarrierId.value |> Option.toObj
+
+        let manager =
+            guard.CurrentManagerSessionId |> Option.map SessionId.value |> Option.toObj
+
         let tree = guard.LastGitTreeHash |> Option.map GitTreeHash.value |> Option.toObj
 
         box
@@ -155,7 +169,10 @@ module ReviewAssuranceSurface =
         | other -> invalidArg "value" $"unknown review verdict '{other}'"
 
     let challengePath = ReviewChallenge.Path
-    let challengeText (language: string) = ProviderResources.readText (ProviderLanguage.parse language) challengePath
+
+    let challengeText (language: string) =
+        ProviderResources.readText (ProviderLanguage.parse language) challengePath
+
     let challengePrompt (text: string) = ReviewChallenge.promptOf text
 
     let challengeObject (language: string) : obj =
@@ -172,9 +189,11 @@ module ReviewAssuranceSurface =
     let verdictWitness (value: obj) : obj = witnessOf value |> witnessView
 
     let attemptIdentity (barrier: string) (witness: obj) : obj =
-        ReviewWitness.attemptIdentity (barrierOf (box barrier)) (witnessOf witness) |> attemptView
+        ReviewWitness.attemptIdentity (barrierOf (box barrier)) (witnessOf witness)
+        |> attemptView
 
-    let dedupeKey (attempt: obj) = ReviewAttemptIdentity.dedupeKey (attemptOf attempt)
+    let dedupeKey (attempt: obj) =
+        ReviewAttemptIdentity.dedupeKey (attemptOf attempt)
 
     let isDistinctAttempt (barrier: string) (first: obj) (second: obj) =
         ReviewWitness.isDistinctAttempt (barrierOf (box barrier)) (witnessOf first) (witnessOf second)
@@ -204,20 +223,29 @@ module ReviewAssuranceSurface =
             (value :?> GuardHandle).Current.Witness
         else
             let inner = field value "Witness"
+
             if not (isNull inner) then
-                if inner :? GuardHandle then (inner :?> GuardHandle).Current.Witness
-                else reviewWitnessOf inner
+                if inner :? GuardHandle then
+                    (inner :?> GuardHandle).Current.Witness
+                else
+                    reviewWitnessOf inner
             else
                 reviewWitnessOf value
 
-    let isConfirmed (witness: obj) = extractWitness witness |> ReviewWitness.isConfirmed
-    let isRevision (witness: obj) = extractWitness witness |> ReviewWitness.isRevision
+    let isConfirmed (witness: obj) =
+        extractWitness witness |> ReviewWitness.isConfirmed
+
+    let isRevision (witness: obj) =
+        extractWitness witness |> ReviewWitness.isRevision
 
     let private witnessPublicView (witness: ReviewWitness) : obj =
         match witness with
         | ReviewWitness.NoReview -> box {| state = "NoReview" |}
         | ReviewWitness.RevisionWitness revision ->
-            box {| state = "RevisionWitness"; report = revision.Report; tree = GitTreeHash.value revision.GitTreeHash |}
+            box
+                {| state = "RevisionWitness"
+                   report = revision.Report
+                   tree = GitTreeHash.value revision.GitTreeHash |}
         | ReviewWitness.Confirmed confirmed ->
             box
                 {| state = "Confirmed"
@@ -253,7 +281,7 @@ module ReviewAssuranceSurface =
                    SecondPhysicalUserMessageId = PhysicalUserMessageId.value confirmed.SecondPhysicalUserMessageId |}
         | _ -> null
 
-    let noReview : obj = box {| state = "NoReview" |}
+    let noReview: obj = box {| state = "NoReview" |}
 
     let gitTreeHash (witness: obj) =
         extractWitness witness
@@ -270,7 +298,8 @@ module ReviewAssuranceSurface =
     let isValidForTree (tree: string) (witness: obj) =
         ReviewWitness.isValidForTree (treeOf (box tree)) (extractWitness witness)
 
-    let emptyGuard () : obj = GuardHandle.Create ReviewProjection.empty :> obj
+    let emptyGuard () : obj =
+        GuardHandle.Create ReviewProjection.empty :> obj
 
     let startBarrier (manager: string) (barrier: string) (tree: string) (current: obj) : obj =
         let next =
@@ -284,8 +313,14 @@ module ReviewAssuranceSurface =
 
     let applyVerdict (attempt: obj) (verdict: string) (current: obj) : obj =
         match ReviewProjection.applyVerdict (attemptOf attempt) (verdictOf (box verdict)) (guardOf current) with
-        | Ok next -> box {| ok = true; value = GuardHandle.Create next :> obj |}
-        | Error rejection -> box {| ok = false; error = rejectionName rejection |}
+        | Ok next ->
+            box
+                {| ok = true
+                   value = GuardHandle.Create next :> obj |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionName rejection |}
 
     let applyConfirmedWitness
         (barrier: string)
@@ -304,12 +339,19 @@ module ReviewAssuranceSurface =
                 (witnessOf second)
                 (guardOf current)
         with
-        | Ok next -> box {| ok = true; value = GuardHandle.Create next :> obj |}
-        | Error rejection -> box {| ok = false; error = rejectionName rejection |}
+        | Ok next ->
+            box
+                {| ok = true
+                   value = GuardHandle.Create next :> obj |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionName rejection |}
 
     let guardView (current: obj) = guardProjectionView (guardOf current)
 
-    let guardWitness (current: obj) = guardOf current |> fun guard -> witnessPublicView guard.Witness
+    let guardWitness (current: obj) =
+        guardOf current |> fun guard -> witnessPublicView guard.Witness
 
     let hasObservedAttempt (attempt: obj) (current: obj) =
         ReviewProjection.hasObservedAttempt (attemptOf attempt) (guardOf current)
@@ -317,7 +359,8 @@ module ReviewAssuranceSurface =
     let satisfiesGuard (tree: string) (current: obj) =
         ReviewProjection.satisfiesGuard (treeOf (box tree)) (guardOf current)
 
-    let requirementsEmpty () : obj = RequirementsHandle.Create ReviewRequirementProjection.empty :> obj
+    let requirementsEmpty () : obj =
+        RequirementsHandle.Create ReviewRequirementProjection.empty :> obj
 
     let requirementsOf (value: obj) =
         match value with
@@ -348,7 +391,10 @@ module ReviewAssuranceSurface =
                         {| sourceSessionId = SessionId.value input.SourceSessionId
                            authorityRoot = AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId |})
                 |> List.toArray
-               lastConfirmedProviderRun = value.LastConfirmedProviderRun |> Option.map ProviderRunIdentity.value |> Option.toObj |}
+               lastConfirmedProviderRun =
+                value.LastConfirmedProviderRun
+                |> Option.map ProviderRunIdentity.value
+                |> Option.toObj |}
 
     /// Provider run binding result. The raw Host message is adapted once here;
     /// SessionMessage never crosses the owner boundary.
@@ -358,6 +404,7 @@ module ReviewAssuranceSurface =
             let mode = firstField value [| "mode"; "Mode" |] |> text
             let summary = boolField value "summary"
             let isCompaction = summary || mode = "compaction" || agent = Some "compaction"
+
             { Id = text (firstField value [| "id"; "Id" |])
               Role = text (firstField value [| "role"; "Role" |])
               Agent = agent
@@ -374,7 +421,19 @@ module ReviewAssuranceSurface =
         let typedMessages = messages |> Array.toList |> List.map messageOf
 
         match ProviderRunBinding.bindableRun physicalUser typedMessages with
-        | Ok message -> box {| ok = true; id = message.Id; parentId = message.ParentId |> Option.toObj; completed = message.Completed |}
-        | Error ProviderRunBinding.Rejection.NoBindableRun -> box {| ok = false; error = "NoBindableRun" |}
-        | Error(ProviderRunBinding.Rejection.AmbiguousRun count) -> box {| ok = false; error = "AmbiguousRun"; count = count |}
+        | Ok message ->
+            box
+                {| ok = true
+                   id = message.Id
+                   parentId = message.ParentId |> Option.toObj
+                   completed = message.Completed |}
+        | Error ProviderRunBinding.Rejection.NoBindableRun ->
+            box
+                {| ok = false
+                   error = "NoBindableRun" |}
+        | Error(ProviderRunBinding.Rejection.AmbiguousRun count) ->
+            box
+                {| ok = false
+                   error = "AmbiguousRun"
+                   count = count |}
         | Error ProviderRunBinding.Rejection.NotLatestRun -> box {| ok = false; error = "NotLatestRun" |}

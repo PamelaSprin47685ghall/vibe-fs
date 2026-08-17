@@ -210,8 +210,7 @@ module CausalFrontier =
                   FrontierProducer = Some producer
                   Cycle = []
                   Detail = "FRONTIER: waiting for external producer " + CausalProducer.key producer }
-            | WorkflowProducer next ->
-                resolveWorkflow byOwner continueWalk key wait next nextChain nextSeen
+            | WorkflowProducer next -> resolveWorkflow byOwner continueWalk key wait next nextChain nextSeen
 
         and resolveWorkflow byOwner continueWalk key wait next nextChain nextSeen =
             match Map.tryFind (ownerKey next) byOwner with
@@ -230,10 +229,7 @@ module CausalFrontier =
 
         go start [] Set.empty
 
-    let private startsForSnapshot
-        (active: DiagnosticWait list)
-        (roots: CausalOwnerRef list)
-        : CausalOwnerRef list =
+    let private startsForSnapshot (active: DiagnosticWait list) (roots: CausalOwnerRef list) : CausalOwnerRef list =
         if List.isEmpty roots then
             active |> List.map (fun wait -> wait.Owner) |> List.distinctBy ownerKey
         else

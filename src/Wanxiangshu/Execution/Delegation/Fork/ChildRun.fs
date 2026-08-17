@@ -159,7 +159,8 @@ module ChildRunProgram =
         (work: CancellationToken -> Task<AgentCompletionOutcome>)
         (ct: CancellationToken)
         (now: unit -> DateTimeOffset)
-        (identityResult: Result<bool, AgentError>) =
+        (identityResult: Result<bool, AgentError>)
+        =
         task {
             match identityResult with
             | Ok true ->
@@ -172,7 +173,8 @@ module ChildRunProgram =
         (run: ChildRun)
         (work: CancellationToken -> Task<AgentCompletionOutcome>)
         (ct: CancellationToken)
-        (now: unit -> DateTimeOffset) : Task<Result<RunCompletion, AgentError>> =
+        (now: unit -> DateTimeOffset)
+        : Task<Result<RunCompletion, AgentError>> =
         task {
             try
                 let! identityResult =

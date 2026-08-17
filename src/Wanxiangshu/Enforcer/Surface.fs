@@ -71,6 +71,7 @@ module EnforcerSurface =
 
     let private rawArgs (value: obj) : Map<string, obj> =
         let tipValue = if isNullish value?tip then value?tipField else value?tip
+
         [ "entry", value?entry
           "text", value?text
           "tip", tipValue
@@ -84,7 +85,8 @@ module EnforcerSurface =
 
     let ruleCount () : int = List.length (rulebook ())
 
-    let fieldNames () : string array = EnforcerCatalog.fieldNames (rulebook ()) |> List.toArray
+    let fieldNames () : string array =
+        EnforcerCatalog.fieldNames (rulebook ()) |> List.toArray
 
     /// Exact TipName/FieldName lookup. Missing and blank values are `null`.
     let tryFindByField (field: string) : obj =
@@ -103,18 +105,32 @@ module EnforcerSurface =
 
     /// Decode chronicle arguments against the packaged exact-tip catalog.
     let decodeCall (value: obj) : obj =
-        EnforcerCodec.decodeCall (rulebook ()) (rawArgs value)
-        |> resultToJs callToJs
+        EnforcerCodec.decodeCall (rulebook ()) (rawArgs value) |> resultToJs callToJs
 
     let missingTipError = EnforcerCodec.MissingTipError
 
     let unknownTipError (value: string) = EnforcerCodec.unknownTipError value
 
     let hasValidText (value: obj) : bool =
+        let rawTip = value?tip
+        let tip =
+            if isNullish rawTip then
+                rawTip
+            elif isNullish rawTip?fieldName then
+                rawTip
+            else
+                rawTip?fieldName
+
         let decoded =
             EnforcerCodec.decodeCall
                 (rulebook ())
-                (rawArgs (box {| entry = value?text; text = value?text; tip = value?tip; evidence = value?evidence |}))
+                (rawArgs (
+                    box
+                        {| entry = value?text
+                           text = value?text
+                           tip = tip
+                           evidence = value?evidence |}
+                ))
 
         match decoded with
         | Ok call -> EnforcerCodec.hasValidText call
@@ -160,20 +176,31 @@ module EnforcerSurface =
     /// UTF-8 byte limits enforced before a cycle can be committed.
     let validateBounds (textValue: string) (evidenceValue: string option) : obj =
         let textBytes = SyntheticToml.byteCount textValue
-        let evidenceBytes = evidenceValue |> Option.map SyntheticToml.byteCount |> Option.defaultValue 0
+
+        let evidenceBytes =
+            evidenceValue |> Option.map SyntheticToml.byteCount |> Option.defaultValue 0
 
         if textBytes > maxBlogTextBytes then
-            box {| ok = false; error = sprintf "MaxBlogTextBytes=%d" maxBlogTextBytes |}
+            box
+                {| ok = false
+                   error = sprintf "MaxBlogTextBytes=%d" maxBlogTextBytes |}
         elif evidenceBytes > maxEvidenceBytes then
-            box {| ok = false; error = sprintf "MaxEvidenceBytes=%d" maxEvidenceBytes |}
+            box
+                {| ok = false
+                   error = sprintf "MaxEvidenceBytes=%d" maxEvidenceBytes |}
         else
-            box {| ok = true; textBytes = textBytes; evidenceBytes = evidenceBytes |}
+            box
+                {| ok = true
+                   textBytes = textBytes
+                   evidenceBytes = evidenceBytes |}
 
     /// Provider-run identity is a required semantic identifier, not a fallback
     /// to tool-call or session ids.
     let validateProviderRun (messageId: string) : obj =
         if System.String.IsNullOrWhiteSpace messageId then
-            box {| ok = false; error = "no provable provider run" |}
+            box
+                {| ok = false
+                   error = "no provable provider run" |}
         else
             box {| ok = true; providerRun = messageId |}
 
@@ -181,7 +208,13 @@ module EnforcerSurface =
     /// the private F# list/DU representation.
     let classifyAssistantStep (value: obj) : obj =
         let messageId = text value?messageId
-        let parts = if isNullish value?parts then [||] else unbox<obj array> value?parts
+
+        let parts =
+            if isNullish value?parts then
+                [||]
+            else
+                unbox<obj array> value?parts
+
         let accepted =
             parts
             |> Array.filter (fun part ->
@@ -191,14 +224,21 @@ module EnforcerSurface =
                 && not (isNullish part?state?input?tip)
                 && not (isNullish part?state?input?text))
             |> Array.length
+
         let hasBlog =
             parts
-            |> Array.exists (fun part -> not (isNullish part) && (text part?tool = "chronicle" || text part?name = "chronicle"))
+            |> Array.exists (fun part ->
+                not (isNullish part)
+                && (text part?tool = "chronicle" || text part?name = "chronicle"))
 
         box
             {| acceptedCalls = accepted
                hasBlogToolPart = hasBlog
-               providerRun = if System.String.IsNullOrWhiteSpace messageId then null else box messageId
+               providerRun =
+                if System.String.IsNullOrWhiteSpace messageId then
+                    null
+                else
+                    box messageId
                protocol =
                 if accepted = 0 then "ProjectMessages"
                 elif accepted = 1 then "CommitCandidate"

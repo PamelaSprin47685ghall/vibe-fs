@@ -15,10 +15,11 @@ module ChatParamsSurface =
             if isNull model then null else model?modelID
 
     let apply (input: obj) (output: obj) : obj =
-        let hook = ChatParamsHook.create() |> unbox<obj -> obj -> unit>
+        let hook = ChatParamsHook.create () |> unbox<obj -> obj -> unit>
 
         try
             hook input output
+
             box
                 {| ok = true
                    error = ""

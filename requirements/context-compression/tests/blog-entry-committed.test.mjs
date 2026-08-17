@@ -7,6 +7,7 @@
 // behavior-diagnosis/tests/blog-entry-committed.test.mjs.
 
 import assert from 'node:assert/strict'
+import test from 'node:test'
 import * as blog from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
 
 const entryWithEnforcement = ({

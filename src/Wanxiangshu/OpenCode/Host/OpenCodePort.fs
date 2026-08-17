@@ -149,10 +149,17 @@ module OpenCodePort =
 
     let private tryNonBlankDirectory (input: obj) =
         let directory = unbox<string> input?directory
-        if String.IsNullOrWhiteSpace directory then None else Some directory
+
+        if String.IsNullOrWhiteSpace directory then
+            None
+        else
+            Some directory
 
     let private tryWorkDirectory (input: obj) =
-        if isNull input || isNull input?directory then None else tryNonBlankDirectory input
+        if isNull input || isNull input?directory then
+            None
+        else
+            tryNonBlankDirectory input
 
     let private readResponseTextSafe (response: obj) : Task<string> =
         task {

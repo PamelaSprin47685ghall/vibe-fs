@@ -41,21 +41,8 @@ for (const script of checks) {
   // --threshold freezes current Direct-CE debt baseline; must only ever decrease.
   // P0→P2-3c: 157→13. P2-2 Host boundary open allowlist: 13→0.
   if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=0')
-  // STRUCTURED-WORKFLOW-016: nested lexical decisions are frozen per file; new debt fails.
-  if (script.endsWith('fsharp-control-pyramid.mjs')) {
-    args.push(
-      `--baseline=${join(root, 'checks/fsharp-control-pyramid-baseline.json')}`,
-      '--root=src/Wanxiangshu',
-    )
-  }
-  // ARCH-016 Gate B: grandfathered Join/horizon migration debt — counts must only shrink.
-  if (script.endsWith('provider-leak-gate.mjs')) {
-    args.push(`--baseline=${join(root, 'checks/provider-leak-gate-baseline.json')}`)
-  }
-  // ARCH-016 Gate E: provider-visible prose ownership — counts must only shrink.
-  if (script.endsWith('provider-prose-ownership.mjs')) {
-    args.push(`--baseline=${join(root, 'checks/provider-prose-ownership-baseline.json')}`)
-  }
+  // STRUCTURED-WORKFLOW-016: nested lexical decisions are an absolute zero gate.
+  if (script.endsWith('fsharp-control-pyramid.mjs')) args.push('--root=src/Wanxiangshu')
   const result = spawnSync(process.execPath, args, { stdio: 'inherit' })
   if (result.status !== 0) process.exit(result.status ?? 1)
 }

@@ -17,7 +17,11 @@ module FileToolsSurface =
     let private execute (tool: Tool) (workspace: string) (payload: string) : Task<obj> =
         task {
             let! output = tool.Execute (context workspace) { Payload = payload }
-            return box {| result = output.Result; truncated = output.Truncated |}
+
+            return
+                box
+                    {| result = output.Result
+                       truncated = output.Truncated |}
         }
 
     let toolName (kind: string) : string =

@@ -25,8 +25,16 @@ module ProviderLanguageSurface =
 
     let private resultOf result =
         match result with
-        | Ok value -> box {| ok = true; value = languageName value; error = "" |}
-        | Error error -> box {| ok = false; value = ""; error = error |}
+        | Ok value ->
+            box
+                {| ok = true
+                   value = languageName value
+                   error = "" |}
+        | Error error ->
+            box
+                {| ok = false
+                   value = ""
+                   error = error |}
 
     let private mapOf (value: obj) : Map<string, string> =
         if isNull value then
@@ -39,7 +47,8 @@ module ProviderLanguageSurface =
             |> List.map (fun key -> key, string (emitJsExpr (value, key) "$0[$1]"))
             |> Map.ofList
 
-    let parse (raw: string) : string = ProviderLanguage.parse raw |> languageName
+    let parse (raw: string) : string =
+        ProviderLanguage.parse raw |> languageName
 
     let nameOf (raw: string) : string = languageOf raw |> languageName
 
@@ -50,13 +59,17 @@ module ProviderLanguageSurface =
 
     let label (raw: string) : string = ProviderLanguage.label (languageOf raw)
 
-    let resourceDirectory (raw: string) : string = ProviderLanguage.resourceDirectory (languageOf raw)
+    let resourceDirectory (raw: string) : string =
+        ProviderLanguage.resourceDirectory (languageOf raw)
 
-    let resourceFileName (raw: string) : string = ProviderLanguage.resourceFileName (languageOf raw)
+    let resourceFileName (raw: string) : string =
+        ProviderLanguage.resourceFileName (languageOf raw)
 
-    let inheritFrom (raw: string) : string = ProviderLanguage.inheritFrom (languageOf raw) |> languageName
+    let inheritFrom (raw: string) : string =
+        ProviderLanguage.inheritFrom (languageOf raw) |> languageName
 
-    let clearAllForTests () : unit = SessionProviderLanguage.clearAllForTests ()
+    let clearAllForTests () : unit =
+        SessionProviderLanguage.clearAllForTests ()
 
     let tryGet (sessionId: string) : obj =
         match SessionProviderLanguage.tryGet (SessionId.create sessionId) with
@@ -64,25 +77,32 @@ module ProviderLanguageSurface =
         | None -> null
 
     let bindOnce (sessionId: string) (language: string) : obj =
-        SessionProviderLanguage.bindOnce (SessionId.create sessionId) (languageOf language) |> resultOf
+        SessionProviderLanguage.bindOnce (SessionId.create sessionId) (languageOf language)
+        |> resultOf
 
     let inheritFromOwner (ownerLanguage: string) (childSessionId: string) : obj =
         SessionProviderLanguage.inheritFromOwner (languageOf ownerLanguage) (SessionId.create childSessionId)
         |> resultOf
 
-    let readGlobalPreference () : string = Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference () |> languageName
+    let readGlobalPreference () : string =
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference ()
+        |> languageName
 
     let ensureRoot (sessionId: string) : string =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot (SessionId.create sessionId) |> languageName
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
+        |> languageName
 
     let ensureInherited (ownerSessionId: string) (childSessionId: string) : string =
-        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureInherited (SessionId.create ownerSessionId) (SessionId.create childSessionId)
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureInherited
+            (SessionId.create ownerSessionId)
+            (SessionId.create childSessionId)
         |> languageName
 
     let languageOfSession (sessionId: string) : string =
         ProviderProse.languageOf (SessionId.create sessionId) |> languageName
 
-    let languageRootsPresent () : bool = ProviderResources.languageRootsPresent ()
+    let languageRootsPresent () : bool =
+        ProviderResources.languageRootsPresent ()
 
     let relativePath (language: string) (semanticPath: string) : string =
         ProviderResources.relativePath (languageOf language) semanticPath
@@ -93,7 +113,8 @@ module ProviderLanguageSurface =
     let readText (language: string) (semanticPath: string) : string =
         ProviderResources.readText (languageOf language) semanticPath
 
-    let requireLanguagePair (semanticPath: string) : unit = ProviderResources.requireLanguagePair semanticPath
+    let requireLanguagePair (semanticPath: string) : unit =
+        ProviderResources.requireLanguagePair semanticPath
 
     let substitute (template: string) (substitutions: obj) : string =
         ProviderProse.substitute template (mapOf substitutions)

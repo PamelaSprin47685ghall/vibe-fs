@@ -102,10 +102,9 @@ STRUCTURED-WORKFLOW-016 的 shape gate。scanner 以 F# offside/缩进结构识�
 字符串与 triple-quoted string，避免教程/示例文本制造命中。
 
 当前生产树 bootstrap：301 个文件、2166 个 depth≥2 decision。直接 hard-zero 会把任何
-小改动淹没在历史噪音里，因此 `scripts/check.mjs` 使用
-`fsharp-control-pyramid-baseline.json` 做 **per-file ratchet**：历史计数只冻结，新文件从
-0 开始；任一文件新增一个 nested decision 立即 RED。`--show-all` 显示全部债务；
-`--snapshot` 只打印当前 JSON，不写 baseline；baseline review 只允许数字下降。
+小改动不得被历史噪音掩盖，因此 `scripts/check.mjs` 以 `--root=src/Wanxiangshu`
+执行绝对零门：任一 nested decision 立即 RED。`--show-all` 显示全部债务；
+不存在 migration baseline，也不存在 grandfathered control-flow debt。
 
 失败输出契约：先打印每个命中的 `file:line + depth + chain + source`，随后只打印一次
 `CONTROL_PYRAMID_GUIDE`。教程由测试硬钉最低 512 行 / 9302 字符，禁止以后以“精简”名义
@@ -135,9 +134,9 @@ node --test requirements/structured-workflow/tests/error-handling-vocabulary.tes
 node scripts/check.mjs
 ```
 
-`--show-all` 是清债视图；正式 CI 只报告相对 baseline 的新增文件/新增计数，避免 2166 个
-历史 todo 每次刷屏。没有 suppression / allowlist；若某命中不是机械 bind，也必须人工
-重审并命名 control-flow boundary。
+`--show-all` 是清债视图；正式 CI 直接报告全部当前命中并在任一命中时失败。
+没有 suppression / allowlist；若某命中不是机械 bind，也必须人工重审并命名
+control-flow boundary。
 
 ### 3.3 高阶 Vocabulary 证明义务（DSL-014）
 

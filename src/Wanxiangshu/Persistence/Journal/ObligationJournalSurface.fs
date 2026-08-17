@@ -20,33 +20,33 @@ module ObligationJournalSurface =
     let private text (value: obj) =
         if isNull value then "" else string value
 
-    let private streamOfSession (sessionId: string) = StreamId.Session(SessionId.create sessionId)
+    let private streamOfSession (sessionId: string) =
+        StreamId.Session(SessionId.create sessionId)
 
     let private runOf (value: obj) =
-        if isNull value then None else Some(ProviderRunIdentity.create (text value))
+        if isNull value then
+            None
+        else
+            Some(ProviderRunIdentity.create (text value))
 
     let private appendResult result =
         match result with
         | Ok receipt ->
-            box {| ok = true; eventId = EventId.value receipt.EventId |}
-        | Error failure -> box {| ok = false; error = JournalAppendFailure.describe failure |}
+            box
+                {| ok = true
+                   eventId = EventId.value receipt.EventId |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error = JournalAppendFailure.describe failure |}
 
-    let appendMagicTodo
-        (handle: JournalHandle)
-        (sessionId: string)
-        (providerRun: obj)
-        (factJson: string)
-        : Task<obj> =
+    let appendMagicTodo (handle: JournalHandle) (sessionId: string) (providerRun: obj) (factJson: string) : Task<obj> =
         task {
             match MagicTodoFactCodec.tryDecode factJson with
             | Error error -> return box {| ok = false; error = error |}
             | Ok fact ->
                 let! result =
-                    AgentJournal.appendMagicTodo
-                        (streamOfSession sessionId)
-                        (runOf providerRun)
-                        fact
-                        handle.Journal
+                    AgentJournal.appendMagicTodo (streamOfSession sessionId) (runOf providerRun) fact handle.Journal
 
                 return appendResult result
         }
@@ -103,8 +103,8 @@ module ObligationJournalSurface =
             return
                 match result with
                 | Ok _ -> box {| ok = true |}
-                | Error error -> box {| ok = false; error = JournalAppendFailure.describe error |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = JournalAppendFailure.describe error |}
         }
-
-
-

@@ -239,7 +239,8 @@ module HandleProjection =
         (expectedDigest: BlobDigest)
         (current: AgentLinkageProjection)
         (record: HandleRecord)
-        (cell: HandleCompletion) =
+        (cell: HandleCompletion)
+        =
         match cell.CompletionRef, cell.CompletionDigest with
         | Some blobRef, Some digest when blobRef = expectedRef && digest = expectedDigest ->
             Ok

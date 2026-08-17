@@ -16,7 +16,8 @@ module SphinxSurface =
 
     let private isNullish (value: obj) = isNull value || isUndefined value
 
-    let private text (value: obj) = if isNullish value then "" else string value
+    let private text (value: obj) =
+        if isNullish value then "" else string value
 
     let private arrayOf (value: obj) : obj array =
         if isNullish value then [||] else unbox<obj array> value
@@ -50,7 +51,8 @@ module SphinxSurface =
 
     let createStore () : obj = StoreHandle(SessionStore()) :> obj
 
-    let start (store: obj) (question: string) : obj = storeOf store |> fun value -> value.Start question
+    let start (store: obj) (question: string) : obj =
+        storeOf store |> fun value -> value.Start question
 
     let resume (store: obj) (handle: string) (observation: obj) : obj =
         storeOf store |> fun value -> value.Resume(handle, observation)
@@ -78,9 +80,17 @@ module SphinxSurface =
         box
             {| semanticKey = evidence.SemanticKey
                proposition = evidence.Proposition
-               source = box {| id = evidence.Source.Id; kind = evidenceKindName evidence.Source.Kind; label = evidence.Source.Label |> Option.map box |> Option.toObj |}
+               source =
+                box
+                    {| id = evidence.Source.Id
+                       kind = evidenceKindName evidence.Source.Kind
+                       label = evidence.Source.Label |> Option.map box |> Option.toObj |}
                dependencyKey = evidence.DependencyKey
-               likelihoods = evidence.Likelihoods |> Map.toList |> List.map (fun (key, value) -> key ==> value) |> createObj
+               likelihoods =
+                evidence.Likelihoods
+                |> Map.toList
+                |> List.map (fun (key, value) -> key ==> value)
+                |> createObj
                reliability = evidence.Reliability |> Option.map box |> Option.toObj
                numericQualified = evidence.NumericQualified
                provenance = evidence.Provenance |> List.toArray |}
@@ -135,15 +145,31 @@ module SphinxSurface =
             | AnswerContract.Credence -> "Credence"
 
         box
-            {| formBelief = root.FormBelief |> Map.toList |> List.map (fun (key, value) -> formName key ==> value) |> createObj
-               contractBelief = root.ContractBelief |> Map.toList |> List.map (fun (key, value) -> contractName key ==> value) |> createObj
-               facets = root.Facets |> Map.toList |> List.map (fun (key, value) -> key ==> value) |> createObj
+            {| formBelief =
+                root.FormBelief
+                |> Map.toList
+                |> List.map (fun (key, value) -> formName key ==> value)
+                |> createObj
+               contractBelief =
+                root.ContractBelief
+                |> Map.toList
+                |> List.map (fun (key, value) -> contractName key ==> value)
+                |> createObj
+               facets =
+                root.Facets
+                |> Map.toList
+                |> List.map (fun (key, value) -> key ==> value)
+                |> createObj
                targets = root.Targets |> List.toArray
                intents = root.Intents |> List.toArray |}
 
     let private bayesianView (belief: BayesianBelief) : obj =
         box
-            {| posterior = belief.Posterior |> Map.toList |> List.map (fun (key, value) -> key ==> value) |> createObj
+            {| posterior =
+                belief.Posterior
+                |> Map.toList
+                |> List.map (fun (key, value) -> key ==> value)
+                |> createObj
                entropy = belief.Entropy
                bayesRisk = belief.BayesRisk |}
 
@@ -153,20 +179,26 @@ module SphinxSurface =
                rootContract = state.RootContract |> Option.map rootView |> Option.toObj
                findings = state.Findings |> Map.toList |> List.map (snd >> findingView) |> List.toArray
                evidence = state.Evidence |> Map.toList |> List.map (snd >> evidenceView) |> List.toArray
-               hypotheses = state.Hypotheses |> Map.toList |> List.map (fun (_, hypothesis) -> box {| semanticKey = hypothesis.SemanticKey; label = hypothesis.Label; prior = hypothesis.Prior |> Option.map box |> Option.toObj |}) |> List.toArray
+               hypotheses =
+                state.Hypotheses
+                |> Map.toList
+                |> List.map (fun (_, hypothesis) ->
+                    box
+                        {| semanticKey = hypothesis.SemanticKey
+                           label = hypothesis.Label
+                           prior = hypothesis.Prior |> Option.map box |> Option.toObj |})
+                |> List.toArray
                actions = state.Actions |> Map.toList |> List.map (snd >> actionView) |> List.toArray
                bayesian = state.Bayesian |> Option.map bayesianView |> Option.toObj
                revision = state.Revision |}
 
     let state (store: obj) (handle: string) : obj =
-        storeOf store |> fun value -> value.TryState handle |> Option.map stateView |> Option.toObj
+        storeOf store
+        |> fun value -> value.TryState handle |> Option.map stateView |> Option.toObj
 
     let close (store: obj) (handle: string) : obj =
         storeOf store
-        |> fun value ->
-            value.TryState handle
-            |> Option.map (Closure.close >> stateView)
-            |> Option.toObj
+        |> fun value -> value.TryState handle |> Option.map (Closure.close >> stateView) |> Option.toObj
 
     let mcpServer (store: obj) : obj = McpServer.create (storeOf store)
 
@@ -177,7 +209,10 @@ module SphinxSurface =
     let localCommand (entryPath: string) = SphinxMcp.localCommand entryPath
     let fixtureCommand (fixturePath: string) = SphinxMcp.fixtureCommand fixturePath
 
-    let libraryNames () : string array = Methodology.library |> List.map (fun definition -> definition.Name) |> List.toArray
+    let libraryNames () : string array =
+        Methodology.library
+        |> List.map (fun definition -> definition.Name)
+        |> List.toArray
 
     let phase0MethodNames () : string array = Methodology.phase0Names |> Set.toArray
 
@@ -195,7 +230,11 @@ module SphinxSurface =
     let solveGraph (problem: obj) : obj =
         match Search.solveGraph (problemOf problem) with
         | None -> null
-        | Some solved -> box {| path = solved.Path |> List.toArray; cost = solved.Cost; expanded = solved.Expanded |> List.toArray |}
+        | Some solved ->
+            box
+                {| path = solved.Path |> List.toArray
+                   cost = solved.Cost
+                   expanded = solved.Expanded |> List.toArray |}
 
     let private modelOf (value: obj) : MonteCarlo.Model =
         { Root = text value?root
@@ -205,9 +244,19 @@ module SphinxSurface =
 
     let mctsRun (iterations: int) (model: obj) : obj =
         let result = MonteCarlo.run iterations (modelOf model)
+
         box
             {| bestAction = result.BestAction |> Option.toObj
-               nodes = result.Nodes |> Map.toList |> List.map (fun (_, node) -> box {| semanticKey = node.SemanticKey; visits = node.Visits; valueSum = node.ValueSum; prior = node.Prior |}) |> List.toArray
+               nodes =
+                result.Nodes
+                |> Map.toList
+                |> List.map (fun (_, node) ->
+                    box
+                        {| semanticKey = node.SemanticKey
+                           visits = node.Visits
+                           valueSum = node.ValueSum
+                           prior = node.Prior |})
+                |> List.toArray
                iterations = result.Iterations |}
 
     let mctsUct (parentVisits: int) (exploration: float) (node: obj) : float =
@@ -220,7 +269,12 @@ module SphinxSurface =
               Prior = float node?prior }
 
     let private actionOf (value: obj) : CognitiveAction =
-        let kind = if text value?kind = "synthesize" then ActionKind.Synthesize else ActionKind.Investigate
+        let kind =
+            if text value?kind = "synthesize" then
+                ActionKind.Synthesize
+            else
+                ActionKind.Investigate
+
         let status =
             match text value?status with
             | "selected" -> ActionStatus.Selected

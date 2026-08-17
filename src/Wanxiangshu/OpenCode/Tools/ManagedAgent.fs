@@ -87,8 +87,7 @@ module ManagedAgent =
 
     let private mapParseRejection rejection =
         match rejection with
-        | PromptAuthority.AgentNameRejection.LegacyAgentName name ->
-            Error(ManagedAgentParseError.LegacyAgentName name)
+        | PromptAuthority.AgentNameRejection.LegacyAgentName name -> Error(ManagedAgentParseError.LegacyAgentName name)
         | PromptAuthority.AgentNameRejection.UnknownManagedAgent name ->
             Error(ManagedAgentParseError.UnknownManagedAgent name)
         | PromptAuthority.AgentNameRejection.Malformed name -> Error(ManagedAgentParseError.Malformed name)

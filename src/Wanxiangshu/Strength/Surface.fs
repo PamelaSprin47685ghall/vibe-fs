@@ -48,8 +48,7 @@ module StrengthSurface =
     type private PredictorHandle(state: StrengthPredictorState) =
         member val State = state with get, set
 
-    let private isUndefined (value: obj) : bool =
-        emitJsExpr value "$0 === undefined"
+    let private isUndefined (value: obj) : bool = emitJsExpr value "$0 === undefined"
 
     let private isNullish (value: obj) = isNull value || isUndefined value
 
@@ -120,7 +119,11 @@ module StrengthSurface =
         | ToolPermission.Sphinx -> "Sphinx"
 
     let private permissionsToJs permissions =
-        permissions |> Set.toList |> List.map permissionLabel |> List.sort |> List.toArray
+        permissions
+        |> Set.toList
+        |> List.map permissionLabel
+        |> List.sort
+        |> List.toArray
 
     let private partResult (value: obj) : Result<MessagePart, string> =
         match textOf value?kind with
@@ -138,11 +141,14 @@ module StrengthSurface =
         | "text" -> ProviderProjection.WireText(textOf value?text)
         | "reasoning" -> ProviderProjection.WireReasoning(textOf value?text)
         | "tool-call" ->
-            ProviderProjection.WireToolCall(ToolCallId.create (textOf value?callId), textOf value?name, textOf value?args)
+            ProviderProjection.WireToolCall(
+                ToolCallId.create (textOf value?callId),
+                textOf value?name,
+                textOf value?args
+            )
         | "tool-result" ->
             ProviderProjection.WireToolResult(ToolCallId.create (textOf value?callId), textOf value?result)
-        | "media" ->
-            ProviderProjection.WireMedia(optionalText value?mediaType, textOf value?contentDigest)
+        | "media" -> ProviderProjection.WireMedia(optionalText value?mediaType, textOf value?contentDigest)
         | other -> failwithf "StrengthSurface: unknown wire part kind %s" other
 
     let private wireMessageOf (value: obj) : ProviderProjection.WireMessage =
@@ -154,14 +160,26 @@ module StrengthSurface =
         | ProviderProjection.WireText value -> box {| kind = "text"; text = value |}
         | ProviderProjection.WireReasoning value -> box {| kind = "reasoning"; text = value |}
         | ProviderProjection.WireToolCall(id, name, args) ->
-            box {| kind = "tool-call"; callId = ToolCallId.value id; name = name; args = args |}
+            box
+                {| kind = "tool-call"
+                   callId = ToolCallId.value id
+                   name = name
+                   args = args |}
         | ProviderProjection.WireToolResult(id, result) ->
-            box {| kind = "tool-result"; callId = ToolCallId.value id; result = result |}
+            box
+                {| kind = "tool-result"
+                   callId = ToolCallId.value id
+                   result = result |}
         | ProviderProjection.WireMedia(mediaType, digest) ->
-            box {| kind = "media"; mediaType = Option.toObj mediaType; contentDigest = digest |}
+            box
+                {| kind = "media"
+                   mediaType = Option.toObj mediaType
+                   contentDigest = digest |}
 
     let private wireMessageToJs (message: ProviderProjection.WireMessage) : obj =
-        box {| role = message.Role; parts = message.Parts |> List.map wirePartToJs |> List.toArray |}
+        box
+            {| role = message.Role
+               parts = message.Parts |> List.map wirePartToJs |> List.toArray |}
 
     let private messagesOf (value: obj) =
         arrayOf value |> Array.toList |> List.map wireMessageOf
@@ -234,7 +252,11 @@ module StrengthSurface =
             | StrengthMirrorError.OrphanToolResultId _ -> "OrphanToolResultId"
             | StrengthMirrorError.MediaCannotCrossSession -> "MediaCannotCrossSession"
 
-        StrengthFrame.tryLocalizeMirror sha256 (StrengthDecisionId.create decisionId) semanticDigest (messagesOf messages)
+        StrengthFrame.tryLocalizeMirror
+            sha256
+            (StrengthDecisionId.create decisionId)
+            semanticDigest
+            (messagesOf messages)
         |> resultToJs (List.map wireMessageToJs >> List.toArray) errorName
 
     let frameWireToolCallId
@@ -278,9 +300,7 @@ module StrengthSurface =
               System = []
               Messages = messagesOf messages }
 
-        wire
-        |> ProviderProjection.toSemantic
-        |> ProviderProjection.renderSemantic
+        wire |> ProviderProjection.toSemantic |> ProviderProjection.renderSemantic
 
     let costEstimate
         (p1: float)
@@ -296,8 +316,13 @@ module StrengthSurface =
         (risk1: float)
         (risk2: float)
         : obj =
-        let estimate = StrengthCostModel.estimate p1 p2 savedDeep1 savedDeep2 fast1 fast2 byte1 byte2 delay1 delay2 risk1 risk2
-        box {| V0 = estimate.V0; V1 = estimate.V1; V2 = estimate.V2 |}
+        let estimate =
+            StrengthCostModel.estimate p1 p2 savedDeep1 savedDeep2 fast1 fast2 byte1 byte2 delay1 delay2 risk1 risk2
+
+        box
+            {| V0 = estimate.V0
+               V1 = estimate.V1
+               V2 = estimate.V2 |}
 
     let private opportunityOf (value: obj) : Result<StrengthOpportunity, string> =
         match requestKindResult value?requestKind, roleResult value?canonicalRole, tierResult value?selectedTier with
@@ -329,33 +354,59 @@ module StrengthSurface =
           EvidenceCount = int value?evidenceCount }
 
     let private estimateOf (value: obj) =
-        { V0 = float value?V0; V1 = float value?V1; V2 = float value?V2 }
+        { V0 = float value?V0
+          V1 = float value?V1
+          V2 = float value?V2 }
 
     let private policyConfigOf (value: obj) =
         { K1Margin = float value?K1Margin
           K2Margin = float value?K2Margin
           K2MinimumEvidence = int value?K2MinimumEvidence }
 
-    let policyDecide (opportunity: obj) (control: bool) (shadow: bool) (prediction: obj) (estimate: obj) (config: obj) : obj =
+    let policyDecide
+        (opportunity: obj)
+        (control: bool)
+        (shadow: bool)
+        (prediction: obj)
+        (estimate: obj)
+        (config: obj)
+        : obj =
         match opportunityOf opportunity with
         | Error error -> box {| ok = false; error = error |}
         | Ok opportunity ->
-            match StrengthPolicy.decideFromFacts
-                opportunity
-                control
-                shadow
-                (predictionOf prediction)
-                (estimateOf estimate)
-                (policyConfigOf config) with
-            | StrengthDecision.Skip reason -> box {| kind = "Skip"; reason = reason; budget = "K0" |}
-            | StrengthDecision.ControlHoldout -> box {| kind = "ControlHoldout"; budget = "K0" |}
+            match
+                StrengthPolicy.decideFromFacts
+                    opportunity
+                    control
+                    shadow
+                    (predictionOf prediction)
+                    (estimateOf estimate)
+                    (policyConfigOf config)
+            with
+            | StrengthDecision.Skip reason ->
+                box
+                    {| kind = "Skip"
+                       reason = reason
+                       budget = "K0" |}
+            | StrengthDecision.ControlHoldout ->
+                box
+                    {| kind = "ControlHoldout"
+                       budget = "K0" |}
             | StrengthDecision.Speculate(budget, value) ->
                 box
                     {| kind = "Speculate"
                        budget = StrengthBudget.wire budget
-                       estimate = {| V0 = value.V0; V1 = value.V1; V2 = value.V2 |} |}
+                       estimate =
+                        {| V0 = value.V0
+                           V1 = value.V1
+                           V2 = value.V2 |} |}
 
-    let policyControlBucket (sha256: string -> string) (policyVersion: string) (authorityRoot: string) (targetRun: string) =
+    let policyControlBucket
+        (sha256: string -> string)
+        (policyVersion: string)
+        (authorityRoot: string)
+        (targetRun: string)
+        =
         StrengthPolicy.controlBucket sha256 policyVersion authorityRoot targetRun
 
     let policyIsControlHoldout (rateBasisPoints: int) (bucket: int) =
@@ -374,7 +425,9 @@ module StrengthSurface =
     let readonlyCapabilitiesResult (role: string) (requestKind: string) : obj =
         match roleResult (box role), requestKindResult (box requestKind) with
         | Ok role, Ok requestKind ->
-            box {| ok = true; value = PromptAuthority.toolCapabilitiesFor role requestKind |> permissionsToJs |}
+            box
+                {| ok = true
+                   value = PromptAuthority.toolCapabilitiesFor role requestKind |> permissionsToJs |}
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
@@ -402,6 +455,7 @@ module StrengthSurface =
         | Error _ -> ""
         | Ok role ->
             let prompts = RuntimeResources.current().Prompts
+
             match role with
             | Role.Manager -> prompts.ManagerSystemPrompt
             | Role.Coder -> prompts.CoderSystemPrompt
@@ -425,10 +479,13 @@ module StrengthSurface =
         | Error _ -> false
 
     let associationFacts (ownerSessionId: string) : obj =
-        let ownership = StrengthReplicaAssociationHints.ownership (SessionId.create ownerSessionId)
+        let ownership =
+            StrengthReplicaAssociationHints.ownership (SessionId.create ownerSessionId)
+
         let owner, attachment =
             match ownership with
-            | SessionOwnership.Attached(owner, AttachmentKind.StrengthReplica) -> SessionId.value owner, "StrengthReplica"
+            | SessionOwnership.Attached(owner, AttachmentKind.StrengthReplica) ->
+                SessionId.value owner, "StrengthReplica"
             | _ -> "", ""
 
         box
@@ -441,8 +498,10 @@ module StrengthSurface =
                 | SessionExecutionClass.Work -> "Work"
                ownerSessionId = owner
                attachment = attachment
-               strengthReplicaAttachment = StrengthReplicaAssociationHints.isStrengthReplicaAttachment AttachmentKind.StrengthReplica
-               companionAttachment = StrengthReplicaAssociationHints.isStrengthReplicaAttachment AttachmentKind.Companion |}
+               strengthReplicaAttachment =
+                StrengthReplicaAssociationHints.isStrengthReplicaAttachment AttachmentKind.StrengthReplica
+               companionAttachment =
+                StrengthReplicaAssociationHints.isStrengthReplicaAttachment AttachmentKind.Companion |}
 
     let private decisionOfResult (value: obj) =
         match textOf value?kind with
@@ -465,11 +524,15 @@ module StrengthSurface =
         | StrengthCommitDecision.FailClosed -> "FailClosed"
 
     let commitResolvePrepared (appendOutcome: string) (evidence: string) =
-        StrengthCommit.resolvePrepared (decisionOfResult (box {| kind = appendOutcome |})) (durableEvidenceOf (box evidence))
+        StrengthCommit.resolvePrepared
+            (decisionOfResult (box {| kind = appendOutcome |}))
+            (durableEvidenceOf (box evidence))
         |> commitDecisionName
 
     let commitResolvePromotion (appendOutcome: string) (evidence: string) =
-        StrengthCommit.resolvePromotion (decisionOfResult (box {| kind = appendOutcome |})) (durableEvidenceOf (box evidence))
+        StrengthCommit.resolvePromotion
+            (decisionOfResult (box {| kind = appendOutcome |}))
+            (durableEvidenceOf (box evidence))
         |> commitDecisionName
 
     let promotionDecide (targetRun: string) (observedRun: string) (evidence: string) =
@@ -479,7 +542,12 @@ module StrengthSurface =
             | "TransportOnly" -> StrengthProviderOutputEvidence.TransportOnly
             | _ -> StrengthProviderOutputEvidence.NoOutput
 
-        match StrengthPromotion.decide (ProviderRunIdentity.create targetRun) (ProviderRunIdentity.create observedRun) output with
+        match
+            StrengthPromotion.decide
+                (ProviderRunIdentity.create targetRun)
+                (ProviderRunIdentity.create observedRun)
+                output
+        with
         | StrengthPromotionDecision.Promote -> "Promote"
         | StrengthPromotionDecision.IgnoreWrongRun -> "IgnoreWrongRun"
         | StrengthPromotionDecision.AwaitOrAbandon -> "AwaitOrAbandon"
@@ -527,9 +595,11 @@ module StrengthSurface =
         EventHandle(StrengthEvents.traced (StrengthDecisionId.create decision) startInclusive endExclusive) :> obj
 
     let eventAbandoned (decision: string) (target: string) : obj =
-        EventHandle(StrengthEvents.abandoned (StrengthDecisionId.create decision) (ProviderRunIdentity.create target)) :> obj
+        EventHandle(StrengthEvents.abandoned (StrengthDecisionId.create decision) (ProviderRunIdentity.create target))
+        :> obj
 
-    let private eventOf (value: obj) = unbox<EventHandle> value |> fun handle -> handle.Value
+    let private eventOf (value: obj) =
+        unbox<EventHandle> value |> fun handle -> handle.Value
 
     let eventType (value: obj) =
         match eventOf value with
@@ -561,13 +631,22 @@ module StrengthSurface =
                    frameDigest = event.FrameDigest
                    materialPayloads = event.MaterialPayloads |> List.map PayloadRef.value |> List.toArray |}
         | StrengthEvent.Traced event ->
-            box {| kind = "Traced"; decisionId = StrengthDecisionId.value event.DecisionId; startInclusive = event.StartInclusive; endExclusive = event.EndExclusive |}
+            box
+                {| kind = "Traced"
+                   decisionId = StrengthDecisionId.value event.DecisionId
+                   startInclusive = event.StartInclusive
+                   endExclusive = event.EndExclusive |}
         | StrengthEvent.Abandoned event ->
-            box {| kind = "Abandoned"; decisionId = StrengthDecisionId.value event.DecisionId; targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun |}
+            box
+                {| kind = "Abandoned"
+                   decisionId = StrengthDecisionId.value event.DecisionId
+                   targetProviderRun = ProviderRunIdentity.value event.TargetProviderRun |}
 
-    let private projectionOf value = unbox<ProjectionHandle> value |> fun handle -> handle.Value
+    let private projectionOf value =
+        unbox<ProjectionHandle> value |> fun handle -> handle.Value
 
-    let projectionEmpty () : obj = ProjectionHandle StrengthProjection.empty :> obj
+    let projectionEmpty () : obj =
+        ProjectionHandle StrengthProjection.empty :> obj
 
     let private projectionErrorName error =
         match error with
@@ -603,13 +682,22 @@ module StrengthSurface =
                abandoned = view.Abandoned
                traceRange =
                 view.TraceRange
-                |> Option.map (fun range -> box {| startInclusive = range.StartInclusive; endExclusive = range.EndExclusive |})
+                |> Option.map (fun range ->
+                    box
+                        {| startInclusive = range.StartInclusive
+                           endExclusive = range.EndExclusive |})
                 |> Option.toObj |}
 
     let projectionApply (projection: obj) (event: obj) : obj =
         match StrengthProjection.apply (projectionOf projection) (eventOf event) with
-        | Ok next -> box {| ok = true; value = (ProjectionHandle next :> obj) |}
-        | Error error -> box {| ok = false; error = projectionErrorName error |}
+        | Ok next ->
+            box
+                {| ok = true
+                   value = (ProjectionHandle next :> obj) |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = projectionErrorName error |}
 
     let projectionHasPrepared (decision: string) (projection: obj) =
         StrengthProjection.hasPrepared (StrengthDecisionId.create decision) (projectionOf projection)
@@ -629,16 +717,21 @@ module StrengthSurface =
 
     let projectionTraceRange (decision: string) (projection: obj) =
         match StrengthProjection.tryTraceRange (StrengthDecisionId.create decision) (projectionOf projection) with
-        | Some range -> box {| startInclusive = range.StartInclusive; endExclusive = range.EndExclusive |}
+        | Some range ->
+            box
+                {| startInclusive = range.StartInclusive
+                   endExclusive = range.EndExclusive |}
         | None -> null
 
     let storeToEnvelope (sha256: string -> string) (event: obj) : obj =
         EnvelopeHandle(StrengthStore.toEnvelope sha256 (eventOf event)) :> obj
 
-    let private envelopeOf value = unbox<EnvelopeHandle> value |> fun handle -> handle.Value
+    let private envelopeOf value =
+        unbox<EnvelopeHandle> value |> fun handle -> handle.Value
 
     let envelopeView (value: obj) : obj =
         let envelope = envelopeOf value
+
         box
             {| id = EventId.value envelope.EventId
                stream = EventStreamId.value envelope.StreamId
@@ -648,7 +741,10 @@ module StrengthSurface =
 
     let storeTryDecodeEnvelope (value: obj) : obj =
         match StrengthStore.tryDecodeEnvelope (envelopeOf value) with
-        | Ok event -> box {| ok = true; value = eventView (EventHandle event :> obj) |}
+        | Ok event ->
+            box
+                {| ok = true
+                   value = eventView (EventHandle event :> obj) |}
         | Error error -> box {| ok = false; error = error |}
 
     let private appendErrorName error =
@@ -668,24 +764,33 @@ module StrengthSurface =
     let storeAppend (store: obj) (sha256: string -> string) (event: obj) : Task<obj> =
         task {
             let! result = StrengthStore.append (EventStoreStrengthSurface.storeOf store) sha256 (eventOf event)
+
             return
                 match result with
                 | Ok() -> box {| ok = true |}
-                | Error error -> box {| ok = false; error = appendErrorName error |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = appendErrorName error |}
         }
 
     let storeWritePayload (store: obj) (bytes: byte array) : Task<obj> =
         task {
             let! result = EventStoreStrengthSurface.writePayload store bytes
+
             return
                 match result with
-                | Ok value -> box {| ok = true; value = PayloadRef.value value |}
+                | Ok value ->
+                    box
+                        {| ok = true
+                           value = PayloadRef.value value |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
     let storeReadPayload (store: obj) (reference: string) : Task<obj> =
         task {
             let! result = EventStoreStrengthSurface.readPayload store (PayloadRef.create reference)
+
             return
                 match result with
                 | Ok(Some bytes) -> box {| ok = true; value = bytes |}
@@ -701,13 +806,15 @@ module StrengthSurface =
     let durabilityCreate (store: obj) : obj =
         DurabilityHandle(EventStoreStrengthSurface.durability store) :> obj
 
-    let private durabilityOf value = unbox<DurabilityHandle> value |> fun handle -> handle.Value
+    let private durabilityOf value =
+        unbox<DurabilityHandle> value |> fun handle -> handle.Value
 
     let durabilityPublishPrepared (durability: obj) (request: obj) : Task<obj> =
         match budgetResult request?budget with
         | Error error -> Task.FromResult(box {| ok = false; error = error |})
         | Ok budget ->
             let value = durabilityOf durability
+
             let preparedRequest =
                 { OwnerSessionId = SessionId.create (textOf request?ownerSessionId)
                   DecisionId = StrengthDecisionId.create (textOf request?decisionId)
@@ -719,37 +826,54 @@ module StrengthSurface =
 
             task {
                 let! result = value.PublishPrepared preparedRequest
+
                 return
                     match result with
                     | StrengthPreparedPublish.Published -> box {| kind = "Published" |}
                     | StrengthPreparedPublish.Rejected reason -> box {| kind = "Rejected"; reason = reason |}
-                    | StrengthPreparedPublish.StorageInvalid reason -> box {| kind = "StorageInvalid"; reason = reason |}
+                    | StrengthPreparedPublish.StorageInvalid reason ->
+                        box
+                            {| kind = "StorageInvalid"
+                               reason = reason |}
             }
 
     let durabilityLoadProjection (durability: obj) : Task<obj> =
         task {
             let! result = (durabilityOf durability).LoadProjection()
+
             return
                 match result with
-                | Ok projection -> box {| ok = true; value = (ProjectionHandle projection :> obj) |}
+                | Ok projection ->
+                    box
+                        {| ok = true
+                           value = (ProjectionHandle projection :> obj) |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
     let durabilityLoadBundleForDecision (durability: obj) (projection: obj) (decision: string) : Task<obj> =
         task {
             match StrengthProjection.tryCandidate (StrengthDecisionId.create decision) (projectionOf projection) with
-            | None -> return box {| ok = false; error = "missing candidate" |}
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           error = "missing candidate" |}
             | Some view ->
                 let! result = (durabilityOf durability).LoadFrameBundle view.Prepared
+
                 return
                     match result with
-                    | Ok bundle -> box {| ok = true; value = bundleToJs bundle |}
+                    | Ok bundle ->
+                        box
+                            {| ok = true
+                               value = bundleToJs bundle |}
                     | Error error -> box {| ok = false; error = error |}
         }
 
     let durabilityAppend (durability: obj) (event: obj) : Task<obj> =
         task {
             let! result = (durabilityOf durability).Append(eventOf event)
+
             return
                 match result with
                 | StrengthDurableAppend.Applied -> box {| ok = true |}
@@ -760,7 +884,10 @@ module StrengthSurface =
     let traceExpectedParts (bundle: obj) : obj array =
         StrengthTraceRecovery.expectedParts (bundleOf bundle)
         |> List.map (fun (kind, toolName, body) ->
-            box {| kind = kind; toolName = toolName |> Option.toObj; body = body |})
+            box
+                {| kind = kind
+                   toolName = toolName |> Option.toObj
+                   body = body |})
         |> List.toArray
 
     let traceRecoverRange (bundle: obj) (observed: obj array) : obj =
@@ -771,12 +898,18 @@ module StrengthSurface =
                 ({ CursorSequence = int64 (int (textOf value?cursorSequence))
                    Kind = textOf value?kind
                    ToolName = optionalText value?toolName
-                   Body = textOf value?body }: StrengthTraceObservedPart))
+                   Body = textOf value?body }
+                : StrengthTraceObservedPart))
 
         match StrengthTraceRecovery.recoverRange (bundleOf bundle) parts with
         | Ok None -> box {| ok = true; value = (null: obj) |}
         | Ok(Some range) ->
-            box {| ok = true; value = box {| startInclusive = range.StartInclusive; endExclusive = range.EndExclusive |} |}
+            box
+                {| ok = true
+                   value =
+                    box
+                        {| startInclusive = range.StartInclusive
+                           endExclusive = range.EndExclusive |} |}
         | Error error -> box {| ok = false; error = error |}
 
     let turnEvidenceClassify (parts: obj array) : obj =
@@ -796,11 +929,13 @@ module StrengthSurface =
         | Error error -> box {| ok = false; error = error |}
         | Ok parts ->
             let evidence = StrengthTurnEvidence.classifyParts parts
+
             let value =
                 match evidence with
                 | StrengthProviderOutputEvidence.RealOutput -> "RealOutput"
                 | StrengthProviderOutputEvidence.TransportOnly -> "TransportOnly"
                 | StrengthProviderOutputEvidence.NoOutput -> "NoOutput"
+
             box value
 
     let private turnOutcomeResult (value: obj) : Result<ReconcileProgram.TurnOutcome, string> =
@@ -829,7 +964,8 @@ module StrengthSurface =
             Ok
                 { SessionId = SessionId.create (textOf value?sessionId)
                   PhysicalUserMessageId = PhysicalUserMessageId.create (textOf value?physicalUserMessageId)
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (textOf value?authorityRootUserMessageId)
+                  AuthorityRootUserMessageId =
+                    AuthorityRootUserMessageId.create (textOf value?authorityRootUserMessageId)
                   ProviderRun = ProviderRunIdentity.create (textOf value?providerRun)
                   Role = None
                   Directory = None
@@ -868,7 +1004,10 @@ module StrengthSurface =
                beforeMessageIndex = plan.BeforeMessageIndex
                existingTraceRange =
                 plan.ExistingTraceRange
-                |> Option.map (fun range -> box {| startInclusive = range.StartInclusive; endExclusive = range.EndExclusive |})
+                |> Option.map (fun range ->
+                    box
+                        {| startInclusive = range.StartInclusive
+                           endExclusive = range.EndExclusive |})
                 |> Option.toObj |}
 
     let private planOf (value: obj) : StrengthReplayPlan =
@@ -881,10 +1020,14 @@ module StrengthSurface =
               AnchorDigest = textOf value?prepared?anchorDigest
               FrameDigest = textOf value?prepared?frameDigest
               ByteLength = int value?prepared?byteLength
-              MaterialPayloads = arrayOf value?prepared?materialPayloads |> Array.toList |> List.map (string >> PayloadRef.create) }
+              MaterialPayloads =
+                arrayOf value?prepared?materialPayloads
+                |> Array.toList
+                |> List.map (string >> PayloadRef.create) }
 
         let traceRange =
-            if isNullish value?existingTraceRange then None
+            if isNullish value?existingTraceRange then
+                None
             else
                 Some
                     { StartInclusive = int64 (int (textOf value?existingTraceRange?startInclusive))
@@ -896,8 +1039,11 @@ module StrengthSurface =
           ExistingTraceRange = traceRange }
 
     let lifecycleReplayPlans (owner: string) (messages: obj array) (bundle: obj) (projection: obj) : Task<obj> =
-        let messageIds = messages |> Array.toList |> List.map (fun value -> box (textOf value?id))
+        let messageIds =
+            messages |> Array.toList |> List.map (fun value -> box (textOf value?id))
+
         let load _ = Task.FromResult(Ok(bundleOf bundle))
+
         task {
             let! result =
                 StrengthLifecycle.replayPlans
@@ -909,18 +1055,27 @@ module StrengthSurface =
 
             return
                 match result with
-                | Ok plans -> box {| ok = true; value = plans |> List.map planToJs |> List.toArray |}
+                | Ok plans ->
+                    box
+                        {| ok = true
+                           value = plans |> List.map planToJs |> List.toArray |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
     let lifecycleNeedsRawReplay (coveredThrough: obj) (plan: obj) : bool =
-        let covered = if isNullish coveredThrough then None else Some(int64 (int (textOf coveredThrough)))
+        let covered =
+            if isNullish coveredThrough then
+                None
+            else
+                Some(int64 (int (textOf coveredThrough)))
+
         StrengthLifecycle.needsRawReplay covered (planOf plan)
 
     let lifecycleReplayIntents (plans: obj array) : obj array =
         plans
         |> Array.map (fun value ->
             let plan = planOf value
+
             box
                 {| kind = "strength-promoted"
                    ownerSessionId = SessionId.value plan.Prepared.OwnerSessionId
@@ -930,7 +1085,8 @@ module StrengthSurface =
                    isReplicaRequest = false
                    bundle = bundleToJs plan.Bundle |})
 
-    let predictorCreate () : obj = PredictorHandle StrengthPredictor.empty :> obj
+    let predictorCreate () : obj =
+        PredictorHandle StrengthPredictor.empty :> obj
 
     let private predictorOf value = unbox<PredictorHandle> value
 
@@ -946,10 +1102,18 @@ module StrengthSurface =
         match roleResult (box role) with
         | Error error -> box {| ok = false; error = error |}
         | Ok role ->
-            match recent |> Array.toList |> List.map (symbolResult << box) |> List.fold (fun state item -> Result.bind (fun values -> Result.map (fun value -> value :: values) item) state) (Ok []) with
+            match
+                recent
+                |> Array.toList
+                |> List.map (symbolResult << box)
+                |> List.fold
+                    (fun state item -> Result.bind (fun values -> Result.map (fun value -> value :: values) item) state)
+                    (Ok [])
+            with
             | Error error -> box {| ok = false; error = error |}
             | Ok symbols ->
                 let feature = StrengthPredictor.feature role (List.rev symbols) visibleBytes
+
                 box
                     {| canonicalRole = roleLabel feature.CanonicalRole
                        recentPrimary =
@@ -1001,6 +1165,7 @@ module StrengthSurface =
         | Error error -> box {| ok = false; error = error |}
         | Ok feature ->
             let bucket = StrengthPredictor.bucket feature (predictorOf state).State
+
             box
                 {| opportunities = bucket.Opportunities
                    readonlyFirst = bucket.ReadonlyFirst
@@ -1012,7 +1177,11 @@ module StrengthSurface =
         | Error error -> box {| ok = false; error = error |}
         | Ok feature ->
             let prediction = StrengthPredictor.predict feature (predictorOf state).State
-            box {| P1 = prediction.P1; P2 = prediction.P2; evidenceCount = prediction.EvidenceCount |}
+
+            box
+                {| P1 = prediction.P1
+                   P2 = prediction.P2
+                   evidenceCount = prediction.EvidenceCount |}
 
     let rolloutEstimate (prediction: obj) (costs: obj) : obj =
         let value =
@@ -1028,7 +1197,11 @@ module StrengthSurface =
                   Delay2 = float costs?Delay2
                   Risk1 = float costs?Risk1
                   Risk2 = float costs?Risk2 }
-        box {| V0 = value.V0; V1 = value.V1; V2 = value.V2 |}
+
+        box
+            {| V0 = value.V0
+               V1 = value.V1
+               V2 = value.V2 |}
 
     let rolloutIsShadow (mode: string) =
         match mode with
@@ -1037,6 +1210,7 @@ module StrengthSurface =
 
     let settingsLoad () : obj =
         let settings = StrengthSettings.load ()
+
         box
             {| mode =
                 match settings.Mode with
@@ -1065,15 +1239,20 @@ module StrengthSurface =
                 |> Option.toObj
                controlRateBasisPoints = settings.ControlRateBasisPoints |}
 
-    let settingsDryRunBudget () = StrengthBudget.wire (StrengthSettings.dryRunBudget ())
+    let settingsDryRunBudget () =
+        StrengthBudget.wire (StrengthSettings.dryRunBudget ())
+
     let settingsHostCanaryHealthy () = StrengthSettings.hostCanaryHealthy ()
     let settingsHostCanaryFingerprint = StrengthSettings.HostCanaryFingerprint
 
     type private ScopeHandle(scope: PluginStrengthScope) =
         member _.Value = scope
 
-    let scopeCreate () : obj = ScopeHandle(PluginStrengthScope()) :> obj
-    let private scopeOf value = unbox<ScopeHandle> value |> fun handle -> handle.Value
+    let scopeCreate () : obj =
+        ScopeHandle(PluginStrengthScope()) :> obj
+
+    let private scopeOf value =
+        unbox<ScopeHandle> value |> fun handle -> handle.Value
 
     let scopeFuseReason (scope: obj) =
         match (scopeOf scope).StrengthFuseReason with
@@ -1088,6 +1267,7 @@ module StrengthSurface =
         match roleResult value?canonicalRole, budgetResult value?budget with
         | Ok role, Ok budget ->
             let requestKind = ProviderRequestKind.StrengthReplica
+
             Ok
                 { OwnerSessionId = SessionId.create (textOf value?ownerSessionId)
                   ReplicaSessionId = SessionId.create (textOf value?replicaSessionId)
@@ -1103,7 +1283,9 @@ module StrengthSurface =
         | _, Error error -> Error error
 
     let runtimeCreate () : obj = RuntimeHandle(StrengthRuntime()) :> obj
-    let private runtimeOf value = unbox<RuntimeHandle> value |> fun handle -> handle.Value
+
+    let private runtimeOf value =
+        unbox<RuntimeHandle> value |> fun handle -> handle.Value
 
     let runtimeBinding
         (owner: string)
@@ -1140,6 +1322,7 @@ module StrengthSurface =
                     | StrengthRuntimeRegisterError.ReplicaAlreadyBound _ -> "ReplicaAlreadyBound"
                     | StrengthRuntimeRegisterError.RoleIneligible _ -> "RoleIneligible"
                     | StrengthRuntimeRegisterError.EmptyBudget -> "EmptyBudget"
+
                 box {| ok = false; error = name |}
 
     let private bindingToJs (binding: StrengthReplicaBinding) =
@@ -1167,11 +1350,16 @@ module StrengthSurface =
     let private emptySessionPort (aborted: ResizeArray<string>) : ISessionHostPort =
         { new ISessionHostPort with
             member _.SubscribeTerminal(_, _) =
-                { new IDisposable with member _.Dispose() = () }
-            member _.SendPrompt(_, _, _) = Task.FromResult(Outcome.Retryable "unused")
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SendPrompt(_, _, _) =
+                Task.FromResult(Outcome.Retryable "unused")
+
             member _.AbortSession(sessionId) =
                 aborted.Add(SessionId.value sessionId)
                 Task.FromResult(Ok())
+
             member _.InterruptSessionOnly(_) = Task.FromResult(Ok())
             member _.AbortChildren(_) = AsyncSupport.completedTask ()
             member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
@@ -1182,9 +1370,14 @@ module StrengthSurface =
 
     let private transformOutcomeToJs outcome output aborted =
         let abortedIds = aborted |> Seq.toArray
+
         match outcome with
         | StrengthReplicaTransformOutcome.NotReplica ->
-            box {| kind = "NotReplica"; batches = [||]; output = output; aborted = abortedIds |}
+            box
+                {| kind = "NotReplica"
+                   batches = [||]
+                   output = output
+                   aborted = abortedIds |}
         | StrengthReplicaTransformOutcome.Ready values ->
             box
                 {| kind = "Ready"
@@ -1201,8 +1394,15 @@ module StrengthSurface =
 
     let transformApply (sha256: string -> string) (runtime: obj) (output: obj) : Task<obj> =
         let aborted = ResizeArray<string>()
+
         task {
             let! outcome = StrengthReplicaTransform.apply sha256 (runtimeOf runtime) (emptySessionPort aborted) output
-            let messages = if isNullish output?messages then [||] else unbox<obj array> output?messages
+
+            let messages =
+                if isNullish output?messages then
+                    [||]
+                else
+                    unbox<obj array> output?messages
+
             return transformOutcomeToJs outcome (box messages) aborted
         }

@@ -36,11 +36,22 @@ module FallbackSurface =
     let duplicateOwnerFailure () : obj = ownerFailure ()
 
     let counterfactualBloggerFailure () : obj =
-        let start = FallbackProjection.forAuthority (LogicalRunId.create "run_L") (AuthorityRootUserMessageId.create "msg_u1")
-        let first = apply "run_owner" AgentPairCursor.FallbackOffset.Fork0 AgentPairCursor.FallbackOffset.Fork1 1 start
-        apply "run_blog_interrupt" AgentPairCursor.FallbackOffset.Fork1 AgentPairCursor.FallbackOffset.Fork2 2 first |> view
+        let start =
+            FallbackProjection.forAuthority (LogicalRunId.create "run_L") (AuthorityRootUserMessageId.create "msg_u1")
 
-    let permutations () : obj array = [| ownerFailure (); ownerFailure (); ownerFailure (); ownerFailure (); ownerFailure (); ownerFailure () |]
+        let first =
+            apply "run_owner" AgentPairCursor.FallbackOffset.Fork0 AgentPairCursor.FallbackOffset.Fork1 1 start
+
+        apply "run_blog_interrupt" AgentPairCursor.FallbackOffset.Fork1 AgentPairCursor.FallbackOffset.Fork2 2 first
+        |> view
+
+    let permutations () : obj array =
+        [| ownerFailure ()
+           ownerFailure ()
+           ownerFailure ()
+           ownerFailure ()
+           ownerFailure ()
+           ownerFailure () |]
 
     let recordSuccess () : obj =
         FallbackProjection.forAuthority (LogicalRunId.create "run_L") (AuthorityRootUserMessageId.create "msg_u1")
@@ -59,6 +70,7 @@ module FallbackSurface =
         : Task<obj> =
         task {
             let runtime = PromptDispatcher.forJournal journal
+
             let! result =
                 runtime.AcceptHumanRoot
                     (SessionId.create session)
@@ -92,10 +104,19 @@ module FallbackSurface =
 
             return
                 match result with
-                | Error error -> box {| ok = false; value = null; error = error |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           value = null
+                           error = error |}
                 | Ok RecoveryAdmission.RecoveryExhausted ->
-                    box {| ok = true; value = "RecoveryExhausted"; error = "" |}
+                    box
+                        {| ok = true
+                           value = "RecoveryExhausted"
+                           error = "" |}
                 | Ok RecoveryAdmission.ContinueRecovery ->
-                    box {| ok = true; value = "ContinueRecovery"; error = "" |}
+                    box
+                        {| ok = true
+                           value = "ContinueRecovery"
+                           error = "" |}
         }
-

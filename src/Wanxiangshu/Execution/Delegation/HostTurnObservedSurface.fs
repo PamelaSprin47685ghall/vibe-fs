@@ -16,7 +16,10 @@ module HostTurnObservedSurface =
         if isNull value then "" else string value
 
     let private providerRunOf (value: obj) : ProviderRunIdentity option =
-        if isNull value then None else Some(ProviderRunIdentity.create (text value))
+        if isNull value then
+            None
+        else
+            Some(ProviderRunIdentity.create (text value))
 
     let private factOfJs (value: obj) : Fact =
         let sessionId = SessionId.create (text (value?SessionId))
@@ -51,15 +54,19 @@ module HostTurnObservedSurface =
                    case = "HostTurnObserved"
                    sessionId = SessionId.value payload.SessionId
                    providerRun =
-                       match payload.ProviderRun with
-                       | None -> null
-                       | Some run -> box (ProviderRunIdentity.value run)
+                    match payload.ProviderRun with
+                    | None -> null
+                    | Some run -> box (ProviderRunIdentity.value run)
                    observedAt = payload.ObservedAt.ToOffset(TimeSpan.Zero).ToString("O")
                    line = FactCodec.serializeFact fact |}
-        | _ -> box {| ok = false; error = "decoded fact is not HostTurnObserved" |}
+        | _ ->
+            box
+                {| ok = false
+                   error = "decoded fact is not HostTurnObserved" |}
 
     /// Encode one plain HostTurnObserved payload to canonical fact bytes.
-    let serialize (value: obj) : string = factOfJs value |> FactCodec.serializeFact
+    let serialize (value: obj) : string =
+        factOfJs value |> FactCodec.serializeFact
 
     /// Decode one fact line without exposing the Fact DU.
     let deserialize (line: string) : obj =
@@ -68,22 +75,29 @@ module HostTurnObservedSurface =
         | Error error -> box {| ok = false; error = error |}
 
     let private rejectionToJs (rejection: Wanxiangshu.Composition.Durable.FoldRejection) : obj =
-        box {| Fact = rejection.Fact; Reason = rejection.Reason |}
+        box
+            {| Fact = rejection.Fact
+               Reason = rejection.Reason |}
 
     /// Fold the observation through the canonical Agent reducer and expose only
     /// whether it created a session projection. HostTurnObserved is an inbox
     /// observation; it must not mutate LinkageProjection by itself.
     let foldNoop (value: obj) : obj =
-        match Wanxiangshu.Composition.Durable.Fold.foldEnvelope
-                  Wanxiangshu.Composition.Durable.Fold.empty
-                  (envelopeOfJs value) with
+        match
+            Wanxiangshu.Composition.Durable.Fold.foldEnvelope
+                Wanxiangshu.Composition.Durable.Fold.empty
+                (envelopeOfJs value)
+        with
         | Ok projection ->
             let hasSession =
                 AgentProjection.tryFind (SessionId.create (text (value?SessionId))) projection.AgentProjections
                 |> Option.isSome
 
             box {| ok = true; hasSession = hasSession |}
-        | Error rejection -> box {| ok = false; error = rejectionToJs rejection |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionToJs rejection |}
 
     /// Stable dedupe identity supplied by the observation payload.
     let identityKey (value: obj) : string =

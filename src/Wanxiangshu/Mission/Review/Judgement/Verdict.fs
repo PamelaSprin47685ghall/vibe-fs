@@ -28,10 +28,7 @@ module VerdictWorkflow =
             | Error failure -> return Error(JournalAppendFailure.describe failure)
         }
 
-    let recordJudgement
-        (journal: AgentJournal)
-        (submission: VerdictSubmission)
-        : Task<Result<unit, string>> =
+    let recordJudgement (journal: AgentJournal) (submission: VerdictSubmission) : Task<Result<unit, string>> =
         taskResult {
             let fact =
                 ReviewFact.ReviewVerdictRecorded

@@ -90,8 +90,11 @@ module ChildPromptAuthority =
             | Some durable ->
                 let snapshot = AgentJournal.snapshot durable
 
-                let handle = Map.tryFind turn.SessionId snapshot.AgentProjections.HandleByChildSession
-                let activeProfile = PromptAuthorityLedger.activeProfile turn.SessionId snapshot.AgentProjections
+                let handle =
+                    Map.tryFind turn.SessionId snapshot.AgentProjections.HandleByChildSession
+
+                let activeProfile =
+                    PromptAuthorityLedger.activeProfile turn.SessionId snapshot.AgentProjections
 
                 let runtime = PromptDispatcher.forJournal durable
                 return! registerLinkedChildIfNeeded runtime turn handle activeProfile

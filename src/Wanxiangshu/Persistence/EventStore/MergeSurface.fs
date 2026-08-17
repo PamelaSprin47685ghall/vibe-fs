@@ -56,16 +56,30 @@ module EventMergeSurface =
     let private invalidToJs (error: StorageInvalid) : obj =
         match error with
         | StorageInvalid.IdentityCollision eventId ->
-            box {| code = "IdentityCollision"; eventId = EventId.value eventId |}
-        | StorageInvalid.NonCanonical reason -> box {| code = "NonCanonical"; reason = reason |}
-        | StorageInvalid.MalformedEnvelope reason -> box {| code = "MalformedEnvelope"; reason = reason |}
+            box
+                {| code = "IdentityCollision"
+                   eventId = EventId.value eventId |}
+        | StorageInvalid.NonCanonical reason ->
+            box
+                {| code = "NonCanonical"
+                   reason = reason |}
+        | StorageInvalid.MalformedEnvelope reason ->
+            box
+                {| code = "MalformedEnvelope"
+                   reason = reason |}
         | StorageInvalid.MissingParent eventId ->
-            box {| code = "MissingParent"; eventId = EventId.value eventId |}
+            box
+                {| code = "MissingParent"
+                   eventId = EventId.value eventId |}
         | StorageInvalid.CyclicParents -> box {| code = "CyclicParents" |}
         | StorageInvalid.MissingPayload payloadRef ->
-            box {| code = "MissingPayload"; payloadRef = PayloadRef.value payloadRef |}
+            box
+                {| code = "MissingPayload"
+                   payloadRef = PayloadRef.value payloadRef |}
         | StorageInvalid.UnknownEventType eventType ->
-            box {| code = "UnknownEventType"; eventType = eventType |}
+            box
+                {| code = "UnknownEventType"
+                   eventType = eventType |}
 
     /// Merge named JS-native writer streams. Writer names only break impossible
     /// duplicate ties; causal readiness and EventId determine the order.
@@ -80,5 +94,11 @@ module EventMergeSurface =
                 writer, events)
 
         match EventKWayMerge.merge parsed with
-        | Ok events -> box {| ok = true; events = events |> List.map eventToJs |> List.toArray |}
-        | Error error -> box {| ok = false; error = invalidToJs error |}
+        | Ok events ->
+            box
+                {| ok = true
+                   events = events |> List.map eventToJs |> List.toArray |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error |}

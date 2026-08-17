@@ -54,7 +54,11 @@ module PrefixSurface =
 
     let private stateOfJs (value: obj) : ActivePrefixEpoch =
         { EpochId = PrefixEpochId.create (int64Value value?epoch)
-          Snapshot = if isNullish value?snapshot then None else Some(snapshotOfJs value?snapshot)
+          Snapshot =
+            if isNullish value?snapshot then
+                None
+            else
+                Some(snapshotOfJs value?snapshot)
           ReanchoredRuns = runsOfJs value?reanchoredRuns }
 
     let private stateToJs (state: ActivePrefixEpoch) : obj =
@@ -74,10 +78,16 @@ module PrefixSurface =
     let private resultToJs (result: Result<ActivePrefixEpoch, PrefixFoldRejection>) : obj =
         match result with
         | Ok value -> box {| ok = true; value = stateToJs value |}
-        | Error rejection -> box {| ok = false; error = rejectionName rejection |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionName rejection |}
 
-    let empty : obj =
-        box {| epoch = 0L; snapshot = null; reanchoredRuns = [||] |}
+    let empty: obj =
+        box
+            {| epoch = 0L
+               snapshot = null
+               reanchoredRuns = [||] |}
 
     let snapshot (value: obj) : obj = snapshotOfJs value |> snapshotToJs
 
@@ -97,12 +107,16 @@ module PrefixSurface =
             (stateOfJs state)
         |> resultToJs
 
-    let epochOf (state: obj) : int64 = PrefixEpochId.value (stateOfJs state).EpochId
+    let epochOf (state: obj) : int64 =
+        PrefixEpochId.value (stateOfJs state).EpochId
 
-    let hasSnapshot (state: obj) : bool = PrefixEpochProjection.hasSnapshot (stateOfJs state)
+    let hasSnapshot (state: obj) : bool =
+        PrefixEpochProjection.hasSnapshot (stateOfJs state)
 
     let reanchoredRuns (state: obj) : string array =
-        (stateOfJs state).ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value
+        (stateOfJs state).ReanchoredRuns
+        |> Set.toArray
+        |> Array.map ProviderRunIdentity.value
 
     let isReanchored (run: string) (state: obj) : bool =
         PrefixEpochProjection.isReanchored (ProviderRunIdentity.create (text run)) (stateOfJs state)
@@ -110,18 +124,30 @@ module PrefixSurface =
     let private intentToJs (intent: ProjectionIntent) : obj =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix ->
-            box {| replacesPrefix = false; dropLeading = 0; memoryId = null; memoryText = null |}
+            box
+                {| replacesPrefix = false
+                   dropLeading = 0
+                   memoryId = null
+                   memoryText = null |}
         | ProjectionIntent.ActivatePrefixEpoch value ->
             box
                 {| replacesPrefix = true
                    dropLeading = value.DropLeading
                    memoryId = value.SyntheticMessageId
                    memoryText = value.Memory |}
-        | _ -> box {| replacesPrefix = false; dropLeading = 0; memoryId = null; memoryText = null |}
+        | _ ->
+            box
+                {| replacesPrefix = false
+                   dropLeading = 0
+                   memoryId = null
+                   memoryText = null |}
 
     let forSnapshot (snapshot: obj) (memoryBody: string) : obj =
         let value =
-            if isNullish snapshot then None else Some(snapshotOfJs snapshot)
+            if isNullish snapshot then
+                None
+            else
+                Some(snapshotOfJs snapshot)
 
         XPrefixProjection.forSnapshot value CompanionProjectionSurface.memoryPreamble memoryBody
         |> intentToJs
@@ -130,7 +156,11 @@ module PrefixSurface =
         if text choice?kind = "probe" then
             let probeId =
                 let id = text choice?probeId
-                if System.String.IsNullOrWhiteSpace id then "probe-1" else id
+
+                if System.String.IsNullOrWhiteSpace id then
+                    "probe-1"
+                else
+                    id
 
             XProjectionChoice.UsePrefixProbe
                 { ProbeId = probeId
@@ -141,18 +171,20 @@ module PrefixSurface =
 
     let forChoice (choice: obj) (committed: obj) (memoryBody: string) : obj =
         let value =
-            if isNullish committed then None else Some(snapshotOfJs committed)
+            if isNullish committed then
+                None
+            else
+                Some(snapshotOfJs committed)
 
-        XPrefixProjection.forChoice
-            (choiceOfJs choice)
-            value
-            CompanionProjectionSurface.memoryPreamble
-            memoryBody
+        XPrefixProjection.forChoice (choiceOfJs choice) value CompanionProjectionSurface.memoryPreamble memoryBody
         |> intentToJs
 
     let requiredBlob (choice: obj) (committed: obj) : obj =
         let value =
-            if isNullish committed then None else Some(snapshotOfJs committed)
+            if isNullish committed then
+                None
+            else
+                Some(snapshotOfJs committed)
 
         XPrefixProjection.requiredBlob (choiceOfJs choice) value
         |> Option.map BlobRef.value

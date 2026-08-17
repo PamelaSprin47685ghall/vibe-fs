@@ -81,7 +81,8 @@ module CompressionSurface =
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
         | NoCandidateReason.CutoffProofFailed _ -> "CutoffProofFailed"
 
-    let private reasonText (reason: NoCandidateReason) = PrefixProbeSelection.describeNoCandidate reason
+    let private reasonText (reason: NoCandidateReason) =
+        PrefixProbeSelection.describeNoCandidate reason
 
     let private reasonOf (value: obj) : NoCandidateReason =
         match text value with
@@ -115,7 +116,10 @@ module CompressionSurface =
     /// digest oracle, not a cached value.
     let select (value: obj) : obj =
         let committed =
-            if isNullish value?committedSnapshot then None else Some(snapshotOfJs value?committedSnapshot)
+            if isNullish value?committedSnapshot then
+                None
+            else
+                Some(snapshotOfJs value?committedSnapshot)
 
         let recompute =
             if isNullish value?recomputeDigest then
@@ -132,14 +136,18 @@ module CompressionSurface =
                 (intValue value?coverableCutoff)
                 (text value?coveredDigest)
                 (intValue value?requestStartCutoff)
-                (BlobRef.create (if isNullish value?frozenRef then "blob-frozen-" + string (intValue value?coverableCutoff) else text value?frozenRef))
+                (BlobRef.create (
+                    if isNullish value?frozenRef then
+                        "blob-frozen-" + string (intValue value?coverableCutoff)
+                    else
+                        text value?frozenRef
+                ))
                 (BlobDigest.create (text value?frozenDigest))
                 recompute
 
         selectionResult result
 
-    let prefixEmpty : obj =
-        box {| epoch = 0; snapshot = null |}
+    let prefixEmpty: obj = box {| epoch = 0; snapshot = null |}
 
     let private optionObj (value: 'a option) : obj =
         match value with
@@ -153,7 +161,11 @@ module CompressionSurface =
 
     let private prefixStateOfJs (value: obj) : ActivePrefixEpoch =
         { EpochId = PrefixEpochId.create (int64Value value?epoch)
-          Snapshot = if isNullish value?snapshot then None else Some(snapshotOfJs value?snapshot)
+          Snapshot =
+            if isNullish value?snapshot then
+                None
+            else
+                Some(snapshotOfJs value?snapshot)
           ReanchoredRuns = Set.empty }
 
     let private prefixRejectionName (rejection: PrefixFoldRejection) : string =
@@ -166,8 +178,14 @@ module CompressionSurface =
 
     let private prefixResultToJs (result: Result<ActivePrefixEpoch, PrefixFoldRejection>) : obj =
         match result with
-        | Ok value -> box {| ok = true; value = prefixStateToJs value |}
-        | Error rejection -> box {| ok = false; error = prefixRejectionName rejection |}
+        | Ok value ->
+            box
+                {| ok = true
+                   value = prefixStateToJs value |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = prefixRejectionName rejection |}
 
     let applyRebase (request: obj) (state: obj) : obj =
         PrefixEpochProjection.applyRebase
@@ -178,10 +196,11 @@ module CompressionSurface =
         |> prefixResultToJs
 
     let prefixSnapshot (value: obj) : obj = snapshotOfJs value |> snapshotToJs
-    let empty : obj = prefixEmpty
+    let empty: obj = prefixEmpty
     let snapshot (value: obj) : obj = prefixSnapshot value
 
-    let prefixSnapshotFromProbe (value: obj) : obj = probeOfJs value |> fun probe -> snapshotToJs probe.Candidate
+    let prefixSnapshotFromProbe (value: obj) : obj =
+        probeOfJs value |> fun probe -> snapshotToJs probe.Candidate
 
     let private requestKindOf (value: obj) : ProviderRequestKind option =
         match text value |> fun value -> value.ToLowerInvariant() with
@@ -206,7 +225,10 @@ module CompressionSurface =
             | None -> Error(sprintf "unknown request kind: %s" (text value))
 
     let private armingOf (value: string) =
-        if value = "ArmedByAdvance" then SlotArming.ArmedByAdvance else SlotArming.NotArmed
+        if value = "ArmedByAdvance" then
+            SlotArming.ArmedByAdvance
+        else
+            SlotArming.NotArmed
 
     let private offsetOf (value: int) =
         match ((value % 4) + 4) % 4 with
@@ -227,9 +249,9 @@ module CompressionSurface =
             {| offset = int (AgentPairCursor.FallbackOffsetCodec.toByte cursor.Offset)
                failures = cursor.ConsecutiveFailureCount |}
 
-    let beginSequence : string = "NotArmed"
-    let afterFailureAdvance : string = "ArmedByAdvance"
-    let afterRestart : string = "NotArmed"
+    let beginSequence: string = "NotArmed"
+    let afterFailureAdvance: string = "ArmedByAdvance"
+    let afterRestart: string = "NotArmed"
     let isArmed (value: string) : bool = RecoverySlot.isArmed (armingOf value)
 
     let mayRecover (arming: string) (offset: int) (hasMaterial: bool) : bool =
@@ -279,7 +301,7 @@ module CompressionSurface =
         | Error error, _
         | _, Error error -> box {| ok = false; error = error |}
 
-    let requestKindLabels : string array =
+    let requestKindLabels: string array =
         [| ProviderRequestKind.WorkMain
            ProviderRequestKind.BloggerMain
            ProviderRequestKind.BloggerSquash
@@ -288,9 +310,14 @@ module CompressionSurface =
         |> Array.map ProviderRequestKind.label
 
     let requestKindMayCarryProbe (kind: string) : bool =
-        requestKindOf kind |> Option.map ProviderRequestKind.mayCarryProbe |> Option.defaultValue false
+        requestKindOf kind
+        |> Option.map ProviderRequestKind.mayCarryProbe
+        |> Option.defaultValue false
 
-    let requestKindLabel (kind: string) : string = requestKindOf kind |> Option.map ProviderRequestKind.label |> Option.defaultValue ""
+    let requestKindLabel (kind: string) : string =
+        requestKindOf kind
+        |> Option.map ProviderRequestKind.label
+        |> Option.defaultValue ""
 
     let armingName (value: string) : string = value
 
@@ -329,7 +356,11 @@ module CompressionSurface =
     let private attemptPlanCore (value: obj) : Result<AttemptPlan, string> =
         match roleResult value?role, tierResult value?tier, requestKindResult value?kind with
         | Ok role, Ok tier, Ok requestKind ->
-            let peerTier = if tier = AgentTier.Fast then AgentTier.Deep else AgentTier.Fast
+            let peerTier =
+                if tier = AgentTier.Fast then
+                    AgentTier.Deep
+                else
+                    AgentTier.Fast
 
             let authority: PromptAuthority.AuthorityExecutionProfile =
                 { SessionId = SessionId.create "surface-session"
@@ -436,12 +467,13 @@ module CompressionSurface =
                     match rejection with
                     | TerminalValidity.Rejection.Empty -> "Empty"
                     | TerminalValidity.Rejection.XmlOnly -> "XmlOnly" |}
-    let compactionSettingPaths : string array =
+
+    let compactionSettingPaths: string array =
         HostCompactionPolicy.requiredSettings
         |> List.map (fun setting -> String.concat "." setting.Path)
         |> List.toArray
 
-    let compactionSettings : obj array =
+    let compactionSettings: obj array =
         HostCompactionPolicy.requiredSettings
         |> List.map (fun setting ->
             box
@@ -470,30 +502,31 @@ module CompressionSurface =
         let name, message =
             match verdict with
             | CompactionGateVerdict.Satisfied -> "Satisfied", HostCompactionPolicy.describeVerdict verdict
-            | CompactionGateVerdict.SettingUnavailable _ -> "SettingUnavailable", HostCompactionPolicy.describeVerdict verdict
+            | CompactionGateVerdict.SettingUnavailable _ ->
+                "SettingUnavailable", HostCompactionPolicy.describeVerdict verdict
             | CompactionGateVerdict.CompactedDespiteSettings _ ->
                 "CompactedDespiteSettings", HostCompactionPolicy.describeVerdict verdict
 
         box {| name = name; message = message |}
 
-    let compactionIsContainable (isCompaction: bool) : bool = HostCompactionPolicy.isContainableCompaction isCompaction
+    let compactionIsContainable (isCompaction: bool) : bool =
+        HostCompactionPolicy.isContainableCompaction isCompaction
 
     let compactionNextReanchor (observed: string array) (reanchored: string array) : obj =
         let handled =
-            reanchored
-            |> Array.toList
-            |> List.map ProviderRunIdentity.create
-            |> Set.ofList
+            reanchored |> Array.toList |> List.map ProviderRunIdentity.create |> Set.ofList
 
-        HostCompactionPolicy.nextReanchor
-            (observed |> Array.toList |> List.map ProviderRunIdentity.create)
-            (fun run -> Set.contains run handled)
+        HostCompactionPolicy.nextReanchor (observed |> Array.toList |> List.map ProviderRunIdentity.create) (fun run ->
+            Set.contains run handled)
         |> Option.map ProviderRunIdentity.value
         |> optionObj
 
     let openingFloor (value: obj) : obj =
         let hasOpenLife = not (isNullish value?hasOpenLife) && unbox<bool> value?hasOpenLife
-        let planCommitted = not (isNullish value?planCommitted) && unbox<bool> value?planCommitted
+
+        let planCommitted =
+            not (isNullish value?planCommitted) && unbox<bool> value?planCommitted
+
         let openingSequence = int64Value value?openingSequence
         let headSequence = int64Value value?xTraceHeadSequence
 

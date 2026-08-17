@@ -109,7 +109,8 @@ module HostSessionDeletion =
                 | _ -> false
 
             if not stagedInspector then
-                do! cleanupRuntime
+                do!
+                    cleanupRuntime
                         scope.SyncDelegateRuntime
                         workspaceDirectory
                         finalizeInspector

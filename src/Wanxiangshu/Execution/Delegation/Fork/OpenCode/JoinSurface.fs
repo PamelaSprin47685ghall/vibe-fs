@@ -110,24 +110,38 @@ module JoinSurface =
                           Message = message }
                 )
             )
-        | "pty-exited" -> Some(PtyItem(PtyExited { PtyId = ptyId; Outcome = outcome; Closed = true }))
+        | "pty-exited" ->
+            Some(
+                PtyItem(
+                    PtyExited
+                        { PtyId = ptyId
+                          Outcome = outcome
+                          Closed = true }
+                )
+            )
         | _ -> None
 
     let private itemOf (value: obj) : JoinItem option =
-        if (text (value?kind)).StartsWith("pty-", StringComparison.Ordinal) then ptyItem value else agentItem value
+        if (text (value?kind)).StartsWith("pty-", StringComparison.Ordinal) then
+            ptyItem value
+        else
+            agentItem value
 
-    let private itemName (value: obj) = text (value?agentId), text (value?agentName)
+    let private itemName (value: obj) =
+        text (value?agentId), text (value?agentName)
 
     let renderBatch (languageName: string) (items: obj array) : string =
         if isNull items || items.Length = 0 then
             ""
         else
             let converted = items |> Array.map itemOf
+
             if converted |> Array.exists Option.isNone then
                 ""
             else
                 let converted = converted |> Array.choose id
                 let names = items |> Array.map itemName |> Map.ofArray
+
                 let terminals =
                     items
                     |> Array.choose (fun value ->
@@ -136,10 +150,12 @@ module JoinSurface =
                         else
                             None)
                     |> Map.ofArray
+
                 let resolveAgentName agentId =
                     match Map.tryFind agentId names with
                     | Some name when not (String.IsNullOrWhiteSpace name) -> name
                     | _ -> ""
+
                 let resolveTerminalLabel ptyId =
                     match Map.tryFind ptyId terminals with
                     | Some label when not (String.IsNullOrWhiteSpace label) -> label
@@ -189,6 +205,4 @@ module JoinSurface =
         match verdicts with
         | [] -> ""
         | head :: tail ->
-            JoinResultRenderer.renderOrchestratorBatch
-                (language languageName)
-                (NonEmptyBatch.ofHeadTail head tail)
+            JoinResultRenderer.renderOrchestratorBatch (language languageName) (NonEmptyBatch.ofHeadTail head tail)

@@ -10,7 +10,8 @@ open Wanxiangshu.Foundation.Identity
 module SessionBindingSurface =
 
     let private optionalText (value: obj) : string option =
-        if isNull value then None
+        if isNull value then
+            None
         else
             let text = string value
             if String.IsNullOrWhiteSpace text then None else Some text
@@ -38,15 +39,20 @@ module SessionBindingSurface =
 
     let private resultObject (project: 'a -> obj) (result: Result<'a, string>) : obj =
         match result with
-        | Ok value -> box {| ok = true; value = project value; error = "" |}
-        | Error message -> box {| ok = false; value = null; error = message |}
+        | Ok value ->
+            box
+                {| ok = true
+                   value = project value
+                   error = "" |}
+        | Error message ->
+            box
+                {| ok = false
+                   value = null
+                   error = message |}
 
     let bindChild (parentId: string) (childId: string) (agent: string) : obj =
         try
-            SessionExecutionBinding.bind
-                (SessionId.create parentId)
-                (SessionId.create childId)
-                (optionalText agent)
+            SessionExecutionBinding.bind (SessionId.create parentId) (SessionId.create childId) (optionalText agent)
 
             box {| ok = true; error = "" |}
         with ex ->
@@ -56,7 +62,8 @@ module SessionBindingSurface =
         SessionExecutionBinding.observeUserFacingAgent (SessionId.create sessionId) agent
 
     let tryAgent (sessionId: string) : string =
-        SessionExecutionBinding.tryAgent (SessionId.create sessionId) |> Option.defaultValue ""
+        SessionExecutionBinding.tryAgent (SessionId.create sessionId)
+        |> Option.defaultValue ""
 
     let prepareManaged (sessionId: string) (agent: string) (overrideBinding: bool) (model: obj) : obj =
         SessionExecutionBinding.prepareManagedPrompt
@@ -101,14 +108,21 @@ module SessionBindingSurface =
                 Some(PhysicalUserMessageId.create physicalUserMessageId)
 
         let prompt =
-            if String.IsNullOrWhiteSpace promptKey then None else Some(PromptKey.create promptKey)
+            if String.IsNullOrWhiteSpace promptKey then
+                None
+            else
+                Some(PromptKey.create promptKey)
 
         SessionExecutionBinding.beginProviderAttempt (SessionId.create sessionId) physical prompt
         |> resultObject (fun _ -> box true)
 
     let validateObservedProvider (sessionId: string) (agent: string) (model: obj) : obj =
         match modelOf model with
-        | None -> box {| ok = false; value = false; error = "PROMPT-006 requires a provider model" |}
+        | None ->
+            box
+                {| ok = false
+                   value = false
+                   error = "PROMPT-006 requires a provider model" |}
         | Some selected ->
             SessionExecutionBinding.validateObservedProvider (SessionId.create sessionId) agent selected
             |> resultObject box

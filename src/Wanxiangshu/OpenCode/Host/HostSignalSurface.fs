@@ -9,8 +9,14 @@ open Wanxiangshu.OpenCode
 module HostSignalSurface =
     let private snapshot signal : obj =
         match signal with
-        | HostSignal.SessionIdle sessionId -> box {| kind = "SessionIdle"; sessionId = SessionId.value sessionId |}
-        | HostSignal.AttemptAborted sessionId -> box {| kind = "AttemptAborted"; sessionId = SessionId.value sessionId |}
+        | HostSignal.SessionIdle sessionId ->
+            box
+                {| kind = "SessionIdle"
+                   sessionId = SessionId.value sessionId |}
+        | HostSignal.AttemptAborted sessionId ->
+            box
+                {| kind = "AttemptAborted"
+                   sessionId = SessionId.value sessionId |}
         | HostSignal.SessionDeleted(sessionId, parent) ->
             box
                 {| kind = "SessionDeleted"
@@ -23,15 +29,17 @@ module HostSignalSurface =
                    attempt = retry.Attempt
                    reason = retry.Reason |}
         | HostSignal.ProviderFailure(sessionId, reason) ->
-            box {| kind = "ProviderFailure"; sessionId = SessionId.value sessionId; reason = reason |}
+            box
+                {| kind = "ProviderFailure"
+                   sessionId = SessionId.value sessionId
+                   reason = reason |}
 
     let tryDecode (raw: obj) : obj =
-        HostEventCodec.tryDecode raw
-        |> Option.map snapshot
-        |> Option.defaultValue null
+        HostEventCodec.tryDecode raw |> Option.map snapshot |> Option.defaultValue null
 
     let tryAdapt (owned: string array) (raw: obj) : obj =
         let registry = HashSet<string>(owned)
+
         HostSignalAdapter.tryAdapt (fun sessionId -> registry.Contains(SessionId.value sessionId)) raw
         |> Option.map snapshot
         |> Option.defaultValue null

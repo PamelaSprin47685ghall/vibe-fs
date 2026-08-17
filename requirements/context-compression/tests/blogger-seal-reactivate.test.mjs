@@ -11,18 +11,6 @@ import * as handle from '../../../dist/Execution/Delegation/Handle/Surface.js'
 const KEY = 'ses-blog'
 
 
-  requestId: 'req-1',
-  mainSession: 'ses-main',
-  bloggerSession: 'ses-blog',
-  toml: 'delta-a',
-  previousIngested: 0,
-  nextIngested: 1,
-  previousCutoff: 0,
-  nextCutoff: 1,
-  nextDigest: 'd1',
-  deltaDigest: 'sha-a',
-})
-
 test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   const completed = handle.scenario('complete')
   assert.equal(completed.ok, true)

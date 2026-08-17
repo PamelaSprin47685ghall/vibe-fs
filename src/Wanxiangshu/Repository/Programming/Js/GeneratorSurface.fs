@@ -113,7 +113,10 @@ module JsGeneratorSurface =
         let bindings =
             surface.RuntimeBindings
             |> Map.toArray
-            |> Array.map (fun (memberName, binding) -> box {| memberName = memberName; binding = binding |})
+            |> Array.map (fun (memberName, binding) ->
+                box
+                    {| memberName = memberName
+                       binding = binding |})
 
         box
             {| toolName = surface.ToolName
@@ -128,15 +131,19 @@ module JsGeneratorSurface =
     /// Generate one JS SDK surface from plain role/permission labels.
     /// Unknown roles and capability-free roles return `null`.
     let generate (role: string) (permissionLabels: string array) (language: string) : obj =
-        typedFor role permissionLabels language |> Option.map surfaceToJs |> Option.toObj
+        typedFor role permissionLabels language
+        |> Option.map surfaceToJs
+        |> Option.toObj
 
     /// Generate from the canonical role permission projection.
     let generateRole (role: string) (language: string) : obj =
         typedRole role language |> Option.map surfaceToJs |> Option.toObj
 
     let isGeneratedToolName (role: string) (permissionLabels: string array) (toolName: string) : bool =
-        if not (roleExists role) then false
-        else JsToolGenerator.isGeneratedToolName role (permissionsOfLabels permissionLabels) toolName
+        if not (roleExists role) then
+            false
+        else
+            JsToolGenerator.isGeneratedToolName role (permissionsOfLabels permissionLabels) toolName
 
     let memberBinding (role: string) (permissionLabels: string array) (memberName: string) : obj =
         if not (roleExists role) then

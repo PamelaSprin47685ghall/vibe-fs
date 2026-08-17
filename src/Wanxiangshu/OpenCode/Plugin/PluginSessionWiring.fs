@@ -101,7 +101,10 @@ module PluginSessionWiring =
         let workspaceDirectory = boot.WorkspaceDirectory
 
         let roleForAgent (agent: string) : Role =
-            if agent.Contains "coder" then Role.Coder else Role.Inspector
+            if agent.Contains "coder" then
+                Role.Coder
+            else
+                Role.Inspector
 
         let bindStrengthReplica replicaId agent =
             match ManagedAgent.tryParse agent with

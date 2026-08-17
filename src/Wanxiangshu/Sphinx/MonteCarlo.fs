@@ -62,9 +62,7 @@ module MonteCarlo =
         | child :: _ -> List.rev (child :: node :: path)
         | [] ->
             chooseChild model node nodes
-            |> Option.fold
-                (fun _ child -> recurse child (node :: path) (depth + 1))
-                (List.rev (node :: path))
+            |> Option.fold (fun _ child -> recurse child (node :: path) (depth + 1)) (List.rev (node :: path))
 
     let private select model nodes =
         let rec loop node path depth =

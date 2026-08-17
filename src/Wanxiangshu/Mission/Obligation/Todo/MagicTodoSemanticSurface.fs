@@ -40,7 +40,10 @@ module MagicTodoSemanticSurface =
           Work = text (value?work) }
 
     let private obligationsOf (value: obj) : ObligationList =
-        if isNull value then [] else value |> unbox<obj array> |> Array.toList |> List.map obligationOf
+        if isNull value then
+            []
+        else
+            value |> unbox<obj array> |> Array.toList |> List.map obligationOf
 
     let private obligationsToJs (items: ObligationList) : obj array =
         items
@@ -50,18 +53,34 @@ module MagicTodoSemanticSurface =
     let private rejectCode reject =
         match reject with
         | MagicTodoReject.MultipleTodowriteInMessage callIds ->
-            box {| code = "MultipleTodowriteInMessage"; callIds = List.toArray callIds |}
-        | MagicTodoReject.EmptyObligationName ordinal -> box {| code = "EmptyObligationName"; ordinal = ordinal |}
-        | MagicTodoReject.DuplicateObligationName name -> box {| code = "DuplicateObligationName"; name = name |}
-        | MagicTodoReject.IdentityCorruption field -> box {| code = "IdentityCorruption"; field = field |}
+            box
+                {| code = "MultipleTodowriteInMessage"
+                   callIds = List.toArray callIds |}
+        | MagicTodoReject.EmptyObligationName ordinal ->
+            box
+                {| code = "EmptyObligationName"
+                   ordinal = ordinal |}
+        | MagicTodoReject.DuplicateObligationName name ->
+            box
+                {| code = "DuplicateObligationName"
+                   name = name |}
+        | MagicTodoReject.IdentityCorruption field ->
+            box
+                {| code = "IdentityCorruption"
+                   field = field |}
         | MagicTodoReject.AwaitingConsumableReview pending ->
-            box {| code = "AwaitingConsumableReview"; pendingTodoWriteId = pending |}
+            box
+                {| code = "AwaitingConsumableReview"
+                   pendingTodoWriteId = pending |}
         | MagicTodoReject.FirstSuicideWithoutCheckpoint -> box {| code = "FirstSuicideWithoutCheckpoint" |}
 
     let private resultToJs mapValue value =
         match value with
         | Ok result -> box {| ok = true; value = mapValue result |}
-        | Error error -> box {| ok = false; error = rejectCode error |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = rejectCode error |}
 
     let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
 
@@ -71,7 +90,10 @@ module MagicTodoSemanticSurface =
           ToolCallId = stringOption (value?toolCallId) |> Option.map ToolCallId.create }
 
     let private traceAnchorsOf (values: obj array) =
-        if isNull values then [] else values |> Array.toList |> List.map traceAnchorOf
+        if isNull values then
+            []
+        else
+            values |> Array.toList |> List.map traceAnchorOf
 
     let canonicalObligationListWire (items: obj array) : string =
         MagicTodo.canonicalObligationListWire (obligationsOf (box items))
@@ -85,10 +107,12 @@ module MagicTodoSemanticSurface =
 
     let admitTodowriteBatch (callIds: string array) : obj =
         let ids =
-            if isNull callIds then [] else callIds |> Array.toList |> List.map ToolCallId.create
+            if isNull callIds then
+                []
+            else
+                callIds |> Array.toList |> List.map ToolCallId.create
 
-        MagicTodo.admitTodowriteBatch ids
-        |> resultToJs (fun () -> null)
+        MagicTodo.admitTodowriteBatch ids |> resultToJs (fun () -> null)
 
     let checkPreparedReplay (expected: obj) (observed: obj) : obj =
         let identityOf value : PreparedIdentity =
@@ -112,13 +136,13 @@ module MagicTodoSemanticSurface =
         let currentItems = obligationsOf (box current)
         let submittedItems = obligationsOf (box submitted)
 
-        let mayProceedResult : Result<unit, MagicTodoReject> =
+        let mayProceedResult: Result<unit, MagicTodoReject> =
             if isNull mayProceed || not (unbox<bool> (mayProceed?ok)) then
                 Error(MagicTodoReject.AwaitingConsumableReview "pending-review")
             else
                 Ok()
 
-        let existingPrepared : ExistingPrepared option =
+        let existingPrepared: ExistingPrepared option =
             if isNull existing then
                 None
             else
@@ -132,7 +156,7 @@ module MagicTodoSemanticSurface =
                     { Identity = identity
                       TodoWriteId = TodoWriteId.create (text (existing?todoWriteId)) }
 
-        let localizedCall : AdmissionLocalizedToolCall =
+        let localizedCall: AdmissionLocalizedToolCall =
             { ToolCallId = ToolCallId.create (text (localized?toolCallId))
               ToolPartOrdinal = unbox<int> (localized?toolPartOrdinal)
               TodowriteCallIdsInMessage =
@@ -170,11 +194,17 @@ module MagicTodoSemanticSurface =
                            toolPartOrdinal = prepared.ToolPartOrdinal
                            providerInputDigest = prepared.ProviderInputDigest |} |}
         | MagicTodoAdmission.AdmissionOutcome.IdempotentReplay writeId ->
-            box {| kind = "IdempotentReplay"; todoWriteId = TodoWriteId.value writeId |}
+            box
+                {| kind = "IdempotentReplay"
+                   todoWriteId = TodoWriteId.value writeId |}
         | MagicTodoAdmission.AdmissionOutcome.AwaitingConsumableReview pending ->
-            box {| kind = "AwaitingConsumableReview"; pendingTodoWriteId = pending |}
+            box
+                {| kind = "AwaitingConsumableReview"
+                   pendingTodoWriteId = pending |}
         | MagicTodoAdmission.AdmissionOutcome.Rejected rejection ->
-            box {| kind = "Rejected"; error = rejectCode rejection |}
+            box
+                {| kind = "Rejected"
+                   error = rejectCode rejection |}
 
     let todoWriteId (sha256: string -> string) (lifeId: string) (toolCallId: string) : string =
         MagicTodo.todoWriteId sha256 (ManagerLifeId.create lifeId) (ToolCallId.create toolCallId)
@@ -185,17 +215,23 @@ module MagicTodoSemanticSurface =
         |> TodoReviewId.value
 
     let dedicatedReviewerId (sha256: string -> string) (lifeId: string) : string =
-        MagicTodo.dedicatedReviewerId sha256 (ManagerLifeId.create lifeId) |> DedicatedReviewerId.value
+        MagicTodo.dedicatedReviewerId sha256 (ManagerLifeId.create lifeId)
+        |> DedicatedReviewerId.value
 
     let todoWriteIdValue (value: string) = value
 
     let desiredLag1Cutoff (acceptedInOrder: string array) : string option =
-        let ids = if isNull acceptedInOrder then [] else acceptedInOrder |> Array.toList |> List.map TodoWriteId.create
+        let ids =
+            if isNull acceptedInOrder then
+                []
+            else
+                acceptedInOrder |> Array.toList |> List.map TodoWriteId.create
 
         MagicTodo.desiredLag1Cutoff ids |> Option.map TodoWriteId.value
 
     let workRecordStart (openingSequence: int) : int =
-        MagicTodo.workRecordStart (cursor openingSequence) |> fun value -> int value.Sequence
+        MagicTodo.workRecordStart (cursor openingSequence)
+        |> fun value -> int value.Sequence
 
     let blindPlanOpeningBoundary
         (openingSequence: int)
@@ -219,7 +255,12 @@ module MagicTodoSemanticSurface =
         (xTraceHeadSequence: int)
         (parts: obj array)
         : obj =
-        let callSequence = if isNull t1CallSequence then None else Some(cursor (unbox<int> t1CallSequence))
+        let callSequence =
+            if isNull t1CallSequence then
+                None
+            else
+                Some(cursor (unbox<int> t1CallSequence))
+
         let callId = stringOption t1ToolCallId |> Option.map ToolCallId.create
 
         MagicTodo.effectiveOpeningFloor
@@ -234,9 +275,7 @@ module MagicTodoSemanticSurface =
         |> Option.toObj
 
     let bloggerEffectiveStart (ingestedThrough: int) (workRecordStartSequence: int) : int =
-        MagicTodo.bloggerEffectiveStart
-            { IngestedThrough = cursor ingestedThrough }
-            (cursor workRecordStartSequence)
+        MagicTodo.bloggerEffectiveStart { IngestedThrough = cursor ingestedThrough } (cursor workRecordStartSequence)
         |> fun value -> int value.Sequence
 
     let requirePlanCommitmentBeforeFirstSuicide (planCommitted: bool) : obj =
@@ -296,16 +335,16 @@ module MagicTodoSemanticSurface =
                yBundleRef = commit.YBundleRef |> Option.map BlobRef.value |> Option.toObj
                yBundleDigest = commit.YBundleDigest |> Option.map BlobDigest.value |> Option.toObj
                providerPrefixDigest = commit.ProviderPrefixDigest |> Option.toObj
-               solvingProviderRun = commit.SolvingProviderRun |> Option.map ProviderRunIdentity.value |> Option.toObj |}
+               solvingProviderRun =
+                commit.SolvingProviderRun
+                |> Option.map ProviderRunIdentity.value
+                |> Option.toObj |}
 
     let requiresLag1Rebase (previousCommitted: obj) : bool =
         MagicTodoPrefixEpoch.requiresLag1Rebase (stringOption previousCommitted |> Option.map TodoWriteId.create)
 
     let wrapT1AcceptedResult (sessionId: string) (body: string) : string =
         let revelation =
-            ProviderProse.documentFor
-                (SessionId.create sessionId)
-                ManagerNarrative.Path.T1Revelation
-                Map.empty
+            ProviderProse.documentFor (SessionId.create sessionId) ManagerNarrative.Path.T1Revelation Map.empty
 
         ManagerNarrative.wrapT1AcceptedResult revelation body

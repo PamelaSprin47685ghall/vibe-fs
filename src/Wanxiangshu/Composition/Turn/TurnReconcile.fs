@@ -69,11 +69,7 @@ module TurnReconcile =
         |> Option.map (List.filter (fun message -> message.Role = "assistant"))
         |> Option.bind List.tryLast
 
-    let private resolveAssistant
-        (messages: SessionMessage list)
-        (root: string)
-        (physical: string)
-        =
+    let private resolveAssistant (messages: SessionMessage list) (root: string) (physical: string) =
         findAssistantAfter messages physical
         |> Option.orElseWith (fun () ->
             if physical = root then

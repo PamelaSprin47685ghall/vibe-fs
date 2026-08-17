@@ -24,8 +24,7 @@ module ExecutorToolSurface =
 
     let private scopeOf (value: obj) = (value :?> SurfaceScope).Value
 
-    let private rawField (raw: obj) (name: string) : obj =
-        if isNull raw then null else raw?(name)
+    let private rawField (raw: obj) (name: string) : obj = if isNull raw then null else raw?(name)
 
     let private rawString (raw: obj) (name: string) : string option =
         let value = rawField raw name
@@ -76,6 +75,7 @@ module ExecutorToolSurface =
     let describeRun (toolModule: obj) : obj =
         let factory = ToolHostCodec.factory toolModule
         let spec = ExecutorTool.runSpec factory (createScope null None |> scopeOf)
+
         box
             {| name = spec.Name
                description = spec.Description
@@ -85,13 +85,7 @@ module ExecutorToolSurface =
     /// schema module, `sessions` is an opaque Host session capability, `args`
     /// and `context` are plain Host objects, and `recovery` is the owner-owned
     /// recovery mode used by tests/canaries ("blocked", "waiting", or "ready").
-    let run
-        (toolModule: obj)
-        (sessions: obj)
-        (args: obj)
-        (context: obj)
-        (recovery: string)
-        : Task<string> =
+    let run (toolModule: obj) (sessions: obj) (args: obj) (context: obj) (recovery: string) : Task<string> =
         let factory = ToolHostCodec.factory toolModule
         let scopeHandle = createScope sessions (rawString context "workspaceDirectory")
         let scope = scopeOf scopeHandle

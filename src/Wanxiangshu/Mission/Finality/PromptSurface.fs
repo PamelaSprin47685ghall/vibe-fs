@@ -27,34 +27,37 @@ module PromptSurface =
         |> SyntheticToml.normalizeNewlines
 
     let private narrativePartView (part: ManagerNarrative.NarrativePart) : obj =
-        box {| text = part.Text; synthetic = part.Synthetic |}
+        box
+            {| text = part.Text
+               synthetic = part.Synthetic |}
 
     let private narrativeView (projection: ManagerNarrative.NarrativeProjection) : obj =
         box
             {| parts = projection.Parts |> List.map narrativePartView |> List.toArray
                text = ManagerNarrative.renderText projection |}
 
-    let planningTail () : string = rawResource ManagerNarrative.Path.PlanningTail
+    let planningTail () : string =
+        rawResource ManagerNarrative.Path.PlanningTail
 
     let reawakeningPrefix () : string =
         let lines = (rawResource ManagerNarrative.Path.Reawakening).Split '\n'
         if lines.Length = 0 then "" else lines.[0]
 
-    let planningTableDocument () : string = document ManagerNarrative.Path.PlanningTable
+    let planningTableDocument () : string =
+        document ManagerNarrative.Path.PlanningTable
 
-    let t1RevelationDocument () : string = document ManagerNarrative.Path.T1Revelation
+    let t1RevelationDocument () : string =
+        document ManagerNarrative.Path.T1Revelation
 
     let wrapT1AcceptedResult (todoWriteResult: string) : string =
         ManagerNarrative.wrapT1AcceptedResult (t1RevelationDocument ()) todoWriteResult
 
     let firstBirth (userTextRaw: string) : obj =
-        ManagerNarrative.firstBirth userTextRaw (planningTableDocument ()) |> narrativeView
+        ManagerNarrative.firstBirth userTextRaw (planningTableDocument ())
+        |> narrativeView
 
     let reawakening (userTextRaw: string) : obj =
-        ManagerNarrative.reawakening
-            userTextRaw
-            (document ManagerNarrative.Path.Reawakening)
-            (planningTableDocument ())
+        ManagerNarrative.reawakening userTextRaw (document ManagerNarrative.Path.Reawakening) (planningTableDocument ())
         |> narrativeView
 
     let firstBirthText (userTextRaw: string) : string =
@@ -62,13 +65,11 @@ module PromptSurface =
         |> ManagerNarrative.renderText
 
     let reawakeningText (userTextRaw: string) : string =
-        ManagerNarrative.reawakening
-            userTextRaw
-            (document ManagerNarrative.Path.Reawakening)
-            (planningTableDocument ())
+        ManagerNarrative.reawakening userTextRaw (document ManagerNarrative.Path.Reawakening) (planningTableDocument ())
         |> ManagerNarrative.renderText
 
-    let workActivation () : string = document ManagerLifecyclePrompt.Path.WorkActivation
+    let workActivation () : string =
+        document ManagerLifecyclePrompt.Path.WorkActivation
 
     let idleEncouragementPreT1 () : string =
         document ManagerLifecyclePrompt.Path.IdleEncouragementPreT1
@@ -76,7 +77,8 @@ module PromptSurface =
     let idleEncouragementPostT1 () : string =
         document ManagerLifecyclePrompt.Path.IdleEncouragementPostT1
 
-    let finalityUndecidable () : string = document ManagerLifecyclePrompt.Path.FinalityUndecidable
+    let finalityUndecidable () : string =
+        document ManagerLifecyclePrompt.Path.FinalityUndecidable
 
     let rejected (reviewerWorkRecord: string) : string =
         FinalityPrompt.rejected (document FinalityPrompt.Path.Rejected) reviewerWorkRecord

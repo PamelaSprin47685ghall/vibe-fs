@@ -83,10 +83,16 @@ module FinalitySurface =
             unbox<string array> value |> Array.toList
 
     let private optionalBlobRef (value: obj) : BlobRef option =
-        if isNull value then None else Some(BlobRef.create (str value))
+        if isNull value then
+            None
+        else
+            Some(BlobRef.create (str value))
 
     let private optionalBlobDigest (value: obj) : BlobDigest option =
-        if isNull value then None else Some(BlobDigest.create (str value))
+        if isNull value then
+            None
+        else
+            Some(BlobDigest.create (str value))
 
     let private handleOf (value: obj) : HandleId =
         HandleId.Agent(AgentHandleId.create (str value))
@@ -252,11 +258,11 @@ module FinalitySurface =
                                FirstProviderRun = ProviderRunIdentity.create (str (event?firstProviderRun))
                                FirstToolCallId = ToolCallId.create (str (event?firstToolCallId))
                                FirstPhysicalUserMessageId =
-                                   PhysicalUserMessageId.create (str (event?firstPhysicalUserMessageId))
+                                PhysicalUserMessageId.create (str (event?firstPhysicalUserMessageId))
                                SecondProviderRun = ProviderRunIdentity.create (str (event?secondProviderRun))
                                SecondToolCallId = ToolCallId.create (str (event?secondToolCallId))
                                SecondPhysicalUserMessageId =
-                                   PhysicalUserMessageId.create (str (event?secondPhysicalUserMessageId)) |}
+                                PhysicalUserMessageId.create (str (event?secondPhysicalUserMessageId)) |}
                     )
                 )
             )
@@ -794,7 +800,10 @@ module FinalitySurface =
         | Error _ -> false
         | Ok profile ->
             let opening =
-                ManagerLifeAdmission.tryHumanRootOpening lifecycle (Some profile) (PhysicalUserMessageId.create messageId)
+                ManagerLifeAdmission.tryHumanRootOpening
+                    lifecycle
+                    (Some profile)
+                    (PhysicalUserMessageId.create messageId)
 
             Option.isSome opening
 
@@ -815,8 +824,7 @@ module FinalitySurface =
 
     /// FINALITY-001: the Finality capability is granted only to Manager. The
     /// role and permission labels are plain strings at this boundary.
-    let isAllowed (role: string) (permission: string) : bool =
-        RolesSurface.isAllowed role permission
+    let isAllowed (role: string) (permission: string) : bool = RolesSurface.isAllowed role permission
 
     /// FINALITY-027: durable parent-visible handles are the Manager's only
     /// background obligation. Hidden Reviewer handles stay invisible through
@@ -836,33 +844,38 @@ module FinalitySurface =
         match str (event?progress) with
         | "manager-started" -> Ok JobProgress.ManagerStarted
         | "candidate-ready" ->
-            Ok
-                (JobProgress.CandidateReady
+            Ok(
+                JobProgress.CandidateReady
                     {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
-                       PreRebaseReviewBarrierId = ReviewBarrierId.create (str (event?preRebaseReviewBarrierId)) |})
+                       PreRebaseReviewBarrierId = ReviewBarrierId.create (str (event?preRebaseReviewBarrierId)) |}
+            )
         | "conflict-pending" ->
-            Ok
-                (JobProgress.ConflictPending
+            Ok(
+                JobProgress.ConflictPending
                     {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
                        TargetHeadSnapshot = CommitHash.create (str (event?targetHeadSnapshot))
                        ConflictFiles = stringArrayOf (event?conflictFiles)
-                       DiagnosticsDigest = str (event?diagnosticsDigest) |})
+                       DiagnosticsDigest = str (event?diagnosticsDigest) |}
+            )
         | "rebased-candidate-ready" ->
-            Ok
-                (JobProgress.RebasedCandidateReady
+            Ok(
+                JobProgress.RebasedCandidateReady
                     {| RebasedCommit = CommitHash.create (str (event?rebasedCommit))
                        TargetHeadSnapshot = CommitHash.create (str (event?targetHeadSnapshot))
-                       PostRebaseReviewBarrierId = ReviewBarrierId.create (str (event?postRebaseReviewBarrierId)) |})
+                       PostRebaseReviewBarrierId = ReviewBarrierId.create (str (event?postRebaseReviewBarrierId)) |}
+            )
         | "publish-claimed" ->
-            Ok
-                (JobProgress.PublishClaimed
+            Ok(
+                JobProgress.PublishClaimed
                     {| RebasedCommit = CommitHash.create (str (event?rebasedCommit))
-                       ExpectedHead = CommitHash.create (str (event?expectedHead)) |})
+                       ExpectedHead = CommitHash.create (str (event?expectedHead)) |}
+            )
         | "published" ->
-            Ok
-                (JobProgress.Published
+            Ok(
+                JobProgress.Published
                     {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
-                       ResultingTargetHead = CommitHash.create (str (event?resultingTargetHead)) |})
+                       ResultingTargetHead = CommitHash.create (str (event?resultingTargetHead)) |}
+            )
         | "failed" -> Ok(JobProgress.Failed(str (event?reason)))
         | "abandoned" -> Ok JobProgress.Abandoned
         | other -> Error $"unknown ManagerJob progress kind: {other}"
@@ -933,7 +946,9 @@ module FinalitySurface =
         match action with
         | JobRecoveryAction.ResumeManager -> box {| kind = "resume-manager" |}
         | JobRecoveryAction.RebaseReviewPublish commit ->
-            box {| kind = "rebase-review-publish"; candidateCommit = CommitHash.value commit |}
+            box
+                {| kind = "rebase-review-publish"
+                   candidateCommit = CommitHash.value commit |}
         | JobRecoveryAction.ResumeConflictResolution conflict ->
             box
                 {| kind = "resume-conflict-resolution"
@@ -951,7 +966,10 @@ module FinalitySurface =
                    resultingTargetHead = CommitHash.value published.ResultingTargetHead |}
         | JobRecoveryAction.RebaseAndReviewAgain -> box {| kind = "rebase-and-review-again" |}
         | JobRecoveryAction.CleanUp -> box {| kind = "clean-up" |}
-        | JobRecoveryAction.FailClosed reason -> box {| kind = "fail-closed"; reason = reason |}
+        | JobRecoveryAction.FailClosed reason ->
+            box
+                {| kind = "fail-closed"
+                   reason = reason |}
 
     let private jobView (job: ManagerJobProjection) : obj =
         box
@@ -972,11 +990,16 @@ module FinalitySurface =
         match jobProjectionEvents events with
         | Error message -> box {| ok = false; error = message |}
         | Ok projection ->
-            let jobs = projection.Jobs |> Map.toList |> List.map (fun (_, job) -> jobView job) |> List.toArray
-
-            let activeJobs =
-                OrchestratorProjection.activeJobs projection
-                |> List.map jobView
+            let jobs =
+                projection.Jobs
+                |> Map.toList
+                |> List.map (fun (_, job) -> jobView job)
                 |> List.toArray
 
-            box {| ok = true; jobs = jobs; activeJobs = activeJobs |}
+            let activeJobs =
+                OrchestratorProjection.activeJobs projection |> List.map jobView |> List.toArray
+
+            box
+                {| ok = true
+                   jobs = jobs
+                   activeJobs = activeJobs |}

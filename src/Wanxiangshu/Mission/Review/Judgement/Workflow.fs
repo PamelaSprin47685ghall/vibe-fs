@@ -140,15 +140,20 @@ module ReviewerWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (runResult: AgentRunResult) =
+        (runResult: AgentRunResult)
+        =
         task {
             if runResult.IsValid then
                 do! XTraceCapture.captureTerminal journal turn
                 do! appendAttemptClosed journal turn
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult) |> ignore
+
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                |> ignore
             else
                 do! appendAttemptClosed journal turn
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output") |> ignore
+
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
+                |> ignore
         }
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the

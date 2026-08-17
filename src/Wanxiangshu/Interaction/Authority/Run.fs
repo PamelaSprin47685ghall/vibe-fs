@@ -192,12 +192,12 @@ module PromptAuthorityRun =
     let private acceptedContinuationEvidence
         (physicalMessageId: PhysicalUserMessageId)
         (origin: PromptAuthority.PromptOrigin)
-        (projection: PromptAuthority.PromptAuthorityProjection) =
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        =
         match origin with
         | PromptAuthority.PromptOrigin.Continuation continuation ->
             { projection with
-                AcceptedContinuationIds =
-                    Map.add physicalMessageId continuation projection.AcceptedContinuationIds }
+                AcceptedContinuationIds = Map.add physicalMessageId continuation projection.AcceptedContinuationIds }
         | PromptAuthority.PromptOrigin.AuthorityRoot _
         | PromptAuthority.PromptOrigin.HostInternal
         | PromptAuthority.PromptOrigin.UnknownOrigin -> projection
@@ -265,7 +265,8 @@ module PromptAuthorityRun =
         (hostCompaction: bool)
         (projection: PromptAuthority.PromptAuthorityProjection)
         : PromptAuthority.PromptOrigin =
-        let pending = promptKey |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims)
+        let pending =
+            promptKey |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims)
 
         match pending, promptKey, projection.ActiveLogicalRun, hostCompaction with
         | Some claim, _, _, _ -> claim.Origin

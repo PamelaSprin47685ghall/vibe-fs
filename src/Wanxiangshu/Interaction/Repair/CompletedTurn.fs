@@ -144,8 +144,7 @@ module CompletedTurnClassifier =
         : obj =
         match isAbortErrorName errorName, completed && Option.isSome errorName, finish with
         | true, _, _ -> box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
-        | false, true, _ ->
-            box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error"))
+        | false, true, _ -> box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error"))
         | false, false, Some value when value.Equals("aborted", StringComparison.OrdinalIgnoreCase) ->
             box (ReconcileProgram.TurnAborted("finish=aborted"))
         | false, false, Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->

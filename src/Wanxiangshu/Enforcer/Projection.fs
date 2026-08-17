@@ -67,6 +67,7 @@ module EnforcementProjection =
             )
         | None ->
             let fieldName = fieldNameAtCommit record
+
             let tip =
                 { RuleId = record.TipRuleId
                   FieldName = fieldName
@@ -90,6 +91,7 @@ module EnforcementProjection =
     /// among the covered range, but improves residual vs independent tip lifetime).
     let applySquash (count: int) (state: EnforcementProjectionState) : EnforcementProjectionState =
         let n = List.length state.RecentTips
+
         let drop =
             if count <= 0 then 0
             elif count < n then count

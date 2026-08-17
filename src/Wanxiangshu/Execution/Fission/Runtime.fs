@@ -155,6 +155,7 @@ module FissionRuntime =
         | None -> ()
         | Some binding ->
             bindHandleAffinity binding.OwnerSessionId handleId binding.LaneIndex
+
             observerForGroup binding.GroupId
             |> Option.iter (fun callback -> callback binding.LaneIndex handleId childSessionId)
 

@@ -153,7 +153,9 @@ module CasebookIndex =
             previousEpoch
 
     let private freezeEntries entries =
-        let previousEpoch = frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
+        let previousEpoch =
+            frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
+
         let epoch = epochAfterRefresh previousEpoch (visibleChange entries)
         dirty <- false
 

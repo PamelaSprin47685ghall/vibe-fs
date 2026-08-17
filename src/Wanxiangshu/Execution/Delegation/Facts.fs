@@ -23,8 +23,7 @@ type HandleAbandonReason =
     | HostSessionGone
 
 [<RequireQualifiedAccess>]
-type FalseCompletionReason =
-    | LegacyAbortWasObservation
+type FalseCompletionReason = | LegacyAbortWasObservation
 
 /// Durable execution facts owned by the delegation boundary.
 type ExecutionFactCases =

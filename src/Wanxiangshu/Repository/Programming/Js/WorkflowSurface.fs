@@ -72,5 +72,4 @@ module JsWorkflowSurface =
         | JsToolWorkflow.JsToolOutcome.Succeeded _ -> null
         | JsToolWorkflow.JsToolOutcome.Failed failure -> box (JsFailure.reason failure)
 
-    let render (value: obj) : string =
-        JsToolsResult.render (outcomeOf value)
+    let render (value: obj) : string = JsToolsResult.render (outcomeOf value)

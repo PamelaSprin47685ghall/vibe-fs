@@ -26,12 +26,7 @@ module PairProgrammingCalibrationSurface =
     let compose (tip: obj) (toolEstimate: obj) (guideline: string) : string =
         PairProgrammingCalibration.compose (optionalText tip) (optionalText toolEstimate) guideline
 
-    let composeWithElapsed
-        (tip: obj)
-        (elapsed: obj)
-        (toolEstimate: obj)
-        (guideline: string)
-        : string =
+    let composeWithElapsed (tip: obj) (elapsed: obj) (toolEstimate: obj) (guideline: string) : string =
         PairProgrammingCalibration.composeWithElapsed
             (optionalText tip)
             (optionalText elapsed)

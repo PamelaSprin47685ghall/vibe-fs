@@ -12,7 +12,10 @@ module JsFilesystemSurface =
         if isNull value then "" else string value
 
     let private failureResult failure =
-        box {| ok = false; code = JsFailure.code failure; reason = JsFailure.reason failure |}
+        box
+            {| ok = false
+               code = JsFailure.code failure
+               reason = JsFailure.reason failure |}
 
     let private anchorOf (value: obj) : AnchorSpec =
         match text (value?kind) with
@@ -48,17 +51,26 @@ module JsFilesystemSurface =
 
     let glob (root: string) (pattern: string) : obj =
         match JsGlobFs.glob root pattern with
-        | Ok listing -> box {| ok = true; paths = listing.Paths |> List.toArray |}
+        | Ok listing ->
+            box
+                {| ok = true
+                   paths = listing.Paths |> List.toArray |}
         | Error failure -> failureResult failure
 
     let findAnchor (textValue: string) (declaration: obj) (occurrence: int) : obj =
         match JsAnchorFs.findAnchor textValue (anchorOf declaration) occurrence with
-        | Ok(startIndex, endIndex) -> box {| ok = true; value = [| box startIndex; box endIndex |] |}
+        | Ok(startIndex, endIndex) ->
+            box
+                {| ok = true
+                   value = [| box startIndex; box endIndex |] |}
         | Error failure -> failureResult failure
 
     let requireUnique (textValue: string) (declaration: obj) : obj =
         match JsAnchorFs.requireUnique textValue (anchorOf declaration) with
-        | Ok(startIndex, endIndex) -> box {| ok = true; value = [| box startIndex; box endIndex |] |}
+        | Ok(startIndex, endIndex) ->
+            box
+                {| ok = true
+                   value = [| box startIndex; box endIndex |] |}
         | Error failure -> failureResult failure
 
     let grep (root: string) (declaration: obj) (pattern: string) : obj =

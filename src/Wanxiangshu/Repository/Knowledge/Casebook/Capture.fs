@@ -195,9 +195,6 @@ module CasebookCapture =
         | _ -> None
 
     let ofExecCommand (command: string) : Observation option =
-        if System.String.IsNullOrWhiteSpace command then
-            None
-        elif command.Contains "$(" || command.Contains "`" then
-            None
-        else
-            tokenize command |> dispatchExecTokens
+        if System.String.IsNullOrWhiteSpace command then None
+        elif command.Contains "$(" || command.Contains "`" then None
+        else tokenize command |> dispatchExecTokens

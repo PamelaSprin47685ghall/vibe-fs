@@ -371,8 +371,7 @@ module ChildRecovery =
             |> List.indexed
             |> List.forall (fun (i, event) ->
                 match event with
-                | JoinRecoveryTrace.JoinReturned(agentId, _) ->
-                    joinReturnHasProofBeforeCommit events i agentId
+                | JoinRecoveryTrace.JoinReturned(agentId, _) -> joinReturnHasProofBeforeCommit events i agentId
                 | _ -> true)
 
         adjacencyOk events && orderForJoinReturns

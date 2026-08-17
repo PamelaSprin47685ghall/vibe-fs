@@ -26,7 +26,8 @@ module DispatchSurface =
         member _.LastObservation = lastObservation
 
         interface Wanxiangshu.OpenCode.ISessionHostPort with
-            member _.SubscribeTerminal(sessionId, listener) = typed.SubscribeTerminal(sessionId, listener)
+            member _.SubscribeTerminal(sessionId, listener) =
+                typed.SubscribeTerminal(sessionId, listener)
 
             member _.SendPrompt(sessionId, text, options) =
                 lastObservation <-
@@ -50,13 +51,20 @@ module DispatchSurface =
             member _.AbortSession(sessionId) = typed.AbortSession sessionId
             member _.InterruptSessionOnly(sessionId) = typed.InterruptSessionOnly sessionId
             member _.AbortChildren(sessionId) = typed.AbortChildren sessionId
-            member _.CreateSiblingSession(owner, parent, options) = typed.CreateSiblingSession(owner, parent, options)
+
+            member _.CreateSiblingSession(owner, parent, options) =
+                typed.CreateSiblingSession(owner, parent, options)
+
             member _.TryGetParentSession(sessionId) = typed.TryGetParentSession sessionId
-            member _.CreateChildSession(parent, options) = typed.CreateChildSession(parent, options)
+
+            member _.CreateChildSession(parent, options) =
+                typed.CreateChildSession(parent, options)
+
             member _.ListChildren(parent) = typed.ListChildren parent
             member _.FamilyRootOf(sessionId) = typed.FamilyRootOf sessionId
 
-    let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort = PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
+    let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort =
+        PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
 
     let admittedWithReceipt (value: string) : Outcome.SendOutcome =
         Outcome.SendOutcome.AdmittedWithReceipt(TransportReceipt.create value)
@@ -66,14 +74,18 @@ module DispatchSurface =
 
     let retryable (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.Retryable reason
 
-    let acceptanceUnknown (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.AcceptanceUnknown reason
+    let acceptanceUnknown (reason: string) : Outcome.SendOutcome =
+        Outcome.SendOutcome.AcceptanceUnknown reason
 
     let fatal (reason: string) : Outcome.SendOutcome = Outcome.SendOutcome.Fatal reason
 
     let private appendResult result =
         match result with
         | Ok _ -> box {| ok = true; error = null |}
-        | Error failure -> box {| ok = false; error = JournalAppendFailure.describe failure |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error = JournalAppendFailure.describe failure |}
 
     /// Seed the durable AgentOwnerRoot needed by a continuation owner. This is
     /// the same PromptFact writer used by production ingress; the returned value
@@ -84,11 +96,12 @@ module DispatchSurface =
             | Error error -> return box {| ok = false; error = error |}
             | Ok(_, role, tier, peer) ->
                 let sessionId = SessionId.create session
+
                 let fact =
                     PromptFact.AuthorityRootAccepted
                         {| SessionId = sessionId
-                           LogicalRunId = LogicalRunId.create(sprintf "run-%s" session)
-                           AuthorityRootUserMessageId = AuthorityRootUserMessageId.create(sprintf "root-%s" session)
+                           LogicalRunId = LogicalRunId.create (sprintf "run-%s" session)
+                           AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sprintf "root-%s" session)
                            AuthorityKind = "AgentOwnerRoot"
                            SelectedAgent = agent
                            PeerAgent = peer
@@ -112,6 +125,7 @@ module DispatchSurface =
         task {
             let runtime = PromptDispatcher.forJournal handle.Journal
             let adapter = PlainSessionPort(port)
+
             let! result =
                 runtime.SendAgentOwnerRoot
                     (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
@@ -139,12 +153,20 @@ module DispatchSurface =
         }
 
     let private profileOf (value: obj) : Result<PromptAuthority.AuthorityExecutionProfile, string> =
-        let selectedAgent = if isNull value?selectedAgent then "" else string value?selectedAgent
+        let selectedAgent =
+            if isNull value?selectedAgent then
+                ""
+            else
+                string value?selectedAgent
 
         match PromptAuthority.parseAgentName selectedAgent with
         | Error error -> Error error
         | Ok(_, role, tier, peer) ->
-            let peerAgent = if isNull value?peerAgent then peer else string value?peerAgent
+            let peerAgent =
+                if isNull value?peerAgent then
+                    peer
+                else
+                    string value?peerAgent
 
             match string value?authorityKind with
             | "AgentOwnerRoot" ->
@@ -192,6 +214,7 @@ module DispatchSurface =
             | Some kind, Ok authorityProfile ->
                 let runtime = PromptDispatcher.forJournal handle.Journal
                 let adapter = PlainSessionPort(port)
+
                 let! result =
                     runtime.SendContinuation
                         (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
@@ -219,9 +242,19 @@ module DispatchSurface =
                                error = error
                                observation = adapter.LastObservation |}
             | None, _ ->
-                return box {| ok = false; key = null; error = sprintf "Unknown continuation kind: %s" continuation; observation = null |}
+                return
+                    box
+                        {| ok = false
+                           key = null
+                           error = sprintf "Unknown continuation kind: %s" continuation
+                           observation = null |}
             | _, Error error ->
-                return box {| ok = false; key = null; error = error; observation = null |}
+                return
+                    box
+                        {| ok = false
+                           key = null
+                           error = error
+                           observation = null |}
         }
 
     let private profileView (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
@@ -256,8 +289,16 @@ module DispatchSurface =
 
             return
                 match result with
-                | Ok profile -> box {| ok = true; profile = profileView profile; error = null |}
-                | Error error -> box {| ok = false; profile = null; error = error |}
+                | Ok profile ->
+                    box
+                        {| ok = true
+                           profile = profileView profile
+                           error = null |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           profile = null
+                           error = error |}
         }
 
     /// PROMPT-004: accept the external HumanRoot through the same Dispatcher
@@ -278,8 +319,16 @@ module DispatchSurface =
 
             return
                 match result with
-                | Ok profile -> box {| ok = true; profile = profileView profile; error = null |}
-                | Error error -> box {| ok = false; profile = null; error = error |}
+                | Ok profile ->
+                    box
+                        {| ok = true
+                           profile = profileView profile
+                           error = null |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           profile = null
+                           error = error |}
         }
 
     let private claimView (claim: PromptAuthority.PromptClaim) : obj =
@@ -304,7 +353,10 @@ module DispatchSurface =
 
         box
             {| runtimeStartCount = snapshot.AgentProjections.RuntimeStartCount
-               activeLogicalRun = projection.ActiveLogicalRun |> Option.map profileView |> Option.defaultValue null
+               activeLogicalRun =
+                projection.ActiveLogicalRun
+                |> Option.map profileView
+                |> Option.defaultValue null
                pendingClaims =
                 projection.PendingClaims
                 |> Map.toArray
@@ -329,7 +381,9 @@ module DispatchSurface =
                standaloneFireAndForget = false |}
 
     let awaitModeObservation () : obj =
-        box {| await = "Await"; detached = "Detached" |}
+        box
+            {| await = "Await"
+               detached = "Detached" |}
 
     let runtimeStartPolicy () : obj =
         box
@@ -344,6 +398,7 @@ module DispatchSurface =
         let kind = watermarkText value?kind
         let sequence = Int64.Parse(watermarkText value?seq)
         let runtime = watermarkText value?runtime
+
         let observedAt =
             if isNull value?observedAt then
                 DateTimeOffset.Parse("1970-01-01T00:00:00Z").AddTicks sequence
@@ -384,7 +439,11 @@ module DispatchSurface =
                                     Some(AuthorityRootUserMessageId.create authorityRoot)
                                EffectiveAgent =
                                 let agent = watermarkText value?effectiveAgent
-                                if System.String.IsNullOrWhiteSpace agent then None else Some agent
+
+                                if System.String.IsNullOrWhiteSpace agent then
+                                    None
+                                else
+                                    Some agent
                                PayloadDigest = watermarkText value?payloadDigest |}
                     )
                 )
@@ -431,10 +490,16 @@ module DispatchSurface =
                     box
                         {| ok = false
                            value = null
-                           error = box {| fact = rejection.Fact; reason = rejection.Reason |} |}
+                           error =
+                            box
+                                {| fact = rejection.Fact
+                                   reason = rejection.Reason |} |}
 
         loop Fold.empty (events |> Array.toList)
 
     let pendingClaimCount (handle: JournalHandle) (session: string) : int =
-        let projection = (PromptDispatcher.forJournal handle.Journal).ProjectionFor(SessionId.create session)
+        let projection =
+            (PromptDispatcher.forJournal handle.Journal)
+                .ProjectionFor(SessionId.create session)
+
         projection.PendingClaims |> Map.count

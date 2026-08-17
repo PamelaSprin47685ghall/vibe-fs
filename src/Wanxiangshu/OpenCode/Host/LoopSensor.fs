@@ -109,7 +109,7 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
         else
             Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "ignored-duplicate" ]
 
-    member private this.Evaluate (delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation =
+    member private this.Evaluate(delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation =
         lock gate (fun () ->
             let detector = this.DetectorFor delta.SessionId
             LoopDetector.pushText detector delta.Delta)
@@ -118,7 +118,7 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
         if evaluation.IsLoop then
             this.Kill delta.SessionId (Some evaluation.WeightedDistinctTokenCount) evaluation.Step
 
-    member private this.ObserveOwned (delta: LoopEventCodec.TextDelta) =
+    member private this.ObserveOwned(delta: LoopEventCodec.TextDelta) =
         match isOwned delta.SessionId, this.IsArmed delta.SessionId with
         | false, _
         | true, true -> ()

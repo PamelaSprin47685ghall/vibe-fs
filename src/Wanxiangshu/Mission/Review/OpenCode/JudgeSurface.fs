@@ -19,11 +19,16 @@ module JudgeSurface =
         | Error error -> box {| ok = false; error = error |}
 
     let contract (language: string) : obj =
-        let description = ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/description"
+        let description =
+            ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/description"
+
         box
             {| name = "judge"
                description = description
-               arguments = [| box {| name = "verdict"; values = [| "PERFECT"; "REVISE" |] |} |] |}
+               arguments =
+                [| box
+                       {| name = "verdict"
+                          values = [| "PERFECT"; "REVISE" |] |} |] |}
 
     /// The public fail-closed precedence used by JudgeTool before any identity
     /// or tree lookup. This is diagnostic text, not internal state.
@@ -36,11 +41,17 @@ module JudgeSurface =
         (hasTree: bool)
         : obj =
         if role <> "Reviewer" then
-            box {| ok = false; message = "This verdict did not come from a Reviewer session." |}
+            box
+                {| ok = false
+                   message = "This verdict did not come from a Reviewer session." |}
         elif System.String.IsNullOrWhiteSpace sessionId then
-            box {| ok = false; message = "judgment authority is established before review context" |}
+            box
+                {| ok = false
+                   message = "judgment authority is established before review context" |}
         elif not hasOwner || not hasParent || not hasBarrier || not hasTree then
-            box {| ok = false; message = "review context is incomplete" |}
+            box
+                {| ok = false
+                   message = "review context is incomplete" |}
         else
             box {| ok = true; message = "" |}
 

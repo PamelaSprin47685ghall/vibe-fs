@@ -113,10 +113,7 @@ type HostForkRuntime
     let childWorkRecordOf =
         defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
-    let readConvergedAggregate
-        (durable: AgentJournal)
-        (aggregateRef: BlobRef)
-        (aggregateDigest: BlobDigest) =
+    let readConvergedAggregate (durable: AgentJournal) (aggregateRef: BlobRef) (aggregateDigest: BlobDigest) =
         task {
             match! durable.Writer.BlobWriter.Read aggregateRef with
             | Ok text when HostDigest.sha256Hex text = BlobDigest.value aggregateDigest -> return Some text
@@ -125,9 +122,7 @@ type HostForkRuntime
 
     let readLatestConverged (durable: AgentJournal) (sessionId: SessionId) =
         match
-            FissionProjection.tryLatestForOwner
-                sessionId
-                (AgentJournal.snapshot durable).AgentProjections.Fission
+            FissionProjection.tryLatestForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
         with
         | Some { Terminal = FissionGroupTerminal.Converged(_, _, aggregateRef, aggregateDigest) } ->
             readConvergedAggregate durable aggregateRef aggregateDigest
@@ -175,7 +170,9 @@ type HostForkRuntime
 
     let notifyPtyObservers item =
         let observers = lock gate (fun () -> ptyCompletionObservers |> Seq.toList)
-        for observer in observers do notifyPtyObserver observer item
+
+        for observer in observers do
+            notifyPtyObserver observer item
 
     do
         ptyPortInstance.AddMailboxSender(fun item ->
@@ -246,7 +243,12 @@ type HostForkRuntime
             | Some run -> this.FailRun(run, error)
             | None -> Task.FromResult(()) :> Task
 
-        let deliverDeferredPrompt (pending: {| ChildId: SessionId; AgentName: string; Prompt: string |}) =
+        let deliverDeferredPrompt
+            (pending:
+                {| ChildId: SessionId
+                   AgentName: string
+                   Prompt: string |})
+            =
             task {
                 let! sent =
                     HostForkAgentOwner.sendFirstPromptObserved

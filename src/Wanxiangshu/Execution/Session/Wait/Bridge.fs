@@ -49,11 +49,21 @@ module CausalWaitBridge =
     let private stringify (value: obj) : string = jsNative
 
     let private existingExclude (excludePath: string) : string =
-        if existsSync excludePath then readFileSync (excludePath, "utf8") else ""
+        if existsSync excludePath then
+            readFileSync (excludePath, "utf8")
+        else
+            ""
+
+    let private linePrefix (existing: string) : string =
+        if existing.Length = 0 || existing.EndsWith("\n") then
+            ""
+        else
+            "\n"
 
     let private appendDiagnosticMarker (excludePath: string) (existing: string) : unit =
         if not (existing.Contains ".wanxiangshu/") then
-            let prefix = if existing.Length = 0 || existing.EndsWith("\n") then "" else "\n"
+            let prefix = linePrefix existing
+
             appendFileSync (
                 excludePath,
                 prefix + "# wanxiangshu diagnostic bridge (non-authoritative)\n.wanxiangshu/\n",
@@ -183,4 +193,7 @@ module CausalWaitBridge =
 
     /// Best-effort overwrite of `<workspace>/.wanxiangshu/diagnostics/causal-waits.json`.
     let writeSnapshot (workspace: string) (reader: IWaitSnapshotReader) : unit =
-        if String.IsNullOrWhiteSpace workspace then () else writeSnapshotUnsafe workspace reader
+        if String.IsNullOrWhiteSpace workspace then
+            ()
+        else
+            writeSnapshotUnsafe workspace reader

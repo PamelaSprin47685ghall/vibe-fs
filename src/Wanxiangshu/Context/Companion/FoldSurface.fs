@@ -23,8 +23,13 @@ module ContextFoldSurface =
     let private providerRun (value: obj) = ProviderRunIdentity.create (text value)
     let private blobRef (value: obj) = BlobRef.create (text value)
     let private blobDigest (value: obj) = BlobDigest.create (text value)
-    let private frameEpoch (value: obj) = FrameEpochId.create (Int64.Parse(text value))
-    let private prefixEpoch (value: obj) = PrefixEpochId.create (Int64.Parse(text value))
+
+    let private frameEpoch (value: obj) =
+        FrameEpochId.create (Int64.Parse(text value))
+
+    let private prefixEpoch (value: obj) =
+        PrefixEpochId.create (Int64.Parse(text value))
+
     let private bloggerRequest (value: obj) = BloggerRequestId.create (text value)
     let private promptKey (value: obj) = PromptKey.create (text value)
 
@@ -41,15 +46,25 @@ module ContextFoldSurface =
     let private intValue (value: obj) = unbox<int> value
 
     let private stringList (value: obj) =
-        if isNull value then [] else unbox<string array> value |> Array.toList
+        if isNull value then
+            []
+        else
+            unbox<string array> value |> Array.toList
 
     let private toolCallList (value: obj) =
-        if isNull value then [] else unbox<string array> value |> Array.toList |> List.map ToolCallId.create
+        if isNull value then
+            []
+        else
+            unbox<string array> value |> Array.toList |> List.map ToolCallId.create
 
     let private companionFact (caseName: string) (payload: obj) : AgentFact option =
         match caseName with
         | "CompanionBloggerClosed" ->
-            Some(AgentFact.Companion(CompanionFactCases.CompanionBloggerClosed {| SessionId = sessionId (payload?SessionId) |}))
+            Some(
+                AgentFact.Companion(
+                    CompanionFactCases.CompanionBloggerClosed {| SessionId = sessionId (payload?SessionId) |}
+                )
+            )
         | "OpeningPromptCaptured" ->
             Some(
                 AgentFact.Companion(
@@ -168,13 +183,17 @@ module ContextFoldSurface =
         | Some state ->
             box
                 {| FrameEpochId = FrameEpochId.value state.FrameEpochId
-                   FrameKinds = state |> BlogProjection.frames |> List.map (fun frame -> string frame.Kind) |> List.toArray
+                   FrameKinds =
+                    state
+                    |> BlogProjection.frames
+                    |> List.map (fun frame -> string frame.Kind)
+                    |> List.toArray
                    FrameCount = BlogProjection.frameCount state
                    Coverage =
-                       box
-                           {| IngestedThroughSequence = state.Coverage.IngestedThroughSequence
-                              CoverableTurnCutoffExclusive = state.Coverage.CoverableTurnCutoffExclusive
-                              CoveredPrefixDigest = state.Coverage.CoveredPrefixDigest |} |}
+                    box
+                        {| IngestedThroughSequence = state.Coverage.IngestedThroughSequence
+                           CoverableTurnCutoffExclusive = state.Coverage.CoverableTurnCutoffExclusive
+                           CoveredPrefixDigest = state.Coverage.CoveredPrefixDigest |} |}
 
     let private sessionToJs (session: SessionAgentProjection) : obj =
         box
@@ -182,12 +201,12 @@ module ContextFoldSurface =
                XTrace = null
                Blog = blogToJs session.Blog
                PrefixEpoch =
-                   match session.PrefixEpoch with
-                   | None -> null
-                   | Some epoch ->
-                       box
-                           {| EpochId = PrefixEpochId.value epoch.EpochId
-                              Snapshot = prefixSnapshotToJs epoch.Snapshot |}
+                match session.PrefixEpoch with
+                | None -> null
+                | Some epoch ->
+                    box
+                        {| EpochId = PrefixEpochId.value epoch.EpochId
+                           Snapshot = prefixSnapshotToJs epoch.Snapshot |}
                Handles = null
                ReviewGuard = null
                ReviewRequirements = null
@@ -207,10 +226,13 @@ module ContextFoldSurface =
         |> List.map (fun (sessionId, session) -> SessionId.value sessionId, sessionToJs session)
         |> createObj
 
-    let private okState projection = box {| sessions = projectionToJs projection |}
+    let private okState projection =
+        box {| sessions = projectionToJs projection |}
 
     let private rejectionToJs (rejection: FoldRejection) : obj =
-        box {| Fact = rejection.Fact; Reason = rejection.Reason |}
+        box
+            {| Fact = rejection.Fact
+               Reason = rejection.Reason |}
 
     let fold (envelopes: obj array) : obj =
         let rec loop current remaining =
@@ -220,7 +242,9 @@ module ContextFoldSurface =
                 match Wanxiangshu.Composition.Durable.Fold.foldEnvelope current (envelopeOfJs value) with
                 | Ok updated -> loop updated tail
                 | Error rejection ->
-                    box {| ok = false; error = rejectionToJs rejection |}
+                    box
+                        {| ok = false
+                           error = rejectionToJs rejection |}
 
         loop Wanxiangshu.Composition.Durable.Fold.empty (envelopes |> Array.toList)
 
@@ -230,6 +254,7 @@ module ContextFoldSurface =
             envelopes
             |> Array.map (fun value ->
                 let envelope = envelopeOfJs value
+
                 match Envelope.deserialize (Envelope.serialize envelope) with
                 | Ok roundTripped -> roundTripped
                 | Error error -> failwith $"ContextFoldSurface: envelope round trip failed: {error}")
@@ -241,6 +266,8 @@ module ContextFoldSurface =
                 match Wanxiangshu.Composition.Durable.Fold.foldEnvelope current envelope with
                 | Ok updated -> loop updated tail
                 | Error rejection ->
-                    box {| ok = false; error = rejectionToJs rejection |}
+                    box
+                        {| ok = false
+                           error = rejectionToJs rejection |}
 
         loop Wanxiangshu.Composition.Durable.Fold.empty (decoded |> Array.toList)

@@ -65,7 +65,9 @@ module HostCompactionGate =
     /// (`bootstrap.ts:36`), so a write here is in force before anything reads it.
     let private writeSetting (config: obj) (setting: CompactionSetting) : unit =
         let ensureChild (node: obj) head =
-            if isNull node?(head) then node?(head) <- createObj []
+            if isNull node?(head) then
+                node?(head) <- createObj []
+
             node?(head)
 
         let rec descend (node: obj) (path: string list) =
@@ -84,7 +86,10 @@ module HostCompactionGate =
     /// automatic compaction.
     let private readSetting (config: obj) (setting: CompactionSetting) : bool option =
         let readLeaf (node: obj) leaf =
-            if isNull node?(leaf) then None else Some(unbox<bool> node?(leaf))
+            if isNull node?(leaf) then
+                None
+            else
+                Some(unbox<bool> node?(leaf))
 
         let rec descendNonNull (node: obj) (path: string list) =
             match path with

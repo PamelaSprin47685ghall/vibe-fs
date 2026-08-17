@@ -64,7 +64,9 @@ type JoinAttemptRegistry() =
 
     let removeLease (key: string) (list: ResizeArray<JoinAttemptLease>) (lease: JoinAttemptLease) =
         list.Remove lease |> ignore
-        if list.Count = 0 then active.Remove key |> ignore
+
+        if list.Count = 0 then
+            active.Remove key |> ignore
 
     let unregister (key: string) (lease: JoinAttemptLease) =
         lock gate (fun () ->

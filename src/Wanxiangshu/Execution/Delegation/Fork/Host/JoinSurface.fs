@@ -16,12 +16,21 @@ module JoinSurface =
         (currentMembers: string array)
         : obj =
         if permitRoot <> currentRoot then
-            box {| ok = false; error = sprintf "family recovery permit root mismatch: permit=%s runtime=%s" permitRoot currentRoot |}
+            box
+                {| ok = false
+                   error = sprintf "family recovery permit root mismatch: permit=%s runtime=%s" permitRoot currentRoot |}
         elif permitSequence > currentSequence then
-            box {| ok = false; error = sprintf "family recovery permit journalSequence stale: permit=%d" permitSequence |}
+            box
+                {| ok = false
+                   error = sprintf "family recovery permit journalSequence stale: permit=%d" permitSequence |}
         else
-            let missing = Set.difference (Set.ofArray permitMembers) (Set.ofArray currentMembers) |> Set.toArray
+            let missing =
+                Set.difference (Set.ofArray permitMembers) (Set.ofArray currentMembers)
+                |> Set.toArray
+
             if missing.Length > 0 then
-                box {| ok = false; error = sprintf "closure lost members: missing=%s" (String.concat "," missing) |}
+                box
+                    {| ok = false
+                       error = sprintf "closure lost members: missing=%s" (String.concat "," missing) |}
             else
                 box {| ok = true; error = "NothingToJoin" |}

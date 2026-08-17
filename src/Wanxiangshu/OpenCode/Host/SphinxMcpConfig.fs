@@ -89,8 +89,7 @@ module SphinxMcpConfig =
 
     let private applyLaunch mcp launch =
         let write (command: string array) (enabled: bool) =
-            mcp?(SphinxMcp.serverName) <-
-                createObj [ "type" ==> "local"; "command" ==> command; "enabled" ==> enabled ]
+            mcp?(SphinxMcp.serverName) <- createObj [ "type" ==> "local"; "command" ==> command; "enabled" ==> enabled ]
 
         match launch with
         | Launch.Disabled -> write (SphinxMcp.localCommand (defaultServerEntry ())) false

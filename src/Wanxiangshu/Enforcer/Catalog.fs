@@ -88,11 +88,7 @@ module EnforcerCatalog =
                 || r.Name <> r.FieldName)
         with
         | Some bad ->
-            Error(
-                sprintf
-                    "enforcer catalog empty text or identity mismatch on rule ordinal %d"
-                    bad.LexicalOrder
-            )
+            Error(sprintf "enforcer catalog empty text or identity mismatch on rule ordinal %d" bad.LexicalOrder)
         | None -> Ok ordered
 
     let validate (schemaVersion: int) (rules: EnforcerRule list) : Result<EnforcerRule list, string> =

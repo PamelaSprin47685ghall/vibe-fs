@@ -30,8 +30,10 @@ module Search =
         (node: string)
         (g: float)
         (heuristic: string -> float)
-        ((queue, costs, lineage, sealedNodes):
-            (string * float * float) list * Map<string, float> * Map<string, string> * Set<string>)
+        (
+            (queue, costs, lineage, sealedNodes):
+                (string * float * float) list * Map<string, float> * Map<string, string> * Set<string>
+        )
         (edge: GraphEdge)
         : (string * float * float) list * Map<string, float> * Map<string, string> * Set<string> =
         let tentative = g + edge.Cost

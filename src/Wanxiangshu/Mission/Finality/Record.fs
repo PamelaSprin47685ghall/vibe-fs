@@ -186,7 +186,8 @@ module RecordWorkflow =
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (requiresTerminalFrontier: bool)
-        (session: SessionAgentProjection) =
+        (session: SessionAgentProjection)
+        =
         task {
             match session.ReviewGuard with
             | None -> return RecordReadiness.Unavailable "review barrier is unavailable"
@@ -205,7 +206,8 @@ module RecordWorkflow =
             match AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections with
             | None -> return RecordReadiness.Unavailable "reviewer projection is unavailable"
             | Some session ->
-                return! readinessForSession journal snapshot reviewerSessionId barrierId requiresTerminalFrontier session
+                return!
+                    readinessForSession journal snapshot reviewerSessionId barrierId requiresTerminalFrontier session
         }
 
     let awaitCanonicalWorkRecord

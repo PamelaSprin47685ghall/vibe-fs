@@ -152,5 +152,4 @@ module FactCodec =
         elif containsLegacyUnanchoredGuideline json then
             Error legacyGuidelineCleanBreakMessage
         else
-            Decode.Auto.fromString<Fact> (json, extra = extra)
-            |> Result.map pinToUtc
+            Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc

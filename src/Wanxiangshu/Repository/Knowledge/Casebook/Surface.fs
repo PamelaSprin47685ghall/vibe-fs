@@ -27,8 +27,7 @@ open Wanxiangshu.Persistence.EventStore
 /// created by EventStoreSurface — passed back, never inspected by JS.
 module CasebookSurface =
 
-    let private storeOf (value: obj) : IEventStore =
-        (unbox<EventStoreHandle> value).Store
+    let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
     // ── Observation translation (JS ↔ F#) ────────────────────────────────────
 
@@ -56,8 +55,7 @@ module CasebookSurface =
                    matches = flat |}
 
     /// Stable SHA-256 fingerprint for a JS-native FileRead observation.
-    let contentHash (text: string) : string =
-        CasebookCapture.contentHash text
+    let contentHash (text: string) : string = CasebookCapture.contentHash text
 
     /// Capture a typed observation from a tool execution. An unrecognized or
     /// incomplete execution returns `null`, not an F# option.
@@ -259,7 +257,9 @@ module CasebookSurface =
         | Error message -> System.Threading.Tasks.Task.FromResult(box {| ok = false; error = message |})
         | Ok parsed -> runWorkflowTask workflow store parsed
 
-    let private runUnitResult (operation: System.Threading.Tasks.Task<Result<unit, string>>) : System.Threading.Tasks.Task<obj> =
+    let private runUnitResult
+        (operation: System.Threading.Tasks.Task<Result<unit, string>>)
+        : System.Threading.Tasks.Task<obj> =
         task {
             match! operation with
             | Ok() -> return box {| ok = true |}
@@ -326,8 +326,7 @@ module CasebookSurface =
         }
 
     /// Feature marker gate exposed without leaking the workflow module.
-    let featureEnabled (workspaceRoot: string) : bool =
-        CasebookFeature.isEnabled workspaceRoot
+    let featureEnabled (workspaceRoot: string) : bool = CasebookFeature.isEnabled workspaceRoot
 
     /// CASE-010 exactly-once finalize. `{ ok: true } | { ok: false, error }`.
     let finalize (store: obj) (case: obj) : System.Threading.Tasks.Task<obj> =

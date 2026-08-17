@@ -251,7 +251,8 @@ module CohortWorkflow =
         request
         slot
         prepared
-        (barrierId: ReviewBarrierId) : Task =
+        (barrierId: ReviewBarrierId)
+        : Task =
         match existingMember with
         | Some _ -> AsyncSupport.completedTask ()
         | None -> recordEnlistedFact journal managerSessionId life request slot prepared barrierId
@@ -288,16 +289,7 @@ module CohortWorkflow =
             match! reviewerPort.PrepareSession physicalRequest with
             | Error error -> return Error error
             | Ok prepared ->
-                do!
-                    recordEnlistmentIfNew
-                        existingMember
-                        journal
-                        managerSessionId
-                        life
-                        request
-                        slot
-                        prepared
-                        barrierId
+                do! recordEnlistmentIfNew existingMember journal managerSessionId life request slot prepared barrierId
 
                 return!
                     openBarrierAndRememberMember

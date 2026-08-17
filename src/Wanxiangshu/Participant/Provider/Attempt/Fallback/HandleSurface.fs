@@ -40,18 +40,17 @@ module FallbackHandleSurface =
 
             return
                 match result with
-                | Ok outcome -> box {| ok = true; outcome = outcomeName outcome |}
+                | Ok outcome ->
+                    box
+                        {| ok = true
+                           outcome = outcomeName outcome |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
     /// Read the durable fallback cursor for one session without exposing the
     /// projection record, map, or closed offset representation.
     let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =
-        match
-            FallbackEvidence.tryCurrentState
-                (SessionId.create session)
-                (AgentJournal.snapshot handle.Journal)
-        with
+        match FallbackEvidence.tryCurrentState (SessionId.create session) (AgentJournal.snapshot handle.Journal) with
         | None -> null
         | Some current ->
             box

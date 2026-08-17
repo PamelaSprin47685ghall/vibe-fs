@@ -57,34 +57,66 @@ module EventCodecSurface =
     let private invalidToJs (error: StorageInvalid) : obj =
         match error with
         | StorageInvalid.IdentityCollision eventId ->
-            box {| code = "IdentityCollision"; eventId = EventId.value eventId |}
-        | StorageInvalid.NonCanonical reason -> box {| code = "NonCanonical"; reason = reason |}
-        | StorageInvalid.MalformedEnvelope reason -> box {| code = "MalformedEnvelope"; reason = reason |}
+            box
+                {| code = "IdentityCollision"
+                   eventId = EventId.value eventId |}
+        | StorageInvalid.NonCanonical reason ->
+            box
+                {| code = "NonCanonical"
+                   reason = reason |}
+        | StorageInvalid.MalformedEnvelope reason ->
+            box
+                {| code = "MalformedEnvelope"
+                   reason = reason |}
         | StorageInvalid.MissingParent eventId ->
-            box {| code = "MissingParent"; eventId = EventId.value eventId |}
+            box
+                {| code = "MissingParent"
+                   eventId = EventId.value eventId |}
         | StorageInvalid.CyclicParents -> box {| code = "CyclicParents" |}
         | StorageInvalid.MissingPayload payloadRef ->
-            box {| code = "MissingPayload"; payloadRef = PayloadRef.value payloadRef |}
+            box
+                {| code = "MissingPayload"
+                   payloadRef = PayloadRef.value payloadRef |}
         | StorageInvalid.UnknownEventType eventType ->
-            box {| code = "UnknownEventType"; eventType = eventType |}
+            box
+                {| code = "UnknownEventType"
+                   eventType = eventType |}
 
     /// Encode one JS-native event as canonical JSON followed by exactly one LF.
-    let encode (event: obj) : string = eventOfJs event |> CanonicalEventCodec.encode
+    let encode (event: obj) : string =
+        eventOfJs event |> CanonicalEventCodec.encode
 
     /// Decode canonical bytes without exposing EventEnvelope or Fable values.
     let decode (bytes: string) : obj =
         match CanonicalEventCodec.tryDecode bytes with
         | Ok event -> box {| ok = true; event = eventToJs event |}
-        | Error error -> box {| ok = false; error = invalidToJs error |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error |}
 
     /// Compare identity bytes for two JS-native events.
     let checkIdentity (left: obj) (right: obj) : obj =
         match CanonicalEventCodec.checkIdentity (eventOfJs left) (eventOfJs right) with
         | Ok() -> box {| ok = true |}
-        | Error error -> box {| ok = false; error = invalidToJs error |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error |}
 
     /// Set-union events by EventId with canonical-byte collision detection.
     let mergeByIdentity (events: obj array) : obj =
-        match events |> Array.toList |> List.map eventOfJs |> CanonicalEventCodec.mergeByIdentity with
-        | Ok merged -> box {| ok = true; events = merged |> List.map eventToJs |> List.toArray |}
-        | Error error -> box {| ok = false; error = invalidToJs error |}
+        match
+            events
+            |> Array.toList
+            |> List.map eventOfJs
+            |> CanonicalEventCodec.mergeByIdentity
+        with
+        | Ok merged ->
+            box
+                {| ok = true
+                   events = merged |> List.map eventToJs |> List.toArray |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = invalidToJs error |}

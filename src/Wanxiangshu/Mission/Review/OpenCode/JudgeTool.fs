@@ -52,9 +52,11 @@ module JudgeTool =
         else
             ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
 
-    let private line (ctx: HostToolContext) path = ProviderProse.render (lang ctx) path Map.empty
+    let private line (ctx: HostToolContext) path =
+        ProviderProse.render (lang ctx) path Map.empty
 
-    let private received ctx = ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.Received ] []
+    let private received ctx =
+        ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.Received ] []
 
     let private challenged ctx =
         ToolHostCodec.tomlObjectWithInstructions
@@ -65,13 +67,12 @@ module JudgeTool =
     let private notReceived ctx reasonPath =
         ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.NotReceived; line ctx reasonPath ] []
 
-    let private processSubmission
-        (journal: AgentJournal)
-        (judgement: ReviewJudgement)
-        : VerdictSubmission option =
+    let private processSubmission (journal: AgentJournal) (judgement: ReviewJudgement) : VerdictSubmission option =
         let snapshot = AgentJournal.snapshot journal
 
-        MagicTodoProjection.pendingProcessReviewForReviewer judgement.ReviewerSessionId snapshot.AgentProjections.MagicTodo
+        MagicTodoProjection.pendingProcessReviewForReviewer
+            judgement.ReviewerSessionId
+            snapshot.AgentProjections.MagicTodo
         |> Option.bind (fun checkpoint ->
             checkpoint.Assignment
             |> Option.bind (fun assignment ->
@@ -92,7 +93,8 @@ module JudgeTool =
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
         (journal: AgentJournal)
-        (submission: VerdictSubmission) =
+        (submission: VerdictSubmission)
+        =
         task {
             match! VerdictWorkflow.recordJudgement journal submission with
             | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
@@ -105,7 +107,8 @@ module JudgeTool =
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
         (journal: AgentJournal)
-        (judgement: ReviewJudgement) =
+        (judgement: ReviewJudgement)
+        =
         match processSubmission journal judgement with
         | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
         | Some submission -> recordSubmittedJudgement scope context journal submission
@@ -128,7 +131,8 @@ module JudgeTool =
             let completed =
                 TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            let finish value = AsyncSupport.trySetResult completed value |> ignore
+            let finish value =
+                AsyncSupport.trySetResult completed value |> ignore
 
             let accept () =
                 scope.MarkVerdictSubmitted context.SessionId
@@ -138,17 +142,15 @@ module JudgeTool =
                 scope.MarkVerdictSubmitted context.SessionId
                 finish (challenged context)
 
-            let reject () = finish (notReceived context Path.JudgmentCouldNotBeRecorded)
+            let reject () =
+                finish (notReceived context Path.JudgmentCouldNotBeRecorded)
 
             match ReviewJudgementInbox.tryDeliver judgement accept challenge reject with
             | None -> return notReceived context Path.CouldNotBind
             | Some() -> return! completed.Task
         }
 
-    let private dispatchJudgement
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (judgement: ReviewJudgement) =
+    let private dispatchJudgement (scope: ToolRuntimeScope) (context: HostToolContext) (judgement: ReviewJudgement) =
         if ReviewJudgementInbox.isOwned judgement.ReviewerSessionId then
             deliverFinalityJudgement scope context judgement
         else

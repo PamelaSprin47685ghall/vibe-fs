@@ -17,15 +17,24 @@ module ObligationEnvelopeSurface =
     let private text (value: obj) =
         if isNull value then "" else string value
 
-    let private streamOfSession (sessionId: string) = StreamId.Session(SessionId.create sessionId)
+    let private streamOfSession (sessionId: string) =
+        StreamId.Session(SessionId.create sessionId)
 
-    let serializeMagicTodoEnvelope (typed: string) : string = FactCodec.serializeFact (Fact.MagicTodo typed)
+    let serializeMagicTodoEnvelope (typed: string) : string =
+        FactCodec.serializeFact (Fact.MagicTodo typed)
 
     let deserializeMagicTodoEnvelope (encoded: string) : obj =
         match FactCodec.deserializeFact encoded with
         | Error error -> box {| ok = false; error = error |}
-        | Ok(Fact.MagicTodo typed) -> box {| ok = true; case = "MagicTodo"; payload = typed |}
-        | Ok _ -> box {| ok = false; error = "not a MagicTodo fact" |}
+        | Ok(Fact.MagicTodo typed) ->
+            box
+                {| ok = true
+                   case = "MagicTodo"
+                   payload = typed |}
+        | Ok _ ->
+            box
+                {| ok = false
+                   error = "not a MagicTodo fact" |}
 
     let private envelopeForMagic (sessionId: string) (providerRun: string) (typed: string) : Envelope =
         { RuntimeId = RuntimeId.create "obligation-ledger-surface"
@@ -38,9 +47,13 @@ module ObligationEnvelopeSurface =
 
     let foldMagicEnvelope (sessionId: string) (providerRun: string) (typed: string) : obj =
         match Fold.foldEnvelope Fold.empty (envelopeForMagic sessionId providerRun typed) with
-        | Error rejection -> box {| ok = false; error = rejection.Reason |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejection.Reason |}
         | Ok projection ->
             let magic = projection.AgentProjections.MagicTodo
+
             let lives =
                 magic.ByLife
                 |> Map.toArray
@@ -81,7 +94,7 @@ module ObligationEnvelopeSurface =
         // DSL-MUTABLE: algorithm-scratch — lifecycle fold accumulator
         let mutable current = Fold.empty
         // DSL-MUTABLE: algorithm-scratch — first fold rejection
-        let mutable failure : string option = None
+        let mutable failure: string option = None
         // DSL-MUTABLE: algorithm-scratch — synthetic envelope sequence
         let mutable sequence = 0
 
@@ -108,7 +121,10 @@ module ObligationEnvelopeSurface =
         | Some error -> box {| ok = false; error = error |}
         | None ->
             match AgentProjection.tryFind (SessionId.create sessionId) current.AgentProjections with
-            | None -> box {| ok = true; protectedPrefixEnd = null |}
+            | None ->
+                box
+                    {| ok = true
+                       protectedPrefixEnd = null |}
             | Some session ->
                 let protectedPrefixEnd =
                     session.ManagerLife
@@ -117,4 +133,6 @@ module ObligationEnvelopeSurface =
                     |> Option.map (fun value -> box (int value.Sequence))
                     |> Option.toObj
 
-                box {| ok = true; protectedPrefixEnd = protectedPrefixEnd |}
+                box
+                    {| ok = true
+                       protectedPrefixEnd = protectedPrefixEnd |}

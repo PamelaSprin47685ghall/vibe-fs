@@ -120,8 +120,7 @@ module PrefixProbeSelection =
               SyntheticMessageId = CompanionIdentity.companionMemoryMessageId sha256 sealRoot }
 
         match committedSnapshot with
-        | Some existing when sameAsCommitted candidate existing ->
-            Error NoCandidateReason.NotNewerThanCommitted
+        | Some existing when sameAsCommitted candidate existing -> Error NoCandidateReason.NotNewerThanCommitted
         | _ ->
             Ok
                 { ProbeId = sha256 (sealRoot + "|probe")

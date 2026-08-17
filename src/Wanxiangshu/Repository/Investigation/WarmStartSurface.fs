@@ -48,13 +48,17 @@ module RepositoryWarmStartSurface =
                 | _ -> fallback
 
     let private contentLineCount (content: string) =
-        if String.IsNullOrEmpty content then 0 else content.Split([| '\n' |], StringSplitOptions.None).Length
+        if String.IsNullOrEmpty content then
+            0
+        else
+            content.Split([| '\n' |], StringSplitOptions.None).Length
 
     let private hitOfJs (value: obj) : SembleMcp.Hit option =
         if isNullish value then
             None
         else
             let filePath = stringOf (property value "filePath")
+
             if String.IsNullOrWhiteSpace filePath then
                 None
             else
@@ -62,13 +66,18 @@ module RepositoryWarmStartSurface =
                 let startLine = intOf (property value "startLine") 1
                 let endLine = intOf (property value "endLine") startLine
                 let declaredTotal = intOf (property value "totalLines") 0
+
                 Some
                     { FilePath = filePath
                       StartLine = startLine
                       EndLine = endLine
                       Content = content
                       Score = floatOf (property value "score") 0.0
-                      TotalLines = if declaredTotal > 0 then declaredTotal else max endLine (contentLineCount content) }
+                      TotalLines =
+                        if declaredTotal > 0 then
+                            declaredTotal
+                        else
+                            max endLine (contentLineCount content) }
 
     let private hitsOfJs (value: obj) : SembleMcp.Hit list =
         if isNullish value then
@@ -88,6 +97,7 @@ module RepositoryWarmStartSurface =
 
     let private searchOfJs (value: obj) : RepositoryWarmStartSearch =
         let hintsValue = property value "hints"
+
         let hints =
             if isNullish hintsValue then
                 []
@@ -98,7 +108,8 @@ module RepositoryWarmStartSurface =
           Query = stringOf (property value "query")
           Hints = hints }
 
-    let private searchesOfJs (value: obj array) = value |> Array.toList |> List.map searchOfJs
+    let private searchesOfJs (value: obj array) =
+        value |> Array.toList |> List.map searchOfJs
 
     [<Emit("$0($1,$2,$3)")>]
     let private apply3 (fn: obj) (first: obj) (second: obj) (third: obj) : obj = jsNative
@@ -112,7 +123,7 @@ module RepositoryWarmStartSurface =
                 if isNullish capability then
                     return []
                 else
-                    let! raw = unbox<Task<obj>>(promiseOf (apply3 capability (box query) (box repo) (box topK)))
+                    let! raw = unbox<Task<obj>> (promiseOf (apply3 capability (box query) (box repo) (box topK)))
                     return hitsOfJs raw
             }
 
@@ -140,7 +151,11 @@ module RepositoryWarmStartSurface =
     let render (instructions: string array) (charge: string) (searches: obj array) : string =
         RepositoryWarmStartPrompt.render (instructions |> Array.toList) charge (searchesOfJs searches)
 
-    let appendToProviderPrompt (appendixInstructions: string array) (basePrompt: string) (searches: obj array) : string =
+    let appendToProviderPrompt
+        (appendixInstructions: string array)
+        (basePrompt: string)
+        (searches: obj array)
+        : string =
         RepositoryWarmStartPrompt.appendToProviderPrompt
             (appendixInstructions |> Array.toList)
             basePrompt

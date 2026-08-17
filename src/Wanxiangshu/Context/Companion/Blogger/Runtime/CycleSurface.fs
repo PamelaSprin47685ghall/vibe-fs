@@ -8,7 +8,8 @@ open Wanxiangshu.Foundation.Identity
 /// projection-owned; JS observes only counts and explicit rejection text.
 [<RequireQualifiedAccess>]
 module BloggerCycleSurface =
-    let private text (value: obj) = if isNull value then "" else string value
+    let private text (value: obj) =
+        if isNull value then "" else string value
 
     let private request requestId bloggerId digest promptKey : OpenBloggerRequest =
         { RequestId = BloggerRequestId.create requestId
@@ -26,7 +27,11 @@ module BloggerCycleSurface =
 
     let private receipt kind requestId run : BloggerCycleReceipt =
         { ProviderRun = ProviderRunIdentity.create run
-          Kind = if kind = "squash" then BlogFrameKind.Squash else BlogFrameKind.Entry
+          Kind =
+            if kind = "squash" then
+                BlogFrameKind.Squash
+            else
+                BlogFrameKind.Entry
           RequestId = BloggerRequestId.create requestId }
 
     let private view state =
@@ -51,15 +56,29 @@ module BloggerCycleSurface =
                     let requestId = text (action?requestId)
                     let digest = text (action?digest)
                     let blogger = text (action?blogger)
-                    let prompt = if isNull (action?promptKey) then None else Some(text (action?promptKey))
+
+                    let prompt =
+                        if isNull (action?promptKey) then
+                            None
+                        else
+                            Some(text (action?promptKey))
+
                     match BloggerCycleProjection.materialize (request requestId blogger digest prompt) state with
                     | Ok next -> state <- next
                     | Error reason -> error <- Some reason
                 | "abandon" ->
-                    state <- BloggerCycleProjection.abandon (BloggerRequestId.create (text (action?requestId))) (SessionId.create (text (action?blogger))) state
+                    state <-
+                        BloggerCycleProjection.abandon
+                            (BloggerRequestId.create (text (action?requestId)))
+                            (SessionId.create (text (action?blogger)))
+                            state
                 | "entry"
                 | "squash" ->
-                    match BloggerCycleProjection.recordReceipt (receipt (text (action?kind)) (text (action?requestId)) (text (action?run)) ) state with
+                    match
+                        BloggerCycleProjection.recordReceipt
+                            (receipt (text (action?kind)) (text (action?requestId)) (text (action?run)))
+                            state
+                    with
                     | Ok next -> state <- next
                     | Error reason -> error <- Some reason
                 | unknown -> error <- Some("unknown action: " + unknown)

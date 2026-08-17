@@ -69,7 +69,8 @@ module private AgentJournalInternals =
     let applyDerivedSuccessToSession
         (sessionId: SessionId)
         (projection: ProjectionSet)
-        (session: SessionAgentProjection) =
+        (session: SessionAgentProjection)
+        =
         match session.Fallback with
         | None -> projection
         | Some fallback ->
@@ -101,7 +102,8 @@ module private AgentJournalInternals =
 
     let registerWaiter
         (fromRevision: JournalRevision)
-        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>) =
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>)
+        =
         let tcs = TaskCompletionSource<JournalChange>()
         waiters.Add(fromRevision, tcs)
         tcs.Task
@@ -109,7 +111,8 @@ module private AgentJournalInternals =
     let partitionWaiters
         (revision: JournalRevision)
         (change: JournalChange)
-        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>) =
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>)
+        =
         let ready, kept =
             waiters
             |> Seq.toList
@@ -269,7 +272,13 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
-        : Task<Result<(ProjectionSet * Envelope) * (TaskCompletionSource<JournalChange> * JournalChange) list, JournalAppendFailure>> =
+        : Task<
+              Result<
+                  (ProjectionSet * Envelope) * (TaskCompletionSource<JournalChange> * JournalChange) list,
+                  JournalAppendFailure
+               >
+           >
+        =
         task {
             let! appended = writer.Append stream providerRun fact
 

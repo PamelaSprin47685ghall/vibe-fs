@@ -26,7 +26,9 @@ module ChildRunProjection =
         | _ -> AgentStatus.Idle
 
     let private statusOfStoredValue storedValue =
-        storedValue |> Option.map statusOfCompletion |> Option.defaultValue AgentStatus.Idle
+        storedValue
+        |> Option.map statusOfCompletion
+        |> Option.defaultValue AgentStatus.Idle
 
     let private lastStatusOfCompletion completion =
         match completion.Outcome with
@@ -34,7 +36,8 @@ module ChildRunProjection =
         | AgentAbandoned(_, reason) -> Some reason
         | _ -> Some(AgentCompletion.status completion.Outcome)
 
-    let private lastStatusOfStoredValue storedValue = storedValue |> Option.bind lastStatusOfCompletion
+    let private lastStatusOfStoredValue storedValue =
+        storedValue |> Option.bind lastStatusOfCompletion
 
     let status runtimeCancelled (run: ChildRun) =
         if run.Completion.IsCompleted then
@@ -46,7 +49,10 @@ module ChildRunProjection =
 
     let toRecord runtimeCancelled (agentId: string) (run: ChildRun) =
         let lastStatus =
-            if run.Completion.IsCompleted then lastStatusOfStoredValue run.Completion.StoredValue else None
+            if run.Completion.IsCompleted then
+                lastStatusOfStoredValue run.Completion.StoredValue
+            else
+                None
 
         { AgentId = agentId
           Agent = run.AgentName

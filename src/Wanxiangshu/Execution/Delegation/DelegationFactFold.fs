@@ -8,12 +8,12 @@ module DelegationFactFold =
 
     let private replaceEstimate
         (projection: AgentProjectionSet)
-        (payload: {| SessionId: Identity.SessionId; ExpectedToolCalls: int |})
+        (payload:
+            {| SessionId: Identity.SessionId
+               ExpectedToolCalls: int |})
         : Result<AgentProjectionSet, FoldRejection> =
         if payload.ExpectedToolCalls < 0 then
-            FoldRejection.reject
-                "DelegatedToolEstimateReplaced"
-                "expected tool calls must be a non-negative integer"
+            FoldRejection.reject "DelegatedToolEstimateReplaced" "expected tool calls must be a non-negative integer"
         else
             Ok(
                 AgentProjection.update
@@ -27,14 +27,15 @@ module DelegationFactFold =
 
     let private observeEstimate
         (projection: AgentProjectionSet)
-        (payload: {| SessionId: Identity.SessionId; ToolCallId: Identity.ToolCallId |})
+        (payload:
+            {| SessionId: Identity.SessionId
+               ToolCallId: Identity.ToolCallId |})
         : Result<AgentProjectionSet, FoldRejection> =
         let update (session: SessionAgentProjection) =
             match session.DelegatedToolEstimate with
             | Some estimate ->
                 { session with
-                    DelegatedToolEstimate =
-                        Some(DelegatedToolEstimateProjection.observe payload.ToolCallId estimate) }
+                    DelegatedToolEstimate = Some(DelegatedToolEstimateProjection.observe payload.ToolCallId estimate) }
             | None -> session
 
         Ok(AgentProjection.update payload.SessionId update projection)

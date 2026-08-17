@@ -101,10 +101,7 @@ module CanonicalEventCodec =
         elif encode left = encode right then Ok()
         else Error(StorageInvalid.IdentityCollision left.EventId)
 
-    let private mergeOne
-        (head: EventEnvelope)
-        (tail: EventEnvelope list)
-        (acc: Map<string, EventEnvelope * string>) =
+    let private mergeOne (head: EventEnvelope) (tail: EventEnvelope list) (acc: Map<string, EventEnvelope * string>) =
         let normalized = EventEnvelope.normalize head
         let id = EventId.value normalized.EventId
         let bytes = encode normalized
@@ -125,9 +122,7 @@ module CanonicalEventCodec =
                 |> List.sortBy fst
                 |> List.map (fun (_, (envelope, _)) -> envelope)
                 |> Ok
-            | head :: tail ->
-                mergeOne head tail acc
-                |> Result.bind (fun (next, updated) -> loop next updated)
+            | head :: tail -> mergeOne head tail acc |> Result.bind (fun (next, updated) -> loop next updated)
 
         loop events Map.empty
 

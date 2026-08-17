@@ -30,7 +30,10 @@ module LoopEventCodec =
             None
 
     let private trySessionIdFromProperties (raw: obj) : SessionId option =
-        if isNull raw then None else trySessionIdProperties raw?properties
+        if isNull raw then
+            None
+        else
+            trySessionIdProperties raw?properties
 
     let private trySessionId (raw: obj) : SessionId option =
         HostEventCodec.trySessionId raw

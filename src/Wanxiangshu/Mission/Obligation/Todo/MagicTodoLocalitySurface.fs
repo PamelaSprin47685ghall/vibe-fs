@@ -20,7 +20,11 @@ module MagicTodoLocalitySurface =
 
     let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
 
-    let private localizedOf (callId: string) (inputCanonical: string) (state: obj) : MagicTodoLocality.LocalizedToolCall =
+    let private localizedOf
+        (callId: string)
+        (inputCanonical: string)
+        (state: obj)
+        : MagicTodoLocality.LocalizedToolCall =
         let frontier = cursor 7
 
         { ProviderRun = ProviderRunIdentity.create "msg-provider-run"
@@ -40,7 +44,10 @@ module MagicTodoLocalitySurface =
         let localized = localizedOf callId inputCanonical state
 
         match MagicTodoLocality.materializeInput localized expectedCanonical with
-        | Ok value -> box {| ok = true; value = box {| inputCanonical = value.InputCanonical |} |}
+        | Ok value ->
+            box
+                {| ok = true
+                   value = box {| inputCanonical = value.InputCanonical |} |}
         | Error reason ->
             let code =
                 match reason with
@@ -49,4 +56,6 @@ module MagicTodoLocalitySurface =
                 | MagicTodoLocality.InputMaterializationRejection.CarrierChanged -> "CarrierChanged"
                 | MagicTodoLocality.InputMaterializationRejection.InputMismatch -> "InputMismatch"
 
-            box {| ok = false; error = box {| code = code |} |}
+            box
+                {| ok = false
+                   error = box {| code = code |} |}

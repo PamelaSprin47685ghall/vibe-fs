@@ -67,13 +67,15 @@ module OrchestratorHostSurface =
         else
             Error(stringOf (field value "error"))
 
-    let private plainUnitResult (value: obj) : Result<unit, string> =
-        plainResult value (fun _ -> ())
+    let private plainUnitResult (value: obj) : Result<unit, string> = plainResult value (fun _ -> ())
 
     let private sessionValue (value: obj) = SessionId.create (stringOf value)
     let private targetValue (value: obj) = TargetRef.create (stringOf value)
     let private worktreePathValue (value: obj) = WorktreePath.create (stringOf value)
-    let private worktreeIdentityValue (value: obj) = WorktreeIdentity.create (stringOf value)
+
+    let private worktreeIdentityValue (value: obj) =
+        WorktreeIdentity.create (stringOf value)
+
     let private commitValue (value: obj) = CommitHash.create (stringOf value)
 
     let private roleOf (value: obj) : Role option =
@@ -94,12 +96,14 @@ module OrchestratorHostSurface =
         match stringOf (field value "kind") with
         | "Completed" ->
             let sessionId = sessionValue (field value "sessionId")
+
             match roleOf (field value "role") with
             | None -> TerminalOutcome.Failed "invalid role"
             | Some role ->
                 TerminalOutcome.Completed
                     { SessionId = sessionId
-                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (stringOf (field value "authorityRoot"))
+                      AuthorityRootUserMessageId =
+                        AuthorityRootUserMessageId.create (stringOf (field value "authorityRoot"))
                       ProviderRun = ProviderRunIdentity.create (stringOf (field value "providerRun"))
                       Role = role
                       Directory = optionalString (field value "directory")
@@ -112,7 +116,9 @@ module OrchestratorHostSurface =
         match stringOf (field value "kind") with
         | "Receipt" -> Outcome.SendOutcome.AdmittedWithReceipt(TransportReceipt.create (stringOf (field value "value")))
         | "Physical" ->
-            Outcome.SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create (stringOf (field value "value")))
+            Outcome.SendOutcome.AdmittedWithPhysicalMessage(
+                PhysicalUserMessageId.create (stringOf (field value "value"))
+            )
         | "Retryable" -> Outcome.SendOutcome.Retryable(stringOf (field value "reason"))
         | "Unknown" -> Outcome.SendOutcome.AcceptanceUnknown(stringOf (field value "reason"))
         | _ -> Outcome.SendOutcome.Fatal(stringOf (field value "reason"))
@@ -126,16 +132,15 @@ module OrchestratorHostSurface =
     type private PlainSessionPort(raw: obj) =
         interface ISessionHostPort with
             member _.SubscribeTerminal(sessionId, listener) =
-                let callback = fun rawSession rawOutcome -> listener (sessionValue rawSession) (terminalOutcome rawOutcome)
+                let callback =
+                    fun rawSession rawOutcome -> listener (sessionValue rawSession) (terminalOutcome rawOutcome)
+
                 invokeRawDisposable raw "SubscribeTerminal" [| box (SessionId.value sessionId); box callback |]
 
             member _.SendPrompt(sessionId, text, options) =
                 task {
                     let! value =
-                        invokeRawTask
-                            raw
-                            "SendPrompt"
-                            [| box (SessionId.value sessionId); box text; box options |]
+                        invokeRawTask raw "SendPrompt" [| box (SessionId.value sessionId); box text; box options |]
 
                     return sendOutcome value
                 }
@@ -176,11 +181,7 @@ module OrchestratorHostSurface =
 
             member _.CreateChildSession(parent, options) =
                 task {
-                    let! value =
-                        invokeRawTask
-                            raw
-                            "CreateChildSession"
-                            [| box (SessionId.value parent); box options |]
+                    let! value = invokeRawTask raw "CreateChildSession" [| box (SessionId.value parent); box options |]
 
                     return plainResult value sessionValue
                 }
@@ -198,99 +199,116 @@ module OrchestratorHostSurface =
         PlainSessionPort(raw) :> ISessionHostPort
 
     let private worktreePair (value: obj) =
-        let identity = field value "identity" |> optionalString |> Option.map WorktreeIdentity.create
+        let identity =
+            field value "identity" |> optionalString |> Option.map WorktreeIdentity.create
+
         worktreePathValue (field value "path"), identity
 
     let private gitPort (raw: obj) : GitPort =
-        { IsDirty = fun path ->
-              task {
-                  let! value = invokeRawTask raw "IsDirty" [| box (WorktreePath.value path) |]
-                  return boolOf value
-              }
-          CreateWorktree = fun job path ->
-              task {
-                  let! value =
-                      invokeRawTask
-                          raw
-                          "CreateWorktree"
-                          [| box (ManagerJobId.value job); box (WorktreePath.value path) |]
+        { IsDirty =
+            fun path ->
+                task {
+                    let! value = invokeRawTask raw "IsDirty" [| box (WorktreePath.value path) |]
+                    return boolOf value
+                }
+          CreateWorktree =
+            fun job path ->
+                task {
+                    let! value =
+                        invokeRawTask
+                            raw
+                            "CreateWorktree"
+                            [| box (ManagerJobId.value job); box (WorktreePath.value path) |]
 
-                  return plainResult value worktreeIdentityValue
-              }
-          FreezeTargetBranch = fun () ->
-              task {
-                  let! value = invokeRawTask raw "FreezeTargetBranch" [||]
-                  return plainResult value targetValue
-              }
-          Rebase = fun path target ->
-              task {
-                  let! value =
-                      invokeRawTask
-                          raw
-                          "Rebase"
-                          [| box (WorktreePath.value path); box (TargetRef.value target) |]
+                    return plainResult value worktreeIdentityValue
+                }
+          FreezeTargetBranch =
+            fun () ->
+                task {
+                    let! value = invokeRawTask raw "FreezeTargetBranch" [||]
+                    return plainResult value targetValue
+                }
+          Rebase =
+            fun path target ->
+                task {
+                    let! value =
+                        invokeRawTask raw "Rebase" [| box (WorktreePath.value path); box (TargetRef.value target) |]
 
-                  return plainUnitResult value
-              }
-          FfMerge = fun path target expected ->
-              task {
-                  let! value =
-                      invokeRawTask
-                          raw
-                          "FfMerge"
-                          [| box (WorktreePath.value path)
-                             box (TargetRef.value target)
-                             box (CommitHash.value expected) |]
+                    return plainUnitResult value
+                }
+          FfMerge =
+            fun path target expected ->
+                task {
+                    let! value =
+                        invokeRawTask
+                            raw
+                            "FfMerge"
+                            [| box (WorktreePath.value path)
+                               box (TargetRef.value target)
+                               box (CommitHash.value expected) |]
 
-                  return plainResult value commitValue
-              }
-          ConflictedFiles = fun path ->
-              task {
-                  let! value = invokeRawTask raw "ConflictedFiles" [| box (WorktreePath.value path) |]
-                  return plainResult value (fun item -> arrayOf item |> Array.toList |> List.map stringOf)
-              }
-          RemoveWorktree = fun path ->
-              task {
-                  let! value = invokeRawTask raw "RemoveWorktree" [| box (WorktreePath.value path) |]
-                  return plainUnitResult value
-              }
-          HasRebaseHead = fun path ->
-              task {
-                  let! value = invokeRawTask raw "HasRebaseHead" [| box (WorktreePath.value path) |]
-                  return boolOf value
-              }
-          ListWorktrees = fun () ->
-              task {
-                  let! value = invokeRawTask raw "ListWorktrees" [||]
-                  return plainResult value (fun item -> arrayOf item |> Array.toList |> List.map worktreePair)
-              }
-          ListManagerBranches = fun () ->
-              task {
-                  let! value = invokeRawTask raw "ListManagerBranches" [||]
-                  return plainResult value (fun item -> arrayOf item |> Array.toList |> List.map worktreeIdentityValue)
-              }
-          DeleteBranch = fun identity ->
-              task {
-                  let! value = invokeRawTask raw "DeleteBranch" [| box (WorktreeIdentity.value identity) |]
-                  return plainUnitResult value
-              }
-          ReadHead = fun path ->
-              task {
-                  let! value = invokeRawTask raw "ReadHead" [| box (WorktreePath.value path) |]
-                  return plainResult value commitValue
-              }
-          GetTargetHead = fun target ->
-              task {
-                  let! value = invokeRawTask raw "GetTargetHead" [| box (TargetRef.value target) |]
-                  return plainResult value commitValue
-              } }
+                    return plainResult value commitValue
+                }
+          ConflictedFiles =
+            fun path ->
+                task {
+                    let! value = invokeRawTask raw "ConflictedFiles" [| box (WorktreePath.value path) |]
+                    return plainResult value (fun item -> arrayOf item |> Array.toList |> List.map stringOf)
+                }
+          RemoveWorktree =
+            fun path ->
+                task {
+                    let! value = invokeRawTask raw "RemoveWorktree" [| box (WorktreePath.value path) |]
+                    return plainUnitResult value
+                }
+          HasRebaseHead =
+            fun path ->
+                task {
+                    let! value = invokeRawTask raw "HasRebaseHead" [| box (WorktreePath.value path) |]
+                    return boolOf value
+                }
+          ListWorktrees =
+            fun () ->
+                task {
+                    let! value = invokeRawTask raw "ListWorktrees" [||]
+                    return plainResult value (fun item -> arrayOf item |> Array.toList |> List.map worktreePair)
+                }
+          ListManagerBranches =
+            fun () ->
+                task {
+                    let! value = invokeRawTask raw "ListManagerBranches" [||]
+
+                    return
+                        plainResult value (fun item -> arrayOf item |> Array.toList |> List.map worktreeIdentityValue)
+                }
+          DeleteBranch =
+            fun identity ->
+                task {
+                    let! value = invokeRawTask raw "DeleteBranch" [| box (WorktreeIdentity.value identity) |]
+                    return plainUnitResult value
+                }
+          ReadHead =
+            fun path ->
+                task {
+                    let! value = invokeRawTask raw "ReadHead" [| box (WorktreePath.value path) |]
+                    return plainResult value commitValue
+                }
+          GetTargetHead =
+            fun target ->
+                task {
+                    let! value = invokeRawTask raw "GetTargetHead" [| box (TargetRef.value target) |]
+                    return plainResult value commitValue
+                } }
 
     type private HostHandle(host: OrchestratorHost, manager: obj) =
         member _.Host = host
         member _.Manager = manager
 
     let private journalOf (value: obj) : AgentJournal option =
-        if isNullish value then None else Some((unbox<JournalHandle> value).Journal)
+        if isNullish value then
+            None
+        else
+            Some((unbox<JournalHandle> value).Journal)
 
     /// Build a real OrchestratorHost from plain JavaScript port contracts.
     /// `sessions`, `gitPort`, and `journal` are capabilities owned by the caller;
@@ -298,6 +316,7 @@ module OrchestratorHostSurface =
     let create (options: obj) : obj =
         let sessions = sessionPort (field options "sessions")
         let journal = journalOf (field options "journal")
+
         let deps: OrchestratorHostDeps =
             { Sessions = sessions
               Journal = journal
@@ -311,7 +330,9 @@ module OrchestratorHostSurface =
               ParentWorkRecordFor = fun _ -> Task.FromResult None
               ChildWorkRecordFor = fun _ -> Task.FromResult None }
 
-        let host = OrchestratorHost(deps, SessionId.create (stringOf (field options "orchestratorId")))
+        let host =
+            OrchestratorHost(deps, SessionId.create (stringOf (field options "orchestratorId")))
+
         let rawGit = field options "gitPort"
 
         if not (isNullish rawGit) then
@@ -319,8 +340,7 @@ module OrchestratorHostSurface =
 
         HostHandle(host, managerPortOf host) :> obj
 
-    let managerPort (handle: obj) : obj =
-        (handle :?> HostHandle).Manager
+    let managerPort (handle: obj) : obj = (handle :?> HostHandle).Manager
 
     let hasChild (handle: obj) (agentId: string) : bool =
         hasChildInRuntime (handle :?> HostHandle).Host agentId

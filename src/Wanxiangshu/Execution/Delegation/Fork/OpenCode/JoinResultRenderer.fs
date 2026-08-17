@@ -200,6 +200,7 @@ module JoinResultRenderer =
 
     let private terminalBody (outcome: string) (detail: string option) : string list =
         let exitCode = tryParseExitCode outcome
+
         let fields =
             match exitCode with
             | Some code -> [ SyntheticToml.field "exit_code" (string code) ]

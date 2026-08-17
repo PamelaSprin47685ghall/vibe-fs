@@ -9,22 +9,30 @@ open Wanxiangshu.Persistence.EventStore
 /// and canonical question; durable session identity remains inside the owner.
 module CasebookIndexSurface =
 
-    let private storeOf (value: obj) : IEventStore =
-        (unbox<EventStoreHandle> value).Store
+    let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
     let private observationToJs (observation: Observation) : obj =
         match observation with
         | Observation.FileRead(path, contentHash) ->
-            box {| kind = "file-read"; path = path; contentHash = contentHash |}
+            box
+                {| kind = "file-read"
+                   path = path
+                   contentHash = contentHash |}
         | Observation.GlobResult(pattern, paths) ->
-            box {| kind = "glob-result"; pattern = pattern; paths = List.toArray paths |}
+            box
+                {| kind = "glob-result"
+                   pattern = pattern
+                   paths = List.toArray paths |}
         | Observation.GrepResult(pattern, matches) ->
             let values =
                 matches
                 |> List.map (fun (path, index, text) -> box [| box path; box index; box text |])
                 |> List.toArray
 
-            box {| kind = "grep-result"; pattern = pattern; matches = values |}
+            box
+                {| kind = "grep-result"
+                   pattern = pattern
+                   matches = values |}
 
     let private caseToJs (case: Case) : obj =
         box
@@ -35,7 +43,9 @@ module CasebookIndexSurface =
                lastAccessOrder = case.LastAccessOrder |}
 
     let private entryToJs (entry: CasebookIndex.Entry) : obj =
-        box {| shelfmark = entry.Shelfmark; question = entry.Question |}
+        box
+            {| shelfmark = entry.Shelfmark
+               question = entry.Question |}
 
     let private snapshotToJs (snapshot: CasebookIndex.Snapshot) : obj =
         box

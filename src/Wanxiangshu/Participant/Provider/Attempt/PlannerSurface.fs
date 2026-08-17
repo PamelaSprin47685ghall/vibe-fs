@@ -100,12 +100,15 @@ module AttemptPlannerSurface =
                    canonicalRole = Roles.roleLabel profile.CanonicalRole
                    systemPromptId = SystemPromptId.value profile.SystemPromptId
                    toolCapabilities =
-                     profile.ToolCapabilitySet
-                     |> Set.toList
-                     |> List.map permissionLabel
-                     |> List.sort
-                     |> List.toArray
+                    profile.ToolCapabilitySet
+                    |> Set.toList
+                    |> List.map permissionLabel
+                    |> List.sort
+                    |> List.toArray
                    requestKind = ProviderRequestKind.label profile.RequestKind |}
         | None, _, _ -> box {| ok = false; error = "unknown role" |}
         | _, None, _ -> box {| ok = false; error = "unknown tier" |}
-        | _, _, None -> box {| ok = false; error = "unknown request kind" |}
+        | _, _, None ->
+            box
+                {| ok = false
+                   error = "unknown request kind" |}

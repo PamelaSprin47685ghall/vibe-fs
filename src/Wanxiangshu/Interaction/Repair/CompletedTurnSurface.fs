@@ -32,7 +32,10 @@ module CompletedTurnSurface =
                   variant = optionalText value?variant }
 
     let private optionalRole (value: string) : Role option =
-        if System.String.IsNullOrWhiteSpace value then None else Roles.tryParseRole value
+        if System.String.IsNullOrWhiteSpace value then
+            None
+        else
+            Roles.tryParseRole value
 
     let private outcomeName (value: obj) : string * string option =
         match value with
@@ -48,7 +51,10 @@ module CompletedTurnSurface =
 
     let private classifiedToJs (value: obj) : obj =
         let name, reason = outcomeName value
-        box {| kind = name; reason = reason |> Option.defaultValue null |}
+
+        box
+            {| kind = name
+               reason = reason |> Option.defaultValue null |}
 
     let partsText (parts: obj) : string =
         CompletedTurnClassifier.partsText (partsOf parts)
@@ -62,12 +68,7 @@ module CompletedTurnSurface =
     let isAbortErrorName (name: string) : bool =
         CompletedTurnClassifier.isAbortErrorName (optionalText (box name))
 
-    let classifyOutcome
-        (completed: bool)
-        (finish: string)
-        (errorName: string)
-        (parts: obj)
-        : obj =
+    let classifyOutcome (completed: bool) (finish: string) (errorName: string) (parts: obj) : obj =
         CompletedTurnClassifier.classifyOutcome
             completed
             (optionalText (box finish))
@@ -75,40 +76,38 @@ module CompletedTurnSurface =
             (partsOf parts)
         |> classifiedToJs
 
-    let needsInteractionRepair
-        (role: string)
-        (completed: bool)
-        (finish: string)
-        (parts: obj)
-        : bool =
+    let needsInteractionRepair (role: string) (completed: bool) (finish: string) (parts: obj) : bool =
         let roleValue = optionalRole role
         let typedParts = partsOf parts
+
         let classified =
-            CompletedTurnClassifier.classifyOutcome
-                completed
-                (optionalText (box finish))
-                None
-                typedParts
+            CompletedTurnClassifier.classifyOutcome completed (optionalText (box finish)) None typedParts
 
         CompletedTurnClassifier.needsInteractionRepair roleValue classified typedParts
 
     let roleOfAgent (agent: string) (fallback: string) : string =
         let result =
-            CompletedTurnClassifier.roleOfAgent
-                (optionalText (box agent))
-                (optionalRole fallback)
+            CompletedTurnClassifier.roleOfAgent (optionalText (box agent)) (optionalRole fallback)
 
         result |> Option.map Roles.roleLabel |> Option.defaultValue ""
 
     let private messageOf (value: obj) : SessionMessage =
         { Id = text value?id
-          Role = if System.String.IsNullOrWhiteSpace(text value?role) then "assistant" else text value?role
+          Role =
+            if System.String.IsNullOrWhiteSpace(text value?role) then
+                "assistant"
+            else
+                text value?role
           Agent = optionalText value?agent
           Finish = optionalText value?finish
           ErrorName = optionalText value?errorName
           Model = optionalModel value?model
           ParentId = optionalText value?parentId
-          Completed = if isNull value?completed then false else unbox<bool> value?completed
+          Completed =
+            if isNull value?completed then
+                false
+            else
+                unbox<bool> value?completed
           IsCompaction = false
           PromptKey = None
           Parts = partsOf value?parts
@@ -118,8 +117,17 @@ module CompletedTurnSurface =
         match part with
         | MessagePart.Text value -> box {| kind = "text"; text = value |}
         | MessagePart.Reasoning value -> box {| kind = "reasoning"; text = value |}
-        | MessagePart.ToolCall(callId, name, args) -> box {| kind = "tool-call"; callId = callId; name = name; args = args |}
-        | MessagePart.ToolResult(callId, result) -> box {| kind = "tool-result"; callId = callId; result = result |}
+        | MessagePart.ToolCall(callId, name, args) ->
+            box
+                {| kind = "tool-call"
+                   callId = callId
+                   name = name
+                   args = args |}
+        | MessagePart.ToolResult(callId, result) ->
+            box
+                {| kind = "tool-result"
+                   callId = callId
+                   result = result |}
         | MessagePart.Activity kind -> box {| kind = "activity"; activity = kind |}
 
     let buildTurn
@@ -140,6 +148,7 @@ module CompletedTurnSurface =
                 (optionalText (box directory))
 
         let outcome, reason = outcomeName (box typed.Outcome)
+
         box
             {| session = SessionId.value typed.SessionId
                providerRun = ProviderRunIdentity.value typed.ProviderRun
@@ -147,7 +156,14 @@ module CompletedTurnSurface =
                directory = typed.Directory |> Option.defaultValue null
                finish = typed.Finish |> Option.defaultValue null
                errorName = typed.ErrorName |> Option.defaultValue null
-               model = typed.Model |> Option.map (fun model -> box {| providerID = model.providerID; modelID = model.modelID; variant = model.variant |> Option.defaultValue null |}) |> Option.defaultValue null
+               model =
+                typed.Model
+                |> Option.map (fun model ->
+                    box
+                        {| providerID = model.providerID
+                           modelID = model.modelID
+                           variant = model.variant |> Option.defaultValue null |})
+                |> Option.defaultValue null
                parts = typed.Parts |> Array.map partToJs
                outcome = outcome
                reason = reason |> Option.defaultValue null

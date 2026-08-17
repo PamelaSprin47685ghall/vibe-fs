@@ -26,7 +26,10 @@ module MagicTodoHostSurface =
 
     let decodeInput (args: obj) : obj =
         match MagicTodoHostCodec.tryDecodeInput args with
-        | Ok input -> box {| ok = true; value = decodedInput input |}
+        | Ok input ->
+            box
+                {| ok = true
+                   value = decodedInput input |}
         | Error error -> box {| ok = false; error = error |}
 
     let projectCompatibilityRows (workingOn: string) (obligations: obj array) : obj array =
@@ -39,7 +42,11 @@ module MagicTodoHostSurface =
 
             item)
         |> MagicTodoSurface.obligationsToCompatibilityRows workingOn
-        |> List.map (fun row -> box {| content = row.Content; status = row.Status; priority = row.Priority |})
+        |> List.map (fun row ->
+            box
+                {| content = row.Content
+                   status = row.Status
+                   priority = row.Priority |})
         |> List.toArray
 
     let canonicalInput (args: obj) : string = MagicTodoHostCodec.canonicalInput args
@@ -55,7 +62,7 @@ module MagicTodoHostSurface =
                 rows
                 |> Array.toList
                 |> List.map (fun row ->
-                    let row : MagicTodoSurface.CompatibilityTodoRow =
+                    let row: MagicTodoSurface.CompatibilityTodoRow =
                         { Content = text (row?content)
                           Status = text (row?status)
                           Priority = text (row?priority) }

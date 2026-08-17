@@ -26,7 +26,10 @@ module XTraceSurface =
     let private isNullish (value: obj) : bool = jsNative
 
     let private field (value: obj) (name: string) : obj =
-        if isNullish value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNullish value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private text (value: obj) : string =
         if isNullish value then "" else string value
@@ -78,8 +81,15 @@ module XTraceSurface =
         match part with
         | SemanticText value -> box {| kind = "text"; text = value |}
         | SemanticReasoning value -> box {| kind = "reasoning"; text = value |}
-        | SemanticToolCall(name, args) -> box {| kind = "tool-call"; name = name; args = args |}
-        | SemanticToolResult value -> box {| kind = "tool-result"; result = value |}
+        | SemanticToolCall(name, args) ->
+            box
+                {| kind = "tool-call"
+                   name = name
+                   args = args |}
+        | SemanticToolResult value ->
+            box
+                {| kind = "tool-result"
+                   result = value |}
         | SemanticMedia(mediaType, digest) ->
             box
                 {| kind = "media"
@@ -89,12 +99,25 @@ module XTraceSurface =
     /// Plain capture-part constructors. Call identities stay in the input only
     /// long enough for the owner mapper to discard them from SemanticPart.
     let textPart (value: string) : obj = box {| kind = "text"; text = value |}
-    let reasoningPart (value: string) : obj = box {| kind = "reasoning"; text = value |}
+
+    let reasoningPart (value: string) : obj =
+        box {| kind = "reasoning"; text = value |}
+
     let toolCallPart (callId: string) (name: string) (args: string) : obj =
-        box {| kind = "tool-call"; callId = callId; name = name; args = args |}
+        box
+            {| kind = "tool-call"
+               callId = callId
+               name = name
+               args = args |}
+
     let toolResultPart (callId: string) (result: string) : obj =
-        box {| kind = "tool-result"; callId = callId; result = result |}
-    let activityPart (kind: string) : obj = box {| kind = "activity"; activity = kind |}
+        box
+            {| kind = "tool-result"
+               callId = callId
+               result = result |}
+
+    let activityPart (kind: string) : obj =
+        box {| kind = "activity"; activity = kind |}
 
     /// The sole MessagePart → SemanticPart mapper, represented as plain JS.
     let mapPart (value: obj) : obj option =
@@ -109,11 +132,21 @@ module XTraceSurface =
                 | SemanticToolResult _ -> "SemanticToolResult"
                 | SemanticMedia _ -> "SemanticMedia"
 
-            Some(box {| kind = tag; part = semanticPartView mapped |})
+            Some(
+                box
+                    {| kind = tag
+                       part = semanticPartView mapped |}
+            )
 
     let semantic (value: obj) : obj =
         let rawMessages = field value "messages"
-        let messages = if isNullish rawMessages then [||] else unbox<obj array> rawMessages
+
+        let messages =
+            if isNullish rawMessages then
+                [||]
+            else
+                unbox<obj array> rawMessages
+
         box {| messages = messages |}
 
     let private semanticProjectionOf (value: obj) : ProviderSemanticProjection =
@@ -145,7 +178,7 @@ module XTraceSurface =
     let private optionalStringView (value: 'a option) (render: 'a -> string) : obj =
         match value with
         | None -> null
-        | Some item -> box(render item)
+        | Some item -> box (render item)
 
     let private openingView (opening: OpeningMaterial) : obj =
         box
@@ -174,18 +207,24 @@ module XTraceSurface =
             {| opening = projection.Opening |> Option.map openingView |> Option.toObj
                parts = projection |> XTraceProjection.parts |> List.map partView |> List.toArray
                terminal =
-                   projection.Terminal
-                   |> Option.map (fun (reference, digest) ->
-                       box
-                           {| textRef = BlobRef.value reference
-                              textDigest = BlobDigest.value digest |})
-                   |> Option.toObj
+                projection.Terminal
+                |> Option.map (fun (reference, digest) ->
+                    box
+                        {| textRef = BlobRef.value reference
+                           textDigest = BlobDigest.value digest |})
+                |> Option.toObj
                head = int (XTraceProjection.head projection) |}
 
     let private prefixEpochView (epoch: ActivePrefixEpoch) : obj =
         box
             {| epochId = int (PrefixEpochId.value epoch.EpochId)
-               snapshot = epoch.Snapshot |> Option.map (fun snapshot -> box {| cutoffExclusive = snapshot.CutoffExclusive; coveredPrefixDigest = snapshot.CoveredPrefixDigest |}) |> Option.toObj
+               snapshot =
+                epoch.Snapshot
+                |> Option.map (fun snapshot ->
+                    box
+                        {| cutoffExclusive = snapshot.CutoffExclusive
+                           coveredPrefixDigest = snapshot.CoveredPrefixDigest |})
+                |> Option.toObj
                reanchoredRuns = epoch.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value |}
 
     let private sessionView (session: SessionAgentProjection) : obj =
@@ -212,18 +251,35 @@ module XTraceSurface =
 
     /// One-past-last cursor from a plain projection snapshot.
     let head (projection: obj) : int =
-        if isNullish projection then 0 else intValue (field projection "head")
+        if isNullish projection then
+            0
+        else
+            intValue (field projection "head")
 
     /// Plain semantic-part constructors for cursor, flatten and rendering proofs.
     /// The capture constructors above retain source call ids; these constructors
     /// describe the already-owned semantic value and never expose a DU.
     let semanticText (value: string) : obj = box {| kind = "text"; text = value |}
-    let semanticReasoning (value: string) : obj = box {| kind = "reasoning"; text = value |}
+
+    let semanticReasoning (value: string) : obj =
+        box {| kind = "reasoning"; text = value |}
+
     let semanticToolCall (name: string) (args: string) : obj =
-        box {| kind = "tool-call"; name = name; args = args |}
-    let semanticToolResult (value: string) : obj = box {| kind = "tool-result"; result = value |}
+        box
+            {| kind = "tool-call"
+               name = name
+               args = args |}
+
+    let semanticToolResult (value: string) : obj =
+        box
+            {| kind = "tool-result"
+               result = value |}
+
     let semanticMedia (mediaType: obj) (digest: string) : obj =
-        box {| kind = "media"; mediaType = mediaType; digest = digest |}
+        box
+            {| kind = "media"
+               mediaType = mediaType
+               digest = digest |}
 
     let private semanticPartOfPlain (value: obj) : SemanticPart =
         match text (field value "kind") with
@@ -241,13 +297,23 @@ module XTraceSurface =
         | "Media" ->
             let mediaType = optionalText (field value "mediaType")
             let digestValue = field value "digest"
-            let digest = if isNullish digestValue then text (field value "contentDigest") else text digestValue
+
+            let digest =
+                if isNullish digestValue then
+                    text (field value "contentDigest")
+                else
+                    text digestValue
+
             SemanticMedia(mediaType, digest)
         | other -> failwith $"XTraceSurface: unknown semantic part '{other}'"
 
     let private itemSequence (value: obj) : int64 =
         let direct = field value "sequence"
-        if isNullish direct then int64Value (field (field value "cursor") "sequence") else int64Value direct
+
+        if isNullish direct then
+            int64Value (field (field value "cursor") "sequence")
+        else
+            int64Value direct
 
     let private semanticItemOfPlain (value: obj) : XTraceItem =
         { Cursor = { Sequence = itemSequence value }
@@ -265,20 +331,26 @@ module XTraceSurface =
                part = semanticPartView item.Part |}
 
     /// Construct one JSON-shaped XTrace item from a cursor/role/semantic part.
-    let item (value: obj) : obj = semanticItemOfPlain value |> semanticItemView
+    let item (value: obj) : obj =
+        semanticItemOfPlain value |> semanticItemView
 
     let private itemList (values: obj array) : XTraceItem list =
-        if isNullish values then [] else values |> Array.toList |> List.map semanticItemOfPlain
+        if isNullish values then
+            []
+        else
+            values |> Array.toList |> List.map semanticItemOfPlain
 
     /// Explicitly normalize item descriptors before passing them to an owner.
-    let toItems (values: obj array) : obj array = itemList values |> List.map semanticItemView |> List.toArray
+    let toItems (values: obj array) : obj array =
+        itemList values |> List.map semanticItemView |> List.toArray
 
     let private cursorOfPlain (value: obj) : XTraceCursor =
         { Sequence = int64Value (field value "sequence") }
 
-    let private cursorView (cursor: XTraceCursor) : obj = box {| sequence = int cursor.Sequence |}
+    let private cursorView (cursor: XTraceCursor) : obj =
+        box {| sequence = int cursor.Sequence |}
 
-    let originCursor : obj = cursorView XTrace.originCursor
+    let originCursor: obj = cursorView XTrace.originCursor
 
     let next (cursor: obj) : obj =
         cursorOfPlain cursor |> XTrace.nextCursor |> cursorView
@@ -310,14 +382,20 @@ module XTraceSurface =
                     { Role = text (field message "role")
                       Parts =
                         let parts = field message "parts"
-                        if isNullish parts then [] else unbox<obj array> parts |> Array.toList |> List.map semanticPartOfPlain })
+
+                        if isNullish parts then
+                            []
+                        else
+                            unbox<obj array> parts |> Array.toList |> List.map semanticPartOfPlain })
 
         XTrace.flatten semanticMessages
-        |> List.map (fun entry -> box {| role = entry.Role; part = semanticPartView entry.Part |})
+        |> List.map (fun entry ->
+            box
+                {| role = entry.Role
+                   part = semanticPartView entry.Part |})
         |> List.toArray
 
-    let render (values: obj array) : string =
-        itemList values |> XTrace.render
+    let render (values: obj array) : string = itemList values |> XTrace.render
 
     let renderItem (value: obj) : string =
         value |> semanticItemOfPlain |> XTrace.renderItem
@@ -328,16 +406,16 @@ module XTraceSurface =
         |> List.toArray
 
     let forOpening (values: obj array) : obj array =
-        XTrace.forOpening (itemList values)
-        |> List.map semanticItemView
-        |> List.toArray
+        XTrace.forOpening (itemList values) |> List.map semanticItemView |> List.toArray
 
     let isWorkRecordPart (value: obj) : bool =
         semanticPartOfPlain value |> XTrace.isWorkRecordPart
 
 
     let fact (caseName: string) (payload: obj) : obj =
-        box {| caseName = caseName; payload = payload |}
+        box
+            {| caseName = caseName
+               payload = payload |}
 
     let envelope (value: obj) : obj =
         box
@@ -349,13 +427,13 @@ module XTraceSurface =
     let private agentFactOf (value: obj) : AgentFact =
         let caseName = text (field value "caseName")
         let payload = field value "payload"
-        let sessionId = SessionId.create(text (field payload "sessionId"))
+        let sessionId = SessionId.create (text (field payload "sessionId"))
 
         match caseName with
         | "CompanionBloggerLinked" ->
             CompanionFact.CompanionBloggerLinked
                 {| SessionId = sessionId
-                   BloggerSessionId = SessionId.create(text (field payload "bloggerSessionId"))
+                   BloggerSessionId = SessionId.create (text (field payload "bloggerSessionId"))
                    BloggerAgent = text (field payload "bloggerAgent") |}
         | "OpeningPromptCaptured" ->
             CompanionFact.OpeningPromptCaptured
@@ -372,8 +450,8 @@ module XTraceSurface =
                    PartIndex = intValue (field payload "partIndex")
                    Kind = text (field payload "kind")
                    ToolName = optionalText (field payload "toolName")
-                   TextRef = BlobRef.create(text (field payload "textRef"))
-                   TextDigest = BlobDigest.create(text (field payload "textDigest"))
+                   TextRef = BlobRef.create (text (field payload "textRef"))
+                   TextDigest = BlobDigest.create (text (field payload "textDigest"))
                    Provenance = text (field payload "provenance")
                    ProviderRun = providerRunOf (field payload "providerRun")
                    ToolCallId = toolCallOf (field payload "toolCallId")
@@ -381,19 +459,19 @@ module XTraceSurface =
         | "TerminalOutputCaptured" ->
             CompanionFact.TerminalOutputCaptured
                 {| SessionId = sessionId
-                   TextRef = BlobRef.create(text (field payload "textRef"))
-                   TextDigest = BlobDigest.create(text (field payload "textDigest"))
+                   TextRef = BlobRef.create (text (field payload "textRef"))
+                   TextDigest = BlobDigest.create (text (field payload "textDigest"))
                    ProviderRun = requiredProviderRunOf (field payload "providerRun") |}
         | "ContextReanchored" ->
             ContextFact.ContextReanchored
                 {| SessionId = sessionId
-                   PreviousEpochId = PrefixEpochId.create(int64Value (field payload "previousEpochId"))
-                   NextEpochId = PrefixEpochId.create(int64Value (field payload "nextEpochId"))
+                   PreviousEpochId = PrefixEpochId.create (int64Value (field payload "previousEpochId"))
+                   NextEpochId = PrefixEpochId.create (int64Value (field payload "nextEpochId"))
                    ObservedCompactionRun = requiredProviderRunOf (field payload "observedCompactionRun") |}
         | other -> failwith $"XTraceSurface: unsupported fold fact '{other}'"
 
     let private envelopeOf (value: obj) : Envelope =
-        let sessionId = SessionId.create(text (field value "sessionId"))
+        let sessionId = SessionId.create (text (field value "sessionId"))
         let providerRun = providerRunOf (field value "providerRun")
         let sequence = int64Value (field value "sequence")
         let factDescriptor = field value "fact"
@@ -401,7 +479,7 @@ module XTraceSurface =
         { RuntimeId = RuntimeId.create "rt-xtrace-surface"
           LocalSeq = LocalSeq.create sequence
           ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-          EventId = EventId.create($"xtrace-{sequence}")
+          EventId = EventId.create ($"xtrace-{sequence}")
           Stream = StreamId.Session sessionId
           ProviderRun = providerRun
           Fact = Fact.Agent(agentFactOf factDescriptor) }
@@ -422,11 +500,17 @@ module XTraceSurface =
 
     let private foldResult (result: Result<ProjectionSet, FoldRejection>) : obj =
         match result with
-        | Ok projection -> box {| ok = true; value = allSessionsView projection |}
+        | Ok projection ->
+            box
+                {| ok = true
+                   value = allSessionsView projection |}
         | Error failure ->
             box
                 {| ok = false
-                   error = box {| Fact = failure.Fact; Reason = failure.Reason |} |}
+                   error =
+                    box
+                        {| Fact = failure.Fact
+                           Reason = failure.Reason |} |}
 
     /// Apply an ordered sequence of plain envelope descriptors through the
     /// production durable fold.
@@ -441,11 +525,21 @@ module XTraceSurface =
             |> List.map envelopeOf
             |> List.map (fun envelope -> Envelope.deserialize (Envelope.serialize envelope))
 
-        match decoded |> List.tryFind (function Error _ -> true | Ok _ -> false) with
-        | Some(Error reason) -> box {| ok = false; error = box {| Fact = "Envelope"; Reason = reason |} |}
+        match
+            decoded
+            |> List.tryFind (function
+                | Error _ -> true
+                | Ok _ -> false)
+        with
+        | Some(Error reason) ->
+            box
+                {| ok = false
+                   error = box {| Fact = "Envelope"; Reason = reason |} |}
         | _ ->
             decoded
-            |> List.choose (function Ok envelope -> Some envelope | Error _ -> None)
+            |> List.choose (function
+                | Ok envelope -> Some envelope
+                | Error _ -> None)
             |> foldTyped
             |> foldResult
 
@@ -458,19 +552,21 @@ module XTraceSurface =
         else
             unbox<obj array> values
             |> Array.tryPick (fun entry ->
-                if text (field entry "sessionId") = sessionId then Some(field entry "value") else None)
+                if text (field entry "sessionId") = sessionId then
+                    Some(field entry "value")
+                else
+                    None)
 
     let private appendResult (result: Result<'a, JournalAppendFailure>) : obj =
         match result with
         | Ok _ -> box {| ok = true |}
-        | Error failure -> box {| ok = false; error = JournalAppendFailure.describe failure |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error = JournalAppendFailure.describe failure |}
 
     /// Capture a plain semantic projection through the opaque journal handle.
-    let captureProjection
-        (handle: JournalHandle)
-        (sessionId: string)
-        (projection: obj)
-        : Task<obj option> =
+    let captureProjection (handle: JournalHandle) (sessionId: string) (projection: obj) : Task<obj option> =
         task {
             let! result =
                 XTraceCapture.captureProjection
@@ -491,7 +587,10 @@ module XTraceSurface =
             (Some handle.Journal)
             (SessionId.create sessionId)
             assignmentText
-            (if isNull authoritativeRequirements then [] else Array.toList authoritativeRequirements)
+            (if isNull authoritativeRequirements then
+                 []
+             else
+                 Array.toList authoritativeRequirements)
 
     let captureTerminalText
         (handle: JournalHandle)
@@ -535,8 +634,8 @@ module XTraceSurface =
                     (Some(ProviderRunIdentity.create observedCompactionRun))
                     (ContextFact.ContextReanchored
                         {| SessionId = SessionId.create sessionId
-                           PreviousEpochId = PrefixEpochId.create(int64 previousEpoch)
-                           NextEpochId = PrefixEpochId.create(int64 nextEpoch)
+                           PreviousEpochId = PrefixEpochId.create (int64 previousEpoch)
+                           NextEpochId = PrefixEpochId.create (int64 nextEpoch)
                            ObservedCompactionRun = ProviderRunIdentity.create observedCompactionRun |})
                     handle.Journal
 
@@ -544,11 +643,7 @@ module XTraceSurface =
         }
 
     /// Journal-backed lifecycle work record projection used by capture proofs.
-    let lifecycleWorkRecord
-        (handle: JournalHandle)
-        (sessionId: string)
-        (includeOpening: bool)
-        : Task<string option> =
+    let lifecycleWorkRecord (handle: JournalHandle) (sessionId: string) (includeOpening: bool) : Task<string option> =
         LifecycleWorkRecordProjection.lifecycleWorkRecord
             (Some handle.Journal)
             (SessionId.create sessionId)
@@ -560,8 +655,14 @@ module XTraceSurface =
     let private stateView state : obj =
         match state with
         | SnapshotToolPartState.Pending -> box {| status = "pending" |}
-        | SnapshotToolPartState.Completed output -> box {| status = "completed"; outputCanonical = output |}
-        | SnapshotToolPartState.Failed error -> box {| status = "failed"; errorCanonical = error |}
+        | SnapshotToolPartState.Completed output ->
+            box
+                {| status = "completed"
+                   outputCanonical = output |}
+        | SnapshotToolPartState.Failed error ->
+            box
+                {| status = "failed"
+                   errorCanonical = error |}
 
     let private localizedView (value: MagicTodoLocality.LocalizedToolCall) : obj =
         box
@@ -586,14 +687,16 @@ module XTraceSurface =
         | MagicTodoLocality.LocalityRejection.XTraceMissing _ -> "XTraceMissing"
         | MagicTodoLocality.LocalityRejection.XTraceAmbiguous _ -> "XTraceAmbiguous"
 
-    let resolveLocality
-        (sessionId: string)
-        (messages: obj array)
-        (envelopes: obj array)
-        (toolCallId: string)
-        : obj =
+    let resolveLocality (sessionId: string) (messages: obj array) (envelopes: obj array) (toolCallId: string) : obj =
         match foldEnvelopes (if isNullish envelopes then [||] else envelopes) with
-        | Error failure -> box {| ok = false; error = box {| code = "Fold"; fact = failure.Fact; reason = failure.Reason |} |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error =
+                    box
+                        {| code = "Fold"
+                           fact = failure.Fact
+                           reason = failure.Reason |} |}
         | Ok projection ->
             let projectedMessages =
                 SessionSnapshotPort.projectMessages (if isNullish messages then [||] else messages)
@@ -605,15 +708,17 @@ module XTraceSurface =
                     projection
                     (ToolCallId.create toolCallId)
             with
-            | Ok localized -> box {| ok = true; value = localizedView localized |}
-            | Error error -> box {| ok = false; error = box {| code = localityErrorCode error |} |}
+            | Ok localized ->
+                box
+                    {| ok = true
+                       value = localizedView localized |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = box {| code = localityErrorCode error |} |}
 
     /// Capture a decoded Host message view while retaining provider/tool identity.
-    let captureMessageView
-        (handle: JournalHandle)
-        (sessionId: string)
-        (messages: obj array)
-        : Task<obj option> =
+    let captureMessageView (handle: JournalHandle) (sessionId: string) (messages: obj array) : Task<obj option> =
         task {
             let captured =
                 ProviderWireCapture.decodeCapturedMessageView (if isNullish messages then [] else Array.toList messages)
@@ -633,4 +738,3 @@ module XTraceSurface =
             (SessionId.create sessionId)
             { StartInclusive = { Sequence = int64 startInclusive }
               EndExclusive = { Sequence = int64 endExclusive } }
-

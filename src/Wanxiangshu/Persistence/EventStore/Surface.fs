@@ -24,17 +24,13 @@ module Surface =
         if isNull value then
             []
         else
-            unbox<string array> value
-            |> Array.toList
-            |> List.map EventId.create
+            unbox<string array> value |> Array.toList |> List.map EventId.create
 
     let private payloadRefsOf (value: obj) : PayloadRef list =
         if isNull value then
             []
         else
-            unbox<string array> value
-            |> Array.toList
-            |> List.map PayloadRef.create
+            unbox<string array> value |> Array.toList |> List.map PayloadRef.create
 
     let private eventOfJs (value: obj) : EventEnvelope =
         { EventId = EventId.create (str (value?id))
@@ -69,27 +65,49 @@ module Surface =
     let private storageInvalidToJs (error: StorageInvalid) : obj =
         match error with
         | StorageInvalid.IdentityCollision eventId ->
-            box {| code = "IdentityCollision"; eventId = EventId.value eventId |}
-        | StorageInvalid.NonCanonical reason -> box {| code = "NonCanonical"; reason = reason |}
-        | StorageInvalid.MalformedEnvelope reason -> box {| code = "MalformedEnvelope"; reason = reason |}
+            box
+                {| code = "IdentityCollision"
+                   eventId = EventId.value eventId |}
+        | StorageInvalid.NonCanonical reason ->
+            box
+                {| code = "NonCanonical"
+                   reason = reason |}
+        | StorageInvalid.MalformedEnvelope reason ->
+            box
+                {| code = "MalformedEnvelope"
+                   reason = reason |}
         | StorageInvalid.MissingParent eventId ->
-            box {| code = "MissingParent"; eventId = EventId.value eventId |}
+            box
+                {| code = "MissingParent"
+                   eventId = EventId.value eventId |}
         | StorageInvalid.CyclicParents -> box {| code = "CyclicParents" |}
         | StorageInvalid.MissingPayload payloadRef ->
-            box {| code = "MissingPayload"; payloadRef = PayloadRef.value payloadRef |}
+            box
+                {| code = "MissingPayload"
+                   payloadRef = PayloadRef.value payloadRef |}
         | StorageInvalid.UnknownEventType eventType ->
-            box {| code = "UnknownEventType"; eventType = eventType |}
+            box
+                {| code = "UnknownEventType"
+                   eventType = eventType |}
 
     let private appendErrorToJs (error: AppendError) : obj =
         match error with
         | AppendError.StorageInvalid invalid ->
-            box {| code = "StorageInvalid"; error = storageInvalidToJs invalid |}
-        | AppendError.SemanticCut cut -> box {| code = "SemanticCut"; cut = cutToJs cut |}
-        | AppendError.AppendFailed reason -> box {| code = "AppendFailed"; reason = reason |}
+            box
+                {| code = "StorageInvalid"
+                   error = storageInvalidToJs invalid |}
+        | AppendError.SemanticCut cut ->
+            box
+                {| code = "SemanticCut"
+                   cut = cutToJs cut |}
+        | AppendError.AppendFailed reason ->
+            box
+                {| code = "AppendFailed"
+                   reason = reason |}
 
     /// Create a process-local writer capability. The caller owns its lifecycle.
     let create (commonDir: string, writerId: string) : EventStoreHandle =
-        EventStoreHandle.Create(EventStore.createLocal commonDir writerId (CanonicalIntegrator.create()))
+        EventStoreHandle.Create(EventStore.createLocal commonDir writerId (CanonicalIntegrator.create ()))
 
     /// Release a writer capability. Further operations fail rather than using a
     /// stale resource.
@@ -107,7 +125,10 @@ module Surface =
                     box
                         {| ok = true
                            cuts = receipt.Cuts |> List.map cutToJs |> List.toArray |}
-                | Error error -> box {| ok = false; error = appendErrorToJs error |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = appendErrorToJs error |}
         }
 
     /// Read one durable event by identity. A missing event is `null`.

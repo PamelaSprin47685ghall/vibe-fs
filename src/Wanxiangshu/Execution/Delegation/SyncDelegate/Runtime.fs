@@ -239,7 +239,10 @@ type SyncDelegateRuntime
 
     let tryConsumeReadyCall (store: SyncDelegateCallStore) (sessionId: SessionId) =
         match store.TryPeekCallByDelegate sessionId with
-        | Some call when call.Invocations |> List.exists (fun invocation -> invocation.StartCursor.IsNone) ->
+        | Some call when
+            call.Invocations
+            |> List.exists (fun invocation -> invocation.StartCursor.IsNone)
+            ->
             // The provider prompt owns the opening capture and cursor
             // assignment. A synthetic or early completion observation must
             // not consume the call before that bounded range exists.
@@ -358,7 +361,8 @@ type SyncDelegateRuntime
         match store.TryPeekCallByDelegate sessionId with
         | Some call ->
             call.Invocations.Length > 0
-            && call.Invocations |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
+            && call.Invocations
+               |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
         | None -> false
 
     member _.CancelSession(sessionId: SessionId) : unit =

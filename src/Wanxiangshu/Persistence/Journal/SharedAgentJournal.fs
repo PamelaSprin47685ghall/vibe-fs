@@ -28,24 +28,20 @@ module SharedAgentJournal =
     let private registerInstance
         (directory: string)
         (ready: Task<Result<AgentJournal, FoldRejection>>)
-        (journal: AgentJournal) =
+        (journal: AgentJournal)
+        =
         lock gate (fun () ->
             match shared.TryGetValue directory with
             | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> entry.Instance <- Some journal
             | _ -> ())
 
-    let private removeOpening
-        (directory: string)
-        (ready: Task<Result<AgentJournal, FoldRejection>>) =
+    let private removeOpening (directory: string) (ready: Task<Result<AgentJournal, FoldRejection>>) =
         lock gate (fun () ->
             match shared.TryGetValue directory with
             | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> shared.Remove directory |> ignore
             | _ -> ())
 
-    let private releaseExisting
-        (directory: string)
-        (entry: SharedJournal)
-        (target: AgentJournal) =
+    let private releaseExisting (directory: string) (entry: SharedJournal) (target: AgentJournal) =
         let remaining = entry.RefCount - 1
 
         if remaining <= 0 then

@@ -234,7 +234,8 @@ module ManagerLifeWorkflow =
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (blob: BlobWriteReceipt)
-        (terminalRecorded: bool) =
+        (terminalRecorded: bool)
+        =
         if not terminalRecorded then
             AgentJournal.appendAgent
                 (StreamId.Session sessionId)
@@ -252,14 +253,10 @@ module ManagerLifeWorkflow =
         (sessionId: SessionId)
         (lastWords: string)
         (providerRun: ProviderRunIdentity)
-        (blob: BlobWriteReceipt) =
+        (blob: BlobWriteReceipt)
+        =
         if not (String.IsNullOrWhiteSpace lastWords) then
-            XTraceCapture.captureLastWords
-                (Some journal)
-                sessionId
-                blob.BlobRef
-                blob.BlobDigest
-                providerRun
+            XTraceCapture.captureLastWords (Some journal) sessionId blob.BlobRef blob.BlobDigest providerRun
         else
             Task.FromResult()
 
@@ -270,9 +267,11 @@ module ManagerLifeWorkflow =
         (blessing: BlessingEvidence)
         (lastWords: string)
         (providerRun: ProviderRunIdentity)
-        (blob: BlobWriteReceipt) =
+        (blob: BlobWriteReceipt)
+        =
         task {
             let snapshot = AgentJournal.snapshot journal
+
             let terminalRecorded =
                 AgentProjection.tryFind sessionId snapshot.AgentProjections
                 |> Option.bind (fun session -> session.XTrace)
@@ -309,14 +308,18 @@ module ManagerLifeWorkflow =
         (blessing: BlessingEvidence)
         (lastWords: string)
         (providerRun: ProviderRunIdentity)
-        (blob: BlobWriteReceipt) =
+        (blob: BlobWriteReceipt)
+        =
         let snapshot = AgentJournal.snapshot journal
+
         let alreadyCompleted =
             AgentProjection.tryFind sessionId snapshot.AgentProjections
             |> Option.bind (fun session -> session.ManagerLife)
             |> Option.exists (fun lifecycle ->
-                (lifecycle.CurrentLife |> Option.exists (fun current -> current.LifeId = life.LifeId && current.Completed))
-                || lifecycle.CompletedLives |> List.exists (fun completed -> completed.LifeId = life.LifeId))
+                (lifecycle.CurrentLife
+                 |> Option.exists (fun current -> current.LifeId = life.LifeId && current.Completed))
+                || lifecycle.CompletedLives
+                   |> List.exists (fun completed -> completed.LifeId = life.LifeId))
 
         match alreadyCompleted with
         | true -> Task.FromResult(Ok BlessedLifeCompletion.AlreadyCompleted)

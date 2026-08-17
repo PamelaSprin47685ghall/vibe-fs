@@ -111,11 +111,13 @@ module OrchestratorHostReview =
         : Task<Result<unit, string>> =
         taskResult {
             let! durable = journal |> Result.requireSome "Review journal is unavailable"
-            let tree = GitTreeHash.create ((GitTree.create (WorktreePath.value worktree)).GetTreeHash())
+
+            let tree =
+                GitTreeHash.create ((GitTree.create (WorktreePath.value worktree)).GetTreeHash())
+
             let! reviewerSessionId = forkReviewer jobId worktree (openingPrompt managerSessionId)
 
-            do!
-                ReviewBarrier.openBarrier (Some durable) managerSessionId reviewerSessionId barrierId tree
+            do! ReviewBarrier.openBarrier (Some durable) managerSessionId reviewerSessionId barrierId tree
 
             let! channel =
                 ReviewJudgementInbox.acquire reviewerSessionId

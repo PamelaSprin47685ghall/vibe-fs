@@ -32,12 +32,14 @@ module TipDeliveryProjection =
         (state: TipDeliveryProjectionState)
         : TipDeliveryProjectionState =
         let normalizedTip =
-            if isNull tipName || tipName.Trim().Length = 0 then None else Some(tipName.Trim())
+            if isNull tipName || tipName.Trim().Length = 0 then
+                None
+            else
+                Some(tipName.Trim())
 
         match normalizedTip, presentation with
         | None, _ -> state
-        | Some tip, TipPresentation.Full ->
-            { FullDeliveredTips = Set.add tip state.FullDeliveredTips }
+        | Some tip, TipPresentation.Full -> { FullDeliveredTips = Set.add tip state.FullDeliveredTips }
         | Some _, TipPresentation.IdentityOnly -> state
 
     /// HOST-006: ContextReanchored voids Full history so Main re-emits main.md after compaction.

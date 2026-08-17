@@ -21,7 +21,10 @@ module ReviewTodoSurface =
         if isNull value then "" else string value
 
     let private field (value: obj) (name: string) : obj =
-        if isNull value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private strField value name = text (field value name)
 
@@ -32,7 +35,11 @@ module ReviewTodoSurface =
     let private cursorOf value =
         { Sequence =
             let nested = field value "Sequence"
-            if isNull nested then int64 (unbox<int> value) else int64 (unbox<int> nested) }
+
+            if isNull nested then
+                int64 (unbox<int> value)
+            else
+                int64 (unbox<int> nested) }
 
     let private blobRefOf value = BlobRef.create (text value)
     let private blobDigestOf value = BlobDigest.create (text value)
@@ -138,7 +145,9 @@ module ReviewTodoSurface =
 
     let private factValidation (caseName: string) (payload: obj) : Result<unit, string> =
         match caseName with
-        | "TodoWriteAccepted" -> physicalEvidenceResult (field payload "PhysicalSuccessEvidence") |> Result.map (fun _ -> ())
+        | "TodoWriteAccepted" ->
+            physicalEvidenceResult (field payload "PhysicalSuccessEvidence")
+            |> Result.map (fun _ -> ())
         | "TodoReviewConcluded" -> verdictResult (field payload "Verdict") |> Result.map (fun _ -> ())
         | _ -> Ok()
 
@@ -184,17 +193,29 @@ module ReviewTodoSurface =
 
     let tryConclude (handle: JournalHandle) (lifeId: string) (writeId: string) : Task<obj> =
         task {
-            let! outcome = TodoProcessReviewProgram.tryConclude handle.Journal (ManagerLifeId.create lifeId) (TodoWriteId.create writeId)
+            let! outcome =
+                TodoProcessReviewProgram.tryConclude
+                    handle.Journal
+                    (ManagerLifeId.create lifeId)
+                    (TodoWriteId.create writeId)
 
             return
                 match outcome with
                 | TodoProcessReviewProgram.ConcludeOutcome.Concluded -> box {| status = "Concluded" |}
-                | TodoProcessReviewProgram.ConcludeOutcome.Pending reason -> box {| status = "Pending"; reason = reason |}
+                | TodoProcessReviewProgram.ConcludeOutcome.Pending reason ->
+                    box
+                        {| status = "Pending"
+                           reason = reason |}
                 | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> box {| status = "Failed"; reason = reason |}
         }
 
     let producerPresence (handle: JournalHandle) (lifeId: string) (writeId: string) : obj =
-        match TodoProcessReviewProgram.producerPresence handle.Journal (ManagerLifeId.create lifeId) (TodoWriteId.create writeId) with
+        match
+            TodoProcessReviewProgram.producerPresence
+                handle.Journal
+                (ManagerLifeId.create lifeId)
+                (TodoWriteId.create writeId)
+        with
         | TodoProcessReviewProgram.ProducerPresence.Present -> box {| status = "Present" |}
         | TodoProcessReviewProgram.ProducerPresence.Absent reason -> box {| status = "Absent"; reason = reason |}
 
@@ -209,7 +230,12 @@ module ReviewTodoSurface =
                 []
             else
                 let values: obj array = unbox<obj array> value
-                values |> Array.toList |> List.map (fun item -> { Name = strField item "name"; Work = strField item "work" })
+
+                values
+                |> Array.toList
+                |> List.map (fun item ->
+                    { Name = strField item "name"
+                      Work = strField item "work" })
 
         MagicTodoProcessReview.renderAssignmentUserMessage
             preamble

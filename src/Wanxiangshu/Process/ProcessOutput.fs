@@ -30,7 +30,10 @@ module ProcessOutput =
 
     let private switchToSpool collector =
         let active = Spool.startStreamingSpool ()
-        for previous in collector.Combined do Spool.appendStreamingSpool active previous
+
+        for previous in collector.Combined do
+            Spool.appendStreamingSpool active previous
+
         collector.Combined.Clear()
         collector.Stdout.Clear()
         collector.Stderr.Clear()
@@ -40,7 +43,9 @@ module ProcessOutput =
         let switchThreshold = min collector.OutputLimit MemoryBufferBudget
         target.Add bytes
         collector.Combined.Add bytes
-        if collector.BytesObserved > switchThreshold then switchToSpool collector
+
+        if collector.BytesObserved > switchThreshold then
+            switchToSpool collector
 
     let private appendInMemory collector target bytes =
         match collector.Spool with
@@ -59,7 +64,10 @@ module ProcessOutput =
         addChunk collector collector.Stderr bytes
 
     let private concatBytes (parts: List<byte[]>) =
-        if parts.Count = 0 then [||] else parts |> Seq.toArray |> Array.concat
+        if parts.Count = 0 then
+            [||]
+        else
+            parts |> Seq.toArray |> Array.concat
 
     let buildResult (collector: OutputCollector) (exitCode: int) : ProcessOutcome =
         match collector.Spool with

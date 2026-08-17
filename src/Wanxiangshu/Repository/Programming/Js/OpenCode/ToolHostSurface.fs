@@ -57,7 +57,9 @@ module JsToolHostSurface =
         (unbox<JsRegisteredToolHandle> handle).Spec.Description
 
     let argumentNames (handle: obj) : string array =
-        (unbox<JsRegisteredToolHandle> handle).Spec.Arguments |> List.map fst |> List.toArray
+        (unbox<JsRegisteredToolHandle> handle).Spec.Arguments
+        |> List.map fst
+        |> List.toArray
 
     let execute (handle: obj) (args: obj) (context: obj) : Task<obj> =
         invokeRegistered (unbox<JsRegisteredToolHandle> handle).Registered args context

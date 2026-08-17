@@ -39,7 +39,6 @@
 | 历史材料 | 裁决 | 记录位置 |
 |---|---|---|
 | `provider-leak-gate.mjs` 的 `FORBIDDEN_TOKENS` / `FORBIDDEN_DTO_PATTERNS` 黑名单 | **迁移 ratchet**：历史 DTO token 名（SessionId、AgentId、status、code…）是 proof fixtures，不是永久 taxonomy（boundary card DOES NOT OWN 明言）。未来 horizon proof 应逐步转 positive admission law；基线稳定后 DELETE 黑名单累加（PROOF-MAP §91/§126、HANDOFF §9.5） | 本文件 + `PROOF.md` |
-| `provider-leak-gate-baseline.json` | HOW/MECHANISM：baseline ratchet 是防回归工具，无独立 semantic 内容 | 本文件 |
 | `horizon-surface.test.mjs` 的 `fast-coder is still away` 之类断言用机器名 | 仅测试 fixture：断言的是「名册按名字渲染、无 DTO」，不是「fast-coder 应可见」。真实 provider 面看不到 binding 名（`FAST_DEEP_BINDING_RE`） | 本文件 |
 | GrandRewrite（active change）把机器拓扑撤出 horizon、普通 completion 取代 `return` | EVIDENCE：语义已进 EXEC-026/031 等；本包吸收其 horizon 面（EXEC-030），不复制其迁移细节 | WHY.md 失败模式表 |
 | `repository-warm-start.md` 的 `MaxKeywords=8 / TopK=4 / 24 hints / 64 KiB` 具体值 | **GARBAGE/HOW**（HANDOFF §12：tuning values 不升级为永久 WHAT）：本包只取准入法则（012/013），数值归 `knowledge-reuse` 的 HOW | 本文件 |

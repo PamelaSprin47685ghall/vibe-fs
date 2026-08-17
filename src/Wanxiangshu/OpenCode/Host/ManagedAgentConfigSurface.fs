@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Resources
+
 /// JS-native Host-config boundary for the managed-agent capability projection.
 ///
 /// ManagedAgentConfig owns validation and writes; this surface only translates
@@ -13,7 +14,7 @@ module ManagedAgentConfigSurface =
     /// boundary is also useful to a pure config-contract consumer that does
     /// not construct a plugin instance.
     let installDefaultResources () : unit =
-        RuntimeResources.install (RuntimeResources.load())
+        RuntimeResources.install (RuntimeResources.load ())
 
     let private roleBindingNames () =
         ManagedAgent.requiredNames
@@ -48,5 +49,4 @@ module ManagedAgentConfigSurface =
             box
                 {| ok = true
                    bindingNames = roleBindingNames () |}
-        | Error error ->
-            failwith ("managed-agent-config-invalid: " + error)
+        | Error error -> failwith ("managed-agent-config-invalid: " + error)

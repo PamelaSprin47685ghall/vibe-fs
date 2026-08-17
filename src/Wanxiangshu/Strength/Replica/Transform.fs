@@ -125,7 +125,11 @@ module StrengthReplicaTransform =
                 { RequestOrdinal = requestOrdinal + 1
                   Exchanges = exchanges }
 
-    let private classifyHostMessage (results: Map<string, string>) (requestOrdinal: int) (rawMessage: obj) : HostBatchStep =
+    let private classifyHostMessage
+        (results: Map<string, string>)
+        (requestOrdinal: int)
+        (rawMessage: obj)
+        : HostBatchStep =
         match SessionSnapshotPort.projectMessage rawMessage with
         | Some message when String.Equals(message.Role, "assistant", StringComparison.OrdinalIgnoreCase) ->
             classifyAssistantBatch results requestOrdinal rawMessage message

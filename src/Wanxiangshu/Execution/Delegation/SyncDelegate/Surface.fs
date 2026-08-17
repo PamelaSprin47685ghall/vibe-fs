@@ -55,17 +55,24 @@ module SyncDelegateSurface =
             member _.AbortSession _ = Task.FromResult(Ok())
             member _.InterruptSessionOnly _ = Task.FromResult(Ok())
             member _.AbortChildren _ = Task.FromResult()
-            member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "sibling creation is outside a managed delegation")
+
+            member _.CreateSiblingSession(_, _, _) =
+                Task.FromResult(Error "sibling creation is outside a managed delegation")
+
             member _.TryGetParentSession _ = Task.FromResult(Ok None)
 
             member _.CreateChildSession(parent, _) =
-                let child = SessionId.create(sprintf "%s-child-%d" (SessionId.value parent) (children.Count + 1))
+                let child =
+                    SessionId.create (sprintf "%s-child-%d" (SessionId.value parent) (children.Count + 1))
+
                 children.Add child
                 Task.FromResult(Ok child)
 
             member _.ListChildren parent =
                 children
-                |> Seq.filter (fun child -> (SessionId.value child).StartsWith((SessionId.value parent) + "-child-", StringComparison.Ordinal))
+                |> Seq.filter (fun child ->
+                    (SessionId.value child)
+                        .StartsWith((SessionId.value parent) + "-child-", StringComparison.Ordinal))
                 |> Seq.map (fun child ->
                     { SessionId = child
                       ParentSessionId = Some parent
@@ -81,11 +88,17 @@ module SyncDelegateSurface =
     let private queueImmediate (callback: unit -> unit) : unit = jsNative
 
     let private nextTurn () : Task<unit> =
-        let tcs = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+        let tcs =
+            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
         queueImmediate (fun () -> AsyncSupport.trySetResult tcs () |> ignore)
         tcs.Task
 
-    let private waitForReadyCall (runtime: SyncDelegateRuntime) (owner: SessionId) (role: SyncDelegateRole) : Task<SessionId option> =
+    let private waitForReadyCall
+        (runtime: SyncDelegateRuntime)
+        (owner: SessionId)
+        (role: SyncDelegateRole)
+        : Task<SessionId option> =
         let rec loop remaining =
             task {
                 match runtime.TryFind(owner, role) with
@@ -124,10 +137,17 @@ module SyncDelegateSurface =
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
             let integrator = CanonicalIntegrator.create ()
-            let store = EventStore.createLocal directory (Guid.NewGuid().ToString("N")) integrator
+
+            let store =
+                EventStore.createLocal directory (Guid.NewGuid().ToString("N")) integrator
+
             let! result =
-                EventStoreJournalWriter.resumeOrCreate
-                    (RuntimeId.create "sync-delegate-surface", 1, DateTimeOffset.UtcNow, store)
+                EventStoreJournalWriter.resumeOrCreate (
+                    RuntimeId.create "sync-delegate-surface",
+                    1,
+                    DateTimeOffset.UtcNow,
+                    store
+                )
 
             match result with
             | Ok(writer, _, projection) ->
@@ -149,6 +169,7 @@ module SyncDelegateSurface =
             let gate = new SessionQuiescenceGate()
 
             let answers = Dictionary<string, string>()
+
             let workRecordFor (sessionId: SessionId) (_range: MagicTodoLwr.BoundedRange) =
                 task {
                     match answers.TryGetValue(SessionId.value sessionId) with
@@ -197,7 +218,15 @@ module SyncDelegateSurface =
             let harness = unbox<Harness> value
             let factory = ToolHostCodec.factory toolModule
             let spec = InspectorTool.spec factory harness.Scope (Some harness.Runtime)
-            let args = HostToolArguments(box {| charge = charge; keywords = null; expected_tool_calls = null |})
+
+            let args =
+                HostToolArguments(
+                    box
+                        {| charge = charge
+                           keywords = null
+                           expected_tool_calls = null |}
+                )
+
             let context =
                 { SessionId = owner
                   Agent = None
@@ -208,11 +237,13 @@ module SyncDelegateSurface =
 
             return! spec.Execute args context
         }
+
     /// Invoke one ordinary managed delegation. The returned promise remains
     /// pending until `settle` receives a reconciled provider turn.
     let invoke (value: obj) (owner: string) (role: string) (question: string) : Task<obj> =
         task {
             let harness = unbox<Harness> value
+
             match roleOf role with
             | Error error -> return box {| ok = false; error = error |}
             | Ok role ->
@@ -228,28 +259,29 @@ module SyncDelegateSurface =
     let settle (value: obj) (owner: string) (role: string) (answer: string) (runId: string) : Task<bool> =
         task {
             let harness = unbox<Harness> value
+
             match roleOf role with
             | Error _ -> return false
             | Ok role ->
                 match! waitForReadyCall harness.Runtime (SessionId.create owner) role with
                 | None -> return false
                 | Some child ->
-                        let turn =
-                            { SessionId = child
-                              PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                              ProviderRun = ProviderRunIdentity.create runId
-                              Role = Some(roleValue role)
-                              Directory = None
-                              Parts = [||]
-                              Finish = Some "stop"
-                              ErrorName = None
-                              Model = None
-                              Outcome = ReconcileProgram.TurnCompleted
-                              Observation = None }
+                    let turn =
+                        { SessionId = child
+                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
+                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
+                          ProviderRun = ProviderRunIdentity.create runId
+                          Role = Some(roleValue role)
+                          Directory = None
+                          Parts = [||]
+                          Finish = Some "stop"
+                          ErrorName = None
+                          Model = None
+                          Outcome = ReconcileProgram.TurnCompleted
+                          Observation = None }
 
-                        harness.Answers.[SessionId.value child] <- answer
-                        return! harness.Runtime.HandleTurn(turn, None)
+                    harness.Answers.[SessionId.value child] <- answer
+                    return! harness.Runtime.HandleTurn(turn, None)
         }
 
     let observeTurn
@@ -262,6 +294,7 @@ module SyncDelegateSurface =
         : Task<bool> =
         task {
             let harness = unbox<Harness> value
+
             match roleOf role, outcomeOf outcomeName with
             | Error _, _
             | _, Error _ -> return false
@@ -269,26 +302,29 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime (SessionId.create owner) role with
                 | None -> return false
                 | Some child ->
-                        if outcomeName = "TurnCompleted" then
-                            harness.Answers.[SessionId.value child] <- answer
-                        let turn =
-                            { SessionId = child
-                              PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                              ProviderRun = ProviderRunIdentity.create runId
-                              Role = Some(roleValue role)
-                              Directory = None
-                              Parts = [||]
-                              Finish = Some "stop"
-                              ErrorName = None
-                              Model = None
-                              Outcome = outcome
-                              Observation = None }
-                        return! harness.Runtime.HandleTurn(turn, None)
+                    if outcomeName = "TurnCompleted" then
+                        harness.Answers.[SessionId.value child] <- answer
+
+                    let turn =
+                        { SessionId = child
+                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
+                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
+                          ProviderRun = ProviderRunIdentity.create runId
+                          Role = Some(roleValue role)
+                          Directory = None
+                          Parts = [||]
+                          Finish = Some "stop"
+                          ErrorName = None
+                          Model = None
+                          Outcome = outcome
+                          Observation = None }
+
+                    return! harness.Runtime.HandleTurn(turn, None)
         }
 
     let child (value: obj) (owner: string) (role: string) : obj =
         let harness = unbox<Harness> value
+
         match roleOf role with
         | Error _ -> null
         | Ok role ->
@@ -300,13 +336,23 @@ module SyncDelegateSurface =
         match roleOf roleName with
         | Error error -> box {| ok = false; error = error |}
         | Ok role ->
-            let tier = if not (isNull tierName) && tierName.Equals("Deep", StringComparison.OrdinalIgnoreCase) then AgentTier.Deep else AgentTier.Fast
+            let tier =
+                if
+                    not (isNull tierName)
+                    && tierName.Equals("Deep", StringComparison.OrdinalIgnoreCase)
+                then
+                    AgentTier.Deep
+                else
+                    AgentTier.Fast
+
             let key = DedicatedDelegateKey.create (ReuseScopeId.create scope) role
+
             box
                 {| tier = SyncDelegate.tierLabel (SyncDelegate.tierForOwner tier)
                    agent = SyncDelegate.agentNameFor role tier
                    scope = ReuseScopeId.value key.Scope
                    role = SyncDelegate.roleLabel key.Role |}
+
     let childCount (value: obj) : int =
         let harness = unbox<Harness> value
         harness.Children.Count
@@ -321,7 +367,10 @@ module SyncDelegateSurface =
                     match SyncDelegate.tryRoleOfToolName name with
                     | Some matched when matched = role -> Some name
                     | _ -> None)
-            box {| order = order; currentPresent = order |> Array.exists (fun name -> name = currentCall) |}
+
+            box
+                {| order = order
+                   currentPresent = order |> Array.exists (fun name -> name = currentCall) |}
 
     let invokeBatch
         (value: obj)
@@ -334,6 +383,7 @@ module SyncDelegateSurface =
         : Task<obj> =
         task {
             let harness = unbox<Harness> value
+
             match roleOf role with
             | Error error -> return box {| kind = "Error"; error = error |}
             | Ok role ->
@@ -341,38 +391,59 @@ module SyncDelegateSurface =
                     { ProviderRun = ProviderRunIdentity.create providerRun
                       CallOrder = callOrder |> Array.toList |> List.map ToolCallId.create
                       CurrentCall = ToolCallId.create callId }
+
                 let! result =
-                    harness.Runtime.InvokeBatchPrepared(
-                        owner,
-                        role,
-                        charge,
-                        batch,
-                        (fun () -> Task.FromResult charge)
-                    )
+                    harness.Runtime.InvokeBatchPrepared(owner, role, charge, batch, (fun () -> Task.FromResult charge))
+
                 return
                     match result with
-                    | Ok(SyncDelegateInvocationResult.WorkRecord record) -> box {| kind = "WorkRecord"; value = record |}
-                    | Ok(SyncDelegateInvocationResult.MergedInto canonical) -> box {| kind = "MergedInto"; canonical = ToolCallId.value canonical |}
+                    | Ok(SyncDelegateInvocationResult.WorkRecord record) ->
+                        box
+                            {| kind = "WorkRecord"
+                               value = record |}
+                    | Ok(SyncDelegateInvocationResult.MergedInto canonical) ->
+                        box
+                            {| kind = "MergedInto"
+                               canonical = ToolCallId.value canonical |}
                     | Error error -> box {| kind = "Error"; error = error |}
         }
 
 
     let serializationDecision (firstScope: string) (secondScope: string) (sameProviderRun: bool) : obj =
-        let sameScope = ReuseScopeId.equals (ReuseScopeId.create firstScope) (ReuseScopeId.create secondScope)
+        let sameScope =
+            ReuseScopeId.equals (ReuseScopeId.create firstScope) (ReuseScopeId.create secondScope)
+
         if sameScope && not sameProviderRun then
-            box {| accepted = false; reason = "same ReuseScope already has an active batch" |}
+            box
+                {| accepted = false
+                   reason = "same ReuseScope already has an active batch" |}
         else
-            box {| accepted = true; reason = "independent provider batch" |}
+            box
+                {| accepted = true
+                   reason = "independent provider batch" |}
 
     let evidenceBoundary (charge: string) (workRecord: string) : obj =
-        box {| charge = charge; workRecord = workRecord; authorityTransferred = false |}
+        box
+            {| charge = charge
+               workRecord = workRecord
+               authorityTransferred = false |}
 
     let retryDisposition (outcomes: string array) : obj =
         if outcomes |> Array.exists ((=) "Completed") then
-            box {| result = "WorkRecord"; childLocalFailures = 0; callerFailure = false |}
+            box
+                {| result = "WorkRecord"
+                   childLocalFailures = 0
+                   callerFailure = false |}
         elif outcomes |> Array.exists ((=) "RetryAvailable") then
-            box {| result = "ChildLocalRetry"; childLocalFailures = outcomes |> Array.filter ((=) "TurnFailed") |> Array.length; callerFailure = false |}
+            box
+                {| result = "ChildLocalRetry"
+                   childLocalFailures = outcomes |> Array.filter ((=) "TurnFailed") |> Array.length
+                   callerFailure = false |}
         else
-            box {| result = "ExhaustedFailure"; childLocalFailures = outcomes |> Array.filter ((=) "TurnFailed") |> Array.length; callerFailure = true |}
+            box
+                {| result = "ExhaustedFailure"
+                   childLocalFailures = outcomes |> Array.filter ((=) "TurnFailed") |> Array.length
+                   callerFailure = true |}
 
-    let dispose (value: obj) : unit = unbox<Harness> value |> fun harness -> harness.Dispose()
+    let dispose (value: obj) : unit =
+        unbox<Harness> value |> fun harness -> harness.Dispose()

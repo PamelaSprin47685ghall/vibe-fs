@@ -93,10 +93,7 @@ module HostForkRunLifecycle =
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.
     /// Claim runs only after JoinableCompletion proof succeeds (fail closed).
-    let private claimPendingRun
-        (gate: obj)
-        (pendingRuns: Dictionary<string, PendingHostRun>)
-        (run: PendingHostRun) =
+    let private claimPendingRun (gate: obj) (pendingRuns: Dictionary<string, PendingHostRun>) (run: PendingHostRun) =
         lock gate (fun () ->
             match pendingRuns.TryGetValue run.AgentId with
             | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
@@ -110,7 +107,8 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (proof: JoinableCompletion)
         (run: PendingHostRun)
-        (agentOutcome: AgentCompletionOutcome) =
+        (agentOutcome: AgentCompletionOutcome)
+        =
         task {
             match! ChildRecoveryWorkflow.commitJoinable journal parentId proof with
             | Ok() -> return agentOutcome
@@ -130,7 +128,8 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (run: PendingHostRun)
         (proof: JoinableCompletion)
-        (agentOutcome: AgentCompletionOutcome) : Task =
+        (agentOutcome: AgentCompletionOutcome)
+        : Task =
         task {
             let! finalOutcome =
                 match journal with
@@ -148,7 +147,8 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (run: PendingHostRun)
         (proof: JoinableCompletion)
-        (agentOutcome: AgentCompletionOutcome) : Task =
+        (agentOutcome: AgentCompletionOutcome)
+        : Task =
         let claimed, subscriptionToDispose = claimPendingRun gate pendingRuns run
 
         if claimed then

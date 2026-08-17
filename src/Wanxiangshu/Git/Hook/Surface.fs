@@ -24,8 +24,14 @@ module HookSurface =
         | HookDispatcher.HookInstallVerdict.DiagnoseIncomplete _ -> "DiagnoseIncomplete"
 
     let classifyExistingHook (existingBody: obj) : string =
-        let body = if isNull existingBody then None else Some(text existingBody)
+        let body =
+            if isNull existingBody then
+                None
+            else
+                Some(text existingBody)
+
         HookDispatcher.classifyExistingHook body |> verdictName
 
     let installOrDiagnose (hooksDirectory: string) (kind: string) (shimBody: string) : string =
-        HookDispatcher.installOrDiagnose hooksDirectory (kindOf kind) shimBody |> verdictName
+        HookDispatcher.installOrDiagnose hooksDirectory (kindOf kind) shimBody
+        |> verdictName

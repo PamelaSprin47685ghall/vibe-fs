@@ -18,15 +18,9 @@ module ParallelSurface =
         source.Cancel()
         box (TokenHandle(source))
 
-    let cancel (token: obj) : unit =
-        (token :?> TokenHandle).Source.Cancel()
+    let cancel (token: obj) : unit = (token :?> TokenHandle).Source.Cancel()
 
-    let mapBounded
-        (maxConcurrency: int)
-        (action: obj)
-        (items: obj array)
-        (token: obj)
-        : Task<obj array> =
+    let mapBounded (maxConcurrency: int) (action: obj) (items: obj array) (token: obj) : Task<obj array> =
         task {
             let handle =
                 if isNull token then

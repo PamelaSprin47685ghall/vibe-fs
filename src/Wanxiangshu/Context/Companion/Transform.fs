@@ -215,15 +215,7 @@ module CompanionTransform =
         : Task<unit> =
         task {
             let companion =
-                ensureCompanion
-                    companions
-                    gate
-                    scope
-                    sessionPort
-                    journal
-                    onBloggerCreated
-                    workspaceDirectory
-                    sessionId
+                ensureCompanion companions gate scope sessionPort journal onBloggerCreated workspaceDirectory sessionId
 
             // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
             companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj

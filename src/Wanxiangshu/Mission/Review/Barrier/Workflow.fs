@@ -24,10 +24,7 @@ open Wanxiangshu.Persistence.Journal
 /// closed) and the guard path could never reach a confirmed double PERFECT.
 module ReviewBarrier =
 
-    let private appendReviewBarrierFact
-        (durable: AgentJournal)
-        (reviewerSessionId: SessionId)
-        fact =
+    let private appendReviewBarrierFact (durable: AgentJournal) (reviewerSessionId: SessionId) fact =
         task {
             match! AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
             | Ok value -> return Ok value

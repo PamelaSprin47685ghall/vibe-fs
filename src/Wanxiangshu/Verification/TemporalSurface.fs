@@ -66,7 +66,10 @@ module TemporalSurface =
 
     let private sessionIdOf (value: obj) = SessionId.create (text value)
     let private logicalRunOf (value: obj) = LogicalRunId.create (text value)
-    let private authorityRootOf (value: obj) = AuthorityRootUserMessageId.create (text value)
+
+    let private authorityRootOf (value: obj) =
+        AuthorityRootUserMessageId.create (text value)
+
     let private providerRunOf (value: obj) = ProviderRunIdentity.create (text value)
 
     let private optionalProviderRun (value: obj) =
@@ -83,9 +86,18 @@ module TemporalSurface =
     let private streamToJs stream =
         match stream with
         | StreamId.Workspace -> box {| kind = "Workspace" |}
-        | StreamId.Session session -> box {| kind = "Session"; session = SessionId.value session |}
-        | StreamId.Child child -> box {| kind = "Child"; child = ChildId.value child |}
-        | StreamId.Process processId -> box {| kind = "Process"; ``process`` = ProcessId.value processId |}
+        | StreamId.Session session ->
+            box
+                {| kind = "Session"
+                   session = SessionId.value session |}
+        | StreamId.Child child ->
+            box
+                {| kind = "Child"
+                   child = ChildId.value child |}
+        | StreamId.Process processId ->
+            box
+                {| kind = "Process"
+                   ``process`` = ProcessId.value processId |}
 
     let private agentFactOfJs (value: obj) : AgentFact =
         let family = text (value?family)
@@ -151,11 +163,20 @@ module TemporalSurface =
         let stream = streamOfJs (value?stream)
         let fact = factOfJs (value?fact)
 
-        { RuntimeId = RuntimeId.create (if isNullish (value?runtime) then "rt_temporal" else text (value?runtime))
+        { RuntimeId =
+            RuntimeId.create (
+                if isNullish (value?runtime) then
+                    "rt_temporal"
+                else
+                    text (value?runtime)
+            )
           LocalSeq = LocalSeq.create (if isNullish (value?seq) then 1L else int64Value (value?seq))
           ObservedAt =
             DateTimeOffset.Parse(
-                if isNullish (value?observedAt) then "2026-01-01T00:00:00Z" else text (value?observedAt)
+                if isNullish (value?observedAt) then
+                    "2026-01-01T00:00:00Z"
+                else
+                    text (value?observedAt)
             )
           EventId = EventId.create (if isNullish (value?id) then "e1" else text (value?id))
           Stream = stream
@@ -174,9 +195,9 @@ module TemporalSurface =
     let private sessionToJs (session: SessionAgentProjection) : obj =
         box
             {| fallback =
-                   match session.Fallback with
-                   | None -> null
-                   | Some value -> fallbackToJs value |}
+                match session.Fallback with
+                | None -> null
+                | Some value -> fallbackToJs value |}
 
     let private projectionToJs (projection: ProjectionSet) : obj =
         let sessions =
@@ -187,7 +208,9 @@ module TemporalSurface =
         box {| sessions = createObj sessions |}
 
     let private rejectionToJs (rejection: FoldRejection) : obj =
-        box {| Fact = rejection.Fact; Reason = rejection.Reason |}
+        box
+            {| Fact = rejection.Fact
+               Reason = rejection.Reason |}
 
     let private factToJs (fact: Fact) : obj =
         match fact with
@@ -196,49 +219,52 @@ module TemporalSurface =
                 {| family = "Runtime"
                    case = "RuntimeStarted"
                    payload =
-                       box
-                           {| RuntimeId = RuntimeId.value payload.RuntimeId
-                              ProcessId = payload.ProcessId
-                              StartedAt = payload.StartedAt.ToString("o") |} |}
+                    box
+                        {| RuntimeId = RuntimeId.value payload.RuntimeId
+                           ProcessId = payload.ProcessId
+                           StartedAt = payload.StartedAt.ToString("o") |} |}
         | Fact.Agent(AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)) ->
             box
                 {| family = "Prompt"
                    case = "AuthorityRootAccepted"
                    payload =
-                       box
-                           {| SessionId = SessionId.value payload.SessionId
-                              LogicalRunId = LogicalRunId.value payload.LogicalRunId
-                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
-                              AuthorityKind = payload.AuthorityKind
-                              SelectedAgent = payload.SelectedAgent
-                              PeerAgent = payload.PeerAgent
-                              CanonicalRole = payload.CanonicalRole
-                              SelectedTier = payload.SelectedTier |} |}
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           AuthorityKind = payload.AuthorityKind
+                           SelectedAgent = payload.SelectedAgent
+                           PeerAgent = payload.PeerAgent
+                           CanonicalRole = payload.CanonicalRole
+                           SelectedTier = payload.SelectedTier |} |}
         | Fact.Agent(AgentFact.Fallback(FallbackFactCases.FallbackCursorAdvanced payload)) ->
             box
                 {| family = "Fallback"
                    case = "FallbackCursorAdvanced"
                    payload =
-                       box
-                           {| SessionId = SessionId.value payload.SessionId
-                              LogicalRunId = LogicalRunId.value payload.LogicalRunId
-                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
-                              ProviderRun = ProviderRunIdentity.value payload.ProviderRun
-                              PreviousOffset = int payload.PreviousOffset
-                              NextOffset = int payload.NextOffset
-                              ConsecutiveFailureCount = payload.ConsecutiveFailureCount
-                              Reason = payload.Reason |} |}
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           ProviderRun = ProviderRunIdentity.value payload.ProviderRun
+                           PreviousOffset = int payload.PreviousOffset
+                           NextOffset = int payload.NextOffset
+                           ConsecutiveFailureCount = payload.ConsecutiveFailureCount
+                           Reason = payload.Reason |} |}
         | Fact.Agent(AgentFact.Fallback(FallbackFactCases.FallbackExhausted payload)) ->
             box
                 {| family = "Fallback"
                    case = "FallbackExhausted"
                    payload =
-                       box
-                           {| SessionId = SessionId.value payload.SessionId
-                              LogicalRunId = LogicalRunId.value payload.LogicalRunId
-                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
-                              FinalConsecutiveFailureCount = payload.FinalConsecutiveFailureCount
-                              FinalOffset = int payload.FinalOffset |} |}
+                    box
+                        {| SessionId = SessionId.value payload.SessionId
+                           LogicalRunId = LogicalRunId.value payload.LogicalRunId
+                           AuthorityRootUserMessageId =
+                            AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
+                           FinalConsecutiveFailureCount = payload.FinalConsecutiveFailureCount
+                           FinalOffset = int payload.FinalOffset |} |}
         | Fact.Agent(AgentFact.Companion(CompanionFactCases.CompanionBloggerClosed payload)) ->
             box
                 {| family = "Companion"
@@ -254,9 +280,9 @@ module TemporalSurface =
                id = EventId.value envelope.EventId
                stream = streamToJs envelope.Stream
                run =
-                   match envelope.ProviderRun with
-                   | None -> null
-                   | Some value -> ProviderRunIdentity.value value
+                match envelope.ProviderRun with
+                | None -> null
+                | Some value -> ProviderRunIdentity.value value
                fact = factToJs envelope.Fact |}
 
     let private decodePersisted (events: EventEnvelope list) : Envelope list =
@@ -284,29 +310,40 @@ module TemporalSurface =
         match AgentJournal.createFromProjection writer projection with
         | Error error ->
             writer.Release()
-            box {| ok = false; error = $"{error.Fact}: {error.Reason}" |}
-        | Ok journal -> box {| ok = true; journal = JournalHandle(commonDir, journal) |}
+
+            box
+                {| ok = false
+                   error = $"{error.Fact}: {error.Reason}" |}
+        | Ok journal ->
+            box
+                {| ok = true
+                   journal = JournalHandle(commonDir, journal) |}
 
     // ── deterministic timer/clock capabilities ─────────────────────────────
 
-    let createVirtualTimer () : obj = TimerHandle(PtyTiming.createVirtualTimerPort()) :> obj
+    let createVirtualTimer () : obj =
+        TimerHandle(PtyTiming.createVirtualTimerPort ()) :> obj
 
     let timerDelay (timer: obj) (milliseconds: int) : obj =
         let handle = (timer :?> TimerHandle).Port.Port.Delay milliseconds
         DeadlineHandle(handle) :> obj
 
-    let timerAwait (handle: obj) : Task<unit> = (handle :?> DeadlineHandle).Handle.Delay
+    let timerAwait (handle: obj) : Task<unit> =
+        (handle :?> DeadlineHandle).Handle.Delay
 
-    let timerCancel (handle: obj) : unit = (handle :?> DeadlineHandle).Handle.Cancel()
+    let timerCancel (handle: obj) : unit =
+        (handle :?> DeadlineHandle).Handle.Cancel()
 
     let timerAdvance (timer: obj) (milliseconds: int) : unit =
         (timer :?> TimerHandle).Port.Advance milliseconds
 
     let timerNowMs (timer: obj) : int = (timer :?> TimerHandle).Port.NowMs()
 
-    let timerDispose (timer: obj) : unit = (timer :?> TimerHandle).Port.Port.Dispose()
+    let timerDispose (timer: obj) : unit =
+        (timer :?> TimerHandle).Port.Port.Dispose()
 
-    let createVirtualClock () : obj = ClockHandle(PtyTiming.createVirtualClockPort()) :> obj
+    let createVirtualClock () : obj =
+        ClockHandle(PtyTiming.createVirtualClockPort ()) :> obj
 
     let clockNowIso (clock: obj) : string =
         (clock :?> ClockHandle).Port.Port.UtcNow().ToString("o")
@@ -325,10 +362,7 @@ module TemporalSurface =
     let openJournal (commonDir: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let store =
-                EventStore.createLocal
-                    commonDir
-                    (Guid.NewGuid().ToString("N"))
-                    (CanonicalIntegrator.create())
+                EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
 
             let! writer, _init =
                 EventStoreJournalWriter.create (
@@ -344,10 +378,7 @@ module TemporalSurface =
     let resumeJournal (commonDir: string) (runtimeId: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let store =
-                EventStore.createLocal
-                    commonDir
-                    (Guid.NewGuid().ToString("N"))
-                    (CanonicalIntegrator.create())
+                EventStore.createLocal commonDir (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
 
             let! result =
                 EventStoreJournalWriter.resumeOrCreate (
@@ -358,7 +389,11 @@ module TemporalSurface =
                 )
 
             match result with
-            | Error error -> return box {| ok = false; error = $"{error.Fact}: {error.Reason}" |}
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = $"{error.Fact}: {error.Reason}" |}
             | Ok(writer, _init, projection) -> return journalResult commonDir writer projection
         }
 
@@ -369,21 +404,23 @@ module TemporalSurface =
             let journal = (handle :?> JournalHandle).Journal
 
             let! result =
-                AgentJournal.appendAgent
-                    (streamOfJs stream)
-                    (optionalProviderRun run)
-                    (agentFactOfJs fact)
-                    journal
+                AgentJournal.appendAgent (streamOfJs stream) (optionalProviderRun run) (agentFactOfJs fact) journal
 
             match result with
-            | Ok projection -> return box {| ok = true; projection = projectionToJs projection |}
-            | Error error -> return box {| ok = false; error = JournalAppendFailure.describe error |}
+            | Ok projection ->
+                return
+                    box
+                        {| ok = true
+                           projection = projectionToJs projection |}
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = JournalAppendFailure.describe error |}
         }
 
     let journalSnapshot (handle: obj) : obj =
-        (handle :?> JournalHandle).Journal
-        |> AgentJournal.snapshot
-        |> projectionToJs
+        (handle :?> JournalHandle).Journal |> AgentJournal.snapshot |> projectionToJs
 
     let journalPersistedEnvelopes (handle: obj) : obj array =
         let commonDir = (handle :?> JournalHandle).CommonDir
@@ -394,11 +431,17 @@ module TemporalSurface =
     let fold (envelopes: obj array) : obj =
         let rec loop current remaining =
             match remaining with
-            | [] -> box {| ok = true; value = projectionToJs current |}
+            | [] ->
+                box
+                    {| ok = true
+                       value = projectionToJs current |}
             | value :: tail ->
                 match Fold.foldEnvelope current (envelopeOfJs value) with
                 | Ok updated -> loop updated tail
-                | Error rejection -> box {| ok = false; error = rejectionToJs rejection |}
+                | Error rejection ->
+                    box
+                        {| ok = false
+                           error = rejectionToJs rejection |}
 
         loop Fold.empty (envelopes |> Array.toList)
 
@@ -422,23 +465,28 @@ module TemporalSurface =
     let fallbackForAuthority (logicalRun: string) (authorityRoot: string) : obj =
         FallbackHandle(FallbackProjection.forAuthority (logicalRunOf logicalRun) (authorityRootOf authorityRoot)) :> obj
 
-    let fallbackApplyAdvance
-        (identity: obj)
-        (previousOffset: int)
-        (nextOffset: int)
-        (count: int)
-        (current: obj)
-        : obj =
+    let fallbackApplyAdvance (identity: obj) (previousOffset: int) (nextOffset: int) (count: int) (current: obj) : obj =
         let state = (current :?> FallbackHandle).State
-        let decodeOffset value = AgentPairCursor.FallbackOffsetCodec.ofByte (byte value)
+
+        let decodeOffset value =
+            AgentPairCursor.FallbackOffsetCodec.ofByte (byte value)
 
         match decodeOffset previousOffset, decodeOffset nextOffset with
         | Error _, _
-        | _, Error _ -> box {| ok = false; error = "InvalidFallbackOffset" |}
+        | _, Error _ ->
+            box
+                {| ok = false
+                   error = "InvalidFallbackOffset" |}
         | Ok previous, Ok next ->
             match FallbackProjection.applyAdvance (fallbackIdentity identity) previous next count state with
-            | Ok updated -> box {| ok = true; value = FallbackHandle updated |}
-            | Error error -> box {| ok = false; error = fallbackError error |}
+            | Ok updated ->
+                box
+                    {| ok = true
+                       value = FallbackHandle updated |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = fallbackError error |}
 
     let fallbackRead (current: obj) : obj =
         (current :?> FallbackHandle).State |> fallbackToJs

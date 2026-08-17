@@ -73,5 +73,7 @@ module LoopDetector =
             pushToken detector token
 
     let pushText (detector: Detector) (text: string) : Evaluation =
-        if not (String.IsNullOrEmpty text) then pushTokens detector text
+        if not (String.IsNullOrEmpty text) then
+            pushTokens detector text
+
         evaluate detector

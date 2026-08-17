@@ -121,16 +121,19 @@ module BloggerRecoveryProbe =
         match claimedTerminalRun with
         | None -> BloggerToolRecovery.NoRecovery
         | Some claimed ->
-            let afterClaimed =
-                completedAssistants
-                |> List.skipWhile (fun (id, _) -> id <> claimed)
-                |> function
-                    | _ :: rest -> rest
-                    | [] ->
-                        // Claimed run absent from transcript: keep nudge stage, never invent AABB.
-                        []
+            match completedAssistants |> List.tryFind (fun (id, _) -> id = claimed) with
+            | Some(_, true) -> BloggerToolRecovery.NoRecovery
+            | _ ->
+                let afterClaimed =
+                    completedAssistants
+                    |> List.skipWhile (fun (id, _) -> id <> claimed)
+                    |> function
+                        | _ :: rest -> rest
+                        | [] ->
+                            // Claimed run absent from transcript: keep nudge stage, never invent AABB.
+                            []
 
-            recoveryAfterClaimed claimed afterClaimed
+                recoveryAfterClaimed claimed afterClaimed
 
     let private isCompletedChronicle (part: SessionToolPart) =
         part.ToolName = "chronicle"

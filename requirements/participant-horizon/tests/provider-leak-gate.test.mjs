@@ -2,13 +2,10 @@
  * ARCH-016 Gate B — provider leak gate (no dist).
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   FORBIDDEN_DTO_PATTERNS,
   FORBIDDEN_TOKENS,
-  compareBaseline,
-  countByFile,
   scanEntries,
   scanRepo,
   scanText,
@@ -63,21 +60,6 @@ test('WHAT[PARTICIPANT-HORIZON-002] gate_b_scan_entries_aggregates', () => {
     { file: 'JoinResultRenderer.fs', text: LEAKY_JOIN },
   ])
   assert.ok(hits.length >= 2)
-})
-
-test('WHAT[PARTICIPANT-HORIZON-002] gate_b_baseline_ratchet_blocks_regression', () => {
-  const current = countByFile(scanEntries([{ file: 'JoinResultRenderer.fs', text: LEAKY_JOIN }]))
-  const { ok, regressions } = compareBaseline({ 'JoinResultRenderer.fs': 1 }, current)
-  assert.equal(ok, false)
-  assert.ok(regressions[0].current > regressions[0].baseline)
-})
-
-test('WHAT[PARTICIPANT-HORIZON-002] gate_b_repo_scan_with_baseline_is_green', () => {
-  const baseline = JSON.parse(
-    readFileSync(new URL('../../../scripts/checks/provider-leak-gate-baseline.json', import.meta.url), 'utf8'),
-  )
-  const result = scanRepo(process.cwd(), { baseline })
-  assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 
 test('WHAT[PARTICIPANT-HORIZON-002] gate_b_repo_scan_without_baseline_is_zero', () => {

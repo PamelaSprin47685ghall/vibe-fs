@@ -64,7 +64,10 @@ module PromptAuthorityLedger =
     /// The recorded peer wins when present; blank facts fall back to the
     /// parser-proven peer without inferring anything from the role.
     let private recordedPeerOrDerived (recorded: string) (derived: string) =
-        if System.String.IsNullOrWhiteSpace recorded then derived else recorded
+        if System.String.IsNullOrWhiteSpace recorded then
+            derived
+        else
+            recorded
 
     /// PROMPT-002: an Authority Root took effect and fixed the profile.
     ///

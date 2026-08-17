@@ -88,7 +88,8 @@ module ProcessSurface =
     type private ResultTaskHandle(source: TaskCompletionSource<Result<unit, string>>) =
         member _.Source = source
 
-    type private PendingEntryHandle(command: PtyCommand, completion: TaskCompletionSource<Result<unit, string>> option) =
+    type private PendingEntryHandle(command: PtyCommand, completion: TaskCompletionSource<Result<unit, string>> option)
+        =
         member _.Command = command
         member _.Completion = completion
 
@@ -115,7 +116,7 @@ module ProcessSurface =
         | Some value -> box value
         | None -> null
 
-    let private undefinedObj : obj = emitJsExpr () "undefined"
+    let private undefinedObj: obj = emitJsExpr () "undefined"
 
     [<Emit("$0==null")>]
     let private isNullish (value: obj) : bool = jsNative
@@ -123,16 +124,23 @@ module ProcessSurface =
     let private property (value: obj) (name: string) : obj = emitJsExpr (value, name) "$0?.[$1]"
 
     let private optionalResult (value: obj) : Result<string, string> option =
-        if isNullish value then None
-        elif isNullish (property value "ok") then None
-        elif unbox<bool> (property value "ok") then Some(Ok(string (property value "value")))
-        else Some(Error(string (property value "error")))
+        if isNullish value then
+            None
+        elif isNullish (property value "ok") then
+            None
+        elif unbox<bool> (property value "ok") then
+            Some(Ok(string (property value "value")))
+        else
+            Some(Error(string (property value "error")))
 
     let private optionString (value: obj) : string option =
         if isNullish value then None else Some(string value)
 
     let private stringArrayOf (value: obj) : string array =
-        if isNullish value then [||] else unbox<obj array> value |> Array.map string
+        if isNullish value then
+            [||]
+        else
+            unbox<obj array> value |> Array.map string
 
     let private bytesOf (value: obj) : byte[] =
         if isNullish value then
@@ -143,7 +151,7 @@ module ProcessSurface =
             unbox<byte array> value
 
     let private bytesView (value: byte[]) : obj =
-        let values : obj array = Array.zeroCreate value.Length
+        let values: obj array = Array.zeroCreate value.Length
         // DSL-MUTABLE: algorithm-scratch — byte view index cursor
         let mutable index = 0
 
@@ -166,7 +174,7 @@ module ProcessSurface =
     let private idValue (id: PtyId) = id.Value
 
     let createVirtualTimer () : obj =
-        TimerPortHandle(PtyTiming.createVirtualTimerPort()) :> obj
+        TimerPortHandle(PtyTiming.createVirtualTimerPort ()) :> obj
 
     let timerDelay (timer: obj) (milliseconds: int) : obj =
         let port = (timer :?> TimerPortHandle).Port.Port
@@ -174,17 +182,20 @@ module ProcessSurface =
 
     let timerAwait (handle: obj) : Task<unit> = (unbox<IDeadlineHandle> handle).Delay
 
-    let timerCancel (handle: obj) : unit = (unbox<IDeadlineHandle> handle).Cancel()
+    let timerCancel (handle: obj) : unit =
+        (unbox<IDeadlineHandle> handle).Cancel()
 
     let timerAdvance (timer: obj) (milliseconds: int) : unit =
         (timer :?> TimerPortHandle).Port.Advance milliseconds
 
-    let timerNowMs (timer: obj) : int = (timer :?> TimerPortHandle).Port.NowMs()
+    let timerNowMs (timer: obj) : int =
+        (timer :?> TimerPortHandle).Port.NowMs()
 
-    let timerDispose (timer: obj) : unit = (timer :?> TimerPortHandle).Port.Port.Dispose()
+    let timerDispose (timer: obj) : unit =
+        (timer :?> TimerPortHandle).Port.Port.Dispose()
 
     let createVirtualClock () : obj =
-        ClockPortHandle(PtyTiming.createVirtualClockPort()) :> obj
+        ClockPortHandle(PtyTiming.createVirtualClockPort ()) :> obj
 
     let clockNowIso (clock: obj) : string =
         (clock :?> ClockPortHandle).Port.Port.UtcNow().ToString("o")
@@ -199,25 +210,41 @@ module ProcessSurface =
         (clock :?> ClockPortHandle).Port.Set(DateTimeOffset.Parse iso)
 
     let effectiveDeadlineSeconds (runtimeSeconds: float) (hardLimitSeconds: float) : float =
-        if Double.IsNaN runtimeSeconds || Double.IsInfinity runtimeSeconds || runtimeSeconds <= 0.0 then
+        if
+            Double.IsNaN runtimeSeconds
+            || Double.IsInfinity runtimeSeconds
+            || runtimeSeconds <= 0.0
+        then
             hardLimitSeconds
         else
             min runtimeSeconds hardLimitSeconds
 
     let outputThreshold (bytes: float) : float =
-        if Double.IsNaN bytes || Double.IsInfinity bytes || bytes <= 0.0 then 0.0 else Math.Floor bytes
+        if Double.IsNaN bytes || Double.IsInfinity bytes || bytes <= 0.0 then
+            0.0
+        else
+            Math.Floor bytes
 
     let validateEstimate (runtimeSeconds: float) (outputBytes: float) : obj =
-        if Double.IsNaN runtimeSeconds || Double.IsInfinity runtimeSeconds || runtimeSeconds <= 0.0 then
-            box {| ok = false; error = "deadline_seconds must be a finite positive number" |}
+        if
+            Double.IsNaN runtimeSeconds
+            || Double.IsInfinity runtimeSeconds
+            || runtimeSeconds <= 0.0
+        then
+            box
+                {| ok = false
+                   error = "deadline_seconds must be a finite positive number" |}
         elif Double.IsNaN outputBytes || Double.IsInfinity outputBytes || outputBytes < 0.0 then
-            box {| ok = false; error = "output_budget_bytes must be non-negative" |}
+            box
+                {| ok = false
+                   error = "output_budget_bytes must be non-negative" |}
         else
             box {| ok = true |}
 
     let defaultHardLimitSeconds = 3600.0
 
-    let renderDeadlineExpired () = "No return reached you before your waiting ended."
+    let renderDeadlineExpired () =
+        "No return reached you before your waiting ended."
 
     let renderElapsed (language: string) (elapsedMilliseconds: float) : string =
         let totalSeconds = int64 (Math.Floor(max 0.0 elapsedMilliseconds / 1000.0))
@@ -231,15 +258,11 @@ module ProcessSurface =
             let secondUnit = if seconds = 1L then "second" else "seconds"
             sprintf "Elapsed wall-clock time: %d %s %d %s." minutes minuteUnit seconds secondUnit
 
-    let composeWithElapsed
-        (tip: obj)
-        (elapsed: obj)
-        (estimate: obj)
-        (guideline: string)
-        : string =
+    let composeWithElapsed (tip: obj) (elapsed: obj) (estimate: obj) (guideline: string) : string =
         [ tip; elapsed; estimate; box guideline ]
         |> List.choose (fun value ->
-            if isNullish value then None
+            if isNullish value then
+                None
             else
                 let text = string value
                 if String.IsNullOrWhiteSpace text then None else Some text)
@@ -254,7 +277,9 @@ module ProcessSurface =
             SessionStartHandle(SessionStartedAtProjection.bind (DateTimeOffset.Parse nowIso) (Some existing)) :> obj
 
     let sessionStartAt (state: obj) : string =
-        let value = SessionStartedAtProjection.startedAt (state :?> SessionStartHandle).State
+        let value =
+            SessionStartedAtProjection.startedAt (state :?> SessionStartHandle).State
+
         value.ToString("o")
 
     /// A bounded process-local ledger used by the JS contract to model journal
@@ -296,6 +321,7 @@ module ProcessSurface =
 
     let commandView (value: obj) : obj =
         let command = commandOf value
+
         box
             {| fileName = command.FileName
                arguments = command.Arguments |> List.toArray
@@ -303,7 +329,12 @@ module ProcessSurface =
                stdin = optionObj command.Stdin |}
 
     let estimate (runtimeSeconds: float) (outputBytes: float) (memory: string) : obj =
-        let memoryValue = if memory.ToLowerInvariant() = "large" then EstimatedMemory.Large else EstimatedMemory.Medium
+        let memoryValue =
+            if memory.ToLowerInvariant() = "large" then
+                EstimatedMemory.Large
+            else
+                EstimatedMemory.Medium
+
         EstimateHandle
             { EstimatedRuntime = RuntimeSeconds runtimeSeconds
               EstimatedOutput = OutputBytes(int64 outputBytes)
@@ -314,21 +345,32 @@ module ProcessSurface =
 
     let estimateView (value: obj) : obj =
         let estimate = estimateOf value
+
         let runtime =
             match estimate.EstimatedRuntime with
             | RuntimeSeconds seconds -> seconds
+
         let output =
             match estimate.EstimatedOutput with
             | OutputBytes bytes -> float bytes
+
         let memory =
             match estimate.EstimatedMemory with
             | EstimatedMemory.Large -> "large"
             | EstimatedMemory.Medium -> "medium"
 
-        box {| runtimeSeconds = runtime; outputBytes = output; memory = memory |}
+        box
+            {| runtimeSeconds = runtime
+               outputBytes = output
+               memory = memory |}
 
     let context (workingDirectory: obj) (hardLimitMs: float) : obj =
-        let limit = if Double.IsNaN hardLimitMs || hardLimitMs <= 0.0 then 3600000.0 else hardLimitMs
+        let limit =
+            if Double.IsNaN hardLimitMs || hardLimitMs <= 0.0 then
+                3600000.0
+            else
+                hardLimitMs
+
         ContextHandle
             { WorkingDirectory = optionString workingDirectory
               HardLimit = TimeSpan.FromMilliseconds limit }
@@ -338,16 +380,21 @@ module ProcessSurface =
 
     let contextView (value: obj) : obj =
         let context = contextOf value
+
         box
             {| workingDirectory = optionObj context.WorkingDirectory
                hardLimitMs = context.HardLimit.TotalMilliseconds |}
 
     let createCancellationToken (cancelled: obj) : obj =
         let source = new CancellationTokenSource()
-        if not (isNullish cancelled) && unbox<bool> cancelled then source.Cancel()
+
+        if not (isNullish cancelled) && unbox<bool> cancelled then
+            source.Cancel()
+
         CancellationHandle source :> obj
 
-    let cancel (token: obj) : unit = (token :?> CancellationHandle).Source.Cancel()
+    let cancel (token: obj) : unit =
+        (token :?> CancellationHandle).Source.Cancel()
 
     let cancelToken (token: obj) : obj = token
 
@@ -356,7 +403,8 @@ module ProcessSurface =
 
     let registerCancellation (token: obj) (callback: obj) : obj =
         let registration =
-            (token :?> CancellationHandle).Source.Token.Register(fun () -> call0 callback |> ignore)
+            (token :?> CancellationHandle)
+                .Source.Token.Register(fun () -> call0 callback |> ignore)
 
         RegistrationHandle registration :> obj
 
@@ -364,36 +412,73 @@ module ProcessSurface =
 
     let private launcherResult (value: obj) : Task<int * byte[] * byte[]> =
         task {
-            let! raw = unbox<Task<obj>>(promiseOf value)
+            let! raw = unbox<Task<obj>> (promiseOf value)
             let values = unbox<obj array> raw
             return int (string values.[0]), bytesOf values.[1], bytesOf values.[2]
         }
 
-    let private launchWithJs (launcher: obj) (command: Command) (token: CancellationToken) : Task<int * byte[] * byte[]> =
+    let private launchWithJs
+        (launcher: obj)
+        (command: Command)
+        (token: CancellationToken)
+        : Task<int * byte[] * byte[]> =
         let register callback =
             token.Register(fun () -> call0 callback |> ignore) |> ignore
             null
-        let tokenObject = box {| cancelled = token.IsCancellationRequested; register = register |}
+
+        let tokenObject =
+            box
+                {| cancelled = token.IsCancellationRequested
+                   register = register |}
+
         launcherResult (apply2 launcher (commandView (CommandHandle command :> obj)) tokenObject)
 
     let private errorView (error: ProcessError) : obj =
         match error with
-        | ProcessError.TimeoutExceeded duration -> box {| kind = "TimeoutExceeded"; durationMs = duration.TotalMilliseconds |}
-        | ProcessError.SpawnFailed reason -> box {| kind = "SpawnFailed"; reason = reason |}
-        | ProcessError.ProcessCancelled reason -> box {| kind = "ProcessCancelled"; reason = reason |}
-        | ProcessError.ExecutionFailed reason -> box {| kind = "ExecutionFailed"; reason = reason |}
+        | ProcessError.TimeoutExceeded duration ->
+            box
+                {| kind = "TimeoutExceeded"
+                   durationMs = duration.TotalMilliseconds |}
+        | ProcessError.SpawnFailed reason ->
+            box
+                {| kind = "SpawnFailed"
+                   reason = reason |}
+        | ProcessError.ProcessCancelled reason ->
+            box
+                {| kind = "ProcessCancelled"
+                   reason = reason |}
+        | ProcessError.ExecutionFailed reason ->
+            box
+                {| kind = "ExecutionFailed"
+                   reason = reason |}
 
     let outcomeView (outcome: obj) : obj =
         match unbox<ProcessOutcome> outcome with
         | ProcessOutcome.Completed(exitCode, stdout, stderr, spooled) ->
-            box {| kind = "Completed"; exitCode = exitCode; stdout = stdout; stderr = stderr; spooled = spooled |}
+            box
+                {| kind = "Completed"
+                   exitCode = exitCode
+                   stdout = stdout
+                   stderr = stderr
+                   spooled = spooled |}
         | ProcessOutcome.Spooled(exitCode, path, bytes, chunks) ->
-            box {| kind = "Spooled"; exitCode = exitCode; spoolPath = path; totalBytes = float bytes; chunkCount = chunks |}
+            box
+                {| kind = "Spooled"
+                   exitCode = exitCode
+                   spoolPath = path
+                   totalBytes = float bytes
+                   chunkCount = chunks |}
 
     let resultView (result: obj) : obj =
         match unbox<Result<ProcessOutcome, ProcessError>> result with
-        | Ok outcome -> box {| ok = true; value = outcomeView (box outcome) |}
-        | Error error -> box {| ok = false; error = errorView error |}
+        | Ok outcome ->
+            box
+                {| ok = true
+                   value = outcomeView (box outcome) |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = errorView error |}
 
     let runWithLauncher (launcher: obj) (command: obj) (estimate: obj) (context: obj) (token: obj) : Task<obj> =
         task {
@@ -428,16 +513,21 @@ module ProcessSurface =
         let callbacks = ResizeArray<unit -> unit>()
         // DSL-MUTABLE: resource — mock child kill count
         let mutable killCount = 0
+
         let kill () =
             killCount <- killCount + 1
-            if not (isNullish onKill) then call0 onKill |> ignore
 
-        ChildHandle
-            ({ Process = null
-               Exit = exit
-               Kill = kill
-               Exited = exited
-               OnExited = callbacks }, (fun () -> killCount))
+            if not (isNullish onKill) then
+                call0 onKill |> ignore
+
+        ChildHandle(
+            { Process = null
+              Exit = exit
+              Kill = kill
+              Exited = exited
+              OnExited = callbacks },
+            (fun () -> killCount)
+        )
         :> obj
 
     let private childOf (value: obj) = (value :?> ChildHandle).Child
@@ -450,11 +540,17 @@ module ProcessSurface =
 
     let childView (child: obj) : obj =
         let value = childOf child
-        box {| exited = value.Exited.Value; killCount = (child :?> ChildHandle).KillCount() |}
+
+        box
+            {| exited = value.Exited.Value
+               killCount = (child :?> ChildHandle).KillCount() |}
 
     let waitOutcomeView (outcome: obj) : obj =
         let value = unbox<NodeProcessWait.WaitOutcome> outcome
-        box {| exitCode = value.ExitCode; timedOut = value.TimedOut |}
+
+        box
+            {| exitCode = value.ExitCode
+               timedOut = value.TimedOut |}
 
     let waitForExit (child: obj) (deadline: obj) (token: obj) : Task<obj> =
         task {
@@ -467,19 +563,23 @@ module ProcessSurface =
             return waitOutcomeView (box outcome)
         }
 
-    let outputCreate (estimate: obj) : obj = OutputHandle(ProcessOutput.create (estimateOf estimate)) :> obj
+    let outputCreate (estimate: obj) : obj =
+        OutputHandle(ProcessOutput.create (estimateOf estimate)) :> obj
 
     let private outputOf (value: obj) = (value :?> OutputHandle).Collector
 
-    let outputAddStdout (collector: obj) (bytes: obj) : unit = ProcessOutput.addStdout (outputOf collector) (bytesOf bytes)
+    let outputAddStdout (collector: obj) (bytes: obj) : unit =
+        ProcessOutput.addStdout (outputOf collector) (bytesOf bytes)
 
-    let outputAddStderr (collector: obj) (bytes: obj) : unit = ProcessOutput.addStderr (outputOf collector) (bytesOf bytes)
+    let outputAddStderr (collector: obj) (bytes: obj) : unit =
+        ProcessOutput.addStderr (outputOf collector) (bytesOf bytes)
 
     let outputBuildResult (collector: obj) (exitCode: int) : obj =
         outcomeView (box (ProcessOutput.buildResult (outputOf collector) exitCode))
 
     let outputView (collector: obj) : obj =
         let value = outputOf collector
+
         box
             {| bytesObserved = float value.BytesObserved
                outputLimit = float value.OutputLimit
@@ -492,11 +592,13 @@ module ProcessSurface =
     let spoolChunkBytes (chunkSize: int) (bytes: obj) : obj =
         Spool.chunkBytes chunkSize (bytesOf bytes) |> Array.map bytesView |> box
 
-    let spoolStart () : obj = SpoolHandle(Spool.startStreamingSpool()) :> obj
+    let spoolStart () : obj =
+        SpoolHandle(Spool.startStreamingSpool ()) :> obj
 
     let private spoolOf (value: obj) = (value :?> SpoolHandle).Spool
 
-    let spoolAppend (spool: obj) (bytes: obj) : unit = Spool.appendStreamingSpool (spoolOf spool) (bytesOf bytes)
+    let spoolAppend (spool: obj) (bytes: obj) : unit =
+        Spool.appendStreamingSpool (spoolOf spool) (bytesOf bytes)
 
     let spoolPath (spool: obj) : string = (spoolOf spool).Path
 
@@ -507,11 +609,9 @@ module ProcessSurface =
 
         task {
             do!
-                Spool.readChunks
-                    (spoolPath spool)
-                    (fun bytes ->
-                        chunks.Add(bytesView bytes)
-                        Task.FromResult<unit>(()))
+                Spool.readChunks (spoolPath spool) (fun bytes ->
+                    chunks.Add(bytesView bytes)
+                    Task.FromResult<unit>(()))
 
             return chunks.ToArray()
         }
@@ -519,7 +619,8 @@ module ProcessSurface =
     let spoolDelete (path: string) : unit = Spool.delete path
 
 
-    let taskSource () : obj = TaskSourceHandle(TaskCompletionSource<obj>()) :> obj
+    let taskSource () : obj =
+        TaskSourceHandle(TaskCompletionSource<obj>()) :> obj
 
     let taskSourceCreate () : obj = taskSource ()
 
@@ -537,24 +638,30 @@ module ProcessSurface =
 
     let bytes (text: string) : obj = Pty.bytes text |> bytesView
 
-    let newId () : obj = PtyIdHandle(Pty.newId()) :> obj
+    let newId () : obj = PtyIdHandle(Pty.newId ()) :> obj
 
     let ptyIdView (id: obj) : string = idValue (id :?> PtyIdHandle).Id
 
     let registerParentAbort (parentId: string) (callback: obj) : int =
         Pty.registerParentAbort parentId (fun () -> call0 callback |> ignore)
 
-    let unregisterParentAbort (parentId: string) (token: int) : unit = Pty.unregisterParentAbort parentId token
+    let unregisterParentAbort (parentId: string) (token: int) : unit =
+        Pty.unregisterParentAbort parentId token
 
 
     let signalParse (name: string) : obj =
         match PtySignal.tryParse name with
-        | Ok signal -> box {| ok = true; value = PtySupervisor.signalName signal |}
+        | Ok signal ->
+            box
+                {| ok = true
+                   value = PtySupervisor.signalName signal |}
         | Error error -> box {| ok = false; error = error |}
 
-    let commandSpawn (command: string) (cwd: string) : obj = PtyCommandHandle(PtyCommand.Spawn(command, cwd)) :> obj
+    let commandSpawn (command: string) (cwd: string) : obj =
+        PtyCommandHandle(PtyCommand.Spawn(command, cwd)) :> obj
 
-    let commandWrite (value: obj) : obj = PtyCommandHandle(PtyCommand.Write(bytesOf value)) :> obj
+    let commandWrite (value: obj) : obj =
+        PtyCommandHandle(PtyCommand.Write(bytesOf value)) :> obj
 
     let commandRead () : obj = PtyCommandHandle PtyCommand.Read :> obj
 
@@ -563,35 +670,89 @@ module ProcessSurface =
         | Ok signal -> PtyCommandHandle(PtyCommand.Signal signal) :> obj
         | Error error -> invalidArg "signal" error
 
-    let commandResize (width: int) (height: int) : obj = PtyCommandHandle(PtyCommand.Resize(width, height)) :> obj
+    let commandResize (width: int) (height: int) : obj =
+        PtyCommandHandle(PtyCommand.Resize(width, height)) :> obj
 
     let private ptyCommandOf (value: obj) = (value :?> PtyCommandHandle).Command
 
     let ptyCommandView (value: obj) : obj =
         match ptyCommandOf value with
-        | PtyCommand.Spawn(command, cwd) -> box {| kind = "Spawn"; command = command; cwd = cwd |}
-        | PtyCommand.Write value -> box {| kind = "Write"; bytes = bytesView value |}
+        | PtyCommand.Spawn(command, cwd) ->
+            box
+                {| kind = "Spawn"
+                   command = command
+                   cwd = cwd |}
+        | PtyCommand.Write value ->
+            box
+                {| kind = "Write"
+                   bytes = bytesView value |}
         | PtyCommand.Read -> box {| kind = "Read" |}
-        | PtyCommand.Signal signal -> box {| kind = "Signal"; signal = PtySupervisor.signalName signal |}
-        | PtyCommand.Resize(width, height) -> box {| kind = "Resize"; width = width; height = height |}
+        | PtyCommand.Signal signal ->
+            box
+                {| kind = "Signal"
+                   signal = PtySupervisor.signalName signal |}
+        | PtyCommand.Resize(width, height) ->
+            box
+                {| kind = "Resize"
+                   width = width
+                   height = height |}
 
     let private completionViewItem (item: PtyJoinItem) : obj =
         match item with
-        | PtyExited value -> box {| kind = "PtyExited"; ptyId = value.PtyId; outcome = value.Outcome; closed = value.Closed |}
-        | PtyFailed value -> box {| kind = "PtyFailed"; ptyId = value.PtyId; outcome = value.Outcome; closed = value.Closed; code = value.Code; message = value.Message |}
-        | PtyAborted value -> box {| kind = "PtyAborted"; ptyId = value.PtyId; outcome = value.Outcome; closed = value.Closed; code = value.Code; message = value.Message |}
+        | PtyExited value ->
+            box
+                {| kind = "PtyExited"
+                   ptyId = value.PtyId
+                   outcome = value.Outcome
+                   closed = value.Closed |}
+        | PtyFailed value ->
+            box
+                {| kind = "PtyFailed"
+                   ptyId = value.PtyId
+                   outcome = value.Outcome
+                   closed = value.Closed
+                   code = value.Code
+                   message = value.Message |}
+        | PtyAborted value ->
+            box
+                {| kind = "PtyAborted"
+                   ptyId = value.PtyId
+                   outcome = value.Outcome
+                   closed = value.Closed
+                   code = value.Code
+                   message = value.Message |}
 
-    let completionView (item: obj) : obj = completionViewItem (unbox<PtyJoinItem> item)
+    let completionView (item: obj) : obj =
+        completionViewItem (unbox<PtyJoinItem> item)
 
     let ptyExited (id: string) (outcome: string) : obj =
-        box (PtyExited { PtyId = id; Outcome = outcome; Closed = true })
+        box (
+            PtyExited
+                { PtyId = id
+                  Outcome = outcome
+                  Closed = true }
+        )
 
     let ptyFailed (id: string) (message: string) : obj =
-        box (PtyFailed { PtyId = id; Outcome = message; Closed = true; Code = "PTY_FAILED"; Message = message })
+        box (
+            PtyFailed
+                { PtyId = id
+                  Outcome = message
+                  Closed = true
+                  Code = "PTY_FAILED"
+                  Message = message }
+        )
 
 
     let ptyAborted (id: string) (message: string) : obj =
-        box (PtyAborted { PtyId = id; Outcome = message; Closed = true; Code = "PTY_ABORTED"; Message = message })
+        box (
+            PtyAborted
+                { PtyId = id
+                  Outcome = message
+                  Closed = true
+                  Code = "PTY_ABORTED"
+                  Message = message }
+        )
 
     let ptySignalParse = signalParse
 
@@ -608,16 +769,27 @@ module ProcessSurface =
     let ptyId (value: string) : obj = PtyIdHandle(PtyId.Create value) :> obj
 
     let ptyHandleView (handle: PtyHandle) : obj =
-        box {| id = handle.Id.Value; command = handle.Command; startedAt = handle.StartedAt.ToString("o"); agent = handle.Agent.Name |}
+        box
+            {| id = handle.Id.Value
+               command = handle.Command
+               startedAt = handle.StartedAt.ToString("o")
+               agent = handle.Agent.Name |}
 
     let ptyReadView (read: PtyRead) : obj =
-        box {| id = read.Id.Value; output = read.Output; closed = read.Closed |}
+        box
+            {| id = read.Id.Value
+               output = read.Output
+               closed = read.Closed |}
 
 
     let private handlerOf (callback: obj) : PtyBackendHandler =
         fun id command ->
             task {
-                let! raw = unbox<Task<obj>>(promiseOf (apply2 callback (box id.Value) (ptyCommandView (PtyCommandHandle command :> obj))))
+                let! raw =
+                    unbox<Task<obj>> (
+                        promiseOf (apply2 callback (box id.Value) (ptyCommandView (PtyCommandHandle command :> obj)))
+                    )
+
                 match optionalResult raw with
                 | None -> return Ok()
                 | Some(Ok _) -> return Ok()
@@ -628,16 +800,26 @@ module ProcessSurface =
         let senderValue = property options "sender"
         let handlerValue = property options "handler"
         let providerValue = property options "agentProvider"
+
         let sender =
-            if isNullish senderValue then None
-            else Some(fun item -> call1 senderValue (completionViewItem item) |> ignore)
-        let handler = if isNullish handlerValue then None else Some(handlerOf handlerValue)
+            if isNullish senderValue then
+                None
+            else
+                Some(fun item -> call1 senderValue (completionViewItem item) |> ignore)
+
+        let handler =
+            if isNullish handlerValue then
+                None
+            else
+                Some(handlerOf handlerValue)
+
         let provider =
             if isNullish providerValue then
                 None
             else
                 Some(fun () ->
                     let values = unbox<obj array> (call0 providerValue)
+
                     values
                     |> Array.choose (fun value ->
                         let name =
@@ -645,6 +827,7 @@ module ProcessSurface =
                                 string value
                             else
                                 let agentValue = property value "agent"
+
                                 if isNullish agentValue then
                                     string (property value "Name")
                                 else
@@ -666,7 +849,8 @@ module ProcessSurface =
 
         let port =
             match sender, handler, provider with
-            | Some sender, Some handler, Some provider -> PtyPort(mailboxSender = sender, handler = handler, agentProvider = provider)
+            | Some sender, Some handler, Some provider ->
+                PtyPort(mailboxSender = sender, handler = handler, agentProvider = provider)
             | Some sender, Some handler, None -> PtyPort(mailboxSender = sender, handler = handler)
             | Some sender, None, Some provider -> PtyPort(mailboxSender = sender, agentProvider = provider)
             | None, Some handler, Some provider -> PtyPort(handler = handler, agentProvider = provider)
@@ -677,7 +861,8 @@ module ProcessSurface =
 
         PtyPortHandle port :> obj
 
-    let backendCreatePort () : obj = PtyPortHandle(PtyBackend.createPort()) :> obj
+    let backendCreatePort () : obj =
+        PtyPortHandle(PtyBackend.createPort ()) :> obj
 
     let private ptyPortOf (value: obj) = (value :?> PtyPortHandle).Port
     let private ptyIdOf (value: obj) = (value :?> PtyIdHandle).Id
@@ -686,7 +871,8 @@ module ProcessSurface =
     /// The callback receives the same plain completion object as the optional
     /// constructor sender; the underlying port remains an opaque capability.
     let portAddMailboxSender (port: obj) (sender: obj) : unit =
-        (ptyPortOf port).AddMailboxSender(fun item -> call1 sender (completionViewItem item) |> ignore)
+        (ptyPortOf port)
+            .AddMailboxSender(fun item -> call1 sender (completionViewItem item) |> ignore)
 
     let portFork (port: obj) (command: string) (agentName: string) (ptyId: obj) (cwd: obj) : obj =
         match agentOf agentName with
@@ -708,16 +894,21 @@ module ProcessSurface =
     let portRead (port: obj) (id: obj) : Task<obj> =
         task {
             let! result = (ptyPortOf port).Read(ptyIdOf id)
+
             return
                 match result with
-                | Ok(output, closed) -> box {| ok = true; value = {| output = output; closed = closed |} |}
+                | Ok(output, closed) ->
+                    box
+                        {| ok = true
+                           value = {| output = output; closed = closed |} |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
     let portReadResult (port: obj) (id: obj) (output: string) (closed: bool) : unit =
         (ptyPortOf port).ReadResult(ptyIdOf id, output, closed)
 
-    let portFailRead (port: obj) (id: obj) (reason: string) : unit = (ptyPortOf port).FailRead(ptyIdOf id, reason)
+    let portFailRead (port: obj) (id: obj) (reason: string) : unit =
+        (ptyPortOf port).FailRead(ptyIdOf id, reason)
 
     let portRegisterExitTask (port: obj) (id: obj) (taskValue: obj) : unit =
         (ptyPortOf port).RegisterExitTask(ptyIdOf id, unbox<Task> taskValue)
@@ -733,7 +924,14 @@ module ProcessSurface =
     let portClose (port: obj) (id: obj) : unit = (ptyPortOf port).Close(ptyIdOf id)
 
     let portCloseAll (port: obj) (graceMs: obj) : Task<unit> =
-        (ptyPortOf port).CloseAll(?graceMs = (if isNullish graceMs then None else Some(int (string graceMs))))
+        (ptyPortOf port)
+            .CloseAll(
+                ?graceMs =
+                    (if isNullish graceMs then
+                         None
+                     else
+                         Some(int (string graceMs)))
+            )
 
     let agentView (agent: AgentRecord) : obj =
         box
@@ -743,10 +941,14 @@ module ProcessSurface =
 
     let portList (port: obj) : obj =
         let agents, ptys = (ptyPortOf port).List()
-        box {| agents = agents |> List.map agentView |> List.toArray; ptys = ptys |> List.map ptyHandleView |> List.toArray |}
+
+        box
+            {| agents = agents |> List.map agentView |> List.toArray
+               ptys = ptys |> List.map ptyHandleView |> List.toArray |}
 
 
-    let completionMailboxCreate () : obj = MailboxHandle(CompletionMailbox(obj())) :> obj
+    let completionMailboxCreate () : obj =
+        MailboxHandle(CompletionMailbox(obj ())) :> obj
 
     let private mailboxOf (value: obj) = (value :?> MailboxHandle).Mailbox
 
@@ -757,15 +959,23 @@ module ProcessSurface =
         (mailboxOf mailbox).PulseAgentHandle(AgentHandleId.create agentId)
 
     let completionMailboxDrainPty (mailbox: obj) (maxCount: int) : obj array =
-        mailboxOf mailbox |> fun value -> value.DrainPtyCompletions maxCount |> List.map completionViewItem |> List.toArray
+        mailboxOf mailbox
+        |> fun value ->
+            value.DrainPtyCompletions maxCount
+            |> List.map completionViewItem
+            |> List.toArray
 
     let completionMailboxDrainAgent (mailbox: obj) (maxCount: int) : string array =
-        mailboxOf mailbox |> fun value -> value.DrainAgentWakes maxCount |> List.map AgentHandleId.value |> List.toArray
+        mailboxOf mailbox
+        |> fun value -> value.DrainAgentWakes maxCount |> List.map AgentHandleId.value |> List.toArray
 
     let completionMailboxCancel (mailbox: obj) : bool = (mailboxOf mailbox).Cancel()
     let completionMailboxPendingCount (mailbox: obj) : int = (mailboxOf mailbox).PendingCount
     let completionMailboxPendingPtyCount (mailbox: obj) : int = (mailboxOf mailbox).PendingPtyCount
-    let completionMailboxPendingAgentCount (mailbox: obj) : int = (mailboxOf mailbox).PendingAgentWakeCount
+
+    let completionMailboxPendingAgentCount (mailbox: obj) : int =
+        (mailboxOf mailbox).PendingAgentWakeCount
+
     let maxJoinBatch = JoinBatch.MaxJoinBatch
 
 
@@ -776,6 +986,7 @@ module ProcessSurface =
 
     let sessionView (session: obj) : obj =
         let value = sessionOf session
+
         box
             {| ptyId = value.PtyId
                backend = value.Backend
@@ -787,16 +998,22 @@ module ProcessSurface =
 
     let sessionSetClosed (session: obj) (closed: bool) : unit = (sessionOf session).Closed <- closed
     let sessionSetBackend (session: obj) (backend: obj) : unit = (sessionOf session).Backend <- backend
-    let sessionAppendOutput (session: obj) (text: string) : unit = (sessionOf session).OutputBuffer.Append(text) |> ignore
+
+    let sessionAppendOutput (session: obj) (text: string) : unit =
+        (sessionOf session).OutputBuffer.Append(text) |> ignore
 
     let sessionPushPending (session: obj) (command: obj) : unit =
         (sessionOf session).Pending.Add(ptyCommandOf command, None)
 
     let sessionPushPendingTask (session: obj) (command: obj) (source: obj) : unit =
-        (sessionOf session).Pending.Add(ptyCommandOf command, Some((source :?> ResultTaskHandle).Source))
+        (sessionOf session)
+            .Pending.Add(ptyCommandOf command, Some((source :?> ResultTaskHandle).Source))
 
-    let supervisorCreate () : obj = PtySupervisorHandle(PtySupervisor.create()) :> obj
-    let private supervisorOf (value: obj) = (value :?> PtySupervisorHandle).Supervisor
+    let supervisorCreate () : obj =
+        PtySupervisorHandle(PtySupervisor.create ()) :> obj
+
+    let private supervisorOf (value: obj) =
+        (value :?> PtySupervisorHandle).Supervisor
 
     let supervisorAdd (supervisor: obj) (id: obj) (session: obj) : unit =
         PtySupervisor.add (supervisorOf supervisor) (ptyIdOf id) (sessionOf session)
@@ -806,8 +1023,11 @@ module ProcessSurface =
         | Some session -> PtySessionHandle session :> obj
         | None -> null
 
-    let supervisorGet (supervisor: obj) (id: obj) : obj = PtySessionHandle(PtySupervisor.get (supervisorOf supervisor) (ptyIdOf id)) :> obj
-    let supervisorRemove (supervisor: obj) (id: obj) : unit = PtySupervisor.remove (supervisorOf supervisor) (ptyIdOf id)
+    let supervisorGet (supervisor: obj) (id: obj) : obj =
+        PtySessionHandle(PtySupervisor.get (supervisorOf supervisor) (ptyIdOf id)) :> obj
+
+    let supervisorRemove (supervisor: obj) (id: obj) : unit =
+        PtySupervisor.remove (supervisorOf supervisor) (ptyIdOf id)
 
     let supervisorList (supervisor: obj) : string array =
         PtySupervisor.list (supervisorOf supervisor) |> List.map idValue |> List.toArray
@@ -817,7 +1037,8 @@ module ProcessSurface =
         | Ok signal -> box (PtySupervisor.signalName signal)
         | Error error -> box {| ok = false; error = error |}
 
-    let supervisorEnsureSpawn (supervisor: obj) : Task<unit> = PtySupervisor.ensureSpawn (supervisorOf supervisor)
+    let supervisorEnsureSpawn (supervisor: obj) : Task<unit> =
+        PtySupervisor.ensureSpawn (supervisorOf supervisor)
 
     let supervisorSpawnSync (supervisor: obj) (command: string) (cwd: string) : obj =
         PtySupervisor.spawnSync (supervisorOf supervisor) command cwd
@@ -834,13 +1055,20 @@ module ProcessSurface =
 
     let supervisorApplyLive (supervisor: obj) (port: obj) (id: obj) (command: obj) : Task<obj> =
         task {
-            let! result = PtySupervisor.applyLive (supervisorOf supervisor) (ptyPortOf port) (ptyIdOf id) (ptyCommandOf command)
+            let! result =
+                PtySupervisor.applyLive (supervisorOf supervisor) (ptyPortOf port) (ptyIdOf id) (ptyCommandOf command)
+
             return resultObject result (fun _ -> undefinedObj)
         }
 
-    let unitTaskSource () : obj = UnitTaskHandle(TaskCompletionSource<unit>()) :> obj
-    let unitTaskResolve (source: obj) : unit = (source :?> UnitTaskHandle).Source.SetResult()
-    let unitTask (source: obj) : Task = (source :?> UnitTaskHandle).Source.Task :> Task
+    let unitTaskSource () : obj =
+        UnitTaskHandle(TaskCompletionSource<unit>()) :> obj
+
+    let unitTaskResolve (source: obj) : unit =
+        (source :?> UnitTaskHandle).Source.SetResult()
+
+    let unitTask (source: obj) : Task =
+        (source :?> UnitTaskHandle).Source.Task :> Task
 
 
     let supervisorAttach (supervisor: obj) (port: obj) (id: obj) (term: obj) (exitTask: obj) : unit =
@@ -853,19 +1081,23 @@ module ProcessSurface =
 
     let spoolReadPath (path: string) : Task<obj array> =
         let chunks = ResizeArray<obj>()
+
         task {
             do!
-                Spool.readChunks
-                    path
-                    (fun bytes ->
-                        chunks.Add(bytesView bytes)
-                        Task.FromResult<unit>(()))
+                Spool.readChunks path (fun bytes ->
+                    chunks.Add(bytesView bytes)
+                    Task.FromResult<unit>(()))
+
             return chunks.ToArray()
         }
 
     let spoolBytesToTempFile (bytes: obj) : obj =
         let path, count, chunks = Spool.spoolBytesToTempFile (bytesOf bytes)
-        box {| path = path; bytesWritten = float count; chunkCount = chunks |}
+
+        box
+            {| path = path
+               bytesWritten = float count
+               chunkCount = chunks |}
 
     let abortParent (parentId: string) : unit = Pty.abortParent parentId
 
@@ -883,6 +1115,7 @@ module ProcessSurface =
     let ptySessionPushPending = sessionPushPending
 
     let sessionExitPending (session: obj) : bool = not ((sessionOf session).ExitCompleted)
+
     let sessionResolveExit (session: obj) : unit =
         let value = sessionOf session
         value.ExitCompleted <- true
@@ -892,9 +1125,12 @@ module ProcessSurface =
     let ptySessionResolveExit = sessionResolveExit
 
     let sessionPendingView (session: obj) : obj array =
-        (sessionOf session).Pending |> Seq.map (fun (command, _) -> ptyCommandView (PtyCommandHandle command :> obj)) |> Seq.toArray
+        (sessionOf session).Pending
+        |> Seq.map (fun (command, _) -> ptyCommandView (PtyCommandHandle command :> obj))
+        |> Seq.toArray
 
-    let supervisorCancelAll (supervisor: obj) : unit = PtySupervisor.cancelAll (supervisorOf supervisor)
+    let supervisorCancelAll (supervisor: obj) : unit =
+        PtySupervisor.cancelAll (supervisorOf supervisor)
 
     let supervisorSetSpawn (supervisor: obj) (spawn: obj) : unit =
         (supervisorOf supervisor).SpawnFn <- Some spawn
@@ -908,11 +1144,15 @@ module ProcessSurface =
 
     let pendingEntryView (entry: obj) : obj =
         let value = entry :?> PendingEntryHandle
-        box {| command = ptyCommandView (PtyCommandHandle value.Command :> obj); hasCompletion = value.Completion.IsSome |}
+
+        box
+            {| command = ptyCommandView (PtyCommandHandle value.Command :> obj)
+               hasCompletion = value.Completion.IsSome |}
 
     let resultTask (source: obj) : Task<obj> =
         task {
             let! value = (source :?> ResultTaskHandle).Source.Task
+
             match value with
             | Ok() -> return box {| ok = true |}
             | Error error -> return box {| ok = false; error = error |}
@@ -921,12 +1161,14 @@ module ProcessSurface =
     let pendingResolve (pending: obj) (index: int) (result: obj) : unit =
         let entries = (pending :?> PendingHandle).Entries
         let _, completion = entries |> List.item index
+
         match completion, optionalResult result with
         | Some source, Some(Ok _) -> source.SetResult(Ok())
         | Some source, Some(Error error) -> source.SetResult(Error error)
         | _ -> ()
 
-    let resultTaskSourceCreate () : obj = ResultTaskHandle(TaskCompletionSource<Result<unit, string>>()) :> obj
+    let resultTaskSourceCreate () : obj =
+        ResultTaskHandle(TaskCompletionSource<Result<unit, string>>()) :> obj
 
     let renderPtyCompletion (label: string) (_id: string) (outcome: string) (exitCode: int) : string =
         sprintf "# %s has %s.\nexit_code = %d" label outcome exitCode
@@ -943,8 +1185,22 @@ module ProcessSurface =
                 let register callback =
                     parentToken.Register(fun () -> call0 callback |> ignore) |> ignore
                     null
-                let tokenView = box {| cancelled = parentToken.IsCancellationRequested; register = register |}
-                let! raw = unbox<Task<obj>>(promiseOf (apply3 host (commandView (CommandHandle cmd :> obj)) (contextView (ContextHandle ctx :> obj)) tokenView))
+
+                let tokenView =
+                    box
+                        {| cancelled = parentToken.IsCancellationRequested
+                           register = register |}
+
+                let! raw =
+                    unbox<Task<obj>> (
+                        promiseOf (
+                            apply3
+                                host
+                                (commandView (CommandHandle cmd :> obj))
+                                (contextView (ContextHandle ctx :> obj))
+                                tokenView
+                        )
+                    )
 
                 if isNullish raw then
                     return Error "host launcher returned no child"
@@ -952,9 +1208,12 @@ module ProcessSurface =
                     return Error(string (property raw "error"))
                 else
                     let candidate =
-                        if raw :? ChildHandle then raw
-                        elif not (isNullish (property raw "value")) then property raw "value"
-                        else raw
+                        if raw :? ChildHandle then
+                            raw
+                        elif not (isNullish (property raw "value")) then
+                            property raw "value"
+                        else
+                            raw
 
                     match candidate with
                     | :? ChildHandle as child -> return Ok child.Child
@@ -972,4 +1231,3 @@ module ProcessSurface =
 
             return resultView (box result)
         }
-

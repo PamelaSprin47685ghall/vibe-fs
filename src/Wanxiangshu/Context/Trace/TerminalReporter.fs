@@ -93,9 +93,7 @@ module TerminalReporter =
 
                 return wasAborted, true
             else
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed "completed with empty terminal output")
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
                 |> ignore
 
                 return wasAborted, false
@@ -122,13 +120,5 @@ module TerminalReporter =
                 |> ignore
 
                 return wasAborted, false
-            | Some role ->
-                return!
-                    reportResolvedRole
-                        eventPort
-                        journal
-                        turn
-                        wasAborted
-                        sessionWideText
-                        role
+            | Some role -> return! reportResolvedRole eventPort journal turn wasAborted sessionWideText role
         }

@@ -19,19 +19,32 @@ module RecoverySurface =
                 AgentHandleId.create (text (value?handle))
             )
         | "companion" ->
-            SessionRecovery.RecoveryNode.Companion(SessionId.create (text (value?main)), SessionId.create (text (value?companion)))
+            SessionRecovery.RecoveryNode.Companion(
+                SessionId.create (text (value?main)),
+                SessionId.create (text (value?companion))
+            )
         | "blogger" ->
-            SessionRecovery.RecoveryNode.Blogger(SessionId.create (text (value?main)), SessionId.create (text (value?blogger)))
+            SessionRecovery.RecoveryNode.Blogger(
+                SessionId.create (text (value?main)),
+                SessionId.create (text (value?blogger))
+            )
         | "managerJob" ->
-            SessionRecovery.RecoveryNode.ManagerJob(ManagerJobId.create (text (value?job)), SessionId.create (text (value?manager)))
+            SessionRecovery.RecoveryNode.ManagerJob(
+                ManagerJobId.create (text (value?job)),
+                SessionId.create (text (value?manager))
+            )
         | "reviewer" ->
-            SessionRecovery.RecoveryNode.Reviewer(ManagerJobId.create (text (value?job)), SessionId.create (text (value?reviewer)))
+            SessionRecovery.RecoveryNode.Reviewer(
+                ManagerJobId.create (text (value?job)),
+                SessionId.create (text (value?reviewer))
+            )
         | _ -> SessionRecovery.RecoveryNode.WorkSession(SessionId.create (text (value?session)))
 
-    let token (value: obj) : string = SessionRecovery.RecoveryNode.token (nodeOf value)
+    let token (value: obj) : string =
+        SessionRecovery.RecoveryNode.token (nodeOf value)
 
     let validateClosure (root: string) (nodes: obj array) : obj =
-        let closure : SessionRecovery.RecoveryClosure =
+        let closure: SessionRecovery.RecoveryClosure =
             { Root = SessionId.create root
               Nodes = nodes |> Array.toList |> List.map nodeOf
               Digest = "surface"
@@ -41,15 +54,18 @@ module RecoverySurface =
         | Ok valid ->
             box
                 {| ok = true
-                   members = SessionRecovery.RecoveryClosure.members (SessionRecovery.ValidatedClosure.value valid) |> Set.toArray |}
+                   members =
+                    SessionRecovery.RecoveryClosure.members (SessionRecovery.ValidatedClosure.value valid)
+                    |> Set.toArray |}
         | Error blocks ->
             let first = blocks.Head
+
             box
                 {| ok = false
                    error =
-                       match first with
-                       | SessionRecovery.RecoveryBlock.RecoveryCycle _ -> "RecoveryCycle"
-                       | _ -> "RecoveryBlock" |}
+                    match first with
+                    | SessionRecovery.RecoveryBlock.RecoveryCycle _ -> "RecoveryCycle"
+                    | _ -> "RecoveryBlock" |}
 
     let missingMembers (permitMembers: string array) (currentMembers: string array) : string array =
         let permit = Set.ofArray permitMembers
@@ -80,7 +96,11 @@ module RecoverySurface =
         | SessionRecovery.SessionRecovery.NoRecoveryRequired _ -> "NoRecoveryRequired"
 
     let combine (names: string array) : string =
-        names |> Array.toList |> List.map outcome |> SessionRecovery.combine |> outcomeName
+        names
+        |> Array.toList
+        |> List.map outcome
+        |> SessionRecovery.combine
+        |> outcomeName
 
     let handleFamily (branch: string) : obj =
         let family =
@@ -108,22 +128,26 @@ module RecoverySurface =
                 )
             | _ -> SessionRecovery.HandleFamilyRecovery.NoLinkedHandles
 
-        let mapped = SessionRecovery.sessionRecoveryOfHandleFamily (SessionId.create "s1") 1L family
+        let mapped =
+            SessionRecovery.sessionRecoveryOfHandleFamily (SessionId.create "s1") 1L family
+
         box
             {| state = outcomeName mapped
                restoredHandles =
-                   match mapped with
-                   | SessionRecovery.SessionRecovery.Recovered receipt ->
-                       SessionRecovery.RecoveryReceipt.restoredHandles receipt |> List.map AgentHandleId.value |> List.toArray
-                   | _ -> [||]
+                match mapped with
+                | SessionRecovery.SessionRecovery.Recovered receipt ->
+                    SessionRecovery.RecoveryReceipt.restoredHandles receipt
+                    |> List.map AgentHandleId.value
+                    |> List.toArray
+                | _ -> [||]
                reason =
-                   match mapped with
-                   | SessionRecovery.SessionRecovery.Waiting blocks
-                   | SessionRecovery.SessionRecovery.Blocked blocks ->
-                       match blocks.Head with
-                       | SessionRecovery.RecoveryBlock.ChildRecoveryFailed(_, reason) -> reason
-                       | _ -> ""
-                   | _ -> "" |}
+                match mapped with
+                | SessionRecovery.SessionRecovery.Waiting blocks
+                | SessionRecovery.SessionRecovery.Blocked blocks ->
+                    match blocks.Head with
+                    | SessionRecovery.RecoveryBlock.ChildRecoveryFailed(_, reason) -> reason
+                    | _ -> ""
+                | _ -> "" |}
 
     let jobFamily (branch: string) : obj =
         let family =
@@ -133,12 +157,13 @@ module RecoverySurface =
             | "waiting" -> SessionRecovery.JobFamilyRecovery.JobRecoveryUnknown(ManagerJobId.create "j2", "no evidence")
             | "blocked" ->
                 SessionRecovery.JobFamilyRecovery.JobsBlocked(
-                    SessionRecovery.NonEmpty.one
-                        (SessionRecovery.RecoveryBlock.MissingSession(SessionId.create "c9"))
+                    SessionRecovery.NonEmpty.one (SessionRecovery.RecoveryBlock.MissingSession(SessionId.create "c9"))
                 )
             | _ -> SessionRecovery.JobFamilyRecovery.NoRelatedJobs
 
-        let mapped = SessionRecovery.sessionRecoveryOfJobFamily (SessionId.create "s1") 1L family
+        let mapped =
+            SessionRecovery.sessionRecoveryOfJobFamily (SessionId.create "s1") 1L family
+
         box {| state = outcomeName mapped |}
 
     let authorize (root: string) (sequence: int) (results: obj array) : obj =
@@ -151,15 +176,17 @@ module RecoverySurface =
                 id, result)
             |> Map.ofList
 
-        let closure : SessionRecovery.RecoveryClosure =
+        let closure: SessionRecovery.RecoveryClosure =
             { Root = SessionId.create root
               Nodes = []
               Digest = "surface"
               JournalSequence = int64 sequence }
-        let recovered : SessionRecovery.RecoveredClosure =
-            { Closure = closure
-              Results = typed }
-        let result = SessionRecovery.authorizeFamilyResume (SessionId.create root) (int64 sequence) recovered
+
+        let recovered: SessionRecovery.RecoveredClosure =
+            { Closure = closure; Results = typed }
+
+        let result =
+            SessionRecovery.authorizeFamilyResume (SessionId.create root) (int64 sequence) recovered
 
         match result with
         | SessionRecovery.FamilyRecovery.FamilyReady permit ->
@@ -173,6 +200,7 @@ module RecoverySurface =
 
     let receiptView (id: string) (sequence: int) : obj =
         let value = receipt id (int64 sequence)
+
         box
             {| session = SessionId.value (SessionRecovery.RecoveryReceipt.sessionId value)
                sequence = SessionRecovery.RecoveryReceipt.journalSequence value

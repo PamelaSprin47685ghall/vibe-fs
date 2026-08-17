@@ -162,20 +162,17 @@ module ProviderRecoveryWorkflow =
 
     let private emitLoopContinuation (turn: ReconciledTurn) (error: string) =
         if error = "loop-kill" then
-            Diagnostic.emit
-                "loop-kill"
-                [ "session_id", SessionId.value turn.SessionId; "result", "continue-sent" ]
+            Diagnostic.emit "loop-kill" [ "session_id", SessionId.value turn.SessionId; "result", "continue-sent" ]
 
     let private handleContinuation
         (eventPort: IEventObservationPort)
         (turn: ReconciledTurn)
         (error: string)
-        (continuation: Result<PromptKey, string>) =
+        (continuation: Result<PromptKey, string>)
+        =
         match continuation with
         | Ok _ -> emitLoopContinuation turn error
-        | Error _ ->
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error)
-            |> ignore
+        | Error _ -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
     ///

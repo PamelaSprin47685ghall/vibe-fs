@@ -187,7 +187,9 @@ module RepositoryWarmStartPrompt =
 
         fitToBudget
             (fun kept omitted ->
-                let appendix = SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
+                let appendix =
+                    SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
+
                 basePrompt.TrimEnd() + "\n\n" + appendix)
             basePrompt
             orderedHints

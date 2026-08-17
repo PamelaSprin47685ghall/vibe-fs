@@ -57,7 +57,7 @@ module PromptSurface =
                EnforcerRules = resources.EnforcerRules |> List.map ruleToJs |> List.toArray
                EnglishEnforcerRules = resources.EnglishEnforcerRules |> List.map ruleToJs |> List.toArray
                SimplifiedChineseEnforcerRules =
-                   resources.SimplifiedChineseEnforcerRules |> List.map ruleToJs |> List.toArray
+                resources.SimplifiedChineseEnforcerRules |> List.map ruleToJs |> List.toArray
                ProviderLanguageRootsReady = resources.ProviderLanguageRootsReady |}
 
     /// Canonical English ten-role prompt catalog.
@@ -84,6 +84,8 @@ module PromptSurface =
 
     /// Match plugin initialization: install the package-owned bundle before
     /// consumers such as EnforcerTipGuidance resolve a localized rule.
-    let runtimeInstallFromPackage () : unit = RuntimeResources.install (RuntimeResources.load ())
+    let runtimeInstallFromPackage () : unit =
+        RuntimeResources.install (RuntimeResources.load ())
 
-    let runtimeCurrent () : obj = RuntimeResources.current () |> runtimeToJs
+    let runtimeCurrent () : obj =
+        RuntimeResources.current () |> runtimeToJs

@@ -151,8 +151,7 @@ module BloggerCycleProjection =
             Ok
                 { state with
                     ByProviderRun = Map.add receipt.ProviderRun receipt state.ByProviderRun
-                    ProviderRunByRequestId =
-                        Map.add receipt.RequestId receipt.ProviderRun state.ProviderRunByRequestId
+                    ProviderRunByRequestId = Map.add receipt.RequestId receipt.ProviderRun state.ProviderRunByRequestId
                     OpenByRequestId = withoutRequest
                     OpenByBlogger = withoutBlogger }
 

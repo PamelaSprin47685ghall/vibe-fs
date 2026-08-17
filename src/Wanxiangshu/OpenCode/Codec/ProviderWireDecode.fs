@@ -139,8 +139,7 @@ module ProviderWireDecode =
             |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
         | "file" ->
             firstString partObj [ "url" ]
-            |> Option.map (fun url ->
-                WireMedia(firstString partObj [ "mime"; "mediaType" ], HostDigest.sha256Hex url))
+            |> Option.map (fun url -> WireMedia(firstString partObj [ "mime"; "mediaType" ], HostDigest.sha256Hex url))
         | _ -> None
 
     let decodePart (partObj: obj) : WirePart option =

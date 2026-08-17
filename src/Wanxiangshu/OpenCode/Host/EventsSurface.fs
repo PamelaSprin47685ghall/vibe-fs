@@ -40,8 +40,16 @@ module EventsSurface =
                 {| kind = "Completed"
                    providerRun = ProviderRunIdentity.value result.ProviderRun
                    text = result.TerminalText |}
-        | TerminalOutcome.Aborted reason -> box {| kind = "Aborted"; providerRun = ""; text = reason |}
-        | TerminalOutcome.Failed error -> box {| kind = "Failed"; providerRun = ""; text = error |}
+        | TerminalOutcome.Aborted reason ->
+            box
+                {| kind = "Aborted"
+                   providerRun = ""
+                   text = reason |}
+        | TerminalOutcome.Failed error ->
+            box
+                {| kind = "Failed"
+                   providerRun = ""
+                   text = error |}
 
     let notify (port: obj) (sessionId: string) (kind: string) (providerRun: string) (text: string) : bool =
         let typed = port :?> IEventObservationPort
@@ -49,12 +57,15 @@ module EventsSurface =
 
     let subscribe (port: obj) (listener: obj -> obj -> unit) : obj =
         let typed = port :?> IEventObservationPort
-        typed.SubscribeTerminalListener(fun sessionId outcome -> listener (box (SessionId.value sessionId)) (snapshot outcome))
+
+        typed.SubscribeTerminalListener(fun sessionId outcome ->
+            listener (box (SessionId.value sessionId)) (snapshot outcome))
 
     let dispose (subscription: obj) : unit =
         match subscription with
         | :? IDisposable as disposable -> disposable.Dispose()
         | _ -> ()
+
     let notifyCompleted
         (port: obj)
         (sessionId: string)
@@ -88,4 +99,3 @@ module EventsSurface =
     let releaseSharedForWorkspace (workspace: string) (port: obj) : unit =
         let key = RuntimePath.forWorkspace workspace
         SharedTerminalBus.release (Some key) (Some(port :?> Events.HostEventPort))
-

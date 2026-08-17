@@ -219,11 +219,7 @@ module HandleController =
     ///
     /// CommitUnknown must not hand the payload out: the caller would treat the
     /// work as consumed while a later restart might still show it joinable.
-    let private retirementFailure
-        (journal: AgentJournal)
-        (parentId: SessionId)
-        (handle: HandleId)
-        failure =
+    let private retirementFailure (journal: AgentJournal) (parentId: SessionId) (handle: HandleId) failure =
         let after = AgentJournal.handleProjection journal parentId
 
         match HandleProjection.tryFind handle after with
@@ -263,8 +259,7 @@ module HandleController =
             | Some { Lifecycle = Retired } -> return Error AlreadyRetired
             | Some { Lifecycle = Active } -> return Error(NotJoinable NotCompleted)
             | Some({ Lifecycle = CompletedAwaitingJoin _ } as record)
-            | Some({ Lifecycle = Abandoned _ } as record) ->
-                return! retireRecord journal parentId handle record
+            | Some({ Lifecycle = Abandoned _ } as record) -> return! retireRecord journal parentId handle record
         }
 
     /// Parent cancel: durable `HandleAbandoned` (ParentCancelled) per owned agent.

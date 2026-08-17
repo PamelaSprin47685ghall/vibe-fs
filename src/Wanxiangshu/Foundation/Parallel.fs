@@ -35,10 +35,13 @@ type private JsTcs<'T>() =
             false
         else
             completed <- true
+
             resolveFn
-            |> Option.fold (fun _ f ->
-                f res
-                true) false
+            |> Option.fold
+                (fun _ f ->
+                    f res
+                    true)
+                false
 
 type private AsyncSemaphore(maxCount: int) =
     // DSL-MUTABLE: resource — remaining permit count of the semaphore
@@ -115,8 +118,7 @@ module Parallel =
                 use semaphore = new AsyncSemaphore(maxConcurrency)
 
                 let workTasks =
-                    indexedItems
-                    |> Array.map (runBoundedWork semaphore cancellation action)
+                    indexedItems |> Array.map (runBoundedWork semaphore cancellation action)
 
                 let promises = workTasks |> Array.map box
                 let! resultsObj = promiseAll promises

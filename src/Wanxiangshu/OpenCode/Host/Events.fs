@@ -54,7 +54,8 @@ module Events =
         let stickyCap = 256
 
         let notifyRegistration sessionId outcome registration =
-            if registration.Live then registration.Listener sessionId outcome
+            if registration.Live then
+                registration.Listener sessionId outcome
 
         let trimSticky () =
             while stickyOrder.Count > stickyCap do
@@ -66,15 +67,20 @@ module Events =
                 let isNew = not (stickyTerminal.ContainsKey key)
                 stickyTerminal.[key] <- outcome
 
-                if isNew then stickyOrder.Enqueue key
-                if isNew then trimSticky ()
+                if isNew then
+                    stickyOrder.Enqueue key
+
+                if isNew then
+                    trimSticky ()
 
                 listeners.Count > 0
                 && listeners |> Seq.exists (fun registration -> registration.Live))
 
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
-            for registration in handlers do notifyRegistration sessionId outcome registration
+
+            for registration in handlers do
+                notifyRegistration sessionId outcome registration
 
         /// One Completed terminal per (session, provider run), across every plugin
         /// instance sharing this port.

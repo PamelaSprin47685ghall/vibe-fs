@@ -2,13 +2,9 @@
  * ARCH-016 Gate E — provider prose ownership ratchet (no dist).
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   PROVIDER_PROSE_SCAN_ROOTS,
-  compareBaseline,
-  countByFile,
-  generateBaseline,
   isProviderProseLiteral,
   scanEntries,
   scanRepo,
@@ -63,32 +59,8 @@ test('WHAT[PROVIDER-LANGUAGE-005] heuristic excludes paths and identifiers from 
   assert.equal(isProviderProseLiteral('{{a}} {{b}} {{c}}'), false)
 })
 
-test('WHAT[PROVIDER-LANGUAGE-009] baseline ratchet blocks regression', () => {
-  const current = countByFile(scanEntries([{ file: 'LeakyPrompt.fs', text: RED_FIXTURE }]))
-  const { ok, regressions } = compareBaseline({ 'LeakyPrompt.fs': 1 }, current)
-  assert.equal(ok, false)
-  assert.ok(regressions[0].current > regressions[0].baseline)
-})
-
-test('WHAT[PROVIDER-LANGUAGE-009] repo scan with generated baseline is green', () => {
-  const baseline = generateBaseline(process.cwd())
-  const result = scanRepo(process.cwd(), { baseline })
-  assert.equal(result.ok, true, JSON.stringify(result.hits, null, 2))
-})
-
 test('WHAT[PROVIDER-LANGUAGE-009] zero hits is closed', () => {
   const result = scanRepo(process.cwd())
   assert.equal(result.ok, true, JSON.stringify(result.hits, null, 2))
   assert.deepEqual(result.counts, {})
-})
-
-test('WHAT[PROVIDER-LANGUAGE-009] committed baseline matches repo', () => {
-  const baseline = JSON.parse(
-    readFileSync(
-      new URL('../../../scripts/checks/provider-prose-ownership-baseline.json', import.meta.url),
-      'utf8',
-    ),
-  )
-  const result = scanRepo(process.cwd(), { baseline })
-  assert.equal(result.ok, true, JSON.stringify(result.hits, null, 2))
 })

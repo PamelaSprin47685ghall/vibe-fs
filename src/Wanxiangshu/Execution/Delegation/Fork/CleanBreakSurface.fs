@@ -13,6 +13,7 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module CleanBreakSurface =
     let private epoch = DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero)
+
     let legacyBody (runId: string) : string =
         sprintf
             "{\"status\":\"aborted\",\"run_id\":\"%s\",\"code\":\"CANCELLED\",\"message\":\"host abort observation\",\"child_session_id\":\"child\"}"
@@ -31,17 +32,35 @@ module CleanBreakSurface =
           Byname = "fast-coder"
           CanonicalRole = Role.Coder
           Ownership = HandleOwnership.DurableParentHandle
-          Lifecycle = HandleLifecycle.CompletedAwaitingJoin { Kind = HandleCompletionKind.SendFailure; CompletionRef = None; CompletionDigest = None }
+          Lifecycle =
+            HandleLifecycle.CompletedAwaitingJoin
+                { Kind = HandleCompletionKind.SendFailure
+                  CompletionRef = None
+                  CompletionDigest = None }
           CreationOrder = 1
-          LastCompletion = Some { Kind = HandleCompletionKind.SendFailure; CompletionRef = None; CompletionDigest = None } }
+          LastCompletion =
+            Some
+                { Kind = HandleCompletionKind.SendFailure
+                  CompletionRef = None
+                  CompletionDigest = None } }
 
     let tryDecode (handle: string) (body: string) : obj =
         match HandleCompletionCodec.decodeBody body with
         | ChildRecovery.DurableCompletionDecode.Current decoded ->
-            let completion = HandleCompletionCodec.tryMaterialiseRunCompletion (record handle) handle decoded epoch
-            box {| ok = true; outcome = completion.Outcome.ToString() |}
-        | ChildRecovery.DurableCompletionDecode.LegacyFalseAbort _ -> box {| ok = false; error = "legacy false abort is not a joinable completion" |}
-        | ChildRecovery.DurableCompletionDecode.Invalid _ -> box {| ok = false; error = "completion blob decode failed" |}
+            let completion =
+                HandleCompletionCodec.tryMaterialiseRunCompletion (record handle) handle decoded epoch
+
+            box
+                {| ok = true
+                   outcome = completion.Outcome.ToString() |}
+        | ChildRecovery.DurableCompletionDecode.LegacyFalseAbort _ ->
+            box
+                {| ok = false
+                   error = "legacy false abort is not a joinable completion" |}
+        | ChildRecovery.DurableCompletionDecode.Invalid _ ->
+            box
+                {| ok = false
+                   error = "completion blob decode failed" |}
 
     let replacement (agentId: string) (digest: string) : string =
         ChildRecovery.FalseTerminalMigration.replacementAgentId agentId (BlobDigest.create digest)
@@ -49,4 +68,9 @@ module CleanBreakSurface =
     let joinWire (agentName: string) (message: string) : string =
         JoinSurface.renderBatch
             "english"
-            [| box {| kind = "failed"; agentId = "a1"; agentName = agentName; code = "CANCELLED"; message = message |} |]
+            [| box
+                   {| kind = "failed"
+                      agentId = "a1"
+                      agentName = agentName
+                      code = "CANCELLED"
+                      message = message |} |]

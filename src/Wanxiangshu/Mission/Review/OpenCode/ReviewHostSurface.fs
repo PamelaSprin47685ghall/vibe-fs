@@ -22,16 +22,22 @@ module ReviewHostSurface =
     let private outcomeView outcome : obj =
         match outcome with
         | HostReviewGuard.GuardNudgeOutcome.Sent promptKey ->
-            box {| outcome = "Sent"; promptKey = PromptKey.value promptKey |}
+            box
+                {| outcome = "Sent"
+                   promptKey = PromptKey.value promptKey |}
         | HostReviewGuard.GuardNudgeOutcome.AlreadyOutstanding -> box {| outcome = "AlreadyOutstanding" |}
         | HostReviewGuard.GuardNudgeOutcome.NoLongerRequired -> box {| outcome = "NoLongerRequired" |}
-        | HostReviewGuard.GuardNudgeOutcome.Failed reason -> box {| outcome = "Failed"; reason = reason |}
+        | HostReviewGuard.GuardNudgeOutcome.Failed reason ->
+            box
+                {| outcome = "Failed"
+                   reason = reason |}
 
     type private PlainSessionPort(raw: obj, typed: ISessionHostPort) =
         let sendPrompt = raw?``SendPrompt``
 
         interface ISessionHostPort with
-            member _.SubscribeTerminal(sessionId, listener) = typed.SubscribeTerminal(sessionId, listener)
+            member _.SubscribeTerminal(sessionId, listener) =
+                typed.SubscribeTerminal(sessionId, listener)
 
             member _.SendPrompt(sessionId, text, options) =
                 emitJsExpr (sendPrompt, SessionId.value sessionId, text, options) "$0($1,$2,$3)"
@@ -44,7 +50,10 @@ module ReviewHostSurface =
                 typed.CreateSiblingSession(owner, parent, options)
 
             member _.TryGetParentSession(sessionId) = typed.TryGetParentSession sessionId
-            member _.CreateChildSession(parent, options) = typed.CreateChildSession(parent, options)
+
+            member _.CreateChildSession(parent, options) =
+                typed.CreateChildSession(parent, options)
+
             member _.ListChildren(parent) = typed.ListChildren parent
             member _.FamilyRootOf(sessionId) = typed.FamilyRootOf sessionId
 
@@ -80,6 +89,7 @@ module ReviewHostSurface =
         : Task<obj> =
         task {
             let port = unbox<ManagerPort> manager
+
             let! result =
                 port.Reverify
                     (ManagerJobId.create jobId)
@@ -139,16 +149,20 @@ module ReviewHostSurface =
                   ToolCallId = ToolCallId.create toolCall
                   Verdict = verdict }
 
-            let tcs = TaskCompletionSource<obj>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let tcs =
+                TaskCompletionSource<obj>(TaskCreationOptions.RunContinuationsAsynchronously)
 
             let accept () =
-                AsyncSupport.trySetResult tcs (box {| ok = true; effect = "Accepted" |}) |> ignore
+                AsyncSupport.trySetResult tcs (box {| ok = true; effect = "Accepted" |})
+                |> ignore
 
             let challenge () =
-                AsyncSupport.trySetResult tcs (box {| ok = true; effect = "Challenge" |}) |> ignore
+                AsyncSupport.trySetResult tcs (box {| ok = true; effect = "Challenge" |})
+                |> ignore
 
             let reject () =
-                AsyncSupport.trySetResult tcs (box {| ok = false; effect = "Rejected" |}) |> ignore
+                AsyncSupport.trySetResult tcs (box {| ok = false; effect = "Rejected" |})
+                |> ignore
 
             match ReviewJudgementInbox.tryDeliver judgement accept challenge reject with
             | None -> None

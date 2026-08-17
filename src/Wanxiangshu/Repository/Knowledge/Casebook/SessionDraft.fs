@@ -37,8 +37,7 @@ module CasebookDraftStore =
 
     let private updateQuestion draft q =
         match List.rev draft.Turns with
-        | last :: earlier when last.A.IsNone ->
-            { Turns = List.rev ({ last with Q = q } :: earlier) }
+        | last :: earlier when last.A.IsNone -> { Turns = List.rev ({ last with Q = q } :: earlier) }
         | _ -> { Turns = draft.Turns @ [ { Q = q; A = None } ] }
 
     let private updateAnswer draft a =

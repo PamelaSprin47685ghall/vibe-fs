@@ -21,10 +21,7 @@ module ProjectionSurface =
     let private isNullish (value: obj) : bool = jsNative
 
     let private arrayOf (value: obj) : obj array =
-        if isNullish value then
-            [||]
-        else
-            unbox<obj array> value
+        if isNullish value then [||] else unbox<obj array> value
 
     let private stringOf (value: obj) : string =
         if isNullish value then "" else string value
@@ -74,8 +71,7 @@ module ProjectionSurface =
             let callId = ToolCallId.create (stringOf value?callId)
             ProviderProjection.WireToolResult(callId, result)
         | "media"
-        | "Media" ->
-            ProviderProjection.WireMedia(optionalString value?mediaType, stringOf value?contentDigest)
+        | "Media" -> ProviderProjection.WireMedia(optionalString value?mediaType, stringOf value?contentDigest)
         | other -> failwithf "ProjectionSurface: unknown wire part kind %s" other
 
     let private wirePartToJs (part: ProviderProjection.WirePart) : obj =
@@ -130,8 +126,14 @@ module ProjectionSurface =
         | ProviderProjection.SemanticText text -> box {| kind = "text"; text = text |}
         | ProviderProjection.SemanticReasoning text -> box {| kind = "reasoning"; text = text |}
         | ProviderProjection.SemanticToolCall(name, args) ->
-            box {| kind = "tool-call"; name = name; args = args |}
-        | ProviderProjection.SemanticToolResult result -> box {| kind = "tool-result"; result = result |}
+            box
+                {| kind = "tool-call"
+                   name = name
+                   args = args |}
+        | ProviderProjection.SemanticToolResult result ->
+            box
+                {| kind = "tool-result"
+                   result = result |}
         | ProviderProjection.SemanticMedia(mediaType, digest) ->
             box
                 {| kind = "media"
@@ -163,8 +165,7 @@ module ProjectionSurface =
         | "tool-result"
         | "ToolResult" -> ProviderProjection.SemanticToolResult(stringOf value?result)
         | "media"
-        | "Media" ->
-            ProviderProjection.SemanticMedia(optionalString value?mediaType, stringOf value?contentDigest)
+        | "Media" -> ProviderProjection.SemanticMedia(optionalString value?mediaType, stringOf value?contentDigest)
         | other -> failwithf "ProjectionSurface: unknown semantic part kind %s" other
 
     let private semanticProjectionOf (value: obj) : ProviderProjection.ProviderSemanticProjection =
@@ -269,6 +270,7 @@ module ProjectionSurface =
                 (arrayOf value?messages |> Array.toList |> List.map wireMessageOf)
         | "strength-candidate" ->
             let bundle = strengthBundleOf value?bundle
+
             ProjectionIntent.strengthCandidate
                 ownerSession
                 decisionId
@@ -277,6 +279,7 @@ module ProjectionSurface =
                 bundle
         | "strength-promoted" ->
             let bundle = strengthBundleOf value?bundle
+
             ProjectionIntent.strengthPromoted
                 ownerSession
                 decisionId
@@ -326,7 +329,9 @@ module ProjectionSurface =
         match intent with
         | ProjectionIntent.KeepPhysicalPrefix -> box {| kind = "KeepPhysicalPrefix" |}
         | ProjectionIntent.ActivatePrefixEpoch activation ->
-            box {| kind = "ActivatePrefixEpoch"; activation = activationToJs activation |}
+            box
+                {| kind = "ActivatePrefixEpoch"
+                   activation = activationToJs activation |}
         | ProjectionIntent.InsertBlogFrames _ -> box {| kind = "InsertBlogFrames" |}
         | ProjectionIntent.InsertRepair _ -> box {| kind = "InsertRepair" |}
         | ProjectionIntent.UseStrengthMirror _ -> box {| kind = "UseStrengthMirror" |}
@@ -349,7 +354,10 @@ module ProjectionSurface =
     let private snapshotOfJs (value: obj) : ProjectionSnapshot =
         { CurrentProjection = semanticProjectionOf value?currentProjection
           CommittedPrefix =
-            if isNullish value?committedPrefix then None else Some(prefixSnapshotOf value?committedPrefix)
+            if isNullish value?committedPrefix then
+                None
+            else
+                Some(prefixSnapshotOf value?committedPrefix)
           BlogFrames = arrayOf value?blogFrames |> Array.toList |> List.map blogFrameOf
           TransportMessages = arrayOf value?transportMessages |> Array.map stringOf |> Set.ofArray
           HostReanchor =
@@ -387,19 +395,33 @@ module ProjectionSurface =
 
     let private renderedPrefixToJs (value: RenderedPrefix) : obj =
         match value with
-        | RenderedPrefix.PhysicalPrefix -> box {| name = "PhysicalPrefix"; activation = null |}
+        | RenderedPrefix.PhysicalPrefix ->
+            box
+                {| name = "PhysicalPrefix"
+                   activation = null |}
         | RenderedPrefix.SyntheticPrefix activation ->
-            box {| name = "SyntheticPrefix"; activation = activationToJs activation |}
+            box
+                {| name = "SyntheticPrefix"
+                   activation = activationToJs activation |}
 
     /// Constructor for the physical-prefix intent.
-    let keepPhysicalPrefix : obj = box {| kind = "KeepPhysicalPrefix" |}
+    let keepPhysicalPrefix: obj = box {| kind = "KeepPhysicalPrefix" |}
 
     /// Constructor for the synthetic-prefix intent.
-    let activatePrefixEpoch (activation: obj) : obj = box {| kind = "ActivatePrefixEpoch"; activation = activation |}
+    let activatePrefixEpoch (activation: obj) : obj =
+        box
+            {| kind = "ActivatePrefixEpoch"
+               activation = activation |}
 
-    let insertBlogFrames (payload: obj) : obj = box {| kind = "InsertBlogFrames"; payload = payload |}
+    let insertBlogFrames (payload: obj) : obj =
+        box
+            {| kind = "InsertBlogFrames"
+               payload = payload |}
 
-    let insertRepair (requestKey: string) : obj = box {| kind = "InsertRepair"; requestKey = requestKey |}
+    let insertRepair (requestKey: string) : obj =
+        box
+            {| kind = "InsertRepair"
+               requestKey = requestKey |}
 
     [<Emit("Object.assign({}, $0, { kind: $1 })")>]
     let private withKind (payload: obj) (kind: string) : obj = jsNative
@@ -410,11 +432,12 @@ module ProjectionSurface =
 
     let strengthPromoted (payload: obj) : obj = withKind payload "strength-promoted"
 
-    let strengthReplicaLocal (payload: obj) : obj = withKind payload "strength-replica-local"
+    let strengthReplicaLocal (payload: obj) : obj =
+        withKind payload "strength-replica-local"
 
-    let suppressTransportOnly : obj = box {| kind = "SuppressTransportOnly" |}
+    let suppressTransportOnly: obj = box {| kind = "SuppressTransportOnly" |}
 
-    let reanchorAfterCompaction : obj = box {| kind = "ReanchorAfterCompaction" |}
+    let reanchorAfterCompaction: obj = box {| kind = "ReanchorAfterCompaction" |}
 
     /// Construct and normalize an attempt-local projection snapshot.
     let projectionSnapshot (currentProjection: obj) (options: obj) : obj =
@@ -438,7 +461,8 @@ module ProjectionSurface =
 
     /// Decode raw Host messages through the production codec into wire data.
     let decodeMessages (rawMessages: obj array) : obj =
-        ProviderWireCapture.decodeMessageView (Array.toList rawMessages) |> wireProjectionToJs
+        ProviderWireCapture.decodeMessageView (Array.toList rawMessages)
+        |> wireProjectionToJs
 
     /// Apply a rendered prefix through the production write-back adapter.
     let applyRenderedPrefix (rawMessages: obj array) (rendered: obj) : obj array =
@@ -448,7 +472,10 @@ module ProjectionSurface =
     /// Resolve a committed prefix snapshot into the production projection intent.
     let prefixForSnapshot (snapshot: obj) (memoryPreamble: string) (body: string) : obj =
         let committed =
-            if isNullish snapshot?committedPrefix then None else Some(prefixSnapshotOf snapshot?committedPrefix)
+            if isNullish snapshot?committedPrefix then
+                None
+            else
+                Some(prefixSnapshotOf snapshot?committedPrefix)
 
         XPrefixProjection.forSnapshot committed memoryPreamble body |> intentToJs
 
@@ -467,11 +494,15 @@ module ProjectionSurface =
                        conflict = conflictName conflict
                        first = intentKind first
                        second = intentKind second |}
-            | _ -> box {| ok = false; conflict = conflictName conflict |}
+            | _ ->
+                box
+                    {| ok = false
+                       conflict = conflictName conflict |}
 
     /// Render a prefix intent set to a write-back instruction.
     let renderPrefix (intents: obj array) : obj =
-        ProjectionRenderer.renderPrefix (Array.toList intents |> List.map intentOf) |> renderedPrefixToJs
+        ProjectionRenderer.renderPrefix (Array.toList intents |> List.map intentOf)
+        |> renderedPrefixToJs
 
     /// Render wire messages with the canonical projection renderer.
     let renderMessages (snapshot: obj) (baseMessages: obj array) (intents: obj array) : obj array =
@@ -522,24 +553,25 @@ module ProjectionSurface =
               System = []
               Messages = Array.toList messages |> List.map wireMessageOf }
 
-        projection
-        |> ProviderProjection.toSemantic
-        |> semanticProjectionToJs
+        projection |> ProviderProjection.toSemantic |> semanticProjectionToJs
 
     /// ARCH-004: the sole append-only prefix authority at the JS boundary.
     let isAppendOnlyPrefix (previous: obj) (next: obj) : bool =
         ProviderProjection.isAppendOnlyPrefix (wireProjectionOf previous) (wireProjectionOf next)
 
     let renderSemantic (projection: obj) : string =
-        wireProjectionOf projection |> ProviderProjection.toSemantic |> ProviderProjection.renderSemantic
+        wireProjectionOf projection
+        |> ProviderProjection.toSemantic
+        |> ProviderProjection.renderSemantic
 
-    let semanticallyEqual (left: obj) (right: obj) : bool = renderSemantic left = renderSemantic right
+    let semanticallyEqual (left: obj) (right: obj) : bool =
+        renderSemantic left = renderSemantic right
 
     /// The owner constant used by the InsertRepair projection.
-    let repairInstruction : string = ProjectionConstants.RepairInstruction
+    let repairInstruction: string = ProjectionConstants.RepairInstruction
 
     /// Explicitly exposed pure API names used by the lifecycle-boundary contract.
-    let pureContractNames : string array =
+    let pureContractNames: string array =
         [| "plan"
            "renderPrefix"
            "renderMessages"
@@ -549,4 +581,3 @@ module ProjectionSurface =
            "isAppendOnlyPrefix"
            "sealDigest"
            "toolResultDigests" |]
-

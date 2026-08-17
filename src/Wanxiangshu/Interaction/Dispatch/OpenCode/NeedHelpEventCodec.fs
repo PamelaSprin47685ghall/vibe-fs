@@ -63,7 +63,10 @@ module NeedHelpEventCodec =
         | _ -> false
 
     let private eventTypeOf (raw: obj) =
-        if isNull raw then None else Some(HostEventCodec.eventTypeOf raw)
+        if isNull raw then
+            None
+        else
+            Some(HostEventCodec.eventTypeOf raw)
 
     let isNeedHelpRelevantEvent (rawInput: obj) : bool =
         let raw = HostEventCodec.unwrap rawInput
@@ -135,9 +138,7 @@ module NeedHelpEventCodec =
         let raw = HostEventCodec.unwrap rawInput
 
         updatedProperties raw
-        |> Option.bind (fun properties ->
-            updatedPart properties
-            |> Option.bind (decodeUpdatedPart raw properties))
+        |> Option.bind (fun properties -> updatedPart properties |> Option.bind (decodeUpdatedPart raw properties))
 
     let tryDecodeDelta (rawInput: obj) : StreamDelta option =
         let raw = HostEventCodec.unwrap rawInput

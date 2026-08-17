@@ -55,10 +55,16 @@ module HostSignalSubscribe =
             trySubscribeValue events listen onSignalEvent
 
     let private clientEvents client =
-        if not (isNull client) && not (isNull client?events) then Some client?events else None
+        if not (isNull client) && not (isNull client?events) then
+            Some client?events
+        else
+            None
 
     let private listenTargetFromInput input =
-        if not (isNull input?events) then Some input?events else clientEvents input?client
+        if not (isNull input?events) then
+            Some input?events
+        else
+            clientEvents input?client
 
     let private listenTarget input =
         if isNull input then None else listenTargetFromInput input

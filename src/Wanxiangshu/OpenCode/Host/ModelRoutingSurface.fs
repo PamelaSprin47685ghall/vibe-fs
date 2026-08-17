@@ -44,7 +44,9 @@ module ModelRoutingSurface =
         if isNullish value then None else Some value
 
     let private targetObject (target: ModelRoutingTarget) : obj =
-        box {| model = target.Model; reasoning = target.Reasoning |}
+        box
+            {| model = target.Model
+               reasoning = target.Reasoning |}
 
     let private targetOf (value: obj) : ModelRoutingTarget =
         if isNullish value then
@@ -53,14 +55,11 @@ module ModelRoutingSurface =
         { Model = text (field value [ "model"; "Model" ])
           Reasoning = text (field value [ "reasoning"; "Reasoning" ]) }
 
-    let private targetsOf (value: obj) : ModelRoutingTarget array =
-        arrayOf value |> Array.map targetOf
+    let private targetsOf (value: obj) : ModelRoutingTarget array = arrayOf value |> Array.map targetOf
 
-    let private runtimeOf (value: obj) : ModelRouting.ModelRoutingRuntime =
-        (unbox<RuntimeHandle> value).Runtime
+    let private runtimeOf (value: obj) : ModelRouting.ModelRoutingRuntime = (unbox<RuntimeHandle> value).Runtime
 
-    let private portOf (value: obj) : IOpenCodePort =
-        (unbox<PortHandle> value).Port
+    let private portOf (value: obj) : IOpenCodePort = (unbox<PortHandle> value).Port
 
     let private modelOf (value: obj) : OpencodeModel option =
         if isNullish value then
@@ -100,18 +99,38 @@ module ModelRoutingSurface =
     let private outcomeToJs (outcome: SendOutcome) : obj =
         match outcome with
         | AdmittedWithReceipt receipt ->
-            box {| kind = "AdmittedWithReceipt"; receipt = TransportReceipt.value receipt; physical = null; error = null |}
+            box
+                {| kind = "AdmittedWithReceipt"
+                   receipt = TransportReceipt.value receipt
+                   physical = null
+                   error = null |}
         | AdmittedWithPhysicalMessage physical ->
-            box {| kind = "AdmittedWithPhysicalMessage"; receipt = null; physical = PhysicalUserMessageId.value physical; error = null |}
+            box
+                {| kind = "AdmittedWithPhysicalMessage"
+                   receipt = null
+                   physical = PhysicalUserMessageId.value physical
+                   error = null |}
         | Retryable reason ->
-            box {| kind = "Retryable"; receipt = null; physical = null; error = reason |}
+            box
+                {| kind = "Retryable"
+                   receipt = null
+                   physical = null
+                   error = reason |}
         | AcceptanceUnknown reason ->
-            box {| kind = "AcceptanceUnknown"; receipt = null; physical = null; error = reason |}
+            box
+                {| kind = "AcceptanceUnknown"
+                   receipt = null
+                   physical = null
+                   error = reason |}
         | Fatal reason ->
-            box {| kind = "Fatal"; receipt = null; physical = null; error = reason |}
+            box
+                {| kind = "Fatal"
+                   receipt = null
+                   physical = null
+                   error = reason |}
 
     /// Initialize the process-shared scheduler runtime used by Host admission.
-    let initialize () : Task = ModelRouting.initialize()
+    let initialize () : Task = ModelRouting.initialize ()
 
     /// Acquire from the process-shared Host runtime and expose only the plain
     /// model/reasoning target selected by the scheduler.
@@ -128,7 +147,7 @@ module ModelRoutingSurface =
 
     /// Release the current process-shared execution for a reusable session.
     let release (sessionId: string) : unit =
-        ModelRouting.releaseExecution(SessionId.create sessionId)
+        ModelRouting.releaseExecution (SessionId.create sessionId)
 
     /// Load the user-visible scheduler module through the owner boundary. The
     /// returned function is an opaque JS capability and is never introspected by
@@ -151,7 +170,8 @@ module ModelRoutingSurface =
     let acquireManaged (runtime: obj) (sessionId: string) (physicalUserMessageId: string) (agent: string) : Task<obj> =
         task {
             let! target =
-                (runtimeOf runtime).AcquireManagedExecution(sessionId, physicalUserMessageId, agent)
+                (runtimeOf runtime)
+                    .AcquireManagedExecution(sessionId, physicalUserMessageId, agent)
 
             return targetObject target
         }
@@ -188,4 +208,3 @@ module ModelRoutingSurface =
             let! outcome = (portOf port).SendPrompt (SessionId.create sessionId) text (promptOptionsOf options)
             return outcomeToJs outcome
         }
-

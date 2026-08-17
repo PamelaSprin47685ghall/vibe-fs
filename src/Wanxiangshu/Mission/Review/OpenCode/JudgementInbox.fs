@@ -13,7 +13,9 @@ module ReviewJudgementInbox =
 
     let private gate = obj ()
     let private owners = HashSet<string>()
-    let private waiters = Dictionary<string, TaskCompletionSource<Result<ReviewJudgementDelivery, string>>>()
+
+    let private waiters =
+        Dictionary<string, TaskCompletionSource<Result<ReviewJudgementDelivery, string>>>()
 
     let private key (sessionId: SessionId) = SessionId.value sessionId
 
@@ -29,7 +31,9 @@ module ReviewJudgementInbox =
                 | false, _ -> None)
 
         pending
-        |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter (Error "review judgement channel closed") |> ignore)
+        |> Option.iter (fun waiter ->
+            AsyncSupport.trySetResult waiter (Error "review judgement channel closed")
+            |> ignore)
 
     let private awaitJudgement sessionKey () =
         lock gate (fun () ->
@@ -57,7 +61,8 @@ module ReviewJudgementInbox =
                 { AwaitJudgement = awaitJudgement sessionKey
                   Dispose = fun () -> release sessionKey }
 
-    let isOwned (sessionId: SessionId) = lock gate (fun () -> owners.Contains(key sessionId))
+    let isOwned (sessionId: SessionId) =
+        lock gate (fun () -> owners.Contains(key sessionId))
 
     let tryDeliver
         (judgement: ReviewJudgement)

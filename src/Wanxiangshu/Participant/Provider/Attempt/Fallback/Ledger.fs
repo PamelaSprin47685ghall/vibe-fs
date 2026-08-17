@@ -81,12 +81,7 @@ module FallbackLedger =
                        FinalConsecutiveFailureCount = next.ConsecutiveFailureCount
                        FinalOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset |}
 
-            let! appended =
-                AgentJournal.appendAgent
-                    (StreamId.Session sessionId)
-                    (Some providerRun)
-                    exhausted
-                    journal
+            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) exhausted journal
 
             return
                 appended
@@ -129,8 +124,7 @@ module FallbackLedger =
                        ConsecutiveFailureCount = next.ConsecutiveFailureCount
                        Reason = reason |}
 
-            let! appended =
-                AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal
+            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal
 
             match appended with
             | Error failure -> return Error(JournalAppendFailure.describe failure)

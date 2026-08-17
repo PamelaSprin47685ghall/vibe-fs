@@ -30,10 +30,11 @@ type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
             release ()
 
     static member internal Create(journal: AgentJournal) =
-        JournalHandle(journal, fun () -> (journal :> IDisposable).Dispose())
+        JournalHandle(journal, (fun () -> (journal :> IDisposable).Dispose()))
 
     static member internal CreateShared(journal: AgentJournal) =
-        JournalHandle(journal, fun () -> SharedAgentJournal.release (Some journal))
+        JournalHandle(journal, (fun () -> SharedAgentJournal.release (Some journal)))
+
 [<RequireQualifiedAccess>]
 module JournalSurface =
 
@@ -43,7 +44,10 @@ module JournalSurface =
     let private sessionIdOf (value: obj) : SessionId = SessionId.create (str value)
 
     let private providerRunOf (value: obj) : ProviderRunIdentity option =
-        if isNull value then None else Some(ProviderRunIdentity.create (str value))
+        if isNull value then
+            None
+        else
+            Some(ProviderRunIdentity.create (str value))
 
     let private blobDigest (value: obj) : BlobDigest = BlobDigest.create (str value)
     let private blobRef (value: obj) : BlobRef = BlobRef.create (str value)
@@ -94,22 +98,24 @@ module JournalSurface =
                 {| ok = true
                    journal = JournalHandle.Create(journal)
                    localSeq = LocalSeq.value init.LocalSeq |}
-        | Error error -> box {| ok = false; error = $"{error.Fact}: {error.Reason}" |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = $"{error.Fact}: {error.Reason}" |}
 
     let private bootResult (result: Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>) : obj =
         match result with
         | Ok(writer, init, projection) -> journalOrError writer init projection
-        | Error error -> box {| ok = false; error = $"{error.Fact}: {error.Reason}" |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = $"{error.Fact}: {error.Reason}" |}
 
     /// Acquire the plugin's process-local workspace journal through the same
     /// runtime-path owner as the composition root. The returned capability is
     /// ref-counted and must be released with `dispose`; no journal internals
     /// cross this boundary.
-    let acquireSharedForWorkspace
-        (workspace: string)
-        (processId: int)
-        (startedAt: string)
-        : Task<obj> =
+    let acquireSharedForWorkspace (workspace: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let commonDirectory = RuntimePath.gitCommonDir workspace
             let runtimeDirectory = RuntimePath.forWorkspace workspace
@@ -125,15 +131,19 @@ module JournalSurface =
                 }
 
             let! result =
-                SharedAgentJournal.acquire
-                    runtimeDirectory
-                    processId
-                    (DateTimeOffset.Parse startedAt)
-                    openJournal
+                SharedAgentJournal.acquire runtimeDirectory processId (DateTimeOffset.Parse startedAt) openJournal
 
             match result with
-            | Ok journal -> return box {| ok = true; journal = JournalHandle.CreateShared journal |}
-            | Error error -> return box {| ok = false; error = $"{error.Fact}: {error.Reason}" |}
+            | Ok journal ->
+                return
+                    box
+                        {| ok = true
+                           journal = JournalHandle.CreateShared journal |}
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = $"{error.Fact}: {error.Reason}" |}
         }
 
     /// Open a workspace journal directly. The returned journal is an opaque
@@ -174,22 +184,36 @@ module JournalSurface =
     /// Append an agent fact and return a normalized projection summary.
     let appendAgent (handle: JournalHandle) (stream: obj) (run: obj) (fact: obj) : Task<obj> =
         task {
-            let! result = AgentJournal.appendAgent (streamOfJs stream) (providerRunOf run) (agentFactOfJs fact) handle.Journal
+            let! result =
+                AgentJournal.appendAgent (streamOfJs stream) (providerRunOf run) (agentFactOfJs fact) handle.Journal
 
             return
                 match result with
-                | Ok projection -> box {| ok = true; projection = projectionToJs projection |}
-                | Error error -> box {| ok = false; error = error.ToString() |}
+                | Ok projection ->
+                    box
+                        {| ok = true
+                           projection = projectionToJs projection |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = error.ToString() |}
         }
 
     let appendManagerLifecycle (handle: JournalHandle) (stream: obj) (fact: obj) : Task<obj> =
         task {
-            let! result = AgentJournal.appendManagerLifecycle (streamOfJs stream) (managerLifecycleOfJs fact) handle.Journal
+            let! result =
+                AgentJournal.appendManagerLifecycle (streamOfJs stream) (managerLifecycleOfJs fact) handle.Journal
 
             return
                 match result with
-                | Ok projection -> box {| ok = true; projection = projectionToJs projection |}
-                | Error error -> box {| ok = false; error = error.ToString() |}
+                | Ok projection ->
+                    box
+                        {| ok = true
+                           projection = projectionToJs projection |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           error = error.ToString() |}
         }
 
     /// Write a UTF-8 payload through the journal's local payload owner.
@@ -224,5 +248,7 @@ module JournalSurface =
 
     /// Keyed session lookup over the current projection.
     let hasSession (handle: JournalHandle) (sessionId: string) : bool =
-        AgentProjection.tryFind (SessionId.create (str sessionId)) (AgentJournal.snapshot handle.Journal).AgentProjections
+        AgentProjection.tryFind
+            (SessionId.create (str sessionId))
+            (AgentJournal.snapshot handle.Journal).AgentProjections
         |> Option.isSome

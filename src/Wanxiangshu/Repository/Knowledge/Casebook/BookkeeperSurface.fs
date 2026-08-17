@@ -16,8 +16,7 @@ open Wanxiangshu.Repository.Programming.Js.OpenCode
 /// result envelopes, and tool metadata are plain JavaScript values.
 module CasebookBookkeeperSurface =
 
-    let private storeOf (value: obj) : IEventStore =
-        (unbox<EventStoreHandle> value).Store
+    let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
     let private resultToJs (result: Result<'value, string>) (valueToJs: 'value -> obj) : obj =
         match result with
@@ -50,14 +49,17 @@ module CasebookBookkeeperSurface =
     let private stagedToJs (result: Result<string * string, string>) : obj =
         resultToJs result (fun (question, answer) -> box [| box question; box answer |])
 
-    let snapshot (txId: string) : obj = BookkeeperStaging.snapshot txId |> stagedToJs
+    let snapshot (txId: string) : obj =
+        BookkeeperStaging.snapshot txId |> stagedToJs
 
-    let take (txId: string) : obj = BookkeeperStaging.take txId |> stagedToJs
+    let take (txId: string) : obj =
+        BookkeeperStaging.take txId |> stagedToJs
 
     /// Execute one provider program against the currently bound transaction.
     /// Host argument/context decoding and ToolResultBound remain owner-private.
     let runProgram (sessionId: string) (program: string) : Task<string> =
-        let args = Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
+        let args =
+            Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
 
         let context: Wanxiangshu.OpenCode.HostToolContext =
             { SessionId = sessionId
@@ -74,7 +76,8 @@ module CasebookBookkeeperSurface =
 
     /// Provider-visible metadata without exposing ToolSpec or HostSchema.
     let contract (toolModule: obj) : obj =
-        let spec = JsBookkeeperTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
+        let spec =
+            JsBookkeeperTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
 
         box
             {| name = spec.Name
@@ -90,7 +93,7 @@ module CasebookBookkeeperSurface =
         SessionId.value (unbox<SessionId> value)
 
     let acceptedSession (value: string) : obj =
-        box (Ok(SessionId.create value) : Result<SessionId, string>)
+        box (Ok(SessionId.create value): Result<SessionId, string>)
 
     let acceptedPrompt () : obj =
         box (AdmittedWithReceipt(TransportReceipt.create "bookkeeper-accepted"))
@@ -100,12 +103,13 @@ module CasebookBookkeeperSurface =
     let aborted () : obj = box (Ok())
 
     let completed (value: string) : obj =
-        box
-            (Wanxiangshu.OpenCode.TerminalOutcome.Completed
+        box (
+            Wanxiangshu.OpenCode.TerminalOutcome.Completed
                 { SessionId = SessionId.create value
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "bookkeeper"
                   ProviderRun = ProviderRunIdentity.create "bookkeeper"
                   Role = Role.Inspector
                   Directory = None
                   TerminalText = "bookkeeper completed"
-                  TurnFormalText = "bookkeeper completed" })
+                  TurnFormalText = "bookkeeper completed" }
+        )

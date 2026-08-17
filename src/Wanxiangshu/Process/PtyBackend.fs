@@ -30,17 +30,17 @@ module PtyBackend =
     open PtySupervisor
 
     let private completeExit (exitTcs: TaskCompletionSource<unit>) : unit =
-        try exitTcs.SetResult(()) with _ -> ()
+        try
+            exitTcs.SetResult(())
+        with _ ->
+            ()
 
-    let private failPendingWrites
-        (super: PtySupervisor)
-        (port: PtyPort)
-        (id: PtyId)
-        (msg: string)
-        : unit =
+    let private failPendingWrites (super: PtySupervisor) (port: PtyPort) (id: PtyId) (msg: string) : unit =
         port.FailRead(id, msg)
+
         for (_, tcsOpt) in takePending super id do
             tcsOpt |> Option.iter (fun t -> t.SetResult(Error msg))
+
         drop super id |> ignore
         port.Complete(id, Error msg)
 

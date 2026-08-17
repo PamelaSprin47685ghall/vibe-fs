@@ -73,7 +73,8 @@ module FinalityWorkflow =
         (providerRun: ProviderRunIdentity)
         (toolCallId: ToolCallId)
         (lifeOpt: LifeProjection option)
-        (existingRequest: FinalityRequestProjection option) =
+        (existingRequest: FinalityRequestProjection option)
+        =
         match lifeOpt, existingRequest with
         | _, Some request -> Task.FromResult(Some request)
         | Some _, None ->
@@ -105,9 +106,13 @@ module FinalityWorkflow =
         (managerSessionId: SessionId)
         (requestId: FinalityRequestId)
         reviewerId
-        fromRace =
+        fromRace
+        =
         match RevisionWorkflow.tryActiveFinality snapshot managerSessionId requestId with
-        | Some activeRequest -> RevisionWorkflow.durableRevisionSiblings snapshot activeRequest reviewerId @ fromRace |> List.distinctBy fst
+        | Some activeRequest ->
+            RevisionWorkflow.durableRevisionSiblings snapshot activeRequest reviewerId
+            @ fromRace
+            |> List.distinctBy fst
         | None -> fromRace
 
     let private reviewMembers
@@ -119,7 +124,8 @@ module FinalityWorkflow =
         (requestId: FinalityRequestId)
         (requestTree: GitTreeHash)
         (members: EnlistedMember list)
-        (request: FinalityRequestProjection) =
+        (request: FinalityRequestProjection)
+        =
         task {
             match!
                 CohortWorkflow.reviewUntilFirstRevisionOrAllConfirmed
@@ -131,7 +137,9 @@ module FinalityWorkflow =
             with
             | CohortJudgement.RevisionRequired(reviewerId, barrierId, fromRace) ->
                 let before = AgentJournal.snapshot durable
-                let siblings = revisionSiblings before managerSessionId requestId reviewerId fromRace
+
+                let siblings =
+                    revisionSiblings before managerSessionId requestId reviewerId fromRace
 
                 return!
                     RevisionWorkflow.rejectAndSteer
@@ -157,6 +165,7 @@ module FinalityWorkflow =
                         requestTree
             | CohortJudgement.Undecided ->
                 let reviewer, barrier = undecidedMember managerSessionId request
+
                 return!
                     RevisionWorkflow.concludeUndecided
                         durable
@@ -177,11 +186,13 @@ module FinalityWorkflow =
         (request: FinalityRequestProjection)
         (lifeIdValue: ManagerLifeId)
         (requestId: FinalityRequestId)
-        (requestTree: GitTreeHash) =
+        (requestTree: GitTreeHash)
+        =
         task {
             match! CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId lifeId request with
             | Error _ ->
                 let reviewer, barrier = undecidedMember managerSessionId request
+
                 return!
                     RevisionWorkflow.concludeUndecided
                         durable
@@ -216,19 +227,49 @@ module FinalityWorkflow =
         (lastWordsRef: BlobRef)
         (lastWordsDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
-        (toolCallId: ToolCallId) =
+        (toolCallId: ToolCallId)
+        =
         task {
             let snapshot = AgentJournal.snapshot durable
+
             let lifeOpt =
                 AgentProjection.tryFind managerSessionId snapshot.AgentProjections
                 |> Option.bind (fun session -> session.ManagerLife)
                 |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
                 |> Option.filter (fun life -> life.LifeId = lifeId)
-            let existingRequest = lifeOpt |> Option.bind (fun life -> life.ActiveFinality) |> Option.filter (fun request -> request.RequestId = requestId)
-            let! requestOpt = requestForLife durable managerSessionId lifeId requestId requestTree lastWordsRef lastWordsDigest providerRun toolCallId lifeOpt existingRequest
+
+            let existingRequest =
+                lifeOpt
+                |> Option.bind (fun life -> life.ActiveFinality)
+                |> Option.filter (fun request -> request.RequestId = requestId)
+
+            let! requestOpt =
+                requestForLife
+                    durable
+                    managerSessionId
+                    lifeId
+                    requestId
+                    requestTree
+                    lastWordsRef
+                    lastWordsDigest
+                    providerRun
+                    toolCallId
+                    lifeOpt
+                    existingRequest
 
             match lifeOpt, requestOpt with
-            | Some life, Some request -> return! enlistAndReview reviewerPort treePort durable managerSessionId life request lifeId requestId requestTree
+            | Some life, Some request ->
+                return!
+                    enlistAndReview
+                        reviewerPort
+                        treePort
+                        durable
+                        managerSessionId
+                        life
+                        request
+                        lifeId
+                        requestId
+                        requestTree
             | _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
         }
 
@@ -243,10 +284,23 @@ module FinalityWorkflow =
         (lastWordsRef: BlobRef)
         (lastWordsDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
-        (toolCallId: ToolCallId) =
+        (toolCallId: ToolCallId)
+        =
         task {
             try
-                return! executeDurable reviewerPort treePort durable managerSessionId lifeId requestId requestTree lastWordsRef lastWordsDigest providerRun toolCallId
+                return!
+                    executeDurable
+                        reviewerPort
+                        treePort
+                        durable
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        lastWordsRef
+                        lastWordsDigest
+                        providerRun
+                        toolCallId
             with _ ->
                 return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
         }

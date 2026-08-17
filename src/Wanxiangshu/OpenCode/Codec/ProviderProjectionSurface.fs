@@ -18,25 +18,47 @@ module ProviderProjectionSurface =
         | ProviderProjection.WireText text -> box {| kind = "Text"; text = text |}
         | ProviderProjection.WireReasoning text -> box {| kind = "Reasoning"; text = text |}
         | ProviderProjection.WireToolCall(callId, name, args) ->
-            box {| kind = "ToolCall"; callId = ToolCallId.value callId; name = name; args = args |}
+            box
+                {| kind = "ToolCall"
+                   callId = ToolCallId.value callId
+                   name = name
+                   args = args |}
         | ProviderProjection.WireToolResult(callId, result) ->
-            box {| kind = "ToolResult"; callId = ToolCallId.value callId; result = result |}
+            box
+                {| kind = "ToolResult"
+                   callId = ToolCallId.value callId
+                   result = result |}
         | ProviderProjection.WireMedia(mediaType, digest) ->
-            box {| kind = "Media"; mediaType = optionObj mediaType; contentDigest = digest |}
+            box
+                {| kind = "Media"
+                   mediaType = optionObj mediaType
+                   contentDigest = digest |}
 
     let private messagePartToJs part : obj =
         match part with
         | MessagePart.Text text -> box {| kind = "Text"; text = text |}
         | MessagePart.Reasoning text -> box {| kind = "Reasoning"; text = text |}
-        | MessagePart.ToolCall(callId, name, args) -> box {| kind = "ToolCall"; callId = callId; name = name; args = args |}
-        | MessagePart.ToolResult(callId, result) -> box {| kind = "ToolResult"; callId = callId; result = result |}
+        | MessagePart.ToolCall(callId, name, args) ->
+            box
+                {| kind = "ToolCall"
+                   callId = callId
+                   name = name
+                   args = args |}
+        | MessagePart.ToolResult(callId, result) ->
+            box
+                {| kind = "ToolResult"
+                   callId = callId
+                   result = result |}
         | MessagePart.Activity kind -> box {| kind = "Activity"; activity = kind |}
 
     let decodeWirePart (raw: obj) : obj =
         ProviderWireDecode.decodePart raw |> Option.map wirePartToJs |> Option.toObj
 
     let decodeWireParts (raw: obj array) : obj array =
-        if isNull raw then [||] else raw |> Array.choose (ProviderWireDecode.decodePart >> Option.map wirePartToJs)
+        if isNull raw then
+            [||]
+        else
+            raw |> Array.choose (ProviderWireDecode.decodePart >> Option.map wirePartToJs)
 
     let decodeMessage (raw: obj) : obj =
         ProviderWireCapture.decodeMessage raw
@@ -48,6 +70,7 @@ module ProviderProjectionSurface =
 
     let decodeRequest (raw: obj) : obj =
         let projection = ProviderWireCapture.decodeRequest raw
+
         box
             {| providerId = optionObj projection.ProviderId
                modelId = optionObj projection.ModelId
@@ -57,11 +80,15 @@ module ProviderProjectionSurface =
                messages =
                 projection.Messages
                 |> List.map (fun message ->
-                    box {| role = message.Role; parts = message.Parts |> List.map wirePartToJs |> List.toArray |})
+                    box
+                        {| role = message.Role
+                           parts = message.Parts |> List.map wirePartToJs |> List.toArray |})
                 |> List.toArray |}
 
     let decodeMessageView (raw: obj array) : obj =
-        let projection = ProviderWireCapture.decodeMessageView(if isNull raw then [] else Array.toList raw)
+        let projection =
+            ProviderWireCapture.decodeMessageView (if isNull raw then [] else Array.toList raw)
+
         box
             {| providerId = null
                modelId = null
@@ -70,7 +97,10 @@ module ProviderProjectionSurface =
                system = [||]
                messages =
                 projection.Messages
-                |> List.map (fun message -> box {| role = message.Role; parts = message.Parts |> List.map wirePartToJs |> List.toArray |})
+                |> List.map (fun message ->
+                    box
+                        {| role = message.Role
+                           parts = message.Parts |> List.map wirePartToJs |> List.toArray |})
                 |> List.toArray |}
 
     let decodeCapturedMessage (raw: obj) : obj =
@@ -98,10 +128,16 @@ module ProviderProjectionSurface =
 
     let decodeIngress (input: obj) (output: obj) : obj =
         let decoded = PromptIngressCodec.decode input output
+
         let physicalUserMessageId =
             decoded.PhysicalUserMessageId
             |> Option.map PhysicalUserMessageId.value
-            |> Option.orElse (if isNull input || isNull input?messageId then None else Some(string input?messageId))
+            |> Option.orElse (
+                if isNull input || isNull input?messageId then
+                    None
+                else
+                    Some(string input?messageId)
+            )
 
         box
             {| sessionId = decoded.SessionId |> Option.map SessionId.value |> optionString
@@ -113,20 +149,55 @@ module ProviderProjectionSurface =
 
     let opencodeModel (providerId: string) (modelId: string) (variant: obj) : obj =
         let value: OpencodeModel =
-            { providerID = providerId; modelID = modelId; variant = if isNull variant then None else Some(unbox<string> variant) }
-        box {| providerID = value.providerID; modelID = value.modelID; variant = optionObj value.variant |}
+            { providerID = providerId
+              modelID = modelId
+              variant = if isNull variant then None else Some(unbox<string> variant) }
+
+        box
+            {| providerID = value.providerID
+               modelID = value.modelID
+               variant = optionObj value.variant |}
 
     let opencodeTextPart (id: string) (kind: string) (text: string) (synthetic: bool) : obj =
-        let value: OpencodeTextPart = { id = id; ``type`` = kind; text = text; synthetic = Some synthetic }
-        box {| id = value.id; ``type`` = value.``type``; text = value.text; synthetic = value.synthetic |> Option.defaultValue false |}
+        let value: OpencodeTextPart =
+            { id = id
+              ``type`` = kind
+              text = text
+              synthetic = Some synthetic }
+
+        box
+            {| id = value.id
+               ``type`` = value.``type``
+               text = value.text
+               synthetic = value.synthetic |> Option.defaultValue false |}
 
     let opencodeToolCallPart (id: string) (kind: string) (callId: string) (tool: string) (args: obj) : obj =
-        let value: OpencodeToolCallPart = { id = id; ``type`` = kind; callID = callId; tool = tool; args = if isNull args then None else Some args }
-        box {| id = value.id; ``type`` = value.``type``; callID = value.callID; tool = value.tool; args = optionObj value.args |}
+        let value: OpencodeToolCallPart =
+            { id = id
+              ``type`` = kind
+              callID = callId
+              tool = tool
+              args = if isNull args then None else Some args }
+
+        box
+            {| id = value.id
+               ``type`` = value.``type``
+               callID = value.callID
+               tool = value.tool
+               args = optionObj value.args |}
 
     let opencodeCompactionPart (id: string) (kind: string) (auto: bool) (overflow: bool) : obj =
-        let value: OpencodeCompactionPart = { id = id; ``type`` = kind; auto = auto; overflow = overflow }
-        box {| id = value.id; ``type`` = value.``type``; auto = value.auto; overflow = value.overflow |}
+        let value: OpencodeCompactionPart =
+            { id = id
+              ``type`` = kind
+              auto = auto
+              overflow = overflow }
+
+        box
+            {| id = value.id
+               ``type`` = value.``type``
+               auto = value.auto
+               overflow = value.overflow |}
 
     let opencodeUserMessage
         (id: string)
@@ -136,13 +207,18 @@ module ProviderProjectionSurface =
         (model: obj)
         (parts: obj array)
         : obj =
-        let modelValue : OpencodeModel option =
-            if isNull model then None
+        let modelValue: OpencodeModel option =
+            if isNull model then
+                None
             else
                 Some
                     { providerID = string model?providerID
                       modelID = string model?modelID
-                      variant = if isNull model?variant then None else Some(string model?variant) }
+                      variant =
+                        if isNull model?variant then
+                            None
+                        else
+                            Some(string model?variant) }
 
         let value: OpencodeUserMessage =
             { id = id
@@ -157,7 +233,14 @@ module ProviderProjectionSurface =
                role = value.role
                sessionID = value.sessionID
                agent = optionObj value.agent
-               model = value.model |> Option.map (fun model -> box {| providerID = model.providerID; modelID = model.modelID; variant = optionObj model.variant |}) |> optionObj
+               model =
+                value.model
+                |> Option.map (fun model ->
+                    box
+                        {| providerID = model.providerID
+                           modelID = model.modelID
+                           variant = optionObj model.variant |})
+                |> optionObj
                parts = List.toArray value.parts |}
 
     let opencodeAssistantMessage
@@ -174,11 +257,19 @@ module ProviderProjectionSurface =
         : obj =
         let value: OpencodeAssistantMessage =
             { id = id
-              parentID = if isNull parentId then None else Some(unbox<string> parentId)
+              parentID =
+                if isNull parentId then
+                    None
+                else
+                    Some(unbox<string> parentId)
               role = role
               sessionID = sessionId
               agent = if isNull agent then None else Some(unbox<string> agent)
-              providerID = if isNull providerId then None else Some(unbox<string> providerId)
+              providerID =
+                if isNull providerId then
+                    None
+                else
+                    Some(unbox<string> providerId)
               modelID = if isNull modelId then None else Some(unbox<string> modelId)
               summary = Some summary
               error = if isNull error then None else Some error
@@ -197,10 +288,14 @@ module ProviderProjectionSurface =
                parts = List.toArray value.parts |}
 
     let opencodeHookInput (sessionId: string) (messageId: string) (agent: string) (model: obj) : obj =
-        let modelValue : OpencodeModel =
+        let modelValue: OpencodeModel =
             { providerID = string model?providerID
               modelID = string model?modelID
-              variant = if isNull model?variant then None else Some(string model?variant) }
+              variant =
+                if isNull model?variant then
+                    None
+                else
+                    Some(string model?variant) }
 
         let value: OpencodeHookInput =
             { sessionID = sessionId
@@ -212,24 +307,43 @@ module ProviderProjectionSurface =
             {| sessionID = value.sessionID
                messageID = optionObj value.messageID
                agent = optionObj value.agent
-               model = value.model |> Option.map (fun model -> box {| providerID = model.providerID; modelID = model.modelID; variant = optionObj model.variant |}) |> optionObj |}
+               model =
+                value.model
+                |> Option.map (fun model ->
+                    box
+                        {| providerID = model.providerID
+                           modelID = model.modelID
+                           variant = optionObj model.variant |})
+                |> optionObj |}
 
     let opencodeToolExecuteInput (tool: string) (sessionId: string) (callId: string) : obj =
-        let value: OpencodeToolExecuteInput = { tool = tool; sessionID = sessionId; callID = callId }
-        box {| tool = value.tool; sessionID = value.sessionID; callID = value.callID |}
+        let value: OpencodeToolExecuteInput =
+            { tool = tool
+              sessionID = sessionId
+              callID = callId }
+
+        box
+            {| tool = value.tool
+               sessionID = value.sessionID
+               callID = value.callID |}
 
     let opencodeToolExecuteOutput (args: obj) : obj =
         let value: OpencodeToolExecuteOutput = { args = args }
         box {| args = value.args |}
 
     let prependCompanionMemory (raw: obj array) (syntheticId: string) (memory: string) (dropLeading: int) : obj array =
-        ProjectionMessageEdit.prependCompanionMemory (if isNull raw then [] else Array.toList raw) syntheticId memory dropLeading
+        ProjectionMessageEdit.prependCompanionMemory
+            (if isNull raw then [] else Array.toList raw)
+            syntheticId
+            memory
+            dropLeading
         |> List.toArray
 
     let private wireMessageOf value : ProviderProjection.WireMessage =
         { Role = string value?role
           Parts =
-            if isNull value?parts then []
+            if isNull value?parts then
+                []
             else
                 value?parts
                 |> unbox<obj array>
@@ -238,21 +352,32 @@ module ProviderProjectionSurface =
                     match string part?kind with
                     | "text" -> ProviderProjection.WireText(string part?text)
                     | "reasoning" -> ProviderProjection.WireReasoning(string part?text)
-                    | "tool-call" -> ProviderProjection.WireToolCall(ToolCallId.create (string part?callId), string part?name, string part?args)
-                    | "tool-result" -> ProviderProjection.WireToolResult(ToolCallId.create (string part?callId), string part?result)
+                    | "tool-call" ->
+                        ProviderProjection.WireToolCall(
+                            ToolCallId.create (string part?callId),
+                            string part?name,
+                            string part?args
+                        )
+                    | "tool-result" ->
+                        ProviderProjection.WireToolResult(ToolCallId.create (string part?callId), string part?result)
                     | "media" ->
-                        let mediaType : string option = if isNull part?mediaType then None else Some(string part?mediaType)
+                        let mediaType: string option =
+                            if isNull part?mediaType then
+                                None
+                            else
+                                Some(string part?mediaType)
+
                         ProviderProjection.WireMedia(mediaType, string part?contentDigest)
                     | other -> failwithf "ProviderProjectionSurface: unknown wire part kind %s" other) }
 
     let private renderedMessagesOf (value: obj) : RenderedMessages =
-        let hostMessageIds : string option list =
+        let hostMessageIds: string option list =
             value?hostMessageIds
             |> unbox<obj array>
             |> Array.toList
             |> List.map (fun id -> if isNull id then None else Some(string id))
 
-        let hostIsPhysical : bool list =
+        let hostIsPhysical: bool list =
             value?hostIsPhysical |> unbox<bool array> |> Array.toList
 
         { Messages = value?messages |> unbox<obj array> |> Array.toList |> List.map wireMessageOf
@@ -261,7 +386,10 @@ module ProviderProjectionSurface =
 
     let private appliedResult result =
         match result with
-        | Ok values -> box {| ok = true; value = values |> List.toArray |}
+        | Ok values ->
+            box
+                {| ok = true
+                   value = values |> List.toArray |}
         | Error error -> box {| ok = false; error = error |}
 
     let tryApplyRenderedMessages (sessionId: string) (sha256: string -> string) (rendered: obj) : obj =
@@ -286,10 +414,25 @@ module ProviderProjectionSurface =
         |> appliedResult
 
     let messagesFromTransformOutput (output: obj) : obj array =
-        if isNull output || isNull output?messages then [||] else unbox<obj array> output?messages
+        if isNull output || isNull output?messages then
+            [||]
+        else
+            unbox<obj array> output?messages
 
-    let hostMessageId (raw: obj) = ProviderWireDecode.hostMessageId raw |> Option.toObj
-    let projectionSessionIdFromMessages (raw: obj) = ProviderWireDecode.projectionSessionIdFromMessages raw |> Option.toObj
-    let lastUserMessageId (raw: obj array) = ProviderWireCapture.lastUserMessageId (Array.toList raw) |> Option.map PhysicalUserMessageId.value |> Option.toObj
-    let lastUserPromptKey (raw: obj array) = ProviderWireCapture.lastUserPromptKey (Array.toList raw) |> Option.map PromptKey.value |> Option.toObj
+    let hostMessageId (raw: obj) =
+        ProviderWireDecode.hostMessageId raw |> Option.toObj
+
+    let projectionSessionIdFromMessages (raw: obj) =
+        ProviderWireDecode.projectionSessionIdFromMessages raw |> Option.toObj
+
+    let lastUserMessageId (raw: obj array) =
+        ProviderWireCapture.lastUserMessageId (Array.toList raw)
+        |> Option.map PhysicalUserMessageId.value
+        |> Option.toObj
+
+    let lastUserPromptKey (raw: obj array) =
+        ProviderWireCapture.lastUserPromptKey (Array.toList raw)
+        |> Option.map PromptKey.value
+        |> Option.toObj
+
     let formalText (raw: obj) = ProviderWireCapture.formalText raw

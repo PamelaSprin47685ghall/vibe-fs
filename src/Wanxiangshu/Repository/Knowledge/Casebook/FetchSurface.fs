@@ -9,19 +9,26 @@ open Wanxiangshu.Persistence.EventStore
 /// and the opaque EventStore capability.
 module CasebookFetchSurface =
 
-    let private storeOf (value: obj) : IEventStore =
-        (unbox<EventStoreHandle> value).Store
+    let private storeOf (value: obj) : IEventStore = (unbox<EventStoreHandle> value).Store
 
     let contract (toolModule: obj) (workspaceRoot: string) (store: obj) : obj =
-        let spec = Wanxiangshu.OpenCode.FetchTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule) workspaceRoot (storeOf store)
+        let spec =
+            Wanxiangshu.OpenCode.FetchTool.spec
+                (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
+                workspaceRoot
+                (storeOf store)
 
         box
             {| name = spec.Name
                description = spec.Description
                argumentNames = spec.Arguments |> List.map fst |> List.toArray
                execute =
-                   fun args context ->
-                       task {
-                           let! result = spec.Execute (Wanxiangshu.OpenCode.HostToolArguments args) (Wanxiangshu.OpenCode.ToolHostCodec.decodeContext context)
-                           return Wanxiangshu.Host.Contract.ToolResultBound.bound result
-                       } |}
+                fun args context ->
+                    task {
+                        let! result =
+                            spec.Execute
+                                (Wanxiangshu.OpenCode.HostToolArguments args)
+                                (Wanxiangshu.OpenCode.ToolHostCodec.decodeContext context)
+
+                        return Wanxiangshu.Host.Contract.ToolResultBound.bound result
+                    } |}

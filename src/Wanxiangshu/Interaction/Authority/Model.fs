@@ -303,10 +303,7 @@ module PromptAuthority =
           PeerName: string }
 
     /// Parse the tier/role segments with fail-closed handling for unknown values.
-    let private parseTierAndRole
-        (trimmed: string)
-        (parts: string array)
-        : Result<ParsedAgentName, AgentNameRejection> =
+    let private parseTierAndRole (trimmed: string) (parts: string array) : Result<ParsedAgentName, AgentNameRejection> =
         match ManagedAgentCatalog.tryParseTier parts.[0], ManagedAgentCatalog.tryParseRole parts.[1] with
         | None, _
         | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)

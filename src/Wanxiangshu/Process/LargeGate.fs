@@ -43,7 +43,8 @@ module LargeGate =
         lock gate (fun () -> if held then 0 else 1)
 
     let private grantWaiter (waiter: Waiter) =
-        if waiter.TryGrant() then held <- true
+        if waiter.TryGrant() then
+            held <- true
 
     let private pumpUnlocked () =
         while waiters.Count > 0 && not held do

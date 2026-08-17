@@ -24,7 +24,10 @@ module CursorSurface =
     let private isNullish (value: obj) : bool = jsNative
 
     let private field (value: obj) (name: string) : obj =
-        if isNullish value then null else emitJsExpr (value, name) "$0[$1]"
+        if isNullish value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
 
     let private text (value: obj) : string =
         if isNullish value then "" else string value
@@ -78,7 +81,9 @@ module CursorSurface =
         { SessionId = SessionId.create (text (firstField value [ "session"; "SessionId" ]))
           LogicalRunId = LogicalRunId.create (text (firstField value [ "run"; "logicalRun"; "LogicalRunId" ]))
           AuthorityRootUserMessageId =
-            AuthorityRootUserMessageId.create (text (firstField value [ "root"; "authorityRoot"; "AuthorityRootUserMessageId" ]))
+            AuthorityRootUserMessageId.create (
+                text (firstField value [ "root"; "authorityRoot"; "AuthorityRootUserMessageId" ])
+            )
           ProviderRun = ProviderRunIdentity.create (text (firstField value [ "attempt"; "ProviderRun" ])) }
 
     let private identityView (identity: FallbackAttemptIdentity) : obj =
@@ -133,13 +138,7 @@ module CursorSurface =
         | FallbackAdvanceRejection.InvalidTransition -> "InvalidTransition"
         | FallbackAdvanceRejection.InvalidFallbackOffset _ -> "InvalidFallbackOffset"
 
-    let private applyAdvance
-        (identity: obj)
-        (previousOffset: int)
-        (nextOffset: int)
-        (count: int)
-        (current: obj)
-        : obj =
+    let private applyAdvance (identity: obj) (previousOffset: int) (nextOffset: int) (count: int) (current: obj) : obj =
         match
             FallbackProjection.applyAdvance
                 (identityOf identity)
@@ -148,8 +147,14 @@ module CursorSurface =
                 count
                 (projectionOf current)
         with
-        | Ok projection -> box {| ok = true; value = projectionHandleView projection |}
-        | Error rejection -> box {| ok = false; error = rejectionName rejection |}
+        | Ok projection ->
+            box
+                {| ok = true
+                   value = projectionHandleView projection |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionName rejection |}
 
     /// Pure cursor API. Every method accepts/returns JSON values; only the
     /// identity key helper intentionally consumes an opaque semantic identity.
@@ -161,13 +166,8 @@ module CursorSurface =
                recordFailure = (fun value -> cursorOf value |> AgentPairCursor.recordFailure |> cursorView)
                recordSuccess = (fun value -> cursorOf value |> AgentPairCursor.recordSuccess |> cursorView)
                side = (fun offset -> AgentPairCursor.side (offsetOf (box offset)) |> string)
-               sideSequence =
-                (fun count ->
-                    AgentPairCursor.sideSequence count
-                    |> List.map string
-                    |> List.toArray)
-               effectiveAgent =
-                (fun pair value -> AgentPairCursor.effectiveAgent (pairOf pair) (cursorOf value))
+               sideSequence = (fun count -> AgentPairCursor.sideSequence count |> List.map string |> List.toArray)
+               effectiveAgent = (fun pair value -> AgentPairCursor.effectiveAgent (pairOf pair) (cursorOf value))
                isValidAdvance =
                 (fun previousOffset nextOffset previousCount nextCount ->
                     AgentPairCursor.isValidAdvance
@@ -202,9 +202,13 @@ module CursorSurface =
                         (LogicalRunId.create logicalRun)
                         (AuthorityRootUserMessageId.create authorityRoot)
                     |> projectionHandleView)
-               applyAdvance = (fun identity previous next count current -> applyAdvance identity previous next count current)
+               applyAdvance =
+                (fun identity previous next count current -> applyAdvance identity previous next count current)
                applyExhausted =
-                (fun current -> projectionOf current |> FallbackProjection.applyExhausted |> projectionHandleView)
+                (fun current ->
+                    projectionOf current
+                    |> FallbackProjection.applyExhausted
+                    |> projectionHandleView)
                recordSuccess =
                 (fun current -> projectionOf current |> FallbackProjection.recordSuccess |> projectionHandleView)
                mayContinue = (fun budget current -> FallbackProjection.mayContinue budget (projectionOf current))
@@ -304,7 +308,10 @@ module CursorSurface =
     let private envelopeOf (value: obj) : Envelope =
         let session = SessionId.create (text (field value "session"))
         let sequence = int64 (intValue (field value "seq"))
-        let providerRun = optionalText (field value "providerRun") |> Option.map ProviderRunIdentity.create
+
+        let providerRun =
+            optionalText (field value "providerRun")
+            |> Option.map ProviderRunIdentity.create
 
         { RuntimeId = RuntimeId.create "rt-fallback-surface"
           LocalSeq = LocalSeq.create sequence
@@ -333,17 +340,24 @@ module CursorSurface =
 
     let private foldResult (result: Result<ProjectionSet, FoldRejection>) : obj =
         match result with
-        | Ok projection -> box {| ok = true; value = fallbackIn projection |}
+        | Ok projection ->
+            box
+                {| ok = true
+                   value = fallbackIn projection |}
         | Error failure ->
             box
                 {| ok = false
-                   error = box {| Fact = failure.Fact; Reason = failure.Reason |} |}
+                   error =
+                    box
+                        {| Fact = failure.Fact
+                           Reason = failure.Reason |} |}
 
     /// Fold fallback owner envelopes through the production durable fold.
     let fold (values: obj array) : obj =
         values |> Array.toList |> List.map envelopeOf |> foldTyped |> foldResult
 
-    let fallbackFactCaseNames : string array = [| "FallbackCursorAdvanced"; "FallbackExhausted" |]
+    let fallbackFactCaseNames: string array =
+        [| "FallbackCursorAdvanced"; "FallbackExhausted" |]
 
     /// Open the first logical run through the existing PromptDispatcher owner.
     /// The JournalHandle is opaque to callers; only this fallback boundary unwraps
@@ -356,6 +370,7 @@ module CursorSurface =
         : Task<obj> =
         task {
             let runtime = PromptDispatcher.forJournal handle.Journal
+
             let! result =
                 runtime.AcceptHumanRoot
                     (SessionId.create session)

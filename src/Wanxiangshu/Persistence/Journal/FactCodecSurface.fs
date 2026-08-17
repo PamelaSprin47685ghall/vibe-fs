@@ -18,12 +18,14 @@ module FactCodecSurface =
 
     let pre050MigrationMessage = FactCodec.pre050MigrationMessage
 
-    let private text (value: obj) = if isNull value then "" else string value
+    let private text (value: obj) =
+        if isNull value then "" else string value
 
     let private optionalString (value: obj) =
         if isNull value then None else Some(text value)
 
-    let private handleOf (value: obj) = HandleId.Agent(AgentHandleId.create (text value))
+    let private handleOf (value: obj) =
+        HandleId.Agent(AgentHandleId.create (text value))
 
     let private completionKindOf (value: obj) =
         match text value with
@@ -172,7 +174,8 @@ module FactCodecSurface =
         | Fact.Runtime(RuntimeStarted _) -> "RuntimeStarted"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleAbandoned _)) -> "HandleAbandoned"
         | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted _)) -> "HandleCompleted"
-        | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreateRequested _)) -> "WorktreeCreateRequested"
+        | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreateRequested _)) ->
+            "WorktreeCreateRequested"
         | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.WorktreeCreated _)) -> "WorktreeCreated"
         | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.PublishClaimed _)) -> "PublishClaimed"
         | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.ManagerJobCreated _)) -> "ManagerJobCreated"
@@ -182,15 +185,22 @@ module FactCodecSurface =
         | Fact.Agent(AgentFact.Orchestrator(OrchestratorFactCases.JobAbandoned _)) -> "JobAbandoned"
         | _ -> "Unknown"
 
-    let containsLegacyFallbackFields (line: string) = FactCodec.containsLegacyFallbackFields line
+    let containsLegacyFallbackFields (line: string) =
+        FactCodec.containsLegacyFallbackFields line
 
-    let containsLegacyScoreVectorEntry (line: string) = FactCodec.containsLegacyScoreVectorEntry line
+    let containsLegacyScoreVectorEntry (line: string) =
+        FactCodec.containsLegacyScoreVectorEntry line
 
     /// Encode one JS-native fact to canonical fact bytes.
-    let encode (fact: obj) : string = factOfJs fact |> FactCodec.serializeFact
+    let encode (fact: obj) : string =
+        factOfJs fact |> FactCodec.serializeFact
 
     /// Decode one line and return normalized bytes plus its semantic case.
     let decode (line: string) : obj =
         match FactCodec.deserializeFact line with
-        | Ok fact -> box {| ok = true; line = FactCodec.serializeFact fact; case = caseOfFact fact |}
+        | Ok fact ->
+            box
+                {| ok = true
+                   line = FactCodec.serializeFact fact
+                   case = caseOfFact fact |}
         | Error error -> box {| ok = false; error = error |}

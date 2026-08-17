@@ -61,7 +61,8 @@ module ManagerOpeningFloor =
     let private workRecordStartAfterPlan
         (life: LifeProjection)
         (state: MagicTodoProjection.LifeMagicTodoState)
-        (xTrace: XTraceProjectionState) =
+        (xTrace: XTraceProjectionState)
+        =
         match t1Anchor state with
         | Some(callCursor, callId) ->
             Some(MagicTodo.blindPlanOpeningBoundary life.OpeningCursor callCursor callId (partAnchors xTrace))
@@ -81,9 +82,11 @@ module ManagerOpeningFloor =
     let private effectiveFloorForCurrentLife
         (current: LifeProjection)
         (magicTodo: MagicTodoProjection.MagicTodoProjectionState)
-        (xTrace: XTraceProjectionState) =
+        (xTrace: XTraceProjectionState)
+        =
         let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
         let planCommitted = magic |> Option.exists MagicTodoProjection.isPlanCommitted
+
         let callCursor, callId =
             magic
             |> Option.bind t1Anchor

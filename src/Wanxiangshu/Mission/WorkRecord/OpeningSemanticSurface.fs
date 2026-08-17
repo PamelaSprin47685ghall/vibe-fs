@@ -31,15 +31,25 @@ module OpeningSemanticSurface =
           Part = partOf (value?part) }
 
     let private itemsOf (values: obj array) =
-        if isNull values then [] else values |> Array.toList |> List.map itemOf
+        if isNull values then
+            []
+        else
+            values |> Array.toList |> List.map itemOf
 
     let private itemView (value: XTraceItem) : obj =
         let part =
             match value.Part with
             | SemanticText text -> box {| kind = "text"; text = text |}
             | SemanticReasoning text -> box {| kind = "reasoning"; text = text |}
-            | SemanticToolCall(name, args) -> box {| kind = "tool-call"; name = name; args = args |}
-            | SemanticToolResult result -> box {| kind = "tool-result"; result = result |}
+            | SemanticToolCall(name, args) ->
+                box
+                    {| kind = "tool-call"
+                       name = name
+                       args = args |}
+            | SemanticToolResult result ->
+                box
+                    {| kind = "tool-result"
+                       result = result |}
             | SemanticMedia(mediaType, digest) ->
                 box
                     {| kind = "media"
@@ -55,7 +65,10 @@ module OpeningSemanticSurface =
     let private openingOf (value: obj) : OpeningMaterial =
         { AssignmentText = text (value?assignment)
           AuthoritativeRequirements =
-            if isNull (value?requirements) then [] else (value?requirements) |> unbox<string array> |> Array.toList
+            if isNull (value?requirements) then
+                []
+            else
+                (value?requirements) |> unbox<string array> |> Array.toList
           ConstitutiveBody = text (value?constitutive) }
 
     let private openingView (value: OpeningMaterial) : obj =
@@ -72,9 +85,20 @@ module OpeningSemanticSurface =
               Part = partOf part }
 
     let textPart (value: string) : obj = box {| kind = "text"; text = value |}
-    let reasoningPart (value: string) : obj = box {| kind = "reasoning"; text = value |}
-    let toolCallPart (name: string) (args: string) : obj = box {| kind = "tool-call"; name = name; args = args |}
-    let toolResultPart (value: string) : obj = box {| kind = "tool-result"; result = value |}
+
+    let reasoningPart (value: string) : obj =
+        box {| kind = "reasoning"; text = value |}
+
+    let toolCallPart (name: string) (args: string) : obj =
+        box
+            {| kind = "tool-call"
+               name = name
+               args = args |}
+
+    let toolResultPart (value: string) : obj =
+        box
+            {| kind = "tool-result"
+               result = value |}
 
     let opening (assignment: string) (requirements: string array) (constitutive: string) : obj =
         box

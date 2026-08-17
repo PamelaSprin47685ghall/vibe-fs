@@ -16,7 +16,9 @@ type WorkspaceJournalHandle private (journal: AgentJournal) =
     let mutable released = false
 
     member internal _.Journal =
-        if released then invalidOp "Workspace journal handle is released"
+        if released then
+            invalidOp "Workspace journal handle is released"
+
         journal
 
     member internal _.Release() =
@@ -31,12 +33,7 @@ module WorkspaceEventStoreSurface =
 
     let private errorText (error: FoldRejection) = $"{error.Fact}: {error.Reason}"
 
-    let acquire
-        (retiredDirectory: string)
-        (commonDirectory: string)
-        (processId: int)
-        (startedAt: string)
-        : Task<obj> =
+    let acquire (retiredDirectory: string) (commonDirectory: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
             let boot = WorkspaceEventStore.bootPort commonDirectory
 
@@ -45,21 +42,24 @@ module WorkspaceEventStoreSurface =
                     let! result = boot.ResumeOrCreate(runtimeId, processIdValue, processStartedAt)
 
                     match result with
-                    | Ok(writer, _, projection) ->
-                        return AgentJournal.createFromProjection writer projection
+                    | Ok(writer, _, projection) -> return AgentJournal.createFromProjection writer projection
                     | Error error -> return Error error
                 }
 
             let! result =
-                SharedAgentJournal.acquire
-                    retiredDirectory
-                    processId
-                    (DateTimeOffset.Parse startedAt)
-                    openJournal
+                SharedAgentJournal.acquire retiredDirectory processId (DateTimeOffset.Parse startedAt) openJournal
 
             match result with
-            | Ok journal -> return box {| ok = true; journal = WorkspaceJournalHandle.Create journal |}
-            | Error error -> return box {| ok = false; error = errorText error |}
+            | Ok journal ->
+                return
+                    box
+                        {| ok = true
+                           journal = WorkspaceJournalHandle.Create journal |}
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = errorText error |}
         }
 
     let release (handle: WorkspaceJournalHandle) : unit = handle.Release()
@@ -69,13 +69,10 @@ module WorkspaceEventStoreSurface =
 
     let appendClosed (handle: WorkspaceJournalHandle) (session: string) : Task<obj> =
         task {
-            let fact = CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create session |}
-            let! result =
-                AgentJournal.appendAgent
-                    (StreamId.Session(SessionId.create session))
-                    None
-                    fact
-                    handle.Journal
+            let fact =
+                CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create session |}
+
+            let! result = AgentJournal.appendAgent (StreamId.Session(SessionId.create session)) None fact handle.Journal
 
             match result with
             | Ok projection ->
@@ -84,7 +81,11 @@ module WorkspaceEventStoreSurface =
                     |> Option.isSome
 
                 return box {| ok = true; session = present |}
-            | Error error -> return box {| ok = false; error = error.ToString() |}
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = error.ToString() |}
         }
 
     let hasCurrent (commonDirectory: string) : bool =

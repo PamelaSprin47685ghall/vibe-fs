@@ -173,7 +173,13 @@ module PluginHooks =
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
-                let sessionId = if isNull toolInput then "" else string (toolInput?sessionID)
+
+                let sessionId =
+                    if isNull toolInput then
+                        ""
+                    else
+                        string (toolInput?sessionID)
+
                 let rendered = if isNull toolOutput then "" else string (toolOutput?output)
 
                 if not (System.String.IsNullOrWhiteSpace sessionId) then
@@ -182,7 +188,9 @@ module PluginHooks =
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     do! magicTodo.After toolInput toolOutput
-                    if casebookEnabled then collectCasebookObservation toolInput toolOutput
+
+                    if casebookEnabled then
+                        collectCasebookObservation toolInput toolOutput
                 }
 
             // HOST-009: the object handed to the Host carries Host hooks and
@@ -301,7 +309,11 @@ module PluginHooks =
 
                     let finalityReviewerTimeoutMs =
                         let configured: obj = input?finalityReviewerTimeoutMs
-                        if isNull configured then None else Some(unbox<int> configured)
+
+                        if isNull configured then
+                            None
+                        else
+                            Some(unbox<int> configured)
 
                     let casebookToolSpecs =
                         match workspaceDirectory with
@@ -346,7 +358,8 @@ module PluginHooks =
                         raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
                 }
 
-            if not (isNull client) then do! guardedClientConfiguration ()
+            if not (isNull client) then
+                do! guardedClientConfiguration ()
 
             return box hooks
         }

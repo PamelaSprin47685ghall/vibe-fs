@@ -80,12 +80,7 @@ module FallbackFactFold =
         | _, Error decodeError -> Error(InvalidFallbackOffset decodeError)
         | Ok previous, Ok next -> Ok(previous, next)
 
-    let private applyCursorAdvance
-        identity
-        previousOffset
-        nextOffset
-        consecutiveFailureCount
-        session =
+    let private applyCursorAdvance identity previousOffset nextOffset consecutiveFailureCount session =
         match session.Fallback with
         | None -> Error NoCursor
         | Some current ->
@@ -94,12 +89,7 @@ module FallbackFactFold =
             // and never a fake Append CommitUnknown.
             decodeOffsets previousOffset nextOffset
             |> Result.bind (fun (previous, next) ->
-                FallbackProjection.applyAdvance
-                    identity
-                    previous
-                    next
-                    consecutiveFailureCount
-                    current
+                FallbackProjection.applyAdvance identity previous next consecutiveFailureCount current
                 |> Result.map (fun updated -> { session with Fallback = Some updated }))
 
     let fold (projection: AgentProjectionSet) (fact: FallbackFactCases) : Result<AgentProjectionSet, FoldRejection> =

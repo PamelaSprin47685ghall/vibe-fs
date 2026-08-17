@@ -62,24 +62,48 @@ module BlogSurface =
             box
                 {| ok = false
                    error = noLiveCycleError
-                   abortedSession = if String.IsNullOrWhiteSpace sessionId then null else box sessionId |}
+                   abortedSession =
+                    if String.IsNullOrWhiteSpace sessionId then
+                        null
+                    else
+                        box sessionId |}
         else
-            match Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText (if isNullish entry then null else string entry) with
-            | Error _ -> box {| ok = true; text = "nothing-to-remember"; error = emptyTextError |}
+            match
+                Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText (if isNullish entry then null else string entry)
+            with
+            | Error _ ->
+                box
+                    {| ok = true
+                       text = "nothing-to-remember"
+                       error = emptyTextError |}
             | Ok _ ->
                 if String.IsNullOrWhiteSpace tip then
-                    box {| ok = true; text = "unknown-tip"; error = "missing required argument: tip" |}
-                elif EnforcerCatalog.tryFindByField tip (EnforcerCatalogResource.load ()) |> Option.isNone then
-                    box {| ok = true; text = "unknown-tip"; error = sprintf "UnknownTip %s" tip |}
+                    box
+                        {| ok = true
+                           text = "unknown-tip"
+                           error = "missing required argument: tip" |}
+                elif
+                    EnforcerCatalog.tryFindByField tip (EnforcerCatalogResource.load ())
+                    |> Option.isNone
+                then
+                    box
+                        {| ok = true
+                           text = "unknown-tip"
+                           error = sprintf "UnknownTip %s" tip |}
                 else
-                    box {| ok = true; text = "remembered"; error = null |}
+                    box
+                        {| ok = true
+                           text = "remembered"
+                           error = null |}
 
-    let tipFieldNames () = EnforcerCatalog.fieldNames (EnforcerCatalogResource.load ()) |> List.toArray
+    let tipFieldNames () =
+        EnforcerCatalog.fieldNames (EnforcerCatalogResource.load ()) |> List.toArray
 
     /// Rejudge transcript evidence. One completed chronicle only proves
     /// recovery; any other terminal is still the nudge stage.
     let rejudgeFromEvidence (claimedRun: obj) (terminals: obj array) : obj =
         let claimed = optionText claimedRun
+
         let evidence =
             terminals
             |> Array.toList
@@ -89,9 +113,13 @@ module BlogSurface =
         |> function
             | BloggerToolRecovery.NoRecovery -> box {| state = "NoRecovery"; run = null |}
             | BloggerToolRecovery.InteractionNudgeIssued run ->
-                box {| state = "InteractionNudgeIssued"; run = ProviderRunIdentity.value run |}
+                box
+                    {| state = "InteractionNudgeIssued"
+                       run = ProviderRunIdentity.value run |}
             | BloggerToolRecovery.AabbRepairIssued run ->
-                box {| state = "AabbRepairIssued"; run = ProviderRunIdentity.value run |}
+                box
+                    {| state = "AabbRepairIssued"
+                       run = ProviderRunIdentity.value run |}
 
     /// Rejudge named chronicle tool-part evidence from a compact semantic
     /// transcript. `chronicleCount` counts raw named calls, while
@@ -125,10 +153,16 @@ module BlogSurface =
                 && text claim?status <> "Abandoned")
 
         match activeClaim "blogger-aabb" with
-        | Some claim -> box {| state = "AabbRepairIssued"; run = text claim?run |}
+        | Some claim ->
+            box
+                {| state = "AabbRepairIssued"
+                   run = text claim?run |}
         | None ->
             match activeClaim "blogger-missing-tool" with
-            | Some claim -> box {| state = "InteractionNudgeIssued"; run = text claim?run |}
+            | Some claim ->
+                box
+                    {| state = "InteractionNudgeIssued"
+                       run = text claim?run |}
             | None -> box {| state = "NoRecovery"; run = null |}
 
     let private id (value: obj) = text value
@@ -181,15 +215,22 @@ module BlogSurface =
         | _ -> "Unknown"
 
     /// Serialize the two observation facts with the production FactCodec.
-    let serializeFact (value: obj) : string = FactCodec.serializeFact (factOfJs value)
+    let serializeFact (value: obj) : string =
+        FactCodec.serializeFact (factOfJs value)
 
     /// Decode a fact line and expose only its normalized bytes and semantic case.
     let deserializeFact (line: string) : obj =
         match FactCodec.deserializeFact line with
         | Error error -> box {| ok = false; error = error |}
-        | Ok fact -> box {| ok = true; case = factCase fact; line = FactCodec.serializeFact fact |}
+        | Ok fact ->
+            box
+                {| ok = true
+                   case = factCase fact
+                   line = FactCodec.serializeFact fact |}
 
-    let containsLegacyScoreVectorEntry (line: string) = FactCodec.containsLegacyScoreVectorEntry line
+    let containsLegacyScoreVectorEntry (line: string) =
+        FactCodec.containsLegacyScoreVectorEntry line
+
     let tipV2CleanBreakMessage = FactCodec.tipV2CleanBreakMessage
 
     let private streamOf (value: obj) : StreamId =
@@ -221,7 +262,10 @@ module BlogSurface =
     let deserializeEnvelope (line: string) : obj =
         match Envelope.deserialize line with
         | Error error -> box {| ok = false; error = error |}
-        | Ok value -> box {| ok = true; value = envelopeToJs value |}
+        | Ok value ->
+            box
+                {| ok = true
+                   value = envelopeToJs value |}
 
     let serializeObservationFact (value: obj) : string = serializeFact value
     let deserializeObservationFact (line: string) : obj = deserializeFact line
@@ -243,15 +287,18 @@ module BlogSurface =
             |> List.map (fun item -> BlobDigest.create (text item?digest), text item?body)
 
         let physicalDelta =
-            if isNullish value?physicalDelta then None
-            else Some(text value?physicalDelta?id, text value?physicalDelta?toml)
+            if isNullish value?physicalDelta then
+                None
+            else
+                Some(text value?physicalDelta?id, text value?physicalDelta?toml)
 
         let previousTips =
             arrayOf value?previousTips
             |> Array.toList
             |> List.map (fun item -> text item?tipName, text item?cycleId)
 
-        let lines (item: obj) = arrayOf item |> Array.toList |> List.map text
+        let lines (item: obj) =
+            arrayOf item |> Array.toList |> List.map text
 
         let plan =
             CompanionProjectionBuilder.build
@@ -275,15 +322,24 @@ module BlogSurface =
                        isPhysical = message.IsPhysical |})
             |> List.toArray
 
-        box {| messages = messages; isFirstTurnShape = CompanionProjectionBuilder.isFirstTurnShape plan |}
+        box
+            {| messages = messages
+               isFirstTurnShape = CompanionProjectionBuilder.isFirstTurnShape plan |}
 
     /// Blog-part status predicates used by continuation repair. The result is
     /// deliberately named and boolean rather than exposing a status DU.
     let classifyPart (part: obj) : obj =
-        let isBlog = not (isNullish part) && (text part?tool = "chronicle" || text part?name = "chronicle")
+        let isBlog =
+            not (isNullish part)
+            && (text part?tool = "chronicle" || text part?name = "chronicle")
+
         let state = if isNullish part?state then null else part?state
         let status = if isNullish state then "" else text state?status
-        let interrupted = not (isNullish state?metadata?interrupted) && unbox<bool> state?metadata?interrupted
+
+        let interrupted =
+            not (isNullish state?metadata?interrupted)
+            && unbox<bool> state?metadata?interrupted
+
         box
             {| isBlogToolPart = isBlog
                status = if isNullish state then null else box status
@@ -298,32 +354,89 @@ module BlogSurface =
         let nextSequence = int64 (text value?nextIngestedThroughSequence)
         let previousCutoff = int (text value?previousCoverableTurnCutoffExclusive)
         let nextCutoff = int (text value?nextCoverableTurnCutoffExclusive)
-        if nextSequence <= previousSequence then box {| ok = false; error = "non-advancing ingested sequence" |}
-        elif nextCutoff <= previousCutoff then box {| ok = false; error = "non-advancing coverable cutoff" |}
-        elif String.IsNullOrWhiteSpace(text value?nextCoveredPrefixDigest) then box {| ok = false; error = "missing covered prefix digest" |}
-        else box {| ok = true; ingestedThroughSequence = nextSequence; coverableTurnCutoffExclusive = nextCutoff |}
+
+        if nextSequence <= previousSequence then
+            box
+                {| ok = false
+                   error = "non-advancing ingested sequence" |}
+        elif nextCutoff <= previousCutoff then
+            box
+                {| ok = false
+                   error = "non-advancing coverable cutoff" |}
+        elif String.IsNullOrWhiteSpace(text value?nextCoveredPrefixDigest) then
+            box
+                {| ok = false
+                   error = "missing covered prefix digest" |}
+        else
+            box
+                {| ok = true
+                   ingestedThroughSequence = nextSequence
+                   coverableTurnCutoffExclusive = nextCutoff |}
 
     /// Commit branch classification over semantic evidence. Each branch keeps
     /// the production failure meaning visible without leaking a Cycle DU.
     let classifyCommit (value: obj) : obj =
-        let calls = if isNullish value?callCount then 0 else int (text value?callCount)
+        let calls =
+            if isNullish value?callCount then
+                0
+            else
+                int (text value?callCount)
+
         let providerRun = text value?providerRun
         let tip = text value?tip
-        if calls <> 1 then box {| branch = "ProtocolRepair"; ok = false; reason = "exactly one chronicle call required" |}
-        elif String.IsNullOrWhiteSpace providerRun then box {| branch = "Fatal"; ok = false; reason = "no provable provider run" |}
-        elif String.IsNullOrWhiteSpace tip then box {| branch = "ProtocolRepair"; ok = false; reason = "missing tip" |}
-        elif EnforcerCatalog.tryFindByField tip (EnforcerCatalogResource.load ()) |> Option.isNone then box {| branch = "ProtocolRepair"; ok = false; reason = "unknown tip" |}
-        else box {| branch = "Committed"; ok = true; providerRun = providerRun; tipRuleId = tip |}
+
+        if calls <> 1 then
+            box
+                {| branch = "ProtocolRepair"
+                   ok = false
+                   reason = "exactly one chronicle call required" |}
+        elif String.IsNullOrWhiteSpace providerRun then
+            box
+                {| branch = "Fatal"
+                   ok = false
+                   reason = "no provable provider run" |}
+        elif String.IsNullOrWhiteSpace tip then
+            box
+                {| branch = "ProtocolRepair"
+                   ok = false
+                   reason = "missing tip" |}
+        elif
+            EnforcerCatalog.tryFindByField tip (EnforcerCatalogResource.load ())
+            |> Option.isNone
+        then
+            box
+                {| branch = "ProtocolRepair"
+                   ok = false
+                   reason = "unknown tip" |}
+        else
+            box
+                {| branch = "Committed"
+                   ok = true
+                   providerRun = providerRun
+                   tipRuleId = tip |}
 
     /// Protocol transition for one terminal assistant step.
     let protocol (value: obj) : obj =
         let step = EnforcerSurface.classifyAssistantStep value
         let accepted = int step?acceptedCalls
         let messageId = text value?messageId
-        if String.IsNullOrWhiteSpace messageId then box {| state = "ProjectMessages"; fatal = "no provable provider run" |}
-        elif accepted = 0 then box {| state = "ProjectMessages"; fatal = null |}
-        elif accepted = 1 then box {| state = "StopPhysicalRun"; fatal = null |}
-        else box {| state = "ProjectMessages"; fatal = "exactly one chronicle call required" |}
+
+        if String.IsNullOrWhiteSpace messageId then
+            box
+                {| state = "ProjectMessages"
+                   fatal = "no provable provider run" |}
+        elif accepted = 0 then
+            box
+                {| state = "ProjectMessages"
+                   fatal = null |}
+        elif accepted = 1 then
+            box
+                {| state = "StopPhysicalRun"
+                   fatal = null |}
+        else
+            box
+                {| state = "ProjectMessages"
+                   fatal = "exactly one chronicle call required" |}
 
     /// Bounded repair transition. A pure terminal first receives one nudge;
     /// only a subsequent different pure terminal may receive AABB, and a third
@@ -331,16 +444,38 @@ module BlogSurface =
     let repairProtocol (value: obj) : obj =
         let prior = text value?priorState
         let terminal = text value?terminalRun
-        let nudgeSucceeded = not (isNullish value?nudgeSucceeded) && unbox<bool> value?nudgeSucceeded
+
+        let nudgeSucceeded =
+            not (isNullish value?nudgeSucceeded) && unbox<bool> value?nudgeSucceeded
+
         let sameTerminal = text value?repairTerminalRun = terminal
+
         match prior with
         | "NoRecovery" ->
-            if nudgeSucceeded then box {| state = "InteractionNudgeIssued"; run = terminal |}
-            else box {| state = "AabbRepairIssued"; run = terminal |}
+            if nudgeSucceeded then
+                box
+                    {| state = "InteractionNudgeIssued"
+                       run = terminal |}
+            else
+                box
+                    {| state = "AabbRepairIssued"
+                       run = terminal |}
         | "InteractionNudgeIssued" ->
-            if sameTerminal then box {| state = "InteractionNudgeIssued"; run = terminal |}
-            else box {| state = "AabbRepairIssued"; run = terminal |}
+            if sameTerminal then
+                box
+                    {| state = "InteractionNudgeIssued"
+                       run = terminal |}
+            else
+                box
+                    {| state = "AabbRepairIssued"
+                       run = terminal |}
         | "AabbRepairIssued" ->
-            if sameTerminal then box {| state = "AabbRepairIssued"; run = terminal |}
-            else box {| state = "ProtocolExhausted"; run = null |}
+            if sameTerminal then
+                box
+                    {| state = "AabbRepairIssued"
+                       run = terminal |}
+            else
+                box
+                    {| state = "ProtocolExhausted"
+                       run = null |}
         | _ -> box {| state = "NoRecovery"; run = null |}

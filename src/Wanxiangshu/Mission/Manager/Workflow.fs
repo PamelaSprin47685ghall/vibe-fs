@@ -146,7 +146,8 @@ module ManagerWorkflow =
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (turn: ReconciledTurn)
-        (settled: ManagerBackground.BackgroundSettlement) =
+        (settled: ManagerBackground.BackgroundSettlement)
+        =
         task {
             match settled with
             | ManagerBackground.BackgroundSettlement.Deferred -> return ()
@@ -178,7 +179,8 @@ module ManagerWorkflow =
                 let! settled =
                     ManagerBackground.ensureSettled sessionPort eventPort journal joinGuardNudges hasLivePty turn
 
-                return! handleBackgroundSettlement sessionPort eventPort journal nudgeSent quiescence context turn settled
+                return!
+                    handleBackgroundSettlement sessionPort eventPort journal nudgeSent quiescence context turn settled
             }
             :> Task
 

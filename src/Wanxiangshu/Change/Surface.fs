@@ -44,7 +44,8 @@ module ChangeSurface =
         | Some value -> box value
         | None -> jsUndefined
 
-    let private stringOf (value: obj) = if isNullish value then "" else string value
+    let private stringOf (value: obj) =
+        if isNullish value then "" else string value
 
     let private field (value: obj) (names: string list) : obj =
         names
@@ -65,7 +66,10 @@ module ChangeSurface =
     let private sessionId value = SessionId.create (stringOf value)
     let private commit value = CommitHash.create (stringOf value)
     let private barrier value = ReviewBarrierId.create (stringOf value)
-    let private worktreeIdentityValue value = WorktreeIdentity.create (stringOf value)
+
+    let private worktreeIdentityValue value =
+        WorktreeIdentity.create (stringOf value)
+
     let private worktreePathValue value = WorktreePath.create (stringOf value)
     let private target value = TargetRef.create (stringOf value)
 
@@ -78,7 +82,8 @@ module ChangeSurface =
         | "CandidateReady" ->
             JobProgress.CandidateReady
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
-                   PreRebaseReviewBarrierId = barrier (field payload [ "preRebaseReviewBarrierId"; "PreRebaseReviewBarrierId" ]) |}
+                   PreRebaseReviewBarrierId =
+                    barrier (field payload [ "preRebaseReviewBarrierId"; "PreRebaseReviewBarrierId" ]) |}
         | "ConflictPending"
         | "ConflictDetected" ->
             JobProgress.ConflictPending
@@ -90,7 +95,8 @@ module ChangeSurface =
             JobProgress.RebasedCandidateReady
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
-                   PostRebaseReviewBarrierId = barrier (field payload [ "postRebaseReviewBarrierId"; "PostRebaseReviewBarrierId" ]) |}
+                   PostRebaseReviewBarrierId =
+                    barrier (field payload [ "postRebaseReviewBarrierId"; "PostRebaseReviewBarrierId" ]) |}
         | "PublishClaimed" ->
             JobProgress.PublishClaimed
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
@@ -105,7 +111,8 @@ module ChangeSurface =
         | "JobAbandoned" -> JobProgress.Abandoned
         | unknown -> invalidArg "progress" ("unknown job progress: " + unknown)
 
-    let progress (kind: string) (payload: obj) : obj = box {| kind = kind; payload = payload |}
+    let progress (kind: string) (payload: obj) : obj =
+        box {| kind = kind; payload = payload |}
 
     let private jobObject (job: ManagerJobProjection) : obj =
         let progressName =
@@ -140,7 +147,8 @@ module ChangeSurface =
            TargetRef = target (field value [ "targetRef"; "TargetRef" ])
            TargetBranchFrozen = stringField value [ "targetBranchFrozen"; "TargetBranchFrozen" ] |}
 
-    let empty () : obj = ProjectionHandle OrchestratorProjection.empty :> obj
+    let empty () : obj =
+        ProjectionHandle OrchestratorProjection.empty :> obj
 
     let createJob (projection: obj) (payload: obj) : obj =
         let current = (projection :?> ProjectionHandle).Projection
@@ -152,6 +160,7 @@ module ChangeSurface =
 
     let find (projection: obj) (job: string) : obj =
         let current = (projection :?> ProjectionHandle).Projection
+
         match OrchestratorProjection.tryFind (jobId job) current with
         | Some value -> jobObject value
         | None -> null
@@ -166,7 +175,10 @@ module ChangeSurface =
     let private actionObject =
         function
         | ResumeManager -> box {| kind = "ResumeManager" |}
-        | RebaseReviewPublish commit -> box {| kind = "RebaseReviewPublish"; candidateCommit = CommitHash.value commit |}
+        | RebaseReviewPublish commit ->
+            box
+                {| kind = "RebaseReviewPublish"
+                   candidateCommit = CommitHash.value commit |}
         | ResumeConflictResolution payload ->
             box
                 {| kind = "ResumeConflictResolution"
@@ -184,40 +196,48 @@ module ChangeSurface =
                    resultingTargetHead = CommitHash.value payload.ResultingTargetHead |}
         | RebaseAndReviewAgain -> box {| kind = "RebaseAndReviewAgain" |}
         | CleanUp -> box {| kind = "CleanUp" |}
-        | FailClosed reason -> box {| kind = "FailClosed"; reason = reason |}
+        | FailClosed reason ->
+            box
+                {| kind = "FailClosed"
+                   reason = reason |}
 
     let recoveryAction (projection: obj) (job: string) (head: obj) : obj =
         let current = (projection :?> ProjectionHandle).Projection
+
         match OrchestratorProjection.tryFind (jobId job) current with
         | None -> null
         | Some value ->
-            let currentHead =
-                if isNullish head then None else Some(commit head)
+            let currentHead = if isNullish head then None else Some(commit head)
 
             OrchestratorProjection.recoveryAction currentHead value |> actionObject
 
     let requestWorktree (projection: obj) (identity: string) (path: string) (job: string) : obj =
         let current = (projection :?> ProjectionHandle).Projection
+
         ProjectionHandle(
             OrchestratorProjection.requestWorktree
                 (worktreeIdentityValue identity)
                 (worktreePathValue path)
                 (jobId job)
                 current
-        ) :> obj
+        )
+        :> obj
 
     let acceptWorktree (projection: obj) (identity: string) (path: string) (job: string) : obj =
         let current = (projection :?> ProjectionHandle).Projection
+
         ProjectionHandle(
             OrchestratorProjection.acceptWorktree
                 (worktreeIdentityValue identity)
                 (worktreePathValue path)
                 (jobId job)
                 current
-        ) :> obj
+        )
+        :> obj
 
     let worktreeEffect (projection: obj) (identity: string) : obj =
         let current = (projection :?> ProjectionHandle).Projection
+
         match OrchestratorProjection.tryWorktreeEffect (worktreeIdentityValue identity) current with
         | None -> null
         | Some status ->
@@ -239,9 +259,10 @@ module ChangeSurface =
         | "JobFailed"
         | "JobAbandoned" ->
             let job = stringField payload [ "jobId"; "ManagerJobId" ]
+
             let value =
                 match kind with
-                | "JobFailed" -> progress "Failed" (box(stringField payload [ "reason"; "Reason" ]))
+                | "JobFailed" -> progress "Failed" (box (stringField payload [ "reason"; "Reason" ]))
                 | "JobAbandoned" -> progress "Abandoned" null
                 | _ -> progress kind payload
 
@@ -251,6 +272,7 @@ module ChangeSurface =
                     match current.Progress with
                     | JobProgress.RebasedCandidateReady rebased ->
                         let expected = commit (field payload [ "expectedHead"; "ExpectedHead" ])
+
                         Ok(
                             OrchestratorProjection.recordProgress
                                 (jobId job)
@@ -297,7 +319,10 @@ module ChangeSurface =
 
         match failure with
         | Some reason -> box {| ok = false; error = reason |}
-        | None -> box {| ok = true; value = ProjectionHandle projection |}
+        | None ->
+            box
+                {| ok = true
+                   value = ProjectionHandle projection |}
 
     let unwrapFold (result: obj) : obj =
         if stringField result [ "ok" ] = "false" then
@@ -313,7 +338,7 @@ module ChangeSurface =
 
     let private invokeRunner (runner: obj) (command: Command) : Task<int * string * string> =
         task {
-            let! raw = unbox<Task<obj>>(asPromise (apply1 runner (commandObject command)))
+            let! raw = unbox<Task<obj>> (asPromise (apply1 runner (commandObject command)))
             let values = unbox<obj array> raw
             return int (string values.[0]), stringOf values.[1], stringOf values.[2]
         }
@@ -398,6 +423,7 @@ module ChangeSurface =
     let gitListWorktrees (git: obj) : Task<obj> =
         task {
             let! result = (git :?> GitHandle).Port.ListWorktrees()
+
             return
                 resultObject result (fun values ->
                     values
@@ -405,9 +431,9 @@ module ChangeSurface =
                         box
                             {| path = WorktreePath.value path
                                identity =
-                                   match identity with
-                                   | Some id -> box (WorktreeIdentity.value id)
-                                   | None -> null |})
+                                match identity with
+                                | Some id -> box (WorktreeIdentity.value id)
+                                | None -> null |})
                     |> List.toArray
                     |> box)
         }
@@ -420,18 +446,26 @@ module ChangeSurface =
 
     let worktreeCreate (git: obj) (job: string) (path: string) : Task<obj> =
         task {
-            let! result = WorktreeResource.Create((git :?> GitHandle).Port, ManagerJobId.create job, WorktreePath.create path)
+            let! result =
+                WorktreeResource.Create((git :?> GitHandle).Port, ManagerJobId.create job, WorktreePath.create path)
+
             return resultObject result (fun resource -> WorktreeHandle resource :> obj)
         }
 
     let worktreeAdopt (git: obj) (identity: string) (path: string) : obj =
-        WorktreeHandle(WorktreeResource.Adopt((git :?> GitHandle).Port, WorktreeIdentity.create identity, WorktreePath.create path)) :> obj
+        WorktreeHandle(
+            WorktreeResource.Adopt((git :?> GitHandle).Port, WorktreeIdentity.create identity, WorktreePath.create path)
+        )
+        :> obj
 
-    let worktreePath (resource: obj) : string = WorktreePath.value ((resource :?> WorktreeHandle).Resource.Path)
+    let worktreePath (resource: obj) : string =
+        WorktreePath.value ((resource :?> WorktreeHandle).Resource.Path)
 
-    let worktreeIdentity (resource: obj) : string = WorktreeIdentity.value ((resource :?> WorktreeHandle).Resource.Identity)
+    let worktreeIdentity (resource: obj) : string =
+        WorktreeIdentity.value ((resource :?> WorktreeHandle).Resource.Identity)
 
-    let worktreeMarkDurable (resource: obj) : unit = (resource :?> WorktreeHandle).Resource.MarkDurable()
+    let worktreeMarkDurable (resource: obj) : unit =
+        (resource :?> WorktreeHandle).Resource.MarkDurable()
 
     let worktreeRelease (resource: obj) : Task<obj> =
         task {
@@ -440,9 +474,7 @@ module ChangeSurface =
         }
 
     let worktreeDispose (resource: obj) : Task<unit> =
-        task {
-            do! ((resource :?> WorktreeHandle).Resource :> IAsyncDisposable).DisposeAsync()
-        }
+        task { do! ((resource :?> WorktreeHandle).Resource :> IAsyncDisposable).DisposeAsync() }
 
     let lockPath (repo: string) (branch: string) : string = IntegrationGate.lockPath repo branch
 
@@ -455,6 +487,4 @@ module ChangeSurface =
     let releaseGate (gate: obj) : Task<unit> = (gate :?> GateHandle).Gate.Release()
 
     let disposeGate (gate: obj) : Task<unit> =
-        task {
-            do! ((gate :?> GateHandle).Gate :> IAsyncDisposable).DisposeAsync()
-        }
+        task { do! ((gate :?> GateHandle).Gate :> IAsyncDisposable).DisposeAsync() }

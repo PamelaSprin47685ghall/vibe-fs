@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 /// never the union or map representation.
 module HandleSurface =
     let private handle = HandleId.Agent(AgentHandleId.create "h1")
+
     let private completion kind : HandleCompletion =
         { Kind = kind
           CompletionRef = None
@@ -88,14 +89,17 @@ module HandleSurface =
             match linked with
             | Ok value -> value
             | Error _ -> HandleProjection.empty
+
         let completeProjection value =
             match HandleProjection.complete handle (completion HandleCompletionKind.Terminal) value with
             | Ok next -> next
             | Error _ -> value
+
         let retireProjection value =
             match HandleProjection.retire handle value with
             | Ok next -> next
             | Error _ -> value
+
         let completed =
             match action with
             | "completed"
@@ -115,6 +119,7 @@ module HandleSurface =
                     match HandleProjection.retire handle completed with
                     | Ok value -> value
                     | Error _ -> completed
+
                 match HandleProjection.complete handle (completion HandleCompletionKind.Terminal) retired with
                 | Ok value -> value
                 | Error _ -> retired
@@ -126,10 +131,9 @@ module HandleSurface =
             box
                 {| lifecycle = lifecycleName record.Lifecycle
                    completion =
-                       match record.LastCompletion with
-                       | Some completion -> box {| kind = completion.Kind.ToString() |}
-                       | None -> null
+                    match record.LastCompletion with
+                    | Some completion -> box {| kind = completion.Kind.ToString() |}
+                    | None -> null
                    abandonReason = null
                    joinable = HandleProjection.joinable replayed |> List.length
                    retired = record.Lifecycle = HandleLifecycle.Retired |}
-

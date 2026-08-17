@@ -19,7 +19,7 @@
 | STRUCTURED-WORKFLOW-013（Decorator 边界：transparent vs semantic） | `tests/semantic-vocabulary.test.mjs`：`SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary` | NEW | `node --test requirements/structured-workflow/tests/semantic-vocabulary.test.mjs` |
 | STRUCTURED-WORKFLOW-014（流程正确性由可观察效果证明） | REUSE `requirements/verification-system/tests/guide-contract.test.mjs`：`VERIFY_008_every_emitted_module_actually_loads`（导出面即契约）；REUSE `tests/unit/temporal/**`（finality-cohort-law / fallback-aabb-confluence / manager-unhappy-exactly-once / join-guard-wakeup / orchestrator-conflict-confluence / until-signal-or-deadline：可观察效果轨迹证明，无解释器节点指针）；REUSE `tests/dsl-ownership.test.mjs`：`DSL_OWNERSHIP_threshold_freeze_semantics` | REUSE | `node --test requirements/verification-system/tests/guide-contract.test.mjs` |
 | STRUCTURED-WORKFLOW-015（取消是控制面，不是业务数据） | `tests/reconcile-program.test.mjs`：`WHAT[STRUCTURED-WORKFLOW-015] operator abort is a control-plane wake, never a business outcome`（AbortWake ∈ ReconcileWake 控制面、∉ TurnOutcome 业务面）；REUSE `requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs`：`P0_RECOVERY_JOIN_001_aborted_alone_is_not_terminal`、`P0_RECOVERY_JOIN_001_joinable_completion_has_no_fromAborted_export`（effect-accounting 拥有 outcome 代数；本命题钉控制面/数据面分离） | NEW + REUSE | `node --test requirements/structured-workflow/tests/reconcile-program.test.mjs` |
-| STRUCTURED-WORKFLOW-016（控制决策不得形成 lexical pyramid） | `tests/fsharp-control-pyramid.test.mjs`：nested match RED、match→if→try RED、flat/tuple/if-elif GREEN、comment/string lexical shielding、per-file ratchet、production baseline exact、单次 repair manual + 教程篇幅下限；`tests/error-handling-vocabulary.test.mjs`：FsToolkit Fable Result vocabulary、项目自有 TaskResult CE + TaskValue/TaskResult/TaskResultList，且生产树禁止引用 FsToolkit 的 .NET-only `Task.map` / `List.traverseTaskResultM`；WriterStreamSync 代表性糖化 | NEW | `node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs` |
+| STRUCTURED-WORKFLOW-016（控制决策不得形成 lexical pyramid） | `tests/fsharp-control-pyramid.test.mjs`：nested match RED、match→if→try RED、flat/tuple/if-elif GREEN、comment/string lexical shielding、absolute-zero gate、production zero exact、单次 repair manual + 教程篇幅下限；`tests/error-handling-vocabulary.test.mjs`：FsToolkit Fable Result vocabulary、项目自有 TaskResult CE + TaskValue/TaskResult/TaskResultList，且生产树禁止引用 FsToolkit 的 .NET-only `Task.map` / `List.traverseTaskResultM`；WriterStreamSync 代表性糖化 | NEW | `node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs` |
 
 ## 2. 本包拥有的测试文件（全部单跑绿）
 
@@ -31,7 +31,7 @@
 | `tests/workflow-surface.test.mjs` | NEW | 已跑绿（3 pass） |
 | `tests/recovery-reentry.test.mjs` | NEW | 已跑绿（2 pass） |
 | `tests/semantic-vocabulary.test.mjs` | NEW | 已跑绿（4 pass；含 STRUCTURED-WORKFLOW-012 contract test） |
-| `tests/fsharp-control-pyramid.test.mjs` | NEW | 已跑绿（11 pass；production baseline=742） |
+| `tests/fsharp-control-pyramid.test.mjs` | NEW | 已跑绿；production nested decisions=0，永久门禁无 baseline |
 | `tests/error-handling-vocabulary.test.mjs` | NEW | 已跑绿（4 pass；Fable build 同步通过） |
 | `tests/g4r-ce-vocabulary.test.mjs` | MOVE（CE vocabulary absence ratchet 机制，HOW §3.3） | 已跑绿（11 pass；S14 已拆为 obsolete/raw-time 两 test，raw-time 生产事实归 TIME-004） |
 | `tests/dsl-ownership.test.mjs` | MOVE（positive 结构门） | 已跑绿（54 pass；NEGATIVES 循环已按命题拆分为静态 test） |

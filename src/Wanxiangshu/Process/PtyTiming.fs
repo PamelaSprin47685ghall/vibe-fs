@@ -148,7 +148,8 @@ module PtyTiming =
                 AsyncSupport.trySetResult completion () |> ignore
 
         let fireDue due =
-            for id, _, completion, cancelled in due do fireOne id completion cancelled
+            for id, _, completion, cancelled in due do
+                fireOne id completion cancelled
 
         let advance (milliseconds: int) =
             if disposed then

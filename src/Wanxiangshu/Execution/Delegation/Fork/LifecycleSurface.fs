@@ -9,11 +9,15 @@ open Wanxiangshu.Foundation.Identity
 /// completion cell and cancellation token remain opaque runtime resources.
 module ForkLifecycleSurface =
     let private epoch = DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero)
+
     let snapshot (action: string) (runtimeCancelled: bool) (message: string) : obj =
         let run = ChildRun.create "agent-1" "run-1" "fast-coder" Role.Manager "prompt" epoch
-        if runtimeCancelled || action = "cancel" then ChildRun.cancel run
+
+        if runtimeCancelled || action = "cancel" then
+            ChildRun.cancel run
 
         let cancelled = ChildRun.isCancelled run
+
         let status, active, completed, label =
             if action = "complete" then
                 let payload =
@@ -25,13 +29,19 @@ module ForkLifecycleSurface =
                       ProviderRun = None
                       WorkRecord = "completed"
                       Directory = None }
-                let completion = ChildRun.makeCompleted run (AgentCompletionOutcome.AgentCompleted payload) epoch
+
+                let completion =
+                    ChildRun.makeCompleted run (AgentCompletionOutcome.AgentCompleted payload) epoch
+
                 ChildRun.tryComplete run completion |> ignore
                 "Idle", false, true, "completed"
             elif action = "fail" || action = "interrupt" || action = "abandon" then
                 let completion = ChildRun.makeFailed run message epoch
                 ChildRun.tryComplete run completion |> ignore
-                (if action = "interrupt" then "Interrupted" else if action = "abandon" then "Closed" else "Idle"),
+
+                (if action = "interrupt" then "Interrupted"
+                 else if action = "abandon" then "Closed"
+                 else "Idle"),
                 false,
                 true,
                 message

@@ -29,7 +29,13 @@ const apply = (state, value, n = 1) => {
       nextCoverableTurnCutoffExclusive: n,
       nextCoveredPrefixDigest: `d-${n}`,
     },
-    observation.blogFrame({ kind: 'Entry', digest: `sha-e${n}`, ref: `blob-e${n}` }),
+    observation.blogFrame({
+      kind: 'Entry',
+      digest: `sha-e${n}`,
+      ref: `blob-e${n}`,
+      coveredFrom: n - 1,
+      coveredThrough: n,
+    }),
     state.blog,
   )
   assert.equal(committed.ok, true, committed.ok ? '' : committed.error)
@@ -66,13 +72,13 @@ test('WHAT[BD-014] ENFORCER_045_duplicate_provider_run_rejected_by_fold', () => 
 test('WHAT[BD-013] ENFORCER_045_stale_previous_ingest_cursor_rejected', () => {
   const first = observation.applyBlogEntry(
     { frameEpoch: 0, previousIngestedThroughSequence: 0, nextIngestedThroughSequence: 2, previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 1, nextCoveredPrefixDigest: 'd1' },
-    observation.blogFrame({ kind: 'Entry', digest: 'sha-a', ref: 'blob-a' }),
+    observation.blogFrame({ kind: 'Entry', digest: 'sha-a', ref: 'blob-a', coveredFrom: 0, coveredThrough: 2 }),
     observation.emptyBlog,
   )
   assert.equal(first.ok, true)
   const stale = observation.applyBlogEntry(
     { frameEpoch: 0, previousIngestedThroughSequence: 0, nextIngestedThroughSequence: 3, previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 2, nextCoveredPrefixDigest: 'd2' },
-    observation.blogFrame({ kind: 'Entry', digest: 'sha-b', ref: 'blob-b' }),
+    observation.blogFrame({ kind: 'Entry', digest: 'sha-b', ref: 'blob-b', coveredFrom: 0, coveredThrough: 3 }),
     first.value,
   )
   assert.equal(stale.ok, false)

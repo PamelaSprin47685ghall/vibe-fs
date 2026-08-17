@@ -40,6 +40,7 @@ const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(
 
 /** Require a direct static/dynamic import in a .test.mjs source, not a comment. */
 export const importsSurface = (source, module) => {
+  if (!source.includes(`dist/${module}`)) return false
   const target = escapeRegExp(module)
   const importPattern = new RegExp(`(?:\\bfrom\\s*|\\bimport\\s*\\(\\s*)['"][^'"]*dist/${target}['"]`)
   return importPattern.test(stripComments(source))
@@ -51,6 +52,7 @@ export const importsSurface = (source, module) => {
  * executable semantic contract.
  */
 export const usesSurface = (source, module) => {
+  if (!source.includes(`dist/${module}`)) return false
   const text = stripComments(source)
   const target = escapeRegExp(module)
   const staticPattern = new RegExp(`\\bimport\\s+([\\s\\S]+?)\\s+from\\s*['"][^'"]*dist/${target}['"]`, 'g')

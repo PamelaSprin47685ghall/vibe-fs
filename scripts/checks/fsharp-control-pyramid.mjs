@@ -10,7 +10,6 @@ export { CONTROL_PYRAMID_GUIDE }
 
 export const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 export const DEFAULT_SOURCE_ROOT = 'src/Wanxiangshu'
-export const DEFAULT_BASELINE = 'scripts/checks/fsharp-control-pyramid-baseline.json'
 
 const norm = (path) => path.replace(/\\/g, '/')
 

@@ -14,33 +14,59 @@ module private MagicTodoProjectionEncoding =
 
     let rejectionView (rejection: MagicTodoProjection.MagicTodoFoldRejection) : obj =
         match rejection with
-        | MagicTodoFoldRejection.LifeMismatch(expected, actual) -> box {| code = "LifeMismatch"; expected = expected; actual = actual |}
-        | MagicTodoFoldRejection.PreparedMissingForAccept writeId -> box {| code = "PreparedMissingForAccept"; todoWriteId = writeId |}
-        | MagicTodoFoldRejection.OutstandingReviewBeforePrepare writeId -> box {| code = "OutstandingReviewBeforePrepare"; todoWriteId = writeId |}
-        | MagicTodoFoldRejection.IdentityCorruption field -> box {| code = "IdentityCorruption"; field = field |}
-        | MagicTodoFoldRejection.AssignmentWithoutAccepted writeId -> box {| code = "AssignmentWithoutAccepted"; todoWriteId = writeId |}
-        | MagicTodoFoldRejection.ConcludedWithoutAccepted writeId -> box {| code = "ConcludedWithoutAccepted"; todoWriteId = writeId |}
+        | MagicTodoFoldRejection.LifeMismatch(expected, actual) ->
+            box
+                {| code = "LifeMismatch"
+                   expected = expected
+                   actual = actual |}
+        | MagicTodoFoldRejection.PreparedMissingForAccept writeId ->
+            box
+                {| code = "PreparedMissingForAccept"
+                   todoWriteId = writeId |}
+        | MagicTodoFoldRejection.OutstandingReviewBeforePrepare writeId ->
+            box
+                {| code = "OutstandingReviewBeforePrepare"
+                   todoWriteId = writeId |}
+        | MagicTodoFoldRejection.IdentityCorruption field ->
+            box
+                {| code = "IdentityCorruption"
+                   field = field |}
+        | MagicTodoFoldRejection.AssignmentWithoutAccepted writeId ->
+            box
+                {| code = "AssignmentWithoutAccepted"
+                   todoWriteId = writeId |}
+        | MagicTodoFoldRejection.ConcludedWithoutAccepted writeId ->
+            box
+                {| code = "ConcludedWithoutAccepted"
+                   todoWriteId = writeId |}
         | MagicTodoFoldRejection.LegacySeedAfterCheckpoint -> box {| code = "LegacySeedAfterCheckpoint" |}
         | MagicTodoFoldRejection.DedicatedMissingForAssign -> box {| code = "DedicatedMissingForAssign" |}
         | MagicTodoFoldRejection.DedicatedMissingForReplace -> box {| code = "DedicatedMissingForReplace" |}
 
-type MagicTodoProjectionHandle private(state: MagicTodoProjection.MagicTodoProjectionState) =
+type MagicTodoProjectionHandle private (state: MagicTodoProjection.MagicTodoProjectionState) =
     // DSL-MUTABLE: resource — opaque projection handle current state
     let mutable current = state
 
     member _.Fold(eventId: string, factJson: string) : obj =
         match MagicTodoFactCodec.tryDecode factJson with
-        | Error error -> box {| ok = false; error = box {| code = "Decode"; message = error |} |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = box {| code = "Decode"; message = error |} |}
         | Ok fact ->
             match MagicTodoProjection.fold (EventId.create eventId) current fact with
-            | Error rejection -> box {| ok = false; error = MagicTodoProjectionEncoding.rejectionView rejection |}
+            | Error rejection ->
+                box
+                    {| ok = false
+                       error = MagicTodoProjectionEncoding.rejectionView rejection |}
             | Ok next ->
                 current <- next
                 box {| ok = true |}
 
     member _.State = current
 
-    static member Create() = MagicTodoProjectionHandle(MagicTodoProjection.empty)
+    static member Create() =
+        MagicTodoProjectionHandle(MagicTodoProjection.empty)
 
 [<RequireQualifiedAccess>]
 module MagicTodoProjectionSurface =
@@ -51,7 +77,10 @@ module MagicTodoProjectionSurface =
     let private refView (reference: (BlobRef * BlobDigest) option) : obj =
         match reference with
         | None -> null
-        | Some(reference, digest) -> box {| reference = BlobRef.value reference; digest = BlobDigest.value digest |}
+        | Some(reference, digest) ->
+            box
+                {| reference = BlobRef.value reference
+                   digest = BlobDigest.value digest |}
 
     let private checkpointView (checkpoint: MagicTodoProjection.CheckpointRecord) : obj =
         let assignment =
@@ -92,7 +121,8 @@ module MagicTodoProjectionSurface =
                assignment = assignment
                concluded = concluded |}
 
-    let internal rejectionView rejection : obj = MagicTodoProjectionEncoding.rejectionView rejection
+    let internal rejectionView rejection : obj =
+        MagicTodoProjectionEncoding.rejectionView rejection
 
     let internal lifeView (state: MagicTodoProjection.MagicTodoProjectionState) (lifeId: ManagerLifeId) : obj =
         match MagicTodoProjection.tryLife lifeId state with
@@ -106,12 +136,17 @@ module MagicTodoProjectionSurface =
             box
                 {| lifeId = ManagerLifeId.value life.LifeId
                    currentObligations = refView life.CurrentObligationsRef
-                   firstAcceptedCheckpoint = life.FirstAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   latestAcceptedCheckpoint = life.LatestAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   pendingReviewCheckpoint = life.PendingReviewCheckpoint |> Option.map TodoWriteId.value |> optionString
+                   firstAcceptedCheckpoint =
+                    life.FirstAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                   latestAcceptedCheckpoint =
+                    life.LatestAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                   pendingReviewCheckpoint =
+                    life.PendingReviewCheckpoint |> Option.map TodoWriteId.value |> optionString
                    firstPlanCommitment = life.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
-                   latestCommittedCheckpoint = life.LatestCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   previousCommittedCheckpoint = life.PreviousCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                   latestCommittedCheckpoint =
+                    life.LatestCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
+                   previousCommittedCheckpoint =
+                    life.PreviousCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
                    checkpoints = checkpoints
                    dedicated =
                     life.Dedicated
@@ -122,7 +157,7 @@ module MagicTodoProjectionSurface =
                     |> Option.toObj
                    legacySeed = refView life.LegacySeed |}
 
-    let create() = MagicTodoProjectionHandle.Create()
+    let create () = MagicTodoProjectionHandle.Create()
 
     let fold (handle: MagicTodoProjectionHandle) (eventId: string) (factJson: string) : obj =
         handle.Fold(eventId, factJson)

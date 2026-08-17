@@ -74,7 +74,9 @@ module HostMessageCodec =
             |> Option.defaultValue ""
 
         let state = readField raw "state"
-        let status = readString state "status" |> Option.map (fun value -> value.ToLowerInvariant())
+
+        let status =
+            readString state "status" |> Option.map (fun value -> value.ToLowerInvariant())
 
         match status with
         | Some "completed" when not (String.IsNullOrWhiteSpace callId) ->

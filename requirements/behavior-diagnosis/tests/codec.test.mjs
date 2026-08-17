@@ -52,7 +52,7 @@ test('WHAT[BD-007] ENFORCER_021_valid_field_maps_exact_rule_id', () => {
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   assert.deepEqual(result.value, {
     text: 'work log entry',
-    evidence: undefined,
+    evidence: null,
     tip: {
       ruleId: rule.ruleId,
       fieldName: rule.fieldName,
@@ -76,7 +76,7 @@ test('WHAT[BD-006] ENFORCER_020_text_is_trimmed_empty_becomes_none', () => {
   const field = firstField()
   const empty = enforcer.decodeCall({ text: '   ', tip: field })
   assert.equal(empty.ok, true)
-  assert.equal(empty.value.text, undefined)
+  assert.equal(empty.value.text, null)
 
   const ok = enforcer.decodeCall({ text: '  hello  ', tip: field })
   assert.equal(ok.ok, true)
@@ -106,7 +106,7 @@ test('WHAT[BD-008] ENFORCER_024_extra_numeric_properties_are_ignored', () => {
   })
   assert.equal(result.ok, true)
   assert.equal(result.value.tip.fieldName, field)
-  assert.equal(result.value.evidence, undefined)
+  assert.equal(result.value.evidence, null)
 })
 
 test('WHAT[BD-006] ENFORCER_022_has_valid_text_requires_nonempty_text', () => {

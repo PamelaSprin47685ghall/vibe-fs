@@ -162,7 +162,8 @@ module SessionAssociationProjection =
     let private satelliteKindConflict
         (kind: SatelliteKind)
         (satelliteSessionId: SessionId)
-        (current: Map<SessionId, SessionAssociation>) =
+        (current: Map<SessionId, SessionAssociation>)
+        =
         match tryFind satelliteSessionId current with
         | Some { Kind = ManagedSessionKind.SatelliteSession(_, existingKind) } when existingKind <> kind -> true
         | _ -> false
@@ -172,10 +173,19 @@ module SessionAssociationProjection =
         (mainSessionId: SessionId)
         (satelliteSessionId: SessionId)
         (parentOfMain: SessionId option)
-        (current: Map<SessionId, SessionAssociation>) =
+        (current: Map<SessionId, SessionAssociation>)
+        =
         let owner = tryFind mainSessionId current
-        let parent = parentOfMain |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
-        let nextBlogger = if kind = SatelliteKind.Companion then Some satelliteSessionId else None
+
+        let parent =
+            parentOfMain
+            |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
+
+        let nextBlogger =
+            if kind = SatelliteKind.Companion then
+                Some satelliteSessionId
+            else
+                None
 
         Ok(
             current
@@ -193,9 +203,13 @@ module SessionAssociationProjection =
         (mainSessionId: SessionId)
         (satelliteSessionId: SessionId)
         (parentOfMain: SessionId option)
-        (current: Map<SessionId, SessionAssociation>) =
+        (current: Map<SessionId, SessionAssociation>)
+        =
         let existingSatellite =
-            if kind = SatelliteKind.Companion then tryBloggerOf mainSessionId current else None
+            if kind = SatelliteKind.Companion then
+                tryBloggerOf mainSessionId current
+            else
+                None
 
         let existingOwner = tryOwnerOf satelliteSessionId current
         let kindConflict = satelliteKindConflict kind satelliteSessionId current

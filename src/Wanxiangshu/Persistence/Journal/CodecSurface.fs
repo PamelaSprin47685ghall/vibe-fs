@@ -32,9 +32,18 @@ module JournalCodecSurface =
     let private streamToJs (stream: StreamId) : obj =
         match stream with
         | Workspace -> box {| kind = "Workspace" |}
-        | Session id -> box {| kind = "Session"; id = SessionId.value id |}
-        | Child id -> box {| kind = "Child"; id = ChildId.value id |}
-        | Process id -> box {| kind = "Process"; id = ProcessId.value id |}
+        | Session id ->
+            box
+                {| kind = "Session"
+                   id = SessionId.value id |}
+        | Child id ->
+            box
+                {| kind = "Child"
+                   id = ChildId.value id |}
+        | Process id ->
+            box
+                {| kind = "Process"
+                   id = ProcessId.value id |}
 
     let private factOfJs (value: obj) : Fact =
         let family = text (value?family)
@@ -43,7 +52,9 @@ module JournalCodecSurface =
 
         match family, case with
         | "Companion", "CompanionBloggerClosed" ->
-            Fact.Agent(CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create (text (payload?SessionId)) |})
+            Fact.Agent(
+                CompanionFact.CompanionBloggerClosed {| SessionId = SessionId.create (text (payload?SessionId)) |}
+            )
         | familyName, caseName -> failwith $"JournalCodecSurface: unknown fact '{familyName}.{caseName}'"
 
     let private factToJs (fact: Fact) : obj =
@@ -53,7 +64,11 @@ module JournalCodecSurface =
                 {| family = "Companion"
                    case = "CompanionBloggerClosed"
                    payload = {| SessionId = SessionId.value payload.SessionId |} |}
-        | _ -> box {| family = "Unknown"; case = "Unknown"; payload = {| |} |}
+        | _ ->
+            box
+                {| family = "Unknown"
+                   case = "Unknown"
+                   payload = {| |} |}
 
     let private envelopeOfJs (value: obj) : Envelope =
         { RuntimeId = RuntimeId.create (text (value?runtime))
@@ -62,8 +77,10 @@ module JournalCodecSurface =
           EventId = EventId.create (text (value?id))
           Stream = streamOfJs (value?stream)
           ProviderRun =
-            if isNull (value?providerRun) then None
-            else Some(ProviderRunIdentity.create (text (value?providerRun)))
+            if isNull (value?providerRun) then
+                None
+            else
+                Some(ProviderRunIdentity.create (text (value?providerRun)))
           Fact = factOfJs (value?fact) }
 
     let private envelopeToJs (envelope: Envelope) : obj =
@@ -74,9 +91,9 @@ module JournalCodecSurface =
                id = EventId.value envelope.EventId
                stream = streamToJs envelope.Stream
                providerRun =
-                   match envelope.ProviderRun with
-                   | None -> null
-                   | Some run -> box (ProviderRunIdentity.value run)
+                match envelope.ProviderRun with
+                | None -> null
+                | Some run -> box (ProviderRunIdentity.value run)
                fact = factToJs envelope.Fact
                line = Envelope.serialize envelope |}
 
@@ -90,12 +107,18 @@ module JournalCodecSurface =
           StreamId = EventStreamId.create (text (value?streamId))
           EventType = text (value?eventType)
           Parents =
-            if isNull (value?parents) then []
-            else unbox<string array> value?parents |> Array.toList |> List.map EventId.create
-          Payload = unbox<JsonValue> (JS.JSON.parse(if isNull payload then "null" else payload))
+            if isNull (value?parents) then
+                []
+            else
+                unbox<string array> value?parents |> Array.toList |> List.map EventId.create
+          Payload = unbox<JsonValue> (JS.JSON.parse (if isNull payload then "null" else payload))
           PayloadRefs =
-            if isNull (value?payloadRefs) then []
-            else unbox<string array> value?payloadRefs |> Array.toList |> List.map PayloadRef.create }
+            if isNull (value?payloadRefs) then
+                []
+            else
+                unbox<string array> value?payloadRefs
+                |> Array.toList
+                |> List.map PayloadRef.create }
         |> EventEnvelope.normalize
 
     let private eventToJs (event: EventEnvelope) : obj =
@@ -121,12 +144,17 @@ module JournalCodecSurface =
     let encode (parents: string array) (payloadRefs: string array) (envelope: obj) : obj =
         let parentIds = parents |> Array.toList |> List.map EventId.create
         let refs = payloadRefs |> Array.toList |> List.map PayloadRef.create
-        EventStoreJournalCodec.encode parentIds refs (envelopeOfJs envelope) |> eventToJs
+
+        EventStoreJournalCodec.encode parentIds refs (envelopeOfJs envelope)
+        |> eventToJs
 
     /// Decode one JS-native event object into a normalized journal envelope.
     let decode (event: obj) : obj =
         match EventStoreJournalCodec.tryDecode (eventOfJs event) with
-        | Ok envelope -> box {| ok = true; value = envelopeToJs envelope |}
+        | Ok envelope ->
+            box
+                {| ok = true
+                   value = envelopeToJs envelope |}
         | Error error -> box {| ok = false; error = error |}
 
     let encodeStreamId (stream: obj) : string =
@@ -134,14 +162,21 @@ module JournalCodecSurface =
 
     let decodeStreamId (streamId: string) : obj =
         match EventStoreJournalCodec.tryDecodeStreamId (EventStreamId.create streamId) with
-        | Ok stream -> box {| ok = true; value = streamToJs stream |}
+        | Ok stream ->
+            box
+                {| ok = true
+                   value = streamToJs stream |}
         | Error error -> box {| ok = false; error = error |}
 
-    let serialize (envelope: obj) : string = envelopeOfJs envelope |> Envelope.serialize
+    let serialize (envelope: obj) : string =
+        envelopeOfJs envelope |> Envelope.serialize
 
     let deserialize (line: string) : obj =
         match Envelope.deserialize line with
-        | Ok envelope -> box {| ok = true; value = envelopeToJs envelope |}
+        | Ok envelope ->
+            box
+                {| ok = true
+                   value = envelopeToJs envelope |}
         | Error error -> box {| ok = false; error = error |}
 
     let compareSortKey (left: obj) (right: obj) : int =

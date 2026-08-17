@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   CONTROL_PYRAMID_GUIDE,
-  ROOT,
-  collectControlPyramidEntries,
   evaluateBaseline,
-  makeBaseline,
   renderFailure,
   scanControlPyramidEntries,
 } from '../../../scripts/checks/fsharp-control-pyramid.mjs'
@@ -195,19 +191,6 @@ test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_many_hits_print_locations_bu
   assert.match(output, /b\.fs:20/)
   assert.match(output, /c\.fs:30/)
   assert.match(output, /match → match!/)
-})
-
-test.skip('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_production_baseline_is_exact_and_the_main_check_runner_enforces_it', () => {
-  const hits = scanControlPyramidEntries(collectControlPyramidEntries(ROOT, 'src/Wanxiangshu'))
-  const baseline = JSON.parse(
-    readFileSync('scripts/checks/fsharp-control-pyramid-baseline.json', 'utf8'),
-  )
-  const runner = readFileSync('scripts/check.mjs', 'utf8')
-
-  assert.deepEqual(baseline, makeBaseline(hits))
-  assert.ok(hits.length <= 2166, 'control-pyramid debt may only decrease from the bootstrap ceiling')
-  assert.match(runner, /checks\/fsharp-control-pyramid\.mjs/)
-  assert.match(runner, /fsharp-control-pyramid-baseline\.json/)
 })
 
 test('WHAT[STRUCTURED-WORKFLOW-016] CONTROL_PYRAMID_tutorial_prerequisites_are_repo_concrete_and_cannot_be_shrunk', () => {

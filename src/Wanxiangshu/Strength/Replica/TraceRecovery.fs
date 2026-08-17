@@ -110,6 +110,7 @@ module StrengthTraceRecovery =
             Ok None
         else
             let width = List.length expected
+
             let matches =
                 [ 0 .. max -1 (List.length observed - width) ]
                 |> List.filter (matchesAt expected observed width)

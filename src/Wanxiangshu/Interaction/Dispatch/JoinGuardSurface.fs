@@ -21,20 +21,23 @@ module JoinGuardSurface =
     let private outcomeView outcome : obj =
         match outcome with
         | HostJoinGuard.JoinGuardNudgeOutcome.Sent promptKey ->
-            box {| outcome = "Sent"; promptKey = PromptKey.value promptKey; reason = null |}
+            box
+                {| outcome = "Sent"
+                   promptKey = PromptKey.value promptKey
+                   reason = null |}
         | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding ->
-            box {| outcome = "AlreadyOutstanding"; promptKey = null; reason = null |}
+            box
+                {| outcome = "AlreadyOutstanding"
+                   promptKey = null
+                   reason = null |}
         | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-            box {| outcome = "Failed"; promptKey = null; reason = reason |}
+            box
+                {| outcome = "Failed"
+                   promptKey = null
+                   reason = reason |}
 
     /// Run the real JoinGuard reservation/send path and expose only its decision.
-    let nudge
-        (port: obj)
-        (handle: obj)
-        (reservations: obj)
-        (session: string)
-        (directory: obj)
-        : Task<obj> =
+    let nudge (port: obj) (handle: obj) (reservations: obj) (session: string) (directory: obj) : Task<obj> =
         task {
             let journal =
                 if isNull handle then
@@ -43,6 +46,7 @@ module JoinGuardSurface =
                     Some((unbox<JournalHandle> handle).Journal)
 
             let keys = (unbox<ReservationCapability> reservations).Keys
+
             let! outcome =
                 HostJoinGuard.nudge
                     (DispatchSurface.sessionPort port)

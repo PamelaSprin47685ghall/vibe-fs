@@ -40,7 +40,11 @@ module BloggerDeltaSurface =
         messages
         |> Array.toList
         |> List.map (fun message ->
-            let parts = if isNullish message?parts then [||] else unbox<obj array> message?parts
+            let parts =
+                if isNullish message?parts then
+                    [||]
+                else
+                    unbox<obj array> message?parts
 
             { Role = textValue message?role
               Parts = parts |> Array.toList |> List.map partOfJs })
@@ -62,8 +66,7 @@ module BloggerDeltaSurface =
             | BloggerDeltaPart.ToolCallPart(tool, args) -> box {| tool = tool; args = args |}
             | BloggerDeltaPart.ToolResultPart value -> box {| text = value |}
             | BloggerDeltaPart.ImageOmitted mediaType
-            | BloggerDeltaPart.MediaOmitted mediaType ->
-                box {| mediaType = mediaType |> Option.toObj |}
+            | BloggerDeltaPart.MediaOmitted mediaType -> box {| mediaType = mediaType |> Option.toObj |}
 
         box
             {| kind = itemKind item.Part
@@ -72,16 +75,30 @@ module BloggerDeltaSurface =
                fields = partFields |}
 
     let private cursorToJs (cursor: SemanticCursor) : obj =
-        box {| turn = cursor.TurnIndex; part = cursor.PartIndex |}
+        box
+            {| turn = cursor.TurnIndex
+               part = cursor.PartIndex |}
 
     /// Plain constructors used by semantic tests and other JS callers.
     let textPart (value: string) : obj = box {| kind = "text"; text = value |}
-    let reasoningPart (value: string) : obj = box {| kind = "reasoning"; text = value |}
-    let toolCallPart (tool: string) (args: string) : obj = box {| kind = "tool-call"; tool = tool; args = args |}
-    let toolResultPart (value: string) : obj = box {| kind = "tool-result"; text = value |}
+
+    let reasoningPart (value: string) : obj =
+        box {| kind = "reasoning"; text = value |}
+
+    let toolCallPart (tool: string) (args: string) : obj =
+        box
+            {| kind = "tool-call"
+               tool = tool
+               args = args |}
+
+    let toolResultPart (value: string) : obj =
+        box {| kind = "tool-result"; text = value |}
 
     let mediaPart (mediaType: obj) (digest: string) : obj =
-        box {| kind = "media"; mediaType = mediaType; digest = digest |}
+        box
+            {| kind = "media"
+               mediaType = mediaType
+               digest = digest |}
 
     let text (value: string) : obj = textPart value
     let reasoning (value: string) : obj = reasoningPart value

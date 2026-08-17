@@ -14,8 +14,7 @@ module DeliverySurface =
     let private text (value: obj) : string =
         if isNullish value then "" else string value
 
-    let private namesOf (state: TipDeliveryProjectionState) : string array =
-        state.FullDeliveredTips |> Set.toArray
+    let private namesOf (state: TipDeliveryProjectionState) : string array = state.FullDeliveredTips |> Set.toArray
 
     let private stateToJs (state: TipDeliveryProjectionState) : obj =
         box {| fullDeliveredTips = namesOf state |}
@@ -34,7 +33,7 @@ module DeliverySurface =
         | "IdentityOnly" -> Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly
         | _ -> Wanxiangshu.OpenCode.Host.TipPresentation.Full
 
-    let empty : obj = stateToJs TipDeliveryProjection.empty
+    let empty: obj = stateToJs TipDeliveryProjection.empty
 
     let hasFullDelivered (tipName: string) (state: obj) : bool =
         TipDeliveryProjection.hasFullDelivered tipName (stateOfJs state)

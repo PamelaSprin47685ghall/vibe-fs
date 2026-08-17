@@ -299,6 +299,7 @@ module ToolHostCodec =
     let decodeContext (raw: obj) =
         let callId = contextString raw "callID"
         let messageId = contextString raw "messageID"
+
         let callId, messageId =
             match callId, messageId with
             | Some call, Some message -> Some call, Some message

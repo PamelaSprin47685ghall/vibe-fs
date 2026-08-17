@@ -78,6 +78,10 @@ module RuntimePath =
     let forWorkspace workspace =
         try
             let commonDirectory = askGitCommonDir workspace
-            commonDirectory |> resolveCommonPath workspace |> canonicalPath |> runtimeDirectory
+
+            commonDirectory
+            |> resolveCommonPath workspace
+            |> canonicalPath
+            |> runtimeDirectory
         with _ ->
             stateDirectory workspace

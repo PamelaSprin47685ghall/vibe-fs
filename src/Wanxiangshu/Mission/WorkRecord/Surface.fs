@@ -25,10 +25,14 @@ module WorkRecordSurface =
     let private optionalText (value: obj) : string option =
         if isNull value then None else Some(text value)
 
-    let private streamOfSession (sessionId: string) = StreamId.Session(SessionId.create sessionId)
+    let private streamOfSession (sessionId: string) =
+        StreamId.Session(SessionId.create sessionId)
 
     let private runOf (value: obj) : ProviderRunIdentity option =
-        if isNull value then None else Some(ProviderRunIdentity.create (text value))
+        if isNull value then
+            None
+        else
+            Some(ProviderRunIdentity.create (text value))
 
     let private semanticPartOf (value: obj) : SemanticPart =
         match text (value?kind) with
@@ -59,7 +63,10 @@ module WorkRecordSurface =
     let private appendResult result : obj =
         match result with
         | Ok _ -> box {| ok = true |}
-        | Error failure -> box {| ok = false; error = JournalAppendFailure.describe failure |}
+        | Error failure ->
+            box
+                {| ok = false
+                   error = JournalAppendFailure.describe failure |}
 
     let private sequenceOf (cursor: obj) : int64 = int64 (text (cursor?Sequence))
 
@@ -71,7 +78,12 @@ module WorkRecordSurface =
         (requirements: obj)
         : Task<unit> =
         let required = arrayOf requirements |> Array.map text |> Array.toList
-        Wanxiangshu.Context.Trace.XTraceCapture.captureOpening (Some handle.Journal) (SessionId.create sessionId) assignment required
+
+        Wanxiangshu.Context.Trace.XTraceCapture.captureOpening
+            (Some handle.Journal)
+            (SessionId.create sessionId)
+            assignment
+            required
 
     /// COMPANION-012: capture a plain semantic projection and return its inclusive last cursor.
     let captureProjection (handle: JournalHandle) (sessionId: string) (projection: obj) : Task<obj> =
@@ -126,11 +138,7 @@ module WorkRecordSurface =
         }
 
     /// EXEC-006 / EXEC-008: render one session's canonical full lifecycle WorkRecord.
-    let lifecycleWorkRecord
-        (handle: JournalHandle)
-        (sessionId: string)
-        (includeOpening: bool)
-        : Task<obj> =
+    let lifecycleWorkRecord (handle: JournalHandle) (sessionId: string) (includeOpening: bool) : Task<obj> =
         task {
             let! rendered =
                 LifecycleWorkRecordProjection.lifecycleWorkRecord
@@ -144,12 +152,8 @@ module WorkRecordSurface =
         }
 
     /// COMPANION-015 / EXEC-031: render one request-range bounded WorkRecord without exposing typed cursors.
-    let lifecycleWorkRecordBounded
-        (handle: JournalHandle)
-        (sessionId: string)
-        (range: obj)
-        : Task<obj> =
-        let bounded : MagicTodoLwr.BoundedRange =
+    let lifecycleWorkRecordBounded (handle: JournalHandle) (sessionId: string) (range: obj) : Task<obj> =
+        let bounded: MagicTodoLwr.BoundedRange =
             { StartInclusive = { Sequence = sequenceOf range?StartInclusive }
               EndExclusive = { Sequence = sequenceOf range?EndExclusive } }
 

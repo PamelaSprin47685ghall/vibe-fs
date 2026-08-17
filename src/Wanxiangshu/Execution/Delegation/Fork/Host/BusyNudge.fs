@@ -62,12 +62,13 @@ module HostForkBusyNudge =
     /// used to fall through to `sessions.SendChildPromptFireAndForget`, which reaches
     /// the Host prompt endpoint directly with no claim, no PromptKey and no recovery
     /// anchor — the exact bypass package A removed elsewhere. It fails closed instead.
-    let private managedBusyAgent
-        (profile: PromptAuthority.AuthorityExecutionProfile)
-        (agent: string)
-        : string =
+    let private managedBusyAgent (profile: PromptAuthority.AuthorityExecutionProfile) (agent: string) : string =
         let trimmed = if String.IsNullOrWhiteSpace agent then "" else agent.Trim()
-        if trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then trimmed else profile.SelectedAgent
+
+        if trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then
+            trimmed
+        else
+            profile.SelectedAgent
 
     let private sendResult sent : Result<unit, string> =
         match sent with
@@ -81,7 +82,8 @@ module HostForkBusyNudge =
         (profile: PromptAuthority.AuthorityExecutionProfile)
         (agent: string)
         (directory: string option)
-        (prompt: string) =
+        (prompt: string)
+        =
         task {
             let busyAgent = managedBusyAgent profile agent
             let rt = PromptDispatcher.forJournal j
@@ -108,7 +110,8 @@ module HostForkBusyNudge =
         (childId: SessionId)
         (agent: string)
         (directory: string option)
-        (prompt: string) =
+        (prompt: string)
+        =
         task {
             let snapshot = AgentJournal.snapshot j
 

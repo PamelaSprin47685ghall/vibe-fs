@@ -249,7 +249,8 @@ module MagicTodo =
         (openingCursor: XTraceCursor)
         (t1CallCursor: XTraceCursor option)
         (t1ToolCallId: ToolCallId option)
-        (parts: TracePartAnchor list) =
+        (parts: TracePartAnchor list)
+        =
         match t1CallCursor, t1ToolCallId with
         | Some callCursor, Some callId -> Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
         | _ -> Some(workRecordStart openingCursor)

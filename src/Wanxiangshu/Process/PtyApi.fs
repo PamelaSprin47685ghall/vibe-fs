@@ -44,7 +44,9 @@ module Pty =
 
     let private removeCallback parentId token (callbacks: Dictionary<int, unit -> unit>) =
         callbacks.Remove token |> ignore
-        if callbacks.Count = 0 then parentAborters.Remove parentId |> ignore
+
+        if callbacks.Count = 0 then
+            parentAborters.Remove parentId |> ignore
 
     let unregisterParentAbort (parentId: string) (token: int) =
         lock parentGate (fun () ->

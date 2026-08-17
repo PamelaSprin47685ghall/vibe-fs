@@ -117,14 +117,22 @@ module HostEventCodec =
     let private parentSessionIdOf (raw: obj) : SessionId option =
         let properties = raw?properties
         let info = if isNull properties then null else properties?info
+
         let fromInfo =
-            if isNull info || isNull info?parentID then None
-            else Some(SessionId.create (unbox<string> info?parentID))
+            if isNull info || isNull info?parentID then
+                None
+            else
+                Some(SessionId.create (unbox<string> info?parentID))
+
         let fromProperties =
-            if isNull properties then None
-            elif not (isNull properties?parentID) then Some(SessionId.create (unbox<string> properties?parentID))
-            elif not (isNull properties?parentId) then Some(SessionId.create (unbox<string> properties?parentId))
-            else None
+            if isNull properties then
+                None
+            elif not (isNull properties?parentID) then
+                Some(SessionId.create (unbox<string> properties?parentID))
+            elif not (isNull properties?parentId) then
+                Some(SessionId.create (unbox<string> properties?parentId))
+            else
+                None
 
         fromInfo |> Option.orElse fromProperties
 

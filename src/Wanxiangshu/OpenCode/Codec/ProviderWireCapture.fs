@@ -72,7 +72,10 @@ module ProviderWireCapture =
                   Parts = parts }
 
     let decodeCapturedMessage (rawObj: obj) : CapturedWireMessage option =
-        if isNull rawObj then None else decodeCapturedMessageBody rawObj
+        if isNull rawObj then
+            None
+        else
+            decodeCapturedMessageBody rawObj
 
     let decodeMessage (rawObj: obj) : WireMessage option =
         decodeCapturedMessage rawObj

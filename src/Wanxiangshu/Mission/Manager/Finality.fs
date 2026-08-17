@@ -45,9 +45,7 @@ module ManagerFinality =
         | Some request when ManagerLifecycleProjection.isOpen request -> LaborAdmission.FinalityOwnsLife
         | _ -> LaborAdmission.LaborMayContinue
 
-    let private classifyOpenFinalityRequest
-        (toolCallId: ToolCallId option)
-        (request: FinalityRequestProjection) =
+    let private classifyOpenFinalityRequest (toolCallId: ToolCallId option) (request: FinalityRequestProjection) =
         match toolCallId with
         | Some callId when callId = request.ToolCallId -> EndingDisposition.ResumeRequest request
         | _ when Map.isEmpty request.Members -> EndingDisposition.RecoverRequestWithoutReviewers request
@@ -70,6 +68,5 @@ module ManagerFinality =
         | true, true, _ -> EndingDisposition.AlreadyCompleted
         | true, false, Some request when ManagerLifecycleProjection.isOpen request ->
             classifyOpenFinalityRequest toolCallId request
-        | true, false, Some request when toolCallId = Some request.ToolCallId ->
-            EndingDisposition.ResumeRequest request
+        | true, false, Some request when toolCallId = Some request.ToolCallId -> EndingDisposition.ResumeRequest request
         | true, false, _ -> classifyCompletedLife life

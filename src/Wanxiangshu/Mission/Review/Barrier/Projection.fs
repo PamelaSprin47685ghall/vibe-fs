@@ -171,7 +171,8 @@ module ReviewProjection =
         (terminalRef: BlobRef)
         (terminalDigest: BlobDigest)
         (sequence: int64)
-        (current: ReviewGuardProjection) =
+        (current: ReviewGuardProjection)
+        =
         if frontierAlreadyFrozen current then
             current
         else
@@ -208,7 +209,8 @@ module ReviewProjection =
     let private applyNewVerdict
         (attempt: ReviewAttemptIdentity)
         (verdict: ReviewGuardVerdict)
-        (current: ReviewGuardProjection) =
+        (current: ReviewGuardProjection)
+        =
         let observed =
             { current with
                 ObservedAttempts = remember attempt current.ObservedAttempts

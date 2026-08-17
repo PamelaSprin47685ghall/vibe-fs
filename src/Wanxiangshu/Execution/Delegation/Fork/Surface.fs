@@ -42,7 +42,13 @@ module ForkChildPayloadSurface =
     /// Render unknown/unavailable calling prose without exposing binding names.
     let unavailableCalling (lang: string) (orchestrator: bool) : string =
         let language = languageOf lang
-        let path = if orchestrator then "tool/commission/unknown-calling" else "tool/fork/unknown-calling"
+
+        let path =
+            if orchestrator then
+                "tool/commission/unknown-calling"
+            else
+                "tool/fork/unknown-calling"
+
         ProviderProse.render language path Map.empty
 
     /// Render one fork child payload document from JSON-shaped input.
@@ -78,12 +84,16 @@ module ForkChildPayloadSurface =
               Payload = input.Payload }
 
     let private nonEmpty value =
-        if String.IsNullOrWhiteSpace value then None else Some(value.Trim())
+        if String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some(value.Trim())
 
     let chooseRoad (calling: string) (byname: string) (charge: string) : obj =
         let road = nonEmpty calling
         let name = nonEmpty byname
         let task = nonEmpty charge
+
         match road, name, task with
         | Some callingName, Some logicalName, Some assignment ->
             box
@@ -101,12 +111,22 @@ module ForkChildPayloadSurface =
                    byname = logicalName
                    charge = assignment
                    authorityTransferred = false |}
-        | _ -> box {| ok = false; error = "charge, byname and calling (for a new road) must be non-empty" |}
+        | _ ->
+            box
+                {| ok = false
+                   error = "charge, byname and calling (for a new road) must be non-empty" |}
 
-    let reuseBinding (byname: string) (boundAgent: string) (requestedAgent: string) (tier: string) (charge: string) : obj =
+    let reuseBinding
+        (byname: string)
+        (boundAgent: string)
+        (requestedAgent: string)
+        (tier: string)
+        (charge: string)
+        : obj =
         match nonEmpty byname, nonEmpty boundAgent, nonEmpty charge with
         | Some logicalName, Some bound, Some assignment ->
             let handle = HandleId.Agent(AgentHandleId.create "surface-binding")
+
             let projection =
                 HandleProjection.linkNamed
                     handle
@@ -116,11 +136,18 @@ module ForkChildPayloadSurface =
                     Role.Coder
                     HandleOwnership.DurableParentHandle
                     HandleProjection.empty
+
             match projection with
-            | Error error -> box {| ok = false; error = error.ToString() |}
+            | Error error ->
+                box
+                    {| ok = false
+                       error = error.ToString() |}
             | Ok linked ->
                 match HandleProjection.tryFindByByname logicalName linked with
-                | None -> box {| ok = false; error = "continuation binding was not found" |}
+                | None ->
+                    box
+                        {| ok = false
+                           error = "continuation binding was not found" |}
                 | Some record ->
                     box
                         {| ok = true
@@ -131,4 +158,7 @@ module ForkChildPayloadSurface =
                            tier = tier
                            charge = assignment
                            authorityTransferred = false |}
-        | _ -> box {| ok = false; error = "continuation requires a bound Byname and managed agent" |}
+        | _ ->
+            box
+                {| ok = false
+                   error = "continuation requires a bound Byname and managed agent" |}

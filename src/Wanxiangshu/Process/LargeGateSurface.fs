@@ -16,7 +16,10 @@ module LargeGateSurface =
 
     let createToken (cancelled: bool) : obj =
         let source = new CancellationTokenSource()
-        if cancelled then source.Cancel()
+
+        if cancelled then
+            source.Cancel()
+
         TokenHandle(source) :> obj
 
     let cancelToken (token: obj) : unit = (token :?> TokenHandle).Cancel()

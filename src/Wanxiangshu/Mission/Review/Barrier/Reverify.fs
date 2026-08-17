@@ -55,11 +55,7 @@ module ReviewBarrierWorkflow =
         else
             Error "judge delivery came from a different Reviewer session"
 
-    let private validateSecond
-        (request: ReviewBarrierRequest)
-        (first: ReviewJudgement)
-        (second: ReviewJudgement)
-        =
+    let private validateSecond (request: ReviewBarrierRequest) (first: ReviewJudgement) (second: ReviewJudgement) =
         if second.PhysicalUserMessageId <> first.PhysicalUserMessageId then
             Error "second judgement came from a different physical review prompt"
         elif first.ProviderRun = second.ProviderRun then
@@ -240,8 +236,7 @@ module ReviewBarrierWorkflow =
         | ReviewGuardVerdict.Revise ->
             firstDelivery.Accept()
             finishAfterTerminal finalTerminal (revision request)
-        | ReviewGuardVerdict.Perfect ->
-            continueAfterFirstPerfect journal host request finalTerminal firstDelivery first
+        | ReviewGuardVerdict.Perfect -> continueAfterFirstPerfect journal host request finalTerminal firstDelivery first
 
     let private run
         (journal: AgentJournal)
@@ -253,7 +248,9 @@ module ReviewBarrierWorkflow =
         let firstAwait = host.AwaitJudgement()
 
         taskResult {
-            do! host.StartReview() |> TaskResult.mapError ReviewBarrierFailure.CannotStartReviewer
+            do!
+                host.StartReview()
+                |> TaskResult.mapError ReviewBarrierFailure.CannotStartReviewer
 
             let! firstDelivery = awaitJudgementBeforeTerminal firstAwait finalTerminal
 

@@ -66,10 +66,7 @@ module Bayes =
         |> Seq.map (fun (_, group) -> group |> Seq.sortBy (fun item -> item.SemanticKey) |> Seq.head)
         |> Seq.toList
 
-    let private beliefFromQualified
-        (state: EpistemicState)
-        (qualified: Evidence list)
-        : BayesianBelief option =
+    let private beliefFromQualified (state: EpistemicState) (qualified: Evidence list) : BayesianBelief option =
         let posterior =
             qualified
             |> List.fold

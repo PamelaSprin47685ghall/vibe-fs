@@ -69,13 +69,7 @@ module GuidelineSurface =
              let pair = pairOfJs value
 
              match
-                 GuidelineProjection.apply
-                     pair.Ordinal
-                     pair.CallId
-                     pair.MarkerText
-                     pair.CallGap
-                     pair.ResultGap
-                     state
+                 GuidelineProjection.apply pair.Ordinal pair.CallId pair.MarkerText pair.CallGap pair.ResultGap state
              with
              | Ok next -> next
              | Error rejection -> failwithf "GuidelineSurface: invalid state (%A)" rejection))
@@ -83,9 +77,14 @@ module GuidelineSurface =
     let private rejectionToJs (rejection: GuidelineFoldRejection) : obj =
         match rejection with
         | GuidelineFoldRejection.NonSequentialOrdinal(expected, actual) ->
-            box {| name = "NonSequentialOrdinal"; expected = expected; actual = actual |}
+            box
+                {| name = "NonSequentialOrdinal"
+                   expected = expected
+                   actual = actual |}
         | GuidelineFoldRejection.DuplicateCallId callId ->
-            box {| name = "DuplicateCallId"; callId = callId |}
+            box
+                {| name = "DuplicateCallId"
+                   callId = callId |}
         | GuidelineFoldRejection.DuplicatePlacement(callGap, resultGap) ->
             box
                 {| name = "DuplicatePlacement"
@@ -95,12 +94,16 @@ module GuidelineSurface =
     let private resultToJs (result: Result<GuidelineProjectionState, GuidelineFoldRejection>) : obj =
         match result with
         | Ok state -> box {| ok = true; value = stateToJs state |}
-        | Error rejection -> box {| ok = false; error = rejectionToJs rejection |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error = rejectionToJs rejection |}
 
     /// Empty projection state.
-    let empty : obj = stateToJs GuidelineProjection.empty
+    let empty: obj = stateToJs GuidelineProjection.empty
 
-    let nextOrdinal (state: obj) : int64 = GuidelineProjection.nextOrdinal (stateOfJs state)
+    let nextOrdinal (state: obj) : int64 =
+        GuidelineProjection.nextOrdinal (stateOfJs state)
 
     let pairs (state: obj) : obj array =
         GuidelineProjection.pairs (stateOfJs state) |> List.map pairToJs |> List.toArray

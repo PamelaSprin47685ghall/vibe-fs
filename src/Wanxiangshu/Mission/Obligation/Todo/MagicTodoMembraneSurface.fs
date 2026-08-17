@@ -14,7 +14,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 /// JS-native effect-shell owner for the Magic Todo membrane.
 /// Journal, snapshot, and review ports stay opaque resources; only durable
 /// receipts and provider-visible outcomes cross the boundary.
-type MagicTodoPreparedHandle private(bridge: MagicTodoMembrane.PreparedBridge) =
+type MagicTodoPreparedHandle private (bridge: MagicTodoMembrane.PreparedBridge) =
     member internal _.Bridge = bridge
     static member Create(bridge: MagicTodoMembrane.PreparedBridge) = MagicTodoPreparedHandle(bridge)
 
@@ -28,7 +28,7 @@ module MagicTodoMembraneSurface =
         interface ISessionSnapshotPort with
             member _.GetMessages(_sessionId: SessionId) =
                 task {
-                    let! value = source?GetMessages()
+                    let! value = source?GetMessages ()
 
                     if not (isNull (value?ok)) && not (unbox<bool> (value?ok)) then
                         return Error(text (value?error))
@@ -44,7 +44,11 @@ module MagicTodoMembraneSurface =
 
     let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
 
-    let private localizedOf (callId: string) (inputCanonical: string) (state: obj) : MagicTodoLocality.LocalizedToolCall =
+    let private localizedOf
+        (callId: string)
+        (inputCanonical: string)
+        (state: obj)
+        : MagicTodoLocality.LocalizedToolCall =
         let frontier = cursor 7
 
         { ProviderRun = ProviderRunIdentity.create "msg-provider-run"
@@ -66,10 +70,14 @@ module MagicTodoMembraneSurface =
         else
             values
             |> Array.toList
-            |> List.map (fun value -> { Name = text (value?name); Work = text (value?work) })
+            |> List.map (fun value ->
+                { Name = text (value?name)
+                  Work = text (value?work) })
 
     let private blobView reference digest =
-        box {| reference = BlobRef.value reference; digest = BlobDigest.value digest |}
+        box
+            {| reference = BlobRef.value reference
+               digest = BlobDigest.value digest |}
 
     let private preparedView (bridge: MagicTodoMembrane.PreparedBridge) : obj =
         box
@@ -91,12 +99,17 @@ module MagicTodoMembraneSurface =
             | MagicTodoMembrane.PrepareRejection.NoOpenManagerLife -> "NoOpenManagerLife"
             | MagicTodoMembrane.PrepareRejection.UnexpectedToolName _ -> "UnexpectedToolName"
             | MagicTodoMembrane.PrepareRejection.SnapshotInputMismatch -> "SnapshotInputMismatch"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.MultipleTodowriteInMessage _) -> "MultipleTodowriteInMessage"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.EmptyObligationName _) -> "EmptyObligationName"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName _) -> "DuplicateObligationName"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.MultipleTodowriteInMessage _) ->
+                "MultipleTodowriteInMessage"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.EmptyObligationName _) ->
+                "EmptyObligationName"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName _) ->
+                "DuplicateObligationName"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.IdentityCorruption _) -> "IdentityCorruption"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.AwaitingConsumableReview _) -> "AwaitingConsumableReview"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.FirstSuicideWithoutCheckpoint) -> "FirstSuicideWithoutCheckpoint"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.AwaitingConsumableReview _) ->
+                "AwaitingConsumableReview"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.FirstSuicideWithoutCheckpoint) ->
+                "FirstSuicideWithoutCheckpoint"
             | MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _ -> "AwaitingConsumableReview"
             | MagicTodoMembrane.PrepareRejection.BlobRead _ -> "BlobRead"
             | MagicTodoMembrane.PrepareRejection.BlobWrite _ -> "BlobWrite"
@@ -105,13 +118,18 @@ module MagicTodoMembraneSurface =
             | MagicTodoMembrane.PrepareRejection.JournalAppend _ -> "JournalAppend"
             | MagicTodoMembrane.PrepareRejection.ProjectionInconsistent _ -> "ProjectionInconsistent"
 
-        box {| code = code; detail = sprintf "%A" rejection |}
+        box
+            {| code = code
+               detail = sprintf "%A" rejection |}
 
     let private acceptRejectionView rejection : obj =
         match rejection with
         | MagicTodoMembrane.AcceptRejection.InputDigestMismatch -> box {| code = "InputDigestMismatch" |}
         | MagicTodoMembrane.AcceptRejection.OutputDigestMismatch -> box {| code = "OutputDigestMismatch" |}
-        | MagicTodoMembrane.AcceptRejection.JournalAppend reason -> box {| code = "JournalAppend"; detail = reason |}
+        | MagicTodoMembrane.AcceptRejection.JournalAppend reason ->
+            box
+                {| code = "JournalAppend"
+                   detail = reason |}
 
     let private physicalResult value : Result<PhysicalSuccessEvidence, string> =
         match text value with
@@ -149,6 +167,7 @@ module MagicTodoMembraneSurface =
         : Task<obj> =
         task {
             let localized = localizedOf callId inputCanonical state
+
             let! result =
                 MagicTodoMembrane.prepare
                     handle.Journal
@@ -160,7 +179,10 @@ module MagicTodoMembraneSurface =
 
             return
                 match result with
-                | Error rejection -> box {| ok = false; error = rejectionView rejection |}
+                | Error rejection ->
+                    box
+                        {| ok = false
+                           error = rejectionView rejection |}
                 | Ok bridge ->
                     box
                         {| ok = true
@@ -170,7 +192,10 @@ module MagicTodoMembraneSurface =
                                    prepared = preparedView bridge
                                    submitted =
                                     bridge.SubmittedObligations
-                                    |> List.map (fun value -> box {| name = value.Name; work = value.Work |})
+                                    |> List.map (fun value ->
+                                        box
+                                            {| name = value.Name
+                                               work = value.Work |})
                                     |> List.toArray |} |}
         }
 
@@ -182,7 +207,15 @@ module MagicTodoMembraneSurface =
         (observedOutputDigest: string)
         : Task<obj> =
         match physicalResult (box physicalEvidence) with
-        | Error error -> Task.FromResult(box {| ok = false; error = box {| code = "InvalidPhysicalEvidence"; detail = error |} |})
+        | Error error ->
+            Task.FromResult(
+                box
+                    {| ok = false
+                       error =
+                        box
+                            {| code = "InvalidPhysicalEvidence"
+                               detail = error |} |}
+            )
         | Ok physicalEvidence ->
             task {
                 let! result =
@@ -195,7 +228,10 @@ module MagicTodoMembraneSurface =
 
                 return
                     match result with
-                    | Error rejection -> box {| ok = false; error = acceptRejectionView rejection |}
+                    | Error rejection ->
+                        box
+                            {| ok = false
+                               error = acceptRejectionView rejection |}
                     | Ok outcome ->
                         box
                             {| ok = true
@@ -206,11 +242,7 @@ module MagicTodoMembraneSurface =
                                        needsEnsureReview = outcome.NeedsEnsureReview |} |}
             }
 
-    let appendFact
-        (handle: JournalHandle)
-        (sessionId: string)
-        (factJson: string)
-        : Task<obj> =
+    let appendFact (handle: JournalHandle) (sessionId: string) (factJson: string) : Task<obj> =
         ObligationJournalSurface.appendMagicTodo handle sessionId null factJson
 
     let snapshot (handle: JournalHandle) (lifeId: string) : obj =
@@ -218,12 +250,19 @@ module MagicTodoMembraneSurface =
 
     let createHooks (handle: JournalHandle) (snapshot: obj) (processReview: obj) : obj =
         let snapshotPort =
-            if isNull snapshot then None else Some((SnapshotPort(snapshot) :> ISessionSnapshotPort))
+            if isNull snapshot then
+                None
+            else
+                Some((SnapshotPort(snapshot) :> ISessionSnapshotPort))
 
         let processReviewPort =
-            if isNull processReview then None else Some(unbox<ProcessReviewPort> processReview)
+            if isNull processReview then
+                None
+            else
+                Some(unbox<ProcessReviewPort> processReview)
 
-        let hooks = MagicTodoHostHooks.create (Some handle.Journal) snapshotPort processReviewPort
+        let hooks =
+            MagicTodoHostHooks.create (Some handle.Journal) snapshotPort processReviewPort
 
         createObj
             [ "Definition", box hooks.Definition

@@ -7,13 +7,24 @@ open System
 module PtySurface =
     let validateCommand (command: string) : obj =
         if String.IsNullOrWhiteSpace command then
-            box {| ok = false; error = "PTY command is required" |}
+            box
+                {| ok = false
+                   error = "PTY command is required" |}
         else
             box {| ok = true; command = command |}
 
     let writeText (text: string) : string =
-        if String.IsNullOrEmpty text then text
-        elif text.EndsWith("\n", StringComparison.Ordinal) || text.EndsWith("\r", StringComparison.Ordinal) then text
-        else text + "\n"
+        if String.IsNullOrEmpty text then
+            text
+        elif
+            text.EndsWith("\n", StringComparison.Ordinal)
+            || text.EndsWith("\r", StringComparison.Ordinal)
+        then
+            text
+        else
+            text + "\n"
 
-    let unknown (id: string) : obj = box {| ok = false; error = sprintf "Unknown PTY id: %s" id |}
+    let unknown (id: string) : obj =
+        box
+            {| ok = false
+               error = sprintf "Unknown PTY id: %s" id |}

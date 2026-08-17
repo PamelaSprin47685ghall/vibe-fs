@@ -17,8 +17,7 @@ module JsRuntimeSurface =
         let api = JsToolsBindings.createApi root staging
         box (JsBindingsHandle(api, staging))
 
-    let api (handle: obj) : obj =
-        (unbox<JsBindingsHandle> handle).Api
+    let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
     let stagedCount (handle: obj) : int =
         (unbox<JsBindingsHandle> handle).Staging.Count
@@ -31,7 +30,10 @@ module JsRuntimeSurface =
         |> Seq.toArray
 
     let private failureResult failure =
-        box {| ok = false; code = JsFailure.code failure; reason = JsFailure.reason failure |}
+        box
+            {| ok = false
+               code = JsFailure.code failure
+               reason = JsFailure.reason failure |}
 
     /// Run one model program with a supplied JS-native API object.
     let run

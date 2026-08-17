@@ -82,8 +82,7 @@ module HostReviewGuard =
     /// happened to expose the missing judge. Confirmation is scoped to the first
     /// PERFECT provider run whose challenge must be consumed.
     [<RequireQualifiedAccess>]
-    type private GuardNudgeOccasion =
-        | MissingVerdict of ReviewBarrierId
+    type private GuardNudgeOccasion = MissingVerdict of ReviewBarrierId
 
     let private kindForOccasion =
         function
@@ -146,9 +145,7 @@ module HostReviewGuard =
     let private releaseKey (nudgeKey: string) =
         lock SharedState.ReviewGuardNudgeGate (fun () -> SharedState.ReviewGuardNudges.Remove nudgeKey |> ignore)
 
-    let private guardOutcomeFromSend
-        (nudgeKey: string)
-        (sent: Result<PromptKey, string>) =
+    let private guardOutcomeFromSend (nudgeKey: string) (sent: Result<PromptKey, string>) =
         match sent with
         | Ok key -> GuardNudgeOutcome.Sent key
         | Error error ->
@@ -161,9 +158,11 @@ module HostReviewGuard =
         (targetSessionId: SessionId)
         (continuationKind: PromptAuthority.ContinuationKind)
         (nudgeKey: string)
-        (prompt: string) =
+        (prompt: string)
+        =
         task {
             let recordedDir = sessionDirectory targetSessionId
+
             let worktreeIsAlive =
                 recordedDir
                 |> Option.map (fun dir -> Directory.Exists dir && File.Exists(Path.Combine(dir, "AGENTS.md")))
@@ -192,7 +191,8 @@ module HostReviewGuard =
         (durable: AgentJournal)
         (targetSessionId: SessionId)
         (occasion: GuardNudgeOccasion)
-        (prompt: string) =
+        (prompt: string)
+        =
         let continuationKind = kindForOccasion occasion
         let nudgeKey = guardNudgeKey targetSessionId occasion
 
@@ -211,14 +211,10 @@ module HostReviewGuard =
         task {
             match journal with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
-            | Some durable ->
-                return! sendGuardForDurable sessionPort durable targetSessionId occasion prompt
+            | Some durable -> return! sendGuardForDurable sessionPort durable targetSessionId occasion prompt
         }
 
-    let private nudgeDurableReviewer
-        (sessionPort: ISessionHostPort)
-        (journal: AgentJournal)
-        (sessionId: SessionId) =
+    let private nudgeDurableReviewer (sessionPort: ISessionHostPort) (journal: AgentJournal) (sessionId: SessionId) =
         task {
             match currentBarrier journal sessionId with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an open review barrier"

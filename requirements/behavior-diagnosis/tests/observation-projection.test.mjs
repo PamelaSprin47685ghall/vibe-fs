@@ -3,8 +3,20 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as observation from '../../../dist/Enforcer/ObservationSurface.js'
 
-const entryFrame = (n) => observation.blogFrame({ kind: 'Entry', digest: `sha-entry-${n}`, ref: `blob-entry-${n}` })
-const squashFrame = (n) => observation.blogFrame({ kind: 'Squash', digest: `sha-squash-${n}`, ref: `blob-squash-${n}` })
+const entryFrame = (n) => observation.blogFrame({
+  kind: 'Entry',
+  digest: `sha-entry-${n}`,
+  ref: `blob-entry-${n}`,
+  coveredFrom: n - 1,
+  coveredThrough: n,
+})
+const squashFrame = (n) => observation.blogFrame({
+  kind: 'Squash',
+  digest: `sha-squash-${n}`,
+  ref: `blob-squash-${n}`,
+  coveredFrom: 0,
+  coveredThrough: 2,
+})
 const cycleRecord = (n, field) => ({
   mainSessionId: 'ses-main',
   bloggerSessionId: 'ses-blog',
@@ -114,6 +126,6 @@ test('WHAT[BD-015] OBS_PROJ_004_unpaired_tip_when_blog_lags', () => {
   const applied = observation.applyEnforcementCycle(observation.emptyEnforcement, cycleRecord(1, 'solo-tip'))
   assert.equal(applied.ok, true)
   assert.deepEqual(readObs(applied.value, observation.emptyBlog), [
-    { tipName: 'solo-tip', cycleId: 'msg_tip_1', frameDigest: undefined },
+    { tipName: 'solo-tip', cycleId: 'msg_tip_1', frameDigest: null },
   ])
 })

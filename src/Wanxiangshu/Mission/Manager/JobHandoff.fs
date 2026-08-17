@@ -113,7 +113,8 @@ module ManagerJobHandoff =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (abortedSessions: HashSet<string>)
-        (turn: ReconciledTurn) =
+        (turn: ReconciledTurn)
+        =
         task {
             match tryJobProgress journal turn.SessionId with
             | Some progress when isTransferred turn.Outcome progress ->
@@ -125,7 +126,8 @@ module ManagerJobHandoff =
     let private recordFallbackSuccessIfValid
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (terminalValid: bool) =
+        (terminalValid: bool)
+        =
         if terminalValid then
             AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
 
@@ -133,7 +135,8 @@ module ManagerJobHandoff =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (abortedSessions: HashSet<string>)
-        (turn: ReconciledTurn) =
+        (turn: ReconciledTurn)
+        =
         task {
             match tryJobProgress journal turn.SessionId with
             | Some progress when isTransferred turn.Outcome progress ->

@@ -15,7 +15,11 @@ module AssociationSurface =
 
     let private optionalText (value: obj) : string option =
         let value = text value
-        if System.String.IsNullOrWhiteSpace value then None else Some value
+
+        if System.String.IsNullOrWhiteSpace value then
+            None
+        else
+            Some value
 
     let private pairsOf (state: obj) : obj array =
         if isNull state then [||] else unbox<obj array> state
@@ -51,11 +55,12 @@ module AssociationSurface =
         |> List.choose (fun (_, entry) ->
             match entry.Kind with
             | ManagedSessionKind.WorkSession ->
-                Some
-                    (box
+                Some(
+                    box
                         {| main = SessionId.value entry.SessionId
                            blogger = entry.BloggerSessionId |> Option.map SessionId.value |> optionObj
-                           parent = entry.ParentSessionId |> Option.map SessionId.value |> optionObj |})
+                           parent = entry.ParentSessionId |> Option.map SessionId.value |> optionObj |}
+                )
             | ManagedSessionKind.SatelliteSession _ -> None)
         |> List.toArray
         |> box
@@ -84,9 +89,15 @@ module AssociationSurface =
 
     let private ownershipToJs (ownership: SessionOwnership) : obj =
         match ownership with
-        | SessionOwnership.Root -> box {| kind = "Root"; owner = null; attachment = null; transactionId = null |}
+        | SessionOwnership.Root ->
+            box
+                {| kind = "Root"
+                   owner = null
+                   attachment = null
+                   transactionId = null |}
         | SessionOwnership.Attached(owner, attachment) ->
             let kind, transactionId = attachmentLabel attachment
+
             box
                 {| kind = "Attached"
                    owner = SessionId.value owner
@@ -98,7 +109,7 @@ module AssociationSurface =
         | SessionExecutionClass.Work -> "Work"
         | SessionExecutionClass.InternalLeaf -> "InternalLeaf"
 
-    let empty : obj = [||]
+    let empty: obj = [||]
 
     let private rejectionLabel (rejection: AssociationRejection) : string =
         match rejection with
@@ -114,13 +125,24 @@ module AssociationSurface =
         let parent = optionalText (pair?parent) |> Option.map SessionId.create
 
         match SessionAssociationProjection.link main blogger parent (mapOf state) with
-        | Ok next -> box {| ok = true; value = stateOf next; error = ""; message = "" |}
+        | Ok next ->
+            box
+                {| ok = true
+                   value = stateOf next
+                   error = ""
+                   message = "" |}
         | Error rejection ->
             let message = SessionAssociationProjection.describe rejection
-            box {| ok = false; value = null; error = rejectionLabel rejection; message = message |}
+
+            box
+                {| ok = false
+                   value = null
+                   error = rejectionLabel rejection
+                   message = message |}
 
     let unlink (mainSessionId: string) (state: obj) : obj =
-        SessionAssociationProjection.unlink (SessionId.create mainSessionId) (mapOf state) |> stateOf
+        SessionAssociationProjection.unlink (SessionId.create mainSessionId) (mapOf state)
+        |> stateOf
 
     let entry (sessionId: string) (state: obj) : obj =
         SessionAssociationProjection.tryFind (SessionId.create sessionId) (mapOf state)
@@ -160,15 +182,17 @@ module AssociationSurface =
 
     let executionClass (kind: string) : obj =
         let value =
-            if kind = "InternalLeaf" then SessionExecutionClass.InternalLeaf
-            else SessionExecutionClass.Work
+            if kind = "InternalLeaf" then
+                SessionExecutionClass.InternalLeaf
+            else
+                SessionExecutionClass.Work
 
         box
             {| name = executionClassLabel value
                isWork = SessionExecutionClass.isWork value
                isInternalLeaf = SessionExecutionClass.isInternalLeaf value |}
 
-    let ownershipRoot : obj = ownershipToJs SessionOwnership.Root
+    let ownershipRoot: obj = ownershipToJs SessionOwnership.Root
 
     let ownershipAttached (owner: string) (attachment: string) : obj =
         let kind =
@@ -191,12 +215,17 @@ module AssociationSurface =
             | _ -> AttachmentKind.Companion
 
         let label, transactionId = attachmentLabel value
-        box {| name = label; transactionId = transactionId |}
+
+        box
+            {| name = label
+               transactionId = transactionId |}
 
     let bookkeeperAttachment (transactionId: string) : obj =
-        box {| name = "Bookkeeper"; transactionId = transactionId |}
+        box
+            {| name = "Bookkeeper"
+               transactionId = transactionId |}
 
-    let dedicatedExecutionClass : string = "Work"
+    let dedicatedExecutionClass: string = "Work"
 
     let dedicatedOwnership (owner: string) (role: string) : obj =
         let attachment = if role = "Coder" then "SyncCoder" else "SyncInspector"
@@ -205,11 +234,11 @@ module AssociationSurface =
     let dedicatedAttachment (role: string) : string =
         if role = "Coder" then "SyncCoder" else "SyncInspector"
 
-    let strengthExecutionClass : string = "InternalLeaf"
+    let strengthExecutionClass: string = "InternalLeaf"
 
-    let strengthOwnership (owner: string) : obj = ownershipAttached owner "StrengthReplica"
+    let strengthOwnership (owner: string) : obj =
+        ownershipAttached owner "StrengthReplica"
 
     let isStrengthReplicaAttachment (kind: string) : bool = kind = "StrengthReplica"
 
-    let satelliteKinds : string array = [| "Companion" |]
-
+    let satelliteKinds: string array = [| "Companion" |]

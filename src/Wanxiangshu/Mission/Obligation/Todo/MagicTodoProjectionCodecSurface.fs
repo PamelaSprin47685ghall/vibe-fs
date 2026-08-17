@@ -10,7 +10,10 @@ module MagicTodoProjectionCodecSurface =
     let encode (factJson: string) : obj =
         match MagicTodoFactCodec.tryDecode factJson with
         | Error error -> box {| ok = false; error = error |}
-        | Ok fact -> box {| ok = true; value = MagicTodoFactCodec.encode fact |}
+        | Ok fact ->
+            box
+                {| ok = true
+                   value = MagicTodoFactCodec.encode fact |}
 
     let decode (factJson: string) : obj =
         match MagicTodoFactCodec.tryDecode factJson with
