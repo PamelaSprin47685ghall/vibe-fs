@@ -1146,8 +1146,16 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/Handle/Surface.js',
     owner: 'managed-session-lifecycle',
-    laws: ['MANAGED-SESSION-013'],
+    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-007', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-013', 'MANAGED-SESSION-015'],
     source: 'src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'Execution/Delegation/Handle/FoldSurface.js',
+    owner: 'managed-session-lifecycle',
+    laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-008', 'MANAGED-SESSION-015'],
+    source: 'src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs',
     representation: 'json',
     kind: 'pure',
   },

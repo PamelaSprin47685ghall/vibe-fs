@@ -16,60 +16,79 @@
 // forever, because removing it would make "retired" indistinguishable from "never
 // existed", and EXEC-009 names the consequence: the caller degrades into treating
 // the input as an agent name and forks a second child.
+//
+// This test exercises the PRODUCTION HandleProjection (via HandleSurface) and
+// ExecutionFactFold (via HandleFoldSurface). No duplicate JS model is used.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  blobDigest,
-  blobRef,
-  completionKind,
-  fact,
-  fold,
-  envelope,
-  handleId,
-  handleOwnership,
-  handleProjection,
-  isSome,
-  journal,
-  roles,
-  sessionId,
-  stream,
-} from './support/managed-surface.mjs'
+import * as HandleSurface from '../../../dist/Execution/Delegation/Handle/Surface.js'
+import * as HandleFoldSurface from '../../../dist/Execution/Delegation/Handle/FoldSurface.js'
+
+// ── Plain value constructors (no production logic, just string wrappers) ────
+
+const blobRef = (value) => String(value)
+const blobDigest = (value) => String(value)
+const sessionId = (value) => String(value)
+const roles = { of: (value) => String(value) }
+const handleOwnership = {
+  durableParentHandle: () => 'DurableParentHandle',
+  hostOwnedHidden: () => 'HostOwnedHidden',
+}
+const completionKind = { of: (value) => String(value) }
+const isSome = (value) => value !== undefined && value !== null
+const fact = (caseName, payload) => ({ case: caseName, payload })
+const envelope = ({ seq, stream, fact: value }) => ({ seq, stream, fact: value })
+const stream = { session: (value) => `session:${value}` }
+
+const handleId = {
+  agent: HandleSurface.handleIdAgent,
+  pty: HandleSurface.handleIdPty,
+  managerJob: HandleSurface.handleIdManagerJob,
+  describe: HandleSurface.handleIdDescribe,
+  tryAgent: HandleSurface.handleIdTryAgent,
+}
 
 const PARENT = sessionId('ses_p')
 const CHILD = sessionId('ses_c')
 const HANDLE = handleId.agent('h1')
 
-const linkOn = (projection, { handle = HANDLE, child = CHILD, agent = 'fast-coder', role = 'Coder' } = {}) => {
-  const applied = handleProjection.link(handle, child, agent, roles.of(role), projection)
-  assert.equal(applied.ok, true, applied.ok ? '' : `link refused: ${applied.error}`)
-  return applied.value
+// ── Projection command helpers (call production HandleSurface) ───────────────
+
+const linkOn = (state, { handle = HANDLE, child = CHILD, agent = 'fast-coder', role = 'Coder' } = {}) => {
+  const applied = HandleSurface.apply(state, { op: 'link', handle, child, agent, role })
+  assert.equal(applied.ok, true, applied.ok ? '' : `link refused: ${JSON.stringify(applied.error)}`)
+  return applied.state
 }
 
-const completeOn = (projection, { handle = HANDLE, kind = 'Terminal', ref, digest } = {}) => {
-  const applied = handleProjection.complete(
-    handle,
-    handleProjection.completionOf(kind, ref, digest),
-    projection,
-  )
-  assert.equal(applied.ok, true, applied.ok ? '' : `complete refused: ${applied.error}`)
-  return applied.value
+const completeOn = (state, { handle = HANDLE, kind = 'Terminal', ref, digest } = {}) => {
+  const command = { op: 'complete', handle, kind }
+  if (ref !== undefined) command.ref = ref
+  if (digest !== undefined) command.digest = digest
+  const applied = HandleSurface.apply(state, command)
+  assert.equal(applied.ok, true, applied.ok ? '' : `complete refused: ${JSON.stringify(applied.error)}`)
+  return applied.state
 }
 
-const retireOn = (projection, { handle = HANDLE } = {}) => {
-  const applied = handleProjection.retire(handle, projection)
-  assert.equal(applied.ok, true, applied.ok ? '' : `retire refused: ${applied.error}`)
-  return applied.value
+const abandonOn = (state, { handle = HANDLE, reason = 'ParentCancelled' } = {}) => {
+  const applied = HandleSurface.apply(state, { op: 'abandon', handle, reason })
+  assert.equal(applied.ok, true, applied.ok ? '' : `abandon refused: ${JSON.stringify(applied.error)}`)
+  return applied.state
 }
 
-const stateOf = (projection, handle = HANDLE) => handleProjection.read(handleProjection.tryFind(handle, projection))
+const retireOn = (state, { handle = HANDLE } = {}) => {
+  const applied = HandleSurface.apply(state, { op: 'retire', handle })
+  assert.equal(applied.ok, true, applied.ok ? '' : `retire refused: ${JSON.stringify(applied.error)}`)
+  return applied.state
+}
+
+const stateOf = (state, handle = HANDLE) => HandleSurface.read(state, handle)
 
 /** Which handles each derived view returns, as sorted describe() strings. */
-const views = (projection) => ({
-  listable: handleProjection.listable(projection).map((r) => handleProjection.read(r).handle).sort(),
-  joinable: handleProjection.joinable(projection).map((r) => handleProjection.read(r).handle).sort(),
-  active: handleProjection.activeHandles(projection).map((r) => handleProjection.read(r).handle).sort(),
-})
+const views = (state) => {
+  const v = HandleSurface.views(state)
+  return { listable: [...v.listable].sort(), joinable: [...v.joinable].sort(), active: [...v.active].sort() }
+}
 
 // ── EXEC-009: typed handles are distinct identities ──────────────────────────
 
@@ -77,27 +96,27 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_agent_pty_and_manager_job_handles_are_s
   // The same string in three handle kinds must be three map keys. Collapsing them
   // to the raw string would let retiring an agent handle retire the PTY that
   // happens to share its id.
-  let projection = linkOn(handleProjection.empty, { handle: handleId.agent('x'), child: sessionId('ses_a') })
-  projection = linkOn(projection, {
+  let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('x'), child: sessionId('ses_a') })
+  state = linkOn(state, {
     handle: handleId.pty('x'),
     child: sessionId('ses_b'),
     agent: 'fast-devops',
     role: 'DevOps',
   })
-  projection = linkOn(projection, {
+  state = linkOn(state, {
     handle: handleId.managerJob('x'),
     child: sessionId('ses_j'),
     agent: 'fast-manager',
     role: 'Manager',
   })
 
-  assert.deepEqual(views(projection).active, ['agent:x', 'manager-job:x', 'pty:x'])
+  assert.deepEqual(views(state).active, ['agent:x', 'manager-job:x', 'pty:x'])
 
   // Retiring one leaves the other two untouched.
-  const retired = retireOn(completeOn(projection, { handle: handleId.agent('x') }), { handle: handleId.agent('x') })
+  const retired = retireOn(completeOn(state, { handle: handleId.agent('x') }), { handle: handleId.agent('x') })
 
-  assert.equal(handleProjection.isRetired(handleId.agent('x'), retired), true)
-  assert.equal(handleProjection.isRetired(handleId.pty('x'), retired), false)
+  assert.equal(HandleSurface.isRetired(retired, handleId.agent('x')), true)
+  assert.equal(HandleSurface.isRetired(retired, handleId.pty('x')), false)
   assert.equal(stateOf(retired, handleId.pty('x')).lifecycle, 'Active')
 })
 
@@ -119,9 +138,9 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_a_linked_handle_records_the_child_sessi
   // The field this pins was missing until package F: `HandleLinked` carried no
   // child SessionId, so eight consumers could not get from a handle to its child
   // and every read side of EXEC-009 was dangling.
-  const projection = linkOn(handleProjection.empty)
+  const state = linkOn(HandleSurface.empty())
 
-  assert.deepEqual(stateOf(projection), {
+  assert.deepEqual(stateOf(state), {
     handle: 'agent:h1',
     child: 'ses_c',
     targetAgent: 'fast-coder',
@@ -141,13 +160,13 @@ test('WHAT[MANAGED-SESSION-007] EXEC_004_the_first_completion_wins_and_later_one
   // Terminal, send-failure and cancel race for one cell. The loser must be
   // REFUSED rather than overwrite the winner, or a cancelled child could report
   // the terminal it never reached.
-  const completed = completeOn(linkOn(handleProjection.empty), { kind: 'Terminal' })
+  const completed = completeOn(linkOn(HandleSurface.empty()), { kind: 'Terminal' })
   assert.equal(stateOf(completed).completion, 'Terminal')
 
   for (const late of ['SendFailure', 'Cancelled', 'Terminal']) {
     assert.deepEqual(
-      handleProjection.complete(HANDLE, handleProjection.completionOf(late), completed),
-      { ok: false, error: 'AlreadyCompleted' },
+      HandleSurface.apply(completed, { op: 'complete', handle: HANDLE, kind: late }),
+      { ok: false, error: { kind: 'TransitionRejected', reason: 'AlreadyCompleted' } },
       `a late ${late} must not overwrite the first winner`,
     )
   }
@@ -159,7 +178,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_004_each_completion_kind_survives_into_the_
   // EXEC-005 requires `list` to say WHICH completion landed, so the kind is part
   // of the lifecycle state rather than a boolean beside it.
   for (const kind of ['Terminal', 'SendFailure', 'Cancelled']) {
-    const completed = completeOn(linkOn(handleProjection.empty), { kind })
+    const completed = completeOn(linkOn(HandleSurface.empty()), { kind })
     assert.deepEqual(
       { lifecycle: stateOf(completed).lifecycle, completion: stateOf(completed).completion },
       { lifecycle: 'CompletedAwaitingJoin', completion: kind },
@@ -168,27 +187,33 @@ test('WHAT[MANAGED-SESSION-007] EXEC_004_each_completion_kind_survives_into_the_
 })
 
 test('WHAT[MANAGED-SESSION-007] EXEC_004_completing_an_unknown_handle_is_refused_by_name', () => {
-  const projection = linkOn(handleProjection.empty)
+  const state = linkOn(HandleSurface.empty())
 
-  assert.deepEqual(handleProjection.complete(handleId.agent('never'), handleProjection.completionOf('Terminal'), projection), {
-    ok: false,
-    error: 'UnknownHandle',
-  })
+  assert.deepEqual(
+    HandleSurface.apply(state, { op: 'complete', handle: handleId.agent('never'), kind: 'Terminal' }),
+    { ok: false, error: { kind: 'TransitionRejected', reason: 'UnknownHandle' } },
+  )
 })
 
 test('WHAT[MANAGED-SESSION-008] EXEC_004_join_may_only_retire_a_handle_that_actually_completed', () => {
   // `retire` IS join's write. Retiring an active handle would discard a child
   // that is still running and leave its completion with nowhere to land.
-  const active = linkOn(handleProjection.empty)
+  const active = linkOn(HandleSurface.empty())
 
-  assert.deepEqual(handleProjection.retire(HANDLE, active), { ok: false, error: 'NotCompleted' })
-  assert.deepEqual(handleProjection.retire(handleId.agent('never'), active), { ok: false, error: 'UnknownHandle' })
+  assert.deepEqual(
+    HandleSurface.apply(active, { op: 'retire', handle: HANDLE }),
+    { ok: false, error: { kind: 'TransitionRejected', reason: 'NotCompleted' } },
+  )
+  assert.deepEqual(
+    HandleSurface.apply(active, { op: 'retire', handle: handleId.agent('never') }),
+    { ok: false, error: { kind: 'TransitionRejected', reason: 'UnknownHandle' } },
+  )
 })
 
 // ── EXEC-005: the three derived views, and what each excludes ────────────────
 
 test('WHAT[MANAGED-SESSION-006] EXEC_005_the_views_partition_the_lifecycle_and_never_show_retired', () => {
-  const active = linkOn(handleProjection.empty)
+  const active = linkOn(HandleSurface.empty())
   const completed = completeOn(active)
   const retired = retireOn(completed)
 
@@ -207,52 +232,55 @@ test('WHAT[MANAGED-SESSION-006] EXEC_005_the_views_partition_the_lifecycle_and_n
 test('WHAT[MANAGED-SESSION-009] EXEC_009_parent_abort_needs_the_handles_themselves_not_a_count', () => {
   // "Cancel every owned physical resource individually" is only expressible if
   // the caller gets the ids. A count would force it to guess which ones.
-  let projection = linkOn(handleProjection.empty, { handle: handleId.agent('a'), child: sessionId('ses_1') })
-  projection = linkOn(projection, { handle: handleId.agent('b'), child: sessionId('ses_2') })
-  projection = linkOn(projection, { handle: handleId.pty('p'), child: sessionId('ses_3'), role: 'DevOps' })
+  let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('a'), child: sessionId('ses_1') })
+  state = linkOn(state, { handle: handleId.agent('b'), child: sessionId('ses_2') })
+  state = linkOn(state, { handle: handleId.pty('p'), child: sessionId('ses_3'), role: 'DevOps' })
 
   // One has already completed, so it is no longer an active resource.
-  projection = completeOn(projection, { handle: handleId.agent('b') })
+  state = completeOn(state, { handle: handleId.agent('b') })
 
-  assert.deepEqual(views(projection).active, ['agent:a', 'pty:p'])
+  assert.deepEqual(views(state).active, ['agent:a', 'pty:p'])
 })
 
 // ── EXEC-009: the tombstone is permanent ────────────────────────────────────
 
 test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_handle_answers_retired_forever', () => {
-  const retired = retireOn(completeOn(linkOn(handleProjection.empty)))
+  const retired = retireOn(completeOn(linkOn(HandleSurface.empty())))
 
-  assert.equal(handleProjection.isRetired(HANDLE, retired), true)
+  assert.equal(HandleSurface.isRetired(retired, HANDLE), true)
   assert.equal(stateOf(retired).lifecycle, 'Retired')
 
   // Every transition is refused from here, including a second retirement.
-  assert.deepEqual(handleProjection.retire(HANDLE, retired), { ok: false, error: 'HandleIsRetired' })
-  assert.deepEqual(handleProjection.complete(HANDLE, handleProjection.completionOf('Terminal'), retired), {
-    ok: false,
-    error: 'HandleIsRetired',
-  })
+  assert.deepEqual(
+    HandleSurface.apply(retired, { op: 'retire', handle: HANDLE }),
+    { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIsRetired' } },
+  )
+  assert.deepEqual(
+    HandleSurface.apply(retired, { op: 'complete', handle: HANDLE, kind: 'Terminal' }),
+    { ok: false, error: { kind: 'TransitionRejected', reason: 'HandleIsRetired' } },
+  )
   // Retired handles are reusable — same agent id reopens on the same child session
   // (HandleLinked re-append → Active) for the next work unit. The tombstone is
   // the prior LastCompletion blob, not a ban on further Labor.
-  const reopened = handleProjection.link(HANDLE, CHILD, 'fast-coder', roles.of('Coder'), retired)
+  const reopened = HandleSurface.apply(retired, { op: 'link', handle: HANDLE, child: CHILD, agent: 'fast-coder', role: 'Coder' })
   assert.equal(reopened.ok, true, `Retired handle must be reopenable for reuse, got ${JSON.stringify(reopened)}`)
-  assert.equal(handleProjection.isRetired(HANDLE, reopened.ok ? reopened.value : retired), false)
-  assert.deepEqual(reopened.ok ? handleProjection.read(handleProjection.tryFind(HANDLE, reopened.value)).lifecycle : null, 'Active')
+  assert.equal(HandleSurface.isRetired(reopened.ok ? reopened.state : retired, HANDLE), false)
+  assert.equal(stateOf(reopened.ok ? reopened.state : retired).lifecycle, 'Active')
 })
 
 test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_id_is_distinguishable_from_one_that_never_existed', () => {
   // The exact confusion the tombstone prevents. If the record were deleted on
   // retire, these two lookups would be identical and `fork` would treat a spent
   // handle id as an agent name.
-  const retired = retireOn(completeOn(linkOn(handleProjection.empty)))
+  const retired = retireOn(completeOn(linkOn(HandleSurface.empty())))
 
-  assert.equal(isSome(handleProjection.tryFind(HANDLE, retired)), true)
-  assert.equal(isSome(handleProjection.tryFind(handleId.agent('never'), retired)), false)
+  assert.equal(isSome(HandleSurface.tryFind(retired, HANDLE)), true)
+  assert.equal(isSome(HandleSurface.tryFind(retired, handleId.agent('never'))), false)
 
   assert.deepEqual(
     {
-      retiredId: handleProjection.isRetired(HANDLE, retired),
-      unknownId: handleProjection.isRetired(handleId.agent('never'), retired),
+      retiredId: HandleSurface.isRetired(retired, HANDLE),
+      unknownId: HandleSurface.isRetired(retired, handleId.agent('never')),
     },
     { retiredId: true, unknownId: false },
   )
@@ -261,33 +289,33 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_id_is_distinguishable_from_on
 test('WHAT[MANAGED-SESSION-006] EXEC_009_a_retired_child_session_is_still_recognised_as_a_child', () => {
   // "Is this session one of mine" must answer yes for a child that already
   // finished — otherwise a late event from it looks like it came from a stranger.
-  const retired = retireOn(completeOn(linkOn(handleProjection.empty)))
-  const found = handleProjection.tryFindByChildSession(CHILD, retired)
+  const retired = retireOn(completeOn(linkOn(HandleSurface.empty())))
+  const found = HandleSurface.tryFindByChildSession(retired, CHILD)
 
   assert.equal(isSome(found), true)
-  assert.equal(handleProjection.read(found).lifecycle, 'Retired')
-  assert.equal(isSome(handleProjection.tryFindByChildSession(sessionId('ses_other'), retired)), false)
+  assert.equal(HandleSurface.read(retired, HANDLE).lifecycle, 'Retired')
+  assert.equal(isSome(HandleSurface.tryFindByChildSession(retired, sessionId('ses_other'))), false)
 })
 
 test('WHAT[MANAGED-SESSION-015] EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating', () => {
   // Restart recovery re-links the same handle id to the same session. That must
   // be idempotent for a live handle — and refused only once retired.
-  const projection = linkOn(handleProjection.empty)
-  const relinked = linkOn(projection)
+  const state = linkOn(HandleSurface.empty())
+  const relinked = linkOn(state)
 
-  assert.equal(handleProjection.linkedChildren(relinked).length, 1)
-  assert.deepEqual(stateOf(relinked), stateOf(projection))
+  assert.equal(HandleSurface.linkedChildren(relinked).length, 1)
+  assert.deepEqual(stateOf(relinked), stateOf(state))
 })
 
 test('WHAT[MANAGED-SESSION-006] EXEC_009_linked_children_lists_every_child_ever_linked', () => {
   // Replaces the old live-only `LinkedChildren` map, which forced restart
   // recovery and the retired-handle check to use two different structures.
-  let projection = linkOn(handleProjection.empty, { handle: handleId.agent('a'), child: sessionId('ses_1') })
-  projection = linkOn(projection, { handle: handleId.agent('b'), child: sessionId('ses_2') })
-  projection = retireOn(completeOn(projection, { handle: handleId.agent('a') }), { handle: handleId.agent('a') })
+  let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('a'), child: sessionId('ses_1') })
+  state = linkOn(state, { handle: handleId.agent('b'), child: sessionId('ses_2') })
+  state = retireOn(completeOn(state, { handle: handleId.agent('a') }), { handle: handleId.agent('a') })
 
   assert.deepEqual(
-    handleProjection.linkedChildren(projection).map((r) => handleProjection.read(r).child).sort(),
+    HandleSurface.linkedChildren(state).map((r) => r.child).sort(),
     ['ses_1', 'ses_2'],
     'a retired child stays in the list',
   )
@@ -322,18 +350,26 @@ const handleFact = {
 }
 
 const foldFacts = (facts) =>
-  fold.apply(
-    fold.empty,
+  HandleFoldSurface.foldApply(
+    HandleFoldSurface.foldEmpty(),
     facts.map((value, index) => envelope({ seq: index + 1, stream: stream.session(PARENT), fact: value })),
   )
+
+const foldStateOf = (folded, handle = HANDLE) => {
+  const handles = HandleFoldSurface.foldSession(folded.state, 'ses_p')
+  return HandleSurface.read(handles, handle)
+}
+
+const foldViews = (folded) => {
+  const handles = HandleFoldSurface.foldSession(folded.state, 'ses_p')
+  return views(handles)
+}
 
 test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_terminal_state', () => {
   const folded = foldFacts([handleFact.linked, handleFact.completed, handleFact.retired])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
 
-  const handles = fold.session(folded.value, 'ses_p').Handles
-
-  assert.deepEqual(handleProjection.read(handleProjection.tryFind(HANDLE, handles)), {
+  assert.deepEqual(foldStateOf(folded), {
     handle: 'agent:h1',
     child: 'ses_c',
     targetAgent: 'fast-coder',
@@ -345,7 +381,7 @@ test('WHAT[MANAGED-SESSION-006] EXEC_009_the_three_facts_replay_into_the_termina
     completionDigest: undefined,
     abandonReason: undefined,
   })
-  assert.deepEqual(views(handles), { listable: [], joinable: [], active: [] })
+  assert.deepEqual(foldViews(folded), { listable: [], joinable: [], active: [] })
 })
 
 test('WHAT[MANAGED-SESSION-008] EXEC_009_a_replayed_completion_or_retirement_is_absorbed', () => {
@@ -360,8 +396,7 @@ test('WHAT[MANAGED-SESSION-008] EXEC_009_a_replayed_completion_or_retirement_is_
   ])
 
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-  const handles = fold.session(folded.value, 'ses_p').Handles
-  assert.equal(handleProjection.read(handleProjection.tryFind(HANDLE, handles)).lifecycle, 'Retired')
+  assert.equal(foldStateOf(folded).lifecycle, 'Retired')
 })
 
 test('WHAT[MANAGED-SESSION-015] EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay', () => {
@@ -391,7 +426,7 @@ test('WHAT[MANAGED-SESSION-008] EXEC_004_a_retirement_without_a_completion_stops
 // ── EXEC-001: fork creates a child run and list / join show its lifecycle ─────
 
 test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
-  const active = linkOn(handleProjection.empty)
+  const active = linkOn(HandleSurface.empty())
 
   assert.deepEqual(views(active), { listable: ['agent:h1'], joinable: [], active: ['agent:h1'] })
   assert.deepEqual(stateOf(active), {
@@ -412,26 +447,26 @@ test('WHAT[MANAGED-SESSION-006] EXEC_001_fork_creates_a_child_run', () => {
 
   const joined = retireOn(completed)
   assert.deepEqual(views(joined), { listable: [], joinable: [], active: [] })
-  assert.equal(handleProjection.isRetired(HANDLE, joined), true)
+  assert.equal(HandleSurface.isRetired(joined, HANDLE), true)
 })
 
 // ── EXEC-007: a nudge to an active handle does not create a second run ─────────
 
 test('WHAT[MANAGED-SESSION-006] EXEC_007_nudge_is_fire_and_forget', () => {
-  const active = linkOn(handleProjection.empty)
+  const active = linkOn(HandleSurface.empty())
   const nudged = linkOn(active, { child: CHILD, agent: 'fast-coder', role: 'Coder' })
 
   // A nudge re-uses the same handle; it does not add a new child, listener,
   // or completion cell.
   assert.deepEqual(views(nudged).active, ['agent:h1'])
-  assert.equal(handleProjection.linkedChildren(nudged).length, 1)
+  assert.equal(HandleSurface.linkedChildren(nudged).length, 1)
   assert.deepEqual(stateOf(nudged).child, 'ses_c')
 })
 
 // ── EXEC-009: durable completion payload on the lifecycle ────────────────────
 
 test('WHAT[MANAGED-SESSION-007] EXEC_009_completed_awaiting_join_carries_blob_refs', () => {
-  const completed = completeOn(linkOn(handleProjection.empty), {
+  const completed = completeOn(linkOn(HandleSurface.empty()), {
     kind: 'Terminal',
     ref: blobRef('blobs/completion-h1'),
     digest: blobDigest('sha-completion-h1'),
@@ -453,7 +488,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_completed_awaiting_join_carries_blob_re
 })
 
 test('WHAT[MANAGED-SESSION-007] EXEC_009_cancelled_completion_has_no_blob', () => {
-  const cancelled = completeOn(linkOn(handleProjection.empty), { kind: 'Cancelled' })
+  const cancelled = completeOn(linkOn(HandleSurface.empty()), { kind: 'Cancelled' })
   assert.deepEqual(
     {
       lifecycle: stateOf(cancelled).lifecycle,
@@ -473,8 +508,7 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_cancelled_completion_has_no_blob', () =
 test('WHAT[MANAGED-SESSION-007] EXEC_009_fold_replays_completion_blob_refs', () => {
   const folded = foldFacts([handleFact.linked, handleFact.completedWithBlob])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-  const handles = fold.session(folded.value, 'ses_p').Handles
-  assert.deepEqual(stateOf(handles), {
+  assert.deepEqual(foldStateOf(folded), {
     handle: 'agent:h1',
     child: 'ses_c',
     targetAgent: 'fast-coder',
@@ -498,8 +532,8 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_codec_migrates_0_5_1_handle_completed_m
     CompletionRef: undefined,
     CompletionDigest: undefined,
   })
-  const modernLine = journal.serializeFact(modern)
-  const modernDecoded = journal.deserializeFact(modernLine)
+  const modernLine = HandleSurface.serializeFact(modern)
+  const modernDecoded = HandleSurface.deserializeFact(modernLine)
   assert.equal(modernDecoded.ok, true, modernDecoded.ok ? '' : modernDecoded.error)
 
   // Strip the new keys to simulate a 0.5.1 line, then migrate on read.
@@ -510,15 +544,78 @@ test('WHAT[MANAGED-SESSION-007] EXEC_009_codec_migrates_0_5_1_handle_completed_m
     .replace(/"CompletionDigest":null,/g, '')
   assert.equal(stripped.includes('CompletionRef'), false, 'fixture must lack CompletionRef')
   assert.equal(stripped.includes('CompletionDigest'), false, 'fixture must lack CompletionDigest')
-  const migrated = journal.deserializeFact(stripped)
+  const migrated = HandleSurface.deserializeFact(stripped)
   assert.equal(migrated.ok, true, migrated.ok ? '' : migrated.error)
 
   // Fold the migrated fact: missing refs become None, handle is still joinable.
   const folded = foldFacts([handleFact.linked, migrated.value])
   assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
-  const state = stateOf(fold.session(folded.value, 'ses_p').Handles)
+  const state = foldStateOf(folded)
   assert.equal(state.lifecycle, 'CompletedAwaitingJoin')
   assert.equal(state.completion, 'Terminal')
   assert.equal(state.completionRef, undefined)
   assert.equal(state.completionDigest, undefined)
+})
+
+// ── Fail-closed input canaries (JS-SEMANTIC-SURFACE-003) ─────────────────────
+//
+// The surface must refuse unrecognized inputs rather than silently defaulting.
+// A mutation that makes a parser default unknown→Coder/Agent/Terminal would
+// make these canaries fail.
+
+test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_role', () => {
+  const result = HandleSurface.apply(HandleSurface.empty(), {
+    op: 'link',
+    handle: HANDLE,
+    child: CHILD,
+    agent: 'fast-coder',
+    role: 'Plumber',
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.error.kind, 'UnknownRole')
+  assert.equal(result.error.value, 'Plumber')
+})
+
+test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_completion_kind', () => {
+  const state = linkOn(HandleSurface.empty())
+  const result = HandleSurface.apply(state, { op: 'complete', handle: HANDLE, kind: 'Exploded' })
+  assert.equal(result.ok, false)
+  assert.equal(result.error.kind, 'UnknownCompletionKind')
+  assert.equal(result.error.value, 'Exploded')
+})
+
+test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_abandon_reason', () => {
+  const state = linkOn(HandleSurface.empty())
+  const result = HandleSurface.apply(state, { op: 'abandon', handle: HANDLE, reason: 'Boredom' })
+  assert.equal(result.ok, false)
+  assert.equal(result.error.kind, 'UnknownAbandonReason')
+  assert.equal(result.error.value, 'Boredom')
+})
+
+test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_ownership', () => {
+  const result = HandleSurface.apply(HandleSurface.empty(), {
+    op: 'link',
+    handle: HANDLE,
+    child: CHILD,
+    agent: 'fast-coder',
+    role: 'Coder',
+    ownership: 'AlienOwned',
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.error.kind, 'UnknownOwnership')
+  assert.equal(result.error.value, 'AlienOwned')
+})
+
+test('WHAT[MANAGED-SESSION-006] surface_refuses_unknown_command_op', () => {
+  const result = HandleSurface.apply(HandleSurface.empty(), { op: 'frobnicate', handle: HANDLE })
+  assert.equal(result.ok, false)
+  assert.equal(result.error.kind, 'UnknownCommand')
+  assert.equal(result.error.value, 'frobnicate')
+})
+
+test('WHAT[MANAGED-SESSION-008] fold_refuses_unknown_fact_case', () => {
+  const folded = foldFacts([fact('HandleExploded', { ParentSessionId: PARENT, Handle: HANDLE })])
+  assert.equal(folded.ok, false)
+  assert.equal(folded.error.kind, 'UnknownFactCase')
+  assert.equal(folded.error.value, 'HandleExploded')
 })

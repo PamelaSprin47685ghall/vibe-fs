@@ -216,6 +216,7 @@
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fs"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
+    <Compile Include="Execution/Delegation/Handle/FoldSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>
     <Compile Include="Context/Companion/FoldSurface.fs"/>
     <Compile Include="Execution/Delegation/HostTurnObservedSurface.fs"/>
