@@ -174,6 +174,7 @@ module SyncDelegateSurface =
             let attached = new AttachedSessionRuntime()
             let gate = new SessionQuiescenceGate()
 
+            // DSL-MUTABLE: resource — answer registry by session id
             let answers = Dictionary<string, string>()
 
             let workRecordFor (sessionId: SessionId) (_range: MagicTodoLwr.BoundedRange) =

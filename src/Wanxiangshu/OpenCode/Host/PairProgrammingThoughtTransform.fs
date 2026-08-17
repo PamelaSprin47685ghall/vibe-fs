@@ -569,8 +569,11 @@ module PairProgrammingThoughtTransform =
             |> List.filter (fun pair -> gapPresent addressSet pair.CallGap && gapPresent addressSet pair.ResultGap)
 
         let starts = ResizeArray<PairProgrammingGuidelineWire>()
+        // DSL-MUTABLE: algorithm-scratch — before-gap pair bucket
         let before = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
+        // DSL-MUTABLE: algorithm-scratch — after-gap pair bucket
         let after = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
+        // DSL-MUTABLE: algorithm-scratch — cursor result-gap pair bucket
         let cursorAfter = Dictionary<string, ResizeArray<PairProgrammingGuidelineWire>>()
 
         for pair in placeable do

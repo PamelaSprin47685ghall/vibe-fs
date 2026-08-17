@@ -41,6 +41,7 @@ module RuntimePath =
     /// journal resolves it on every store open, which showed up as ~69 `git` spawns in a single
     /// canary — synchronous ones, so each blocked the whole event loop for a fact that had not
     /// changed since the first answer.
+    // DSL-MUTABLE: resource — git common-dir answer cache by workspace
     let private commonDirAnswers = Collections.Generic.Dictionary<string, string>()
 
     let private askGitCommonDir (workspace: string) : string =

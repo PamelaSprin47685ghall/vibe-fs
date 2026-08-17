@@ -19,7 +19,9 @@ open Wanxiangshu.OpenCode
 module FissionHostSurface =
 
     type private CallFlags() =
+        // DSL-MUTABLE: single-flight — one-shot continuation sent latch.
         member val ContinuationSent = false with get, set
+        // DSL-MUTABLE: single-flight — one-shot terminal notified latch.
         member val TerminalNotified = false with get, set
 
     type private DummyDeadline() =

@@ -21,6 +21,7 @@ module SharedTerminalBus =
           mutable RefCount: int }
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — shared terminal port refcount registry
     let private shared = Dictionary<string, SharedPort>()
 
     let acquire (directory: string) : Events.HostEventPort =

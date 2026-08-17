@@ -33,6 +33,7 @@ type HostForkRunLifecycleHandle
               Subscription = None
               Finished = false }
 
+        // DSL-MUTABLE: resource — pending host run registry by agent id
         let pendingRuns = Dictionary<string, PendingHostRun>()
         pendingRuns.[agentId] <- run
         HostForkRunLifecycleHandle(obj (), pendingRuns, SessionId.create parentId, run)

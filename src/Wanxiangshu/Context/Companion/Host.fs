@@ -396,10 +396,12 @@ type CompanionHost
     /// the CompanionHost so the squash attempt lands in `scope.Recovery.AttemptPlans` like
     /// any X attempt. A no-op is correct for a scope-less CompanionHost (tests,
     /// tools), which has no reconcile pass that could consult a plan.
+    // DSL-MUTABLE: resource — injectable squash plan callback holder.
     member val RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit = fun _ _ -> () with get, set
 
     /// ENFORCER-045: optional stage hook kept for tests; production freezes
     /// CurrentRequest via BloggerCoordinator before send (not this callback).
+    // DSL-MUTABLE: resource — injectable blogger context stage callback holder.
     member val StageBloggerContext: SessionId -> BloggerRequestContext -> unit = fun _ _ -> () with get, set
 
     /// Ensure the Blogger child exists (create or restore). Key for runtime cell.

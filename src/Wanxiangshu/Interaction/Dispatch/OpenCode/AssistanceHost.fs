@@ -110,8 +110,11 @@ type AssistanceHost
     let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
     let consultationAgent = ManagedAgentCatalog.nameOf AgentTier.Deep Role.Inquiry
     let claimGate = obj ()
+    // DSL-MUTABLE: single-flight — claimed owner attempt latch
     let claimedOwnerAttempts = HashSet<string>()
+    // DSL-MUTABLE: resource — dropped owner set
     let droppedOwners = HashSet<string>()
+    // DSL-MUTABLE: subscription — terminal subscription registry per child
     let terminalSubscriptions = Dictionary<string, IDisposable>()
 
     let assistanceLines (sessionId: SessionId) (path: string) =

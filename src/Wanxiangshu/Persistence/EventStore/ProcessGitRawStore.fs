@@ -37,6 +37,7 @@ module private ProcessGitTreeHash =
 /// process spawn every time a session opened the store — measured 27 `--git-common-dir` spawns in
 /// a single canary, all answering the same question about the same directory.
 module private ProcessGitLayout =
+    // DSL-MUTABLE: resource — git layout answer cache by key
     let private answers = Collections.Generic.Dictionary<string, Task<string option>>()
 
     let resolve (key: string) (ask: unit -> Task<string option>) : Task<string option> =
@@ -119,8 +120,11 @@ module private ProcessGitExec =
 type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
     let zeroOid = String('0', 40)
 
+    // DSL-MUTABLE: resource — git object content cache (immutable oid → bytes)
     let objectCache = Collections.Generic.Dictionary<string, byte[]>()
+    // DSL-MUTABLE: resource — git tree entry cache (immutable oid → entries)
     let treeCache = Collections.Generic.Dictionary<string, TreeEntry list>()
+    // DSL-MUTABLE: resource — written tree cache (content digest → oid)
     let writtenTreeCache = Collections.Generic.Dictionary<string, GitObjectId>()
 
     let utf8 (bytes: byte[]) = Encoding.UTF8.GetString(bytes)

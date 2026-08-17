@@ -56,8 +56,11 @@ open Wanxiangshu.Foundation.Identity
 /// OwnedSessions、UserMessageBindings、hook 订阅、每实例 NudgeSent（非 guard）。
 module SharedState =
 
+    // DSL-MUTABLE: resource — cross-instance session parent map
     let SessionParents = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — cross-instance verdict session set
     let VerdictSessions = HashSet<string>()
+    // DSL-MUTABLE: resource — cross-instance session directory map
     let SessionDirectories = Dictionary<string, string>()
 
     /// REVIEW-003 / HOST-012: missing-verdict + confirm-perfect guard nudge
@@ -69,6 +72,7 @@ module SharedState =
     /// the provider run that merely observed the missing judge. Confirmation is
     /// session + the first PERFECT provider run whose challenge is outstanding.
     let ReviewGuardNudgeGate = obj ()
+    // DSL-MUTABLE: single-flight — cross-instance review guard nudge reservation set
     let ReviewGuardNudges = HashSet<string>()
 
     /// Unit-test isolation only: production must not wipe cross-instance reservations.
@@ -91,6 +95,7 @@ module SharedState =
     /// Per-instance flights made HasFlight miss → AbortSession → no BlogObservationCommitted
     /// → Finality hung on journal-work-log (orchestrator-publish frontier).
     let BloggerFlightGate = obj ()
+    // DSL-MUTABLE: resource — cross-instance blogger flight ownership registry
     let BloggerFlights = Dictionary<string, BloggerRequestContext>()
 
     /// Unit-test isolation only: production Dispose must not wipe cross-instance flights.

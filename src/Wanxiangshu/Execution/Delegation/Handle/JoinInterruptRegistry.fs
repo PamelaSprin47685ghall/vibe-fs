@@ -60,6 +60,7 @@ type IJoinAttemptRegistry =
 /// Thread-safe process-local attempt registry (Dictionary + lock).
 type JoinAttemptRegistry() =
     let gate = obj ()
+    // DSL-MUTABLE: resource — active join attempt registry by session key
     let active = Dictionary<string, ResizeArray<JoinAttemptLease>>()
 
     let removeLease (key: string) (list: ResizeArray<JoinAttemptLease>) (lease: JoinAttemptLease) =
@@ -80,6 +81,7 @@ type JoinAttemptRegistry() =
             let interrupt = JoinInterrupt.create ()
             // A mutable cell lets the dispose closure reference the lease without a
             // recursive-object construction (avoids F# warning 40 / TreatWarningsAsErrors).
+            // DSL-MUTABLE: resource — lease self-reference cell for dispose closure
             let leaseRef = ref Unchecked.defaultof<JoinAttemptLease>
 
             let lease =

@@ -19,6 +19,7 @@ module Pty =
         PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8))
 
     let private parentGate = obj ()
+    // DSL-MUTABLE: resource — cross-runtime parent-abort callback registry
     let private parentAborters = Dictionary<string, Dictionary<int, unit -> unit>>()
     // DSL-MUTABLE: resource — monotonic abort-token counter under parentGate
     let mutable private nextAbortToken = 0
@@ -32,6 +33,7 @@ module Pty =
                 match parentAborters.TryGetValue parentId with
                 | true, values -> values
                 | _ ->
+                    // DSL-MUTABLE: resource — per-parent callback registry
                     let values = Dictionary<int, unit -> unit>()
                     parentAborters.[parentId] <- values
                     values

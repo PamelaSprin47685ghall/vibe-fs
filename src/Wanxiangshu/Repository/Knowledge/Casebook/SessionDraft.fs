@@ -32,6 +32,7 @@ type CasebookTurn = { Q: string; A: string option }
 type CasebookDraft = { Turns: CasebookTurn list }
 
 module CasebookDraftStore =
+    // DSL-MUTABLE: resource — per-session casebook draft registry
     let private drafts = Dictionary<string, CasebookDraft>()
     let private gate = obj ()
 

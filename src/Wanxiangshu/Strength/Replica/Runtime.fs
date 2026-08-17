@@ -375,6 +375,7 @@ type StrengthReplicaRuntime
     ) =
 
     let gate = obj ()
+    // DSL-MUTABLE: resource — replica decision state map
     let byReplica = Dictionary<string, StrengthReplicaDecisionState>()
     let directory = workspaceDirectory
     let latencyMs = max 1 (defaultArg maxLatencyMs 2500)

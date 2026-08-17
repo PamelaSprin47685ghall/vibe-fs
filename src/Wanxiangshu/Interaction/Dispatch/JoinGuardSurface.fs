@@ -12,6 +12,7 @@ open Wanxiangshu.Persistence.Journal
 module JoinGuardSurface =
 
     type private ReservationCapability() =
+        // DSL-MUTABLE: single-flight — nudge key reservation set
         let keys = HashSet<string>()
 
         member _.Keys = keys

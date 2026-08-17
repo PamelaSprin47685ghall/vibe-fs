@@ -56,8 +56,11 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     let sentinelText = AssistancePrompt.Sentinel
 
     let gate = obj ()
+    // DSL-MUTABLE: resource — rolling suffix registry by attempt key
     let suffixes = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — reasoning part identity set
     let reasoningParts = HashSet<string>()
+    // DSL-MUTABLE: single-flight — one-shot armed attempt mark
     let armed = HashSet<string>()
 
     let attemptKey (sessionId: SessionId) (providerRun: ProviderRunIdentity) =

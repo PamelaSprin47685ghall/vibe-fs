@@ -46,6 +46,7 @@ module StrengthSurface =
         member _.Value = runtime
 
     type private PredictorHandle(state: StrengthPredictorState) =
+        // DSL-MUTABLE: resource — predictor state holder
         member val State = state with get, set
 
     let private isUndefined (value: obj) : bool = emitJsExpr value "$0 === undefined"

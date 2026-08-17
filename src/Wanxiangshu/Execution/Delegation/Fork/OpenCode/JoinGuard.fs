@@ -84,6 +84,7 @@ module HostJoinGuard =
         | AlreadyOutstanding
         | Failed of reason: string
 
+    // DSL-MUTABLE: single-flight — one nudge per key across process
     let private processNudgeKeys = HashSet<string>()
 
     let private hasOutstandingJoinClaim (journal: AgentJournal) (targetSessionId: SessionId) =

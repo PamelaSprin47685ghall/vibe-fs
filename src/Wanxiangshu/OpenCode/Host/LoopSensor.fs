@@ -33,7 +33,9 @@ open Wanxiangshu.Foundation.Identity
 type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Result<unit, string>>) =
 
     let gate = obj ()
+    // DSL-MUTABLE: resource — per-session loop detector registry
     let detectors = Dictionary<string, LoopDetector.Detector>()
+    // DSL-MUTABLE: single-flight — one-shot loop-kill armed mark per session
     let armed = HashSet<string>()
 
     let keyOf (sessionId: SessionId) = SessionId.value sessionId

@@ -68,9 +68,13 @@ type ToolRuntimeScope
 
     let gate = obj ()
     let ownedWorkGate = obj ()
+    // DSL-MUTABLE: resource — per-owner fork runtime registry
     let runtimes = Dictionary<string, HostForkRuntime>()
+    // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
+    // DSL-MUTABLE: resource — reviewer tree port registry
     let treePorts = Dictionary<string, GitTreePort>()
+    // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
@@ -377,6 +381,7 @@ type ToolRuntimeScope
     /// ceiling. A non-positive or unparseable setting falls back to the default
     /// rather than being treated as "no limit": the clause requires the hard limit
     /// to be finite, so an unreadable configuration must not widen it.
+    // DSL-MUTABLE: resource — resolved process hard limit ceiling
     member val ProcessHardLimit =
         match Environment.GetEnvironmentVariable "WANXIANGSHU_PROCESS_HARD_LIMIT_SECS" with
         | null

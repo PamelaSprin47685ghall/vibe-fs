@@ -42,6 +42,7 @@ module WorkspaceEventStore =
           mutable RefCount: int }
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — shared workspace event store refcount registry
     let private shared = Dictionary<string, SharedEntry>()
 
     let acquire (commonDir: string) : IEventStore =

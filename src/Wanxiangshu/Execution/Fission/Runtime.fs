@@ -34,15 +34,22 @@ type FissionLaneBinding =
 module FissionRuntime =
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — lane binding registry by session id
     let private lanes = Dictionary<string, FissionLaneBinding>()
+    // DSL-MUTABLE: resource — silent interrupt owner set
     let private silentInterrupts = HashSet<string>()
+    // DSL-MUTABLE: resource — handle affinity map by owner+handle key
     let private handleAffinities = Dictionary<string, int>()
 
+    // DSL-MUTABLE: resource — child observer callback registry by group id
     let private childObservers =
         Dictionary<string, int -> string -> SessionId -> unit>()
 
+    // DSL-MUTABLE: resource — group disposable resource registry
     let private groupResources = Dictionary<string, ResizeArray<IDisposable>>()
+    // DSL-MUTABLE: single-flight — delivery claim latch per group+completion+lane
     let private deliveryClaims = HashSet<string>()
+    // DSL-MUTABLE: single-flight — takeover claim latch per group
     let private takeoverClaims = HashSet<string>()
 
     let private handleKey ownerSessionId handleId =

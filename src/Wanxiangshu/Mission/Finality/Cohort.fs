@@ -162,8 +162,10 @@ module CohortWorkflow =
             let tcs =
                 TaskCompletionSource<Choice<'a * 'a list, 'a list>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+            // DSL-MUTABLE: algorithm-scratch — remaining task counter
             let remaining = ref (List.length tasks)
             let results = ResizeArray<'a>()
+            // DSL-MUTABLE: algorithm-scratch — short-circuit winner cell
             let shortCircuitWinner = ref None
 
             let decide (result: 'a) =

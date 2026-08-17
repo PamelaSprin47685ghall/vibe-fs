@@ -212,6 +212,7 @@ module ProcessRunner =
                 let exitTcs = TaskCompletionSource<int>()
                 let onExited = ResizeArray<unit -> unit>()
                 // DSL-MUTABLE: cancellation — launcher child exit flag.
+                // DSL-MUTABLE: cancellation — process exited flag
                 let exited = ref false
 
                 // Mirrors the real host: kill only signals. `exited` is set by the

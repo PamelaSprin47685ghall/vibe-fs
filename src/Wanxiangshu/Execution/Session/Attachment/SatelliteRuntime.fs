@@ -220,6 +220,7 @@ module private SatelliteLeaseFlow =
 
 type SatelliteRuntime(sessions: ISessionHostPort) =
     let gate = obj ()
+    // DSL-MUTABLE: single-flight — memoized satellite create task by owner+kind
     let flights = Dictionary<string, Task<Result<SatelliteLease, string>>>()
 
     let key owner kind =

@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 module PromptPhysicalAcceptance =
 
     let private gate = obj ()
+    // DSL-MUTABLE: subscription — physical acceptance callback registry
     let private callbacks = Dictionary<string, PhysicalUserMessageId -> unit>()
 
     let register (promptKey: PromptKey) (callback: PhysicalUserMessageId -> unit) =

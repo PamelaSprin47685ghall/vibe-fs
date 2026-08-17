@@ -26,6 +26,7 @@ module AttachmentSurface =
                            secondAgent = secondAgent
                            created = 2 |}
             else
+                // DSL-MUTABLE: algorithm-scratch — attachment id counter
                 let next = ref 0
                 let runtime = AttachedSessionRuntime()
 

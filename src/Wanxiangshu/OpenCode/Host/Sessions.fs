@@ -50,6 +50,7 @@ type InjectedSessionPort
         eventPort: IEventObservationPort,
         ?familyParent: SessionId -> SessionId option
     ) =
+    // DSL-MUTABLE: resource — active terminal listener registry per session
     let activeListeners = Dictionary<SessionId, HashSet<Guid>>()
 
     let removeActiveListenerToken sessionId token =
@@ -59,7 +60,9 @@ type InjectedSessionPort
             listeners.Count = 0
         | false, _ -> false
 
+    // DSL-MUTABLE: resource — parent-to-child session set map
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
+    // DSL-MUTABLE: resource — child-to-parent session map
     let childParents = Dictionary<SessionId, SessionId>()
     let lockObj = obj ()
     let restoredParent = defaultArg familyParent (fun _ -> None)
@@ -239,6 +242,7 @@ type InjectedSessionPort
                     match activeListeners.TryGetValue sessionId with
                     | true, current -> current
                     | false, _ ->
+                        // DSL-MUTABLE: algorithm-scratch — local created set for batch replay
                         let created = HashSet<Guid>()
                         activeListeners.[sessionId] <- created
                         created

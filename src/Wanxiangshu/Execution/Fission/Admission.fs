@@ -102,6 +102,7 @@ module FissionAdmission =
 
     // One process-wide single-flight resource for live admissions only.
     let private gate = obj ()
+    // DSL-MUTABLE: single-flight — one active fission admission per owner
     let private activeOwners = HashSet<string>()
 
     let private noHooks =

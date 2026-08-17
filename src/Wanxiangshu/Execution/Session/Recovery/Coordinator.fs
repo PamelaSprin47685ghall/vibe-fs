@@ -29,6 +29,7 @@ open Wanxiangshu.Foundation.Identity
 module FamilyRecoveryCoordinator =
 
     let private gate = obj ()
+    // DSL-MUTABLE: single-flight — in-flight recovery task by root key
     let private inflight = Dictionary<string, Task<FamilyRecovery>>()
 
     let private startRecovery (recover: SessionId -> Task<FamilyRecovery>) (root: SessionId) key =

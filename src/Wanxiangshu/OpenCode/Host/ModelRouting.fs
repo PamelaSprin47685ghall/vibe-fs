@@ -244,9 +244,12 @@ module ModelRouting =
 
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
+        // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
+        // DSL-MUTABLE: resource — last physical target map per session
         let lastPhysicalTargetBySession = Dictionary<string, ModelRoutingTarget>()
         let pending = ResizeArray<PendingDemand>()
+        // DSL-MUTABLE: resource — pending demand map per session
         let pendingBySession = Dictionary<string, PendingDemand>()
         // DSL-MUTABLE: resource — process-local scheduler poison
         let mutable fatalError: exn option = None

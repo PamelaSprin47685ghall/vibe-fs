@@ -23,6 +23,7 @@ module SharedAgentJournal =
           mutable RefCount: int }
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — shared journal owner registry by directory
     let private shared = Dictionary<string, SharedJournal>()
 
     let private registerInstance

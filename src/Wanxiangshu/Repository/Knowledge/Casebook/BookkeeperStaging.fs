@@ -35,6 +35,7 @@ module BookkeeperStaging =
     type private Slot = { Question: string; Answer: string }
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — staged transaction slot registry
     let private slots = Dictionary<string, Slot>()
     let private missingTransaction = "js-bookkeeper: no staged transaction"
 

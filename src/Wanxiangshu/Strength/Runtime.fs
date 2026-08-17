@@ -93,7 +93,9 @@ module StrengthReplicaTools =
 /// removes both indexes atomically.
 type StrengthRuntime() =
     let gate = obj ()
+    // DSL-MUTABLE: resource — owner-to-replica binding map
     let byOwner = Dictionary<string, StrengthReplicaBinding>()
+    // DSL-MUTABLE: resource — replica-to-binding map
     let byReplica = Dictionary<string, StrengthReplicaBinding>()
 
     member _.Register(binding: StrengthReplicaBinding) : Result<unit, StrengthRuntimeRegisterError> =

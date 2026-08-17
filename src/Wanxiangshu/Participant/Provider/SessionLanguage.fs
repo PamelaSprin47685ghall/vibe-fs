@@ -50,6 +50,7 @@ open Wanxiangshu.Foundation.Identity
 module SessionProviderLanguage =
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — per-session language registry
     let private bySession = Dictionary<string, ProviderLanguage>()
 
     let clearAllForTests () = lock gate (fun () -> bySession.Clear())

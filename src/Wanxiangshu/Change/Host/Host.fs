@@ -54,6 +54,7 @@ open FsToolkit.ErrorHandling
 /// Host wiring for the Orchestrator: forks Managers and reviewers under one
 /// runtime, and supplies `ManagerPort` to the pure publish program.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
+    // DSL-MUTABLE: resource — manager worktree path registry
     let worktrees = Dictionary<string, string>()
     let joinGate = obj ()
     // DSL-MUTABLE: single-flight — join-in-flight latch under joinGate

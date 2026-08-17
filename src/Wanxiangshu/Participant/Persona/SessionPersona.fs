@@ -49,6 +49,7 @@ open Wanxiangshu.Foundation.Identity
 module SessionPersona =
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — per-session persona registry
     let private bySession = Dictionary<string, string>()
 
     let clearAllForTests () = lock gate (fun () -> bySession.Clear())

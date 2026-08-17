@@ -40,6 +40,7 @@ module Events =
     type HostEventPort() as this =
         let listeners = ResizeArray<ListenerRegistration>()
         let lockObj = obj ()
+        // DSL-MUTABLE: resource — last completed run cache per session
         let lastCompletedRun = System.Collections.Generic.Dictionary<string, string>()
 
         /// Last non-duplicate terminal per session. ARCH-002: sticky stores an
@@ -49,6 +50,7 @@ module Events =
         ///
         /// Cap 256 sessions by insert order: duplicate writes update the value
         /// without re-enqueue so the queue cannot grow unbounded on churn.
+        // DSL-MUTABLE: resource — sticky terminal registry for late subscriber replay
         let stickyTerminal = Dictionary<string, TerminalOutcome>()
         let stickyOrder = Queue<string>()
         let stickyCap = 256

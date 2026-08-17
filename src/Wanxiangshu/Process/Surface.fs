@@ -276,6 +276,7 @@ module ProcessSurface =
     /// A bounded process-local ledger used by the JS contract to model journal
     /// replay without exposing AgentJournal or Fable records.
     type private SessionStartLedger() =
+        // DSL-MUTABLE: resource — session-start handle registry by session id
         let values = Dictionary<string, SessionStartHandle>()
 
         member _.Append(sessionId: string, startedAt: string) =

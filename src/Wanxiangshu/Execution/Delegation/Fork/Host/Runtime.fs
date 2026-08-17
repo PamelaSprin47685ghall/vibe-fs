@@ -73,16 +73,18 @@ type HostForkRuntime
     ) as this =
     let clockPort = defaultArg clock (PtyTiming.nodeClockPort ())
     let runtime = ForkRuntime(clock = clockPort)
+    // DSL-MUTABLE: resource — live child session registry by agent id
     let children = Dictionary<string, SessionId>()
-    // Join visibility is process ownership, not liveness. A run may already have
-    // settled and left the live list while its completion is still waiting for join.
+    // DSL-MUTABLE: resource — process-owned agent handle set
     let processOwnedAgents = HashSet<string>()
-    // CRASH-018: explicit /continue discoveries are addressable for reuse but
-    // are not owned by this process until a new charge actually reopens them.
+    // DSL-MUTABLE: resource — dormant /continue child registry by agent id
     let dormantChildren = Dictionary<string, SessionId>()
+    // DSL-MUTABLE: resource — pending host run registry by agent id
     let pendingRuns = Dictionary<string, PendingHostRun>()
+    // DSL-MUTABLE: resource — PTY run id set owned by this runtime
     let ptyRuns = HashSet<string>()
     /// Provider TerminalName → PtyId. Occupied until Join delivers closure.
+    // DSL-MUTABLE: resource — terminal name to PtyId map
     let terminalByName = Dictionary<string, string>()
     let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()

@@ -17,7 +17,9 @@ module SessionExecutionBinding =
           Model: OpencodeModel }
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — session parent binding map
     let private parents = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — session agent binding map
     let private agents = Dictionary<string, string>()
     // Accepted plugin prompt execution identity awaiting the provider transform
     // that answers that exact PromptKey. Process-local only; restart

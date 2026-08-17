@@ -46,6 +46,7 @@ module HostSignalSurface =
         |> Option.defaultValue null
 
     let tryAdapt (owned: string array) (raw: obj) : obj =
+        // DSL-MUTABLE: resource — owned signal registry for host signal adaptation
         let registry = HashSet<string>(owned)
 
         HostSignalAdapter.tryAdapt (fun sessionId -> registry.Contains(SessionId.value sessionId)) raw

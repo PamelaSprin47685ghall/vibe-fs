@@ -64,6 +64,7 @@ open Wanxiangshu.Strength.Replica
 /// (the caller decides when — collector never decides lifecycle).
 type ObservationCollector() =
 
+    // DSL-MUTABLE: resource — per-session observation buffer registry
     let buffers = Dictionary<string, ResizeArray<Observation>>()
 
     let appendObservation sessionId observation =

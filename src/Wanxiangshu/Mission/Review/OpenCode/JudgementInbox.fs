@@ -12,6 +12,7 @@ open Wanxiangshu.Mission.Review
 module ReviewJudgementInbox =
 
     let private gate = obj ()
+    // DSL-MUTABLE: single-flight — judgement channel owner latch
     let private owners = HashSet<string>()
 
     let private waiters =

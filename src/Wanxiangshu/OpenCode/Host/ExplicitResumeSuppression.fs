@@ -31,6 +31,7 @@ module ExplicitResumeSuppression =
               "metadata" ==> createObj [ MetadataKey ==> true ] ]
 
     let private gate = obj ()
+    // DSL-MUTABLE: resource — marked physical material registry per session
     let private markedPhysicalBySession = Dictionary<string, string>()
 
     [<Emit("""(() => {

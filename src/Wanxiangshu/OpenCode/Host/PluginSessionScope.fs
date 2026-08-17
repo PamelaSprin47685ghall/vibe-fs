@@ -67,6 +67,7 @@ type PluginSessionScope() =
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
     // Companions 等）保持 per-instance。
+    // DSL-MUTABLE: resource — alias to SharedState session directory map.
     member val SessionDirectories = SharedState.SessionDirectories
     // DSL-MUTABLE: resource — per-instance owned session set.
     member val OwnedSessions = HashSet<string>()
@@ -77,22 +78,29 @@ type PluginSessionScope() =
     member val ModelRoutingSessions = HashSet<string>()
     // DSL-MUTABLE: resource — per-instance user message binding map.
     member val UserMessageBindings = Dictionary<string, PhysicalUserMessageId>()
+    // DSL-MUTABLE: resource — alias to SharedState session parent map.
     member val SessionParents = SharedState.SessionParents
     // DSL-MUTABLE: resource — per-instance companion registry.
     member val Companions = Dictionary<string, CompanionHost>()
+    // DSL-MUTABLE: resource — lock gate object for companion operations.
     member val CompanionGate = obj ()
+    // DSL-MUTABLE: resource — alias to SharedState verdict session set.
     member val VerdictSessions = SharedState.VerdictSessions
+    // DSL-MUTABLE: single-flight — per-instance nudge sent set.
     member val NudgeSent = HashSet<string>()
+    // DSL-MUTABLE: single-flight — per-instance join guard nudge set.
     member val JoinGuardNudges = HashSet<string>()
     // DSL-MUTABLE: resource — per-instance aborted session set.
     member val AbortedSessions = HashSet<string>()
     // HOST-004: process-local idle-derived continuation admission. Per plugin
     // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A
     // worktree owner transfer starts a fresh gate — no old permit survives.
+    // DSL-MUTABLE: resource — per-instance quiescence gate instance.
     member val Quiescence = SessionQuiescenceGate()
     /// EXEC-017: process-local attempt-scoped join registry. External user messages
     /// signal only the CURRENT active JoinAttempt (UserMessageArrived), without
     /// cancelling mailbox/runtime and without a future latch (not journaled).
+    // DSL-MUTABLE: resource — per-instance join interrupt registry.
     member val JoinInterrupts: IJoinAttemptRegistry = JoinAttemptRegistry() :> IJoinAttemptRegistry
 
     /// C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is

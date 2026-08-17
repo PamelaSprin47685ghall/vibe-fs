@@ -155,9 +155,11 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
     // DSL-MUTABLE: resource — abort-pending PTY id set.
     let abortPending = HashSet<PtyId>()
 
+    // DSL-MUTABLE: resource — per-PtyId read waiter registry
     let readWaiters =
         Dictionary<PtyId, TaskCompletionSource<Result<string * bool, string>>>()
 
+    // DSL-MUTABLE: resource — per-PtyId exit task registry for CloseAll drain
     let exitTasks = Dictionary<PtyId, Task>()
     do mailboxSender |> Option.iter mailboxSenders.Add
 

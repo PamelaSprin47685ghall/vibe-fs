@@ -255,6 +255,7 @@ module StrengthReplay =
                   EndExclusive = List.last sequences + 1L }
 
     let private tryStableTraceRange (plan: StrengthReplayPlan) (parts: XTracePartRef list) =
+        // DSL-MUTABLE: algorithm-scratch — expected host id set for replay verification
         let expectedIdSet = HashSet<string>(expectedHostIds plan)
 
         let byStableId =
