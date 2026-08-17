@@ -9,6 +9,9 @@ open Wanxiangshu.Foundation.Identity
 type PromptAbandonReason =
     /// Transport proved the prompt was not accepted.
     | SendFailed of error: string
+    /// An idle-derived prompt was durably claimed, but newer physical user
+    /// material revoked its quiescence permit before SendPrompt was invoked.
+    | SupersededBeforePhysicalSend
     /// Recovery budget expired without proving physical acceptance.
     | UnresolvedAfterRecovery
 

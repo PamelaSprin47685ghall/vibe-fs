@@ -67,6 +67,15 @@ module PromptDispatcher =
         | Await
         | Detached
 
+    /// Internal result of the claim→physical-send path. `Superseded` is only
+    /// possible for an idle-derived send carrying a final physical admission
+    /// check; ordinary callers continue to consume `Result<PromptKey,string>`.
+    [<RequireQualifiedAccess>]
+    type internal SendAttemptOutcome =
+        | Sent of PromptKey
+        | Superseded
+        | Failed of string
+
     /// The single PROMPT-005 sender.
     ///
     /// Holds no authority state. The previous version kept a `mutable authority`

@@ -39,9 +39,9 @@ type SessionQuiescenceGate() =
     let mutable serials = Map.empty<string, int64>
     // DSL-MUTABLE: resource — per-session activity admission map under gate
     let mutable activities = Map.empty<string, Activity>
-    // DSL-MUTABLE: resource — exact physical user ingress dedupe. A new
-    // physical message closes the preceding idle-send window before the next
-    // provider transform starts; replay of the same message is inert.
+    // A new physical message closes the preceding idle-send window before the
+    // next provider transform starts; replay of the same message is inert.
+    // DSL-MUTABLE: resource — exact physical user ingress dedupe under gate
     let mutable physicalMessages = Map.empty<string, string>
 
     let nextSerial key =

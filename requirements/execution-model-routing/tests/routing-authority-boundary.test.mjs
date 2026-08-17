@@ -49,6 +49,20 @@ test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse
     'application completion/finality must not own physical capacity release')
 })
 
+test('WHAT[EMR-007] EMR_007_chat_message_closes_the_old_idle_window_before_model_admission', async () => {
+  const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const chatHook = host.slice(host.indexOf('let chatMessageHook ='), host.indexOf('let cancelSignals'))
+  const revoke = chatHook.indexOf('Quiescence.ObservePhysicalUserMessage')
+  const classify = chatHook.indexOf('let admission = chatExecutionAdmission')
+  const acquire = chatHook.indexOf('let! routedExecution = routeChatExecution')
+
+  assert.notEqual(revoke, -1, 'chat.message must close the preceding idle-send window')
+  assert.notEqual(classify, -1)
+  assert.notEqual(acquire, -1)
+  assert.ok(revoke < classify, 'physical ingress barrier must run before routing classification')
+  assert.ok(revoke < acquire, 'old idle authority must die before the new model lease can be superseded')
+})
+
 test('WHAT[EMR-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {
   const policy = await source('src/Wanxiangshu/Strength/Policy.fs')
   const speculate = await source('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
