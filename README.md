@@ -263,4 +263,4 @@ Git 工作树须干净。验证输出放 CI artifact 或发布附件，不提交
 
 专有商业软件。见 [LICENSE](LICENSE)。`private: true`；分发受 LICENSE 与商业合同约束。
 
-更多：[requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)
+更多：[在线文档 · docs/index.html](docs/index.html) · [requirements/README.md](requirements/README.md) · [CHANGELOG.md](CHANGELOG.md) · [LICENSE](LICENSE) · [AGENTS.md](AGENTS.md)
