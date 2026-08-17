@@ -87,6 +87,7 @@ const assertWireEqual = (a, b, label) => {
 }
 
 const toolNames = (messages) => messages.map((m) => m.parts[0]?.tool)
+const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
 const callIdOf = (messages, index) => messages[index].parts[0].callID
 
 /** Fresh durable journal in a temp dir. */
@@ -111,7 +112,7 @@ test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_appe
 
   // round 1: Req1 Req2 Resp1 Resp2 → FakePair1 (one completed Host row)
   const round1Wire = await inject(undefined, session, round1Real)
-  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', '-'])
+  assert.deepEqual(toolNames(round1Wire), ['bash', 'read', 'bash', 'read', 'skill'])
   const call1 = stableCallId(session, 1n)
   assert.equal(round1Wire[4].parts[0].state.status, 'completed')
   assert.notEqual(round1Wire[4].parts[0].state.status, 'pending')
@@ -126,8 +127,8 @@ test('WHAT[PREFIX-STABILITY-001] H13_01_canonical_multi_tool_sequence_is_an_appe
   ]
   const round2Wire = await inject(undefined, session, round2Real)
   assert.deepEqual(toolNames(round2Wire), [
-    'bash', 'read', 'bash', 'read', '-',
-    'write', 'write', '-',
+    'bash', 'read', 'bash', 'read', 'skill',
+    'write', 'write', 'skill',
   ])
   const call2 = stableCallId(session, 2n)
   assert.equal(callIdOf(round2Wire, 7), call2)
@@ -144,17 +145,43 @@ test('WHAT[PREFIX-STABILITY-010] H13_02_historical_pair_never_relocates_to_curre
   const round1 = [toolCall('c1', 'bash', 't1'), toolResult('r1', 'bash', 't1')]
   const wire1 = await inject(undefined, session, round1)
   // Req1 Resp1 FakePair1
-  assert.deepEqual(toolNames(wire1), ['bash', 'bash', '-'])
+  assert.deepEqual(toolNames(wire1), ['bash', 'bash', 'skill'])
 
   const round2 = [...wire1, toolCall('c2', 'read', 't2'), toolResult('r2', 'read', 't2')]
   const wire2 = await inject(undefined, session, round2)
   // Req1 Resp1 FakePair1 Req2 Resp2 FakePair2
   // A historyBlock implementation would move pair1 next to the current batch.
   assert.deepEqual(toolNames(wire2), [
-    'bash', 'bash', '-',
-    'read', 'read', '-',
+    'bash', 'bash', 'skill',
+    'read', 'read', 'skill',
   ])
   assertPrefixLaw(wire1, wire2, 'H13-02 no historical relocation')
+})
+
+test('WHAT[PREFIX-STABILITY-010] H13_02b_pre_skill_history_replays_its_original_hyphen_wire', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-h1302b-'))
+  const opened = await openJournal(dir)
+  try {
+    const session = 'h13-02b'
+    const appended = await pair.appendAnchoredPair(opened.journal, {
+      session,
+      ordinal: 1n,
+      callId: 'legacy-pair-call',
+      markerText: 'legacy raw marker bytes',
+      callGapAfter: { kind: 'start' },
+      resultGapAfter: { kind: 'start' },
+    })
+    assert.equal(appended.ok, true, JSON.stringify(appended))
+
+    const wire = await inject(opened.journal, session, [])
+    assert.equal(wire.length, 1)
+    assert.equal(wire[0].parts[0].tool, '-')
+    assert.deepEqual(wire[0].parts[0].state.input, {})
+    assert.equal(wire[0].parts[0].state.output, 'legacy raw marker bytes')
+  } finally {
+    pair.disposeJournal(opened.journal)
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 // ── H13-03: same placement re-entry appends nothing ─────────────────────────
@@ -320,7 +347,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_06_prior_tip_only_affects_the_new_pair', as
   const wire1 = await inject(undefined, session, [userMsg('u1')], 'guideline')
   const call1 = stableCallId(session, 1n)
   assert.equal(wire1[0].parts[0].callID, call1)
-  assert.equal(wire1[0].parts[0].state.output, 'guideline')
+  assert.equal(wire1[0].parts[0].state.output, skillContent('guideline'))
 
   const wire2 = await inject(
     undefined,
@@ -329,8 +356,8 @@ test('WHAT[PREFIX-STABILITY-010] H13_06_prior_tip_only_affects_the_new_pair', as
     'tip2\n\nguideline',
   )
   const call2 = stableCallId(session, 2n)
-  assert.equal(wire2[0].parts[0].state.output, 'guideline', 'pair1 marker bytes must never change')
-  assert.equal(wire2[3].parts[0].state.output, 'tip2\n\nguideline')
+  assert.equal(wire2[0].parts[0].state.output, skillContent('guideline'), 'pair1 marker bytes must never change')
+  assert.equal(wire2[3].parts[0].state.output, skillContent('tip2\n\nguideline'))
   assert.equal(wire2[3].parts[0].callID, call2)
   assert.notEqual(call1, call2)
 

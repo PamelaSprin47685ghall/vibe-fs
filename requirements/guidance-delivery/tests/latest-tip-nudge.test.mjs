@@ -113,17 +113,18 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () 
 })
 
 const guideline = '# Pair programming auto-injected'
+const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
 const anchor = [{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
 const markerOutput = (messages) => {
-  // pair sits before trailing user: completed -, user
-  const result = messages.find((m) => m?.parts?.[0]?.tool === '-' && m?.parts?.[0]?.state?.status === 'completed')
+  // pair sits before trailing user: completed synthetic skill, user
+  const result = messages.find((m) => m?.parts?.[0]?.tool === 'skill' && m?.parts?.[0]?.state?.status === 'completed')
   return result?.parts?.[0]?.state?.output
 }
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
   const result = await tryInject(undefined, `${guideline}`, anchor)
   assert.equal(result.ok, true, result.error)
-  assert.equal(markerOutput(result.value), guideline)
+  assert.equal(markerOutput(result.value), skillContent(guideline))
 })
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
@@ -132,5 +133,5 @@ test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline',
     { info: { id: 'user-2', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
   ])
   assert.equal(result.ok, true, result.error)
-  assert.equal(markerOutput(result.value), `${nudge}\n\n${guideline}`)
+  assert.equal(markerOutput(result.value), skillContent(`${nudge}\n\n${guideline}`))
 })

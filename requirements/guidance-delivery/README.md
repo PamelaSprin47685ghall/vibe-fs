@@ -20,7 +20,7 @@ delivery 问题。
 - **audience 分离**：detection 材料（enforcer.md）只进 Blogger system，remediation
   材料（main.md）只进 Main 交付；`previous_enforcer_tip` 是低信任历史，不进 Main
   Authority；共享 TipName 身份，不互相泄漏职责。
-- **交付不造 authority**：Main tip 只经投影 + auto-injected marker 进 horizon，
+- **交付不造 authority**：Main tip 只经投影 + synthetic empty-name `skill` marker 进 horizon，
   不注入 fake-user message、不 mint Authority Root。
 - **历史字节冻结**：已投递的 auto-injected MarkerText 按当时实际字节持久化，
   replay byte-identical（HOST-013 `GuidelineProjection`）。
@@ -36,7 +36,7 @@ mechanics（`provider-projection`）；horizon admission general law
 |---|---|---|
 | 交付决策 | `src/Wanxiangshu/Enforcer/Guidance/Tip.fs` | `resolveTipGuidance`：读 Frontier+Coverage → Full/Identity；只 fold durable facts |
 | 投影 | `src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs` + `src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs` | Full 历史（reanchor 可清）、auto-injected pair 历史（byte 冻结） |
-| marker 注入 | `src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs` | `tryInject`：auto-injected tool pair |
+| marker 注入 | `src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs` | `tryInject`：ordinary synthetic `skill({ name: "" })` + `<skill_content name="">`；Cursor 同 payload 走 terminal suffix |
 
 ## Proof 概览（落点表见 `PROOF.md`）
 

@@ -134,11 +134,14 @@ const allowList = (config, name) => {
     'chronicle',
     'fetch',
     'suicide',
+    'skill',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
 // AGENT-006 matrix (tool names as they reach the Host permission schema).
+const HOST_UTILITY_ALLOW = ['skill']
+
 const ROLE_ALLOW = {
   Manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'suicide'],
   Orchestrator: ['commission', 'join', 'horizon'],
@@ -204,7 +207,7 @@ test('WHAT[ENF-002] AGENT_006_role_tool_matrix_reaches_the_host_schema', () => {
     for (const tier of TIERS) {
       const name = agentName(tier, role)
       const allowed = allowList(config, name).sort()
-      assert.deepEqual(allowed, [...ROLE_ALLOW[role]].sort(), `${name} allow set must equal AGENT-006 matrix`)
+      assert.deepEqual(allowed, [...ROLE_ALLOW[role], ...HOST_UTILITY_ALLOW].sort(), `${name} allow set must equal AGENT-006 matrix + Host utilities`)
     }
   }
 })
@@ -227,7 +230,7 @@ test('WHAT[ENF-010] AGENT_007_bash_stays_denied_even_when_the_gate_fails', () =>
       assert.ok(entry.permission && entry.permission['*'] === 'deny', `${name} must keep "*": deny after a gate error`)
       assert.deepEqual(
         allowList(config, name).sort(),
-        [...ROLE_ALLOW[role]].sort(),
+        [...ROLE_ALLOW[role], ...HOST_UTILITY_ALLOW].sort(),
         `${name} tool set must survive a gate error`,
       )
       assert.ok(!allowList(config, name).includes('bash'), `${name} must never allow bash`)
@@ -313,8 +316,18 @@ test('WHAT[ENF-002] roles.permissions_agree_with_the_host_schema_matrix', () => 
     const fromRoles = permissions(role.toLowerCase())
     const config = buildConfig()
     configureManagedAgents(config)
-    const fromSchema = [...new Set(allowList(config, agentName('fast', role)).map(permissionOf))].sort()
+    const fromSchema = [...new Set(allowList(config, agentName('fast', role)).filter((tool) => !HOST_UTILITY_ALLOW.includes(tool)).map(permissionOf))].sort()
     assert.deepEqual(fromSchema, fromRoles, `${role}: domain permissions must equal the Host schema allow list`)
+  }
+})
+
+test('WHAT[ENF-006] HOST_skill_remains_allowed_for_every_managed_role', () => {
+  const config = buildConfig()
+  assert.equal(configureManagedAgents(config).ok, true)
+  for (const tier of TIERS) {
+    for (const role of ROLES) {
+      assert.equal(evaluate(mergedRules(config, agentName(tier, role)), 'skill', '*').action, 'allow')
+    }
   }
 })
 

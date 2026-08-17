@@ -81,7 +81,7 @@ TodoCheckpoint lag-1 rebase。禁止按容量/token 主动切换 epoch。
 | 为什么需要压缩/rebase | context-compression（何时/哪些可替换） |
 | provider language/identity/cognition 内容 | provider-language / participant-identity；本包只要求「若属于 prefix identity 则稳定」 |
 | renderer 实现 | provider-projection |
-| 当前 gap-anchor / fake-tool / Cursor suffix HOW | 可整体替换（INDEPENDENT CHANGE） |
+| 当前 gap-anchor / synthetic empty-name `skill` / Cursor suffix HOW | 可整体替换（INDEPENDENT CHANGE） |
 | 候选的选择 policy | context-compression（CTX-011 判定） |
 | fold/落盘机制 | durable-events |
 

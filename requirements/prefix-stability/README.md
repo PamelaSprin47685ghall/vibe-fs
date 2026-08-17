@@ -53,5 +53,5 @@ provider cache 与认知连续性依赖「已呈现的过去不会无故重排�
 - 为什么需要 compression/rebase → `context-compression`
 - provider language/identity/cognition 内容 → `provider-language` / `participant-identity`
 - renderer 实现 → `provider-projection`
-- 当前 gap-anchor / fake-tool / Cursor suffix HOW（可整体替换）
+- 当前 gap-anchor / synthetic empty-name `skill` / Cursor suffix HOW（可整体替换）
 - fold 拒绝语义 → `durable-events`

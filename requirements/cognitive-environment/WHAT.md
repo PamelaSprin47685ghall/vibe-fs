@@ -116,6 +116,9 @@ Pair Programming Hint（HOST-013 occurrence 的正文）是一个 canonical sema
 - 每次工具 turn 前寻找完整 parallel wave：已知、确有用、彼此独立的调用默认同一 assistant turn
   一起发出，最小化 provider↔tool RTT；仅真实数据依赖/共享可变 owner/协议顺序/破坏性干扰/明确有限
   容量可序列化；不猜未知参数、不制造无用调用、不写死全局并发数字（pair-parallel-tools §3-§14）。
+- 该 hint 是 injection-only skill content；模型不得主动调用 `skill({ name: "" })` / `skill("")`
+  尝试读取它。空 skill name 只作为 HOST-013 synthetic wire identity；真实 skill 工具及所有非空 skill name
+  保持正常可用。
 
 该语义**不**按 provider 复制；wire 形状由 renderer 决定（`prefix-stability` / `provider-projection`）。
 

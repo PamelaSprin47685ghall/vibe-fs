@@ -176,8 +176,8 @@ anchor 再 replay。legacy 无 anchor journal → fail closed（incompatible）�
 **含义/动机**：历史字节只能由 durable append-only 事实恢复，不得由当前 transcript 形态
 重新决定——否则每次 transform 都在重排已呈现的历史。
 
-**边界**：occurrence 的 wire 形状（NUL+BOM、fake-tool 展开）归 provider-projection；
-本命题拥有「位置与字节的稳定性」。
+**边界**：occurrence 的 wire 形状（ordinary synthetic `skill({ name: "" })` + `<skill_content name="">`；
+Cursor `NUL+BOM` + 同一 skill-content payload）归 provider-projection；本命题拥有「位置与字节的稳定性」。
 
 **证据**：HOST-013；cache.md §4/§5；`requirements/prefix-stability/tests/pair-thought-anchored.test.mjs`
 （REUSE：`H13_02_historical_pair_never_relocates_to_current_batch`、`H13_05_missing_anchor_pair_is_omitted_not_relocated`）。

@@ -56,6 +56,7 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 })
 
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
+const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
 
 const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.info.role, 'assistant')
@@ -63,12 +64,13 @@ const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.info.synthetic, true)
   assert.equal(msg.parts.length, 1)
   assert.equal(msg.parts[0].type, 'tool')
-  assert.equal(msg.parts[0].tool, '-')
+  assert.equal(msg.parts[0].tool, 'skill')
   assert.equal(msg.parts[0].callID, callId)
   assert.equal(msg.parts[0].state.status, 'completed')
   assert.notEqual(msg.parts[0].state.status, 'pending')
   assert.notEqual(msg.parts[0].state.status, 'running')
-  assert.equal(msg.parts[0].state.output, markerText)
+  assert.deepEqual(msg.parts[0].state.input, { name: '' })
+  assert.equal(msg.parts[0].state.output, skillContent(markerText))
 }
 
 test('WHAT[PREFIX-STABILITY-014] PPT_source_is_the_frozen_side_channel_identity', () => {
@@ -130,10 +132,11 @@ test('WHAT[PREFIX-STABILITY-010] PPT_tryInject_merges_into_tool_batches_before_u
   assert.equal(out[2].parts[0].state.status, 'completed')
   assert.equal(out[3].parts[0].tool, 'read')
   assert.equal(out[3].parts[0].state.status, 'completed')
-  assert.equal(out[4].parts[0].tool, '-')
+  assert.equal(out[4].parts[0].tool, 'skill')
   assert.equal(out[4].parts[0].state.status, 'completed')
   assert.equal(out[4].parts[0].callID, callId)
-  assert.equal(out[4].parts[0].state.output, text)
+  assert.deepEqual(out[4].parts[0].state.input, { name: '' })
+  assert.equal(out[4].parts[0].state.output, skillContent(text))
   assert.deepEqual(out[5], raw[4])
 })
 

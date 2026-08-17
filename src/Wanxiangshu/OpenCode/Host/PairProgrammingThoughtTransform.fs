@@ -70,8 +70,9 @@ open Wanxiangshu.Resources
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
-/// Ordinary Host 编码是 ResultGap 上的一条 completed `auto-injected` tool part。
-/// OpenCode `toModelMessagesEffect` 把它展开成 provider tool-call + tool-result。
+/// Ordinary Host 编码是 ResultGap 上的一条 completed synthetic `skill({ name: "" })` tool part。
+/// OpenCode `toModelMessagesEffect` 把它展开成 provider tool-call + tool-result；Cursor 保持真实
+/// terminal tool result，并在 NUL+BOM 后拼同一 `<skill_content name="">` payload。
 /// 禁止 pending/running：Host 会把它们收成 "[Tool execution was interrupted]"。
 /// 每个 occurrence 的 transcript 位置由 durable CallGap/ResultGap 决定；同一 placement
 /// occasion（SessionId + CallGap + ResultGap）最多一个 pair，重复 transform 只 replay、
@@ -130,10 +131,22 @@ module PairProgrammingThoughtTransform =
 
     let private idPrefix = "pair-programming-auto-injected-"
 
-    /// Marker tool name on the wire (HOST-013). Meaningless identifier to prevent LLM abuse.
-    let toolName = "-"
+    /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
+    /// real non-empty skill names remain ordinary executable Host skills.
+    let toolName = "skill"
 
-    let private legacyToolName = "auto-injected"
+    let skillName = ""
+
+    let private skillContentPrefix = "<skill_content name=\"\">"
+
+    let skillContent (body: string) : string =
+        let content = if isNull body then "" else body.Trim()
+
+        if content.StartsWith(skillContentPrefix, StringComparison.Ordinal)
+           && content.EndsWith("</skill_content>", StringComparison.Ordinal) then
+            content
+        else
+            String.concat "\n" [ skillContentPrefix; content; "</skill_content>" ]
 
     let private isMarkerSource (markerSource: string) =
         markerSource = source || markerSource = legacySource
@@ -144,33 +157,23 @@ module PairProgrammingThoughtTransform =
         |> Option.map (fun info -> unbox<string> info?source)
         |> Option.exists isMarkerSource
 
-    /// Scolding text for active model calls to the non-executable placeholder.
+    /// Active empty-name skill loads are reserved for synthetic injection only.
     let reprimandText (lang: ProviderLanguage option) : string =
         match lang with
         | Some ProviderLanguage.SimplifiedChinese ->
-            "DENIED. `-` 不是可执行工具，禁止主动调用。这是系统内部占位标记，没有任何功能。请专注于你的本职任务，不要尝试调用内部标记符号。"
+            "DENIED. `skill({ name: \"\" })` 只保留给系统注入的 pair-programming hint，不能主动调用或读取。真实 `skill` 工具仍可正常使用；请只加载 available skills 列表中的非空 name。"
         | _ ->
-            "DENIED. `-` is not an executable tool. Do not call this symbol. This is an internal system marker with no functionality. Focus on your assigned tasks and do not attempt to invoke non-existent internal symbols."
+            "DENIED. `skill({ name: \"\" })` is reserved for the injected pair-programming hint and cannot be called or read manually. The real `skill` tool remains available; load only non-empty names from the available skills list."
 
-    let private isMatchingToolName (name: obj) : bool =
-        match tryUnboxString name with
-        | Some s -> s = toolName || s = legacyToolName
-        | None -> false
+    let private isSkillToolPart (part: obj) : bool =
+        not (isNull part)
+        && (tryUnboxString part?tool |> Option.exists ((=) toolName))
 
-    let private isHyphenToolType (part: obj) : bool =
-        match tryUnboxString part?``type`` with
-        | None -> false
-        | Some t ->
-            let kind = t.ToLowerInvariant()
-            kind = "tool--" || kind = "tool-auto-injected"
-
-    let private isHyphenToolPart (part: obj) : bool =
-        if isNull part then
-            false
-        else
-            isMatchingToolName part?tool
-            || isMatchingToolName part?name
-            || isHyphenToolType part
+    let private isReservedSkillToolPart (part: obj) : bool =
+        isSkillToolPart part
+        && not (isNull part?state)
+        && not (isNull part?state?input)
+        && (tryUnboxString part?state?input?name |> Option.exists ((=) skillName))
 
     let private writeCompletedReprimandState (reprimand: string) (part: obj) (originalState: obj) =
         if isNull originalState then
@@ -195,17 +198,17 @@ module PairProgrammingThoughtTransform =
         if not (isNull part?output) then
             part?output <- box reprimand
 
-    let private applyHyphenReprimand (reprimand: string) (part: obj) : obj =
+    let private applyReservedSkillReprimand (reprimand: string) (part: obj) : obj =
         writeCompletedReprimandState reprimand part (part?state)
         clearPartError part
         overwritePartOutput reprimand part
         part
 
     let private reprimandToolPart (lang: ProviderLanguage option) (part: obj) : obj =
-        if not (isHyphenToolPart part) then
+        if not (isReservedSkillToolPart part) then
             part
         else
-            applyHyphenReprimand (reprimandText lang) part
+            applyReservedSkillReprimand (reprimandText lang) part
 
     let private isJsArray (value: obj) : bool =
         not (isNull value) && emitJsExpr value "Array.isArray($0)"
@@ -223,9 +226,9 @@ module PairProgrammingThoughtTransform =
             |> Option.orElseWith (fun () -> asJsArray rawMsg?content)
             |> Option.defaultValue [||]
 
-    let private reprimandHyphenParts (lang: ProviderLanguage option) (parts: obj array) =
+    let private reprimandReservedSkillParts (lang: ProviderLanguage option) (parts: obj array) =
         parts
-        |> Array.filter isHyphenToolPart
+        |> Array.filter isReservedSkillToolPart
         |> Array.iter (fun part -> reprimandToolPart lang part |> ignore)
 
     let private sanitizeNonMarkerMessage (lang: ProviderLanguage option) (rawMsg: obj) : obj =
@@ -234,18 +237,19 @@ module PairProgrammingThoughtTransform =
         if Array.isEmpty parts then
             rawMsg
         else
-            reprimandHyphenParts lang parts
+            reprimandReservedSkillParts lang parts
             rawMsg
 
-    let private sanitizeActiveHyphenMessage (lang: ProviderLanguage option) (rawMsg: obj) : obj =
+    let private sanitizeActiveReservedSkillMessage (lang: ProviderLanguage option) (rawMsg: obj) : obj =
         if isNull rawMsg || isPairProgrammingThought rawMsg then
             rawMsg
         else
             sanitizeNonMarkerMessage lang rawMsg
 
-    /// Transform any active LLM calls to `-` on real messages from failed into completed with reprimand.
+    /// Transform only active `skill({ name: "" })` calls from failed into completed DENIED results.
+    /// Every non-empty real skill call passes through untouched.
     let sanitizeActiveToolCalls (lang: ProviderLanguage option) (rawMessages: obj list) : obj list =
-        rawMessages |> List.map (sanitizeActiveHyphenMessage lang)
+        rawMessages |> List.map (sanitizeActiveReservedSkillMessage lang)
 
     /// Durable/memory pair with both halves' transcript gap anchors.
     type PairProgrammingGuidelineWire =
@@ -270,16 +274,20 @@ module PairProgrammingThoughtTransform =
         idPrefix + digest.Substring(0, 24)
 
     let private buildPairMessage (callId: string) (markerText: string) : obj =
+        let currentSkillWire = markerText.TrimStart().StartsWith(skillContentPrefix, StringComparison.Ordinal)
+        let currentToolName = if currentSkillWire then toolName else "-"
+        let input = if currentSkillWire then createObj [ "name", box skillName ] else createObj []
+
         let part =
             createObj
                 [ "type", box "tool"
-                  "tool", box toolName
+                  "tool", box currentToolName
                   "callID", box callId
                   "state",
                   box (
                       createObj
                           [ "status", box "completed"
-                            "input", box (createObj [])
+                            "input", box input
                             "output", box markerText
                             "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
                   ) ]
@@ -725,7 +733,7 @@ module PairProgrammingThoughtTransform =
                 let candidate =
                     { Ordinal = ordinal
                       CallId = stableCallId sessionId ordinal
-                      MarkerText = markerText
+                      MarkerText = skillContent markerText
                       CallGap = callGap
                       ResultGap = resultGap }
 

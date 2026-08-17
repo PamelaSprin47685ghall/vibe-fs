@@ -180,6 +180,16 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_parallel_wave_without
   }
 })
 
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_reserves_empty_skill_name_without_disabling_real_skills', () => {
+  for (const locale of ['en', 'zh-CN']) {
+    const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
+    assert.match(text, /skill\(\{ name: "" \}\)|skill\(""\)/)
+    assert.match(text, /injection-only|只能由系统注入|空 skill name|empty skill name/i)
+    assert.match(text, /non-empty|非空 name/i)
+    assert.doesNotMatch(text, /This prompt is injected automatically|本提示由系统自动注入/)
+  }
+})
+
 test('WHAT[COGNITIVE-ENVIRONMENT-010] CE_010_lifecycle_texts_orient_without_educating_or_replacing_system_prompt', () => {
   const transientTexts = [...walkMarkdown('resources/provider/lifecycle'), ...walkMarkdown('resources/provider/runtime')]
   assert.ok(transientTexts.length > 0, 'lifecycle and runtime provider texts must exist')

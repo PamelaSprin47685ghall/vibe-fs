@@ -667,7 +667,7 @@ module PluginTransforms =
 
                 // HOST-013：永久 pair-programming auto-injected。
                 // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
-                // 再在 ResultGap 写入本次 completed auto-injected Host 行。
+                // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
                 do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 

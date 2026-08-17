@@ -211,13 +211,13 @@ export const runtimeKeyCases = [
   {
     name: 'HOST-013 the pair-programming thought marker never counts as a step',
     fn: () => {
-      // The marker is a synthetic assistant message, not a provider step. Host
-      // identity (current or legacy source) and auto-injected tool parts — completed
-      // ordinary rows and legacy pending FakeReq — must all be skipped.
+      // The marker is a synthetic assistant message, not a provider step. Current
+      // empty-name skill wire and legacy marker shapes must all be skipped, while a
+      // real non-empty skill call remains an ordinary provider step.
       const rawShape = {
         role: 'assistant',
         info: { source: pairProgrammingThoughtSource },
-        parts: [{ type: 'tool', tool: '-', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        parts: [{ type: 'tool', tool: 'skill', state: { status: 'completed', input: { name: '' }, output: pairProgrammingThoughtText } }],
       };
       const legacyRawShape = {
         role: 'assistant',
@@ -230,24 +230,21 @@ export const runtimeKeyCases = [
       };
       const contentShape = {
         role: 'assistant',
-        content: [{ type: 'tool', tool: '-', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        content: [{ type: 'tool', tool: 'skill', state: { status: 'completed', input: { name: '' }, output: pairProgrammingThoughtText } }],
       };
-      // Provider wire often strips `info.source`; a legacy FakeReq half is status
-      // pending with no output and must not count as a real step either.
       const pendingFakeReq = {
         role: 'assistant',
-        parts: [{ type: 'tool', tool: '-', state: { status: 'pending' } }],
+        parts: [{ type: 'tool', tool: 'skill', state: { status: 'pending', input: { name: '' } } }],
       };
       const completedFakeResp = {
         role: 'assistant',
-        parts: [{ type: 'tool', tool: '-', state: { status: 'completed', output: pairProgrammingThoughtText } }],
+        parts: [{ type: 'tool', tool: 'skill', state: { status: 'completed', input: { name: '' }, output: pairProgrammingThoughtText } }],
       };
-      // OpenAI HTTP wire FakeReq: assistant with tool_calls named - or auto-injected
-      // (no completed status/output required). FakeResp is often role tool.
-      const openAiFakeReq = toolCall('-');
+      const openAiFakeReq = toolCall('skill', '{"name":""}');
+      const openAiLegacyHyphenReq = toolCall('-');
       const openAiLegacyFakeReq = toolCall('auto-injected');
 
-      for (const marker of [rawShape, legacyRawShape, legacySourceShape, contentShape, pendingFakeReq, completedFakeResp, openAiFakeReq, openAiLegacyFakeReq]) {
+      for (const marker of [rawShape, legacyRawShape, legacySourceShape, contentShape, pendingFakeReq, completedFakeResp, openAiFakeReq, openAiLegacyHyphenReq, openAiLegacyFakeReq]) {
         assertEq(stepOf(request([user('go'), marker])), 0, 'marker alone is not a step');
         assertEq(
           stepOf(request([user('go'), marker, assistant('r1')])),
@@ -256,8 +253,9 @@ export const runtimeKeyCases = [
         );
       }
 
-      // Probe: user + OpenAI FakeReq must not count as a step.
-      assertEq(stepOf(request([user('go'), openAiFakeReq])), 0, 'OpenAI FakeReq tool_calls alone is step 0');
+      // Probe: synthetic empty-name skill does not count; a real skill does.
+      assertEq(stepOf(request([user('go'), openAiFakeReq])), 0, 'OpenAI empty-name skill FakeReq is step 0');
+      assertEq(stepOf(request([user('go'), toolCall('skill', '{"name":"pdfs"}')])), 1, 'real non-empty skill call is a step');
 
       // Measured failure: FakeReq+FakeResp both assistant halves around a real
       // tool batch must not shift stepOf — only the real assistant counts.

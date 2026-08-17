@@ -34,7 +34,7 @@ const PLUGIN_TOOL_NAMES = [
 ]
 
 const HOST_OWNED_TOOL_NAMES = [
-  'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'stealth-browser-mcp', 'sphinx',
+  'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'stealth-browser-mcp', 'sphinx',
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller']
@@ -147,8 +147,8 @@ test('WHAT[ENF-001] MANAGER_role_permission_matrix_is_owned_by_RolesSurface', ()
   }
 })
 
-test('WHAT[ENF-006] MANAGER_pair_marker_is_not_a_registered_tool_and_transform_keeps_canonical_text', async () => {
-  assert.equal(markerToolName, '-')
+test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_keeps_canonical_text', async () => {
+  assert.equal(markerToolName, 'skill')
   assert.equal(typeof markerSource, 'string')
   assert.equal(typeof canonicalText, 'string')
   const client = {
@@ -163,7 +163,7 @@ test('WHAT[ENF-006] MANAGER_pair_marker_is_not_a_registered_tool_and_transform_k
     },
   }
   await withPluginClient(client, async (hooks) => {
-    assert.equal(hooks.tool['-'], undefined)
+    assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned')
     const transformed = {
       messages: withSession([
         { role: 'user', info: { id: 'user-1' }, parts: [{ type: 'text', text: 'hello' }] },
@@ -176,9 +176,11 @@ test('WHAT[ENF-006] MANAGER_pair_marker_is_not_a_registered_tool_and_transform_k
     assert.equal(marker.parts?.length, 1)
     assert.equal(marker.parts?.[0]?.type, 'tool')
     assert.equal(marker.parts?.[0]?.tool, markerToolName)
+    assert.deepEqual(marker.parts?.[0]?.state?.input, { name: '' })
     assert.equal(marker.parts?.[0]?.state?.status, 'completed')
-    assert.ok(marker.parts?.[0]?.state?.output?.includes(canonicalText), 'marker keeps canonical pair-programming text')
-    assert.equal(hooks.tool[markerToolName], undefined, 'wire marker never becomes an executable plugin tool')
+    assert.match(marker.parts?.[0]?.state?.output ?? '', /^<skill_content name="">\n/)
+    assert.ok(marker.parts?.[0]?.state?.output?.includes(canonicalText.trim()), 'marker keeps canonical pair-programming text')
+    assert.equal(hooks.tool[markerToolName], undefined, 'wire marker borrows the Host-owned skill name without plugin registration')
   })
 })
 

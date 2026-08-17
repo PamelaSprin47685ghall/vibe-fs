@@ -11,18 +11,20 @@ const inject = async (session, raw, markerText = pair.text) => {
 
 const userMsg = (id, body = 'hello') => ({ info: { id, role: 'user' }, parts: [{ type: 'text', text: body }] })
 const pairMessages = (messages) => messages.filter((message) => pair.isPairProgrammingThought(message))
+const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
 const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.info.role, 'assistant')
   assert.equal(msg.info.source, pair.source)
   assert.equal(msg.info.synthetic, true)
   assert.equal(msg.parts.length, 1)
   assert.equal(msg.parts[0].type, 'tool')
-  assert.equal(msg.parts[0].tool, '-')
+  assert.equal(msg.parts[0].tool, 'skill')
   assert.equal(msg.parts[0].callID, callId)
   assert.equal(msg.parts[0].state.status, 'completed')
   assert.notEqual(msg.parts[0].state.status, 'pending')
   assert.notEqual(msg.parts[0].state.status, 'running')
-  assert.equal(msg.parts[0].state.output, markerText)
+  assert.deepEqual(msg.parts[0].state.input, { name: '' })
+  assert.equal(msg.parts[0].state.output, skillContent(markerText))
 }
 
 test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_keeps_durable_occurrence_without_synthetic_message', async () => {
@@ -57,7 +59,7 @@ test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_
   assert.equal(out.length, raw.length)
   assert.equal(out.at(-1).info.id, 'r1')
   assert.equal(out.at(-1).parts[0].state.status, 'completed')
-  assert.equal(out.at(-1).parts[0].state.output, `success\0\uFEFF${pair.text}`)
+  assert.equal(out.at(-1).parts[0].state.output, `success\0\uFEFF${skillContent(pair.text)}`)
   assert.equal(raw.at(-1).parts[0].state.output, 'success')
   assert.deepEqual(await inject('ses_cursor_completed_tool', raw), out)
 })
@@ -71,6 +73,6 @@ test('WHAT[PROVIDER-PROJECTION-010] C_PH_cursor_appends_NUL_BOM_guidance_inside_
   const out = await inject('ses_cursor_error_tool', raw)
   assert.equal(pairMessages(out).length, 0)
   assert.equal(out.at(-1).parts[0].state.status, 'error')
-  assert.equal(out.at(-1).parts[0].state.error, `not found\0\uFEFF${pair.text}`)
+  assert.equal(out.at(-1).parts[0].state.error, `not found\0\uFEFF${skillContent(pair.text)}`)
   assert.equal(raw.at(-1).parts[0].state.error, 'not found')
 })

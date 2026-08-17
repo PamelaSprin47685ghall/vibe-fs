@@ -156,28 +156,36 @@ const isAssistant = (message) => {
   // assistant step; it never enters the scenario step cursor.
   //
   // Measured shapes: Host raw message may keep `info.source`. Provider wire often
-  // strips it and instead carries auto-injected tool parts. Ordinary Host encoding
-  // is one completed row; legacy FakeReq used `status: pending`. Both must be skipped
-  // or they shift `stepOf` after real tool batches.
+  // strips it and instead carries the current empty-name `skill` call or legacy
+  // auto-injected tool parts. All synthetic shapes must be skipped without hiding
+  // real non-empty skill calls.
   const source = message?.info?.source;
   if (source === pairProgrammingThoughtSource || source === 'pair-programming-thought') return false;
-  // Any auto-injected tool part is synthetic regardless of status/output: production
-  // uses that tool name only for HOST-013, and requiring completed+output would miss
-  // a legacy pending FakeReq row.
-  const isGuidelineToolPart = (part) =>
-    part?.type === 'tool'
-    && (part?.tool === '-' || part?.tool === 'auto-injected');
+  const isGuidelineToolPart = (part) => {
+    if (part?.type !== 'tool') return false;
+    if (part?.tool === '-' || part?.tool === 'auto-injected') return true;
+    return part?.tool === 'skill' && part?.state?.input?.name === '';
+  };
   if (Array.isArray(message?.parts) && message.parts.some(isGuidelineToolPart)) return false;
   const content = message?.content;
   if (Array.isArray(content) && content.some(isGuidelineToolPart)) return false;
-  // OpenAI HTTP wire: FakeReq is an assistant with tool_calls named - or auto-injected
-  // (FakeResp is often role tool and already non-assistant). Skip only when every
-  // named call is synthetic so a mixed real+hyphen message still counts.
+  // OpenAI HTTP wire: current FakeReq is skill({name:""}); old transcripts may
+  // still carry - / auto-injected. A non-empty real skill call remains a step.
+  const isGuidelineToolCall = (call) => {
+    const name = call?.function?.name ?? call?.name;
+    if (name === '-' || name === 'auto-injected') return true;
+    if (name !== 'skill') return false;
+    const args = call?.function?.arguments ?? call?.arguments;
+    if (args && typeof args === 'object') return args.name === '';
+    if (typeof args !== 'string') return false;
+    try {
+      return JSON.parse(args)?.name === '';
+    } catch {
+      return false;
+    }
+  };
   const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
-  if (toolCalls.length > 0) {
-    const names = toolCalls.map((call) => call?.function?.name ?? call?.name);
-    if (names.every((name) => name === '-' || name === 'auto-injected')) return false;
-  }
+  if (toolCalls.length > 0 && toolCalls.every(isGuidelineToolCall)) return false;
   return true;
 };
 

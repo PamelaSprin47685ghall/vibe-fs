@@ -58,12 +58,11 @@ type PairProgrammingGuideline =
   next（`NonSequentialOrdinal`）、CallId 重复（`DuplicateCallId`）、placement 重复
   （`DuplicatePlacement`，SessionId 隐含 + CallGap + ResultGap 至多一对）。
 - `pairs`：存储 newest-first，返回 oldest-first（replay 顺序）。
-- `MarkerText` 原样存储 → replay byte-identical（HOST-013「当时实际看到的精确
-  正文」）。substrate 是 Journal fold，不是私有 delivery 文件。
+- `MarkerText` 原样存储 → replay byte-identical（HOST-013「当时实际看到的精确 payload」）。新 occurrence 在 append 前已包成 `<skill_content name="">…</skill_content>`；历史 raw MarkerText 保持旧 wire。substrate 是 Journal fold，不是私有 delivery 文件。
 
 ## 4. marker 注入：`src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs`
 
-- `tryInject`：只负责把**已经完成组装的** `MarkerText` 生成 auto-injected tool-call/tool-result pair，并锚到 transcript 的 CallGap/ResultGap；Main 侧没有 fake-user message（GD-009）。
+- `tryInject`：把**已经完成组装的** pair body 包成 `<skill_content name="">…</skill_content>`，再生成 synthetic `skill({ name: "" })` tool-call/tool-result pair，并锚到 transcript 的 CallGap/ResultGap；Cursor 不造 synthetic message，只把同一 final MarkerText 追加到既有 terminal result 分隔符后。Main 侧没有 fake-user message（GD-009）。
 - occurrence 组装在 `PluginTransforms` + `PairProgrammingCalibration`：`latest tip guidance` → TIME-007 `elapsed` → DELEG-022 `remaining expected tool calls` → canonical pair-programming guideline，各动态 owner 只做 O(1) projection read；无 estimate 时省略该 fragment。
 - `composeWithElapsed` 的结果立即交给 `tryInject`，成功后由 `PairProgrammingGuidelineAnchored.MarkerText` 原样 durable；replay 不再调用 elapsed/estimate renderer。
 

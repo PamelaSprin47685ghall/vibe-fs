@@ -93,7 +93,8 @@ type ActivePrefixEpoch =
 
 - `ReanchoredRuns` 集合的持久化（compaction 消息永远留在 transcript，epoch check 不够）是
   实现机制；「同 compaction 只重锚一次」才是命题（PREFIX-STABILITY-006）。
-- `NUL+BOM+MarkerText` / fake-tool 展开是 HOST-013 的 wire HOW（card 明确可整体替换）。
+- ordinary synthetic `skill({ name: "" })` + `<skill_content name="">…</skill_content>` / Cursor `NUL+BOM+MarkerText`
+  是 HOST-013 的 wire HOW（card 明确可整体替换）；新 occurrence 的 MarkerText 已是最终 skill-content payload。
 - `CoverableFrameCount`（vs 存储 CoverableBRef）是等价压缩 HOW（context-compression 侧）。
 
 ## 4. 历史与弃权

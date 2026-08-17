@@ -100,6 +100,6 @@ Finality dual-PERFECT 不消费 provider-projection digest。
 | 历史 change（cache） | 弃权（anchored prefix 部分） | HOST-013 anchored prefix / gap anchor / replay 属 `prefix-stability`（任务边界明确不重复收）；本包只收 renderer 侧（WHAT 005/010 的 wire 机制） |
 | 历史 why/synthetic-toml 条款 | EVIDENCE | 字符串写法唯一 owner；同 semantic input 同 bytes。落点：WHAT 008/012 |
 | PROJ-008 迁移日程（Batch 1–6 顺序） | HOW | 迁移执行记录，非永久命题 |
-| `NUL+BOM`、`-` 工具名（原 `auto-injected`）、`source="pair-programming-auto-injected"` | HOW | wire 分隔符与工具名机制（COVERAGE HOST-013 HOW 行） |
+| `NUL+BOM`、synthetic `skill({ name: "" })`、`<skill_content name="">`、`source="pair-programming-auto-injected"` | HOW | HOST-013 wire 机制；Cursor 仍把同一 skill-content payload 拼到 `NUL+BOM` 后 |
 | LegacyProjection 删除 / `LegacyDigest = DslDigest` 切换 | HOW | 迁移期机制 |
 | `MaxKeywords=8`/`TopK=4` 等 tuning 值 | GARBAGE 弃权 | 不在本包命题内（归 knowledge-reuse/repository-investigation 的 HOW） |

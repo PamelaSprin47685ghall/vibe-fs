@@ -113,9 +113,10 @@ Main Full/Identity 交付；`previous_enforcer_tip` 是低信任 Blogger 历史
 
 ### GD-009 交付不创建 interaction authority
 
-Main tip guidance 只经 `TipGuidanceDelivered` 投影 + auto-injected tool-call/
-tool-result pair 进入 horizon，不注入工程 fake-user message、不 mint 新 Authority
-Root；delivery 不改变 authority/personhood。
+Main tip guidance 只经 `TipGuidanceDelivered` 投影 + synthetic `skill({ name: "" })`
+tool-call/tool-result pair 进入 horizon；其 result 是 `<skill_content name="">…</skill_content>`，不注入工程
+fake-user message、不 mint 新 Authority Root；delivery 不改变 authority/personhood。真实 `skill` 工具保持可用，
+空 name 只保留给 injection-only HOST-013 occurrence。
 
 - 含义：guidance 是 Host-adopted 提示，不是第二 Authority 解释器
   （ENFORCER-071 / 边界 card）。
@@ -136,7 +137,8 @@ tournament 范畴，本包不再设机器载体）。编号保留不回收。
 
 每个 auto-injected pair 以 `PairProgrammingGuideline { Ordinal; CallId;
 MarkerText; CallGap; ResultGap }` 持久化（HOST-013）：`MarkerText` = provider
-当时实际看到的精确正文；replay 必须 byte-identical 恢复原文，不随 authored
+当时实际看到的精确 payload（新 occurrence 为 `<skill_content name="">…</skill_content>`；历史 occurrence 保留其
+原 wire 字节）；replay 必须 byte-identical 恢复原文，不随 authored
 `main.md` 版本演进改写。fold 拒绝：ordinal 乱序、重复 CallId、重复 placement
 （SessionId + CallGap + ResultGap 至多一对）。
 
