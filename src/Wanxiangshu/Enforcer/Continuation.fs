@@ -242,12 +242,26 @@ module EnforcerContinuation =
                     )
         }
 
+    let private firstAabbOrExhaust
+        (ctx: Context)
+        (sessionKey: string)
+        (currentCtx: BloggerRequestContext option)
+        (live: BloggerRequestContext)
+        (guaranteedFirstAabb: bool)
+        (reason: string)
+        : Task<ContinuationOutcome> =
+        if guaranteedFirstAabb then
+            projectRepairInstruction ctx sessionKey live reason
+        else
+            fatalProjectRaw ctx sessionKey currentCtx "blog aabb exhausted; auto-recovery budget spent"
+
     /// Evidence → Decision: sealed main → seal; else AABB admit then repair/exhaust.
     let private aabbRepair
         (ctx: Context)
         (sessionKey: string)
         (currentCtx: BloggerRequestContext option)
         (live: BloggerRequestContext)
+        (guaranteedFirstAabb: bool)
         (reason: string)
         : Task<ContinuationOutcome> =
         task {
@@ -263,8 +277,7 @@ module EnforcerContinuation =
                         admission
                         sessionKey
                         reason
-                        (fun () ->
-                            fatalProjectRaw ctx sessionKey currentCtx "blog aabb exhausted; auto-recovery budget spent")
+                        (fun () -> firstAabbOrExhaust ctx sessionKey currentCtx live guaranteedFirstAabb reason)
                         (fun () -> projectRepairInstruction ctx sessionKey live reason)
         }
 
@@ -286,7 +299,7 @@ module EnforcerContinuation =
             Task.FromResult(ctx.Project ctx.RawMessages)
         | Error err ->
             Diagnostic.emit "enforcer-cycle-nudge-fail" [ "session_id", sessionKey; "result", err ]
-            aabbRepair ctx sessionKey currentCtx live ("nudge-failed: " + err)
+            aabbRepair ctx sessionKey currentCtx live true ("nudge-failed: " + err)
 
     /// Evidence → Decision: repair nudge port → send or AABB.
     let private interactionNudge
@@ -304,7 +317,7 @@ module EnforcerContinuation =
                     "enforcer-cycle-nudge-fail"
                     [ "session_id", sessionKey; "result", "no repair nudge port; " + reason ]
 
-                return! aabbRepair ctx sessionKey currentCtx live ("nudge-no-port: " + reason)
+                return! aabbRepair ctx sessionKey currentCtx live true ("nudge-no-port: " + reason)
             | Some send ->
                 let requestId = BloggerRequestContext.requestId live
 
@@ -348,7 +361,7 @@ module EnforcerContinuation =
         | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
             sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
         | BloggerToolRecovery.AabbRepairIssued _ ->
-            fatalProjectRaw ctx sessionKey currentCtx "blog tool interrupted; aabb exhausted"
+            aabbRepair ctx sessionKey currentCtx live false "blog tool interrupted after AABB"
         | _ -> projectRepairInstruction ctx sessionKey live "blog tool interrupted without completed call"
 
     /// Evidence → Decision: live cycle for interrupted blog → recovery or stop.
@@ -375,8 +388,8 @@ module EnforcerContinuation =
         | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
             sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
         | BloggerToolRecovery.AabbRepairIssued _ ->
-            fatalProjectRaw ctx sessionKey currentCtx "blog tool error; aabb exhausted"
-        | _ -> aabbRepair ctx sessionKey currentCtx live "blog tool error without completed call"
+            aabbRepair ctx sessionKey currentCtx live false "blog tool error after AABB"
+        | _ -> aabbRepair ctx sessionKey currentCtx live false "blog tool error without completed call"
 
     /// Evidence → Decision: live cycle for errored blog → recovery or stop.
     let private decideErroredBlog
@@ -407,11 +420,11 @@ module EnforcerContinuation =
 
             Task.FromResult(ctx.Project ctx.RawMessages)
         | BloggerToolRecovery.InteractionNudgeIssued _ ->
-            aabbRepair ctx sessionKey currentCtx live ("nudge semantic failure; " + reason)
+            aabbRepair ctx sessionKey currentCtx live true ("nudge semantic failure; " + reason)
         | BloggerToolRecovery.AabbRepairIssued issuedRun when issuedRun = terminalRun ->
             sameAabbTerminalReentry ctx sessionKey issuedRun terminalRun
         | BloggerToolRecovery.AabbRepairIssued _ ->
-            fatalProjectRaw ctx sessionKey currentCtx "protocol-repair-exhausted (ENFORCER-060)"
+            aabbRepair ctx sessionKey currentCtx live false ("invalid terminal after AABB; " + reason)
 
     let private decideInvalidTerminal
         (ctx: Context)

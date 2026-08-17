@@ -46,7 +46,7 @@ resolveOrigin（journal 已知 provenance）
   durability 前提）。
 - continuation 归属只读 `ActiveLogicalRun`（不回退 `LastAuthorityProfile`）。
 - root 的 `registerAuthority` 清空 run-scoped 映射（PendingClaims/AcceptedContinuationIds/ClaimSequences），使 PERSIST-008 有界。
-- ordinary repair 的 claim scope payload 只含 repair family；LogicalRunId 已是 scope 组件，所以同 run 后续 terminal 不会重置预算。Blogger exact-one special digest = `BloggerRequestId + terminal ProviderRunIdentity + repair kind`：request axis 隔离长寿命 Blogger session 上连续的工作请求，terminal axis 只负责同 terminal 幂等；再由 nudge→AABB→exhaust 状态机单独限界。
+- ordinary repair 的 claim scope payload 只含 repair family；LogicalRunId 已是 scope 组件，所以同 run 后续 terminal 不会重置预算。Blogger exact-one special digest = `BloggerRequestId + terminal ProviderRunIdentity + repair kind`：request axis 隔离长寿命 Blogger session 上连续的工作请求，terminal axis 只负责同 terminal 幂等。`blogger-missing-tool` nudge 每 request 一次；进入 AABB 后，每个新的 invalid terminal 可有新的 `blogger-aabb` occasion，但是否继续由 shared fallback projection/budget 限界，而不是用“已有任意 AABB claim”当 exhaustion。
 - Manager idle digest = `LifeId + conditionKey`；condition 由 Manager 是否已有 plan commitment 决定，ProviderRunIdentity 不参与自动 encouragement budget。
 
 ## 历史与弃权

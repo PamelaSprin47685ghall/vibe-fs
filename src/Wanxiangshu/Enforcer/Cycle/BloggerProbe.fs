@@ -63,8 +63,9 @@ open Wanxiangshu.Strength
 
 /// ENFORCER-153: Blogger missing-tool recovery stage is DERIVED, never stored.
 ///
-/// The stage of the one repair budget (nudge once, then one AABB) is a pure
-/// function of the durable InteractionRepair claim and the provider-visible
+/// The repair stage (one nudge, then request-scoped AABB occasions while the
+/// shared fallback budget remains) is a pure function of durable
+/// InteractionRepair claims and the provider-visible
 /// transcript. Recovery is never stored on a runtime cell: the hot path
 /// (EnforcerHost.handleContinuation) reads `repairState`, and the crash window
 /// (BloggerCrashRecovery.reconcile) reads `rejudgeToolRecovery`. A restart
@@ -76,7 +77,7 @@ module BloggerRecoveryProbe =
     [<Literal>]
     let BloggerMissingToolRepairKind = "blogger-missing-tool"
 
-    /// Durable marker for the one fallback/AABB continuation that may follow the nudge.
+    /// Durable marker for one request+terminal-scoped fallback/AABB continuation.
     [<Literal>]
     let BloggerAabbRepairKind = "blogger-aabb"
 
@@ -200,6 +201,18 @@ module BloggerRecoveryProbe =
         | PromptAuthorityLedger.DispatchStatus.Pending
         | PromptAuthorityLedger.DispatchStatus.Accepted _ -> true
 
+    let private repairIssuedForKind
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (requestId: BloggerRequestId)
+        (terminalRun: ProviderRunIdentity)
+        (repairKind: string)
+        =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+
+        repairClaimedForKind journal bloggerSessionId requestId terminalRun repairKind
+        && repairDispatchExists projections bloggerSessionId requestId terminalRun repairKind
+
     let private claimRunCandidate (prefix: string) (suffix: string) (scope: string) (sequence: int) : string option =
         let runLength = scope.Length - prefix.Length - suffix.Length
         let runStart = min prefix.Length scope.Length
@@ -264,9 +277,10 @@ module BloggerRecoveryProbe =
         claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId requestId
         |> Option.map ProviderRunIdentity.create
 
-    /// Invalid-terminal stage preserves WHICH terminal received the AABB. Idle
-    /// may be delivered repeatedly for one terminal, so stage identity is part
-    /// of the idempotency proof.
+    /// Invalid-terminal stage preserves WHICH terminal most recently proves an
+    /// issued AABB occasion. Idle may be delivered repeatedly for one terminal,
+    /// so exact-current identity is part of the idempotency proof; a prior AABB
+    /// on another terminal means "already in AABB", not "budget exhausted".
     let repairStateForInvalidTerminal
         (journal: AgentJournal)
         (bloggerSessionId: SessionId)
@@ -274,9 +288,12 @@ module BloggerRecoveryProbe =
         (terminalRun: ProviderRunIdentity)
         : InvalidTerminalRepairState =
         let aabb =
-            claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId requestId
-            |> Option.map (fun claimedRun ->
-                InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun))
+            if repairIssuedForKind journal bloggerSessionId requestId terminalRun BloggerAabbRepairKind then
+                Some(InvalidTerminalRepairState.AabbRepairIssued terminalRun)
+            else
+                claimedRunFromSequencesFor BloggerAabbRepairKind journal bloggerSessionId requestId
+                |> Option.map (fun claimedRun ->
+                    InvalidTerminalRepairState.AabbRepairIssued(ProviderRunIdentity.create claimedRun))
 
         let nudge =
             if repairClaimedFor journal bloggerSessionId requestId terminalRun then
