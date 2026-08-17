@@ -181,3 +181,12 @@ test('WHAT[VERIFICATION-SYSTEM-007] plugin scope preserves detached background f
     lateBackgroundRejected: true,
   })
 })
+
+test('WHAT[VERIFICATION-SYSTEM-007] finality reviewer aborts remain owned until every admitted abort settles', async () => {
+  const result = await temporal.finalityReviewerAbortDrainScenario()
+  assert.deepEqual(result, {
+    blockedOnFirstAbort: true,
+    blockedOnSecondAbort: true,
+    drained: true,
+  })
+})

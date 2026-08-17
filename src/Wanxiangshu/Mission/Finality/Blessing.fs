@@ -161,8 +161,7 @@ module BlessingWorkflow =
                                WorkRecordBundleRef = blob.BlobRef
                                WorkRecordBundleDigest = blob.BlobDigest |})
 
-                members
-                |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
+                do! FinalityReviewerPort.abortAll reviewerPort members
 
                 return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
         }

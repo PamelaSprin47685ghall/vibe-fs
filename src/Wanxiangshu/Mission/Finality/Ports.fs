@@ -27,7 +27,15 @@ type FinalityReviewerPort =
       OpenJudgementChannel: SessionId -> Result<ReviewJudgementChannel, string>
       AwaitTerminal: SessionId -> Task<Result<unit, string>>
       SendRevisionSteer: SessionId -> string -> Task<Result<unit, string>>
-      AbortReviewer: SessionId -> unit }
+      AbortReviewer: SessionId -> Task }
+
+module FinalityReviewerPort =
+
+    let abortAll (port: FinalityReviewerPort) (members: EnlistedMember list) : Task =
+        task {
+            for memberInfo in members do
+                do! port.AbortReviewer memberInfo.ReviewerSessionId
+        }
 
 /// Read the Manager's current git tree for GLORY-058/059 equality checks.
 type FinalityTreePort =

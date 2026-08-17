@@ -13,6 +13,8 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Mission.Finality
+open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Persistence.EventStore
@@ -652,6 +654,82 @@ module TemporalSurface =
                 box
                     {| error = error
                        lateBackgroundRejected = not lateBackgroundStarted |}
+        }
+
+    /// Finality owner proof: blessing cleanup may retain the reviewer session,
+    /// but every admitted physical abort must settle before the caller can leave
+    /// the Finality owner tree.
+    let finalityReviewerAbortDrainScenario () : Task<obj> =
+        task {
+            let firstEntered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let secondEntered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let releaseFirst =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let releaseSecond =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let abort reviewerSessionId : Task =
+                task {
+                    match SessionId.value reviewerSessionId with
+                    | "finality-reviewer-1" ->
+                        AsyncSupport.trySetResult firstEntered () |> ignore
+                        do! releaseFirst.Task
+                    | "finality-reviewer-2" ->
+                        AsyncSupport.trySetResult secondEntered () |> ignore
+                        do! releaseSecond.Task
+                    | unknown -> invalidOp (sprintf "unexpected reviewer: %s" unknown)
+                }
+                :> Task
+
+            let reviewerPort: FinalityReviewerPort =
+                { PrepareSession = fun _ -> Task.FromResult(Error "unused")
+                  StartReview = fun _ -> Task.FromResult(Error "unused")
+                  OpenJudgementChannel = fun _ -> Error "unused"
+                  AwaitTerminal = fun _ -> Task.FromResult(Error "unused")
+                  SendRevisionSteer = fun _ _ -> Task.FromResult(Error "unused")
+                  AbortReviewer = abort }
+
+            let members =
+                [ { ReviewerSessionId = SessionId.create "finality-reviewer-1"
+                    BarrierId = ReviewBarrierId.create "finality-barrier-1"
+                    ReviewerOrdinal = 0
+                    AgentId = "reviewer-1"
+                    IsNew = false }
+                  { ReviewerSessionId = SessionId.create "finality-reviewer-2"
+                    BarrierId = ReviewBarrierId.create "finality-barrier-2"
+                    ReviewerOrdinal = 1
+                    AgentId = "reviewer-2"
+                    IsNew = false } ]
+
+            // DSL-MUTABLE: algorithm-scratch — scenario drain completion observation.
+            let mutable drained = false
+
+            let draining =
+                task {
+                    do! FinalityReviewerPort.abortAll reviewerPort members
+                    drained <- true
+                }
+
+            do! firstEntered.Task
+            let blockedOnFirstAbort = not drained
+
+            AsyncSupport.trySetResult releaseFirst () |> ignore
+            do! secondEntered.Task
+            let blockedOnSecondAbort = not drained
+
+            AsyncSupport.trySetResult releaseSecond () |> ignore
+            do! draining
+
+            return
+                box
+                    {| blockedOnFirstAbort = blockedOnFirstAbort
+                       blockedOnSecondAbort = blockedOnSecondAbort
+                       drained = drained |}
         }
 
     // ── pure durable fold ───────────────────────────────────────────────────

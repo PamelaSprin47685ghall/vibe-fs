@@ -233,7 +233,13 @@ module FinalityHostPort =
               OpenJudgementChannel = ReviewJudgementInbox.acquire
               AwaitTerminal = awaitTerminal
               SendRevisionSteer = sendRevisionSteer
-              AbortReviewer = fun reviewerSessionId -> scope.Sessions.AbortSession reviewerSessionId |> ignore }
+              AbortReviewer =
+                fun reviewerSessionId ->
+                    task {
+                        let! _ = scope.Sessions.AbortSession reviewerSessionId
+                        return ()
+                    }
+                    :> Task }
 
         let readManagerTree port =
             let current = port.GetTreeHash().Trim()

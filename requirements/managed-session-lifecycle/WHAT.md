@@ -113,6 +113,8 @@ cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel�
 `HandleAbandoned` 与 physical child teardown。runtime 从 owner registry 移除时也必须先取得并 await
 其 drain Task，禁止「remove → `Cancel() |> ignore`」使资源从最终 shutdown 的可达集合逃逸；不得用
 任何 detached `Async.StartImmediate` / ignored Task 把 Journal append 留到 store/repository 已释放后继续执行。若 durable writer 因首个 physical append failure 进入 poisoned，则 Host Reconciler 必须同步关闭新的 wake admission，并丢弃尚未开始的 queued reconcile；不得继续在 poisoned writer 上消费 durable effect。
+Finality blessing 对 hidden reviewer 只取消当前 physical attempt、保留 process-review session；这些 abort
+同样属于 owner 已准入工作，Blessing 返回前必须全部 settle，禁止用同步 `unit` port 丢弃 `AbortSession` Task。
 
 **含义/动机**：父取消 = 子全部止损；逐 child 使恢复与审计逐条可定位。
 
