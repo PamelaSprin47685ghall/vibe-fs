@@ -6,7 +6,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import * as enforcer from '../../../../../dist/Enforcer/Surface.js'
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../..')
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../..')
 const enforcerRoot = path.join(repoRoot, 'resources', 'enforcer')
 
 test('WHAT[BD-001] ENFORCER_resource_folder_rulebook_loads_with_contiguous_ordinals', () => {

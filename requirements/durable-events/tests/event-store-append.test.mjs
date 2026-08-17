@@ -34,6 +34,7 @@ test('WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updat
     const found = eventStore.read(store, id(1))
     assert.ok(found)
     assert.equal(found.id, id(1))
+    assert.deepEqual(found.payload, e.payload, 'read returns the event payload, not the canonical envelope')
     const text = await readFile(path.join(dir, 'wanxiang', 'events', 'append-proof.ndjson'), 'utf8')
     assert.equal(text.endsWith('\n'), true)
     assert.equal(text.trim().split('\n').length, 1)

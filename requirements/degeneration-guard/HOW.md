@@ -37,7 +37,7 @@ LOOP iff D <= threshold
 
 1. `git ls-files --cached --others --exclude-standard` 得到仓库集合。
 2. `TextDecoder('utf-8', { fatal: true })` 定义「可读文字」；不可 strict UTF-8 解码者排除。
-3. 所有非空行分别用 o200k 计 token；当前 p99=57，向上取二次幂 → `HALF_LIFE=64`。
+3. 所有非空行分别用 o200k 计 token；当前 p99=56，向上取二次幂 → `HALF_LIFE=64`。
 4. 所有可读文字按确定的 git path 顺序连接并 token 化。
 5. calibration 从理论最大 distinct steady prior `1/(1-λ)` 扫完整 token 流，取全程最低 `D` 为正常侧：当前 `18.385164504723882`。这些当前统计基线随仓库语料派生；feel free to modify，重跑 calibration 后同步 production 与文档即可。
 6. 异常侧不采样：全为同一 token 时 `D` 的理论极限就是 `1`。

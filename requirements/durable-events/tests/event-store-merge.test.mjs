@@ -44,6 +44,7 @@ test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_same_bytes_dedupe
   ])
   assert.equal(merged.ok, true)
   assert.equal(merged.events.length, 1)
+  assert.deepEqual(merged.events[0].payload, { x: 1 }, 'merge returns the event payload, not the canonical envelope')
 })
 
 test('WHAT[DURABLE-EVENTS-003] DURABLE_EVENTS_003_same_EventId_different_bytes_fail_closed', () => {
