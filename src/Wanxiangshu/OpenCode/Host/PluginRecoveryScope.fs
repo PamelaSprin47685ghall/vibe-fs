@@ -67,7 +67,6 @@ open Wanxiangshu.Persistence.Journal
 /// per-session arming and per-provider-run attempt plans.
 type PluginRecoveryScope(journal: AgentJournal option) =
 
-    // DSL-MUTABLE: single-flight — per-session one-shot recovery arming latch
     // (HasFlight guard). ArmRecovery sets ArmedByAdvance after a non-fission-owner
     // turn failure; TryRecoveryArming checks the latch before planning a retry in
     // the next provider transform; ClearRecovery consumes it. One armed slot
@@ -89,9 +88,10 @@ type PluginRecoveryScope(journal: AgentJournal option) =
     //   recovery sequence." The type exists so the answer cannot be produced
     //   from a cursor alone (parked-cursor bug, FALLBACK-004). Single-flight:
     //   idempotent set (overwrites same value), consumed exactly once.
+    // DSL-MUTABLE: single-flight — per-session one-shot recovery arming latch
     member val RecoveryArming = Dictionary<string, SlotArming>()
 
-    // DSL-MUTABLE: single-flight — per-provider-run attempt plan memo. Recorded
+    // Per-provider-run attempt plan memo. Recorded
     // during the provider transform (planArmedWorkMainRetry / applyStrengthReplicaPlan
     // / RecordSquashPlan callback), consumed by reconcileAttempt when the turn
     // resolves (commitPromotablePrefixRebase on TurnCompleted, cleared on terminal),
@@ -111,6 +111,7 @@ type PluginRecoveryScope(journal: AgentJournal option) =
     //   reconciliation would yield a different plan, breaking
     //   PrefixRebaseCommitted promotion. Single-flight: one plan per provider
     //   run, consumed exactly once on terminal outcome.
+    // DSL-MUTABLE: single-flight — per-provider-run attempt plan memo
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
 
     /// Ordinary business entry never performs cross-process recovery. The permit

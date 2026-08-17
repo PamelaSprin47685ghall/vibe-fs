@@ -142,8 +142,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable satelliteRuntime: SatelliteRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
-    // DSL-MUTABLE: resource — assistance workflow callbacks attach after
-    // LifecycleWorkRecord composition, without reversing compile-layer ownership.
+    // Assistance workflow callbacks attach after LifecycleWorkRecord composition,
+    // without reversing compile-layer ownership.
     // DSL-MUTABLE: resource — assistance reconciled-turn handler attachment slot
     let mutable assistanceTurnHandler: (ReconciledTurnContext -> Task<AssistanceTurnDisposition>) option =
         None
