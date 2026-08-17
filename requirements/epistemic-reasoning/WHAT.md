@@ -79,8 +79,7 @@ SynthesizeRequest         ↔ Synthesis
 **边界**：Request/Observation 的 wire 编码（当前 JSON 形状）是 HOW（`host-boundary`）；
 「同型契约 + 错型不前进」是命题。
 
-**证据**：PROOF.md EPI-004 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`、
-mcp-handle `mcp_server_surface_is_exactly_start_and_resume`）。
+**证据**：PROOF.md EPI-004 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`）。
 
 ## EPI-005：Proposal ≠ Evidence；No Free Information
 
@@ -252,3 +251,37 @@ posterior 质量。
 
 **证据**：PROOF.md EPI-012 行（kernel `closure_is_idempotent_at_fixed_point`、semantics
 `synthesis_is_information_propagation_not_information_acquisition`）。
+
+## EPI-013：MCP affordance 面忠实翻译 Kernel continuation
+
+**规范陈述**：每个 pending Request 类型恰好对应一个 phase tool（SemanticAssessment↔assess、
+GenerateCandidates↔propose、Investigate↔investigate、Synthesize↔synthesize）；每个结果携带由
+kernel-decided pending Request 翻译而来的 `nextTool`——MCP 层从不自行判断 phase、action key
+或 observation 合法性（`Policy.resume` / `observationMatches` 仍是唯一裁判）。成功使用
+structuredContent，失败使用 isError + typed error code
+（QUESTION_REQUIRED/MISSING_HANDLE/UNKNOWN_HANDLE/INVALID_OBSERVATION/KERNEL_REJECTED/ALREADY_ANSWERED），
+携带 recoverable/retryable/nextAction 以及 pre-failure revision/expectedTool。answered 与
+cancelled 的 handle 终止，拒绝后续 observation；handle 是 process-local，重启后旧 handle →
+UNKNOWN_HANDLE 是当前明确接受的边界（persistence 是独立的未来需求）。
+
+**含义/动机**：affordance 面是 Kernel continuation 的机械投影，不是第二个决策者。若 MCP 层
+自行判断 phase，调用方就能绕过 controller-owned continuation 提交未被调度的观测。
+
+**边界**：wire 形状细节与 tool description 文案是 HOW；legacy `resume` 保留为兼容工具但不在
+推荐面。
+
+**证据**：PROOF.md EPI-013 行（mcp-handle `mcp_server_surface_exposes_phase_tools_and_legacy_resume`、
+mcp-contract、mcp-stdio）。
+
+## EPI-014：MCP server 身份元数据与 shipped manifest 一致
+
+**规范陈述**：initialize 的 `serverInfo.name = 'sphinx'`，`serverInfo.version` 必须等于 shipped
+package.json 的 version（经 `import.meta.url` 定位包根读取，禁止 cwd 探测），server 携带
+kernel-controlled 使用 instructions。
+
+**含义/动机**：server 身份是可验证事实，不是运行时猜测。若 version 来自 cwd 探测或硬编码，
+部署环境与 shipped manifest 可能不一致，使版本追踪失去意义。
+
+**边界**：instructions 文案是 HOW。
+
+**证据**：PROOF.md EPI-014 行（mcp-stdio initialize serverInfo.version）。

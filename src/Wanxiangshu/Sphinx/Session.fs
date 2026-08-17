@@ -155,6 +155,17 @@ module private SessionInterop =
     [<Import("randomUUID", "node:crypto")>]
     let randomUUID () : string = jsNative
 
+    let lifecycleOf (result: InquiryResult) : SessionLifecycle =
+        match result with
+        | InquiryResult.Answered answer -> SessionLifecycle.Answered answer
+        | _ -> SessionLifecycle.Active
+
+    let statusOfEntry (handle: string) (entry: SessionEntry) : LookupOutcome<SessionStatus> =
+        match entry.Lifecycle with
+        | SessionLifecycle.Active -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
+        | SessionLifecycle.Answered answer ->
+            LookupOutcome.Found(handle, SessionStatus.Answered(answer, entry.State))
+
 type SessionStore() =
     let sessions = Dictionary<string, SessionEntry>()
 
@@ -173,12 +184,9 @@ type SessionStore() =
         | _ ->
             let handle = SessionInterop.randomUUID ()
 
-            let lifecycle =
-                match result with
-                | InquiryResult.Answered answer -> SessionLifecycle.Answered answer
-                | _ -> SessionLifecycle.Active
-
-            sessions[handle] <- { State = state; Lifecycle = lifecycle }
+            sessions[handle] <-
+                { State = state
+                  Lifecycle = SessionInterop.lifecycleOf result }
 
             StartOutcome.Started(handle, state, result)
 
@@ -199,26 +207,18 @@ type SessionStore() =
         | false, (true, entry) -> SessionWire.resumeActive handle entry observation sessions
 
     member _.Status(handle: string) : LookupOutcome<SessionStatus> =
-        if String.IsNullOrWhiteSpace handle then
-            LookupOutcome.MissingHandle
-        else
-            match sessions.TryGetValue handle with
-            | false, _ -> LookupOutcome.UnknownHandle handle
-            | true, entry ->
-                match entry.Lifecycle with
-                | SessionLifecycle.Active -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
-                | SessionLifecycle.Answered answer ->
-                    LookupOutcome.Found(handle, SessionStatus.Answered(answer, entry.State))
+        match String.IsNullOrWhiteSpace handle, sessions.TryGetValue handle with
+        | true, _ -> LookupOutcome.MissingHandle
+        | _, (false, _) -> LookupOutcome.UnknownHandle handle
+        | _, (true, entry) -> SessionInterop.statusOfEntry handle entry
 
     member _.Cancel(handle: string) : LookupOutcome<unit> =
-        if String.IsNullOrWhiteSpace handle then
-            LookupOutcome.MissingHandle
-        else
-            match sessions.TryGetValue handle with
-            | false, _ -> LookupOutcome.UnknownHandle handle
-            | true, _ ->
-                sessions.Remove handle |> ignore
-                LookupOutcome.Found(handle, ())
+        match String.IsNullOrWhiteSpace handle, sessions.TryGetValue handle with
+        | true, _ -> LookupOutcome.MissingHandle
+        | _, (false, _) -> LookupOutcome.UnknownHandle handle
+        | _, (true, _) ->
+            sessions.Remove handle |> ignore
+            LookupOutcome.Found(handle, ())
 
     member this.Start(question: string) : obj =
         this.StartTyped(question) |> SessionWire.startOutcomeToObj

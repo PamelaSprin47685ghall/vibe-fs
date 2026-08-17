@@ -67,18 +67,20 @@ module McpContract =
         | InquiryResult.Error message ->
             raise (InvalidOperationException($"session success cannot wrap kernel error: {message}"))
 
+    let private activeStatusPayload (handle: string) (state: EpistemicState) : obj =
+        match state.PendingRequest with
+        | Some request ->
+            createObj
+                [ "handle" ==> handle
+                  "status" ==> "active"
+                  "revision" ==> state.Revision
+                  "nextTool" ==> nextTool request
+                  "request" ==> Codec.requestObject request ]
+        | None -> raise (InvalidOperationException "active session without pending kernel request")
+
     let statusPayload (handle: string) (status: SessionStatus) : obj =
         match status with
-        | SessionStatus.Active state ->
-            match state.PendingRequest with
-            | Some request ->
-                createObj
-                    [ "handle" ==> handle
-                      "status" ==> "active"
-                      "revision" ==> state.Revision
-                      "nextTool" ==> nextTool request
-                      "request" ==> Codec.requestObject request ]
-            | None -> raise (InvalidOperationException "active session without pending kernel request")
+        | SessionStatus.Active state -> activeStatusPayload handle state
         | SessionStatus.Answered(answer, _) ->
             createObj
                 [ "handle" ==> handle
@@ -136,6 +138,11 @@ module McpContract =
             None
             None
 
+    let private kernelRejectedAction (expectedTool: string option) : string =
+        match expectedTool with
+        | Some tool -> $"Call {tool} for the same inquiry."
+        | None -> "Call status for this handle and follow nextTool."
+
     /// Session-layer failure → typed MCP error view. Revision and expectedTool
     /// come from the pre-failure state the kernel refused to advance.
     let failureView (failure: SessionFailureView) : ErrorView =
@@ -171,12 +178,15 @@ module McpContract =
             { invalidObservationView failure.Handle message with
                 Revision = revision }
         | SessionFailure.KernelRejected message ->
-            let action =
-                match expectedTool with
-                | Some tool -> $"Call {tool} for the same inquiry."
-                | None -> "Call status for this handle and follow nextTool."
-
-            view codeKernelRejected message true false action failure.Handle revision expectedTool
+            view
+                codeKernelRejected
+                message
+                true
+                false
+                (kernelRejectedAction expectedTool)
+                failure.Handle
+                revision
+                expectedTool
         | SessionFailure.AlreadyAnswered ->
             view
                 codeAlreadyAnswered
@@ -196,23 +206,34 @@ module McpContract =
     let summarizeSuccess (success: SessionSuccess) : string =
         match success.Result with
         | InquiryResult.Yield request ->
-            $"Sphinx inquiry yielded.\nNext tool: {nextTool request}\nRevision: {success.State.Revision}{questionLine request}"
+            "Sphinx inquiry yielded.\n"
+            + $"Next tool: {nextTool request}\n"
+            + $"Revision: {success.State.Revision}{questionLine request}"
         | InquiryResult.Answered answer ->
-            $"Sphinx inquiry answered.\nRevision: {answer.Revision}\nStop reason: {answer.StopReason}"
+            "Sphinx inquiry answered.\n"
+            + $"Revision: {answer.Revision}\n"
+            + $"Stop reason: {answer.StopReason}"
         | InquiryResult.Error message ->
-            raise (InvalidOperationException($"session success cannot wrap kernel error: {message}"))
+            raise (InvalidOperationException $"session success cannot wrap kernel error: {message}")
+
+    let private summarizeActive (state: EpistemicState) : string =
+        match state.PendingRequest with
+        | Some request ->
+            "Sphinx inquiry active.\n"
+            + $"Next tool: {nextTool request}\n"
+            + $"Revision: {state.Revision}{questionLine request}"
+        | None -> raise (InvalidOperationException "active session without pending kernel request")
 
     let summarizeStatus (status: SessionStatus) : string =
         match status with
-        | SessionStatus.Active state ->
-            match state.PendingRequest with
-            | Some request ->
-                $"Sphinx inquiry active.\nNext tool: {nextTool request}\nRevision: {state.Revision}{questionLine request}"
-            | None -> raise (InvalidOperationException "active session without pending kernel request")
+        | SessionStatus.Active state -> summarizeActive state
         | SessionStatus.Answered(answer, _) ->
-            $"Sphinx inquiry answered.\nRevision: {answer.Revision}\nStop reason: {answer.StopReason}"
+            "Sphinx inquiry answered.\n"
+            + $"Revision: {answer.Revision}\n"
+            + $"Stop reason: {answer.StopReason}"
 
     let summarizeCancel () : string = "Sphinx inquiry cancelled."
 
     let summarizeError (view: ErrorView) : string =
-        $"Sphinx tool error [{view.Code}]: {view.Message}\nNext action: {view.NextAction}"
+        $"Sphinx tool error [{view.Code}]: {view.Message}\n"
+        + $"Next action: {view.NextAction}"
