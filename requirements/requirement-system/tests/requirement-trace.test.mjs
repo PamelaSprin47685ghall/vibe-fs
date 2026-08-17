@@ -192,6 +192,40 @@ test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown /
   assert.equal(graph.multiPrimary.length, 0)
 })
 
+test('WHAT[REQUIREMENT-SYSTEM-018] graph rejects prose-only proof rows with no executable test anchor', () => {
+  const root = mkdtempSync(join(tmpdir(), 'requirement-trace-prose-'))
+  const requirements = join(root, 'requirements')
+  const packageRoot = join(requirements, 'fixture-package')
+  const tests = join(packageRoot, 'tests')
+  const testFile = join(tests, 'case.test.mjs')
+  const whatFile = join(packageRoot, 'WHAT.md')
+  const proofFile = join(packageRoot, 'PROOF.md')
+  mkdirSync(packageRoot, { recursive: true })
+  mkdirSync(tests, { recursive: true })
+  try {
+    writeFileSync(whatFile, '# WHAT\n\n## FIXTURE-PACKAGE-001：contract\n\n## FIXTURE-PACKAGE-002：untested\n')
+    writeFileSync(testFile, "test('WHAT[FIXTURE-PACKAGE-001] exact anchor', () => {})\n")
+    // Row 1 has a test path → valid proof. Row 2 has only a law ID + prose,
+    // no .test.mjs path → must be flagged as prose-only.
+    writeFileSync(proofFile, [
+      '| 命题 | 落点 |',
+      '|---|---|',
+      '| FIXTURE-PACKAGE-001 | `tests/case.test.mjs::WHAT[FIXTURE-PACKAGE-001] exact anchor` |',
+      '| FIXTURE-PACKAGE-002 | prose narrative with no test path |',
+    ].join('\n') + '\n')
+
+    const graph = buildTraceGraph(requirements)
+    assert.equal(graph.proseOnlyProof.length, 1, 'exactly one prose-only proof row')
+    assert.equal(graph.proseOnlyProof[0].whatIds[0], 'FIXTURE-PACKAGE-002')
+    assert.match(graph.proseOnlyProof[0].rowText, /prose narrative with no test path/)
+    // The valid row must still produce a proof edge.
+    assert.equal(graph.proofEdges.length, 1)
+    assert.equal(graph.proofEdges[0].whatId, 'FIXTURE-PACKAGE-001')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[REQUIREMENT-SYSTEM-018] packageOf resolves the owning package, not a tests/eval directory', () => {
   assert.equal(packageOf('requirements/office-capability/tests/eval/provider-office-boundary/office-boundary-eval.test.mjs'), 'office-capability')
   assert.equal(packageOf('requirements/behavior-diagnosis/tests/paired-history-eval.test.mjs'), 'behavior-diagnosis')

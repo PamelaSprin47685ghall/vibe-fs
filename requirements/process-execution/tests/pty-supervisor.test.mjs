@@ -369,24 +369,22 @@ test('WHAT[PROC-003] SUPERVISOR_attach_onExit_publishes_residual_output', async 
 
 test('WHAT[PROC-003] SUPERVISOR_attach_onExit_fails_pending_writes_and_parked_read', async () => {
   const supervisor = supervisorCreate()
-  const parkedWrite = resultTaskSourceCreate()
   const term = fakeTerm(9999)
-  const exit = unitTaskSource()
   const p = portWith('pty-fp')
-  supervisorAttach(supervisor, p, id('pty-fp'), term, exit)
+  supervisorAttach(supervisor, p, id('pty-fp'), term)
   const parkedRead = portRead(p, id('pty-fp'))
   const session = supervisorGet(supervisor, id('pty-fp'))
-  sessionPushPendingTask(session, ptyCommandWrite(new Uint8Array(0)), parkedWrite)
+  const parkedWrite = sessionPushPendingTask(session, ptyCommandWrite(new Uint8Array(0)))
   term.exitCb({ exitCode: 0 })
   assert.deepEqual(await parkedRead, resultError('PTY exited before read completed'))
-  assert.deepEqual(await resultTask(parkedWrite), resultError('PTY exited before command was applied'))
+  assert.deepEqual(await parkedWrite, resultError('PTY exited before command was applied'))
 })
 
 test('WHAT[PROC-006] SUPERVISOR_attach_without_port_entry_kills_the_term', async () => {
   const process = child()
   try {
     const supervisor = supervisorCreate()
-    supervisorAttach(supervisor, createPtyPort({}), id('pty-nk'), fakeTerm(process.pid), unitTaskSource())
+    supervisorAttach(supervisor, createPtyPort({}), id('pty-nk'), fakeTerm(process.pid))
     await waitExit(process)
     assert.ok(died(process), 'unregistered attach SIGKILLs the process tree')
   } finally { killChild(process) }
@@ -398,7 +396,7 @@ test('WHAT[PROC-007] SUPERVISOR_attach_replays_pending_writes_onto_the_live_back
   supervisorAdd(supervisor, id('pty-rp'), session)
   const parked = supervisorApplyLive(supervisor, port(), id('pty-rp'), ptyCommandWrite(new TextEncoder().encode('early')))
   const term = fakeTerm(9999)
-  supervisorAttach(supervisor, portWith('pty-rp'), id('pty-rp'), term, unitTaskSource())
+  supervisorAttach(supervisor, portWith('pty-rp'), id('pty-rp'), term)
   assert.deepEqual(await parked, resultOk)
   assert.deepEqual(term.writes, ['early'])
 })
@@ -409,7 +407,7 @@ test('WHAT[PROC-003] SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_
   const completions = []
   const p = portWith('pty-idem')
   portAddMailboxSender(p, (item) => completions.push(item))
-  supervisorAttach(supervisor, p, id('pty-idem'), term, unitTaskSource())
+  supervisorAttach(supervisor, p, id('pty-idem'), term)
   term.exitCb({ exitCode: 0 })
   await new Promise((resolve) => setImmediate(resolve))
   term.exitCb({ exitCode: 0 })
@@ -422,7 +420,7 @@ test('WHAT[PROC-003] SUPERVISOR_attach_onExit_noop_when_session_already_closed',
   const completions = []
   const p = portWith('pty-ec')
   portAddMailboxSender(p, (item) => completions.push(item))
-  supervisorAttach(supervisor, p, id('pty-ec'), term, unitTaskSource())
+  supervisorAttach(supervisor, p, id('pty-ec'), term)
   sessionSetClosed(supervisorGet(supervisor, id('pty-ec')), true)
   term.exitCb({ exitCode: 0 })
   assert.equal(completions.length, 0)

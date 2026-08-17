@@ -6926,7 +6926,7 @@ requirements/<owner>/WHAT.md
 - `node scripts/build.mjs` 通过：Fable 5.13.0 解析 647 source files，assembly 生成成功。
 - `node requirements/verification-system/tests/run.mjs` 通过：3120/3120 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
 - `FinalitySurface` 合成信封（synthetic envelope）已消除：通过 `Fold.foldFact` 直接按 Fact 分发，移除了 `envelopeFor`、`streamOf`、`sessionOfStream` 及死载荷字段（RuntimeId, LocalSeq, ObservedAt, EventId, ProviderRun）。
-- `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；测试驱动原语（childCreate, unitTaskSource, completionMailboxCreate 等）内联为 `ProcessSurface` 的合法物理能力（子进程句柄构造、延迟信号、PTY 完成邮箱），不再独立 `ProcessTestSurface` 模块或 manifest 条目，生产表面与测试入口统一。
+- `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；删除独立 `ProcessTestSurface` 模块及其 manifest 条目。`childCreate`（子进程句柄构造）和 `completionMailboxCreate`（PTY 完成邮箱 FIFO）内联为 `ProcessSurface` 的合法物理能力。`sessionPushPendingTask` 返回 JS-native Promise（内部 TCS），`supervisorAttach` 内部创建 exit TCS——不再导出 `unitTaskSource`/`resultTaskSource` 等测试原语，生产表面与测试入口统一。
 - `Scheduler` 控制状态机已消除：删除了 `Reconciler.Scheduler` 中的 `Work` 和 `Release` 控制令牌 DU，drain 循环改用直接的 CE 布尔流。
 - `Git` 钩子路径收敛：`Git/Gateway.fs` 现通过 `ProcessRunner.run` 的类型化 `Command` 抽象路由；`Git/Subject.fs`（同步内省）与 `ProcessGitRawStore.fs`（二进制 I/O）已记录架构留存理由。
 - `LEGACY-007` 裁定完成：在 `cleanup/legacy-ledger.md` 中裁定为 BOUNDED-COMPAT，明确具名债权人（历史持久化 journal 中的退休假中止 blob）、精确边界与退出条件。
