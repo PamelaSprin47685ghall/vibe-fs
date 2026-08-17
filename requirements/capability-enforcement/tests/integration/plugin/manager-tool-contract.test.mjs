@@ -15,6 +15,7 @@ import {
   acceptAuthorityRoot,
   withExecutablePlugin,
   withPlugin,
+  withPluginClient,
 } from '../../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const TOOL_NAMES = [
@@ -23,6 +24,17 @@ const TOOL_NAMES = [
   'bash-honeypot', 'inspect', 'establish-behavior', 'repair-behavior',
   'run', 'query-shell', 'stealth-browser-mcp', 'sphinx', 'judge',
   'chronicle', 'fetch',
+]
+
+const PLUGIN_TOOL_NAMES = [
+  'fork', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+  'join', 'horizon', 'fission', 'judge', 'suicide', 'run', 'query-shell', 'inspect',
+  'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'chronicle',
+  'js-browser', 'js-coder', 'js-devops', 'js-inspector', 'js-reviewer',
+]
+
+const HOST_OWNED_TOOL_NAMES = [
+  'todowrite', 'read', 'write', 'edit', 'glob', 'grep', 'stealth-browser-mcp', 'sphinx',
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller']
@@ -56,10 +68,14 @@ const fullConfig = () => ({
   ),
 })
 
-test('WHAT[ENF-010] MANAGER_plugin_registers_the_declared_capability_tool_set', async () => {
+test('WHAT[ENF-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools', async () => {
   await withPlugin(async (hooks) => {
-    for (const toolName of TOOL_NAMES) {
+    assert.deepEqual(Object.keys(hooks.tool).sort(), [...PLUGIN_TOOL_NAMES].sort())
+    for (const toolName of PLUGIN_TOOL_NAMES) {
       assert.equal(typeof hooks.tool[toolName]?.execute, 'function', `${toolName} is registered`)
+    }
+    for (const toolName of HOST_OWNED_TOOL_NAMES) {
+      assert.equal(hooks.tool[toolName], undefined, `${toolName} stays Host-owned`)
     }
     const forbidden = ['auto-injected', '-', 'tool', 'bash', 'shell']
     for (const toolName of forbidden) assert.equal(hooks.tool[toolName], undefined, `${toolName} must not be an export`)
@@ -83,13 +99,23 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
   })
 })
 
-test('WHAT[ENF-010] MANAGER_agent_enum_accepts_only_managed_names', async () => {
+test('WHAT[ENF-010] MANAGER_calling_enum_uses_personas_while_name_remains_a_free_byname', async () => {
   await withPlugin(async (hooks) => {
-    for (const toolName of ['fork', 'commission']) {
-      for (const name of ['fast-coder', 'deep-coder', 'fast-manager', 'deep-manager']) {
-        assert.equal(hooks.tool[toolName].args.name.safeParse(name).success, true, `${toolName}.${name}`)
-      }
-      assert.equal(hooks.tool[toolName].args.name.safeParse('coder').success, false, `${toolName} rejects legacy coder`)
+    const managerPersonas = [
+      'coder', 'engineer', 'scout', 'investigator', 'technician',
+      'operator', 'navigator', 'researcher', 'analyst', 'inquirer',
+    ]
+    for (const calling of managerPersonas) {
+      assert.equal(hooks.tool.fork.args.calling.safeParse(calling).success, true, `fork.calling=${calling}`)
+    }
+    for (const calling of ['coordinator', 'lead']) {
+      assert.equal(hooks.tool.commission.args.calling.safeParse(calling).success, true, `commission.calling=${calling}`)
+    }
+    for (const managedName of ['fast-coder', 'deep-coder', 'fast-manager', 'deep-manager']) {
+      assert.equal(hooks.tool.fork.args.calling.safeParse(managedName).success, false, `fork rejects ${managedName}`)
+      assert.equal(hooks.tool.commission.args.calling.safeParse(managedName).success, false, `commission rejects ${managedName}`)
+      assert.equal(hooks.tool.fork.args.name.safeParse(managedName).success, true, `fork.name is free-form byname`)
+      assert.equal(hooks.tool.commission.args.name.safeParse(managedName).success, true, `commission.name is free-form byname`)
     }
   })
 })
@@ -125,7 +151,18 @@ test('WHAT[ENF-006] MANAGER_pair_marker_is_not_a_registered_tool_and_transform_k
   assert.equal(markerToolName, '-')
   assert.equal(typeof markerSource, 'string')
   assert.equal(typeof canonicalText, 'string')
-  await withPlugin(async (hooks) => {
+  const client = {
+    session: {
+      abort: async () => ({ data: {} }),
+      children: async () => ({ data: [] }),
+      create: async () => ({ data: { id: 'host-child-capability-contract' } }),
+      delete: async () => ({ data: {} }),
+      get: async (args) => ({ data: { id: args?.path?.id, parentID: null } }),
+      messages: async () => ({ data: [] }),
+      promptAsync: async () => ({ data: {} }),
+    },
+  }
+  await withPluginClient(client, async (hooks) => {
     assert.equal(hooks.tool['-'], undefined)
     const transformed = {
       messages: withSession([
@@ -133,9 +170,15 @@ test('WHAT[ENF-006] MANAGER_pair_marker_is_not_a_registered_tool_and_transform_k
       ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
-    for (const message of transformed.messages) {
-      assert.notEqual(message.info?.source, markerSource, 'plain user input does not synthesize a pair tool')
-    }
+    const marker = transformed.messages.find((message) => message.info?.source === markerSource)
+    assert.ok(marker, 'transform injects the internal pair marker')
+    assert.equal(marker.info?.synthetic, true)
+    assert.equal(marker.parts?.length, 1)
+    assert.equal(marker.parts?.[0]?.type, 'tool')
+    assert.equal(marker.parts?.[0]?.tool, markerToolName)
+    assert.equal(marker.parts?.[0]?.state?.status, 'completed')
+    assert.ok(marker.parts?.[0]?.state?.output?.includes(canonicalText), 'marker keeps canonical pair-programming text')
+    assert.equal(hooks.tool[markerToolName], undefined, 'wire marker never becomes an executable plugin tool')
   })
 })
 

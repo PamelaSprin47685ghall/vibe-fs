@@ -44,6 +44,7 @@ module EventMergeSurface =
             CanonicalEventCodec.encode event
             |> (fun text -> text.TrimEnd('\n'))
             |> JS.JSON.parse
+            |> fun eventObject -> eventObject?payload
 
         box
             {| id = EventId.value event.EventId

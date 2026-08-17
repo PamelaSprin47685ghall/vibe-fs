@@ -46,6 +46,7 @@ module Surface =
             CanonicalEventCodec.encode envelope
             |> (fun text -> text.TrimEnd('\n'))
             |> JS.JSON.parse
+            |> fun eventObject -> eventObject?payload
 
         box
             {| id = EventId.value envelope.EventId
