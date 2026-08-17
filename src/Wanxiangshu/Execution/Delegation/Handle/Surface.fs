@@ -423,6 +423,7 @@ module HandleSurface =
     /// record snapshots sorted by creation order.
     let linkedChildren (state: HandleProjectionState) : obj array =
         HandleProjection.linkedChildren state.Internal
+        |> List.sortBy (fun record -> record.CreationOrder)
         |> List.map recordView
         |> List.toArray
 

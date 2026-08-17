@@ -22,6 +22,7 @@ const armedInput = (overrides = {}) => ({
   journal: true,
   sessionId: 'ses_x',
   armed: true,
+  prefixEpoch: 0,
   offset: 1, // Fork1 — a recovery slot
   physicalUser: 'user-1',
   snapshotPort: true,
@@ -38,7 +39,14 @@ const armedInput = (overrides = {}) => ({
   ...overrides,
 })
 
-// ── HOST-BOUNDARY-021: no business semantics without full context ───────
+// ── HOST-BOUNDARY-021: no business semantics without full context ────────
+
+test('WHAT[HOST-BOUNDARY-021] XWIRE_covered_prefix_digest_is_sha256', () => {
+  assert.equal(
+    XWireSurface.coveredPrefixDigest(baseProjection, 1),
+    '823d6b40827ef755cd32aeef72b073a7883c01dcb29c5fdf3318c237a59f1129',
+  )
+})
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_no_journal_is_a_noop', () => {
   const result = XWireSurface.transform(armedInput({ journal: false }))
@@ -80,6 +88,29 @@ test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_snapshot_port_fail_closed', () => {
   assert.match(result.error, /snapshot/)
 })
 
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
+  const withoutEpoch = armedInput()
+  delete withoutEpoch.prefixEpoch
+  const result = XWireSurface.transform(withoutEpoch)
+  assert.equal(result.ok, false)
+  assert.equal(result.noop, false)
+  assert.match(result.error, /prefix epoch/)
+})
+
+test('WHAT[HOST-BOUNDARY-020] XWIRE_malformed_prefix_epoch_fail_closed', () => {
+  const result = XWireSurface.transform(armedInput({ prefixEpoch: 'not-an-epoch' }))
+  assert.equal(result.ok, false)
+  assert.equal(result.noop, false)
+  assert.match(result.error, /prefix epoch/)
+})
+
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_frozen_prefix_body_fail_closed', () => {
+  const result = XWireSurface.transform(armedInput({ frozenRecordPrefixBody: undefined }))
+  assert.equal(result.ok, false)
+  assert.equal(result.noop, false)
+  assert.match(result.error, /frozen record prefix body/)
+})
+
 // ── HOST-BOUNDARY-021: armed + material → probe renders synthetic prefix ─
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_with_material_renders_synthetic_prefix', () => {
@@ -116,6 +147,18 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_completed_attempt_with_probe_promotes_prefix
   assert.equal(result.promoted, true)
 })
 
+test('WHAT[HOST-BOUNDARY-021] XWIRE_stale_probe_does_not_promote_after_prefix_rebase', () => {
+  const result = XWireSurface.reconcile({
+    hasPlan: true,
+    outcome: 'completed',
+    hasProbe: true,
+    currentEpoch: 2,
+    probeEpoch: 1,
+  })
+  assert.equal(result.promoted, false)
+  assert.equal(result.cleared, true)
+})
+
 test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_does_not_promote', () => {
   const result = XWireSurface.transform(armedInput({ outcome: 'failed', coverableCutoff: 2 }))
   assert.equal(result.ok, true)
@@ -125,7 +168,7 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_does_not_promote', () => {
 // ── HOST-BOUNDARY-021: reconcile decision surface ────────────────────────
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_with_probe_promotes_and_clears', () => {
-  const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'completed', hasProbe: true })
+  const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'completed', hasProbe: true, currentEpoch: 0, probeEpoch: 0 })
   assert.equal(result.promoted, true)
   assert.equal(result.cleared, true)
   assert.equal(result.keptPlan, false)

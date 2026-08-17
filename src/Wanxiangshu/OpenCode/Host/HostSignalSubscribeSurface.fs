@@ -52,10 +52,13 @@ module HostSignalSubscribeSurface =
     ///   success → { ok: true, source: string, dispose: () => void | null }
     ///   failure → { ok: false, error: string }
     let trySubscribe (input: obj) (onSignalEvent: obj) (timerPort: obj) : Task<obj> =
-        let callback = onSignalEventOf onSignalEvent
-        let port = if isNullish timerPort then None else Some(unbox<ITimerPort> timerPort)
+        if not (isFunction onSignalEvent) then
+            Task.FromResult(box {| ok = false; error = "OPENCODE-SIGNAL-SUBSCRIBE: callback unavailable" |})
+        else
+            let callback = onSignalEventOf onSignalEvent
+            let port = if isNullish timerPort then None else Some(unbox<ITimerPort> timerPort)
 
-        task {
-            let! result = HostSignalSubscribe.trySubscribe input callback port
-            return translate (box result)
-        }
+            task {
+                let! result = HostSignalSubscribe.trySubscribe input callback port
+                return translate (box result)
+            }

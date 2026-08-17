@@ -310,14 +310,18 @@ test('WHAT[MANAGED-SESSION-015] EXEC_009_relinking_a_live_handle_rebinds_it_rath
 test('WHAT[MANAGED-SESSION-006] EXEC_009_linked_children_lists_every_child_ever_linked', () => {
   // Replaces the old live-only `LinkedChildren` map, which forced restart
   // recovery and the retired-handle check to use two different structures.
-  let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('a'), child: sessionId('ses_1') })
-  state = linkOn(state, { handle: handleId.agent('b'), child: sessionId('ses_2') })
-  state = retireOn(completeOn(state, { handle: handleId.agent('a') }), { handle: handleId.agent('a') })
+  let state = linkOn(HandleSurface.empty(), { handle: handleId.agent('z'), child: sessionId('ses_1') })
+  state = linkOn(state, { handle: handleId.agent('a'), child: sessionId('ses_2') })
+  state = retireOn(completeOn(state, { handle: handleId.agent('z') }), { handle: handleId.agent('z') })
 
   assert.deepEqual(
-    HandleSurface.linkedChildren(state).map((r) => r.child).sort(),
+    HandleSurface.linkedChildren(state).map((r) => r.child),
     ['ses_1', 'ses_2'],
-    'a retired child stays in the list',
+    'linked children retain creation order rather than handle-key order',
+  )
+  assert.deepEqual(
+    HandleSurface.linkedChildren(state).map((r) => r.creationOrder),
+    [0, 1],
   )
 })
 

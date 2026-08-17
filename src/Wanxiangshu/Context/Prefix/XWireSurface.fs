@@ -145,7 +145,7 @@ module XWireSurface =
             { typed with
                 Messages = typed.Messages |> List.truncate cutoff }
 
-        ProviderProjection.renderSemantic truncated
+        HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
 
     /// HOST-BOUNDARY-020/021: the X-wire transform decision.
     ///
@@ -153,6 +153,7 @@ module XWireSurface =
     ///   journal:       truthy = a durable journal is available.
     ///   sessionId:     the managed session id found in the transform output.
     ///   armed:         true when the recovery slot is armed.
+    ///   prefixEpoch:   current durable prefix epoch (the probe's base epoch).
     ///   offset:        fallback cursor offset (0-3). Recovery slots are 1 and 3.
     ///   physicalUser:  the physical user message id (required when armed).
     ///   snapshotPort:  truthy = the public session snapshot port is available.
@@ -169,6 +170,9 @@ module XWireSurface =
     ///
     /// Output fields (JS object):
     ///   ok, noop, changed, consumed, promoted, probe, noProbeReason, error, output.
+    ///   `promoted` is plan-time promotability at the observed prefix epoch;
+    ///   durable promotion is committed only by `reconcile`, which rechecks
+    ///   the probe epoch.
     let transform (input: obj) : obj =
         // ── HOST-BOUNDARY-021: no journal → no-op ──
         let journal = not (isNullish input?journal) && (input?journal |> unbox<bool>)
@@ -234,8 +238,26 @@ module XWireSurface =
                         let snapshotPort =
                             not (isNullish input?snapshotPort)
                             && (input?snapshotPort |> unbox<bool>)
+                        let prefixEpoch =
+                            if isNullish input?prefixEpoch then
+                                None
+                            else
+                                match Int64.TryParse(text input?prefixEpoch) with
+                                | true, value -> Some(PrefixEpochId.create value)
+                                | false, _ -> None
 
-                        if not snapshotPort then
+                        let prefixEpochAvailable = Option.isSome prefixEpoch
+                        let frozenBodyAvailable = not (isNullish input?frozenRecordPrefixBody)
+
+                        if not snapshotPort || not prefixEpochAvailable || not frozenBodyAvailable then
+                            let error =
+                                if not snapshotPort then
+                                    "X-wire cannot plan a retry without the public session snapshot"
+                                elif not prefixEpochAvailable then
+                                    "X-wire cannot plan a retry without the current prefix epoch"
+                                else
+                                    "X-wire cannot plan a retry without the frozen record prefix body"
+
                             box
                                 {| ok = false
                                    noop = false
@@ -244,7 +266,7 @@ module XWireSurface =
                                    promoted = false
                                    probe = null
                                    noProbeReason = null
-                                   error = "X-wire cannot plan a retry without the public session snapshot"
+                                   error = error
                                    output = null |}
                         else
                             // ── Recovery decision: mayRecover (CTX-006) ──
@@ -264,7 +286,8 @@ module XWireSurface =
 
                             // ── Probe selection (CTX-011) ──
                             let committedSnapshot = snapshotOptionOfJs input?committedSnapshot
-                            let committedEpoch = PrefixEpochId.initial
+                            let committedEpoch = prefixEpoch |> Option.defaultValue PrefixEpochId.initial
+
                             let coveredDigest = text input?coveredDigest
                             let requestStartCutoff = intValue input?requestStartCutoff
                             let frozenRef = BlobRef.create (text input?frozenRecordPrefixRef)
@@ -277,7 +300,7 @@ module XWireSurface =
                                     { currentProjection with
                                         Messages = currentProjection.Messages |> List.truncate cutoff }
 
-                                ProviderProjection.renderSemantic truncated
+                                HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
 
                             let probeResult =
                                 if mayRecover then
@@ -411,6 +434,8 @@ module XWireSurface =
     ///   hasPlan:    true when an attempt plan exists for this (session, run).
     ///   outcome:    "completed" | "failed" | "aborted" | "in-progress" | "unknown".
     ///   hasProbe:   true when the plan carries a prefix probe.
+    ///   currentEpoch: current durable prefix epoch.
+    ///   probeEpoch: probe's durable base epoch.
     ///
     /// Output fields (JS object):
     ///   promoted:  true when a PrefixRebaseCommitted fact would be written.
@@ -424,11 +449,21 @@ module XWireSurface =
         else
             let outcome = text input?outcome
             let hasProbe = not (isNullish input?hasProbe) && (input?hasProbe |> unbox<bool>)
+            let currentEpoch =
+                if isNullish input?currentEpoch then None
+                else Some(PrefixEpochId.create (int64 (text input?currentEpoch)))
+            let probeEpoch =
+                if isNullish input?probeEpoch then None
+                else Some(PrefixEpochId.create (int64 (text input?probeEpoch)))
+            let epochMatches =
+                match currentEpoch, probeEpoch with
+                | Some current, Some probe -> current = probe
+                | _ -> false
 
             match outcome with
             | "completed" ->
-                // CTX-012: Completed + has probe → promote prefix rebase, clear plan.
-                box {| promoted = hasProbe; cleared = true; keptPlan = false |}
+                // CTX-012: only a probe based on the current epoch can promote.
+                box {| promoted = hasProbe && epochMatches; cleared = true; keptPlan = false |}
             | "failed"
             | "aborted" ->
                 // Terminal failure: clear plan, no promotion.

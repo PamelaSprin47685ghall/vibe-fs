@@ -6918,13 +6918,13 @@ requirements/<owner>/WHAT.md
 
 # 当前整改状态（2026-08-17，已集成验证）
 
-当前 working tree clean；以下数字由本次实际运行的 gate、build、proof 与 integration 命令得到，不是历史估计：
+当前 working tree 在本次集成提交后保持 clean；以下数字由本次实际运行的 gate、build、proof 与 integration 命令得到，不是历史估计：
 
-- `node scripts/check.mjs` 全部通过：architecture 609 files；manifest 132 registered surfaces；requirement-trace 666 WHAT / 3136 tests，closure complete；所有 wired gates green。
-- `node scripts/test-surface-inventory.mjs` 报告 0 semantic test files carry debt、0 violating lines；仅 8 个 build-verification files 保留 Fable-aware quarantine。
+- `node scripts/check.mjs` 全部通过：architecture 619 files；manifest 143 registered surfaces；requirement-trace 666 WHAT / 3198 tests，closure complete；所有 wired gates green。
+- `node scripts/test-surface-inventory.mjs` 报告 0 semantic test files carry debt、0 violating lines；仅 9 个 build-verification files 保留 Fable-aware quarantine。
 - `js-boundary-gate` 报告 0 debt line、0 debt file、baseline absent、0 frozen package-local `*-contract.mjs`；`test-boundary` 报告除 build verification 外无 direct Fable-module import。
-- `node scripts/build.mjs` 通过：Fable 5.13.0 解析 647 source files，assembly 生成成功。
-- `node requirements/verification-system/tests/run.mjs` 通过：3120/3120 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
+- `node scripts/build.mjs` 通过：Fable 5.13.0 解析 657 source files，assembly 生成成功。
+- `node requirements/verification-system/tests/run.mjs` 通过：3182/3182 tests；requirement-trace 已闭合 3198 个 test cases；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
 - `FinalitySurface` 合成信封（synthetic envelope）已消除：通过 `Fold.foldFact` 直接按 Fact 分发，移除了 `envelopeFor`、`streamOf`、`sessionOfStream` 及死载荷字段（RuntimeId, LocalSeq, ObservedAt, EventId, ProviderRun）。
 - `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；删除独立 `ProcessTestSurface` 模块及其 manifest 条目。`childCreate`（子进程句柄构造）和 `completionMailboxCreate`（PTY 完成邮箱 FIFO）内联为 `ProcessSurface` 的合法物理能力。`sessionPushPendingTask` 返回 JS-native Promise（内部 TCS），`supervisorAttach` 内部创建 exit TCS——不再导出 `unitTaskSource`/`resultTaskSource` 等测试原语，生产表面与测试入口统一。
 - `Scheduler` 控制状态机已消除：删除了 `Reconciler.Scheduler` 中的 `Work` 和 `Release` 控制令牌 DU，drain 循环改用直接的 CE 布尔流。
@@ -6936,6 +6936,7 @@ requirements/<owner>/WHAT.md
 - `ReconcilePass` 已删除 `MaterializeContinuation` 控制令牌；snapshot error/success 分支由直接 CE 函数与有界递归表达。
 - JS semantic scanner 已覆盖 template dist import 与 support→support 传递依赖；surface manifest 只接受真实 test binding 使用；P0 recovery/join 物理权限改为精确路径。
 - `P8` 效应所有权审查完成：PTY、Journal/EventStore、Host 会话生命周期拥有单一清晰所有者；Git 路径已收敛；定时器/时钟边界符合 `IClockPort` 契约（定义于 `Foundation/Temporal.fs`，由 composition 点注入）。
+- Host boundary surface closure 完成：signals、session context/snapshot、run binding、shared state、MCP launch、plugin hooks 与 XWire 均走已注册 JS-native owner surface；XWire 以 prefix epoch 与 SHA-256 covered digest 做 fail-closed promotion；Handle surface 的 projection/fold state 为 opaque capability，linked children 按 creation order 返回。
 - 架构门禁深度强化与死检查清零：
   - `architecture.mjs`：修复 Gate ⑪ 中字符串 replace 导致的正则失效（`replace(/\.fs$/, '')`），使 Reviewer 所有权门禁真正生效；检查 ④ 同步覆盖现代 `Mission/Finality/` 路径。
   - `causal-wait-boundary.mjs`：重构静态路径判据为真实有界上下文目录，消除关键文件缺失时的静默 `continue` 跳过，缺文件立即 fail-closed。
@@ -6948,13 +6949,13 @@ requirements/<owner>/WHAT.md
 ```text
 semantic test files with debt       = 0
 violating lines                     = 0
-build-verification quarantine files = 8
+build-verification quarantine files = 9
 requirement-trace findings          = 0
 WHAT propositions                   = 666
-traced test cases                   = 3136
-registered surfaces                 = 132
-Fable build                        = green (647 source files parsed)
-verification proof                 = 3120 passed, 0 failed
+traced test cases                   = 3198
+registered surfaces                 = 143
+Fable build                        = green (657 source files parsed)
+verification proof                 = 3182 passed, 0 failed
 integration proof                  = 275 passed, 0 failed
 ```
 
