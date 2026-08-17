@@ -128,7 +128,9 @@ test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text'
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const result = await tryInject(undefined, `${nudge}\n\n${guideline}`, anchor)
+  const result = await tryInject(undefined, `${nudge}\n\n${guideline}`, [
+    { info: { id: 'user-2', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
+  ])
   assert.equal(result.ok, true, result.error)
   assert.equal(markerOutput(result.value), `${nudge}\n\n${guideline}`)
 })

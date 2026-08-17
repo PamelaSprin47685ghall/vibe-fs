@@ -4,7 +4,14 @@
 // opaque capability.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as lifecycle from '../../../dist/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.js'
+import * as lifecycleModule from '../../../dist/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.js'
+
+const lifecycle = {
+  create: lifecycleModule.HostForkRunLifecycleSurface_create,
+  complete: lifecycleModule.HostForkRunLifecycleSurface_complete,
+  observe: lifecycleModule.HostForkRunLifecycleSurface_observe,
+  completion: lifecycleModule.HostForkRunLifecycleSurface_completion,
+}
 
 const makeRun = (agentId, childId, parentId) => lifecycle.create({ agentId, childId, parentId })
 

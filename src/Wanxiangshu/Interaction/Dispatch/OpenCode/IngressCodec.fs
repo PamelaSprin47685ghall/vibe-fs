@@ -113,8 +113,6 @@ module PromptIngressCodec =
 
         if not (isNull input) && not (isNull input?messageID) then
             physical (unbox<string> input?messageID)
-        elif not (isNull input) && not (isNull input?messageId) then
-            physical (unbox<string> input?messageId)
         elif not (isNull output) && not (isNull output?id) then
             physical (unbox<string> output?id)
         elif

@@ -46,3 +46,11 @@ module ReviewerContinuation =
             else
                 return! port.NudgeMissingVerdict sessionId
         }
+
+    let ensurePerfectConfirmed
+        (port: ReviewerContinuationPort)
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (reviewerKey: string)
+        : Task<Result<unit, string>> =
+        ensureVerdictSubmitted port journal sessionId reviewerKey

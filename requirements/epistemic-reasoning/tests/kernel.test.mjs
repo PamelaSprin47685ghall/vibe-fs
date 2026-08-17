@@ -100,8 +100,9 @@ test('WHAT[EPI-012] closure_is_idempotent_at_fixed_point', () => {
   const store = createStore()
   const started = start(store, '花儿为什么这样红？')
   assessWhy(store, started.handle)
-  const current = state(store, started.handle)
-  assert.deepEqual(close(current), current)
+  const first = close(store, started.handle)
+  const second = close(store, started.handle)
+  assert.deepEqual(second, first)
 })
 
 test('WHAT[EPI-002] fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge', () => {

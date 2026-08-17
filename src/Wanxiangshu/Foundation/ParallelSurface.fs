@@ -3,6 +3,7 @@ namespace Wanxiangshu.Foundation
 open System
 open System.Threading
 open System.Threading.Tasks
+open Fable.Core
 
 [<RequireQualifiedAccess>]
 module ParallelSurface =
@@ -20,6 +21,9 @@ module ParallelSurface =
 
     let cancel (token: obj) : unit = (token :?> TokenHandle).Source.Cancel()
 
+    [<Emit("$0($1, $2)")>]
+    let private invokeAction (action: obj) (item: obj) (token: obj) : Task<obj> = jsNative
+
     let mapBounded (maxConcurrency: int) (action: obj) (items: obj array) (token: obj) : Task<obj array> =
         task {
             let handle =
@@ -29,8 +33,7 @@ module ParallelSurface =
                     token :?> TokenHandle
 
             let run item _ =
-                let fn = unbox<obj -> obj -> Task<obj>> action
-                fn item (box handle)
+                invokeAction action item (box handle)
 
             let! results = Parallel.mapBounded maxConcurrency handle.Token run (items |> Array.toList)
             return results |> List.toArray

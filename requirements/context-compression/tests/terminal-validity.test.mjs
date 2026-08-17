@@ -13,7 +13,13 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { terminalValidity } from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
+
+const terminalValidity = {
+  check: compression.terminalValidityCheck,
+  isValid: compression.terminalValidityIsValid,
+  describe: compression.terminalValidityDescription,
+}
 
 test('WHAT[CONTEXT-COMPRESSION-004] CTX_004_empty_terminal_is_not_a_result', () => {
   // Whitespace-only counts as empty: a model that emitted nothing but a newline

@@ -26,7 +26,7 @@ const referenceScore = (text) => {
 }
 
 test('WHAT[DG-004] LOOP_004_constants_are_token_calibrated', () => {
-  assert.equal(loopDetector.tokenizerVocabularySize, vocabularySize)
+  assert.equal(loopDetector.vocabularySize, vocabularySize)
   assert.equal(loopDetector.halfLife, 64)
   close(loopDetector.lambda, 2 ** (-1 / 64))
   assert.equal(loopDetector.theoreticalLoopWeightedDistinctCount, 1)

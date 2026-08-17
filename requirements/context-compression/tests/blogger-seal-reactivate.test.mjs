@@ -9,7 +9,21 @@ import * as parkedTransform from '../../../dist/Context/Companion/RuntimeSurface
 import * as handle from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 const KEY = 'ses-blog'
-
+const authorityRoot = (value) => value
+const ctx = () => bloggerRuntime.main({
+  requestId: 'request-main',
+  mainSession: 'ses-main',
+  bloggerSession: KEY,
+  toml: '[[new_work_to_record]]\nuser = "work"',
+  previousIngested: 0,
+  nextIngested: 1,
+  previousCutoff: 0,
+  nextCutoff: 1,
+  nextDigest: 'digest-1',
+  frameEpoch: 0,
+  deltaDigest: 'delta-1',
+  observedEpoch: 0,
+})
 
 test('WHAT[CONTEXT-COMPRESSION-018] HANDLE_lifecycle_CompletedAwaitingJoin_and_Retired_seal_blogger', () => {
   const completed = handle.scenario('complete')
@@ -50,8 +64,8 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_du
     false,
     'drain window lets the cycle through',
   )
-  // openDrain mints an unforgeable DrainPermit (module-private constructor).
-  assert.equal(bloggerRuntime.drainOpenOf(parkedTransform.getDrainWindow(scope, KEY)), true)
+  // The drain permit remains opaque; the owner exposes only its semantic state.
+  assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
 
   assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
   parkedTransform.setCurrentRequest(scope, KEY, ctx())

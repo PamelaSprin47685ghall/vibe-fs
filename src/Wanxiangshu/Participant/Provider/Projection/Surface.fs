@@ -26,11 +26,11 @@ module ProjectionSurface =
     let private stringOf (value: obj) : string =
         if isNullish value then "" else string value
 
-    let private optionalString (value: obj) : string option =
-        if isNullish value then None else Some(string value)
-
     let private intOf (value: obj) : int =
         if isNullish value then 0 else int (string value)
+
+    let private optionalString (value: obj) : string option =
+        if isNullish value then None else Some(string value)
 
     let private int64Of (value: obj) : int64 =
         if isNullish value then 0L else int64 (string value)
@@ -215,10 +215,14 @@ module ProjectionSurface =
                digest = value.Digest
                body = value.Body |}
 
+    let blogFrame (value: obj) : obj = value |> blogFrameOf |> blogFrameToJs
+
     let private pairOf (value: obj) : string * string =
         if emitJsExpr value "Array.isArray($0)" then
             let fields = arrayOf value
             (stringOf fields[0], stringOf fields[1])
+        elif not (isNullish value?field) || not (isNullish value?cycleId) then
+            stringOf value?field, stringOf value?cycleId
         else
             stringOf value?messageId, stringOf value?toml
 
@@ -314,6 +318,7 @@ module ProjectionSurface =
         | ProjectionIntent.ActivatePrefixEpoch _ -> "ActivatePrefixEpoch"
         | ProjectionIntent.InsertBlogFrames _ -> "InsertBlogFrames"
         | ProjectionIntent.InsertRepair _ -> "InsertRepair"
+        | ProjectionIntent.AppendReviewChallenge _ -> "AppendReviewChallenge"
         | ProjectionIntent.UseStrengthMirror _ -> "UseStrengthMirror"
         | ProjectionIntent.InsertStrengthFrames _ -> "InsertStrengthFrames"
         | ProjectionIntent.SuppressTransportOnly -> "SuppressTransportOnly"
@@ -334,6 +339,7 @@ module ProjectionSurface =
                    activation = activationToJs activation |}
         | ProjectionIntent.InsertBlogFrames _ -> box {| kind = "InsertBlogFrames" |}
         | ProjectionIntent.InsertRepair _ -> box {| kind = "InsertRepair" |}
+        | ProjectionIntent.AppendReviewChallenge _ -> box {| kind = "AppendReviewChallenge" |}
         | ProjectionIntent.UseStrengthMirror _ -> box {| kind = "UseStrengthMirror" |}
         | ProjectionIntent.InsertStrengthFrames _ -> box {| kind = "InsertStrengthFrames" |}
         | ProjectionIntent.SuppressTransportOnly -> box {| kind = "SuppressTransportOnly" |}
@@ -344,6 +350,7 @@ module ProjectionSurface =
         | ProjectionConflict.ConflictingPrefixSelection _ -> "ConflictingPrefixSelection"
         | ProjectionConflict.ConflictingBlogFrames -> "ConflictingBlogFrames"
         | ProjectionConflict.ConflictingRepair -> "ConflictingRepair"
+        | ProjectionConflict.ConflictingReviewChallenge -> "ConflictingReviewChallenge"
         | ProjectionConflict.ConflictingPrefixLifecycle -> "ConflictingPrefixLifecycle"
         | ProjectionConflict.ConflictingStrengthFrames _ -> "ConflictingStrengthFrames"
         | ProjectionConflict.StrengthCandidateWrongTarget _ -> "StrengthCandidateWrongTarget"
@@ -566,6 +573,19 @@ module ProjectionSurface =
 
     let semanticallyEqual (left: obj) (right: obj) : bool =
         renderSemantic left = renderSemantic right
+
+    let sealDigest (sha256: string -> string) (projection: obj) : string =
+        wireProjectionOf projection |> ProviderProjection.renderWire |> sha256
+
+    let toolResultDigests (sha256: string -> string) (projection: obj) : string array =
+        wireProjectionOf projection
+        |> fun value -> value.Messages
+        |> List.collect (fun message ->
+            message.Parts
+            |> List.choose (function
+                | ProviderProjection.WireToolResult(_, result) -> Some(sha256 result)
+                | _ -> None))
+        |> List.toArray
 
     /// The owner constant used by the InsertRepair projection.
     let repairInstruction: string = ProjectionConstants.RepairInstruction

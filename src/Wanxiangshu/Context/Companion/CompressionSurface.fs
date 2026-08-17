@@ -457,8 +457,33 @@ module CompressionSurface =
                basedOnEpoch = int64Value value?basedOnEpoch
                candidate = snapshotToJs (snapshotOfJs value?candidate) |}
 
+    let private terminalValidityResult (value: string) : Result<unit, TerminalValidity.Rejection> =
+        TerminalValidity.check value
+
+    let terminalValidityCheck (value: string) : obj =
+        match terminalValidityResult value with
+        | Ok() -> box {| ok = true |}
+        | Error rejection ->
+            box
+                {| ok = false
+                   error =
+                    match rejection with
+                    | TerminalValidity.Rejection.Empty -> "Empty"
+                    | TerminalValidity.Rejection.XmlOnly -> "XmlOnly" |}
+
+    let terminalValidityIsValid (value: string) : bool =
+        match terminalValidityResult value with
+        | Ok() -> true
+        | Error _ -> false
+
+    let terminalValidityDescription (value: string) : string =
+        match value with
+        | "Empty" -> "empty terminal"
+        | "XmlOnly" -> "XML-only terminal"
+        | _ -> "unknown terminal rejection"
+
     let terminalValidity (value: string) : obj =
-        match TerminalValidity.check value with
+        match terminalValidityResult value with
         | Ok() -> box {| valid = true; rejection = null |}
         | Error rejection ->
             box

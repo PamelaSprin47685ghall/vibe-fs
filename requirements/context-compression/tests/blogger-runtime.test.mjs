@@ -30,7 +30,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_cycle_commit_clears_flight', ()
 
   parkedTransform.clearCurrentRequest(scope, KEY)
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), undefined)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_parked_waiter_offers', () => {
@@ -61,7 +61,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_squash_commit_clears_flight', (
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
   parkedTransform.clearCurrentRequest(scope, KEY)
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), undefined)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_session_delete_is_registry_removal_not_a_cell_state', () => {

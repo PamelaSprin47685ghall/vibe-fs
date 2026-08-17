@@ -85,6 +85,7 @@ module BlogFrameSurface =
         | BlogFoldRejection.IngestCursorMismatch -> "IngestCursorMismatch"
         | BlogFoldRejection.CoverageRetreated -> "CoverageRetreated"
         | BlogFoldRejection.CoveredFrameCountOutOfRange _ -> "CoveredFrameCountOutOfRange"
+        | BlogFoldRejection.FrameDigestMismatch _ -> "FrameDigestMismatch"
 
     let private resultToJs (ok: 'a -> obj) (result: Result<'a, BlogFoldRejection>) : obj =
         match result with

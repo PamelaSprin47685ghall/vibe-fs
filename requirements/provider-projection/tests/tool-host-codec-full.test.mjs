@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const codec = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 const {
-  arguments: makeArgs,
+  makeArguments: makeArgs,
   argumentText,
   argumentOptionalText,
   argumentOptionalTexts,
@@ -44,31 +44,31 @@ test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_text_reads_present_and_missi
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_optional_text_filters_blank', () => {
   const args = makeArgs({ name: 'value', blank: '  ' })
   assert.equal(argumentOptionalText(args, 'name'), 'value')
-  assert.equal(argumentOptionalText(args, 'blank'), undefined)
-  assert.equal(argumentOptionalText(args, 'missing'), undefined)
+  assert.equal(argumentOptionalText(args, 'blank'), null)
+  assert.equal(argumentOptionalText(args, 'missing'), null)
 })
 
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_optional_texts_collects_nonempty_strings', () => {
   const args = makeArgs({ items: ['a', '', '  ', 'b', null, 7] })
   assert.deepEqual(argumentOptionalTexts(args, 'items'), ['a', 'b', '7'])
-  assert.equal(argumentOptionalTexts(args, 'missing'), undefined)
+  assert.equal(argumentOptionalTexts(args, 'missing'), null)
   const notArray = makeArgs({ items: 'plain' })
-  assert.equal(argumentOptionalTexts(notArray, 'items'), undefined)
+  assert.equal(argumentOptionalTexts(notArray, 'items'), null)
 })
 
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_optional_number_reads_floats', () => {
   const args = makeArgs({ timeout: 2.5, name: 'x' })
   assert.equal(argumentOptionalNumber(args, 'timeout'), 2.5)
-  assert.equal(argumentOptionalNumber(args, 'missing'), undefined)
-  assert.equal(argumentOptionalNumber(args, 'name'), undefined)
+  assert.equal(argumentOptionalNumber(args, 'missing'), null)
+  assert.equal(argumentOptionalNumber(args, 'name'), null)
 })
 
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_arguments_null_raw_is_all_absent', () => {
   const args = makeArgs(null)
   assert.equal(argumentText(args, 'x'), '')
-  assert.equal(argumentOptionalText(args, 'x'), undefined)
-  assert.equal(argumentOptionalTexts(args, 'x'), undefined)
-  assert.equal(argumentOptionalNumber(args, 'x'), undefined)
+  assert.equal(argumentOptionalText(args, 'x'), null)
+  assert.equal(argumentOptionalTexts(args, 'x'), null)
+  assert.equal(argumentOptionalNumber(args, 'x'), null)
 })
 
 const toolModule = {
@@ -98,7 +98,8 @@ const toolModule = {
 
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_schema_dsl_builds_each_shape', () => {
   assert.equal(schemaString(toolModule).schema, 'string')
-  assert.deepEqual(schemaStringDescribed(toolModule, 'program source'), { schema: 'string-described', description: 'program source' })
+  assert.equal(schemaStringDescribed(toolModule, 'program source').schema, 'string-described')
+  assert.equal(schemaStringDescribed(toolModule, 'program source').description, 'program source')
   assert.equal(schemaNumber(toolModule).schema, 'number')
   assert.deepEqual(schemaEnumDescribed(toolModule, ['a', 'b'], 'pick one'), { schema: 'enum-described', values: ['a', 'b'], description: 'pick one' })
   assert.deepEqual(schemaEnum(toolModule, ['x']), { schema: 'enum', values: ['x'] })

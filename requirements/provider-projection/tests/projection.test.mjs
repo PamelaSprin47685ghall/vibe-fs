@@ -87,7 +87,7 @@ test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_apply_rendered_prefix_both_s
   const out = Projection.applyRenderedPrefix(raw, synthetic)
   assert.equal(out[0].info.id, 'syn-9')
   assert.equal(out[1].info.id, 'm1')
-  assert.equal(Projection.applyRenderedPrefix(raw, { name: 'PhysicalPrefix', activation: null }), raw)
+  assert.deepEqual(Projection.applyRenderedPrefix(raw, { name: 'PhysicalPrefix', activation: null }), raw)
 })
 
 test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_host_message_id', () => {

@@ -106,8 +106,7 @@ module BloggerDeltaSurface =
     let toolResult (value: string) : obj = toolResultPart value
     let media (mediaType: obj) (digest: string) : obj = mediaPart mediaType digest
     let byteCount (value: string) : int = SyntheticToml.byteCount value
-
-
+    let messages (values: obj array) : obj = box values
 
     let cursor (turn: int) (part: int) : obj = box {| turn = turn; part = part |}
 
@@ -123,10 +122,16 @@ module BloggerDeltaSurface =
             { TurnIndex = intValue cursorValue?turn
               PartIndex = intValue cursorValue?part }
 
+        let previousCutoff =
+            if isNullish request?previousCutoff then
+                0
+            else
+                intValue request?previousCutoff
+
         BloggerDelta.nextChunk
             (intValue request?limit)
             cursor
-            (intValue request?previousCutoff)
+            previousCutoff
             (messagesOfJs request?messages)
         |> Option.map (fun chunk ->
             let bytes = SyntheticToml.byteCount chunk.Toml

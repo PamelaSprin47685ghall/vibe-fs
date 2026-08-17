@@ -132,12 +132,6 @@ module ProviderProjectionSurface =
         let physicalUserMessageId =
             decoded.PhysicalUserMessageId
             |> Option.map PhysicalUserMessageId.value
-            |> Option.orElse (
-                if isNull input || isNull input?messageId then
-                    None
-                else
-                    Some(string input?messageId)
-            )
 
         box
             {| sessionId = decoded.SessionId |> Option.map SessionId.value |> optionString

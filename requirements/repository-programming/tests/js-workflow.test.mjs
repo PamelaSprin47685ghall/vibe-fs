@@ -227,6 +227,7 @@ test('WHAT[REPOSITORY-PROGRAMMING-016] JS010_016_primitive_return_uses_data_fiel
 test('WHAT[REPOSITORY-PROGRAMMING-011] JS010_array_null_is_invalid_return_value', async () => {
   const { dir, cleanup } = sandbox()
   try {
+    writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
     this.rewrite('a.txt', 'new')

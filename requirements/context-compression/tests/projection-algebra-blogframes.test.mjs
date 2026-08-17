@@ -9,6 +9,8 @@ import test from 'node:test'
 import * as algebra from '../../../dist/Participant/Provider/Projection/Surface.js'
 import * as companionProj from '../../../dist/Context/Companion/ProjectionSurface.js'
 
+const projectionSnapshot = algebra
+
 const stage3Snapshot = (blogFrames = []) =>
   algebra.projectionSnapshot(
     { providerId: null, modelId: null, variant: null, tools: [], system: [], messages: [] },
@@ -49,7 +51,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_step3b_InsertBlogFrames_digest_equi
     blogger: 'ses_y',
     epoch: 0,
     kind: 'normal',
-    frames: frames.map((f) => ({ digest: f.Digest, body: f.Body })),
+    frames: frames.map((f) => ({ digest: f.digest, body: f.body })),
     delta,
     previousTips,
   })
@@ -86,8 +88,8 @@ test('WHAT[CONTEXT-COMPRESSION-012] PROJ_008_step3b_InsertBlogFrames_squash_dige
   const builderPlan = companionProj.build(spy, {
     blogger: 'ses_y',
     epoch: 1,
-    kind: 'squash',
-    frames: frames.map((f) => ({ digest: f.Digest, body: f.Body })),
+    kind: companionProj.squash(2),
+    frames: frames.map((f) => ({ digest: f.digest, body: f.body })),
   })
 
   assert.deepEqual(

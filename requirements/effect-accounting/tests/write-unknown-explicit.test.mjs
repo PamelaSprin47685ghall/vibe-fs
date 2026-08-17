@@ -12,9 +12,9 @@ test('WHAT[EFFECT-ACCOUNTING-006] write_after_dispose_returns_explicit_unknown_n
   const event = {
     id: 'event-unknown-1',
     stream: 'session/ses_006',
-    type: 'CompanionBloggerClosed',
+    type: 'JobRequested',
     parents: [],
-    payload: { SessionId: 'ses_006' },
+    payload: { id: 'event-unknown-1' },
     payloadRefs: [],
   }
 

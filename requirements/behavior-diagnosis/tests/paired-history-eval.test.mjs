@@ -52,7 +52,12 @@ const foldPairedHistory = () => {
         nextCoverableTurnCutoffExclusive: n,
         nextCoveredPrefixDigest: `digest-paired-${n}`,
       },
-      observation.blogFrame({ kind: 'Entry', ...frames[n - 1] }),
+      observation.blogFrame({
+        kind: 'Entry',
+        ...frames[n - 1],
+        coveredFrom: n - 1,
+        coveredThrough: n,
+      }),
       blogState,
     )
     assert.equal(entry.ok, true, entry.ok ? '' : entry.error)

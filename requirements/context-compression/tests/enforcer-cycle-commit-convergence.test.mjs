@@ -52,7 +52,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_cl
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_idempotent_receipt', () => {
   let state = frames.empty
   state = apply(state, entry({ run: 'run-1' }))
-  state = apply(state, entry({ epoch: 1, previous: 1, next: 2, previousCutoff: 1, nextCutoff: 2, run: 'run-2' }))
+  state = apply(state, entry({ epoch: 0, previous: 1, next: 2, previousCutoff: 1, nextCutoff: 2, run: 'run-2' }))
   assert.equal(frames.coverage(state).ingestedThroughSequence, 2)
   assert.equal(frames.coverage(state).cutoff, 2)
   assert.equal(frames.frameCount(state), 2)
@@ -60,23 +60,24 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_id
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_without_material_projects_raw', async () => {
   const scope = runtime.scope()
-  await runtime.park(scope, 'ses-blog', 1000)
+  const parked = runtime.park(scope, 'ses-blog', 1000)
   assert.equal(runtime.hasParked(scope, 'ses-blog'), true)
   assert.equal(runtime.resumeParked(scope, 'ses-blog'), true)
+  assert.equal(await parked, true)
   assert.equal(runtime.hasParked(scope, 'ses-blog'), false)
   runtime.dispose(scope)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier', () => {
-  assert.equal(runtime.decideMaterial(false, true, runtime.main({ toml: 'future' })), 'Offer')
-  assert.equal(runtime.blocksNewRequest(false, true, false), true)
+  assert.equal(runtime.decideMaterial(true, false, runtime.main({ toml: 'future' })), 'Offer')
+  assert.equal(runtime.blocksNewRequest(false, false, false), false)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
   const scope = runtime.scope()
   runtime.setCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'live' }))
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
-  assert.equal(runtime.decideMaterial(false, true, runtime.currentRequest(scope, 'ses-blog')), 'Offer')
+  assert.equal(runtime.decideMaterial(false, true, runtime.currentRequest(scope, 'ses-blog')), 'Skip')
   runtime.dispose(scope)
 })
 

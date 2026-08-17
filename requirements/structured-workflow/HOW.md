@@ -147,6 +147,7 @@ control-flow boundary。
 | `ManagerBackground.ensureSettled` | completion / join / wake permutations |
 | `ManagerIdle.encourageLabor` | independent idle occasions / stale permit |
 | `ReviewBarrierWorkflow.reverify` | first PERFECT / challenge PhysicalAccepted / second PERFECT / REVISE / terminal ordering |
+| `ReviewerContinuation.ensurePerfectConfirmed` | closed continuation no-op / missing verdict nudge |
 | `FallbackLedger.recordConfirmedFailure` | dedupe / AABB / exhaustion |
 | `ProviderRecoveryWorkflow.continueAfterConfirmedFailure` | failure → material → continuation |
 | `FinalityCohort.reviewUntilFirstRevisionOrAllConfirmed` | cohort interleavings |

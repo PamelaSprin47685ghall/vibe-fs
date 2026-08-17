@@ -82,6 +82,13 @@ module ContextFactFold =
             reject factName "coverage moved backwards within one numbering (CTX-011)"
         | Error(BlogFoldRejection.CoveredFrameCountOutOfRange(claimed, available)) ->
             reject factName (sprintf "squash claimed %d of %d available frames (CTX-012)" claimed available)
+        | Error(BlogFoldRejection.FrameDigestMismatch(expected, actual)) ->
+            reject
+                factName
+                (sprintf
+                    "single-frame squash digest %s does not replace expected %s (PERSIST-010)"
+                    (BlobDigest.value actual)
+                    (BlobDigest.value expected))
 
     let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── failure-driven context recovery (docs/what/context.md) ───────────────────────

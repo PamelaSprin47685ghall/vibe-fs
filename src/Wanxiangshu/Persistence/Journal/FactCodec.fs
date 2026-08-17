@@ -94,9 +94,13 @@ module FactCodec =
     /// MarkerText. Its transcript position cannot be recovered without a
     /// heuristic ordinal≈batch guess, which would re-create the exact prefix
     /// bug this change fixes. Refuse — never migrate by guessing (cache §13).
-    let containsLegacyUnanchoredGuideline (json: string) =
-        json.IndexOf("\"PairProgrammingGuidelineAppended\"", StringComparison.Ordinal)
-        >= 0
+    let containsHandleCompletedMissingCompletionFields (json: string) =
+        let isHandleCompleted =
+            json.IndexOf("\"HandleCompleted\"", StringComparison.Ordinal) >= 0
+
+        isHandleCompleted
+        && (json.IndexOf("\"CompletionRef\"", StringComparison.Ordinal) < 0
+            || json.IndexOf("\"CompletionDigest\"", StringComparison.Ordinal) < 0)
 
     let legacyGuidelineCleanBreakMessage =
         "Wanxiangshu HOST-013 requires anchored PairProgrammingGuidelineAnchored facts; legacy unanchored PairProgrammingGuidelineAppended journals are not supported (anchored replay clean break).\nArchive or remove the old Wanxiangshu runtime journal before starting."
@@ -151,5 +155,7 @@ module FactCodec =
             Error tipV2CleanBreakMessage
         elif containsLegacyUnanchoredGuideline json then
             Error legacyGuidelineCleanBreakMessage
+        elif containsHandleCompletedMissingCompletionFields json then
+            Error "HandleCompleted requires CompletionRef and CompletionDigest; decode migration is not supported."
         else
             Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc

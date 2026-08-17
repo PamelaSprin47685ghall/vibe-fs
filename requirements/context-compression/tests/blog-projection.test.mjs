@@ -20,8 +20,20 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as blog from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
 
-const entryFrame = (n) => blog.frame({ kind: 'Entry', digest: `sha-entry-${n}`, ref: `blob-entry-${n}` })
-const squashFrame = (n) => blog.frame({ kind: 'Squash', digest: `sha-squash-${n}`, ref: `blob-squash-${n}` })
+const entryFrame = (n) => blog.frame({
+  kind: 'Entry',
+  digest: `sha-entry-${n}`,
+  ref: `blob-entry-${n}`,
+  coveredFrom: n - 1,
+  coveredThrough: n,
+})
+const squashFrame = (n) => blog.frame({
+  kind: 'Squash',
+  digest: `sha-entry-${n}`,
+  ref: `blob-squash-${n}`,
+  coveredFrom: 0,
+  coveredThrough: 2,
+})
 
 /** Commit one entry whose record coverage advances from `from` to `to`. */
 const commitEntry = (state, { epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `digest-${cutoffTo}`, n = 1 }) =>
@@ -71,8 +83,8 @@ test('WHAT[CONTEXT-COMPRESSION-015] COMPANION_008_entry_appends_frame_and_advanc
   assert.deepEqual(blog.coverableFrameKinds(result.value), ['Entry'])
 
   const [stamped] = blog.frames(result.value)
-  assert.equal(stamped.coveredFrom, 0n)
-  assert.equal(stamped.coveredThrough, 1n)
+  assert.equal(stamped.coveredFrom, 0)
+  assert.equal(stamped.coveredThrough, 1)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-015] CTX_011_entry_that_consumed_nothing_is_refused', () => {

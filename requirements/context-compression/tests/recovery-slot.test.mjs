@@ -225,7 +225,7 @@ test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_parked_cursor_does_not_trigger_
 
       if (squash.advancesCursor) {
         offset = (offset + 1) % 4
-        arming = squash.nextArming
+        arming = squash.nextArmingName
         return
       }
     } else {
@@ -236,7 +236,7 @@ test('WHAT[CONTEXT-COMPRESSION-002] FALLBACK_012_parked_cursor_does_not_trigger_
     trace.push(`${label}: main → ${main.name}`)
 
     if (main.advancesCursor) offset = (offset + 1) % 4
-    arming = main.nextArming
+    arming = main.nextArmingName
   }
 
   // turns 1–4: plain successes. Offset stays 0, nothing is ever armed.

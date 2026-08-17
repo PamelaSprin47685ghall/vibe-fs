@@ -33,8 +33,8 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_non_recovery_slot_never_asks_for_a
   const plan = planner.attemptPlan({ kind: 'work-main', mayRecover: false })
 
   assert.equal(plan.choice, 'UseCommittedEpoch')
-  assert.equal(plan.probeId, undefined)
-  assert.equal(plan.noProbeReason, undefined, 'not asking is not a refusal')
+  assert.equal(plan.probeId, null)
+  assert.equal(plan.noProbeReason, null, 'not asking is not a refusal')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a_probe_even_when_armed', () => {
@@ -45,7 +45,7 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a
     const plan = planner.attemptPlan({ kind, mayRecover: true })
 
     assert.equal(plan.choice, 'UseCommittedEpoch', `${kind} must not carry a probe`)
-    assert.equal(plan.probeId, undefined)
+    assert.equal(plan.probeId, null)
   }
 })
 
@@ -58,7 +58,7 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_armed_work_main_carries_the_probe
 
   assert.equal(plan.choice, 'UsePrefixProbe')
   assert.equal(plan.probeId, 'probe-abc')
-  assert.equal(plan.noProbeReason, undefined)
+  assert.equal(plan.noProbeReason, null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_invalid_role_tier_and_kind_fail_closed', () => {
@@ -79,6 +79,6 @@ test('WHAT[CONTEXT-COMPRESSION-009] CTX_011_a_refused_candidate_falls_back_to_th
   })
 
   assert.equal(plan.choice, 'UseCommittedEpoch')
-  assert.equal(plan.probeId, undefined)
+  assert.equal(plan.probeId, null)
   assert.equal(plan.noProbeReason, 'NoCoverage')
 })

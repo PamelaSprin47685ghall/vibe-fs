@@ -50,7 +50,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_an_offer_staged_before_the_park
   const staged = parkedTransform.consumeStaged(scope, 'ses-blogger')
   assert.equal(staged.kind, 'Main')
   assert.equal(staged.toml, 'delta-1')
-  assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), undefined)
+  assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_an_offer_to_a_parked_transform_resumes_it_with_the_context', async () => {
@@ -71,7 +71,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_staged_context_is_consumed_only
   const first = parkedTransform.consumeStaged(scope, 'ses-blogger')
   const second = parkedTransform.consumeStaged(scope, 'ses-blogger')
   assert.equal(first.toml, 'once')
-  assert.equal(second, undefined)
+  assert.equal(second, null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_two_parks_for_one_session_share_one_waiter', async () => {
@@ -103,7 +103,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_clears_staged_context_wi
   // Staged only (offer-first, no park yet).
   parkedTransform.offerParked(scope, 'ses-x', main('staged'))
   parkedTransform.cancelParked(scope, 'ses-x')
-  assert.equal(parkedTransform.consumeStaged(scope, 'ses-x'), undefined)
+  assert.equal(parkedTransform.consumeStaged(scope, 'ses-x'), null)
 
   // Parked + staged: cancel releases waiter and drops the offer.
   const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
@@ -111,7 +111,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_clears_staged_context_wi
   // offer already resumed the waiter; a second stage then cancel:
   parkedTransform.offerParked(scope, 'ses-blogger', main('again'))
   parkedTransform.cancelParked(scope, 'ses-blogger')
-  assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), undefined)
+  assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), null)
   assert.equal(await waiter, true)
 })
 
@@ -134,7 +134,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flig
   const key = 'ses-blogger'
   const request = main('coverage-delta')
 
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key), null)
   assert.equal(parkedTransform.hasFlight(scope, key), false)
 
   parkedTransform.setCurrentRequest(scope, key, request)
@@ -146,13 +146,13 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flig
 
   // Commit success path: ClearCurrentRequest drops ownership.
   parkedTransform.clearCurrentRequest(scope, key)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key), null)
   assert.equal(parkedTransform.hasFlight(scope, key), false)
 
   // Fail path: Clear while live removes flight (idempotent thereafter).
   parkedTransform.setCurrentRequest(scope, key, main('fail-me'))
   assert.equal(parkedTransform.hasFlight(scope, key), true)
   parkedTransform.clearCurrentRequest(scope, key)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key), undefined)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key), null)
   assert.equal(parkedTransform.hasFlight(scope, key), false)
 })

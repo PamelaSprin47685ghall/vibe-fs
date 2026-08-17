@@ -90,7 +90,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real 
 
   // Table completeness: HOW §3.4 registers exactly these nine.
   const how = readFileSync(join(root, 'requirements/structured-workflow/HOW.md'), 'utf8')
-  const tableSection = how.slice(how.indexOf('### 3.4'), how.indexOf('### 3.4.1'))
+  const tableSection = how.slice(how.indexOf('### 3.3'), how.indexOf('### 3.3.1'))
   for (const [vocab] of OBLIGATIONS) {
     assert.match(tableSection, new RegExp(`\\| \`${vocab.replace('.', '\\.')}\``), `HOW §3.4 must register ${vocab}`)
   }

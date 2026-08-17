@@ -94,6 +94,7 @@ module ProviderWireDecode =
                 |> Option.defaultValue "null"
 
             Some(WireToolResult(ToolCallId.create callId, result))
+        | _ when String.IsNullOrWhiteSpace name -> None
         | _ ->
             let args =
                 firstCanonical stateObj [ "input" ]
@@ -104,10 +105,12 @@ module ProviderWireDecode =
 
     let private decodeToolCallPart partObj =
         // REVIEW-004 needs the call id, so a tool call without one is not usable
-        // evidence. Dropped rather than given an empty id.
-        match firstString partObj [ "callID"; "callId"; "id" ], firstString partObj [ "tool"; "name" ] with
-        | Some callId, Some name -> decodeToolState (readField partObj "state") callId name partObj
-        | _ -> None
+        // evidence. A completed/error result does not need the original tool name.
+        match firstString partObj [ "callID"; "callId"; "id" ] with
+        | Some callId ->
+            let name = firstString partObj [ "tool"; "name" ] |> Option.defaultValue ""
+            decodeToolState (readField partObj "state") callId name partObj
+        | None -> None
 
     let private decodeNonNullPart partObj =
         let kind =
@@ -124,8 +127,10 @@ module ProviderWireDecode =
         | "tool" -> decodeToolCallPart partObj
         | "tool-result"
         | "tool_result" ->
+            let state = readField partObj "state"
             let result =
                 firstCanonical partObj [ "result"; "output"; "content" ]
+                |> Option.orElse (firstCanonical state [ "result"; "output"; "content" ])
                 |> Option.defaultValue "null"
 
             firstString partObj [ "callID"; "callId"; "id" ]

@@ -127,14 +127,14 @@ test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_an_already_reanchored_compaction_is
   // Two observations of one pseudo-run must produce one retirement. This is the first
   // of two guards; the second is PrefixEpochProjection's epoch check (see
   // prefix-epoch.test.mjs).
-  assert.equal(policy.compactionNextReanchor(['msg_c1'], ['msg_c1']), undefined)
+  assert.equal(policy.compactionNextReanchor(['msg_c1'], ['msg_c1']), null)
   assert.equal(policy.compactionNextReanchor(['msg_c1', 'msg_c2'], ['msg_c2']), 'msg_c1')
-  assert.equal(policy.compactionNextReanchor(['msg_c1', 'msg_c2'], ['msg_c1', 'msg_c2']), undefined)
+  assert.equal(policy.compactionNextReanchor(['msg_c1', 'msg_c2'], ['msg_c1', 'msg_c2']), null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_no_observed_compaction_means_nothing_to_do', () => {
-  assert.equal(policy.compactionNextReanchor([], []), undefined)
-  assert.equal(policy.compactionNextReanchor([], ['msg_c1']), undefined)
+  assert.equal(policy.compactionNextReanchor([], []), null)
+  assert.equal(policy.compactionNextReanchor([], ['msg_c1']), null)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-002] HOST_006_a_new_compaction_after_a_handled_one_is_still_caught', () => {

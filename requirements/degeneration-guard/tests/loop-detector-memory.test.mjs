@@ -20,7 +20,7 @@ test('WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_n
 
   loopDetector.pushText(detector, text)
   assert.equal(trackedTokenCount(detector), distinct)
-  assert.ok(trackedTokenCount(detector) <= loopDetector.tokenizerVocabularySize)
+  assert.ok(trackedTokenCount(detector) <= loopDetector.vocabularySize)
 
   loopDetector.pushText(detector, text)
   assert.equal(

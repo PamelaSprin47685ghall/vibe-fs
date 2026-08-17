@@ -21,7 +21,7 @@ module LoopDetectorSurface =
                weightedDistinctTokens = evaluation.WeightedDistinctTokenCount
                step = evaluation.Step |}
 
-    let tokenizerVocabularySize = LoopDetector.TokenVocabularySize
+    let vocabularySize = LoopDetector.TokenVocabularySize
     let halfLife = LoopDetector.HalfLife
     let lambda = LoopDetector.Lambda
     let normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount
@@ -33,7 +33,7 @@ module LoopDetectorSurface =
 
     let constants () : obj =
         box
-            {| tokenizerVocabularySize = LoopDetector.TokenVocabularySize
+            {| vocabularySize = LoopDetector.TokenVocabularySize
                halfLife = LoopDetector.HalfLife
                lambda = LoopDetector.Lambda
                normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount

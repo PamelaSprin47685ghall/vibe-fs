@@ -25,7 +25,7 @@ const agreeing = (digest) => () => digest
 const committedAt = (cutoff, { digest = `prefix-${cutoff}`, frozen = `frozen-${cutoff}`, seal = `seal-${cutoff}` } = {}) =>
   prefix.snapshot({
     ref: `blob-frozen-${cutoff}`,
-    digest: frozen,
+    frozenDigest: frozen,
     cutoff,
     prefixDigest: digest,
     sealRoot: seal,

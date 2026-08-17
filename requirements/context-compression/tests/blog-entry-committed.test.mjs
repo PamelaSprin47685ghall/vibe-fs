@@ -76,7 +76,13 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_does_not_advance_coverage', (
     previousEpoch: 0,
     nextEpoch: 1,
     count: 1,
-    frame: blog.frame({ kind: 'Squash', digest: 'sha-s1', ref: 'blob-s1' }),
+    frame: blog.frame({
+      kind: 'Squash',
+      digest: 'sha-e1',
+      ref: 'blob-s1',
+      coveredFrom: 0,
+      coveredThrough: 2,
+    }),
   }
 
   let state = blog.empty

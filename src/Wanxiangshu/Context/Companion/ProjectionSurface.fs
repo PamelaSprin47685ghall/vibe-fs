@@ -105,10 +105,13 @@ module CompanionProjectionSurface =
 
         let count =
             if kind = "squash" then
-                if isNullish kindValue?count then
-                    intValue value?count
-                else
-                    intValue kindValue?count
+                let countValue =
+                    if isNullish kindValue?count then
+                        value?count
+                    else
+                        kindValue?count
+
+                if isNullish countValue then 0 else intValue countValue
             else
                 0
 

@@ -127,6 +127,8 @@ type BlogFoldRejection =
     | CoverageRetreated
     /// A squash claimed a frame count outside `1 .. current`.
     | CoveredFrameCountOutOfRange of claimed: int * available: int
+    /// A single-frame squash must carry the identity it replaces.
+    | FrameDigestMismatch of expected: BlobDigest * actual: BlobDigest
 
 // PERSIST-007's "TextDigest = digest(blob content)" is deliberately NOT a case
 // here. This module is pure and holds only a `BlobRef`, so it cannot read the body
@@ -248,6 +250,12 @@ module BlogProjection =
             Error BlogFoldRejection.NonSequentialFrameEpoch
         elif count < 1 || count > available then
             Error(BlogFoldRejection.CoveredFrameCountOutOfRange(count, available))
+        elif count = 1
+             && (match frames state with
+                 | oldest :: _ -> oldest.Digest <> frame.Digest
+                 | [] -> false) then
+            let expected = (frames state |> List.head).Digest
+            Error(BlogFoldRejection.FrameDigestMismatch(expected, frame.Digest))
         else
             // The coverable boundary is a frame INDEX, so collapsing frames below it
             // moves it. The cutoff and the digest do not change — a squash rewrites how

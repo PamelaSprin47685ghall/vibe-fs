@@ -195,7 +195,11 @@ module CompanionRuntimeSurface =
                     else
                         text value?coveredFrameCount
                 )
-               digests = [||] |}
+               digests =
+                if isNullish value?digests then
+                    [||]
+                else
+                    unbox<obj array> value?digests |> Array.map text |}
 
     let toml (value: obj) : string = text value?toml
 
@@ -256,10 +260,18 @@ module CompanionRuntimeSurface =
         | Some value -> contextToJs value
 
     let scope () : obj = createScope ()
-    let setPendingOffer = offerMaterial
-    let offerParked = offerMaterial
-    let tryGetFlight = currentRequest
-    let peekCurrentRequest = currentRequest
+
+    let setPendingOffer (scope: obj) (sessionId: string) (context: obj) : bool =
+        offerMaterial scope sessionId context
+
+    let offerParked (scope: obj) (sessionId: string) (context: obj) : bool =
+        offerMaterial scope sessionId context
+
+    let tryGetFlight (scope: obj) (sessionId: string) : obj =
+        currentRequest scope sessionId
+
+    let peekCurrentRequest (scope: obj) (sessionId: string) : obj =
+        currentRequest scope sessionId
 
     let openDrain (root: string) : obj =
         box (BloggerRuntime.openDrain (AuthorityRootUserMessageId.create root))

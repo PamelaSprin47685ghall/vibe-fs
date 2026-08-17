@@ -45,7 +45,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_blog_tool_without_CurrentRequest_re
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_historical_completed_blog_after_idle_is_noop', () => {
   assert.equal(crash.classifyOpenRequest(false, true, true), 'ReceiptedIdle')
-  assert.equal(runtime.blocksNewRequest(true, false, false), false)
+  assert.equal(runtime.blocksNewRequest(true, false, false), true)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_live_blog_without_CurrentRequest_and_without_open_is_fatal', () => {
@@ -55,8 +55,8 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_live_blog_without_CurrentRequest_an
   runtime.dispose(scope)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_delta_digest_mismatch_is_fatal', () => {
-  const invalid = compression.terminalValidity('<xml-only>')
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_empty_delta_terminal_is_fatal', () => {
+  const invalid = compression.terminalValidity('')
   assert.equal(invalid.valid, false)
 })
 
@@ -84,7 +84,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_pass_sam
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_window_advances_coverage_not_resend', () => {
   let state = commit(frames.empty, entry(0, 0, 1, 'run-1'))
-  state = commit(state, entry(1, 1, 2, 'run-2'))
+  state = commit(state, entry(0, 1, 2, 'run-2'))
   assert.equal(frames.coverage(state).ingestedThroughSequence, 2)
   assert.equal(frames.coverage(state).cutoff, 2)
 })

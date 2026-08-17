@@ -54,7 +54,7 @@ module JsFilesystemSurface =
         | Ok listing ->
             box
                 {| ok = true
-                   paths = listing.Paths |> List.toArray |}
+                   value = box {| paths = listing.Paths |> List.toArray |} |}
         | Error failure -> failureResult failure
 
     let findAnchor (textValue: string) (declaration: obj) (occurrence: int) : obj =
@@ -87,7 +87,7 @@ module JsFilesystemSurface =
                            text = hit.Text |})
                 |> List.toArray
 
-            box {| ok = true; matches = matches |}
+            box {| ok = true; value = box {| matches = matches |} |}
 
     let commitPlan (root: string) (plan: obj array) : obj =
         match JsMutationFs.commitPlan root (planOf (box plan)) with

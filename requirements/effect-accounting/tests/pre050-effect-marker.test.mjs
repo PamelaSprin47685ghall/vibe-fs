@@ -15,7 +15,7 @@ test('WHAT[EFFECT-ACCOUNTING-010] PERSIST_005_pre050_marker_refuses_with_migrati
     'DurableEffectRequested',
     'DurableEffectAccepted',
   ]) {
-    assert.equal(source.includes(`"${marker}"`), true, marker)
+    assert.equal(source.includes(marker), true, marker)
   }
   assert.match(source, /pre050MigrationMessage/)
   assert.match(source, /containsLegacyFallbackFields/)

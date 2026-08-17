@@ -335,10 +335,14 @@ module BlogSurface =
 
         let state = if isNullish part?state then null else part?state
         let status = if isNullish state then "" else text state?status
+        let metadata = if isNullish state then null else state?metadata
 
         let interrupted =
-            not (isNullish state?metadata?interrupted)
-            && unbox<bool> state?metadata?interrupted
+            if isNullish metadata then
+                false
+            else
+                not (isNullish metadata?interrupted)
+                && unbox<bool> metadata?interrupted
 
         box
             {| isBlogToolPart = isBlog

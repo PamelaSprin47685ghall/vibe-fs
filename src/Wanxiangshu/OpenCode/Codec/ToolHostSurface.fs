@@ -22,7 +22,7 @@ module ToolHostSurface =
     let private contextOf value =
         unbox<ContextHandle> value |> fun handle -> handle.Value
 
-    let arguments (raw: obj) : obj =
+    let makeArguments (raw: obj) : obj =
         ArgumentsHandle(HostToolArguments raw) :> obj
 
     let argumentText (args: obj) (name: string) = (argumentsOf args).Text name
@@ -42,7 +42,8 @@ module ToolHostSurface =
         | Ok None -> box {| ok = true; value = null |}
         | Error() -> box {| ok = false |}
 
-    let private schemaValue schema : obj = emitJsExpr schema "$0.fields[0]"
+    [<Emit("(($0.value ?? $0.fields[0]).value ?? ($0.value ?? $0.fields[0]))")>]
+    let private schemaValue (schema: obj) : obj = jsNative
 
     let private factory toolModule = ToolHostCodec.factory toolModule
 
