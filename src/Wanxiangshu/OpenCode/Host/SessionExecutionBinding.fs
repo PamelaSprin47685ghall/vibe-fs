@@ -82,6 +82,13 @@ module SessionExecutionBinding =
         && left.modelID = right.modelID
         && left.variant = right.variant
 
+    let private modelText (model: OpencodeModel) =
+        sprintf
+            "%s/%s[%s]"
+            model.providerID
+            model.modelID
+            (model.variant |> Option.defaultValue "<missing>")
+
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
         lock gate (fun () ->
             let childKey = SessionId.value childId
@@ -336,7 +343,12 @@ module SessionExecutionBinding =
         if expected.Agent <> observedAgent then
             Error(sprintf "PROMPT-006: provider agent drift (%s -> %s)" expected.Agent observedAgent)
         elif not (sameModel expected.Model model) then
-            Error "PROMPT-006: provider model/reasoning drift from accepted prompt binding"
+            Error(
+                sprintf
+                    "PROMPT-006: provider model/reasoning drift from accepted prompt binding (%s -> %s)"
+                    (modelText expected.Model)
+                    (modelText model)
+            )
         else
             validateLease sessionId expected.PhysicalUserMessageId observedAgent model
 

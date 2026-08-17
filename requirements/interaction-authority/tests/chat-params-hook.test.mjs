@@ -37,6 +37,59 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding
   assert.equal(output.model.modelID, 'deep-opus')
 })
 
+test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_uses_the_resolved_provider_model_id_not_the_mutated_user_message_model', () => {
+  binding.bindChild('ses_chat_params_root_3', 'ses_chat_params_child_3', 'deep-coder')
+  binding.acceptPromptExecution(
+    'ses_chat_params_child_3',
+    'pk-chat-params-actual-model',
+    'physical-chat-params-actual-model',
+    'deep-coder',
+    { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
+  )
+
+  const output = {}
+  const observed = chatParams.apply(
+    {
+      sessionID: 'ses_chat_params_child_3',
+      agent: 'deep-coder',
+      model: { id: 'fast-haiku', providerID: 'anthropic' },
+      message: {
+        model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
+      },
+    },
+    output,
+  )
+
+  assert.equal(observed.ok, false)
+  assert.match(observed.error, /model\/reasoning drift/i)
+})
+
+test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_model_shape_with_message_variant', () => {
+  binding.bindChild('ses_chat_params_root_4', 'ses_chat_params_child_4', 'deep-coder')
+  binding.acceptPromptExecution(
+    'ses_chat_params_child_4',
+    'pk-chat-params-real-shape',
+    'physical-chat-params-real-shape',
+    'deep-coder',
+    { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
+  )
+
+  const observed = chatParams.apply(
+    {
+      sessionID: 'ses_chat_params_child_4',
+      agent: 'deep-coder',
+      model: { id: 'deep-opus', providerID: 'anthropic' },
+      message: {
+        model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
+      },
+    },
+    {},
+  )
+
+  assert.equal(observed.ok, true, observed.error)
+  assert.equal(observed.temperature, 1)
+})
+
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_agentless_root_does_not_invent_binding', () => {
   const output = { model: { providerID: 'anthropic', modelID: 'fast-haiku' } }
   const observed = chatParams.apply({ sessionID: 'ses_unbound_root' }, output)

@@ -24,6 +24,7 @@ test('WHAT[BD-017] REPRO_blogger_aabb_is_sent_even_when_generic_fallback_reaches
     repairTerminalRun: nudge.run,
     terminalRun: 'asst-generic-exhaust-p2',
     nudgeSucceeded: true,
+    fallbackExhausted: true,
   })
   assert.equal(aabb.state, 'AabbRepairIssued')
   const exhausted = blog.repairProtocol({
@@ -31,6 +32,7 @@ test('WHAT[BD-017] REPRO_blogger_aabb_is_sent_even_when_generic_fallback_reaches
     repairTerminalRun: aabb.run,
     terminalRun: 'asst-generic-exhaust-p3',
     nudgeSucceeded: true,
+    fallbackExhausted: true,
   })
   assert.equal(exhausted.state, 'ProtocolExhausted')
 })

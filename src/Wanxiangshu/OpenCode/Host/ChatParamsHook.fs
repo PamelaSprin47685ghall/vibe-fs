@@ -26,13 +26,15 @@ module ChatParamsHook =
         let message: obj = input?message
         let messageModel: obj = if isNull message then null else message?model
 
-        let provider =
-            textField rawModel "providerID"
-            |> Option.orElseWith (fun () -> textField messageModel "providerID")
+        let provider = textField rawModel "providerID"
 
         let modelId =
-            textField rawModel "modelID"
-            |> Option.orElseWith (fun () -> textField messageModel "modelID")
+            // chat.params receives the resolved provider catalog Model. Its
+            // canonical model identifier is `id`; `modelID` belongs to the
+            // persisted UserMessage model reference. The compatibility fallback
+            // is raw-model-local; message.model never supplies provider identity.
+            textField rawModel "id"
+            |> Option.orElseWith (fun () -> textField rawModel "modelID")
 
         let variant =
             textField messageModel "variant"

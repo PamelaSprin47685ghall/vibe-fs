@@ -121,6 +121,7 @@ test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', asyn
   const drift = binding.validateObservedProvider(child, 'deep-distiller', { ...expected, variant: 'default' })
   assert.equal(drift.ok, false)
   assert.match(drift.error, /model\/reasoning drift/i)
+  assert.match(drift.error, /test\/deep\[high\] -> test\/deep\[default\]/)
 
   binding.drop(child)
 })

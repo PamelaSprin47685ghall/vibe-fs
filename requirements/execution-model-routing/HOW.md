@@ -226,7 +226,7 @@ plugin/tool dispatch
 
 ## 7. root/user-facing 路径
 
-`chat.message` 是 managed execution 的唯一 required acquisition hook：真实用户 message 先解析用户选中的 EffectiveAgent；plugin synthetic message 则从 PromptKey claim/profile 解析 EffectiveAgent；两者同时必须有 PhysicalUserMessageId。该 hook 先建立 current exact binding，再把输出 message/request 的 model/reasoning 改成 lease target。Host 随后的 `chat.params` 因发生在 messages transform 之前，只验证 chat.message 已记录的 current exact binding；provider-facing transform 再用 trailing PhysicalUserMessageId（以及 plugin PromptKey）重新证明同一个 execution。
+`chat.message` 是 managed execution 的唯一 required acquisition hook：真实用户 message 先解析用户选中的 EffectiveAgent；plugin synthetic message 则从 PromptKey claim/profile 解析 EffectiveAgent；两者同时必须有 PhysicalUserMessageId。该 hook 先建立 current exact binding，再把输出 message/request 的 model/reasoning 改成 lease target。Host 随后的 `chat.params` 因发生在 messages transform 之前，只验证 chat.message 已记录的 current exact binding；其中实际 provider/model 必须从 Host 已 resolve 的 `input.model.providerID + input.model.id` 观察，reasoning variant 从当前 user message 的 `input.message.model.variant` 观察。不得把 provider-facing `Model` 与 persisted `UserMessage.model` 拼成一个 hybrid target，也不得因 SDK 字段名差异退化成只比较 message model。provider-facing transform 再用 trailing PhysicalUserMessageId（以及 plugin PromptKey）重新证明同一个 execution。
 
 这条 Host mutation 能力必须由 `host-boundary` physical canary 证明，不能只测 DTO 被改了。
 
@@ -247,7 +247,7 @@ Strength 不再读取静态 fast/deep model string。它对 `fast-<owner-role>` 
 
 ## 9. physical execution lifecycle 与进程边界
 
-managed execution lease 在 `SessionIdle` / typed abort / session delete / scope cleanup 释放；同 SessionId 新 PhysicalUserMessageId 也会在 admission 内 supersede 旧 execution，因此 correctness 不依赖 end signal 必达。业务 completion/retire/join/finality 不直接释放。plugin shutdown 清理当前进程 pending/active execution 状态；进程退出自然丢失 process-local lease registry。
+managed execution lease 的普通释放由 final assistant exact `parentID = PhysicalUserMessageId` 驱动；同 SessionId 新 PhysicalUserMessageId 也会在 admission 内 supersede 旧 execution，因此 correctness 不依赖 end signal 必达。`SessionIdle` / typed abort 只有 SessionId，只能 wake/quiescence/observe，不能删除 active exact lease；session delete / scope cleanup / plugin shutdown 才能按 owner 强制清理。业务 completion/retire/join/finality 不直接释放。进程退出自然丢失 process-local lease registry。
 
 process restart 重新 import MJS 并开启新 routing epoch。本包当前不把 model execution lease 写入 durable event history；跨进程只保留业务 identity/authority，不承诺历史 session reuse 时继续使用上一进程同一个 physical target。
 
