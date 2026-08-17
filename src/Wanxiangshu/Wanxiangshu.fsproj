@@ -513,6 +513,7 @@
     <Compile Include="OpenCode/JoinResultRendererSurface.fs"/>
     <Compile Include="OpenCode/Tools/ToolRuntimeScope.fs"/>
     <Compile Include="OpenCode/Host/ExplicitSessionResume.fs"/>
+    <Compile Include="OpenCode/Host/ExplicitResumeSurface.fs"/>
     <Compile Include="Mission/Finality/OpenCode/HostPort.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/OneShotTool.fs"/>
     <Compile Include="Execution/Delegation/Fork/OpenCode/Tool.fs"/>

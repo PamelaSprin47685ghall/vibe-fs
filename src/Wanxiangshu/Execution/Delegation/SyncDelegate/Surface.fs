@@ -235,7 +235,7 @@ module SyncDelegateSurface =
                 )
 
             let context =
-                { SessionId = owner
+                { SessionId = SessionId.value (harness.OwnerSession owner)
                   Agent = None
                   ToolCallId = None
                   ProviderRunId = None

@@ -313,6 +313,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Host/ExplicitResumeSurface.js',
+    owner: 'crash-reconciliation',
+    laws: ['CRASH-018'],
+    source: 'src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'OpenCode/Tools/ExecutorToolSurface.js',
     owner: 'process-execution',
     laws: ['PROC-011'],

@@ -1,8 +1,6 @@
 // INTERACTION-AUTHORITY proof — assistance remains same-session continuation authority.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import test from 'node:test'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
@@ -47,8 +45,4 @@ test('WHAT[INTERACTION-AUTHORITY-013] AGENT_031_deep_binding_uses_consultation_c
   assert.equal(claim.authorityRoot, root.authorityRoot)
   assert.deepEqual(profile(after.activeLogicalRun), profile(root))
 
-  const source = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs'), 'utf8')
-  assert.match(source, /NeedHelpAdvice/)
-  assert.match(source, /ManagedAgentCatalog\.nameOf AgentTier\.Deep Role\.Inquiry/)
-  assert.match(source, /NeedHelpEscalation/)
 })

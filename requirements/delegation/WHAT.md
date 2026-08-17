@@ -237,7 +237,7 @@ owner 生命周期约束保证咨询不脱管。
 边界：sentinel 的 delta 识别与 assistance abort 分型 → `interaction-authority`（HOST-027）；
 advice 的 prompt 渲染 → `provider-projection` + `prefix-stability`；「何时鼓励求助」→ `cognitive-environment`。
 
-证据：REUSE `requirements/host-boundary/tests/needhelp-sensor.test.mjs` 与 `requirements/delegation/tests/assistance-host.test.mjs`
+证据：NEW `requirements/delegation/tests/assistance-host.test.mjs`（JS-native authority surface 证明 assistance continuation 保持 authority root，advice 不伪装为 provider retry）；REUSE `requirements/host-boundary/tests/needhelp-sensor.test.mjs`；真实 consultation/advice 路由由 verification-system Long Stroke e2e 的 `assertNeedHelpAssistance` 证明
 （host 面，见 PROOF.md SPLIT@cutover 注记：sentinel 识别归 `interaction-authority`，consultation 委托语义归本包）。
 
 ## DELEG-019：fork child 首 prompt 是 typed 语义载荷，不是自由文本

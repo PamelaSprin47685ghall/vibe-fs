@@ -98,7 +98,7 @@ module CausalWaitBridge =
 
     let private escapeObj (escape: WaitEscape) : obj =
         match escape with
-        | DeadlineAt at -> createObj [ "tag", box "deadlineAt"; "at", box (at.ToString("o")) ]
+        | DeadlineAt at -> createObj [ "tag", box "deadlineAt"; "at", box (at.ToUniversalTime().ToString("o")) ]
         | CancelledBy owner -> createObj [ "tag", box "cancelledBy"; "owner", ownerObj owner ]
         | ProcessLifetime -> createObj [ "tag", box "processLifetime" ]
         | SessionLifetime -> createObj [ "tag", box "sessionLifetime" ]

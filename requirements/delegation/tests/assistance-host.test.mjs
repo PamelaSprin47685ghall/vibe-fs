@@ -1,20 +1,49 @@
-// Assistance host owns its quiescence gate and recovery state; semantic tests
-// consume source laws and the existing QuiescenceSurface only.
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
-import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 
-const assistance = readFileSync(new URL('../../../src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs', import.meta.url), 'utf8')
-const sensor = readFileSync(new URL('../../../src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs', import.meta.url), 'utf8')
-test('WHAT[DELEG-018] ASSISTANCE_HOST_never_starts_repair_while_turn_is_active', () => {
-  assert.match(assistance, /Quiescence|beginAttempt|TurnActive/i)
-  assert.match(quiescence.inspect('ses-assist', 'empty'), /quiet|quiescent|available/i)
+const root = authority.createAuthorityRoot(
+  (value) => `H(${value})`,
+  'rt_assistance-delegation',
+  'ses_owner',
+  'HumanRoot',
+  'msg_root',
+  'fast-coder',
+).value
+
+test('WHAT[DELEG-018] ASSISTANCE_HOST_needhelp_escalation_keeps_the_same_authority_root', () => {
+  const state = authority.registerAuthority(root, authority.empty)
+  const claim = authority.claimContinuation(
+    'pk-help',
+    'ses_owner',
+    'NeedHelpEscalation',
+    root,
+    'deep-coder',
+    'needhelp|run-1',
+  )
+  const after = authority.acceptClaim('pk-help', 'msg-help', authority.registerClaim(claim, state))
+
+  assert.equal(claim.origin, 'Continuation')
+  assert.equal(claim.authorityRoot, root.authorityRoot)
+  assert.equal(after.activeLogicalRun.authorityRoot, root.authorityRoot)
+  assert.equal(after.activeLogicalRun.logicalRun, root.logicalRun)
+  assert.equal(after.acceptedContinuations.length, 1)
 })
-test('WHAT[DELEG-018] ASSISTANCE_HOST_need_help_sensor_has_explicit_signal', () => {
-  assert.match(sensor, /NeedHelp|needHelp|signal/i)
-})
-test('WHAT[DELEG-018] ASSISTANCE_HOST_recovery_is_observable_not_silent', () => {
-  assert.match(assistance, /Recover|recovery/i)
-  assert.doesNotMatch(assistance, /swallow|catch\s+_.*recovery/i)
+
+test('WHAT[DELEG-018] ASSISTANCE_HOST_needhelp_advice_is_not_a_provider_retry', () => {
+  const state = authority.registerAuthority(root, authority.empty)
+  const claim = authority.claimContinuation(
+    'pk-advice',
+    'ses_owner',
+    'NeedHelpAdvice',
+    root,
+    'deep-coder',
+    'advice|run-2',
+  )
+  const after = authority.registerClaim(claim, state)
+
+  assert.equal(claim.origin, 'Continuation')
+  assert.equal(after.activeLogicalRun.authorityRoot, root.authorityRoot)
+  assert.equal(after.acceptedContinuations.length, 0)
+  assert.equal(after.acceptedContinuations.some((item) => item.kind === 'ProviderRetryAttempt'), false)
 })

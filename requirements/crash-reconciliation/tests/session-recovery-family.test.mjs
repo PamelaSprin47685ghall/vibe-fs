@@ -97,8 +97,10 @@ test('WHAT[CRASH-005] RECOVERY_FAMILY_handle_family_waiting_maps_to_waiting_not_
   const src = readFileSync(join(ROOT, 'src/Wanxiangshu/Execution/Session/Recovery/Model.fs'), 'utf8')
   const waitingArm = src.match(/HandleFamilyRecovery\.HandlesWaiting[\s\S]*?(?=HandleFamilyRecovery\.HandlesBlocked)/)?.[0]
   assert.ok(waitingArm, 'HandleFamilyRecovery.HandlesWaiting arm body not found')
-  assert.match(waitingArm, /SessionRecovery\.Waiting/)
+  assert.match(waitingArm, /waitingRecovery/)
   assert.doesNotMatch(waitingArm, /SessionRecovery\.Blocked/)
+  const waitingMapping = src.match(/let private waitingRecovery[\s\S]*?SessionRecovery\.Waiting/)?.[0]
+  assert.ok(waitingMapping, 'waitingRecovery must map to SessionRecovery.Waiting')
   assert.match(src, /\| FamilyWaiting of NonEmpty<RecoveryBlock>/)
   assert.match(src, /\| Waiting of NonEmpty<RecoveryBlock>/)
 })

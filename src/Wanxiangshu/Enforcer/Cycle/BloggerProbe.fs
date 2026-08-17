@@ -118,22 +118,25 @@ module BloggerRecoveryProbe =
         (claimedTerminalRun: string option)
         (completedAssistants: (string * bool) list)
         : BloggerToolRecovery =
-        match claimedTerminalRun with
-        | None -> BloggerToolRecovery.NoRecovery
-        | Some claimed ->
-            match completedAssistants |> List.tryFind (fun (id, _) -> id = claimed) with
-            | Some(_, true) -> BloggerToolRecovery.NoRecovery
-            | _ ->
-                let afterClaimed =
-                    completedAssistants
-                    |> List.skipWhile (fun (id, _) -> id <> claimed)
-                    |> function
-                        | _ :: rest -> rest
-                        | [] ->
-                            // Claimed run absent from transcript: keep nudge stage, never invent AABB.
-                            []
+        let claimedEvidence =
+            claimedTerminalRun
+            |> Option.bind (fun claimed ->
+                completedAssistants |> List.tryFind (fun (id, _) -> id = claimed))
 
-                recoveryAfterClaimed claimed afterClaimed
+        match claimedTerminalRun, claimedEvidence with
+        | None, _ -> BloggerToolRecovery.NoRecovery
+        | Some _, Some(_, true) -> BloggerToolRecovery.NoRecovery
+        | Some claimed, _ ->
+            let afterClaimed =
+                completedAssistants
+                |> List.skipWhile (fun (id, _) -> id <> claimed)
+                |> function
+                    | _ :: rest -> rest
+                    | [] ->
+                        // Claimed run absent from transcript: keep nudge stage, never invent AABB.
+                        []
+
+            recoveryAfterClaimed claimed afterClaimed
 
     let private isCompletedChronicle (part: SessionToolPart) =
         part.ToolName = "chronicle"

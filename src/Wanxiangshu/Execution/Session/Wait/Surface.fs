@@ -92,7 +92,7 @@ module CausalWaitSurface =
         | DeadlineAt at ->
             box
                 {| tag = "deadlineAt"
-                   at = at.ToString("o") |}
+                   at = at.ToUniversalTime().ToString("o") |}
         | CancelledBy owner ->
             box
                 {| tag = "cancelledBy"
