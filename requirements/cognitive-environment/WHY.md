@@ -53,5 +53,9 @@ Prompt/Role Law 只是这些事实的 presentation surface，不获得 semantic 
 - **把 Pair Hint 拆成多个独立 synthetic 消息（一个中文、一个 NEEDHELP、一个并行工具）。** 拒绝：
   一个 canonical Pair Hint occurrence 承载全部 craft；provider renderer 只决定 wire 形状
   （pair-parallel-tools.md §18）。
+- **把并行理解成固定 wave、阶段 barrier，或把预先画出的依赖图当执行日程。** 拒绝：依赖图只描述
+  当前已知因果，不拥有调度权。若 A/B 已并发且 A 先完成并解锁 A1，等待 B 只会把无关延迟伪造成 A1
+  的前置条件。Pair Hint 因而诱导模型在每个新结果/新事实后重算 ready frontier，立即释放新 ready 的
+  细粒度后继；batch 只可能是同一时刻 ready 调用的自然合并，不是同步边界。
 - **把 NEEDHELP 写成稀缺/失败语言（"only when truly blocked"）。** 拒绝：制造求助羞耻、诱导长时
   低价值自我挣扎（increase-strength.md §3.1）；budget 是机器侧护栏，不进 provider 文案。

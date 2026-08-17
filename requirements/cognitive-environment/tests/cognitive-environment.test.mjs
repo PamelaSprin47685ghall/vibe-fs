@@ -171,10 +171,17 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_requires_immediate_todowrite_
   }
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_parallel_wave_without_global_concurrency_number', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers', () => {
   for (const locale of ['en', 'zh-CN']) {
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
-    assert.match(text, /parallel|并行/i)
+    assert.match(text, /parallel|concurr|并行|并发/i)
+    assert.match(text, /ready frontier/i)
+    assert.match(text, /A1/)
+    assert.match(text, /解锁|unlock/i)
+    assert.match(text, /兄弟|sibling/i)
+    assert.match(text, /快照|snapshot/i)
+    assert.match(text, /执行日程|execution schedule/i)
+    assert.match(text, /wall-clock/i)
     assert.match(text, /dependenc|依赖/i)
     assert.doesNotMatch(text, /最多\s*\d+|max(?:imum)?\s+\d+/i)
   }
@@ -185,7 +192,8 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrenc
     const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
     assert.match(text, /并发槽|concurrency slot/i)
     assert.match(text, /十个|ten/i)
-    assert.match(text, /用满|fill/i)
+    assert.match(text, /空着|empty/i)
+    assert.match(text, /ready/i)
   }
 })
 

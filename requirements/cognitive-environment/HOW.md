@@ -12,7 +12,7 @@
 | 006/007/008/009 | `resources/provider/library/{ingress,closing,kolmogorov,scarcity,reviewer/quality-ledger}/**`；`PromptResources.fs` `libraryPaths` | ingress 明言「do not enlarge your authority」；closing 明言书从属于 assignment |
 | 005/011 | `resources/provider/role/*/`（无 fast/deep 字样）；`Session/CompanionPrompt.fs` 等使用 `PromptResources` 组合 | 自我模型稳定；`prompt-stability` 测试（byte-stability）归 `prefix-stability`/`participant-identity` |
 | 012 | `resources/provider/role/reviewer/*` + `resources/provider/library/reviewer/quality-ledger/*` | REVIEW-012：双 PERFECT 不入 prompt |
-| 013 | `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`；HOST-013 transform（`Infrastructure/OpenCode/Host/*`）把同一 canonical 正文投影到 wire | craft 单源；`cursor-pair-hint.md`/`pair-parallel-tools.md`/`increase-strength.md` 考古 |
+| 013 | `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`；HOST-013 transform（`Infrastructure/OpenCode/Host/*`）把同一 canonical 正文投影到 wire | craft 单源；并发文案用持续重算的 ready frontier 表达因果调度，不把 wave/DAG 变成 barrier；`cursor-pair-hint.md`/`pair-parallel-tools.md`/`increase-strength.md` 考古 |
 
 ## 关键机制：PromptResources 是唯一组合源
 
