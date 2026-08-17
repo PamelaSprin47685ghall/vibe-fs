@@ -116,7 +116,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 在本次任务中，你的上下文和时间都是无限的。
 本文件是需求，也是台账。每解决一部分，就编辑本文件改成一部分完成时，然后 git commit。要并发工作，不需要按次序工作。
 
-## 台账 — 2026-08-17 四轮无限清剿完成时
+## 台账 — 2026-08-18 八轮无限清剿完成时
 
 - [x] Fractal CE 一统：Fact 外层路由 44 行，53 构造器归 8 所属，630:630 无漂移（b973b08b1）
 - [x] Ghostbuster：Top-10 GHOST 7 EXORCISED + 5 KEEP 物理（HasFlight/CAS），pyramid 0，dsl 0（9c5486bb0+cab8c0876）
@@ -124,8 +124,12 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [x] JS Surface：143 面 0 债务，baseline 不存在，143 封闭，VERIFICATION-013 6 不变式，js-surface-manifest 移后置（b973b08b1）
 - [x] Trace：670 WHAT / 3237 tests / 672 PROOF 0 孤儿 0 悬空
 - [x] 第四轮深挖死码与墓碑：ofLegacyProbe 已删，HOW stale 5 处已改完成时，FactCodec 4 horizon 锚已补（cab8c0876）
+- [x] 第五轮 9 路审计：proposals 禁删合规、18 墓碑 T1 已正 17 护栏、可选硬化 3 项 WATCH、不建论证（numeric/transition/god-module）
+- [x] 第六轮 42 死码+28 批注：Batch A 21 + Batch B 24+5 孤立，共 42 高置信删除；mailbox/reservation 归一，9 远距修窗口（3b3bc0e40）
+- [x] 第七轮 DSL 100% 进击：Batch A 41 + Batch B 65 约 104 批注，20/20 Surface 0 消费者确证保留（8ee5697a8）
+- [x] 第八轮收口：326/326 DSL 真 100%（49 补扫尾），59 Surface 余函归档，新增死码 0 增量，unified-store 6 scanner 0 可删，horizon 双债四向锚固（3bb7f4400）
 - [x] 门禁：check.mjs 0，build 668/143 ok，structured-workflow 115，p0 52，pyramid 0，spec 244/18
-- [ ] 剩余有界债 horizon 到期后自删：005 FactCodec 4 探测器，006 Host TodoTable；台账与 cleanup 自删之日即归零
+- [ ] 剩余有界债 horizon 到期后自删：005 FactCodec 4 探测器（外部 census 0），006 Host TodoTable（Host V1 退役）；台账与 cleanup 自删之日即归零
 
 ---
 
