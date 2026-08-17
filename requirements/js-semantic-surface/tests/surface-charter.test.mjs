@@ -27,6 +27,7 @@ import { walk } from '../../../scripts/lib/walk.mjs'
 const ROOT = resolve(join(dirname(fileURLToPath(import.meta.url)), '../../..'))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const relativePath = (path) => relative(process.cwd(), path).replace(/\\/g, '/')
+const distImport = (prefix, module) => `${prefix}dist/${module}`
 
 // ── 001: all semantic tests are JavaScript ──────────────────────────────────
 
@@ -79,7 +80,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
   const fixtureSource = [
     'import { leak } ',
     'from ',
-    "'../../../../" + "dist/Mission/Finality/Workflow.js'",
+    `'${distImport('../../../../', 'Mission/Finality/Workflow.js')}'`,
     '\nexport const leak = (value) => value.',
     'f',
     'ields[0]\n',
@@ -167,7 +168,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
     writeFileSync(source, 'module Owner.Surface\n')
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
-    writeFileSync(testFile, ['import * as surface ', 'from ', "'../../../dist/Owner/Surface.js'\nvoid surface\n"].join(''))
+    writeFileSync(testFile, ['import * as surface ', 'from ', `'${distImport('../../../', 'Owner/Surface.js')}'\nvoid surface\n`].join(''))
     const entry = {
       module: 'Owner/Surface.js',
       owner: 'owner',
@@ -319,7 +320,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004b_support_to_support_transitiv
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_string_and_recognizes_active_imports', () => {
   const module = 'Owner/Surface.js'
   const deadStringSource = [
-    `import { value } from '../../../dist/${module}'`,
+    `import { value } from '${distImport('../../../', module)}'`,
     "// const value = 'Owner/Surface.js'",
     "const label = 'value'",
     'export const noop = () => null',
@@ -327,25 +328,25 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_str
   assert.equal(usesSurface(deadStringSource, module), false, 'binding name in a string/comment is not an active use')
 
   const activeDefaultSource = [
-    `import surface from '../../../dist/${module}'`,
+    `import surface from '${distImport('../../../', module)}'`,
     'export const call = () => surface()',
   ].join('\n')
   assert.equal(usesSurface(activeDefaultSource, module), true, 'active default import must be recognized')
 
   const activeNamedSource = [
-    `import { value as v } from '../../../dist/${module}'`,
+    `import { value as v } from '${distImport('../../../', module)}'`,
     'export const call = () => v()',
   ].join('\n')
   assert.equal(usesSurface(activeNamedSource, module), true, 'active named import with alias must be recognized')
 
   const activeNamespaceSource = [
-    `import * as surface from '../../../dist/${module}'`,
+    `import * as surface from '${distImport('../../../', module)}'`,
     'export const call = () => surface.value()',
   ].join('\n')
   assert.equal(usesSurface(activeNamespaceSource, module), true, 'active namespace import must be recognized')
 
   const deadDefaultSource = [
-    `import surface from '../../../dist/${module}'`,
+    `import surface from '${distImport('../../../', module)}'`,
     'export const noop = () => null',
   ].join('\n')
   assert.equal(usesSurface(deadDefaultSource, module), false, 'imported but never referenced default binding is not active')
@@ -384,9 +385,9 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorize
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
     // Authorized: owner dir + matching WHAT tag
-    writeFileSync(ownerTest, ["import { value } from '../../../", "dist/Owner/Surface.js'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n"].join(''))
+    writeFileSync(ownerTest, `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n`)
     // Unauthorized: rogue dir, non-matching WHAT tag, no declared consumer edge
-    writeFileSync(rogueTest, ["import { value } from '../../../", "dist/Owner/Surface.js'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n"].join(''))
+    writeFileSync(rogueTest, `import { value } from '${distImport('../../../', 'Owner/Surface.js')}'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n`)
 
     const entry = {
       module: 'Owner/Surface.js',

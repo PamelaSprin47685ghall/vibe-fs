@@ -1141,7 +1141,7 @@ export const SURFACE_MANIFEST = [
     laws: ['HOST-BOUNDARY-011'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs',
     representation: 'json',
-    kind: 'pure',
+    kind: 'resource',
   },
   {
     module: 'OpenCode/Host/HostSessionContextSurface.js',
@@ -1205,7 +1205,7 @@ export const SURFACE_MANIFEST = [
     laws: ['HOST-BOUNDARY-017'],
     source: 'src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs',
     representation: 'json',
-    kind: 'pure',
+    kind: 'resource',
   },
   {
     module: 'OpenCode/Host/StealthBrowserMcpConfigSurface.js',
@@ -1213,7 +1213,7 @@ export const SURFACE_MANIFEST = [
     laws: ['HOST-BOUNDARY-017'],
     source: 'src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs',
     representation: 'json',
-    kind: 'pure',
+    kind: 'resource',
   },
   {
     module: 'Interaction/Dispatch/OpenCode/NeedHelpSurface.js',
@@ -1228,7 +1228,7 @@ export const SURFACE_MANIFEST = [
     owner: 'managed-session-lifecycle',
     laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-007', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-013', 'MANAGED-SESSION-015'],
     source: 'src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'pure',
   },
   {
@@ -1236,7 +1236,7 @@ export const SURFACE_MANIFEST = [
     owner: 'managed-session-lifecycle',
     laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-008', 'MANAGED-SESSION-015'],
     source: 'src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
     kind: 'pure',
   },
   {

@@ -93,6 +93,16 @@ test('WHAT[HOST-BOUNDARY-003] MISC_signals_listen_error_paths', async () => {
   assert.match(throwingListen.error, /listener boom/)
 })
 
+test('WHAT[HOST-BOUNDARY-003] MISC_signals_invalid_callback_fails_closed', async () => {
+  const result = await HostSignalSubscribeSurface.trySubscribe(
+    { events: { listen: () => () => {} } },
+    null,
+    null,
+  )
+  assert.equal(result.ok, false)
+  assert.match(result.error, /callback unavailable/)
+})
+
 test('WHAT[HOST-BOUNDARY-003] MISC_signals_default_input_resolves_to_local_event_hook', async () => {
   const result = await trySubscribe({})
   assert.equal(result.ok, true)
