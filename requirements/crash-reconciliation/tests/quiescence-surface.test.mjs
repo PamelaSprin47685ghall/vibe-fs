@@ -151,8 +151,8 @@ test('WHAT[CRASH-006] P4_SURFACE_exports_exact_capability_names', () => {
     'beginAttempt',
     'create',
     'dropSession',
-    'observePhysicalMessage',
     'observeIdle',
+    'observePhysicalMessage',
     'revoke',
     'tryConsume',
   ])

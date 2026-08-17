@@ -119,6 +119,21 @@ module PromptDispatcherSend =
                 return raise ex
         }
 
+    let private publicResultOfAttempt =
+        function
+        | PromptDispatcher.SendAttemptOutcome.Sent key -> Ok key
+        | PromptDispatcher.SendAttemptOutcome.Failed error -> Error error
+        | PromptDispatcher.SendAttemptOutcome.Superseded ->
+            Error "idle-derived send was superseded before physical dispatch"
+
+    let private attemptOfResult =
+        function
+        | Ok key -> PromptDispatcher.SendAttemptOutcome.Sent key
+        | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error
+
+    let private physicalSendAdmitted (admission: (unit -> bool) option) =
+        admission |> Option.map (fun admit -> admit ()) |> Option.defaultValue true
+
     type PromptDispatcher.Runtime with
 
         /// Record the Host's answer and report what the caller may conclude.
@@ -366,7 +381,73 @@ module PromptDispatcherSend =
         /// `payloadDigest` is a parameter rather than `sha256 text` computed here,
         /// because FALLBACK-008 needs one continuation kind to digest something
         /// other than its text. See `SendInteractionRepair`.
-        member private this.SendContinuationWithDigest
+        member private this.SendClaimedContinuation
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (originLabel: string)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (tools: Map<string, bool> option)
+            (physicalAdmission: (unit -> bool) option)
+            (key: PromptKey)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            task {
+                use _listener = this.SubscribeNoOp port sessionId
+
+                let bindingIntent =
+                    if effectiveAgent = profile.SelectedAgent then
+                        SessionBindingIntent.Preserve
+                    else
+                        SessionBindingIntent.ExplicitExecutionOverride
+
+                let options =
+                    { Model = None
+                      Agent = Some effectiveAgent
+                      Directory = directory
+                      Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
+                      Tools = tools
+                      BindingIntent = bindingIntent }
+
+                match awaitMode, onAccepted with
+                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
+                | _ -> ()
+
+                if not (physicalSendAdmitted physicalAdmission) then
+                    return!
+                        this.Abandon key sessionId PromptAbandonReason.SupersededBeforePhysicalSend
+                        |> TaskValue.map (function
+                            | Ok() -> PromptDispatcher.SendAttemptOutcome.Superseded
+                            | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error)
+                else
+                    // The admission check and the Host call are deliberately
+                    // synchronous neighbours. No await may reopen a window where
+                    // newer physical material can arrive after quiescence was
+                    // proven but before SendPrompt is invoked.
+                    let sendTask = port.SendPrompt(sessionId, text, options)
+
+                    let acceptFn physicalId =
+                        this.AcceptContinuation key sessionId physicalId
+                        |> TaskValue.map (Result.map ignore)
+
+                    match awaitMode with
+                    | PromptDispatcher.AwaitMode.Detached ->
+                        match! this.PersistDetachedInvocation(key, sessionId) with
+                        | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
+                        | Ok() ->
+                            this.ObserveDetachedSend key sessionId sendTask None
+                            return PromptDispatcher.SendAttemptOutcome.Sent key
+                    | PromptDispatcher.AwaitMode.Await ->
+                        return!
+                            awaitPhysicalAwareSend key sendTask (fun outcome ->
+                                this.RecordSendOutcome key sessionId outcome acceptFn)
+                            |> TaskValue.map attemptOfResult
+            }
+
+        member private this.SendContinuationWithDigestAttempt
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
@@ -378,8 +459,9 @@ module PromptDispatcherSend =
             (awaitMode: PromptDispatcher.AwaitMode)
             (onAccepted: (PhysicalUserMessageId -> unit) option)
             (tools: Map<string, bool> option)
-            : Task<Result<PromptKey, string>> =
-            taskResult {
+            (physicalAdmission: (unit -> bool) option)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            task {
                 let origin = PromptAuthority.PromptOrigin.Continuation continuation
                 let originLabel = PromptDispatcher.originLabel origin
 
@@ -406,44 +488,52 @@ module PromptDispatcherSend =
                            EffectiveAgent = claim.EffectiveAgent
                            PayloadDigest = payloadDigest |}
 
-                let! _ = this.Persist sessionId None claimed
-
-                use _listener = this.SubscribeNoOp port sessionId
-
-                let bindingIntent =
-                    if effectiveAgent = profile.SelectedAgent then
-                        SessionBindingIntent.Preserve
-                    else
-                        SessionBindingIntent.ExplicitExecutionOverride
-
-                let options =
-                    { Model = None
-                      Agent = Some effectiveAgent
-                      Directory = directory
-                      Metadata = Some(this.Metadata key originLabel (Some profile.LogicalRunId))
-                      Tools = tools
-                      BindingIntent = bindingIntent }
-
-                match awaitMode, onAccepted with
-                | PromptDispatcher.AwaitMode.Await, Some callback -> PromptPhysicalAcceptance.register key callback
-                | _ -> ()
-
-                let sendTask = port.SendPrompt(sessionId, text, options)
-
-                let acceptFn physicalId =
-                    this.AcceptContinuation key sessionId physicalId
-                    |> TaskValue.map (Result.map ignore)
-
-                match awaitMode with
-                | PromptDispatcher.AwaitMode.Detached ->
-                    let! _ = this.PersistDetachedInvocation(key, sessionId)
-                    this.ObserveDetachedSend key sessionId sendTask None
-                    return key
-                | PromptDispatcher.AwaitMode.Await ->
+                match! this.Persist sessionId None claimed with
+                | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
+                | Ok() ->
                     return!
-                        awaitPhysicalAwareSend key sendTask (fun outcome ->
-                            this.RecordSendOutcome key sessionId outcome acceptFn)
+                        this.SendClaimedContinuation
+                            port
+                            sessionId
+                            text
+                            originLabel
+                            profile
+                            effectiveAgent
+                            directory
+                            awaitMode
+                            onAccepted
+                            tools
+                            physicalAdmission
+                            key
             }
+
+        member private this.SendContinuationWithDigest
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (payloadDigest: string)
+            (continuation: PromptAuthority.ContinuationKind)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (tools: Map<string, bool> option)
+            : Task<Result<PromptKey, string>> =
+            this.SendContinuationWithDigestAttempt
+                port
+                sessionId
+                text
+                payloadDigest
+                continuation
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                onAccepted
+                tools
+                None
+            |> TaskValue.map publicResultOfAttempt
 
         member this.SendContinuation
             (port: ISessionHostPort)
@@ -585,3 +675,112 @@ module PromptDispatcherSend =
                 awaitMode
                 onAccepted
                 None
+
+        /// HOST-004: idle-derived continuation whose quiescence permit is
+        /// consumed at the final physical SendPrompt boundary, after durable
+        /// claim persistence. This is the only continuation send surface that
+        /// may return `Superseded`.
+        member internal this.SendIdleContinuation
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (continuation: PromptAuthority.ContinuationKind)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            (physicalAdmission: unit -> bool)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            this.SendContinuationWithDigestAttempt
+                port
+                sessionId
+                text
+                (HostDigest.sha256Hex text)
+                continuation
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                onAccepted
+                None
+                (Some physicalAdmission)
+
+        member internal this.SendIdleRepairFamily
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (repairKind: string)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (physicalAdmission: unit -> bool)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            this.SendContinuationWithDigestAttempt
+                port
+                sessionId
+                text
+                (PromptAuthority.repairFamilyPayloadDigest repairKind)
+                PromptAuthority.ContinuationKind.InteractionRepair
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                None
+                None
+                (Some physicalAdmission)
+
+        member internal this.SendIdleInteractionRepair
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (requestId: BloggerRequestId)
+            (terminalProviderRun: ProviderRunIdentity)
+            (repairKind: string)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (physicalAdmission: unit -> bool)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            this.SendContinuationWithDigestAttempt
+                port
+                sessionId
+                text
+                (PromptAuthority.repairPayloadDigest requestId terminalProviderRun repairKind)
+                PromptAuthority.ContinuationKind.InteractionRepair
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                None
+                None
+                (Some physicalAdmission)
+
+        member internal this.SendIdleManagerIdleEncouragement
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (lifeId: ManagerLifeId)
+            (conditionKey: string)
+            (terminalProviderRun: ProviderRunIdentity)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (physicalAdmission: unit -> bool)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            this.SendContinuationWithDigestAttempt
+                port
+                sessionId
+                text
+                (PromptAuthority.idlePayloadDigest lifeId conditionKey terminalProviderRun)
+                PromptAuthority.ContinuationKind.ManagerIdleEncouragement
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                None
+                None
+                (Some physicalAdmission)
