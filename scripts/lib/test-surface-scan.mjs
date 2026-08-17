@@ -1414,7 +1414,6 @@ export const SURFACE_CONSUMERS = {
   'Persistence/Journal/Surface.js': ['degeneration-guard', 'dispatch-protocol', 'durable-events', 'host-boundary', 'obligation-ledger', 'provider-attempt-recovery', 'review-assurance', 'semantic-trace', 'work-record'],
   'Process/DeadlineSurface.js': ['process-execution', 'verification-system'],
   'Process/Surface.js': ['causal-wait', 'process-execution'],
-  'Process/TestSurface.js': ['process-execution'],
   'Repository/Knowledge/Casebook/BookkeeperSurface.js': ['knowledge-reuse'],
   'Repository/Knowledge/Casebook/IndexSurface.js': ['knowledge-reuse', 'verification-system'],
   'Repository/Knowledge/Casebook/Surface.js': ['knowledge-reuse'],

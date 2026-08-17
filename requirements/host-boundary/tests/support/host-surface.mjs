@@ -99,36 +99,6 @@ export const hostEvents = (capacity = 256) => {
   }
 }
 
-export const hostMessage = {
-  sanitizeMessage: (raw) => {
-    if (!raw) return raw
-    const role = raw.info?.role ?? raw.role ?? ''
-    const parts = Array.isArray(raw.parts) ? raw.parts : []
-    const hasText = parts.some((part) => part?.type === 'text' && String(part.text ?? '').trim() !== '') || String(raw.content ?? '').trim() !== '' || String(raw.text ?? '').trim() !== ''
-    const hasTool = parts.some((part) => /^(tool|tool-call|tool_call|tool-result|tool_result)$/.test(part?.type ?? '')) || (Array.isArray(raw.tool_calls) && raw.tool_calls.length > 0)
-    if (hasText || hasTool) return raw
-    const reasoning = parts.find((part) => /^(reasoning|thinking)$/.test(part?.type ?? '') && String(part.text ?? part.reasoning ?? part.thinking ?? '').trim() !== '')
-    return { ...raw, parts: [...parts, { type: 'text', text: String(reasoning?.text ?? reasoning?.reasoning ?? reasoning?.thinking ?? (role.toLowerCase() === 'assistant' ? '...' : '#')) }] }
-  },
-  sanitizeMessages: (messages) => messages.map((message) => hostMessage.sanitizeMessage(message)),
-}
-
-export const hostContext = {
-  roleOf: (agent) => {
-    if (!agent || !String(agent).trim()) return undefined
-    const match = String(agent).match(/^(?:fast|deep)-(.+)$/)
-    if (!match) return undefined
-    const role = match[1]
-    const known = ['coder', 'reviewer', 'manager', 'orchestrator', 'inspector', 'browser', 'inquiry', 'devops', 'distiller', 'blogger', 'bookkeeper']
-    return known.includes(role.toLowerCase()) ? role[0].toUpperCase() + role.slice(1) : undefined
-  },
-  read: (raw) => {
-    const event = raw?.event ?? raw
-    const props = event?.properties
-    return [props?.sessionID ?? event?.sessionID ?? '', props?.info?.agent]
-  },
-}
-
 export const hostSnapshot = {
   projectMessages: (messages) => messages.map((message) => {
     const info = message.info ?? {}

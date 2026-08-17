@@ -25,9 +25,6 @@ const {
   portClose,
   portCloseAll,
   portList,
-  unitTaskSource,
-  unitTaskResolve,
-  unitTask,
 } = await import('../../../dist/Process/Surface.js')
 
 const agent = { Name: 'fast-distiller' }
@@ -39,6 +36,11 @@ const forkDefault = (port, value, command = 'echo hi') =>
   portFork(port, command, 'fast-distiller', value === undefined ? undefined : id(value), undefined)
 const success = { ok: true, value: undefined }
 const failure = (error) => ({ ok: false, error })
+const exitSignal = () => {
+  let resolve
+  const promise = new Promise((r) => { resolve = r })
+  return { promise, resolve }
+}
 
 // ── constructor / handler boundary ──────────────────────────────────────────
 
@@ -312,8 +314,8 @@ test('WHAT[PROC-003] PORT_complete_isolates_failing_senders', () => {
 test('WHAT[PROC-003] PORT_complete_removes_the_exit_task_entry', async () => {
   const port = createPtyPort({})
   const pid = forkDefault(port, 'pty-et')
-  const exit = unitTaskSource()
-  portRegisterExitTask(port, pid, unitTask(exit))
+  const exit = exitSignal()
+  portRegisterExitTask(port, pid, exit.promise)
   portComplete(port, pid, { ok: true, value: 'done' })
   await portCloseAll(port, 0)
 })
@@ -358,38 +360,38 @@ test('WHAT[PROC-007] PORT_close_all_with_no_sessions_resolves', async () => {
 
 test('WHAT[PROC-007] PORT_close_all_awaits_exit_task_when_it_resolves_in_grace', async () => {
   const seen = []
-  const exit = unitTaskSource()
+  const exit = exitSignal()
   const port = createPtyPort({ handler: async (_pid, command) => { if (command.kind !== 'Spawn') seen.push(command.kind); return success } })
   const pid = forkDefault(port, 'pty-cg')
-  portRegisterExitTask(port, pid, unitTask(exit))
+  portRegisterExitTask(port, pid, exit.promise)
   const closing = portCloseAll(port, 1000)
-  unitTaskResolve(exit)
+  exit.resolve()
   await closing
   assert.deepEqual(seen, ['Signal'])
 })
 
 test('WHAT[PROC-007] PORT_close_all_escalates_to_kill_after_grace', async () => {
   const seen = []
-  const exit = unitTaskSource()
+  const exit = exitSignal()
   const port = createPtyPort({ handler: async (_pid, command) => {
     if (command.kind !== 'Spawn') seen.push(command.signal)
-    if (command.kind === 'Signal' && command.signal === 'SIGKILL') unitTaskResolve(exit)
+    if (command.kind === 'Signal' && command.signal === 'SIGKILL') exit.resolve()
     return success
   } })
   const pid = forkDefault(port, 'pty-ck')
-  portRegisterExitTask(port, pid, unitTask(exit))
+  portRegisterExitTask(port, pid, exit.promise)
   await portCloseAll(port, 0)
   assert.deepEqual(seen, ['SIGTERM', 'SIGKILL'])
 })
 
 test('WHAT[PROC-007] PORT_close_all_kill_failure_propagates', async () => {
-  const exit = unitTaskSource()
+  const exit = exitSignal()
   const port = createPtyPort({ handler: async (_pid, command) => {
     if (command.kind === 'Signal' && command.signal === 'SIGKILL') return failure('no such process')
     return success
   } })
   const pid = forkDefault(port, 'pty-cf')
-  portRegisterExitTask(port, pid, unitTask(exit))
+  portRegisterExitTask(port, pid, exit.promise)
   await assert.rejects(portCloseAll(port, 0), /PTY kill failed for pty-cf: no such process/)
 })
 

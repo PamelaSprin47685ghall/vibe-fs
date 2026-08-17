@@ -42,9 +42,6 @@ const {
   ptyCommandSignal,
   ptyCommandResize,
   ptyCommandSpawn,
-  resultTaskSourceCreate,
-  resultTask,
-  unitTaskSource,
 } = await import('../../../dist/Process/Surface.js')
 
 const id = (value) => ptyId(value)
@@ -202,12 +199,11 @@ test('WHAT[PROC-007] SUPERVISOR_drop_removes_session_and_returns_pending', () =>
 test('WHAT[PROC-003] SUPERVISOR_failPending_resolves_every_tcs_with_the_reason', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-fp0', null)
-  const source = resultTaskSourceCreate()
-  sessionPushPendingTask(session, ptyCommandWrite('write'), source)
+  const parked = sessionPushPendingTask(session, ptyCommandWrite('write'))
   supervisorAdd(supervisor, id('pty-fp0'), session)
   const pending = supervisorTakePending(supervisor, id('pty-fp0'))
   supervisorFailPending(pending, 'PTY exited before command was applied')
-  assert.deepEqual(await resultTask(source), resultError('PTY exited before command was applied'))
+  assert.deepEqual(await parked, resultError('PTY exited before command was applied'))
 })
 
 // ── applyLive ────────────────────────────────────────────────────────────────
@@ -321,8 +317,7 @@ test('WHAT[PROC-001] SUPERVISOR_applyLive_non_write_commands_without_backend_ret
 test('WHAT[PROC-007] SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', () => {
   const supervisor = supervisorCreate()
   const term = fakeTerm(9999)
-  const exit = unitTaskSource()
-  supervisorAttach(supervisor, portWith('pty-at'), id('pty-at'), term, exit)
+  supervisorAttach(supervisor, portWith('pty-at'), id('pty-at'), term)
   const session = supervisorGet(supervisor, id('pty-at'))
   assert.equal(sessionView(session).backend, term)
   assert.equal(sessionView(session).closed, false)
@@ -334,7 +329,7 @@ test('WHAT[PROC-007] SUPERVISOR_attach_registers_live_session_and_forwards_onDat
 test('WHAT[PROC-007] SUPERVISOR_attach_onData_ignored_after_session_closed', () => {
   const supervisor = supervisorCreate()
   const term = fakeTerm(9999)
-  supervisorAttach(supervisor, portWith('pty-ic'), id('pty-ic'), term, unitTaskSource())
+  supervisorAttach(supervisor, portWith('pty-ic'), id('pty-ic'), term)
   const session = supervisorGet(supervisor, id('pty-ic'))
   sessionSetClosed(session, true)
   term.dataCb('late data')
@@ -344,11 +339,10 @@ test('WHAT[PROC-007] SUPERVISOR_attach_onData_ignored_after_session_closed', () 
 test('WHAT[PROC-003] SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session', async () => {
   const supervisor = supervisorCreate()
   const term = fakeTerm(9999)
-  const exit = unitTaskSource()
   const completions = []
   const p = portWith('pty-ex')
   portAddMailboxSender(p, (item) => completions.push(item))
-  supervisorAttach(supervisor, p, id('pty-ex'), term, exit)
+  supervisorAttach(supervisor, p, id('pty-ex'), term)
   term.exitCb({ exitCode: 0 })
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(supervisorTryGet(supervisor, id('pty-ex')), null, 'session dropped')
@@ -362,11 +356,10 @@ test('WHAT[PROC-003] SUPERVISOR_attach_onExit_completes_exit_publishes_closed_an
 test('WHAT[PROC-003] SUPERVISOR_attach_onExit_publishes_residual_output', async () => {
   const supervisor = supervisorCreate()
   const term = fakeTerm(9999)
-  const exit = unitTaskSource()
   const completions = []
   const p = portWith('pty-ro')
   portAddMailboxSender(p, (item) => completions.push(item))
-  supervisorAttach(supervisor, p, id('pty-ro'), term, exit)
+  supervisorAttach(supervisor, p, id('pty-ro'), term)
   term.dataCb('final words')
   term.exitCb({ exitCode: 1 })
   await new Promise((resolve) => setImmediate(resolve))

@@ -146,6 +146,16 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
     return ['surface manifest must be an array']
   }
 
+  // Reject consumer metadata for modules no longer in the manifest. A stale
+  // SURFACE_CONSUMERS entry grants phantom import authority to a surface that
+  // no longer exists.
+  const manifestModules = new Set(manifest.map((entry) => entry?.module).filter(Boolean))
+  for (const consumerModule of Object.keys(SURFACE_CONSUMERS)) {
+    if (!manifestModules.has(consumerModule)) {
+      fail(`${consumerModule}: stale SURFACE_CONSUMERS entry for unregistered module`)
+    }
+  }
+
   for (const entry of manifest) {
     if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
       fail('manifest entry must be an object')

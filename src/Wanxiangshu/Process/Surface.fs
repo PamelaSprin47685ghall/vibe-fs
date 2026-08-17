@@ -79,12 +79,6 @@ module ProcessSurface =
     type private PendingHandle(entries: (PtyCommand * TaskCompletionSource<Result<unit, string>> option) list) =
         member _.Entries = entries
 
-    type internal UnitTaskHandle(source: TaskCompletionSource<unit>) =
-        member _.Source = source
-
-    type internal ResultTaskHandle(source: TaskCompletionSource<Result<unit, string>>) =
-        member _.Source = source
-
     type private PendingEntryHandle(command: PtyCommand, completion: TaskCompletionSource<Result<unit, string>> option)
         =
         member _.Command = command
@@ -981,31 +975,16 @@ module ProcessSurface =
     let sessionPushPending (session: obj) (command: obj) : unit =
         (sessionOf session).Pending.Add(ptyCommandOf command, None)
 
-    let sessionPushPendingTask (session: obj) (command: obj) (source: obj) : unit =
-        (sessionOf session)
-            .Pending.Add(ptyCommandOf command, Some((source :?> ResultTaskHandle).Source))
+    /// Enqueue a pending command with a settleable completion (EXEC-015).
+    /// Returns a JS-native Promise that resolves to { ok: true } on success
+    /// or { ok: false, error } on failure. The TCS is internal: callers
+    /// never construct or inspect Fable task sources.
+    let sessionPushPendingTask (session: obj) (command: obj) : Task<obj> =
+        let tcs = TaskCompletionSource<Result<unit, string>>()
+        (sessionOf session).Pending.Add(ptyCommandOf command, Some tcs)
 
-    /// Deferred unit signal — a settleable Task<unit> wrapper (EXEC-011).
-    /// supervisorAttach and portRegisterExitTask consume the task; the caller
-    /// resolves it via unitTaskResolve when the physical exit is observed.
-    let unitTaskSource () : obj =
-        UnitTaskHandle(TaskCompletionSource<unit>()) :> obj
-
-    let unitTaskResolve (source: obj) : unit =
-        (source :?> UnitTaskHandle).Source.SetResult()
-
-    let unitTask (source: obj) : Task =
-        (source :?> UnitTaskHandle).Source.Task :> Task
-
-    /// Deferred result signal — a settleable Task<Result<unit, string>> wrapper.
-    /// sessionPushPendingTask consumes the source; resultTask awaits the
-    /// outcome as a plain JS { ok, error? } object.
-    let resultTaskSourceCreate () : obj =
-        ResultTaskHandle(TaskCompletionSource<Result<unit, string>>()) :> obj
-
-    let resultTask (source: obj) : Task<obj> =
         task {
-            let! value = (source :?> ResultTaskHandle).Source.Task
+            let! value = tcs.Task
 
             match value with
             | Ok() -> return box {| ok = true |}
@@ -1065,13 +1044,17 @@ module ProcessSurface =
         }
 
 
-    let supervisorAttach (supervisor: obj) (port: obj) (id: obj) (term: obj) (exitTask: obj) : unit =
+    /// Attach a live terminal to a supervisor session (EXEC-015).
+    /// The exit completion source is created internally — callers pass only
+    /// the terminal handle. The supervisor owns the full exit lifecycle.
+    let supervisorAttach (supervisor: obj) (port: obj) (id: obj) (term: obj) : unit =
+        let exitTcs = TaskCompletionSource<unit>()
         PtySupervisor.attach
             (supervisorOf supervisor)
             (ptyPortOf port)
             (ptyIdOf id)
             term
-            (exitTask :?> UnitTaskHandle).Source
+            exitTcs
 
     let spoolReadPath (path: string) : Task<obj array> =
         let chunks = ResizeArray<obj>()
