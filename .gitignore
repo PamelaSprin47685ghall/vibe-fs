@@ -46,3 +46,8 @@ Thumbs.db
 # Local deepwork state
 .slim/deepwork/
 .omo/
+
+# Local scan artifacts
+/local/
+/local:/
+scripts/deadcode-scan.mjs
