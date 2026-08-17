@@ -30,24 +30,13 @@ module PackageResources =
     [<Import("statSync", "node:fs")>]
     let private statSync (path: string) : obj = jsNative
 
-    [<Import("fileURLToPath", "node:url")>]
-    let private fileURLToPath (url: string) : string = jsNative
-
-    [<Import("dirname", "node:path")>]
-    let private dirname (path: string) : string = jsNative
-
     [<Import("join", "node:path")>]
     let private pathJoin (a: string, b: string) : string = jsNative
-
-    [<Emit("import.meta.url")>]
-    let private importMetaUrl: string = jsNative
 
     [<Emit("$0.isDirectory()")>]
     let private statsIsDirectory (stats: obj) : bool = jsNative
 
-    let private packageRoot () =
-        let here = dirname (fileURLToPath importMetaUrl)
-        pathJoin (pathJoin (here, ".."), "..")
+    let private packageRoot = PackageMetadata.packageRoot
 
     let private resourcesRoot () = pathJoin (packageRoot (), "resources")
 

@@ -136,30 +136,25 @@ test('WHAT[EPI-003] full_co_yield_path_preserves_grounded_epistemic_basis', () =
   assert.equal(answered.answer.synthesis.findingKeys[0], 'finding:anthocyanin')
 })
 
-test('WHAT[EPI-004] mcp_server_surface_is_exactly_start_and_resume', async () => {
+test('WHAT[EPI-013] mcp_server_surface_exposes_phase_tools_and_legacy_resume', async () => {
   const server = mcpServer(createStore())
-  assert.ok('start' in server._registeredTools)
-  assert.ok('resume' in server._registeredTools)
-  assert.equal(Object.getOwnPropertyNames(server._registeredTools).length, 2)
+  for (const name of ['start', 'assess', 'propose', 'investigate', 'synthesize', 'status', 'cancel']) {
+    assert.ok(name in server._registeredTools, `missing tool ${name}`)
+  }
+  assert.ok('resume' in server._registeredTools, 'legacy resume must remain for compatibility')
+  assert.match(server._registeredTools.resume.description, /^Legacy compatibility tool/)
 
-  const started = JSON.parse(
-    (await server._registeredTools.start.handler({ question: '明天白银会涨吗？' })).content[0].text,
-  )
-  assert.equal(started.status, 'yield')
-  assert.equal(started.request.type, 'SemanticAssessmentRequest')
+  const started = await server._registeredTools.start.handler({ question: '明天白银会涨吗？' })
+  assert.equal(started.structuredContent.status, 'yield')
+  assert.equal(started.structuredContent.nextTool, 'assess')
+  assert.equal(started.structuredContent.request.type, 'SemanticAssessmentRequest')
 
-  const resumed = JSON.parse(
-    (
-      await server._registeredTools.resume.handler({
-        handle: started.handle,
-        observation: {
-          type: 'SemanticAssessment',
-          forms: { Polar: 0.9, Other: 0.1 },
-          facets: { predictive: 1 },
-        },
-      })
-    ).content[0].text,
-  )
-  assert.equal(resumed.handle, started.handle)
-  assert.equal(resumed.request.type, 'GenerateCandidatesRequest')
+  const assessed = await server._registeredTools.assess.handler({
+    handle: started.structuredContent.handle,
+    forms: { Polar: 0.9, Other: 0.1 },
+    facets: { predictive: 1 },
+  })
+  assert.equal(assessed.structuredContent.handle, started.structuredContent.handle)
+  assert.equal(assessed.structuredContent.nextTool, 'propose')
+  assert.equal(assessed.structuredContent.request.type, 'GenerateCandidatesRequest')
 })

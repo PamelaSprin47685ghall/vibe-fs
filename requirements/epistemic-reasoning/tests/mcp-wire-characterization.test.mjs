@@ -3,33 +3,43 @@ import assert from 'node:assert/strict'
 
 import { createStore, start, resume, state, mcpServer } from '../../../dist/Sphinx/Surface.js'
 
-test('WHAT[EPI-001] start_yield_wire_format_has_content_text_json', async () => {
+test('WHAT[EPI-001] start_yield_returns_structured_content_with_next_tool', async () => {
   const server = mcpServer(createStore())
   const result = await server._registeredTools.start.handler({ question: '花青素合成是否解释红色？' })
 
+  assert.equal(result.isError, undefined)
   assert.equal(result.content[0].type, 'text')
+  assert.match(result.content[0].text, /Next tool: assess/)
 
-  const parsed = JSON.parse(result.content[0].text)
-  assert.equal(parsed.status, 'yield')
-  assert.equal(typeof parsed.handle, 'string')
-  assert.ok(parsed.handle.length > 0)
-  assert.equal(parsed.request.type, 'SemanticAssessmentRequest')
+  const structured = result.structuredContent
+  assert.equal(structured.status, 'yield')
+  assert.equal(typeof structured.handle, 'string')
+  assert.ok(structured.handle.length > 0)
+  assert.equal(structured.revision, 0)
+  assert.equal(structured.nextTool, 'assess')
+  assert.equal(structured.request.type, 'SemanticAssessmentRequest')
+  assert.equal(structured.answer, null)
 })
 
-test('WHAT[EPI-004] error_wire_format_has_status_and_error_string', async () => {
+test('WHAT[EPI-004] wrong_phase_returns_typed_error_without_structured_content', async () => {
   const server = mcpServer(createStore())
   const started = await server._registeredTools.start.handler({ question: '花青素合成是否解释红色？' })
-  const handle = JSON.parse(started.content[0].text).handle
+  const handle = started.structuredContent.handle
 
-  const result = await server._registeredTools.resume.handler({
+  const result = await server._registeredTools.synthesize.handler({
     handle,
-    observation: { type: 'Synthesis', text: 'wrong type', findingKeys: [] },
+    text: 'wrong phase',
+    findingKeys: [],
   })
 
-  const parsed = JSON.parse(result.content[0].text)
-  assert.equal(parsed.status, 'error')
-  assert.equal(typeof parsed.error, 'string')
-  assert.ok(parsed.error.length > 0)
+  assert.equal(result.isError, true)
+  assert.equal(result.structuredContent, undefined)
+  assert.equal(result._meta.tool, 'synthesize')
+  assert.equal(result._meta.error.code, 'KERNEL_REJECTED')
+  assert.equal(result._meta.error.expectedTool, 'assess')
+  assert.equal(result._meta.error.revision, 0)
+  assert.equal(result._meta.error.handle, handle)
+  assert.match(result.content[0].text, /KERNEL_REJECTED/)
 })
 
 test('WHAT[EPI-004] kernel_reject_does_not_advance_revision', () => {
@@ -48,92 +58,76 @@ test('WHAT[EPI-004] kernel_reject_does_not_advance_revision', () => {
   assert.equal(afterState.revision, revisionBefore)
 })
 
-test('WHAT[EPI-002] answered_wire_format_has_status_and_answer', async () => {
+test('WHAT[EPI-002] answered_returns_structured_answer_and_null_next_tool', async () => {
   const server = mcpServer(createStore())
+  const tools = server._registeredTools
 
-  const started = JSON.parse(
-    (await server._registeredTools.start.handler({ question: '花儿为什么这样红？' })).content[0].text,
-  )
-  const handle = started.handle
+  const started = await tools.start.handler({ question: '花儿为什么这样红？' })
+  const handle = started.structuredContent.handle
 
-  await server._registeredTools.resume.handler({
+  const assessed = await tools.assess.handler({
     handle,
-    observation: {
-      type: 'SemanticAssessment',
-      forms: { Why: 0.8, How: 0.2 },
-      facets: { causal: 0.9, explanatory: 1 },
-    },
+    forms: { Why: 0.8, How: 0.2 },
+    facets: { causal: 0.9, explanatory: 1 },
+  })
+  assert.equal(assessed.structuredContent.nextTool, 'propose')
+
+  const proposed = await tools.propose.handler({
+    handle,
+    items: [
+      {
+        method: 'CausalMechanism',
+        question: '花青素合成及其光谱吸收是否解释红色？',
+        semanticKey: 'question:anthocyanin',
+        dependencyKey: 'source:pigment-study',
+        expectedRootGain: 0.95,
+        cost: 0.2,
+      },
+    ],
+  })
+  assert.equal(proposed.structuredContent.nextTool, 'investigate')
+  const actionId = proposed.structuredContent.request.action.id
+
+  const investigated = await tools.investigate.handler({
+    handle,
+    actionKey: actionId,
+    findings: [
+      {
+        semanticKey: 'finding:anthocyanin',
+        text: '花青素的吸收谱与组织酸碱环境共同决定可见红色。',
+        evidenceKeys: ['evidence:pigment-study'],
+        provenance: ['investigation:pigment'],
+      },
+    ],
+    evidence: [
+      {
+        semanticKey: 'evidence:pigment-study',
+        proposition: '独立色素研究支持花青素机制。',
+        source: { id: 'pigment-study', kind: 'document' },
+        dependencyKey: 'pigment-study',
+        provenance: ['document:pigment-study'],
+      },
+    ],
+  })
+  assert.equal(investigated.structuredContent.status, 'yield')
+
+  const regenerated = await tools.propose.handler({ handle, items: [] })
+  assert.equal(regenerated.structuredContent.nextTool, 'synthesize')
+
+  const answered = await tools.synthesize.handler({
+    handle,
+    text: '现有证据支持以花青素机制解释红色，同时保留环境条件作为边界。',
+    findingKeys: ['finding:anthocyanin'],
+    uncertainties: [],
   })
 
-  const proposed = JSON.parse(
-    (
-      await server._registeredTools.resume.handler({
-        handle,
-        observation: {
-          type: 'Candidates',
-          items: [
-            {
-              method: 'CausalMechanism',
-              question: '花青素合成及其光谱吸收是否解释红色？',
-              semanticKey: 'question:anthocyanin',
-              dependencyKey: 'source:pigment-study',
-              expectedRootGain: 0.95,
-              cost: 0.2,
-            },
-          ],
-        },
-      })
-    ).content[0].text,
-  )
-
-  await server._registeredTools.resume.handler({
-    handle,
-    observation: {
-      type: 'Investigation',
-      actionKey: proposed.request.action.id,
-      findings: [
-        {
-          semanticKey: 'finding:anthocyanin',
-          text: '花青素的吸收谱与组织酸碱环境共同决定可见红色。',
-          evidenceKeys: ['evidence:pigment-study'],
-          provenance: ['investigation:pigment'],
-        },
-      ],
-      evidence: [
-        {
-          semanticKey: 'evidence:pigment-study',
-          proposition: '独立色素研究支持花青素机制。',
-          source: { id: 'pigment-study', kind: 'document' },
-          dependencyKey: 'pigment-study',
-          provenance: ['document:pigment-study'],
-        },
-      ],
-    },
-  })
-
-  await server._registeredTools.resume.handler({
-    handle,
-    observation: { type: 'Candidates', items: [] },
-  })
-
-  const answered = JSON.parse(
-    (
-      await server._registeredTools.resume.handler({
-        handle,
-        observation: {
-          type: 'Synthesis',
-          text: '现有证据支持以花青素机制解释红色，同时保留环境条件作为边界。',
-          findingKeys: ['finding:anthocyanin'],
-          uncertainties: [],
-        },
-      })
-    ).content[0].text,
-  )
-
-  assert.equal(answered.status, 'answered')
-  assert.equal(answered.handle, handle)
-  assert.ok(answered.answer.question)
-  assert.ok(answered.answer.contract)
-  assert.ok(answered.answer.epistemicBasis)
-  assert.equal(typeof answered.answer.revision, 'number')
+  assert.equal(answered.isError, undefined)
+  assert.equal(answered.structuredContent.status, 'answered')
+  assert.equal(answered.structuredContent.handle, handle)
+  assert.equal(answered.structuredContent.nextTool, null)
+  assert.equal(answered.structuredContent.request, null)
+  assert.ok(answered.structuredContent.answer.question)
+  assert.ok(answered.structuredContent.answer.contract)
+  assert.ok(answered.structuredContent.answer.epistemicBasis)
+  assert.equal(typeof answered.structuredContent.answer.revision, 'number')
 })
