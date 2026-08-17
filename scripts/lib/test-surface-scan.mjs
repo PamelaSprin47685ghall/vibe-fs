@@ -1364,7 +1364,7 @@ export const SURFACE_MODULES = SURFACE_MANIFEST.map((entry) => entry.module)
 const SURFACE_ALT = SURFACE_MODULES.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
 
 const A_DEEP_IMPORT = new RegExp(
-  `(?:from\\s*|import\\s*\\(\\s*)['"][^'"]*dist/(?!fable_modules)(?!(?:${SURFACE_ALT})['"])[^'"]+\\.js['"]`,
+  `(?:from\\s*|import\\s*\\(\\s*|import\\s+)['"][^'"]*dist/(?!fable_modules)(?!(?:${SURFACE_ALT})['"])[^'"]+\\.js['"]`,
 )
 const B_EXPORT_DISCOVERY = /Object\.(?:keys|entries|values)\(\s*([A-Za-z_$][\w$]*)/
 const B_MANGLED_LOOKUP = /(?:\.startsWith|\.endsWith)\(\s*['"`][^'"`]*(?:__|_[A-Z])/

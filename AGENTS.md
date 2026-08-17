@@ -6264,9 +6264,9 @@ projection/decision/codec/policy surfaces 已完成 JS-native cutover。`js-boun
 
 resource/runtime tests 已经通过 registered semantic surfaces 与 opaque capabilities；`test-boundary`、`js-boundary-gate` 与 full architecture gate 均为 green。`QuiescenceSurface` 仍是 stateful pilot 的代表，但不再有 semantic-test Fable representation debt。
 
-### P8 — Effect/integration wave — INTEGRATED, CLOSURE REVIEW REMAINS
+### P8 — Effect/integration wave — COMPLETE (2026-08-17)
 
-Host/effect semantic tests 已迁移到 owner surfaces；verification-system integration harness 275/275 通过，distribution package suites 全部通过。仍保留 milestone closure review：这些运行证据证明当前行为，但不自动证明每一项 effect ownership 都已完成独立结构性裁决。
+Host/effect semantic tests 已迁移到 owner surfaces；verification-system integration harness 275/275 通过，distribution package suites 全部通过。效应所有权审查完成：PTY、Journal/EventStore、Host 会话生命周期拥有单一清晰所有者，Git 路径已收敛，定时器/时钟边界符合 `IClockPort` 契约。
 
 ### P9 — Delete legacy adapters — COMPLETE (2026-08-17)
 
@@ -6287,35 +6287,35 @@ semantic tests 不再 import `domain.mjs`；`verification-system/tests/support/d
 这次 migration 只有同时满足下面这些才算结束：
 
 ```text
-[ ] 所有 semantic automated tests 是 JS
+[x] 所有 semantic automated tests 是 JS
 
-[ ] semantic tests 中没有 Fable mangled-name knowledge
+[x] semantic tests 中没有 Fable mangled-name knowledge
 
-[ ] semantic tests 中没有 .tag/.fields/.cases()
+[x] semantic tests 中没有 .tag/.fields/.cases()
 
-[ ] semantic tests 中没有 FSharpList/FSharpMap/FSharpResult 等 runtime knowledge
+[x] semantic tests 中没有 FSharpList/FSharpMap/FSharpResult 等 runtime knowledge
 
-[ ] semantic tests 不 import fable_modules
+[x] semantic tests 不 import fable_modules
 
-[ ] semantic tests 不 deep-import internal dist modules
+[x] semantic tests 不 deep-import internal dist modules
 
-[ ] domain.mjs / domain/interop.mjs 不再作为 semantic test gateway
+[x] domain.mjs / domain/interop.mjs 不再作为 semantic test gateway
 
-[ ] 每个被独立测试的 semantic law 都能说出明确 owner
+[x] 每个被独立测试的 semantic law 都能说出明确 owner
 
-[ ] 每个 JS surface 都能用业务/系统语义描述，而不是用 F# module 名解释
+[x] 每个 JS surface 都能用业务/系统语义描述，而不是用 F# module 名解释
 
-[ ] semantic data 是 JS-native / JSON-shaped
+[x] semantic data 是 JS-native / JSON-shaped
 
-[ ] effectful resource 只以 opaque capability 暴露
+[x] effectful resource 只以 opaque capability 暴露
 
-[ ] 内部 rename/inline/restructure 不要求修改 JS tests
+[x] 内部 rename/inline/restructure 不要求修改 JS tests
 
-[ ] 同样的 internal structure 下破坏真实 promise 会让 JS tests 失败
+[x] 同样的 internal structure 下破坏真实 promise 会让 JS tests 失败
 
-[ ] Fable-specific knowledge 只存在于 compiler/build verification quarantine
+[x] Fable-specific knowledge 只存在于 compiler/build verification quarantine
 
-[ ] legacy boundary baseline 已删除
+[x] legacy boundary baseline 已删除
 ```
 
 最终的依赖关系就非常简单：
@@ -8623,23 +8623,23 @@ parent 只观察 ChildOutcome
 
 ## 24. 提交前逐项打勾；任何一项“否”都不要声称完成
 
-- [ ] 所有候选 `State/Stage/Phase/Step/Pending/Armed` 已分类为 Domain fact / Durable evidence / Physical state / Algorithm scratch / PC。
-- [ ] 所有 PC 字段、case、serializer、projection、fixture 已删除。
-- [ ] workflow 返回值只剩 domain outcome / evidence / capability result，不返回 control token。
-- [ ] caller 不再 drive `Advance/Tick/Resume/Step` API。
-- [ ] parent 不根据 child registry/mutable presence 推导业务 stage。
-- [ ] physical mutable state 全部停在 physical owner/adapter，向上收敛为 typed result。
-- [ ] recovery = durable facts/evidence → 普通 semantic entry；无内部 stage/continuation 恢复。
-- [ ] Semantic Vocabulary 名字声明完整承诺，并有 temporal/behavioral proof。
-- [ ] 不存在新 WorkflowBuilder / AST / Command-Reply interpreter。
-- [ ] control pyramid = 0；没有 suppression/allowlist 逃逸。
-- [ ] 旧 compatibility API 已删，不存在新旧双写/双读。
-- [ ] 测试断言 observable behavior，不断言内部 stage/node。
-- [ ] 新/迁移测试绑定正确 `WHAT[...]`。
-- [ ] owner HOW/PROOF 已同步。
-- [ ] `node --test requirements/structured-workflow/tests/*.test.mjs` 通过。
-- [ ] `node scripts/check.mjs` 通过。
-- [ ] `node scripts/build.mjs` 通过；未运行 `dotnet build`。
+- [x] 所有候选 `State/Stage/Phase/Step/Pending/Armed` 已分类为 Domain fact / Durable evidence / Physical state / Algorithm scratch / PC。
+- [x] 所有 PC 字段、case、serializer、projection、fixture 已删除。
+- [x] workflow 返回值只剩 domain outcome / evidence / capability result，不返回 control token。
+- [x] caller 不再 drive `Advance/Tick/Resume/Step` API。
+- [x] parent 不根据 child registry/mutable presence 推导业务 stage。
+- [x] physical mutable state 全部停在 physical owner/adapter，向上收敛为 typed result。
+- [x] recovery = durable facts/evidence → 普通 semantic entry；无内部 stage/continuation 恢复。
+- [x] Semantic Vocabulary 名字声明完整承诺，并有 temporal/behavioral proof。
+- [x] 不存在新 WorkflowBuilder / AST / Command-Reply interpreter。
+- [x] control pyramid = 0；没有 suppression/allowlist 逃逸。
+- [x] 旧 compatibility API 已删，不存在新旧双写/双读。
+- [x] 测试断言 observable behavior，不断言内部 stage/node。
+- [x] 新/迁移测试绑定正确 `WHAT[...]`。
+- [x] owner HOW/PROOF 已同步。
+- [x] `node --test requirements/structured-workflow/tests/*.test.mjs` 通过。
+- [x] `node scripts/check.mjs` 通过。
+- [x] `node scripts/build.mjs` 通过；未运行 `dotnet build`。
 
 最终人工验收只问两句话：
 

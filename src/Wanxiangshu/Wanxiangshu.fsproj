@@ -448,7 +448,6 @@
     <Compile Include="Composition/Turn/TurnReconcile.fs"/>
     <Compile Include="Composition/Turn/ReconcilePass.fs"/>
     <Compile Include="Composition/Turn/Scheduler.fs"/>
-    <Compile Include="Composition/Turn/Supervisor.fs"/>
     <Compile Include="Mission/Review/Judgement/Verdict.fs"/>
     <Compile Include="Mission/Review/Barrier/Reverify.fs"/>
     <Compile Include="Mission/Review/Judgement/Evidence.fs"/>
@@ -534,7 +533,6 @@
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Tool.fs"/>
-    <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Tools.fs"/>
     <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>
     <Compile Include="Repository/Programming/Js/GlobFs.fs"/>
     <Compile Include="Repository/Programming/Js/AnchorFs.fs"/>

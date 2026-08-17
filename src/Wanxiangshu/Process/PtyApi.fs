@@ -13,9 +13,6 @@ open System.Text
 /// required `ManagedAgent` — keeping it would preserve a way to open a PTY without
 /// a managed identity.
 module Pty =
-    [<Literal>]
-    let AgentName = "pty"
-
     let bytes (text: string) = Encoding.UTF8.GetBytes text
 
     let newId () =

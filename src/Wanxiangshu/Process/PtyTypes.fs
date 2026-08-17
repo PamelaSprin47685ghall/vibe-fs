@@ -112,9 +112,6 @@ module PtyOutcome =
     let Closed = "closed"
 
     [<Literal>]
-    let Signalled = "signalled"
-
-    [<Literal>]
     let termToKillGraceMs = 5000
 
 /// Buffered-read plan: unknown id, already in-flight, already closed, or parked.

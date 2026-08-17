@@ -147,8 +147,7 @@ module ChildRun =
     let tryComplete (run: ChildRun) (completion: RunCompletion) : bool = run.Completion.TrySet(completion)
 
 /// The canonical agent program for running a child to its single completion.
-/// This is where `agent {}` is actually invoked by the child/fork production
-/// path; the orphan showcase `AgentProgram` module has been removed.
+/// This is where child flows are executed through AgentProgram and completed.
 module ChildRunProgram =
 
     /// Run `work` and return the resulting RunCompletion.

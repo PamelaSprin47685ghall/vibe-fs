@@ -37,8 +37,6 @@ module Spool =
     let readChunks (path: string) (consume: byte[] -> Task<unit>) : Task<unit> =
         NodeProcessHost.readFileAsyncChunks path ChunkSizeBytes consume
 
-    let streamChunks (path: string) (consume: byte[] -> Task<unit>) : Task<unit> = readChunks path consume
-
     let chunkBytes (chunkSize: int) (bytes: byte[]) : byte[][] =
         if isNull bytes || bytes.Length = 0 then
             [||]

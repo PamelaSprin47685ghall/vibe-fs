@@ -119,10 +119,7 @@ module MagicTodoLocality =
 
         let missingPrefixCount = expectedPrefixCount - capturedPrefixCount
 
-        { Sequence =
-            XTraceProjection.headSequence trace
-            + 1L
-            + int64 missingPrefixCount }
+        { Sequence = XTraceProjection.headSequence trace + 1L + int64 missingPrefixCount }
 
     let private isUnmaterializedPendingStub (part: SessionToolPart) =
         part.State = SnapshotToolPartState.Pending
@@ -198,7 +195,8 @@ module MagicTodoLocality =
 
         match Array.toList partMatches with
         | [ (index, _) ] ->
-            let frontier = pendingReviewFrontier trace message located.ProviderRun located.ToolCallId
+            let frontier =
+                pendingReviewFrontier trace message located.ProviderRun located.ToolCallId
 
             let todowriteCallIds = semanticTodowriteCallIds located.ToolCallId message.ToolParts
 
