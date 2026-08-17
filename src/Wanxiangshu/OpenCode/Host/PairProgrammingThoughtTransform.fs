@@ -142,8 +142,10 @@ module PairProgrammingThoughtTransform =
     let skillContent (body: string) : string =
         let content = if isNull body then "" else body.Trim()
 
-        if content.StartsWith(skillContentPrefix, StringComparison.Ordinal)
-           && content.EndsWith("</skill_content>", StringComparison.Ordinal) then
+        if
+            content.StartsWith(skillContentPrefix, StringComparison.Ordinal)
+            && content.EndsWith("</skill_content>", StringComparison.Ordinal)
+        then
             content
         else
             String.concat "\n" [ skillContentPrefix; content; "</skill_content>" ]
@@ -166,8 +168,7 @@ module PairProgrammingThoughtTransform =
             "DENIED. `skill({ name: \"\" })` is reserved for the injected pair-programming hint and cannot be called or read manually. The real `skill` tool remains available; load only non-empty names from the available skills list."
 
     let private isSkillToolPart (part: obj) : bool =
-        not (isNull part)
-        && (tryUnboxString part?tool |> Option.exists ((=) toolName))
+        not (isNull part) && (tryUnboxString part?tool |> Option.exists ((=) toolName))
 
     let private isReservedSkillToolPart (part: obj) : bool =
         isSkillToolPart part
@@ -274,9 +275,16 @@ module PairProgrammingThoughtTransform =
         idPrefix + digest.Substring(0, 24)
 
     let private buildPairMessage (callId: string) (markerText: string) : obj =
-        let currentSkillWire = markerText.TrimStart().StartsWith(skillContentPrefix, StringComparison.Ordinal)
+        let currentSkillWire =
+            markerText.TrimStart().StartsWith(skillContentPrefix, StringComparison.Ordinal)
+
         let currentToolName = if currentSkillWire then toolName else "-"
-        let input = if currentSkillWire then createObj [ "name", box skillName ] else createObj []
+
+        let input =
+            if currentSkillWire then
+                createObj [ "name", box skillName ]
+            else
+                createObj []
 
         let part =
             createObj
