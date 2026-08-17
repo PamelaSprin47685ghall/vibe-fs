@@ -99,15 +99,17 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
   completed-but-invalid 单调用共用 nudge/repair/AABB/Fallback 决策表（BD-017）。Nudge claim identity 绑定
   exact `BloggerRequestId + ProviderRunIdentity`；transform AABB marker 同时保存 requestKey + target terminal。
   同一 terminal 在任一阶段重放都只投影，不重复发送、不推进预算；只有 nudge 后的下一 invalid terminal
-  才进入 AABB，只有 AABB 后再出现一个新的 invalid terminal 才 fatal。旧 request 的 claim 不参与新 request。
+  才进入 AABB。进入 AABB 后，每个新的 invalid terminal 都推进一次 shared fallback failure；projection 仍可
+  继续则再发送一次 request-scoped AABB，只有 durable fallback exhaustion 才 fatal。旧 request 的 claim 不参与新 request。
 - `HostTurnObserver`：`Role.Blogger` 的 zero-tool idle terminal 不再进入 ordinary
   `MissingClosingReport`。它调用 `InteractionRepairWorkflow.repairBloggerProtocol`：只有 exact live
   `BloggerRequest` 才拥有 repair budget；第一次 invalid terminal 通过 fresh idle permit 发送
   `blogger-missing-tool` nudge；同 terminal 重放幂等；新的 invalid terminal 消费 fresh idle permit，
   `FallbackLedger` 只负责记录 confirmed failure，随后仍必须发送该 request 的 `blogger-aabb` repair——
-  即使这次记账返回 generic `RecoveryExhausted` 也不得抢走 AABB。`blogger-aabb` claim 保留 request id +
-  target terminal；同 terminal 的重复 idle/transform 幂等；只有不同的新 invalid terminal 在该 AABB
-  之后再次出现才终止 Blogger cycle。无 live request 的历史 idle 只观察，不发送。
+  即使首发 AABB 前这次记账返回 generic `RecoveryExhausted` 也不得抢走已经赢得的首发 AABB。`blogger-aabb`
+  claim 保留 request id + target terminal；同 terminal 的重复 idle/transform 幂等；后续不同的新 invalid
+  terminal 再次记 confirmed failure，`RecoveryAdvanced` 才继续下一发 AABB，真实 `RecoveryExhausted`
+  才终止 Blogger cycle。无 live request 的历史 idle 只观察，不发送。
 - cold/reconcile recovery 只从 `SessionMessage.ToolParts` 读取 `ToolName=chronicle` + completed state；
   `MessagePart.ToolResult` 已丢 tool name，禁止用于判断修复是否成功。`ClaimSequences` 只负责 durable
   occasion/audit；probe 还必须核对当前 request-scoped dispatch lifecycle，已 `Abandoned` 的 AABB claim

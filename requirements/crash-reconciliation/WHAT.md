@@ -127,7 +127,7 @@ in-flight），只从 durable 与 Host snapshot 判据得出 `WindowOutcome`；s
 `Unreadable` → `SessionRecovery.Blocked`。`tool-present` 只由 snapshot **最新 assistant** 的具名
 `SessionToolPart` 证明：raw `chronicle` 总数必须恰好 1，且该唯一 part 必须 `Completed`；历史旧
 chronicle、2+ raw chronicle、pending/failed/statusless 都不得把 open request 误判为已 recommit。
-恢复机会经 `HostTurnObserver` 观察，不自行发消息。Blogger protocol 的 AABB 阶段若由 idle 路径实际发出，则以 durable `blogger-aabb` InteractionRepair claim 作为“预算已花掉”的恢复证据；纯 snapshot/transcript 本身不得凭空推导 AABB consumed。
+恢复机会经 `HostTurnObserver` 观察，不自行发消息。Blogger protocol 的某一发 AABB 若由 idle 路径实际发出，则以 durable `blogger-aabb` InteractionRepair claim 作为“该 terminal 的这一发已发送”的恢复证据；它不是整个 fallback budget 已耗尽的证据。纯 snapshot/transcript 本身不得凭空推导 AABB issued/exhausted。
 
 ## CRASH-017：工具中断不恢复；未来 session 续传必须显式
 

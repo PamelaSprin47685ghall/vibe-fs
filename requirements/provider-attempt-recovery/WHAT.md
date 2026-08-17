@@ -86,7 +86,7 @@ FallbackExhausted 之后同一 (LogicalRunId, AuthorityRoot) 再收 Advanced →
 
 ## PAR-008：空 / XML-only terminal 不计入推进
 
-空 terminal 或 XML-only terminal 不是已确认 provider failure：可以进入一次有界 Interaction Repair，但**不得**因此推进 provider fallback cursor 或消耗 provider failure budget。ordinary repair 的 authority budget 由 interaction-authority 定义为同一 LogicalRun + repair family 一次；repair 后仍无可用 terminal 时以 `INTERACTION_REPAIR_EXHAUSTED` 收束该业务 run，而不是继续生成 repair。Blogger exact-one 协议保留自己的 terminal-scoped nudge→AABB→exhaust 状态机。terminal validity 已 resolve 进 `AttemptOutcome`：`CompletedInvalid` 与 `Failed` 分开（`Participant/Provider/Attempt/RecoverySlot.fs`），因为前者是「回应完整但不可用」，后者才是「provider request 已确认失败」。
+空 terminal 或 XML-only terminal 不是已确认 provider failure：可以进入一次有界 Interaction Repair，但**不得**因此推进 provider fallback cursor 或消耗 provider failure budget。ordinary repair 的 authority budget 由 interaction-authority 定义为同一 LogicalRun + repair family 一次；repair 后仍无可用 terminal 时以 `INTERACTION_REPAIR_EXHAUSTED` 收束该业务 run，而不是继续生成 repair。Blogger exact-one 协议保留自己的 terminal-scoped 特例：第一次 invalid terminal 只获得一次 nudge；nudge 后仍 invalid 才开始记 confirmed failure 并进入 request-scoped AABB。首发 AABB 是 Blogger protocol 已赢得的 repair occasion，即使该次记账恰好把 generic cursor 打到 exhausted 也仍发送；此后每个新的 invalid AABB terminal 再推进一次同一 fallback projection，只有 projection 真正 exhausted 才停止继续 AABB 并收束业务 run。terminal validity 已 resolve 进 `AttemptOutcome`：`CompletedInvalid` 与 `Failed` 分开（`Participant/Provider/Attempt/RecoverySlot.fs`），因为前者是「回应完整但不可用」，后者才是「provider request 已确认失败」。
 
 ## PAR-009：Host Attempt 不是领域计数
 

@@ -185,10 +185,36 @@ module InteractionRepairWorkflow =
         (journal: AgentJournal)
         (context: ReconciledTurnContext)
         (requestId: BloggerRequestId)
+        (guaranteedFirstAabb: bool)
         (reason: string)
         : Task =
         task {
             let turn = context.Turn
+
+            let sendAabb () =
+                task {
+                    match!
+                        HostSessionNudge.trySendInteractionRepair
+                            sessionPort
+                            turn.SessionId
+                            EnforcerRepair.RepairInstruction
+                            turn.Directory
+                            (Some journal)
+                            requestId
+                            turn.ProviderRun
+                            BloggerRecoveryProbe.BloggerAabbRepairKind
+                    with
+                    | Ok _ -> ()
+                    | Error error when error.IndexOf("already claimed", System.StringComparison.OrdinalIgnoreCase) >= 0 ->
+                        ()
+                    | Error error -> notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
+                }
+
+            let fallbackStillOpen () =
+                FallbackEvidence.mayContinue
+                    AgentPairCursor.DefaultAutoRecoveryBudget
+                    turn.SessionId
+                    (AgentJournal.snapshot journal)
 
             match!
                 FallbackLedger.recordConfirmedFailure
@@ -201,29 +227,23 @@ module InteractionRepairWorkflow =
             | Error error -> notifyBloggerProtocolFailure eventPort turn error
             | Ok ConfirmedFailureOutcome.NoActiveRun ->
                 notifyBloggerProtocolFailure eventPort turn "blogger AABB has no active logical run"
-            | Ok ConfirmedFailureOutcome.RecoveryExhausted
-            | Ok ConfirmedFailureOutcome.AlreadyRecorded
-            | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
-                // The provider fallback cursor is orthogonal accounting. Reaching
-                // its generic limit on this confirmed failure must not steal the
-                // Blogger request's one protocol AABB send. Blogger exhaustion is
-                // derived only from a prior request-scoped AABB followed by a NEW
-                // invalid terminal.
-                match!
-                    HostSessionNudge.trySendInteractionRepair
-                        sessionPort
-                        turn.SessionId
-                        EnforcerRepair.RepairInstruction
-                        turn.Directory
-                        (Some journal)
-                        requestId
-                        turn.ProviderRun
-                        BloggerRecoveryProbe.BloggerAabbRepairKind
-                with
-                | Ok _ -> ()
-                | Error error when error.IndexOf("already claimed", System.StringComparison.OrdinalIgnoreCase) >= 0 ->
-                    ()
-                | Error error -> notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
+            | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb ->
+                // The nudge failure has already earned one protocol AABB attempt.
+                // A generic fallback boundary reached by this same failure may not
+                // retroactively steal that first send.
+                do! sendAabb ()
+            | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
+                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
+            | Ok ConfirmedFailureOutcome.AlreadyRecorded when guaranteedFirstAabb ->
+                do! sendAabb ()
+            | Ok ConfirmedFailureOutcome.AlreadyRecorded when fallbackStillOpen () ->
+                // A racing observer may have advanced this exact terminal before
+                // the request-scoped AABB claim became visible. The claim itself
+                // dedupes the physical send.
+                do! sendAabb ()
+            | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
+                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
+            | Ok ConfirmedFailureOutcome.RecoveryAdvanced -> do! sendAabb ()
         }
         :> Task
 
@@ -235,11 +255,20 @@ module InteractionRepairWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (requestId: BloggerRequestId)
+        (guaranteedFirstAabb: bool)
         (reason: string)
         : Task =
         match context.Quiescence with
         | Some permit when quiescence.TryConsume permit ->
-            sendBloggerAabbAfterPermitConsumed host sessionPort eventPort journal context requestId reason
+            sendBloggerAabbAfterPermitConsumed
+                host
+                sessionPort
+                eventPort
+                journal
+                context
+                requestId
+                guaranteedFirstAabb
+                reason
         | _ -> AsyncSupport.completedTask ()
 
     let private sendBloggerNudge
@@ -279,6 +308,7 @@ module InteractionRepairWorkflow =
                             journal
                             context
                             requestId
+                            true
                             ("blogger nudge failed: " + error)
         }
         :> Task
@@ -316,13 +346,23 @@ module InteractionRepairWorkflow =
                 eventPort
                 durable
                 requestId
+                true
                 "blogger missing chronicle after interaction nudge"
         | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued issuedRun when
             issuedRun = context.Turn.ProviderRun
             ->
             AsyncSupport.completedTask ()
         | BloggerRecoveryProbe.InvalidTerminalRepairState.AabbRepairIssued _ ->
-            exhaustBloggerProtocol host eventPort durable context "blogger protocol repair exhausted"
+            consumeThenSendBloggerAabb
+                host
+                quiescence
+                context
+                sessionPort
+                eventPort
+                durable
+                requestId
+                false
+                "blogger invalid terminal after AABB"
 
     /// Blogger has a stricter terminal protocol than ordinary agents: prose-only
     /// completion is not a closing report. Idle is the only guaranteed wake after

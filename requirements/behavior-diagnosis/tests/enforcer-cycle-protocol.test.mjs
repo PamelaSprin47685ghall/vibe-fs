@@ -74,12 +74,24 @@ test('WHAT[BD-017] ENFORCER_067_reentry_of_same_terminal_is_idempotent', () => {
   assert.equal(out.run, 'asst-p1')
 })
 
-test('WHAT[BD-017] ENFORCER_068_third_invalid_terminal_exhausts_protocol', () => {
+test('WHAT[BD-017] ENFORCER_068_new_invalid_terminal_after_aabb_continues_while_fallback_budget_remains', () => {
   const out = blog.repairProtocol({
     priorState: 'AabbRepairIssued',
     terminalRun: 'asst-p3',
     repairTerminalRun: 'asst-p2',
     nudgeSucceeded: true,
+  })
+  assert.equal(out.state, 'AabbRepairIssued')
+  assert.equal(out.run, 'asst-p3')
+})
+
+test('WHAT[BD-017] ENFORCER_068_new_invalid_terminal_after_aabb_exhausts_only_with_fallback_exhaustion', () => {
+  const out = blog.repairProtocol({
+    priorState: 'AabbRepairIssued',
+    terminalRun: 'asst-p3',
+    repairTerminalRun: 'asst-p2',
+    nudgeSucceeded: true,
+    fallbackExhausted: true,
   })
   assert.equal(out.state, 'ProtocolExhausted')
   assert.equal(out.run, null)

@@ -442,8 +442,8 @@ module BlogSurface =
                    fatal = "exactly one chronicle call required" |}
 
     /// Bounded repair transition. A pure terminal first receives one nudge;
-    /// only a subsequent different pure terminal may receive AABB, and a third
-    /// invalid terminal exhausts the protocol.
+    /// subsequent different invalid terminals stay in AABB until the shared
+    /// provider fallback budget is actually exhausted.
     let repairProtocol (value: obj) : obj =
         let prior = text value?priorState
         let terminal = text value?terminalRun
@@ -452,6 +452,8 @@ module BlogSurface =
             not (isNullish value?nudgeSucceeded) && unbox<bool> value?nudgeSucceeded
 
         let sameTerminal = text value?repairTerminalRun = terminal
+        let fallbackExhausted =
+            not (isNullish value?fallbackExhausted) && unbox<bool> value?fallbackExhausted
 
         match prior with
         | "NoRecovery" ->
@@ -477,8 +479,12 @@ module BlogSurface =
                 box
                     {| state = "AabbRepairIssued"
                        run = terminal |}
-            else
+            elif fallbackExhausted then
                 box
                     {| state = "ProtocolExhausted"
                        run = null |}
+            else
+                box
+                    {| state = "AabbRepairIssued"
+                       run = terminal |}
         | _ -> box {| state = "NoRecovery"; run = null |}
