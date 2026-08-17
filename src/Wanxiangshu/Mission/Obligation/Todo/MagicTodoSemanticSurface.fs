@@ -154,7 +154,12 @@ module MagicTodoSemanticSurface =
 
                 Some
                     { Identity = identity
-                      TodoWriteId = TodoWriteId.create (text (existing?todoWriteId)) }
+                      TodoWriteId = TodoWriteId.create (text (existing?todoWriteId))
+                      Accepted =
+                        if isNull (existing?accepted) then
+                            false
+                        else
+                            unbox<bool> (existing?accepted) }
 
         let localizedCall: AdmissionLocalizedToolCall =
             { ToolCallId = ToolCallId.create (text (localized?toolCallId))
