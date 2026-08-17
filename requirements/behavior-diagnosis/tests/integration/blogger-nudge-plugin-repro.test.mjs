@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as blog from '../../../../dist/Enforcer/BlogSurface.js'
 
-test('WHAT[BD-017] REPRO_blogger_pure_prose_terminal_sends_interaction_nudge_through_real_plugin_transform', () => {
+test('WHAT[BD-017] REPRO_blogger_pure_prose_protocol_records_the_idle_owned_nudge_occasion', () => {
   const first = blog.repairProtocol({ priorState: 'NoRecovery', terminalRun: 'asst-blogger-prose-only', nudgeSucceeded: true })
   assert.equal(first.state, 'InteractionNudgeIssued')
   assert.equal(first.run, 'asst-blogger-prose-only')

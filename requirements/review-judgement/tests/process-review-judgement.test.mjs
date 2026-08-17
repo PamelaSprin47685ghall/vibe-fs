@@ -72,6 +72,25 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_assignment_is_request_range_
   assert.equal(obligation.renderObligationListWire([]), '[]')
 })
 
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_continuation_process_assignment_does_not_replay_opening_authority', () => {
+  const preamble = providerResources.readText(providerLanguage.english, 'lifecycle/magic-todo/process-reviewer-preamble')
+  const message = todo.renderAssignmentUserMessage(preamble, {
+    TodoReviewId: reviewId,
+    TodoWriteId: write,
+    ManagerLifeId: life,
+    OpeningRaw: '',
+    ManagerCheckpointLwr: 'only work since the reviewer last concluded',
+    EffectivePlanComplete: true,
+    OldTodo: [{ name: 'old', work: 'old work' }],
+    ProposedTodo: [{ name: 'next', work: 'next work' }],
+  })
+
+  assert.doesNotMatch(message, /OpeningRaw \(task authority\)/)
+  assert.doesNotMatch(message, /original task authority text/)
+  assert.match(message, /only work since the reviewer last concluded/)
+  assert.match(message, /ManagerCheckpointLWR \(includeOpening=false; frontier-bounded\)/)
+})
+
 test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_a_process_verdict_never_becomes_a_confirmed_witness_by_itself', () => {
   const applied = apply(attempt, 'PERFECT', empty)
   assert.equal(applied.ok, true, applied.ok ? '' : applied.error)

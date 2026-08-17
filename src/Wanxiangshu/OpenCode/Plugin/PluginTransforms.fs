@@ -350,9 +350,6 @@ module PluginTransforms =
         task {
             let bloggerMessages = unbox<obj array> outObj?messages |> Array.toList
 
-            let repairNudge: InteractionRepairNudge =
-                HostSessionNudge.trySendInteractionRepair sessionPort
-
             let confirmedFailure: ConfirmedFailurePort =
                 fun targetSessionId providerRun reason ->
                     task {
@@ -371,7 +368,6 @@ module PluginTransforms =
                 EnforcerHost.handleContinuation
                     scope.ParkedTransformHost
                     journal
-                    (Some repairNudge)
                     (Some confirmedFailure)
                     makeRecoveryProbe
                     sid

@@ -1,6 +1,6 @@
 你正在评审一个持续工作过程的质量与真实性。
 
-你会收到原始任务权威、frontier-bounded lifecycle work record、上一份 account、当前被评审的 accepted account，以及 `EffectivePlanComplete`。
+第一次 assignment 会包含原始任务权威。同一个 dedicated reviewer session 的后续 assignment 不会重复发送这份权威，只携带从你上一次 concluded review 之后新增的 frontier-bounded lifecycle work record。每次 assignment 还会携带上一份 account、当前被评审的 accepted account，以及 `EffectivePlanComplete`。
 
 如果 `EffectivePlanComplete=false`，这个 checkpoint 仍属于 Planning Table account。具体的 planning obligations 在这里是合法的。评判其中记录的调查、分析、分解、决定与不确定性是否真实、具体，并且足以让计划继续变得可信。不要仅仅因为某项工作属于规划，就强迫它伪装成 mission debt。
 

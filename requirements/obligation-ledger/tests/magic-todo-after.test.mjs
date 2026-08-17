@@ -84,6 +84,11 @@ test('WHAT[OBLIGATION-LEDGER-020] persistent process reviewer receives only mana
     /StartInclusive = start[\s\S]{0,160}EndExclusive = reviewFrontier/,
     'manager checkpoint LWR must be the non-overlapping interval [last concluded frontier, current frontier)',
   )
+  assert.match(
+    source,
+    /Option\.isNone magicLife\.LatestConcludedManagerReviewFrontier[\s\S]{0,220}openingRaw journal life/,
+    'only the first process-review assignment may replay OpeningRaw; later continuations already know it',
+  )
 })
 
 test('WHAT[OBLIGATION-LEDGER-020] first T1 review start is frozen before its own commitment can move the global opening floor', () => {

@@ -95,8 +95,10 @@ type CycleCommitOutcome = KnownCommitted | KnownNotCommitted of string | CommitU
 ### 3.3 协调：`src/Wanxiangshu/Session/EnforcerHost.fs` + `EnforcerContinuation.fs`
 
 - `handleContinuation`：薄分发（emptyCallsBranch / commitBranch / firstRequestBranch）。
-- `EnforcerContinuation`：三分支 + `CycleDisposition`；成功提交后 Park 或注入；0/2+ chronicle 与
-  completed-but-invalid 单调用共用 nudge/repair/AABB/Fallback 决策表（BD-017）。Nudge claim identity 绑定
+- `EnforcerContinuation`：三分支 + `CycleDisposition`；成功提交后 Park 或注入；transform **没有物理
+  InteractionRepairNudge capability**。`NoRecovery` invalid terminal 只原样 Project，第一次 nudge 留给 idle owner；
+  `status=error` 且非 interrupted 的 chronicle 同样只 Project，让 Host tool result 驱动 Blogger 自纠。只有
+  nudge 已实际发生之后的新 invalid terminal 才可在 transform 进入 AABB/Fallback。Nudge claim identity 绑定
   exact `BloggerRequestId + ProviderRunIdentity`；transform AABB marker 同时保存 requestKey + target terminal。
   同一 terminal 在任一阶段重放都只投影，不重复发送、不推进预算；只有 nudge 后的下一 invalid terminal
   才进入 AABB。进入 AABB 后，每个新的 invalid terminal 都推进一次 shared fallback failure；projection 仍可

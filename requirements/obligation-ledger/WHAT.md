@@ -434,7 +434,10 @@ adopt；同 session 后续新 Life 禁止再次从 Host TodoTable 反推 seed（
   `TodoReviewConcluded` O(1) 从该 **assigned exact frontier** 推进
   `LatestConcludedManagerReviewFrontier`，下一 checkpoint 的 `ManagerCheckpointLWR` 必须使用
   `[LatestConcludedManagerReviewFrontier, current assigned ManagerReviewFrontier)`；不得每轮从 Opening
-  重放旧工作，也不得扫描 checkpoint history 重建这个起点；
+  重放旧工作，也不得扫描 checkpoint history 重建这个起点。首个 process-review assignment 可携带
+  `OpeningRaw` 作为 reviewer authority bootstrap；同一 dedicated reviewer 已经 concluded 至少一轮后，
+  后续 continuation **不得再次携带 OpeningRaw**，否则即使 `ManagerCheckpointLWR` 本身 bounded，wire 仍
+  会把“从头历史”重复塞给 reviewer；
 - 仅 proven permanent loss 后 `DedicatedTodoReviewerReplaced`（logical id 不变）；不确定 → fail closed；
 - **Finality cohort membership 可 graduate，process-review duty / session 至少保留到
   `LifeCompleted`**——Blessing 或 Finality REVISE 不 Dispose、不丢过程历史（TODO-008/010）。
