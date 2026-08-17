@@ -79,7 +79,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
   const fixtureSource = [
     'import { leak } ',
     'from ',
-    "'../../../../dist/Mission/Finality/Workflow.js'",
+    ["'../../../../", "dist/Mission/Finality/Workflow.js'"].join(''),
     '\nexport const leak = (value) => value.',
     'f',
     'ields[0]\n',
@@ -167,7 +167,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
     writeFileSync(source, 'module Owner.Surface\n')
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
-    writeFileSync(testFile, ['import * as surface ', 'from ', "'../../../dist/Owner/Surface.js'\nvoid surface\n"].join(''))
+    writeFileSync(testFile, ['import * as surface ', 'from ', "'../../../", "dist/Owner/Surface.js'\nvoid surface\n"].join(''))
     const entry = {
       module: 'Owner/Surface.js',
       owner: 'owner',
@@ -384,9 +384,9 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorize
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
     // Authorized: owner dir + matching WHAT tag
-    writeFileSync(ownerTest, "import { value } from '../../../dist/Owner/Surface.js'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n")
+    writeFileSync(ownerTest, ["import { value } from '../../../", "dist/Owner/Surface.js'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n"].join(''))
     // Unauthorized: rogue dir, non-matching WHAT tag, no declared consumer edge
-    writeFileSync(rogueTest, "import { value } from '../../../dist/Owner/Surface.js'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n")
+    writeFileSync(rogueTest, ["import { value } from '../../../", "dist/Owner/Surface.js'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n"].join(''))
 
     const entry = {
       module: 'Owner/Surface.js',

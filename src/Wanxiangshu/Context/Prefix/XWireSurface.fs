@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
@@ -27,6 +28,9 @@ module XWireSurface =
 
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative
+
+    [<Emit("Boolean($0)")>]
+    let private isTruthy (value: obj) : bool = jsNative
 
     let private text (value: obj) : string =
         if isNullish value then "" else string value
@@ -128,10 +132,9 @@ module XWireSurface =
                        syntheticId = c.SyntheticMessageId |}
             |}
 
-    // ── sha256: JS crypto, same as HostDigest.sha256Hex ─────────────────────
+    // ── sha256: exact production owner used by XWire.applyTransform ─────────
 
-    [<Emit("(() => {{ const {{createHash}} = require('node:crypto'); return (v) => createHash('sha256').update(String(v)).digest('hex'); }})()")>]
-    let private sha256Hex (value: string) : string = jsNative
+    let private sha256Hex (value: string) : string = HostDigest.sha256Hex value
 
     // ── The transform decision (mirrors XWire.applyTransform's logic) ───────
     //
@@ -164,7 +167,7 @@ module XWireSurface =
     ///   ok, noop, changed, consumed, promoted, probe, noProbeReason, error, output.
     let transform (input: obj) : obj =
         // ── HOST-BOUNDARY-021: no journal → no-op ──
-        let journal = not (isNullish input?journal)
+        let journal = isTruthy input?journal
 
         if not journal then
             box
@@ -224,7 +227,7 @@ module XWireSurface =
                                output = null |}
                     else
                         // ── HOST-BOUNDARY-020: armed + missing snapshot port → fail-closed ──
-                        let snapshotPort = not (isNullish input?snapshotPort)
+                        let snapshotPort = isTruthy input?snapshotPort
 
                         if not snapshotPort then
                             box
@@ -268,7 +271,7 @@ module XWireSurface =
                                     { currentProjection with
                                         Messages = currentProjection.Messages |> List.truncate cutoff }
 
-                                ProviderProjection.renderSemantic truncated
+                                ProviderProjection.renderSemantic truncated |> sha256Hex
 
                             let probeResult =
                                 if mayRecover then

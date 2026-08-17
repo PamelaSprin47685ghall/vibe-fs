@@ -358,6 +358,9 @@ module Reconciler =
         member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =
             binding.BindContinuationUserMessage(sessionId, physical)
 
+        member _.BindPhysicalUserMaterial(sessionId: SessionId, physical: PhysicalUserMessageId) =
+            binding.BindPhysicalUserMaterial(sessionId, physical)
+
         member _.BindActiveRun(value: ActiveRunBinding) =
             lock gate (fun () -> cleared.Remove(SessionId.value value.SessionId) |> ignore)
             binding.BindActiveRun(value)

@@ -57,8 +57,11 @@ closed（PERSIST-003）。Attached restore 中 journal 关联 id 匹配但 agent
 ## CRASH-006：没有 fresh evidence 就没有自动 effect
 
 恢复闭合后，副作用入口必须持有证明：`FamilyRecoveryPermit`（family 恢复闭合的唯一凭据）才可
-join；`QuiescencePermit` 在发送边界 fresh 才可发 idle-derived continuation（`TryConsume` 失败
-→ Superseded，不写 claim 不发消息）。线性序：permit → join，禁止跳步（EXEC-023）。
+join；`QuiescencePermit` 必须一直保持 fresh 到**最终物理 `SendPrompt` 边界**才可发
+idle-derived continuation。claim durability 先于物理发送，因此 permit 可能在 claim 持久化期间被更新
+material 撤销：此时 `TryConsume` 失败 → typed `Superseded`，已写的 claim 必须收束为
+`Abandoned(SupersededBeforePhysicalSend)`，不得调用 Host `SendPrompt`；若 supersession 更早发生则可在
+claim 前结束。两种情况都不能产生 queued user message。线性序：permit → join，禁止跳步（EXEC-023）。
 
 新的 physical user material 一旦在 `chat.message` 被 Host 接受，就已经否定上一 terminal 的
 idle-send 前提；因此必须在任何异步 routing / ingress / reconcile 之前按 exact

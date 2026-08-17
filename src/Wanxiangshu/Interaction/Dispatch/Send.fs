@@ -381,6 +381,41 @@ module PromptDispatcherSend =
         /// `payloadDigest` is a parameter rather than `sha256 text` computed here,
         /// because FALLBACK-008 needs one continuation kind to digest something
         /// other than its text. See `SendInteractionRepair`.
+        member private this.SendDetachedAdmittedContinuation
+            (key: PromptKey)
+            (sessionId: SessionId)
+            (sendTask: Task<SendOutcome>)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            task {
+                match! this.PersistDetachedInvocation(key, sessionId) with
+                | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
+                | Ok() ->
+                    this.ObserveDetachedSend key sessionId sendTask None
+                    return PromptDispatcher.SendAttemptOutcome.Sent key
+            }
+
+        member private this.SendAdmittedContinuation
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (options: SessionPromptOptions)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (key: PromptKey)
+            : Task<PromptDispatcher.SendAttemptOutcome> =
+            let sendTask = port.SendPrompt(sessionId, text, options)
+
+            let acceptFn physicalId =
+                this.AcceptContinuation key sessionId physicalId
+                |> TaskValue.map (Result.map ignore)
+
+            match awaitMode with
+            | PromptDispatcher.AwaitMode.Detached ->
+                this.SendDetachedAdmittedContinuation key sessionId sendTask
+            | PromptDispatcher.AwaitMode.Await ->
+                awaitPhysicalAwareSend key sendTask (fun outcome ->
+                    this.RecordSendOutcome key sessionId outcome acceptFn)
+                |> TaskValue.map attemptOfResult
+
         member private this.SendClaimedContinuation
             (port: ISessionHostPort)
             (sessionId: SessionId)
@@ -427,24 +462,7 @@ module PromptDispatcherSend =
                     // synchronous neighbours. No await may reopen a window where
                     // newer physical material can arrive after quiescence was
                     // proven but before SendPrompt is invoked.
-                    let sendTask = port.SendPrompt(sessionId, text, options)
-
-                    let acceptFn physicalId =
-                        this.AcceptContinuation key sessionId physicalId
-                        |> TaskValue.map (Result.map ignore)
-
-                    match awaitMode with
-                    | PromptDispatcher.AwaitMode.Detached ->
-                        match! this.PersistDetachedInvocation(key, sessionId) with
-                        | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
-                        | Ok() ->
-                            this.ObserveDetachedSend key sessionId sendTask None
-                            return PromptDispatcher.SendAttemptOutcome.Sent key
-                    | PromptDispatcher.AwaitMode.Await ->
-                        return!
-                            awaitPhysicalAwareSend key sendTask (fun outcome ->
-                                this.RecordSendOutcome key sessionId outcome acceptFn)
-                            |> TaskValue.map attemptOfResult
+                    return! this.SendAdmittedContinuation port sessionId text options awaitMode key
             }
 
         member private this.SendContinuationWithDigestAttempt

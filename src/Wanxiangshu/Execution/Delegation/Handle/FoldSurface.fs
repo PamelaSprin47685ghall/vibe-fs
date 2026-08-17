@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
@@ -196,31 +197,21 @@ module HandleFoldSurface =
     /// `{ ok: false, error: { Fact, Reason } }` (fold rejection) or
     /// `{ ok: false, error: { kind, value } }` (invalid input).
     let foldApply (state: FoldState) (envelopes: obj array) : obj =
-        let mutable current = state.Internal
-        let mutable failed = None
+        let foldEnvelope current envelope =
+            result {
+                let! fact = buildFact envelope?fact
 
-        for envelope in envelopes do
-            match failed with
-            | Some _ -> ()
-            | None ->
-                let factObj = envelope?fact
+                return!
+                    ExecutionFactFold.fold current fact
+                    |> Result.mapError (fun rejection ->
+                        box
+                            {| ok = false
+                               error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |})
+            }
 
-                match buildFact factObj with
-                | Error errorBox -> failed <- Some errorBox
-                | Ok fact ->
-                    match ExecutionFactFold.fold current fact with
-                    | Ok next -> current <- next
-                    | Error rejection ->
-                        failed <-
-                            Some(
-                                box
-                                    {| ok = false
-                                       error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |}
-                            )
-
-        match failed with
-        | Some errorBox -> errorBox
-        | None -> box {| ok = true; state = FoldState current |}
+        match Array.fold (fun folded envelope -> Result.bind (fun current -> foldEnvelope current envelope) folded) (Ok state.Internal) envelopes with
+        | Ok current -> box {| ok = true; state = FoldState current |}
+        | Error errorBox -> errorBox
 
     /// Extract the handle projection for one parent session from a fold state.
     /// Returns a `HandleProjectionState` (from `HandleSurface`) that the

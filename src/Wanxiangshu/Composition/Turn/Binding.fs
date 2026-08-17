@@ -173,6 +173,27 @@ module TurnBinding =
                           Role = None
                           Directory = None })
 
+        /// CRASH-018: the explicit-resume material and the first ordinary
+        /// material that replaces it must move reconciliation's physical cursor
+        /// without minting authority or a continuation identity.
+        member _.BindPhysicalUserMaterial(sessionId: SessionId, physical: PhysicalUserMessageId) =
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                userMessageBindings.[key] <- physical
+
+                match activeBindings.TryGetValue(key) with
+                | true, binding ->
+                    activeBindings.[key] <- { binding with PhysicalUserMessageId = Some physical }
+                | false, _ ->
+                    activeBindings.[key] <-
+                        { SessionId = sessionId
+                          RunId = None
+                          AuthorityRootUserMessageId = None
+                          PhysicalUserMessageId = Some physical
+                          ContinuationMessageIds = Set.empty
+                          Role = None
+                          Directory = None })
+
         /// Register a host-provided active run (e.g. child session start).
         member _.BindActiveRun(binding: ActiveRunBinding) =
             lock gate (fun () ->

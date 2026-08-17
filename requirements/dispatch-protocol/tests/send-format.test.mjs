@@ -146,3 +146,48 @@ test('WHAT[DISPATCH-PROTOCOL-011] PROMPT_006_send_payload_carries_prompt_key_met
     rmSync(base, { recursive: true, force: true })
   }
 })
+
+test('WHAT[DISPATCH-PROTOCOL-002] HOST_004_stale_idle_repair_is_abandoned_at_the_final_physical_send_boundary', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-idle-send-race-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-idle-race', 'rt-idle-race', 4242, '2026-01-01T00:00:00Z')
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const session = 'ses_idle_race'
+      const accepted = await dispatch.acceptHumanRoot(opened.journal, session, 'msg-root', 'fast-blogger')
+      assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
+
+      let sends = 0
+      const port = {
+        SubscribeTerminal: () => ({ Dispose: () => {} }),
+        SendPrompt: async () => {
+          sends += 1
+          return dispatch.admittedWithReceipt('should-not-send')
+        },
+      }
+
+      const outcome = await dispatch.sendIdleContinuation(
+        port,
+        opened.journal,
+        session,
+        'repair stale terminal',
+        'InteractionRepair',
+        accepted.profile,
+        'fast-blogger',
+        false,
+      )
+
+      assert.equal(outcome.outcome, 'Superseded', 'stale final admission must become Superseded, not a send failure')
+      assert.equal(sends, 0, 'superseded idle repair must never invoke the physical Host SendPrompt')
+      assert.equal(outcome.observation, null, 'no physical send means no Host observation is captured')
+
+      const projection = dispatch.projectionObservation(opened.journal, session)
+      assert.equal(projection.pendingClaims.length, 0, 'durable claim must be closed as Abandoned')
+      assert.equal(projection.claimSequences.length, 1, 'abandon preserves the spent exact repair occasion')
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})

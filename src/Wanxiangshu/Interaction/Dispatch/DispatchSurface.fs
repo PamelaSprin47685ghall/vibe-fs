@@ -257,6 +257,76 @@ module DispatchSurface =
                            observation = null |}
         }
 
+    /// HOST-004 / DISPATCH-PROTOCOL-002: exercise the dispatch-owned final
+    /// physical-send admission without exposing Quiescence internals to this
+    /// package's JS tests. Crash-reconciliation proves when the admission turns
+    /// stale; this surface proves that stale evidence closes the durable claim
+    /// and never reaches the Host SendPrompt boundary.
+    let sendIdleContinuation
+        (port: obj)
+        (handle: JournalHandle)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (profile: obj)
+        (effectiveAgent: string)
+        (physicalAdmission: bool)
+        : Task<obj> =
+        task {
+            match PromptAuthority.tryParseContinuationKind continuation, profileOf profile with
+            | Some kind, Ok authorityProfile ->
+                let runtime = PromptDispatcher.forJournal handle.Journal
+                let adapter = PlainSessionPort(port)
+
+                let! outcome =
+                    runtime.SendIdleContinuation
+                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
+                        (SessionId.create session)
+                        text
+                        kind
+                        authorityProfile
+                        effectiveAgent
+                        None
+                        PromptDispatcher.AwaitMode.Await
+                        None
+                        (fun () -> physicalAdmission)
+
+                return
+                    match outcome with
+                    | PromptDispatcher.SendAttemptOutcome.Sent key ->
+                        box
+                            {| outcome = "Sent"
+                               key = PromptKey.value key
+                               error = null
+                               observation = adapter.LastObservation |}
+                    | PromptDispatcher.SendAttemptOutcome.Superseded ->
+                        box
+                            {| outcome = "Superseded"
+                               key = null
+                               error = null
+                               observation = adapter.LastObservation |}
+                    | PromptDispatcher.SendAttemptOutcome.Failed error ->
+                        box
+                            {| outcome = "Failed"
+                               key = null
+                               error = error
+                               observation = adapter.LastObservation |}
+            | None, _ ->
+                return
+                    box
+                        {| outcome = "Failed"
+                           key = null
+                           error = sprintf "Unknown continuation kind: %s" continuation
+                           observation = null |}
+            | _, Error error ->
+                return
+                    box
+                        {| outcome = "Failed"
+                           key = null
+                           error = error
+                           observation = null |}
+        }
+
     let private profileView (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
         box
             {| session = SessionId.value profile.SessionId

@@ -376,6 +376,7 @@
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs"/>
     <Compile Include="OpenCode/Codec/ProviderProjectionSurface.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fs"/>
+    <Compile Include="OpenCode/Host/HostBoundarySurface.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
     <Compile Include="Context/Trace/Capture.fs"/>

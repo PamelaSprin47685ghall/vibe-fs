@@ -583,6 +583,15 @@ module HostSignalBootstrap =
                      | None -> Ok()
                      | Some workspace -> HookDispatcher.ensure workspace)
 
+            let observePhysicalAdmission output sessionId physicalId =
+                scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
+
+                match ExplicitResumeSuppression.observePhysicalMaterial sessionId physicalId output with
+                | ExplicitResumeSuppression.PhysicalMaterialObservation.ExplicitResume
+                | ExplicitResumeSuppression.PhysicalMaterialObservation.ReplacedExplicitResume ->
+                    reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
+                | ExplicitResumeSuppression.PhysicalMaterialObservation.Ordinary -> ()
+
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
@@ -602,8 +611,7 @@ module HostSignalBootstrap =
                             // messages.transform leaves a race where an old idle repair
                             // can enqueue after this message is accepted and supersede
                             // its model-routing lease before chat.params.
-                            scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
-                            ExplicitResumeSuppression.observePhysicalMaterial sessionId physicalId output
+                            observePhysicalAdmission output sessionId physicalId
                         | _ -> ()
 
                         // EMR-009 / PROMPT-006: route from typed authority evidence.

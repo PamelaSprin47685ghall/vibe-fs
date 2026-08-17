@@ -32,6 +32,11 @@ Claimed → Submitted → Abandoned
 `Submitted` 保持 claim pending（只记 receipt），`PhysicalAccepted` 才解决它；`Abandoned` 是终局，
 不改 Active Logical Run，同 PromptKey 不再重发。
 
+idle-derived continuation 的 quiescence gate 位于 claim durability **之后**、Host `SendPrompt` **之前**。
+若新 physical material 在 claim 已写但物理发送尚未发生时 supersede 该 idle occasion，则必须走
+`Claimed → Abandoned(SupersededBeforePhysicalSend)`；这是 known-not-sent，不得伪装成 transport
+failure、Submitted 或 PhysicalAccepted，也不得调用真实 Host port。
+
 - 含义：claim 先于发送持久化（durability 是 sequencing 前提）；`acceptanceCallback` 只在
   PhysicalAccepted 后触发。
 - 证据：→ PROOF.md R1。

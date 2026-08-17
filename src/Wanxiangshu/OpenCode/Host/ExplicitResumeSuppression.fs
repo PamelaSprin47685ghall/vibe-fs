@@ -15,6 +15,12 @@ open Wanxiangshu.Foundation.Identity
 /// No session-end/idle/abort signal is required for correctness.
 module ExplicitResumeSuppression =
 
+    [<RequireQualifiedAccess>]
+    type PhysicalMaterialObservation =
+        | ExplicitResume
+        | ReplacedExplicitResume
+        | Ordinary
+
     [<Literal>]
     let MetadataKey = "wanxiangshu_explicit_resume"
 
@@ -36,14 +42,25 @@ module ExplicitResumeSuppression =
     /// chat.message is the physical-material boundary. Same marked material keeps
     /// its suppression across provider retries; a later ordinary user material on
     /// the same SessionId removes it immediately.
-    let observePhysicalMaterial (sessionId: SessionId) (physicalId: PhysicalUserMessageId) (output: obj) : unit =
+    let observePhysicalMaterial
+        (sessionId: SessionId)
+        (physicalId: PhysicalUserMessageId)
+        (output: obj)
+        : PhysicalMaterialObservation =
         lock gate (fun () ->
             let sessionKey = SessionId.value sessionId
+            let marked = outputHasMarker output
+            let hadMarked = markedPhysicalBySession.ContainsKey sessionKey
 
-            if outputHasMarker output then
+            if marked then
                 markedPhysicalBySession.[sessionKey] <- PhysicalUserMessageId.value physicalId
             else
-                markedPhysicalBySession.Remove sessionKey |> ignore)
+                markedPhysicalBySession.Remove sessionKey |> ignore
+
+            match marked, hadMarked with
+            | true, _ -> PhysicalMaterialObservation.ExplicitResume
+            | false, true -> PhysicalMaterialObservation.ReplacedExplicitResume
+            | false, false -> PhysicalMaterialObservation.Ordinary)
 
     let isPhysicalMaterial (sessionId: SessionId) (physicalId: PhysicalUserMessageId) : bool =
         lock gate (fun () ->

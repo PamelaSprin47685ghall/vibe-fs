@@ -898,6 +898,22 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'OpenCode/Host/HostBoundarySurface.js',
+    owner: 'host-boundary',
+    laws: [
+      'HOST-BOUNDARY-006',
+      'HOST-BOUNDARY-008',
+      'HOST-BOUNDARY-009',
+      'HOST-BOUNDARY-011',
+      'HOST-BOUNDARY-012',
+      'HOST-BOUNDARY-017',
+      'HOST-BOUNDARY-019',
+    ],
+    source: 'src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'OpenCode/Host/SessionsSurface.js',
     owner: 'session-ontology',
     laws: ['SESSION-ONTOLOGY-006'],
