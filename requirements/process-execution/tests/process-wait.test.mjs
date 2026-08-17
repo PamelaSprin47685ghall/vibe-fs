@@ -4,9 +4,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 const { create: createDeadline } = await import('../../../dist/Process/DeadlineSurface.js')
-const { killAckGraceMs } = await import('../../../dist/Process/Surface.js')
-const { mockWaitChild } = await import('../../../dist/Process/TestSurface.js')
 const {
+  killAckGraceMs,
+  childCreate,
   childExit,
   childView,
   waitForExit,
@@ -28,7 +28,7 @@ const expired = () => createDeadline('2000-01-01T00:00:00Z', 1)
 const killCount = (child) => childView(child).killCount
 
 test('WHAT[PROC-003] EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill', async () => {
-  const child = mockWaitChild(undefined)
+  const child = childCreate(undefined)
   const deadline = createDeadline(nowIso(), 5_000)
   const wait = waitForExit(child, deadline, createCancellationToken(false))
 
@@ -41,7 +41,7 @@ test('WHAT[PROC-003] EXEC_011_A_natural_exit_before_deadline_returns_code_withou
 
 test('WHAT[PROC-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
   let child
-  child = mockWaitChild(() => {
+  child = childCreate(() => {
     setTimeout(() => childExit(child, 137), 15)
   })
   const wait = waitForExit(child, expired(), createCancellationToken(false))
@@ -56,7 +56,7 @@ test(
   { timeout: 15_000 },
   async () => {
     assert.equal(killAckGraceMs, 1_000)
-    const child = mockWaitChild(undefined)
+    const child = childCreate(undefined)
     const wait = waitForExit(child, expired(), createCancellationToken(false))
 
     const outcome = await within(wait, 5_000, 'kill-ack timeout')
@@ -66,7 +66,7 @@ test(
 )
 
 test('WHAT[PROC-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit', async () => {
-  const child = mockWaitChild(undefined)
+  const child = childCreate(undefined)
   const deadline = createDeadline(nowIso(), 60_000)
   const token = createCancellationToken(false)
   const wait = waitForExit(child, deadline, token)

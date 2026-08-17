@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-import { SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
+import { SURFACE_CONSUMERS, SURFACE_MANIFEST } from '../lib/test-surface-scan.mjs'
 import { walk } from '../lib/walk.mjs'
 
 export const WHAT_ID = /^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\b/gm
@@ -18,6 +18,16 @@ export const WHAT_ID = /^#{1,6}\s+([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\b
 const normalize = (path) => path.replace(/\\/g, '/')
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const read = (root, path) => readFileSync(join(root, path), 'utf8')
+
+/** Extract the requirements package slug from a test file path. */
+const packageOfTestFile = (file, requirementsRoot) => {
+  const rel = normalize(file).replace(normalize(requirementsRoot) + '/', '')
+  const segments = rel.split('/')
+  return segments.length > 1 && segments[1] === 'tests' ? segments[0] : null
+}
+
+/** Render a path relative to root for error messages. */
+const relativePath = (file, root) => normalize(file).replace(normalize(root) + '/', '')
 
 const WHAT_TAG = /WHAT\[([A-Z][A-Z0-9-]*-\d{3}(?:[A-Z]|-[A-Z0-9]+)?)\]/g
 
@@ -206,19 +216,43 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
 
     const importedBy = typeof entry.module === 'string' ? testSources.filter(({ source }) => importsSurface(source, entry.module)) : []
     const activeBy = typeof entry.module === 'string' ? testSources.filter(({ source }) => usesSurface(source, entry.module)) : []
-    const authorizedBy = activeBy.filter(({ file, source }) => {
+    const consumerPackages = new Set(
+      typeof entry.module === 'string' && Array.isArray(SURFACE_CONSUMERS[entry.module]) ? SURFACE_CONSUMERS[entry.module] : [],
+    )
+
+    /** A consumer is authorized when it carries a surface law WHAT tag and
+     * lives under the law owner's tests directory, or when its package is
+     * declared as an explicit cross-owner consumer. */
+    const isAuthorizedConsumer = ({ file, source }) => {
       const sourceLaws = new Set(whatIds(source))
-      return laws.some((law) => {
+      const lawAuthorized = laws.some((law) => {
         const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
         return sourceLaws.has(law) && file.startsWith(`${requirements}/${lawOwner}/tests/`)
       })
-    })
+      if (lawAuthorized) return true
+      const pkg = packageOfTestFile(file, requirements)
+      return pkg !== null && consumerPackages.has(pkg)
+    }
+
+    const authorizedBy = activeBy.filter(isAuthorizedConsumer)
     if (typeof entry.module === 'string' && importedBy.length === 0) {
       fail(`${label}: no .test.mjs imports the registered surface`)
     } else if (typeof entry.module === 'string' && activeBy.length === 0) {
       fail(`${label}: surface import has no active executable use in a .test.mjs`)
     } else if (typeof entry.module === 'string' && authorizedBy.length === 0) {
       fail(`${label}: no active contract test WHAT law authorizes this surface`)
+    }
+
+    // Per-consumer rejection: every active import must be law-authorized or
+    // declared as an explicit cross-owner consumer. An unrelated test that
+    // merely imports the surface is a false green, not proof.
+    if (typeof entry.module === 'string') {
+      for (const consumer of activeBy) {
+        if (!isAuthorizedConsumer(consumer)) {
+          const pkg = packageOfTestFile(consumer.file, requirements) ?? '?'
+          fail(`${label}: unauthorized active import from ${relativePath(consumer.file, root)} (package ${pkg} has no law or declared consumer edge)`)
+        }
+      }
     }
   }
   return failures

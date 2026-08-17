@@ -66,8 +66,10 @@ quarantine——scanner（PR 1）覆盖整个 semantic-test zone，`js-boundary-
 
 ## domain.mjs 退场
 
-当前 `requirements/verification-system/tests/support/domain.mjs` 是大量测试的
-anti-corruption boundary，Fable mechanics 在 `domain/interop.mjs`。退场分四步：
+`requirements/verification-system/tests/support/domain.mjs` 曾是大量测试的
+anti-corruption boundary，Fable mechanics 在 `domain/interop.mjs`。退场已完成：文件已删除，
+semantic tests 现在直接消费 registered owner surface，不再经中央 facade。退场分四步
+（历史记录）：
 
 ```text
 1. 冻结：no new imports from domain.mjs（P2 gate 的 baseline 只减不增）
@@ -77,7 +79,7 @@ anti-corruption boundary，Fable mechanics 在 `domain/interop.mjs`。退场分�
 4. 最后删除普通测试可见的 caseOf/payloadOf/toList/listItems/mapEntries/resultOf/unwrapOption
 ```
 
-删除 helpers 不因为它们写得不好——它们成功完成了迁移任务，以后普通测试已到不了危险区域。
+删除 helpers 不因为它们写得不好——它们成功完成了迁移任务，普通测试已到不了危险区域。
 
 ## package-local contract 冻结（TASK.md §PR 3）
 
@@ -101,4 +103,4 @@ production 时越过 registered surface 直连 internal dist」。
 - 六条宪法来自 Operation Clean Slate（TASK.md P0），非本仓库原创。
 - `SURFACE-001..006` 历史编号在本包收编（见 WHAT 头部）；引用它们的包无需改动。
 - `JS-001..020`（repository-programming HOW 的 js-tools capability 编号）不归本包。
-- 本包不拥有 `domain.mjs` 的实现细节，只拥有「测试到不了 Fable mechanics」这条边。
+- 本包不拥有已删除的 `domain.mjs` 的历史实现细节，只拥有「测试到不了 Fable mechanics」这条边。

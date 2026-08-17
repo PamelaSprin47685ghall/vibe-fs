@@ -162,7 +162,7 @@ facade 层的时区无关性（`requirements/verification-system/tests/domain.me
 
 **规范陈述**：生产代码是 `.fs`；第 1–3 层测试全部是 `.mjs`，直接消费 `dist` 发布产物
 （生产入口与测试入口同一份字节）。Fable 输出形状（`Module_` 前缀、DU tag、FSharpMap）
-隔离在唯一 facade `requirements/verification-system/tests/support/domain.mjs`；测试只经契约面进入（序列化文本、纯
+不出现在语义测试中；测试只经 registered owner surface 进入（序列化文本、纯
 函数、公开 Port、Host hook 对象、发布产物 export）。断言必须比对完整结构或完整序列化
 文本，不得只断言真值。`.mjs` 消费的 `dist` 早于 `.fs` 源时运行器拒绝运行（陈旧产物
 fail closed）。

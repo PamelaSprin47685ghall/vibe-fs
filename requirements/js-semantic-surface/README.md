@@ -52,7 +52,7 @@ tests/      本包拥有的可执行 proof
 - 「怎么证明、如何可红」→ `verification-system`（本包消费其 guarantee）。
 - 「每 assertion 一个 owner」「WHAT 是唯一合同」→ `requirement-system`。
 - 任一产品语义（session/join/finality 等）→ 各产品包；本包只规定测试如何到达它们。
-- `domain.mjs` / `domain/interop.mjs` 的具体实现 → 当前 HOW（迁移载体），退场路径见本包 HOW。
+- `domain.mjs` / `domain/interop.mjs` 的历史实现 → 已删除（退场完成，见本包 HOW）。
 
 ## DEPENDS ON
 

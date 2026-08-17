@@ -6,17 +6,17 @@
 
 | 层 | 模块 | 职责 | 命题 |
 |---|---|---|---|
-| Domain | `src/Wanxiangshu/Domain/MagicTodo.fs` | Obligation / provider input 值对象、纯 validation、identity、纯 decision；不得读 Journal/Host | 001-009/016 |
-| Domain | `src/Wanxiangshu/Domain/MagicTodoFacts.fs` | 只定义已发生事实：Prepared/Accepted/reviewer/legacy seed；不定义 Stage/NextAction | 008/010/012/018/019 |
-| Domain | `src/Wanxiangshu/Domain/MagicTodoObligationCodec.fs` | provider/blob wire codec；外部协议解码，不解释业务流程 | 002/024 |
+| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/Model.fs` | Obligation / provider input 值对象、纯 validation、identity、纯 decision；不得读 Journal/Host | 001-009/016 |
+| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs` | 只定义已发生事实：Prepared/Accepted/reviewer/legacy seed；不定义 Stage/NextAction | 008/010/012/018/019 |
+| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs` | provider/blob wire codec；外部协议解码，不解释业务流程 | 002/024 |
 | Journal | `src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs` | **O(1) 增量积分**：Current、pending review locator、first plan commitment、latest/previous committed checkpoint、dedicated reviewer locator；append 后单步 fold | 010-021 |
 | Journal | `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs` | typed fact codec；boot 时可从 event history 重建 projection，但普通业务查询不得 replay | 008/018 |
-| Application | `src/Wanxiangshu/Application/Manager/ObligationLedgerWorkflow.fs` | **Direct F# `task {}` CE**：读取当前 projection facts → `let!/match` → 调用具名 capabilities → append facts；恢复调用同一入口 | 007-014/018/022/025/026 |
-| Application | `src/Wanxiangshu/Application/Review/TodoProcessReviewProgram.fs` | record-ready / ConsumableReview CE；只读当前投影与 reviewer evidence | 012-014 |
-| Application | `src/Wanxiangshu/Application/Review/DedicatedTodoReviewerRuntime.fs` | dedicated reviewer physical session 的复用/恢复；不拥有 ledger stage | 020 |
-| Infrastructure | `src/Wanxiangshu/Infrastructure/OpenCode/**` | Host hook / schema / JS compatibility effect shell：decode、materialize、调用 Application workflow、回写 result；**不拥有 business sequencing** | 024-026 |
+| Application | `src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs` | **Direct F# `task {}` CE**：读取当前 projection facts → `let!/match` → 调用具名 capabilities → append facts；恢复调用同一入口 | 007-014/018/022/025/026 |
+| Application | `src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs` | record-ready / ConsumableReview CE；只读当前投影与 reviewer evidence | 012-014 |
+| Application | `src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs` | dedicated reviewer physical session 的复用/恢复；不拥有 ledger stage | 020 |
+| Infrastructure | `src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/**` | Host hook / schema / JS compatibility effect shell：decode、materialize、调用 Application workflow、回写 result；**不拥有 business sequencing** | 024-026 |
 
-现有 `Mission/Obligation/Todo/MagicTodoMembrane.fs` 同时混合 Host adapter、Journal I/O、admission 与业务顺序；本次重构目标是把业务 CE 提升到 `Application/Manager/ObligationLedgerWorkflow.fs`，让 Infrastructure hook 只做 effect-shell 适配。若文件名保留，也必须缩退到薄 adapter，不得继续成为第二个 workflow owner。
+现有 `Mission/Obligation/Todo/MagicTodoMembrane.fs` 同时混合 Host adapter、Journal I/O、admission 与业务顺序；本次重构目标是把业务 CE 提升到 `Mission/Obligation/LedgerWorkflow.fs`，让 OpenCode effect shell 只做适配。若文件名保留，也必须缩退到薄 adapter，不得继续成为第二个 workflow owner。
 
 ## 2. Direct CE 与增量 projection 形状（非 normative 摘要）
 

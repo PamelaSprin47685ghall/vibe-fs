@@ -42,12 +42,10 @@ const {
   ptyCommandSignal,
   ptyCommandResize,
   ptyCommandSpawn,
-} = await import('../../../dist/Process/Surface.js')
-const {
   resultTaskSourceCreate,
   resultTask,
   unitTaskSource,
-} = await import('../../../dist/Process/TestSurface.js')
+} = await import('../../../dist/Process/Surface.js')
 
 const id = (value) => ptyId(value)
 const port = () => createPtyPort({})

@@ -506,6 +506,34 @@ module ProcessSurface =
 
     let private childOf (value: obj) = (value :?> ChildHandle).Child
 
+    /// Create a child process handle driven externally (EXEC-011).
+    /// The exit source starts unresolved; childExit resolves it. Kill invokes
+    /// the supplied callback and tracks the call count. A host launcher that
+    /// manages its own process lifecycle uses this to construct the handle it
+    /// returns to runWithHostLauncher.
+    let childCreate (onKill: obj) : obj =
+        let exit = TaskCompletionSource<int>()
+        let exited = ref false
+        let callbacks = ResizeArray<unit -> unit>()
+        // DSL-MUTABLE: resource — child kill count
+        let mutable killCount = 0
+
+        let kill () =
+            killCount <- killCount + 1
+
+            if not (isNullish onKill) then
+                call0 onKill |> ignore
+
+        ChildHandle(
+            { Process = null
+              Exit = exit
+              Kill = kill
+              Exited = exited
+              OnExited = callbacks },
+            (fun () -> killCount)
+        )
+        :> obj
+
     let childExit (child: obj) (code: int) : unit =
         let value = childOf child
         value.Exited.Value <- true
@@ -681,6 +709,26 @@ module ProcessSurface =
 
     let completionView (item: obj) : obj =
         completionViewItem (unbox<PtyJoinItem> item)
+
+    /// Create a standalone PTY completion mailbox (EXEC-015/EXEC-018).
+    /// The mailbox is a bounded FIFO queue of physical PTY facts; publish,
+    /// drain and pending-count are the sole operations a join consumer needs.
+    let completionMailboxCreate () : obj =
+        MailboxHandle(CompletionMailbox(obj ())) :> obj
+
+    let completionMailboxPublishPty (mailbox: obj) (item: obj) : unit =
+        (mailbox :?> MailboxHandle)
+            .Mailbox.PublishPtyCompletion(unbox<PtyJoinItem> item)
+
+    let completionMailboxDrainPty (mailbox: obj) (maxCount: int) : obj array =
+        (mailbox :?> MailboxHandle).Mailbox
+        |> fun value ->
+            value.DrainPtyCompletions maxCount
+            |> List.map completionViewItem
+            |> List.toArray
+
+    let completionMailboxPendingCount (mailbox: obj) : int =
+        (mailbox :?> MailboxHandle).Mailbox.PendingCount
 
     let ptyExited (id: string) (outcome: string) : obj =
         box (
@@ -936,6 +984,33 @@ module ProcessSurface =
     let sessionPushPendingTask (session: obj) (command: obj) (source: obj) : unit =
         (sessionOf session)
             .Pending.Add(ptyCommandOf command, Some((source :?> ResultTaskHandle).Source))
+
+    /// Deferred unit signal — a settleable Task<unit> wrapper (EXEC-011).
+    /// supervisorAttach and portRegisterExitTask consume the task; the caller
+    /// resolves it via unitTaskResolve when the physical exit is observed.
+    let unitTaskSource () : obj =
+        UnitTaskHandle(TaskCompletionSource<unit>()) :> obj
+
+    let unitTaskResolve (source: obj) : unit =
+        (source :?> UnitTaskHandle).Source.SetResult()
+
+    let unitTask (source: obj) : Task =
+        (source :?> UnitTaskHandle).Source.Task :> Task
+
+    /// Deferred result signal — a settleable Task<Result<unit, string>> wrapper.
+    /// sessionPushPendingTask consumes the source; resultTask awaits the
+    /// outcome as a plain JS { ok, error? } object.
+    let resultTaskSourceCreate () : obj =
+        ResultTaskHandle(TaskCompletionSource<Result<unit, string>>()) :> obj
+
+    let resultTask (source: obj) : Task<obj> =
+        task {
+            let! value = (source :?> ResultTaskHandle).Source.Task
+
+            match value with
+            | Ok() -> return box {| ok = true |}
+            | Error error -> return box {| ok = false; error = error |}
+        }
 
     let supervisorCreate () : obj =
         PtySupervisorHandle(PtySupervisor.create ()) :> obj

@@ -53,9 +53,9 @@ later, user Git process (Wanxiangshu may be absent)
 | Domain | `EventEnvelope` / `PayloadRef` / 因果与业务语义 | `GitObjectId` / `RootOid` / `StoreSnapshot` / Git 操作 |
 | Persist | canonical JSON、本地 process NDJSON、payload closure、k-way input、唯一 `CanonicalIntegrator` CE、sync materialization | 领域业务判断、feature-owned history reader、按 domain 拆 backend |
 | HookDispatcher / HookSync / GitGateway | activation-time hook/refspec ensure；独立 Git-hook 进程 transport、writer-file blobification、remote snapshot replace | plugin Load Phase mutation、产品进程主动 fetch/pull/push、Domain reducer、后台同步状态机、第二套业务积分器 |
-| Semantic owner surfaces | `EventStore/CodecSurface`, `EventStore/MergeSurface`, `EventStore/Surface`, `Journal/CodecSurface`, `Journal/FactCodecSurface`, `Journal/Surface`; each names one law family and translates to JS-native values | domain.mjs imports, Fable list/union values, typed-ID constructors, test-side interop facades |
+| Semantic owner surfaces | `EventStore/CodecSurface`, `EventStore/MergeSurface`, `EventStore/Surface`, `Journal/CodecSurface`, `Journal/FactCodecSurface`, `Journal/Surface`; each names one law family and translates to JS-native values | Fable list/union values, typed-ID constructors, test-side interop facades |
 
-红线：`src/Wanxiangshu/Domain/EventStore.fs` 不引用 `Infrastructure`；Git object identity 只存在于
+红线：`src/Wanxiangshu/Persistence/EventStore/` 模块不引用 `OpenCode`/`Process` 物理层；Git object identity 只存在于
 sync membrane；业务模块不能取得 `IEventHistoryReader`/本地 writer 文件路径。
 
 ## 核心机制（逐概念）

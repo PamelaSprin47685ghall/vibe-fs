@@ -1111,14 +1111,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Process/TestSurface.js',
-    owner: 'process-execution',
-    laws: ['PROC-001', 'PROC-006', 'PROC-010'],
-    source: 'src/Wanxiangshu/Process/TestSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
-  {
     module: 'OpenCode/Host/EventsSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-016'],
@@ -1357,6 +1349,81 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
 ]
+
+/**
+ * Explicit cross-owner consumer authorization (JS-SEMANTIC-SURFACE-003).
+ *
+ * A test that actively uses a registered surface must either carry a WHAT tag
+ * from the surface's `laws` and live under the corresponding law owner's
+ * tests directory, or be declared here as an authorized consumer package.
+ * Registration grants no blanket import authority: every cross-owner
+ * dependency is explicit so an unrelated test importing a surface is a hard
+ * failure, not a false green.
+ */
+export const SURFACE_CONSUMERS = {
+  'Change/Surface.js': ['effect-accounting'],
+  'Composition/Turn/ReconcileSurface.js': ['crash-reconciliation', 'structured-workflow'],
+  'Context/Companion/Blogger/BloggerCrashSurface.js': ['context-compression'],
+  'Context/Companion/Blogger/FrameSurface.js': ['context-compression'],
+  'Context/Companion/Blogger/TomlSurface.js': ['context-compression', 'guidance-delivery'],
+  'Context/Companion/CompressionSurface.js': ['context-compression', 'prefix-stability', 'provider-attempt-recovery'],
+  'Context/Companion/FoldSurface.js': ['verification-system'],
+  'Context/Companion/ProjectionSurface.js': ['guidance-delivery'],
+  'Enforcer/BlogSurface.js': ['behavior-diagnosis'],
+  'Enforcer/Surface.js': ['behavior-diagnosis', 'guidance-delivery'],
+  'Execution/Delegation/Fork/ChildRecoverySurface.js': ['crash-reconciliation', 'effect-accounting'],
+  'Execution/Delegation/Fork/OpenCode/JoinSurface.js': ['crash-reconciliation', 'delegation', 'effect-accounting', 'participant-horizon'],
+  'Execution/Delegation/Fork/Surface.js': ['delegation', 'participant-horizon'],
+  'Execution/Delegation/Handle/Surface.js': ['context-compression', 'crash-reconciliation', 'delegation', 'effect-accounting'],
+  'Execution/Delegation/SyncDelegate/Surface.js': ['knowledge-reuse', 'prefix-stability'],
+  'Execution/Session/AssociationSurface.js': ['session-ontology'],
+  'Execution/Session/Wait/Surface.js': ['time-capability'],
+  'Foundation/RolesSurface.js': ['capability-enforcement', 'cognitive-environment', 'repository-programming'],
+  'Interaction/Authority/RuntimeSurface.js': ['delegation', 'dispatch-protocol'],
+  'Interaction/Authority/Surface.js': ['prefix-stability'],
+  'Interaction/Dispatch/DispatchSurface.js': ['degeneration-guard', 'dispatch-protocol'],
+  'Mission/Manager/FinalitySurface.js': ['interaction-authority'],
+  'Mission/Obligation/Todo/MagicTodoLocalitySurface.js': ['host-boundary'],
+  'Mission/Obligation/Todo/MagicTodoMembraneSurface.js': ['host-boundary'],
+  'Mission/Obligation/Todo/MagicTodoSemanticSurface.js': ['host-boundary', 'obligation-ledger', 'prefix-stability', 'work-record'],
+  'Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.js': ['host-boundary'],
+  'Mission/Review/Assurance/Surface.js': ['review-judgement'],
+  'Mission/Review/ReviewTodoSurface.js': ['effect-accounting', 'review-judgement'],
+  'Mission/WorkRecord/OpeningSemanticSurface.js': ['work-record'],
+  'OpenCode/Codec/CanonicalJsonSurface.js': ['prefix-stability'],
+  'OpenCode/Codec/ProviderProjectionSurface.js': ['prefix-stability', 'speculative-investigation'],
+  'OpenCode/Codec/ToolHostSurface.js': ['output-distillation', 'process-execution'],
+  'OpenCode/Host/ManagedAgentConfigSurface.js': ['capability-enforcement', 'external-investigation', 'prefix-stability', 'repository-investigation', 'speculative-investigation'],
+  'OpenCode/Host/ModelRoutingSurface.js': ['host-boundary', 'participant-identity'],
+  'OpenCode/Host/PairProgrammingThoughtSurface.js': ['capability-enforcement', 'guidance-delivery', 'prefix-stability'],
+  'OpenCode/Host/QuiescenceSurface.js': ['managed-session-lifecycle'],
+  'OpenCode/Host/SessionBindingSurface.js': ['host-boundary', 'interaction-authority'],
+  'OpenCode/Tools/ExecutorToolSurface.js': ['output-distillation'],
+  'Participant/Persona/Surface.js': ['participant-identity', 'session-ontology'],
+  'Participant/Provider/Attempt/Fallback/HandleSurface.js': ['provider-attempt-recovery'],
+  'Participant/Provider/Attempt/Fallback/Surface.js': ['verification-system'],
+  'Participant/Provider/Attempt/PlannerSurface.js': ['prefix-stability'],
+  'Participant/Provider/LanguageSurface.js': ['cognitive-environment', 'degeneration-guard', 'guidance-delivery', 'review-judgement'],
+  'Participant/Provider/Projection/Surface.js': ['context-compression', 'interaction-authority', 'prefix-stability', 'speculative-investigation'],
+  'Persistence/EventStore/MergeSurface.js': ['durable-events'],
+  'Persistence/EventStore/Surface.js': ['durable-convergence', 'durable-events', 'effect-accounting', 'knowledge-reuse', 'repository-programming'],
+  'Persistence/Journal/CodecSurface.js': ['verification-system'],
+  'Persistence/Journal/FactCodecSurface.js': ['verification-system'],
+  'Persistence/Journal/ObligationJournalSurface.js': ['host-boundary'],
+  'Persistence/Journal/ReviewJournalSurface.js': ['review-assurance'],
+  'Persistence/Journal/Surface.js': ['degeneration-guard', 'dispatch-protocol', 'durable-events', 'host-boundary', 'obligation-ledger', 'provider-attempt-recovery', 'review-assurance', 'semantic-trace', 'work-record'],
+  'Process/DeadlineSurface.js': ['process-execution', 'verification-system'],
+  'Process/Surface.js': ['causal-wait', 'process-execution'],
+  'Process/TestSurface.js': ['process-execution'],
+  'Repository/Knowledge/Casebook/BookkeeperSurface.js': ['knowledge-reuse'],
+  'Repository/Knowledge/Casebook/IndexSurface.js': ['knowledge-reuse', 'verification-system'],
+  'Repository/Knowledge/Casebook/Surface.js': ['knowledge-reuse'],
+  'Repository/Programming/Js/GeneratorSurface.js': ['repository-programming'],
+  'Repository/Programming/Js/WorkflowSurface.js': ['repository-programming'],
+  'Resources/PromptSurface.js': ['guidance-delivery'],
+  'Strength/Surface.js': ['capability-enforcement', 'prefix-stability'],
+  'Verification/TemporalSurface.js': ['provider-attempt-recovery'],
+}
 
 /** Flat module-path allowlist derived from the manifest (scanner regex input). */
 export const SURFACE_MODULES = SURFACE_MANIFEST.map((entry) => entry.module)

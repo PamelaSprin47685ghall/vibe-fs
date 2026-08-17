@@ -6,7 +6,7 @@
 
 ## Semantic boundary（本包 JS contract）
 
-语义测试只观察 JS-native values；它们不导入 `domain.mjs`、Fable emitted internals 或测试侧
+语义测试只观察 JS-native values；它们不导入 Fable emitted internals 或测试侧
 interop facade。持久资源由 opaque capability 句柄承载，并必须显式 `dispose`：
 
 | owner surface | laws | production source | representation |
