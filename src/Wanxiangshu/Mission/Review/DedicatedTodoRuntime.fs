@@ -559,8 +559,7 @@ module DedicatedTodoReviewerRuntime =
             let! reviewFrontier = managerReviewFrontier journal managerSessionId checkpoint capturedMessages
             let! opening = openingRaw journal managerLife |> TaskResultCE.ofTask
 
-            let! checkpointLwr =
-                managerCheckpointLwr journal managerSessionId managerLife life reviewFrontier
+            let! checkpointLwr = managerCheckpointLwr journal managerSessionId managerLife life reviewFrontier
 
             let request: ProcessReviewRequest =
                 { TodoReviewId = reviewId
