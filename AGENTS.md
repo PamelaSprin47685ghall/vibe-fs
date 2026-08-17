@@ -1711,7 +1711,7 @@ Finality 也是一个明显的真实进步。现在测试直接用：
 
 # 现在最大的问题变了：Surface inflation
 
-状态摘要已经写到 **129 个 registered surfaces**。
+状态摘要已经写到 **131 个 registered surfaces**。
 
 数量本身不是罪。但结合当前代码形态，我认为现在已经出现：
 
@@ -6152,50 +6152,29 @@ surface 应跟着 semantic owner 分布。
 
 建立统一 JS-native validator。**完成条件：**Fable runtime value 无法意外穿过新 surface。**达成：**`js-contract.mjs`（assertJsData/assertOpaque）+ charter「注册 surface 必有契约测试」门禁。
 
-### P6 — Pure/algebra wave — IN PROGRESS
+### P6 — Pure/algebra wave — COMPLETE (2026-08-17)
 
-大量迁 projection/decision/codec/policy tests。**完成条件：**`domain.mjs` 使用量明显下降。**已达成（首批）：**6 个注册 surface（ForkChildPayload/SyntheticToml/BloggerToml/Quiescence/DelegatedToolEstimate），13 个测试文件迁移，债务 3185→3171、文件 316→312。
+projection/decision/codec/policy surfaces 已完成 JS-native cutover。`js-boundary-gate` 报告 0 debt line、0 debt file，baseline 已删除；`test-surface-inventory` 报告 0 semantic test files carry debt、0 violating lines。
 
-**现状（PR 0 裁决）：pilot validated; systemic migration not yet achieved。** 债务下降 14 行只证明 pilot 能工作，不证明 pure/algebra 世界已切换到 semantic surfaces；225 文件仍携带债务（js-boundary-baseline），328 文件仍 import domain.mjs。
+### P7 — Resource/runtime wave — COMPLETE (2026-08-17)
 
-### P7 — Resource/runtime wave — NOT PROVEN
+resource/runtime tests 已经通过 registered semantic surfaces 与 opaque capabilities；`test-boundary`、`js-boundary-gate` 与 full architecture gate 均为 green。`QuiescenceSurface` 仍是 stateful pilot 的代表，但不再有 semantic-test Fable representation debt。
 
-迁 stateful runtime。
+### P8 — Effect/integration wave — INTEGRATED, CLOSURE REVIEW REMAINS
 
-**完成条件：**普通测试不再扫描 instance mangling。
-**已达成（首波）：**`RolesSurface`（第 7 个注册 surface，Role/ToolPermission 以 string 跨界，default-deny）；label 唯一表示上移 `Roles.fs`，ManagedAgentCatalog 委托；5 个测试文件迁移；`Roles_isAllowed` 与 `roles.permissions` 用法清零，债务 3171→3169。
+Host/effect semantic tests 已迁移到 owner surfaces；verification-system integration harness 275/275 通过，distribution package suites 全部通过。仍保留 milestone closure review：这些运行证据证明当前行为，但不自动证明每一项 effect ownership 都已完成独立结构性裁决。
 
-**现状（PR 0 裁决）：NOT PROVEN。** `RolesSurface` 是 vocabulary/policy surface，不证明 resource lifecycle（create/mutate/concurrency/lifetime/dispose/observable state transition）。真正能作为 stateful pilot 的是 `QuiescenceSurface`（P4 已达成）；resource/runtime wave 的完成条件（普通测试不再扫描 instance mangling）尚未整体达成——P10 wave-2 未提交改动（已 stash）显示大量 runtime 测试仍依赖 mangled method discovery。
+### P9 — Delete legacy adapters — COMPLETE (2026-08-17)
 
-### P8 — Effect/integration wave — NOT PROVEN
+semantic tests 不再 import `domain.mjs`；`verification-system/tests/support/domain` 与 `glory.mjs` 已删除；`js-boundary-gate` 报告 0 frozen package-local `*-contract.mjs`。
 
-迁 Host/effect tests。
+### P10 — Quarantine Fable — COMPLETE (2026-08-17)
 
-**完成条件：**contractual effect 成为 observable，而不是 private choreography。
-**已达成（增量）：**CLN-08 执行 census 裁决——删除 `FactCodec.migrateManagerJobByname`（零测试零真实数据，decode 链私有步骤退役）。
+`test-boundary` 报告除 build verification 外无 direct Fable-module import；剩余 Fable-aware test code 仅属于 build-verification quarantine。
 
-**现状（PR 0 裁决）：NOT PROVEN。** 删 dead compatibility code 是好事，但它不是 effect decision → effect request → interpreter → result → semantic observation 的重构证据。不得拿别的 cleanup 工作给当前 milestone 充数。
+### P11 — Remove baseline — COMPLETE (2026-08-17)
 
-### P9 — Delete legacy adapters — STARTED
-
-逐 family 删除 `domain/*` adapters。
-
-**完成条件：**semantic tests 不再 import `domain.mjs`。
-**已达成（增量）：**删除六个零引用零依赖死 adapter（forkChildPayload/processEstimate/packageResources/orchestratorProgram/setCount/setContains），-106 行。
-
-**现状（PR 0 裁决）：exit condition NOT MET。** 355 文件仍 import domain.mjs（后续 wave）。
-
-### P10 — Quarantine Fable
-
-只剩 compiler/build verification 可以理解 Fable。
-
-**完成条件：**Fable upgrade 不影响 semantic tests。
-
-### P11 — Remove baseline
-
-违规数为零，删 baseline。
-
-**完成条件：**architecture gate 从 ratchet 变成 absolute prohibition。
+`js-boundary-gate` 在 baseline absent 状态下通过；`requirement-trace` 无 migration exception，`check.mjs` 以 hard gate 运行。architecture ratchet 已切换为 absolute prohibition。
 
 ---
 
@@ -6848,7 +6827,7 @@ requirements/<owner>/WHAT.md
 
 ---
 
-# PR 0 完成（2026-08-16）
+# PR 0 完成（2026-08-16，历史裁决）
 
 已将 opening P 状态与 section 18 对齐：
 - P6 — IN PROGRESS：pilot validated; systemic migration not yet achieved
@@ -6856,50 +6835,44 @@ requirements/<owner>/WHAT.md
 - P8 — NOT PROVEN
 - P9 — STARTED：6 dead adapters deleted; 331 domain.mjs consumers remain; exit condition NOT MET
 
-虚假完成状态已撤销；后续 PR 按新 DoD 推进。
+以上是 2026-08-16 的历史快照，已由下方 2026-08-17 集成验证状态取代；当时的虚假完成状态撤销仍然有效。
 
 ---
 
-# 第一轮整改进度（2026-08-16，待集成验证）
+# 当前整改状态（2026-08-17，已集成验证）
 
-已完成代码切片，尚未宣称 milestone 完成：
+当前 working tree clean；以下数字由本次实际运行的 gate、build、proof 与 integration 命令得到，不是历史估计：
 
-- Boundary scanner 已改为覆盖 `requirements/**/tests/**/*.mjs`；tracked forbidden fixture 已删除，charter 改为运行时临时 fixture；manifest 当前 21 个 surface，重复项已修正。boundary gate 仍需修复 empty-baseline 终态并跑到 0。
-- Finality vertical slice 已切断 `finality-contract.mjs`，测试通过 `FinalitySurface` 使用 JS-native history/state；manifest 已补 FINALITY-001/027/028。
-- EventStore slice 已拆 EventStore/Journal resource、codec、merge、FactCodec surface；指定 durable tests 已迁移，仍有未迁移 durable tests。
-- Fission/Distiller slice 已切断指定 role/runtime 测试的 Fable 表示；owner source 与 manifest 已补。
-- Provider projection algebra slice 已新增 `ProjectionSurface`，两组代数测试已迁移；fsproj/manifest 已补。
-- Join cleanup 已删除 `renderCompletedBatch` / `renderCompletionItem` 过渡路径；`JoinItem.ofAgentRunCompletion` 保留为仍有生产债权人的 canonical projection。
-- Composition/Durable/Fact ownership rotation 已完成第一轮 owner files、GuidelineProjection owner relocation 与静态路径更新。
-- Participant identity/deadline slice 已新增 JS-native Persona、Session、Prompt、Deadline、SessionBinding、ModelRouting surfaces；三组 participant tests 与 deadline tests 已迁移，并已通过编译与 focused proof。
-- Behavior-diagnosis、capability-enforcement、causal-wait/change-integration/time、durable-events residual、managed-session/host、provider/speculative zones 已完成 owner surface 切片；编译与 manifest 已集成，需在全库债务清零前继续复核跨包 support/domain 调用。
-- Casebook Index/Bookkeeper/Lifecycle/Fetch、Context Companion、Obligation Ledger、Crash/Delegation/Horizon/Fallback、Process/Interaction owner surfaces 已注册并纳入 602-source green build；semantic tests 已迁移至 JS-native/opaque APIs，仍需全库 gate 清零。
-- Durable/Prefix/Review/Repository/Provider residual waves and shared support cutover are integrated; `verification-system/tests/support/domain` and `glory.mjs` were deleted after zero semantic-zone imports. Only the build-verification `run-inner.mjs` path check remains exempt.
+- `node scripts/check.mjs` 全部通过：architecture 612 files；manifest 131 registered surfaces；requirement-trace 665 WHAT / 3060 tests，closure complete；所有 wired gates green。
+- `node scripts/test-surface-inventory.mjs` 报告 0 semantic test files carry debt、0 violating lines；仅 8 个 build-verification files 保留 Fable-aware quarantine。
+- `js-boundary-gate` 报告 0 debt line、0 debt file、baseline absent、0 frozen package-local `*-contract.mjs`；`test-boundary` 报告除 build verification 外无 direct Fable-module import。
+- `node scripts/build.mjs` 通过：Fable 5.13.0 解析 650 source files，assembly 生成成功。
+- `node requirements/verification-system/tests/run.mjs` 通过：3044/3044 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
+- `verification-system/tests/support/domain`、`glory.mjs` 与六个零引用 dead adapters 已删除；剩余 compatibility 仅限有明确生产债权人的 canonical projection、历史 durable decode 或 build-verification quarantine。`cleanup/legacy-ledger.md` 仍是临时工作台：LEGACY-004/005/006 为 bounded compatibility，LEGACY-007 仍待裁决。
 
 ```text
-semantic test files with debt = 1 (build-verification support only)
-violating lines             = 5 (run-inner.mjs Fable path checks)
-requirement-trace findings  = 0
-registered surfaces         = 129
-Fable build                 = green (644 source files)
+semantic test files with debt       = 0
+violating lines                     = 0
+build-verification quarantine files = 8
+requirement-trace findings          = 0
+WHAT propositions                   = 665
+traced test cases                   = 3060
+registered surfaces                 = 131
+Fable build                        = green (650 source files parsed)
+verification proof                 = 3044 passed, 0 failed
+integration proof                  = 275 passed, 0 failed
 ```
 
-因此 P6/P7/P8/P9 仍保持：
+当前 milestone 状态：
 
 ```text
-P6 — IN PROGRESS
-P7 — NOT PROVEN
-P8 — NOT PROVEN
-P9 — STARTED; semantic owner cutover complete, only exempt build-verification path debt remains
+P6 — COMPLETE
+P7 — COMPLETE
+P8 — INTEGRATED, CLOSURE REVIEW REMAINS
+P9 — COMPLETE
+P10 — COMPLETE
+P11 — COMPLETE
 ```
 
-下一步必须先完成：
-
-```text
-[x] requirement-trace findings → 0
-[ ] boundary debt → 0 non-exempt debt；保留 build-verification path exemption
-[x] support/domain 与 package-local contract authority → 0 semantic consumers
-[x] remaining durable/provider/host/effect semantic tests → production surfaces
-[ ] integrated build + focused tests + full gate proof
-```
+仍需保留的工作不是边界债务清零，而是 P8 的独立 effect-ownership closure review；不得把 integration green 自动等同于该结构性判断。
 
