@@ -145,7 +145,7 @@ module XWireSurface =
             { typed with
                 Messages = typed.Messages |> List.truncate cutoff }
 
-        HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
+        ProviderProjection.renderSemantic truncated
 
     /// HOST-BOUNDARY-020/021: the X-wire transform decision.
     ///

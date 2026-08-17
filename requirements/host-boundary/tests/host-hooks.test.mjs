@@ -1,14 +1,9 @@
 // HOST-BOUNDARY-014 / 018 / 019: the plugin hook surface and fatal membrane.
 //
-// Production owners (no support fixture):
-//   - dist/OpenCode/Host/PluginHostInterop.js  — fatalHook (the fatal membrane)
-//   - dist/OpenCode/Host/Diagnostic.js          — fatal (print + kill)
-//   - src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs — the registered hook set
-//   - src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs — curriedHook / pairedHook
-//
-// The hook name set, positional arity, and fatal-membrane-before-rethrow
-// contract are read from the production source that builds the hooks object
-// (PluginHooks.fs) and exercised through the compiled fatalHook callable.
+// Production owners (no support fixture): the registered hook set and the
+// PluginHooksSurface fatal membrane. The hook name set, positional arity, and
+// fatal-membrane-before-rethrow contract are read from the production source
+// that builds the hooks object and exercised through the registered surface.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -16,8 +11,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import * as PluginHostInterop from '../../../dist/OpenCode/Host/PluginHostInterop.js'
-import * as Diagnostic from '../../../dist/OpenCode/Host/Diagnostic.js'
+import * as PluginHooksSurface from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
 
 process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
@@ -47,7 +41,7 @@ const REGISTERED_HOOK_NAMES = [
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_hook_invariant_exceptions_cross_a_fatal_membrane_before_rethrow', () => {
   let threw = null
-  const wrapped = PluginHostInterop.fatalHook('test-fatal-sync', () => { throw new Error('invariant-broken') })
+  const wrapped = PluginHooksSurface.fatalHook('test-fatal-sync', () => { throw new Error('invariant-broken') })
   try {
     wrapped('args', 'ctx')
   } catch (e) {
@@ -59,7 +53,7 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_hook_invariant_exceptions_cross_a_fatal_m
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_catches_async_rejection_and_rethrows', async () => {
   let caught = null
-  const wrapped = PluginHostInterop.fatalHook('test-fatal-async', () => Promise.reject(new Error('async-invariant-broken')))
+  const wrapped = PluginHooksSurface.fatalHook('test-fatal-async', () => Promise.reject(new Error('async-invariant-broken')))
   try {
     await wrapped('args', 'ctx')
   } catch (e) {
@@ -77,7 +71,7 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_calls_diagnostic_fatal_bef
   const captured = []
   process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
   try {
-    const wrapped = PluginHostInterop.fatalHook('observed-op', () => { throw new Error('observed-error') })
+    const wrapped = PluginHooksSurface.fatalHook('observed-op', () => { throw new Error('observed-error') })
     try {
       wrapped('a', 'b')
     } catch (_) {
@@ -126,7 +120,7 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_position
   assert.match(interopSource, /\(args,\s*context\)\s*=>\s*\$0\(args,\s*context\)/)
   // The fatal membrane itself is a two-argument callable. It wraps the return
   // in Promise.resolve, so the positional args arrive but the result is async.
-  const wrapped = PluginHostInterop.fatalHook('positional-test', (args, context) => ({ args, context }))
+  const wrapped = PluginHooksSurface.fatalHook('positional-test', (args, context) => ({ args, context }))
   const result = await wrapped('arg-val', 'ctx-val')
   assert.equal(result.args, 'arg-val')
   assert.equal(result.context, 'ctx-val')

@@ -196,31 +196,27 @@ module HandleFoldSurface =
     /// `{ ok: false, error: { Fact, Reason } }` (fold rejection) or
     /// `{ ok: false, error: { kind, value } }` (invalid input).
     let foldApply (state: FoldState) (envelopes: obj array) : obj =
-        let mutable current = state.Internal
-        let mutable failed = None
-
-        for envelope in envelopes do
-            match failed with
-            | Some _ -> ()
-            | None ->
+        let rec foldAll current remaining =
+            match remaining with
+            | [] -> Ok current
+            | envelope :: tail ->
                 let factObj = envelope?fact
 
                 match buildFact factObj with
-                | Error errorBox -> failed <- Some errorBox
+                | Error errorBox -> Error errorBox
                 | Ok fact ->
                     match ExecutionFactFold.fold current fact with
-                    | Ok next -> current <- next
+                    | Ok next -> foldAll next tail
                     | Error rejection ->
-                        failed <-
-                            Some(
-                                box
-                                    {| ok = false
-                                       error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |}
-                            )
+                        Error(
+                            box
+                                {| ok = false
+                                   error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |}
+                        )
 
-        match failed with
-        | Some errorBox -> errorBox
-        | None -> box {| ok = true; state = FoldState current |}
+        match foldAll state.Internal (Array.toList envelopes) with
+        | Ok current -> box {| ok = true; state = FoldState current |}
+        | Error errorBox -> errorBox
 
     /// Extract the handle projection for one parent session from a fold state.
     /// Returns a `HandleProjectionState` (from `HandleSurface`) that the

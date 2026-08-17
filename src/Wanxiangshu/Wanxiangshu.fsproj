@@ -381,6 +381,7 @@
     <Compile Include="Interaction/Dispatch/OpenCode/IngressCodec.fs"/>
     <Compile Include="OpenCode/Codec/ProviderProjectionSurface.fs"/>
     <Compile Include="OpenCode/Host/HostSessionContext.fs"/>
+    <Compile Include="OpenCode/Host/HostSessionContextSurface.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
     <Compile Include="Context/Trace/Capture.fs"/>
@@ -604,6 +605,7 @@
     <Compile Include="OpenCode/Host/ChatParamsHook.fs"/>
     <Compile Include="OpenCode/Host/ChatParamsSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginHostInterop.fs"/>
+    <Compile Include="OpenCode/Host/PluginHooksSurface.fs"/>
     <Compile Include="OpenCode/Host/ProviderSystemTransform.fs"/>
     <Compile Include="Participant/Provider/LanguageSurface.fs"/>
     <Compile Include="OpenCode/Plugin/PluginBoot.fs"/>

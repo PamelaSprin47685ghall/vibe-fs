@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import * as HostSessionContext from '../../../dist/OpenCode/Host/HostSessionContext.js'
-import { roleName } from '../../../dist/Participant/Persona/RoleIdentity.js'
+import * as HostSessionContext from '../../../dist/OpenCode/Host/HostSessionContextSurface.js'
 
 const roleOf = HostSessionContext.roleOf
 const read = HostSessionContext.read
-const labelOf = (role) => (role ? roleName(role) : undefined)
+const labelOf = (role) => role ?? undefined
 
 test('WHAT[HOST-BOUNDARY-017] HOST_CTX_roleOf_rejects_absent_and_blank_agents', () => {
   assert.equal(roleOf(null), undefined)

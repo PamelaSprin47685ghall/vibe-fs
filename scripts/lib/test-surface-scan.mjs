@@ -45,6 +45,9 @@ export const BUILD_VERIFICATION_FILES = new Set([
   'requirements/verification-system/tests/run.mjs',
   'requirements/verification-system/tests/support/run-inner.mjs',
   'requirements/verification-system/tests/support/coverage-policy.mjs',
+  // Its subject is the semantic-surface scanner/manifest itself; fixtures
+  // intentionally contain forbidden import strings to prove rejection.
+  'requirements/js-semantic-surface/tests/surface-charter.test.mjs',
 ])
 
 /**
@@ -1136,6 +1139,22 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Host/HostMessageProjection.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-011'],
+    source: 'src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'OpenCode/Host/HostSessionContextSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-017'],
+    source: 'src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'OpenCode/Host/SharedStateSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-010'],
@@ -1148,7 +1167,15 @@ export const SURFACE_MANIFEST = [
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-008'],
     source: 'src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs',
-    representation: 'json',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Host/PluginHooksSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-014'],
+    source: 'src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs',
+    representation: 'opaque-capability',
     kind: 'pure',
   },
   {
@@ -1164,6 +1191,30 @@ export const SURFACE_MANIFEST = [
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-001', 'HOST-BOUNDARY-002', 'HOST-BOUNDARY-003'],
     source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'OpenCode/Host/HostSignalSubscribeSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-003'],
+    source: 'src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
+    module: 'OpenCode/Host/SphinxMcpConfigSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-017'],
+    source: 'src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
+    module: 'OpenCode/Host/StealthBrowserMcpConfigSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-017'],
+    source: 'src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs',
     representation: 'json',
     kind: 'pure',
   },
@@ -1411,7 +1462,7 @@ export const SURFACE_MANIFEST = [
  */
 export const SURFACE_CONSUMERS = {
   'Change/Surface.js': ['effect-accounting'],
-  'Composition/Turn/ReconcileSurface.js': ['crash-reconciliation', 'structured-workflow'],
+  'Composition/Turn/ReconcileSurface.js': ['crash-reconciliation', 'host-boundary', 'structured-workflow'],
   'Context/Companion/Blogger/BloggerCrashSurface.js': ['context-compression'],
   'Context/Companion/Blogger/FrameSurface.js': ['context-compression'],
   'Context/Companion/Blogger/TomlSurface.js': ['context-compression', 'guidance-delivery'],
