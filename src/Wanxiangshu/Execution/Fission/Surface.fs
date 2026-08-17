@@ -257,6 +257,11 @@ module FissionSurface =
         |> List.map (fun (index, workRef) -> box [| box index; box workRef |])
         |> List.toArray
 
+    let ringSuccessor (laneCount: int) (laneIndex: int) (closedLanes: int array) : obj =
+        FissionRing.successor laneCount laneIndex (Array.toList closedLanes)
+        |> Option.map box
+        |> Option.defaultValue null
+
     let convergenceReady (laneCount: int) (completionIds: string array) (bundle: obj) (delivery: obj) : bool =
         FissionConvergence.ready laneCount (Array.toList completionIds) (bundleOfJs bundle) (deliveryOfJs delivery)
 

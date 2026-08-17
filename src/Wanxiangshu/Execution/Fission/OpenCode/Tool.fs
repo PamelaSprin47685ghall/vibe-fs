@@ -341,15 +341,19 @@ module FissionTool =
                    Map.containsKey id group.CapturedCompletions
                    && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
 
-    let private convergeWithEventPort
-        (eventPort: IEventObservationPort)
+    let private convergeWithScope
+        (scope: ToolRuntimeScope)
         (durable: AgentJournal)
         (owner: SessionId)
         (groupId: string)
         =
         task {
             let _, beforeRevision = durable.SnapshotWithRevision
-            let! converged = FissionHost.tryConverge eventPort durable owner
+
+            let directoryFor sessionId =
+                scope.DirectoryFor(SessionId.value sessionId)
+
+            let! converged = FissionHost.tryConverge scope.Sessions durable directoryFor owner
 
             if converged then
                 return ()
@@ -357,7 +361,7 @@ module FissionTool =
                 return ()
             else
                 let! _ = durable.AwaitChangeFrom beforeRevision
-                let! _ = FissionHost.tryConverge eventPort durable owner
+                let! _ = FissionHost.tryConverge scope.Sessions durable directoryFor owner
                 return ()
         }
 
@@ -365,7 +369,7 @@ module FissionTool =
         task {
             match scope.EventPort with
             | None -> return ()
-            | Some eventPort -> return! convergeWithEventPort eventPort durable owner groupId
+            | Some _ -> return! convergeWithScope scope durable owner groupId
         }
 
     let private deliverAllLaneCompletions

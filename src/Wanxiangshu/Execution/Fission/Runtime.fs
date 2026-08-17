@@ -43,6 +43,7 @@ module FissionRuntime =
 
     let private groupResources = Dictionary<string, ResizeArray<IDisposable>>()
     let private deliveryClaims = HashSet<string>()
+    let private takeoverClaims = HashSet<string>()
 
     let private handleKey ownerSessionId handleId =
         SessionId.value ownerSessionId + "\u001f" + handleId
@@ -126,6 +127,12 @@ module FissionRuntime =
     let endDelivery groupId completionId laneIndex =
         lock gate (fun () -> deliveryClaims.Remove(deliveryKey groupId completionId laneIndex) |> ignore)
 
+    let tryBeginTakeover groupId =
+        lock gate (fun () -> takeoverClaims.Add groupId)
+
+    let endTakeover groupId =
+        lock gate (fun () -> takeoverClaims.Remove groupId |> ignore)
+
     let clearGroup groupId =
         let resources =
             lock gate (fun () ->
@@ -135,6 +142,8 @@ module FissionRuntime =
                 |> Seq.filter (fun key -> key.StartsWith(groupId + "\u001f"))
                 |> Seq.toArray
                 |> Array.iter (fun key -> deliveryClaims.Remove key |> ignore)
+
+                takeoverClaims.Remove groupId |> ignore
 
                 match groupResources.TryGetValue groupId with
                 | true, current ->
@@ -183,6 +192,8 @@ module FissionRuntime =
             |> Array.iter (fun key -> lanes.Remove key |> ignore)
 
             groupIds |> Array.iter (fun groupId -> childObservers.Remove groupId |> ignore)
+
+            groupIds |> Array.iter (fun groupId -> takeoverClaims.Remove groupId |> ignore)
 
             groupIds |> Array.iter (disposeGroupResources groupResources)
 

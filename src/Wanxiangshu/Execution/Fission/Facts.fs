@@ -41,6 +41,14 @@ type FissionFactCases =
            OwnerSessionId: SessionId
            ExternalId: string
            LaneIndex: int |}
+    | FissionTakeoverStarted of
+        {| GroupId: string
+           OwnerSessionId: SessionId
+           LaneIndex: int
+           LaneSessionId: SessionId
+           PhysicalUserMessageId: PhysicalUserMessageId
+           AggregateWorkRecordRef: BlobRef
+           AggregateWorkRecordDigest: BlobDigest |}
     | FissionConverged of
         {| GroupId: string
            OwnerSessionId: SessionId

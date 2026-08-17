@@ -61,6 +61,9 @@ module Fact =
         let inline FissionExternalAffinityBound payload =
             AgentFact.Fission(FissionFactCases.FissionExternalAffinityBound payload)
 
+        let inline FissionTakeoverStarted payload =
+            AgentFact.Fission(FissionFactCases.FissionTakeoverStarted payload)
+
         let inline FissionConverged payload =
             AgentFact.Fission(FissionFactCases.FissionConverged payload)
 

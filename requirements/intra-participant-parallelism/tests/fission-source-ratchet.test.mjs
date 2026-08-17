@@ -22,9 +22,22 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session
   assert.match(facts, /FissionAdmitted/)
   assert.match(facts, /FissionLaneMaterialized/)
   assert.match(facts, /FissionCompletionDelivered/)
+  assert.match(facts, /FissionTakeoverStarted/)
   assert.match(facts, /FissionConverged/)
   assert.match(fold, /FissionAdmitted/)
+  assert.match(fold, /FissionTakeoverStarted/)
   assert.match(fold, /FissionConverged/)
+})
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring takeover before reporting the old logical owner', () => {
+  const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+
+  assert.match(host, /FissionFact\.FissionTakeoverStarted/)
+  assert.match(host, /SendContinuation[\s\S]{0,1200}?ContinuationKind\.FissionHandoff[\s\S]{0,600}?AwaitMode\.Await/)
+  assert.match(host, /turn\.PhysicalUserMessageId <> takeover\.PhysicalUserMessageId/)
+  assert.match(host, /CompletedTurnClassifier\.partsSessionText turn\.Parts/)
+  assert.match(host, /NotifyTerminal group\.OwnerSessionId \(TerminalOutcome\.Completed result\)/)
+  assert.doesNotMatch(host, /TerminalText\s*=\s*aggregate/)
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {

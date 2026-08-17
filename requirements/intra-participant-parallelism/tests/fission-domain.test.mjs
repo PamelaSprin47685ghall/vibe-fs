@@ -81,6 +81,13 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] convergence requires all lane reco
   assert.equal(fission.convergenceReady(3, ['pre-child'], incomplete, delivery), false)
 })
 
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] ring successor wraps and forwards past already-closed lanes to the next live present', () => {
+  assert.equal(fission.ringSuccessor(4, 0, [0, 1, 2, 3]), null, 'all lanes closed leaves the group finalizer holding the bundle')
+  assert.equal(fission.ringSuccessor(4, 1, [0, 1, 3]), 2, 'lane 1 forwards directly to live successor lane 2')
+  assert.equal(fission.ringSuccessor(4, 1, [0, 1, 2]), 3, 'closed successor lane 2 forwards mechanically to lane 3')
+  assert.equal(fission.ringSuccessor(4, 3, [1, 2, 3]), 0, 'lane N-1 wraps to lane 0')
+})
+
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
   const lane = fission.startedLane(1, 'lane-session-1', 'lane input')
   assertJsData(lane, 'started lane')

@@ -16,6 +16,14 @@ type FissionGroupTerminal =
     | Failed of reason: string
 
 [<CLIMutable>]
+type FissionTakeoverProjection =
+    { LaneIndex: int
+      LaneSessionId: SessionId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      AggregateWorkRecordRef: BlobRef
+      AggregateWorkRecordDigest: BlobDigest }
+
+[<CLIMutable>]
 type FissionGroupProjection =
     { GroupId: string
       OwnerSessionId: SessionId
@@ -29,9 +37,11 @@ type FissionGroupProjection =
       PreFissionCompletionIds: Set<string>
       LaneWork: Map<int, BlobRef * BlobDigest>
       LaneProviderRuns: Map<int, ProviderRunIdentity>
+      LastMaterializedLaneIndex: int option
       CapturedCompletions: Map<string, BlobRef * BlobDigest>
       CompletionDeliveries: Map<string, Set<int>>
       ExternalAffinities: Map<string, int>
+      Takeover: FissionTakeoverProjection option
       Terminal: FissionGroupTerminal }
 
 [<CLIMutable>]
@@ -50,6 +60,7 @@ type FissionProjectionRejection =
     | InvalidLane of laneIndex: int
     | LaneSessionMismatch of laneIndex: int
     | ConflictingLaneWork of laneIndex: int
+    | ConflictingTakeover of groupId: string
     | ConvergenceIncomplete of groupId: string
     | TerminalAlreadySet of groupId: string
 
@@ -94,6 +105,15 @@ module FissionProjection =
            OwnerSessionId: SessionId
            ExternalId: string
            LaneIndex: int |}
+
+    type private TakeoverStartedPayload =
+        {| GroupId: string
+           OwnerSessionId: SessionId
+           LaneIndex: int
+           LaneSessionId: SessionId
+           PhysicalUserMessageId: PhysicalUserMessageId
+           AggregateWorkRecordRef: BlobRef
+           AggregateWorkRecordDigest: BlobDigest |}
 
     type private ConvergedPayload =
         {| GroupId: string
@@ -190,9 +210,11 @@ module FissionProjection =
               PreFissionCompletionIds = Set.ofList payload.PreFissionCompletionIds
               LaneWork = Map.empty
               LaneProviderRuns = Map.empty
+              LastMaterializedLaneIndex = None
               CapturedCompletions = Map.empty
               CompletionDeliveries = Map.empty
               ExternalAffinities = Map.empty
+              Takeover = None
               Terminal = FissionGroupTerminal.Open }
 
         { state with
@@ -241,7 +263,8 @@ module FissionProjection =
                 { group with
                     LaneWork =
                         Map.add payload.LaneIndex (payload.WorkRecordRef, payload.WorkRecordDigest) group.LaneWork
-                    LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns }
+                    LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns
+                    LastMaterializedLaneIndex = Some payload.LaneIndex }
 
             Ok(replaceGroup state payload.GroupId next)
 
@@ -320,24 +343,53 @@ module FissionProjection =
             Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
         | Some group -> decideExternalAffinity state payload group
 
+    let private takeoverMatches (existing: FissionTakeoverProjection) (payload: TakeoverStartedPayload) =
+        existing.LaneIndex = payload.LaneIndex
+        && existing.LaneSessionId = payload.LaneSessionId
+        && existing.PhysicalUserMessageId = payload.PhysicalUserMessageId
+        && existing.AggregateWorkRecordRef = payload.AggregateWorkRecordRef
+        && existing.AggregateWorkRecordDigest = payload.AggregateWorkRecordDigest
+
+    let private foldTakeoverStarted (state: FissionProjectionState) (payload: TakeoverStartedPayload) =
+        let takeover: FissionTakeoverProjection =
+            { LaneIndex = payload.LaneIndex
+              LaneSessionId = payload.LaneSessionId
+              PhysicalUserMessageId = payload.PhysicalUserMessageId
+              AggregateWorkRecordRef = payload.AggregateWorkRecordRef
+              AggregateWorkRecordDigest = payload.AggregateWorkRecordDigest }
+
+        match Map.tryFind payload.GroupId state.Groups with
+        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
+        | Some group when payload.LaneIndex < 0 || payload.LaneIndex >= group.LaneCount ->
+            Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
+        | Some group when Map.tryFind payload.LaneIndex group.LaneSessions <> Some payload.LaneSessionId ->
+            Error(FissionProjectionRejection.LaneSessionMismatch payload.LaneIndex)
+        | Some group when not (convergenceReady group) ->
+            Error(FissionProjectionRejection.ConvergenceIncomplete payload.GroupId)
+        | Some { Takeover = Some existing } when takeoverMatches existing payload -> Ok state
+        | Some { Takeover = Some _ } -> Error(FissionProjectionRejection.ConflictingTakeover payload.GroupId)
+        | Some group -> Ok(replaceGroup state payload.GroupId { group with Takeover = Some takeover })
+
     let private decideConverged
         (state: FissionProjectionState)
         (payload: ConvergedPayload)
         (group: FissionGroupProjection)
         =
-        match group.Terminal with
-        | FissionGroupTerminal.Converged(existingLane, existingRun, existingRef, existingDigest) when
+        match group.Terminal, group.Takeover with
+        | FissionGroupTerminal.Converged(existingLane, existingRun, existingRef, existingDigest), _ when
             existingLane = payload.TerminalLaneSessionId
             && existingRun = payload.TerminalProviderRun
             && existingRef = payload.AggregateWorkRecordRef
             && existingDigest = payload.AggregateWorkRecordDigest
             ->
             Ok state
-        | FissionGroupTerminal.Converged _
-        | FissionGroupTerminal.Failed _ -> Error(FissionProjectionRejection.TerminalAlreadySet payload.GroupId)
-        | FissionGroupTerminal.Open when not (convergenceReady group) ->
+        | FissionGroupTerminal.Converged _, _
+        | FissionGroupTerminal.Failed _, _ -> Error(FissionProjectionRejection.TerminalAlreadySet payload.GroupId)
+        | FissionGroupTerminal.Open, _ when not (convergenceReady group) ->
             Error(FissionProjectionRejection.ConvergenceIncomplete payload.GroupId)
-        | FissionGroupTerminal.Open ->
+        | FissionGroupTerminal.Open, Some takeover when takeover.LaneSessionId <> payload.TerminalLaneSessionId ->
+            Error(FissionProjectionRejection.ConflictingTakeover payload.GroupId)
+        | FissionGroupTerminal.Open, _ ->
             let next =
                 { group with
                     Terminal =
@@ -384,5 +436,6 @@ module FissionProjection =
         | FissionFactCases.FissionCompletionCaptured payload -> foldCompletionCaptured state payload
         | FissionFactCases.FissionCompletionDelivered payload -> foldCompletionDelivered state payload
         | FissionFactCases.FissionExternalAffinityBound payload -> foldExternalAffinityBound state payload
+        | FissionFactCases.FissionTakeoverStarted payload -> foldTakeoverStarted state payload
         | FissionFactCases.FissionConverged payload -> foldConverged state payload
         | FissionFactCases.FissionFailed payload -> foldFailed state payload

@@ -168,6 +168,21 @@ module FissionWorkBundle =
 
     let count bundle = value bundle |> Map.count
 
+module FissionRing =
+
+    /// Ring transport is derived from lane index/count. Closed successors are
+    /// skipped mechanically until the next live present; when every lane is
+    /// closed the durable group finalizer owns the bundle.
+    let successor laneCount laneIndex closedLanes =
+        if laneCount < 2 || laneIndex < 0 || laneIndex >= laneCount then
+            None
+        else
+            let closed = Set.ofList closedLanes
+
+            [ 1..laneCount ]
+            |> List.map (fun offset -> (laneIndex + offset) % laneCount)
+            |> List.tryFind (fun candidate -> not (Set.contains candidate closed))
+
 module FissionConvergence =
 
     let ready laneCount preFissionCompletionIds bundle delivery =

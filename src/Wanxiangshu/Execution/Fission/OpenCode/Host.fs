@@ -268,68 +268,6 @@ module FissionHost =
         PromptAuthorityLedger.activeProfile ownerSessionId projections
         |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile ownerSessionId projections)
 
-    let private notifyOwnerConverged
-        (eventPort: IEventObservationPort)
-        (group: FissionGroupProjection)
-        providerRun
-        (authority: PromptAuthority.AuthorityExecutionProfile)
-        (aggregate: string)
-        =
-        eventPort.NotifyTerminal
-            group.OwnerSessionId
-            (TerminalOutcome.Completed
-                { SessionId = group.OwnerSessionId
-                  AuthorityRootUserMessageId = authority.AuthorityRootUserMessageId
-                  ProviderRun = providerRun
-                  Role = authority.CanonicalRole
-                  Directory = None
-                  TerminalText = aggregate
-                  TurnFormalText = aggregate })
-        |> ignore
-
-        FissionAdmission.releaseOwner group.OwnerSessionId
-        FissionRuntime.clearOwner group.OwnerSessionId
-        true
-
-    let private publishVerifiedAggregate
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (group: FissionGroupProjection)
-        providerRun
-        (aggregate: string)
-        =
-        let projections = (AgentJournal.snapshot durable).AgentProjections
-
-        match ownerAuthority projections group.OwnerSessionId with
-        | None -> false
-        | Some authority -> notifyOwnerConverged eventPort group providerRun authority aggregate
-
-    let private publishAggregate
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (group: FissionGroupProjection)
-        providerRun
-        aggregateRef
-        aggregateDigest
-        =
-        task {
-            match! readVerified durable aggregateRef aggregateDigest with
-            | Error _ -> return false
-            | Ok aggregate -> return publishVerifiedAggregate eventPort durable group providerRun aggregate
-        }
-
-    let private publishConverged
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        (group: FissionGroupProjection)
-        =
-        task {
-            match group.Terminal with
-            | FissionGroupTerminal.Converged(_, providerRun, aggregateRef, aggregateDigest) ->
-                return! publishAggregate eventPort durable group providerRun aggregateRef aggregateDigest
-            | _ -> return false
-        }
-
     let private allLaneWorkPresent (group: FissionGroupProjection) =
         group.LaneWork.Count = group.LaneCount
         && group.LaneProviderRuns.Count = group.LaneCount
@@ -345,132 +283,223 @@ module FissionHost =
             Map.containsKey completionId group.CapturedCompletions
             && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
 
-    let private appendConvergedFact
+    let private takeoverPrompt aggregate =
+        String.concat
+            "\n"
+            [ "The Fission ring has collected every lane's canonical work record and returned the complete handoff to this final present."
+              "Continue as the same logical participant. Integrate the handoff below and now produce the ordinary final report to your commissioner."
+              "Do not report lane mechanics, physical session ids, or the internal Fission topology."
+              ""
+              "[fission_ring_handoff]"
+              aggregate ]
+
+    let private appendTakeoverStarted
         (durable: AgentJournal)
-        owner
         (group: FissionGroupProjection)
         (aggregateBlob: BlobWriteReceipt)
-        terminalLane
-        terminalRun
+        laneIndex
+        laneSessionId
+        physicalUserMessageId
         =
         appendFission
             durable
-            owner
-            (Some terminalRun)
-            (FissionFact.FissionConverged
+            group.OwnerSessionId
+            None
+            (FissionFact.FissionTakeoverStarted
                 {| GroupId = group.GroupId
-                   OwnerSessionId = owner
-                   TerminalLaneSessionId = terminalLane
-                   TerminalProviderRun = terminalRun
+                   OwnerSessionId = group.OwnerSessionId
+                   LaneIndex = laneIndex
+                   LaneSessionId = laneSessionId
+                   PhysicalUserMessageId = physicalUserMessageId
                    AggregateWorkRecordRef = aggregateBlob.BlobRef
                    AggregateWorkRecordDigest = aggregateBlob.BlobDigest |})
 
-    let private publishAfterConverge (eventPort: IEventObservationPort) (durable: AgentJournal) groupId =
-        match FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission with
-        | Some converged -> publishConverged eventPort durable converged
-        | None -> task { return false }
-
-    let private commitConvergenceWithTerminal
-        (eventPort: IEventObservationPort)
+    let private sendTakeover
+        (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
-        owner
+        (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
         (aggregateBlob: BlobWriteReceipt)
-        terminalLane
-        terminalRun
+        aggregate
+        laneIndex
+        laneSessionId
         =
         task {
-            match! appendConvergedFact durable owner group aggregateBlob terminalLane terminalRun with
+            let acceptedPhysicalId = TaskCompletionSource<PhysicalUserMessageId>()
+            let dispatcher = PromptDispatcher.forJournal durable
+
+            match!
+                dispatcher.SendContinuation
+                    sessionPort
+                    laneSessionId
+                    (takeoverPrompt aggregate)
+                    PromptAuthority.ContinuationKind.FissionHandoff
+                    authority
+                    authority.SelectedAgent
+                    (directoryFor laneSessionId)
+                    PromptDispatcher.AwaitMode.Await
+                    (Some(fun physicalId -> acceptedPhysicalId.TrySetResult physicalId |> ignore))
+            with
             | Error _ -> return false
-            | Ok() -> return! publishAfterConverge eventPort durable group.GroupId
+            | Ok _ ->
+                let! physicalId = acceptedPhysicalId.Task
+
+                match! appendTakeoverStarted durable group aggregateBlob laneIndex laneSessionId physicalId with
+                | Error _ -> return false
+                | Ok() -> return true
         }
 
-    let private commitWithAggregateBlob
-        (eventPort: IEventObservationPort)
+    let private sendTakeoverWithAggregateBlob
+        (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
-        owner
+        (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
         (aggregateBlob: BlobWriteReceipt)
+        aggregate
         =
-        let terminalIndex = group.LaneCount - 1
+        let target =
+            group.LastMaterializedLaneIndex
+            |> Option.bind (fun laneIndex ->
+                Map.tryFind laneIndex group.LaneSessions
+                |> Option.map (fun laneSessionId -> laneIndex, laneSessionId))
 
-        match Map.tryFind terminalIndex group.LaneSessions, Map.tryFind terminalIndex group.LaneProviderRuns with
-        | Some terminalLane, Some terminalRun ->
-            commitConvergenceWithTerminal eventPort durable owner group aggregateBlob terminalLane terminalRun
-        | _ -> task { return false }
+        match target with
+        | None -> task { return false }
+        | Some(laneIndex, laneSessionId) ->
+            sendTakeover
+                sessionPort
+                durable
+                directoryFor
+                group
+                authority
+                aggregateBlob
+                aggregate
+                laneIndex
+                laneSessionId
 
-    let private writeAggregateAndCommit
-        (eventPort: IEventObservationPort)
+    let private writeAggregateAndTakeover
+        (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
-        owner
+        (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
-        (aggregate: string)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
+        aggregate
         =
         task {
             match! durable.WriteBlob aggregate with
             | Error _ -> return false
-            | Ok aggregateBlob -> return! commitWithAggregateBlob eventPort durable owner group aggregateBlob
+            | Ok aggregateBlob ->
+                return!
+                    sendTakeoverWithAggregateBlob
+                        sessionPort
+                        durable
+                        directoryFor
+                        group
+                        authority
+                        aggregateBlob
+                        aggregate
         }
 
-    let private commitConvergence
-        (eventPort: IEventObservationPort)
+    let private startTakeoverWithAuthority
+        (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
-        owner
+        (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
+        (authority: PromptAuthority.AuthorityExecutionProfile)
         =
         task {
             match! aggregateWorkRecord durable group with
             | Error _ -> return false
-            | Ok aggregate -> return! writeAggregateAndCommit eventPort durable owner group aggregate
+            | Ok aggregate ->
+                return! writeAggregateAndTakeover sessionPort durable directoryFor group authority aggregate
         }
 
-    let private afterPreConsumed
-        (eventPort: IEventObservationPort)
+    let private runClaimedTakeover
+        (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
-        owner
-        (group: FissionGroupProjection)
-        preConsumed
-        =
-        if not preConsumed then
-            task { return false }
-        else
-            commitConvergence eventPort durable owner group
-
-    let private tryConvergeOpen
-        (eventPort: IEventObservationPort)
-        (durable: AgentJournal)
-        owner
+        (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
         =
         task {
-            if not (allLaneWorkPresent group) || not (allSharedCompletionsDelivered group) then
+            try
+                let projections = (AgentJournal.snapshot durable).AgentProjections
+
+                return!
+                    ownerAuthority projections group.OwnerSessionId
+                    |> Option.map (startTakeoverWithAuthority sessionPort durable directoryFor group)
+                    |> Option.defaultValue (task { return false })
+            finally
+                FissionRuntime.endTakeover group.GroupId
+        }
+
+    let private startTakeover
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        (group: FissionGroupProjection)
+        =
+        if FissionRuntime.tryBeginTakeover group.GroupId then
+            runClaimedTakeover sessionPort durable directoryFor group
+        else
+            task { return false }
+
+    let private startTakeoverIfPreConsumed
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        (group: FissionGroupProjection)
+        preConsumed
+        =
+        if preConsumed then
+            startTakeover sessionPort durable directoryFor group
+        else
+            task { return false }
+
+    let private tryConvergeOpen
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        (group: FissionGroupProjection)
+        =
+        task {
+            if group.Takeover.IsSome then
+                return true
+            elif not (allLaneWorkPresent group) || not (allSharedCompletionsDelivered group) then
                 return false
             else
                 let! preConsumed = consumePreFissionAgents durable group
-                return! afterPreConsumed eventPort durable owner group preConsumed
+                return! startTakeoverIfPreConsumed sessionPort durable directoryFor group preConsumed
         }
 
     let private tryConvergeGroup
-        (eventPort: IEventObservationPort)
+        (sessionPort: ISessionHostPort)
         (durable: AgentJournal)
-        owner
+        (directoryFor: SessionId -> string option)
         (group: FissionGroupProjection)
         =
         match group.Terminal with
         | FissionGroupTerminal.Failed _ -> task { return false }
-        | FissionGroupTerminal.Converged _ -> publishConverged eventPort durable group
-        | FissionGroupTerminal.Open -> tryConvergeOpen eventPort durable owner group
+        | FissionGroupTerminal.Converged _ -> task { return true }
+        | FissionGroupTerminal.Open -> tryConvergeOpen sessionPort durable directoryFor group
 
-    /// Attempt the single logical convergence. Safe to call from lane terminal,
-    /// shared-completion delivery, or crash recovery. Completed publication is
-    /// deduped by the shared Host event port on (owner SessionId, ProviderRun).
-    let tryConverge (eventPort: IEventObservationPort) (durable: AgentJournal) (owner: SessionId) =
+    /// Once every lane record and shared completion is accounted for, route the
+    /// complete ring bundle back into the final physical present. The logical
+    /// owner remains open until that continuation itself reaches an ordinary
+    /// terminal turn.
+    let tryConverge
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (directoryFor: SessionId -> string option)
+        (owner: SessionId)
+        =
         task {
             match
                 FissionProjection.tryLatestForOwner owner (AgentJournal.snapshot durable).AgentProjections.Fission
             with
             | None -> return false
-            | Some group -> return! tryConvergeGroup eventPort durable owner group
+            | Some group -> return! tryConvergeGroup sessionPort durable directoryFor group
         }
 
     let private captureNewPayload
@@ -690,7 +719,7 @@ module FissionHost =
             task {
                 do! deliverAllLanes sessionPort durable directoryFor groupId completionId group authority payload
 
-                let! _ = tryConverge eventPort durable group.OwnerSessionId
+                let! _ = tryConverge sessionPort durable directoryFor group.OwnerSessionId
                 return ()
             }
 
@@ -811,6 +840,96 @@ module FissionHost =
             | _ -> ()
         }
 
+    let private validateOwnerRunResult (result: AgentRunResult) =
+        if result.IsValid then
+            Ok result
+        else
+            Error "Fission takeover completed with empty terminal output"
+
+    let private ownerRunResult (durable: AgentJournal) (group: FissionGroupProjection) (turn: ReconciledTurn) =
+        let projections = (AgentJournal.snapshot durable).AgentProjections
+
+        match ownerAuthority projections group.OwnerSessionId with
+        | None -> Error "Fission takeover completed without owner authority"
+        | Some authority ->
+            { SessionId = group.OwnerSessionId
+              AuthorityRootUserMessageId = authority.AuthorityRootUserMessageId
+              ProviderRun = turn.ProviderRun
+              Role = authority.CanonicalRole
+              Directory = turn.Directory
+              TerminalText = CompletedTurnClassifier.partsSessionText turn.Parts
+              TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
+            |> validateOwnerRunResult
+
+    let private appendConvergedFromTakeover
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (takeover: FissionTakeoverProjection)
+        (turn: ReconciledTurn)
+        =
+        appendFission
+            durable
+            group.OwnerSessionId
+            (Some turn.ProviderRun)
+            (FissionFact.FissionConverged
+                {| GroupId = group.GroupId
+                   OwnerSessionId = group.OwnerSessionId
+                   TerminalLaneSessionId = turn.SessionId
+                   TerminalProviderRun = turn.ProviderRun
+                   AggregateWorkRecordRef = takeover.AggregateWorkRecordRef
+                   AggregateWorkRecordDigest = takeover.AggregateWorkRecordDigest |})
+
+    let private publishOwnerTakeover
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (turn: ReconciledTurn)
+        (result: AgentRunResult)
+        =
+        task {
+            do! XTraceCapture.captureTerminal (Some durable) turn
+
+            eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Completed result)
+            |> ignore
+
+            FissionAdmission.releaseOwner group.OwnerSessionId
+            FissionRuntime.clearOwner group.OwnerSessionId
+            return true
+        }
+
+    let private persistAndPublishTakeover
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (takeover: FissionTakeoverProjection)
+        (turn: ReconciledTurn)
+        (result: AgentRunResult)
+        =
+        task {
+            match! appendConvergedFromTakeover durable group takeover turn with
+            | Error error ->
+                do! failGroup sessionPort eventPort durable group error
+                return true
+            | Ok() -> return! publishOwnerTakeover eventPort durable group turn result
+        }
+
+    let private completeTakeover
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (takeover: FissionTakeoverProjection)
+        (turn: ReconciledTurn)
+        =
+        task {
+            match ownerRunResult durable group turn with
+            | Error error ->
+                do! failGroup sessionPort eventPort durable group error
+                return true
+            | Ok result -> return! persistAndPublishTakeover sessionPort eventPort durable group takeover turn result
+        }
+
     let private appendLaneMaterialized
         (durable: AgentJournal)
         (group: FissionGroupProjection)
@@ -836,6 +955,7 @@ module FissionHost =
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
+        (directoryFor: SessionId -> string option)
         (outcome: Result<unit, string>)
         =
         task {
@@ -844,9 +964,15 @@ module FissionHost =
                 do! failGroup sessionPort eventPort durable group error
                 return true
             | Ok() ->
-                let! _ = tryConverge eventPort durable group.OwnerSessionId
+                let! _ = tryConverge sessionPort durable directoryFor group.OwnerSessionId
                 return true
         }
+
+    let private directoryForTurn (turn: ReconciledTurn) laneSessionId =
+        if laneSessionId = turn.SessionId then
+            turn.Directory
+        else
+            None
 
     let private writeLaneWorkAndMaterialize
         (sessionPort: ISessionHostPort)
@@ -864,7 +990,7 @@ module FissionHost =
                 return true
             | Ok workBlob ->
                 let! outcome = appendLaneMaterialized durable group laneIndex turn workBlob
-                return! afterLaneMaterializedAppend sessionPort eventPort durable group outcome
+                return! afterLaneMaterializedAppend sessionPort eventPort durable group (directoryForTurn turn) outcome
         }
 
     let private materializeCompletedLane
@@ -930,7 +1056,55 @@ module FissionHost =
         | FissionGroupTerminal.Open ->
             observeOpenLaneCompletion sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
-    let private observeLaneOutcome
+    [<RequireQualifiedAccess>]
+    type private TakeoverTurnDisposition =
+        | Stale
+        | Current
+
+    let private classifyTakeoverTurn (takeover: FissionTakeoverProjection) (turn: ReconciledTurn) =
+        if turn.SessionId <> takeover.LaneSessionId then
+            TakeoverTurnDisposition.Stale
+        elif turn.PhysicalUserMessageId <> takeover.PhysicalUserMessageId then
+            TakeoverTurnDisposition.Stale
+        else
+            TakeoverTurnDisposition.Current
+
+    let private observeCurrentTakeoverOutcome
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (takeover: FissionTakeoverProjection)
+        (turn: ReconciledTurn)
+        =
+        match turn.Outcome with
+        | ReconcileProgram.TurnInProgress
+        | ReconcileProgram.TurnNeedsContinuation _
+        | ReconcileProgram.TurnFailed _ -> task { return false }
+        | ReconcileProgram.TurnAborted reason ->
+            task {
+                do! failGroup sessionPort eventPort durable group reason
+                return true
+            }
+        | ReconcileProgram.TurnCompleted -> completeTakeover sessionPort eventPort durable group takeover turn
+
+    let private observeTakeoverOutcome
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        (takeover: FissionTakeoverProjection)
+        (turn: ReconciledTurn)
+        =
+        match classifyTakeoverTurn takeover turn with
+        | TakeoverTurnDisposition.Stale ->
+            // The handoff is already admitted. Any replay of an earlier slice
+            // terminal is stale and cannot rematerialize or complete the owner.
+            task { return true }
+        | TakeoverTurnDisposition.Current ->
+            observeCurrentTakeoverOutcome sessionPort eventPort durable group takeover turn
+
+    let private observeOpenLaneOutcome
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -955,6 +1129,24 @@ module FissionHost =
             }
         | ReconcileProgram.TurnCompleted ->
             observeCompletedLane sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
+
+    let private observeLaneOutcome
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (joinGuardNudges: HashSet<string>)
+        (durable: AgentJournal)
+        (group: FissionGroupProjection)
+        laneIndex
+        (turn: ReconciledTurn)
+        =
+        match group.Terminal, group.Takeover with
+        | FissionGroupTerminal.Converged _, _
+        | FissionGroupTerminal.Failed _, _ -> task { return true }
+        | FissionGroupTerminal.Open, Some takeover ->
+            observeTakeoverOutcome sessionPort eventPort durable group takeover turn
+        | FissionGroupTerminal.Open, None ->
+            observeOpenLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
     let private observeDurableLaneTurn
         (sessionPort: ISessionHostPort)
