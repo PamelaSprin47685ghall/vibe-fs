@@ -80,6 +80,10 @@ active state 与 WHAT ID 相同；不存在、歧义、skip/todo、WHAT mismatch
 
 锁 WHAT-015 AGENTS.md 小修复豁免、WHAT-014 blocker 四步原文、WHAT-013 Completed 不作当前依据。
 live `changes/active/` 若存在必须声明 origin 标题。不扫归档 changes 树，不读正文推断生命周期。
+WHAT-013 Active 冻结 origin 边界 + 段白名单 + 禁止 progress/commit/code-snapshot 段由
+`activeBodyViolations` 纯验证器机械承接；跨版本原文不被反向改写由
+`frozenOriginViolations(before, after)` 纯验证器承接（均由 `scripts/checks/spec-rules.mjs` 导出，
+不扫 `changes/active/`，不从正文推断生命周期）。
 
 ## 依赖与理由
 
@@ -112,7 +116,7 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时三条
 | GOV-010（clean break：旧 proposal/status 目录废止） | HOW/GARBAGE：一次性迁移历史；live 面（废止路径不引用）并入 WHAT-010 | WHAT-010；本 HOW |
 | 当前 Clause ID 前缀表（ARCH/GOV/…/VERIFY） | HOW：迁移载体；ID 稳定性原则本身是 WHAT-008 | WHAT-008 |
 | 旧 docs/README.md 导航职责 | HOW：已由 requirements/README.md 承接（2026-08-14 cutover） | 本 HOW §4 |
-| change 正文内容合同（Active 字段白名单、Completed 原文冻结） | Completed 不作当前依据 + live Active origin 标题：`tests/change-lifecycle.test.mjs`；Active 字段白名单 / 原文不被反向改写仍人工（GOV 禁止检查器读正文推断生命周期） | WHAT-013；PROOF L20 |
+| change 正文内容合同（Active 字段白名单、Completed 原文冻结） | Completed 不作当前依据 + live Active origin 标题 + `activeBodyViolations` / `frozenOriginViolations` 纯验证器（冻结 origin 边界、跨版本原文不变、段白名单、禁止 progress·commit·code-snapshot 段）：`tests/change-lifecycle.test.mjs`；验证器接受纯文本输入，不扫目录 | WHAT-013；PROOF L20 |
 | blocker 协议（GOV-009） | WHAT-014 四步原文由 `tests/change-lifecycle.test.mjs` 锁定；一次实现是否真正停下仍人工 | WHAT-014；PROOF L21 |
 | 直接闭环小变更（GOV-012） | AGENTS.md 豁免句由 `tests/change-lifecycle.test.mjs` 锁定 | WHAT-015；PROOF L22 |
 | 旧 36 工作集 / Proposal 生命周期本身 | 不迁入 WHAT：Git 记历史，未来树只表达当前接受真理 | 本 HOW |
@@ -121,7 +125,9 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时三条
 
 - **已闭合（2026-08-14）**：meta-verifier 依赖骨架解析源迁入 `requirements/INDEX.md`；
   `requirements/README.md` 承接树导航；spec gate 已重写为 requirements/ 树治理。
-- **GAP**：WHAT-013 Active 原文冻结 / 正文白名单仍人工（`requirements/GAP.md` GAP-003 PARTIAL）；
-  WHAT-014/015 机器面已由 `tests/change-lifecycle.test.mjs` 承接（GAP-004/005 CLOSED）。
+- **已闭合（2026-08-17）**：WHAT-013 Active 冻结 origin 边界、跨版本原文不变、段白名单与
+  progress/commit/code-snapshot 禁止段由 `activeBodyViolations` + `frozenOriginViolations`
+  纯验证器机械承接；不要求启用 `changes/active/`。WHAT-014/015 机器面已由
+  `tests/change-lifecycle.test.mjs` 承接（GAP-003/004/005 CLOSED）。
 - 命题 ID 前缀规则（`<PACKAGE>-NNN` = 大写包名）由 meta-verifier 强制；若后续裁决改用其它
   格式，需同步改 verifier 与全部 WHAT（属本包独立变化）。

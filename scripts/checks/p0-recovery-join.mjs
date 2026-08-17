@@ -185,9 +185,11 @@ export const RULES = [
   },
   {
     // P0 REVISE: production Tools agent-join must not bare-call runtime.Join(
-    // (JoinTool, Distillation*, ExecutorTool). HostForkRuntime internal race
-    // mailbox + ForkRuntime/CompletionMailbox are the sole whitelist (fileHint null
-    // + basename allowlist below).
+    // (JoinTool, Distillation*, ExecutorTool). No production path currently
+    // bare-calls runtime.Join( — every join routes through Join.joinAvailable /
+    // JoinWithPermit / AwaitAgentWithPermit. The exact-path allowlist
+    // (BARE_RUNTIME_JOIN_ALLOW_PATHS) is empty, so any reintroduction fails
+    // closed until an exact owner path is added with a source reference.
     // Allow runtime.Join(permit, ...) (permit-gated IExecutorRuntime); forbid Join() / Join(timeoutMs=...).
     id: 'tools-no-bare-runtime-join',
     fileHint: null,
@@ -391,26 +393,25 @@ const norm = (p) => p.replace(/\\/g, '/')
 
 const stripComments = (line) => line.replace(/\/\/.*/g, '')
 
-/** Basename allowlist for record-completion-single-owner (definition + sole commit owner). */
-const RECORD_COMPLETION_OWNER_BASENAMES = new Set([
-  'HandleController.fs',
-  'Controller.fs',
-  'ChildRecoveryWorkflow.fs',
-  'Surface.fs',
+/**
+ * Exact normalized repo-relative paths permitted to reference recordCompletion:
+ * the HandleController definition and its sole production caller ChildRecoveryWorkflow.
+ * Basename matching is forbidden — an unrelated `Surface.fs` / `Controller.fs` must not
+ * inherit this authority. Fail-closed for any renamed/moved/new file.
+ */
+const RECORD_COMPLETION_OWNER_PATHS = new Set([
+  'src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs',
+  'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
 ])
 
 /**
- * Basename allowlist for tools-no-bare-runtime-join.
- * Only interpreter / HostForkRuntime race mailbox / low-level mailbox may call runtime.Join(.
- * Production Tools (JoinTool, Distillation*, ExecutorTool) must not appear here.
+ * Exact normalized repo-relative paths permitted to bare-call runtime.Join(.
+ * No production path currently does — every join routes through Join.joinAvailable /
+ * JoinWithPermit / AwaitAgentWithPermit. The set is empty so any reintroduction of
+ * runtime.Join( fails closed until an exact owner path is added here with a source
+ * reference proving it is a physical caller.
  */
-const BARE_RUNTIME_JOIN_ALLOWLIST = new Set([
-  'HostForkRuntime.fs',
-  'ForkRuntime.fs',
-  'Runtime.fs',
-  'CompletionMailbox.fs',
-  'Join.fs', // direct CE ops call JoinWithPermit / JoinAvailableWithPermit only
-])
+const BARE_RUNTIME_JOIN_ALLOW_PATHS = new Set([])
 
 /**
  * Scan one file body. Multi-line rules see joined non-comment text; single-line
@@ -447,18 +448,18 @@ export const scanText = (text, file = '<synthetic>') => {
     let found = false
     for (let i = 0; i < codeLines.length; i++) {
       if (rule.pattern.test(codeLines[i])) {
-        // Sole-owner rule: definition + ChildRecoveryWorkflow may call; others red.
+        // Sole-owner rule: exact owner paths only (definition + ChildRecoveryWorkflow).
         if (
           rule.id === 'record-completion-single-owner' &&
-          RECORD_COMPLETION_OWNER_BASENAMES.has(base)
+          RECORD_COMPLETION_OWNER_PATHS.has(norm(file))
         ) {
           found = true
           break
         }
-        // Bare Join allowlist: HostForkRuntime race + mailbox internals only.
+        // Bare Join allowlist: exact physical caller paths only (currently none).
         if (
           rule.id === 'tools-no-bare-runtime-join' &&
-          BARE_RUNTIME_JOIN_ALLOWLIST.has(base)
+          BARE_RUNTIME_JOIN_ALLOW_PATHS.has(norm(file))
         ) {
           found = true
           break
@@ -479,13 +480,13 @@ export const scanText = (text, file = '<synthetic>') => {
     if (!found && rule.pattern.test(joined)) {
       if (
         rule.id === 'record-completion-single-owner' &&
-        RECORD_COMPLETION_OWNER_BASENAMES.has(base)
+        RECORD_COMPLETION_OWNER_PATHS.has(norm(file))
       ) {
         continue
       }
       if (
         rule.id === 'tools-no-bare-runtime-join' &&
-        BARE_RUNTIME_JOIN_ALLOWLIST.has(base)
+        BARE_RUNTIME_JOIN_ALLOW_PATHS.has(norm(file))
       ) {
         continue
       }

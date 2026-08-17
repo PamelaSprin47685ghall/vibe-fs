@@ -263,8 +263,6 @@ module PluginTransforms =
             |> Option.iter (refreshCompanionXTrace scope.Sessions.Companions sessionId)
 
             do! applyManagerNarrativeRewrite journal (Some sessionId) traceState rawMessages outObj
-
-            do! ManagerNarrativeTransform.applyAcceptedActivation journal (Some sessionId) traceState rawMessages
         }
 
     let private applySessionXTracePipeline

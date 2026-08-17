@@ -100,15 +100,6 @@ module ManagerNarrativeTransform =
     let private reawakeningProjection (sessionId: SessionId) (rawText: string) =
         ManagerNarrative.reawakening rawText (reawakeningDocument sessionId) (planningTableDocument sessionId)
 
-    let private workActivationAnchors =
-        lazy
-            ([ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ]
-             |> List.collect (fun lang ->
-                 ProviderProse.instructionLines lang ManagerLifecyclePrompt.Path.WorkActivation Map.empty
-                 |> List.filter (fun line -> not (String.IsNullOrWhiteSpace line))
-                 |> List.truncate 1)
-             |> List.distinct)
-
     let private activeProfile (journal: AgentJournal) (sessionId: SessionId) =
         PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
 
@@ -119,14 +110,6 @@ module ManagerNarrativeTransform =
             state.Parts
             |> List.tryFind (fun part -> part.Turn = turnIndex && part.PartIndex = 0)
             |> Option.map (fun part -> part.Cursor.Sequence))
-
-    /// The `PromptKey` a Host message carries in its metadata (PROMPT-011).
-    /// Read via the Codec boundary (ProviderWireDecode.promptKeyOfMessage).
-    let private promptKeyOfMessage (raw: obj) =
-        ProviderWireDecode.promptKeyOfMessage raw
-
-    let private promptKeyOrEmpty (raw: obj) =
-        promptKeyOfMessage raw |> Option.defaultValue (PromptKey.create "")
 
     let private narrativePartObj (part: ManagerNarrative.NarrativePart) =
         if part.Synthetic then
@@ -248,7 +231,7 @@ module ManagerNarrativeTransform =
             List.isEmpty completedLives
             && state.Parts |> List.exists (fun part -> part.Turn <> 0)
             ->
-            Some(opening, XTraceProjection.headSequence state + 1L)
+            Some opening
         | _ -> None
 
     let private requireWorkflowUnit (result: Result<unit, string>) =
@@ -266,11 +249,11 @@ module ManagerNarrativeTransform =
         task {
             match migrationCandidate traceState lifecycle.CompletedLives with
             | None -> return false
-            | Some(opening, cursor) ->
+            | Some opening ->
                 let lifeId = ManagerLifeId.create (Guid.NewGuid().ToString("N"))
 
                 let! result =
-                    ManagerLifeWorkflow.ensureMigrated durable sid lifeId messageIdValue opening.AssignmentText cursor
+                    ManagerLifeWorkflow.ensureMigrated durable sid lifeId messageIdValue opening.AssignmentText
 
                 requireWorkflowUnit result
                 return true
@@ -429,78 +412,4 @@ module ManagerNarrativeTransform =
             | _, None -> return None
             | Some durable, Some sessionIdValue ->
                 return! transformWithJournal durable sessionIdValue traceState rawMessages
-        }
-
-    let private partIsWorkActivationAnchor part =
-        match part with
-        | ProviderProjection.WireText text ->
-            workActivationAnchors.Value
-            |> List.exists (fun anchor -> text.Contains(anchor, StringComparison.Ordinal))
-        | _ -> false
-
-    let private isWorkActivationMessage (raw: obj) =
-        ProviderWireCapture.decodeMessage raw
-        |> Option.exists (fun message ->
-            message.Role = "user" && message.Parts |> List.exists partIsWorkActivationAnchor)
-
-    let private lifeNeedingActivation (lifecycle: ManagerLifeProjection) =
-        match lifecycle.CurrentLife with
-        | Some life when life.ProtectedPrefixEnd.IsNone && not life.Completed -> Some life
-        | _ -> None
-
-    let private commitActivation
-        (durable: AgentJournal)
-        (sid: SessionId)
-        (lifeId: ManagerLifeId)
-        (promptKey: PromptKey)
-        (protectedPrefixEnd: int64)
-        =
-        task {
-            match! ManagerLifeWorkflow.acceptActivation durable sid lifeId promptKey protectedPrefixEnd with
-            | Error error -> return raise (InvalidOperationException error)
-            | Ok() -> ()
-        }
-
-    let private acceptActivationIfEligible
-        (durable: AgentJournal)
-        (sessionIdValue: string)
-        (state: XTraceProjectionState)
-        (rawMessages: obj list)
-        =
-        task {
-            let sid = SessionId.create sessionIdValue
-            let snapshot = AgentJournal.snapshot durable
-
-            let lifecycle =
-                AgentProjection.tryFind sid snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ManagerLife)
-                |> Option.defaultValue ManagerLifecycleProjection.empty
-
-            match
-                lifeNeedingActivation lifecycle
-                |> Option.bind (fun life ->
-                    rawMessages
-                    |> List.tryFind isWorkActivationMessage
-                    |> Option.map (fun raw -> life, raw))
-            with
-            | None -> ()
-            | Some(life, raw) ->
-                let protectedPrefixEnd = XTraceProjection.headSequence state + 1L
-                do! commitActivation durable sid life.LifeId (promptKeyOrEmpty raw) protectedPrefixEnd
-        }
-
-    /// GLORY-021 legacy: if a historical Activation message is still in the wire,
-    /// append inert WorkActivated. Production BlindPlan never sends Activation;
-    /// Opening floor is effectiveOpeningFloor / T1 (TODO-001).
-    let applyAcceptedActivation
-        (journal: AgentJournal option)
-        (sessionId: string option)
-        (traceState: XTraceProjectionState option)
-        (rawMessages: obj list)
-        : Task =
-        task {
-            match journal, sessionId, traceState with
-            | Some durable, Some sessionIdValue, Some state ->
-                do! acceptActivationIfEligible durable sessionIdValue state rawMessages
-            | _ -> ()
         }

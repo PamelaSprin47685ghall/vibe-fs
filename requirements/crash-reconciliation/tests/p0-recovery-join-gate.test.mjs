@@ -350,15 +350,37 @@ test('WHAT[CRASH-012] P0_RECOVERY_JOIN_GATE_host_fork_restart_with_terminal_stru
   assert.ok(!hits.some((h) => h.id === 'publish-completion-agent'))
 })
 
-test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_bare_join_allowlist_host_fork_stays_green', () => {
+test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_bare_runtime_join_in_host_fork_runtime_goes_red_fail_closed', () => {
+  // No production path currently bare-calls runtime.Join(; the allowlist is empty.
+  // HostForkRuntime must not inherit authority by basename — reintroduction fails
+  // closed at the exact owner path until an explicit entry is added.
   const source = [
     'module HostForkRuntime',
     'let raceChangeAndMailbox durable fromRev ms =',
     '    let! joined = runtime.Join(timeoutMs = ms)',
     '    return Choice2Of2 joined',
   ].join('\n')
-  const hits = scanText(source, 'HostForkRuntime.fs')
-  assert.ok(!hits.some((h) => h.id === 'tools-no-bare-runtime-join'))
+  const hits = scanText(source, 'src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs')
+  assert.ok(
+    hits.some((h) => h.id === 'tools-no-bare-runtime-join'),
+    `bare runtime.Join( must fail closed even in HostForkRuntime; got ${hits.map((h) => h.id).join(',')}`,
+  )
+})
+
+test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_unrelated_runtime_fs_does_not_inherit_bare_join_authority', () => {
+  // Basename exemption is forbidden: an unrelated Runtime.fs bare-calling runtime.Join(
+  // must be flagged — authority is bound to exact physical caller paths (currently none).
+  const source = [
+    'module SomeRuntime',
+    'let wait ms =',
+    '    let! joined = runtime.Join(timeoutMs = ms)',
+    '    return joined',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/Change/Runtime.fs')
+  assert.ok(
+    hits.some((h) => h.id === 'tools-no-bare-runtime-join'),
+    `unrelated Runtime.fs must not inherit bare-join authority; got ${hits.map((h) => h.id).join(',')}`,
+  )
 })
 
 test('WHAT[CRASH-011] P0_RECOVERY_JOIN_GATE_executor_permit_path_stays_green', () => {

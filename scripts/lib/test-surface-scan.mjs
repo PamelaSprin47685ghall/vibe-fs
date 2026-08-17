@@ -1366,6 +1366,11 @@ const SURFACE_ALT = SURFACE_MODULES.map((m) => m.replace(/[.*+?^${}()|[\]\\]/g, 
 const A_DEEP_IMPORT = new RegExp(
   `(?:from\\s*|import\\s*\\(\\s*|import\\s+)['"][^'"]*dist/(?!fable_modules)(?!(?:${SURFACE_ALT})['"])[^'"]+\\.js['"]`,
 )
+// Dynamic template import: `new URL(`...dist/${...}.js`, ...)` bypasses the
+// static-import regex. A template literal with interpolation that contains
+// `dist/` and ends in `.js` is a deep import — the variable means the scanner
+// cannot prove it loads only registered surfaces, so it is always debt.
+const A_TEMPLATE_IMPORT = /new URL\(\s*[`'"][^`'"]*dist\/[^`'"]*\$\{[^}]+\}[^`'"]*\.js[`'"]/
 const B_EXPORT_DISCOVERY = /Object\.(?:keys|entries|values)\(\s*([A-Za-z_$][\w$]*)/
 const B_MANGLED_LOOKUP = /(?:\.startsWith|\.endsWith)\(\s*['"`][^'"`]*(?:__|_[A-Z])/
 
@@ -1377,6 +1382,7 @@ const D_HELPERS = /(?<![.$])\b(?:member|bind|fableInstanceMethod|prod|toList|cas
 
 const RULES = [
   ['deep-dist-import', A_DEEP_IMPORT],
+  ['template-dist-import', A_TEMPLATE_IMPORT],
   ['export-discovery', B_EXPORT_DISCOVERY],
   ['mangled-lookup', B_MANGLED_LOOKUP],
   ['du-shape', C1_DU_SHAPE],
@@ -1425,21 +1431,35 @@ export const scanFile = (absPath, relPath) => {
   return hits
 }
 
-const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*)['"]([^'"]+)['"]/g
+const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"]([^'"]+)['"]/g
 
-/** Resolve relative local imports from semantic tests into the scanned zone. */
+/** Resolve relative local imports from semantic tests into the scanned zone.
+ *
+ * Traverses transitively from `.test.mjs` roots through all semantic-zone
+ * files (support, fixtures, helpers): a support→support edge that carries
+ * debt is just as much a test dependency as a direct test→support edge.
+ */
 export const semanticImportEdges = (root = REQUIREMENTS_ROOT) => {
   const files = semanticTestFiles(root)
   const known = new Set(files.map((file) => resolve(file)))
   const edges = []
-  for (const importer of files.filter((file) => file.endsWith('.test.mjs'))) {
+  const visited = new Set()
+  const queue = files.filter((file) => file.endsWith('.test.mjs'))
+  while (queue.length > 0) {
+    const importer = queue.shift()
+    const importerKey = resolve(importer)
+    if (visited.has(importerKey)) continue
+    visited.add(importerKey)
     const source = readFileSync(importer, 'utf8')
     IMPORT_SPECIFIER.lastIndex = 0
     let match
     while ((match = IMPORT_SPECIFIER.exec(source)) !== null) {
       if (!match[1].startsWith('.')) continue
       const target = resolve(dirname(importer), match[1])
-      if (known.has(target)) edges.push({ importer, target })
+      if (known.has(target)) {
+        edges.push({ importer, target })
+        if (!visited.has(target)) queue.push(target)
+      }
     }
   }
   return edges

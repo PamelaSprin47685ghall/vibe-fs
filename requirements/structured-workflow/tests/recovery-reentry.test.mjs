@@ -5,14 +5,24 @@
 // surface anywhere in the reconcile or recovery program path — the reconcile
 // domain is an observation-stabilization boundary (ce-temporal-ownership §17),
 // and recovery drives the same named workflow entrypoints the live path uses.
+//
+// The registered ReconcileSurface is the owner contract for the first test.
+// The second test proves the source-tree invariant: recovery workflow modules
+// export named entrypoints (not stored positions), verified by reading the
+// production source — build-verification (guide-contract.test.mjs) proves the
+// emitted modules load and export callable functions.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import * as reconcile from '../../../dist/Composition/Turn/ReconcileSurface.js'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
-const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
+const ROOT = new URL('../../../', import.meta.url).pathname
+const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
   // The registered ReconcileSurface is the owner contract: callers observe
   // bounded reread + publish decisions, never emitted union metadata.
   for (const n of [
@@ -46,24 +56,32 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabi
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', () => {
   // Recovery is a permit-gated re-entry into the same named workflows the
   // live path uses (ARCH-005 / ce-temporal-ownership §15–17): the
   // SessionRecoveryWorkflow entry, the provider recovery vocabulary, and the
   // thin per-context TurnWorkflow router. None of them is a stored position.
-  const sessionRecovery = await load('Execution/Session/Recovery/Workflow')
-  assert.equal(typeof sessionRecovery.recoverFamilyDirect, 'function')
-
-  const providerRecovery = await load('Participant/Provider/Attempt/Fallback/Workflow')
-  for (const n of ['continueAfterConfirmedFailure', 'continueAfterLoopKill', 'awaitRecoveryMaterial']) {
-    assert.equal(typeof providerRecovery[n], 'function', `ProviderRecoveryWorkflow must export ${n}`)
+  //
+  // Source-tree proof: each workflow module defines its named entrypoint as a
+  // `let` — the direct-CE contract (STRUCTURED-WORKFLOW-001). Build-verification
+  // (guide-contract.test.mjs) proves the emitted modules load and the
+  // entrypoints are callable.
+  const entrypoints = [
+    ['src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs', 'recoverFamilyDirect'],
+    ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'continueAfterConfirmedFailure'],
+    ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'continueAfterLoopKill'],
+    ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'awaitRecoveryMaterial'],
+    ['src/Wanxiangshu/Composition/Turn/Workflow.fs', 'observe'],
+    ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observe'],
+    ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observeIdle'],
+    ['src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs', 'observe'],
+  ]
+  const missing = []
+  for (const [file, name] of entrypoints) {
+    const source = readSrc(file)
+    if (!new RegExp(`\\blet(?: rec)?(?: private)? ${name}\\b`).test(source)) {
+      missing.push(`${file}: ${name}`)
+    }
   }
-
-  const turn = await load('Composition/Turn/Workflow')
-  assert.equal(typeof turn.observe, 'function')
-
-  const manager = await load('Mission/Manager/Workflow')
-  assert.equal(typeof manager.observe, 'function')
-  const reviewer = await load('Mission/Review/Judgement/Workflow')
-  assert.equal(typeof reviewer.observe, 'function')
+  assert.deepEqual(missing, [], `recovery workflow entrypoints must exist in production source: ${missing.join('; ')}`)
 })

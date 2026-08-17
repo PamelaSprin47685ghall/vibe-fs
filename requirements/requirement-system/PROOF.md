@@ -17,7 +17,7 @@
 | REQUIREMENT-SYSTEM-010 | `scripts/checks/spec.mjs`（archivePathReferences：全仓零归档树引用；legacyWorkflowPathReferences：废止路径）；`tests/spec-rules.test.mjs`（规则单测） | GATE + MOVE | node scripts/check.mjs / node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-011 | `tests/spec-rules.test.mjs`（changeDependencyReferences：proposed 非当前依赖，规则单测）；人工评审承接（本文件 人工评审承接表：Agent 未经用户指定启动 Proposed） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-012 | `tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：CHG-001 与产品条款区分）；`scripts/checks/spec.mjs`（正式定义只在 WHAT.md） | MOVE + GATE | 分别 node --test / node scripts/check.mjs |
-| REQUIREMENT-SYSTEM-013 | `tests/change-lifecycle.test.mjs`（Completed 不作当前依据；live Active 必须声明冻结 origin）；Active 原文冻结 / 正文白名单仍人工评审（本文件 人工评审承接表） | NEW + 人工 | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
+| REQUIREMENT-SYSTEM-013 | `tests/change-lifecycle.test.mjs`（Completed 不作当前依据；live Active 必须声明冻结 origin；activeBodyViolations + frozenOriginViolations 纯验证器：冻结 origin 边界、跨版本原文不变、段白名单、禁止 progress/commit/code-snapshot 段） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
 | REQUIREMENT-SYSTEM-014 | `tests/change-lifecycle.test.mjs`（WHAT-014 四步 blocker 协议；删步即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
 | REQUIREMENT-SYSTEM-015 | `tests/change-lifecycle.test.mjs`（AGENTS.md「普通小型修复不要求创建 Change」；删句即红） | NEW | node --test requirements/requirement-system/tests/change-lifecycle.test.mjs |
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（每个包 README/WHY/WHAT 的 DEPENDS ON ⊆ INDEX 骨架断言） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
@@ -29,10 +29,9 @@
 | 检查 | 失败含义（对应条款） |
 |---|---|
 | Agent 未经用户指定启动 Proposed | REQUIREMENT-SYSTEM-011 |
-| Active 原文被反向改写 | REQUIREMENT-SYSTEM-013 |
 | Active 成为目标产品语义的唯一来源 | REQUIREMENT-SYSTEM-007/013 |
 | Completed 被用作当前实现依据 | REQUIREMENT-SYSTEM-010 |
-| Active 保存进度流水或未经批准的新设计 | REQUIREMENT-SYSTEM-013 |
+| Active 保存进度流水或未经批准的新设计 | REQUIREMENT-SYSTEM-013（进度流水段已机械承接；段内未经批准新设计仍人工） |
 
 ## 语义 anchor
 
@@ -45,6 +44,6 @@ anchor id**；本包的机器事实由 meta-verifier + spec-rules 承担。
 - 依赖骨架解析源已迁至 `requirements/INDEX.md`；meta-verifier 已同步。
 - 树导航职责已移交 `requirements/README.md`。
 - spec gate 已重写为 requirements/ 树治理（归档树检查面整体替换）。
-- WHAT-013/014/015：`tests/change-lifecycle.test.mjs`（GAP-003 PARTIAL / GAP-004 CLOSED / GAP-005 CLOSED）；Active 原文冻结仍人工。
+- WHAT-013/014/015：`tests/change-lifecycle.test.mjs`（GAP-003/004/005 CLOSED）。
 - PROOF-MAP「顶层 3 文件」归属分歧（verdict-feed / domain.meta / guide-contract 的
   assertion 级 owner）：见 `requirements/verification-system/PROOF.md`。

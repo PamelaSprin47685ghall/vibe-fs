@@ -5,51 +5,16 @@
 // never a Command/Reply/Step AST + interpreter. PR3 clean break: the Domain
 // OrchestratorProgram AST module and OrchestratorInterpreter are deleted and
 // must not return.
+//
+// Build-verification (guide-contract.test.mjs) proves Change/Program exports
+// `run` and that the deleted modules stay deleted. This semantic test proves
+// the source-tree invariant: no second-runtime protocol tokens in the
+// Orchestration workflow source.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { walk } from '../../../scripts/lib/walk.mjs'
-
-const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
-
-test('WHAT[STRUCTURED-WORKFLOW-001] ORCHESTRATOR_PROGRAM_001: Application Program is the sole direct-CE entrypoint', async () => {
-  const mod = await load('Change/Program')
-  // `run` is the direct-CE owner contract; emitted export enumeration is not semantic.
-  assert.equal(typeof mod.run, 'function')
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', async () => {
-  await assert.rejects(
-    () => load('Domain/OrchestratorProgram'),
-    (error) => {
-      const message = String(error?.message ?? error)
-      return (
-        message.includes('Cannot find module') ||
-        message.includes('ERR_MODULE_NOT_FOUND') ||
-        message.includes('Failed to load') ||
-        error?.code === 'ERR_MODULE_NOT_FOUND'
-      )
-    },
-    'Domain/OrchestratorProgram must be deleted after PR3 direct-CE cutover',
-  )
-})
-
-test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', async () => {
-  await assert.rejects(
-    () => load('Application/Orchestration/OrchestratorInterpreter'),
-    (error) => {
-      const message = String(error?.message ?? error)
-      return (
-        message.includes('Cannot find module') ||
-        message.includes('ERR_MODULE_NOT_FOUND') ||
-        message.includes('Failed to load') ||
-        error?.code === 'ERR_MODULE_NOT_FOUND'
-      )
-    },
-    'Application/Orchestration/OrchestratorInterpreter must be deleted after PR3',
-  )
-})
 
 test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_004: no Command/Reply/Step AST tokens in Orchestration workflow source', () => {
   // Fail closed if a second-runtime protocol sneaks back into the vertical slice.
@@ -66,4 +31,16 @@ test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_004: no Command/Reply/S
     }
   }
   assert.deepEqual(hits, [])
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_002: Domain OrchestratorProgram AST module is gone', () => {
+  const files = walk('src/Wanxiangshu', ['.fs'])
+  const ast = files.filter((file) => /OrchestratorProgram\.fs$/.test(file))
+  assert.deepEqual(ast, [], 'Domain OrchestratorProgram AST module must be deleted after PR3 direct-CE cutover')
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-002] ORCHESTRATOR_PROGRAM_003: OrchestratorInterpreter is gone', () => {
+  const files = walk('src/Wanxiangshu', ['.fs'])
+  const interpreter = files.filter((file) => /OrchestratorInterpreter\.fs$/.test(file))
+  assert.deepEqual(interpreter, [], 'OrchestratorInterpreter must be deleted after PR3')
 })

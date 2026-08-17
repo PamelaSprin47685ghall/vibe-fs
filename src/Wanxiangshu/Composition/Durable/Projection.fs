@@ -115,9 +115,9 @@ type AgentProjectionSet =
         Orchestrator: OrchestratorProjection
         /// PERSIST-008: child session → handle record, across ALL parents.
         ///
-        /// `TerminalPolicy.tryLinkedChild` answers "is this session somebody's
-        /// child" from this one keyed lookup; scanning every parent's handle map
-        /// instead is the scan PERSIST-008 forbids. Fold keeps it in step with the
+        /// Child-link queries answer "is this session somebody's child" from
+        /// this one keyed lookup; scanning every parent's handle map instead is
+        /// the scan PERSIST-008 forbids. Fold keeps it in step with the
         /// three handle facts (link / complete / retire), and retired records stay
         /// — the tombstone is permanent (EXEC-009).
         HandleByChildSession: Map<SessionId, HandleRecord>

@@ -178,8 +178,11 @@ Proposal/Status/Decision/Outcome 文件；不引入 manifest、中央注册表�
 的正文合同由人工评审把关（GOV-008）。
 
 **边界**：Completed 不作当前依据的机器面由 `tests/change-lifecycle.test.mjs` +
-REQUIREMENT-SYSTEM-010 `changeDependencyReferences` 承接。Active 原文冻结与正文白名单
-仍由人工评审承接（检查器不读正文推断生命周期状态）。live `changes/active/` 若被重新启用，
+REQUIREMENT-SYSTEM-010 `changeDependencyReferences` 承接。Active 冻结 origin 边界与
+正文段白名单由 `activeBodyViolations` 纯验证器机械承接（`tests/change-lifecycle.test.mjs`）；
+跨版本原文不被反向改写由 `frozenOriginViolations(before, after)` 纯验证器承接。两个
+验证器接受纯文本输入，不扫 `changes/active/` 目录、不从正文推断生命周期状态。live
+`changes/active/` 若被重新启用，
 必须带 Original proposal / Work origin 标题。
 
 **证据指针**：→ PROOF.md L20。

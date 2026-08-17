@@ -66,8 +66,38 @@ test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_record_completion_owner_allowlist_is_gr
     'let recordCompletion journal parentId completion =',
     '    Ok ()',
   ].join('\n')
-  assert.equal(scanText(owner, 'ChildRecoveryWorkflow.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
-  assert.equal(scanText(def, 'HandleController.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
+  assert.equal(scanText(owner, 'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
+  assert.equal(scanText(def, 'src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs').filter((h) => h.id === 'record-completion-single-owner').length, 0)
+})
+
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_unrelated_surface_fs_does_not_inherit_record_completion_authority', () => {
+  // Basename exemption is forbidden: an unrelated Surface.fs calling recordCompletion
+  // must be flagged — authority is bound to the exact owner path, not the filename.
+  const source = [
+    'module SomeSurface',
+    'let commit journal parentId proof =',
+    '    HandleController.recordCompletion journal parentId proof',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/Some/Surface.fs')
+  assert.ok(
+    hits.some((h) => h.id === 'record-completion-single-owner'),
+    `unrelated Surface.fs must not inherit recordCompletion authority; got ${hits.map((h) => h.id).join(',')}`,
+  )
+})
+
+test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_unrelated_controller_fs_does_not_inherit_record_completion_authority', () => {
+  // A same-basename Controller.fs in a different directory must not inherit the
+  // HandleController definition exemption.
+  const source = [
+    'module OtherController',
+    'let commit journal parentId proof =',
+    '    HandleController.recordCompletion journal parentId proof',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Tools/Controller.fs')
+  assert.ok(
+    hits.some((h) => h.id === 'record-completion-single-owner'),
+    `unrelated Controller.fs must not inherit recordCompletion authority; got ${hits.map((h) => h.id).join(',')}`,
+  )
 })
 
 test('WHAT[DG-009] P0_RECOVERY_JOIN_GATE_production_sources_are_green', () => {
