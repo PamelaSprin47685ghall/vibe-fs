@@ -17,7 +17,7 @@ work-record、prefix-stability、participant-horizon、effect-accounting）只�
 **规范**：`CurrentObligations` 始终描述「在当前 relation 下仍欠什么」。Pre-T1（`Ek=false`）时，
 它可以诚实记录把计划做完仍欠的调查、分析、分解、验证与决策；Post-T1（`Ek=true`）时，它只描述
 为了真正满足用户请求仍需成为真的 mission work / evidence / condition。它不携带 `kind` / `id` /
-`status` / `priority` / `reviewing` 之类 provider-visible 冷状态，也没有 alias。
+`status` / `priority` 之类 provider-visible 冷状态，也没有 alias。
 
 **含义 / 动机**：Manager 生命周期唯一诚实的进度表示是「现在还欠什么」，不是伪造 status。
 强迫 Pre-T1 账本假装只有 mission debt 会诱使模型把 planning work 改名成假的实现义务；显式 commitment
@@ -54,9 +54,8 @@ supersession 语义见 OBLIGATION-LEDGER-010。
 
 ## OBLIGATION-LEDGER-003：禁止用 status 枚举伪装进度
 
-**规范**：禁止把进度伪装成 provider-visible status 枚举（`pending` / `in_progress` / `reviewing` /
-`completed` / `cancelled`）。真实性由 process review 与 Manager 下一轮 truthful account 判断，
-不另造机械枚举机（TODO-003）。
+**规范**：禁止把进度伪装成 provider-visible status 枚举。真实性由 process review 与 Manager 下一轮
+truthful account 判断，不另造机械枚举机（TODO-003）。
 
 **含义 / 动机**：`status` 机器描述阶段，不是债务；一旦存在，模型会被诱导填写「现在在做什么」
 而不是「还欠什么」。
@@ -290,9 +289,9 @@ account；Accepted 后 canonical 与 sink 指向同一个 Pk。Process review ve
 **含义 / 动机**：Host 表是兼容 UI sink，不能决定 account identity、review cadence 或 recovery
 （why「真相源」裁决）。REVISE 不是 sink rollback 触发器。
 
-**边界**：sink 的具体字段投影（`content=name: work / status=in_progress / priority=medium`、
-reviewing 降级 in_progress 等）是**兼容性实现**，属 HOW「历史与弃权」——compatibility 不写成
-永久需求；未来 sink 替换不改变 canonical 语义。
+**边界**：sink 的具体字段投影（`content=name: work / status=(name=workingOn ? in_progress : pending) /
+priority=medium`）是**兼容性实现**，属 HOW——compatibility 不写成永久需求；未来 sink 替换不改变
+canonical 语义。
 
 **Exit（COMPAT-001 裁决，TASK.md §七/§十四）**：兼容性必须带债权人、边界与退出条件。
 
@@ -379,7 +378,7 @@ desired rebase 写成 Requested Stage / 未 seal 声称已 committed
 provider 成功当作 epoch commit 条件
 机械 Finality terminal-todo completeness gate
 Activation / WorkActivated 资格门 / system prompt 切换
-kind/id/status/priority/reviewing provider 冷状态
+kind/id/status/priority provider 冷状态
 ```
 
 （TODO-012；后三项分别归 finality / participant-identity / 本包 001）

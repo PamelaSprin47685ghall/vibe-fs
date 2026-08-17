@@ -8,7 +8,7 @@ Manager 是长期 mission 的执行者。系统随时要回答同一个问题：
 
 如果答案不是「一个持续维护的诚实账本」，就会退化成以下任一坏世界：
 
-- **phase/status 伪装进度**：`pending → in_progress → reviewing → completed` 描述的是「我现在在哪个工作阶段」，
+- **phase/status 伪装进度**：把过程阶段编码成 item status 描述的是「我现在在哪个工作阶段」，
   不是「用户请求仍缺哪些真」。计划、等待、评审被冒充成债务，系统把过程动作当成用户仍欠的结果。
 - **planning debt 与 mission debt 被强迫伪装成同一种东西**：模型在计划尚未完备时仍需要记录调查、分析、分解等工作；若协议禁止这些工作进入账本，模型只会把它们改名成假的 mission debt，反而让账本失真并过早触发 T1。
 - **reviewer 拥有账本写权**：PERFECT/REVISE 决定哪个 account 才「真正生效」，
@@ -44,7 +44,7 @@ RED = 满足下列任一：
 ## 4. 历史考古（为什么曾经 RED）
 
 历史 change（magic-todo）的 GrandRewrite 之前，provider 冷状态带
-`kind/id/status/priority/reviewing`，`settled/proposed/semanticMerge` 三态 + status min-merge 决定
+`kind/id/status/priority`，`settled/proposed/semanticMerge` 三态 + status min-merge 决定
 「preview 是否生效」。被拒方案与裁决：
 
 | 被拒方向 | 裁决 |

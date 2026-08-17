@@ -87,7 +87,7 @@ Load Phase 可以检查模块、静态资源、配置与 durable bytes 的结构
 - **canary 不可弯曲**（canary-unbend.md）：canary 是生产前置证明，不得为绿而弯曲（归
   verification-system 纪律；本包消费其结果）。
 - **HOST-013 全部**：归 prefix-stability 等（见 WHAT 弃权）；本包不复制。
-- **Magic Todo membrane canaries**：A..R 清单（见 PROOF.md）中本包只拥有 H（唯一
+- **Magic Todo membrane canaries**：现行清单（见 PROOF.md）中本包只拥有 H（唯一
   定位）、A/C（before 时序/原地 mutation）的 Host 观察面；canonical 语义归各 feature owner。
 - **`external_directory`**：AGENT-019 唯一 enforcement 写点归 capability-enforcement；Host 路径
   边界机制是 host-boundary 交叉（本包只记录观察面）。

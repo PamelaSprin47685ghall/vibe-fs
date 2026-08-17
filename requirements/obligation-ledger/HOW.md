@@ -102,7 +102,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | 内容 | 裁决理由 |
 |---|---|
 | `settled` / `proposed` / `semanticMerge` 三态 + status min-merge | GrandRewrite clean break 删除；reviewer 不拥有账本写权（TODO-005）。源码 production path 不得出现（静态 proof 断言，PROOF O-11） |
-| provider `kind` / `id` / `status` / `priority` / `reviewing` 冷状态 | 删除；wire 只有 top-level `planComplete` + `workingOn` + `{name,work}` obligations。`planComplete` 是单调业务承诺；`workingOn` 是单一当前焦点指针，不是 item status state |
+| provider `kind` / `id` / `status` / `priority` 冷状态 | 删除；wire 只有 top-level `planComplete` + `workingOn` + `{name,work}` obligations。`planComplete` 是单调业务承诺；`workingOn` 是单一当前焦点指针，不是 item status state |
 | `TodoPlanningStage` / `ReviewStage` / `AwaitingReview` bool / `TodoStage` PC | 程序计数器；恢复只从 durable facts（TODO-012） |
 | 生产 Activation 资格门 / `WorkActivated` 资格门 / `PlanningTail` / Birth/Labor floor | planning→Activation 两阶段删除；`WorkActivated` 仅 inert legacy decode（TODO-001/GLORY-018..021）。不在本包 WHAT 中写成命题 |
 | 第二套 PrefixEpoch / 平行 LWR renderer | 单一 SSOT（TODO-009/012） |

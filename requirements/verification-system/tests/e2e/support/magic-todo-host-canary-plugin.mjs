@@ -474,7 +474,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!after.enrichedOutput.includes('Keep working.')) {
     throw new Error(`HOST_CANARY_E: accepted result must keep the Manager moving without echoing the account: ${JSON.stringify(after.enrichedOutput)}`);
   }
-  if (/Current obligations:|proposed|settled|preview|reviewing/i.test(after.enrichedOutput)) {
+  if (/Current obligations:|proposed|settled|preview/i.test(after.enrichedOutput)) {
     throw new Error(`HOST_CANARY_E: accepted result leaked canonical/legacy account DTO vocabulary: ${JSON.stringify(after.enrichedOutput)}`);
   }
   // Settled snapshot is best-effort; when present it must show the same enriched bytes.

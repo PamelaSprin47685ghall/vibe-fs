@@ -59,11 +59,6 @@ const nodeTestSteps = [
     files: [path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs')],
   },
   {
-    // Phase 0 Host canaries D/I — reviewing sink strategy freeze (no Magic membrane).
-    label: 'plugin/magic-todo-sink-canary.test.mjs (obligation-ledger)',
-    files: [path.join(root, 'requirements/obligation-ledger/tests/integration/plugin/magic-todo-sink-canary.test.mjs')],
-  },
-  {
     label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',
     files: [path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs')],
   },

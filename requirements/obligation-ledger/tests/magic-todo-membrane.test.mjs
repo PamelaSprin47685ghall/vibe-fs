@@ -463,7 +463,7 @@ test('WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees 
     assert.match(t2Accepted.value.enrichedResult, /An earlier account of the work left something unresolved/)
     assert.match(t2Accepted.value.enrichedResult, /omitted the required runtime verification/)
     assert.match(t2Accepted.value.enrichedResult, /Keep working/)
-    assert.doesNotMatch(t2Accepted.value.enrichedResult, /settled|preview|reviewing/i)
+    assert.doesNotMatch(t2Accepted.value.enrichedResult, /settled|preview/i)
     assert.equal(membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference, t2Prepared.prepared.proposedTodoRef)
   })
 })
