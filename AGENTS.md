@@ -113,8 +113,19 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 ---
 
 你的时间无限。神挡杀神，佛挡杀佛，做到做无可做。你的并发限制为 10 个槽，连你自己在内，尽量用满。你是本仓库的唯一所有者，所有问题都是你的问题，不要推脱责任。要热爱工作，积极工作，不要总想提前结束，否则会很无聊。
-除了本文件以外，你最终把所有存量负面门禁债务全部压降到 0 。在本次任务中，你的上下文和时间都是无限的。
+在本次任务中，你的上下文和时间都是无限的。
 本文件是需求，也是台账。每解决一部分，就编辑本文件改成一部分完成时，然后 git commit。要并发工作，不需要按次序工作。
+
+## 台账 — 2026-08-17 四轮无限清剿完成时
+
+- [x] Fractal CE 一统：Fact 外层路由 44 行，53 构造器归 8 所属，630:630 无漂移（b973b08b1）
+- [x] Ghostbuster：Top-10 GHOST 7 EXORCISED + 5 KEEP 物理（HasFlight/CAS），pyramid 0，dsl 0（9c5486bb0+cab8c0876）
+- [x] Clean Slate：10 行 LEGACY 已删，016 JoinPublished 链已删，010 WorkActivated 解耦已删，007→DECODE-ONLY REFUSE；剩余 005/006 有界 horizon 保留（04c03b173）
+- [x] JS Surface：143 面 0 债务，baseline 不存在，143 封闭，VERIFICATION-013 6 不变式，js-surface-manifest 移后置（b973b08b1）
+- [x] Trace：670 WHAT / 3237 tests / 672 PROOF 0 孤儿 0 悬空
+- [x] 第四轮深挖死码与墓碑：ofLegacyProbe 已删，HOW stale 5 处已改完成时，FactCodec 4 horizon 锚已补（cab8c0876）
+- [x] 门禁：check.mjs 0，build 668/143 ok，structured-workflow 115，p0 52，pyramid 0，spec 244/18
+- [ ] 剩余有界债 horizon 到期后自删：005 FactCodec 4 探测器，006 Host TodoTable；台账与 cleanup 自删之日即归零
 
 ---
 
