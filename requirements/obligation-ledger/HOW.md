@@ -115,7 +115,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | `settled` / `proposed` / `semanticMerge` 三态 + status min-merge | GrandRewrite clean break 删除；reviewer 不拥有账本写权（TODO-005）。源码 production path 不得出现（静态 proof 断言，PROOF O-11） |
 | provider `kind` / `id` / `status` / `priority` 冷状态 | 删除；wire 只有 top-level `planComplete` + `workingOn` + `{name,work}` obligations。`planComplete` 是单调业务承诺；`workingOn` 是单一当前焦点指针，不是 item status state |
 | `TodoPlanningStage` / `ReviewStage` / `AwaitingReview` bool / `TodoStage` PC | 程序计数器；恢复只从 durable facts（TODO-012） |
-| 生产 Activation 资格门 / `WorkActivated` 资格门 / `PlanningTail` / Birth/Labor floor | planning→Activation 两阶段删除；`acceptActivation` / `applyAcceptedActivation` / wire Activation 检测已删除（无 creditor）；`WorkActivated` 仅 inert legacy decode + `appendLegacyMigrationWorkActivatedCompat` bounded-compat writer（LEGACY-010，e2e long-stroke creditor）（TODO-001/GLORY-018..021）。不在本包 WHAT 中写成命题 |
+| 生产 Activation 资格门 / `WorkActivated` 资格门 / `PlanningTail` / Birth/Labor floor | planning→Activation 两阶段删除；`acceptActivation` / `applyAcceptedActivation` / wire Activation 检测已删除（无 creditor）；`WorkActivated` 仅 inert legacy decode，writer 已删除 2026-08-17（LEGACY-010 closed），e2e long-stroke 已解耦（TODO-001/GLORY-018..021）。不在本包 WHAT 中写成命题 |
 | 第二套 PrefixEpoch / 平行 LWR renderer | 单一 SSOT（TODO-009/012） |
 | Host 按 `plan` / `survey` / `placeholder` 等关键词分类 planning work | 语义改由显式 `planComplete` 表达；Host 只校验 bool/call-shape，不猜自然语言 |
 

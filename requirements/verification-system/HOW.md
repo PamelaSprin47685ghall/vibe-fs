@@ -77,7 +77,7 @@ proof-ladder 现在必须绿。全量命令由 lead 在集成时执行（不跑 
 |---|---|---|
 | multi-canary / parallel pool / shuffle / 三轮 repeat（test.md G4R 之前形态） | GARBAGE（target-delete）：One World 取代；只作反例不成为目标 | WHAT-002/003；本 HOW |
 | `tests/e2e/cases/**`（31 cases） | GARBAGE：已删除；E2E_CASE_CEILING=0 只降不升 | WHAT-002 |
-| `enforcer-rulebook-gate.mjs` | retired stub（2026-08-12）：RuleBook 散文质量属编辑/判断关切，不设机械门；空壳保留在 proof-ladder allowlist | proof-ladder allowlist |
+| `enforcer-rulebook-gate.mjs` | retired stub（2026-08-12）：RuleBook 散文质量属编辑/判断关切，不设机械门；已删除，全仓无该文件，proof-ladder allowlist 已移除 | proof-ladder allowlist |
 | g4r-freeze / student-teacher-absence | 迁移期 ratchet，已删除（2026-08-14 Wave 2b）：由 `e2e-watchdog-feed`（One World 门）与 unified-store `student-qa-revival` scanner 承接 | PROOF SPLIT@cutover |
 | 旧 symbol blacklist（dsl-ownership / provider-leak） | 迁移期 ratchet（PROOF-MAP 标 DELETE）：基线稳定后弱化；不进入永久 verifier | PROOF SPLIT@cutover |
 | canary-unbend / orchestrator-e2e-timeout 的具体场景修复 | 历史证据：证明「断言不可弯曲」「先可解释再修根因」有现实失败模式 | WHY 考古；WHAT-004/005 |

@@ -6,7 +6,7 @@
 
 | 模块 | 职责 | 命题 |
 |---|---|---|
-| `src/Wanxiangshu/Mission/Manager/Life/Facts.fs` | `ManagerLifecycleFact` 类型（`LifeOpened` / `FinalityRequested` / `FinalityReviewerEnlisted` / `FinalityRejected` / `FinalitySiblingSteered` / `FinalityBlessed` / `FinalityUndecided` / `LifeCompleted`；`WorkActivated` 仅 legacy decode + bounded-compat writer `appendLegacyMigrationWorkActivatedCompat`，LEGACY-010） | 008/021/025 |
+| `src/Wanxiangshu/Mission/Manager/Life/Facts.fs` | `ManagerLifecycleFact` 类型（`LifeOpened` / `FinalityRequested` / `FinalityReviewerEnlisted` / `FinalityRejected` / `FinalitySiblingSteered` / `FinalityBlessed` / `FinalityUndecided` / `LifeCompleted`；`WorkActivated` 仅 legacy decode，writer 已删除 2026-08-17 (LEGACY-010 closed)，e2e long-stroke 已解耦） | 008/021/025 |
 | `src/Wanxiangshu/Mission/Manager/Life/Projection.fs` | `LifeProjection` / `FinalityRequestProjection` fold：ActiveFinality、EnlistedReviewers、LastBlessing、Completed、Resolution（Open/Rejected/Blessed/Undecided） | 008-017/021/022 |
 | `src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs` | `rosterOf` / `graduatedReviewer`（纯函数） | 009/010 |
 | `src/Wanxiangshu/Mission/Manager/FinalitySurface.fs` | JS-native owner boundary: lifecycle/history fold, Life/cohort views, ending/labor decisions, background obligation and ManagerJob projection | 001-010/016-028 |
@@ -91,7 +91,7 @@ at-rest 经验。输出逐字等于 last_words。
 
 | 内容 | 裁决理由 |
 |---|---|
-| 生产 Activation 资格门、`WorkActivated` 资格门、`PlanningTail`、Birth/Labor floor、Activation-only suicide gate | planning→Activation 两阶段删除；`acceptActivation` / `applyAcceptedActivation` / wire Activation 检测已删除（无 creditor）；`WorkActivated` 仅 inert legacy decode + `appendLegacyMigrationWorkActivatedCompat` bounded-compat writer（LEGACY-010，e2e long-stroke creditor），不得决定工作/压缩/Finality（GLORY-014/016..021）。不在本包 WHAT 中写成命题 |
+| 生产 Activation 资格门、`WorkActivated` 资格门、`PlanningTail`、Birth/Labor floor、Activation-only suicide gate | planning→Activation 两阶段删除；`acceptActivation` / `applyAcceptedActivation` / wire Activation 检测已删除（无 creditor）；`WorkActivated` 仅 inert legacy decode，writer 已删除 2026-08-17，ratchet 改为断言 writer 不存在（LEGACY-010 closed，e2e long-stroke 已解耦），不得决定工作/压缩/Finality（GLORY-014/016..021）。不在本包 WHAT 中写成命题 |
 | `status="already_completed"` / `"already_received"` 与 `Work log N` ordinal | 三种经验分型删除这些枚举（GLORY-076）；idempotent replay 重放原 result |
 | 旧 `HostReviewGuard` 的 Manager 面（missingTree/nudgeManager/ManagerGuard） | 删除；ManagerWorkflow 只判 join/finality/planning/handedOff（GLORY-070/REVIEW-007） |
 | 结构化 `FinalityFinding` schema / 固定 report DTO | 第二事实源 + 摘要漂移；反馈 = canonical LWR（GLORY-004/049/050） |

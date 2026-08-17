@@ -62,28 +62,3 @@ module MagicTodoPrefixEpoch =
           YBundleDigest = Some yBundleDigest
           ProviderPrefixDigest = Some providerPrefixDigest
           SolvingProviderRun = None }
-
-    /// Map legacy Probe commit shape into V2 EvidenceKind.Probe (migration aid).
-    let ofLegacyProbe
-        (sessionId: SessionId)
-        (previousEpoch: PrefixEpochId)
-        (nextEpoch: PrefixEpochId)
-        (snapshot: PrefixSnapshot)
-        (probeId: string)
-        (solvingRun: ProviderRunIdentity)
-        : PrefixRebaseCommittedV2 =
-        { SessionId = sessionId
-          ManagerLifeId = None
-          PreviousEpochId = previousEpoch
-          NextEpochId = nextEpoch
-          EvidenceKind = PrefixEvidenceKind.Probe probeId
-          FrozenRecordPrefixRef = snapshot.FrozenRecordPrefixRef
-          FrozenRecordPrefixDigest = snapshot.FrozenRecordPrefixDigest
-          CutoffExclusive = snapshot.CutoffExclusive
-          CoveredPrefixDigest = snapshot.CoveredPrefixDigest
-          SealRoot = snapshot.SealRoot
-          SyntheticMessageId = snapshot.SyntheticMessageId
-          YBundleRef = None
-          YBundleDigest = None
-          ProviderPrefixDigest = None
-          SolvingProviderRun = Some solvingRun }

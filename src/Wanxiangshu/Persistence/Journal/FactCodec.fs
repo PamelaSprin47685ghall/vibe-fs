@@ -68,6 +68,7 @@ module FactCodec =
            "\"DurableEffectRequested\""
            "\"DurableEffectAccepted\"" |]
 
+    // retention horizon: durable-events HOW §223 (pre-0.5.0 markers) — decode-only, delete when external census proves 0
     let containsLegacyFallbackFields (json: string) =
         pre050Markers
         |> Array.exists (fun marker -> json.IndexOf(marker, StringComparison.Ordinal) >= 0)
@@ -75,6 +76,7 @@ module FactCodec =
     /// ENFORCER-072: BlogObservationCommitted / legacy BlogEntryCommitted carrying
     /// ScoreVectorRef, or lacking TipRuleId, is a pre-tip-v2 shape. Explicit refuse
     /// — no max-score migration. Check both tags so old journals still fail closed.
+    // retention horizon: durable-events HOW §224 (tip-v2 clean break) — decode-only, delete when external census proves 0
     let containsLegacyScoreVectorEntry (json: string) =
         let isObservationCommit =
             json.IndexOf("\"BlogObservationCommitted\"", StringComparison.Ordinal) >= 0
@@ -94,6 +96,7 @@ module FactCodec =
     /// MarkerText. Its transcript position cannot be recovered without a
     /// heuristic ordinal≈batch guess, which would re-create the exact prefix
     /// bug this change fixes. Refuse — never migrate by guessing (cache §13).
+    // retention horizon: durable-events HOW §226 (EXEC-009 HandleCompleted missing completion) — decode-only, delete when external census proves 0
     let containsHandleCompletedMissingCompletionFields (json: string) =
         let isHandleCompleted =
             json.IndexOf("\"HandleCompleted\"", StringComparison.Ordinal) >= 0
@@ -102,6 +105,7 @@ module FactCodec =
         && (json.IndexOf("\"CompletionRef\"", StringComparison.Ordinal) < 0
             || json.IndexOf("\"CompletionDigest\"", StringComparison.Ordinal) < 0)
 
+    // retention horizon: durable-events HOW §225 (HOST-013 unanchored guideline) — decode-only, delete when external census proves 0
     let containsLegacyUnanchoredGuideline (json: string) =
         json.IndexOf("\"PairProgrammingGuidelineAppended\"", StringComparison.Ordinal)
         >= 0
