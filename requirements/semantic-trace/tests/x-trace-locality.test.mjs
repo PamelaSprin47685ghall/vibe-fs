@@ -171,6 +171,128 @@ test('WHAT[SEMANTIC-TRACE-006] TODO-004 localizes a pending before-hook ToolPart
   assert.equal(value.toolPartOrdinal, 1)
 })
 
+test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending empty todowrite stubs are not semantic sibling calls', () => {
+  const messages = [
+    {
+      info: { id: 'asst_pending_stub_run', role: 'assistant' },
+      parts: [
+        {
+          id: 'part_stub_a',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_stub_a',
+          state: { status: 'pending', input: {} },
+        },
+        {
+          id: 'part_stub_b',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_stub_b',
+          state: { status: 'pending', input: {} },
+        },
+        {
+          id: 'part_current',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_current',
+          state: {
+            status: 'pending',
+            input: {
+              planComplete: true,
+              workingOn: 'ship',
+              obligations: [{ name: 'ship', work: 'Ship the reviewed road.' }],
+            },
+          },
+        },
+      ],
+    },
+  ]
+  const localized = xTrace.resolveLocality(
+    managerSession,
+    messages,
+    [
+      tracePartEnvelope({
+        sequence: 8,
+        run: 'asst_prior_run',
+        turn: 3,
+        partIndex: 1,
+        kind: 'text',
+        toolName: undefined,
+        textRef: 'blobs/prior-text',
+        textDigest: 'digest:prior-text',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+    ],
+    'call_current',
+  )
+  const value = assertLocality(localized)
+
+  assert.deepEqual(value.todowriteCallIdsInMessage, ['call_current'])
+
+  const captured = xTrace.resolveLocality(
+    managerSession,
+    messages,
+    [
+      tracePartEnvelope({
+        sequence: 12,
+        run: 'asst_pending_stub_run',
+        partIndex: 3,
+        toolCallId: 'call_current',
+        hostToolPartId: 'part_current',
+      }),
+    ],
+    'call_current',
+  )
+  assert.deepEqual(assertLocality(captured).todowriteCallIdsInMessage, ['call_current'])
+})
+
+test('WHAT[SEMANTIC-TRACE-006] TODO-004 a populated sibling todowrite remains a real protocol sibling', () => {
+  const messages = [
+    {
+      info: { id: 'asst_real_sibling_run', role: 'assistant' },
+      parts: [
+        {
+          id: 'part_real_a',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_real_a',
+          state: { status: 'pending', input: { planComplete: false, workingOn: '', obligations: [] } },
+        },
+        {
+          id: 'part_real_b',
+          type: 'tool',
+          tool: 'todowrite',
+          callID: 'call_real_b',
+          state: { status: 'pending', input: { planComplete: true, workingOn: '', obligations: [] } },
+        },
+      ],
+    },
+  ]
+  const localized = xTrace.resolveLocality(
+    managerSession,
+    messages,
+    [
+      tracePartEnvelope({
+        sequence: 8,
+        run: 'asst_prior_run',
+        turn: 3,
+        partIndex: 1,
+        kind: 'text',
+        toolName: undefined,
+        textRef: 'blobs/prior-text',
+        textDigest: 'digest:prior-text',
+        toolCallId: undefined,
+        hostToolPartId: undefined,
+      }),
+    ],
+    'call_real_b',
+  )
+  const value = assertLocality(localized)
+
+  assert.deepEqual(value.todowriteCallIdsInMessage, ['call_real_a', 'call_real_b'])
+})
+
 test('WHAT[SEMANTIC-TRACE-006] TODO-004 pending before-hook ReviewFrontier includes last assistant text in the same message', () => {
   const messages = [
     {

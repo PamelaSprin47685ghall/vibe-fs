@@ -102,7 +102,12 @@ tool 渲染为 `[tool call] name args`）。
 **规范**：XTrace 提供半开区间定位：`sliceBetween [start, endExclusive)`、
 `sliceFrom [start, head)`、`head` = 最后一条之后（空轨迹为 origin）。`RecordCoverage =
 { IngestedThrough: XTraceCursor }` 是 Y 已消化位置的 durable 游标（COMPANION-003），
-决定 LWR gap 起点，可落在 turn 中间。
+决定 LWR gap 起点，可落在 turn 中间。Host before-hook 若要冻结 `Before(Tk)`，必须先从 full snapshot
+定位 Tk 所在 provider run，再把**该 run 之前的完整 transcript prefix**同步到 XTrace；否则此前已发生但
+尚未 capture 的 assistant / join 材料会被错误排除在 review range 外。当前 provider run 自身不得在
+input 尚为 `{}` 时提前 durable capture；它由 pending locality 在 fresh prior-prefix head 上定位。Host 流式工具构造留下的 sibling
+`pending + {}` / null ToolPart 只是未 materialize transport identity，不得冒充第二个 semantic todowrite；
+已有真实 input / terminal state 的 sibling 仍保留其独立 ToolCallId。
 
 **含义/动机**：任何消费者（LWR 物化、Blogger chunker、review frontier）都必须能对
 同一段历史给出**可证明相同**的 range。半开区间让「covered through N」与「next starts at N+1」

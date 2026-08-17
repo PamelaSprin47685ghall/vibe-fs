@@ -50,6 +50,7 @@ CurrentObligationsRef
 FirstAcceptedCheckpoint?         // once-set: first Accepted; reviewer first-delivery identity
 LatestAcceptedCheckpoint?        // current review / previous-review locator
 PendingReviewCheckpoint?
+LatestConcludedManagerReviewFrontier? // dedicated reviewer 已消费的 Manager LWR exclusive end
 FirstPlanCommitment?             // once-set: first Accepted whose Prepared declared true
 LatestCommittedCheckpoint?      // after FirstPlanCommitment, every later Accepted is effective committed
 PreviousCommittedCheckpoint?    // lag-1 cutoff without scanning history
@@ -74,7 +75,12 @@ Review(k)     => verdict/report only; never rewrites Current
 ### before / deferred prepare（OBLIGATION-LEDGER-025）
 
 before 同步阶段只 decode + 内存 compatibility 投影，启动 deferred prepare 后立即返回；
-deferred prepare 等 `pending + {}` materialize，校验 materialized canonical == 捕获值后
+deferred prepare 读取 full Host snapshot，先用 `SessionSnapshotPort.locateToolCall` 找到当前 provider run，
+再用 `XTraceCapture.captureSessionMessages` 只同步该 run **之前**的完整 transcript prefix，最后在 fresh
+projection 上 localize 当前 call；这样补齐漏 capture 的历史，又不会把当前 `pending + {}` tool stub 写进
+durable XTrace。当前 `pending + {}` 只允许由本次 before live args materialize。
+同 message 其它 `pending + {}`/null ToolPart 只是 Host construction stub，不计作第二个 semantic todowrite；
+另一个已有真实 input/terminal state 的 sibling 仍由 O-7 全拒。随后校验 materialized canonical == 捕获值并
 durable `TodoWritePrepared`，其中原样冻结 submitted `planComplete`。ephemeral JS bridge
 （process-local Map + hidden Symbol）只搬运本次 effect shell 的 ephemeral 数据，**不是** durable 状态；
 crash recovery 只重放 Prepared/Accepted，不读取 bridge。
@@ -84,6 +90,11 @@ crash recovery 只重放 Prepared/Accepted，不读取 bridge。
 physical success 双路径（live after / recovery ToolPart completed）收敛同一
 `TodoWriteId + input digest + output digest`；ensure Accepted（幂等，`PreparedFactRef` 必须指向
 真实 append 返回的 EventId）→ ensure Dedicated → ensureReview。禁止先 reviewer 后 Accepted。
+
+Dedicated reviewer 的 manager-side LWR 起点也是 O(1) projection：首次 assignment 使用 structural
+`WorkRecordStart`；`TodoReviewConcluded` fold 把当前 checkpoint `ReviewFrontier` 写入
+`LatestConcludedManagerReviewFrontier`，下一 assignment 直接物化
+`[LatestConcludedManagerReviewFrontier, current ReviewFrontier)`。不得扫描历史 checkpoint 找“上一份”。
 
 ### 失败分型（OBLIGATION-LEDGER-009）
 

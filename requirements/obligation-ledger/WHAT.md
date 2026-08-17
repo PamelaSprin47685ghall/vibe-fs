@@ -107,12 +107,15 @@ blank name 同样语法拒绝。禁止靠 `work` 文本猜 identity；Host 内�
 
 **证据** → PROOF.md 行 O-6。
 
-## OBLIGATION-LEDGER-007：admission —— 同 message 多 todowrite 全拒、单 inflight
+## OBLIGATION-LEDGER-007：admission —— 同 message 多个已 materialize todowrite 全拒、单 inflight
 
 **规范**：
 
-1. 同一 assistant message 出现 >1 个不同 `ToolCallId` 的 `todowrite` → **全部**作为调用语法/协议
-   错误拒绝。无 ordinal winner、无 hook 到达顺序 / wall-clock 仲裁。
+1. 同一 assistant message 出现 >1 个不同 `ToolCallId` 的**已 materialize / 可执行** `todowrite` →
+   **全部**作为调用语法/协议错误拒绝。无 ordinal winner、无 hook 到达顺序 / wall-clock 仲裁。
+   Host 在流式工具构造期间暴露的 `state=pending,input={}` / null 空壳不是第二个语义调用；当前
+   `tool.execute.before` 已携带完整 args 的 call 必须作为唯一 materialized call 参与 admission。只有另一个
+   sibling 也已有真实 input / terminal tool state 时才构成真正 multi-call 冲突。
 2. 同一 Manager Life 同时最多一个新 checkpoint admission。
 3. 不同 `ToolCallId`（即使 list 相同）→ 新 checkpoint。
 
@@ -418,6 +421,11 @@ adopt；同 session 后续新 Life 禁止再次从 Host TodoTable 反推 seed（
 
 - 首次 `TodoWriteAccepted` 时若尚不存在 → Host-owned hidden session 创建并 durable enlist；
 - 后续 checkpoint：同一 logical reviewer，优先同一 physical session；上一轮 Host-owned work-unit handle 已 `CompletedAwaitingJoin/Retired` 不等于 logical reviewer 丢失；在**新 assignment 尚未 durable**时必须为同一 physical reviewer 取得新的 Active work-unit/link，再发送 continuation；已 assigned 的旧 checkpoint 不得为掩盖 record-ready 缺口而复活 handle；
+- 同一 dedicated reviewer 已经读过的 Manager LWR 不重复发送：首个 checkpoint 从 structural
+  `WorkRecordStart` 起；每次 `TodoReviewConcluded` O(1) 推进 `LatestConcludedManagerReviewFrontier`，
+  下一 checkpoint 的 `ManagerCheckpointLWR` 必须使用
+  `[LatestConcludedManagerReviewFrontier, current ReviewFrontier)`；不得每轮从 Opening / WorkRecordStart
+  重放旧工作，也不得扫描 checkpoint history 重建这个起点；
 - 仅 proven permanent loss 后 `DedicatedTodoReviewerReplaced`（logical id 不变）；不确定 → fail closed；
 - **Finality cohort membership 可 graduate，process-review duty / session 至少保留到
   `LifeCompleted`**——Blessing 或 Finality REVISE 不 Dispose、不丢过程历史（TODO-008/010）。
@@ -510,7 +518,9 @@ reviewer、**不**写 `TodoWriteAccepted`（HOST-019/020）。
 ```text
 before live args → decode obligations → compatibility projection → executor
                   ↘ deferred prepare:
-                     pending + {} → wait + reread same callID
+                     locate same callID in full Host snapshot
+                     synchronize XTrace only through the transcript prefix before its provider run
+                     pending + {} → materialize from this before-hook's live args
                      materialized canonical == captured live canonical → durable prepare/admit
                      materialized canonical != captured live canonical → fail closed
                      carrier/provider run/part 变化 → fail closed
@@ -518,8 +528,12 @@ before live args → decode obligations → compatibility projection → executo
 
 `TodoWritePrepared` 冻结 provider 原始 `planComplete` + canonical
 `{planComplete,workingOn,obligations:[{name,work}]}` `ProviderInputDigest` 与 BaseObligations / Submitted digests、
-`ReviewFrontier`（本 tool-call 前 exclusive cursor，绑
-ManagerLifeId；pending before-hook 计入 next-assigned + 同 message 本 call 之前的可捕获 part 数）。
+`ReviewFrontier`（本 tool-call 前 exclusive cursor，绑 ManagerLifeId）。冻结它之前必须先从 full Host
+snapshot 定位当前 provider run，并把**该 run 之前的完整 transcript prefix**同步进 XTrace；这样此前已经
+发生但 transform capture 尚未来得及写入的 Scout/join/assistant 材料不会落在 frontier 之后，同时当前
+assistant message 里仍可能 `pending,input={}` 的 tool construction state 不会被提前写成 durable semantic
+XTrace。随后当前 pending call 使用 fresh XTrace head + 同 message 本 call 之前的可捕获 part 数得到
+`ReviewFrontier`，并由本次 before live args materialize input。
 `TodoWriteAccepted.PreparedFactRef` 必须是 append 对应 Prepared 返回的真实 Journal `EventId`，
 不得重猜、伪造或用逻辑 id 代替（TODO-004）。
 

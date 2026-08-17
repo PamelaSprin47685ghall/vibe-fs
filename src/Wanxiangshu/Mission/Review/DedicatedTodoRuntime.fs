@@ -127,8 +127,9 @@ module DedicatedTodoReviewerRuntime =
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (life: LifeProjection)
+        (magicLife: MagicTodoProjection.LifeMagicTodoState)
         (reviewFrontier: XTraceCursor)
-        : Task<string> =
+        : Task<Result<string, string>> =
         task {
             let snapshot = AgentJournal.snapshot journal
 
@@ -137,20 +138,24 @@ module DedicatedTodoReviewerRuntime =
                 |> Option.bind (fun session -> session.XTrace)
                 |> Option.defaultValue XTraceProjection.empty
 
-            let start =
-                ManagerOpeningFloor.workRecordStart
-                    life
-                    (MagicTodoProjection.tryLife life.LifeId snapshot.AgentProjections.MagicTodo)
-                    xTrace
+            let structuralStart =
+                ManagerOpeningFloor.workRecordStart life (Some magicLife) xTrace
                 |> Option.defaultValue life.OpeningCursor
 
-            let range =
-                { MagicTodoLwr.BoundedRange.StartInclusive = start
-                  MagicTodoLwr.BoundedRange.EndExclusive = reviewFrontier }
+            let start =
+                magicLife.LatestConcludedManagerReviewFrontier
+                |> Option.defaultValue structuralStart
 
-            let! record = LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
+            if start.Sequence > reviewFrontier.Sequence then
+                return Error "process-review manager LWR start exceeds current ReviewFrontier"
+            else
+                let range =
+                    { MagicTodoLwr.BoundedRange.StartInclusive = start
+                      MagicTodoLwr.BoundedRange.EndExclusive = reviewFrontier }
 
-            return record |> Option.defaultValue ""
+                let! record = LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) managerSessionId range
+
+                return Ok(record |> Option.defaultValue "")
         }
 
     let private capturePortMessages
@@ -532,8 +537,7 @@ module DedicatedTodoReviewerRuntime =
             let! opening = openingRaw journal managerLife |> TaskResultCE.ofTask
 
             let! checkpointLwr =
-                managerCheckpointLwr journal managerSessionId managerLife checkpoint.ReviewFrontier
-                |> TaskResultCE.ofTask
+                managerCheckpointLwr journal managerSessionId managerLife life checkpoint.ReviewFrontier
 
             let request: ProcessReviewRequest =
                 { TodoReviewId = reviewId

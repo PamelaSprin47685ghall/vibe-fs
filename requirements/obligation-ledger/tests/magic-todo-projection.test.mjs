@@ -289,6 +289,47 @@ test('WHAT[OBLIGATION-LEDGER-018] reviewer reverse locator is maintained on enli
   assert.equal(projection.MagicTodoProjectionSurface_reviewerLife(handle, replacementSession), life)
 })
 
+test('WHAT[OBLIGATION-LEDGER-020] concluded manager review frontier advances only when the dedicated reviewer concludes', () => {
+  const handle = projection.MagicTodoProjectionSurface_create()
+  const firstCall = 'todo-review-range-first'
+  const firstWrite = todo.todoWriteId(sha256, life, firstCall)
+  const firstReview = todo.todoReviewId(sha256, life, firstWrite)
+  const secondCall = 'todo-review-range-second'
+  const secondWrite = todo.todoWriteId(sha256, life, secondCall)
+  const secondReview = todo.todoReviewId(sha256, life, secondWrite)
+
+  ok(foldMagic(handle, preparedFact({ todoWriteId: firstWrite, toolCallId: firstCall, reviewFrontier: 10 }), 'prepared-review-range-first'))
+  ok(foldMagic(handle, acceptedFact({ todoWriteId: firstWrite, toolCallId: firstCall, preparedFactRef: 'prepared-review-range-first' })))
+  ok(foldMagic(handle, enlisted))
+  ok(foldMagic(handle, assignedFact({ todoWriteId: firstWrite, todoReviewId: firstReview, managerReviewFrontier: 10 })))
+  ok(foldMagic(handle, concludedFact({ todoWriteId: firstWrite, todoReviewId: firstReview })))
+  assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).latestConcludedManagerReviewFrontier, 10)
+
+  ok(foldMagic(handle, preparedFact({
+    todoWriteId: secondWrite,
+    toolCallId: secondCall,
+    baseTodoRef: 'proposal-list',
+    baseTodoDigest: 'proposal-digest',
+    proposedTodoRef: 'proposal-list-second',
+    proposedTodoDigest: 'proposal-digest-second',
+    reviewFrontier: 20,
+  }), 'prepared-review-range-second'))
+  ok(foldMagic(handle, acceptedFact({
+    todoWriteId: secondWrite,
+    toolCallId: secondCall,
+    preparedFactRef: 'prepared-review-range-second',
+  })))
+  assert.equal(
+    projection.MagicTodoProjectionSurface_view(handle, life).latestConcludedManagerReviewFrontier,
+    10,
+    'the current Accepted checkpoint is not reviewer coverage until its own review concludes',
+  )
+
+  ok(foldMagic(handle, assignedFact({ todoWriteId: secondWrite, todoReviewId: secondReview, managerReviewFrontier: 20 })))
+  ok(foldMagic(handle, concludedFact({ todoWriteId: secondWrite, todoReviewId: secondReview })))
+  assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).latestConcludedManagerReviewFrontier, 20)
+})
+
 test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment and never reopens it', () => {
   const makeCheckpoint = (suffix, declared, baseName, proposalName, frontier) => {
     const cpCall = `todo-${suffix}`
@@ -363,6 +404,7 @@ test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment a
   closeReview(handle, planning)
   lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
   assert.equal(lifeState.pendingReviewCheckpoint, null)
+  assert.equal(lifeState.latestConcludedManagerReviewFrontier, planning.frontier)
 
   ok(foldMagic(handle, commitment.prepared, commitment.preparedRef))
   ok(foldMagic(handle, commitment.accepted))
@@ -370,12 +412,20 @@ test('WHAT[OBLIGATION-LEDGER-016] projection latches the first true commitment a
   assert.equal(lifeState.firstPlanCommitment, commitment.write)
   assert.equal(lifeState.latestCommittedCheckpoint, commitment.write)
   assert.equal(lifeState.previousCommittedCheckpoint, null)
+  assert.equal(
+    lifeState.latestConcludedManagerReviewFrontier,
+    planning.frontier,
+    'accepting the next checkpoint does not pretend its review range is already known by the reviewer',
+  )
 
   closeReview(handle, commitment)
+  lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
+  assert.equal(lifeState.latestConcludedManagerReviewFrontier, commitment.frontier)
   ok(foldMagic(handle, laterFalse.prepared, laterFalse.preparedRef))
   ok(foldMagic(handle, laterFalse.accepted))
   lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
   assert.equal(lifeState.firstPlanCommitment, commitment.write)
   assert.equal(lifeState.previousCommittedCheckpoint, commitment.write)
   assert.equal(lifeState.latestCommittedCheckpoint, laterFalse.write)
+  assert.equal(lifeState.latestConcludedManagerReviewFrontier, commitment.frontier)
 })

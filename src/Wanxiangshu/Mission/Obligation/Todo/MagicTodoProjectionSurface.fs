@@ -142,6 +142,10 @@ module MagicTodoProjectionSurface =
                     life.LatestAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
                    pendingReviewCheckpoint =
                     life.PendingReviewCheckpoint |> Option.map TodoWriteId.value |> optionString
+                   latestConcludedManagerReviewFrontier =
+                    life.LatestConcludedManagerReviewFrontier
+                    |> Option.map (fun value -> box (int value.Sequence))
+                    |> Option.toObj
                    firstPlanCommitment = life.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
                    latestCommittedCheckpoint =
                     life.LatestCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString

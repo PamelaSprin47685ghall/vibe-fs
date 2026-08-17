@@ -701,6 +701,26 @@ module MagicTodoHostHooks =
             let! messagesResult = snapshots.GetMessages sessionId
             let messages = requireMessages sessionText messagesResult
 
+            let currentProviderRun =
+                match SessionSnapshotPort.locateToolCall callId messages with
+                | Ok located -> located.ProviderRun
+                | Error reason ->
+                    fatalInfrastructure sessionText (sprintf "todowrite snapshot locality failed: %A" reason)
+
+            let priorMessages =
+                let currentRunId = ProviderRunIdentity.value currentProviderRun
+                messages |> List.takeWhile (fun message -> message.Id <> currentRunId)
+
+            // Synchronise only the complete transcript prefix before this provider
+            // run. The current assistant message can still contain Host-created
+            // pending tool stubs with `{}` input; capturing those now would make
+            // transport construction state durable semantic XTrace. Locality below
+            // accounts for current-message parts before this call without persisting
+            // the unmaterialized call itself.
+            match! XTraceCapture.captureSessionMessages (Some durable) sessionId priorMessages with
+            | Error reason -> fatalInfrastructure sessionText ("XTrace transcript-prefix capture failed: " + reason)
+            | Ok() -> ()
+
             let locality =
                 MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId
                 |> requireLocality sessionText

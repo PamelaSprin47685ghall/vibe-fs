@@ -88,6 +88,10 @@ module MagicTodoProjection =
             FirstAcceptedCheckpoint: TodoWriteId option
             LatestAcceptedCheckpoint: TodoWriteId option
             PendingReviewCheckpoint: TodoWriteId option
+            /// Manager XTrace frontier already delivered to and concluded by the
+            /// dedicated process reviewer. While the current checkpoint review is
+            /// pending this remains the previous checkpoint's exclusive end.
+            LatestConcludedManagerReviewFrontier: XTraceCursor option
             FirstPlanCommitment: TodoWriteId option
             LatestCommittedCheckpoint: TodoWriteId option
             PreviousCommittedCheckpoint: TodoWriteId option
@@ -132,6 +136,7 @@ module MagicTodoProjection =
           FirstAcceptedCheckpoint = None
           LatestAcceptedCheckpoint = None
           PendingReviewCheckpoint = None
+          LatestConcludedManagerReviewFrontier = None
           FirstPlanCommitment = None
           LatestCommittedCheckpoint = None
           PreviousCommittedCheckpoint = None
@@ -407,7 +412,8 @@ module MagicTodoProjection =
         putLife
             { life with
                 Checkpoints = Map.add key cp life.Checkpoints
-                PendingReviewCheckpoint = None }
+                PendingReviewCheckpoint = None
+                LatestConcludedManagerReviewFrontier = Some cp.ReviewFrontier }
             state
 
     let private requireReviewerIndexOwns

@@ -39,7 +39,8 @@ RED = 满足下列任一：
 2. `planComplete=false` 时 planning work 被迫伪装成 mission debt，或 commitment 后仍把 planning placeholder 当成 mission debt；
 3. REVISE 能静默回滚已经 accepted 的 account（reviewer settlement / semanticMerge 复活）；
 4. 崩溃恢复不重放 Accepted 链而靠 Stage / 布尔 / 时间猜；
-5. 同一 message 多个 todowrite 有 winner 仲裁，或 infra 失败被降格成 tool 红字。
+5. 同一 message 多个**已 materialize** todowrite 有 winner 仲裁，或 infra 失败被降格成 tool 红字；Host
+   流式构造期间尚无 input 的 pending ToolPart 空壳不算第二份账。
 
 ## 4. 历史考古（为什么曾经 RED）
 
@@ -49,7 +50,7 @@ RED = 满足下列任一：
 
 | 被拒方向 | 裁决 |
 |---|---|
-| 同 message 多 todowrite 按 hook 到达顺序仲裁 winner | 全部作为语法/协议错误拒绝；无 ordinal winner |
+| 同 message 多个已 materialize todowrite 按 hook 到达顺序仲裁 winner | 全部作为语法/协议错误拒绝；无 ordinal winner。`pending + {}` / null construction stub 不是可仲裁 candidate |
 | V2 runner 裸奔（无 hook parity） | Attempt construction fail closed；错入则 fatal |
 | Host 用自然语言关键词分类器识别 meta-work | 分类器无法区分合法 planning work 与 commitment 后的伪 mission debt；改用 provider 显式 `planComplete` + durable 单调 latch |
 | reviewer 以 PERFECT/REVISE 决定哪个 account 生效 | reviewer 只判断并报告；REVISE 不涂改 Tk |

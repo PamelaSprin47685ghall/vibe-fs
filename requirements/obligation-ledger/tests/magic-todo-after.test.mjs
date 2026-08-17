@@ -10,6 +10,10 @@ const runtimeSource = join(
   here,
   '../../../src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
 )
+const membraneSource = join(
+  here,
+  '../../../src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
+)
 
 test('WHAT[OBLIGATION-LEDGER-026] first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment', () => {
   assert.equal(todo.assignmentDelivery(false), 'OwnerRoot')
@@ -52,4 +56,32 @@ test('WHAT[OBLIGATION-LEDGER-020] a new checkpoint reactivates a retired reviewe
   assert.match(source, /ensureReusableReviewerWorkUnit/, 'runtime must name the work-unit reactivation promise')
   assert.match(source, /HandleLifecycle\.Retired/, 'retired previous work-unit is a handled reuse case')
   assert.match(source, /HandleLinked/, 'reactivation must be durable, not only AdoptChild process memory')
+})
+
+test('WHAT[OBLIGATION-LEDGER-025] deferred prepare synchronizes the Host snapshot before freezing ReviewFrontier', () => {
+  const source = readFileSync(membraneSource, 'utf8')
+  const locate = source.indexOf('SessionSnapshotPort.locateToolCall callId messages')
+  const prefix = source.indexOf('messages |> List.takeWhile (fun message -> message.Id <> currentRunId)')
+  const capture = source.indexOf('XTraceCapture.captureSessionMessages (Some durable) sessionId priorMessages')
+  const resolve = source.indexOf('MagicTodoLocality.resolve sessionId messages (AgentJournal.snapshot durable) callId')
+  assert.ok(locate > 0, 'deferred prepare must identify the exact current provider run from the Host snapshot')
+  assert.ok(prefix > locate, 'only the complete transcript before the current provider run may be synchronized')
+  assert.ok(capture > prefix, 'the prior transcript must be synchronized into XTrace')
+  assert.ok(resolve > capture, 'ReviewFrontier must be localized only after the synchronized XTrace snapshot is current')
+  assert.doesNotMatch(
+    source,
+    /captureSessionMessages \(Some durable\) sessionId messages/,
+    'the current pending tool message must not be durably captured before its input materializes',
+  )
+})
+
+test('WHAT[OBLIGATION-LEDGER-020] persistent process reviewer receives only manager work after its last concluded frontier', () => {
+  const source = readFileSync(runtimeSource, 'utf8')
+  assert.match(source, /LatestConcludedManagerReviewFrontier/)
+  assert.match(source, /Option\.defaultValue structuralStart/)
+  assert.match(
+    source,
+    /StartInclusive = start[\s\S]{0,160}EndExclusive = reviewFrontier/,
+    'manager checkpoint LWR must be the non-overlapping interval [last concluded frontier, current frontier)',
+  )
 })

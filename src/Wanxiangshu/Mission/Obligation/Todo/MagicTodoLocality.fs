@@ -113,7 +113,34 @@ module MagicTodoLocality =
             + 1L
             + int64 (capturablePartsBeforeTool message.Parts toolCallId) }
 
-    let private resolveCapturedToolCall trace (located: SessionSnapshotPort.ToolCallLocation) (part: XTracePartRef) =
+    let private isUnmaterializedPendingStub (part: SessionToolPart) =
+        part.State = SnapshotToolPartState.Pending
+        && (String.IsNullOrWhiteSpace part.InputCanonical
+            || part.InputCanonical = "{}"
+            || part.InputCanonical = "null")
+
+    let private semanticTodowriteCallIds (currentCallId: ToolCallId) (parts: SessionToolPart array) =
+        parts
+        |> Array.filter (fun part ->
+            part.ToolName = "todowrite"
+            && (part.ToolCallId = currentCallId || not (isUnmaterializedPendingStub part)))
+        |> Array.map (fun part -> part.ToolCallId)
+        |> Array.distinct
+        |> Array.toList
+
+    let private assistantMessageForRun
+        (messages: SessionMessage list)
+        (providerRun: ProviderRunIdentity)
+        =
+        let run = ProviderRunIdentity.value providerRun
+        messages |> List.filter (fun message -> message.Role = "assistant" && message.Id = run)
+
+    let private resolveCapturedToolCall
+        trace
+        messages
+        (located: SessionSnapshotPort.ToolCallLocation)
+        (part: XTracePartRef)
+        =
         let toolPartOrdinal =
             XTraceProjection.parts trace
             |> List.filter (fun candidate ->
@@ -122,28 +149,26 @@ module MagicTodoLocality =
                 && candidate.Cursor.Sequence <= part.Cursor.Sequence)
             |> List.length
 
-        let todowriteCallIds =
-            XTraceProjection.parts trace
-            |> List.filter (fun candidate ->
-                candidate.ProviderRun = Some located.ProviderRun
-                && candidate.Kind = "tool_call"
-                && candidate.ToolName = Some "todowrite")
-            |> List.choose (fun candidate -> candidate.ToolCallId)
-            |> List.distinct
+        let todowriteCallIdsResult =
+            assistantMessageForRun messages located.ProviderRun
+            |> List.map (fun message -> semanticTodowriteCallIds located.ToolCallId message.ToolParts)
 
-        Ok
-            { ProviderRun = located.ProviderRun
-              HostToolPartId = located.HostToolPartId
-              ToolCallId = located.ToolCallId
-              ToolName = located.ToolName
-              InputCanonical = located.InputCanonical
-              State = located.State
-              TodowriteCallIdsInMessage = todowriteCallIds
-              ToolPartOrdinal = toolPartOrdinal
-              ReviewFrontier = part.Cursor
-              Range =
-                { Start = part.Cursor
-                  EndExclusive = { Sequence = part.Cursor.Sequence + 1L } } }
+        match todowriteCallIdsResult with
+        | [ todowriteCallIds ] ->
+            Ok
+                { ProviderRun = located.ProviderRun
+                  HostToolPartId = located.HostToolPartId
+                  ToolCallId = located.ToolCallId
+                  ToolName = located.ToolName
+                  InputCanonical = located.InputCanonical
+                  State = located.State
+                  TodowriteCallIdsInMessage = todowriteCallIds
+                  ToolPartOrdinal = toolPartOrdinal
+                  ReviewFrontier = part.Cursor
+                  Range =
+                    { Start = part.Cursor
+                      EndExclusive = { Sequence = part.Cursor.Sequence + 1L } } }
+        | _ -> Error(LocalityRejection.XTraceMissing(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
     let private resolvePendingInMessage
         trace
@@ -161,12 +186,7 @@ module MagicTodoLocality =
         | [ (index, _) ] ->
             let frontier = pendingReviewFrontier trace message located.ToolCallId
 
-            let todowriteCallIds =
-                message.ToolParts
-                |> Array.filter (fun part -> part.ToolName = "todowrite")
-                |> Array.map (fun part -> part.ToolCallId)
-                |> Array.distinct
-                |> Array.toList
+            let todowriteCallIds = semanticTodowriteCallIds located.ToolCallId message.ToolParts
 
             Ok
                 { ProviderRun = located.ProviderRun
@@ -213,7 +233,7 @@ module MagicTodoLocality =
                 && part.HostToolPartId = Some located.HostToolPartId)
 
         match matches with
-        | [ part ] -> resolveCapturedToolCall trace located part
+        | [ part ] -> resolveCapturedToolCall trace messages located part
         | [] -> resolvePendingToolCall trace messages located
         | _ -> Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 

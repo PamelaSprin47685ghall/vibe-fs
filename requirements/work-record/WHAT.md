@@ -259,10 +259,16 @@ RecordCoverage 推导可替换前缀，禁止用 PrefixCoverage 填 LWR gap。
 `ManagerCheckpointLWR(k)`、`ProcessReviewLWR(k)`、`FinalityReviewLWR(k)`，全部
 `includeOpening=false`。
 
+对于同一 Life 内复用的 dedicated process reviewer，`ManagerCheckpointLWR` 还必须按 reviewer 已知
+范围连续分段：第一份从 structural `WorkRecordStart` 起；后续份从上一 `TodoReviewConcluded` 对应的
+Manager review exclusive frontier 起，到当前 `Before(Tk)` 为止。不得因为 reviewer physical work-unit
+重新 link / continuation 就把起点重置到 Opening；range transport 可复用，但已交付的 manager history
+不重复发送。
+
 **含义/动机**：session head 会混入其它 invocation / 未来工作；bounded range 让 review
 可证明「这份 record 恰好覆盖 Rk 的证据区间」。
 
-**边界**：各 frontier 的推导（`Before(Tk)` 等）归 `obligation-ledger` / `review-assurance`；
+**边界**：各 frontier 的推导（`Before(Tk)`、上一 concluded manager frontier 等）归 `obligation-ledger` / `review-assurance`；
 本命题拥有「materialize 必须 bounded」这一半。
 
 **证据**：REVIEW-016；GLORY-004；TODO-008；`Application/Finality/LifecycleWorkRecordProjection.fs`
