@@ -16,6 +16,7 @@ import { isBuildVerificationOnlyBaseline, run as runBoundaryGate } from '../../.
 import { usesSurface, validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
 import {
   BUILD_VERIFICATION_FILES,
+  SURFACE_CONSUMERS,
   SURFACE_MANIFEST,
   scanAll,
   semanticImportEdges,
@@ -348,4 +349,69 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_str
     'export const noop = () => null',
   ].join('\n')
   assert.equal(usesSurface(deadDefaultSource, module), false, 'imported but never referenced default binding is not active')
+})
+
+// ── 003d: per-consumer unauthorized import rejection ───────────────────────
+// Registration grants no blanket import authority. A test that actively uses a
+// surface must carry a matching law WHAT tag in the owner's tests directory,
+// or its package must be declared as an explicit cross-owner consumer. An
+// unrelated test importing the surface is a false green, not proof.
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorized_active_consumer', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-unauth-'))
+  const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
+  const ownerProof = join(temporaryRoot, 'requirements', 'owner', 'PROOF.md')
+  const rogueWhat = join(temporaryRoot, 'requirements', 'rogue', 'WHAT.md')
+  const rogueProof = join(temporaryRoot, 'requirements', 'rogue', 'PROOF.md')
+  const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
+  const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
+  const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
+  const ownerTest = join(temporaryRoot, 'requirements', 'owner', 'tests', 'owner.test.mjs')
+  const rogueTest = join(temporaryRoot, 'requirements', 'rogue', 'tests', 'rogue.test.mjs')
+  mkdirSync(dirname(ownerWhat), { recursive: true })
+  mkdirSync(dirname(rogueWhat), { recursive: true })
+  mkdirSync(dirname(source), { recursive: true })
+  mkdirSync(dirname(dist), { recursive: true })
+  mkdirSync(dirname(ownerTest), { recursive: true })
+  mkdirSync(dirname(rogueTest), { recursive: true })
+
+  try {
+    writeFileSync(ownerWhat, '# OWNER-001\n')
+    writeFileSync(ownerProof, '| OWNER-001 | `tests/owner.test.mjs::WHAT[OWNER-001] authorized` |\n')
+    writeFileSync(rogueWhat, '# ROGUE-001\n')
+    writeFileSync(rogueProof, '| ROGUE-001 | `tests/rogue.test.mjs::WHAT[ROGUE-001] rogue proof` |\n')
+    writeFileSync(source, 'module Owner.Surface\n')
+    writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
+    writeFileSync(dist, 'export const value = 1\n')
+    // Authorized: owner dir + matching WHAT tag
+    writeFileSync(ownerTest, "import { value } from '../../../dist/Owner/Surface.js'\ntest('WHAT[OWNER-001] authorized', () => { value() })\n")
+    // Unauthorized: rogue dir, non-matching WHAT tag, no declared consumer edge
+    writeFileSync(rogueTest, "import { value } from '../../../dist/Owner/Surface.js'\ntest('WHAT[ROGUE-001] unauthorized', () => { value() })\n")
+
+    const entry = {
+      module: 'Owner/Surface.js',
+      owner: 'owner',
+      laws: ['OWNER-001'],
+      source: 'src/Wanxiangshu/Owner/Surface.fs',
+      representation: 'json',
+      kind: 'pure',
+    }
+    const failures = validateSurfaceManifest([entry], temporaryRoot)
+    const unauthorized = failures.filter((f) => f.includes('unauthorized active import'))
+    assert.equal(unauthorized.length, 1, `exactly one unauthorized import failure, got: ${failures.join('\n')}`)
+    assert.match(unauthorized[0], /rogue\.test\.mjs/)
+    assert.match(unauthorized[0], /package rogue has no law or declared consumer edge/)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
+// ── 003e: stale consumer metadata for unregistered modules is rejected ──────
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003e_manifest_rejects_stale_consumer_metadata', () => {
+  // SURFACE_CONSUMERS must not carry entries for modules removed from the
+  // manifest. A stale entry grants phantom import authority.
+  const manifestModules = new Set(SURFACE_MANIFEST.map((e) => e.module))
+  const stale = Object.keys(SURFACE_CONSUMERS).filter((m) => !manifestModules.has(m))
+  assert.deepEqual(stale, [], `stale SURFACE_CONSUMERS entries for unregistered modules: ${stale.join(', ')}`)
 })

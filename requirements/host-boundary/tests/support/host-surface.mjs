@@ -11,20 +11,6 @@ export const wireProjection = {
   },
 }
 
-export const needHelp = {
-  isDelta: (event) => event?.type === 'text-delta' && String(event.text ?? '').includes('NEED_HELP'),
-  isRelevant: (event) => ['message.updated', 'part.updated', 'text-delta'].includes(event?.type),
-  reason: (event) => String(event?.text ?? event?.reason ?? ''),
-  strip: (text) => String(text).replace(/\s*NEED_HELP\s*/g, '').trim(),
-  sensor: () => ({ seen: [], observe(event) { if (needHelp.isDelta(event)) this.seen.push(needHelp.reason(event)) }, dispose() { this.disposed = true } }),
-}
-
-export const chatParams = {
-  initialize: () => ({ initialized: true }),
-  apply: ({ sessionId = 'ses', agent = 'fast-coder', model = undefined, directory = undefined } = {}) => ({ sessionId, agent, model, directory }),
-  invalidSession: () => ({ ok: false, error: 'session id is required' }),
-}
-
 export const hostCompaction = {
   settingPaths: ['compaction.auto', 'compaction.prune', 'compaction.autocontinue'],
   settings: [
@@ -99,46 +85,6 @@ export const hostEvents = (capacity = 256) => {
   }
 }
 
-export const hostSnapshot = {
-  projectMessages: (messages) => messages.map((message) => {
-    const info = message.info ?? {}
-    const parts = Array.isArray(message.parts) ? message.parts : []
-    const projected = parts.map((part) => {
-      if (part.type !== 'tool') return part
-      const status = part.state?.status
-      return {
-        ...part,
-        parts: status === 'completed' || status === 'error' ? 'ToolResult' : 'ToolCall',
-        toolParts: status === 'error' ? 'Failed' : status === 'completed' ? 'Completed' : status === 'running' || status === 'pending' ? 'Pending' : undefined,
-        messageId: info.id,
-      }
-    })
-    return { ...message, info, parts: projected }
-  }),
-  locateToolCall: (callId, messages) => {
-    const matches = []
-    for (const message of messages) for (const part of message.parts ?? []) if (part.callID === callId) matches.push({ messageId: message.info?.id, partId: part.id ?? part.partID, callId })
-    return matches.length === 1 ? { ok: true, value: matches[0] } : { ok: false, error: 'Ambiguous tool callback' }
-  },
-}
-
-export const toolCodec = {
-  decodeContext: (value) => ({ sessionID: value?.sessionID, callID: value?.callID, messageID: value?.messageID }),
-}
-
-export const toolParts = {
-  decode: (messages) => hostSnapshot.projectMessages(messages),
-  resultDigests: (messages) => messages.flatMap((message) => (message.parts ?? []).filter((part) => part.type === 'tool').map((part) => ({ callId: part.callID, status: part.state?.status ?? 'unknown', text: part.state?.output ?? part.state?.errorText ?? '' }))),
-}
-
-export const runIdentity = {
-  bindableRun: (physical, messages) => {
-    const matches = messages.filter((message) => message.role === 'assistant' && !message.completed && message.parentID === physical)
-    return matches.length === 1 ? matches[0].id : undefined
-  },
-  contextMessageId: (runId) => runId,
-}
-
 export const turnUnknown = {
   turnOutcomeCases: () => ['TurnCompleted', 'TurnFailed', 'TurnInProgress'],
   snapshotObservationCases: () => ['TurnUnknown'],
@@ -180,11 +126,6 @@ export const mcpConfig = {
   server: (name, command) => ({ type: 'local', command, enabled: true, name }),
   apply: (config, name, entry) => ({ ...config, mcp: { ...(config.mcp ?? {}), [name]: entry } }),
   launch: ({ enabled = true, testMode = false, fixture = false } = {}) => ({ enabled: enabled && !testMode && !fixture, reason: !enabled ? 'disabled' : testMode ? 'test-mode' : fixture ? 'fixture' : 'enabled' }),
-}
-
-export const magicTodo = {
-  locate: ({ sessionID, callID, parts }) => hostSnapshot.locateToolCall(callID, [{ info: { id: sessionID }, parts }]),
-  execute: ({ args }) => ({ ...args, observed: true }),
 }
 
 export const pluginHooks = {

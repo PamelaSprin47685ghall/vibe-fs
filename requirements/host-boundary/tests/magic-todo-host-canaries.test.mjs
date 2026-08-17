@@ -6,32 +6,34 @@
 // location proof for canary H: the Host's persisted assistant run + ToolPart
 // uniquely locate a tool callback through (messageId, partId, callId).
 //
-// The snapshot projection logic is a JS-native implementation that mirrors
-// the F# SessionSnapshotPort.projectMessages / locateToolCall production code.
-// It is used here because there is no registered JS semantic surface for raw
-// Host SDK snapshot projection — the membrane surface (MagicTodoMembraneSurface)
-// wraps this resolution internally but does not expose the raw projection.
+// Uses production SessionSnapshotPort.projectMessages / locateToolCall directly.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hostSnapshot } from './support/host-surface.mjs'
+import * as SessionSnapshotPort from '../../../dist/OpenCode/Host/SessionSnapshotPort.js'
+import { ToolCallIdModule_create, ToolCallIdModule_value, ProviderRunIdentityModule_value, HostToolPartIdModule_value } from '../../../dist/Foundation/Identity.js'
+
+const projectMessages = SessionSnapshotPort.SessionSnapshotPort_projectMessages
+const locateToolCall = (callId, messages) =>
+  SessionSnapshotPort.SessionSnapshotPort_locateToolCall(ToolCallIdModule_create(callId), messages)
 
 const assistantToolMessage = ({ messageID = 'asst_run', partID = 'part_todo', callID = 'call_todo', status = 'pending' } = {}) => ({
   info: { id: messageID, role: 'assistant' },
-  parts: [{ type: 'tool', id: partID, callID, state: { status } }],
+  parts: [{ type: 'tool', id: partID, callID, tool: 'auto-injected', state: { status } }],
 })
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_H journal xtrace uniquely completes host carrier', () => {
-  const located = hostSnapshot.locateToolCall('call_todo', [
-    { info: { id: 'ses_magic_todo_canary' }, parts: [{ type: 'tool', id: 'part_1', callID: 'call_todo', state: { status: 'completed', output: 'ok' } }] },
-  ])
-  assert.equal(located.ok, true)
-  assert.deepEqual(located.value, { messageId: 'ses_magic_todo_canary', partId: 'part_1', callId: 'call_todo' })
+  const messages = projectMessages([assistantToolMessage({ status: 'completed' })])
+  const located = locateToolCall('call_todo', messages)
+  assert.equal(located.tag, 0) // Ok
+  const value = located.fields[0]
+  assert.equal(ProviderRunIdentityModule_value(value.ProviderRun), 'asst_run')
+  assert.equal(HostToolPartIdModule_value(value.HostToolPartId), 'part_todo')
+  assert.equal(ToolCallIdModule_value(value.ToolCallId), 'call_todo')
 })
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_H journal mapping fails closed on host part mismatch', () => {
-  const located = hostSnapshot.locateToolCall('call_missing', [
-    { info: { id: 'ses_x' }, parts: [{ type: 'text', text: 'not a tool' }] },
-  ])
-  assert.equal(located.ok, false)
+  const messages = projectMessages([{ info: { id: 'ses_x' }, parts: [{ type: 'text', text: 'not a tool' }] }])
+  const located = locateToolCall('call_missing', messages)
+  assert.equal(located.tag, 1) // Error
 })
