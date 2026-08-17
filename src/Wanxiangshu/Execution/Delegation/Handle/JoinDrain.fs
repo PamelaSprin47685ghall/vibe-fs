@@ -37,7 +37,7 @@ open Wanxiangshu.Persistence.Journal
 /// Order: HandleRecord → blob body → DurableCompletionDecode → branch:
 ///   Current → fromDecoded → CAS HandleRetired → AgentJoinItem
 ///   LegacyFalseAbort + not retired → HandleFalseCompletionRejected → no result
-///   LegacyFalseAbort + retired → deterministic replacement migration → no aborted
+///   LegacyFalseAbort + retired → fail-closed refuse (no replacement) → Error
 ///   Invalid → keep waiting → no consume
 /// Renderer never sees legacy blob.
 module JoinDrain =
@@ -149,73 +149,6 @@ module JoinDrain =
 
                 return rejectAppendOutcome durable parentId record appendResult
             | _ -> return None
-        }
-
-    let private appendMigrationFacts
-        (durable: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        (replacement: HandleId)
-        (blobRef: BlobRef)
-        (blobDigest: BlobDigest)
-        : Task<Result<unit, ForkError>> =
-        taskResult {
-            do!
-                appendFact
-                    durable
-                    parentId
-                    (ExecutionFact.HandleFalseTerminalReported
-                        {| ParentSessionId = parentId
-                           Handle = record.Handle
-                           BadCompletionRef = blobRef
-                           BadCompletionDigest = blobDigest
-                           Reason = FalseCompletionReason.LegacyAbortWasObservation |})
-                |> TaskValue.map (Result.mapError ForkError.NotFound)
-
-            do!
-                appendFact
-                    durable
-                    parentId
-                    (ExecutionFact.HandleLinked
-                        {| ParentSessionId = parentId
-                           ChildSessionId = record.ChildSessionId
-                           Handle = replacement
-                           TargetAgent = record.TargetAgent
-                           Byname = record.Byname
-                           CanonicalRole = record.CanonicalRole
-                           Ownership = record.Ownership |})
-                |> TaskValue.map (Result.mapError ForkError.NotFound)
-
-            do!
-                appendFact
-                    durable
-                    parentId
-                    (ExecutionFact.ParentJoinCorrectionRequested
-                        {| ParentSessionId = parentId
-                           OriginalHandle = record.Handle
-                           ReplacementHandle = replacement
-                           BadCompletionDigest = blobDigest |})
-                |> TaskValue.map (Result.mapError ForkError.NotFound)
-        }
-
-    /// Retired legacy false abort: deterministic replacement + correction (idempotent).
-    let private migrateRetiredFalseAbort
-        (durable: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        (agentId: string)
-        (blobRef: BlobRef)
-        (blobDigest: BlobDigest)
-        : Task<Result<unit, ForkError> option> =
-        task {
-            let replacement = FalseTerminalMigration.replacementHandle agentId blobDigest
-            let projection = AgentJournal.handleProjection durable parentId
-
-            match HandleProjection.tryFind replacement projection with
-            | Some _ -> return None
-            | None ->
-                let! result = appendMigrationFacts durable parentId record replacement blobRef blobDigest
-                return Some result
         }
 
     let private missingBodyOutcome (agentId: string) (lifecycle: HandleLifecycle) =
@@ -402,40 +335,12 @@ module JoinDrain =
         else
             consumeSafe [] cap (orderedCandidates projection)
 
-    let private forkErrorMessage (e: ForkError) =
-        match e with
-        | ForkError.NotFound msg -> msg
-        | other -> sprintf "%A" other
-
-    let private migrateOutcomeToUnit (outcome: Result<unit, ForkError> option) =
-        match outcome with
-        | None
-        | Some(Ok _) -> Ok()
-        | Some(Error e) -> Error(forkErrorMessage e)
-
-    /// Execute replacement migration when blob identity is known.
-    let tryMigrateRetiredFalseAbort
-        (durable: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        (blobRef: BlobRef)
-        (blobDigest: BlobDigest)
-        : Task<Result<unit, string>> =
-        task {
-            match HandleId.tryAgent record.Handle with
-            | None -> return Error "not an agent handle"
-            | Some agentHandleId ->
-                let agentId = AgentHandleId.value agentHandleId
-                let! outcome = migrateRetiredFalseAbort durable parentId record agentId blobRef blobDigest
-                return migrateOutcomeToUnit outcome
-        }
-
     let private completionBlobPair (cell: HandleCompletion) =
         match cell.CompletionRef, cell.CompletionDigest with
         | Some blobRef, Some blobDigest -> Some(blobRef, blobDigest)
         | _ -> None
 
-    /// Unretired awaiting-join → reject path; retired → migrate path.
+    /// Unretired awaiting-join → reject path; retired → refuse path (fail-closed).
     let private tryFalseAbortCell (record: HandleRecord) =
         match record.Lifecycle, HandleId.tryAgent record.Handle, record.LastCompletion with
         | HandleLifecycle.CompletedAwaitingJoin cell, Some _, _ ->
@@ -451,15 +356,27 @@ module JoinDrain =
         (blobDigest: BlobDigest)
         (body: string)
         (retired: bool)
-        : Task<unit> =
+        : Task<Result<unit, ForkError>> =
         match HandleCompletionCodec.decodeBody body, retired with
         | LegacyFalseAbort _, false ->
-            rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
-            |> TaskValue.map ignore
+            task {
+                do! rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
+                    |> TaskValue.map ignore
+                return Ok()
+            }
         | LegacyFalseAbort _, true ->
-            tryMigrateRetiredFalseAbort durable parentId record blobRef blobDigest
-            |> TaskValue.map ignore
-        | _ -> Task.FromResult()
+            // EFFECT-ACCOUNTING-007: retired handle with legacy false-abort tombstone.
+            // Fail-closed refuse — do not mint a replacement. The bad-data set is
+            // observably empty (48-journal census: zero fired); the writer is dead
+            // (codec-encode-finality-aborted gate). Action: archive or remove the
+            // affected journal.
+            Task.FromResult(
+                Error(
+                    ForkError.NotFound
+                        "legacy false-abort tombstone on retired handle; archive or remove the affected journal"
+                )
+            )
+        | _ -> Task.FromResult(Ok())
 
     let private maybeApplyLegacyFalseAbort
         (durable: AgentJournal)
@@ -468,34 +385,40 @@ module JoinDrain =
         (blobRef: BlobRef)
         (blobDigest: BlobDigest)
         (retired: bool)
-        : Task<unit> =
+        : Task<Result<unit, ForkError>> =
         task {
             let! readResult = durable.Writer.BlobWriter.Read blobRef
 
             match readResult with
             | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
                 return! applyDecodedFalseAbort durable parentId record blobRef blobDigest body retired
-            | _ -> return ()
+            | _ -> return Ok()
         }
 
-    let private reconcileOne (durable: AgentJournal) (parentId: SessionId) (record: HandleRecord) : Task<unit> =
+    let private reconcileOne (durable: AgentJournal) (parentId: SessionId) (record: HandleRecord) : Task<Result<unit, ForkError>> =
         task {
             match tryFalseAbortCell record with
-            | None -> return ()
+            | None -> return Ok()
             | Some((blobRef, blobDigest), retired) ->
                 return! maybeApplyLegacyFalseAbort durable parentId record blobRef blobDigest retired
         }
 
-    /// Scan projection: reject unretired false aborts; migrate retired false aborts.
+    /// Scan projection: reject unretired false aborts; refuse retired false aborts.
     /// O(handles) keyed lookups + blob reads for cells that already carry ref/digest.
-    /// Idempotent. Does not return join items.
-    let reconcileFalseAborts (durable: AgentJournal) (parentId: SessionId) : Task<unit> =
-        task {
-            let projection = AgentJournal.handleProjection durable parentId
+    /// Returns Error on the first retired false-abort tombstone (fail-closed refuse).
+    let reconcileFalseAborts (durable: AgentJournal) (parentId: SessionId) : Task<Result<unit, ForkError>> =
+        let projection = AgentJournal.handleProjection durable parentId
 
-            for record in HandleProjection.linkedChildren projection do
-                do! reconcileOne durable parentId record
-        }
+        let rec loop (remaining: HandleRecord list) : Task<Result<unit, ForkError>> =
+            taskResult {
+                match remaining with
+                | [] -> return ()
+                | record :: rest ->
+                    do! reconcileOne durable parentId record
+                    do! loop rest
+            }
+
+        loop (HandleProjection.linkedChildren projection)
 
     /// Production entry: reconcile false aborts, then drain joinable.
     /// `completedAt` stamps every materialised RunCompletion (IClockPort at composition).
@@ -506,12 +429,16 @@ module JoinDrain =
         (completedAt: DateTimeOffset)
         : Task<Result<RunCompletion list, ForkError>> =
         task {
-            do! reconcileFalseAborts durable parentId
-            let projection = AgentJournal.handleProjection durable parentId
+            let! reconcileResult = reconcileFalseAborts durable parentId
 
-            return!
-                drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) (fun () ->
-                    AgentJournal.handleProjection durable parentId)
+            match reconcileResult with
+            | Error e -> return Error e
+            | Ok() ->
+                let projection = AgentJournal.handleProjection durable parentId
+
+                return!
+                    drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) (fun () ->
+                        AgentJournal.handleProjection durable parentId)
         }
 
     /// Fission lane join: consume only completion cells whose logical active-run
@@ -531,8 +458,12 @@ module JoinDrain =
                 Handles = projection.Handles |> Map.filter (fun _ record -> accept record) }
 
         task {
-            do! reconcileFalseAborts durable parentId
-            let projection = filtered ()
+            let! reconcileResult = reconcileFalseAborts durable parentId
 
-            return! drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) filtered
+            match reconcileResult with
+            | Error e -> return Error e
+            | Ok() ->
+                let projection = filtered ()
+
+                return! drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) filtered
         }

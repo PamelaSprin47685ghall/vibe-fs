@@ -69,6 +69,15 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
+/// Two-step counterfactual observation — replaces the former
+/// strengthPendingFirst/strengthPendingSecond dictionary pair. One
+/// dictionary holds a single DU value; the transition is a pure fold
+/// (advanceCounterfactual), not two separate mutable dictionaries with
+/// implicit step logic encoded by lookup order.
+type CounterfactualAwait =
+    | AwaitFirst of targetRun: ProviderRunIdentity * feature: StrengthFeatureKey
+    | AwaitSecond of feature: StrengthFeatureKey
+
 /// STRENGTH-*: decision-local replica ownership/capability registry plus bounded
 /// predictor evidence for one plugin instance. Durable causality stays in
 /// EventStore; this is only live physical-session state (STRENGTH-014).
@@ -86,30 +95,32 @@ type PluginStrengthScope() =
     let mutable strengthPredictorState = StrengthPredictor.empty
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
 
-    let strengthPendingFirst =
-        Dictionary<string, ProviderRunIdentity * StrengthFeatureKey>()
+    let counterfactualAwait = Dictionary<string, CounterfactualAwait>()
 
-    let strengthPendingSecond = Dictionary<string, StrengthFeatureKey>()
-    // DSL-MUTABLE: resource — process-local Strength fuse latch
-    let mutable strengthFuseReason: string option = None
+    /// Fuse is a Result error latch, not a string option. Ok = operational,
+    /// Error reason = tripped. TripStrengthFuse is one-shot idempotent: the
+    /// first Error wins, matching the former IsNone guard. The Result type
+    /// lets callers participate in Result.bind / CE short-circuit flows.
+    // DSL-MUTABLE: resource — strength fuse latch (Ok=operational, Error=tripped)
+    let mutable strengthFuse: Result<unit, string> = Ok()
 
-    let observeFirst key feature symbol =
-        strengthPendingFirst.Remove key |> ignore
+    /// Pure step transition: (await, symbol, predictorState) → (nextAwait, nextPredictorState).
+    /// No dictionary mutation — the caller owns the dictionary update.
+    let nextAwaitAfterFirst feature firstReadonly =
+        if firstReadonly then Some(AwaitSecond feature) else None
 
-        let next, firstReadonly =
-            StrengthPredictor.observeFirst feature symbol strengthPredictorState
-
-        strengthPredictorState <- next
-
-        if firstReadonly then
-            strengthPendingSecond.[key] <- feature
-
-    let observeSecond key symbol =
-        match strengthPendingSecond.TryGetValue key with
-        | true, feature ->
-            strengthPendingSecond.Remove key |> ignore
-            strengthPredictorState <- StrengthPredictor.observeSecond feature symbol strengthPredictorState
-        | false, _ -> ()
+    let advanceCounterfactual
+        (await: CounterfactualAwait)
+        (symbol: StrengthPrimarySymbol)
+        (state: StrengthPredictorState)
+        : CounterfactualAwait option * StrengthPredictorState =
+        match await with
+        | AwaitFirst(_, feature) ->
+            let next, firstReadonly = StrengthPredictor.observeFirst feature symbol state
+            nextAwaitAfterFirst feature firstReadonly, next
+        | AwaitSecond feature ->
+            let next = StrengthPredictor.observeSecond feature symbol state
+            None, next
 
     member _.StrengthRuntime = strengthRuntime
 
@@ -130,30 +141,42 @@ type PluginStrengthScope() =
         StrengthPredictor.predict feature strengthPredictorState
 
     member _.TripStrengthFuse(reason: string) =
-        if strengthFuseReason.IsNone then
-            strengthFuseReason <- Some reason
+        match strengthFuse with
+        | Ok() -> strengthFuse <- Error reason
+        | Error _ -> ()
 
-    member _.StrengthFuseReason = strengthFuseReason
+    member _.StrengthFuseReason =
+        match strengthFuse with
+        | Ok() -> None
+        | Error reason -> Some reason
+
+    member _.StrengthFuse = strengthFuse
 
     member _.ArmStrengthCounterfactual
         (sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey)
         =
         let key = SessionId.value sessionId
 
-        if
-            not (strengthPendingFirst.ContainsKey key)
-            && not (strengthPendingSecond.ContainsKey key)
-        then
-            strengthPendingFirst.[key] <- (targetRun, feature)
+        if not (counterfactualAwait.ContainsKey key) then
+            counterfactualAwait.[key] <- AwaitFirst(targetRun, feature)
 
     member _.ObserveStrengthPrimary
         (sessionId: SessionId, providerRun: ProviderRunIdentity, symbol: StrengthPrimarySymbol)
         =
         let key = SessionId.value sessionId
 
-        match strengthPendingFirst.TryGetValue key with
-        | true, (targetRun, feature) when targetRun = providerRun -> observeFirst key feature symbol
-        | _ -> observeSecond key symbol
+        match counterfactualAwait.TryGetValue key with
+        | true, AwaitFirst(targetRun, _) when targetRun = providerRun ->
+            let nextAwait, nextState = advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+            strengthPredictorState <- nextState
+            counterfactualAwait.Remove key |> ignore
+            nextAwait |> Option.iter (fun p -> counterfactualAwait.[key] <- p)
+        | true, AwaitSecond _ ->
+            let nextAwait, nextState = advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+            strengthPredictorState <- nextState
+            counterfactualAwait.Remove key |> ignore
+            nextAwait |> Option.iter (fun p -> counterfactualAwait.[key] <- p)
+        | _ -> ()
 
         let recent =
             match strengthRecentPrimary.TryGetValue key with
@@ -166,8 +189,7 @@ type PluginStrengthScope() =
     /// (mirror of DisposeSession's per-session cleanup in PluginRuntimeScope).
     member _.ClearSession(sessionId: string) =
         strengthRecentPrimary.Remove sessionId |> ignore
-        strengthPendingFirst.Remove sessionId |> ignore
-        strengthPendingSecond.Remove sessionId |> ignore
+        counterfactualAwait.Remove sessionId |> ignore
 
     member _.Dispose() =
         strengthReplicaRuntime |> Option.iter (fun runtime -> runtime.Dispose())

@@ -13,14 +13,13 @@ type SessionFailure =
     | KernelRejected of message: string
     | AlreadyAnswered
 
-[<RequireQualifiedAccess>]
-type SessionLifecycle =
-    | Active
-    | Answered of CanonicalAnswer
-
+/// Session entry stores the domain fact (last InquiryResult) directly.
+/// The lifecycle projection (active vs answered) is a pure fold of
+/// LastResult, not a separate mutable state machine — exorcised from
+/// the former SessionLifecycle DU that duplicated InquiryResult's shape.
 type SessionEntry =
     { State: EpistemicState
-      Lifecycle: SessionLifecycle }
+      LastResult: InquiryResult }
 
 type SessionSuccess =
     { Handle: string
@@ -109,7 +108,7 @@ module private SessionWire =
         | InquiryResult.Yield _ ->
             sessions[handle] <-
                 { State = nextState
-                  Lifecycle = SessionLifecycle.Active }
+                  LastResult = result }
 
             SessionOutcome.Success
                 { Handle = handle
@@ -118,7 +117,7 @@ module private SessionWire =
         | InquiryResult.Answered answer ->
             sessions[handle] <-
                 { State = nextState
-                  Lifecycle = SessionLifecycle.Answered answer }
+                  LastResult = result }
 
             SessionOutcome.Success
                 { Handle = handle
@@ -131,13 +130,13 @@ module private SessionWire =
         (observation: Observation)
         (sessions: Dictionary<string, SessionEntry>)
         : SessionOutcome =
-        match entry.Lifecycle with
-        | SessionLifecycle.Answered _ ->
+        match entry.LastResult with
+        | InquiryResult.Answered _ ->
             SessionOutcome.Failure
                 { Handle = Some handle
                   State = Some entry.State
                   Failure = SessionFailure.AlreadyAnswered }
-        | SessionLifecycle.Active ->
+        | _ ->
             let nextState, result = Policy.resume entry.State observation
             applyResumeResult handle entry nextState result sessions
 
@@ -155,16 +154,11 @@ module private SessionInterop =
     [<Import("randomUUID", "node:crypto")>]
     let randomUUID () : string = jsNative
 
-    let lifecycleOf (result: InquiryResult) : SessionLifecycle =
-        match result with
-        | InquiryResult.Answered answer -> SessionLifecycle.Answered answer
-        | _ -> SessionLifecycle.Active
-
     let statusOfEntry (handle: string) (entry: SessionEntry) : LookupOutcome<SessionStatus> =
-        match entry.Lifecycle with
-        | SessionLifecycle.Active -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
-        | SessionLifecycle.Answered answer ->
+        match entry.LastResult with
+        | InquiryResult.Answered answer ->
             LookupOutcome.Found(handle, SessionStatus.Answered(answer, entry.State))
+        | _ -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
 
 type SessionStore() =
     let sessions = Dictionary<string, SessionEntry>()
@@ -186,7 +180,7 @@ type SessionStore() =
 
             sessions[handle] <-
                 { State = state
-                  Lifecycle = SessionInterop.lifecycleOf result }
+                  LastResult = result }
 
             StartOutcome.Started(handle, state, result)
 

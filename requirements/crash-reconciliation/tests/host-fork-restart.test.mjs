@@ -35,9 +35,9 @@ test('WHAT[CRASH-015] HFR_restart_legacy_false_abort_waits_with_rejection_fact',
   assert.equal(child.resolve('active', 'missing', ['aborted:legacy'], '').result, 'RecoveryIncomplete')
 })
 
-test('WHAT[CRASH-015] HFR_restart_retired_legacy_false_abort_migrates_replacement_once', () => {
+test('WHAT[CRASH-015] HFR_restart_retired_legacy_false_abort_refuses_without_replacement', () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs', import.meta.url), 'utf8')
-  assert.match(source, /tryMigrateRetiredFalseAbort/)
+  assert.doesNotMatch(source, /tryMigrateRetiredFalseAbort/)
   assert.equal(handles.crashScenario('replayed-retired').retired, true)
 })
 

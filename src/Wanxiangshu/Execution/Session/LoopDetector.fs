@@ -36,10 +36,14 @@ module LoopDetector =
           WeightedDistinctTokenCount: float
           Step: int }
 
-    /// DSL-state-combination: physical — Step and WeightedDistinctTokenCount are attempt-local transient detector counters.
+    /// DSL-state-combination: physical — Detector is pure data: Step and
+    /// WeightedDistinctTokenCount are immutable fold state threaded through
+    /// pushText. LastSeenTokenStep is algorithm scratch (token decay memory,
+    /// mutated in place as the only physical resource). A Detector stored in
+    /// the LoopSensor detectors Dictionary is a physical cache entry.
     type Detector =
-        { mutable Step: int
-          mutable WeightedDistinctTokenCount: float
+        { Step: int
+          WeightedDistinctTokenCount: float
           LastSeenTokenStep: Dictionary<int, int> }
 
     let create () : Detector =
@@ -55,7 +59,9 @@ module LoopDetector =
           WeightedDistinctTokenCount = detector.WeightedDistinctTokenCount
           Step = detector.Step }
 
-    let private pushToken (detector: Detector) (token: int) =
+    /// Pure fold over one token. Returns the next Detector; only LastSeenTokenStep
+    /// (algorithm scratch) is mutated in place.
+    let private pushToken (detector: Detector) (token: int) : Detector =
         let step = detector.Step + 1
 
         let replacement =
@@ -63,17 +69,26 @@ module LoopDetector =
             | true, previousStep -> 1.0 - Math.Pow(Lambda, float (step - previousStep))
             | false, _ -> 1.0
 
-        detector.WeightedDistinctTokenCount <- Lambda * detector.WeightedDistinctTokenCount + replacement
-
-        detector.Step <- step
         detector.LastSeenTokenStep.[token] <- step
 
-    let private pushTokens (detector: Detector) (text: string) =
+        { Step = step
+          WeightedDistinctTokenCount = Lambda * detector.WeightedDistinctTokenCount + replacement
+          LastSeenTokenStep = detector.LastSeenTokenStep }
+
+    let private pushTokens (detector: Detector) (text: string) : Detector =
+        // DSL-MUTABLE: algorithm-scratch — fold accumulator over token stream
+        let mutable acc = detector
+
         for token in TokenEncoding.encode text do
-            pushToken detector token
+            acc <- pushToken acc token
 
-    let pushText (detector: Detector) (text: string) : Evaluation =
-        if not (String.IsNullOrEmpty text) then
-            pushTokens detector text
+        acc
 
-        evaluate detector
+    /// Pure fold: returns the updated Detector and its Evaluation without
+    /// in-place mutation of Step or WeightedDistinctTokenCount.
+    let pushText (detector: Detector) (text: string) : Detector * Evaluation =
+        let updated =
+            if String.IsNullOrEmpty text then detector
+            else pushTokens detector text
+
+        updated, evaluate updated

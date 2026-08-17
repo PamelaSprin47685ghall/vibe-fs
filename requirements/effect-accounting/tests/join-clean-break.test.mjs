@@ -41,10 +41,11 @@ test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_v2_terminal_decodes_as_joinable
   assert.equal(clean.tryDecode('h-v2', body).ok, true)
 })
 
-test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_retired_legacy_abort_creates_replacement_once', () => {
-  assert.equal(clean.replacement('agent-a', 'digest-a'), 'recovery:agent-a:digest-a')
-  assert.equal(clean.replacement('agent-a', 'digest-a'), clean.replacement('agent-a', 'digest-a'))
+test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_retired_legacy_abort_refuses_without_replacement', () => {
+  // Decode permanently detects legacy false abort (EFFECT-ACCOUNTING-007).
   assert.equal(clean.decode(legacy()).case, 'LegacyFalseAbort')
+  // No replacement surface — retired path refuses, does not mint recovery:<agent>:<digest>.
+  assert.equal(typeof clean.replacement, 'undefined')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-007] P0_CLEAN_BREAK_retired_legacy_abort_never_surfaces_aborted', () => {

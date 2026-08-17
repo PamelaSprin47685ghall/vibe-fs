@@ -67,7 +67,50 @@ open Wanxiangshu.Persistence.Journal
 /// per-session arming and per-provider-run attempt plans.
 type PluginRecoveryScope(journal: AgentJournal option) =
 
+    // DSL-MUTABLE: single-flight — per-session one-shot recovery arming latch
+    // (HasFlight guard). ArmRecovery sets ArmedByAdvance after a non-fission-owner
+    // turn failure; TryRecoveryArming checks the latch before planning a retry in
+    // the next provider transform; ClearRecovery consumes it. One armed slot
+    // produces at most one recovery attempt (FALLBACK-011). Process-local only:
+    // RecoverySlot.afterRestart = NotArmed, so the latch intentionally forgets
+    // arming across process boundaries — cross-process recovery is owned by
+    // explicit /continue, not by automatic arming.
+    //
+    // PHYSICAL RESOURCE PROOF (not a ghost):
+    //   Arming bridges two separate async entry points — turn observation
+    //   (HostTurnObserver.observe → armRecoveryIfEligible, after a turn fails)
+    //   and provider transform (XWire.applyTransform → applyNonReplicaTransform,
+    //   before the next turn runs). There is no shared call chain to thread a
+    //   CE closure through. It cannot be derived from durable facts:
+    //   FallbackCursorAdvanced / FallbackExhausted track the cursor position and
+    //   budget (durable, cross-process), but arming is deliberately NOT durable
+    //   — RecoverySlot.fs: "Not persistent state, not a field on the cursor,
+    //   never written to the journal. A local control-flow fact of one automatic
+    //   recovery sequence." The type exists so the answer cannot be produced
+    //   from a cursor alone (parked-cursor bug, FALLBACK-004). Single-flight:
+    //   idempotent set (overwrites same value), consumed exactly once.
     member val RecoveryArming = Dictionary<string, SlotArming>()
+
+    // DSL-MUTABLE: single-flight — per-provider-run attempt plan memo. Recorded
+    // during the provider transform (planArmedWorkMainRetry / applyStrengthReplicaPlan
+    // / RecordSquashPlan callback), consumed by reconcileAttempt when the turn
+    // resolves (commitPromotablePrefixRebase on TurnCompleted, cleared on terminal),
+    // and peeked read-only by StrengthSpeculate.planEvidence during the same
+    // transform. One plan per (session, providerRun); cleared on terminal outcome
+    // or session deletion.
+    //
+    // PHYSICAL RESOURCE PROOF (not a ghost):
+    //   The plan bridges two separate async entry points — provider transform
+    //   (PluginTransforms.fs → XWire.applyTransform, before the turn runs) and
+    //   turn reconciliation (HostTurnObserver.observe → XWire.reconcileAttempt,
+    //   after the turn completes). There is no shared call chain to thread a CE
+    //   closure through. It cannot be derived from durable facts: the plan is a
+    //   frozen decision at transform time (authority, cursor, projectionChoice,
+    //   probe), and the projection state may advance between transform and
+    //   reconciliation (new blog frames, cursor advances). Recomputing at
+    //   reconciliation would yield a different plan, breaking
+    //   PrefixRebaseCommitted promotion. Single-flight: one plan per provider
+    //   run, consumed exactly once on terminal outcome.
     member val AttemptPlans = Dictionary<string, AttemptPlan>()
 
     /// Ordinary business entry never performs cross-process recovery. The permit

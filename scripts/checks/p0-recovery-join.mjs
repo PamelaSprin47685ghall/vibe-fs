@@ -384,7 +384,7 @@ export const RULES = [
     id: 'parent-join-correction-fact',
     fileHint: 'Delegation/Facts.fs|Delegation/Fact.fs',
     pattern: /ParentJoinCorrectionRequested/,
-    label: 'AgentFact must retain ParentJoinCorrectionRequested for retired false-abort migration (EXEC-022)',
+    label: 'AgentFact must retain ParentJoinCorrectionRequested for legacy false-abort compensation replay (EXEC-022)',
     positive: true,
   },
 ]

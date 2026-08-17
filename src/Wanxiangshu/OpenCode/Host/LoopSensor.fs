@@ -111,8 +111,11 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
 
     member private this.Evaluate(delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation =
         lock gate (fun () ->
+            let key = keyOf delta.SessionId
             let detector = this.DetectorFor delta.SessionId
-            LoopDetector.pushText detector delta.Delta)
+            let updated, evaluation = LoopDetector.pushText detector delta.Delta
+            detectors.[key] <- updated
+            evaluation)
 
     member private this.KillIfLoop (delta: LoopEventCodec.TextDelta) (evaluation: LoopDetector.Evaluation) =
         if evaluation.IsLoop then

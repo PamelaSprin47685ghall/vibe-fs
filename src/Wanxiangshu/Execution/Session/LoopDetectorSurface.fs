@@ -7,7 +7,10 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module LoopDetectorSurface =
     type private DetectorHandle(detector: LoopDetector.Detector) =
-        member _.Detector = detector
+        // DSL-MUTABLE: resource — JS boundary state holder for opaque Detector handle
+        let mutable current = detector
+        member _.Detector = current
+        member _.Replace(d: LoopDetector.Detector) = current <- d
 
     let private stateName (state: LoopDetector.State) =
         match state with
@@ -51,8 +54,10 @@ module LoopDetectorSurface =
         LoopDetector.evaluate detector |> evaluationView
 
     let pushText (handle: obj) (text: string) : obj =
-        let detector = (handle :?> DetectorHandle).Detector
-        LoopDetector.pushText detector text |> evaluationView
+        let handle = (handle :?> DetectorHandle)
+        let updated, evaluation = LoopDetector.pushText handle.Detector text
+        handle.Replace updated
+        evaluationView evaluation
 
     let isLoopTextDelta (raw: obj) : bool =
         Wanxiangshu.OpenCode.LoopEventCodec.isLoopTextDelta raw

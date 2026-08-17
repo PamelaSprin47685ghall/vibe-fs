@@ -9,7 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// Clean-break owner surface for legacy completion handling. Decoder branches
-/// and deterministic replacement identities are plain data; no DTO union leaks.
+/// are plain data; no DTO union leaks.
 [<RequireQualifiedAccess>]
 module CleanBreakSurface =
     let private epoch = DateTimeOffset(1970, 1, 1, 0, 0, 0, TimeSpan.Zero)
@@ -61,9 +61,6 @@ module CleanBreakSurface =
             box
                 {| ok = false
                    error = "completion blob decode failed" |}
-
-    let replacement (agentId: string) (digest: string) : string =
-        ChildRecovery.FalseTerminalMigration.replacementAgentId agentId (BlobDigest.create digest)
 
     let joinWire (agentName: string) (message: string) : string =
         JoinSurface.renderBatch

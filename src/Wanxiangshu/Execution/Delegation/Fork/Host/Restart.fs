@@ -36,7 +36,7 @@ open Wanxiangshu.Process
 
 /// Restart recovery for linked children. Terminal path: ChildRecoveryWorkflow
 /// → ChildRecoveryResult → recordCompletion → PulseAgentHandle. Fail closed on proof.
-/// Clean-break: legacy abort blobs never publish; retired false terminals migrate once.
+/// Clean-break: legacy abort blobs never publish; retired false terminals refuse (no replacement).
 /// GREEN-4: returns HandleFamilyRecovery (query result), never option/missing-port.
 /// EXEC-024: agent mailbox is wake-only (PulseAgentHandle); no agent completion payload path.
 module HostForkRestart =
@@ -125,52 +125,6 @@ module HostForkRestart =
             let! resolved = ChildRecoveryWorkflow.resolveAndCommit p
             return applyResolvedRecovery runtime agentId resolved
         }
-
-    let private completionBlobPair (cell: HandleCompletion) =
-        match cell.CompletionRef, cell.CompletionDigest with
-        | Some blobRef, Some blobDigest -> Some(blobRef, blobDigest)
-        | _ -> None
-
-    let private migrateIfLegacyAbort
-        (journal: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        (blobRef: BlobRef)
-        (blobDigest: BlobDigest)
-        (body: string)
-        =
-        match HandleCompletionCodec.decodeBody body with
-        | LegacyFalseAbort _ ->
-            task {
-                let! _ = JoinDrain.tryMigrateRetiredFalseAbort journal parentId record blobRef blobDigest
-                return ()
-            }
-        | Current _
-        | Invalid _ -> task { return () }
-
-    let private migrateFromBlob
-        (journal: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        (blobRef: BlobRef)
-        (blobDigest: BlobDigest)
-        =
-        task {
-            match! journal.Writer.BlobWriter.Read blobRef with
-            | Ok body when HostDigest.sha256Hex body = BlobDigest.value blobDigest ->
-                do! migrateIfLegacyAbort journal parentId record blobRef blobDigest body
-            | _ -> ()
-        }
-
-    /// Clean-break: retired handle whose last cell was a legacy abort → replacement once.
-    let private migrateRetiredIfFalseAbort
-        (journal: AgentJournal)
-        (parentId: SessionId)
-        (record: HandleRecord)
-        : Task<unit> =
-        match record.LastCompletion |> Option.bind completionBlobPair with
-        | None -> task { return () }
-        | Some(blobRef, blobDigest) -> migrateFromBlob journal parentId record blobRef blobDigest
 
     let private recoveredHandle (agentHandle: AgentHandleId) (child: SessionId) (kind: string) : RecoveredHandle =
         { Handle = agentHandle
@@ -531,10 +485,11 @@ module HostForkRestart =
         | HandleLifecycle.Abandoned _, None
         | _, None -> task { return () }
         | HandleLifecycle.Retired, Some agentHandle ->
-            task {
-                do! migrateRetiredIfFalseAbort journal parentId record
-                recovered.Add(recoveredHandle agentHandle record.ChildSessionId "retired")
-            }
+            // Retired handles are terminal tombstones — no migration, no replacement.
+            // JoinDrain.reconcileFalseAborts handles fail-closed refuse for any
+            // retired handle whose LastCompletion was a LegacyFalseAbort.
+            recovered.Add(recoveredHandle agentHandle record.ChildSessionId "retired")
+            task { return () }
         | HandleLifecycle.CompletedAwaitingJoin _, Some agentHandle ->
             restoreCompletedAwaitingJoin
                 runtime

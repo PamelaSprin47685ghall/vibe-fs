@@ -168,15 +168,6 @@ module ChildRecovery =
             | ProvenCompleted _
             | ProvenFailed _ -> Error "proven terminal body must be non-empty"
 
-    /// Pure replacement handle id for a retired false-abort tombstone.
-    /// recovery:<originalAgentId>:<bad-completion-digest> — repeat recovery never mints twice.
-    module FalseTerminalMigration =
-        let replacementAgentId (originalAgentId: string) (badDigest: BlobDigest) : string =
-            sprintf "recovery:%s:%s" originalAgentId (BlobDigest.value badDigest)
-
-        let replacementHandle (originalAgentId: string) (badDigest: BlobDigest) : HandleId =
-            HandleId.Agent(AgentHandleId.create (replacementAgentId originalAgentId badDigest))
-
     /// Domain view of durable handle lifecycle (no Journal types).
     [<RequireQualifiedAccess>]
     type DurableHandleEvidence =
