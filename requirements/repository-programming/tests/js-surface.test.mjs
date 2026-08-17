@@ -246,3 +246,81 @@ test('WHAT[REPOSITORY-PROGRAMMING-005] JS_description_retains_no_unsubstituted_p
   const result = generate('Coder', caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Write), 'en')
   assert.equal(result.description.includes('{{'), false)
 })
+
+test('WHAT[REPOSITORY-PROGRAMMING-022] JS_description_teaches_tool_choice_through_paid_failure_memory', () => {
+  const coder = surface('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
+  const lessonText = coder.description.replace(/\s+/g, ' ')
+
+  assert.equal(
+    lessonText.startsWith('WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.'),
+    true,
+    'the first screen must interrupt autopilot before the API manual begins',
+  )
+
+  for (const lesson of [
+    'The Host already owns this boundary',
+    'There are only two acceptable moves',
+    'Suspicion is enough to trigger verification',
+    'only evidence earns permission to continue',
+    'use the primitive that owns it',
+    'prove it cannot express the job before dropping lower',
+    'Precommitment matters',
+    'does not get to renegotiate those rules after seeing an inconvenient result',
+    'Numbers, required sentinels, and section counts outrank the story',
+    'Do not let familiarity impersonate evidence',
+    'The lower-level technique carries the burden of proof',
+    'evidence beats confidence',
+    'Do not invent a third category called "probably fine"',
+    'I have already paid for this mistake',
+    'roughly 8k lines',
+    'roughly 31k lines',
+    'grep was finding candidates, not owning structure',
+    'ordered anchors',
+    'second and third cleanup programs',
+    'cheap invariants',
+    'throw before return',
+    'zero committed mutations',
+    'If you are about to calculate structural boundaries by hand',
+    'STOP SIGNAL',
+    'Do not confuse "I can reimplement this" with "I should reimplement this"',
+  ]) {
+    assert.equal(lessonText.includes(lesson), true, `paid-failure lesson missing: ${lesson}`)
+  }
+
+  const zh = generate(
+    'Coder',
+    caps(...permsOf(['Read', 'Write', 'Edit', 'Glob', 'Grep'])),
+    'zh-CN',
+  ).description.replace(/\s+/g, ' ')
+
+  assert.equal(
+    zh.startsWith('警告：你正准备把一个本来有边界保护的文件任务，亲手变成一场返工事故。'),
+    true,
+    '中文第一屏必须先惊醒，再解释',
+  )
+
+  for (const lesson of [
+    'Host 已经拥有这层边界',
+    '只有两个合格动作',
+    '只要起疑，就触发验证',
+    '只有证据才能换来继续执行的资格',
+    '使用已经拥有它的 primitive',
+    '先证明它表达不了任务，再往下降一层',
+    '先承诺，再动手',
+    '就没有资格临时改口',
+    '优先于你在坏结果出现后给自己编的解释',
+    '别让熟悉感冒充证据',
+    '举证责任在你',
+    '证据 > 自信',
+    '不要再发明第三类叫「大概没问题」',
+    '这笔学费我已经交过一次',
+    '约 8k 行',
+    '约 31k 行',
+    '给前一个 program 擦屁股',
+    '如果你正准备手算结构边界',
+    '停止信号',
+    '别把「我也能自己重写一遍」误当成「我应该自己重写一遍」',
+  ]) {
+    assert.equal(zh.includes(lesson), true, `中文现身说法缺失: ${lesson}`)
+  }
+})

@@ -10,12 +10,12 @@ Wanxiangshu 的 managed model routing 只能由 `~/.config/opencode/wanxiangshu.
 
 因此推荐模板只是“首次生成的可编辑配置”，不是隐藏 fallback：一旦创建，它和用户手写文件完全同权，之后唯一 authority 就是该文件自身。创建目录/文件失败、import/evaluation 失败、default export 不是同步函数时，plugin load fail closed；不得退回旧 model inventory。
 
-## EMR-002：scheduler ABI 只有 `role + running → target | null`
+## EMR-002：scheduler ABI 只有 `role + running + previous → target | null`
 
 scheduler 的唯一调用合同是：
 
 ```js
-export default function route(role, running) {
+export default function route(role, running, previous) {
   // return { model: "provider/model", reasoning: "none|low|..." }
   // or null
 }
@@ -23,11 +23,12 @@ export default function route(role, running) {
 
 - `role` 是当前需要物理模型的 managed `EffectiveAgent` 精确名（如 `fast-coder`、`deep-browser`）。
 - `running` 是当前进程全部已取得且尚未释放的 ModelTarget multiset，元素形状固定为 `{ model: string, reasoning: string }`；重复元素必须保留，数组顺序无语义。
+- `previous` 是同一未删除 Session 最近一次**成功物理 execution admission** 使用的 `{ model, reasoning }`，或 `null`。它只是接续对话的选择提示：exact terminal 释放 active lease 后仍保留，新的 Session / 已 drop 的 Session 必须传 `null`；它自身不贡献 `running` occurrence，也不恢复上一 execution 的 lease。
 - 非 `null` 返回值必须同时包含完整非空 `provider/model` 与非空 `reasoning`；裸 `modelID` 非法，因为 provider 也必须由同一个 MJS authority 明确决定。非推理模型用显式字符串（推荐 `none`），不得靠缺字段猜测。
 - `null` 的唯一含义是“按当前 occupancy 暂时不能安排”。
 - scheduler throw、返回 Promise、返回其它值或非法 target 都是配置程序错误，fail closed；不得当作 `null`、provider failure 或 fallback 信号。
 
-Wanxiangshu 不向 scheduler 暴露 SessionId、transcript、prompt、Host client 或业务状态。模型策略只以当前角色和 occupancy 为输入。
+Wanxiangshu 不向 scheduler 暴露 SessionId、transcript、prompt、Host client 或业务状态。模型策略只以当前角色、occupancy 与上一成功 target 为输入。
 
 ## EMR-003：`running` 是**当前物理 provider execution** 的 lease multiset；不是 live-session 计数
 
@@ -64,13 +65,14 @@ Wanxiangshu runtime 只拥有：scheduler 加载、ABI 校验、process-shared o
 - 模型优先级；
 - 每个 `{model, reasoning}` 或模型族允许多少占用；
 - 满载时是否尝试同策略中的第二候选；
-- 任意基于 `role + running` 可确定的其它资源选择规则。
+- 是否在当前 role/capacity 仍允许时优先延续 `previous` target；
+- 任意基于 `role + running + previous` 可确定的其它资源选择规则。
 
 runtime 不得重建“七个 lane”、`max_sessions` schema、first-free candidate、模型能力分类或其它第二套调度算法。MJS 返回非 `null` target 后，runtime 只做结构校验并接受该选择。
 
-## EMR-006：managed lease 只在一个物理 execution 内稳定；session reopen 必须重新调度
+## EMR-006：managed lease 只在一个物理 execution 内稳定；session continuation 重新调度但可偏好上一 target
 
-成功分配后，当前 execution 的 **`(SessionId, PhysicalUserMessageId) → {EffectiveAgent, ModelTarget}`** 在该 physical user material 内稳定；Host/provider retry 若仍引用同一 physical id，继续使用同一 lease，且 EffectiveAgent 不得漂移。新的 PhysicalUserMessageId 即使没有先看到 idle，也必须原子 retire 旧 lease / cancel 旧 pending，再为新 execution 调度；因此后续同一 SessionId、同一 EffectiveAgent 也允许依据新的 occupancy 选择不同 target。禁止把上一 execution 的 target 当成“session 永久模型”。
+成功分配后，当前 execution 的 **`(SessionId, PhysicalUserMessageId) → {EffectiveAgent, ModelTarget}`** 在该 physical user material 内稳定；Host/provider retry 若仍引用同一 physical id，继续使用同一 lease，且 EffectiveAgent 不得漂移。新的 PhysicalUserMessageId 即使没有先看到 idle，也必须原子 retire 旧 lease / cancel 旧 pending，再为新 execution 调度。该次 scheduler 调用必须额外收到同一未删除 Session 最近一次成功物理 execution 的 target 作为 `previous`；MJS 可以优先返回它，但 occupancy/role policy 不允许时仍可返回其它 target 或 `null`。因此 continuation 有稳定偏好而无永久绑定，禁止跳过 scheduler 直接复用上一 lease。
 
 AABB 保持原代数：A/A 使用当前 SelectedAgent，B/B 使用其 peer。peer/tier 选择仍属于 authority/fallback；scheduler 只在每个物理 execution admission 时把当时 EffectiveAgent 映射到 target。A 与 B 的 `{model, reasoning}` 可以完全相同，也可以不同；不得以物理 target 是否相同判断 peer 是否成立。
 

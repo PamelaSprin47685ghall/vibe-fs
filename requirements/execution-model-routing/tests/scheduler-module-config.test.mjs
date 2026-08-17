@@ -59,19 +59,27 @@ test('WHAT[EMR-001] EMR_001_concurrent_bootstrap_keeps_one_atomic_winner_without
   })
 })
 
-test('WHAT[EMR-002] EMR_002_scheduler_preserves_running_duplicates_and_null', async () => {
+test('WHAT[EMR-002] EMR_002_scheduler_preserves_running_duplicates_null_and_previous', async () => {
   await withTemp(async (path) => {
-    const body = `export default function route(role, running) {
+    const body = `export default function route(role, running, previous) {
       if (running.length !== 2) throw new Error('duplicates lost')
       if (running[0].model !== running[1].model) throw new Error('unexpected running')
-      return null
+      if (role === 'new' && previous !== null) throw new Error('new conversation previous must be null')
+      if (role === 'continued' && (previous?.model !== 'provider/previous' || previous?.reasoning !== 'high')) {
+        throw new Error('previous target lost')
+      }
+      return previous
     }\n`
     const scheduler = await bootstrapAndLoadAt(path, body)
     const running = [
       { model: 'provider/shared', reasoning: 'low' },
       { model: 'provider/shared', reasoning: 'low' },
     ]
-    assert.equal(invokeScheduler(scheduler, 'deep-coder', running), null)
+    assert.equal(invokeScheduler(scheduler, 'new', running, null), null)
+    assert.deepEqual(
+      invokeScheduler(scheduler, 'continued', running, { model: 'provider/previous', reasoning: 'high' }),
+      { model: 'provider/previous', reasoning: 'high' },
+    )
   })
 })
 

@@ -1,13 +1,27 @@
 // Wanxiangshu model scheduler. Edit this file freely.
 // `running` is a multiset of active { model, reasoning } leases.
+// `previous` is the last successful physical execution target for this session,
+// or null for a new conversation. It is a preference hint, not occupancy.
 // Return a target to acquire it, or null to wait for an occupancy change.
 
-const count = (running, model, reasoning) =>
-  running.filter((item) => item.model === model && item.reasoning === reasoning).length
+const providerOf = (model) => model.slice(0, model.indexOf('/'))
 
-const pick = (running, candidates) => {
-  for (const [model, reasoning, limit] of candidates) {
-    if (count(running, model, reasoning) < limit) return { model, reasoning }
+const providerCount = (running, model) =>
+  running.filter((item) => providerOf(item.model) === providerOf(model)).length
+
+const available = (running, [model, , limit]) => providerCount(running, model) < limit
+
+const targetOf = ([model, reasoning]) => ({ model, reasoning })
+
+const pick = (running, previous, candidates) => {
+  const preferred = previous && candidates.find(
+    ([model, reasoning]) => model === previous.model && reasoning === previous.reasoning,
+  )
+
+  if (preferred && available(running, preferred)) return targetOf(preferred)
+
+  for (const candidate of candidates) {
+    if (available(running, candidate)) return targetOf(candidate)
   }
   return null
 }
@@ -67,8 +81,8 @@ const pools = new Map([
   ['deep-browser', DEEP_BROWSER],
 ])
 
-export default function route(role, running) {
+export default function route(role, running, previous) {
   const candidates = pools.get(role)
   if (!candidates) throw new Error(`unknown model-routing role: ${role}`)
-  return pick(running, candidates)
+  return pick(running, previous, candidates)
 }

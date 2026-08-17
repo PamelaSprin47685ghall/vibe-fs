@@ -42,3 +42,34 @@ test('WHAT[EMR-005] EMR_005_recommended_resource_is_only_a_policy_template', asy
 
   assert.notDeepEqual(next, first, 'the template itself, not runtime, owns capacity/fallback policy')
 })
+
+test('WHAT[EMR-005] EMR_005_recommended_template_counts_capacity_by_provider_across_models', async () => {
+  const { default: route } = await import(`${templateUrl.href}?provider=${Date.now()}`)
+  const occupied = Array.from({ length: 4 }, () => ({
+    model: 'opencode-go/deepseek-v4-flash',
+    reasoning: 'low',
+  }))
+
+  assert.equal(
+    route('deep-browser', occupied, null),
+    null,
+    'opencode-go/minimax-m3 shares provider capacity with opencode-go/deepseek-v4-flash',
+  )
+})
+
+test('WHAT[EMR-006] EMR_006_recommended_template_prefers_previous_candidate_when_provider_has_capacity', async () => {
+  const { default: route } = await import(`${templateUrl.href}?previous=${Date.now()}`)
+  const previous = { model: 'neuralwatt/glm-5.2-flex', reasoning: 'high' }
+
+  assert.deepEqual(route('deep-coder', [], previous), previous)
+
+  const neuralwattFull = Array.from({ length: 4 }, () => ({
+    model: 'neuralwatt/another-model',
+    reasoning: 'none',
+  }))
+  assert.equal(
+    route('deep-coder', neuralwattFull, previous).model,
+    'cursor/cursor-grok-4.6-xhigh',
+    'when the previous provider is full, normal candidate fallback still applies',
+  )
+})

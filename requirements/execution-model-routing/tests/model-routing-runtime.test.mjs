@@ -164,6 +164,26 @@ test('WHAT[EMR-006] EMR_006_lease_is_stable_only_for_one_physical_user_material'
   assert.equal(calls, 2)
 })
 
+test('WHAT[EMR-006] EMR_006_continuation_passes_previous_target_but_new_session_passes_null', async () => {
+  let next = 0
+  const seenPrevious = []
+  const runtime = createRuntime((_role, _running, previous) => {
+    seenPrevious.push(previous)
+    return previous ?? target(`provider/model-${++next}`, 'low')
+  })
+
+  const first = await acquireManaged(runtime, 'continued', 'msg-1', 'deep-coder')
+  assert.equal(first.model, 'provider/model-1')
+  releasePhysicalExecution(runtime, 'continued', 'msg-1')
+
+  const continued = await acquireManaged(runtime, 'continued', 'msg-2', 'deep-coder')
+  assert.deepEqual(continued, first, 'exact terminal releases capacity but preserves continuation preference')
+
+  const fresh = await acquireManaged(runtime, 'new-session', 'msg-1', 'deep-coder')
+  assert.equal(fresh.model, 'provider/model-2')
+  assert.deepEqual(seenPrevious, [null, first, null])
+})
+
 test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_once', async () => {
   const runtime = createRuntime((_role, running) => running.length === 0 ? target('provider/one') : null)
   await acquireManaged(runtime, 'holder', 'msg-holder', 'fast-coder')

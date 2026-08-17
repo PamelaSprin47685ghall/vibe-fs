@@ -20,6 +20,7 @@ type private PendingDemand =
     { SessionId: string
       PhysicalUserMessageId: string
       Agent: string
+      PreviousTarget: ModelRoutingTarget option
       Completion: TaskCompletionSource<ModelRoutingTarget> }
 
 module ModelRouting =
@@ -60,8 +61,8 @@ module ModelRouting =
     [<Emit("$0 != null && typeof $0.then === 'function'")>]
     let private isThenable (value: obj) : bool = jsNative
 
-    [<Emit("$0($1, $2)")>]
-    let private callScheduler (scheduler: obj) (role: string) (running: obj array) : obj = jsNative
+    [<Emit("$0($1, $2, $3)")>]
+    let private callScheduler (scheduler: obj) (role: string) (running: obj array) (previous: obj) : obj = jsNative
 
     let private nonEmpty name (value: obj) =
         match value with
@@ -91,6 +92,7 @@ module ModelRouting =
         (scheduler: obj)
         (role: string)
         (running: ModelRoutingTarget array)
+        (previous: ModelRoutingTarget option)
         : ModelRoutingTarget option =
         if not (isFunction scheduler) then
             invalidOp "execution-model-routing: scheduler default export must be a function"
@@ -99,7 +101,11 @@ module ModelRouting =
             invalidOp "execution-model-routing: scheduler role must be non-empty"
 
         let result =
-            callScheduler scheduler (role.Trim()) (running |> Array.map targetObject)
+            callScheduler
+                scheduler
+                (role.Trim())
+                (running |> Array.map targetObject)
+                (previous |> Option.map targetObject |> Option.defaultValue null)
 
         if isThenable result then
             invalidOp "execution-model-routing: scheduler must be synchronous and must not return a Promise"
@@ -239,6 +245,7 @@ module ModelRouting =
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
         let activeBySession = Dictionary<string, ExecutionLease>()
+        let lastPhysicalTargetBySession = Dictionary<string, ModelRoutingTarget>()
         let pending = ResizeArray<PendingDemand>()
         let pendingBySession = Dictionary<string, PendingDemand>()
         // DSL-MUTABLE: resource — process-local scheduler poison
@@ -246,6 +253,11 @@ module ModelRouting =
 
         let running () =
             activeBySession.Values |> Seq.map _.Target |> Seq.toArray
+
+        let previousTarget sessionId =
+            match lastPhysicalTargetBySession.TryGetValue sessionId with
+            | true, target -> Some target
+            | false, _ -> None
 
         let ensureHealthy () = fatalError |> Option.iter raise
 
@@ -274,12 +286,12 @@ module ModelRouting =
             pendingBySession.Clear()
             waiting |> Array.iter (failDemand error)
 
-        let trySchedule agent =
-            invokeScheduler scheduler agent (running ())
+        let trySchedule agent previous =
+            invokeScheduler scheduler agent (running ()) previous
 
-        let scheduleOrPoison agent =
+        let scheduleOrPoison agent previous =
             try
-                trySchedule agent
+                trySchedule agent previous
             with ex ->
                 poison ex
                 raise ex
@@ -289,6 +301,8 @@ module ModelRouting =
                 { PhysicalUserMessageId = Some demand.PhysicalUserMessageId
                   Agent = demand.Agent
                   Target = target }
+
+            lastPhysicalTargetBySession.[demand.SessionId] <- target
 
         let commit demand target =
             rememberExecution demand target
@@ -304,7 +318,7 @@ module ModelRouting =
 
         let schedulePendingDemand demand =
             if pending.Contains demand then
-                scheduleOrPoison demand.Agent |> commitScheduled demand
+                scheduleOrPoison demand.Agent demand.PreviousTarget |> commitScheduled demand
             else
                 false
 
@@ -366,6 +380,8 @@ module ModelRouting =
                     { lease with
                         PhysicalUserMessageId = Some physicalUserMessageId }
 
+                lastPhysicalTargetBySession.[sessionId] <- lease.Target
+
                 Some(Task.FromResult lease.Target)
             | Some _ -> None
 
@@ -382,12 +398,16 @@ module ModelRouting =
             | false, _ -> reusePendingExecution sessionId physicalUserMessageId agent
 
         let acquireFreshDemand sessionId physicalUserMessageId agent =
-            match scheduleOrPoison agent with
+            let previous = previousTarget sessionId
+
+            match scheduleOrPoison agent previous with
             | Some target ->
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = Some physicalUserMessageId
                       Agent = agent
                       Target = target }
+
+                lastPhysicalTargetBySession.[sessionId] <- target
 
                 drainDemands ()
                 Task.FromResult target
@@ -399,6 +419,7 @@ module ModelRouting =
                     { SessionId = sessionId
                       PhysicalUserMessageId = physicalUserMessageId
                       Agent = agent
+                      PreviousTarget = previous
                       Completion = completion }
 
                 pending.Add demand
@@ -426,7 +447,7 @@ module ModelRouting =
                 failedTask<ModelRoutingTarget> ex
 
         let tryReserveFresh sessionId agent =
-            match scheduleOrPoison agent with
+            match scheduleOrPoison agent (previousTarget sessionId) with
             | None -> None
             | Some target ->
                 activeBySession.[sessionId] <-
@@ -483,7 +504,10 @@ module ModelRouting =
         /// mechanism. A newer chat.message also supersedes this lease atomically.
         member _.ReleaseExecution(sessionId: string) =
             normalizeSessionId sessionId
-            |> Option.iter (fun normSessionId -> lock gate (fun () -> retireCurrentExecution normSessionId))
+            |> Option.iter (fun normSessionId ->
+                lock gate (fun () ->
+                    retireCurrentExecution normSessionId
+                    lastPhysicalTargetBySession.Remove normSessionId |> ignore))
 
         /// Exact physical terminal evidence. Unlike force cleanup, this cannot
         /// retire a newer execution or pending demand that happens to reuse the

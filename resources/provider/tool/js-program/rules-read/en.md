@@ -37,5 +37,25 @@ Recommended workflow:
 4. For edits, build the complete resulting file from text(...) slices plus new content.
 5. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.
 
+I have already paid for this mistake. I once treated a roughly 8k lines file
+reorganization as manual string surgery: indexOf, substring, then join. One run
+turned it into roughly 31k lines. The ugly part was not one bad output; I then
+spent more calls guessing at the damage, using grep to stare at repeated
+headings and replace to scrape away leftovers. grep was finding candidates, not
+owning structure. The generated API had already given me an immutable snapshot,
+ordered anchors, and exact text() slices; by calculating the boundaries myself I
+threw those guards away and recreated the bugs they exist to prevent.
+
+So when the job is structural — keep these spans, drop those spans, reorder these
+sections — declare the structure first, then splice only the slices that belong
+in the target file. Do not make "load everything, then keep deleting what looks
+wrong" your default plan. Raw string search is useful inside a known slice; it is
+not a reason to reimplement structural location.
+
+Do not let familiarity impersonate evidence. indexOf feels "simple" because you
+have seen it thousands of times; that familiarity says nothing about whether it
+owns this file's structure. The primitive with the stronger contract gets the
+presumption. The lower-level technique carries the burden of proof.
+
 Prefer:
   f.text("^", "begin") + "newString" + f.text("end", "$")

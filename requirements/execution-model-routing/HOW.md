@@ -9,14 +9,28 @@
 ```js
 // Wanxiangshu model scheduler. Edit this file freely.
 // `running` is a multiset of active { model, reasoning } leases.
+// `previous` is the last successful physical execution target for this session,
+// or null for a new conversation. It is a preference hint, not occupancy.
 // Return a target to acquire it, or null to wait for an occupancy change.
 
-const count = (running, model, reasoning) =>
-  running.filter((item) => item.model === model && item.reasoning === reasoning).length
+const providerOf = (model) => model.slice(0, model.indexOf('/'))
 
-const pick = (running, candidates) => {
-  for (const [model, reasoning, limit] of candidates) {
-    if (count(running, model, reasoning) < limit) return { model, reasoning }
+const providerCount = (running, model) =>
+  running.filter((item) => providerOf(item.model) === providerOf(model)).length
+
+const available = (running, [model, , limit]) => providerCount(running, model) < limit
+
+const targetOf = ([model, reasoning]) => ({ model, reasoning })
+
+const pick = (running, previous, candidates) => {
+  const preferred = previous && candidates.find(
+    ([model, reasoning]) => model === previous.model && reasoning === previous.reasoning,
+  )
+
+  if (preferred && available(running, preferred)) return targetOf(preferred)
+
+  for (const candidate of candidates) {
+    if (available(running, candidate)) return targetOf(candidate)
   }
   return null
 }
@@ -76,18 +90,18 @@ const pools = new Map([
   ["deep-browser", DEEP_BROWSER],
 ])
 
-export default function route(role, running) {
+export default function route(role, running, previous) {
   const candidates = pools.get(role)
   if (!candidates) throw new Error(`unknown model-routing role: ${role}`)
-  return pick(running, candidates)
+  return pick(running, previous, candidates)
 }
 ```
 
-这就是推荐的 MJS 风格：**小纯函数 + 明确常量 + 显式 role 表 + `running` 计数 + 顺序 `pick` + 满载 `null`**。不依赖闭包外可变状态，不读时钟/网络/Host，不把模型策略藏进 runtime。
+这就是推荐的 MJS 风格：**小纯函数 + 明确常量 + 显式 role 表 + provider 聚合计数 + `previous` 优先 + 顺序 `pick` + 满载 `null`**。同一 provider 下无论 model/reasoning 是否不同都合并占用 provider budget；上一 target 只有在仍属于当前候选且其 provider 未满时才优先。不依赖闭包外可变状态，不读时钟/网络/Host，不把模型策略藏进 runtime。
 
 当前推荐模型对应此前七档意图：最快非推理 `ollama-cloud/gemma4:31b` / `opencode-go/deepseek-v4-flash`；快速只读 `stepfun/step-3.5-flash-2603`；常规中档 `opencode-go/deepseek-v4-flash` low；高档 `cursor/cursor-grok-4.6-xhigh` xhigh / `neuralwatt/glm-5.2-flex` high；Browser 分别使用 `ollama-cloud/minimax-m3` 与 `opencode-go/minimax-m3` 的非推理档，fast/deep 两个 role 可保留不同 admission limit。
 
-这些模型名/limit 是**首次生成模板的当前推荐值**，不是 runtime schema。用户可以直接编辑整个 MJS：删掉七档、换模型、换计数方法、让 fast/deep 共池都合法。已有文件在升级时绝不被新模板覆盖。
+这些模型名/limit 是**首次生成模板的当前推荐值**，不是 runtime schema。推荐模板把第三列 limit 解释为候选 provider 的 admission limit；同 provider 的其它 model/reasoning occurrence 也计入。用户可以直接编辑整个 MJS：删掉七档、换模型、换计数方法、让 fast/deep 共池都合法。已有文件在升级时绝不被新模板覆盖。
 
 `model` 必须是完整非空 `provider/model`；裸 `modelID` 非法，因为 provider 同样属于 MJS routing authority。`reasoning` 直接映射 OpenCode 的 reasoning/variant 档位，非推理显式写 `none`。返回值结构之外的策略信息不穿过 ABI。
 
@@ -125,8 +139,9 @@ ModelTarget = { Model: string OpenCode model selector; Reasoning: string }
 ExecutionLeaseKey = SessionId × PhysicalUserMessageId
 ExecutionLease = { EffectiveAgent; ModelTarget }
 Running = ModelTarget list                        // active execution multiset，重复保留
-Scheduler = role:string × Running -> ModelTarget option
-PendingDemand = { ExecutionLeaseKey; EffectiveAgent; cancellation }
+Previous = ModelTarget option                     // same-session last successful physical target; no capacity
+Scheduler = role:string × Running × Previous -> ModelTarget option
+PendingDemand = { ExecutionLeaseKey; EffectiveAgent; Previous; cancellation }
 ```
 
 不再有：
@@ -151,10 +166,11 @@ registry 至少维护：
 
 ```text
 managedExecutions: SessionId → { PhysicalUserMessageId option; EffectiveAgent; ModelTarget }
+lastPhysicalTarget: SessionId → ModelTarget
 pending: SessionId → latest arrival-ordered physical-execution demand
 ```
 
-`running` 每次调用临时由 active execution lease 表的 values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。session 是否还可 reuse、handle 是否 retired、业务是否 completed 均不进入该表的生命周期判断。
+`running` 每次调用临时由 active execution lease 表的 values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。`lastPhysicalTarget` 不计 occupancy，只在成功 physical admission/adopt 时更新；exact terminal 释放 active lease 时保留，session drop/scope cleanup 时删除。session 是否还可 reuse、handle 是否 retired、业务是否 completed 均不进入 active occupancy 的生命周期判断。
 
 同一 SessionId 同时至多一个 current physical execution；不同 SessionId 的并发 execution 若指向同一 target，values 中自然出现重复元素。`PhysicalUserMessageId=None` 只用于 Strength 在 Host 物理 message 创建前的 optional reservation，chat.message 必须把它原位 rebind 成 exact physical id，而不是再占一个 occurrence。
 
@@ -174,7 +190,7 @@ Host 已接收该物理 user message 后：
 2. 当前 SessionId 已绑定**同一个** PhysicalUserMessageId → 要求 EffectiveAgent 完全一致并直接复用 target；
 3. 当前 SessionId 若绑定旧 physical id / 旧 pending → 原子 retire/cancel；新 physical message 自身就是 supersession 证据，不等待 idle；
 4. 若存在 Strength 的 `PhysicalUserMessageId=None` reservation 且 agent 一致 → 原位 adopt 成当前 physical id，不重调 scheduler、不增加 `running` occurrence；
-5. 否则生成当前 `running` snapshot，调 `route(agent, running)`；
+5. 否则生成当前 `running` snapshot，并读取该 Session 的 `lastPhysicalTarget`（不存在为 `null`），调 `route(agent, running, previous)`；
 6. target → 校验结构、原子写 exact execution lease，并把 target 投影到 mutable Host message；`null` → 把 exact demand 挂入 pending。
 
 ### Occupancy changed
@@ -182,7 +198,7 @@ Host 已接收该物理 user message 后：
 每次成功 acquire 或 release 后，对 pending 按 arrival order 做一轮：
 
 1. 对当前仍有效 demand 构造最新 `running`；
-2. 调 scheduler；
+2. 用 demand 在首次 admission 时冻结的 `previous` 调 scheduler；不得因等待期间其它 occupancy 变化而改写这份接续提示；
 3. `null` → 保留该 demand，继续检查后面的 demand，避免不同 role 的 head-of-line blocking；
 4. target → 立即提交 occupancy，再处理下一个 demand，使后续调用看到更新后的 multiset。
 
@@ -196,7 +212,7 @@ Host 已接收该物理 user message 后：
 
 ### Optional demand
 
-Strength 这类可丢弃优化应走 nonwaiting reservation：调用一次 scheduler；`null` 立即 K0，不进入 required pending queue。若获得 target，先以该 replica SessionId 保存 `PhysicalUserMessageId=None` 的 capacity reservation；之后真实 `chat.message` 必须以相同 agent 将该 reservation 原位 adopt 为 exact physical execution。reservation/physical execution 始终只占一个 occurrence；失败/销毁时按 SessionId 清理。
+Strength 这类可丢弃优化应走 nonwaiting reservation：调用一次 scheduler，并同样传该 Session 已知的 `previous`（通常新 replica 为 `null`）；`null` 立即 K0，不进入 required pending queue。若获得 target，先以该 replica SessionId 保存 `PhysicalUserMessageId=None` 的 capacity reservation；reservation 本身不更新 `lastPhysicalTarget`，只有之后真实 `chat.message` 以相同 agent 原位 adopt 成 exact physical execution 时才更新。reservation/physical execution 始终只占一个 occurrence；失败/销毁时按 SessionId 清理。
 
 ## 6. Host config 与 managed prompt 路径
 

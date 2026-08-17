@@ -8,30 +8,32 @@
 
 ## 2. 更短的充分边界：真实 occupancy 在 runtime，选择算法在 MJS
 
-模型调度真正不可消除的 runtime 事实只有两类：
+模型调度真正不可消除的 runtime 事实只有三类：
 
 ```text
 当前需要哪个机器角色 role
 当前已经占用了哪些 ModelTarget running
+当前接续 Session 最近一次成功物理执行使用的 ModelTarget previous（新 Session = null）
 ```
 
 其余都可以是纯策略：
 
 ```text
-(role, running) -> { model, reasoning } | null
+(role, running, previous) -> { model, reasoning } | null
 ```
 
-Wanxiangshu 只维护真实 lease multiset、串行 acquire/release 与 Host 投影；用户的 `wanxiangshu.mjs` 自己决定角色分组、模型优先级、容量、视觉模型、fast/deep 差异等。这样产品内不再存在第二份“调度知识”。
+Wanxiangshu 只维护真实 lease multiset、最近一次物理执行 target、串行 acquire/release 与 Host 投影；用户的 `wanxiangshu.mjs` 自己决定角色分组、模型优先级、容量、是否优先延续上一 LLM、视觉模型、fast/deep 差异等。`previous` 只是选择提示，不占容量，也不把上一 lease 复活成 session 级永久绑定。这样产品内不再存在第二份“调度知识”。
 
 ## 3. 为什么 `running` 用 multiset，而不是容量字段
 
-容量不是 runtime 应理解的 schema。若某 target 在 `running` 中出现 4 次，scheduler 就知道当前有 4 个 lease；它可以把第 5 个视为满载，也可以继续允许，完全由 MJS 决定。
+容量不是 runtime 应理解的 schema。`running` 保留完整 target occurrence，因此 scheduler 可以按 exact target、model family 或 provider 自己聚合。推荐模板按 `provider`（完整 `provider/model` 中 `/` 前的部分）计数：同一 provider 下不同 model/reasoning 的 active lease 合并占用同一 provider 并发预算。
 
 重复项不能去重。不同 role 共用同一 `{model, reasoning}` 时，自然在同一数组中累计；同一 SessionId 的 A/B 两个 EffectiveAgent 若都取得相同 target，也必须贡献两个 occurrence，因为它们是两个独立稳定 lease。
 
 这种表示足够表达：
 
 - 单模型并发上限；
+- provider 级并发上限（跨 model/reasoning 合并）；
 - 多候选优先级；
 - fast/deep 分池或共池；
 - Browser 单独廉价视觉池；
@@ -51,6 +53,8 @@ required execution 应保持 pending；只有真实 occupancy 变化时才重新
 Session 是可复用容器：业务 completed、handle retired、甚至 Host close 都不能可靠回答“下一次是否还会在这个 SessionId 上执行”。反过来，`PhysicalUserMessageId` 精确命名了 Host 当前正在处理的 user material。若把槽冻结到 session，就会让 idle 后的可复用 session 永久占容量；若按 EffectiveAgent 给同一 session 同时留 A/B 两份 lease，又会把一次物理 execution 双计数。
 
 因此 managed lease 以 `(SessionId, PhysicalUserMessageId)` 为 identity，EffectiveAgent 是该 execution 的稳定属性。同一 physical id 的 provider retry 复用 target；同一 SessionId 出现新 physical id 时，新 material 自身就足以 supersede 旧 lease，不依赖 idle 必达。AABB 切到 peer 只影响**下一条 physical execution**的 EffectiveAgent，不保留一份 session 级 B 槽。
+
+新的 physical execution 仍然必须重新调用 scheduler；只是同一未删除 Session 的上一成功 target 会作为 `previous` 一并传入。这样 MJS 可以在角色策略仍允许、provider 仍有容量时优先保持原 LLM，减少接续对话的模型漂移；一旦原 target 不再属于当前 role 的候选或 provider 已满，仍可立即选择其它 target。exact terminal 释放容量但不删除这份无容量语义的 previous hint；session delete/scope cleanup 才清除它，所以真正新对话得到 `null`。
 
 ## 6. 为什么事件驱动状态必须 process-shared
 

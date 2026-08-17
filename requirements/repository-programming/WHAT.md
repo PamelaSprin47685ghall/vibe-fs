@@ -217,3 +217,13 @@
 **边界**：门禁机制本身是共享 checker（`scripts/checks/js-surface-gate.mjs`，MECHANISM）；本命题拥有的是「生成面唯一 + 无手写变体」的语义。同构律本身 → `capability-enforcement`（其 `capability-isomorphism-gate.mjs` 拥有 schema/runtime gate 同源）。
 
 **证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-021 行。
+
+## REPOSITORY-PROGRAMMING-022 — 工具选择也属于正确性：description 必须让失败经验现身说法
+
+**规范陈述**：生成的 `js-*` description 不得只罗列 API 或给轻飘飘的「prefer X / avoid Y」建议；它必须把**正确行为包装成高显著性、低逃逸率的行为引导**。开头先做醒目的风险中断（例如「警告：你正准备酿成大错」），抢在模型沿熟悉低层路径自动补全之前重新分配注意力；随后用短而具体的失败经验解释为什么应该先使用当前 surface 已拥有的高层 primitive。至少覆盖：① `file(matches)` / ordered anchors / `text()` 已拥有结构定位时，不得把手算 `indexOf`/`substring`/大范围 `replace` 当默认重构路径；② grep 是候选发现工具，不承担文件切片/重组语义；③ mutation 应先在不可变 snapshot 上构造目标结果，再对每个 path 一次提交，禁止把「第一轮留下的残骸」当成合理的第二、第三轮工作流；④ program 返回前应检查廉价且明显的不变量（例如规模、关键结构、预期锚点），结果离谱时应 fail 当前 program，让 staged mutation 零提交，而不是看到文件开头「看起来正常」就继续猜；⑤ description 必须给出可执行的 trigger→action 规则（例如「如果你正准备手算边界，就停下并先声明 anchor」）和明确 stop rule，使异常证据能中断自动驾驶；⑥ 允许并鼓励使用**真实权威、数字锚定、损失厌恶、二选一 framing、重复、首因/近因、承诺一致性、反自我辩护提示**等心理手段强化记忆，但这些手段只能强化真实合同，禁止虚构权威、虚构数字、虚构因果或把非穷尽集合伪装成逻辑穷尽；⑦ 当工程 policy 本身定义了穷尽选择时，应故意把选择压成强二分，例如「高层 primitive 已拥有边界 → 用它；否则先明确证明它表达不了，再下降一层」，不保留「我熟悉低层 API 所以顺手重写一遍」这种心理逃生门。该教育必须保留「我/我们已经为这种错误付过代价」的现身说法质感：惊醒 → 事故 → 损失 → 根因 → 下一次动作；单纯禁令、口号或 API 摘要不满足本命题。
+
+**含义/动机**：对 LLM 来说，工具说明就是执行习惯塑形层。一个拥有 snapshot/anchor/transaction 的高级 primitive 如果被描述成「可选便利方法」，模型会沿训练语料中最熟悉的字符串手工活自动补全，并重新制造 Host 已经替它消灭的 offset、边界、残骸和多轮修补问题。仅靠理性摘要往往来不及截断这条自动路径；先用高显著性警告制造 prediction break，再用具体损失形成鲜活记忆，用因果解释避免迷信，用 trigger→action 把记忆绑定到下一次相同情境，用 stop rule 让异常证据真正打断执行。目标不是吓唬，而是让正确工具选择在需要它的瞬间被想起来。
+
+**边界**：具体事故数字（例如约 8k → 31k）、比喻、第一人称措辞、文案长度与双语表达属于 HOW，可替换；永久合同是「description 以具体失败记忆教授高层 primitive 的适用边界，并给出可执行的下一步」，且不得因此推荐当前 capability surface 中不存在的方法（仍受 002/005 约束）。
+
+**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-022 行。

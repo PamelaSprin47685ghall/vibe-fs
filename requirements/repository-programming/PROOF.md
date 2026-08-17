@@ -29,13 +29,14 @@
 | `REPOSITORY-PROGRAMMING-019` | `js-workflow.test.mjs` → `JS019_invalid_return_value_commits_nothing`（非法 return 零提交）/ `JS085_workflow_program_error_fails_without_commit` / `JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk`（commit 失败不给成功结果） | MOVE | `node --test requirements/repository-programming/tests/js-workflow.test.mjs` |
 | `REPOSITORY-PROGRAMMING-020` | `file-mutation-tools.test.mjs` → 全部 11 个 test（`FILEMUT_mv_moves_a_file` / `FILEMUT_mv_renames_a_directory_with_contents` / `FILEMUT_rm_removes_a_file` / `FILEMUT_rm_refuses_a_non_empty_directory` / `FILEMUT_mv_rename_failure_surfaces_os_message` 等）；交叉 REUSE `requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs`（plugin 级 `AGENT_017_mv_*` / `AGENT_018_rm_*` + 角色门禁 `AGENT_016_*`） | MOVE + REUSE | `node --test requirements/repository-programming/tests/file-mutation-tools.test.mjs` |
 | `REPOSITORY-PROGRAMMING-021` | `js-surface-gate.test.mjs` → `JS_SURFACE_GATE_handwritten_tokens_use_inquiry_not_meditator` / `JS_SURFACE_GATE_rejects_handwritten_js_coder_outside_permission_matrix` / `JS_SURFACE_GATE_allows_permission_matrix_enumeration`；门禁本体 REUSE `scripts/checks/js-surface-gate.mjs`（`node scripts/check.mjs` 内运行） | MOVE + REUSE | `node --test requirements/repository-programming/tests/js-surface-gate.test.mjs`；`node scripts/checks/js-surface-gate.mjs` |
+| `REPOSITORY-PROGRAMMING-022` | `js-surface.test.mjs` → `JS_description_teaches_tool_choice_through_paid_failure_memory`（惊醒→真实权威→数字损失→根因→强二分→动作→stop rule；anchor/grep/mutation/invariant guard） | NEW | `node --test requirements/repository-programming/tests/js-surface.test.mjs` |
 
 ## 统计
 
 ```text
-WHAT 命题：21（REPOSITORY-PROGRAMMING-001..021）
+WHAT 命题：22（REPOSITORY-PROGRAMMING-001..022）
 落点：   MOVE 20 个命题（19 个纯 MOVE + 017/020/021 带 REUSE 交叉）
-        NEW  1（js-parallel-contract.test.mjs ×3 test，覆盖 017）
+        NEW  2（js-parallel-contract.test.mjs ×3 test，覆盖 017；js-surface.test.mjs 新增 022）
         REUSE 3（scripts/checks/js-surface-gate.mjs、requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs、integration Host 串行面）
 GAP：    0
 ```

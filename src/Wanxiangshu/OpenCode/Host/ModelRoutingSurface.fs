@@ -165,8 +165,12 @@ module ModelRoutingSurface =
 
     /// Invoke a scheduler with plain JS target observations. `null` means the
     /// scheduler declined the demand; target validation remains owned by routing.
-    let invokeScheduler (scheduler: obj) (role: string) (running: obj) : obj =
-        ModelRouting.invokeScheduler scheduler role (targetsOf running)
+    let invokeScheduler (scheduler: obj) (role: string) (running: obj) (previous: obj) : obj =
+        ModelRouting.invokeScheduler
+            scheduler
+            role
+            (targetsOf running)
+            (if isNullish previous then None else Some(targetOf previous))
         |> Option.map targetObject
         |> Option.defaultValue null
 

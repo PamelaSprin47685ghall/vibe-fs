@@ -56,6 +56,26 @@ resolve Attempt → immutable profile（AttemptExecutionProfile.ToolCapabilitySe
 → JsToolsResult.render：Synthetic TOML 两份文档（#ok/#failed + [data]/[fs]）
 ```
 
+## description 的「交过学费」工具选择层
+
+`resources/provider/tool/js-program/` 不只解释 syntax；它负责在模型做选择的那一刻把高层 primitive 的正确性边界说透（REPOSITORY-PROGRAMMING-022）。文案按「显著性中断 → 权威定位 → 鲜活损失 → 数字锚定 → 因果 → 强二分 → If/Then 行动 → stop rule → 近因重复」组织：先阻断自动驾驶，再讲理，再把下一次动作钉住。这里的“心理手段”只用于**提高正确合同被想起和执行的概率**，不得替代证据：Host 的权威来自真实 ownership；数字来自真实事故或当前 program 可计算的不变量；二分只在 policy 已经定义穷尽选择时使用；模糊措辞只能用于制造危险感，不能模糊技术事实。
+
+- `header/{en,zh-CN}.md`：description 第一屏先给风险中断，不让模型把后面的规则当普通参考资料扫过去；紧跟可识别的危险信号（手算 offset、用 grep 猜结构、准备第二轮修第一轮）。
+- `rules-read/{en,zh-CN}.md`：用一次真实感强的失败链说明「结构化重排 → ordered anchors + `text()`」，并明确 grep 只能找候选、不能替代结构切片；手写 `indexOf`/`substring` 不是默认定位策略。
+- `rules-mutation/{en,zh-CN}.md`：说明「先构造最终文本、每 path 一次 mutation」；若结果规模/结构明显异常，program 应在 return 前 throw，让 staging 丢弃，而不是 commit 后再写第二轮清残骸。
+- `footer/{en,zh-CN}.md`：把经验泛化成总原则——生成 API 已拥有某层边界时，自己重写一份低层版本不是更聪明，而是主动拆掉护栏；只有高层 primitive 确实表达不了任务时才下降一层。
+
+行为塑形的固定手法：
+
+- **真实权威**：反复强调「Host owns the boundary / transaction」，让模型知道这不是个人偏好，而是执行语义所有权。
+- **数字锚定 + 损失厌恶**：保留 `≈8k → ≈31k` 与「第二、第三轮只为修第一轮」这种代价，不写抽象的“可能有风险”。
+- **强二分**：高层 primitive 已拥有边界时，只有「使用」或「证明表达不了后下降一层」两个合格选择；熟悉、方便、想炫技都不构成第三条路。
+- **承诺一致性**：program 在开始 mutation 前先把“我要保护哪些不变量”写进代码，return 前必须兑现；异常即 throw。
+- **反自我辩护**：专门点破「开头看起来正常」「再 replace 一次就好」「我自己实现更灵活」这些最常见的自我安慰。
+- **首因 + 近因**：header 第一屏惊醒；footer 最后一屏再次压缩成一句可复述的铁律。
+
+文案必须保持惊醒 → 权威 → 事故 → 损失 → 根因 → 二选一 → 下一次动作 → 停止规则 → 再提醒；至少有一条「如果你正准备 X → 立刻 Y」implementation intention 和一条异常 stop rule。禁止退化回「Best practice: prefer anchors」式无痛摘要；精确事故数字与比喻可换，但要保留能让模型记住代价的具体性。
+
 ## 依赖（DEPENDS ON，逐条理由）
 
 | 依赖 | 理由 |
