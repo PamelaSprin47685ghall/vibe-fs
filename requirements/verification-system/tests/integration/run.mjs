@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url'
 import { WATCHDOG_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
 import { assessIntegrationEntryCoverage } from '../support/integration-entry-coverage.mjs'
+import { discoverSuiteTests } from '../support/discover-suite-tests.mjs'
+import { integrationNodeTestSteps } from '../support/integration-node-test-steps.mjs'
 import { walk } from '../../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -47,56 +49,7 @@ const INTEGRATION_PER_TEST_TIMEOUT_MS = Math.max(
 )
 
 /** node:test files supervised via the shared verdict-silence helper. */
-const nodeTestSteps = [
-  {
-    label: 'resources/prompts.test.mjs (cognitive-environment)',
-    files: [path.join(root, 'requirements/cognitive-environment/tests/integration/resources/prompts.test.mjs')],
-  },
-  {
-    label: 'resources/enforcer-rulebook.test.mjs (behavior-diagnosis)',
-    files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs')],
-  },
-  {
-    label: 'blogger-nudge-plugin-repro.test.mjs (behavior-diagnosis)',
-    files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/blogger-nudge-plugin-repro.test.mjs')],
-  },
-  {
-    label: 'plugin contracts (capability-enforcement)',
-    files: [
-      path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs'),
-      path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/auto-injected-tool.test.mjs'),
-      path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/bash-honeypot-tool.test.mjs'),
-    ],
-  },
-  {
-    label: 'worktree-create.test.mjs (change-integration)',
-    files: [path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs')],
-  },
-  {
-    label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',
-    files: [path.join(root, 'requirements/repository-programming/tests/integration/plugin/file-mutation-tools.test.mjs')],
-  },
-  {
-    label: 'strength/lifecycle.test.mjs (speculative-investigation)',
-    files: [path.join(root, 'requirements/speculative-investigation/tests/integration/strength/lifecycle.test.mjs')],
-  },
-  // Persist owns the only durable substrate, and these three files were reachable only by
-  // running them by hand — a self-test outside the gate is not a gate. `object-identity` in
-  // particular pins our in-process Git object writer against the real binary.
-  {
-    label: 'persist (durable-events)',
-    files: [
-      path.join(root, 'requirements/durable-events/tests/integration/persist/object-identity.test.mjs'),
-      path.join(root, 'requirements/durable-events/tests/integration/persist/leave-unread.test.mjs'),
-    ],
-  },
-  {
-    label: 'persist (durable-convergence)',
-    files: [
-      path.join(root, 'requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs'),
-    ],
-  },
-]
+const nodeTestSteps = integrationNodeTestSteps(root)
 
 /** Child entrypoints that already own their silence criterion. */
 const childSteps = [
@@ -110,13 +63,16 @@ const childSteps = [
   },
 ]
 
-// Integration tests are excluded from the unit runner. Child suites own only the
-// prefixes listed here; every other *.test.mjs under tests/integration must be
-// wired into nodeTestSteps or the integration entry fails closed.
-const childOwnedIntegrationPrefixes = [
-  'requirements/distribution/tests/integration/package/',
-]
+// Integration tests are excluded from the unit runner. Child suites own only
+// the tests discovered by the shared helper in their directory; every other
+// *.test.mjs under tests/integration must be wired into nodeTestSteps or the
+// integration entry fails closed. The discovered child set is the same set the
+// child run.mjs executes, so parent delegation and child execution cannot drift.
+const packageIntegrationDir = path.join(root, 'requirements/distribution/tests/integration/package')
 const normalize = (file) => path.relative(root, file).split(path.sep).join('/')
+const childOwnedIntegrationTests = discoverSuiteTests(packageIntegrationDir).map((name) =>
+  normalize(path.join(packageIntegrationDir, name)),
+)
 const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
   .map(normalize)
   .filter((file) => file.includes('/tests/integration/'))
@@ -124,7 +80,7 @@ const wiredIntegrationTests = nodeTestSteps.flatMap((step) => step.files.map(nor
 const entryCoverage = assessIntegrationEntryCoverage({
   discoveredTests: discoveredIntegrationTests,
   wiredTests: wiredIntegrationTests,
-  childOwnedPrefixes: childOwnedIntegrationPrefixes,
+  childOwnedTests: childOwnedIntegrationTests,
 })
 
 if (!entryCoverage.ok) {

@@ -207,13 +207,31 @@ export const scanEntries = (entries) => {
   return hits
 }
 
-const collectEntries = (repoRoot) => {
+/**
+ * Read every configured owner root. Each root is REQUIRED: a missing,
+ * non-file, or unreadable root throws with path context so provider-visible
+ * prose cannot slip past the gate when an owner surface is moved or deleted.
+ *
+ * @param {string} repoRoot
+ * @param {readonly string[]} [roots] injectable for tests; defaults to the
+ *   canonical configured set.
+ * @returns {{ file: string, text: string }[]}
+ */
+export const collectEntries = (repoRoot, roots = PROVIDER_PROSE_SCAN_ROOTS) => {
   /** @type {{ file: string, text: string }[]} */
   const entries = []
-  for (const root of PROVIDER_PROSE_SCAN_ROOTS) {
+  for (const root of roots) {
     const abs = resolve(repoRoot, root)
-    if (!existsSync(abs)) continue
-    entries.push({ file: norm(root), text: readFileSync(abs, 'utf8') })
+    if (!existsSync(abs)) {
+      throw new Error(`provider-prose-ownership: scan root missing on disk: ${root}`)
+    }
+    let text
+    try {
+      text = readFileSync(abs, 'utf8')
+    } catch (cause) {
+      throw new Error(`provider-prose-ownership: scan root unreadable: ${root}`, { cause })
+    }
+    entries.push({ file: norm(root), text })
   }
   return entries
 }
@@ -247,8 +265,8 @@ export const compareBaseline = (baseline, current) => {
  * @param {string} [repoRoot]
  * @returns {Record<string, number>} non-zero per-file hit counts
  */
-export const generateBaseline = (repoRoot = process.cwd()) => {
-  const hits = scanEntries(collectEntries(repoRoot))
+export const generateBaseline = (repoRoot = process.cwd(), opts = {}) => {
+  const hits = scanEntries(collectEntries(repoRoot, opts.roots))
   return countByFile(hits)
 }
 
@@ -258,7 +276,7 @@ export const generateBaseline = (repoRoot = process.cwd()) => {
  * @returns {{ ok: boolean, hits: Hit[], counts: Record<string, number> }}
  */
 export const scanRepo = (repoRoot = process.cwd(), opts = {}) => {
-  const hits = scanEntries(collectEntries(repoRoot))
+  const hits = scanEntries(collectEntries(repoRoot, opts.roots))
   const counts = countByFile(hits)
   if (!opts.baseline) {
     return { ok: hits.length === 0, hits, counts }

@@ -31,7 +31,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 
 ## GAP 记录
 
-- 聚合台账见 `requirements/GAP.md`（GAP-007 CLOSED / GAP-008 OPEN）。
+- 聚合台账见 `requirements/GAP.md`（GAP-007 CLOSED / GAP-008 CLOSED）。
 - `HOST-BOUNDARY-008`：unit encoding 由 `tests/host010-run-id-equivalence.test.mjs` 承接
   （bindableRun id ≡ ToolContext.messageID；0/≥2 无合法 run id）。共时 Host 穿线是不可模拟
   physical contract，由 Long Stroke 入口声明（VERIFICATION-SYSTEM-003），不另立 unit GAP。

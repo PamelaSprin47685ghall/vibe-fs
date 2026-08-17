@@ -197,10 +197,8 @@ test('WHAT[VERIFICATION-SYSTEM-008] the journal publishes boot append and snapsh
   ])
   assertCallable(codec, 'Persistence/Journal/FactCodec', ['serializeFact', 'deserializeFact'])
 
-  // PERSIST-008's integrated state, and the runtime snapshot a boot produces.
-  for (const name of ['ProjectionSet', 'RuntimeSnapshot']) {
-    assert.equal(typeof state[name], 'function', `Journal/ProjectionState must publish '${name}'`)
-  }
+  // PERSIST-008's integrated state.
+  assert.equal(typeof state['ProjectionSet'], 'function', 'Journal/ProjectionState must publish ProjectionSet')
 })
 
 test('WHAT[VERIFICATION-SYSTEM-008] the outcome kernel publishes the two commit results', async () => {

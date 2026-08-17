@@ -223,6 +223,7 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
    | `containsLegacyFallbackFields` → `pre050MigrationMessage` | 仍可能被操作者提交的 pre-0.5.0 runtime journal；需要可操作的 archive-or-remove 诊断 | retention horizon + 外部 workspace census 证明无 pre-0.5.0 bytes → 删除检测与诊断测试 |
    | `containsLegacyScoreVectorEntry` → `tipV2CleanBreakMessage` | 历史 tip-v1 observation/entry bytes；不能无损猜成单一 tip | 所有受支持 workspace 完成 tip-v2 clean break 且无旧 bytes → 删除检测与诊断测试 |
    | `containsLegacyUnanchoredGuideline` → `legacyGuidelineCleanBreakMessage` | 历史未锚定 guideline bytes；ordinal 无法恢复 transcript position | HOST-013 retention horizon + census 无旧 bytes → 删除检测与诊断测试 |
+   | `containsHandleCompletedMissingCompletionFields` → explicit refusal | 历史缺少 `CompletionRef` / `CompletionDigest` 的 `HandleCompleted` bytes；完成身份无法安全重建 | EXEC-009 retention horizon + census 无旧 bytes → 删除检测与诊断测试 |
 
    **禁止**：把任何 decode-only refusal 升级为双向 adapter、old writer、migrator 或 fallback-to-old-store shim。
 

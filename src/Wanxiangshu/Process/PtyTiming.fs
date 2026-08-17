@@ -5,9 +5,6 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
-/// Compatibility alias — prefer Kernel.IDeadlineHandle (G4R-CE S1 transition).
-type ITimerHandle = IDeadlineHandle
-
 /// Virtual-clock control surface for ITimerPort contract tests.
 type VirtualTimerPort =
     { Port: ITimerPort

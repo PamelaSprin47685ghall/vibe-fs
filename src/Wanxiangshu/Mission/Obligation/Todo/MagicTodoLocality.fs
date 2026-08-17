@@ -255,7 +255,8 @@ module MagicTodoLocality =
         =
         match collapseIdenticalPhysicalReplays duplicates with
         | Some first -> resolveCapturedToolCall trace messages located first
-        | None -> Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+        | None ->
+            Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
 
     let private resolveLocated trace messages (located: SessionSnapshotPort.ToolCallLocation) =
         let matches =

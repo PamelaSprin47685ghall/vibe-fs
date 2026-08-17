@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   PROVIDER_PROSE_SCAN_ROOTS,
+  collectEntries,
   isProviderProseLiteral,
   scanEntries,
   scanRepo,
@@ -63,4 +64,38 @@ test('WHAT[PROVIDER-LANGUAGE-009] zero hits is closed', () => {
   const result = scanRepo(process.cwd())
   assert.equal(result.ok, true, JSON.stringify(result.hits, null, 2))
   assert.deepEqual(result.counts, {})
+})
+
+test('WHAT[PROVIDER-LANGUAGE-009] missing configured scan root fails closed with path context', () => {
+  // A required owner surface that no longer exists must abort the gate, not
+  // be silently skipped — otherwise provider prose outside the surviving
+  // roots passes undetected.
+  assert.throws(
+    () => collectEntries(process.cwd(), ['does/not/exist.fs']),
+    /scan root missing on disk: does\/not\/exist\.fs/,
+  )
+})
+
+test('WHAT[PROVIDER-LANGUAGE-009] unreadable scan root fails closed with path context', () => {
+  // readFileSync on a directory throws EISDIR — a deterministic, cross-platform
+  // read failure that exercises the unreadable-root path without chmod.
+  assert.throws(
+    () => collectEntries(process.cwd(), ['src/Wanxiangshu']),
+    /scan root unreadable: src\/Wanxiangshu/,
+  )
+})
+
+test('WHAT[PROVIDER-LANGUAGE-009] scanRepo propagates missing-root failure (gate cannot pass)', () => {
+  // The gate entry point must surface the failure, never swallow it into ok.
+  assert.throws(
+    () => scanRepo(process.cwd(), { roots: ['does/not/exist.fs'] }),
+    /scan root missing on disk: does\/not\/exist\.fs/,
+  )
+})
+
+test('WHAT[PROVIDER-LANGUAGE-009] every configured scan root exists on disk', () => {
+  // Guards against a root being added to the config but never created; if one
+  // is missing the gate would have skipped it silently under the old policy.
+  const entries = collectEntries(process.cwd())
+  assert.equal(entries.length, PROVIDER_PROSE_SCAN_ROOTS.length)
 })

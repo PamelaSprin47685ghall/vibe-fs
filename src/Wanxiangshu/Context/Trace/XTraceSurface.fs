@@ -730,14 +730,12 @@ module XTraceSurface =
     let captureSessionMessages (handle: JournalHandle) (sessionId: string) (messages: obj array) : Task<obj> =
         task {
             let sessionIdentity = SessionId.create sessionId
-            let projected = SessionSnapshotPort.projectMessages (if isNullish messages then [||] else messages)
+
+            let projected =
+                SessionSnapshotPort.projectMessages (if isNullish messages then [||] else messages)
 
             match! XTraceCapture.captureSessionMessages (Some handle.Journal) sessionIdentity projected with
-            | Error error ->
-                return
-                    box
-                        {| ok = false
-                           error = error |}
+            | Error error -> return box {| ok = false; error = error |}
             | Ok() ->
                 let projection = AgentJournal.snapshot handle.Journal
 

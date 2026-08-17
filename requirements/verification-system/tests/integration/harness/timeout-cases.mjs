@@ -200,7 +200,7 @@ const CAUSAL_LANE = ['publish', 'main', 'manager', 'turn-1'].join('/');
 function runNoWildcardEventAwait() {
   const WILDCARD_AWAIT = /awaitEvent\(\s*\(?[\w$,\s]*\)?\s*=>\s*(?:true|1)\b/;
   const offenders = [];
-  for (const file of walk(join(REPO_ROOT, 'tests/e2e'), ['.js', '.mjs'])) {
+  for (const file of walk(join(REPO_ROOT, 'requirements/verification-system/tests/e2e'), ['.js', '.mjs'])) {
     const rel = relative(REPO_ROOT, file);
     readFileSync(file, 'utf8').split('\n').forEach((text, index) => {
       if (WILDCARD_AWAIT.test(text)) offenders.push(`${rel}:${index + 1} ${text.trim()}`);
