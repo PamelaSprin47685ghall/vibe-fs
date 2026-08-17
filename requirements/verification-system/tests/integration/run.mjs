@@ -1,8 +1,8 @@
 // requirements/verification-system/tests/integration/run.mjs — sequential integration suite orchestrator.
 //
 //   node requirements/verification-system/tests/integration/run.mjs
-// Order: resources ×2 → plugin/manager-tool-contract → magic-todo-sink
-//        → file-mutation-tools → strength/lifecycle → persist (durable-events,
+// Order: resources ×2 → capability plugin contracts → file-mutation-tools
+//        → strength/lifecycle → persist (durable-events,
 //        durable-convergence) → package/run.mjs → harness/run.mjs
 // Any non-zero exit stops with exit 1.
 // package suite remains independently invocable via
@@ -17,6 +17,8 @@ import { fileURLToPath } from 'node:url'
 
 import { WATCHDOG_TIMEOUT_MS } from '../e2e/support/time-budget.js'
 import { superviseNodeTest } from '../e2e/support/supervise-node-test.mjs'
+import { assessIntegrationEntryCoverage } from '../support/integration-entry-coverage.mjs'
+import { walk } from '../../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
@@ -55,8 +57,20 @@ const nodeTestSteps = [
     files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs')],
   },
   {
-    label: 'plugin/manager-tool-contract.test.mjs (capability-enforcement)',
-    files: [path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs')],
+    label: 'blogger-nudge-plugin-repro.test.mjs (behavior-diagnosis)',
+    files: [path.join(root, 'requirements/behavior-diagnosis/tests/integration/blogger-nudge-plugin-repro.test.mjs')],
+  },
+  {
+    label: 'plugin contracts (capability-enforcement)',
+    files: [
+      path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs'),
+      path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/auto-injected-tool.test.mjs'),
+      path.join(root, 'requirements/capability-enforcement/tests/integration/plugin/bash-honeypot-tool.test.mjs'),
+    ],
+  },
+  {
+    label: 'worktree-create.test.mjs (change-integration)',
+    files: [path.join(root, 'requirements/change-integration/tests/integration/worktree-create.test.mjs')],
   },
   {
     label: 'plugin/file-mutation-tools.test.mjs (repository-programming)',
@@ -95,6 +109,31 @@ const childSteps = [
     args: [path.join(root, 'requirements/verification-system/tests/integration/harness/run.mjs')],
   },
 ]
+
+// Integration tests are excluded from the unit runner. Child suites own only the
+// prefixes listed here; every other *.test.mjs under tests/integration must be
+// wired into nodeTestSteps or the integration entry fails closed.
+const childOwnedIntegrationPrefixes = [
+  'requirements/distribution/tests/integration/package/',
+]
+const normalize = (file) => path.relative(root, file).split(path.sep).join('/')
+const discoveredIntegrationTests = walk(path.join(root, 'requirements'), ['.test.mjs'])
+  .map(normalize)
+  .filter((file) => file.includes('/tests/integration/'))
+const wiredIntegrationTests = nodeTestSteps.flatMap((step) => step.files.map(normalize))
+const entryCoverage = assessIntegrationEntryCoverage({
+  discoveredTests: discoveredIntegrationTests,
+  wiredTests: wiredIntegrationTests,
+  childOwnedPrefixes: childOwnedIntegrationPrefixes,
+})
+
+if (!entryCoverage.ok) {
+  console.error('integration: entry coverage mismatch')
+  for (const file of entryCoverage.missingFromEntry) console.error(`  unwired integration test: ${file}`)
+  for (const file of entryCoverage.staleEntry) console.error(`  wired path is not a discovered integration test: ${file}`)
+  for (const file of entryCoverage.duplicateWiring) console.error(`  integration test is wired more than once: ${file}`)
+  process.exit(1)
+}
 
 for (const step of nodeTestSteps) {
   console.log(`\n=== integration: ${step.label} ===`)
