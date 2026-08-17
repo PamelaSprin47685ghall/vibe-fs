@@ -102,32 +102,11 @@ module SessionAssociationProjection =
         | Some { Kind = ManagedSessionKind.SatelliteSession _ } -> true
         | _ -> false
 
-    /// HOST-008: WorkSession, or no association yet (lazy Y not created).
-    /// Unknown answers `true` for the same reason `isCompanion` answers `false`.
-    let isWorkSession (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
-        not (isSatellite sessionId current)
-
     /// ManagedSessionKind → SessionExecutionClass (no Ownership yet).
     let executionClassOf (kind: ManagedSessionKind) : SessionExecutionClass =
         match kind with
         | ManagedSessionKind.WorkSession -> SessionExecutionClass.Work
         | ManagedSessionKind.SatelliteSession _ -> SessionExecutionClass.InternalLeaf
-
-    /// Journal-proven logical parent (`ParentSessionId`), if any.
-    let parentOf (entry: SessionAssociation) : SessionId option = entry.ParentSessionId
-
-    let tryParentOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
-        tryFind sessionId current |> Option.bind parentOf
-
-    /// Refuse when the session is already a satellite leaf (Companion).
-    let assertWorkSession
-        (sessionId: SessionId)
-        (current: Map<SessionId, SessionAssociation>)
-        : Result<unit, AssociationRejection> =
-        if isSatellite sessionId current then
-            Error(AssociationRejection.CompanionWouldRecurse sessionId)
-        else
-            Ok()
 
     /// COMPANION-002: the main session a Companion belongs to.
     let tryMainSessionOf (sessionId: SessionId) (current: Map<SessionId, SessionAssociation>) =
@@ -336,7 +315,4 @@ module StrengthReplicaAssociationHints =
         | AttachmentKind.SyncCoder
         | AttachmentKind.Bookkeeper _ -> false
 
-    /// Look up the active StrengthReplica session for an owner from a process-local
-    /// owner → replica map. Not a durable association fold.
-    let tryStrengthReplica (ownerSessionId: SessionId) (replicasByOwner: Map<SessionId, SessionId>) : SessionId option =
-        Map.tryFind ownerSessionId replicasByOwner
+

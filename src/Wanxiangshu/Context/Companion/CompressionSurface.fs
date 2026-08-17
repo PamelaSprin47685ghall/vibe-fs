@@ -199,9 +199,6 @@ module CompressionSurface =
     let empty: obj = prefixEmpty
     let snapshot (value: obj) : obj = prefixSnapshot value
 
-    let prefixSnapshotFromProbe (value: obj) : obj =
-        probeOfJs value |> fun probe -> snapshotToJs probe.Candidate
-
     let private requestKindOf (value: obj) : ProviderRequestKind option =
         match text value |> fun value -> value.ToLowerInvariant() with
         | "workmain"

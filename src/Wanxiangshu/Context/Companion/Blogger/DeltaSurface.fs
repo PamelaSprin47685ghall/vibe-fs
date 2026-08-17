@@ -111,7 +111,6 @@ module BloggerDeltaSurface =
     let cursor (turn: int) (part: int) : obj = box {| turn = turn; part = part |}
 
     let limitBytes = BloggerDelta.DeltaLimitBytes
-    let truncationMarker = BloggerToml.TruncationMarker
 
     /// Render the next deterministic chunk. `None` remains an absent option at
     /// the JS boundary; a present chunk is a plain semantic summary.

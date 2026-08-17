@@ -53,14 +53,6 @@ module ManagerNarrative =
         [<Literal>]
         let ForkReturnedPreT1 = "lifecycle/manager/fork-returned-pre-t1"
 
-    /// GLORY-015: synthetic narrative source identity for duplicate detection.
-    [<Literal>]
-    let BirthNarrativeSource = "manager-birth-planning-table"
-
-    /// Substitution key for fork taken/returned templates.
-    [<Literal>]
-    let BynameKey = "byname"
-
     type NarrativePart = { Text: string; Synthetic: bool }
 
     type NarrativeProjection = { Parts: NarrativePart list }

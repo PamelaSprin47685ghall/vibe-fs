@@ -161,6 +161,7 @@ module private SessionInterop =
         | _ -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
 
 type SessionStore() =
+    // DSL-MUTABLE: resource — Sphinx session registry by handle.
     let sessions = Dictionary<string, SessionEntry>()
 
     member _.Count = sessions.Count

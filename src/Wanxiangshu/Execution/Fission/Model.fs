@@ -88,7 +88,6 @@ type FissionCompletionAffinity =
     | Lane of int
 
 module FissionCompletionAffinity =
-    let preFission = FissionCompletionAffinity.PreFissionBroadcast
     let lane index = FissionCompletionAffinity.Lane index
 
 module FissionExternalId =

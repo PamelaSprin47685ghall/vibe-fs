@@ -54,8 +54,4 @@ module SessionOwnership =
         | SessionOwnership.Root -> None
         | SessionOwnership.Attached(owner, _) -> Some owner
 
-    /// Attachment kind of an Attached session; `None` for Root.
-    let attachmentKind =
-        function
-        | SessionOwnership.Root -> None
-        | SessionOwnership.Attached(_, kind) -> Some kind
+

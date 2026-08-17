@@ -100,20 +100,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     // DSL-MUTABLE: single-flight — fire-and-forget send task handle
     let mutable lastSendTask: Task<unit> option = None
 
-    let startAsTask (work: Async<unit>) : Task<unit> =
-        let completion = TaskCompletionSource<unit>()
-
-        Async.StartImmediate(
-            async {
-                try
-                    do! work
-                finally
-                    completion.SetResult(())
-            }
-        )
-
-        completion.Task
-
     member _.Memory: CompanionMemory =
         lock lockObj (fun () ->
             { Blog = blogProjection

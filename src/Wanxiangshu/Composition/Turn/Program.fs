@@ -270,7 +270,4 @@ module ReconcileProgram =
     let evidenceTerminal (outcome: TurnOutcome) =
         ReconcileEvidence.Terminal(pureObservation outcome)
 
-    let evidenceObservedTerminal (turn: PublishTurn) =
-        ReconcileEvidence.Terminal(observedTurn turn)
-
     let evidenceSessionCleared () = ReconcileEvidence.SessionCleared

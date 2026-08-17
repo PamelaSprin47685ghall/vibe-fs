@@ -305,12 +305,13 @@ type internal SyncDelegateCallStore() as this =
     let callsByDelegate = Dictionary<string, SyncDelegateCall>()
     // DSL-MUTABLE: resource — retired Inspector ids staged between child and owner SessionDeleted
     let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
-    // DSL-MUTABLE: mailbox — incomplete semantic batches by (scope, role)
+    // DSL-MUTABLE: resource — incomplete semantic batches by (scope, role)
     let pendingBatches = Dictionary<string * SyncDelegateRole, PendingBatch>()
     // Host event projection: provider tool parts accumulate in Host order and
     // complement the independently lagging session snapshot view.
+    // DSL-MUTABLE: resource — host event projection by (owner, providerRun).
     let observedProviderRuns = Dictionary<string * string, ObservedProviderRun>()
-    // DSL-MUTABLE: reservation — complete/admitted batch through ordinary completion
+    // DSL-MUTABLE: single-flight — complete/admitted batch through ordinary completion
     let activeBatches =
         Dictionary<string * SyncDelegateRole, SyncDelegateInvocation list>()
 

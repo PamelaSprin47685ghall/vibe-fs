@@ -192,6 +192,7 @@ module NodeProcessHost =
         =
         let exitTcs = TaskCompletionSource<int>()
         let onExited = ResizeArray<unit -> unit>()
+        // DSL-MUTABLE: cancellation — child process exit flag.
         let exitedRef = ref false
 
         attachStream (stdoutOf child) onStdout

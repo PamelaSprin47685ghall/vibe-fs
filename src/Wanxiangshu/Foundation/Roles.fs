@@ -195,5 +195,4 @@ module RoleDefinitions =
             { Role = role
               Tools = Roles.permissions role })
 
-    let forRole (role: Role) : RoleDefinition option =
-        all |> List.tryFind (fun def -> def.Role = role)
+

@@ -180,26 +180,6 @@ module EnforcerRepair =
                    | Some "error" -> true
                    | _ -> false)
 
-    /// Extract the requestKey from an interaction-repair synthetic user message.
-    let repairRequestKey (message: obj) : string option =
-        let info =
-            if isNull message then null
-            elif isNull message?info then message
-            else message?info
-
-        if
-            not (isNull message)
-            && not (isNull info)
-            && not (isNull info?source)
-            && unbox<string> info?source = "interaction-repair"
-            && not (isNull info?synthetic)
-            && unbox<bool> info?synthetic
-            && not (isNull info?requestKey)
-        then
-            Some(unbox<string> info?requestKey)
-        else
-            None
-
     /// ENFORCER-060/061: InteractionRepair via Projection algebra (PROJ-008 Step4).
     ///
     /// 消息正文 / 顺序来自 `InsertRepair` → plan → renderMessagesWithIntents。

@@ -145,7 +145,4 @@ module NeedHelpEventCodec =
 
         deltaProperties raw |> Option.bind (decodeDelta raw)
 
-    /// Legacy direct-field decoder retained for focused compatibility proof.
-    let tryDecodeReasoningDelta (rawInput: obj) : StreamDelta option =
-        tryDecodeDelta rawInput
-        |> Option.filter (fun delta -> legacyReasoningField delta.Field)
+

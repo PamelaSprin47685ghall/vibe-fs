@@ -641,7 +641,4 @@ module PromptAuthority =
             else
                 XProjectionChoice.UseCommittedEpoch }
 
-    /// AGENT-007 layer two: the runtime execution gate reads the same set the
-    /// Host-visible schema was built from.
-    let allowsTool (permission: ToolPermission) (profile: AttemptExecutionProfile) : bool =
-        Set.contains permission profile.ToolCapabilitySet
+

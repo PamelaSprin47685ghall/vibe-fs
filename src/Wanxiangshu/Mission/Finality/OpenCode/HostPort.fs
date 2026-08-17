@@ -184,6 +184,7 @@ module FinalityHostPort =
                 let completed =
                     TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+                // DSL-MUTABLE: cancellation — subscription acceptance flag.
                 let accepting = ref false
 
                 use subscription =

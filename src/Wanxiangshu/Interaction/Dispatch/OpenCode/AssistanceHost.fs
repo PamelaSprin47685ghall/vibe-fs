@@ -261,25 +261,6 @@ type AssistanceHost
                 pending || accepted)
         | _ -> false
 
-    let childHasRootClaimOrProfile childId =
-        match currentProjection () with
-        | None -> false
-        | Some snapshot ->
-            let active =
-                PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections
-                |> Option.isSome
-
-            let pendingRoot =
-                AgentProjection.tryFind childId snapshot.AgentProjections
-                |> Option.bind (fun state -> state.PromptAuthority)
-                |> Option.exists (fun projection ->
-                    projection.PendingClaims
-                    |> Map.exists (fun _ claim ->
-                        claim.Origin = PromptAuthority.PromptOrigin.AuthorityRoot
-                                           PromptAuthority.RootAuthorityKind.AgentOwnerRoot))
-
-            active || pendingRoot
-
     let toolMap role =
         PromptAuthority.toolCapabilitiesFor role ProviderRequestKind.WorkMain
         |> StaticTools.requestToolMap

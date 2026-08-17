@@ -77,10 +77,6 @@ module ObservationProjection =
         : WorkLogObservation list =
         RulebookObservation.ofTipsAndFrames (tipIdentities enforcement) (frameDigests blog)
 
-    /// Session-facing Observation view (Blog + Enforcement on one SessionAgentProjection).
-    let observationsOfSession (session: SessionAgentProjection) : WorkLogObservation list =
-        observationsOf session.Enforcement session.Blog
-
     /// After Observation squash (`BlogObservationsSquashed` + `EnforcementProjection.applySquash`),
     /// re-derive the paired list. Pure convenience over `observationsOf`.
     let observationsAfterSquash

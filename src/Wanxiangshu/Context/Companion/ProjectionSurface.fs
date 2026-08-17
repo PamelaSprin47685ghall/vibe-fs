@@ -41,7 +41,6 @@ module CompanionProjectionSurface =
     let squashInstructionLines: string array = squashLines |> List.toArray
     let normalInstruction: string = CompanionPrompt.asCommentedInstruction normalLines
     let squashInstruction: string = CompanionPrompt.asCommentedInstruction squashLines
-    let memoryPreambleText: string = memoryPreambleValue
     let memoryPreamble: string = memoryPreambleValue
     let normal: string = "normal"
 

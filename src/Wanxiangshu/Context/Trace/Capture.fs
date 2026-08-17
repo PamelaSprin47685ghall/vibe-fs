@@ -646,25 +646,6 @@ module XTraceCapture =
                       HostToolPartId = captured.HostToolPartId }) })
         |> captureSources journal sessionId
 
-    let captureProjectionStable
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (messageIds: string list)
-        (projection: ProviderSemanticProjection)
-        : Task<Result<XTraceProjectionState option, string>> =
-        projection.Messages
-        |> List.map (fun message ->
-            { Role = message.Role
-              ProviderRun = None
-              Parts =
-                message.Parts
-                |> List.map (fun part ->
-                    { Part = part
-                      HostPartId = None
-                      ToolCallId = None
-                      HostToolPartId = None }) })
-        |> captureSourcesStable journal sessionId messageIds
-
     let captureMessageViewStable
         (journal: AgentJournal option)
         (sessionId: SessionId)

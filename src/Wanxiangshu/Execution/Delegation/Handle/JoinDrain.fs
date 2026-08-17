@@ -420,27 +420,6 @@ module JoinDrain =
 
         loop (HandleProjection.linkedChildren projection)
 
-    /// Production entry: reconcile false aborts, then drain joinable.
-    /// `completedAt` stamps every materialised RunCompletion (IClockPort at composition).
-    let drainFromJournal
-        (durable: AgentJournal)
-        (parentId: SessionId)
-        (maxCount: int)
-        (completedAt: DateTimeOffset)
-        : Task<Result<RunCompletion list, ForkError>> =
-        task {
-            let! reconcileResult = reconcileFalseAborts durable parentId
-
-            match reconcileResult with
-            | Error e -> return Error e
-            | Ok() ->
-                let projection = AgentJournal.handleProjection durable parentId
-
-                return!
-                    drainJoinableBatch maxCount projection (tryConsumeOne durable parentId completedAt) (fun () ->
-                        AgentJournal.handleProjection durable parentId)
-        }
-
     /// Fission lane join: consume only completion cells whose logical active-run
     /// affinity belongs to this present. Candidates not accepted by the predicate
     /// stay untouched and remain joinable for their owning lane.

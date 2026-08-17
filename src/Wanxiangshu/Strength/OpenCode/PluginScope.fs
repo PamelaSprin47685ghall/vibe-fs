@@ -94,7 +94,7 @@ type PluginStrengthScope() =
     // DSL-MUTABLE: resource — restart-discardable predictor evidence cache
     let mutable strengthPredictorState = StrengthPredictor.empty
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
-
+    // DSL-MUTABLE: resource — counterfactual await registry by session.
     let counterfactualAwait = Dictionary<string, CounterfactualAwait>()
 
     /// Fuse is a Result error latch, not a string option. Ok = operational,

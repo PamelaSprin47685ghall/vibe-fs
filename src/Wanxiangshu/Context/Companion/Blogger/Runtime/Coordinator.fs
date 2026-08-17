@@ -591,23 +591,3 @@ module BloggerCoordinator =
                         key
                         squashEffect
             }
-
-    /// AABB: rebuild Main context from latest projection at the same prev ingest.
-    /// Does not advance coverage; replaces frozen Toml/RequestId/next_* for retry.
-    let tryRefreshMainContext
-        (journal: AgentJournal option)
-        (host: CompanionHost)
-        (scope: IParkedTransformHost)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (projection: ProviderSemanticProjection)
-        : BloggerRequestContext option =
-        let key = SessionId.value bloggerSessionId
-
-        if blocksNew journal mainSessionId scope key then
-            None
-        else
-            // GLORY-023 / TODO-001: same Opening floor as onMainMaterial.
-            let floorSequence = openingFloor journal mainSessionId
-            let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
-            nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace floorSequence projection

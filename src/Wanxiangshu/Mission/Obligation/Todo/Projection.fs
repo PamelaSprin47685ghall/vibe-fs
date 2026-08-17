@@ -166,9 +166,6 @@ module MagicTodoProjection =
 
     let isPlanCommitted (life: LifeMagicTodoState) : bool = life.FirstPlanCommitment.IsSome
 
-    let isFirstAcceptedCheckpoint (life: LifeMagicTodoState) (writeId: TodoWriteId) : bool =
-        life.FirstAcceptedCheckpoint = Some writeId
-
     /// Pending process-review obligation: the protocol admits at most one.
     let pendingReviewObligation (life: LifeMagicTodoState) : CheckpointRecord option =
         life.PendingReviewCheckpoint
@@ -199,9 +196,6 @@ module MagicTodoProjection =
         |> Map.tryFind (reviewerSessionKey reviewerSessionId)
         |> Option.bind (fun lifeId -> tryLife lifeId state)
         |> Option.bind pendingReviewObligation
-
-    /// Desired committed lag-1 cutoff. Pre-T1 planning checkpoints never enter it.
-    let desiredLag1 (life: LifeMagicTodoState) : TodoWriteId option = life.PreviousCommittedCheckpoint
 
     let private requirePreparedReplayIdentity
         (existing: CheckpointRecord)

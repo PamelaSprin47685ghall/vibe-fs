@@ -507,6 +507,7 @@ module ProcessSurface =
     /// returns to runWithHostLauncher.
     let childCreate (onKill: obj) : obj =
         let exit = TaskCompletionSource<int>()
+        // DSL-MUTABLE: cancellation — child process exit flag.
         let exited = ref false
         let callbacks = ResizeArray<unit -> unit>()
         // DSL-MUTABLE: resource — child kill count

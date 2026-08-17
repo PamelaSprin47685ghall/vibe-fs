@@ -417,11 +417,3 @@ module SyncDelegateTier =
         | None ->
             (dispatcher.ProjectionFor sessionId).LastAuthorityProfile
             |> Option.map (fun profile -> profile.SelectedTier)
-
-    /// Same resolution via AgentProjection snapshot (no dispatcher required).
-    let fromJournal (journal: AgentJournal) (sessionId: SessionId) : AgentTier option =
-        let projections = (AgentJournal.snapshot journal).AgentProjections
-
-        PromptAuthorityLedger.activeProfile sessionId projections
-        |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections)
-        |> Option.map (fun profile -> profile.SelectedTier)

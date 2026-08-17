@@ -147,9 +147,12 @@ type PtyPort(?mailboxSender: PtyJoinItem -> unit, ?handler: PtyBackendHandler, ?
     let agentProvider = defaultArg agentProvider (fun () -> [])
     let mailboxSenders = ResizeArray<PtyJoinItem -> unit>()
     let gate = obj ()
+    // DSL-MUTABLE: resource — active PTY handle registry by PtyId.
     let active = Dictionary<PtyId, PtyHandle * ref<bool>>()
+    // DSL-MUTABLE: resource — closed PTY id tracking set.
     let closedIds = HashSet<PtyId>()
     /// Owner TERM/KILL requested: next Complete for this id → PtyAborted (EXEC-020).
+    // DSL-MUTABLE: resource — abort-pending PTY id set.
     let abortPending = HashSet<PtyId>()
 
     let readWaiters =

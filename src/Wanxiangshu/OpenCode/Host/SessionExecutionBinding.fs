@@ -19,13 +19,15 @@ module SessionExecutionBinding =
     let private gate = obj ()
     let private parents = Dictionary<string, string>()
     let private agents = Dictionary<string, string>()
-    // DSL-MUTABLE: resource — accepted plugin prompt execution identity awaiting
-    // the provider transform that answers that exact PromptKey. Process-local only;
-    // restart intentionally forgets it and therefore cannot resume old sends.
+    // Accepted plugin prompt execution identity awaiting the provider transform
+    // that answers that exact PromptKey. Process-local only; restart
+    // intentionally forgets it and therefore cannot resume old sends.
+    // DSL-MUTABLE: resource — accepted prompt execution identity map.
     let private acceptedPromptBindings = Dictionary<string, ExpectedBinding>()
-    // DSL-MUTABLE: resource — binding frozen for the provider attempt currently
-    // being built by experimental.chat.messages.transform. Replaced at every
-    // provider-attempt boundary; never session authority.
+    // Binding frozen for the provider attempt currently being built by
+    // experimental.chat.messages.transform. Replaced at every provider-attempt
+    // boundary; never session authority.
+    // DSL-MUTABLE: resource — provider attempt binding map.
     let private providerAttemptBindings = Dictionary<string, ExpectedBinding>()
 
     let private nonEmpty (value: string) =

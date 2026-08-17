@@ -68,18 +68,23 @@ type PluginSessionScope() =
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
     // Companions 等）保持 per-instance。
     member val SessionDirectories = SharedState.SessionDirectories
+    // DSL-MUTABLE: resource — per-instance owned session set.
     member val OwnedSessions = HashSet<string>()
     /// EMR-004: per-plugin-instance routing demands, including a root chat.message
     /// that may block before PromptIngress has had a chance to register ownership.
     /// This is cleanup bookkeeping only, never business/session authority.
+    // DSL-MUTABLE: resource — per-instance routing session set.
     member val ModelRoutingSessions = HashSet<string>()
+    // DSL-MUTABLE: resource — per-instance user message binding map.
     member val UserMessageBindings = Dictionary<string, PhysicalUserMessageId>()
     member val SessionParents = SharedState.SessionParents
+    // DSL-MUTABLE: resource — per-instance companion registry.
     member val Companions = Dictionary<string, CompanionHost>()
     member val CompanionGate = obj ()
     member val VerdictSessions = SharedState.VerdictSessions
     member val NudgeSent = HashSet<string>()
     member val JoinGuardNudges = HashSet<string>()
+    // DSL-MUTABLE: resource — per-instance aborted session set.
     member val AbortedSessions = HashSet<string>()
     // HOST-004: process-local idle-derived continuation admission. Per plugin
     // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A

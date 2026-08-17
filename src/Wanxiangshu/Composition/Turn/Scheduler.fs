@@ -92,22 +92,21 @@ module Reconciler =
         ) as this =
 
         let gate = obj ()
-        // DSL-MUTABLE: resource — per-session single-flight admission queue.
         // When a signal arrives while a drain is active, the work is queued
         // here; releaseAfterPass checks it to re-drain after the current pass.
         // Same single-flight model as runningDrains (global task count) but
         // scoped per session.
+        // DSL-MUTABLE: resource — per-session single-flight admission queue.
         let queued = Dictionary<string, int>()
-        // DSL-MUTABLE: resource — per-session single-flight admission latch
         // (HasFlight guard). startOrEnqueue checks active.ContainsKey to decide
         // whether to start a new drain task or enqueue. Only one drain task per
         // session at a time — the per-session equivalent of runningDrains.
+        // DSL-MUTABLE: resource — per-session single-flight admission latch.
         let active = Dictionary<string, int>()
-        // DSL-MUTABLE: resource — per-session cleared-session flag.
         // Set by ClearSession, cleared by BindUserMessage/BindActiveRun.
         // RunPass polls isCleared to skip drains for cleared sessions.
+        // DSL-MUTABLE: resource — per-session cleared-session flag.
         let cleared = HashSet<string>()
-        // DSL-MUTABLE: resource — per-session cooperative cancellation token
         // store. ClearSession bumps the generation to invalidate in-flight
         // drains; isCurrent (polled deep inside ReconcilePass.run) compares the
         // generation captured at drain start against the current value here and
@@ -116,6 +115,7 @@ module Reconciler =
         // Dictionary is the external invalidation authority that ClearSession
         // mutates, not a drain-pass program counter. Without it, ClearSession
         // would have no mechanism to cancel running drains.
+        // DSL-MUTABLE: resource — per-session cooperative cancellation token store.
         let generations = Dictionary<string, int>()
         // DSL-MUTABLE: resource — per-session published reconcile maps cache.
         // recordMaps stores publish output; mapsFor retrieves it for re-drain.
@@ -126,10 +126,10 @@ module Reconciler =
         let mutable runningDrains = 0
         // DSL-MUTABLE: single-flight — shared waiter for scheduler shutdown drain.
         let mutable stopWaiter: TaskCompletionSource<unit> option = None
-        // DSL-MUTABLE: resource — per-session last-dispatch wake. Never consumed:
-        // a drain-resume re-run needs the same wake, and a newer signal simply
-        // overwrites it. A session with no recorded wake defaults to RetryWake
-        // (no idle rights — the safe side).
+        // Never consumed: a drain-resume re-run needs the same wake, and a newer
+        // signal simply overwrites it. A session with no recorded wake defaults
+        // to RetryWake (no idle rights — the safe side).
+        // DSL-MUTABLE: resource — per-session last-dispatch wake.
         let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore

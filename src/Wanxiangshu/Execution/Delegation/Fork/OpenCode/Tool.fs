@@ -255,12 +255,6 @@ module ForkTool =
         else
             ManagedAgent.tryParse record.Agent
 
-    /// GLORY-032: provider-facing denial for any target the Manager cannot
-    /// reach (the Host-owned Reviewer among them). Generic — it must not prove
-    /// the hidden target exists.
-    let HiddenTargetDeniedText language =
-        prose language Path.Fork.HiddenTargetDenied
-
     let private forbiddenManagerRole (managed: ManagedAgent) =
         match managed.Role with
         | Role.Distiller

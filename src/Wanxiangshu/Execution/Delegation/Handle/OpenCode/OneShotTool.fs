@@ -103,12 +103,6 @@ module OneShotAgentTool =
     [<Literal>]
     let CompletionTimeoutMs = 600_000
 
-    let promptFrom (args: HostToolArguments) =
-        match args.OptionalText "prompt", args.OptionalTexts "prompts" with
-        | Some prompt, _ -> prompt
-        | None, Some prompts -> String.concat "\n" prompts
-        | None, None -> ""
-
     /// PROMPT-005: a one-shot child is prompted through the Dispatcher like any
     /// other agent-owned session.
     ///

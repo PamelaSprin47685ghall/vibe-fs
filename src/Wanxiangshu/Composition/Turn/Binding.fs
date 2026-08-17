@@ -110,8 +110,11 @@ module TurnBinding =
     /// Mutable store for in-memory bindings. Durable recovery uses the journal.
     type Store() =
         let gate = obj ()
+        // DSL-MUTABLE: resource — user message binding map by session.
         let userMessageBindings = Dictionary<string, PhysicalUserMessageId>()
+        // DSL-MUTABLE: resource — active run binding map by session.
         let activeBindings = Dictionary<string, ActiveRunBinding>()
+        // DSL-MUTABLE: resource — continuation message id set by session.
         let continuationMessageIds = Dictionary<string, Set<string>>()
 
         member _.UserMessageBindings = userMessageBindings

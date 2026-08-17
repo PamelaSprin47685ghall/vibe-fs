@@ -43,10 +43,3 @@ module DelegatedToolEstimate =
 
     let invalid language =
         ProviderProse.render language InvalidPath Map.empty
-
-    let replaceIfSpecified journal sessionId expectedToolCalls : Task<unit> =
-        task {
-            match journal, expectedToolCalls with
-            | Some durable, Some expected -> do! DelegatedToolEstimateLedger.replace durable sessionId expected
-            | _ -> ()
-        }

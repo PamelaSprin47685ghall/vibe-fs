@@ -106,9 +106,6 @@ module FissionRuntime =
     let bindHandleAffinity ownerSessionId handleId laneIndex =
         lock gate (fun () -> handleAffinities.[handleKey ownerSessionId handleId] <- laneIndex)
 
-    let registerChildObserver groupId observer =
-        lock gate (fun () -> childObservers.[groupId] <- observer)
-
     let trackGroupResource groupId (resource: IDisposable) =
         lock gate (fun () ->
             let resources =
@@ -133,26 +130,6 @@ module FissionRuntime =
     let endTakeover groupId =
         lock gate (fun () -> takeoverClaims.Remove groupId |> ignore)
 
-    let clearGroup groupId =
-        let resources =
-            lock gate (fun () ->
-                childObservers.Remove groupId |> ignore
-
-                deliveryClaims
-                |> Seq.filter (fun key -> key.StartsWith(groupId + "\u001f"))
-                |> Seq.toArray
-                |> Array.iter (fun key -> deliveryClaims.Remove key |> ignore)
-
-                takeoverClaims.Remove groupId |> ignore
-
-                match groupResources.TryGetValue groupId with
-                | true, current ->
-                    groupResources.Remove groupId |> ignore
-                    current |> Seq.toList
-                | false, _ -> [])
-
-        resources |> Seq.iter disposeSafely
-
     let private observerForGroup groupId =
         lock gate (fun () ->
             match childObservers.TryGetValue groupId with
@@ -167,12 +144,6 @@ module FissionRuntime =
 
             observerForGroup binding.GroupId
             |> Option.iter (fun callback -> callback binding.LaneIndex handleId childSessionId)
-
-    let tryHandleAffinity ownerSessionId handleId =
-        lock gate (fun () ->
-            match handleAffinities.TryGetValue(handleKey ownerSessionId handleId) with
-            | true, laneIndex -> Some laneIndex
-            | false, _ -> None)
 
     let clearOwner ownerSessionId =
         let ownerKey = SessionId.value ownerSessionId

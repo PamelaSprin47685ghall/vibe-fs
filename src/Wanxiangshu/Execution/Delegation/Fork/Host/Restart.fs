@@ -592,14 +592,3 @@ module HostForkRestart =
             // HandleFamilyRecovery carries Domain.SessionRecovery.NonEmpty.
             return concludeFamilyRecovery recovered waiting blocked
         }
-
-    /// Restore without a live ForkRuntime (journal-only parent, no in-process mailbox).
-    /// Still walks durable handles and ChildRecoveryWorkflow for Active/incomplete cells.
-    let restoreLinkedChildrenWithoutRuntime
-        (snapshot: ISessionSnapshotPort)
-        (journal: AgentJournal)
-        (parentId: SessionId)
-        : Task<HandleFamilyRecovery> =
-        let runtime = ForkRuntime()
-        let children = Dictionary<string, SessionId>()
-        restoreLinkedChildren runtime (Some snapshot) journal parentId children (fun _ _ _ -> ()) (fun _ -> None)

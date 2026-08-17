@@ -120,6 +120,7 @@ module PtyTiming =
             { new ITimerPort with
                 member _.Delay(milliseconds: int) =
                     let completion = TaskCompletionSource<unit>()
+                    // DSL-MUTABLE: cancellation — deadline handle cancel flag.
                     let cancelled = ref false
                     let id = nextId
                     nextId <- nextId + 1

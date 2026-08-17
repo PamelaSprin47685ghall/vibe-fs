@@ -58,14 +58,6 @@ module HostEventCodec =
 
     let trySessionId (raw: obj) = tryReadSessionId raw
 
-    let isHostSignalEvent (raw: obj) : bool =
-        match eventTypeOf raw with
-        | "session.status"
-        | "session.idle"
-        | "session.deleted"
-        | "session.error" -> true
-        | _ -> false
-
     let private retrySignal (sessionId: SessionId) (raw: obj) : RetrySignal option =
         let properties = if isNull raw then null else raw?properties
         let status = if isNull properties then null else properties?status
