@@ -727,6 +727,32 @@ module XTraceSurface =
             return result |> Option.map projectionView
         }
 
+    let captureSessionMessages (handle: JournalHandle) (sessionId: string) (messages: obj array) : Task<obj> =
+        task {
+            let sessionIdentity = SessionId.create sessionId
+            let projected = SessionSnapshotPort.projectMessages (if isNullish messages then [||] else messages)
+
+            match! XTraceCapture.captureSessionMessages (Some handle.Journal) sessionIdentity projected with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = error |}
+            | Ok() ->
+                let projection = AgentJournal.snapshot handle.Journal
+
+                let trace =
+                    projection.AgentProjections.Sessions
+                    |> Map.tryFind sessionIdentity
+                    |> Option.bind (fun session -> session.XTrace)
+                    |> Option.defaultValue XTraceProjection.empty
+
+                return
+                    box
+                        {| ok = true
+                           value = projectionView trace |}
+        }
+
     let lifecycleWorkRecordBounded
         (handle: JournalHandle)
         (sessionId: string)

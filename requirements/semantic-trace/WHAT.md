@@ -29,7 +29,10 @@ material，不是第二事实源。
 **规范**：XTrace 包含：Host 可见 prompt、assistant 正文、host-visible reasoning、tool call/result、
 omission marker。**不包含**：UI delta、usage、cost、timestamp、directory、finish reason、runtime ID。
 `MessagePart → SemanticPart` 映射只有一条（`XTraceCapture.semanticPart`）；`Activity` part 是
-transport bookkeeping，被丢弃不映射。
+transport bookkeeping，被丢弃不映射。OpenCode 已为 text / reasoning / tool part 提供稳定物理 `id`；
+stable capture 必须以这个 Host part identity（连同 message/provider-run identity）作为幂等 authority，
+不得把当前 decoded semantic array index 当成物理身份。Host 后续 materialize 一个更早的 part 时，
+已有 physical part 不得因 index 漂移重复 append，新 materialized physical part 也不得被旧 positional slot 吞掉。
 
 **含义/动机**：capture 边界是 typed 的，不是「挑着记」。工具调用号、Host 消息 id 属于
 provenance（证明/恢复用），renderer 永不输出它们（SEMANTIC-TRACE-005）。
@@ -109,6 +112,9 @@ input 尚为 `{}` 时提前 durable capture；before-hook pending locality 只�
 boundary，并且必须扣除该 provider run 已经 durable capture 的 prefix，不能重复计数。tool success 后、
 process-review assignment 前必须从同一 Host snapshot 捕获 current run 并用 exact Host ToolPart/XTrace join
 重新证明最终 `ManagerReviewFrontier`；只有这个 exact frontier 才能成为 reviewer consumption coverage。
+历史版本若已经因 positional provenance 把同一 physical ToolPart 重复 capture，只有当这些记录的
+role / kind / toolName / semantic digest 完全相同，才可视为同一物理 observation 的 replay，并以最早
+durable cursor 为 authority；任一 semantic payload 冲突仍必须 `XTraceAmbiguous` fail closed。
 Host 流式工具构造留下的 sibling
 `pending + {}` / null ToolPart 只是未 materialize transport identity，不得冒充第二个 semantic todowrite；
 已有真实 input / terminal state 的 sibling 仍保留其独立 ToolCallId。

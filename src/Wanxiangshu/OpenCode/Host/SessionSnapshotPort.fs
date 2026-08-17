@@ -64,6 +64,7 @@ type SessionMessage =
         /// matched to a physical message after a restart.
         PromptKey: string option
         Parts: MessagePart array
+        PartIds: HostMessagePartId option array
         ToolParts: SessionToolPart array
     }
 
@@ -84,17 +85,23 @@ module SessionSnapshotPort =
         elif not (isNull raw?info) then raw?info
         else raw
 
-    let private decodePartsOrEmpty (parts: obj array) : MessagePart array =
+    let private decodePartsOrEmpty (parts: obj array) : (MessagePart * HostMessagePartId option) array =
         try
-            HostMessageCodec.decodeParts parts
+            parts
+            |> Array.choose (fun rawPart ->
+                HostMessageCodec.decodePart rawPart
+                |> Option.map (fun part ->
+                    let partId = readString rawPart?id |> Option.map HostMessagePartId.create
+                    part, partId))
         with _ ->
             [||]
 
-    let private partsOf (raw: obj) : MessagePart array =
+    let private partsOf (raw: obj) : MessagePart array * HostMessagePartId option array =
         if isNull raw || isNull raw?parts then
-            [||]
+            [||], [||]
         else
-            decodePartsOrEmpty (unbox<obj array> raw?parts)
+            let decoded = decodePartsOrEmpty (unbox<obj array> raw?parts)
+            decoded |> Array.map fst, decoded |> Array.map snd
 
     let private canonicalValue (value: obj) =
         if isNull value then
@@ -312,6 +319,8 @@ module SessionSnapshotPort =
                     |> Option.orElse (readString raw?finish)
                     |> Option.orElse (readString raw?finishReason)
 
+                let parts, partIds = partsOf raw
+
                 Some
                     { Id = id
                       Role = role
@@ -325,7 +334,8 @@ module SessionSnapshotPort =
                       Completed = completedOf info raw
                       IsCompaction = isCompactionOf info raw
                       PromptKey = promptKeyOf info raw
-                      Parts = partsOf raw
+                      Parts = parts
+                      PartIds = partIds
                       ToolParts = toolPartsOf raw }
 
     let projectMessages (rawMessages: obj array) =

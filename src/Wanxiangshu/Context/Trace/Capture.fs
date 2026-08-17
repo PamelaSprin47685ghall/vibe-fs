@@ -98,6 +98,7 @@ module XTraceCapture =
 
     type private TraceSourcePart =
         { Part: SemanticPart
+          HostPartId: HostMessagePartId option
           ToolCallId: ToolCallId option
           HostToolPartId: HostToolPartId option }
 
@@ -285,7 +286,8 @@ module XTraceCapture =
           TurnIndex: int
           PartIndex: int
           Source: TraceSourcePart
-          Provenance: string }
+          Provenance: string
+          LegacyStableProvenance: string option }
 
     let private enumeratePositionalCaptureWork
         (generation: int)
@@ -299,7 +301,8 @@ module XTraceCapture =
                   TurnIndex = turnIndex
                   PartIndex = partIndex
                   Source = source
-                  Provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex }))
+                  Provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex
+                  LegacyStableProvenance = None }))
         |> List.concat
 
     let private enumerateStableCaptureWork
@@ -311,11 +314,22 @@ module XTraceCapture =
         |> List.mapi (fun turnIndex (messageId, message) ->
             message.Parts
             |> List.mapi (fun partIndex source ->
+                let provenance =
+                    match source.HostPartId with
+                    | Some partId ->
+                        sprintf
+                            "g:%d/msg:%s/host-part:%s"
+                            generation
+                            messageId
+                            (HostMessagePartId.value partId)
+                    | None -> sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
+
                 { Message = message
                   TurnIndex = turnIndex
                   PartIndex = partIndex
                   Source = source
-                  Provenance = sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex }))
+                  Provenance = provenance
+                  LegacyStableProvenance = Some(sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex) }))
         |> List.concat
 
     /// One positional part: skip if provenance known; else blob + append (raises on blob error).
@@ -421,16 +435,52 @@ module XTraceCapture =
         else
             Ok()
 
-    /// One stable part: skip if provenance known; else blob + append (Error on blob failure).
+    let private legacySemanticMatch (work: PartCaptureWork) (part: XTracePartRef) =
+        let kind, toolName, body = partShape work.Source.Part
+
+        part.ProviderRun = work.Message.ProviderRun
+        && part.Kind = kind
+        && part.ToolName = toolName
+        && part.ToolCallId = work.Source.ToolCallId
+        && part.HostToolPartId = work.Source.HostToolPartId
+        && BlobDigest.value part.TextDigest = HostDigest.sha256Hex body
+
+    let private stablePartAlreadyCaptured (existing: XTracePartRef list) (work: PartCaptureWork) =
+        let exactPhysicalProvenance =
+            match work.Source.HostPartId with
+            | Some _ -> existing |> List.exists (fun part -> part.Provenance = work.Provenance)
+            | None -> false
+
+        let exactPhysicalToolPart =
+            match work.Source.HostToolPartId with
+            | Some hostToolPartId ->
+                existing
+                |> List.exists (fun part ->
+                    part.ProviderRun = work.Message.ProviderRun
+                    && part.HostToolPartId = Some hostToolPartId
+                    && part.ToolCallId = work.Source.ToolCallId)
+            | None -> false
+
+        let compatibleLegacyPosition =
+            work.LegacyStableProvenance
+            |> Option.exists (fun provenance ->
+                existing
+                |> List.exists (fun part -> part.Provenance = provenance && legacySemanticMatch work part))
+
+        exactPhysicalProvenance || exactPhysicalToolPart || compatibleLegacyPosition
+
+    /// One stable Host part: physical part identity wins. Legacy positional
+    /// provenance is accepted only while the semantic payload at that slot is
+    /// still the same physical observation.
     let private appendStablePartIfAbsent
         (durable: AgentJournal)
         (sessionId: SessionId)
-        (recorded: Set<string>)
+        (existing: XTracePartRef list)
         (nextCursor: unit -> int64)
         (work: PartCaptureWork)
         : Task<Result<unit, string>> =
         taskResult {
-            if Set.contains work.Provenance recorded then
+            if stablePartAlreadyCaptured existing work then
                 return ()
             else
                 let cursor = nextCursor ()
@@ -467,8 +517,7 @@ module XTraceCapture =
             let existing = xTraceOf durable sessionId
             let generation = captureGeneration durable sessionId
 
-            let recorded =
-                existing.Parts |> List.map (fun part -> part.Provenance) |> Set.ofList
+            let recorded = XTraceProjection.parts existing
             // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one stable capture batch
             let mutable cursor = XTraceProjection.headSequence existing
 
@@ -570,6 +619,7 @@ module XTraceCapture =
                 message.Parts
                 |> List.map (fun part ->
                     { Part = part
+                      HostPartId = None
                       ToolCallId = None
                       HostToolPartId = None }) })
         |> captureSources journal sessionId
@@ -595,6 +645,7 @@ module XTraceCapture =
                         | _ -> None
 
                     { Part = semanticPartFromWire captured.WirePart
+                      HostPartId = captured.HostPartId
                       ToolCallId = toolCallId
                       HostToolPartId = captured.HostToolPartId }) })
         |> captureSources journal sessionId
@@ -613,6 +664,7 @@ module XTraceCapture =
                 message.Parts
                 |> List.map (fun part ->
                     { Part = part
+                      HostPartId = None
                       ToolCallId = None
                       HostToolPartId = None }) })
         |> captureSourcesStable journal sessionId messageIds
@@ -637,6 +689,7 @@ module XTraceCapture =
                         | _ -> None
 
                     { Part = semanticPartFromWire captured.WirePart
+                      HostPartId = captured.HostPartId
                       ToolCallId = toolCallId
                       HostToolPartId = captured.HostToolPartId }) })
         |> captureSourcesStable journal sessionId messageIds
@@ -654,25 +707,46 @@ module XTraceCapture =
                 None
           Parts =
             message.Parts
+            |> Array.mapi (fun index part ->
+                let hostPartId =
+                    if index < message.PartIds.Length then message.PartIds.[index] else None
+
+                part, hostPartId)
             |> Array.toList
-            |> List.choose (fun part ->
+            |> List.choose (fun (part, hostPartId) ->
                 match part with
                 | MessagePart.Text text ->
                     Some
                         { WirePart = WireText text
+                          HostPartId = hostPartId
                           HostToolPartId = None }
                 | MessagePart.Reasoning text ->
                     Some
                         { WirePart = WireReasoning text
+                          HostPartId = hostPartId
                           HostToolPartId = None }
                 | MessagePart.ToolCall(callId, name, args) ->
+                    let hostToolPartId = Map.tryFind callId hostToolByCall
+
                     Some
                         { WirePart = WireToolCall(ToolCallId.create callId, name, args)
-                          HostToolPartId = Map.tryFind callId hostToolByCall }
+                          HostPartId =
+                            hostPartId
+                            |> Option.orElseWith (fun () ->
+                                hostToolPartId
+                                |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
+                          HostToolPartId = hostToolPartId }
                 | MessagePart.ToolResult(callId, result) ->
+                    let hostToolPartId = Map.tryFind callId hostToolByCall
+
                     Some
                         { WirePart = WireToolResult(ToolCallId.create callId, result)
-                          HostToolPartId = Map.tryFind callId hostToolByCall }
+                          HostPartId =
+                            hostPartId
+                            |> Option.orElseWith (fun () ->
+                                hostToolPartId
+                                |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
+                          HostToolPartId = hostToolPartId }
                 | MessagePart.Activity _ -> None) }
 
     /// Synchronise XTrace with the Host snapshot (after-hook / ensureReview).

@@ -18,6 +18,7 @@ module ProviderWireCapture =
     /// One decoded wire part plus the stable Host ToolPart address when present.
     type CapturedWirePart =
         { WirePart: WirePart
+          HostPartId: HostMessagePartId option
           HostToolPartId: HostToolPartId option }
 
     /// A decoded wire message retaining the assistant provider-run identity.
@@ -31,15 +32,20 @@ module ProviderWireCapture =
     let private capturePart (rawPart: obj) : CapturedWirePart option =
         ProviderWireDecode.decodePart rawPart
         |> Option.map (fun wirePart ->
+            let hostPartId =
+                ProviderWireDecode.firstString rawPart [ "id" ]
+                |> Option.map HostMessagePartId.create
+
             let hostToolPartId =
                 match wirePart with
                 | WireToolCall _
                 | WireToolResult _ ->
-                    ProviderWireDecode.firstString rawPart [ "id" ]
-                    |> Option.map HostToolPartId.create
+                    hostPartId
+                    |> Option.map (HostMessagePartId.value >> HostToolPartId.create)
                 | _ -> None
 
             { WirePart = wirePart
+              HostPartId = hostPartId
               HostToolPartId = hostToolPartId })
 
     let private providerRunOf role rawObj info =

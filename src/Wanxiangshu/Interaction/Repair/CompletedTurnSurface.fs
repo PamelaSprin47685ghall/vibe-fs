@@ -111,6 +111,7 @@ module CompletedTurnSurface =
           IsCompaction = false
           PromptKey = None
           Parts = partsOf value?parts
+          PartIds = [||]
           ToolParts = [||] }
 
     let private partToJs (part: MessagePart) : obj =

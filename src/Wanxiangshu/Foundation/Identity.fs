@@ -105,6 +105,12 @@ module Identity =
     /// the former identifies the Host object, the latter identifies one invocation.
     type HostToolPartId = private HostToolPartId of string
 
+    /// One physical part inside a Host transcript message. OpenCode gives text,
+    /// reasoning and tool parts stable ids even while the surrounding assistant
+    /// message is still growing. XTrace stable capture uses this address rather
+    /// than the part's mutable array position.
+    type HostMessagePartId = private HostMessagePartId of string
+
     /// A Host transcript message address (HOST-013).
     ///
     /// The raw message's `info.id` / `id` — the same address Session snapshot
@@ -315,6 +321,10 @@ module Identity =
     module HostToolPartId =
         let create (value: string) = HostToolPartId value
         let value (HostToolPartId v) = v
+
+    module HostMessagePartId =
+        let create (value: string) = HostMessagePartId value
+        let value (HostMessagePartId v) = v
 
     module TranscriptMessageAddress =
         let create (value: string) = TranscriptMessageAddress value

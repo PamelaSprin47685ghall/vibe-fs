@@ -157,6 +157,10 @@ module MagicTodoLocality =
                 candidate.ProviderRun = Some located.ProviderRun
                 && candidate.Kind = "tool_call"
                 && candidate.Cursor.Sequence <= part.Cursor.Sequence)
+            |> List.distinctBy (fun candidate ->
+                candidate.HostToolPartId
+                |> Option.map HostToolPartId.value
+                |> Option.defaultValue candidate.Provenance)
             |> List.length
 
         let todowriteCallIdsResult =
@@ -234,6 +238,27 @@ module MagicTodoLocality =
         else
             resolvePendingAssistantMessage trace messages located
 
+    let private sameCapturedToolObservation (expected: XTracePartRef) (candidate: XTracePartRef) =
+        candidate.Role = expected.Role
+        && candidate.Kind = expected.Kind
+        && candidate.ToolName = expected.ToolName
+        && candidate.TextDigest = expected.TextDigest
+
+    let private collapseIdenticalPhysicalReplays (matches: XTracePartRef list) =
+        match matches with
+        | first :: rest when rest |> List.forall (sameCapturedToolObservation first) -> Some first
+        | _ -> None
+
+    let private resolveDuplicateCapturedTool
+        trace
+        messages
+        (located: SessionSnapshotPort.ToolCallLocation)
+        (duplicates: XTracePartRef list)
+        =
+        match collapseIdenticalPhysicalReplays duplicates with
+        | Some first -> resolveCapturedToolCall trace messages located first
+        | None -> Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+
     let private resolveLocated trace messages (located: SessionSnapshotPort.ToolCallLocation) =
         let matches =
             XTraceProjection.parts trace
@@ -245,7 +270,7 @@ module MagicTodoLocality =
         match matches with
         | [ part ] -> resolveCapturedToolCall trace messages located part
         | [] -> resolvePendingToolCall trace messages located
-        | _ -> Error(LocalityRejection.XTraceAmbiguous(located.ProviderRun, located.ToolCallId, located.HostToolPartId))
+        | duplicates -> resolveDuplicateCapturedTool trace messages located duplicates
 
     let private resolveWithTrace messages (located: SessionSnapshotPort.ToolCallLocation) xTrace =
         match xTrace with

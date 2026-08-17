@@ -34,8 +34,10 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 
 - `semanticPart`：唯一的 `MessagePart → SemanticPart` mapper；`Activity` → `None`（丢弃）。
 - `captureSources`：按 provenance `g:N/turn:M/part:P` 幂等 append（recorded 集合去重）。
-- `captureSourcesStable`：按 `g:N/msg:<id>/part:P`（STRENGTH-008 stable insertion 前提）；
-  legacy positional trace 只读、强制 Strength K0。
+- `captureSourcesStable`：新 capture 优先按 `g:N/msg:<id>/host-part:<physical-part-id>`；Host 未提供
+  physical part id 时才保留 positional fallback。升级前已有 `g:N/msg:<id>/part:P` 通过
+  semantic-equivalent legacy slot + exact HostToolPart identity 兼容去重，不能让 index drift 复制 tool
+  或吞掉新 materialized part（STRENGTH-008 stable insertion 前提）；legacy turn-positional trace 仍只读、强制 Strength K0。
 - `captureGeneration`：generation = `ReanchoredRuns` 集合大小，reanchor 后 +1。
 - `captureOpening` / `captureTerminalText` / `captureLastWords`：Opening 与 Terminal 的捕获入口。
 
@@ -67,7 +69,9 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
   SemanticCursor 映射回 XTrace cursor；XTrace cursor 本身独立于它们（`XTraceProjection.fs` 注释）。
 - `supportsStableInsertion` 的存在（STRENGTH-008）是 Strength 优化 HOW；「Candidate 永不入迹」
   才是命题（SEMANTIC-TRACE-008）。
-- `Provenance` 字符串格式（`g:N/turn:M/part:P` vs `g:N/msg:id/part:P`）是定位实现，可演进。
+- `Provenance` 字符串格式（`g:N/turn:M/part:P` / legacy `g:N/msg:id/part:P` /
+  current `g:N/msg:id/host-part:id`）是定位实现，可演进；规范只要求 stable Host capture 不以可漂移数组位置
+  冒充 physical identity。
 
 ## 5. 历史与弃权
 

@@ -416,6 +416,7 @@ module ReviewAssuranceSurface =
               IsCompaction = isCompaction
               PromptKey = None
               Parts = [||]
+              PartIds = [||]
               ToolParts = [||] }
 
         let typedMessages = messages |> Array.toList |> List.map messageOf
