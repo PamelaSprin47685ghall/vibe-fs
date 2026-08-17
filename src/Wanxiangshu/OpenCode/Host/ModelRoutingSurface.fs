@@ -149,6 +149,14 @@ module ModelRoutingSurface =
     let release (sessionId: string) : unit =
         ModelRouting.releaseExecution (SessionId.create sessionId)
 
+    /// Release only the process-shared execution proven to belong to this exact
+    /// physical user material. A stale terminal observation for an older turn is
+    /// therefore harmless after the SessionId has been reused.
+    let releasePhysical (sessionId: string) (physicalUserMessageId: string) : unit =
+        ModelRouting.releasePhysicalExecution
+            (SessionId.create sessionId)
+            (PhysicalUserMessageId.create physicalUserMessageId)
+
     /// Load the user-visible scheduler module through the owner boundary. The
     /// returned function is an opaque JS capability and is never introspected by
     /// the semantic caller.
@@ -188,6 +196,9 @@ module ModelRoutingSurface =
 
     let releaseExecution (runtime: obj) (sessionId: string) : unit =
         (runtimeOf runtime).ReleaseExecution(sessionId)
+
+    let releasePhysicalExecution (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : unit =
+        (runtimeOf runtime).ReleasePhysicalExecution(sessionId, physicalUserMessageId)
 
     let cancelPendingExecution (runtime: obj) (sessionId: string) : unit =
         (runtimeOf runtime).CancelPendingExecution(sessionId)

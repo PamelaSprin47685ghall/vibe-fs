@@ -9,6 +9,7 @@ const {
   tryReserveManaged,
   tryLease,
   releaseExecution,
+  releasePhysicalExecution,
   cancelPendingExecution,
   snapshotOccupied,
   pendingCount,
@@ -175,6 +176,24 @@ test('WHAT[EMR-007] EMR_007_execution_release_is_idempotent_and_wakes_waiters_on
 
   releaseExecution(runtime, 'holder')
   assert.equal(snapshotOccupied(runtime).length, 1, 'second release cannot remove somebody else\'s execution')
+})
+
+test('WHAT[EMR-007] EMR_007_late_terminal_for_superseded_physical_execution_cannot_release_current_lease', async () => {
+  const runtime = createRuntime((role) => target(`provider/${role}`))
+
+  await acquireManaged(runtime, 'reused-session', 'msg-old', 'fast-coder')
+  await acquireManaged(runtime, 'reused-session', 'msg-current', 'deep-coder')
+
+  releasePhysicalExecution(runtime, 'reused-session', 'msg-old')
+  assert.equal(
+    key(tryLease(runtime, 'reused-session', 'msg-current', 'deep-coder')),
+    'provider/deep-coder|none',
+    'late exact terminal evidence for the old physical material must not touch the current lease',
+  )
+  assert.equal(snapshotOccupied(runtime).length, 1)
+
+  releasePhysicalExecution(runtime, 'reused-session', 'msg-current')
+  assert.equal(snapshotOccupied(runtime).length, 0, 'the matching physical terminal releases exactly one occurrence')
 })
 
 test('WHAT[EMR-002] EMR_002_scheduler_program_error_poisons_pending_and_future_demands', async () => {

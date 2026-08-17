@@ -37,6 +37,14 @@ module HostSignalSurface =
     let tryDecode (raw: obj) : obj =
         HostEventCodec.tryDecode raw |> Option.map snapshot |> Option.defaultValue null
 
+    let tryDecodePhysicalExecutionEnd (raw: obj) : obj =
+        HostEventCodec.tryDecodePhysicalExecutionEnd raw
+        |> Option.map (fun (sessionId, physicalUserMessageId) ->
+            box
+                {| sessionId = SessionId.value sessionId
+                   physicalUserMessageId = PhysicalUserMessageId.value physicalUserMessageId |})
+        |> Option.defaultValue null
+
     let tryAdapt (owned: string array) (raw: obj) : obj =
         let registry = HashSet<string>(owned)
 

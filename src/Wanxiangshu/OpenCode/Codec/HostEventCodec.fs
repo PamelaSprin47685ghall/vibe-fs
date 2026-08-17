@@ -186,3 +186,58 @@ module HostEventCodec =
         let raw = unwrap rawInput
 
         if isNull raw then None else decodeHostSignal raw
+
+    let private fieldText (value: obj) (name: string) =
+        if isNull value || isNull value?(name) then "" else string value?(name)
+
+    let private nonEmptyFieldText value name =
+        let text = fieldText value name
+        if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private messageInfo (raw: obj) =
+        let properties = if isNull raw then null else raw?properties
+        if isNull properties then null else properties?info
+
+    let private terminalAssistantInfo (info: obj) =
+        let assistant = fieldText info "role" = "assistant"
+        let time = if isNull info then null else info?time
+        let completed = not (isNull time) && not (isNull time?completed)
+        let failed = not (isNull info) && not (isNull info?error)
+        let finish = nonEmptyFieldText info "finish"
+
+        // `tool-calls` completes one provider step but the same physical user
+        // execution continues through tool execution and the next provider
+        // step. Releasing there would recreate the exact missing-lease bug on
+        // the next chat.params call for the same physical material.
+        let finalFinish =
+            completed
+            && (finish
+                |> Option.exists (fun reason ->
+                    not (String.Equals(reason, "tool-calls", StringComparison.Ordinal))))
+
+        assistant && (failed || finalFinish)
+
+    let private messageInfoSessionId (info: obj) =
+        nonEmptyFieldText info "sessionID" |> Option.map SessionId.create
+
+    let private physicalParentId (info: obj) =
+        nonEmptyFieldText info "parentID" |> Option.map PhysicalUserMessageId.create
+
+    /// EMR-007: physical capacity release needs exact execution identity. The
+    /// coarse SessionIdle signal has only SessionId and can arrive after a newer
+    /// chat.message admission, so it cannot safely release model occupancy.
+    /// A terminal assistant message carries parentID = the exact physical user
+    /// message that caused that provider execution.
+    let tryDecodePhysicalExecutionEnd
+        (rawInput: obj)
+        : (SessionId * PhysicalUserMessageId) option =
+        let raw = unwrap rawInput
+        let info = messageInfo raw
+        let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"
+        let isTerminal = terminalAssistantInfo info
+        let sessionId = tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+        let physicalUserMessageId = physicalParentId info
+
+        match isMessageUpdated, isTerminal, sessionId, physicalUserMessageId with
+        | true, true, Some sessionId, Some physicalUserMessageId -> Some(sessionId, physicalUserMessageId)
+        | _ -> None

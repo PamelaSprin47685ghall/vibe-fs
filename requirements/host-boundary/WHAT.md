@@ -15,6 +15,10 @@ wake 的物理编码；两者都不得携带 terminal 事实。禁止处理 `mes
 `session.updated` / `session.diff` 作为业务输入；禁止从 idle payload 推断 terminal/完成/失败；禁止依赖
 两个 idle 编码的先后顺序推导因果。
 
+物理基础设施可以在这个边界并行抽取不进入业务层的资源证据：execution-model-routing 只读取
+最终 assistant `message.updated.info.parentID`（error，或 completed 且非 `tool-calls` finish）来得到 exact PhysicalUserMessageId 并释放对应 model
+lease；该 observation 不得被包装成 `HostSignal`、不得携带 terminal 业务语义（具体合同归 EMR-007）。
+
 **含义/动机**：碎片顺序/形状随 Host 版本漂移；把因果绑在传输噪声上（why/host.md §4）。
 
 **证据**：`HostEventCodec`（`isHostSignalEvent` / `tryDecode` 在 codec 边界丢弃 fragment）；

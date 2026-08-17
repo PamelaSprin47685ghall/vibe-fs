@@ -42,6 +42,23 @@ test('WHAT[HOST-BOUNDARY-006] HOST-006_provider_drift_is_rejected_after_prompt_b
   assert.match(stale.error, /provider agent drift/)
 })
 
+test('WHAT[HOST-BOUNDARY-006] HOST-006_stale_physical_terminal_cannot_strip_the_lease_before_chat_params_validation', async () => {
+  const session = 'ses_binding_stale_terminal'
+  binding.drop(session)
+
+  await modelFromLease(session, 'physical-old', 'fast-coder')
+  const currentModel = await modelFromLease(session, 'physical-current', 'deep-coder')
+
+  routing.releasePhysical(session, 'physical-old')
+  binding.acceptPromptExecution(session, 'prompt-current', 'physical-current', 'deep-coder', currentModel)
+
+  const observed = binding.validateObservedProvider(session, 'deep-coder', currentModel)
+  assert.equal(observed.ok, true, observed.error)
+  assert.equal(observed.value, true)
+
+  binding.drop(session)
+})
+
 test('WHAT[HOST-BOUNDARY-006] HOST-006_managed_prompt_preserves_agent_but_does_not_acquire_model', () => {
   binding.drop('ses_binding_4')
   binding.bindChild('ses_parent_4', 'ses_binding_4', 'deep-coder')

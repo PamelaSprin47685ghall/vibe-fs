@@ -382,12 +382,6 @@ module HostSignalBootstrap =
             let onSignal (signal: HostSignal) =
                 match signal with
                 | SessionIdle sessionId ->
-                    // EMR: idle is the physical execution boundary. Capacity is
-                    // not tied to business completion or session lifetime; the
-                    // same SessionId may later receive another charge and acquire
-                    // a fresh execution lease at chat.message.
-                    ModelRouting.releaseExecution sessionId
-
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
                     // LoopKillArmed must stay until OrdinaryTurnWorkflow bridges TurnAborted
                     // (ResetDetector deliberately does not clear it; LOOP-006).
@@ -404,10 +398,6 @@ module HostSignalBootstrap =
                 // attempt's idle permits, then routes to the
                 // reconciler. Never ProviderFailure — it does not advance fallback.
                 | AttemptAborted sessionId ->
-                    // Abort ends the current physical execution even though the
-                    // reusable session container may survive.
-                    ModelRouting.releaseExecution sessionId
-
                     // Fission retires only the replaced physical present. It is not
                     // an owner cancellation: do not revoke owner resources or cancel
                     // speculation/children here. Revoke the physical attempt's idle
@@ -486,7 +476,8 @@ module HostSignalBootstrap =
                         (fun raw ->
                             if not (needHelpSensor.IsReasoningDelta raw) then
                                 loopSensor.Observe raw),
-                    onNeedHelpEvent = needHelpSensor.Observe
+                    onNeedHelpEvent = needHelpSensor.Observe,
+                    onPhysicalExecutionEnd = ModelRouting.releasePhysicalExecution
                 )
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None

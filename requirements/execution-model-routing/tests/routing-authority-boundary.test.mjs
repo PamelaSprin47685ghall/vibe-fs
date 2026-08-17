@@ -34,12 +34,17 @@ test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admissi
   assert.doesNotMatch(params, /observeUserFacing\s/)
 })
 
-test('WHAT[EMR-007] EMR_007_physical_idle_and_abort_release_execution_not_business_completion', async () => {
+test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse_idle_or_business_completion', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const codec = await source('src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs')
   const ordinary = await source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
 
-  assert.match(host, /SessionIdle sessionId[\s\S]*ModelRouting\.releaseExecution sessionId/)
-  assert.match(host, /AttemptAborted sessionId[\s\S]*ModelRouting\.releaseExecution sessionId/)
+  assert.match(codec, /tryDecodePhysicalExecutionEnd/)
+  assert.match(codec, /isMessageUpdated = not \(isNull raw\) && eventTypeOf raw = "message\.updated"/)
+  assert.match(codec, /info\?parentID/)
+  assert.match(host, /onPhysicalExecutionEnd = ModelRouting\.releasePhysicalExecution/)
+  assert.doesNotMatch(host, /SessionIdle sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
+  assert.doesNotMatch(host, /AttemptAborted sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
   assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,
     'application completion/finality must not own physical capacity release')
 })

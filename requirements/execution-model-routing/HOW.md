@@ -188,7 +188,9 @@ Host 已接收该物理 user message 后：
 
 一轮结束后若仍有 pending，不自行再次循环；等待下一次真实 occupancy event。没有 timer/poll。
 
-`SessionIdle`、typed attempt abort、session delete / scope cleanup、plugin shutdown 释放 current execution lease 并取消对应 pending；此外，新 PhysicalUserMessageId admission 会在同一个串行临界区 supersede 旧 lease/pending。业务 completed/retired/join/finality 不直接操作 occupancy；ProviderRetry/ProviderFailure 若仍引用同一 physical user material 则继续复用。
+普通 provider 完成由 raw Host `message.updated` 的最终 assistant observation 释放：读取 `properties.info.parentID` 作为 exact `PhysicalUserMessageId`，只有它仍与该 SessionId 的 current lease 匹配时才删除 occurrence。assistant error 直接 terminal；正常路径要求 `time.completed` 且 `finish != "tool-calls"`，因为 `tool-calls` 只是同一 physical execution 的中间 provider step。该 observation 是 model-routing 的物理资源边界，不会转成业务 `HostSignal`。这样 A 的 terminal 即使在 B 已经 admission 后才到，也只能尝试释放 A，不能误删 B。
+
+`SessionIdle` / typed attempt abort 只有 SessionId，继续服务 Reconciler、quiescence、loop/abort 语义，但不直接操作 active model occupancy。session delete / scope cleanup / plugin shutdown 因为整个 owner 已被销毁，可以按 SessionId 强制释放 current lease 并取消 pending。新 PhysicalUserMessageId admission 仍在同一个串行临界区 supersede 旧 lease/pending。业务 completed/retired/join/finality 不直接操作 occupancy；ProviderRetry/ProviderFailure 若仍引用同一 physical user material 则继续复用。
 
 因此同一 SessionId reopen/reuse 不依赖“是否准确监听到 session end”：新 `chat.message` 的 physical identity 足以切断旧槽。
 
@@ -257,4 +259,4 @@ process restart 重新 import MJS 并开启新 routing epoch。本包当前不�
 - `OpenCodePort.fs`：删除 `Agent → ManagedAgentConfig.tryBoundModel` fallback。
 - `ChatParamsHook.fs` + request mutation hook：managed model/reasoning route/validate。
 - `PluginSessionWiring.fs` / Strength：删除静态 inventory model 依赖，optional replica 走 scheduler probe。
-- Host idle / typed execution end / session delete / plugin dispose：统一释放当前 managed execution lease；业务 lifecycle 不直接参与 capacity bookkeeping。
+- final assistant 的 exact physical terminal 释放匹配 lease；session delete / scope cleanup / plugin dispose 才按 owner 强制清理；Host idle / attempt abort 只提供 wake/quiescence/abort observation，业务 lifecycle 不直接参与 capacity bookkeeping。

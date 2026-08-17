@@ -78,11 +78,13 @@ Strength/assistance/fallback 改档仍通过既有 EffectiveAgent authority；sc
 
 ## EMR-007：physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
-`SessionIdle`、typed `AttemptAborted`、`SessionDeleted`/scope cleanup 与 plugin shutdown 是当前 managed execution 的显式释放边界；此外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution 被 supersede 的直接物理证据，必须在新 admission 内原子释放旧 lease，即使 Host 没有先发 end signal。每个实际 lease 删除一个 `running` occurrence，重复 cleanup 幂等，并触发 EMR-004 pending-demand 重算。
+active lease 的普通完成释放必须携带 **exact physical identity**：Host terminal `message.updated` 的 assistant `parentID` 指向触发该 provider execution 的 `PhysicalUserMessageId`，只有 `(SessionId, parentID)` 与 current lease 完全匹配时才能删除该 occurrence。`finish="tool-calls"` 只结束一个 provider step，同一 physical execution 仍会经工具继续，因此不得释放；只接受 assistant error，或已 completed 且 finish 不是 `tool-calls` 的最终 assistant。迟到的旧 terminal 对已经 reuse 到新 PhysicalUserMessageId 的同一 SessionId 必须是 no-op。
+
+`SessionIdle` 与 typed `AttemptAborted` 只带 SessionId，因此只能作为 wake / quiescence / abort observation，**不得直接删除 active model lease**；否则 A 的迟到 coarse signal 可以误删刚由 B 的 `chat.message` 建立的 lease。`SessionDeleted`、scope cleanup 与 plugin shutdown 因为销毁整个 owner，可按 SessionId 强制清理 current lease/pending。除此之外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution 被 supersede 的直接物理证据，必须在新 admission 内原子释放旧 lease，即使 Host 没有先发 exact terminal。每个实际 lease 删除一个 `running` occurrence，重复 cleanup 幂等，并触发 EMR-004 pending-demand 重算。
 
 业务层的 handle completed/retired/join/finality、Companion close 等**不得直接决定槽是否释放**：它们描述工作语义，不证明 provider execution 的物理状态。反过来，释放槽也不表示 session 永久结束；同一 SessionId 可继续 reuse/reopen。
 
-Host `ProviderRetry` / `ProviderFailure` 若仍处于同一物理 user execution，不提前释放；否则一次 upstream retry 会被误当成新 execution 并与旧 attempt 重叠计数。
+Host `ProviderRetry` / `ProviderFailure` 若仍处于同一物理 user execution，不提前释放；否则一次 upstream retry 会被误当成新 execution 并与旧 attempt 重叠计数。`chat.params` 对 exact binding 的复核必须在这种迟到 coarse signal 下保持稳定；不得用“取消 live lease 校验”来掩盖错误 release。
 
 ## EMR-008：`opencode.json` model 不再具有 authority；不校验 fast/deep model 互异
 

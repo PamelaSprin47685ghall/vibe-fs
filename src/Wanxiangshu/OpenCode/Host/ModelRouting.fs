@@ -230,6 +230,12 @@ module ModelRouting =
         else
             Some(sessionId.Trim())
 
+    let private normalizePhysicalExecutionKey sessionId physicalUserMessageId =
+        match normalizeSessionId sessionId with
+        | None -> None
+        | Some _ when String.IsNullOrWhiteSpace physicalUserMessageId -> None
+        | Some normSessionId -> Some(normSessionId, physicalUserMessageId.Trim())
+
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
         let activeBySession = Dictionary<string, ExecutionLease>()
@@ -322,6 +328,18 @@ module ModelRouting =
             | true, demand -> cancelDemand demand
             | false, _ -> ()
 
+            if changed && fatalError.IsNone then
+                drainDemands ()
+
+        let retirePhysicalExecution sessionId physicalUserMessageId =
+            let changed =
+                match activeBySession.TryGetValue sessionId with
+                | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
+                    activeBySession.Remove sessionId
+                | _ -> false
+
+            // Exact terminal evidence for an older physical execution must never
+            // cancel a newer pending demand for the same reusable SessionId.
             if changed && fatalError.IsNone then
                 drainDemands ()
 
@@ -467,6 +485,15 @@ module ModelRouting =
             normalizeSessionId sessionId
             |> Option.iter (fun normSessionId -> lock gate (fun () -> retireCurrentExecution normSessionId))
 
+        /// Exact physical terminal evidence. Unlike force cleanup, this cannot
+        /// retire a newer execution or pending demand that happens to reuse the
+        /// same SessionId after the terminal event was produced.
+        member _.ReleasePhysicalExecution(sessionId: string, physicalUserMessageId: string) =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> ()
+            | Some(normSessionId, normPhysicalUserMessageId) ->
+                lock gate (fun () -> retirePhysicalExecution normSessionId normPhysicalUserMessageId)
+
         member _.CancelPendingExecution(sessionId: string) =
             normalizeSessionId sessionId
             |> Option.iter (fun normSessionId -> lock gate (fun () -> cancelPendingLocked normSessionId))
@@ -534,6 +561,15 @@ module ModelRouting =
     let releaseExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime -> runtime.ReleaseExecution(SessionId.value sessionId)
+        | None -> ()
+
+    let releasePhysicalExecution (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.ReleasePhysicalExecution(
+                SessionId.value sessionId,
+                PhysicalUserMessageId.value physicalUserMessageId
+            )
         | None -> ()
 
     let cancelUnacquiredExecution (sessionId: SessionId) =

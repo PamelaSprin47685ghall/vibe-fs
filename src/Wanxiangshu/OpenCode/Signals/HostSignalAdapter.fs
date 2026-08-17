@@ -40,7 +40,8 @@ type HostSignalRouter
         // adapter routes raw Host events without owning sensor business state.
         // Drop-session cleanup is the composition root's job.
         ?onLoopEvent: obj -> unit,
-        ?onNeedHelpEvent: obj -> unit
+        ?onNeedHelpEvent: obj -> unit,
+        ?onPhysicalExecutionEnd: SessionId -> PhysicalUserMessageId -> unit
     ) =
 
     // Fail-closed: empty registry owns nothing.
@@ -52,6 +53,11 @@ type HostSignalRouter
         | Some signal -> onSignal signal
         | None -> ()
 
+    let observePhysicalExecutionEnd raw =
+        match onPhysicalExecutionEnd, HostEventCodec.tryDecodePhysicalExecutionEnd raw with
+        | Some observe, Some(sessionId, physicalUserMessageId) -> observe sessionId physicalUserMessageId
+        | _ -> ()
+
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
 
@@ -62,8 +68,11 @@ type HostSignalRouter
     /// HOST-027 part classification and LOOP-009 text detection both observe the
     /// same raw stream events. NeedHelp records part.updated before the matching
     /// delta; the composition root may then suppress reasoning deltas from the
-    /// LoopSensor. Neither callback owns coarse HostSignal adaptation.
+    /// LoopSensor. Model routing also observes exact terminal assistant identity;
+    /// none of these callbacks turns a fragment into a business HostSignal.
     member _.Observe(raw: obj) =
+        observePhysicalExecutionEnd raw
+
         match onNeedHelpEvent with
         | Some observe when NeedHelpEventCodec.isNeedHelpRelevantEvent raw -> observe raw
         | _ -> ()
