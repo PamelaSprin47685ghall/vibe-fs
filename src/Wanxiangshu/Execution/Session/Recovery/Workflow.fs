@@ -66,6 +66,7 @@ module SessionRecoveryWorkflow =
         (host: IParkedTransformHost)
         (snapshot: ISessionSnapshotPort)
         : SessionId -> Task<SessionRecovery> =
+        // DSL-MUTABLE: algorithm-scratch — per-call blogger recovery memoization cache
         let memo: ResizeArray<BloggerCrashRecovery.WindowOutcome> option ref = ref None
 
         fun (sessionId: SessionId) ->
@@ -133,6 +134,7 @@ module SessionRecoveryWorkflow =
         (journal: AgentJournal)
         (snapshot: ISessionSnapshotPort)
         : SessionId -> Task<SessionRecovery> =
+        // DSL-MUTABLE: algorithm-scratch — per-call prompt-claim recovery memoization cache
         let memo: PromptRecovery.Reconciled list option ref = ref None
 
         fun (sessionId: SessionId) ->
