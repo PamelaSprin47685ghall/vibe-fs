@@ -133,7 +133,7 @@ test('WHAT[VERIFICATION-SYSTEM-003] missing or empty cases/ is allowed (no throw
     const files = e2eTestCaseFiles(root)
     assert.equal(files.length, 1, 'only the sole top-level entry is in scope')
     assert.ok(
-      files[0].endsWith(`/tests/e2e/${SOLE_ENTRY}`),
+      files[0].endsWith('/tests/e2e/' + SOLE_ENTRY),
       `expected sole entry path, got ${files[0]}`,
     )
   } finally {

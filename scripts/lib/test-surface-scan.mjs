@@ -44,6 +44,7 @@ export const BUILD_VERIFICATION_FILES = new Set([
   // including the literal fable_modules exclusion that keeps coverage honest.
   'requirements/verification-system/tests/run.mjs',
   'requirements/verification-system/tests/support/run-inner.mjs',
+  'requirements/verification-system/tests/support/coverage-policy.mjs',
 ])
 
 /**

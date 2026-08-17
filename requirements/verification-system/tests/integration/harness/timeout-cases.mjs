@@ -36,7 +36,7 @@ const watchdogUrl = new URL('../../e2e/support/watchdog.js', import.meta.url).hr
 const budgetUrl = new URL('../../e2e/support/time-budget.js', import.meta.url).href;
 const driverUrl = new URL('../../e2e/support/scenario-driver.mjs', import.meta.url).href;
 const gateFactsUrl = new URL('./event-store-gate-facts.mjs', import.meta.url).href;
-const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../../../../', import.meta.url));
 
 /**
  * Run a module source as a child and report how it ended.
