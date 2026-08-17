@@ -30,12 +30,24 @@ src/Wanxiangshu/Sphinx/
   ObservationCodec.fs    raw observation → strong Observation
   WireEncode.fs          Request / Canonical Answer → MCP wire object
   Codec.fs               public wire façade（只委托，不实现业务）
-  Session.fs             SessionStore：handle → EpistemicState（进程内；UUID；唯一 handle 索引）
-  McpServer.fs           MCP SDK / zod / stdio 唯一 owner；注册 start / resume
+  Session.fs             SessionStore：handle → SessionEntry（Active|Answered lifecycle；进程内；
+                         UUID；唯一 handle 索引）；Status/Cancel typed members
+  McpContract.fs         nextTool 翻译（Request→tool）/ success DTO（yield/answered/status/cancel
+                         payload）/ typed error view（ErrorView + errorObject）/ human summary；
+                         纯 F# + plain JS objects，不依赖 MCP SDK
+  McpServer.fs           MCP SDK / zod / stdio 唯一 owner；注册 start / assess / propose /
+                         investigate / synthesize / status / cancel + legacy resume；
+                         structuredContent（成功）/ isError + _meta（失败）；server instructions；
+                         version 来自 PackageMetadata
 ```
 
 Fable 编译 `Wanxiangshu.fsproj` 的 `Sphinx/*.fs` → `dist/Sphinx/*.js`。生产 MCP 入口唯一为
 `dist/Sphinx/McpServer.js`；`scripts/build.mjs` 只验证该产物存在，不 copy 第二套源码。
+
+`src/Wanxiangshu/Resources/PackageMetadata.fs`：`packageRoot()` 经 `import.meta.url` 定位包根
+（`dist/<Area>/<Module>.js` 上溯两级），`version()` 读取该处 `package.json` 的 `version` 字段；
+不 cwd 探测、不 candidate search、不 fallback。`McpServer.create` 用 `PackageMetadata.version()`
+填充 `serverInfo.version`。
 
 ## 2. 主循环
 
@@ -43,14 +55,25 @@ Fable 编译 `Wanxiangshu.fsproj` 的 `Sphinx/*.fs` → `dist/Sphinx/*.js`。生
 start(question)
   → create immutable EpistemicState
   → Policy.decide → YIELD SemanticAssessmentRequest → SessionStore alloc opaque handle
+  → McpContract.nextTool(SemanticAssessmentRequest) = "assess"
 
-resume(handle, rawObservation)
-  → SessionStore lookup（缺失/未知 handle → error，不建隐式会话）
-  → Codec.decodeObservation
-  → Policy 校验 PendingRequest ↔ Observation（错型/错 actionKey → error，状态不前进）
+phase tool（assess / propose / investigate / synthesize）(handle, typed observation)
+  → SessionStore.ResumeObservation（所有 phase tool 汇聚于此）
+  → Codec.decodeTyped（每 tool 各自的 decoder）
+  → Policy 校验 PendingRequest ↔ Observation（错型/错 actionKey → KERNEL_REJECTED，状态不前进）
   → Closure.absorbAndClose → fixed point
   → Policy.decide → YIELD next Request | ANSWER CanonicalAnswer
+  → McpContract.nextTool(next Request) → structuredContent.nextTool
+
+status(handle) → active（nextTool + pending request）| answered（answer, nextTool=null）
+cancel(handle) → cancelled；handle 立即失效
+resume(handle, observation)  ← legacy 兼容工具（raw observation with explicit type field）
 ```
+
+每个 phase tool 的 handler 调用各自的 `ObservationCodec.decode*`，然后统一进入
+`SessionStore.ResumeObservation`——MCP 层不判断 phase 或 observation 合法性，`Policy.resume` /
+`observationMatches` 是唯一裁判。成功返回 `{content, structuredContent}`，失败返回
+`{content, isError:true, _meta:{tool, error:{code, ...}}}`（无 structuredContent）。
 
 ## 3. RootContract 与方法生成
 
@@ -156,6 +179,11 @@ Answer 不复制 transcript，也不把 candidate/value estimate/method score �
   WHY.md §3。
 - **MCP/wire 身份 → `host-boundary`**：MCP server identity、launch config、`sphinx_*` 权限键、
   wire 编码归属 Host 边界；本包只拥有认识语义（EPI-004 的「同型契约」是语义侧）。
+- **v2 affordance surface（2026-08-17）**：旧 `start`/`resume`-only wire（observation 以 JSON
+  塞入 content text）被 v2 affordance 面取代——phase tools（assess/propose/investigate/synthesize）
+  + status/cancel + structuredContent/isError 双信封 + `nextTool` 翻译。`mcp_server_surface_is_exactly_start_and_resume`
+  测试被 `mcp_server_surface_exposes_phase_tools_and_legacy_resume` 取代（tool count 不是认识论
+  定理，是 affordance 面事实，归 EPI-013）。legacy `resume` 保留为兼容工具但不在推荐面。
 - **Inquiry office authority → `office-capability`/`capability-enforcement`**：谁能发起 inquiry、
   谁 allow `sphinx_*` 不是认识论命题。
 - **durable journal 弃权**：V1 不做 durable EpistemicState journal——handle 进程内失效即丢弃；

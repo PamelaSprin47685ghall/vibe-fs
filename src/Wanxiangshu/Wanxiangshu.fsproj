@@ -22,6 +22,7 @@
     <Compile Include="Foundation/TaskResult.fs"/>
     <Compile Include="Foundation/FsToolkitFableCompat.fs"/>
     <Compile Include="OpenCode/Host/StealthBrowserMcp.fs"/>
+    <Compile Include="Resources/PackageMetadata.fs"/>
     <Compile Include="Sphinx/Mcp.fs"/>
     <Compile Include="Sphinx/Types.fs"/>
     <Compile Include="Sphinx/RuntimeTypes.fs"/>
@@ -40,6 +41,7 @@
     <Compile Include="Sphinx/WireEncode.fs"/>
     <Compile Include="Sphinx/Codec.fs"/>
     <Compile Include="Sphinx/Session.fs"/>
+    <Compile Include="Sphinx/McpContract.fs"/>
     <Compile Include="Sphinx/McpServer.fs"/>
     <Compile Include="Sphinx/Surface.fs"/>
     <Compile Include="Repository/Investigation/Semble/Mcp.fs"/>

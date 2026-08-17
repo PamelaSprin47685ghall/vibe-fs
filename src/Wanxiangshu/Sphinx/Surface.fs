@@ -200,6 +200,25 @@ module SphinxSurface =
         storeOf store
         |> fun value -> value.TryState handle |> Option.map (Closure.close >> stateView) |> Option.toObj
 
+    let private lookupError (failure: SessionFailure) (handle: string option) : obj =
+        { Handle = handle
+          State = None
+          Failure = failure }
+        |> McpContract.failureView
+        |> McpContract.errorObject
+
+    let status (store: obj) (handle: string) : obj =
+        match (storeOf store).Status handle with
+        | LookupOutcome.Found(foundHandle, sessionStatus) -> McpContract.statusPayload foundHandle sessionStatus
+        | LookupOutcome.MissingHandle -> lookupError SessionFailure.MissingHandle None
+        | LookupOutcome.UnknownHandle unknownHandle -> lookupError SessionFailure.UnknownHandle (Some unknownHandle)
+
+    let cancel (store: obj) (handle: string) : obj =
+        match (storeOf store).Cancel handle with
+        | LookupOutcome.Found(foundHandle, ()) -> McpContract.cancelPayload foundHandle
+        | LookupOutcome.MissingHandle -> lookupError SessionFailure.MissingHandle None
+        | LookupOutcome.UnknownHandle unknownHandle -> lookupError SessionFailure.UnknownHandle (Some unknownHandle)
+
     let private observationTypeName (observation: Observation) : string =
         match observation with
         | SemanticAssessmentObservation _ -> "SemanticAssessment"
