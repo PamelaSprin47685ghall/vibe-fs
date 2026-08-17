@@ -584,7 +584,6 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
         let wired = host.Wired
-        let _workspaceDirectory = boot.WorkspaceDirectory
         let strengthFailFuse = boot.StrengthFailClosed
 
         let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj =

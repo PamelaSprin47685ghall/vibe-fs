@@ -248,10 +248,6 @@ module ProviderProjection =
         && List.length previous.Messages <= List.length next.Messages
         && (next.Messages |> List.truncate (List.length previous.Messages)) = previous.Messages
 
-    /// VERIFY-003: the fixture key. Semantic by construction, so a fixture
-    /// written once matches on every later run of the same conversation.
-    let fixtureKey (semantic: ProviderSemanticProjection) : string = renderSemantic semantic
-
     /// COMPANION-012: Blogger delta compares semantic projections, never wire
     /// ones — otherwise a re-run with new call IDs would look like new content.
     let semanticallyEqual (left: ProviderSemanticProjection) (right: ProviderSemanticProjection) : bool =

@@ -91,9 +91,6 @@ module CanonicalEventCodec =
         let json = JS.JSON.stringify (normalizeJson (envelopeObject envelope))
         json + "\n"
 
-    /// UTF-8 bytes of canonical JSON+LF (no BOM).
-    let encodeUtf8 (envelope: EventEnvelope) : byte[] = Encoding.UTF8.GetBytes(encode envelope)
-
     /// Same EventId with different canonical bytes → IdentityCollision (§5.3).
     /// Distinct EventIds are not a collision (Ok).
     let checkIdentity (left: EventEnvelope) (right: EventEnvelope) : Result<unit, StorageInvalid> =

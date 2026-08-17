@@ -246,8 +246,6 @@ module Identity =
     module ChildId =
         let create (value: string) = ChildId value
         let value (ChildId v) = v
-        /// A child is a Host session, so it can be addressed as one.
-        let toSessionId (ChildId v) = SessionId v
 
     module ProcessId =
         let create (value: string) = ProcessId value

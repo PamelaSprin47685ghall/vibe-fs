@@ -103,7 +103,3 @@ module StrengthCostModel =
               Delay2 = delay2
               Risk1 = risk1
               Risk2 = risk2 }
-
-    /// Fuse semantics are deliberately one-way for new decisions. Durable
-    /// Promoted replay is owned elsewhere and is never erased by this helper.
-    let rollbackToK0 (_current: StrengthBudget) : StrengthBudget = StrengthBudget.K0

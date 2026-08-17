@@ -117,16 +117,4 @@ module SphinxMcpConfig =
             applyNonNull config launch
             config
 
-    /// Classify a launch decision as enabled/disabled for contract tests.
-    let launchEnabled (launch: Launch) : bool =
-        match launch with
-        | Launch.Disabled -> false
-        | Launch.Fixture _
-        | Launch.Local _ -> true
 
-    /// The reason a launch is disabled or enabled.
-    let launchReason (launch: Launch) : string =
-        match launch with
-        | Launch.Disabled -> "disabled"
-        | Launch.Fixture _ -> "fixture"
-        | Launch.Local _ -> "enabled"

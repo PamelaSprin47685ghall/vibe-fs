@@ -12,7 +12,7 @@ ProcessEventLog(commonDir, WriterId)         // Persistence/EventStore/ProcessEv
   → EventStore.createLocal                   // append + payload closure + Current
   → WorkspaceEventStore.acquire（process-local refcount）
   → IJournalEventStoreBoot.ResumeOrCreate / EventStoreJournalWriter
-  → AgentJournal.createFromEventStore | createFromProjection
+  → AgentJournal.createFromProjection
 
 JS semantic boundary (requirements/durable-events/tests)
   → EventStore/CodecSurface.js       // canonical bytes + identity result objects

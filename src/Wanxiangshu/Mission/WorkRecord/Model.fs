@@ -30,9 +30,6 @@ type OpeningPolicy =
 [<RequireQualifiedAccess>]
 module OpeningPolicy =
 
-    /// Manager OpeningPolicy = BlindPlan (GLORY-074).
-    let forManager = BlindPlan FirstPlanCompleteTodoWrite
-
     /// Non-Manager roles close Opening at InitialCharge (Immediate).
     let immediate = Immediate
 

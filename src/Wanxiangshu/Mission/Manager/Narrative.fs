@@ -36,9 +36,6 @@ module ManagerNarrative =
         let T1Revelation = "lifecycle/manager/t1-revelation"
 
         [<Literal>]
-        let LivingMission = "lifecycle/manager/living-mission"
-
-        [<Literal>]
         let Reawakening = "lifecycle/manager/reawakening"
 
         [<Literal>]
@@ -46,12 +43,6 @@ module ManagerNarrative =
 
         [<Literal>]
         let IdlePostT1 = "lifecycle/manager/idle-post-t1"
-
-        [<Literal>]
-        let ForkTakenPreT1 = "lifecycle/manager/fork-taken-pre-t1"
-
-        [<Literal>]
-        let ForkReturnedPreT1 = "lifecycle/manager/fork-returned-pre-t1"
 
     type NarrativePart = { Text: string; Synthetic: bool }
 

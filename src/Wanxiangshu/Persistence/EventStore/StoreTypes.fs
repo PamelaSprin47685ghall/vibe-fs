@@ -75,9 +75,6 @@ type IGitRawStore =
 [<RequireQualifiedAccess>]
 module GitTree =
     [<Literal>]
-    let BlobMode = "100644"
-
-    [<Literal>]
     let TreeMode = "40000"
 
     let normalizeMode mode =

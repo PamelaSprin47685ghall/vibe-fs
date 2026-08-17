@@ -208,7 +208,6 @@ module CanonicalIntegrator =
           Faults = Map.empty }
 
     let private eventKey (eventId: EventId) = EventId.value eventId
-    let private streamKey (streamId: EventStreamId) = EventStreamId.value streamId
 
     let private structuralRule = StructuralIntegration.rule
 

@@ -27,9 +27,6 @@ module MagicTodoSurface =
     [<RequireQualifiedAccess>]
     module Path =
         [<Literal>]
-        let ManagerGuideline = "lifecycle/magic-todo/manager-guideline"
-
-        [<Literal>]
         let TodoWriteDescription = "lifecycle/magic-todo/todowrite-description"
 
         [<Literal>]

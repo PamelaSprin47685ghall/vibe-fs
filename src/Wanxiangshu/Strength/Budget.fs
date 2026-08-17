@@ -56,12 +56,5 @@ module StrengthBudget =
         | StrengthBudget.K1 -> 1
         | StrengthBudget.K2 -> 2
 
-    /// Holdout-gated promotion: K0->K1 needs ExpectedValue(K1) > K1Margin.
-    /// K1->K2 needs ExpectedValue(K2) > K2Margin where K2Margin > K1Margin.
-    let canPromoteToK1 (expectedValueK1: float) (k1Margin: float) : bool = expectedValueK1 > k1Margin
-
+    /// Holdout-gated promotion: K1->K2 needs ExpectedValue(K2) > K2Margin where K2Margin > K1Margin.
     let canPromoteToK2 (expectedValueK2: float) (k2Margin: float) : bool = expectedValueK2 > k2Margin
-
-    /// Gate: K2 never before minimum evidence floor, steering risk higher for K2.
-    /// Ineligible / unknown cost -> stay K0. Non-deep / fallback side -> K0.
-    let isEligibleForK2 (evidenceCount: int) (minFloor: int) : bool = evidenceCount >= minFloor

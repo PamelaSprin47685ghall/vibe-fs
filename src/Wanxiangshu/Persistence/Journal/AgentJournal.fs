@@ -339,17 +339,6 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
 
 module AgentJournal =
 
-    /// EventStore-backed journal for empty init-only tests. Caller builds the
-    /// writer via the EventStore journal writer factory (keeps this module free
-    /// of store write tokens for the unified-store dual-write gate).
-    let createFromEventStore (writer: IJournalWriter) (_initEnvelope: Envelope) : Result<AgentJournal, FoldRejection> =
-        let projection =
-            match writer.TryCurrent "Journal" with
-            | Some current -> unbox<ProjectionSet> current
-            | None -> Fold.empty
-
-        Ok(new AgentJournal(writer, projection))
-
     /// Attach a writer to a projection already folded at EventStore boot
     /// (`resumeOrCreate`). Does not re-fold; does not open a store.
     let createFromProjection

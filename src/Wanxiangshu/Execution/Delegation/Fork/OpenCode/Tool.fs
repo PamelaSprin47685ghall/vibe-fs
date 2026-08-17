@@ -136,9 +136,6 @@ module ForkTool =
             let UnknownCalling = "tool/fork/unknown-calling"
 
             [<Literal>]
-            let HiddenTargetDenied = "tool/fork/hidden-target-denied"
-
-            [<Literal>]
             let ChargeContextUnavailable = "tool/fork/charge-context-unavailable"
 
             [<Literal>]

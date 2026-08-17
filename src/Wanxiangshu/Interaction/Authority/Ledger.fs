@@ -244,21 +244,6 @@ module PromptAuthorityLedger =
         projectionFor sessionId agentProjections
         |> Option.bind (fun authority -> Map.tryFind promptKey authority.PendingClaims)
 
-    /// PROMPT-003: was this physical message accepted as a continuation, and of
-    /// what kind.
-    ///
-    /// Requires the SessionId. The previous version searched every session with
-    /// `Map.tryPick`, which violates PERSIST-008 and is also wrong in principle:
-    /// a message id belongs to exactly one session, so a hit under a different
-    /// one would be a bug the scan silently tolerated.
-    let acceptedContinuation
-        (sessionId: SessionId)
-        (physicalMessageId: PhysicalUserMessageId)
-        (agentProjections: AgentProjectionSet)
-        =
-        projectionFor sessionId agentProjections
-        |> Option.bind (fun authority -> Map.tryFind physicalMessageId authority.AcceptedContinuationIds)
-
     /// The durable outcome of one logical dispatch, for resend admission.
     ///
     /// REVIEW-013/018 (process-review assignment reentry): `Accepted` means the

@@ -95,9 +95,6 @@ module BuiltinToolDescriptionHook =
     let BuiltinFilesystemTools =
         set [ "read"; "edit"; "write"; "glob"; "grep"; "patch" ]
 
-    /// No provider annotation: primitive fallbacks are not deprecated.
-    let hookSuffix (_jsRoleToolName: string) : string = ""
-
     let annotate (_builtinName: string) (description: string) (_jsRoleToolName: string) : string = description
 
     /// JS-003: the hook must not recommend a tool the provider cannot see.
