@@ -93,9 +93,14 @@ const productionFs = productionFiles.filter(isFs).map(norm)
 
 // ④ Finality observes reviewer facts; ReviewerWorkflow is the sole continuation writer.
 {
-  const finalityPath = `${PRODUCTION_ROOT}/Infrastructure/OpenCode/Tools/FinalityController.fs`
-  if (existsSync(finalityPath)) {
-    fail('obsolete-controller', `${finalityPath} must be deleted (rabbit S7/S8)`)
+  const obsoletePaths = [
+    `${PRODUCTION_ROOT}/Infrastructure/OpenCode/Tools/FinalityController.fs`,
+    `${PRODUCTION_ROOT}/OpenCode/Tools/FinalityController.fs`,
+  ]
+  for (const finalityPath of obsoletePaths) {
+    if (existsSync(finalityPath)) {
+      fail('obsolete-controller', `${finalityPath} must be deleted (rabbit S7/S8)`)
+    }
   }
 }
 
@@ -260,7 +265,7 @@ for (const file of productionFs) {
     'PromptAuthority.ContinuationKind.ReviewerGuard',
   ]
   for (const file of productionFs) {
-    const base = file.split('/').pop().replace('\.fs$', '')
+    const base = file.split('/').pop().replace(/\.fs$/, '')
     if (!finalityFiles.some((name) => base === name)) continue
     const text = read(file)
     for (const token of forbiddenReviewerDecision) {

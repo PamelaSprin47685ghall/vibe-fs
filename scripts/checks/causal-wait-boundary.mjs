@@ -96,7 +96,10 @@ const critical = [
 
 for (const rel of critical) {
   const abs = join(src, rel)
-  if (!existsSync(abs)) continue
+  if (!existsSync(abs)) {
+    problems.push(`${rel}: critical causal-wait site missing on disk`)
+    continue
+  }
   const text = read(abs)
   const lines = text.split('\n')
   for (let i = 0; i < lines.length; i += 1) {
@@ -119,7 +122,9 @@ for (const rel of critical) {
 // 6. CausalWaitRegistry mutable must be DSL-MUTABLE annotated
 {
   const abs = join(src, 'Execution/Session/Wait/Registry.fs')
-  if (existsSync(abs)) {
+  if (!existsSync(abs)) {
+    problems.push('Execution/Session/Wait/Registry.fs: missing on disk')
+  } else {
     const text = read(abs)
     const lines = text.split('\n')
     for (let i = 0; i < lines.length; i += 1) {

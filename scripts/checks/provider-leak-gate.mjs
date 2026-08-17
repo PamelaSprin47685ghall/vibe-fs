@@ -32,6 +32,10 @@ export const PROVIDER_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs',
   'src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs',
   'src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs',
+  'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
+  'src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs',
+  'src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Tools.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs',
 ])
 
 /** Lines that assemble provider-visible prose or wire fields. */
@@ -132,7 +136,9 @@ const collectEntries = (repoRoot) => {
   const entries = []
   for (const root of PROVIDER_SCAN_ROOTS) {
     const abs = resolve(repoRoot, root)
-    if (!existsSync(abs)) continue
+    if (!existsSync(abs)) {
+      throw new Error(`provider-leak-gate: scan root missing on disk: ${root}`)
+    }
     if (abs.endsWith('.fs')) {
       entries.push({ file: norm(root), text: readFileSync(abs, 'utf8') })
       continue

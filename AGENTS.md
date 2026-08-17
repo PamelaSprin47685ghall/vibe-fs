@@ -6947,11 +6947,11 @@ requirements/<owner>/WHAT.md
 
 当前 working tree clean；以下数字由本次实际运行的 gate、build、proof 与 integration 命令得到，不是历史估计：
 
-- `node scripts/check.mjs` 全部通过：architecture 611 files；manifest 132 registered surfaces；requirement-trace 666 WHAT / 3073 tests，closure complete；所有 21 个 wired gates green。
+- `node scripts/check.mjs` 全部通过：architecture 611 files；manifest 132 registered surfaces；requirement-trace 666 WHAT / 3076 tests，closure complete；所有 21 个 wired gates green。
 - `node scripts/test-surface-inventory.mjs` 报告 0 semantic test files carry debt、0 violating lines；仅 8 个 build-verification files 保留 Fable-aware quarantine。
 - `js-boundary-gate` 报告 0 debt line、0 debt file、baseline absent、0 frozen package-local `*-contract.mjs`；`test-boundary` 报告除 build verification 外无 direct Fable-module import。
 - `node scripts/build.mjs` 通过：Fable 5.13.0 解析 649 source files，assembly 生成成功。
-- `node requirements/verification-system/tests/run.mjs` 通过：3057/3057 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
+- `node requirements/verification-system/tests/run.mjs` 通过：3060/3060 tests；verification-system integration harness 275/275 通过；distribution package integration suites 全部通过。
 - `FinalitySurface` 合成信封（synthetic envelope）已消除：通过 `Fold.foldFact` 直接按 Fact 分发，移除了 `envelopeFor`、`streamOf`、`sessionOfStream` 及死载荷字段（RuntimeId, LocalSeq, ObservedAt, EventId, ProviderRun）。
 - `ProcessSurface` 治理完成：删除了 7 个零消费者的废弃函数；将测试工具原语（mockWaitChild, unitTaskSource 等）剥离至独立的 `ProcessTestSurface` 模块并在 manifest 中注册为 opaque-capability 资源表面，使生产表面仅保留生产语义。
 - `Scheduler` 控制状态机已消除：删除了 `Reconciler.Scheduler` 中的 `Work` 和 `Release` 控制令牌 DU，drain 循环改用直接的 CE 布尔流。
@@ -6960,8 +6960,10 @@ requirements/<owner>/WHAT.md
 - `MagicTodo` 状态模式已核实：`MagicTodoLocalitySurface` 和 `MagicTodoMembraneSurface` 中的数字匹配（| 1 -> | 2 -> | _ ->）为类型转换编解码器边界，非程序计数器。
 - `P8` 效应所有权审查完成：PTY、Journal/EventStore、Host 会话生命周期拥有单一清晰所有者；Git 路径已收敛；定时器/时钟边界符合 `IClockPort` 契约（仅限 Domain/Application/Session 限制）。
 - 架构门禁深度强化与死检查清零：
+  - `architecture.mjs`：修复 Gate ⑪ 中字符串 replace 导致的正则失效（`replace(/\.fs$/, '')`），使 Reviewer 所有权门禁真正生效；检查 ④ 同步覆盖现代 `OpenCode/Tools/FinalityController.fs` 路径。
+  - `causal-wait-boundary.mjs`：重构静态路径判据为真实有界上下文目录，消除关键文件缺失时的静默 `continue` 跳过，缺文件立即 fail-closed。
+  - `provider-leak-gate.mjs`：补全 `Fission/OpenCode/Tool.fs`、`Delegation/Handle/OpenCode/OneShotTool.fs`、`SyncDelegate/OpenCode/Tools.fs`、`Casebook/OpenCode/Tools.fs` 扫描根，消除扫描根缺失时的静默跳过。
   - `g4r-ce-vocabulary.mjs`：扫描层从失效路径重映射至 11 个活跃有界上下文目录，明确物理适配器白名单，杜绝盲门禁。
-  - `causal-wait-boundary.mjs`：静态路径判据重构为真实有界上下文目录，事实/编解码面匹配现代化。
   - `unified-store-gate.mjs` 与 `test-boundary.mjs`：测试扫描范围从历史 `tests/` 统一收敛至 `requirements/`。
   - `dsl-ownership.mjs`：现代化纯领域层判据，守住领域/业务层零可变记录字段。
 - 孤儿死代码清理：删除了未在清单中注册且零引用的 `TerminalPolicySurface.fs`、`PtySurface.fs`、`magicTodoBridge.mjs`，并从 `Wanxiangshu.fsproj` 移除；清理了附带的过时历史角色注释。
@@ -6972,10 +6974,10 @@ violating lines                     = 0
 build-verification quarantine files = 8
 requirement-trace findings          = 0
 WHAT propositions                   = 666
-traced test cases                   = 3073
+traced test cases                   = 3076
 registered surfaces                 = 132
 Fable build                        = green (649 source files parsed)
-verification proof                 = 3057 passed, 0 failed
+verification proof                 = 3060 passed, 0 failed
 integration proof                  = 275 passed, 0 failed
 ```
 
