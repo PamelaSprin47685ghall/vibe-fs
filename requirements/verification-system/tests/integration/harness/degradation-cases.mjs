@@ -90,10 +90,10 @@ const DEGRADATION_COVERAGE = new Map([
     'VERIFY_004_D_RAW_TRAFFIC_RENEWS_WATCHDOG',
     [
       'VERIFY-004 a hung test that keeps printing is ended by the verdict-silence window',
-      'VERIFY_004_bytes_moving_is_recorded_and_does_not_renew',
+      'WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew',
     ],
   ],
-  ['VERIFY_004_D_BACKGROUND_LANE_RENEWS_WATCHDOG', ['VERIFY_004_bytes_moving_is_recorded_and_does_not_renew']],
+  ['VERIFY_004_D_BACKGROUND_LANE_RENEWS_WATCHDOG', ['WHAT[VERIFICATION-SYSTEM-006] bytes moving is recorded and does not renew']],
   [
     'VERIFY_004_D_WATCHDOG_DUMP_REDUCED_TO_EXIT_CODE',
     ['VERIFY-004 a hung test that keeps printing is ended by the verdict-silence window'],

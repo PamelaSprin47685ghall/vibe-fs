@@ -189,17 +189,23 @@ export const projectionCases = [
 
   // ── tools participate in identity ────────────────────────────────────────
 
-  differs(
-    'ARCH-004 a different tool set is a different exchange',
-    body([SYSTEM, user('go')], ['fork']),
-    body([SYSTEM, user('go')], ['fork', 'join']),
-  ),
+  {
+    name: 'ARCH-004 a different tool set is a different exchange',
+    fn: () => {
+      const forkOnly = body([SYSTEM, user('go')], ['fork']);
+      const forkAndJoin = body([SYSTEM, user('go')], ['fork', 'join']);
+      assertTrue(!sameBytes(forkOnly, forkAndJoin), 'tool-set changes must change provider wire identity');
+    },
+  },
 
-  differs(
-    'ARCH-004 tool order is part of the wire identity',
-    body([SYSTEM, user('go')], ['fork', 'join']),
-    body([SYSTEM, user('go')], ['join', 'fork']),
-  ),
+  {
+    name: 'ARCH-004 tool order is part of the wire identity',
+    fn: () => {
+      const forkThenJoin = body([SYSTEM, user('go')], ['fork', 'join']);
+      const joinThenFork = body([SYSTEM, user('go')], ['join', 'fork']);
+      assertTrue(!sameBytes(forkThenJoin, joinThenFork), 'tool order must remain part of exact provider wire identity');
+    },
+  },
 
   // ── the seal barrier ────────────────────────────────────────────────────
 
