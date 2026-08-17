@@ -45,9 +45,6 @@ export const BUILD_VERIFICATION_FILES = new Set([
   'requirements/verification-system/tests/run.mjs',
   'requirements/verification-system/tests/support/run-inner.mjs',
   'requirements/verification-system/tests/support/coverage-policy.mjs',
-  // Its subject is the semantic-surface scanner/manifest itself; fixtures
-  // intentionally contain forbidden import strings to prove rejection.
-  'requirements/js-semantic-surface/tests/surface-charter.test.mjs',
 ])
 
 /**

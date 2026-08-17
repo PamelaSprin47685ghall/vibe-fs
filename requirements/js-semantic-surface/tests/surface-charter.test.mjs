@@ -79,7 +79,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
   const fixtureSource = [
     'import { leak } ',
     'from ',
-    "'../../../../dist/Mission/Finality/Workflow.js'",
+    "'../../../../" + "dist/Mission/Finality/Workflow.js'",
     '\nexport const leak = (value) => value.',
     'f',
     'ields[0]\n',
