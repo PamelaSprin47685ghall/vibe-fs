@@ -113,13 +113,11 @@ module EnforcerSurface =
 
     let hasValidText (value: obj) : bool =
         let rawTip = value?tip
+
         let tip =
-            if isNullish rawTip then
-                rawTip
-            elif isNullish rawTip?fieldName then
-                rawTip
-            else
-                rawTip?fieldName
+            if isNullish rawTip then rawTip
+            elif isNullish rawTip?fieldName then rawTip
+            else rawTip?fieldName
 
         let decoded =
             EnforcerCodec.decodeCall

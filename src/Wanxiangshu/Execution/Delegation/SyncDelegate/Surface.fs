@@ -213,7 +213,9 @@ module SyncDelegateSurface =
                     None
                 )
 
-            let ownerPrefix = sprintf "sync-delegate-surface-%s-" (ToolHostCodec.digest directory)
+            let ownerPrefix =
+                sprintf "sync-delegate-surface-%s-" (ToolHostCodec.digest directory)
+
             return box (Harness(journal, runtime, scope, children, answers, ownerPrefix))
         }
 

@@ -14,10 +14,7 @@ module ExplicitResumeSurface =
 
     let run (command: string) (sessionId: string) (arguments: string) : Task<obj> =
         let input =
-            createObj
-                [ "command" ==> command
-                  "sessionID" ==> sessionId
-                  "arguments" ==> arguments ]
+            createObj [ "command" ==> command; "sessionID" ==> sessionId; "arguments" ==> arguments ]
 
         let output = createObj [ "parts" ==> [||] ]
         let adopt (_parent: SessionId) (_record: HandleRecord) : Result<unit, string> = Ok()

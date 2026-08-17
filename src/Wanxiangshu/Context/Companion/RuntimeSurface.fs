@@ -261,17 +261,13 @@ module CompanionRuntimeSurface =
 
     let scope () : obj = createScope ()
 
-    let setPendingOffer (scope: obj) (sessionId: string) (context: obj) : bool =
-        offerMaterial scope sessionId context
+    let setPendingOffer (scope: obj) (sessionId: string) (context: obj) : bool = offerMaterial scope sessionId context
 
-    let offerParked (scope: obj) (sessionId: string) (context: obj) : bool =
-        offerMaterial scope sessionId context
+    let offerParked (scope: obj) (sessionId: string) (context: obj) : bool = offerMaterial scope sessionId context
 
-    let tryGetFlight (scope: obj) (sessionId: string) : obj =
-        currentRequest scope sessionId
+    let tryGetFlight (scope: obj) (sessionId: string) : obj = currentRequest scope sessionId
 
-    let peekCurrentRequest (scope: obj) (sessionId: string) : obj =
-        currentRequest scope sessionId
+    let peekCurrentRequest (scope: obj) (sessionId: string) : obj = currentRequest scope sessionId
 
     let openDrain (root: string) : obj =
         box (BloggerRuntime.openDrain (AuthorityRootUserMessageId.create root))

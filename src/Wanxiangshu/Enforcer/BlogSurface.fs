@@ -341,8 +341,7 @@ module BlogSurface =
             if isNullish metadata then
                 false
             else
-                not (isNullish metadata?interrupted)
-                && unbox<bool> metadata?interrupted
+                not (isNullish metadata?interrupted) && unbox<bool> metadata?interrupted
 
         box
             {| isBlogToolPart = isBlog

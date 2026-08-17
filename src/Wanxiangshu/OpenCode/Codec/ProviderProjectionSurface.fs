@@ -130,8 +130,7 @@ module ProviderProjectionSurface =
         let decoded = PromptIngressCodec.decode input output
 
         let physicalUserMessageId =
-            decoded.PhysicalUserMessageId
-            |> Option.map PhysicalUserMessageId.value
+            decoded.PhysicalUserMessageId |> Option.map PhysicalUserMessageId.value
 
         box
             {| sessionId = decoded.SessionId |> Option.map SessionId.value |> optionString

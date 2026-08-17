@@ -32,8 +32,7 @@ module ParallelSurface =
                 else
                     token :?> TokenHandle
 
-            let run item _ =
-                invokeAction action item (box handle)
+            let run item _ = invokeAction action item (box handle)
 
             let! results = Parallel.mapBounded maxConcurrency handle.Token run (items |> Array.toList)
             return results |> List.toArray

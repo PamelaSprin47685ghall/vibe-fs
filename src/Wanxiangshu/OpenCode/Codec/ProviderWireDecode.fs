@@ -128,6 +128,7 @@ module ProviderWireDecode =
         | "tool-result"
         | "tool_result" ->
             let state = readField partObj "state"
+
             let result =
                 firstCanonical partObj [ "result"; "output"; "content" ]
                 |> Option.orElse (firstCanonical state [ "result"; "output"; "content" ])

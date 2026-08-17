@@ -128,11 +128,7 @@ module BloggerDeltaSurface =
             else
                 intValue request?previousCutoff
 
-        BloggerDelta.nextChunk
-            (intValue request?limit)
-            cursor
-            previousCutoff
-            (messagesOfJs request?messages)
+        BloggerDelta.nextChunk (intValue request?limit) cursor previousCutoff (messagesOfJs request?messages)
         |> Option.map (fun chunk ->
             let bytes = SyntheticToml.byteCount chunk.Toml
             let items = chunk.Items |> List.map itemToJs |> List.toArray

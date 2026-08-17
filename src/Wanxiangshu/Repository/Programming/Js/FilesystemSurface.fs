@@ -87,7 +87,9 @@ module JsFilesystemSurface =
                            text = hit.Text |})
                 |> List.toArray
 
-            box {| ok = true; value = box {| matches = matches |} |}
+            box
+                {| ok = true
+                   value = box {| matches = matches |} |}
 
     let commitPlan (root: string) (plan: obj array) : obj =
         match JsMutationFs.commitPlan root (planOf (box plan)) with

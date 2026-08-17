@@ -250,10 +250,12 @@ module BlogProjection =
             Error BlogFoldRejection.NonSequentialFrameEpoch
         elif count < 1 || count > available then
             Error(BlogFoldRejection.CoveredFrameCountOutOfRange(count, available))
-        elif count = 1
-             && (match frames state with
-                 | oldest :: _ -> oldest.Digest <> frame.Digest
-                 | [] -> false) then
+        elif
+            count = 1
+            && (match frames state with
+                | oldest :: _ -> oldest.Digest <> frame.Digest
+                | [] -> false)
+        then
             let expected = (frames state |> List.head).Digest
             Error(BlogFoldRejection.FrameDigestMismatch(expected, frame.Digest))
         else

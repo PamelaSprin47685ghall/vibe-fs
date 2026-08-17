@@ -120,8 +120,7 @@ module BloggerRecoveryProbe =
         : BloggerToolRecovery =
         let claimedEvidence =
             claimedTerminalRun
-            |> Option.bind (fun claimed ->
-                completedAssistants |> List.tryFind (fun (id, _) -> id = claimed))
+            |> Option.bind (fun claimed -> completedAssistants |> List.tryFind (fun (id, _) -> id = claimed))
 
         match claimedTerminalRun, claimedEvidence with
         | None, _ -> BloggerToolRecovery.NoRecovery
