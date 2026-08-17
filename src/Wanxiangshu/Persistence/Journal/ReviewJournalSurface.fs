@@ -41,9 +41,11 @@ module ReviewJournalSurface =
 
     let private verdictOf value =
         match text value with
+        | "PERFECT"
+        | "Perfect" -> ReviewGuardVerdict.Perfect
         | "REVISE"
         | "Revise" -> ReviewGuardVerdict.Revise
-        | _ -> ReviewGuardVerdict.Perfect
+        | other -> failwith $"ReviewJournalSurface: unknown verdict '{other}'"
 
     let private roleOf value =
         match text value with
@@ -53,21 +55,24 @@ module ReviewJournalSurface =
         | "Inspector" -> Role.Inspector
         | "Browser" -> Role.Browser
         | "Inquiry" -> Role.Inquiry
+        | "Reviewer" -> Role.Reviewer
         | "DevOps" -> Role.DevOps
         | "Distiller" -> Role.Distiller
         | "Blogger" -> Role.Blogger
-        | _ -> Role.Reviewer
+        | other -> failwith $"ReviewJournalSurface: unknown role '{other}'"
 
     let private ownershipOf value =
         match text value with
         | "DurableParentHandle" -> HandleOwnership.DurableParentHandle
-        | _ -> HandleOwnership.HostOwnedHidden
+        | "HostOwnedHidden" -> HandleOwnership.HostOwnedHidden
+        | other -> failwith $"ReviewJournalSurface: unknown ownership '{other}'"
 
     let private completionKindOf value =
         match text value with
+        | "Terminal" -> HandleCompletionKind.Terminal
         | "SendFailure" -> HandleCompletionKind.SendFailure
         | "Cancelled" -> HandleCompletionKind.Cancelled
-        | _ -> HandleCompletionKind.Terminal
+        | other -> failwith $"ReviewJournalSurface: unknown completion kind '{other}'"
 
     let private reviewFactOf (caseName: string) (payload: obj) : AgentFact =
         match caseName with
@@ -169,14 +174,17 @@ module ReviewJournalSurface =
         (payload: obj)
         : Task<obj> =
         task {
-            let! result =
-                AgentJournal.appendAgent
-                    (streamOfSession sessionId)
-                    (runOf providerRun)
-                    (factOf family caseName payload)
-                    handle.Journal
+            try
+                let! result =
+                    AgentJournal.appendAgent
+                        (streamOfSession sessionId)
+                        (runOf providerRun)
+                        (factOf family caseName payload)
+                        handle.Journal
 
-            return appendResult result
+                return appendResult result
+            with error ->
+                return box {| ok = false; error = error.Message |}
         }
 
     let appendReview (handle: JournalHandle) (sessionId: string) (providerRun: obj) (caseName: string) (payload: obj) : Task<obj> =

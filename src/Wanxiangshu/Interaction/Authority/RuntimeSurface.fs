@@ -15,30 +15,57 @@ module RuntimeSurface =
     let private arrayOf (value: obj) : obj array =
         if isNull value then [||] else unbox<obj array> value
 
-    let private rootKindOf (value: obj) =
+    let private rootKindResult (value: obj) : Result<PromptAuthority.RootAuthorityKind, string> =
         match text value with
-        | "AgentOwnerRoot" -> PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-        | _ -> PromptAuthority.RootAuthorityKind.HumanRoot
+        | "HumanRoot" -> Ok PromptAuthority.RootAuthorityKind.HumanRoot
+        | "AgentOwnerRoot" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        | unknown -> Error(sprintf "unknown authority root kind: %s" unknown)
+
+    let private rootKindOf (value: obj) =
+        match rootKindResult value with
+        | Ok kind -> kind
+        | Error error -> invalidArg "authorityKind" error
+
+    let private continuationKindResult (value: string) =
+        match PromptAuthority.tryParseContinuationKind value with
+        | Some kind -> Ok kind
+        | None -> Error(sprintf "unknown ContinuationKind: %s" value)
 
     let private continuationKindOf (value: string) =
-        PromptAuthority.tryParseContinuationKind value
-        |> Option.defaultWith (fun () -> invalidArg "kind" (sprintf "unknown ContinuationKind: %s" value))
+        match continuationKindResult value with
+        | Ok kind -> kind
+        | Error error -> invalidArg "kind" error
 
-    let private roleOf (value: obj) =
-        Roles.tryParseRole (text value) |> Option.defaultValue Role.Coder
+    let private roleResult (value: obj) : Result<Role, string> =
+        match Roles.tryParseRole (text value) with
+        | Some role -> Ok role
+        | None -> Error(sprintf "unknown role: %s" (text value))
 
-    let private tierOf (value: obj) =
-        Roles.tryParseTier (text value) |> Option.defaultValue AgentTier.Fast
+    let private tierResult (value: obj) : Result<AgentTier, string> =
+        match Roles.tryParseTier (text value) with
+        | Some tier -> Ok tier
+        | None -> Error(sprintf "unknown tier: %s" (text value))
+
+    let private profileResult (value: obj) : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+        match rootKindResult value?authorityKind, roleResult value?canonicalRole, tierResult value?selectedTier with
+        | Ok authorityKind, Ok canonicalRole, Ok selectedTier ->
+            Ok
+                { SessionId = SessionId.create (text value?session)
+                  LogicalRunId = LogicalRunId.create (text value?logicalRun)
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text value?authorityRoot)
+                  AuthorityKind = authorityKind
+                  SelectedAgent = text value?selectedAgent
+                  PeerAgent = text value?peerAgent
+                  CanonicalRole = canonicalRole
+                  SelectedTier = selectedTier }
+        | Error error, _, _
+        | _, Error error, _
+        | _, _, Error error -> Error error
 
     let private profileOf (value: obj) : PromptAuthority.AuthorityExecutionProfile =
-        { SessionId = SessionId.create (text value?session)
-          LogicalRunId = LogicalRunId.create (text value?logicalRun)
-          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text value?authorityRoot)
-          AuthorityKind = rootKindOf value?authorityKind
-          SelectedAgent = text value?selectedAgent
-          PeerAgent = text value?peerAgent
-          CanonicalRole = roleOf value?canonicalRole
-          SelectedTier = tierOf value?selectedTier }
+        match profileResult value with
+        | Ok profile -> profile
+        | Error error -> invalidArg "profile" error
 
     let private profileToJs (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
         box
@@ -103,6 +130,18 @@ module RuntimeSurface =
 
     let private profileOption (value: obj) =
         if isNull value then None else Some(profileOf value)
+
+    let private projectionValidation (value: obj) : Result<unit, string> =
+        if isNull value then
+            Ok()
+        else
+            let validateProfile value =
+                if isNull value then Ok() else profileResult value |> Result.map (fun _ -> ())
+
+            match validateProfile value?lastAuthorityProfile, validateProfile value?activeLogicalRun with
+            | Ok(), Ok() -> Ok()
+            | Error error, _
+            | _, Error error -> Error error
 
     let private projectionOf (value: obj) : PromptAuthority.PromptAuthorityProjection =
         if isNull value then
@@ -173,17 +212,20 @@ module RuntimeSurface =
         (physical: string)
         (agent: string)
         : obj =
-        match
-            PromptAuthorityRun.createAuthorityRoot
-                hash
-                (RuntimeId.create runtime)
-                (SessionId.create session)
-                (rootKindOf (box kind))
-                (PhysicalUserMessageId.create physical)
-                agent
-        with
-        | Ok profile -> box {| ok = true; value = profileToJs profile; error = "" |}
+        match rootKindResult (box kind) with
         | Error error -> box {| ok = false; value = null; error = error |}
+        | Ok authorityKind ->
+            match
+                PromptAuthorityRun.createAuthorityRoot
+                    hash
+                    (RuntimeId.create runtime)
+                    (SessionId.create session)
+                    authorityKind
+                    (PhysicalUserMessageId.create physical)
+                    agent
+            with
+            | Ok profile -> box {| ok = true; value = profileToJs profile; error = "" |}
+            | Error error -> box {| ok = false; value = null; error = error |}
 
     let parseAgentName (agent: string) : obj =
         match PromptAuthority.parseAgentNameTyped agent with
@@ -210,7 +252,10 @@ module RuntimeSurface =
             box {| ok = false; value = null; error = box {| kind = kind; message = message |} |}
 
     let registerAuthority (profile: obj) (projection: obj) : obj =
-        PromptAuthorityRun.registerAuthority (profileOf profile) (projectionOf projection) |> projectionToJs
+        match profileResult profile, projectionValidation projection with
+        | Ok profile, Ok() -> PromptAuthorityRun.registerAuthority profile (projectionOf projection) |> projectionToJs
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
 
     let claimContinuation
         (promptKey: string)
@@ -220,14 +265,18 @@ module RuntimeSurface =
         (effectiveAgent: string)
         (payloadDigest: string)
         : obj =
-        PromptAuthorityRun.claimContinuation
-            (PromptKey.create promptKey)
-            (SessionId.create session)
-            (continuationKindOf kind)
-            (profileOf profile)
-            effectiveAgent
-            payloadDigest
-        |> claimToJs
+        match continuationKindResult kind, profileResult profile with
+        | Ok continuationKind, Ok profile ->
+            PromptAuthorityRun.claimContinuation
+                (PromptKey.create promptKey)
+                (SessionId.create session)
+                continuationKind
+                profile
+                effectiveAgent
+                payloadDigest
+            |> claimToJs
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
 
     let claimAgentOwnerRoot
         (promptKey: string)
@@ -246,28 +295,39 @@ module RuntimeSurface =
         | Error error -> box {| ok = false; value = null; error = error |}
 
     let registerClaim (claim: obj) (projection: obj) : obj =
-        PromptAuthorityRun.registerClaim (claimOf claim) (projectionOf projection) |> projectionToJs
+        match projectionValidation projection with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() -> PromptAuthorityRun.registerClaim (claimOf claim) (projectionOf projection) |> projectionToJs
 
     let acceptClaim (promptKey: string) (physical: string) (projection: obj) : obj =
-        PromptAuthorityRun.acceptClaim
-            (PromptKey.create promptKey)
-            (PhysicalUserMessageId.create physical)
-            (projectionOf projection)
-        |> projectionToJs
+        match projectionValidation projection with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() ->
+            PromptAuthorityRun.acceptClaim
+                (PromptKey.create promptKey)
+                (PhysicalUserMessageId.create physical)
+                (projectionOf projection)
+            |> projectionToJs
 
     let abandonClaim (promptKey: string) (projection: obj) : obj =
-        PromptAuthorityRun.abandonClaim (PromptKey.create promptKey) (projectionOf projection)
-        |> projectionToJs
+        match projectionValidation projection with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() -> PromptAuthorityRun.abandonClaim (PromptKey.create promptKey) (projectionOf projection) |> projectionToJs
 
     let nextClaimSequence (scope: string) (projection: obj) : int =
-        PromptAuthority.nextClaimSequence scope (projectionOf projection)
+        match projectionValidation projection with
+        | Error _ -> 0
+        | Ok() -> PromptAuthority.nextClaimSequence scope (projectionOf projection)
 
     let submitClaim (promptKey: string) (receipt: string) (projection: obj) : obj =
-        PromptAuthorityRun.submitClaim
-            (PromptKey.create promptKey)
-            (TransportReceipt.create receipt)
-            (projectionOf projection)
-        |> projectionToJs
+        match projectionValidation projection with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() ->
+            PromptAuthorityRun.submitClaim
+                (PromptKey.create promptKey)
+                (TransportReceipt.create receipt)
+                (projectionOf projection)
+            |> projectionToJs
 
     let claimScopeDigest
         (session: string)
@@ -303,24 +363,30 @@ module RuntimeSurface =
         |> PromptKey.value
 
     let closeAuthority (logicalRun: string) (authorityRoot: string) (projection: obj) : obj =
-        match
-            PromptAuthorityRun.closeAuthority
-                (LogicalRunId.create logicalRun)
-                (AuthorityRootUserMessageId.create authorityRoot)
-                (projectionOf projection)
-        with
-        | Ok closed -> box {| ok = true; value = projectionToJs closed; error = "" |}
+        match projectionValidation projection with
         | Error error -> box {| ok = false; value = null; error = error |}
+        | Ok() ->
+            match
+                PromptAuthorityRun.closeAuthority
+                    (LogicalRunId.create logicalRun)
+                    (AuthorityRootUserMessageId.create authorityRoot)
+                    (projectionOf projection)
+            with
+            | Ok closed -> box {| ok = true; value = projectionToJs closed; error = "" |}
+            | Error error -> box {| ok = false; value = null; error = error |}
 
     let closeCompletedHumanRootManager (projection: obj) : obj =
-        let typed = projectionOf projection
+        match projectionValidation projection with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() ->
+            let typed = projectionOf projection
 
-        match typed.ActiveLogicalRun with
-        | Some profile when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot ->
-            match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId typed with
-            | Ok closed -> projectionToJs closed
-            | Error _ -> projectionToJs typed
-        | _ -> projectionToJs typed
+            match typed.ActiveLogicalRun with
+            | Some profile when profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot ->
+                match PromptAuthorityRun.closeAuthority profile.LogicalRunId profile.AuthorityRootUserMessageId typed with
+                | Ok closed -> projectionToJs closed
+                | Error _ -> projectionToJs typed
+            | _ -> projectionToJs typed
 
     let resolveKnownOrigin
         (physical: string)
@@ -328,12 +394,15 @@ module RuntimeSurface =
         (hostCompaction: bool)
         (projection: obj)
         : string =
-        PromptAuthorityRun.resolveKnownOrigin
-            (PhysicalUserMessageId.create physical)
-            (if System.String.IsNullOrWhiteSpace promptKey then None else Some(PromptKey.create promptKey))
-            hostCompaction
-            (projectionOf projection)
-        |> originName
+        match projectionValidation projection with
+        | Error _ -> "UnknownOrigin"
+        | Ok() ->
+            PromptAuthorityRun.resolveKnownOrigin
+                (PhysicalUserMessageId.create physical)
+                (if System.String.IsNullOrWhiteSpace promptKey then None else Some(PromptKey.create promptKey))
+                hostCompaction
+                (projectionOf projection)
+            |> originName
 
     let stableLogicalRunId (hash: string -> string) (runtime: string) (session: string) (physical: string) : string =
         PromptAuthority.stableLogicalRunId

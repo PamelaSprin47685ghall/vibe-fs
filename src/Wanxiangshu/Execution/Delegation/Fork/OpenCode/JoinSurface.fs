@@ -24,50 +24,64 @@ module JoinSurface =
         | "chinese" -> ProviderLanguage.SimplifiedChinese
         | _ -> ProviderLanguage.English
 
-    let private role (value: obj) =
+    let private role (value: obj) : Role option =
         match text value with
-        | "Manager" -> Role.Manager
-        | "Inspector" -> Role.Inspector
-        | "DevOps" -> Role.DevOps
-        | "Browser" -> Role.Browser
-        | "Inquiry" -> Role.Inquiry
-        | "Distiller" -> Role.Distiller
-        | _ -> Role.Coder
+        | "Manager" -> Some Role.Manager
+        | "Orchestrator" -> Some Role.Orchestrator
+        | "Coder" -> Some Role.Coder
+        | "Inspector" -> Some Role.Inspector
+        | "DevOps" -> Some Role.DevOps
+        | "Browser" -> Some Role.Browser
+        | "Inquiry" -> Some Role.Inquiry
+        | "Reviewer" -> Some Role.Reviewer
+        | "Distiller" -> Some Role.Distiller
+        | "Blogger" -> Some Role.Blogger
+        | _ -> None
 
-    let private agentItem (value: obj) : JoinItem =
+    let private requiredRunId (value: obj) : string option =
+        let runId = text value
+        if String.IsNullOrWhiteSpace runId then None else Some runId
+
+    let private agentItem (value: obj) : JoinItem option =
         let agentId = text (value?agentId)
-        let runId =
-            let value = text (value?runId)
-            if String.IsNullOrWhiteSpace value then "run-1" else value
         let agentName = text (value?agentName)
-        let canonicalRole = role (value?role)
+        let kind = text (value?kind)
+        let rawRole = value?role
+        let canonicalRole = role rawRole
+        let hasRole = not (isNull rawRole)
 
-        match text (value?kind) with
-        | "failed" ->
-            AgentItem(
-                AgentFailedItem
-                    { AgentId = agentId
-                      ChildSessionId = None
-                      RunId = runId
-                      Role = Some canonicalRole
-                      Code = text (value?code)
-                      Message = text (value?message) }
+        match kind, canonicalRole, requiredRunId (value?runId) with
+        | "failed", Some role, Some runId ->
+            Some(
+                AgentItem(
+                    AgentFailedItem
+                        { AgentId = agentId
+                          ChildSessionId = None
+                          RunId = runId
+                          Role = Some role
+                          Code = text (value?code)
+                          Message = text (value?message) }
+                )
             )
-        | "abandoned" -> AgentItem(AgentAbandonedItem(agentId, text (value?reason)))
-        | _ ->
-            AgentItem(
-                AgentCompletedItem
-                    { AgentId = agentId
-                      ChildSessionId = None
-                      RunId = runId
-                      Role = canonicalRole
-                      AuthorityRoot = None
-                      ProviderRun = None
-                      WorkRecord = text (value?workRecord)
-                      Directory = None }
+        | "completed", Some role, Some runId ->
+            Some(
+                AgentItem(
+                    AgentCompletedItem
+                        { AgentId = agentId
+                          ChildSessionId = None
+                          RunId = runId
+                          Role = role
+                          AuthorityRoot = None
+                          ProviderRun = None
+                          WorkRecord = text (value?workRecord)
+                          Directory = None }
+                )
             )
+        | "abandoned", _, _ when hasRole && Option.isNone canonicalRole -> None
+        | "abandoned", _, _ -> Some(AgentItem(AgentAbandonedItem(agentId, text (value?reason))))
+        | _ -> None
 
-    let private ptyItem (value: obj) : JoinItem =
+    let private ptyItem (value: obj) : JoinItem option =
         let ptyId = text (value?ptyId)
         let outcome = text (value?outcome)
         let code = text (value?code)
@@ -75,26 +89,31 @@ module JoinSurface =
 
         match text (value?kind) with
         | "pty-failed" ->
-            PtyItem(
-                PtyFailed
-                    { PtyId = ptyId
-                      Outcome = outcome
-                      Closed = true
-                      Code = code
-                      Message = message }
+            Some(
+                PtyItem(
+                    PtyFailed
+                        { PtyId = ptyId
+                          Outcome = outcome
+                          Closed = true
+                          Code = code
+                          Message = message }
+                )
             )
         | "pty-aborted" ->
-            PtyItem(
-                PtyAborted
-                    { PtyId = ptyId
-                      Outcome = outcome
-                      Closed = true
-                      Code = code
-                      Message = message }
+            Some(
+                PtyItem(
+                    PtyAborted
+                        { PtyId = ptyId
+                          Outcome = outcome
+                          Closed = true
+                          Code = code
+                          Message = message }
+                )
             )
-        | _ -> PtyItem(PtyExited { PtyId = ptyId; Outcome = outcome; Closed = true })
+        | "pty-exited" -> Some(PtyItem(PtyExited { PtyId = ptyId; Outcome = outcome; Closed = true }))
+        | _ -> None
 
-    let private itemOf (value: obj) : JoinItem =
+    let private itemOf (value: obj) : JoinItem option =
         if (text (value?kind)).StartsWith("pty-", StringComparison.Ordinal) then ptyItem value else agentItem value
 
     let private itemName (value: obj) = text (value?agentId), text (value?agentName)
@@ -104,29 +123,33 @@ module JoinSurface =
             ""
         else
             let converted = items |> Array.map itemOf
-            let names = items |> Array.map itemName |> Map.ofArray
-            let terminals =
-                items
-                |> Array.choose (fun value ->
-                    if (text (value?kind)).StartsWith("pty-", StringComparison.Ordinal) then
-                        Some(text (value?ptyId), text (value?terminalLabel))
-                    else
-                        None)
-                |> Map.ofArray
-            let resolveAgentName agentId =
-                match Map.tryFind agentId names with
-                | Some name when not (String.IsNullOrWhiteSpace name) -> name
-                | _ -> ""
-            let resolveTerminalLabel ptyId =
-                match Map.tryFind ptyId terminals with
-                | Some label when not (String.IsNullOrWhiteSpace label) -> label
-                | _ -> ptyId
+            if converted |> Array.exists Option.isNone then
+                ""
+            else
+                let converted = converted |> Array.choose id
+                let names = items |> Array.map itemName |> Map.ofArray
+                let terminals =
+                    items
+                    |> Array.choose (fun value ->
+                        if (text (value?kind)).StartsWith("pty-", StringComparison.Ordinal) then
+                            Some(text (value?ptyId), text (value?terminalLabel))
+                        else
+                            None)
+                    |> Map.ofArray
+                let resolveAgentName agentId =
+                    match Map.tryFind agentId names with
+                    | Some name when not (String.IsNullOrWhiteSpace name) -> name
+                    | _ -> ""
+                let resolveTerminalLabel ptyId =
+                    match Map.tryFind ptyId terminals with
+                    | Some label when not (String.IsNullOrWhiteSpace label) -> label
+                    | _ -> ptyId
 
-            JoinResultRenderer.renderJoinItemBatch
-                (language languageName)
-                resolveAgentName
-                (NonEmptyBatch.ofHeadTail converted[0] (converted |> Array.skip 1 |> Array.toList))
-                resolveTerminalLabel
+                JoinResultRenderer.renderJoinItemBatch
+                    (language languageName)
+                    resolveAgentName
+                    (NonEmptyBatch.ofHeadTail converted[0] (converted |> Array.skip 1 |> Array.toList))
+                    resolveTerminalLabel
 
     let renderInterrupted (languageName: string) (reason: string) : string =
         let interrupt =

@@ -100,6 +100,14 @@ module PluginSessionWiring =
         let wired = host.Wired
         let workspaceDirectory = boot.WorkspaceDirectory
 
+        let roleForAgent (agent: string) : Role =
+            if agent.Contains "coder" then Role.Coder else Role.Inspector
+
+        let bindStrengthReplica replicaId agent =
+            match ManagedAgent.tryParse agent with
+            | Some managed -> wired.BindActiveRun replicaId managed.Role workspaceDirectory
+            | None -> ()
+
         match journal with
         | Some durable ->
             // SyncDelegate attaches whenever the durable journal exists.
@@ -116,13 +124,7 @@ module PluginSessionWiring =
             let registerDelegate (delegateId: SessionId) (agent: string) =
                 wired.RegisterOwned(SessionId.value delegateId)
 
-                let role =
-                    if agent.Contains "coder" then
-                        Role.Coder
-                    else
-                        Role.Inspector
-
-                wired.BindActiveRun delegateId role workspaceDirectory
+                wired.BindActiveRun delegateId (roleForAgent agent) workspaceDirectory
 
             let syncDelegate =
                 new SyncDelegateRuntime(
@@ -151,9 +153,7 @@ module PluginSessionWiring =
                 wired.RegisterOwned ownerKey
                 wired.RegisterOwned replicaKey
 
-                match ManagedAgent.tryParse agent with
-                | Some managed -> wired.BindActiveRun replicaId managed.Role workspaceDirectory
-                | None -> ()
+                bindStrengthReplica replicaId agent
 
             let strengthReplicaRuntime =
                 new StrengthReplicaRuntime(

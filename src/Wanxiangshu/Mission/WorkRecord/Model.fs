@@ -75,31 +75,30 @@ module LifecycleWorkRecord =
         else
             heading + "\n" + body
 
+    let private renderOpeningBody (record: LifecycleWorkRecord) =
+        let requirements =
+            record.Opening.AuthoritativeRequirements
+            |> List.filter (System.String.IsNullOrWhiteSpace >> not)
+
+        let reqText =
+            if List.isEmpty requirements then
+                ""
+            else
+                requirements
+                |> List.mapi (fun index text -> sprintf "%d. %s" (index + 1) text)
+                |> String.concat "\n"
+
+        [ record.Opening.AssignmentText; reqText; record.Opening.ConstitutiveBody ]
+        |> List.filter (System.String.IsNullOrWhiteSpace >> not)
+        |> String.concat "\n"
+
     /// 稳定 Markdown 渲染。空段整段省略。
     /// 段标题为纯文本（Opening / Chronicle / Recent work）；`# `
     /// 仅由 `SyntheticToml.comment` 在 wire 注入，避免 `# # Chronicle`。
     /// `includeOpening=false` 时省略 Opening（子→父）。
     /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
     let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =
-        let openingBody =
-            if not includeOpening then
-                ""
-            else
-                let requirements =
-                    record.Opening.AuthoritativeRequirements
-                    |> List.filter (System.String.IsNullOrWhiteSpace >> not)
-
-                let reqText =
-                    if List.isEmpty requirements then
-                        ""
-                    else
-                        requirements
-                        |> List.mapi (fun index text -> sprintf "%d. %s" (index + 1) text)
-                        |> String.concat "\n"
-
-                [ record.Opening.AssignmentText; reqText; record.Opening.ConstitutiveBody ]
-                |> List.filter (System.String.IsNullOrWhiteSpace >> not)
-                |> String.concat "\n"
+        let openingBody = if includeOpening then renderOpeningBody record else ""
 
         let framesText =
             record.Frames

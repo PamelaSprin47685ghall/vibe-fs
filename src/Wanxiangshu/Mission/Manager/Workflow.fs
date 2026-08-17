@@ -138,6 +138,23 @@ module ManagerWorkflow =
         | Some life -> handleLaborContinuation sessionPort eventPort journal nudgeSent quiescence context life
         | None -> AsyncSupport.completedTask ()
 
+    let private handleBackgroundSettlement
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (turn: ReconciledTurn)
+        (settled: ManagerBackground.BackgroundSettlement) =
+        task {
+            match settled with
+            | ManagerBackground.BackgroundSettlement.Deferred -> return ()
+            | ManagerBackground.BackgroundSettlement.Settled ->
+                let! _ = handleSettledManager sessionPort eventPort journal nudgeSent quiescence context turn
+                return ()
+        }
+
     let private handleCompletedManager
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -161,11 +178,7 @@ module ManagerWorkflow =
                 let! settled =
                     ManagerBackground.ensureSettled sessionPort eventPort journal joinGuardNudges hasLivePty turn
 
-                match settled with
-                | ManagerBackground.BackgroundSettlement.Deferred -> return ()
-                | ManagerBackground.BackgroundSettlement.Settled ->
-                    let! _ = handleSettledManager sessionPort eventPort journal nudgeSent quiescence context turn
-                    return ()
+                return! handleBackgroundSettlement sessionPort eventPort journal nudgeSent quiescence context turn settled
             }
             :> Task
 

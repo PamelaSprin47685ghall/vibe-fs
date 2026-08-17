@@ -111,6 +111,35 @@ module Absorb =
                 |> List.distinct
             Uncertainties = synthesis.Uncertainties |> List.distinct }
 
+    let private applyInvestigation (baseState: EpistemicState) (result: InvestigationResult) =
+        let resolved =
+            State.markActionResolved (normalizeKey result.ActionKey) { baseState with Synthesis = None }
+
+        let semanticallyUpdated =
+            match result.SemanticAssessment with
+            | None -> resolved
+            | Some assessment ->
+                { resolved with
+                    RootContract = Some(State.deriveRootContract assessment) }
+
+        let findings =
+            result.Findings
+            |> List.fold (fun current item -> addFinding item current) semanticallyUpdated
+
+        let evidence =
+            result.Evidence
+            |> List.fold (fun current item -> addEvidence item current) findings
+
+        let hypotheses =
+            result.Hypotheses
+            |> List.fold (fun current item -> addHypothesis item current) evidence
+
+        result.Candidates
+        |> List.fold
+            (fun current proposal -> addCandidate proposal current)
+            { hypotheses with
+                NeedsGeneration = true }
+
     let apply (state: EpistemicState) (observation: Observation) =
         let baseState =
             { state with
@@ -128,34 +157,7 @@ module Absorb =
                 (fun current proposal -> addCandidate proposal current)
                 { baseState with
                     NeedsGeneration = false }
-        | InvestigationObservation result ->
-            let resolved =
-                State.markActionResolved (normalizeKey result.ActionKey) { baseState with Synthesis = None }
-
-            let semanticallyUpdated =
-                match result.SemanticAssessment with
-                | None -> resolved
-                | Some assessment ->
-                    { resolved with
-                        RootContract = Some(State.deriveRootContract assessment) }
-
-            let findings =
-                result.Findings
-                |> List.fold (fun current item -> addFinding item current) semanticallyUpdated
-
-            let evidence =
-                result.Evidence
-                |> List.fold (fun current item -> addEvidence item current) findings
-
-            let hypotheses =
-                result.Hypotheses
-                |> List.fold (fun current item -> addHypothesis item current) evidence
-
-            result.Candidates
-            |> List.fold
-                (fun current proposal -> addCandidate proposal current)
-                { hypotheses with
-                    NeedsGeneration = true }
+        | InvestigationObservation result -> applyInvestigation baseState result
         | SynthesisObservation synthesis ->
             let state' =
                 { baseState with

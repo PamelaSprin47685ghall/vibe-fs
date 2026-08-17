@@ -103,47 +103,79 @@ module ProviderRecoveryWorkflow =
     /// Wait on journal folds until coverage exists or the injectable deadline
     /// fires. Fail open: WaitTimedOut still sends the ordinary main
     /// (CTX-011 no-candidate path).
+    let private tryReadCoverage (durable: AgentJournal) (sessionId: SessionId) =
+        if sessionHasCoverage durable sessionId then
+            Some()
+        else
+            None
+
+    let private awaitCoverageSignal (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
+        task {
+            let sessionKey = SessionId.value sessionId
+
+            let descriptor =
+                DiagnosticWait.create
+                    "provider-recovery-material"
+                    (CausalOwner.create "ProviderRecoveryWorkflow" [ "session", sessionKey ])
+                    [ "session", sessionKey; "name", "coverage" ]
+                    (ExternalProducer("journal", [ "session", sessionKey ]))
+                    [ WaitEscape.OpenEndedExternal ]
+                    "ProviderRecoveryWorkflow.awaitRecoveryMaterial"
+
+            let deadline = timerPort.Delay 2000
+
+            let awaitSignal () =
+                task {
+                    let fromRev = AgentJournal.revision durable
+                    let! _ = AgentJournal.awaitChangeFrom fromRev durable
+                    return ()
+                }
+
+            match!
+                CausalAwait.untilSignalOrDeadline
+                    CausalWaitHub.observer
+                    descriptor
+                    deadline
+                    (fun () -> tryReadCoverage durable sessionId)
+                    awaitSignal
+            with
+            | Ok() -> return ()
+            | Error DiagnosticWaitExit.WaitTimedOut -> return ()
+            | Error _ -> return ()
+        }
+
+    let private waitForCoverage (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
+        task {
+            if sessionHasCoverage durable sessionId then
+                return ()
+            else
+                return! awaitCoverageSignal timerPort durable sessionId
+        }
+
     let awaitRecoveryMaterial (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
         task {
             if not (expectsCoverage durable sessionId) then
                 return ()
             else
-                let tryRead () =
-                    if sessionHasCoverage durable sessionId then
-                        Some()
-                    else
-                        None
-
-                match tryRead () with
-                | Some() -> return ()
-                | None ->
-                    let sessionKey = SessionId.value sessionId
-
-                    let descriptor =
-                        DiagnosticWait.create
-                            "provider-recovery-material"
-                            (CausalOwner.create "ProviderRecoveryWorkflow" [ "session", sessionKey ])
-                            [ "session", sessionKey; "name", "coverage" ]
-                            (ExternalProducer("journal", [ "session", sessionKey ]))
-                            [ WaitEscape.OpenEndedExternal ]
-                            "ProviderRecoveryWorkflow.awaitRecoveryMaterial"
-
-                    let deadline = timerPort.Delay 2000
-
-                    let awaitSignal () =
-                        task {
-                            let fromRev = AgentJournal.revision durable
-                            let! _ = AgentJournal.awaitChangeFrom fromRev durable
-                            return ()
-                        }
-
-                    match!
-                        CausalAwait.untilSignalOrDeadline CausalWaitHub.observer descriptor deadline tryRead awaitSignal
-                    with
-                    | Ok() -> return ()
-                    | Error DiagnosticWaitExit.WaitTimedOut -> return ()
-                    | Error _ -> return ()
+                return! waitForCoverage timerPort durable sessionId
         }
+
+    let private emitLoopContinuation (turn: ReconciledTurn) (error: string) =
+        if error = "loop-kill" then
+            Diagnostic.emit
+                "loop-kill"
+                [ "session_id", SessionId.value turn.SessionId; "result", "continue-sent" ]
+
+    let private handleContinuation
+        (eventPort: IEventObservationPort)
+        (turn: ReconciledTurn)
+        (error: string)
+        (continuation: Result<PromptKey, string>) =
+        match continuation with
+        | Ok _ -> emitLoopContinuation turn error
+        | Error _ ->
+            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error)
+            |> ignore
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
     ///
@@ -202,13 +234,7 @@ module ProviderRecoveryWorkflow =
                             PromptDispatcher.AwaitMode.Detached
                             None
 
-                    match continuation with
-                    | Ok _ ->
-                        if error = "loop-kill" then
-                            Diagnostic.emit
-                                "loop-kill"
-                                [ "session_id", SessionId.value turn.SessionId; "result", "continue-sent" ]
-                    | Error _ -> fail error
+                    handleContinuation eventPort turn error continuation
         }
         :> Task
 

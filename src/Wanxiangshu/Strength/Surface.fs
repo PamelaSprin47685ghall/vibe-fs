@@ -62,23 +62,34 @@ module StrengthSurface =
     let private optionalText (value: obj) =
         if isNullish value then None else Some(string value)
 
-    let private roleOf (value: obj) =
-        Roles.tryParseRole (textOf value) |> Option.defaultValue Role.Coder
+    let private roleResult (value: obj) : Result<Role, string> =
+        match Roles.tryParseRole (textOf value) with
+        | Some role -> Ok role
+        | None -> Error(sprintf "unknown role: %s" (textOf value))
 
-    let private tierOf (value: obj) =
-        Roles.tryParseTier (textOf value) |> Option.defaultValue AgentTier.Deep
+    let private tierResult (value: obj) : Result<AgentTier, string> =
+        match Roles.tryParseTier (textOf value) with
+        | Some tier -> Ok tier
+        | None -> Error(sprintf "unknown tier: %s" (textOf value))
+
+    let private budgetResult (value: obj) : Result<StrengthBudget, string> =
+        match StrengthBudget.parse (textOf value) with
+        | Some budget -> Ok budget
+        | None -> Error(sprintf "unknown budget: %s" (textOf value))
+
+    let private requestKindResult (value: obj) : Result<ProviderRequestKind, string> =
+        match textOf value with
+        | "work-main" -> Ok ProviderRequestKind.WorkMain
+        | "blogger-main" -> Ok ProviderRequestKind.BloggerMain
+        | "blogger-squash" -> Ok ProviderRequestKind.BloggerSquash
+        | "interaction-repair" -> Ok ProviderRequestKind.InteractionRepair
+        | "strength-replica" -> Ok ProviderRequestKind.StrengthReplica
+        | unknown -> Error(sprintf "unknown request kind: %s" unknown)
 
     let private budgetOf (value: obj) =
-        StrengthBudget.parse (textOf value) |> Option.defaultValue StrengthBudget.K0
-
-    let private requestKindOf (value: obj) =
-        match textOf value with
-        | "work-main" -> ProviderRequestKind.WorkMain
-        | "blogger-main" -> ProviderRequestKind.BloggerMain
-        | "blogger-squash" -> ProviderRequestKind.BloggerSquash
-        | "interaction-repair" -> ProviderRequestKind.InteractionRepair
-        | "strength-replica" -> ProviderRequestKind.StrengthReplica
-        | _ -> ProviderRequestKind.WorkMain
+        match budgetResult value with
+        | Ok budget -> budget
+        | Error error -> invalidArg "budget" error
 
     let private roleLabel role = Roles.roleLabel role
 
@@ -111,13 +122,16 @@ module StrengthSurface =
     let private permissionsToJs permissions =
         permissions |> Set.toList |> List.map permissionLabel |> List.sort |> List.toArray
 
-    let private partOf (value: obj) : MessagePart =
+    let private partResult (value: obj) : Result<MessagePart, string> =
         match textOf value?kind with
-        | "text" -> MessagePart.Text(textOf value?text)
-        | "reasoning" -> MessagePart.Reasoning(textOf value?text)
-        | "tool-call" -> MessagePart.ToolCall(textOf value?callId, textOf value?name, textOf value?args)
-        | "tool-result" -> MessagePart.ToolResult(textOf value?callId, textOf value?result)
-        | _ -> MessagePart.Activity(textOf value?kind)
+        | "text" -> Ok(MessagePart.Text(textOf value?text))
+        | "reasoning" -> Ok(MessagePart.Reasoning(textOf value?text))
+        | "tool-call" -> Ok(MessagePart.ToolCall(textOf value?callId, textOf value?name, textOf value?args))
+        | "tool-result" -> Ok(MessagePart.ToolResult(textOf value?callId, textOf value?result))
+        | "patch"
+        | "step-start"
+        | "step-finish" -> Ok(MessagePart.Activity(textOf value?kind))
+        | unknown -> Error(sprintf "unknown message part kind: %s" unknown)
 
     let private wirePartOf (value: obj) : ProviderProjection.WirePart =
         match textOf value?kind with
@@ -285,23 +299,29 @@ module StrengthSurface =
         let estimate = StrengthCostModel.estimate p1 p2 savedDeep1 savedDeep2 fast1 fast2 byte1 byte2 delay1 delay2 risk1 risk2
         box {| V0 = estimate.V0; V1 = estimate.V1; V2 = estimate.V2 |}
 
-    let private opportunityOf (value: obj) : StrengthOpportunity =
-        { IsRootWork = unbox<bool> value?isRootWork
-          RequestKind = requestKindOf value?requestKind
-          CanonicalRole = roleOf value?canonicalRole
-          SelectedTier = tierOf value?selectedTier
-          SelectedAgent = textOf value?selectedAgent
-          EffectiveAgent = textOf value?effectiveAgent
-          IsFallbackRetry = unbox<bool> value?isFallbackRetry
-          HasPrefixProbe = unbox<bool> value?hasPrefixProbe
-          IsReviewerOrFinality = unbox<bool> value?isReviewerOrFinality
-          IsAttachedOrInternalLeaf = unbox<bool> value?isAttachedOrInternalLeaf
-          OwnerCancelled = unbox<bool> value?ownerCancelled
-          TargetProviderRunBound = unbox<bool> value?targetProviderRunBound
-          EventStoreHealthy = unbox<bool> value?eventStoreHealthy
-          HostCanaryHealthy = unbox<bool> value?hostCanaryHealthy
-          FastPeerAvailable = unbox<bool> value?fastPeerAvailable
-          CostModelAvailable = unbox<bool> value?costModelAvailable }
+    let private opportunityOf (value: obj) : Result<StrengthOpportunity, string> =
+        match requestKindResult value?requestKind, roleResult value?canonicalRole, tierResult value?selectedTier with
+        | Ok requestKind, Ok canonicalRole, Ok selectedTier ->
+            Ok
+                { IsRootWork = unbox<bool> value?isRootWork
+                  RequestKind = requestKind
+                  CanonicalRole = canonicalRole
+                  SelectedTier = selectedTier
+                  SelectedAgent = textOf value?selectedAgent
+                  EffectiveAgent = textOf value?effectiveAgent
+                  IsFallbackRetry = unbox<bool> value?isFallbackRetry
+                  HasPrefixProbe = unbox<bool> value?hasPrefixProbe
+                  IsReviewerOrFinality = unbox<bool> value?isReviewerOrFinality
+                  IsAttachedOrInternalLeaf = unbox<bool> value?isAttachedOrInternalLeaf
+                  OwnerCancelled = unbox<bool> value?ownerCancelled
+                  TargetProviderRunBound = unbox<bool> value?targetProviderRunBound
+                  EventStoreHealthy = unbox<bool> value?eventStoreHealthy
+                  HostCanaryHealthy = unbox<bool> value?hostCanaryHealthy
+                  FastPeerAvailable = unbox<bool> value?fastPeerAvailable
+                  CostModelAvailable = unbox<bool> value?costModelAvailable }
+        | Error error, _, _
+        | _, Error error, _
+        | _, _, Error error -> Error error
 
     let private predictionOf (value: obj) =
         { P1 = float value?P1
@@ -317,20 +337,23 @@ module StrengthSurface =
           K2MinimumEvidence = int value?K2MinimumEvidence }
 
     let policyDecide (opportunity: obj) (control: bool) (shadow: bool) (prediction: obj) (estimate: obj) (config: obj) : obj =
-        match StrengthPolicy.decideFromFacts
-            (opportunityOf opportunity)
-            control
-            shadow
-            (predictionOf prediction)
-            (estimateOf estimate)
-            (policyConfigOf config) with
-        | StrengthDecision.Skip reason -> box {| kind = "Skip"; reason = reason; budget = "K0" |}
-        | StrengthDecision.ControlHoldout -> box {| kind = "ControlHoldout"; budget = "K0" |}
-        | StrengthDecision.Speculate(budget, value) ->
-            box
-                {| kind = "Speculate"
-                   budget = StrengthBudget.wire budget
-                   estimate = {| V0 = value.V0; V1 = value.V1; V2 = value.V2 |} |}
+        match opportunityOf opportunity with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok opportunity ->
+            match StrengthPolicy.decideFromFacts
+                opportunity
+                control
+                shadow
+                (predictionOf prediction)
+                (estimateOf estimate)
+                (policyConfigOf config) with
+            | StrengthDecision.Skip reason -> box {| kind = "Skip"; reason = reason; budget = "K0" |}
+            | StrengthDecision.ControlHoldout -> box {| kind = "ControlHoldout"; budget = "K0" |}
+            | StrengthDecision.Speculate(budget, value) ->
+                box
+                    {| kind = "Speculate"
+                       budget = StrengthBudget.wire budget
+                       estimate = {| V0 = value.V0; V1 = value.V1; V2 = value.V2 |} |}
 
     let policyControlBucket (sha256: string -> string) (policyVersion: string) (authorityRoot: string) (targetRun: string) =
         StrengthPolicy.controlBucket sha256 policyVersion authorityRoot targetRun
@@ -339,13 +362,21 @@ module StrengthSurface =
         StrengthPolicy.isControlHoldout rateBasisPoints bucket
 
     let readonlyCapabilities (role: string) (requestKind: string) : string array =
-        PromptAuthority.toolCapabilitiesFor (roleOf (box role)) (requestKindOf (box requestKind))
-        |> permissionsToJs
+        match roleResult (box role), requestKindResult (box requestKind) with
+        | Ok role, Ok requestKind -> PromptAuthority.toolCapabilitiesFor role requestKind |> permissionsToJs
+        | _ -> [||]
 
     /// StrengthReplica readonly capability labels for a canonical role.
     /// Kept as the short owner name consumed by policy and authority laws.
     let capabilities (role: string) : string array =
         readonlyCapabilities role "strength-replica"
+
+    let readonlyCapabilitiesResult (role: string) (requestKind: string) : obj =
+        match roleResult (box role), requestKindResult (box requestKind) with
+        | Ok role, Ok requestKind ->
+            box {| ok = true; value = PromptAuthority.toolCapabilitiesFor role requestKind |> permissionsToJs |}
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
 
     let exactReadonlyHostToolMap: obj array =
         StrengthReplicaTools.exactReadonlyHostToolMap
@@ -362,27 +393,36 @@ module StrengthSurface =
 
     /// Prompt identity remains role-owned and cannot inherit Strength metadata.
     let systemPromptIdForRole (role: string) : string =
-        PromptAuthority.systemPromptIdFor (roleOf (box role)) |> SystemPromptId.value
+        match roleResult (box role) with
+        | Ok role -> PromptAuthority.systemPromptIdFor role |> SystemPromptId.value
+        | Error _ -> ""
 
     let systemPromptForRole (role: string) : string =
-        let prompts = RuntimeResources.current().Prompts
-        match roleOf (box role) with
-        | Role.Manager -> prompts.ManagerSystemPrompt
-        | Role.Coder -> prompts.CoderSystemPrompt
-        | Role.DevOps -> prompts.DevopsSystemPrompt
-        | Role.Inspector -> prompts.InspectorSystemPrompt
-        | Role.Reviewer -> prompts.ReviewerSystemPrompt
-        | Role.Browser -> prompts.BrowserSystemPrompt
-        | Role.Inquiry -> prompts.InquirySystemPrompt
-        | Role.Orchestrator -> prompts.OrchestratorSystemPrompt
-        | Role.Distiller -> prompts.DistillerSystemPrompt
-        | Role.Blogger -> prompts.BloggerSystemPrompt
+        match roleResult (box role) with
+        | Error _ -> ""
+        | Ok role ->
+            let prompts = RuntimeResources.current().Prompts
+            match role with
+            | Role.Manager -> prompts.ManagerSystemPrompt
+            | Role.Coder -> prompts.CoderSystemPrompt
+            | Role.DevOps -> prompts.DevopsSystemPrompt
+            | Role.Inspector -> prompts.InspectorSystemPrompt
+            | Role.Reviewer -> prompts.ReviewerSystemPrompt
+            | Role.Browser -> prompts.BrowserSystemPrompt
+            | Role.Inquiry -> prompts.InquirySystemPrompt
+            | Role.Orchestrator -> prompts.OrchestratorSystemPrompt
+            | Role.Distiller -> prompts.DistillerSystemPrompt
+            | Role.Blogger -> prompts.BloggerSystemPrompt
 
     let clearsFailureCountOnSuccess (requestKind: string) =
-        ProviderRequestKind.clearsFailureCountOnSuccess (requestKindOf (box requestKind))
+        match requestKindResult (box requestKind) with
+        | Ok requestKind -> ProviderRequestKind.clearsFailureCountOnSuccess requestKind
+        | Error _ -> false
 
     let mayCarryProbe (requestKind: string) =
-        ProviderRequestKind.mayCarryProbe (requestKindOf (box requestKind))
+        match requestKindResult (box requestKind) with
+        | Ok requestKind -> ProviderRequestKind.mayCarryProbe requestKind
+        | Error _ -> false
 
     let associationFacts (ownerSessionId: string) : obj =
         let ownership = StrengthReplicaAssociationHints.ownership (SessionId.create ownerSessionId)
@@ -455,19 +495,22 @@ module StrengthSurface =
         (byteLength: int)
         (refs: string array)
         : obj =
-        EventHandle(
-            StrengthEvents.prepared
-                (SessionId.create owner)
-                (StrengthDecisionId.create decision)
-                (ProviderRunIdentity.create target)
-                (SessionId.create replica)
-                (budgetOf (box budget))
-                anchor
-                digest
-                byteLength
-                (refs |> Array.toList |> List.map PayloadRef.create)
-        )
-        :> obj
+        match budgetResult (box budget) with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok budget ->
+            EventHandle(
+                StrengthEvents.prepared
+                    (SessionId.create owner)
+                    (StrengthDecisionId.create decision)
+                    (ProviderRunIdentity.create target)
+                    (SessionId.create replica)
+                    budget
+                    anchor
+                    digest
+                    byteLength
+                    (refs |> Array.toList |> List.map PayloadRef.create)
+            )
+            :> obj
 
     let eventPromoted (owner: string) (decision: string) (target: string) (digest: string) (refs: string array) : obj =
         EventHandle(
@@ -661,24 +704,27 @@ module StrengthSurface =
     let private durabilityOf value = unbox<DurabilityHandle> value |> fun handle -> handle.Value
 
     let durabilityPublishPrepared (durability: obj) (request: obj) : Task<obj> =
-        let value = durabilityOf durability
-        let preparedRequest =
-            { OwnerSessionId = SessionId.create (textOf request?ownerSessionId)
-              DecisionId = StrengthDecisionId.create (textOf request?decisionId)
-              TargetProviderRun = ProviderRunIdentity.create (textOf request?targetProviderRun)
-              ReplicaSessionId = SessionId.create (textOf request?replicaSessionId)
-              Budget = budgetOf request?budget
-              AnchorDigest = textOf request?anchorDigest
-              Bundle = bundleOf request?bundle }
+        match budgetResult request?budget with
+        | Error error -> Task.FromResult(box {| ok = false; error = error |})
+        | Ok budget ->
+            let value = durabilityOf durability
+            let preparedRequest =
+                { OwnerSessionId = SessionId.create (textOf request?ownerSessionId)
+                  DecisionId = StrengthDecisionId.create (textOf request?decisionId)
+                  TargetProviderRun = ProviderRunIdentity.create (textOf request?targetProviderRun)
+                  ReplicaSessionId = SessionId.create (textOf request?replicaSessionId)
+                  Budget = budget
+                  AnchorDigest = textOf request?anchorDigest
+                  Bundle = bundleOf request?bundle }
 
-        task {
-            let! result = value.PublishPrepared preparedRequest
-            return
-                match result with
-                | StrengthPreparedPublish.Published -> box {| kind = "Published" |}
-                | StrengthPreparedPublish.Rejected reason -> box {| kind = "Rejected"; reason = reason |}
-                | StrengthPreparedPublish.StorageInvalid reason -> box {| kind = "StorageInvalid"; reason = reason |}
-        }
+            task {
+                let! result = value.PublishPrepared preparedRequest
+                return
+                    match result with
+                    | StrengthPreparedPublish.Published -> box {| kind = "Published" |}
+                    | StrengthPreparedPublish.Rejected reason -> box {| kind = "Rejected"; reason = reason |}
+                    | StrengthPreparedPublish.StorageInvalid reason -> box {| kind = "StorageInvalid"; reason = reason |}
+            }
 
     let durabilityLoadProjection (durability: obj) : Task<obj> =
         task {
@@ -733,47 +779,87 @@ module StrengthSurface =
             box {| ok = true; value = box {| startInclusive = range.StartInclusive; endExclusive = range.EndExclusive |} |}
         | Error error -> box {| ok = false; error = error |}
 
-    let turnEvidenceClassify (parts: obj array) =
-        let evidence = StrengthTurnEvidence.classifyParts (parts |> Array.map partOf)
-        match evidence with
-        | StrengthProviderOutputEvidence.RealOutput -> "RealOutput"
-        | StrengthProviderOutputEvidence.TransportOnly -> "TransportOnly"
-        | StrengthProviderOutputEvidence.NoOutput -> "NoOutput"
+    let turnEvidenceClassify (parts: obj array) : obj =
+        let parsed =
+            parts
+            |> Array.toList
+            |> List.fold
+                (fun state value ->
+                    match state, partResult value with
+                    | Ok current, Ok part -> Ok(part :: current)
+                    | Error error, _ -> Error error
+                    | _, Error error -> Error error)
+                (Ok [])
+            |> Result.map (List.rev >> List.toArray)
 
-    let private turnOutcomeOf (value: obj) =
+        match parsed with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok parts ->
+            let evidence = StrengthTurnEvidence.classifyParts parts
+            let value =
+                match evidence with
+                | StrengthProviderOutputEvidence.RealOutput -> "RealOutput"
+                | StrengthProviderOutputEvidence.TransportOnly -> "TransportOnly"
+                | StrengthProviderOutputEvidence.NoOutput -> "NoOutput"
+            box value
+
+    let private turnOutcomeResult (value: obj) : Result<ReconcileProgram.TurnOutcome, string> =
         match textOf value with
-        | "completed" -> ReconcileProgram.TurnCompleted
-        | "needs-continuation" -> ReconcileProgram.TurnNeedsContinuation "needs-continuation"
-        | "aborted" -> ReconcileProgram.TurnAborted "aborted"
-        | "failed" -> ReconcileProgram.TurnFailed "failed"
-        | _ -> ReconcileProgram.TurnInProgress
+        | "completed" -> Ok ReconcileProgram.TurnCompleted
+        | "needs-continuation" -> Ok(ReconcileProgram.TurnNeedsContinuation "needs-continuation")
+        | "aborted" -> Ok(ReconcileProgram.TurnAborted "aborted")
+        | "failed" -> Ok(ReconcileProgram.TurnFailed "failed")
+        | unknown -> Error(sprintf "unknown turn outcome: %s" unknown)
 
-    let private reconciledTurnOf (value: obj) : ReconciledTurn =
-        { SessionId = SessionId.create (textOf value?sessionId)
-          PhysicalUserMessageId = PhysicalUserMessageId.create (textOf value?physicalUserMessageId)
-          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (textOf value?authorityRootUserMessageId)
-          ProviderRun = ProviderRunIdentity.create (textOf value?providerRun)
-          Role = None
-          Directory = None
-          Parts = arrayOf value?parts |> Array.map partOf
-          Finish = None
-          ErrorName = None
-          Model = None
-          Outcome = turnOutcomeOf value?outcome
-          Observation = None }
+    let private reconciledTurnOf (value: obj) : Result<ReconciledTurn, string> =
+        let parts =
+            arrayOf value?parts
+            |> Array.toList
+            |> List.fold
+                (fun state item ->
+                    match state, partResult item with
+                    | Ok current, Ok part -> Ok(part :: current)
+                    | Error error, _ -> Error error
+                    | _, Error error -> Error error)
+                (Ok [])
+            |> Result.map (List.rev >> List.toArray)
+
+        match parts, turnOutcomeResult value?outcome with
+        | Ok parts, Ok outcome ->
+            Ok
+                { SessionId = SessionId.create (textOf value?sessionId)
+                  PhysicalUserMessageId = PhysicalUserMessageId.create (textOf value?physicalUserMessageId)
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (textOf value?authorityRootUserMessageId)
+                  ProviderRun = ProviderRunIdentity.create (textOf value?providerRun)
+                  Role = None
+                  Directory = None
+                  Parts = parts
+                  Finish = None
+                  ErrorName = None
+                  Model = None
+                  Outcome = outcome
+                  Observation = None }
+        | Error error, _
+        | _, Error error -> Error error
 
     let lifecycleReconcileEvent (projection: obj) (turn: obj) : obj =
-        match StrengthLifecycle.reconcileEvent (projectionOf projection) (reconciledTurnOf turn) with
-        | Some event -> eventView (EventHandle event :> obj)
-        | None -> null
+        match reconciledTurnOf turn with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok turn ->
+            match StrengthLifecycle.reconcileEvent (projectionOf projection) turn with
+            | Some event -> eventView (EventHandle event :> obj)
+            | None -> null
 
     let lifecycleReconcileHandle (projection: obj) (turn: obj) : obj =
-        match StrengthLifecycle.reconcileEvent (projectionOf projection) (reconciledTurnOf turn) with
-        | Some event ->
-            box
-                {| event = (EventHandle event :> obj)
-                   view = eventView (EventHandle event :> obj) |}
-        | None -> box {| event = null; view = null |}
+        match reconciledTurnOf turn with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok turn ->
+            match StrengthLifecycle.reconcileEvent (projectionOf projection) turn with
+            | Some event ->
+                box
+                    {| event = (EventHandle event :> obj)
+                       view = eventView (EventHandle event :> obj) |}
+            | None -> box {| event = null; view = null |}
 
     let private planToJs (plan: StrengthReplayPlan) : obj =
         box
@@ -848,69 +934,85 @@ module StrengthSurface =
 
     let private predictorOf value = unbox<PredictorHandle> value
 
+    let private symbolResult (value: obj) : Result<StrengthPrimarySymbol, string> =
+        match textOf value with
+        | "ReadonlyBatch" -> Ok StrengthPrimarySymbol.ReadonlyBatch
+        | "MutatingOrExecuting" -> Ok StrengthPrimarySymbol.MutatingOrExecuting
+        | "TextOnly" -> Ok StrengthPrimarySymbol.TextOnly
+        | "Other" -> Ok StrengthPrimarySymbol.Other
+        | unknown -> Error(sprintf "unknown primary symbol: %s" unknown)
+
     let predictorFeature (role: string) (recent: string array) (visibleBytes: int) : obj =
-        let symbols =
-            recent
-            |> Array.toList
-            |> List.map (function
-                | "ReadonlyBatch" -> StrengthPrimarySymbol.ReadonlyBatch
-                | "MutatingOrExecuting" -> StrengthPrimarySymbol.MutatingOrExecuting
-                | "TextOnly" -> StrengthPrimarySymbol.TextOnly
-                | _ -> StrengthPrimarySymbol.Other)
+        match roleResult (box role) with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok role ->
+            match recent |> Array.toList |> List.map (symbolResult << box) |> List.fold (fun state item -> Result.bind (fun values -> Result.map (fun value -> value :: values) item) state) (Ok []) with
+            | Error error -> box {| ok = false; error = error |}
+            | Ok symbols ->
+                let feature = StrengthPredictor.feature role (List.rev symbols) visibleBytes
+                box
+                    {| canonicalRole = roleLabel feature.CanonicalRole
+                       recentPrimary =
+                        feature.RecentPrimary
+                        |> List.map (function
+                            | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
+                            | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
+                            | StrengthPrimarySymbol.TextOnly -> "TextOnly"
+                            | StrengthPrimarySymbol.Other -> "Other")
+                        |> List.toArray
+                       visibleByteBucket = feature.VisibleByteBucket |}
 
-        let feature = StrengthPredictor.feature (roleOf (box role)) symbols visibleBytes
-        box
-            {| canonicalRole = roleLabel feature.CanonicalRole
-               recentPrimary =
-                feature.RecentPrimary
-                |> List.map (function
-                    | StrengthPrimarySymbol.ReadonlyBatch -> "ReadonlyBatch"
-                    | StrengthPrimarySymbol.MutatingOrExecuting -> "MutatingOrExecuting"
-                    | StrengthPrimarySymbol.TextOnly -> "TextOnly"
-                    | StrengthPrimarySymbol.Other -> "Other")
-                |> List.toArray
-               visibleByteBucket = feature.VisibleByteBucket |}
-
-    let private featureOf (value: obj) : StrengthFeatureKey =
-        { CanonicalRole = roleOf value?canonicalRole
-          RecentPrimary =
+    let private featureOf (value: obj) : Result<StrengthFeatureKey, string> =
+        match roleResult value?canonicalRole with
+        | Error error -> Error error
+        | Ok role ->
             arrayOf value?recentPrimary
             |> Array.toList
-            |> List.map (function
-                | value when textOf value = "ReadonlyBatch" -> StrengthPrimarySymbol.ReadonlyBatch
-                | value when textOf value = "MutatingOrExecuting" -> StrengthPrimarySymbol.MutatingOrExecuting
-                | value when textOf value = "TextOnly" -> StrengthPrimarySymbol.TextOnly
-                | _ -> StrengthPrimarySymbol.Other)
-          VisibleByteBucket = int value?visibleByteBucket }
+            |> List.map (symbolResult)
+            |> List.fold
+                (fun state item -> Result.bind (fun values -> Result.map (fun value -> value :: values) item) state)
+                (Ok [])
+            |> Result.map (fun recent ->
+                { CanonicalRole = role
+                  RecentPrimary = List.rev recent
+                  VisibleByteBucket = int value?visibleByteBucket })
 
-    let private symbolOf value =
-        match textOf value with
-        | "ReadonlyBatch" -> StrengthPrimarySymbol.ReadonlyBatch
-        | "MutatingOrExecuting" -> StrengthPrimarySymbol.MutatingOrExecuting
-        | "TextOnly" -> StrengthPrimarySymbol.TextOnly
-        | _ -> StrengthPrimarySymbol.Other
+    let predictorObserveFirst (state: obj) (feature: obj) (symbol: string) : obj =
+        match featureOf feature, symbolResult (box symbol) with
+        | Ok feature, Ok symbol ->
+            let handle = predictorOf state
+            let next, readonly = StrengthPredictor.observeFirst feature symbol handle.State
+            handle.State <- next
+            box readonly
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
 
-    let predictorObserveFirst (state: obj) (feature: obj) (symbol: string) : bool =
-        let handle = predictorOf state
-        let next, readonly = StrengthPredictor.observeFirst (featureOf feature) (symbolOf (box symbol)) handle.State
-        handle.State <- next
-        readonly
-
-    let predictorObserveSecond (state: obj) (feature: obj) (symbol: string) : unit =
-        let handle = predictorOf state
-        handle.State <- StrengthPredictor.observeSecond (featureOf feature) (symbolOf (box symbol)) handle.State
+    let predictorObserveSecond (state: obj) (feature: obj) (symbol: string) : obj =
+        match featureOf feature, symbolResult (box symbol) with
+        | Ok feature, Ok symbol ->
+            let handle = predictorOf state
+            handle.State <- StrengthPredictor.observeSecond feature symbol handle.State
+            box ()
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
 
     let predictorBucket (state: obj) (feature: obj) : obj =
-        let bucket = StrengthPredictor.bucket (featureOf feature) (predictorOf state).State
-        box
-            {| opportunities = bucket.Opportunities
-               readonlyFirst = bucket.ReadonlyFirst
-               secondObservations = bucket.SecondObservations
-               readonlySecond = bucket.ReadonlySecond |}
+        match featureOf feature with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok feature ->
+            let bucket = StrengthPredictor.bucket feature (predictorOf state).State
+            box
+                {| opportunities = bucket.Opportunities
+                   readonlyFirst = bucket.ReadonlyFirst
+                   secondObservations = bucket.SecondObservations
+                   readonlySecond = bucket.ReadonlySecond |}
 
     let predictorPredict (state: obj) (feature: obj) : obj =
-        let prediction = StrengthPredictor.predict (featureOf feature) (predictorOf state).State
-        box {| P1 = prediction.P1; P2 = prediction.P2; evidenceCount = prediction.EvidenceCount |}
+        match featureOf feature with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok feature ->
+            let prediction = StrengthPredictor.predict feature (predictorOf state).State
+            box {| P1 = prediction.P1; P2 = prediction.P2; evidenceCount = prediction.EvidenceCount |}
 
     let rolloutEstimate (prediction: obj) (costs: obj) : obj =
         let value =
@@ -982,19 +1084,23 @@ module StrengthSurface =
     let scopeClearSession (scope: obj) (session: string) = (scopeOf scope).ClearSession session
     let scopeDispose (scope: obj) = (scopeOf scope).Dispose()
 
-    let private bindingOf (value: obj) : StrengthReplicaBinding =
-        let role = roleOf value?canonicalRole
-        let requestKind = ProviderRequestKind.StrengthReplica
-        { OwnerSessionId = SessionId.create (textOf value?ownerSessionId)
-          ReplicaSessionId = SessionId.create (textOf value?replicaSessionId)
-          DecisionId = StrengthDecisionId.create (textOf value?decisionId)
-          TargetProviderRun = ProviderRunIdentity.create (textOf value?targetProviderRun)
-          CanonicalRole = role
-          Budget = budgetOf value?budget
-          MaxFrameBytes = int value?maxFrameBytes
-          SemanticDigest = textOf value?semanticDigest
-          LocalizedMirrorMessages = messagesOf value?localizedMirrorMessages
-          ToolCapabilitySet = PromptAuthority.toolCapabilitiesFor role requestKind }
+    let private bindingOf (value: obj) : Result<StrengthReplicaBinding, string> =
+        match roleResult value?canonicalRole, budgetResult value?budget with
+        | Ok role, Ok budget ->
+            let requestKind = ProviderRequestKind.StrengthReplica
+            Ok
+                { OwnerSessionId = SessionId.create (textOf value?ownerSessionId)
+                  ReplicaSessionId = SessionId.create (textOf value?replicaSessionId)
+                  DecisionId = StrengthDecisionId.create (textOf value?decisionId)
+                  TargetProviderRun = ProviderRunIdentity.create (textOf value?targetProviderRun)
+                  CanonicalRole = role
+                  Budget = budget
+                  MaxFrameBytes = int value?maxFrameBytes
+                  SemanticDigest = textOf value?semanticDigest
+                  LocalizedMirrorMessages = messagesOf value?localizedMirrorMessages
+                  ToolCapabilitySet = PromptAuthority.toolCapabilitiesFor role requestKind }
+        | Error error, _
+        | _, Error error -> Error error
 
     let runtimeCreate () : obj = RuntimeHandle(StrengthRuntime()) :> obj
     let private runtimeOf value = unbox<RuntimeHandle> value |> fun handle -> handle.Value
@@ -1022,16 +1128,19 @@ module StrengthSurface =
                localizedMirrorMessages = localizedMirrorMessages |}
 
     let runtimeRegister (runtime: obj) (binding: obj) : obj =
-        match (runtimeOf runtime).Register(bindingOf binding) with
-        | Ok() -> box {| ok = true |}
-        | Error error ->
-            let name =
-                match error with
-                | StrengthRuntimeRegisterError.OwnerAlreadyHasReplica _ -> "OwnerAlreadyHasReplica"
-                | StrengthRuntimeRegisterError.ReplicaAlreadyBound _ -> "ReplicaAlreadyBound"
-                | StrengthRuntimeRegisterError.RoleIneligible _ -> "RoleIneligible"
-                | StrengthRuntimeRegisterError.EmptyBudget -> "EmptyBudget"
-            box {| ok = false; error = name |}
+        match bindingOf binding with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok binding ->
+            match (runtimeOf runtime).Register(binding) with
+            | Ok() -> box {| ok = true |}
+            | Error error ->
+                let name =
+                    match error with
+                    | StrengthRuntimeRegisterError.OwnerAlreadyHasReplica _ -> "OwnerAlreadyHasReplica"
+                    | StrengthRuntimeRegisterError.ReplicaAlreadyBound _ -> "ReplicaAlreadyBound"
+                    | StrengthRuntimeRegisterError.RoleIneligible _ -> "RoleIneligible"
+                    | StrengthRuntimeRegisterError.EmptyBudget -> "EmptyBudget"
+                box {| ok = false; error = name |}
 
     let private bindingToJs (binding: StrengthReplicaBinding) =
         box

@@ -197,6 +197,14 @@ module CompressionSurface =
         | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
         | _ -> None
 
+    let private requestKindResult value : Result<ProviderRequestKind, string> =
+        if isNullish value then
+            Ok ProviderRequestKind.WorkMain
+        else
+            match requestKindOf value with
+            | Some requestKind -> Ok requestKind
+            | None -> Error(sprintf "unknown request kind: %s" (text value))
+
     let private armingOf (value: string) =
         if value = "ArmedByAdvance" then SlotArming.ArmedByAdvance else SlotArming.NotArmed
 
@@ -227,12 +235,13 @@ module CompressionSurface =
     let mayRecover (arming: string) (offset: int) (hasMaterial: bool) : bool =
         RecoverySlot.mayRecover (armingOf arming) (offsetOf offset) hasMaterial
 
-    let private outcomeOf (value: obj) : AttemptOutcome =
+    let private outcomeResult (value: obj) : Result<AttemptOutcome, string> =
         match text value with
-        | "CompletedInvalid" -> AttemptOutcome.CompletedInvalid
-        | "Failed" -> AttemptOutcome.Failed
-        | "Aborted" -> AttemptOutcome.Aborted
-        | _ -> AttemptOutcome.Completed
+        | "Completed" -> Ok AttemptOutcome.Completed
+        | "CompletedInvalid" -> Ok AttemptOutcome.CompletedInvalid
+        | "Failed" -> Ok AttemptOutcome.Failed
+        | "Aborted" -> Ok AttemptOutcome.Aborted
+        | unknown -> Error(sprintf "unknown attempt outcome: %s" unknown)
 
     let private decisionName (decision: SlotDecision) : string =
         match decision with
@@ -257,12 +266,18 @@ module CompressionSurface =
                 | SlotDecision.CommitMain clears -> clears
                 | _ -> false |}
 
-    let onSquash (outcome: string) : obj = RecoverySlot.onSquashOutcome (outcomeOf outcome) |> decisionToJs
+    let onSquash (outcome: string) : obj =
+        match outcomeResult (box outcome) with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok outcome -> RecoverySlot.onSquashOutcome outcome |> decisionToJs
 
     let onMain (value: obj) : obj =
-        let kind = requestKindOf value?kind |> Option.defaultValue ProviderRequestKind.WorkMain
-        let consumed = not (isNullish value?aabbConsumed) && unbox<bool> value?aabbConsumed
-        RecoverySlot.onMainOutcome kind consumed (outcomeOf value?outcome) |> decisionToJs
+        match requestKindResult value?kind, outcomeResult value?outcome with
+        | Ok kind, Ok outcome ->
+            let consumed = not (isNullish value?aabbConsumed) && unbox<bool> value?aabbConsumed
+            RecoverySlot.onMainOutcome kind consumed outcome |> decisionToJs
+        | Error error, _
+        | _, Error error -> box {| ok = false; error = error |}
 
     let requestKindLabels : string array =
         [| ProviderRequestKind.WorkMain
@@ -293,42 +308,59 @@ module CompressionSurface =
     let cursor = box {| isRecoverySlot = (fun offset -> offset % 2 <> 0) |}
 
 
-    let private roleOf value = Roles.tryParseRole (text value) |> Option.defaultValue Role.Coder
-    let private tierOf value = Roles.tryParseTier (text value) |> Option.defaultValue AgentTier.Fast
+    let private roleResult value : Result<Role, string> =
+        if isNullish value then
+            Ok Role.Coder
+        else
+            match Roles.tryParseRole (text value) with
+            | Some role -> Ok role
+            | None -> Error(sprintf "unknown role: %s" (text value))
+
+    let private tierResult value : Result<AgentTier, string> =
+        if isNullish value then
+            Ok AgentTier.Fast
+        else
+            match Roles.tryParseTier (text value) with
+            | Some tier -> Ok tier
+            | None -> Error(sprintf "unknown tier: %s" (text value))
 
     let private attemptProbeOf (value: obj) : PrefixProbe = probeOfJs value
 
-    let private attemptPlanCore (value: obj) : AttemptPlan =
-        let role = roleOf value?role
-        let tier = tierOf value?tier
-        let requestKind = requestKindOf value?kind |> Option.defaultValue ProviderRequestKind.WorkMain
-        let peerTier = if tier = AgentTier.Fast then AgentTier.Deep else AgentTier.Fast
+    let private attemptPlanCore (value: obj) : Result<AttemptPlan, string> =
+        match roleResult value?role, tierResult value?tier, requestKindResult value?kind with
+        | Ok role, Ok tier, Ok requestKind ->
+            let peerTier = if tier = AgentTier.Fast then AgentTier.Deep else AgentTier.Fast
 
-        let authority: PromptAuthority.AuthorityExecutionProfile =
-            { SessionId = SessionId.create "surface-session"
-              LogicalRunId = LogicalRunId.create "surface-run"
-              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "surface-root"
-              AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
-              SelectedAgent = Roles.managedAgentName tier role
-              PeerAgent = Roles.managedAgentName peerTier role
-              CanonicalRole = role
-              SelectedTier = tier }
+            let authority: PromptAuthority.AuthorityExecutionProfile =
+                { SessionId = SessionId.create "surface-session"
+                  LogicalRunId = LogicalRunId.create "surface-run"
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "surface-root"
+                  AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
+                  SelectedAgent = Roles.managedAgentName tier role
+                  PeerAgent = Roles.managedAgentName peerTier role
+                  CanonicalRole = role
+                  SelectedTier = tier }
 
-        let selectProbe () =
-            if not (isNullish value?probe) then
-                Ok(attemptProbeOf value?probe)
-            else
-                Error(reasonOf value?noCandidateReason)
+            let selectProbe () =
+                if not (isNullish value?probe) then
+                    Ok(attemptProbeOf value?probe)
+                else
+                    Error(reasonOf value?noCandidateReason)
 
-        AttemptPlanner.plan
-            authority
-            (cursorOfJs value?cursor)
-            (PhysicalUserMessageId.create "surface-user")
-            (ProviderRunIdentity.create "surface-provider-run")
-            (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
-            requestKind
-            (not (isNullish value?mayRecover) && unbox<bool> value?mayRecover)
-            selectProbe
+            Ok(
+                AttemptPlanner.plan
+                    authority
+                    (cursorOfJs value?cursor)
+                    (PhysicalUserMessageId.create "surface-user")
+                    (ProviderRunIdentity.create "surface-provider-run")
+                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
+                    requestKind
+                    (not (isNullish value?mayRecover) && unbox<bool> value?mayRecover)
+                    selectProbe
+            )
+        | Error error, _, _
+        | _, Error error, _
+        | _, _, Error error -> Error error
 
     let private attemptPlanView (plan: AttemptPlan) : obj =
         let choice, probeId =
@@ -345,22 +377,27 @@ module CompressionSurface =
     /// Build the production AttemptPlan from plain request labels. The caller
     /// supplies either a probe or a named no-candidate result; the planner itself
     /// still owns the choice and defers probe selection until it is allowed.
-    let attemptPlan (value: obj) : obj = attemptPlanCore value |> attemptPlanView
+    let attemptPlan (value: obj) : obj =
+        match attemptPlanCore value with
+        | Ok plan -> attemptPlanView plan
+        | Error error -> box {| ok = false; error = error |}
 
     /// JSON/opaque owner API for semantic tests. `handle` is deliberately opaque:
     /// only `promotableProbeId` can consume it, while the profile observations stay
     /// plain JSON.
     let private attemptPlanWithHandle (value: obj) : obj =
-        let plan = attemptPlanCore value
-        let view = attemptPlanView plan
-        let viewObject = unbox<obj> view
+        match attemptPlanCore value with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok plan ->
+            let view = attemptPlanView plan
+            let viewObject = unbox<obj> view
 
-        box
-            {| choice = viewObject?choice
-               probeId = viewObject?probeId
-               noProbeReason = viewObject?noProbeReason
-               effectiveAgent = viewObject?effectiveAgent
-               handle = box (AttemptPlanHandle plan) |}
+            box
+                {| choice = viewObject?choice
+                   probeId = viewObject?probeId
+                   noProbeReason = viewObject?noProbeReason
+                   effectiveAgent = viewObject?effectiveAgent
+                   handle = box (AttemptPlanHandle plan) |}
 
     let private promotableProbeId (value: obj) (outcome: string) : obj =
         let handleValue = value?handle
@@ -370,9 +407,12 @@ module CompressionSurface =
         else
             let handle = unbox<AttemptPlanHandle> handleValue
 
-            match AttemptPlanner.promotableProbe handle.Value (outcomeOf outcome) with
-            | None -> null
-            | Some probe -> box probe.ProbeId
+            match outcomeResult (box outcome) with
+            | Error _ -> null
+            | Ok outcome ->
+                match AttemptPlanner.promotableProbe handle.Value outcome with
+                | None -> null
+                | Some probe -> box probe.ProbeId
 
     let attemptPlanner =
         box

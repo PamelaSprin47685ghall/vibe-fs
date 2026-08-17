@@ -158,18 +158,19 @@ module AgentPairCursor =
 
     /// FALLBACK-006's table as a function: which side attempt N lands on,
     /// counting attempts from 0. Unbounded by construction.
+    let private sideAtIndex index : ModelSide =
+        match index % 4 with
+        | 0 -> FallbackOffset.Fork0
+        | 1 -> FallbackOffset.Fork1
+        | 2 -> FallbackOffset.Fork2
+        | _ -> FallbackOffset.Fork3
+        |> side
+
     let sideSequence (count: int) : ModelSide list =
         if count < 0 then
             invalidOp "count must be non-negative"
         else
-            [ 0 .. count - 1 ]
-            |> List.map (fun index ->
-                match index % 4 with
-                | 0 -> FallbackOffset.Fork0
-                | 1 -> FallbackOffset.Fork1
-                | 2 -> FallbackOffset.Fork2
-                | _ -> FallbackOffset.Fork3
-                |> side)
+            [ 0 .. count - 1 ] |> List.map sideAtIndex
 
     let atOffset (offset: FallbackOffset) : FallbackCursor =
         { Offset = offset

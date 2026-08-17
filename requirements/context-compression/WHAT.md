@@ -182,7 +182,7 @@ cutoff 证明；本命题拥有「什么算新候选」的判定。
 | 动作 | 成功 | 失败 |
 |---|---|---|
 | X probe | 提交 epoch（EvidenceKind=Probe）+ SealRoot 继承 | 无事实 |
-| Y squash | `BlogSquashCommitted`，FrameEpoch+1 | 不改 frames/coverage |
+| Y squash | `BlogObservationsSquashed`，FrameEpoch+1 | 不改 frames/coverage |
 
 squash 选择范围/级联：前半有效 frames；不混父 LWR（COMPANION-006）。squash 成功后
 被永久保留；同一 armed slot 内 squash 与 main 是两次物理请求但至多一次
@@ -246,7 +246,7 @@ provenance（例如 DryRun 可见 child 的 `replica_session_id`），前提是�
 ## CONTEXT-COMPRESSION-015：busy/失败不推进 coverage
 
 **规范**：Blogger busy：不打断、不排队、**不推进** RecordCoverage；失败/空/XML-only 不推进。
-仅 `BlogEntryCommitted` 原子推进 frame 可见性与 RecordCoverage（COMPANION-008 / PERSIST-010）。
+仅 `BlogObservationCommitted` 原子推进 frame 可见性与 RecordCoverage（COMPANION-008 / PERSIST-010）。
 
 **含义/动机**：coverage 是「Y 真实消化到哪」；没消化就没有新覆盖。原子推进保证
 frame 与 coverage 永不半套。

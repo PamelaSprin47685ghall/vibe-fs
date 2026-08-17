@@ -95,14 +95,16 @@ module JsFailure =
         | JsFailure.UnknownMember -> "UNKNOWN_MEMBER"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
+    let private reasonWithMessage fallback prefix message =
+        if System.String.IsNullOrEmpty message then
+            fallback
+        else
+            prefix + message
+
     let reason (failure: JsFailure) : string =
         match failure with
         | JsFailure.InvalidProgram -> "program source is invalid JavaScript"
-        | JsFailure.ProgramFailed message ->
-            if System.String.IsNullOrEmpty message then
-                "program threw"
-            else
-                "program threw: " + message
+        | JsFailure.ProgramFailed message -> reasonWithMessage "program threw" "program threw: " message
         | JsFailure.ProgramTimeout -> "program exceeded its deadline"
         | JsFailure.ProgramResourceLimit -> "program exceeded a resource bound"
         | JsFailure.PermissionDenied capability -> "capability not present in this attempt: " + capability
@@ -113,11 +115,7 @@ module JsFailure =
         | JsFailure.InvalidUtf8 path -> "file is not strict UTF-8: " + path
         | JsFailure.AnchorEmptyContent -> "anchor content is empty"
         | JsFailure.AnchorInvalidPattern -> "anchor RegExp is invalid"
-        | JsFailure.AnchorNotFound detail ->
-            if System.String.IsNullOrEmpty detail then
-                "anchor did not match"
-            else
-                detail
+        | JsFailure.AnchorNotFound detail -> reasonWithMessage "anchor did not match" "" detail
         | JsFailure.AnchorNotUnique -> "anchor matches multiple locations and no occurrence was declared"
         | JsFailure.AnchorCrossFile -> "anchor declaration crosses files"
         | JsFailure.DuplicateMutationTarget path -> "the same path was mutated twice in one program: " + path

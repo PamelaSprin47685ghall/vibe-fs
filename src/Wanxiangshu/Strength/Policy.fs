@@ -126,6 +126,14 @@ module StrengthPolicy =
         let rate = max 0 (min 10000 rateBasisPoints)
         bucket >= 0 && bucket < rate
 
+    let private speculationDecision k1Worthwhile k2Worthwhile estimate =
+        if k2Worthwhile && k1Worthwhile then
+            StrengthDecision.Speculate(StrengthBudget.K2, estimate)
+        elif k1Worthwhile then
+            StrengthDecision.Speculate(StrengthBudget.K1, estimate)
+        else
+            StrengthDecision.Skip "non-positive-value"
+
     /// Pure Evidence → Decision. `shadow=true` computes upstream prediction/value
     /// but never intervenes. `control=true` is checked only after eligibility so
     /// ineligible traffic never masquerades as a holdout observation.
@@ -149,12 +157,7 @@ module StrengthPolicy =
                 && config.K2Margin > config.K1Margin
                 && estimate.V2 > estimate.V1 + config.K2Margin
 
-            if k2Worthwhile && k1Worthwhile then
-                StrengthDecision.Speculate(StrengthBudget.K2, estimate)
-            elif k1Worthwhile then
-                StrengthDecision.Speculate(StrengthBudget.K1, estimate)
-            else
-                StrengthDecision.Skip "non-positive-value"
+            speculationDecision k1Worthwhile k2Worthwhile estimate
 
     let budgetOf (decision: StrengthDecision) : StrengthBudget =
         match decision with

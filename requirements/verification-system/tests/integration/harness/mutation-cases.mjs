@@ -62,7 +62,7 @@ const compiled = (source) => {
 /** A runtime over a source that must load, with `lane` bound. */
 const runtimeOf = (source, lane = 'fast-coder') => {
   const runtime = new ScenarioRuntime(compiled(source));
-  runtime['bind'](lane, SESSION);
+  runtime.bindAlias(lane, SESSION);
   return runtime;
 };
 

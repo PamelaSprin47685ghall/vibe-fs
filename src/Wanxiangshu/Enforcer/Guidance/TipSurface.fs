@@ -7,7 +7,6 @@ open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 
 /// Opaque JS owner for Main tip-guidance delivery. Journal handles and typed
@@ -144,8 +143,8 @@ module TipSurface =
             {| tipName = guidance.TipName
                presentation =
                    match guidance.Presentation with
-                   | TipPresentation.Full -> "Full"
-                   | TipPresentation.IdentityOnly -> "IdentityOnly"
+                   | Wanxiangshu.OpenCode.Host.TipPresentation.Full -> "Full"
+                   | Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly -> "IdentityOnly"
                text = guidance.Text |}
 
     /// Resolve one Main/Blogger session to the localized Full or Identity

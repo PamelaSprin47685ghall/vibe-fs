@@ -141,6 +141,9 @@ module MagicTodoFacts =
 
     /// Todo-aware PrefixRebaseCommitted payload with EvidenceKind.
     /// Fold routes it into the existing PrefixEpochProjection SSOT.
+    /// DSL-state-combination: domain — optional life/evidence/provider facets
+    /// describe one durable prefix rebase fact; they are proof metadata, not a
+    /// stored continuation stage.
     type PrefixRebaseCommittedV2 =
         {
             SessionId: SessionId

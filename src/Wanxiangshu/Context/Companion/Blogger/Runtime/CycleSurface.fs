@@ -37,7 +37,9 @@ module BloggerCycleSurface =
                requestBindings = state.ProviderRunByRequestId.Count |}
 
     let scenario (actions: obj array) : obj =
+        // DSL-MUTABLE: algorithm-scratch — scenario projection accumulator
         let mutable state = BloggerCycleProjection.empty
+        // DSL-MUTABLE: algorithm-scratch — first scenario rejection
         let mutable error: string option = None
 
         for action in actions do

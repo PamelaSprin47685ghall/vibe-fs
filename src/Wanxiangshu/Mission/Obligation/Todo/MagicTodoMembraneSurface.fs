@@ -113,10 +113,16 @@ module MagicTodoMembraneSurface =
         | MagicTodoMembrane.AcceptRejection.OutputDigestMismatch -> box {| code = "OutputDigestMismatch" |}
         | MagicTodoMembrane.AcceptRejection.JournalAppend reason -> box {| code = "JournalAppend"; detail = reason |}
 
-    let private physicalOf value =
+    let private physicalResult value : Result<PhysicalSuccessEvidence, string> =
         match text value with
-        | "RecoveredCompletedToolPart" -> PhysicalSuccessEvidence.RecoveredCompletedToolPart
-        | _ -> PhysicalSuccessEvidence.LiveAfterSuccess
+        | "RecoveredCompletedToolPart" -> Ok PhysicalSuccessEvidence.RecoveredCompletedToolPart
+        | "LiveAfterSuccess" -> Ok PhysicalSuccessEvidence.LiveAfterSuccess
+        | unknown -> Error(sprintf "unknown physical success evidence: %s" unknown)
+
+    let private physicalOf value =
+        match physicalResult value with
+        | Ok evidence -> evidence
+        | Error error -> invalidArg "physicalEvidence" error
 
     let openLife (handle: JournalHandle) (sessionId: string) (lifeId: string) : Task<obj> =
         ObligationJournalSurface.appendManagerLifecycle
@@ -175,27 +181,30 @@ module MagicTodoMembraneSurface =
         (observedInputDigest: string)
         (observedOutputDigest: string)
         : Task<obj> =
-        task {
-            let! result =
-                MagicTodoMembrane.accept
-                    handle.Journal
-                    prepared.Bridge
-                    (physicalOf physicalEvidence)
-                    observedInputDigest
-                    observedOutputDigest
+        match physicalResult (box physicalEvidence) with
+        | Error error -> Task.FromResult(box {| ok = false; error = box {| code = "InvalidPhysicalEvidence"; detail = error |} |})
+        | Ok physicalEvidence ->
+            task {
+                let! result =
+                    MagicTodoMembrane.accept
+                        handle.Journal
+                        prepared.Bridge
+                        physicalEvidence
+                        observedInputDigest
+                        observedOutputDigest
 
-            return
-                match result with
-                | Error rejection -> box {| ok = false; error = acceptRejectionView rejection |}
-                | Ok outcome ->
-                    box
-                        {| ok = true
-                           value =
-                            box
-                                {| enrichedResult = outcome.EnrichedResult
-                                   needsDedicatedEnlist = outcome.NeedsDedicatedEnlist
-                                   needsEnsureReview = outcome.NeedsEnsureReview |} |}
-        }
+                return
+                    match result with
+                    | Error rejection -> box {| ok = false; error = acceptRejectionView rejection |}
+                    | Ok outcome ->
+                        box
+                            {| ok = true
+                               value =
+                                box
+                                    {| enrichedResult = outcome.EnrichedResult
+                                       needsDedicatedEnlist = outcome.NeedsDedicatedEnlist
+                                       needsEnsureReview = outcome.NeedsEnsureReview |} |}
+            }
 
     let appendFact
         (handle: JournalHandle)

@@ -130,19 +130,22 @@ module MagicTodo =
             sha256 (String.concat "|" [ ManagerLifeId.value lifeId; "dedicated-todo-reviewer" ])
         )
 
+    let private escapedJsonCharacter character =
+        match character with
+        | '"' -> "\\\""
+        | '\\' -> "\\\\"
+        | '\n' -> "\\n"
+        | '\r' -> "\\r"
+        | '\t' -> "\\t"
+        | _ when int character < 0x20 -> sprintf "\\u%04x" (int character)
+        | _ -> string character
+
     let private jsonString (value: string) =
         let builder = StringBuilder(value.Length + 8)
         builder.Append('"') |> ignore
 
         for character in value do
-            match character with
-            | '"' -> builder.Append("\\\"") |> ignore
-            | '\\' -> builder.Append("\\\\") |> ignore
-            | '\n' -> builder.Append("\\n") |> ignore
-            | '\r' -> builder.Append("\\r") |> ignore
-            | '\t' -> builder.Append("\\t") |> ignore
-            | _ when int character < 0x20 -> builder.Append(sprintf "\\u%04x" (int character)) |> ignore
-            | _ -> builder.Append(character) |> ignore
+            builder.Append(escapedJsonCharacter character) |> ignore
 
         builder.Append('"') |> ignore
         builder.ToString()
@@ -242,6 +245,15 @@ module MagicTodo =
         else
             minimum
 
+    let private committedOpeningFloor
+        (openingCursor: XTraceCursor)
+        (t1CallCursor: XTraceCursor option)
+        (t1ToolCallId: ToolCallId option)
+        (parts: TracePartAnchor list) =
+        match t1CallCursor, t1ToolCallId with
+        | Some callCursor, Some callId -> Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
+        | _ -> Some(workRecordStart openingCursor)
+
     /// Pre-T1 uses the dynamic XTrace head; post-T1 uses the constitutive T1 boundary.
     /// Accepted planning checkpoints do not close Opening.
     let effectiveOpeningFloor
@@ -258,9 +270,7 @@ module MagicTodo =
         elif not planCommitted then
             Some { Sequence = xTraceHeadSequence }
         else
-            match t1CallCursor, t1ToolCallId with
-            | Some callCursor, Some callId -> Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
-            | _ -> Some(workRecordStart openingCursor)
+            committedOpeningFloor openingCursor t1CallCursor t1ToolCallId parts
 
     let bloggerEffectiveStart (recordCoverage: RecordCoverage) (workRecordStartCursor: XTraceCursor) : XTraceCursor =
         if recordCoverage.IngestedThrough.Sequence > workRecordStartCursor.Sequence then

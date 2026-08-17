@@ -54,52 +54,64 @@ module BloggerCycleProjection =
 
     let tryReceipt (run: ProviderRunIdentity) (state: BloggerCycleProjectionState) = Map.tryFind run state.ByProviderRun
 
+    let private materializeExisting
+        (openReq: OpenBloggerRequest)
+        (state: BloggerCycleProjectionState)
+        (existing: OpenBloggerRequest)
+        : Result<BloggerCycleProjectionState, string> =
+        // Same semantic context. Allow PromptKey fill-in after physical send
+        // (materialize is pre-send with None; send returns PromptKey).
+        // Never clear a bound key, never replace one key with another.
+        match existing.PromptKey, openReq.PromptKey with
+        | None, Some _ ->
+            Ok
+                { state with
+                    OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId }
+        | Some bound, Some next when bound <> next ->
+            Error(
+                sprintf
+                    "BloggerRequestMaterialized request %s already bound to a different PromptKey"
+                    (BloggerRequestId.value openReq.RequestId)
+            )
+        | _ -> Ok state
+
+    let private materializeNew
+        (openReq: OpenBloggerRequest)
+        (state: BloggerCycleProjectionState)
+        : Result<BloggerCycleProjectionState, string> =
+        match Map.tryFind openReq.BloggerSessionId state.OpenByBlogger with
+        | Some existing when existing = openReq.RequestId ->
+            // OpenByBlogger already points here but OpenByRequestId missing — heal.
+            Ok
+                { state with
+                    OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId }
+        | Some existing ->
+            Error(
+                sprintf
+                    "Blogger session %s already has open request %s"
+                    (SessionId.value openReq.BloggerSessionId)
+                    (BloggerRequestId.value existing)
+            )
+        | None ->
+            Ok
+                { state with
+                    OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId
+                    OpenByBlogger = Map.add openReq.BloggerSessionId openReq.RequestId state.OpenByBlogger }
+
     let materialize
         (openReq: OpenBloggerRequest)
         (state: BloggerCycleProjectionState)
         : Result<BloggerCycleProjectionState, string> =
         match Map.tryFind openReq.RequestId state.OpenByRequestId with
         | Some existing when existing.ContextDigest = openReq.ContextDigest ->
-            // Same semantic context. Allow PromptKey fill-in after physical send
-            // (materialize is pre-send with None; send returns PromptKey).
-            // Never clear a bound key, never replace one key with another.
-            match existing.PromptKey, openReq.PromptKey with
-            | None, Some _ ->
-                Ok
-                    { state with
-                        OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId }
-            | Some bound, Some next when bound <> next ->
-                Error(
-                    sprintf
-                        "BloggerRequestMaterialized request %s already bound to a different PromptKey"
-                        (BloggerRequestId.value openReq.RequestId)
-                )
-            | _ -> Ok state
+            materializeExisting openReq state existing
         | Some _ ->
             Error(
                 sprintf
                     "BloggerRequestMaterialized already open for request %s with different context"
                     (BloggerRequestId.value openReq.RequestId)
             )
-        | None ->
-            match Map.tryFind openReq.BloggerSessionId state.OpenByBlogger with
-            | Some existing when existing = openReq.RequestId ->
-                // OpenByBlogger already points here but OpenByRequestId missing — heal.
-                Ok
-                    { state with
-                        OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId }
-            | Some existing ->
-                Error(
-                    sprintf
-                        "Blogger session %s already has open request %s"
-                        (SessionId.value openReq.BloggerSessionId)
-                        (BloggerRequestId.value existing)
-                )
-            | None ->
-                Ok
-                    { state with
-                        OpenByRequestId = Map.add openReq.RequestId openReq state.OpenByRequestId
-                        OpenByBlogger = Map.add openReq.BloggerSessionId openReq.RequestId state.OpenByBlogger }
+        | None -> materializeNew openReq state
 
     let abandon
         (requestId: BloggerRequestId)
@@ -116,6 +128,33 @@ module BloggerCycleProjection =
         { state with
             OpenByRequestId = withoutRequest
             OpenByBlogger = withoutBlogger }
+
+    let private recordNewReceipt
+        (receipt: BloggerCycleReceipt)
+        (state: BloggerCycleProjectionState)
+        : Result<BloggerCycleProjectionState, string> =
+        match Map.tryFind receipt.RequestId state.ProviderRunByRequestId with
+        | Some bound when bound <> receipt.ProviderRun ->
+            Error(
+                sprintf
+                    "RequestId %s already bound to ProviderRun %s; cannot rebind to %s"
+                    (BloggerRequestId.value receipt.RequestId)
+                    (ProviderRunIdentity.value bound)
+                    (ProviderRunIdentity.value receipt.ProviderRun)
+            )
+        | _ ->
+            let withoutRequest = Map.remove receipt.RequestId state.OpenByRequestId
+
+            let withoutBlogger =
+                state.OpenByBlogger |> Map.filter (fun _ rid -> rid <> receipt.RequestId)
+
+            Ok
+                { state with
+                    ByProviderRun = Map.add receipt.ProviderRun receipt state.ByProviderRun
+                    ProviderRunByRequestId =
+                        Map.add receipt.RequestId receipt.ProviderRun state.ProviderRunByRequestId
+                    OpenByRequestId = withoutRequest
+                    OpenByBlogger = withoutBlogger }
 
     /// Record Entry or Squash receipt. Rejects:
     /// - same ProviderRun twice (any kind)
@@ -136,26 +175,4 @@ module BloggerCycleProjection =
                     receipt.Kind
                     (BloggerRequestId.value receipt.RequestId)
             )
-        | None ->
-            match Map.tryFind receipt.RequestId state.ProviderRunByRequestId with
-            | Some bound when bound <> receipt.ProviderRun ->
-                Error(
-                    sprintf
-                        "RequestId %s already bound to ProviderRun %s; cannot rebind to %s"
-                        (BloggerRequestId.value receipt.RequestId)
-                        (ProviderRunIdentity.value bound)
-                        (ProviderRunIdentity.value receipt.ProviderRun)
-                )
-            | _ ->
-                let withoutRequest = Map.remove receipt.RequestId state.OpenByRequestId
-
-                let withoutBlogger =
-                    state.OpenByBlogger |> Map.filter (fun _ rid -> rid <> receipt.RequestId)
-
-                Ok
-                    { state with
-                        ByProviderRun = Map.add receipt.ProviderRun receipt state.ByProviderRun
-                        ProviderRunByRequestId =
-                            Map.add receipt.RequestId receipt.ProviderRun state.ProviderRunByRequestId
-                        OpenByRequestId = withoutRequest
-                        OpenByBlogger = withoutBlogger }
+        | None -> recordNewReceipt receipt state

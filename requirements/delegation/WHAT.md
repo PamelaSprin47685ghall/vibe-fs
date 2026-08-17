@@ -103,7 +103,9 @@ scheduler 到达时序猜批次边界；Host 的不同观察面若暂时只暴�
 
 含义/动机：批次边界是 Host tool-call 集合这一语义事实，不是某个观察面的到达竞态。
 
-证据：`requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host_order`、`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`）；`requirements/delegation/tests/sync-delegate-tools.test.mjs`（`DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispatch`）；唯一 Long Stroke 的 G2 simultaneous Inspector canary 交叉证明真实 Host 边界。
+JS owner surface 对 unknown/空白 role 返回 `{ ok: false, error }`（或既有 bool/null 错误形状），对 unknown turn outcome 返回 `false`；不得将 malformed input 选择成 Inspector 或 TurnCompleted。
+
+证据：`requirements/delegation/tests/sync-delegate-runtime.test.mjs`（`DELEG_008_provider_batch_observation_deduplicates_parts_and_preserves_host_order`、`EXEC_026_sync_delegate_provider_batch_coalesces_without_race_and_returns_once`、`SYNC_RUNTIME_unknown_role_and_outcome_fail_closed_at_every_entry`）；`requirements/delegation/tests/sync-delegate-tools.test.mjs`（`DELEG_008_inspect_batch_waits_for_complete_host_tool_call_set_before_dispatch`）；唯一 Long Stroke 的 G2 simultaneous Inspector canary 交叉证明真实 Host 边界。
 
 ## DELEG-009：serialization key = immediate caller ReuseScope；同 key 至多一个 active batch
 
@@ -155,6 +157,7 @@ batch 内 exactly one canonical caller（provider 顺序第一项）接收 bound
 Join 只消费当前 owner 可用 completion；批次有界（`MaxJoinBatch`）、成员稳定排序、逐项 CAS 消费；
 禁止「谁先完成谁先入 wire」的非确定序（EXEC-004/018）。中断前先 drain 已可用 completion。
 agent 完成项为 entry-local WorkRecord（`includeOpening=false`），禁止字段式 `work_record` DTO。
+JS join 边界只接受 canonical agent `role`、非空 `runId` 与已知 `kind`；任一缺失或未知均拒绝该批次并返回空 wire，不得把 malformed observation 合成为成功 completion。
 
 含义/动机：并发完成必须收敛成确定性 wire，否则父流程无法稳定判断「谁回来了、带回了什么」。
 

@@ -8,6 +8,7 @@ open Wanxiangshu.Persistence.Journal
 /// JS-native boundary for the host-owned terminal event port.  The port stays
 /// opaque; only session ids, outcome labels, and terminal text cross the edge.
 module EventsSurface =
+    // DSL-MUTABLE: resource — synthetic provider-run identity counter for malformed host input
     let mutable private noRun = 0
     let create () : obj = box (Events.HostEventPort())
 
@@ -61,18 +62,23 @@ module EventsSurface =
         (formalText: string)
         (roleLabel: string)
         : bool =
-        let role = Roles.tryParseRole roleLabel |> Option.defaultValue Role.Coder
-        let result =
-            { SessionId = SessionId.create sessionId
-              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sessionId + "-root")
-              ProviderRun = ProviderRunIdentity.create (sessionId + "-completed")
-              Role = role
-              Directory = None
-              TerminalText = terminalText
-              TurnFormalText = formalText }
+        if String.IsNullOrWhiteSpace roleLabel then
+            false
+        else
+            match Roles.tryParseRole roleLabel with
+            | None -> false
+            | Some role ->
+                let result =
+                    { SessionId = SessionId.create sessionId
+                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sessionId + "-root")
+                      ProviderRun = ProviderRunIdentity.create (sessionId + "-completed")
+                      Role = role
+                      Directory = None
+                      TerminalText = terminalText
+                      TurnFormalText = formalText }
 
-        let typed = port :?> IEventObservationPort
-        typed.NotifyTerminal (SessionId.create sessionId) (TerminalOutcome.Completed result)
+                let typed = port :?> IEventObservationPort
+                typed.NotifyTerminal (SessionId.create sessionId) (TerminalOutcome.Completed result)
 
     let acquireSharedForWorkspace (workspace: string) : obj =
         match SharedTerminalBus.tryAcquireForWorkspace (Some workspace) with

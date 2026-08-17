@@ -119,6 +119,33 @@ module ChronicleTool =
     let private unknownTip language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.UnknownTip ] []
 
+    let private abortSessionIfPresent (runtime: ToolRuntimeScope) sessionId : System.Threading.Tasks.Task =
+        task {
+            if not (String.IsNullOrWhiteSpace sessionId) then
+                let! _ = runtime.Sessions.AbortSession(SessionId.create sessionId)
+                ()
+        }
+
+    let private noLiveCycleResult runtime (ctx: HostToolContext) : System.Threading.Tasks.Task<string> =
+        task {
+            Diagnostic.emit "chronicle-execute" [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
+            do! abortSessionIfPresent runtime ctx.SessionId
+            return raise (InvalidOperationException(NoLiveCycleError))
+        }
+
+    let private resultForTip language tipRaw =
+        if String.IsNullOrWhiteSpace tipRaw then
+            unknownTip language
+        else
+            EnforcerCatalog.tryFindByField tipRaw (enforcerRules ())
+            |> Option.map (fun _ -> remembered language)
+            |> Option.defaultValue (unknownTip language)
+
+    let private executeValidEntry language (args: HostToolArguments) : string =
+        match tryCanonicalText (args.Text "entry") with
+        | Error _ -> nothingToRemember language
+        | Ok _ -> resultForTip language (args.Text "tip")
+
     let spec
         (factory: HostToolFactory)
         (runtime: ToolRuntimeScope)
@@ -139,28 +166,12 @@ module ChronicleTool =
             [ "entry", ToolHostCodec.stringSchema factory
               "tip", ToolHostCodec.enumSchema fields factory ]
           Execute =
-            fun args ctx ->
-                task {
-                    let language = lang ctx
+                fun args ctx ->
+                    task {
+                        let language = lang ctx
 
-                    if not (hasLiveCycle parkedHost ctx.SessionId) then
-                        Diagnostic.emit "chronicle-execute" [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
-
-                        if not (String.IsNullOrWhiteSpace ctx.SessionId) then
-                            let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
-                            ()
-
-                        return raise (InvalidOperationException(NoLiveCycleError))
-                    else
-                        match tryCanonicalText (args.Text "entry") with
-                        | Error _ -> return nothingToRemember language
-                        | Ok _ ->
-                            let tipRaw = args.Text "tip"
-
-                            if String.IsNullOrWhiteSpace tipRaw then
-                                return unknownTip language
-                            else
-                                match EnforcerCatalog.tryFindByField tipRaw (enforcerRules ()) with
-                                | None -> return unknownTip language
-                                | Some _ -> return remembered language
-                } }
+                        if hasLiveCycle parkedHost ctx.SessionId then
+                            return executeValidEntry language args
+                        else
+                            return! noLiveCycleResult runtime ctx
+                    } }

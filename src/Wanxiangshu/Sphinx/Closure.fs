@@ -51,12 +51,13 @@ module Closure =
             if remaining <= 0 then
                 current
             else
-                let next = synchronize current
+                fixedPointStep remaining current (synchronize current)
 
-                if next = current then
-                    current
-                else
-                    fixedPoint (remaining - 1) next
+        and fixedPointStep remaining current next =
+            if next = current then
+                current
+            else
+                fixedPoint (remaining - 1) next
 
         fixedPoint 16 state
 

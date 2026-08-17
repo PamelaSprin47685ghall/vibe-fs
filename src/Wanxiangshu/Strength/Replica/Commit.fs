@@ -62,6 +62,20 @@ type StrengthCommitDecision =
 [<RequireQualifiedAccess>]
 module StrengthCommit =
 
+    let private preparedUnknown evidence =
+        match evidence with
+        | StrengthDurableEvidence.Matches -> StrengthCommitDecision.Proceed
+        | StrengthDurableEvidence.Absent -> StrengthCommitDecision.FallBackK0
+        | StrengthDurableEvidence.Conflicts
+        | StrengthDurableEvidence.Unknown -> StrengthCommitDecision.FailClosed
+
+    let private promotionUnknown evidence =
+        match evidence with
+        | StrengthDurableEvidence.Matches -> StrengthCommitDecision.Proceed
+        | StrengthDurableEvidence.Absent -> StrengthCommitDecision.RetryAppend
+        | StrengthDurableEvidence.Conflicts
+        | StrengthDurableEvidence.Unknown -> StrengthCommitDecision.FailClosed
+
     /// Prepared is still pre-intervention. A definite rejection, or an unknown
     /// append later proved absent, may safely collapse this decision to K0.
     let resolvePrepared
@@ -71,12 +85,7 @@ module StrengthCommit =
         match appendOutcome with
         | StrengthAppendOutcome.Committed -> StrengthCommitDecision.Proceed
         | StrengthAppendOutcome.Rejected -> StrengthCommitDecision.FallBackK0
-        | StrengthAppendOutcome.CommitUnknown ->
-            match durableEvidence with
-            | StrengthDurableEvidence.Matches -> StrengthCommitDecision.Proceed
-            | StrengthDurableEvidence.Absent -> StrengthCommitDecision.FallBackK0
-            | StrengthDurableEvidence.Conflicts
-            | StrengthDurableEvidence.Unknown -> StrengthCommitDecision.FailClosed
+        | StrengthAppendOutcome.CommitUnknown -> preparedUnknown durableEvidence
 
     /// Promotion closes already-real causality: the target provider run has
     /// consumed the Candidate. A definite append rejection therefore cannot
@@ -90,9 +99,4 @@ module StrengthCommit =
         match appendOutcome with
         | StrengthAppendOutcome.Committed -> StrengthCommitDecision.Proceed
         | StrengthAppendOutcome.Rejected -> StrengthCommitDecision.FailClosed
-        | StrengthAppendOutcome.CommitUnknown ->
-            match durableEvidence with
-            | StrengthDurableEvidence.Matches -> StrengthCommitDecision.Proceed
-            | StrengthDurableEvidence.Absent -> StrengthCommitDecision.RetryAppend
-            | StrengthDurableEvidence.Conflicts
-            | StrengthDurableEvidence.Unknown -> StrengthCommitDecision.FailClosed
+        | StrengthAppendOutcome.CommitUnknown -> promotionUnknown durableEvidence

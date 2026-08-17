@@ -49,6 +49,11 @@ module ContextFactFold =
 
     let private reject = FoldRejection.reject
 
+    let private projectionOutcome factName onSuccess result =
+        match result with
+        | Error reason -> reject factName reason
+        | Ok updated -> onSuccess updated
+
     /// PERSIST-010: every Companion frame refusal describes a line a correct
     /// writer could not have produced, so none of them is absorbed.
     ///
@@ -103,9 +108,8 @@ module ContextFactFold =
                     { session with
                         BloggerCycles = Some updated })
 
-            match AgentProjection.tryUpdate payload.MainSessionId apply projection with
-            | Error reason -> reject "BloggerRequestMaterialized" reason
-            | Ok updated -> Ok updated
+            AgentProjection.tryUpdate payload.MainSessionId apply projection
+            |> projectionOutcome "BloggerRequestMaterialized" (fun updated -> Ok updated)
 
         | ContextFactCases.BloggerRequestAbandoned payload ->
             let apply session =
@@ -116,9 +120,8 @@ module ContextFactFold =
                         BloggerCycles =
                             Some(BloggerCycleProjection.abandon payload.RequestId payload.BloggerSessionId cycles) }
 
-            match AgentProjection.tryUpdate payload.MainSessionId apply projection with
-            | Error reason -> reject "BloggerRequestAbandoned" reason
-            | Ok updated -> Ok updated
+            AgentProjection.tryUpdate payload.MainSessionId apply projection
+            |> projectionOutcome "BloggerRequestAbandoned" (fun updated -> Ok updated)
 
         | ContextFactCases.BlogObservationCommitted payload ->
             // ENFORCER-045 + C5: Blog + Enforcement + unified cycle receipt.
@@ -151,9 +154,8 @@ module ContextFactFold =
                             Enforcement = Some enfUpdated
                             BloggerCycles = Some cycleUpdated }))
 
-            match AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection with
-            | Error reason -> reject "BlogObservationCommitted" reason
-            | Ok updated ->
+            AgentProjection.tryUpdate payload.SessionId applyEnforcementAndReceipt projection
+            |> projectionOutcome "BlogObservationCommitted" (fun updated ->
                 tryUpdateBlog
                     payload.SessionId
                     (BlogProjection.applyEntry
@@ -169,7 +171,7 @@ module ContextFactFold =
                           CoveredFromSequence = payload.PreviousIngestedThroughSequence
                           CoveredThroughSequence = payload.NextIngestedThroughSequence })
                     updated
-                |> blogOutcome "BlogObservationCommitted"
+                |> blogOutcome "BlogObservationCommitted")
 
         | ContextFactCases.BlogObservationsSquashed payload ->
             // Blog frames squash + Enforcement tip co-truncate on the same main session
@@ -191,9 +193,8 @@ module ContextFactFold =
                         BloggerCycles = Some updated
                         Enforcement = Some enforcement })
 
-            match AgentProjection.tryUpdate payload.SessionId applyReceiptAndTips projection with
-            | Error reason -> reject "BlogObservationsSquashed" reason
-            | Ok updated ->
+            AgentProjection.tryUpdate payload.SessionId applyReceiptAndTips projection
+            |> projectionOutcome "BlogObservationsSquashed" (fun updated ->
                 tryUpdateBlog
                     payload.SessionId
                     (BlogProjection.applySquash
@@ -206,7 +207,7 @@ module ContextFactFold =
                           CoveredFromSequence = 0L
                           CoveredThroughSequence = 0L })
                     updated
-                |> blogOutcome "BlogObservationsSquashed"
+                |> blogOutcome "BlogObservationsSquashed")
 
         | ContextFactCases.PrefixRebaseCommitted payload ->
             tryUpdatePrefix

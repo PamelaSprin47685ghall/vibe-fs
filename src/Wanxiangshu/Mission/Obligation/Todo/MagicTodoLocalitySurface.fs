@@ -3,7 +3,6 @@ namespace Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
-open Wanxiangshu.OpenCode
 
 /// Pure provider-input materialization owner. Snapshot/resource operations are
 /// intentionally absent; those belong to MagicTodoMembraneSurface.
@@ -13,11 +12,11 @@ module MagicTodoLocalitySurface =
     let private text (value: obj) =
         if isNull value then "" else string value
 
-    let private stateOf (value: obj) : SnapshotToolPartState =
+    let private stateOf (value: obj) : Wanxiangshu.OpenCode.SnapshotToolPartState =
         match if isNull value then 0 else unbox<int> value with
-        | 1 -> SnapshotToolPartState.Completed ""
-        | 2 -> SnapshotToolPartState.Failed ""
-        | _ -> SnapshotToolPartState.Pending
+        | 1 -> Wanxiangshu.OpenCode.SnapshotToolPartState.Completed ""
+        | 2 -> Wanxiangshu.OpenCode.SnapshotToolPartState.Failed ""
+        | _ -> Wanxiangshu.OpenCode.SnapshotToolPartState.Pending
 
     let private cursor (sequence: int) : XTraceCursor = { Sequence = int64 sequence }
 

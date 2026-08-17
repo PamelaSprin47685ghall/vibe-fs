@@ -31,12 +31,14 @@ module TipDeliveryProjection =
         (presentation: TipPresentation)
         (state: TipDeliveryProjectionState)
         : TipDeliveryProjectionState =
-        if isNull tipName || tipName.Trim().Length = 0 then
-            state
-        else
-            match presentation with
-            | TipPresentation.Full -> { FullDeliveredTips = Set.add (tipName.Trim()) state.FullDeliveredTips }
-            | TipPresentation.IdentityOnly -> state
+        let normalizedTip =
+            if isNull tipName || tipName.Trim().Length = 0 then None else Some(tipName.Trim())
+
+        match normalizedTip, presentation with
+        | None, _ -> state
+        | Some tip, TipPresentation.Full ->
+            { FullDeliveredTips = Set.add tip state.FullDeliveredTips }
+        | Some _, TipPresentation.IdentityOnly -> state
 
     /// HOST-006: ContextReanchored voids Full history so Main re-emits main.md after compaction.
     /// Identity-only must not strand the post-reanchor transcript (FullDeliveredTips → empty).

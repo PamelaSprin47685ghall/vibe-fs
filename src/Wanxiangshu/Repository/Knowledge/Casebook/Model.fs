@@ -145,6 +145,31 @@ module CasebookProjection =
 
     let empty: Map<string, Case> = emptyState.Cases
 
+    let private refreshCase state sessionId q a observations =
+        match Map.tryFind sessionId state.Cases with
+        | Some existing ->
+            let updated =
+                { existing with
+                    Q = q
+                    A = a
+                    Observations = Observations.normalize observations
+                    LastAccessOrder = state.AccessCounter }
+
+            { AccessCounter = state.AccessCounter + 1L
+              Cases = Map.add sessionId updated state.Cases }
+        | None -> state
+
+    let private accessCase state sessionId =
+        match Map.tryFind sessionId state.Cases with
+        | Some existing ->
+            let touched =
+                { existing with
+                    LastAccessOrder = state.AccessCounter }
+
+            { AccessCounter = state.AccessCounter + 1L
+              Cases = Map.add sessionId touched state.Cases }
+        | None -> state
+
     let apply (state: State) (event: CasebookEvent) : State =
         match event with
         | CasebookEvent.CaseCaptured case ->
@@ -155,29 +180,8 @@ module CasebookProjection =
 
             { AccessCounter = state.AccessCounter + 1L
               Cases = Map.add case.SessionId withAccess state.Cases }
-        | CasebookEvent.CaseRefreshed(sessionId, q, a, observations) ->
-            match Map.tryFind sessionId state.Cases with
-            | Some existing ->
-                let updated =
-                    { existing with
-                        Q = q
-                        A = a
-                        Observations = Observations.normalize observations
-                        LastAccessOrder = state.AccessCounter }
-
-                { AccessCounter = state.AccessCounter + 1L
-                  Cases = Map.add sessionId updated state.Cases }
-            | None -> state
-        | CasebookEvent.CaseAccessed sessionId ->
-            match Map.tryFind sessionId state.Cases with
-            | Some existing ->
-                let touched =
-                    { existing with
-                        LastAccessOrder = state.AccessCounter }
-
-                { AccessCounter = state.AccessCounter + 1L
-                  Cases = Map.add sessionId touched state.Cases }
-            | None -> state
+        | CasebookEvent.CaseRefreshed(sessionId, q, a, observations) -> refreshCase state sessionId q a observations
+        | CasebookEvent.CaseAccessed sessionId -> accessCase state sessionId
         | CasebookEvent.CaseEvicted sessionId ->
             { state with
                 Cases = Map.remove sessionId state.Cases }

@@ -130,12 +130,9 @@ export const awaitPrompted = (sessionId) => {
 /**
  * A plugin instance whose tools can actually execute (EXEC-002, layer 3).
  *
- * `runtime` passed to the body is { journal, runtimeId, terminalPort,
- * recordFork } — the shared production instances, resolved AFTER
- * `initSpikePlugin` so `acquire` returns the already-registered entries rather
- * than booting second owners. `recordFork(parentSessionId, agentId,
- * childSessionId)` registers a forked handle so its terminal completion also
- * claims the EXEC-004 durable cell (see below).
+ * `runtime` passed to the body is { journal, runtimeId, terminalPort } — the
+ * shared production instances, resolved AFTER `initSpikePlugin` so `acquire`
+ * returns the already-registered entries rather than booting second owners.
  */
 export const withExecutablePlugin = async (body, options = {}) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-exec-'))
@@ -175,63 +172,10 @@ export const withExecutablePlugin = async (body, options = {}) => {
         journal: journalResult.journal,
         runtimeId: journalSurface.JournalSurface_runtimeId(journalResult.journal),
         terminalPort,
-        // Filled in by forkHandle below; the recorder needs the parent session's
-        // handle ids, which only a fork return value reveals.
-        handles: new Map(),
         prompts,
         messages,
         abortedIds,
         pushHostMessage: client.__pushHostMessage,
-        pendingTerminalRecords: new Set(),
-      }
-      // EXEC-004's completion cell is claimed by HostForkRuntime.Complete in
-      // production. The fixture uses the same terminal owner and the durable
-      // JournalSurface completion owner so joins observe the exact durable
-      // state transition rather than a fabricated Host notification.
-      const recorderByParent = new Map()
-      runtime.terminalSubscription = eventsSurface.subscribe(runtime.terminalPort, (sessionId, outcome) => {
-        for (const [parentSessionId, byChild] of recorderByParent) {
-          const agentId = byChild.get(sessionId)
-          if (agentId !== undefined) {
-            const completed = outcome?.kind === 'Completed'
-            const body = completed
-              ? JSON.stringify({
-                  status: 'completed',
-                  run_id: `run-${agentId}`,
-                  work_record: 'fixture-work-record',
-                  child_session_id: sessionId,
-                  authority_root: '',
-                  provider_run: '',
-                  directory: '',
-                })
-              : JSON.stringify({
-                  status: 'failed',
-                  run_id: `run-${agentId}`,
-                  code: 'ERROR',
-                  message: 'fixture terminal failure',
-                  child_session_id: sessionId,
-                })
-            const recording = journalSurface.JournalSurface_recordTerminalCompletion(
-              runtime.journal,
-              parentSessionId,
-              agentId,
-              sessionId,
-              completed ? 'completed' : 'failed',
-              body,
-            ).then((recorded) => {
-              if (!recorded?.ok) {
-                throw new Error(`HandleCompleted(${agentId}) rejected: ${recorded?.error ?? 'unknown error'}`)
-              }
-              byChild.delete(sessionId)
-            })
-            runtime.pendingTerminalRecords.add(recording)
-            recording.finally(() => runtime.pendingTerminalRecords.delete(recording))
-          }
-        }
-      })
-      runtime.recordFork = (parentSessionId, agentId, childSessionId) => {
-        if (!recorderByParent.has(parentSessionId)) recorderByParent.set(parentSessionId, new Map())
-        recorderByParent.get(parentSessionId).set(childSessionId, agentId)
       }
       await body(hooks, directory, createdIds, runtime)
     } finally {
@@ -245,10 +189,8 @@ export const withExecutablePlugin = async (body, options = {}) => {
           await new Promise((resolve) => setTimeout(resolve, 0))
         }
         try {
-          await Promise.all([...runtime.pendingTerminalRecords])
-        } finally {
-          runtime.terminalSubscription?.Dispose?.()
           eventsSurface.releaseSharedForWorkspace(directory, runtime.terminalPort)
+        } finally {
           journalSurface.JournalSurface_dispose(runtime.journal)
         }
       }
@@ -426,7 +368,6 @@ export const notifyCompleted = async (runtime, childSessionId, sessionWideText, 
   const roleLabels = ['manager', 'orchestrator', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger']
   const role = roleLabels[roleCaseTag] ?? 'coder'
   await eventsSurface.notifyCompleted(runtime.terminalPort, childSessionId, sessionWideText, turnFormalText, role)
-  await Promise.all([...runtime.pendingTerminalRecords])
 }
 
 /**

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // JS-semantic-surface boundary ratchet (P2): semantic-test debt can only
-// shrink. The scan covers every requirements/**/tests/**/*.mjs file; moving
+// shrink. The scan covers every executable requirements/**/tests/**/*.mjs and
+// .js file; moving
 // Fable knowledge into support or fixtures does not change its debt class.
 //
 //   node scripts/checks/js-boundary-gate.mjs
@@ -13,11 +14,11 @@
 // The baseline is a migration ledger, never an exemption or a regeneration
 // button that can bless newly introduced debt.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { walk } from '../lib/walk.mjs'
-import { scanAll } from '../lib/test-surface-scan.mjs'
+import { BUILD_VERIFICATION_FILES, scanAll } from '../lib/test-surface-scan.mjs'
 
 export const DEFAULT_OUT = join(dirname(fileURLToPath(import.meta.url)), 'js-boundary-baseline.json')
 export const FROZEN_CONTRACTS = join(dirname(fileURLToPath(import.meta.url)), 'js-boundary-frozen-contracts.json')
@@ -106,6 +107,12 @@ const totalDebt = (actual) =>
     0,
   )
 
+/** A non-empty ledger may survive zero semantic debt only for explicit quarantine paths. */
+export const isBuildVerificationOnlyBaseline = (baseline) => {
+  const files = Object.keys(baseline)
+  return files.length > 0 && files.every((file) => BUILD_VERIFICATION_FILES.has(file))
+}
+
 const parseArgs = (args) => {
   const argValue = (flag) => {
     const inline = args.find((arg) => arg.startsWith(`${flag}=`))
@@ -173,17 +180,33 @@ export const run = ({ args = process.argv.slice(2), root = process.cwd() } = {})
     }
   }
 
+  const debt = totalDebt(current.actual)
+  const explicitExemption = baseline && isBuildVerificationOnlyBaseline(baseline)
   const failures = baseline
     ? compareBaseline(baseline, current.actual)
-    : Object.keys(current.actual).length === 0
+    : debt === 0
       ? []
       : ['baseline missing while semantic-boundary debt remains — remove debt before deleting the ledger']
 
+  if (debt === 0 && baseline && !explicitExemption) {
+    failures.push('semantic-boundary debt is zero; delete the migration ledger or leave only explicit build-verification exemptions')
+  }
+
   if (generate) {
-    if (failures.length > 0) {
+    if (failures.length > 0 && !(debt === 0 && baseline && !explicitExemption)) {
       console.error(`js-boundary-gate: refusing baseline regeneration (${failures.length} violation(s))`)
       for (const failure of failures) console.error(`  ${failure}`)
       return 1
+    }
+    if (debt === 0) {
+      if (baselineExists && !explicitExemption) unlinkSync(out)
+      const action = explicitExemption
+        ? 'explicit build-verification exemptions retained'
+        : baselineExists
+          ? 'baseline removed'
+          : 'zero debt; baseline absent'
+      console.log(`js-boundary-gate: ${action}`)
+      return 0
     }
     writeFileSync(out, `${JSON.stringify(current.actual, null, 2)}\n`)
     console.log(`js-boundary-gate: baseline written to ${out} (${Object.keys(current.actual).length} files)`)
@@ -197,9 +220,13 @@ export const run = ({ args = process.argv.slice(2), root = process.cwd() } = {})
   }
 
   const frozen = current.contracts.filter((file) => current.frozen.has(file)).length
-  const ledger = baseline ? 'at/below baseline' : 'zero debt; baseline absent'
+  const ledger = explicitExemption
+    ? 'explicit build-verification exemptions'
+    : baseline
+      ? 'at/below baseline'
+      : 'zero debt; baseline absent'
   console.log(
-    `js-boundary-gate: OK — ${totalDebt(current.actual)} debt line(s) across ${Object.keys(current.actual).length} file(s), ${ledger}; ${frozen} frozen package-local *-contract.mjs`,
+    `js-boundary-gate: OK — ${debt} debt line(s) across ${Object.keys(current.actual).length} file(s), ${ledger}; ${frozen} frozen package-local *-contract.mjs`,
   )
   return 0
 }

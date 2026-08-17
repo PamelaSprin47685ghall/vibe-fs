@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 // Test/Fable-boundary ratchet (Wave 1, Proposal ch. 19).
 //
-// The anti-corruption boundary is requirements/verification-system/tests/support/domain/
-// (moved from tests/unit/support/domain/ during the requirements cutover) — the ONLY
-// place tests may touch Fable internals (dist/fable_modules/**). Ordinary unit and
-// integration tests must reach Fable shapes through the domain adapters.
+// The legacy anti-corruption ratchet scans executable test-zone files for direct
+// Fable-runtime imports. Ordinary semantic tests must use registered JS-native
+// surfaces; only explicit compiler/build verification paths are quarantined.
 //
-// Existing violations (imports of dist/fable_modules/** in *.test.mjs that
-// predate this check) are grandfathered in EMBEDDED_BASELINE and tolerated;
+// Existing violations (imports of dist/fable_modules/** in executable test-zone
+// files that predate this check) are grandfathered in EMBEDDED_BASELINE and tolerated;
 // NEW violations fail. This is a semantic anti-corruption boundary, not a
 // size heuristic: compiler-runtime imports must not spread.
 //
 // Modes:
 //   node scripts/checks/test-boundary.mjs
-//       exit 1 when a *.test.mjs outside the baseline imports dist/fable_modules/**
+//       exit 1 when an executable test-zone file outside the baseline imports
+//       dist/fable_modules/**
 //   node scripts/checks/test-boundary.mjs --generate [--out=<file>]
 //       write the current violation set as a baseline JSON (for refreshing
 //       EMBEDDED_BASELINE after legacy debt is paid down)
@@ -22,6 +22,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { walk } from '../lib/walk.mjs'
+import { BUILD_VERIFICATION_FILES } from '../lib/test-surface-scan.mjs'
 
 const DEFAULT_OUT = join(dirname(fileURLToPath(import.meta.url)), 'test-boundary-baseline.json')
 const FABLE_PATTERN = /dist[/\\]fable_modules/
@@ -87,8 +88,9 @@ const scanViolations = (root) => {
   ]
   for (const [, base] of scopes) {
     if (!existsSync(base)) continue
-    for (const abs of walk(base, ['.test.mjs'])) {
+    for (const abs of walk(base, ['.mjs', '.js'])) {
       const rel = relative(root, abs).replace(/\\/g, '/')
+      if (BUILD_VERIFICATION_FILES.has(rel)) continue
       const lines = readFileSync(abs, 'utf8').split('\n')
       lines.forEach((line) => {
         if (FABLE_PATTERN.test(line)) {

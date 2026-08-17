@@ -5,7 +5,7 @@ import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurf
 import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 test('WHAT[DELEG-015] JOIN_COMPLETION_failed_is_rendered_as_agent_failed', () => {
-  const wire = join.renderBatch('english', [{ kind: 'failed', agentId: 'a1', agentName: 'Ada', code: 'E', message: 'no' }])
+  const wire = join.renderBatch('english', [{ kind: 'failed', agentId: 'a1', agentName: 'Ada', role: 'Coder', runId: 'run-a1', code: 'E', message: 'no' }])
   assert.match(wire, /could not complete/)
   assert.doesNotMatch(wire, /has returned/)
 })

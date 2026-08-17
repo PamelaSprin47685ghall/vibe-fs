@@ -162,41 +162,42 @@ module CasebookCapture =
 
     /// §63 positives: single-file reads via cat/head/tail/sed (with or without
     /// option prefixes). `cat file | grep bar` still counts as reading `file`.
+    let rec private firstReadFile (tokens: string list) : string option =
+        match tokens with
+        | [] -> None
+        | "-n" :: value :: tail when value |> Seq.forall System.Char.IsDigit -> firstReadFile tail
+        | "-n" :: tail -> firstReadFile tail
+        | token :: tail when token.StartsWith "-" -> firstReadFile tail
+        | file :: _ -> Some file
+
+    let private sedReadFile (rest: string list) =
+        // sed -n 'SCRIPT' file — the script is the first non-option
+        // token (quotes already stripped by tokenize), the file is the
+        // one after it. A bare `sed file` (no script) is skipped.
+        match rest |> List.skipWhile (fun token -> token.StartsWith "-") with
+        | _script :: file :: _ -> Some(Observation.FileRead(file, contentHash ""))
+        | _ -> None
+
+    let private dispatchExecTokens tokens : Observation option =
+        match tokens with
+        | [] -> None
+        | "sh" :: _
+        | "bash" :: _ -> None
+        | "cat" :: rest
+        | "head" :: rest
+        | "tail" :: rest ->
+            // Skip options and their values (-n 30, -100, -f); the first
+            // remaining token is the file. `cat file | grep bar` lands here
+            // too and counts as reading file.
+            firstReadFile rest
+            |> Option.map (fun file -> Observation.FileRead(file, contentHash ""))
+        | "sed" :: rest -> sedReadFile rest
+        | _ -> None
+
     let ofExecCommand (command: string) : Observation option =
         if System.String.IsNullOrWhiteSpace command then
             None
         elif command.Contains "$(" || command.Contains "`" then
             None
         else
-            let tokens = tokenize command
-
-            match tokens with
-            | [] -> None
-            | "sh" :: _
-            | "bash" :: _ -> None
-            | "cat" :: rest
-            | "head" :: rest
-            | "tail" :: rest ->
-                // Skip options and their values (-n 30, -100, -f); the first
-                // remaining token is the file. `cat file | grep bar` lands here
-                // too and counts as reading file.
-                let rec firstFile (tokens: string list) : string option =
-                    match tokens with
-                    | [] -> None
-                    | "-n" :: value :: tail when value |> Seq.forall System.Char.IsDigit -> firstFile tail
-                    | "-n" :: tail -> firstFile tail
-                    | token :: tail when token.StartsWith "-" -> firstFile tail
-                    | file :: _ -> Some file
-
-                firstFile rest
-                |> Option.map (fun file -> Observation.FileRead(file, contentHash ""))
-            | "sed" :: rest ->
-                // sed -n 'SCRIPT' file — the script is the first non-option
-                // token (quotes already stripped by tokenize), the file is the
-                // one after it. A bare `sed file` (no script) is skipped.
-                let withoutOptions = rest |> List.skipWhile (fun token -> token.StartsWith "-")
-
-                match withoutOptions with
-                | _script :: file :: _ -> Some(Observation.FileRead(file, contentHash ""))
-                | _ -> None
-            | _ -> None
+            tokenize command |> dispatchExecTokens

@@ -12,9 +12,9 @@
 
 ```text
 001: 扫描 requirements/**/tests/**/*.mjs 全部是 JS（F# 测试文件不存在）
-002: 扫描完整 semantic-test dependency zone；禁止 deep dist / Fable 形状 / mangled
+002: 扫描完整 semantic-test dependency zone（.mjs/.js，包括 support、fixture、helper、e2e、integration）；禁止 deep dist / Fable 形状 / mangled
      export discovery，已存迁移债务只能由 baseline 单调减少，baseline 缺失仅在零债务时允许
-003: SURFACE_MANIFEST 机械证明 law → owner → source → Compile Include → contract test
+003: SURFACE_MANIFEST 机械证明 law → owner → source → Compile Include → emitted dist module → active executable contract test；该测试必须以 WHAT law 直接授权 surface，登记或死 import 不构成证据
 004: semanticImportEdges 扫描整个 corpus；有债务的 helper 不能成为新的直接测试 subject
 005/006: representation 规则由 P5 `js-contract.mjs` validator 承载（assertJsData /
      assertOpaque）；compiler/build verification 才能拥有显式 quarantine
@@ -34,15 +34,17 @@ legacy interop authority（member( / bind( / fableInstanceMethod( / prod( / toLi
 现存违规进 `js-boundary-baseline.json`；baseline 可以删，不能新增或增大。`--generate` 先以
 当前 baseline 比较，发现新文件或计数上升即拒绝写入；只有债务已经减少时才落盘。baseline
 文件可在绝对零债务时删除，gate 会把「文件缺失但仍有债务」判红，把「文件缺失且零债务」判为
-终态。
+终态。零债务下 `--generate` 会删除 stale/empty ledger；正常运行只接受已删除的 ledger，或
+仅含 `BUILD_VERIFICATION_FILES` 明确 quarantine 的 ledger。当前仓库为零债务、ledger absent。
 
 ### 2a. SURFACE_MANIFEST 注册合同
 
 `scripts/lib/test-surface-scan.mjs` 中的 `SURFACE_MANIFEST` 不是字符串免检名单。每项同时
 声明 `module`、`owner`、`laws`、`source`、`representation`、`kind`；
 `scripts/checks/js-surface-manifest.mjs` 逐项证明：owner 的 WHAT heading 当前存在、每条 law
-有 owner PROOF 表行、source 文件存在且被 `Wanxiangshu.fsproj` 精确 Compile、至少一个
-`.test.mjs` 真实 import 该 emitted surface。缺一项即无权绕过 deep-import 规则。
+有 owner PROOF 表行、source 文件存在且被 `Wanxiangshu.fsproj` 精确 Compile、对应 `dist/`
+产物存在、至少一个 `.test.mjs` 真正使用该 emitted surface，且该测试的 WHAT law 直接包含在
+manifest 授权 law 中。缺一项即无权绕过 deep-import 规则；登记、死 import、无关 law 均不是证据。
 
 ### 3. P5 representation validator（`tests/support/js-contract.mjs`）
 

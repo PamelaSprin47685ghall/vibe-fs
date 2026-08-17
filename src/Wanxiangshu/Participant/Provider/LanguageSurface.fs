@@ -4,7 +4,6 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Resources
 
@@ -71,13 +70,13 @@ module ProviderLanguageSurface =
         SessionProviderLanguage.inheritFromOwner (languageOf ownerLanguage) (SessionId.create childSessionId)
         |> resultOf
 
-    let readGlobalPreference () : string = ProviderLanguageBinding.readGlobalPreference () |> languageName
+    let readGlobalPreference () : string = Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference () |> languageName
 
     let ensureRoot (sessionId: string) : string =
-        ProviderLanguageBinding.ensureRoot (SessionId.create sessionId) |> languageName
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot (SessionId.create sessionId) |> languageName
 
     let ensureInherited (ownerSessionId: string) (childSessionId: string) : string =
-        ProviderLanguageBinding.ensureInherited (SessionId.create ownerSessionId) (SessionId.create childSessionId)
+        Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureInherited (SessionId.create ownerSessionId) (SessionId.create childSessionId)
         |> languageName
 
     let languageOfSession (sessionId: string) : string =
@@ -108,13 +107,13 @@ module ProviderLanguageSurface =
     let transformBookkeeperSystem (sessionId: string) (system: string array) : Task<obj> =
         task {
             let sid = SessionId.create sessionId
-            ProviderLanguageBinding.ensureRoot sid |> ignore
+            Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot sid |> ignore
             BookkeeperRuntime.bindSession sessionId "provider-language-surface" "provider-language-surface"
 
             try
                 let input = createObj [ "sessionID" ==> sessionId; "model" ==> createObj [] ]
                 let output = createObj [ "system" ==> system ]
-                let! _ = ProviderSystemTransform.create None input output
+                let! _ = Wanxiangshu.OpenCode.ProviderSystemTransform.create None input output
                 return box {| system = unbox<string array> output?system |}
             finally
                 BookkeeperRuntime.unbindSession sessionId

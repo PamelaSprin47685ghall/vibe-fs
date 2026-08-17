@@ -15,6 +15,8 @@ open Wanxiangshu.Foundation.Identity
 /// completed-awaiting-join. EXEC-005 requires `list` to show that state, so a
 /// finished-but-unjoined child was reported as running. Abandoned is a durable
 /// terminal that is never joinable and never reverts.
+/// DSL-state-combination: domain — optional blob reference and digest are the
+/// two evidence facets of one durable completion; they never select execution.
 type HandleCompletion =
     {
         Kind: HandleCompletionKind
@@ -96,6 +98,35 @@ module HandleProjection =
         { Handles = Map.empty
           NextCreationOrder = 0 }
 
+    let private reactivateExisting
+        (handle: HandleId)
+        (childSessionId: SessionId)
+        (targetAgent: string)
+        (byname: string)
+        (role: Role)
+        (ownership: HandleOwnership)
+        (current: AgentLinkageProjection)
+        (existing: HandleRecord)
+        : Result<AgentLinkageProjection, HandleTransitionRejection> =
+        match existing.Lifecycle with
+        | Retired
+        | Active
+        | CompletedAwaitingJoin _ ->
+            Ok
+                { Handles =
+                    Map.add
+                        handle
+                        { existing with
+                            ChildSessionId = childSessionId
+                            TargetAgent = targetAgent
+                            Byname = byname
+                            CanonicalRole = role
+                            Ownership = ownership
+                            Lifecycle = Active }
+                        current.Handles
+                  NextCreationOrder = current.NextCreationOrder }
+        | Abandoned _ -> Error AlreadyAbandoned
+
     let linkNamed
         (handle: HandleId)
         (childSessionId: SessionId)
@@ -124,25 +155,7 @@ module HandleProjection =
                           LastCompletion = None }
                         current.Handles
                   NextCreationOrder = order + 1 }
-        | Some existing ->
-            match existing.Lifecycle with
-            | Retired
-            | Active
-            | CompletedAwaitingJoin _ ->
-                Ok
-                    { Handles =
-                        Map.add
-                            handle
-                            { existing with
-                                ChildSessionId = childSessionId
-                                TargetAgent = targetAgent
-                                Byname = byname
-                                CanonicalRole = role
-                                Ownership = ownership
-                                Lifecycle = Active }
-                            current.Handles
-                      NextCreationOrder = current.NextCreationOrder }
-            | Abandoned _ -> Error AlreadyAbandoned
+        | Some existing -> reactivateExisting handle childSessionId targetAgent byname role ownership current existing
 
     /// Compatibility for internal callers that do not need a separate
     /// presentation identity. Provider-facing fork/commission use linkNamed.
@@ -220,6 +233,20 @@ module HandleProjection =
     /// CompletedAwaitingJoin and ref/digest match exactly → Active. Mismatch
     /// refuses so a true terminal cannot be revoked by a bad compensation fact.
     /// Already Active = prior reject succeeded (idempotent Ok).
+    let private verifyFalseCompletionCell
+        (handle: HandleId)
+        (expectedRef: BlobRef)
+        (expectedDigest: BlobDigest)
+        (current: AgentLinkageProjection)
+        (record: HandleRecord)
+        (cell: HandleCompletion) =
+        match cell.CompletionRef, cell.CompletionDigest with
+        | Some blobRef, Some digest when blobRef = expectedRef && digest = expectedDigest ->
+            Ok
+                { current with
+                    Handles = Map.add handle { record with Lifecycle = Active } current.Handles }
+        | _ -> Error AlreadyCompleted
+
     let rejectFalseCompletion
         (handle: HandleId)
         (expectedRef: BlobRef)
@@ -232,12 +259,7 @@ module HandleProjection =
         | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
         | Some { Lifecycle = Active } -> Ok current
         | Some({ Lifecycle = CompletedAwaitingJoin cell } as record) ->
-            match cell.CompletionRef, cell.CompletionDigest with
-            | Some blobRef, Some digest when blobRef = expectedRef && digest = expectedDigest ->
-                Ok
-                    { current with
-                        Handles = Map.add handle { record with Lifecycle = Active } current.Handles }
-            | _ -> Error AlreadyCompleted
+            verifyFalseCompletionCell handle expectedRef expectedDigest current record cell
 
     let tryFind (handle: HandleId) (current: AgentLinkageProjection) = Map.tryFind handle current.Handles
 

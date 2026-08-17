@@ -83,6 +83,10 @@ module ProjectionRenderer =
         | Some(ProjectionIntent.ActivatePrefixEpoch activation) -> RenderedPrefix.SyntheticPrefix activation
         | Some _ -> invalidOp "unreachable: prefix filter admits only Keep/Activate/Mirror"
 
+    let private validateDropLeading (activation: PrefixActivation) (messages: ProviderProjection.WireMessage list) =
+        if activation.DropLeading > List.length messages then
+            invalidArg "DropLeading" "prefix cutoff exceeds the current message view"
+
     /// wire 层视图：合成头部 + 保留尾部。
     ///
     /// 与「写回 Host 后再 `decodeMessageView`」的视图一致（bookkeeping part 两侧都被
@@ -98,8 +102,7 @@ module ProjectionRenderer =
         match rendered with
         | RenderedPrefix.PhysicalPrefix -> messages
         | RenderedPrefix.SyntheticPrefix activation ->
-            if activation.DropLeading > List.length messages then
-                invalidArg "DropLeading" "prefix cutoff exceeds the current message view"
+            validateDropLeading activation messages
 
             let head: ProviderProjection.WireMessage =
                 { Role = "user"
@@ -113,6 +116,42 @@ module ProjectionRenderer =
               Parts = [ ProviderProjection.WireText text ] }
 
         message
+
+    let private companionRequestKind (intent: BlogFramesIntent) (isSquash: bool) =
+        if isSquash then
+            CompanionRequestKind.Squash intent.SquashFrameCount
+        else
+            CompanionRequestKind.Normal
+
+    let private insertIntoExistingCompanion
+        (companionWires: ProviderProjection.WireMessage list)
+        (companionIds: string option list)
+        (companionPhysical: bool list)
+        (acc: RenderedMessages)
+        : RenderedMessages =
+        match acc.Messages with
+        | [] ->
+            { Messages = companionWires
+              HostMessageIds = companionIds
+              HostIsPhysical = companionPhysical }
+        | head :: tail ->
+            { Messages = head :: companionWires @ tail
+              HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
+              HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
+
+    let private insertCompanionMessages
+        (fullCompanionRebuild: bool)
+        (companionWires: ProviderProjection.WireMessage list)
+        (companionIds: string option list)
+        (companionPhysical: bool list)
+        (acc: RenderedMessages)
+        : RenderedMessages =
+        if fullCompanionRebuild then
+            { Messages = companionWires
+              HostMessageIds = companionIds
+              HostIsPhysical = companionPhysical }
+        else
+            insertIntoExistingCompanion companionWires companionIds companionPhysical acc
 
     /// COMPANION-005：`InsertBlogFrames` 的唯一形状源是 `CompanionProjectionBuilder`。
     /// Builder 只在此调用一次；真实 `sha256` 产出 MessageId，经 Host 侧信道写回（PROJ-004）。
@@ -138,11 +177,7 @@ module ProjectionRenderer =
         match snapshot.BlogFrames, fullCompanionRebuild with
         | [], false -> acc
         | frames, _ ->
-            let kind =
-                if isSquash then
-                    CompanionRequestKind.Squash intent.SquashFrameCount
-                else
-                    CompanionRequestKind.Normal
+            let kind = companionRequestKind intent isSquash
 
             let frameBodies =
                 frames |> List.map (fun frame -> BlobDigest.create frame.Digest, frame.Body)
@@ -170,20 +205,7 @@ module ProjectionRenderer =
             let companionIds = companionMessages |> List.map (fun msg -> Some msg.MessageId)
             let companionPhysical = companionMessages |> List.map (fun msg -> msg.IsPhysical)
 
-            if fullCompanionRebuild then
-                { Messages = companionWires
-                  HostMessageIds = companionIds
-                  HostIsPhysical = companionPhysical }
-            else
-                match acc.Messages with
-                | [] ->
-                    { Messages = companionWires
-                      HostMessageIds = companionIds
-                      HostIsPhysical = companionPhysical }
-                | head :: tail ->
-                    { Messages = head :: companionWires @ tail
-                      HostMessageIds = List.head acc.HostMessageIds :: companionIds @ List.tail acc.HostMessageIds
-                      HostIsPhysical = List.head acc.HostIsPhysical :: companionPhysical @ List.tail acc.HostIsPhysical }
+            insertCompanionMessages fullCompanionRebuild companionWires companionIds companionPhysical acc
 
     let private appendSynthetic (role: string) (text: string) (acc: RenderedMessages) : RenderedMessages =
         { Messages = acc.Messages @ [ textMessage role text ]
@@ -203,39 +225,42 @@ module ProjectionRenderer =
           HostMessageIds = headId :: List.skip drop acc.HostMessageIds
           HostIsPhysical = headPhysical :: List.skip drop acc.HostIsPhysical }
 
+    let private suppressTransport
+        (budget: int)
+        (acc: RenderedMessages)
+        : RenderedMessages =
+        let rec loop
+            (remaining: (ProviderProjection.WireMessage * string option * bool) list)
+            (toDrop: int)
+            (accMsgs: ProviderProjection.WireMessage list)
+            (accIds: string option list)
+            (accPhys: bool list)
+            =
+            match remaining, toDrop with
+            | [], _ ->
+                { Messages = List.rev accMsgs
+                  HostMessageIds = List.rev accIds
+                  HostIsPhysical = List.rev accPhys }
+            | _, 0 ->
+                let restMsgs, restIds, restPhys =
+                    remaining
+                    |> List.fold (fun (ms, is, ps) (m, i, p) -> m :: ms, i :: is, p :: ps) ([], [], [])
+
+                { Messages = List.rev accMsgs @ List.rev restMsgs
+                  HostMessageIds = List.rev accIds @ List.rev restIds
+                  HostIsPhysical = List.rev accPhys @ List.rev restPhys }
+            | (msg, _, _) :: tail, n when msg.Role = "assistant" -> loop tail (n - 1) accMsgs accIds accPhys
+            | (msg, id, phys) :: tail, n -> loop tail n (msg :: accMsgs) (id :: accIds) (phys :: accPhys)
+
+        List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
+        |> fun zipped -> loop zipped budget [] [] []
+
     /// Suppress：与 wire 同步裁剪侧信道（按同样 assistant 丢弃规则）。
     let private applySuppressWithIds (snapshot: ProjectionSnapshot) (acc: RenderedMessages) : RenderedMessages =
         if Set.isEmpty snapshot.TransportMessages then
             acc
         else
-            let budget = Set.count snapshot.TransportMessages
-
-            let rec loop
-                (remaining: (ProviderProjection.WireMessage * string option * bool) list)
-                (toDrop: int)
-                (accMsgs: ProviderProjection.WireMessage list)
-                (accIds: string option list)
-                (accPhys: bool list)
-                =
-                match remaining, toDrop with
-                | [], _ ->
-                    { Messages = List.rev accMsgs
-                      HostMessageIds = List.rev accIds
-                      HostIsPhysical = List.rev accPhys }
-                | _, 0 ->
-                    let restMsgs, restIds, restPhys =
-                        remaining
-                        |> List.fold (fun (ms, is, ps) (m, i, p) -> m :: ms, i :: is, p :: ps) ([], [], [])
-
-                    { Messages = List.rev accMsgs @ List.rev restMsgs
-                      HostMessageIds = List.rev accIds @ List.rev restIds
-                      HostIsPhysical = List.rev accPhys @ List.rev restPhys }
-                | (msg, _, _) :: tail, n when msg.Role = "assistant" -> loop tail (n - 1) accMsgs accIds accPhys
-                | (msg, id, phys) :: tail, n -> loop tail n (msg :: accMsgs) (id :: accIds) (phys :: accPhys)
-
-            let zipped = List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
-
-            loop zipped budget [] [] []
+            suppressTransport (Set.count snapshot.TransportMessages) acc
 
     /// STRENGTH-009: replace base messages with frozen owner wire messages.
     /// Host identity/physical channels reset — mirror bytes are not Host-owned.

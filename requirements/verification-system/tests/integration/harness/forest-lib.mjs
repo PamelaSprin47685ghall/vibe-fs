@@ -391,7 +391,7 @@ const lineOf = (selection) => {
  */
 export function runForest(scenario, { bindings, requests }) {
   const runtime = new ScenarioRuntime(scenario);
-  for (const [alias, sessionId] of bindings) runtime['bind'](alias, sessionId);
+  for (const [alias, sessionId] of bindings) runtime.bindAlias(alias, sessionId);
 
   const lines = [`scenario ${scenario.name} requests ${requests.length}`];
   const mismatches = [];

@@ -282,7 +282,9 @@ module ChangeSurface =
         | unknown -> Error("unknown orchestrator event: " + unknown)
 
     let fold (events: obj array) : obj =
+        // DSL-MUTABLE: algorithm-scratch — fold accumulator
         let mutable projection = OrchestratorProjection.empty
+        // DSL-MUTABLE: algorithm-scratch — first fold failure
         let mutable failure: string option = None
 
         for event in events do

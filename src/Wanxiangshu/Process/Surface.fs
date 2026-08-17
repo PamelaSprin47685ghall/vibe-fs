@@ -144,6 +144,7 @@ module ProcessSurface =
 
     let private bytesView (value: byte[]) : obj =
         let values : obj array = Array.zeroCreate value.Length
+        // DSL-MUTABLE: algorithm-scratch — byte view index cursor
         let mutable index = 0
 
         while index < value.Length do
@@ -425,6 +426,7 @@ module ProcessSurface =
         let exit = TaskCompletionSource<int>()
         let exited = ref false
         let callbacks = ResizeArray<unit -> unit>()
+        // DSL-MUTABLE: resource — mock child kill count
         let mutable killCount = 0
         let kill () =
             killCount <- killCount + 1

@@ -61,6 +61,23 @@ test('WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_
   assert.equal(coder.currentPresent, true)
 })
 
+test('WHAT[DELEG-021] SYNC_RUNTIME_unknown_role_and_outcome_fail_closed_at_every_entry', async () => {
+  const h = await live()
+  try {
+    assert.deepEqual(await sync.invoke(h, 'owner-invalid', 'Mystery', 'charge'), { ok: false, error: 'unknown role: Mystery' })
+    assert.deepEqual(await sync.invoke(h, 'owner-invalid', '', 'charge'), { ok: false, error: 'role is required' })
+    assert.equal(await sync.settle(h, 'owner-invalid', 'Mystery', 'answer'), false)
+    assert.equal(await sync.observeTurn(h, 'owner-invalid', 'Inspector', 'UnexpectedOutcome', '', 'run-invalid'), false)
+    assert.equal(sync.child(h, 'owner-invalid', 'Mystery'), null)
+    assert.deepEqual(sync.vocabulary('Mystery', 'Fast', 'scope'), { ok: false, error: 'unknown role: Mystery' })
+    assert.deepEqual(sync.batchOrder('Mystery', ['inspect'], 'inspect'), { ok: false, error: 'unknown role: Mystery' })
+    assert.deepEqual(
+      await sync.invokeBatch(h, 'owner-invalid', 'Mystery', 'charge', 'run-invalid', 'call-invalid', ['call-invalid']),
+      { kind: 'Error', error: 'unknown role: Mystery' },
+    )
+  } finally { sync.dispose(h) }
+})
+
 test('WHAT[DELEG-009] SYNC_RUNTIME_same_reuse_scope_serializes_distinct_provider_runs_but_distinct_scopes_are_independent', () => {
   const blocked = sync.serializationDecision('owner-a', 'owner-a', false)
   assert.equal(blocked.accepted, false)

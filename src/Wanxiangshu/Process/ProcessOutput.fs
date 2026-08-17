@@ -28,29 +28,29 @@ module ProcessOutput =
     /// OutputLimit 那一刻把积压的全部字节一次性同步 dump。与 Spool 分块一致。
     let private MemoryBufferBudget: int64 = 204800L
 
+    let private switchToSpool collector =
+        let active = Spool.startStreamingSpool ()
+        for previous in collector.Combined do Spool.appendStreamingSpool active previous
+        collector.Combined.Clear()
+        collector.Stdout.Clear()
+        collector.Stderr.Clear()
+        collector.Spool <- Some active
+
+    let private appendNewMemory (collector: OutputCollector) (target: List<byte[]>) (bytes: byte[]) =
+        let switchThreshold = min collector.OutputLimit MemoryBufferBudget
+        target.Add bytes
+        collector.Combined.Add bytes
+        if collector.BytesObserved > switchThreshold then switchToSpool collector
+
+    let private appendInMemory collector target bytes =
+        match collector.Spool with
+        | Some active -> Spool.appendStreamingSpool active bytes
+        | None -> appendNewMemory collector target bytes
+
     let private addChunk (collector: OutputCollector) (target: List<byte[]>) (bytes: byte[]) =
         if not (isNull bytes) && bytes.Length > 0 then
-            let length = int64 bytes.Length
-            collector.BytesObserved <- collector.BytesObserved + length
-
-            match collector.Spool with
-            | Some active -> Spool.appendStreamingSpool active bytes
-            | None ->
-                // 跨 OutputLimit 必切；OutputLimit 更大时用预算封顶，提前流式落盘。
-                let switchThreshold = min collector.OutputLimit MemoryBufferBudget
-                target.Add bytes
-                collector.Combined.Add bytes
-
-                if collector.BytesObserved > switchThreshold then
-                    let active = Spool.startStreamingSpool ()
-
-                    for previous in collector.Combined do
-                        Spool.appendStreamingSpool active previous
-
-                    collector.Combined.Clear()
-                    collector.Stdout.Clear()
-                    collector.Stderr.Clear()
-                    collector.Spool <- Some active
+            collector.BytesObserved <- collector.BytesObserved + int64 bytes.Length
+            appendInMemory collector target bytes
 
     let addStdout (collector: OutputCollector) (bytes: byte[]) : unit =
         addChunk collector collector.Stdout bytes
@@ -58,19 +58,16 @@ module ProcessOutput =
     let addStderr (collector: OutputCollector) (bytes: byte[]) : unit =
         addChunk collector collector.Stderr bytes
 
+    let private concatBytes (parts: List<byte[]>) =
+        if parts.Count = 0 then [||] else parts |> Seq.toArray |> Array.concat
+
     let buildResult (collector: OutputCollector) (exitCode: int) : ProcessOutcome =
         match collector.Spool with
         | Some active ->
             ProcessOutcome.Spooled(exitCode, active.Path, active.BytesWritten, Spool.chunkCount active.BytesWritten)
         | None ->
-            let concat (parts: List<byte[]>) =
-                if parts.Count = 0 then
-                    [||]
-                else
-                    parts |> Seq.toArray |> Array.concat
-
-            let stdoutBytes = concat collector.Stdout
-            let stderrBytes = concat collector.Stderr
+            let stdoutBytes = concatBytes collector.Stdout
+            let stderrBytes = concatBytes collector.Stderr
             let stdoutText = Encoding.UTF8.GetString(stdoutBytes, 0, stdoutBytes.Length)
             let stderrText = Encoding.UTF8.GetString(stderrBytes, 0, stderrBytes.Length)
 

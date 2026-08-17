@@ -93,24 +93,55 @@ module ManagerJobHandoff =
 
     /// Progress cases that mean the Orchestrator has taken the job from the Manager.
     let private isTransferred (outcome: ReconcileProgram.TurnOutcome) (progress: JobProgress) =
-        let progressTransferred =
-            match progress with
-            | JobProgress.CandidateReady _
-            | JobProgress.RebasedCandidateReady _
-            | JobProgress.PublishClaimed _
-            | JobProgress.Published _
-            | JobProgress.Failed _
-            | JobProgress.Abandoned -> true
-            | JobProgress.ConflictPending _ ->
-                match outcome with
-                | ReconcileProgram.TurnCompleted -> true
-                | _ -> false
-            | _ -> false
-
-        match outcome with
-        | ReconcileProgram.TurnInProgress
-        | ReconcileProgram.TurnCompleted -> progressTransferred
+        match outcome, progress with
+        | ReconcileProgram.TurnInProgress, JobProgress.CandidateReady _
+        | ReconcileProgram.TurnCompleted, JobProgress.CandidateReady _
+        | ReconcileProgram.TurnInProgress, JobProgress.RebasedCandidateReady _
+        | ReconcileProgram.TurnCompleted, JobProgress.RebasedCandidateReady _
+        | ReconcileProgram.TurnInProgress, JobProgress.PublishClaimed _
+        | ReconcileProgram.TurnCompleted, JobProgress.PublishClaimed _
+        | ReconcileProgram.TurnInProgress, JobProgress.Published _
+        | ReconcileProgram.TurnCompleted, JobProgress.Published _
+        | ReconcileProgram.TurnInProgress, JobProgress.Failed _
+        | ReconcileProgram.TurnCompleted, JobProgress.Failed _
+        | ReconcileProgram.TurnInProgress, JobProgress.Abandoned
+        | ReconcileProgram.TurnCompleted, JobProgress.Abandoned
+        | ReconcileProgram.TurnCompleted, JobProgress.ConflictPending _ -> true
         | _ -> false
+
+    let private completeInProgress
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (abortedSessions: HashSet<string>)
+        (turn: ReconciledTurn) =
+        task {
+            match tryJobProgress journal turn.SessionId with
+            | Some progress when isTransferred turn.Outcome progress ->
+                let! _ = TerminalReporter.complete eventPort journal abortedSessions turn
+                return HandoffOutcome.Transferred
+            | _ -> return HandoffOutcome.ManagerOwnsTurn
+        }
+
+    let private recordFallbackSuccessIfValid
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (terminalValid: bool) =
+        if terminalValid then
+            AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
+
+    let private completeCompleted
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (abortedSessions: HashSet<string>)
+        (turn: ReconciledTurn) =
+        task {
+            match tryJobProgress journal turn.SessionId with
+            | Some progress when isTransferred turn.Outcome progress ->
+                let! _, terminalValid = TerminalReporter.complete eventPort journal abortedSessions turn
+                recordFallbackSuccessIfValid journal turn terminalValid
+                return HandoffOutcome.Transferred
+            | _ -> return HandoffOutcome.ManagerOwnsTurn
+        }
 
     /// If Orchestrator progress already owns this Manager turn, complete the agent
     /// and report Transferred; otherwise leave ownership with the Manager.
@@ -120,23 +151,7 @@ module ManagerJobHandoff =
         (abortedSessions: HashSet<string>)
         (turn: ReconciledTurn)
         : Task<HandoffOutcome> =
-        task {
-            match turn.Outcome with
-            | ReconcileProgram.TurnInProgress ->
-                match tryJobProgress journal turn.SessionId with
-                | Some progress when isTransferred turn.Outcome progress ->
-                    let! _ = TerminalReporter.complete eventPort journal abortedSessions turn
-                    return HandoffOutcome.Transferred
-                | _ -> return HandoffOutcome.ManagerOwnsTurn
-            | ReconcileProgram.TurnCompleted ->
-                match tryJobProgress journal turn.SessionId with
-                | Some progress when isTransferred turn.Outcome progress ->
-                    let! _, terminalValid = TerminalReporter.complete eventPort journal abortedSessions turn
-
-                    if terminalValid then
-                        AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
-
-                    return HandoffOutcome.Transferred
-                | _ -> return HandoffOutcome.ManagerOwnsTurn
-            | _ -> return HandoffOutcome.ManagerOwnsTurn
-        }
+        match turn.Outcome with
+        | ReconcileProgram.TurnInProgress -> completeInProgress eventPort journal abortedSessions turn
+        | ReconcileProgram.TurnCompleted -> completeCompleted eventPort journal abortedSessions turn
+        | _ -> Task.FromResult HandoffOutcome.ManagerOwnsTurn

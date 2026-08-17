@@ -62,30 +62,22 @@ module RuntimePath =
 
         runtimeDirectory (joinPath stateRoot (HostDigest.sha256Hex workspace))
 
+    let private resolveCommonPath (workspace: string) (commonDirectory: string) =
+        if isAbsolute commonDirectory then
+            commonDirectory
+        else
+            resolvePath workspace commonDirectory
+
     let gitCommonDir (workspace: string) : string =
         try
             let commonDirectory = askGitCommonDir workspace
-
-            let resolved =
-                if isAbsolute commonDirectory then
-                    commonDirectory
-                else
-                    resolvePath workspace commonDirectory
-
-            canonicalPath resolved
+            commonDirectory |> resolveCommonPath workspace |> canonicalPath
         with _ ->
             workspace
 
     let forWorkspace workspace =
         try
             let commonDirectory = askGitCommonDir workspace
-
-            let gitDirectory =
-                if isAbsolute commonDirectory then
-                    commonDirectory
-                else
-                    resolvePath workspace commonDirectory
-
-            runtimeDirectory (canonicalPath gitDirectory)
+            commonDirectory |> resolveCommonPath workspace |> canonicalPath |> runtimeDirectory
         with _ ->
             stateDirectory workspace

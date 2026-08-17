@@ -57,6 +57,15 @@ module MonteCarlo =
         |> List.tryHead
         |> Option.map fst
 
+    let private continueSelection model nodes node path depth unvisited recurse =
+        match unvisited with
+        | child :: _ -> List.rev (child :: node :: path)
+        | [] ->
+            chooseChild model node nodes
+            |> Option.fold
+                (fun _ child -> recurse child (node :: path) (depth + 1))
+                (List.rev (node :: path))
+
     let private select model nodes =
         let rec loop node path depth =
             if depth >= 64 || Map.containsKey node model.TerminalReward then
@@ -69,28 +78,25 @@ module MonteCarlo =
                     |> List.filter (fun key -> (nodeFor model key nodes).Visits = 0)
                     |> List.sort
 
-                match unvisited with
-                | child :: _ -> List.rev (child :: node :: path)
-                | [] ->
-                    match chooseChild model node nodes with
-                    | None -> List.rev (node :: path)
-                    | Some child -> loop child (node :: path) (depth + 1)
+                continueSelection model nodes node path depth unvisited loop
 
         loop model.Root [] 0
+
+    let private continueRollout model node depth recurse =
+        match model.Children |> Map.tryFind node |> Option.defaultValue [] with
+        | [] -> 0.0
+        | children ->
+            children
+            |> List.sortBy (fun key -> -(model.Prior |> Map.tryFind key |> Option.defaultValue 0.5), key)
+            |> List.head
+            |> fun child -> recurse child (depth + 1)
 
     let private rollout model start =
         let rec loop node depth =
             match Map.tryFind node model.TerminalReward with
             | Some reward -> reward
             | None when depth >= 64 -> 0.0
-            | None ->
-                match model.Children |> Map.tryFind node |> Option.defaultValue [] with
-                | [] -> 0.0
-                | children ->
-                    children
-                    |> List.sortBy (fun key -> -(model.Prior |> Map.tryFind key |> Option.defaultValue 0.5), key)
-                    |> List.head
-                    |> fun child -> loop child (depth + 1)
+            | None -> continueRollout model node depth loop
 
         loop start 0
 

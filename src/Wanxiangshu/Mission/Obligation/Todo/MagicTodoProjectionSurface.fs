@@ -25,6 +25,7 @@ module private MagicTodoProjectionEncoding =
         | MagicTodoFoldRejection.DedicatedMissingForReplace -> box {| code = "DedicatedMissingForReplace" |}
 
 type MagicTodoProjectionHandle private(state: MagicTodoProjection.MagicTodoProjectionState) =
+    // DSL-MUTABLE: resource — opaque projection handle current state
     let mutable current = state
 
     member _.Fold(eventId: string, factJson: string) : obj =

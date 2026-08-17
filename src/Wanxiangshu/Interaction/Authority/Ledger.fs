@@ -61,6 +61,11 @@ module PromptAuthorityLedger =
         | "AgentOwnerRoot" -> Some PromptAuthority.RootAuthorityKind.AgentOwnerRoot
         | _ -> None
 
+    /// The recorded peer wins when present; blank facts fall back to the
+    /// parser-proven peer without inferring anything from the role.
+    let private recordedPeerOrDerived (recorded: string) (derived: string) =
+        if System.String.IsNullOrWhiteSpace recorded then derived else recorded
+
     /// PROMPT-002: an Authority Root took effect and fixed the profile.
     ///
     /// An uninterpretable fact leaves the projection alone. A fact naming an
@@ -87,11 +92,7 @@ module PromptAuthorityLedger =
             // be proven during config validation, and the fact preserves what was
             // proven then; deriving it here would silently repair a journal
             // written under a different config.
-            let peerAgent =
-                if System.String.IsNullOrWhiteSpace fact.PeerAgent then
-                    derivedPeer
-                else
-                    fact.PeerAgent
+            let peerAgent = recordedPeerOrDerived fact.PeerAgent derivedPeer
 
             let profile: PromptAuthority.AuthorityExecutionProfile =
                 { SessionId = fact.SessionId

@@ -52,6 +52,34 @@ module ChildPromptAuthority =
 
     /// Register AgentOwnerRoot authority for one proven linked child, idempotently.
     /// The durable handle is the only source of TargetAgent; no role-to-agent rebuild.
+    let private createLinkedChildAuthority
+        (runtime: PromptDispatcher.Runtime)
+        (turn: ReconciledTurn)
+        (handle: Wanxiangshu.Execution.Delegation.HandleRecord)
+        : System.Threading.Tasks.Task<Result<unit, string>> =
+        match
+            PromptAuthorityRun.createAuthorityRoot
+                HostDigest.sha256Hex
+                runtime.RuntimeId
+                turn.SessionId
+                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                turn.PhysicalUserMessageId
+                handle.TargetAgent
+        with
+        | Error error -> System.Threading.Tasks.Task.FromResult(Error error)
+        | Ok profile -> runtime.RegisterAuthority profile
+
+    let private registerLinkedChildIfNeeded
+        (runtime: PromptDispatcher.Runtime)
+        (turn: ReconciledTurn)
+        handle
+        (activeProfile: PromptAuthority.AuthorityExecutionProfile option)
+        : System.Threading.Tasks.Task<Result<unit, string>> =
+        match handle, activeProfile with
+        | None, _
+        | Some _, Some _ -> System.Threading.Tasks.Task.FromResult(Ok())
+        | Some handle, None -> createLinkedChildAuthority runtime turn handle
+
     let ensureForLinkedChild
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
@@ -62,23 +90,9 @@ module ChildPromptAuthority =
             | Some durable ->
                 let snapshot = AgentJournal.snapshot durable
 
-                match Map.tryFind turn.SessionId snapshot.AgentProjections.HandleByChildSession with
-                | None -> return Ok()
-                | Some handle ->
-                    match PromptAuthorityLedger.activeProfile turn.SessionId snapshot.AgentProjections with
-                    | Some _ -> return Ok()
-                    | None ->
-                        let runtime = PromptDispatcher.forJournal durable
+                let handle = Map.tryFind turn.SessionId snapshot.AgentProjections.HandleByChildSession
+                let activeProfile = PromptAuthorityLedger.activeProfile turn.SessionId snapshot.AgentProjections
 
-                        match
-                            PromptAuthorityRun.createAuthorityRoot
-                                HostDigest.sha256Hex
-                                runtime.RuntimeId
-                                turn.SessionId
-                                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                                turn.PhysicalUserMessageId
-                                handle.TargetAgent
-                        with
-                        | Error error -> return Error error
-                        | Ok profile -> return! runtime.RegisterAuthority profile
+                let runtime = PromptDispatcher.forJournal durable
+                return! registerLinkedChildIfNeeded runtime turn handle activeProfile
         }

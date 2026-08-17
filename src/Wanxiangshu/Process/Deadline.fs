@@ -35,15 +35,10 @@ module Deadline =
     /// Next wait duration in milliseconds against the absolute deadline, capped at
     /// the JS timer ceiling. A huge legal estimate (tens of days) therefore returns
     /// the cap instead of overflowing int, so the caller can wait in segments.
+    let private capWaitMs total =
+        if total > int64 MaxTimerWaitMs then MaxTimerWaitMs else int total
+
     let nextWaitMs (clock: unit -> DateTimeOffset) (Deadline expiresAt: Deadline) : int =
         let rem = expiresAt - clock ()
 
-        if rem <= TimeSpan.Zero then
-            0
-        else
-            let total = int64 rem.TotalMilliseconds
-
-            if total > int64 MaxTimerWaitMs then
-                MaxTimerWaitMs
-            else
-                int total
+        if rem <= TimeSpan.Zero then 0 else capWaitMs (int64 rem.TotalMilliseconds)

@@ -74,20 +74,22 @@ module StrengthSettings =
         | value when String.IsNullOrWhiteSpace value -> None
         | value -> Some(value.Trim())
 
-    let private nonNegativeFloat name =
+    let private nonNegativeFloat (name: string) =
         env name
-        |> Option.bind (fun text ->
+        |> Option.bind (fun (text: string) ->
             match Double.TryParse text with
             | true, value when value >= 0.0 && value <= Double.MaxValue -> Some value
             | _ -> None)
 
+    let private parseNonNegativeInt (fallback: int) (text: string) =
+        match Int32.TryParse text with
+        | true, value when value >= 0 -> value
+        | _ -> fallback
+
     let private nonNegativeInt name fallback =
         match env name with
         | None -> fallback
-        | Some text ->
-            match Int32.TryParse text with
-            | true, value when value >= 0 -> value
-            | _ -> fallback
+        | Some text -> parseNonNegativeInt fallback text
 
     let private mode () =
         match
@@ -100,6 +102,31 @@ module StrengthSettings =
         | Some "shadow"
         | None -> StrengthRolloutMode.Shadow
         | Some _ -> StrengthRolloutMode.Off
+
+    let private buildCosts (values: float option list) =
+        match values with
+        | [ Some savedDeep1
+            Some savedDeep2
+            Some fast1
+            Some fast2
+            Some byte1
+            Some byte2
+            Some delay1
+            Some delay2
+            Some risk1
+            Some risk2 ] ->
+            Some
+                { SavedDeep1 = savedDeep1
+                  SavedDeep2 = savedDeep2
+                  Fast1 = fast1
+                  Fast2 = fast2
+                  Byte1 = byte1
+                  Byte2 = byte2
+                  Delay1 = delay1
+                  Delay2 = delay2
+                  Risk1 = risk1
+                  Risk2 = risk2 }
+        | _ -> None
 
     let private costs () =
         let values =
@@ -115,22 +142,7 @@ module StrengthSettings =
               nonNegativeFloat "WANXIANGSHU_STRENGTH_RISK_2" ]
 
         if values |> List.forall Option.isSome then
-            let unwrapped = values |> List.map Option.get
-
-            match unwrapped with
-            | [ savedDeep1; savedDeep2; fast1; fast2; byte1; byte2; delay1; delay2; risk1; risk2 ] ->
-                Some
-                    { SavedDeep1 = savedDeep1
-                      SavedDeep2 = savedDeep2
-                      Fast1 = fast1
-                      Fast2 = fast2
-                      Byte1 = byte1
-                      Byte2 = byte2
-                      Delay1 = delay1
-                      Delay2 = delay2
-                      Risk1 = risk1
-                      Risk2 = risk2 }
-            | _ -> None
+            buildCosts values
         else
             None
 

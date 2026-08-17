@@ -33,6 +33,7 @@ module TemporalSurface =
         member _.Port = port
 
     type private JournalHandle(commonDir: string, journal: AgentJournal) =
+        // DSL-MUTABLE: resource — one-shot temporal journal disposal latch
         let mutable disposed = false
 
         member _.CommonDir = commonDir

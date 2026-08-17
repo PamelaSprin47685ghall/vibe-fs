@@ -62,86 +62,87 @@ module NeedHelpEventCodec =
         | "reasoning_content" -> true
         | _ -> false
 
+    let private eventTypeOf (raw: obj) =
+        if isNull raw then None else Some(HostEventCodec.eventTypeOf raw)
+
     let isNeedHelpRelevantEvent (rawInput: obj) : bool =
         let raw = HostEventCodec.unwrap rawInput
 
-        if isNull raw then
-            false
-        else
-            match HostEventCodec.eventTypeOf raw with
-            | "message.part.updated"
-            | "message.part.delta" -> true
-            | _ -> false
+        match eventTypeOf raw with
+        | Some("message.part.updated" | "message.part.delta") -> true
+        | _ -> false
 
     /// Compatibility probe for Hosts that directly label a reasoning delta in
     /// `field`. Current OpenCode uses part.updated(type=reasoning) + delta(field=text).
+    let private present (value: obj) =
+        if isNull value then None else Some value
+
+    let private deltaProperties (raw: obj) =
+        if isNull raw || HostEventCodec.eventTypeOf raw <> "message.part.delta" then
+            None
+        else
+            present raw?properties
+
+    let private updatedPart (properties: obj) = present properties?part
+
+    let private updatedProperties (raw: obj) =
+        if isNull raw || HostEventCodec.eventTypeOf raw <> "message.part.updated" then
+            None
+        else
+            present raw?properties
+
+    let private decodeUpdatedPart (raw: obj) (properties: obj) (part: obj) : PartIdentity option =
+        match
+            sessionIdOf raw properties,
+            stringField part?messageID |> Option.orElse (stringField part?messageId),
+            stringField part?id |> Option.orElse (stringField properties?partID),
+            stringField part?``type``
+        with
+        | Some session, Some message, Some partId, Some partType ->
+            Some
+                { SessionId = session
+                  ProviderRun = ProviderRunIdentity.create message
+                  PartId = partId
+                  PartType = partType }
+        | _ -> None
+
+    let private decodeDelta (raw: obj) (properties: obj) : StreamDelta option =
+        match
+            sessionIdOf raw properties,
+            stringField properties?messageID
+            |> Option.orElse (stringField properties?messageId),
+            stringField properties?partID |> Option.orElse (stringField properties?partId),
+            stringField properties?field,
+            stringField properties?delta
+        with
+        | Some session, Some message, Some partId, Some field, Some delta ->
+            Some
+                { SessionId = session
+                  ProviderRun = ProviderRunIdentity.create message
+                  PartId = partId
+                  Field = field
+                  Delta = delta }
+        | _ -> None
+
     let isNeedHelpDelta (rawInput: obj) : bool =
         let raw = HostEventCodec.unwrap rawInput
 
-        if isNull raw || HostEventCodec.eventTypeOf raw <> "message.part.delta" then
-            false
-        else
-            let properties = raw?properties
-
-            if isNull properties then
-                false
-            else
-                stringField properties?field |> Option.exists legacyReasoningField
+        match deltaProperties raw with
+        | Some properties -> stringField properties?field |> Option.exists legacyReasoningField
+        | None -> false
 
     let tryDecodePartUpdated (rawInput: obj) : PartIdentity option =
         let raw = HostEventCodec.unwrap rawInput
 
-        if isNull raw || HostEventCodec.eventTypeOf raw <> "message.part.updated" then
-            None
-        else
-            let properties = raw?properties
-
-            if isNull properties || isNull properties?part then
-                None
-            else
-                let part = properties?part
-
-                match
-                    sessionIdOf raw properties,
-                    stringField part?messageID |> Option.orElse (stringField part?messageId),
-                    stringField part?id |> Option.orElse (stringField properties?partID),
-                    stringField part?``type``
-                with
-                | Some session, Some message, Some partId, Some partType ->
-                    Some
-                        { SessionId = session
-                          ProviderRun = ProviderRunIdentity.create message
-                          PartId = partId
-                          PartType = partType }
-                | _ -> None
+        updatedProperties raw
+        |> Option.bind (fun properties ->
+            updatedPart properties
+            |> Option.bind (decodeUpdatedPart raw properties))
 
     let tryDecodeDelta (rawInput: obj) : StreamDelta option =
         let raw = HostEventCodec.unwrap rawInput
 
-        if isNull raw || HostEventCodec.eventTypeOf raw <> "message.part.delta" then
-            None
-        else
-            let properties = raw?properties
-
-            if isNull properties then
-                None
-            else
-                match
-                    sessionIdOf raw properties,
-                    stringField properties?messageID
-                    |> Option.orElse (stringField properties?messageId),
-                    stringField properties?partID |> Option.orElse (stringField properties?partId),
-                    stringField properties?field,
-                    stringField properties?delta
-                with
-                | Some session, Some message, Some partId, Some field, Some delta ->
-                    Some
-                        { SessionId = session
-                          ProviderRun = ProviderRunIdentity.create message
-                          PartId = partId
-                          Field = field
-                          Delta = delta }
-                | _ -> None
+        deltaProperties raw |> Option.bind (decodeDelta raw)
 
     /// Legacy direct-field decoder retained for focused compatibility proof.
     let tryDecodeReasoningDelta (rawInput: obj) : StreamDelta option =

@@ -253,6 +253,59 @@ module ChildRecovery =
     /// restore in flight / abort-only / unknown → RecoveryIncomplete (must not issue permit)
     /// ParentCancelled / DeadlineExceeded / HostSessionGone → RecoveredAbandoned
     /// conflict / retired → RecoveryBlocked
+    let private resolveTerminal evidence : ChildResolution =
+        match JoinableCompletion.tryFromProvenTerminal evidence with
+        | Ok proof -> ChildResolution.RecoveredTerminal proof
+        | Error reason -> ChildResolution.RecoveryBlocked reason
+
+    let private resolveNonTerminal (observations: HostObservation list) : ChildResolution =
+        let hasAbortOnly =
+            observations
+            |> List.exists (function
+                | HostObservation.AbortedObserved _ -> true
+                | _ -> false)
+
+        let abandonReason =
+            observations
+            |> List.tryPick (function
+                | HostObservation.ParentCancelled -> Some HandleAbandonReason.ParentCancelled
+                | HostObservation.DeadlineExceeded -> Some HandleAbandonReason.DeadlineExceeded
+                | HostObservation.HostSessionGone -> Some HandleAbandonReason.HostSessionGone
+                | _ -> None)
+
+        let restoreInFlight =
+            observations
+            |> List.exists (function
+                | HostObservation.RecoveryInFlight -> true
+                | _ -> false)
+
+        let sessionActive =
+            observations
+            |> List.exists (function
+                | HostObservation.SessionActive -> true
+                | _ -> false)
+
+        match abandonReason with
+        | Some reason -> ChildResolution.RecoveredAbandoned reason
+        // Session active = child continues; recovery step for this handle is done.
+        | None when sessionActive -> ChildResolution.RecoveredActive
+        // Restore still running or only abort noise → incomplete (no permit).
+        | None when restoreInFlight -> ChildResolution.RecoveryIncomplete
+        | None when hasAbortOnly -> ChildResolution.RecoveryIncomplete
+        | None -> ChildResolution.RecoveryIncomplete
+
+    let private resolveSnapshot
+        (snapshot: ChildSnapshotEvidence)
+        (observations: HostObservation list)
+        : ChildResolution =
+        match snapshot with
+        | ChildSnapshotEvidence.Terminal evidence -> resolveTerminal evidence
+        // True GetMessages / decode failure: incomplete (wait), not definitive block.
+        // Family permit must not issue; join / onTurn consumers treat as wait-not-hard-error.
+        | ChildSnapshotEvidence.Unreadable _ -> ChildResolution.RecoveryIncomplete
+        | ChildSnapshotEvidence.Missing
+        | ChildSnapshotEvidence.Active -> resolveNonTerminal observations
+
     let resolveChild
         (durable: DurableHandleEvidence)
         (snapshot: ChildSnapshotEvidence)
@@ -263,51 +316,7 @@ module ChildRecovery =
         | DurableHandleEvidence.CompletedAwaitingJoin proof -> ChildResolution.RecoveredTerminal proof
         | DurableHandleEvidence.Retired -> ChildResolution.RecoveryBlocked "handle already retired"
         | DurableHandleEvidence.Unknown
-        | DurableHandleEvidence.Active ->
-            match snapshot with
-            | ChildSnapshotEvidence.Terminal evidence ->
-                match JoinableCompletion.tryFromProvenTerminal evidence with
-                | Ok proof -> ChildResolution.RecoveredTerminal proof
-                | Error reason -> ChildResolution.RecoveryBlocked reason
-            // True GetMessages / decode failure: incomplete (wait), not definitive block.
-            // Family permit must not issue; join / onTurn consumers treat as wait-not-hard-error.
-            | ChildSnapshotEvidence.Unreadable _ -> ChildResolution.RecoveryIncomplete
-            | ChildSnapshotEvidence.Missing
-            | ChildSnapshotEvidence.Active ->
-                let hasAbortOnly =
-                    observations
-                    |> List.exists (function
-                        | HostObservation.AbortedObserved _ -> true
-                        | _ -> false)
-
-                let abandonReason =
-                    observations
-                    |> List.tryPick (function
-                        | HostObservation.ParentCancelled -> Some HandleAbandonReason.ParentCancelled
-                        | HostObservation.DeadlineExceeded -> Some HandleAbandonReason.DeadlineExceeded
-                        | HostObservation.HostSessionGone -> Some HandleAbandonReason.HostSessionGone
-                        | _ -> None)
-
-                let restoreInFlight =
-                    observations
-                    |> List.exists (function
-                        | HostObservation.RecoveryInFlight -> true
-                        | _ -> false)
-
-                let sessionActive =
-                    observations
-                    |> List.exists (function
-                        | HostObservation.SessionActive -> true
-                        | _ -> false)
-
-                match abandonReason with
-                | Some reason -> ChildResolution.RecoveredAbandoned reason
-                // Session active = child continues; recovery step for this handle is done.
-                | None when sessionActive -> ChildResolution.RecoveredActive
-                // Restore still running or only abort noise → incomplete (no permit).
-                | None when restoreInFlight -> ChildResolution.RecoveryIncomplete
-                | None when hasAbortOnly -> ChildResolution.RecoveryIncomplete
-                | None -> ChildResolution.RecoveryIncomplete
+        | DurableHandleEvidence.Active -> resolveSnapshot snapshot observations
 
     /// §九 join-recovery timeline events (pure observation log, not a program counter).
     /// agentId is the AgentHandle key string (same as JoinableCompletion.agentId).
@@ -336,11 +345,26 @@ module ChildRecovery =
             function
             | []
             | [ _ ] -> true
-            | a :: b :: rest ->
-                if adjacentForbidden a b then
-                    false
-                else
-                    adjacencyOk (b :: rest)
+            | a :: b :: rest -> not (adjacentForbidden a b) && adjacencyOk (b :: rest)
+
+        let joinReturnHasProofBeforeCommit events index agentId =
+            let before = List.take index events
+
+            let proofIdx =
+                before
+                |> List.tryFindIndex (function
+                    | JoinRecoveryTrace.TerminalProofIssued id when id = agentId -> true
+                    | _ -> false)
+
+            let commitIdx =
+                before
+                |> List.tryFindIndex (function
+                    | JoinRecoveryTrace.HandleCompletionCommitted id when id = agentId -> true
+                    | _ -> false)
+
+            match proofIdx, commitIdx with
+            | Some p, Some c -> p < c
+            | _ -> false
 
         let orderForJoinReturns =
             events
@@ -348,23 +372,7 @@ module ChildRecovery =
             |> List.forall (fun (i, event) ->
                 match event with
                 | JoinRecoveryTrace.JoinReturned(agentId, _) ->
-                    let before = List.take i events
-
-                    let proofIdx =
-                        before
-                        |> List.tryFindIndex (function
-                            | JoinRecoveryTrace.TerminalProofIssued id when id = agentId -> true
-                            | _ -> false)
-
-                    let commitIdx =
-                        before
-                        |> List.tryFindIndex (function
-                            | JoinRecoveryTrace.HandleCompletionCommitted id when id = agentId -> true
-                            | _ -> false)
-
-                    match proofIdx, commitIdx with
-                    | Some p, Some c -> p < c
-                    | _ -> false
+                    joinReturnHasProofBeforeCommit events i agentId
                 | _ -> true)
 
         adjacencyOk events && orderForJoinReturns

@@ -26,6 +26,8 @@ module MagicTodoFinalityCohort =
 
     /// Ordinary graduation: after first dual-PERFECT on a FinalityRequest,
     /// Dedicated is NOT force-re-enlisted by Magic Todo on later requests.
+    /// DSL-state-combination: domain — the two booleans are an explicit
+    /// graduation policy decision, not stored execution position.
     type DedicatedFinalityPolicy =
         {
             /// Physical session still retained for process-review until LifeCompleted.

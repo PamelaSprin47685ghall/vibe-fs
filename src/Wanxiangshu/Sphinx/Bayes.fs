@@ -66,33 +66,41 @@ module Bayes =
         |> Seq.map (fun (_, group) -> group |> Seq.sortBy (fun item -> item.SemanticKey) |> Seq.head)
         |> Seq.toList
 
+    let private beliefFromQualified
+        (state: EpistemicState)
+        (qualified: Evidence list)
+        : BayesianBelief option =
+        let posterior =
+            qualified
+            |> List.fold
+                (fun current evidence ->
+                    current
+                    |> Map.map (fun key prior -> prior * evidence.Likelihoods[key])
+                    |> normalize)
+                (initialPrior state.Hypotheses)
+
+        if Map.isEmpty posterior then
+            None
+        else
+            Some
+                { Posterior = posterior
+                  Entropy = entropy posterior
+                  BayesRisk = risk posterior }
+
+    let private updateEligible (state: EpistemicState) : BayesianBelief option =
+        let hypothesisKeys = state.Hypotheses |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+        let qualified = independentQualifiedEvidence hypothesisKeys state.Evidence
+
+        if List.isEmpty qualified then
+            None
+        else
+            beliefFromQualified state qualified
+
     let update (state: EpistemicState) : BayesianBelief option =
         if state.Hypotheses.Count < 2 then
             None
         else
-            let hypothesisKeys = state.Hypotheses |> Map.toSeq |> Seq.map fst |> Set.ofSeq
-
-            let qualified = independentQualifiedEvidence hypothesisKeys state.Evidence
-
-            if List.isEmpty qualified then
-                None
-            else
-                let posterior =
-                    qualified
-                    |> List.fold
-                        (fun current evidence ->
-                            current
-                            |> Map.map (fun key prior -> prior * evidence.Likelihoods[key])
-                            |> normalize)
-                        (initialPrior state.Hypotheses)
-
-                if Map.isEmpty posterior then
-                    None
-                else
-                    Some
-                        { Posterior = posterior
-                          Entropy = entropy posterior
-                          BayesRisk = risk posterior }
+            updateEligible state
 
     let likelihoodQualified (state: EpistemicState) =
         match update state with

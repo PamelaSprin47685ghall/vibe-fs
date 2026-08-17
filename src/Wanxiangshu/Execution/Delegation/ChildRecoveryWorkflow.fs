@@ -36,6 +36,9 @@ open Wanxiangshu.Strength
 /// GREEN-5: after durable commit, Pulse agent handle only (wake); Journal is fact source.
 module ChildRecoveryWorkflow =
 
+    /// DSL-state-combination: physical — optional Journal/Snapshot capabilities
+    /// are injected infrastructure ports; the remaining fields are one recovery
+    /// invocation's identities and observations, not a stored program counter.
     type Ports =
         {
             Journal: AgentJournal option

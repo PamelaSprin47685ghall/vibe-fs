@@ -229,6 +229,99 @@ module ManagerLifeWorkflow =
         | EndingLifeAdmission.InitialAgentOwnerMigration evidence ->
             materializeInitialAgentOwnerLife journal sessionId evidence
 
+    let private captureTerminalIfMissing
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (blob: BlobWriteReceipt)
+        (terminalRecorded: bool) =
+        if not terminalRecorded then
+            AgentJournal.appendAgent
+                (StreamId.Session sessionId)
+                (Some providerRun)
+                (CompanionFact.TerminalOutputCaptured
+                    {| SessionId = sessionId
+                       TextRef = blob.BlobRef
+                       TextDigest = blob.BlobDigest
+                       ProviderRun = providerRun |})
+                journal
+            |> ignore
+
+    let private captureLastWordsIfPresent
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (lastWords: string)
+        (providerRun: ProviderRunIdentity)
+        (blob: BlobWriteReceipt) =
+        if not (String.IsNullOrWhiteSpace lastWords) then
+            XTraceCapture.captureLastWords
+                (Some journal)
+                sessionId
+                blob.BlobRef
+                blob.BlobDigest
+                providerRun
+        else
+            Task.FromResult()
+
+    let private completeFreshBlessedLife
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (life: LifeProjection)
+        (blessing: BlessingEvidence)
+        (lastWords: string)
+        (providerRun: ProviderRunIdentity)
+        (blob: BlobWriteReceipt) =
+        task {
+            let snapshot = AgentJournal.snapshot journal
+            let terminalRecorded =
+                AgentProjection.tryFind sessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.XTrace)
+                |> Option.exists (fun state -> state.Terminal.IsSome)
+
+            match!
+                appendLifecycle
+                    journal
+                    sessionId
+                    (ManagerLifecycleFact.LifeCompleted
+                        {| SessionId = sessionId
+                           LifeId = life.LifeId
+                           RequestId = blessing.RequestId
+                           TerminalRef = blob.BlobRef
+                           TerminalDigest = blob.BlobDigest |})
+            with
+            | Error error -> return Error error
+            | Ok() ->
+                captureTerminalIfMissing journal sessionId providerRun blob terminalRecorded
+                do! captureLastWordsIfPresent journal sessionId lastWords providerRun blob
+
+                let authorityRoot =
+                    PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
+                    |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+                    |> Option.defaultValue (AuthorityRootUserMessageId.create "")
+
+                return Ok(BlessedLifeCompletion.Completed authorityRoot)
+        }
+
+    let private completeWithBlessingBlob
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (life: LifeProjection)
+        (blessing: BlessingEvidence)
+        (lastWords: string)
+        (providerRun: ProviderRunIdentity)
+        (blob: BlobWriteReceipt) =
+        let snapshot = AgentJournal.snapshot journal
+        let alreadyCompleted =
+            AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.ManagerLife)
+            |> Option.exists (fun lifecycle ->
+                (lifecycle.CurrentLife |> Option.exists (fun current -> current.LifeId = life.LifeId && current.Completed))
+                || lifecycle.CompletedLives |> List.exists (fun completed -> completed.LifeId = life.LifeId))
+
+        match alreadyCompleted with
+        | true -> Task.FromResult(Ok BlessedLifeCompletion.AlreadyCompleted)
+        | false -> completeFreshBlessedLife journal sessionId life blessing lastWords providerRun blob
+
     /// GLORY-062 durable half of the second suicide. Physical terminal publish is
     /// deliberately returned to Infrastructure as a capability effect.
     let completeBlessedLife
@@ -242,70 +335,5 @@ module ManagerLifeWorkflow =
         task {
             match! journal.WriteBlob lastWords with
             | Error error -> return Error error
-            | Ok blob ->
-                let snapshot = AgentJournal.snapshot journal
-
-                let alreadyCompleted =
-                    AgentProjection.tryFind sessionId snapshot.AgentProjections
-                    |> Option.bind (fun session -> session.ManagerLife)
-                    |> Option.exists (fun lifecycle ->
-                        (lifecycle.CurrentLife
-                         |> Option.exists (fun current -> current.LifeId = life.LifeId && current.Completed))
-                        || lifecycle.CompletedLives
-                           |> List.exists (fun completed -> completed.LifeId = life.LifeId))
-
-                if alreadyCompleted then
-                    return Ok BlessedLifeCompletion.AlreadyCompleted
-                else
-                    let terminalRecorded =
-                        AgentProjection.tryFind sessionId snapshot.AgentProjections
-                        |> Option.bind (fun session -> session.XTrace)
-                        |> Option.exists (fun state -> state.Terminal.IsSome)
-
-                    match!
-                        appendLifecycle
-                            journal
-                            sessionId
-                            (ManagerLifecycleFact.LifeCompleted
-                                {| SessionId = sessionId
-                                   LifeId = life.LifeId
-                                   RequestId = blessing.RequestId
-                                   TerminalRef = blob.BlobRef
-                                   TerminalDigest = blob.BlobDigest |})
-                    with
-                    | Error error -> return Error error
-                    | Ok() ->
-                        // Preserve the original error boundary: XTrace terminal capture
-                        // is best-effort after the durable LifeCompleted fact.
-                        if not terminalRecorded then
-                            AgentJournal.appendAgent
-                                (StreamId.Session sessionId)
-                                (Some providerRun)
-                                (CompanionFact.TerminalOutputCaptured
-                                    {| SessionId = sessionId
-                                       TextRef = blob.BlobRef
-                                       TextDigest = blob.BlobDigest
-                                       ProviderRun = providerRun |})
-                                journal
-                            |> ignore
-
-                        // last_words must appear in the completed Life's LWR Recent
-                        // work as a normal assistant part (Closing report is gone).
-                        if not (String.IsNullOrWhiteSpace lastWords) then
-                            do!
-                                XTraceCapture.captureLastWords
-                                    (Some journal)
-                                    sessionId
-                                    blob.BlobRef
-                                    blob.BlobDigest
-                                    providerRun
-
-                        let authorityRoot =
-                            PromptAuthorityLedger.activeProfile
-                                sessionId
-                                (AgentJournal.snapshot journal).AgentProjections
-                            |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
-                            |> Option.defaultValue (AuthorityRootUserMessageId.create "")
-
-                        return Ok(BlessedLifeCompletion.Completed authorityRoot)
+            | Ok blob -> return! completeWithBlessingBlob journal sessionId life blessing lastWords providerRun blob
         }

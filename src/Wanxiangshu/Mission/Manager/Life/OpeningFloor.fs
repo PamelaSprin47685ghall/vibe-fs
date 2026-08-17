@@ -58,6 +58,15 @@ module ManagerOpeningFloor =
         |> Option.bind (fun writeId -> Map.tryFind (TodoWriteId.value writeId) magic.Checkpoints)
         |> Option.map (fun cp -> cp.ReviewFrontier, cp.ToolCallId)
 
+    let private workRecordStartAfterPlan
+        (life: LifeProjection)
+        (state: MagicTodoProjection.LifeMagicTodoState)
+        (xTrace: XTraceProjectionState) =
+        match t1Anchor state with
+        | Some(callCursor, callId) ->
+            Some(MagicTodo.blindPlanOpeningBoundary life.OpeningCursor callCursor callId (partAnchors xTrace))
+        | None -> Some(MagicTodo.workRecordStart life.OpeningCursor)
+
     /// WorkRecordStart when Post-T1; None while Pre-T1 (Opening still open).
     let workRecordStart
         (life: LifeProjection)
@@ -67,11 +76,28 @@ module ManagerOpeningFloor =
         match magic with
         | None -> None
         | Some state when not (MagicTodoProjection.isPlanCommitted state) -> None
-        | Some state ->
-            match t1Anchor state with
-            | Some(callCursor, callId) ->
-                Some(MagicTodo.blindPlanOpeningBoundary life.OpeningCursor callCursor callId (partAnchors xTrace))
-            | None -> Some(MagicTodo.workRecordStart life.OpeningCursor)
+        | Some state -> workRecordStartAfterPlan life state xTrace
+
+    let private effectiveFloorForCurrentLife
+        (current: LifeProjection)
+        (magicTodo: MagicTodoProjection.MagicTodoProjectionState)
+        (xTrace: XTraceProjectionState) =
+        let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
+        let planCommitted = magic |> Option.exists MagicTodoProjection.isPlanCommitted
+        let callCursor, callId =
+            magic
+            |> Option.bind t1Anchor
+            |> Option.map (fun (cursor, id) -> Some cursor, Some id)
+            |> Option.defaultValue (None, None)
+
+        MagicTodo.effectiveOpeningFloor
+            true
+            planCommitted
+            current.OpeningCursor
+            callCursor
+            callId
+            (XTraceProjection.headSequence xTrace)
+            (partAnchors xTrace)
 
     /// Production floor for BloggerCoordinator / CompanionTransform.
     let effectiveOpeningFloor
@@ -82,24 +108,7 @@ module ManagerOpeningFloor =
         match life with
         | None -> None
         | Some current when current.Completed -> None
-        | Some current ->
-            let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
-
-            let planCommitted = magic |> Option.exists MagicTodoProjection.isPlanCommitted
-
-            let callCursor, callId =
-                match magic |> Option.bind t1Anchor with
-                | Some(cursor, id) -> Some cursor, Some id
-                | None -> None, None
-
-            MagicTodo.effectiveOpeningFloor
-                true
-                planCommitted
-                current.OpeningCursor
-                callCursor
-                callId
-                (XTraceProjection.headSequence xTrace)
-                (partAnchors xTrace)
+        | Some current -> effectiveFloorForCurrentLife current magicTodo xTrace
 
     /// Session helper: CurrentLife floor sequence for Blogger max(coverage, floor).
     let floorSequence (sessionId: SessionId) (projections: AgentProjectionSet) : int64 option =

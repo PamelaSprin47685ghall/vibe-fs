@@ -34,19 +34,19 @@ module SharedTerminalBus =
                 shared.[directory] <- { Port = port; RefCount = 1 }
                 port)
 
+    let private updateRelease key (entry: SharedPort) =
+        let remaining = entry.RefCount - 1
+        if remaining <= 0 then shared.Remove key |> ignore else entry.RefCount <- remaining
+
+    let private releaseTarget key target =
+        lock gate (fun () ->
+            match shared.TryGetValue key with
+            | true, entry when obj.ReferenceEquals(entry.Port, target) -> updateRelease key entry
+            | _ -> ())
+
     let release (directory: string option) (port: Events.HostEventPort option) =
         match directory, port with
-        | Some key, Some target ->
-            lock gate (fun () ->
-                match shared.TryGetValue key with
-                | true, entry when obj.ReferenceEquals(entry.Port, target) ->
-                    let remaining = entry.RefCount - 1
-
-                    if remaining <= 0 then
-                        shared.Remove key |> ignore
-                    else
-                        entry.RefCount <- remaining
-                | _ -> ())
+        | Some key, Some target -> releaseTarget key target
         | _ -> ()
 
     let tryAcquireForWorkspace (workspace: string option) : (string * Events.HostEventPort) option =

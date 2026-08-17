@@ -12,6 +12,7 @@ open Wanxiangshu.Persistence.Journal
 /// Runtime paths and EventStore capabilities stay opaque; callers observe only
 /// identity, keyed Current presence, and append outcomes.
 type WorkspaceJournalHandle private (journal: AgentJournal) =
+    // DSL-MUTABLE: resource — one-shot shared journal release latch
     let mutable released = false
 
     member internal _.Journal =

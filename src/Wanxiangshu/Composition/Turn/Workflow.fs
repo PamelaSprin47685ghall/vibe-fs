@@ -103,12 +103,10 @@ module TurnWorkflow =
             let observeIdleOrdinary current =
                 OrdinaryTurnWorkflow.observeIdle quiescence sessionPort eventPort journal current
 
-            match context.Delivery with
-            | ReconciledTurnDelivery.IdleRevisit ->
-                match turn.Role with
-                | Some Role.Manager ->
-                    match turn.Observation, turn.Outcome with
-                    | None, ReconcileProgram.TurnCompleted ->
+            let observeIdleDelivery () : Task =
+                task {
+                    match turn.Role, turn.Observation, turn.Outcome with
+                    | Some Role.Manager, None, ReconcileProgram.TurnCompleted ->
                         do!
                             ManagerWorkflow.observeIdle
                                 sessionPort
@@ -118,62 +116,69 @@ module TurnWorkflow =
                                 hasLivePty
                                 quiescence
                                 context
+                    | Some Role.Reviewer, _, _ ->
+                        // A reviewer may have delivered its terminal observation on a
+                        // non-idle wake before the just-recorded verdict/challenge facts
+                        // were visible. Re-evaluate the durable ReviewerEvidence on the
+                        // fresh idle capability; Host nudge keys and terminal provider-run
+                        // dedupe keep the physical effects exactly-once.
+                        do!
+                            ReviewerWorkflow.observe
+                                reviewerContinuationPort
+                                eventPort
+                                journal
+                                turn
+                                (SessionId.value turn.SessionId)
                     | _ -> do! observeIdleOrdinary context
-                | Some Role.Reviewer ->
-                    // A reviewer may have delivered its terminal observation on a
-                    // non-idle wake before the just-recorded verdict/challenge facts
-                    // were visible. Re-evaluate the durable ReviewerEvidence on the
-                    // fresh idle capability; Host nudge keys and terminal provider-run
-                    // dedupe keep the physical effects exactly-once.
-                    do!
-                        ReviewerWorkflow.observe
-                            reviewerContinuationPort
-                            eventPort
-                            journal
-                            turn
-                            (SessionId.value turn.SessionId)
-                | _ -> do! observeIdleOrdinary context
-            | ReconciledTurnDelivery.Observation ->
-                // Linked-child prompt authority is Application ownership: establish it
-                // once from durable linkage before bounded-context workflows consume the fact.
-                let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
+                }
 
-                let observeOrdinary current =
-                    OrdinaryTurnWorkflow.observe
-                        timerPort
-                        abortParent
-                        sessionPort
-                        eventPort
-                        journal
-                        joinGuardNudges
-                        hasLivePty
-                        abortedSessions
-                        loopSensor
-                        quiescence
-                        current
+            let observeOrdinary current =
+                OrdinaryTurnWorkflow.observe
+                    timerPort
+                    abortParent
+                    sessionPort
+                    eventPort
+                    journal
+                    joinGuardNudges
+                    hasLivePty
+                    abortedSessions
+                    loopSensor
+                    quiescence
+                    current
 
-                match turn.Role with
-                | Some Role.Reviewer ->
-                    do!
-                        ReviewerWorkflow.observe
-                            reviewerContinuationPort
-                            eventPort
-                            journal
-                            turn
-                            (SessionId.value turn.SessionId)
-                | Some Role.Manager ->
-                    do!
-                        ManagerWorkflow.observe
-                            sessionPort
-                            eventPort
-                            journal
-                            nudgeSent
-                            joinGuardNudges
-                            hasLivePty
-                            abortedSessions
-                            quiescence
-                            observeOrdinary
-                            context
-                | _ -> do! observeOrdinary context
+            let observeObservation () : Task =
+                task {
+                    // Linked-child prompt authority is Application ownership: establish it
+                    // once from durable linkage before bounded-context workflows consume the fact.
+                    let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
+
+                    match turn.Role with
+                    | Some Role.Reviewer ->
+                        do!
+                            ReviewerWorkflow.observe
+                                reviewerContinuationPort
+                                eventPort
+                                journal
+                                turn
+                                (SessionId.value turn.SessionId)
+                    | Some Role.Manager ->
+                        do!
+                            ManagerWorkflow.observe
+                                sessionPort
+                                eventPort
+                                journal
+                                nudgeSent
+                                joinGuardNudges
+                                hasLivePty
+                                abortedSessions
+                                quiescence
+                                observeOrdinary
+                                context
+                    | _ -> do! observeOrdinary context
+                }
+
+            match context.Delivery with
+            | ReconciledTurnDelivery.IdleRevisit -> return! observeIdleDelivery ()
+            | ReconciledTurnDelivery.Observation -> return! observeObservation ()
         }
         :> Task

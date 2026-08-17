@@ -23,6 +23,9 @@ open Wanxiangshu.Foundation.Identity
 /// Decodes the raw chat.message hook payload before authority policy sees it.
 module PromptIngressCodec =
 
+    /// DSL-state-combination: physical — this is one decoded Host ingress
+    /// message; optional identity fields preserve wire absence and are consumed
+    /// at the adapter boundary, never as a persisted workflow cursor.
     type DecodedMessage =
         {
             SessionId: SessionId option
@@ -67,14 +70,16 @@ module PromptIngressCodec =
             let value = unbox<string> (source?(name))
             if String.IsNullOrWhiteSpace value then None else Some value
 
+    let private tryBoolean (value: obj) =
+        try
+            Some(unbox<bool> value)
+        with _ ->
+            None
+
     let private isTrue (value: obj) =
-        if isNull value then
-            false
-        else
-            try
-                unbox<bool> value = true
-            with _ ->
-                false
+        match tryBoolean value with
+        | Some true -> true
+        | _ -> false
 
     let private isHostCompaction (output: obj) =
         let outputParts = parts output
@@ -138,18 +143,20 @@ module PromptIngressCodec =
             |> Option.filter (String.IsNullOrWhiteSpace >> not)
             |> Option.map PromptKey.create
 
+    /// Classify one physical message part; synthetic and non-text parts are not
+    /// opening content.
+    let private textOfPart (part: obj) : string option =
+        match isTrue (if isNull part then null else part?synthetic), readString part "type" with
+        | true, _ -> None
+        | false, Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
+        | _ -> None
+
     /// COMPANION-003: the user message's text, for the opening capture. Only the
     /// physical user message's own text parts count — the opening is the first
     /// task prompt, and a synthetic part (tool result, metadata, guidance) is not it.
     let private textOf (output: obj) : string option =
         parts output
-        |> Array.choose (fun part ->
-            if isTrue (if isNull part then null else part?synthetic) then
-                None
-            else
-                match readString part "type" with
-                | Some kind when kind.Equals("text", StringComparison.OrdinalIgnoreCase) -> readString part "text"
-                | _ -> None)
+        |> Array.choose textOfPart
         |> Array.filter (String.IsNullOrWhiteSpace >> not)
         |> Array.toList
         |> function

@@ -220,7 +220,7 @@ outcome 完成新 run。
 
 ## HOST-BOUNDARY-017：Host 身份观察 + managed config 投影适配（HostSessionContext / ManagedAgentConfig）
 
-**规范**：Host 边界负责两类薄适配：raw event → `(sessionId, agent)` 提取（`properties.sessionID` 优先，`event.sessionID` 兜底；agent 只从 `properties.info` 取），agent 名 → Role 解析（`fast-coder` → Coder；`build`/`plan` 等 alias 拒绝）经 `AgentRoleIdentity`；以及把 Wanxiangshu-owned managed agent fields 投影到 Host config。`ManagedAgentConfig` 不再从 Host-final agent inventory 读取 managed model authority，模型来源与容量路由归 `execution-model-routing`。Host 适配不创建任何业务 authority。
+**规范**：Host 边界负责两类薄适配：raw event → `(sessionId, agent)` 提取（`properties.sessionID` 优先，`event.sessionID` 兜底；agent 只从 `properties.info` 取），agent 名 → Role 解析（`fast-coder` → Coder；`build`/`plan` 等 alias 拒绝）经 `AgentRoleIdentity`；以及把 Wanxiangshu-owned managed agent fields 投影到 Host config。`notifyCompleted` 只接受 canonical role label；unknown、空白或缺失 role 返回 `false` 且不投递 Completed，不得静默降级为 Coder。`ManagedAgentConfig` 不再从 Host-final agent inventory 读取 managed model authority，模型来源与容量路由归 `execution-model-routing`。Host 适配不创建任何业务 authority。
 
 **含义/动机**：身份观察与 Host schema 投影都是边界能力；alias 拒绝防止把非 managed 名当真实角色，单向投影防止 `opencode.json` 反向成为模型 truth。
 

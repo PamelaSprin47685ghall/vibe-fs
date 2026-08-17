@@ -34,6 +34,25 @@ module private SessionInterop =
 type SessionStore() =
     let sessions = Dictionary<string, EpistemicState>()
 
+    let persistResumeResult handle next result =
+        match result with
+        | InquiryResult.Error _ -> ()
+        | _ -> sessions[handle] <- next
+
+        SessionWire.result (Some handle) result
+
+    let decodeAndResume handle state rawObservation =
+        match Codec.decodeObservation rawObservation with
+        | Error error -> SessionWire.result (Some handle) (InquiryResult.Error error)
+        | Ok observation ->
+            let next, result = Policy.resume state observation
+            persistResumeResult handle next result
+
+    let resumeKnownHandle handle rawObservation =
+        match sessions.TryGetValue handle with
+        | false, _ -> SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
+        | true, state -> decodeAndResume handle state rawObservation
+
     member _.Count = sessions.Count
 
     member _.TryState(handle: string) =
@@ -55,19 +74,7 @@ type SessionStore() =
         if String.IsNullOrWhiteSpace handle then
             SessionWire.result None (InquiryResult.Error "missing handle")
         else
-            match sessions.TryGetValue handle with
-            | false, _ -> SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
-            | true, state ->
-                match Codec.decodeObservation rawObservation with
-                | Error error -> SessionWire.result (Some handle) (InquiryResult.Error error)
-                | Ok observation ->
-                    let next, result = Policy.resume state observation
-
-                    match result with
-                    | InquiryResult.Error _ -> ()
-                    | _ -> sessions[handle] <- next
-
-                    SessionWire.result (Some handle) result
+            resumeKnownHandle handle rawObservation
 
 module Session =
 

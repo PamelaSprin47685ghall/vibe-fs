@@ -136,6 +136,31 @@ module CasebookIndex =
     let private publicEntries (cases: Map<string, Case>) =
         resolvedEntries cases |> List.map (fun entry -> entry.Public)
 
+    let private frozenOrEmpty () =
+        match frozen with
+        | Some snapshot -> snapshot
+        | None -> { Epoch = 0L; Cases = [] }
+
+    let private visibleChange entries =
+        match frozen with
+        | None -> true
+        | Some snapshot -> snapshot.Cases <> entries
+
+    let private epochAfterRefresh previousEpoch visibleChanged =
+        if dirty || visibleChanged then
+            previousEpoch + 1L
+        else
+            previousEpoch
+
+    let private freezeEntries entries =
+        let previousEpoch = frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
+        let epoch = epochAfterRefresh previousEpoch (visibleChange entries)
+        dirty <- false
+
+        let snapshot = { Epoch = epoch; Cases = entries }
+        frozen <- Some snapshot
+        snapshot
+
     let private project (store: IEventStore) (capacity: int) : Result<Map<string, Case>, string> =
         match store.TryCurrent "Casebook" with
         | None -> Ok Map.empty
@@ -169,30 +194,6 @@ module CasebookIndex =
             return
                 lock gate (fun () ->
                     match projected with
-                    | Error _ ->
-                        match frozen with
-                        | Some snapshot -> snapshot
-                        | None -> { Epoch = 0L; Cases = [] }
-                    | Ok cases ->
-                        let entries = publicEntries cases
-
-                        let previousEpoch =
-                            frozen |> Option.map (fun snapshot -> snapshot.Epoch) |> Option.defaultValue -1L
-
-                        let visibleChanged =
-                            match frozen with
-                            | None -> true
-                            | Some snapshot -> snapshot.Cases <> entries
-
-                        let epoch =
-                            if dirty || visibleChanged then
-                                previousEpoch + 1L
-                            else
-                                previousEpoch
-
-                        dirty <- false
-
-                        let snapshot = { Epoch = epoch; Cases = entries }
-                        frozen <- Some snapshot
-                        snapshot)
+                    | Error _ -> frozenOrEmpty ()
+                    | Ok cases -> publicEntries cases |> freezeEntries)
         }

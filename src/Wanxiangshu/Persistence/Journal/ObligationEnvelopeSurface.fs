@@ -78,8 +78,11 @@ module ObligationEnvelopeSurface =
 
     let foldLifecycleSequence (sessionId: string) (events: obj array) : obj =
         let values = if isNull events then [||] else events
+        // DSL-MUTABLE: algorithm-scratch — lifecycle fold accumulator
         let mutable current = Fold.empty
+        // DSL-MUTABLE: algorithm-scratch — first fold rejection
         let mutable failure : string option = None
+        // DSL-MUTABLE: algorithm-scratch — synthetic envelope sequence
         let mutable sequence = 0
 
         for value in values do

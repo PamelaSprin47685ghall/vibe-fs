@@ -55,13 +55,16 @@ module AgentRoleIdentity =
     let toRole (role: Role) : Role = role
 
     /// Host wire names (`fast-manager`) parse via Domain SSOT; bare role labels fall back to catalog.
+    let private parseRoleName (value: string) : Role option =
+        match PromptAuthority.parseAgentNameTyped value with
+        | Ok parsed -> Some parsed.Role
+        | Error _ -> ManagedAgentCatalog.tryParseRole (value.Trim().ToLowerInvariant())
+
     let roleOfString (value: string) : Role option =
         if String.IsNullOrWhiteSpace value then
             None
         else
-            match PromptAuthority.parseAgentNameTyped value with
-            | Ok parsed -> Some parsed.Role
-            | Error _ -> ManagedAgentCatalog.tryParseRole (value.Trim().ToLowerInvariant())
+            parseRoleName value
 
     /// The canonical role label persisted in durable facts.
     ///

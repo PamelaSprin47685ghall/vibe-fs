@@ -139,29 +139,34 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
             removePartsByPrefix prefix
             armedKeys |> Array.iter (fun key -> armed.Remove key |> ignore))
 
+    member private _.ReportAbortOutcome(sessionId: SessionId, outcome: Result<unit, string>) =
+        match outcome with
+        | Ok() ->
+            Diagnostic.emit "needhelp" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
+        | Error reason ->
+            Diagnostic.emit
+                "needhelp"
+                [ "session_id", SessionId.value sessionId
+                  "result", "abort-failed"
+                  "provider_error", reason ]
+
+    member private this.AbortAndReport(sessionId: SessionId) =
+        task {
+            try
+                let! outcome = abortSession sessionId
+                this.ReportAbortOutcome(sessionId, outcome)
+            with ex ->
+                Diagnostic.emit
+                    "needhelp"
+                    [ "session_id", SessionId.value sessionId
+                      "result", "abort-failed"
+                      "provider_error", ex.Message ]
+        }
+
     member private this.RequestAbort(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         if this.TryArm(sessionId, providerRun) then
             Diagnostic.emit "needhelp" [ "session_id", SessionId.value sessionId; "result", "armed" ]
-
-            task {
-                try
-                    match! abortSession sessionId with
-                    | Ok() ->
-                        Diagnostic.emit "needhelp" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
-                    | Error reason ->
-                        Diagnostic.emit
-                            "needhelp"
-                            [ "session_id", SessionId.value sessionId
-                              "result", "abort-failed"
-                              "provider_error", reason ]
-                with ex ->
-                    Diagnostic.emit
-                        "needhelp"
-                        [ "session_id", SessionId.value sessionId
-                          "result", "abort-failed"
-                          "provider_error", ex.Message ]
-            }
-            |> ignore
+            this.AbortAndReport(sessionId) |> ignore
 
     member _.IsReasoningDelta(raw: obj) =
         match NeedHelpEventCodec.tryDecodeDelta raw with
@@ -194,17 +199,16 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
             if hit then
                 this.RequestAbort(delta.SessionId, delta.ProviderRun)
 
-    member this.Observe(raw: obj) =
-        match NeedHelpEventCodec.tryDecodePartUpdated raw with
-        | Some part when isOwned part.SessionId ->
-            lock gate (fun () ->
-                let key = partKey part.SessionId part.ProviderRun part.PartId
+    member private _.ObserveUpdatedPart(part: NeedHelpEventCodec.PartIdentity) =
+        lock gate (fun () ->
+            let key = partKey part.SessionId part.ProviderRun part.PartId
 
-                if String.Equals(part.PartType, "reasoning", StringComparison.OrdinalIgnoreCase) then
-                    reasoningParts.Add key |> ignore
-                else
-                    reasoningParts.Remove key |> ignore)
-        | _ ->
-            match NeedHelpEventCodec.tryDecodeDelta raw with
-            | Some delta -> this.ObserveDelta(raw, delta)
-            | None -> ()
+            match String.Equals(part.PartType, "reasoning", StringComparison.OrdinalIgnoreCase) with
+            | true -> reasoningParts.Add key |> ignore
+            | false -> reasoningParts.Remove key |> ignore)
+
+    member this.Observe(raw: obj) =
+        match NeedHelpEventCodec.tryDecodePartUpdated raw, NeedHelpEventCodec.tryDecodeDelta raw with
+        | Some part, _ when isOwned part.SessionId -> this.ObserveUpdatedPart part
+        | _, Some delta -> this.ObserveDelta(raw, delta)
+        | _ -> ()

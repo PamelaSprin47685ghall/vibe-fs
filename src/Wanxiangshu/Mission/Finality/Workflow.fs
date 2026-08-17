@@ -62,6 +62,195 @@ module FinalityWorkflow =
         |> Option.map (fun (reviewerSessionId, memberRef) -> reviewerSessionId, memberRef.BarrierId)
         |> Option.defaultValue (managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N")))
 
+    let private requestForLife
+        (durable: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (lastWordsRef: BlobRef)
+        (lastWordsDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId)
+        (lifeOpt: LifeProjection option)
+        (existingRequest: FinalityRequestProjection option) =
+        match lifeOpt, existingRequest with
+        | _, Some request -> Task.FromResult(Some request)
+        | Some _, None ->
+            task {
+                do!
+                    FinalityJournal.appendLifecycle
+                        durable
+                        (ManagerLifecycleFact.FinalityRequested
+                            {| SessionId = managerSessionId
+                               LifeId = lifeId
+                               RequestId = requestId
+                               GitTreeHash = requestTree
+                               LastWordsRef = lastWordsRef
+                               LastWordsDigest = lastWordsDigest
+                               ProviderRun = providerRun
+                               ToolCallId = toolCallId |})
+
+                return
+                    AgentProjection.tryFind managerSessionId (AgentJournal.snapshot durable).AgentProjections
+                    |> Option.bind (fun session -> session.ManagerLife)
+                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                    |> Option.bind (fun life -> life.ActiveFinality)
+                    |> Option.filter (fun request -> request.RequestId = requestId)
+            }
+        | None, None -> Task.FromResult None
+
+    let private revisionSiblings
+        (snapshot: ProjectionSet)
+        (managerSessionId: SessionId)
+        (requestId: FinalityRequestId)
+        reviewerId
+        fromRace =
+        match RevisionWorkflow.tryActiveFinality snapshot managerSessionId requestId with
+        | Some activeRequest -> RevisionWorkflow.durableRevisionSiblings snapshot activeRequest reviewerId @ fromRace |> List.distinctBy fst
+        | None -> fromRace
+
+    let private reviewMembers
+        (reviewerPort: FinalityReviewerPort)
+        (treePort: FinalityTreePort)
+        (durable: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (members: EnlistedMember list)
+        (request: FinalityRequestProjection) =
+        task {
+            match!
+                CohortWorkflow.reviewUntilFirstRevisionOrAllConfirmed
+                    reviewerPort
+                    durable
+                    managerSessionId
+                    members
+                    requestTree
+            with
+            | CohortJudgement.RevisionRequired(reviewerId, barrierId, fromRace) ->
+                let before = AgentJournal.snapshot durable
+                let siblings = revisionSiblings before managerSessionId requestId reviewerId fromRace
+
+                return!
+                    RevisionWorkflow.rejectAndSteer
+                        reviewerPort
+                        durable
+                        managerSessionId
+                        lifeId
+                        requestId
+                        reviewerId
+                        barrierId
+                        requestTree
+                        siblings
+            | CohortJudgement.AllConfirmed ->
+                return!
+                    BlessingWorkflow.blessIfTreeUnchanged
+                        reviewerPort
+                        treePort
+                        durable
+                        managerSessionId
+                        lifeId
+                        requestId
+                        members
+                        requestTree
+            | CohortJudgement.Undecided ->
+                let reviewer, barrier = undecidedMember managerSessionId request
+                return!
+                    RevisionWorkflow.concludeUndecided
+                        durable
+                        managerSessionId
+                        lifeId
+                        requestId
+                        requestTree
+                        reviewer
+                        barrier
+        }
+
+    let private enlistAndReview
+        (reviewerPort: FinalityReviewerPort)
+        (treePort: FinalityTreePort)
+        (durable: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: LifeProjection)
+        (request: FinalityRequestProjection)
+        (lifeIdValue: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash) =
+        task {
+            match! CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId lifeId request with
+            | Error _ ->
+                let reviewer, barrier = undecidedMember managerSessionId request
+                return!
+                    RevisionWorkflow.concludeUndecided
+                        durable
+                        managerSessionId
+                        lifeIdValue
+                        requestId
+                        requestTree
+                        reviewer
+                        barrier
+            | Ok members ->
+                return!
+                    reviewMembers
+                        reviewerPort
+                        treePort
+                        durable
+                        managerSessionId
+                        lifeIdValue
+                        requestId
+                        requestTree
+                        members
+                        request
+        }
+
+    let private executeDurable
+        (reviewerPort: FinalityReviewerPort)
+        (treePort: FinalityTreePort)
+        (durable: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (lastWordsRef: BlobRef)
+        (lastWordsDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId) =
+        task {
+            let snapshot = AgentJournal.snapshot durable
+            let lifeOpt =
+                AgentProjection.tryFind managerSessionId snapshot.AgentProjections
+                |> Option.bind (fun session -> session.ManagerLife)
+                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
+                |> Option.filter (fun life -> life.LifeId = lifeId)
+            let existingRequest = lifeOpt |> Option.bind (fun life -> life.ActiveFinality) |> Option.filter (fun request -> request.RequestId = requestId)
+            let! requestOpt = requestForLife durable managerSessionId lifeId requestId requestTree lastWordsRef lastWordsDigest providerRun toolCallId lifeOpt existingRequest
+
+            match lifeOpt, requestOpt with
+            | Some life, Some request -> return! enlistAndReview reviewerPort treePort durable managerSessionId life request lifeId requestId requestTree
+            | _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
+        }
+
+    let private startDurable
+        (reviewerPort: FinalityReviewerPort)
+        (treePort: FinalityTreePort)
+        (durable: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (requestTree: GitTreeHash)
+        (lastWordsRef: BlobRef)
+        (lastWordsDigest: BlobDigest)
+        (providerRun: ProviderRunIdentity)
+        (toolCallId: ToolCallId) =
+        task {
+            try
+                return! executeDurable reviewerPort treePort durable managerSessionId lifeId requestId requestTree lastWordsRef lastWordsDigest providerRun toolCallId
+            with _ ->
+                return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
+        }
+
     let start
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
@@ -75,131 +264,21 @@ module FinalityWorkflow =
         (providerRun: ProviderRunIdentity)
         (toolCallId: ToolCallId)
         : Task<FinalityOutcome> =
-        task {
-            match journal with
-            | None -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
-            | Some durable ->
-                try
-                    let snapshot = AgentJournal.snapshot durable
-
-                    let lifeOpt =
-                        AgentProjection.tryFind managerSessionId snapshot.AgentProjections
-                        |> Option.bind (fun session -> session.ManagerLife)
-                        |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                        |> Option.filter (fun life -> life.LifeId = lifeId)
-
-                    let existingRequest =
-                        lifeOpt
-                        |> Option.bind (fun life -> life.ActiveFinality)
-                        |> Option.filter (fun request -> request.RequestId = requestId)
-
-                    let! requestOpt =
-                        match lifeOpt, existingRequest with
-                        | _, Some request -> Task.FromResult(Some request)
-                        | Some _, None ->
-                            task {
-                                do!
-                                    FinalityJournal.appendLifecycle
-                                        durable
-                                        (ManagerLifecycleFact.FinalityRequested
-                                            {| SessionId = managerSessionId
-                                               LifeId = lifeId
-                                               RequestId = requestId
-                                               GitTreeHash = requestTree
-                                               LastWordsRef = lastWordsRef
-                                               LastWordsDigest = lastWordsDigest
-                                               ProviderRun = providerRun
-                                               ToolCallId = toolCallId |})
-
-                                return
-                                    AgentProjection.tryFind
-                                        managerSessionId
-                                        (AgentJournal.snapshot durable).AgentProjections
-                                    |> Option.bind (fun session -> session.ManagerLife)
-                                    |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                                    |> Option.bind (fun life -> life.ActiveFinality)
-                                    |> Option.filter (fun request -> request.RequestId = requestId)
-                            }
-                        | None, None -> Task.FromResult None
-
-                    match lifeOpt, requestOpt with
-                    | Some life, Some request ->
-                        match!
-                            CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId life request
-                        with
-                        | Error _ ->
-                            let reviewer, barrier = undecidedMember managerSessionId request
-
-                            return!
-                                RevisionWorkflow.concludeUndecided
-                                    durable
-                                    managerSessionId
-                                    lifeId
-                                    requestId
-                                    requestTree
-                                    reviewer
-                                    barrier
-                        | Ok members ->
-                            match!
-                                CohortWorkflow.reviewUntilFirstRevisionOrAllConfirmed
-                                    reviewerPort
-                                    durable
-                                    managerSessionId
-                                    members
-                                    requestTree
-                            with
-                            | CohortJudgement.RevisionRequired(reviewerId, barrierId, fromRace) ->
-                                let before = AgentJournal.snapshot durable
-
-                                let siblings =
-                                    match RevisionWorkflow.tryActiveFinality before managerSessionId requestId with
-                                    | Some activeRequest ->
-                                        RevisionWorkflow.durableRevisionSiblings before activeRequest reviewerId
-                                        @ fromRace
-                                        |> List.distinctBy fst
-                                    | None -> fromRace
-
-                                return!
-                                    RevisionWorkflow.rejectAndSteer
-                                        reviewerPort
-                                        durable
-                                        managerSessionId
-                                        lifeId
-                                        requestId
-                                        reviewerId
-                                        barrierId
-                                        requestTree
-                                        siblings
-                            | CohortJudgement.AllConfirmed ->
-                                return!
-                                    BlessingWorkflow.blessIfTreeUnchanged
-                                        reviewerPort
-                                        treePort
-                                        durable
-                                        managerSessionId
-                                        lifeId
-                                        requestId
-                                        members
-                                        requestTree
-                            | CohortJudgement.Undecided ->
-                                let reviewer, barrier =
-                                    match members with
-                                    | first :: _ -> first.ReviewerSessionId, first.BarrierId
-                                    | [] -> undecidedMember managerSessionId request
-
-                                return!
-                                    RevisionWorkflow.concludeUndecided
-                                        durable
-                                        managerSessionId
-                                        lifeId
-                                        requestId
-                                        requestTree
-                                        reviewer
-                                        barrier
-                    | _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
-                with _ ->
-                    return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
-        }
+        match journal with
+        | None -> Task.FromResult(FinalityOutcome.Undecided(undecidedPrompt managerSessionId))
+        | Some durable ->
+            startDurable
+                reviewerPort
+                treePort
+                durable
+                managerSessionId
+                lifeId
+                requestId
+                requestTree
+                lastWordsRef
+                lastWordsDigest
+                providerRun
+                toolCallId
 
     let resume
         (reviewerPort: FinalityReviewerPort)

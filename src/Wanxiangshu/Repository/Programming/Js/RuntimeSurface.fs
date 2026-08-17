@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open System.Threading.Tasks
-open Wanxiangshu.Process
 
 /// JS runtime owner boundary for bindings and sandbox execution. The mutable
 /// staging buffer and sandbox failure union remain opaque; observations cross
@@ -45,7 +44,7 @@ module JsRuntimeSurface =
         : Task<obj> =
         task {
             let! result =
-                JsSandbox.runSurface
+                Wanxiangshu.Process.JsSandbox.runSurface
                     baseClassSource
                     modelSource
                     apiValue

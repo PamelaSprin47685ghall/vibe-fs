@@ -178,7 +178,9 @@ canonical 行 append/payload closure，再把同一 EventEnvelope 交给 Integra
 
 **含义/动机**：历史只有一个解释权，避免 Journal/Strength/Casebook/JsTransaction 各写一套
 “load history → project”的隐性第二积分器。
-**边界**：Integrator 的注册模型见 019；各业务状态字段意义归对应 domain owner。
+**边界**：Integrator 的注册模型见 019；各业务状态字段意义归对应 domain owner。Terminal
+completion proof 只能由 ChildRecovery/Host lifecycle owner 产生；Persistence Journal surface
+不接受任意字符串来伪造 terminal evidence。
 **证据**：→ PROOF.md 013。
 
 ## DURABLE-EVENTS-014 —— k-way 输入顺序 + 确定性积分
@@ -196,9 +198,9 @@ bytes fail closed。业务模块不得自行重排历史。
 
 **规范陈述**：business fold 对以下事实的不变量**不满足任一条 → 当前 fact semantic reject + durable cut-tail reset**：
 `OpeningPromptCaptured`（每 lifecycle 幂等、不可覆盖）、`XTracePartAppended`（严格顺序
-append-only、Cursor 单调）、`BlogEntryCommitted`（PreviousIngestCursor=当前、Next>Previous、
+append-only、Cursor 单调）、`BlogObservationCommitted`（PreviousIngestCursor=当前、Next>Previous、
 CoverableTurnCutoff 单调、TextDigest=blob、attempt Completed 且 terminal valid）、
-`TerminalOutputCaptured`（幂等不可覆盖）、`BlogSquashCommitted`（FrameEpoch+1、不改
+`TerminalOutputCaptured`（幂等不可覆盖）、`BlogObservationsSquashed`（FrameEpoch+1、不改
 Ingest/Coverage）、`PrefixRebaseCommitted`（Epoch+1、candidate digest 再验证、Y bundle
 PrefixCoverage-complete-turn）、`ContextReanchored`（Epoch+1、同一消息 id 只接受一次）。
 

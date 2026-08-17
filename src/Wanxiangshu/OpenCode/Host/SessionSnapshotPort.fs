@@ -32,6 +32,9 @@ type SessionToolPart =
       InputCanonical: string
       State: SnapshotToolPartState }
 
+/// DSL-state-combination: physical — this is one raw Host snapshot message;
+/// optional metadata and completion flags mirror wire absence/transport facts and
+/// are interpreted at the boundary, never persisted as workflow state.
 type SessionMessage =
     {
         Id: string

@@ -76,31 +76,35 @@ module OrchestratorHostSurface =
     let private worktreeIdentityValue (value: obj) = WorktreeIdentity.create (stringOf value)
     let private commitValue (value: obj) = CommitHash.create (stringOf value)
 
-    let private roleOf (value: obj) =
+    let private roleOf (value: obj) : Role option =
         match stringOf value with
-        | "Manager" -> Role.Manager
-        | "Orchestrator" -> Role.Orchestrator
-        | "Coder" -> Role.Coder
-        | "Inspector" -> Role.Inspector
-        | "Browser" -> Role.Browser
-        | "Inquiry" -> Role.Inquiry
-        | "DevOps" -> Role.DevOps
-        | "Distiller" -> Role.Distiller
-        | "Blogger" -> Role.Blogger
-        | _ -> Role.Reviewer
+        | "Manager" -> Some Role.Manager
+        | "Orchestrator" -> Some Role.Orchestrator
+        | "Coder" -> Some Role.Coder
+        | "Inspector" -> Some Role.Inspector
+        | "Browser" -> Some Role.Browser
+        | "Inquiry" -> Some Role.Inquiry
+        | "DevOps" -> Some Role.DevOps
+        | "Distiller" -> Some Role.Distiller
+        | "Blogger" -> Some Role.Blogger
+        | "Reviewer" -> Some Role.Reviewer
+        | _ -> None
 
     let private terminalOutcome (value: obj) : TerminalOutcome =
         match stringOf (field value "kind") with
         | "Completed" ->
             let sessionId = sessionValue (field value "sessionId")
-            TerminalOutcome.Completed
-                { SessionId = sessionId
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (stringOf (field value "authorityRoot"))
-                  ProviderRun = ProviderRunIdentity.create (stringOf (field value "providerRun"))
-                  Role = roleOf (field value "role")
-                  Directory = optionalString (field value "directory")
-                  TerminalText = stringOf (field value "terminalText")
-                  TurnFormalText = stringOf (field value "turnFormalText") }
+            match roleOf (field value "role") with
+            | None -> TerminalOutcome.Failed "invalid role"
+            | Some role ->
+                TerminalOutcome.Completed
+                    { SessionId = sessionId
+                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (stringOf (field value "authorityRoot"))
+                      ProviderRun = ProviderRunIdentity.create (stringOf (field value "providerRun"))
+                      Role = role
+                      Directory = optionalString (field value "directory")
+                      TerminalText = stringOf (field value "terminalText")
+                      TurnFormalText = stringOf (field value "turnFormalText") }
         | "Aborted" -> TerminalOutcome.Aborted(stringOf (field value "reason"))
         | _ -> TerminalOutcome.Failed(stringOf (field value "error"))
 

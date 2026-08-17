@@ -113,22 +113,46 @@ type HostForkRuntime
     let childWorkRecordOf =
         defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
+    let readConvergedAggregate
+        (durable: AgentJournal)
+        (aggregateRef: BlobRef)
+        (aggregateDigest: BlobDigest) =
+        task {
+            match! durable.Writer.BlobWriter.Read aggregateRef with
+            | Ok text when HostDigest.sha256Hex text = BlobDigest.value aggregateDigest -> return Some text
+            | _ -> return None
+        }
+
+    let readLatestConverged (durable: AgentJournal) (sessionId: SessionId) =
+        match
+            FissionProjection.tryLatestForOwner
+                sessionId
+                (AgentJournal.snapshot durable).AgentProjections.Fission
+        with
+        | Some { Terminal = FissionGroupTerminal.Converged(_, _, aggregateRef, aggregateDigest) } ->
+            readConvergedAggregate durable aggregateRef aggregateDigest
+        | _ -> Task.FromResult None
+
     let convergedFissionWorkRecordOf (sessionId: SessionId) =
         task {
             match journal with
             | None -> return None
-            | Some durable ->
-                match
-                    FissionProjection.tryLatestForOwner
-                        sessionId
-                        (AgentJournal.snapshot durable).AgentProjections.Fission
-                with
-                | Some { Terminal = FissionGroupTerminal.Converged(_, _, aggregateRef, aggregateDigest) } ->
-                    match! durable.Writer.BlobWriter.Read aggregateRef with
-                    | Ok text when HostDigest.sha256Hex text = BlobDigest.value aggregateDigest -> return Some text
-                    | _ -> return None
-                | _ -> return None
+            | Some durable -> return! readLatestConverged durable sessionId
         }
+
+    let chooseWorkRecord aggregate fallback =
+        match aggregate with
+        | Some value -> Task.FromResult(Some value)
+        | None -> fallback ()
+
+    let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
+        match outcome with
+        | TerminalOutcome.Completed _ ->
+            task {
+                let! aggregate = convergedFissionWorkRecordOf run.ChildId
+                return! chooseWorkRecord aggregate (fun () -> childWorkRecordOf run.ChildId)
+            }
+        | _ -> Task.FromResult None
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
@@ -143,6 +167,16 @@ type HostForkRuntime
 
     let parentAbortToken = Pty.registerParentAbort parentKey (fun () -> this.Cancel())
 
+    let notifyPtyObserver observer item =
+        try
+            observer item
+        with _ ->
+            ()
+
+    let notifyPtyObservers item =
+        let observers = lock gate (fun () -> ptyCompletionObservers |> Seq.toList)
+        for observer in observers do notifyPtyObserver observer item
+
     do
         ptyPortInstance.AddMailboxSender(fun item ->
             let id = PtyJoinItem.ptyId item
@@ -153,14 +187,7 @@ type HostForkRuntime
                 // must not turn another runtime's exit into this runtime's join.
                 runtime.PublishPtyCompletion item
                 runtime.UnregisterPty id
-
-                let observers = lock gate (fun () -> ptyCompletionObservers |> Seq.toList)
-
-                for observer in observers do
-                    try
-                        observer item
-                    with _ ->
-                        ())
+                notifyPtyObservers item)
     // Cross-process recovery is not wired into ordinary HostForkRuntime lifecycle.
     // HostForkRestart remains a detached algorithm library for explicit resume flows.
 
@@ -219,16 +246,8 @@ type HostForkRuntime
             | Some run -> this.FailRun(run, error)
             | None -> Task.FromResult(()) :> Task
 
-        task {
-            let pendingOpt =
-                lock gate (fun () ->
-                    match deferredFirstPrompts.TryGetValue agentId with
-                    | true, pending -> Some pending
-                    | false, _ -> None)
-
-            match pendingOpt with
-            | None -> return Ok()
-            | Some pending ->
+        let deliverDeferredPrompt (pending: {| ChildId: SessionId; AgentName: string; Prompt: string |}) =
+            task {
                 let! sent =
                     HostForkAgentOwner.sendFirstPromptObserved
                         this.Sessions
@@ -239,11 +258,24 @@ type HostForkRuntime
                         pending.Prompt
                         failPendingRun
 
-                match sent with
-                | Ok _ ->
-                    lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
-                    return Ok()
-                | Error err -> return Error err
+                return
+                    match sent with
+                    | Ok _ ->
+                        lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
+                        Ok()
+                    | Error err -> Error err
+            }
+
+        task {
+            let pendingOpt =
+                lock gate (fun () ->
+                    match deferredFirstPrompts.TryGetValue agentId with
+                    | true, pending -> Some pending
+                    | false, _ -> None)
+
+            match pendingOpt with
+            | None -> return Ok()
+            | Some pending -> return! deliverDeferredPrompt pending
         }
 
     /// Drop a deferSend preamble so process-review assignment can go out as
@@ -304,16 +336,7 @@ type HostForkRuntime
         // child WorkRecord asynchronously, then hand the materialized value to the
         // lifecycle completion path in-order.
         task {
-            let! workRecord =
-                match outcome with
-                | TerminalOutcome.Completed _ ->
-                    task {
-                        match! convergedFissionWorkRecordOf run.ChildId with
-                        | Some aggregate -> return Some aggregate
-                        | None -> return! childWorkRecordOf run.ChildId
-                    }
-                | _ -> Task.FromResult None
-
+            let! workRecord = workRecordForOutcome run outcome
             do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
         }
         |> ignore

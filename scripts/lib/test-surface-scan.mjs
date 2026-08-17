@@ -1,7 +1,8 @@
 // Test-surface debt scanner (P1/P2 shared core).
 //
-// Scans the complete requirements/**/tests/**/*.mjs dependency zone, including
-// support, fixtures, helpers, e2e, and integration files. It reports the debt
+// Scans the complete requirements/**/tests executable dependency zone (.mjs
+// and .js), including support, fixtures, helpers, e2e, and integration files.
+// It reports the debt
 // classes a semantic test must not carry (TASK.md §1):
 //
 //   A. deep production import   import '...dist/<internal>.js' (not fable_modules)
@@ -132,7 +133,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/Fork/CleanBreakSurface.js',
     owner: 'crash-reconciliation',
-    laws: ['CRASH-009', 'CRASH-012'],
+    laws: ['CRASH-009', 'CRASH-012', 'EFFECT-ACCOUNTING-007'],
+    lawOwners: { 'EFFECT-ACCOUNTING-007': 'effect-accounting' },
     source: 'src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -140,7 +142,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Delegation/Fork/Host/JoinSurface.js',
     owner: 'delegation',
-    laws: ['DELEG-013', 'DELEG-015'],
+    laws: ['DELEG-013', 'DELEG-015', 'CRASH-011'],
+    lawOwners: { 'CRASH-011': 'crash-reconciliation' },
     source: 'src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -156,7 +159,11 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Execution/Session/OpenCode/HorizonSurface.js',
     owner: 'delegation',
-    laws: ['DELEG-016'],
+    laws: ['DELEG-016', 'PARTICIPANT-HORIZON-004', 'PARTICIPANT-HORIZON-011'],
+    lawOwners: {
+      'PARTICIPANT-HORIZON-004': 'participant-horizon',
+      'PARTICIPANT-HORIZON-011': 'participant-horizon',
+    },
     source: 'src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -172,7 +179,11 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Context/Companion/Blogger/Runtime/CycleSurface.js',
     owner: 'crash-reconciliation',
-    laws: ['CRASH-016'],
+    laws: ['CRASH-016', 'EFFECT-ACCOUNTING-004', 'EFFECT-ACCOUNTING-008'],
+    lawOwners: {
+      'EFFECT-ACCOUNTING-004': 'effect-accounting',
+      'EFFECT-ACCOUNTING-008': 'effect-accounting',
+    },
     source: 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -180,7 +191,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Participant/Provider/Attempt/Fallback/Surface.js',
     owner: 'provider-attempt-recovery',
-    laws: ['PAR-001', 'PAR-003', 'PAR-005', 'PAR-008', 'PAR-011', 'PAR-012', 'PAR-014'],
+    laws: ['PAR-001', 'PAR-003', 'PAR-005', 'PAR-008', 'PAR-011', 'PAR-012', 'PAR-014', 'EFFECT-ACCOUNTING-004'],
+    lawOwners: { 'EFFECT-ACCOUNTING-004': 'effect-accounting' },
     source: 'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -946,6 +958,7 @@ export const SURFACE_MANIFEST = [
     module: 'OpenCode/Codec/ProviderProjectionSurface.js',
     owner: 'provider-projection',
     laws: ['PROVIDER-PROJECTION-003', 'HOST-BOUNDARY-020'],
+    lawOwners: { 'HOST-BOUNDARY-020': 'host-boundary' },
     source: 'src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs',
     representation: 'json',
     kind: 'pure',
@@ -954,6 +967,7 @@ export const SURFACE_MANIFEST = [
     module: 'OpenCode/Codec/ToolHostSurface.js',
     owner: 'provider-projection',
     laws: ['PROVIDER-PROJECTION-003', 'PROVIDER-PROJECTION-005', 'PROVIDER-PROJECTION-008', 'PROVIDER-PROJECTION-009', 'HOST-BOUNDARY-009'],
+    lawOwners: { 'HOST-BOUNDARY-009': 'host-boundary' },
     source: 'src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs',
     representation: 'opaque-capability',
     kind: 'resource',
@@ -1342,7 +1356,8 @@ const B_MANGLED_LOOKUP = /(?:\.startsWith|\.endsWith)\(\s*['"`][^'"`]*(?:__|_[A-
 const C1_DU_SHAPE = /\.cases\(\)|\.fields\b|\.tag\b/
 const C2_FSHARP = /\bFSharp(?:List|Map|Set|Option|Result)\b/
 const C3_FABLE_MODULES = /fable_modules/
-const D_HELPERS = /\b(?:member|bind|fableInstanceMethod|prod|toList|caseOf|payloadOf|resultOf|unwrapOption)\(/
+// Ordinary JavaScript `.bind(...)` is not the legacy Fable helper; bare calls remain forbidden.
+const D_HELPERS = /(?<![.$])\b(?:member|bind|fableInstanceMethod|prod|toList|caseOf|payloadOf|resultOf|unwrapOption)\(/
 
 const RULES = [
   ['deep-dist-import', A_DEEP_IMPORT],
@@ -1415,9 +1430,9 @@ export const semanticImportEdges = (root = REQUIREMENTS_ROOT) => {
 }
 
 /**
- * Semantic-test zone files under requirements: every .mjs under a package's
- * tests directory — *.test.mjs, support files, fixtures, helpers,
- * *-contract.mjs, e2e, and integration.
+ * Semantic-test zone files under requirements: every executable .mjs or .js
+ * under a package's tests directory — *.test.*, support files, fixtures,
+ * helpers, *-contract.*, e2e, and integration.
  *
  * TASK.md §7/§21: forbidden knowledge moved from a test file into test
  * support does not reduce debt; the whole semantic-test dependency zone is
@@ -1426,7 +1441,11 @@ export const semanticImportEdges = (root = REQUIREMENTS_ROOT) => {
  * removed; neither path is a quarantine.
  */
 export const semanticTestFiles = (root = REQUIREMENTS_ROOT) =>
-  walk(root, ['.mjs']).filter((abs) => relative(process.cwd(), abs).replace(/\\/g, '/').includes('/tests/'))
+  walk(root, ['.mjs', '.js']).filter((abs) => {
+    const segments = relative(root, abs).replace(/\\/g, '/').split('/')
+    const testsIndex = segments.indexOf('tests')
+    return testsIndex > 0
+  })
 
 /** Full inventory: { <rel-file>: [ {line, rule, text}, ... ] } minus allowlist. */
 export const scanAll = (root = REQUIREMENTS_ROOT) => {

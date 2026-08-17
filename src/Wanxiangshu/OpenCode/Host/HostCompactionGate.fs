@@ -64,15 +64,15 @@ module HostCompactionGate =
     /// returns `s.config` with no clone), and `plugin.init` runs before other services
     /// (`bootstrap.ts:36`), so a write here is in force before anything reads it.
     let private writeSetting (config: obj) (setting: CompactionSetting) : unit =
+        let ensureChild (node: obj) head =
+            if isNull node?(head) then node?(head) <- createObj []
+            node?(head)
+
         let rec descend (node: obj) (path: string list) =
             match path with
             | [] -> ()
             | [ leaf ] -> node?(leaf) <- box setting.Required
-            | head :: rest ->
-                if isNull node?(head) then
-                    node?(head) <- createObj []
-
-                descend node?(head) rest
+            | head :: rest -> descend (ensureChild node head) rest
 
         descend config setting.Path
 
@@ -83,18 +83,20 @@ module HostCompactionGate =
     /// blind and assuming success is what would let a renamed key silently re-enable
     /// automatic compaction.
     let private readSetting (config: obj) (setting: CompactionSetting) : bool option =
-        let rec descend (node: obj) (path: string list) =
-            if isNull node then
-                None
-            else
-                match path with
-                | [] -> None
-                | [ leaf ] ->
-                    if isNull node?(leaf) then
-                        None
-                    else
-                        Some(unbox<bool> node?(leaf))
-                | head :: rest -> descend node?(head) rest
+        let readLeaf (node: obj) leaf =
+            if isNull node?(leaf) then None else Some(unbox<bool> node?(leaf))
+
+        let rec descendNonNull (node: obj) (path: string list) =
+            match path with
+            | [] -> None
+            | [ leaf ] -> readLeaf node leaf
+            | head :: rest -> descendChild node?(head) rest
+
+        and descendChild (child: obj) rest =
+            if isNull child then None else descendNonNull child rest
+
+        let descend (node: obj) (path: string list) =
+            if isNull node then None else descendNonNull node path
 
         descend config setting.Path
 

@@ -7,9 +7,14 @@
 //   node scripts/test-surface-inventory.mjs --json
 
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { scanAll, REQUIREMENTS_ROOT, BUILD_VERIFICATION_FILES } from './lib/test-surface-scan.mjs'
+import {
+  BUILD_VERIFICATION_FILES,
+  REQUIREMENTS_ROOT,
+  scanAll,
+  semanticTestFiles,
+} from './lib/test-surface-scan.mjs'
 
 const args = process.argv.slice(2)
 const argValue = (flag) => {
@@ -24,11 +29,16 @@ const asJson = args.includes('--json')
 
 const all = scanAll()
 const entries = Object.entries(all)
+const packageNames = [
+  ...new Set(
+    semanticTestFiles().map((file) => relative(REQUIREMENTS_ROOT, file).replace(/\\/g, '/').split('/')[0]),
+  ),
+].sort()
 
 const filtered = pkg ? entries.filter(([file]) => file.startsWith(`requirements/${pkg}/`)) : entries
 
 if (asJson) {
-  console.log(JSON.stringify({ packages: [...new Set(entries.map(([f]) => f.split('/')[1]))].sort(), files: filtered.length, debt: Object.fromEntries(filtered) }, null, 2))
+  console.log(JSON.stringify({ packages: packageNames, files: filtered.length, debt: Object.fromEntries(filtered) }, null, 2))
   process.exit(0)
 }
 

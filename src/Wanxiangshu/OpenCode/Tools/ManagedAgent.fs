@@ -85,6 +85,14 @@ module ManagedAgent =
     let inspectorToolNames = ManagedAgentCatalog.inspectorToolNames
     let coderToolNames = ManagedAgentCatalog.coderToolNames
 
+    let private mapParseRejection rejection =
+        match rejection with
+        | PromptAuthority.AgentNameRejection.LegacyAgentName name ->
+            Error(ManagedAgentParseError.LegacyAgentName name)
+        | PromptAuthority.AgentNameRejection.UnknownManagedAgent name ->
+            Error(ManagedAgentParseError.UnknownManagedAgent name)
+        | PromptAuthority.AgentNameRejection.Malformed name -> Error(ManagedAgentParseError.Malformed name)
+
     /// AGENT-002/003: the ONE parser lives in `Domain.PromptAuthority`. This adds
     /// only the visibility that `ManagedAgent` carries.
     let parse (value: string) : Result<ManagedAgent, ManagedAgentParseError> =
@@ -95,13 +103,7 @@ module ManagedAgent =
                   Role = parsed.Role
                   Tier = parsed.Tier
                   Visibility = visibilityOf parsed.Role }
-        | Error rejection ->
-            match rejection with
-            | PromptAuthority.AgentNameRejection.LegacyAgentName name ->
-                Error(ManagedAgentParseError.LegacyAgentName name)
-            | PromptAuthority.AgentNameRejection.UnknownManagedAgent name ->
-                Error(ManagedAgentParseError.UnknownManagedAgent name)
-            | PromptAuthority.AgentNameRejection.Malformed name -> Error(ManagedAgentParseError.Malformed name)
+        | Error rejection -> mapParseRejection rejection
 
     let tryParse (value: string) : ManagedAgent option = parse value |> Result.toOption
 
@@ -114,23 +116,22 @@ module ManagedAgent =
     let isInternal (agent: ManagedAgent) =
         agent.Visibility = AgentVisibility.Internal
 
+    let private unknownAgentSuggestion (name: string) =
+        if name.IndexOf("inspect", StringComparison.OrdinalIgnoreCase) >= 0 then
+            " Use 'fast-inspector' or 'deep-inspector'."
+        elif name.IndexOf("review", StringComparison.OrdinalIgnoreCase) >= 0 then
+            " Use 'fast-reviewer' or 'deep-reviewer'."
+        elif name.IndexOf("manager", StringComparison.OrdinalIgnoreCase) >= 0 then
+            " Use 'fast-manager' or 'deep-manager'."
+        elif name.IndexOf("coder", StringComparison.OrdinalIgnoreCase) >= 0 then
+            " Use 'fast-coder' or 'deep-coder'."
+        else
+            " Use an explicit fast-* or deep-* managed agent name."
+
     let formatParseError (err: ManagedAgentParseError) : string =
         match err with
         | ManagedAgentParseError.LegacyAgentName name -> ManagedAgentCatalog.formatLegacyNameNotSupported name
         | ManagedAgentParseError.UnknownManagedAgent name ->
-            // Best-effort suggestion for near-miss inspector typos.
-            let suggestion =
-                if name.IndexOf("inspect", StringComparison.OrdinalIgnoreCase) >= 0 then
-                    " Use 'fast-inspector' or 'deep-inspector'."
-                elif name.IndexOf("review", StringComparison.OrdinalIgnoreCase) >= 0 then
-                    " Use 'fast-reviewer' or 'deep-reviewer'."
-                elif name.IndexOf("manager", StringComparison.OrdinalIgnoreCase) >= 0 then
-                    " Use 'fast-manager' or 'deep-manager'."
-                elif name.IndexOf("coder", StringComparison.OrdinalIgnoreCase) >= 0 then
-                    " Use 'fast-coder' or 'deep-coder'."
-                else
-                    " Use an explicit fast-* or deep-* managed agent name."
-
-            sprintf "Unknown managed agent '%s'.%s" name suggestion
+            sprintf "Unknown managed agent '%s'.%s" name (unknownAgentSuggestion name)
         | ManagedAgentParseError.Malformed name ->
             sprintf "Malformed managed agent name '%s'. Expected fast-ROLE or deep-ROLE." name

@@ -98,6 +98,73 @@ module HostJoinGuard =
     let private nudgeKey (runtimeId: RuntimeId) (targetSessionId: SessionId) =
         sprintf "join-guard:%s:%s" (RuntimeId.value runtimeId) (SessionId.value targetSessionId)
 
+    let private reserveNudge
+        (durable: AgentJournal)
+        (nudgeKeys: HashSet<string>)
+        (sessionId: SessionId)
+        (key: string)
+        : bool =
+        lock processNudgeKeys (fun () ->
+            if
+                hasOutstandingJoinClaim durable sessionId
+                || nudgeKeys.Contains key
+                || processNudgeKeys.Contains key
+            then
+                false
+            else
+                nudgeKeys.Add key |> ignore
+                processNudgeKeys.Add key |> ignore
+                true)
+
+    let private sendReservedNudge
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (nudgeKeys: HashSet<string>)
+        (key: string)
+        (sessionId: SessionId)
+        (directory: string option)
+        : Task<JoinGuardNudgeOutcome> =
+        task {
+            let releaseKey () =
+                lock processNudgeKeys (fun () ->
+                    nudgeKeys.Remove key |> ignore
+                    processNudgeKeys.Remove key |> ignore)
+
+            let! sent =
+                HostSessionNudge.sendContinuationResult
+                    sessionPort
+                    sessionId
+                    (ProviderProse.documentFor sessionId RuntimeNudge.BackgroundJoin Map.empty)
+                    PromptAuthority.ContinuationKind.JoinGuard
+                    directory
+                    (Some durable)
+                    PromptDispatcher.AwaitMode.Await
+                    None
+
+            match sent with
+            | Ok promptKey -> return JoinGuardNudgeOutcome.Sent promptKey
+            | Error error ->
+                releaseKey ()
+                return JoinGuardNudgeOutcome.Failed error
+        }
+
+    let private nudgeWithJournal
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (nudgeKeys: HashSet<string>)
+        (sessionId: SessionId)
+        (directory: string option)
+        : Task<JoinGuardNudgeOutcome> =
+        task {
+            let key = nudgeKey (AgentJournal.runtimeId durable) sessionId
+            let reserved = reserveNudge durable nudgeKeys sessionId key
+
+            if not reserved then
+                return JoinGuardNudgeOutcome.AlreadyOutstanding
+            else
+                return! sendReservedNudge sessionPort durable nudgeKeys key sessionId directory
+        }
+
     /// Send JoinGuard Continuation. Dedupes on durable PendingClaims + process key.
     let nudge
         (sessionPort: ISessionHostPort)
@@ -109,44 +176,5 @@ module HostJoinGuard =
         task {
             match journal with
             | None -> return JoinGuardNudgeOutcome.Failed "Join guard nudge requires an AgentJournal"
-            | Some durable ->
-                let key = nudgeKey (AgentJournal.runtimeId durable) sessionId
-
-                let reserved =
-                    lock processNudgeKeys (fun () ->
-                        if
-                            hasOutstandingJoinClaim durable sessionId
-                            || nudgeKeys.Contains key
-                            || processNudgeKeys.Contains key
-                        then
-                            false
-                        else
-                            nudgeKeys.Add key |> ignore
-                            processNudgeKeys.Add key |> ignore
-                            true)
-
-                if not reserved then
-                    return JoinGuardNudgeOutcome.AlreadyOutstanding
-                else
-                    let releaseKey () =
-                        lock processNudgeKeys (fun () ->
-                            nudgeKeys.Remove key |> ignore
-                            processNudgeKeys.Remove key |> ignore)
-
-                    let! sent =
-                        HostSessionNudge.sendContinuationResult
-                            sessionPort
-                            sessionId
-                            (ProviderProse.documentFor sessionId RuntimeNudge.BackgroundJoin Map.empty)
-                            PromptAuthority.ContinuationKind.JoinGuard
-                            directory
-                            (Some durable)
-                            PromptDispatcher.AwaitMode.Await
-                            None
-
-                    match sent with
-                    | Ok promptKey -> return JoinGuardNudgeOutcome.Sent promptKey
-                    | Error error ->
-                        releaseKey ()
-                        return JoinGuardNudgeOutcome.Failed error
+            | Some durable -> return! nudgeWithJournal sessionPort durable nudgeKeys sessionId directory
         }

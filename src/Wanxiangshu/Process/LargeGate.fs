@@ -42,12 +42,23 @@ module LargeGate =
     let getCount () =
         lock gate (fun () -> if held then 0 else 1)
 
+    let private grantWaiter (waiter: Waiter) =
+        if waiter.TryGrant() then held <- true
+
     let private pumpUnlocked () =
         while waiters.Count > 0 && not held do
             let waiter = waiters.Dequeue()
+            grantWaiter waiter
 
-            if waiter.TryGrant() then
-                held <- true
+    let private acquireUnlocked ct =
+        if not held && waiters.Count = 0 then
+            held <- true
+            Task.FromResult() :> Task
+        else
+            let waiter = Waiter ct
+            waiters.Enqueue waiter
+            pumpUnlocked ()
+            waiter.Task
 
     let acquire (ct: CancellationToken) : Task =
         if ct.IsCancellationRequested then
@@ -55,15 +66,7 @@ module LargeGate =
             trySetCanceled tcs |> ignore
             tcs.Task
         else
-            lock gate (fun () ->
-                if not held && waiters.Count = 0 then
-                    held <- true
-                    Task.FromResult() :> Task
-                else
-                    let waiter = Waiter ct
-                    waiters.Enqueue waiter
-                    pumpUnlocked ()
-                    waiter.Task)
+            lock gate (fun () -> acquireUnlocked ct)
 
     let release () : unit =
         lock gate (fun () ->

@@ -136,6 +136,17 @@ type BlogFoldRejection =
 
 module BlogProjection =
 
+    let private coverableFrameCount
+        (previousCutoff: int)
+        (nextCutoff: int)
+        (nextFrames: BlogFrame list)
+        (previousCount: int)
+        =
+        if nextCutoff > previousCutoff then
+            List.length nextFrames
+        else
+            previousCount
+
     let empty =
         { FrameEpochId = FrameEpochId.initial
           Frames = []
@@ -214,9 +225,10 @@ module BlogProjection =
                           // material the cutoff does not yet claim, so counting it would
                           // let a probe summarise a turn that is also still raw.
                           CoverableFrameCount =
-                            if nextCutoff > previousCutoff then
-                                List.length nextFrames
-                            else
+                            coverableFrameCount
+                                previousCutoff
+                                nextCutoff
+                                nextFrames
                                 state.Coverage.CoverableFrameCount } }
 
     /// PERSIST-010 `BlogObservationsSquashed`. Replaces the oldest `count` frames with

@@ -126,22 +126,35 @@ module Methodology =
             0.0
 
     let private facetScore (definition: MethodDefinition) (facets: Map<string, float>) =
+        let total = facets |> Map.fold (fun sum _ p -> sum + max 0.0 p) 0.0
+
         if Map.isEmpty facets then
             0.25
+        elif total <= 0.0 then
+            0.25
         else
-            let total = facets |> Map.fold (fun sum _ p -> sum + max 0.0 p) 0.0
+            facets
+            |> Map.fold
+                (fun score facet p ->
+                    score
+                    + max 0.0 p
+                      * (definition.FacetWeights |> Map.tryFind facet |> Option.defaultValue 0.2))
+                0.0
+            |> fun score -> score / total
 
-            if total <= 0.0 then
-                0.25
-            else
-                facets
-                |> Map.fold
-                    (fun score facet p ->
-                        score
-                        + max 0.0 p
-                          * (definition.FacetWeights |> Map.tryFind facet |> Option.defaultValue 0.2))
-                    0.0
-                |> fun score -> score / total
+    let private synthesisReadiness (state: EpistemicState) (definition: MethodDefinition) =
+        if definition.CombinesExistingKnowledge && Map.isEmpty state.Findings then
+            -0.7
+        elif definition.CombinesExistingKnowledge then
+            min 0.55 (0.12 * float state.Findings.Count)
+        else
+            0.0
+
+    let private saturationPenalty (unresolved: float) (definition: MethodDefinition) =
+        if definition.CombinesExistingKnowledge then
+            0.0
+        else
+            min 0.35 (0.04 * unresolved)
 
     let utility (state: EpistemicState) (definition: MethodDefinition) =
         match state.RootContract with
@@ -157,23 +170,11 @@ module Methodology =
                 |> Seq.length
                 |> float
 
-            let synthesisReadiness =
-                if definition.CombinesExistingKnowledge then
-                    if Map.isEmpty state.Findings then
-                        -0.7
-                    else
-                        min 0.55 (0.12 * float state.Findings.Count)
-                else
-                    0.0
+            let readiness = synthesisReadiness state definition
+            let saturation = saturationPenalty unresolved definition
 
-            let saturationPenalty =
-                if definition.CombinesExistingKnowledge then
-                    0.0
-                else
-                    min 0.35 (0.04 * unresolved)
-
-            0.58 * form + 0.42 * facets + synthesisReadiness
-            - saturationPenalty
+            0.58 * form + 0.42 * facets + readiness
+            - saturation
             - 0.08 * definition.BaseCost
 
     let activate (state: EpistemicState) =

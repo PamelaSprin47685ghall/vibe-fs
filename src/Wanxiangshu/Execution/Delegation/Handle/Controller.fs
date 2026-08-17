@@ -113,6 +113,51 @@ module HandleController =
     /// Blob write precedes the fact (PERSIST-007). Kind + body come from the proof;
     /// callers cannot pass raw Aborted or bare `HandleCompletionKind` + `"ABORTED"`.
     /// The fold refuses a second claim, so a duplicate is a no-op rather than overwrite.
+    let private writeCompletionBlob
+        (durable: AgentJournal)
+        (content: string)
+        : Task<Result<BlobRef option * BlobDigest option, string>> =
+        task {
+            match! durable.WriteBlob content with
+            | Error err -> return Error err
+            | Ok receipt -> return Ok(Some receipt.BlobRef, Some receipt.BlobDigest)
+        }
+
+    let private completionBlobRefs
+        (durable: AgentJournal)
+        (body: string option)
+        : Task<Result<BlobRef option * BlobDigest option, string>> =
+        task {
+            match body with
+            | None -> return Ok(None, None)
+            | Some content -> return! writeCompletionBlob durable content
+        }
+
+    let private recordCompletionWithJournal
+        durable
+        parentId
+        (completion: JoinableCompletion)
+        : Task<Result<unit, string>> =
+        task {
+            let agentId = JoinableCompletion.agentId completion
+            let kind = JoinableCompletion.kind completion
+            let! refs = completionBlobRefs durable (JoinableCompletion.body completion)
+
+            match refs with
+            | Error err -> return Error err
+            | Ok(completionRef, completionDigest) ->
+                return!
+                    append
+                        durable
+                        parentId
+                        (ExecutionFact.HandleCompleted
+                            {| ParentSessionId = parentId
+                               Handle = agentHandle agentId
+                               Kind = kind
+                               CompletionRef = completionRef
+                               CompletionDigest = completionDigest |})
+        }
+
     let recordCompletion
         (journal: AgentJournal option)
         (parentId: SessionId)
@@ -121,34 +166,7 @@ module HandleController =
         task {
             match journal with
             | None -> return Ok()
-            | Some durable ->
-                let agentId = JoinableCompletion.agentId completion
-                let kind = JoinableCompletion.kind completion
-                let body = JoinableCompletion.body completion
-
-                let! refs =
-                    task {
-                        match body with
-                        | None -> return Ok(None, None)
-                        | Some content ->
-                            match! durable.WriteBlob content with
-                            | Error err -> return Error err
-                            | Ok receipt -> return Ok(Some receipt.BlobRef, Some receipt.BlobDigest)
-                    }
-
-                match refs with
-                | Error err -> return Error err
-                | Ok(completionRef, completionDigest) ->
-                    return!
-                        append
-                            durable
-                            parentId
-                            (ExecutionFact.HandleCompleted
-                                {| ParentSessionId = parentId
-                                   Handle = agentHandle agentId
-                                   Kind = kind
-                                   CompletionRef = completionRef
-                                   CompletionDigest = completionDigest |})
+            | Some durable -> return! recordCompletionWithJournal durable parentId completion
         }
 
     /// EXEC-009: durable abandon. Single-assignment via fold CAS.
@@ -201,6 +219,37 @@ module HandleController =
     ///
     /// CommitUnknown must not hand the payload out: the caller would treat the
     /// work as consumed while a later restart might still show it joinable.
+    let private retirementFailure
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (handle: HandleId)
+        failure =
+        let after = AgentJournal.handleProjection journal parentId
+
+        match HandleProjection.tryFind handle after with
+        | Some { Lifecycle = Retired } -> Error AlreadyRetired
+        | _ -> Error(AppendFailed(JournalAppendFailure.describe failure))
+
+    let private retireRecord
+        (journal: AgentJournal)
+        (parentId: SessionId)
+        (handle: HandleId)
+        (record: HandleRecord)
+        : Task<Result<HandleRecord, HandleConsumeRejection>> =
+        task {
+            match!
+                AgentJournal.appendAgent
+                    (StreamId.Session parentId)
+                    None
+                    (ExecutionFact.HandleRetired
+                        {| ParentSessionId = parentId
+                           Handle = handle |})
+                    journal
+            with
+            | Ok _ -> return Ok record
+            | Error failure -> return retirementFailure journal parentId handle failure
+        }
+
     let consume
         (journal: AgentJournal)
         (parentId: SessionId)
@@ -215,22 +264,7 @@ module HandleController =
             | Some { Lifecycle = Active } -> return Error(NotJoinable NotCompleted)
             | Some({ Lifecycle = CompletedAwaitingJoin _ } as record)
             | Some({ Lifecycle = Abandoned _ } as record) ->
-                match!
-                    AgentJournal.appendAgent
-                        (StreamId.Session parentId)
-                        None
-                        (ExecutionFact.HandleRetired
-                            {| ParentSessionId = parentId
-                               Handle = handle |})
-                        journal
-                with
-                | Ok _ -> return Ok record
-                | Error failure ->
-                    let after = AgentJournal.handleProjection journal parentId
-
-                    match HandleProjection.tryFind handle after with
-                    | Some { Lifecycle = Retired } -> return Error AlreadyRetired
-                    | _ -> return Error(AppendFailed(JournalAppendFailure.describe failure))
+                return! retireRecord journal parentId handle record
         }
 
     /// Parent cancel: durable `HandleAbandoned` (ParentCancelled) per owned agent.
@@ -239,6 +273,13 @@ module HandleController =
     /// explicit durable terminal that is not joinable. Each child is abandoned
     /// individually — EXEC-009 requires parent cancel to cancel every owned resource
     /// one by one, so there is deliberately no bulk "abandon all children" fact.
+    let private abandonChild journal parentId agentId abandonedAt =
+        task {
+            match! recordAbandon journal parentId agentId HandleAbandonReason.ParentCancelled abandonedAt with
+            | Error err -> return Error err
+            | Ok() -> return Ok()
+        }
+
     let cancelChildren
         (journal: AgentJournal option)
         (parentId: SessionId)
@@ -250,9 +291,15 @@ module HandleController =
                 match ids with
                 | [] -> return Ok()
                 | agentId :: rest ->
-                    match! recordAbandon journal parentId agentId HandleAbandonReason.ParentCancelled abandonedAt with
-                    | Error err -> return Error err
-                    | Ok() -> return! loop rest
+                    let! result = abandonChild journal parentId agentId abandonedAt
+                    return! continueAbandon rest result
+            }
+
+        and continueAbandon rest result =
+            task {
+                match result with
+                | Error err -> return Error err
+                | Ok() -> return! loop rest
             }
 
         loop agentIds

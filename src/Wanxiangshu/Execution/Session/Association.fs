@@ -44,6 +44,9 @@ type ManagedSessionKind =
 /// Record fields and FactCodec stay on the ManagedSessionKind model.
 /// Orthogonal ExecutionClass × Ownership is a derived view
 /// (`SessionOwnershipClassification`), not a durable rewrite.
+/// DSL-state-combination: domain — optional Blogger/parent identities are
+/// relationship facts on one durable session association, not a workflow state
+/// product.
 type SessionAssociation =
     {
         SessionId: SessionId
@@ -156,6 +159,55 @@ module SessionAssociationProjection =
     ///
     /// Idempotent for the same pair: re-linking X to the same Y is what restart
     /// recovery does, and refusing it would turn recovery into a startup failure.
+    let private satelliteKindConflict
+        (kind: SatelliteKind)
+        (satelliteSessionId: SessionId)
+        (current: Map<SessionId, SessionAssociation>) =
+        match tryFind satelliteSessionId current with
+        | Some { Kind = ManagedSessionKind.SatelliteSession(_, existingKind) } when existingKind <> kind -> true
+        | _ -> false
+
+    let private linkedSatellite
+        (kind: SatelliteKind)
+        (mainSessionId: SessionId)
+        (satelliteSessionId: SessionId)
+        (parentOfMain: SessionId option)
+        (current: Map<SessionId, SessionAssociation>) =
+        let owner = tryFind mainSessionId current
+        let parent = parentOfMain |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
+        let nextBlogger = if kind = SatelliteKind.Companion then Some satelliteSessionId else None
+
+        Ok(
+            current
+            |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger)
+            |> Map.add
+                satelliteSessionId
+                { SessionId = satelliteSessionId
+                  Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
+                  BloggerSessionId = None
+                  ParentSessionId = Some mainSessionId }
+        )
+
+    let private linkValidated
+        (kind: SatelliteKind)
+        (mainSessionId: SessionId)
+        (satelliteSessionId: SessionId)
+        (parentOfMain: SessionId option)
+        (current: Map<SessionId, SessionAssociation>) =
+        let existingSatellite =
+            if kind = SatelliteKind.Companion then tryBloggerOf mainSessionId current else None
+
+        let existingOwner = tryOwnerOf satelliteSessionId current
+        let kindConflict = satelliteKindConflict kind satelliteSessionId current
+
+        match existingSatellite, existingOwner, kindConflict with
+        | Some existing, _, _ when existing <> satelliteSessionId ->
+            Error(AssociationRejection.AlreadyLinkedToOther(existing, satelliteSessionId))
+        | _, Some owner, _ when owner <> mainSessionId ->
+            Error(AssociationRejection.CompanionClaimedByOther(owner, satelliteSessionId))
+        | _, Some _, true -> Error(AssociationRejection.SatelliteKindConflict satelliteSessionId)
+        | _ -> linkedSatellite kind mainSessionId satelliteSessionId parentOfMain current
+
     let linkSatellite
         (kind: SatelliteKind)
         (mainSessionId: SessionId)
@@ -168,63 +220,7 @@ module SessionAssociationProjection =
         elif isSatellite mainSessionId current then
             Error(AssociationRejection.CompanionWouldRecurse mainSessionId)
         else
-            let existingSatellite =
-                match kind with
-                | SatelliteKind.Companion -> tryBloggerOf mainSessionId current
-
-            let existingOwner = tryOwnerOf satelliteSessionId current
-
-            match existingSatellite, existingOwner with
-            | Some existing, _ when existing <> satelliteSessionId ->
-                Error(AssociationRejection.AlreadyLinkedToOther(existing, satelliteSessionId))
-            | _, Some owner when owner <> mainSessionId ->
-                Error(AssociationRejection.CompanionClaimedByOther(owner, satelliteSessionId))
-            | _, Some _ ->
-                match tryFind satelliteSessionId current with
-                | Some { Kind = ManagedSessionKind.SatelliteSession(_, existingKind) } when existingKind <> kind ->
-                    Error(AssociationRejection.SatelliteKindConflict satelliteSessionId)
-                | _ ->
-                    let owner = tryFind mainSessionId current
-
-                    let parent =
-                        parentOfMain
-                        |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
-
-                    let nextBlogger =
-                        match kind with
-                        | SatelliteKind.Companion -> Some satelliteSessionId
-
-                    Ok(
-                        current
-                        |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger)
-                        |> Map.add
-                            satelliteSessionId
-                            { SessionId = satelliteSessionId
-                              Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
-                              BloggerSessionId = None
-                              ParentSessionId = Some mainSessionId }
-                    )
-            | _ ->
-                let owner = tryFind mainSessionId current
-
-                let parent =
-                    parentOfMain
-                    |> Option.orElse (owner |> Option.bind (fun e -> e.ParentSessionId))
-
-                let nextBlogger =
-                    match kind with
-                    | SatelliteKind.Companion -> Some satelliteSessionId
-
-                Ok(
-                    current
-                    |> Map.add mainSessionId (workSession mainSessionId parent nextBlogger)
-                    |> Map.add
-                        satelliteSessionId
-                        { SessionId = satelliteSessionId
-                          Kind = ManagedSessionKind.SatelliteSession(mainSessionId, kind)
-                          BloggerSessionId = None
-                          ParentSessionId = Some mainSessionId }
-                )
+            linkValidated kind mainSessionId satelliteSessionId parentOfMain current
 
     let link mainSessionId bloggerSessionId parentOfMain current =
         linkSatellite SatelliteKind.Companion mainSessionId bloggerSessionId parentOfMain current

@@ -121,6 +121,18 @@ module CompletedTurnClassifier =
             lower.Contains("abort")
         | None -> false
 
+    /// CTX-004: stop is completed only when formal text passes the shared
+    /// terminal validity gate; otherwise the turn earns interaction repair.
+    let private classifyStopped (parts: MessagePart array) : obj =
+        match TerminalValidity.check (partsText parts) with
+        | Ok() -> box ReconcileProgram.TurnCompleted
+        | Error rejection ->
+            box (
+                ReconcileProgram.TurnNeedsContinuation(
+                    sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
+                )
+            )
+
     /// Returns either a publishable `TurnOutcome` or a private `SnapshotObservation`.
     /// Heterogeneous `obj` so finish=None stays instanceof SnapshotObservation in JS
     /// (HOST-004 Clean Break — must not mint TurnOutcome.TurnUnknown).
@@ -130,45 +142,24 @@ module CompletedTurnClassifier =
         (errorName: string option)
         (parts: MessagePart array)
         : obj =
-        if isAbortErrorName errorName then
-            box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
-        elif completed && Option.isSome errorName then
+        match isAbortErrorName errorName, completed && Option.isSome errorName, finish with
+        | true, _, _ -> box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
+        | false, true, _ ->
             box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant completed with error"))
-        elif
-            finish
-            |> Option.exists (fun value -> value.Equals("aborted", StringComparison.OrdinalIgnoreCase))
-        then
+        | false, false, Some value when value.Equals("aborted", StringComparison.OrdinalIgnoreCase) ->
             box (ReconcileProgram.TurnAborted("finish=aborted"))
-        else
-            match finish with
-            | Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->
-                if isAbortErrorName errorName then
-                    box (ReconcileProgram.TurnAborted(defaultArg errorName "aborted"))
-                else
-                    box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant finish=error"))
-            | Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
-                // CTX-004: a terminal provider step is not a final answer unless
-                // it carries usable formal text. `TerminalValidity` is the single
-                // owner of that predicate — reasoning and tool bookkeeping may be
-                // present while the model-visible answer is still empty or is
-                // tool-call markup, and both cases earn interaction repair rather
-                // than durable provider fallback.
-                match TerminalValidity.check (partsText parts) with
-                | Ok() -> box ReconcileProgram.TurnCompleted
-                | Error rejection ->
-                    box (
-                        ReconcileProgram.TurnNeedsContinuation(
-                            sprintf "assistant stop with %s" (TerminalValidity.describe rejection)
-                        )
-                    )
-            | Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) ->
-                box ReconcileProgram.TurnInProgress
-            | Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
-                box (ReconcileProgram.TurnNeedsContinuation "assistant finish=length")
-            | Some value -> box (ReconcileProgram.TurnFailed(sprintf "assistant finish=%s" value))
-            // No finish yet: private SnapshotObservation. Never invent Completed
-            // from parts alone — abort/error may still be racing the idle wake-up.
-            | None -> box ReconcileProgram.TurnUnknown
+        | false, false, Some value when value.Equals("error", StringComparison.OrdinalIgnoreCase) ->
+            box (ReconcileProgram.TurnFailed(defaultArg errorName "assistant finish=error"))
+        | false, false, Some value when value.Equals("stop", StringComparison.OrdinalIgnoreCase) ->
+            classifyStopped parts
+        | false, false, Some value when value.Equals("tool-calls", StringComparison.OrdinalIgnoreCase) ->
+            box ReconcileProgram.TurnInProgress
+        | false, false, Some value when value.Equals("length", StringComparison.OrdinalIgnoreCase) ->
+            box (ReconcileProgram.TurnNeedsContinuation "assistant finish=length")
+        | false, false, Some value -> box (ReconcileProgram.TurnFailed(sprintf "assistant finish=%s" value))
+        // No finish yet: private SnapshotObservation. Never invent Completed
+        // from parts alone — abort/error may still be racing the idle wake-up.
+        | false, false, None -> box ReconcileProgram.TurnUnknown
 
     /// ARCH-011: named for the typed occasion (unfinished interaction), not for any
     /// character feature of the repair payload. A normal `finish=tool-calls` turn is

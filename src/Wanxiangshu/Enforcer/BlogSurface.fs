@@ -12,7 +12,6 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
 
@@ -39,12 +38,12 @@ module BlogSurface =
         | Ok value -> box {| ok = true; value = ok value |}
         | Error reason -> box {| ok = false; error = error reason |}
 
-    let emptyTextError = ChronicleTool.EmptyTextError
-    let noLiveCycleError = ChronicleTool.NoLiveCycleError
+    let emptyTextError = Wanxiangshu.OpenCode.ChronicleTool.EmptyTextError
+    let noLiveCycleError = Wanxiangshu.OpenCode.ChronicleTool.NoLiveCycleError
 
     /// Chronicle's canonical text gate.
     let canonicalText (value: obj) : obj =
-        ChronicleTool.tryCanonicalText (if isNullish value then null else string value)
+        Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText (if isNullish value then null else string value)
         |> resultToJs box box
 
     /// Physical Blogger flight is the only live-cycle authority.
@@ -65,7 +64,7 @@ module BlogSurface =
                    error = noLiveCycleError
                    abortedSession = if String.IsNullOrWhiteSpace sessionId then null else box sessionId |}
         else
-            match ChronicleTool.tryCanonicalText (if isNullish entry then null else string entry) with
+            match Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText (if isNullish entry then null else string entry) with
             | Error _ -> box {| ok = true; text = "nothing-to-remember"; error = emptyTextError |}
             | Ok _ ->
                 if String.IsNullOrWhiteSpace tip then

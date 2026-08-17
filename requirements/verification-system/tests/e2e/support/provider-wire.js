@@ -1,99 +1,45 @@
 /**
- * provider-wire.js — OpenAI HTTP wire body → production `ProviderWireProjection`.
+ * provider-wire.js — OpenAI HTTP wire body → the registered provider projection surface.
  *
- * VERIFY-007 has exactly two projections and they live in
- * `src/Wanxiangshu/Domain/ProviderProjection.fs`. This file is NOT a third one: it decodes a
- * wire format and then asks the production projection every question. Nothing here
- * compares, normalises or digests — those all come from `dist`.
- *
- * ── why an adapter is still needed ──────────────────────────────────────────
- *
- * Two different byte formats carry the same conversation:
- *
- *   Host raw      parts: [{ type: "text", text: "..." }]      ← production transform
- *   OpenAI HTTP   content: "...", tool_calls: [{ id, ... }]   ← what this mock receives
- *
- * Production's `Projection.decodeRequest` dispatches on a part's `type` field, so
- * an OpenAI message — which has no `parts` array at all — decodes to zero parts and
- * keeps only its `Role`. Feeding OpenAI bodies to it therefore makes ANY two
- * requests with the same role sequence compare equal.
- *
- * That failure is silent and it points the wrong way: every scenario edge would
- * match every request, every prefix seal would hold, and the canaries would go
- * green. `design-script-forest.md` §14 calls this the worst outcome available — a
- * verification device that green-lights a wrong implementation. `provider-wire-
- * tautology.mjs` is the test that keeps it from coming back.
- *
- * So: one decoder per wire format (they really are two formats), one set of
- * questions (there really is one meaning).
+ * OpenAI bodies and the owner surface use different JS-native wire shapes. This
+ * adapter owns only that format translation; projection, semantic reduction,
+ * rendering, and prefix decisions remain the registered owner operations.
  */
 
-import { canonicalJson } from '../../../../../dist/OpenCode/Codec/CanonicalJson.js';
-import { sha256Hex } from '../../../../../dist/Host/Digest.js';
-import { ToolCallIdModule_create as toolCallId } from '../../../../../dist/Foundation/Identity.js';
-import {
-  ProviderWireProjection,
-  WireMessage,
-  WirePart,
-  fixtureKey,
-  isAppendOnlyPrefix,
-  renderSemantic,
-  renderWire,
-  sealDigest,
-  semanticallyEqual,
-  toSemantic,
-  toolResultDigests,
-} from '../../../../../dist/Participant/Provider/Projection/Model.js';
-import { ofArray, toArray as listToArray } from '../../../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
+import { createHash } from 'node:crypto';
+import { canonicalJson } from '../../../../../dist/OpenCode/Codec/CanonicalJsonSurface.js';
+import * as ProjectionSurface from '../../../../../dist/Participant/Provider/Projection/Surface.js';
 
-// ── union construction by case NAME ─────────────────────────────────────────
-// Positional construction would silently relabel prose as reasoning: `WireText`
-// and `WireReasoning` are both one string, so swapping them yields a projection
-// that renders as valid JSON and compares unequal for the wrong reason.
+const sha256Hex = (value) => createHash('sha256').update(String(value)).digest('hex');
 
-const WIRE_PART_CASES = new WirePart(0, ['']).cases();
+const wirePart = (kind, payload) => ({ kind, ...payload });
 
-const wirePart = (caseName, fields) => {
-  const index = WIRE_PART_CASES.indexOf(caseName);
-  if (index < 0) {
-    throw new Error(`WirePart has no case '${caseName}'. Available: ${WIRE_PART_CASES.join(', ')}`);
-  }
-  return new WirePart(index, fields);
-};
-
-// ── decoding one OpenAI message ─────────────────────────────────────────────
-
-/** A data URL or remote URL is the media's identity; the digest stands in for it. */
 const mediaPart = (part) => {
   const url = part?.image_url?.url ?? part?.url ?? null;
   if (typeof url !== 'string' || url === '') return null;
-  const mediaType = part?.image_url?.detail ?? part?.mime ?? part?.mediaType ?? undefined;
-  return wirePart('WireMedia', [mediaType, sha256Hex(url)]);
+  const mediaType = part?.image_url?.detail ?? part?.mime ?? part?.mediaType ?? null;
+  return wirePart('media', { mediaType, contentDigest: sha256Hex(url) });
 };
 
-/**
- * `content` is either a string or an array of typed chunks.
- *
- * An unrecognised chunk is DROPPED rather than rendered as empty text: an empty
- * `WireText` would make every such chunk compare equal to every other, which is
- * the same tautology this file exists to prevent, one level down.
- */
+/** `content` is either text or typed chunks from the OpenAI body. */
 const contentParts = (content) => {
   if (typeof content === 'string') {
-    return content === '' ? [] : [wirePart('WireText', [content])];
+    return content === '' ? [] : [wirePart('text', { text: content })];
   }
   if (!Array.isArray(content)) return [];
 
   return content
     .map((chunk) => {
-      if (typeof chunk === 'string') return chunk === '' ? null : wirePart('WireText', [chunk]);
+      if (typeof chunk === 'string') return chunk === '' ? null : wirePart('text', { text: chunk });
       switch (chunk?.type) {
         case 'text':
-          return typeof chunk.text === 'string' && chunk.text !== '' ? wirePart('WireText', [chunk.text]) : null;
+          return typeof chunk.text === 'string' && chunk.text !== ''
+            ? wirePart('text', { text: chunk.text })
+            : null;
         case 'reasoning':
         case 'thinking':
           return typeof chunk.text === 'string' && chunk.text !== ''
-            ? wirePart('WireReasoning', [chunk.text])
+            ? wirePart('reasoning', { text: chunk.text })
             : null;
         case 'image_url':
         case 'image':
@@ -106,13 +52,11 @@ const contentParts = (content) => {
     .filter((part) => part !== null);
 };
 
-/** `arguments` is a JSON string on the wire; canonicalise so key order cannot leak. */
 const canonicalArguments = (raw) => {
   if (typeof raw !== 'string') return canonicalJson(raw ?? {});
   try {
     return canonicalJson(JSON.parse(raw));
   } catch {
-    // Not JSON. The bytes the model produced are the identity, so keep them.
     return raw;
   }
 };
@@ -122,122 +66,112 @@ const toolCallParts = (message) =>
     .map((call) => {
       const id = call?.id;
       const name = call?.function?.name ?? call?.name;
-      // Both halves are the identity (HOST-011). A call missing either is dropped
-      // rather than given a placeholder, which would let "no identity" look real.
       if (typeof id !== 'string' || typeof name !== 'string') return null;
-      return wirePart('WireToolCall', [toolCallId(id), name, canonicalArguments(call?.function?.arguments)]);
+      return wirePart('tool-call', {
+        callId: id,
+        name,
+        args: canonicalArguments(call?.function?.arguments),
+      });
     })
     .filter((part) => part !== null);
 
 const decodeMessage = (message) => {
   const role = typeof message?.role === 'string' ? message.role.toLowerCase() : '';
-
   if (role === 'tool') {
     const id = message?.tool_call_id;
     if (typeof id !== 'string') return null;
-    const result = typeof message?.content === 'string' ? message.content : canonicalJson(message?.content ?? null);
-    return new WireMessage(role, ofArray([wirePart('WireToolResult', [toolCallId(id), result])]));
+    const result = typeof message?.content === 'string'
+      ? message.content
+      : canonicalJson(message?.content ?? null);
+    return { role, parts: [wirePart('tool-result', { callId: id, result })] };
   }
 
   const parts = [...contentParts(message?.content), ...toolCallParts(message)];
   if (role === '' && parts.length === 0) return null;
-  return new WireMessage(role, ofArray(parts));
+  return { role, parts };
 };
 
-// ── the one entry point ─────────────────────────────────────────────────────
-
-/**
- * Decode a whole OpenAI chat-completions body.
- *
- * `system` stays a MESSAGE here, unlike production's separate `System` list. That
- * is not a divergence: production keeps it separate because the Host sends
- * `system: string[]` through its own hook, and on the OpenAI wire the system
- * prompt genuinely is `messages[0]`. Each decoder mirrors the bytes it reads,
- * which is what makes `renderWire` mean "these bytes" in both.
- */
+/** Decode one OpenAI body into the owner surface's JS-native wire shape. */
 export function wireOf(body) {
   const messages = Array.isArray(body?.messages) ? body.messages : [];
   const tools = (Array.isArray(body?.tools) ? body.tools : [])
     .map((tool) => tool?.function?.name ?? tool?.name)
     .filter((name) => typeof name === 'string');
 
-  return new ProviderWireProjection(
-    undefined,
-    typeof body?.model === 'string' ? body.model : undefined,
-    undefined,
-    ofArray(tools),
-    ofArray([]),
-    ofArray(messages.map(decodeMessage).filter((message) => message !== null)),
-  );
+  return {
+    providerId: null,
+    modelId: typeof body?.model === 'string' ? body.model : null,
+    variant: null,
+    tools,
+    system: [],
+    messages: messages.map(decodeMessage).filter((message) => message !== null),
+  };
 }
 
-/** VERIFY-007's one-way downgrade, applied to a decoded body. */
-export const semanticOf = (body) => toSemantic(wireOf(body));
+const withMetadata = (wire, semantic) => ({
+  ...semantic,
+  providerId: wire.providerId,
+  modelId: wire.modelId,
+  variant: wire.variant,
+});
 
-/** VERIFY-007: the fixture-matching key. Semantic, so it survives a second run. */
-export const fixtureKeyOf = (body) => fixtureKey(semanticOf(body))
+/** Apply the production semantic projection to decoded JS-native messages. */
+export const semanticOf = (body) => {
+  const wire = wireOf(body);
+  return withMetadata(wire, ProjectionSurface.semanticProjection(wire.messages));
+};
 
-const SEMANTIC_PART_CASES = ['SemanticText', 'SemanticReasoning', 'SemanticToolCall', 'SemanticToolResult', 'SemanticMedia']
+/** The semantic rendering is the stable fixture key. */
+export const fixtureKeyOf = (body) => ProjectionSurface.renderSemantic(semanticOf(body));
 
-const UNIT = '\u001f'
-const RECORD = '\u001e'
-
-/**
- * One semantic part as text a PREFIX comparison can work on.
- *
- * NOT `renderSemantic`: its closed JSON envelope puts `}]}]}` after the text, so no
- * shorter utterance is ever a string prefix of a longer one and VERIFY-003's
- * longest-prefix rule silently degrades to whole-string equality.
- *
- * Prose verbatim; every other kind tagged with `\u001f`, which prose cannot contain.
- */
 const partText = (part) => {
-  const kind = SEMANTIC_PART_CASES[part.tag]
-  const fields = part.fields ?? []
-
-  switch (kind) {
-    case 'SemanticText':
-      return fields[0]
-    case 'SemanticReasoning':
-      return `${UNIT}reasoning${UNIT}${fields[0]}`
-    case 'SemanticToolCall':
-      return `${UNIT}tool-call${UNIT}${fields[0]}${UNIT}${fields[1]}`
-    case 'SemanticToolResult':
-      return `${UNIT}tool-result${UNIT}${fields[0]}`
-    case 'SemanticMedia':
-      return `${UNIT}media${UNIT}${fields[0] ?? ''}${UNIT}${fields[1]}`
+  switch (part?.kind) {
+    case 'text':
+      return part.text ?? '';
+    case 'reasoning':
+      return `\u001freasoning\u001f${part.text ?? ''}`;
+    case 'tool-call':
+      return `\u001ftool-call\u001f${part.callId ?? ''}\u001f${part.name ?? ''}\u001f${part.args ?? ''}`;
+    case 'tool-result':
+      return `\u001ftool-result\u001f${part.callId ?? ''}\u001f${part.result ?? ''}`;
+    case 'media':
+      return `\u001fmedia\u001f${part.mediaType ?? ''}\u001f${part.contentDigest ?? ''}`;
     default:
-      throw new Error(`unknown SemanticPart case at tag ${part.tag}`)
+      throw new Error(`unknown semantic part kind '${part?.kind ?? ''}'`);
   }
-}
+};
 
-/** One message's semantic content, prefix-comparable. Role excluded: the caller selected by it. */
-export const messageText = (message) => listToArray(message.Parts).map(partText).join(RECORD);
+/** One message's semantic content, prefix-comparable and role-independent. */
+export const messageText = (message) => (message?.parts ?? []).map(partText).join('\u001e');
 
-// ── the production questions, re-exported ───────────────────────────────────
-//
-// Named exports rather than a namespace object so an accidental local
-// re-implementation collides at import time instead of shadowing quietly.
+/** Owner rendering and equality operations, kept as named adapter exports. */
+export const renderWire = (projection) => {
+  const wire = projection ?? {};
+  const ownerWire = JSON.parse(ProjectionSurface.renderWire(wire.messages ?? []));
+  return JSON.stringify({
+    ...ownerWire,
+    provider: wire.providerId ?? null,
+    model: wire.modelId ?? null,
+    variant: wire.variant ?? null,
+    tools: wire.tools ?? [],
+    system: wire.system ?? [],
+  });
+};
+export const renderSemantic = (projection) => ProjectionSurface.renderSemantic(projection);
+export const semanticallyEqual = (left, right) => ProjectionSurface.semanticallyEqual(left, right);
+export const isAppendOnlyPrefix = (previous, next) => ProjectionSurface.isAppendOnlyPrefix(previous, next);
+export const toSemantic = (wire) => withMetadata(wire, ProjectionSurface.semanticProjection(wire.messages ?? []));
 
-export { fixtureKey, isAppendOnlyPrefix, renderSemantic, renderWire, sealDigest, semanticallyEqual, toSemantic, toolResultDigests };
-
-/**
- * ARCH-004 / COMPANION-009: is `next` an append-only continuation of `previous`.
- *
- * Takes the two WIRE projections, because the seal barrier is about bytes the
- * provider already saw. Replaces harness's own `isProviderVisiblePrefix`, which
- * hand-compared `JSON.stringify` of tools and then of each message — two
- * comparison rules that could disagree with production's.
- */
+/** ARCH-004: a first request establishes the seal; later requests must append. */
 export const sealHolds = (previousWire, nextBody) =>
   previousWire === null || previousWire === undefined ? true : isAppendOnlyPrefix(previousWire, wireOf(nextBody));
 
 const systemHead = (wire) => {
-  const messages = listToArray(wire.Messages);
-  if (messages.length === 0 || messages[0].Role !== 'system') return null;
-  const parts = listToArray(messages[0].Parts);
-  if (parts.length !== 1 || parts[0].cases()[parts[0].tag] !== 'WireText') return null;
-  return { text: parts[0].fields[0], tail: messages.slice(1) };
+  const messages = wire?.messages ?? [];
+  if (messages.length === 0 || messages[0].role !== 'system') return null;
+  const parts = messages[0].parts ?? [];
+  if (parts.length !== 1 || parts[0].kind !== 'text') return null;
+  return { text: parts[0].text ?? '', tail: messages.slice(1) };
 };
 
 const normalizeModelIdentity = (text, modelId) =>
@@ -245,44 +179,31 @@ const normalizeModelIdentity = (text, modelId) =>
     ? text.split(modelId).join('<execution-model>')
     : text;
 
-/**
- * AGENT-031 Host canary boundary: a NEEDHELP fast→deep continuation changes the
- * execution model while preserving Persona / authority / tools / transcript.
- * OpenCode itself writes that model id into its leading system message, so the
- * corresponding model-id substitution is the only tolerated system-byte change.
- * Every other message still goes through production isAppendOnlyPrefix.
- */
+/** Admit only the measured fast→deep model substitution plus append-only growth. */
 export function assistanceBindingPrefixHolds(previousWire, nextBody) {
   const nextWire = wireOf(nextBody);
-  if (previousWire.ModelId === nextWire.ModelId) return false;
+  if (previousWire.modelId === nextWire.modelId) return false;
 
   const previousHead = systemHead(previousWire);
   const nextHead = systemHead(nextWire);
   if (previousHead === null || nextHead === null) return false;
 
   if (
-    !previousHead.text.includes(previousWire.ModelId)
-    || !nextHead.text.includes(nextWire.ModelId)
-    || normalizeModelIdentity(previousHead.text, previousWire.ModelId)
-      !== normalizeModelIdentity(nextHead.text, nextWire.ModelId)
+    !previousHead.text.includes(previousWire.modelId)
+    || !nextHead.text.includes(nextWire.modelId)
+    || normalizeModelIdentity(previousHead.text, previousWire.modelId)
+      !== normalizeModelIdentity(nextHead.text, nextWire.modelId)
   ) return false;
 
-  const previousTail = new ProviderWireProjection(
-    nextWire.ProviderId,
-    nextWire.ModelId,
-    nextWire.Variant,
-    previousWire.Tools,
-    previousWire.System,
-    ofArray(previousHead.tail),
-  );
-  const nextTail = new ProviderWireProjection(
-    nextWire.ProviderId,
-    nextWire.ModelId,
-    nextWire.Variant,
-    nextWire.Tools,
-    nextWire.System,
-    ofArray(nextHead.tail),
-  );
+  const previousTail = {
+    ...previousWire,
+    modelId: nextWire.modelId,
+    messages: previousHead.tail,
+  };
+  const nextTail = {
+    ...nextWire,
+    messages: nextHead.tail,
+  };
 
   return isAppendOnlyPrefix(previousTail, nextTail);
 }

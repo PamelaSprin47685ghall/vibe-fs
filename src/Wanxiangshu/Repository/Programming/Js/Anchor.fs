@@ -42,6 +42,9 @@ type AnchorSpec =
     | Exact of string
     | Regex of string
 
+/// DSL-state-combination: domain — anchor pattern plus optional occurrence
+/// selector describe one edit declaration; they are validation inputs, not a
+/// persistent execution cursor.
 type AnchorDeclaration =
     {
         Spec: AnchorSpec

@@ -24,6 +24,16 @@ open Wanxiangshu.Persistence.Journal
 /// closed) and the guard path could never reach a confirmed double PERFECT.
 module ReviewBarrier =
 
+    let private appendReviewBarrierFact
+        (durable: AgentJournal)
+        (reviewerSessionId: SessionId)
+        fact =
+        task {
+            match! AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable with
+            | Ok value -> return Ok value
+            | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }
+
     let openBarrier
         (journal: AgentJournal option)
         (managerSessionId: SessionId)
@@ -42,14 +52,6 @@ module ReviewBarrier =
                            BarrierId = barrierId
                            GitTreeHash = tree |}
 
-                let! _ =
-                    AgentJournal.appendAgent (StreamId.Session reviewerSessionId) None fact durable
-                    |> fun append ->
-                        task {
-                            match! append with
-                            | Ok value -> return Ok value
-                            | Error failure -> return Error(JournalAppendFailure.describe failure)
-                        }
-
+                let! _ = appendReviewBarrierFact durable reviewerSessionId fact
                 return ()
         }

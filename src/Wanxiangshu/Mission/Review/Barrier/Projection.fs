@@ -61,6 +61,8 @@ type ClosedAttempt =
 
 /// Completed review facts for one session. Attempt/closure audit windows are bounded;
 /// no field encodes where the Finality review CE is currently executing.
+/// DSL-state-combination: domain — optional barrier/session/tree/frontier
+/// identities are durable review evidence; no field stores an execution stage.
 type ReviewGuardProjection =
     {
         CurrentBarrierId: ReviewBarrierId option
@@ -129,6 +131,12 @@ module ReviewProjection =
     let private remember key keys =
         key :: (keys |> List.filter ((<>) key)) |> List.truncate AttemptWindow
 
+    let private witnessAfterBarrier currentWitness =
+        match currentWitness with
+        | ReviewWitness.Confirmed _ -> currentWitness
+        | ReviewWitness.NoReview
+        | ReviewWitness.RevisionWitness _ -> ReviewWitness.NoReview
+
     /// A new barrier discards the previous barrier's pending challenge and
     /// attempt window. REVIEW-008: a confirmed witness stays auditable (validity
     /// is still asked against the current tree / barrier); unfinished revision
@@ -150,11 +158,30 @@ module ReviewProjection =
                 TerminalFrontier = None
                 ObservedAttempts = []
                 ClosedAttempts = []
-                Witness =
-                    match current.Witness with
-                    | ReviewWitness.Confirmed _ -> current.Witness
-                    | ReviewWitness.NoReview
-                    | ReviewWitness.RevisionWitness _ -> ReviewWitness.NoReview }
+                Witness = witnessAfterBarrier current.Witness }
+
+    let private frontierAlreadyFrozen (current: ReviewGuardProjection) =
+        match current.Witness with
+        | ReviewWitness.RevisionWitness _
+        | ReviewWitness.Confirmed _ -> current.TerminalFrontier.IsSome
+        | ReviewWitness.NoReview -> false
+
+    let private recordFrontierIfOpen
+        (barrierId: ReviewBarrierId)
+        (terminalRef: BlobRef)
+        (terminalDigest: BlobDigest)
+        (sequence: int64)
+        (current: ReviewGuardProjection) =
+        if frontierAlreadyFrozen current then
+            current
+        else
+            { current with
+                TerminalFrontier =
+                    Some
+                        { BarrierId = barrierId
+                          TerminalRef = terminalRef
+                          TerminalDigest = terminalDigest
+                          Sequence = sequence } }
 
     /// GLORY-072/073: bind a terminal's exclusive XTrace frontier to the barrier
     /// that was active when the terminal fact folded. ProviderRun is deliberately
@@ -167,23 +194,7 @@ module ReviewProjection =
         =
         match current.CurrentBarrierId with
         | None -> current
-        | Some barrierId ->
-            let frozen =
-                match current.Witness with
-                | ReviewWitness.RevisionWitness _
-                | ReviewWitness.Confirmed _ -> current.TerminalFrontier.IsSome
-                | ReviewWitness.NoReview -> false
-
-            if frozen then
-                current
-            else
-                { current with
-                    TerminalFrontier =
-                        Some
-                            { BarrierId = barrierId
-                              TerminalRef = terminalRef
-                              TerminalDigest = terminalDigest
-                              Sequence = sequence } }
+        | Some barrierId -> recordFrontierIfOpen barrierId terminalRef terminalDigest sequence current
 
     /// REVIEW-002: any REVISE clears an unfinished PERFECT confirmation.
     let private applyRevise (gitTreeHash: GitTreeHash) (current: ReviewGuardProjection) =
@@ -193,6 +204,19 @@ module ReviewProjection =
                 ReviewWitness.RevisionWitness
                     {| Report = ""
                        GitTreeHash = gitTreeHash |} }
+
+    let private applyNewVerdict
+        (attempt: ReviewAttemptIdentity)
+        (verdict: ReviewGuardVerdict)
+        (current: ReviewGuardProjection) =
+        let observed =
+            { current with
+                ObservedAttempts = remember attempt current.ObservedAttempts
+                LastGitTreeHash = Some attempt.GitTreeHash }
+
+        match verdict with
+        | ReviewGuardVerdict.Revise -> Ok(applyRevise attempt.GitTreeHash observed)
+        | ReviewGuardVerdict.Perfect -> Ok observed
 
     /// Apply one verdict.
     ///
@@ -210,14 +234,7 @@ module ReviewProjection =
         if List.contains attempt current.ObservedAttempts then
             Error DuplicateAttempt
         else
-            let observed =
-                { current with
-                    ObservedAttempts = remember attempt current.ObservedAttempts
-                    LastGitTreeHash = Some attempt.GitTreeHash }
-
-            match verdict with
-            | ReviewGuardVerdict.Revise -> Ok(applyRevise attempt.GitTreeHash observed)
-            | ReviewGuardVerdict.Perfect -> Ok observed
+            applyNewVerdict attempt verdict current
 
     /// REVIEW-003/006: the confirmed witness, already proven by its writer.
     ///

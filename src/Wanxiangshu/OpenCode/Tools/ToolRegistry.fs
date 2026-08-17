@@ -215,6 +215,14 @@ module ToolRegistry =
                 ?finalityReviewerTimeoutMs = finalityReviewerTimeoutMs
             )
 
+        let generatedJsSpecs () =
+            [ for role in RoleDefinitions.all |> List.map (fun d -> d.Role) do
+                  match JsToolGenerator.generate (string role) (Roles.permissions role) jsProse with
+                  | Some surface ->
+                      yield
+                          JsToolSpec.create factory surface (defaultArg workspaceDirectory "") jsTransactionPersistence
+                  | None -> () ]
+
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
               yield! PtyTool.specs factory runtime
@@ -244,16 +252,10 @@ module ToolRegistry =
               // is generated from the role matrix (AGENT-007: profile capability
               // set == Roles.permissions), so a role without filesystem
               // capability gets no js-* spec at all.
-              for role in RoleDefinitions.all |> List.map (fun d -> d.Role) do
-                  match JsToolGenerator.generate (string role) (Roles.permissions role) jsProse with
-                  | Some surface ->
-                      yield
-                          JsToolSpec.create factory surface (defaultArg workspaceDirectory "") jsTransactionPersistence
-                  | None -> () ]
+              yield! generatedJsSpecs () ]
 
         // Role-gated tools: agent permission schema and this execute gate agree on
-        // CanonicalRole. chronicle is request-scoped on top of Role=Blogger: no live
-        // CurrentRequest must not complete as a soft tool error (Host step loop).
+        // CanonicalRole. chronicle is request-scoped on top of Role=Blogger.
         let gateExecute (spec: ToolSpec) =
             let original = spec.Execute
 
@@ -268,57 +270,68 @@ module ToolRegistry =
                     Diagnostic.emit
                         "chronicle-gate"
                         [ "session_id", ctx.SessionId; "result", ChronicleTool.NoLiveCycleError ]
-
                     if not (String.IsNullOrWhiteSpace ctx.SessionId) then
                         let! _ = runtime.Sessions.AbortSession(SessionId.create ctx.SessionId)
                         ()
-
                     return raise (InvalidOperationException(ChronicleTool.NoLiveCycleError))
+                }
+
+            let executeKnownRole args (ctx: HostToolContext) allowed role =
+                task {
+                    match allowed role, spec.Name = "chronicle" && role = Role.Blogger with
+                    | true, _ -> return! original args ctx
+                    | _, true -> return! stopChronicleNoLiveCycle ctx
+                    | _ -> return denyRole ctx role
+                }
+
+            let executeAfterEnsure args (ctx: HostToolContext) allowed =
+                task {
+                    match! runtime.EnsureRoleFor ctx with
+                    | Some role -> return! executeKnownRole args ctx allowed role
+                    | None -> return denied ctx Path.DeniedUnestablished Map.empty
+                }
+
+            let executeEstablished args (ctx: HostToolContext) allowed =
+                task {
+                    match runtime.RoleFor ctx with
+                    | Some role -> return! executeKnownRole args ctx allowed role
+                    | None -> return! executeAfterEnsure args ctx allowed
+                }
+
+            let executeNonBookkeeper args (ctx: HostToolContext) allowed =
+                task {
+                    if spec.Name = "js-bookkeeper" then
+                        return denied ctx Path.DeniedNoStagedCase Map.empty
+                    else
+                        return! executeEstablished args ctx allowed
+                }
+
+            let executeBookkeeper args (ctx: HostToolContext) =
+                task {
+                    if spec.Name = "js-bookkeeper" then
+                        return! original args ctx
+                    else
+                        return denied ctx Path.DeniedBookkeeperOnly Map.empty
                 }
 
             fun args (ctx: HostToolContext) ->
                 task {
                     let allowed = rolePredicate spec.Name parkedHost ctx.SessionId
-
                     let isStrengthReplica =
                         match strengthRuntime with
                         | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
                             strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
                         | _ -> false
-
                     let isBookkeeper =
                         not (String.IsNullOrWhiteSpace ctx.SessionId)
                         && BookkeeperRuntime.isAttached ctx.SessionId
 
-                    if isStrengthReplica then
-                        // STRENGTH-004: Host-native read/glob/grep are the entire
-                        // replica tool surface. Every plugin-registered tool is
-                        // therefore a forged/hidden path and fails closed here.
+                    match isStrengthReplica, isBookkeeper with
+                    | true, _ ->
+                        // STRENGTH-004: Host-native read/glob/grep are the entire replica surface.
                         return denied ctx Path.DeniedStrength Map.empty
-                    elif isBookkeeper then
-                        // Bookkeeper may run js-bookkeeper only. No Role.Bookkeeper.
-                        if spec.Name = "js-bookkeeper" then
-                            return! original args ctx
-                        else
-                            return denied ctx Path.DeniedBookkeeperOnly Map.empty
-                    elif spec.Name = "js-bookkeeper" then
-                        return denied ctx Path.DeniedNoStagedCase Map.empty
-                    else
-                        match runtime.RoleFor ctx with
-                        | Some role when allowed role -> return! original args ctx
-                        | Some role when spec.Name = "chronicle" && role = Role.Blogger ->
-                            return! stopChronicleNoLiveCycle ctx
-                        | Some role -> return denyRole ctx role
-                        | None ->
-                            match! runtime.EnsureRoleFor ctx with
-                            | Some role when allowed role -> return! original args ctx
-                            | Some role when spec.Name = "chronicle" && role = Role.Blogger ->
-                                return! stopChronicleNoLiveCycle ctx
-                            | Some role -> return denyRole ctx role
-                            | None ->
-                                // AGENT-007: an unresolved Role means an empty tool set.
-                                // Executing under an unknown role is unauthorised.
-                                return denied ctx Path.DeniedUnestablished Map.empty
+                    | false, true -> return! executeBookkeeper args ctx
+                    | false, false -> return! executeNonBookkeeper args ctx allowed
                 }
 
         let specs =

@@ -88,24 +88,36 @@ module JudgeTool =
                           ToolCallId = judgement.ToolCallId
                           Verdict = judgement.Verdict }))))
 
+    let private recordSubmittedJudgement
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (journal: AgentJournal)
+        (submission: VerdictSubmission) =
+        task {
+            match! VerdictWorkflow.recordJudgement journal submission with
+            | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
+            | Ok() ->
+                scope.MarkVerdictSubmitted context.SessionId
+                return received context
+        }
+
+    let private recordJournalJudgement
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (journal: AgentJournal)
+        (judgement: ReviewJudgement) =
+        match processSubmission journal judgement with
+        | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
+        | Some submission -> recordSubmittedJudgement scope context journal submission
+
     let private recordProcessJudgement
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
         (judgement: ReviewJudgement)
         =
-        task {
-            match scope.Journal with
-            | None -> return notReceived context Path.ContextIncomplete
-            | Some journal ->
-                match processSubmission journal judgement with
-                | None -> return notReceived context Path.ContextIncomplete
-                | Some submission ->
-                    match! VerdictWorkflow.recordJudgement journal submission with
-                    | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
-                    | Ok() ->
-                        scope.MarkVerdictSubmitted context.SessionId
-                        return received context
-        }
+        match scope.Journal with
+        | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
+        | Some journal -> recordJournalJudgement scope context journal judgement
 
     let private deliverFinalityJudgement
         (scope: ToolRuntimeScope)
@@ -132,6 +144,15 @@ module JudgeTool =
             | None -> return notReceived context Path.CouldNotBind
             | Some() -> return! completed.Task
         }
+
+    let private dispatchJudgement
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (judgement: ReviewJudgement) =
+        if ReviewJudgementInbox.isOwned judgement.ReviewerSessionId then
+            deliverFinalityJudgement scope context judgement
+        else
+            recordProcessJudgement scope context judgement
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
@@ -163,11 +184,7 @@ module JudgeTool =
 
             match validated with
             | Error reason -> return notReceived context reason
-            | Ok judgement ->
-                if ReviewJudgementInbox.isOwned judgement.ReviewerSessionId then
-                    return! deliverFinalityJudgement scope context judgement
-                else
-                    return! recordProcessJudgement scope context judgement
+            | Ok judgement -> return! dispatchJudgement scope context judgement
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

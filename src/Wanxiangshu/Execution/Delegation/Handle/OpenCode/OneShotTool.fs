@@ -85,6 +85,9 @@ module OneShotAgentTool =
 
     type Request = { Agent: string; Prompt: string }
 
+    /// DSL-state-combination: domain — optional parent background and WorkRecord
+    /// preserve evidence attached to one completed tool outcome; they do not
+    /// represent independent runtime stages.
     type Outcome =
         {
             ChildId: string

@@ -210,17 +210,17 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
    观察、不建 process registry」是并发模型；正向 replica 收敛律归 `durable-convergence`。
 6. **`schemaVersion` 例外站点 —— HOW**：`NON_STORE_SCHEMA_VERSION_SITES`（HandleCompletionCodec
    等）是产品发布面字段，不是 durable store 版本；unified-store-gate 只拦 store 上下文。
-7. **FactCodec 文本 migration —— decode-only bounded compat（CLN-07 census / CLN-08..N 裁决）**：
-   `deserializeFact` 链的四个文本修复是 **decode-only ingress**，无旧 writer（新 writer 永远
-   写完整字段）。census 2026-08-16：`.git/wanxiang/events/` 26 journals 全部现代形状，零缺字段行。
+7. **FactCodec 历史输入诊断 —— decode-only bounded compat（CLN-07 census / CLN-08..N 裁决）**：
+   当前 writer 只产生完整的 canonical facts；已删除缺字段注入与旧 observation-tag
+   rewrite。保留的历史路径只在 persistence ingress 对已知旧 bytes 做**拒绝并给出明确处置
+   信息**，绝不把旧 bytes 迁移为新 facts，也没有旧 writer。census 2026-08-16：
+   `.git/wanxiang/events/` 的 26 journals 全部现代形状，零缺字段行。
 
-   | 步骤 | 修复 | Exit condition |
+   | decode-only ingress | 真实债权人 | Exit condition |
    |---|---|---|
-   | `migrateHandleCompleted` | 缺 `CompletionRef` 注入 null | 真实旧数据为零（census / instrumentation）→ DELETE |
-   | `migrateHandleOwnership` | 缺 `Ownership` 注入 `DurableParentHandle`（pre-change 语义） | 同上 → DELETE |
-   | `migrateHandleByname` | 缺 `Byname` 注入 `""`（回退 TargetAgent） | 同上 → DELETE |
-   | `rewriteLegacyObservationTags` | 旧 Observation tag 双解码（tip-v2 clean break 配套，Envelope.fs:93 同用） | tip-v2 clean break 完成 → 删双解码 + 对应测试 |
+   | `containsLegacyFallbackFields` → `pre050MigrationMessage` | 仍可能被操作者提交的 pre-0.5.0 runtime journal；需要可操作的 archive-or-remove 诊断 | retention horizon + 外部 workspace census 证明无 pre-0.5.0 bytes → 删除检测与诊断测试 |
+   | `containsLegacyScoreVectorEntry` → `tipV2CleanBreakMessage` | 历史 tip-v1 observation/entry bytes；不能无损猜成单一 tip | 所有受支持 workspace 完成 tip-v2 clean break 且无旧 bytes → 删除检测与诊断测试 |
+   | `containsLegacyUnanchoredGuideline` → `legacyGuidelineCleanBreakMessage` | 历史未锚定 guideline bytes；ordinal 无法恢复 transcript position | HOST-013 retention horizon + census 无旧 bytes → 删除检测与诊断测试 |
 
-   每项都有 fixture 测试契约（`MIGRATION_*`）；删除时同步删 fixture 与测试。
-   **禁止**：把任何文本修复升级为双向 adapter 或旧 writer。
+   **禁止**：把任何 decode-only refusal 升级为双向 adapter、old writer、migrator 或 fallback-to-old-store shim。
 

@@ -38,6 +38,35 @@ module EnforcerCodec =
                 if t.Length = 0 then None else Some t
             | _ -> None)
 
+    let private decodeTipString
+        (rules: EnforcerRule list)
+        (text: string option)
+        (evidence: string option)
+        (tipRaw: string)
+        : Result<CanonicalBlogCall, string> =
+        let tipValue = tipRaw.Trim()
+
+        if tipValue.Length = 0 then
+            Error MissingTipError
+        else
+            EnforcerCatalog.tryFindByField tipValue rules
+            |> Option.map (fun rule ->
+                Ok
+                    { Text = text
+                      Evidence = evidence
+                      Tip = EnforcerTip.ofRule rule })
+            |> Option.defaultValue (Error(unknownTipError tipValue))
+
+    let private decodeTip
+        (rules: EnforcerRule list)
+        (text: string option)
+        (evidence: string option)
+        (value: obj)
+        : Result<CanonicalBlogCall, string> =
+        match value with
+        | :? string as tipRaw -> decodeTipString rules text evidence tipRaw
+        | _ -> Error MissingTipError
+
     /// ENFORCER-020/021/023：解析一个 blog 调用。
     ///
     /// 缺 tip / tip 非 string / 未知 field → Error。
@@ -51,22 +80,7 @@ module EnforcerCodec =
         match Map.tryFind "tip" rawArgs with
         | None -> Error MissingTipError
         | Some null -> Error MissingTipError
-        | Some value ->
-            match value with
-            | :? string as tipRaw ->
-                let tipValue = tipRaw.Trim()
-
-                if tipValue.Length = 0 then
-                    Error MissingTipError
-                else
-                    match EnforcerCatalog.tryFindByField tipValue rules with
-                    | None -> Error(unknownTipError tipValue)
-                    | Some rule ->
-                        Ok
-                            { Text = text
-                              Evidence = evidence
-                              Tip = EnforcerTip.ofRule rule }
-            | _ -> Error MissingTipError
+        | Some value -> decodeTip rules text evidence value
 
     /// ENFORCER-022/061：text 必须存在且规范化后非空。
     let hasValidText (call: CanonicalBlogCall) : bool = call.Text.IsSome

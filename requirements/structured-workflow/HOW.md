@@ -80,18 +80,12 @@ reread，≤3 次）、`publishDecision`（terminal/provisional consume maps）�
 | `bool-loop` | 003/008 | 文件级：两个 mutable false + while 循环 |
 | `dup-cases` | 006 | 跨文件同 case 集（`DUP_CASES_EXEMPT` 显式豁免） |
 | `registry-joint-branch` | 003/005 | 两个 declared registry 的 direct/try probe 联合选择 effect branch |
-| `infrastructure-leak` | 007 | `open Wanxiangshu.Infrastructure|OpenCode|Process` 或 FQN 引用；Host 边界 basename 白名单豁免（DSL-010） |
+| `infrastructure-leak` | 007 | `open Wanxiangshu.Infrastructure|OpenCode|Process` 或 FQN 引用；仅允许登记的 Host owner exact paths（DSL-010） |
 | 大 DU 分类 + `DSL-control-state-reason` | 003/005 | ≥10 case 必须 `DSL-class`；ControlState 必须机器可校验理由（ce-equivalent=none + blockers 覆盖 function-call/match!/return!/resource-scope/waiter/bounded-recursion） |
 
-fixtures：`tests/unit/verify/fixtures/{state-axes-illegal,state-axes-domain,state-axes-physical,mutable-record-program-counter,ref-record-program-counter,registry-joint-branch}.fs`。
+fixtures：`tests/fixtures/{state-axes-illegal,state-axes-domain,state-axes-physical,state-axes-multiline,mutable-record-program-counter,ref-record-program-counter,registry-joint-branch}.fs`。
 
-### 3.2 `scripts/checks/dsl-ownership-ratchet.mjs`（migration）
-
-per-file/per-gate 违规计数基线（`dsl-ownership-ratchet-baseline.json`）。**这是
-legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT 的 DELETE
-半边），cutover 后随 legacy blacklist 一起删除。
-
-### 3.3 `scripts/checks/g4r-ce-vocabulary.mjs`（CE vocabulary absence ratchet）
+### 3.2 `scripts/checks/g4r-ce-vocabulary.mjs`（CE vocabulary absence ratchet）
 
 - `OBSOLETE_CONTROLLER_PATHS`：`TurnCompletionProgram.fs`、`FinalityController.fs`、
   `ReviewController.fs`、`ManagerLifecycleGate.fs`、`ReviewerGuardState.fs`、
@@ -100,7 +94,7 @@ legacy symbol blacklist 的迁移 ratchet**（PROOF-MAP：dsl-ownership SPLIT �
   `Date.now` / `setTimeout` / `timerTask` 等——**raw-time 禁止语义归
   `time-capability`**，本门只是共享 scanner（MECHANISM 交叉）。
 
-### 3.3.1 `scripts/checks/fsharp-control-pyramid.mjs`（lexical decision ratchet）
+### 3.2.1 `scripts/checks/fsharp-control-pyramid.mjs`（lexical decision ratchet）
 
 STRUCTURED-WORKFLOW-016 的 shape gate。scanner 以 F# offside/缩进结构识别
 `match` / `match!` / `function` / 多行 `if` / `try` / `while` / `for`；同级顺序 decision
@@ -145,7 +139,7 @@ node scripts/check.mjs
 历史 todo 每次刷屏。没有 suppression / allowlist；若某命中不是机械 bind，也必须人工
 重审并命名 control-flow boundary。
 
-### 3.4 高阶 Vocabulary 证明义务（DSL-014）
+### 3.3 高阶 Vocabulary 证明义务（DSL-014）
 
 每个改变 trace 的压缩 Vocabulary 必须有 temporal/behavioral proof。当前义务表：
 
@@ -162,7 +156,7 @@ node scripts/check.mjs
 
 新增高阶 Vocabulary 必须追加本表一行并挂可观察效果测试。
 
-### 3.4.1 正交组合证明（DSL-005，人工）
+### 3.3.1 正交组合证明（DSL-005，人工）
 
 > 本节约 DSL-005 的人工证明（2026-08-14 cutover 自旧 proof 归档吸收）。
 > 自动化下限现已含结构化 `state-product` 门禁：`scripts/checks/dsl-ownership.mjs` 解析
@@ -201,11 +195,10 @@ record/DU。可观察「组合」由**独立物理槽位的存在性**构成，�
 
 - `scripts/checks/dsl-ownership.mjs --threshold=0`（program-counter / large-DU / ControlState 理由 /
   `state-product` 组合轴等结构门；全量扫描全部生产 `src/Wanxiangshu/**/*.fs`，无目录级豁免）
-- `scripts/checks/dsl-ownership-ratchet.mjs`（基线防回归）
 - `requirements/context-compression/tests/blogger-convergence-gaps.test.mjs`（`HasFlight` 唯一 busy、
   无 shadow state API）
 - `requirements/structured-workflow/tests/dsl-ownership.test.mjs`（含 `state-axes-{illegal,domain,physical}.fs`
-  与 `ControlState` reason fixtures）与 `dsl-ownership-ratchet.test.mjs`
+  与 `ControlState` reason fixtures）
 
 `state-product` 门禁在字段名无关的结构层面识别 record 状态轴乘积；它不替代上表人工枚举
 的架构级语义，只把「未分类组合」变成构建期失败。`registry-joint-branch` 只拒绝两个
@@ -276,7 +269,7 @@ deadline escape 都是消费关系，非定义前提。
 
 | 源 | 吸收位置 |
 |---|---|
-| 历史 change（rabbit，G4R-CE Vocabulary） | WHY.md §2.5/§3；WHAT 011/012/013；HOW §1/§3.3 |
+| 历史 change（rabbit，G4R-CE Vocabulary） | WHY.md §2.5/§3；WHAT 011/012/013；HOW §1/§3.2 |
 | 历史 change（ce-temporal-ownership，时序所有权清算） | WHY.md §2.1/§2.2/§3；WHAT 009；HOW §2.2/§2.3 |
 | 历史 change（fsharp-dsl-governance，mutable record 状态乘积） | WHY.md §2.3/§3；WHAT 005/008；HOW §3.1 |
 | 历史 change（dsl-structured-program-gap，DSL 结构化程序缺口闭环） | WHY.md §2.4；WHAT 005；HOW §3.1（flight registry 单一物理来源） |
@@ -294,7 +287,7 @@ deadline escape 都是消费关系，非定义前提。
 | 历史 LOOP-001..008 | **不归本包**：degeneration-guard 单 owner；本包只提供 LOOP-006 桥接依赖的「无第二状态机 / 进程内局部事实」保证 | WHAT.md 反向覆盖清单 |
 | 历史 EXEC-001..032 主体 | **不归本包**：delegation / process-execution / effect-accounting / work-record / managed-session-lifecycle / participant-horizon / time-capability 等各自 owner；本包只吸收 EXEC-020 控制面/数据面（WHAT 015） | WHAT.md 反向覆盖清单 |
 | 历史 ARCH-002/003/004/006/007/010-017 | **不归本包**：host-boundary / prefix-stability / action-affordance / provider-projection / office-capability 等各自 owner | WHAT.md 反向覆盖清单 |
-| `scripts/checks/dsl-ownership.mjs` 的 `program-counter` 词表 + `behaviour-bool` 名称正则、`dsl-ownership-ratchet` 基线、`g4r-ce-vocabulary` obsolete-controller absence、`g4r-freeze` | **migration ratchet（DELETE@cutover）**：旧 symbol absence 黑名单只能防已经想起来的坏名字；新世界以 positive 结构门（state-product / mutable-record-field / second-runtime-protocol / registry-joint-branch）+ 本包 NEW 测试为正式证明面 | PROOF.md §4/§6；PROOF-MAP DELETE 清单 |
+| `scripts/checks/dsl-ownership.mjs` 的 `program-counter` 词表 + `behaviour-bool` 名称正则、`g4r-ce-vocabulary` obsolete-controller absence、`g4r-freeze` | **migration ratchet（DELETE@cutover）**：旧 symbol absence 黑名单与计数基线已删除；新世界以 positive 结构门（state-product / mutable-record-field / second-runtime-protocol / registry-joint-branch）+ 本包 NEW 测试为正式证明面 | PROOF.md §4；PROOF-MAP DELETE 清单 |
 
 ### 5.3 已实施的 clean break（不再回退）
 
@@ -310,7 +303,7 @@ deadline escape 都是消费关系，非定义前提。
 
 - `state-product` 类型级自动组合计数仍是「结构门 + 人工证明」组合（dsl-structured-
   program-gap.md blocker 保留），不降低 WHAT 005。
-- dsl-ownership 的 legacy 名称门与 ratchet 在 cutover 前仍承担部分 003/004 证明；
-  删除前需确保 positive 结构门 + 本包 NEW 测试覆盖等价面（见 PROOF.md §6 待办）。
+- dsl-ownership 的永久结构门与本包测试现在承担 003/004/005/008 的机器证明；
+  旧名称黑名单与 ratchet 计数基线已在 cutover 删除。
 - `tests/unit/temporal/**`、`guide-contract`、`verify/**` 的 SPLIT@cutover 未执行
   （PROOF.md §4），当前为共享套件。

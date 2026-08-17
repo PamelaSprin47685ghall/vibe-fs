@@ -48,32 +48,25 @@ module CausalWaitBridge =
     [<Emit("JSON.stringify($0, null, 2)")>]
     let private stringify (value: obj) : string = jsNative
 
+    let private existingExclude (excludePath: string) : string =
+        if existsSync excludePath then readFileSync (excludePath, "utf8") else ""
+
+    let private appendDiagnosticMarker (excludePath: string) (existing: string) : unit =
+        if not (existing.Contains ".wanxiangshu/") then
+            let prefix = if existing.Length = 0 || existing.EndsWith("\n") then "" else "\n"
+            appendFileSync (
+                excludePath,
+                prefix + "# wanxiangshu diagnostic bridge (non-authoritative)\n.wanxiangshu/\n",
+                "utf8"
+            )
+
     /// Keep diagnostic files out of `git status` / IsDirty. Best-effort only.
     let private ensureDiagnosticsGitExcluded (workspace: string) : unit =
         try
             let gitInfo = pathJoin (pathJoin (workspace, ".git"), "info")
             mkdirSync (gitInfo, {| recursive = true |})
             let excludePath = pathJoin (gitInfo, "exclude")
-            let marker = ".wanxiangshu/"
-
-            let existing =
-                if existsSync excludePath then
-                    readFileSync (excludePath, "utf8")
-                else
-                    ""
-
-            if not (existing.Contains marker) then
-                let prefix =
-                    if existing.Length = 0 || existing.EndsWith("\n") then
-                        ""
-                    else
-                        "\n"
-
-                appendFileSync (
-                    excludePath,
-                    prefix + "# wanxiangshu diagnostic bridge (non-authoritative)\n" + marker + "\n",
-                    "utf8"
-                )
+            appendDiagnosticMarker excludePath (existingExclude excludePath)
         with _ ->
             ()
 
@@ -178,17 +171,16 @@ module CausalWaitBridge =
               "history", box (snapshot.History |> List.map transitionObj |> Array.ofList)
               "frontiers", box (frontiers |> List.map frontierObj |> Array.ofList) ]
 
+    let private writeSnapshotUnsafe (workspace: string) (reader: IWaitSnapshotReader) =
+        try
+            ensureDiagnosticsGitExcluded workspace
+            let diagnosticsDir = pathJoin (pathJoin (workspace, ".wanxiangshu"), "diagnostics")
+            mkdirSync (diagnosticsDir, {| recursive = true |})
+            let filePath = pathJoin (diagnosticsDir, "causal-waits.json")
+            writeFileSync (filePath, stringify (toPlainObject reader), "utf8")
+        with _ ->
+            ()
+
     /// Best-effort overwrite of `<workspace>/.wanxiangshu/diagnostics/causal-waits.json`.
     let writeSnapshot (workspace: string) (reader: IWaitSnapshotReader) : unit =
-        if String.IsNullOrWhiteSpace workspace then
-            ()
-        else
-            try
-                ensureDiagnosticsGitExcluded workspace
-                let diagnosticsDir = pathJoin (pathJoin (workspace, ".wanxiangshu"), "diagnostics")
-
-                mkdirSync (diagnosticsDir, {| recursive = true |})
-                let filePath = pathJoin (diagnosticsDir, "causal-waits.json")
-                writeFileSync (filePath, stringify (toPlainObject reader), "utf8")
-            with _ ->
-                ()
+        if String.IsNullOrWhiteSpace workspace then () else writeSnapshotUnsafe workspace reader

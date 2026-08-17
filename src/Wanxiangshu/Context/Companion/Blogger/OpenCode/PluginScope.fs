@@ -103,12 +103,10 @@ type PluginBloggerScope() =
                             // ENFORCER-050 offer-first merge: PendingOffer staged
                             // while no transform was parked makes this park return
                             // immediately with `true`.
-                            let staged = pendingOffer.ContainsKey sessionId
+                            created, pendingOffer.ContainsKey sessionId)
 
-                            if staged then
-                                created.TryResume()
-
-                            created, staged)
+                if staged then
+                    entry.TryResume()
 
                 let! resumed = entry.Completion
 

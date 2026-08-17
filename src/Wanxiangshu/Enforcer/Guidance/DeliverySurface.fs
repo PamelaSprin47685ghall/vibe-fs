@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Enforcer.Guidance
 
 open Fable.Core.JsInterop
-open Wanxiangshu.OpenCode.Host
 
 /// JS-native owner boundary for the Main tip Full/Identity projection. The
 /// durable fold keeps its typed set and TipPresentation private; callers see
@@ -30,10 +29,10 @@ module DeliverySurface =
 
         { FullDeliveredTips = names |> Array.toList |> Set.ofList }
 
-    let private presentationOf (value: obj) : TipPresentation =
+    let private presentationOf (value: obj) : Wanxiangshu.OpenCode.Host.TipPresentation =
         match text value with
-        | "IdentityOnly" -> TipPresentation.IdentityOnly
-        | _ -> TipPresentation.Full
+        | "IdentityOnly" -> Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly
+        | _ -> Wanxiangshu.OpenCode.Host.TipPresentation.Full
 
     let empty : obj = stateToJs TipDeliveryProjection.empty
 

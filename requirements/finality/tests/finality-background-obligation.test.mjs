@@ -26,6 +26,18 @@ const worldOf = (events) => {
   return result.world
 }
 
+test('WHAT[FINALITY-027] malformed handle role ownership and completion fail closed', () => {
+  for (const event of [
+    { ...handleLinked(), role: 'unknown' },
+    { ...handleLinked(), ownership: 'unknown' },
+    { kind: 'handle-completed', sessionId: MANAGER, handleId: 'h1', completionKind: 'unknown' },
+  ]) {
+    const result = finality.project([event])
+    assert.equal(result.ok, false)
+    assert.match(JSON.stringify(result.error), /unknown (role|handle ownership|handle completion kind)/)
+  }
+})
+
 test('WHAT[FINALITY-027] Manager without journal or handles is never outstanding', () => {
   assert.equal(finality.backgroundOutstanding(worldOf([]), MANAGER), false)
 })

@@ -53,12 +53,28 @@ module Events =
         let stickyOrder = Queue<string>()
         let stickyCap = 256
 
+        let notifyRegistration sessionId outcome registration =
+            if registration.Live then registration.Listener sessionId outcome
+
+        let trimSticky () =
+            while stickyOrder.Count > stickyCap do
+                let evicted = stickyOrder.Dequeue()
+                stickyTerminal.Remove(evicted) |> ignore
+
+        let rememberSticky key outcome =
+            lock lockObj (fun () ->
+                let isNew = not (stickyTerminal.ContainsKey key)
+                stickyTerminal.[key] <- outcome
+
+                if isNew then stickyOrder.Enqueue key
+                if isNew then trimSticky ()
+
+                listeners.Count > 0
+                && listeners |> Seq.exists (fun registration -> registration.Live))
+
         let notify sessionId outcome =
             let handlers = lock lockObj (fun () -> listeners |> Seq.toList)
-
-            for registration in handlers do
-                if registration.Live then
-                    registration.Listener sessionId outcome
+            for registration in handlers do notifyRegistration sessionId outcome registration
 
         /// One Completed terminal per (session, provider run), across every plugin
         /// instance sharing this port.
@@ -71,21 +87,21 @@ module Events =
         /// completes it with the PREVIOUS run's outcome (measured: the challenge
         /// nudge's run completed before the reviewer answered, so the Orchestrator's
         /// second await returned early and a confirmed review read as UNPROVEN).
+        let isCompletedRunDuplicate sessionId (providerRun: ProviderRunIdentity) =
+            let key = SessionId.value sessionId
+            let runValue = ProviderRunIdentity.value providerRun
+
+            lock lockObj (fun () ->
+                match lastCompletedRun.TryGetValue key with
+                | true, last when last = runValue -> true
+                | _ ->
+                    lastCompletedRun.[key] <- runValue
+                    false)
+
         member private _.IsCompletedDuplicate(sessionId: SessionId, outcome: TerminalOutcome) =
             match outcome with
-            | TerminalOutcome.Completed result ->
-                if isNull (box result.ProviderRun) then
-                    false
-                else
-                    let key = SessionId.value sessionId
-                    let runValue = ProviderRunIdentity.value result.ProviderRun
-
-                    lock lockObj (fun () ->
-                        match lastCompletedRun.TryGetValue key with
-                        | true, last when last = runValue -> true
-                        | _ ->
-                            lastCompletedRun.[key] <- runValue
-                            false)
+            | TerminalOutcome.Completed result when not (isNull (box result.ProviderRun)) ->
+                isCompletedRunDuplicate sessionId result.ProviderRun
             | _ -> false
 
         /// Terminal completions arrive through NotifyTerminal from the reconcile
@@ -114,22 +130,8 @@ module Events =
 
             member _.NotifyTerminal sessionId outcome =
                 if not (this.IsCompletedDuplicate(sessionId, outcome)) then
-                    let hasListeners =
-                        lock lockObj (fun () ->
-                            let key = SessionId.value sessionId
-                            let isNew = not (stickyTerminal.ContainsKey key)
-                            stickyTerminal.[key] <- outcome
-
-                            if isNew then
-                                stickyOrder.Enqueue key
-
-                                while stickyOrder.Count > stickyCap do
-                                    let evicted = stickyOrder.Dequeue()
-                                    stickyTerminal.Remove(evicted) |> ignore
-
-                            listeners.Count > 0
-                            && listeners |> Seq.exists (fun registration -> registration.Live))
-
+                    let key = SessionId.value sessionId
+                    let hasListeners = rememberSticky key outcome
                     notify sessionId outcome
                     hasListeners
                 else

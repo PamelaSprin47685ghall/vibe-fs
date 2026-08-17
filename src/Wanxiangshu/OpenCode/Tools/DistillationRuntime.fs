@@ -49,6 +49,11 @@ module DistillationRuntime =
     /// derived from a role — the role is a constant, not an inference.
     let private distillerAgent = ManagedAgent.nameOf AgentTier.Fast Role.Distiller
 
+    let private awaitWithTimeout runtime permit agentId timeoutMs : Task<Result<RunCompletion, ForkError>> =
+        match timeoutMs with
+        | Some ms -> HostForkJoin.awaitAgentWithPermit runtime permit agentId (Some ms)
+        | None -> HostForkJoin.awaitAgentWithPermit runtime permit agentId None
+
     let asDistillationRuntime
         (runtime: HostForkRuntime)
         (journal: AgentJournal)
@@ -66,10 +71,7 @@ module DistillationRuntime =
                         // throttle-retries within AwaitAgentTimeoutMs; NotFound is hard fail.
                         return Error ForkError.TimedOut
                     | Error msg -> return Error(ForkError.NotFound msg)
-                    | Ok permit ->
-                        match timeoutMs with
-                        | Some ms -> return! HostForkJoin.awaitAgentWithPermit runtime permit agentId (Some ms)
-                        | None -> return! HostForkJoin.awaitAgentWithPermit runtime permit agentId None
+                    | Ok permit -> return! awaitWithTimeout runtime permit agentId timeoutMs
                 }
 
             member _.CurrentJournalRevision() = AgentJournal.revision journal

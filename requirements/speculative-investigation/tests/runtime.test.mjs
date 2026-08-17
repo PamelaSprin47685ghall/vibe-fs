@@ -18,6 +18,16 @@ test('WHAT[SPEC-INV-004] STRENGTH_014_runtime_is_owner_single_flight_and_decisio
   assert.equal(Strength.runtimeRegister(runtime, second).ok, true)
 })
 
+test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_unknown_role_and_budget', () => {
+  const runtime = Strength.runtimeCreate()
+  const unknownRole = Strength.runtimeRegister(runtime, binding('o1', 'r1', 'd1', 'Unknown', 'K1'))
+  assert.equal(unknownRole.ok, false)
+  assert.match(unknownRole.error, /unknown role/)
+  const unknownBudget = Strength.runtimeRegister(runtime, binding('o2', 'r2', 'd2', 'Coder', 'Unknown'))
+  assert.equal(unknownBudget.ok, false)
+  assert.match(unknownBudget.error, /unknown budget/)
+})
+
 test('WHAT[SPEC-INV-004] STRENGTH_004_runtime_rejects_K0_and_ineligible_replica_authority', () => {
   const runtime = Strength.runtimeCreate()
   assert.equal(Strength.runtimeRegister(runtime, binding('o1', 'r1', 'd1', 'Coder', 'K0')).error, 'EmptyBudget')

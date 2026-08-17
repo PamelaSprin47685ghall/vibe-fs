@@ -140,6 +140,16 @@ test('WHAT[REVIEW-ASSURANCE-008] REVIEW_014_concluded_marker_is_durable_and_cons
   assert.equal(checkpoint.concluded.workRecordRef, 'review-lwr')
 })
 
+test('WHAT[REVIEW-ASSURANCE-012] REVIEW_016_unknown_verdict_and_physical_evidence_fail_closed', () => {
+  const invalidVerdict = todo.factJson('TodoReviewConcluded', { ...concluded, Verdict: 'UNKNOWN' })
+  assert.equal(invalidVerdict.ok, false)
+  assert.match(invalidVerdict.error, /unknown review verdict/)
+
+  const invalidEvidence = todo.factJson('TodoWriteAccepted', { ...accepted, PhysicalSuccessEvidence: 'UNKNOWN' })
+  assert.equal(invalidEvidence.ok, false)
+  assert.match(invalidEvidence.error, /unknown physical success evidence/)
+})
+
 test('WHAT[REVIEW-ASSURANCE-012] REVIEW_016_concluded_fact_freezes_the_request_frontier', () => {
   const encoded = JSON.parse(todo.factJson('TodoReviewConcluded', concluded))
   assert.equal(String(encoded.ReviewerRecordFrontier.Sequence), '8')

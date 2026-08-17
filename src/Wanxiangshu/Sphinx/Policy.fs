@@ -128,13 +128,16 @@ module Policy =
         else
             decideOpenAction state
 
+    let private decideWithinBudget (state: EpistemicState) =
+        match state.RootContract with
+        | None -> yieldRequest (SemanticAssessmentRequest state.RootQuestion) state
+        | Some root -> decideWithRoot root state
+
     let decide (state: EpistemicState) =
         if not (State.withinBudget state) then
             state, InquiryResult.Answered(canonicalAnswer "budget" state)
         else
-            match state.RootContract with
-            | None -> yieldRequest (SemanticAssessmentRequest state.RootQuestion) state
-            | Some root -> decideWithRoot root state
+            decideWithinBudget state
 
     let start (question: string) =
         let text = if isNull question then "" else question.Trim()

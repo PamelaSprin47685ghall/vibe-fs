@@ -176,14 +176,15 @@ module Reconciler =
             lock gate (fun () ->
                 let key = SessionId.value sessionId
 
-                match active.TryGetValue key with
-                | true, activeGeneration when activeGeneration = generation ->
-                    match queued.TryGetValue key with
-                    | true, queuedGeneration when queuedGeneration = generation && isCurrent sessionId generation ->
-                        Release.ResumeDrain
-                    | _ ->
-                        active.Remove(key) |> ignore
-                        Release.Released
+                let activeState = active.TryGetValue key
+                let queuedState = queued.TryGetValue key
+
+                match activeState, queuedState with
+                | (true, activeGeneration), (true, queuedGeneration) when activeGeneration = generation && queuedGeneration = generation && isCurrent sessionId generation ->
+                    Release.ResumeDrain
+                | (true, activeGeneration), _ when activeGeneration = generation ->
+                    active.Remove(key) |> ignore
+                    Release.Released
                 | _ -> Release.Released)
 
         let mapsFor (sessionId: SessionId) =
@@ -224,17 +225,21 @@ module Reconciler =
                             generation
             }
 
+        member private this.DrainAfterPass(sessionId: SessionId, generation: int) : Task =
+            task {
+                if isCurrent sessionId generation then
+                    return! this.Drain(sessionId, generation)
+                else
+                    return ()
+            }
+
         member private this.Drain(sessionId: SessionId, generation: int) : Task =
             task {
                 match takeWork sessionId generation with
                 | Work.Drained -> return ()
                 | Work.Wake ->
                     do! this.RunPass(sessionId, generation)
-
-                    if isCurrent sessionId generation then
-                        return! this.Drain(sessionId, generation)
-                    else
-                        return ()
+                    return! this.DrainAfterPass(sessionId, generation)
             }
 
         member private this.Run(sessionId: SessionId, generation: int) : Task =

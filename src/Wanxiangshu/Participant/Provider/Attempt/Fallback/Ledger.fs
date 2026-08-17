@@ -60,6 +60,83 @@ type ConfirmedFailureOutcome =
 /// or project it to host-facing RecoveryAdmission.
 module FallbackLedger =
 
+    let private invalidOffsetMessage decodeError =
+        match decodeError with
+        | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
+            $"Fallback advance rejected: corrupt offset byte {value} (FALLBACK-002)"
+
+    let private appendExhausted
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (current: FallbackProjection)
+        (next: AgentPairCursor.FallbackCursor)
+        : Task<Result<ConfirmedFailureOutcome, string>> =
+        task {
+            let exhausted =
+                FallbackFact.FallbackExhausted
+                    {| SessionId = sessionId
+                       LogicalRunId = current.LogicalRunId
+                       AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
+                       FinalConsecutiveFailureCount = next.ConsecutiveFailureCount
+                       FinalOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset |}
+
+            let! appended =
+                AgentJournal.appendAgent
+                    (StreamId.Session sessionId)
+                    (Some providerRun)
+                    exhausted
+                    journal
+
+            return
+                appended
+                |> Result.map (fun _ -> ConfirmedFailureOutcome.RecoveryExhausted)
+                |> Result.mapError JournalAppendFailure.describe
+        }
+
+    let private completeAdvance
+        (journal: AgentJournal)
+        (budget: int)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (current: FallbackProjection)
+        (next: AgentPairCursor.FallbackCursor)
+        : Task<Result<ConfirmedFailureOutcome, string>> =
+        task {
+            match AgentPairCursor.recoveryVerdict budget next with
+            | AgentPairCursor.MayContinue _ -> return Ok ConfirmedFailureOutcome.RecoveryAdvanced
+            | AgentPairCursor.Exhausted _ -> return! appendExhausted journal sessionId providerRun current next
+        }
+
+    let private appendAdvanced
+        (journal: AgentJournal)
+        (budget: int)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (reason: string)
+        (current: FallbackProjection)
+        (next: AgentPairCursor.FallbackCursor)
+        : Task<Result<ConfirmedFailureOutcome, string>> =
+        task {
+            let advanced =
+                FallbackFact.FallbackCursorAdvanced
+                    {| SessionId = sessionId
+                       LogicalRunId = current.LogicalRunId
+                       AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
+                       ProviderRun = providerRun
+                       PreviousOffset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
+                       NextOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset
+                       ConsecutiveFailureCount = next.ConsecutiveFailureCount
+                       Reason = reason |}
+
+            let! appended =
+                AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal
+
+            match appended with
+            | Error failure -> return Error(JournalAppendFailure.describe failure)
+            | Ok _ -> return! completeAdvance journal budget sessionId providerRun current next
+        }
+
     let recordConfirmedFailure
         (journal: AgentJournal)
         (budget: int)
@@ -95,46 +172,8 @@ module FallbackLedger =
                 | Error FallbackAdvanceRejection.InvalidTransition ->
                     return Error "Fallback advance violates FALLBACK-007 (offset or count is not the successor)"
                 | Error(FallbackAdvanceRejection.InvalidFallbackOffset decodeError) ->
-                    match decodeError with
-                    | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
-                        return Error $"Fallback advance rejected: corrupt offset byte {value} (FALLBACK-002)"
-                | Ok _ ->
-                    let advanced =
-                        FallbackFact.FallbackCursorAdvanced
-                            {| SessionId = sessionId
-                               LogicalRunId = current.LogicalRunId
-                               AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
-                               ProviderRun = providerRun
-                               PreviousOffset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
-                               NextOffset = AgentPairCursor.FallbackOffsetCodec.toByte next.Offset
-                               ConsecutiveFailureCount = next.ConsecutiveFailureCount
-                               Reason = reason |}
-
-                    match!
-                        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) advanced journal
-                    with
-                    | Error failure -> return Error(JournalAppendFailure.describe failure)
-                    | Ok _ ->
-                        match AgentPairCursor.recoveryVerdict budget next with
-                        | AgentPairCursor.MayContinue _ -> return Ok ConfirmedFailureOutcome.RecoveryAdvanced
-                        | AgentPairCursor.Exhausted cursor ->
-                            let exhausted =
-                                FallbackFact.FallbackExhausted
-                                    {| SessionId = sessionId
-                                       LogicalRunId = current.LogicalRunId
-                                       AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
-                                       FinalConsecutiveFailureCount = cursor.ConsecutiveFailureCount
-                                       FinalOffset = AgentPairCursor.FallbackOffsetCodec.toByte cursor.Offset |}
-
-                            match!
-                                AgentJournal.appendAgent
-                                    (StreamId.Session sessionId)
-                                    (Some providerRun)
-                                    exhausted
-                                    journal
-                            with
-                            | Error failure -> return Error(JournalAppendFailure.describe failure)
-                            | Ok _ -> return Ok ConfirmedFailureOutcome.RecoveryExhausted
+                    return Error(invalidOffsetMessage decodeError)
+                | Ok _ -> return! appendAdvanced journal budget sessionId providerRun reason current next
         }
 
     let admitConfirmedFailure journal budget sessionId providerRun reason =

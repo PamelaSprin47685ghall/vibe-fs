@@ -54,3 +54,15 @@ test('WHAT[HOST-BOUNDARY-016] EVT_disposed_listener_stops_delivery_and_listener_
   notify(port, 'ses_dispose', failed('after'))
   assert.deepEqual(received, ['Failed'])
 })
+
+test('WHAT[HOST-BOUNDARY-017] HOST_CTX_notifyCompleted_rejects_unknown_or_blank_roles', () => {
+  const port = EventsSurface.create()
+  const received = []
+  EventsSurface.subscribe(port, (_, outcome) => received.push(outcome.kind))
+
+  assert.equal(EventsSurface.notifyCompleted(port, 'ses_role', 'done', 'done', 'reviewer'), true)
+  assert.equal(EventsSurface.notifyCompleted(port, 'ses_role', 'ignored', 'ignored', 'unknown-role'), false)
+  assert.equal(EventsSurface.notifyCompleted(port, 'ses_role', 'ignored', 'ignored', ''), false)
+  assert.equal(EventsSurface.notifyCompleted(port, 'ses_role', 'ignored', 'ignored', null), false)
+  assert.deepEqual(received, ['Completed'])
+})

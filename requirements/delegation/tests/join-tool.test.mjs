@@ -5,13 +5,13 @@ import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurf
 
 const text = (items) => join.renderBatch('english', items)
 test('WHAT[DELEG-019] JOIN_TOOL_completed_agent_is_natural_language', () => {
-  const wire = text([{ kind: 'completed', agentId: 'a1', agentName: 'Ada', workRecord: 'done' }])
+  const wire = text([{ kind: 'completed', agentId: 'a1', agentName: 'Ada', role: 'Coder', runId: 'run-a1', workRecord: 'done' }])
   assert.match(wire, /Ada has returned/)
   assert.match(wire, /done/)
   assert.doesNotMatch(wire, /\bstatus\s*=/)
 })
 test('WHAT[DELEG-019] JOIN_TOOL_failed_agent_preserves_failure_message', () => {
-  const wire = text([{ kind: 'failed', agentId: 'a1', agentName: 'Ada', code: 'E1', message: 'broken' }])
+  const wire = text([{ kind: 'failed', agentId: 'a1', agentName: 'Ada', role: 'Coder', runId: 'run-a1', code: 'E1', message: 'broken' }])
   assert.match(wire, /Ada could not complete/)
   assert.match(wire, /broken/)
 })

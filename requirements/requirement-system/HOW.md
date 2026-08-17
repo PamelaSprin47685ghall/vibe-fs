@@ -58,8 +58,8 @@ requirements/ 树治理与归档脱离合同：
 正则 literal、template 静态正文被跳过，`${ ... }` 表达式递归 token 化；只识别
 `test()`、`test.only()`、`test.fails()`、`test.skip()`、`test.todo()`、`t.test()`、
 `t.test.only()`、`t.test.fails()`、`t.test.skip()`、`t.test.todo()`。
-`describe`、hook、alias 与普通 `assert` 不是 proof case。每个 call 都记录 file/line/title/
-state/WHAT ids/anchor；首个 title token 非字符串或模板时也记录为 orphan，而不是静默漏掉。
+`describe`、hook、alias、函数/类声明、构造器调用与 method body 不是 proof case。每个 call 都记录
+file/line/title/state/WHAT ids/anchor；首个 title token 非字符串或模板时也记录为 orphan，而不是静默漏掉。
 
 WHAT tag 只认 title 开头的 `WHAT[<PREFIX-NNN>]`，完整 ID 必须能在 WHAT.md 唯一定义中解析。
 同一 title 的重复 tag 仍是 multi-primary；skip/todo 需要 tag 但不计入 active proof。graph

@@ -37,11 +37,105 @@ const openSeeded = async (sid, agent = 'reviewer') => {
   }
 }
 
+test('WHAT[REVIEW-ASSURANCE-010] review host rejects unknown or empty verdict text', async () => {
+  for (const verdict of ['', 'FORGED']) {
+    const pending = reviewHost.deliverJudgement('ses_rv', 'physical-rv', 'run-rv', 'call-rv', verdict)
+    assert.ok(pending)
+    const result = await pending
+    assert.equal(result.ok, false)
+    assert.match(result.error, /verdict must be exactly PERFECT or REVISE/)
+  }
+})
+
 test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_closed_without_journal', async () => {
   reviewHost.clearGuardNudges()
   const outcome = await reviewHost.nudgeReviewer(capturingPort([]), null, 'ses_rv')
   assert.equal(outcome.outcome, 'Failed')
   assert.match(outcome.reason, /requires an AgentJournal/)
+})
+
+test('WHAT[REVIEW-ASSURANCE-008] review_journal_rejects_forged_verdict_role_ownership_and_completion_labels', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-review-labels-'))
+  const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-labels', 'rt-labels', 4242, '2026-01-01T00:00:00Z')
+  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  try {
+    const verdict = await reviewJournal.appendAgent(
+      opened.journal,
+      'ses_labels',
+      null,
+      'Review',
+      'ReviewVerdictRecorded',
+      {
+        ReviewerSessionId: 'ses_labels',
+        ManagerSessionId: 'ses_manager',
+        BarrierId: 'bar-labels',
+        GitTreeHash: 'tree-labels',
+        ProviderRun: 'run-labels',
+        ToolCallId: 'call-labels',
+        Verdict: 'FORGED',
+      },
+    )
+    assert.equal(verdict.ok, false)
+    assert.match(verdict.error, /unknown verdict/i)
+
+    const linkedRole = await reviewJournal.appendAgent(
+      opened.journal,
+      'ses_labels',
+      null,
+      'Execution',
+      'HandleLinked',
+      {
+        ParentSessionId: 'ses_labels',
+        ChildSessionId: 'ses_child',
+        Handle: 'h-labels',
+        TargetAgent: 'fast-reviewer',
+        Byname: 'Rhea',
+        CanonicalRole: 'FORGED',
+        Ownership: 'DurableParentHandle',
+      },
+    )
+    assert.equal(linkedRole.ok, false)
+    assert.match(linkedRole.error, /unknown role/i)
+
+    const linkedOwnership = await reviewJournal.appendAgent(
+      opened.journal,
+      'ses_labels',
+      null,
+      'Execution',
+      'HandleLinked',
+      {
+        ParentSessionId: 'ses_labels',
+        ChildSessionId: 'ses_child',
+        Handle: 'h-labels',
+        TargetAgent: 'fast-reviewer',
+        Byname: 'Rhea',
+        CanonicalRole: 'Reviewer',
+        Ownership: 'FORGED',
+      },
+    )
+    assert.equal(linkedOwnership.ok, false)
+    assert.match(linkedOwnership.error, /unknown ownership/i)
+
+    const completed = await reviewJournal.appendAgent(
+      opened.journal,
+      'ses_labels',
+      null,
+      'Execution',
+      'HandleCompleted',
+      {
+        ParentSessionId: 'ses_labels',
+        Handle: 'h-labels',
+        Kind: 'FORGED',
+        CompletionRef: null,
+        CompletionDigest: null,
+      },
+    )
+    assert.equal(completed.ok, false)
+    assert.match(completed.error, /unknown completion kind/i)
+  } finally {
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_without_open_review_barrier', async () => {

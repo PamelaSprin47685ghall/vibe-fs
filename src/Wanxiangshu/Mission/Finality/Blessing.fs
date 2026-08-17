@@ -64,6 +64,59 @@ module BlessingWorkflow =
         | Ok current -> current = expected
         | Error _ -> false
 
+    let private prepareBlessing
+        (treePort: FinalityTreePort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (members: EnlistedMember list)
+        (requestTree: GitTreeHash) =
+        taskResult {
+            let! orderedRecords = RecordWorkflow.awaitCanonicalCohortRecords journal members
+
+            let! orderedRecords =
+                if List.length orderedRecords = List.length members then
+                    Ok orderedRecords
+                else
+                    Error "Finality cohort record count changed"
+
+            do!
+                if treeUnchanged treePort managerSessionId requestTree then
+                    Ok()
+                else
+                    Error "Manager tree changed during Finality blessing"
+
+            let logs =
+                orderedRecords
+                |> List.map (fun (ordinal, record) -> ordinal + 1, SyntheticToml.normalizeNewlines record)
+
+            let material = logs |> List.map snd |> String.concat "\n\n"
+            let! blob = journal.WriteBlob material
+            return logs, blob
+        }
+
+    let private prepareBlessingAfterTreeCheck
+        (treePort: FinalityTreePort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (members: EnlistedMember list)
+        (requestTree: GitTreeHash) =
+        task {
+            match! prepareBlessing treePort journal managerSessionId members requestTree with
+            | Error _ -> return Error false
+            | Ok prepared -> return Ok prepared
+        }
+
+    let private prepareBlessingIfTreeStable
+        (treePort: FinalityTreePort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (members: EnlistedMember list)
+        (requestTree: GitTreeHash) =
+        if not (treeUnchanged treePort managerSessionId requestTree) then
+            Task.FromResult(Error true)
+        else
+            prepareBlessingAfterTreeCheck treePort journal managerSessionId members requestTree
+
     let blessIfTreeUnchanged
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
@@ -90,36 +143,23 @@ module BlessingWorkflow =
                     reviewer
                     barrier
 
-            if not (treeUnchanged treePort managerSessionId requestTree) then
-                return! undecided ()
-            else
-                match! RecordWorkflow.awaitCanonicalCohortRecords journal members with
-                | Error _ -> return! undecided ()
-                | Ok orderedRecords when List.length orderedRecords <> List.length members -> return! undecided ()
-                | Ok _ when not (treeUnchanged treePort managerSessionId requestTree) -> return! undecided ()
-                | Ok orderedRecords ->
-                    let logs =
-                        orderedRecords
-                        |> List.map (fun (ordinal, record) -> ordinal + 1, SyntheticToml.normalizeNewlines record)
+            match! prepareBlessingIfTreeStable treePort journal managerSessionId members requestTree with
+            | Error true -> return! undecided ()
+            | Error false -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
+            | Ok(logs, blob) ->
+                    do!
+                        FinalityJournal.appendLifecycle
+                            journal
+                            (ManagerLifecycleFact.FinalityBlessed
+                                {| SessionId = managerSessionId
+                                   LifeId = lifeId
+                                   RequestId = requestId
+                                   GitTreeHash = requestTree
+                                   WorkRecordBundleRef = blob.BlobRef
+                                   WorkRecordBundleDigest = blob.BlobDigest |})
 
-                    let material = logs |> List.map snd |> String.concat "\n\n"
+                    members
+                    |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
 
-                    match! journal.WriteBlob material with
-                    | Error _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
-                    | Ok blob ->
-                        do!
-                            FinalityJournal.appendLifecycle
-                                journal
-                                (ManagerLifecycleFact.FinalityBlessed
-                                    {| SessionId = managerSessionId
-                                       LifeId = lifeId
-                                       RequestId = requestId
-                                       GitTreeHash = requestTree
-                                       WorkRecordBundleRef = blob.BlobRef
-                                       WorkRecordBundleDigest = blob.BlobDigest |})
-
-                        members
-                        |> List.iter (fun memberInfo -> reviewerPort.AbortReviewer memberInfo.ReviewerSessionId)
-
-                        return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
+                    return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
         }

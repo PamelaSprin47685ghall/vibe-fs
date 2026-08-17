@@ -101,6 +101,19 @@ module CanonicalEventCodec =
         elif encode left = encode right then Ok()
         else Error(StorageInvalid.IdentityCollision left.EventId)
 
+    let private mergeOne
+        (head: EventEnvelope)
+        (tail: EventEnvelope list)
+        (acc: Map<string, EventEnvelope * string>) =
+        let normalized = EventEnvelope.normalize head
+        let id = EventId.value normalized.EventId
+        let bytes = encode normalized
+
+        match Map.tryFind id acc with
+        | Some(_, existingBytes) when existingBytes = bytes -> Ok(tail, acc)
+        | Some _ -> Error(StorageInvalid.IdentityCollision normalized.EventId)
+        | None -> Ok(tail, Map.add id (normalized, bytes) acc)
+
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
     /// This is a pure identity utility; writer-stream ordering belongs to EventKWayMerge.
     let mergeByIdentity (events: EventEnvelope list) : Result<EventEnvelope list, StorageInvalid> =
@@ -113,16 +126,51 @@ module CanonicalEventCodec =
                 |> List.map (fun (_, (envelope, _)) -> envelope)
                 |> Ok
             | head :: tail ->
-                let normalized = EventEnvelope.normalize head
-                let id = EventId.value normalized.EventId
-                let bytes = encode normalized
-
-                match Map.tryFind id acc with
-                | Some(_, existingBytes) when existingBytes = bytes -> loop tail acc
-                | Some _ -> Error(StorageInvalid.IdentityCollision normalized.EventId)
-                | None -> loop tail (Map.add id (normalized, bytes) acc)
+                mergeOne head tail acc
+                |> Result.bind (fun (next, updated) -> loop next updated)
 
         loop events Map.empty
+
+    let private ensureCanonical (text: string) (normalized: EventEnvelope) =
+        if encode normalized <> text then
+            Error(StorageInvalid.NonCanonical "event bytes are not §5.0 canonical")
+        else
+            Ok normalized
+
+    let private decodeParsed (text: string) (parsed: obj) : Result<EventEnvelope, StorageInvalid> =
+        let hasShape: bool =
+            emitJsExpr
+                parsed
+                "!!$0 && typeof $0 === 'object' && typeof $0.event_id === 'string' && typeof $0.stream_id === 'string' && typeof $0.event_type === 'string' && Array.isArray($0.parents) && Array.isArray($0.payload_refs)"
+
+        if not hasShape then
+            Error(StorageInvalid.MalformedEnvelope "event JSON missing required fields")
+        else
+            let parents =
+                (unbox<string[]> parsed?parents) |> Array.toList |> List.map EventId.create
+
+            let payloadRefs =
+                (unbox<string[]> parsed?payload_refs)
+                |> Array.toList
+                |> List.map PayloadRef.create
+
+            let envelope =
+                { EventId = EventId.create (unbox<string> parsed?event_id)
+                  StreamId = EventStreamId.create (unbox<string> parsed?stream_id)
+                  EventType = unbox<string> parsed?event_type
+                  Parents = parents
+                  Payload = parsed?payload
+                  PayloadRefs = payloadRefs }
+
+            EventEnvelope.normalize envelope |> ensureCanonical text
+
+    let private tryDecodeCanonical (text: string) : Result<EventEnvelope, StorageInvalid> =
+        try
+            let body = text.Substring(0, text.Length - 1)
+            let parsed = JS.JSON.parse body
+            decodeParsed text parsed
+        with ex ->
+            Error(StorageInvalid.MalformedEnvelope ex.Message)
 
     /// Decode canonical JSON+LF into EventEnvelope. Re-encode must match (§5.0).
     let tryDecode (text: string) : Result<EventEnvelope, StorageInvalid> =
@@ -131,42 +179,7 @@ module CanonicalEventCodec =
         elif not (text.EndsWith("\n")) || text.EndsWith("\n\n") then
             Error(StorageInvalid.NonCanonical "event bytes must end with exactly one LF")
         else
-            try
-                let body = text.Substring(0, text.Length - 1)
-                let parsed = JS.JSON.parse body
-
-                let hasShape: bool =
-                    emitJsExpr
-                        parsed
-                        "!!$0 && typeof $0 === 'object' && typeof $0.event_id === 'string' && typeof $0.stream_id === 'string' && typeof $0.event_type === 'string' && Array.isArray($0.parents) && Array.isArray($0.payload_refs)"
-
-                if not hasShape then
-                    Error(StorageInvalid.MalformedEnvelope "event JSON missing required fields")
-                else
-                    let parents =
-                        (unbox<string[]> parsed?parents) |> Array.toList |> List.map EventId.create
-
-                    let payloadRefs =
-                        (unbox<string[]> parsed?payload_refs)
-                        |> Array.toList
-                        |> List.map PayloadRef.create
-
-                    let envelope =
-                        { EventId = EventId.create (unbox<string> parsed?event_id)
-                          StreamId = EventStreamId.create (unbox<string> parsed?stream_id)
-                          EventType = unbox<string> parsed?event_type
-                          Parents = parents
-                          Payload = parsed?payload
-                          PayloadRefs = payloadRefs }
-
-                    let normalized = EventEnvelope.normalize envelope
-
-                    if encode normalized <> text then
-                        Error(StorageInvalid.NonCanonical "event bytes are not §5.0 canonical")
-                    else
-                        Ok normalized
-            with ex ->
-                Error(StorageInvalid.MalformedEnvelope ex.Message)
+            tryDecodeCanonical text
 
     let tryDecodeUtf8 (bytes: byte[]) : Result<EventEnvelope, StorageInvalid> =
         tryDecode (Encoding.UTF8.GetString bytes)

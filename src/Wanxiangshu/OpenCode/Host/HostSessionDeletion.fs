@@ -29,6 +29,48 @@ module HostSessionDeletion =
 
     /// Sync prefix (DropSession + CancelOwner) runs before the returned Task starts
     /// awaiting CaseFinalize. Bootstrap fire-and-forgets the Task via emitJsExpr.
+    let private finalizeInspectorIfRoot
+        (workspaceDirectory: string option)
+        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (inspectorId: SessionId)
+        : Task =
+        task {
+            match workspaceDirectory with
+            | Some root ->
+                let! _ = finalizeInspector root (SessionId.value inspectorId)
+                ()
+            | None -> ()
+        }
+
+    let private closeInspector
+        (runtime: SyncDelegateRuntime)
+        (workspaceDirectory: string option)
+        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (sessionId: SessionId)
+        : Task =
+        task {
+            match runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Inspector) with
+            | Some inspectorId -> do! finalizeInspectorIfRoot workspaceDirectory finalizeInspector inspectorId
+            | None -> ()
+        }
+
+    let private cleanupRuntime
+        (runtimeOpt: SyncDelegateRuntime option)
+        (workspaceDirectory: string option)
+        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (cleanupInspectorDraft: string -> unit)
+        (sessionId: SessionId)
+        : Task =
+        task {
+            match runtimeOpt with
+            | Some runtime ->
+                do! closeInspector runtime workspaceDirectory finalizeInspector sessionId
+                runtime.CancelSession sessionId
+            | None -> ()
+
+            cleanupInspectorDraft (SessionId.value sessionId)
+        }
+
     let handle
         (scope: PluginRuntimeScope)
         (workspaceDirectory: string option)
@@ -67,22 +109,12 @@ module HostSessionDeletion =
                 | _ -> false
 
             if not stagedInspector then
-                match scope.SyncDelegateRuntime with
-                | Some runtime ->
-                    match runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Inspector) with
-                    | Some inspectorId ->
-                        match workspaceDirectory with
-                        | Some root ->
-                            let! _ = finalizeInspector root (SessionId.value inspectorId)
-                            ()
-                        | None -> ()
-                    | None -> ()
-
-                    runtime.CancelSession sessionId
-                | None -> ()
-
-                // Residual draft if the deleted id itself held Inspector Q/A.
-                cleanupInspectorDraft (SessionId.value sessionId)
+                do! cleanupRuntime
+                        scope.SyncDelegateRuntime
+                        workspaceDirectory
+                        finalizeInspector
+                        cleanupInspectorDraft
+                        sessionId
 
             scope.Sessions.Quiescence.DropSession sessionId
             ExplicitResumeSuppression.dropSession sessionId

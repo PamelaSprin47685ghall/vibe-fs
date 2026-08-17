@@ -89,41 +89,40 @@ module internal CompanionHostBlogger =
         : BloggerRequestContext option =
         let m = List.length blog.Frames
         let k = coveredFrameCount m
-
-        if k < 1 then
-            None
-        else
-            let selected = List.truncate k (BlogProjection.frames blog)
-
-            if List.length selected <> k then
+        let selected =
+            if k < 1 then
                 None
             else
-                let digests = selected |> List.map (fun f -> f.Digest)
+                let frames = List.truncate k (BlogProjection.frames blog)
+                Some frames |> Option.filter (fun selected -> List.length selected = k)
 
-                let requestId =
-                    BloggerRequestId.create (
-                        HostDigest.sha256Hex (
-                            String.concat
-                                "|"
-                                [ SessionId.value mainSessionId
-                                  SessionId.value bloggerSessionId
-                                  "squash"
-                                  string (FrameEpochId.value blog.FrameEpochId)
-                                  string k
-                                  (digests |> List.map BlobDigest.value |> String.concat ",") ]
-                        )
+        selected
+        |> Option.map (fun selected ->
+            let digests = selected |> List.map (fun f -> f.Digest)
+
+            let requestId =
+                BloggerRequestId.create (
+                    HostDigest.sha256Hex (
+                        String.concat
+                            "|"
+                            [ SessionId.value mainSessionId
+                              SessionId.value bloggerSessionId
+                              "squash"
+                              string (FrameEpochId.value blog.FrameEpochId)
+                              string k
+                              (digests |> List.map BlobDigest.value |> String.concat ",") ]
                     )
-
-                Some(
-                    BloggerRequestContext.Squash
-                        { RequestId = requestId
-                          MainSessionId = mainSessionId
-                          BloggerSessionId = bloggerSessionId
-                          FrameEpochId = blog.FrameEpochId
-                          CoveredFrameCount = k
-                          FrameDigests = digests
-                          ObservedPrefixEpochId = observedEpoch }
                 )
+
+            BloggerRequestContext.Squash
+                { RequestId = requestId
+                  MainSessionId = mainSessionId
+                  BloggerSessionId = bloggerSessionId
+                  FrameEpochId = blog.FrameEpochId
+                  CoveredFrameCount = k
+                  FrameDigests = digests
+                  ObservedPrefixEpochId = observedEpoch })
+
 
     let private sendBloggerPrompt
         (deps: BloggerDeps)

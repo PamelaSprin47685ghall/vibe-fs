@@ -58,8 +58,23 @@ module FinalitySurface =
 
     let private str (value: obj) : string = string value
 
-    let private roleOf (value: obj) : Role =
-        Roles.tryParseRole (str value) |> Option.defaultValue Role.Coder
+    let private roleResult (value: obj) : Result<Role, string> =
+        match Roles.tryParseRole (str value) with
+        | Some role -> Ok role
+        | None -> Error(sprintf "unknown role: %s" (str value))
+
+    let private ownershipResult (value: obj) : Result<HandleOwnership, string> =
+        match str value with
+        | "host-owned-hidden" -> Ok HandleOwnership.HostOwnedHidden
+        | "durable-parent-handle" -> Ok HandleOwnership.DurableParentHandle
+        | unknown -> Error(sprintf "unknown handle ownership: %s" unknown)
+
+    let private completionResult (value: obj) : Result<HandleCompletionKind, string> =
+        match str value with
+        | "send-failure" -> Ok HandleCompletionKind.SendFailure
+        | "cancelled" -> Ok HandleCompletionKind.Cancelled
+        | "terminal" -> Ok HandleCompletionKind.Terminal
+        | unknown -> Error(sprintf "unknown handle completion kind: %s" unknown)
 
     let private stringArrayOf (value: obj) : string list =
         if isNull value then
@@ -75,12 +90,6 @@ module FinalitySurface =
 
     let private handleOf (value: obj) : HandleId =
         HandleId.Agent(AgentHandleId.create (str value))
-
-    let private ownershipOf (value: obj) : HandleOwnership =
-        if str value = "host-owned-hidden" then
-            HandleOwnership.HostOwnedHidden
-        else
-            HandleOwnership.DurableParentHandle
 
     /// The opaque world handle: the folded projection plus the Manager session
     /// the lifecycle facts belong to. Tests pass it back; they never read it
@@ -252,39 +261,40 @@ module FinalitySurface =
                 )
             )
         | "handle-linked" ->
-            Ok(
-                Fact.Agent(
-                    AgentFact.Execution(
-                        ExecutionFactCases.HandleLinked
-                            {| ParentSessionId = sessionId
-                               ChildSessionId = SessionId.create (str (event?childSessionId))
-                               Handle = handleOf (event?handleId)
-                               TargetAgent = str (event?targetAgent)
-                               Byname = str (event?byname)
-                               CanonicalRole = roleOf (event?role)
-                               Ownership = ownershipOf (event?ownership) |}
+            match roleResult event?role, ownershipResult event?ownership with
+            | Ok role, Ok ownership ->
+                Ok(
+                    Fact.Agent(
+                        AgentFact.Execution(
+                            ExecutionFactCases.HandleLinked
+                                {| ParentSessionId = sessionId
+                                   ChildSessionId = SessionId.create (str (event?childSessionId))
+                                   Handle = handleOf (event?handleId)
+                                   TargetAgent = str (event?targetAgent)
+                                   Byname = str (event?byname)
+                                   CanonicalRole = role
+                                   Ownership = ownership |}
+                        )
                     )
                 )
-            )
+            | Error error, _
+            | _, Error error -> Error error
         | "handle-completed" ->
-            let completionKind =
-                match str (event?completionKind) with
-                | "send-failure" -> HandleCompletionKind.SendFailure
-                | "cancelled" -> HandleCompletionKind.Cancelled
-                | _ -> HandleCompletionKind.Terminal
-
-            Ok(
-                Fact.Agent(
-                    AgentFact.Execution(
-                        ExecutionFactCases.HandleCompleted
-                            {| ParentSessionId = sessionId
-                               Handle = handleOf (event?handleId)
-                               Kind = completionKind
-                               CompletionRef = optionalBlobRef (event?completionRef)
-                               CompletionDigest = optionalBlobDigest (event?completionDigest) |}
+            match completionResult event?completionKind with
+            | Error error -> Error error
+            | Ok completionKind ->
+                Ok(
+                    Fact.Agent(
+                        AgentFact.Execution(
+                            ExecutionFactCases.HandleCompleted
+                                {| ParentSessionId = sessionId
+                                   Handle = handleOf (event?handleId)
+                                   Kind = completionKind
+                                   CompletionRef = optionalBlobRef (event?completionRef)
+                                   CompletionDigest = optionalBlobDigest (event?completionDigest) |}
+                        )
                     )
                 )
-            )
         | "handle-retired" ->
             Ok(
                 Fact.Agent(
@@ -698,31 +708,37 @@ module FinalitySurface =
 
     // ── Life admission (FINALITY-022 / INTERACTION-AUTHORITY-009) ────────────
 
+    let private authorityKindResult (value: string) : Result<PromptAuthority.RootAuthorityKind, string> =
+        match value with
+        | "human-root" -> Ok PromptAuthority.RootAuthorityKind.HumanRoot
+        | "agent-owner-root" -> Ok PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        | unknown -> Error(sprintf "unknown authority kind: %s" unknown)
+
+    let private tierResult (value: string) : Result<AgentTier, string> =
+        match Roles.tryParseTier value with
+        | Some tier -> Ok tier
+        | None -> Error(sprintf "unknown tier: %s" value)
+
     let private authorityProfileOf
         (authorityKind: string)
         (rootMessageId: string)
         (selectedAgent: string)
         (peerAgent: string)
         (tier: string)
-        : PromptAuthority.AuthorityExecutionProfile =
-        let kind =
-            if authorityKind = "human-root" then
-                PromptAuthority.RootAuthorityKind.HumanRoot
-            else
-                PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-
-        let role = Role.Manager
-
-        let tier = if tier = "deep" then AgentTier.Deep else AgentTier.Fast
-
-        { SessionId = SessionId.create "ses-authority"
-          LogicalRunId = LogicalRunId.create "run-authority"
-          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create rootMessageId
-          AuthorityKind = kind
-          SelectedAgent = selectedAgent
-          PeerAgent = peerAgent
-          CanonicalRole = role
-          SelectedTier = tier }
+        : Result<PromptAuthority.AuthorityExecutionProfile, string> =
+        match authorityKindResult authorityKind, tierResult tier with
+        | Ok kind, Ok tier ->
+            Ok
+                { SessionId = SessionId.create "ses-authority"
+                  LogicalRunId = LogicalRunId.create "run-authority"
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create rootMessageId
+                  AuthorityKind = kind
+                  SelectedAgent = selectedAgent
+                  PeerAgent = peerAgent
+                  CanonicalRole = Role.Manager
+                  SelectedTier = tier }
+        | Error error, _
+        | _, Error error -> Error error
 
     let private lifecycleOf (world: obj) : ManagerLifeProjection =
         let world = asWorld world
@@ -747,26 +763,26 @@ module FinalitySurface =
         let world = asWorld world
         let lifecycle = lifecycleOf world
 
-        let profile =
-            authorityProfileOf authorityKind rootMessageId selectedAgent peerAgent tier
+        match authorityProfileOf authorityKind rootMessageId selectedAgent peerAgent tier with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok profile ->
+            let xTrace =
+                if isNull opening then
+                    None
+                else
+                    Some
+                        { XTraceProjectionState.Opening =
+                            Some
+                                { AssignmentText = str (opening?assignmentText)
+                                  AuthoritativeRequirements = []
+                                  ConstitutiveBody = "" }
+                          Parts = []
+                          Terminal = None }
 
-        let xTrace =
-            if isNull opening then
-                None
-            else
-                Some
-                    { XTraceProjectionState.Opening =
-                        Some
-                            { AssignmentText = str (opening?assignmentText)
-                              AuthoritativeRequirements = []
-                              ConstitutiveBody = "" }
-                      Parts = []
-                      Terminal = None }
-
-        match ManagerLifeAdmission.ending lifecycle (Some profile) xTrace with
-        | EndingLifeAdmission.ExistingLife _ -> box {| kind = "existing-life" |}
-        | EndingLifeAdmission.InitialAgentOwnerMigration _ -> box {| kind = "initial-agent-owner-migration" |}
-        | EndingLifeAdmission.NoLife -> box {| kind = "no-life" |}
+            match ManagerLifeAdmission.ending lifecycle (Some profile) xTrace with
+            | EndingLifeAdmission.ExistingLife _ -> box {| kind = "existing-life" |}
+            | EndingLifeAdmission.InitialAgentOwnerMigration _ -> box {| kind = "initial-agent-owner-migration" |}
+            | EndingLifeAdmission.NoLife -> box {| kind = "no-life" |}
 
     /// FINALITY-022 HumanRoot opening: true only for the exact authority-root
     /// physical message; session-level authority never generalizes.
@@ -774,13 +790,13 @@ module FinalitySurface =
         let world = asWorld world
         let lifecycle = lifecycleOf world
 
-        let profile =
-            authorityProfileOf authorityKind rootMessageId "fast-manager" "deep-manager" "fast"
+        match authorityProfileOf authorityKind rootMessageId "fast-manager" "deep-manager" "fast" with
+        | Error _ -> false
+        | Ok profile ->
+            let opening =
+                ManagerLifeAdmission.tryHumanRootOpening lifecycle (Some profile) (PhysicalUserMessageId.create messageId)
 
-        let opening =
-            ManagerLifeAdmission.tryHumanRootOpening lifecycle (Some profile) (PhysicalUserMessageId.create messageId)
-
-        Option.isSome opening
+            Option.isSome opening
 
     // ── ReviewerOutcome (FINALITY-006 drain typing) ───────────────────────────
 

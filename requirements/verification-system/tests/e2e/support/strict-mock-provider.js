@@ -136,7 +136,7 @@ export class StrictMockProvider {
     if (typeof alias !== 'string' || alias.trim() === '') throw new Error('StrictMock session alias must be non-empty');
     if (typeof sessionID !== 'string' || sessionID.trim() === '') throw new Error('StrictMock session ID must be non-empty');
 
-    this._scenario?.bind(alias, sessionID);
+    this._scenario?.bindAlias(alias, sessionID);
     this._state.sessionBindings.set(alias, sessionID);
   }
 
@@ -289,20 +289,20 @@ export class StrictMockProvider {
         const prev = this._scenario?.seals?.get(sessionId);
         const next = wireOf(parsed);
         const h = (s) => createHash('sha256').update(s).digest('hex').slice(0, 12);
-        const fmt = (w) => (w ? Array.from(w.Messages).map((m) => `${m.Role}:${h(JSON.stringify(m.Parts))}`).join('|') : 'null');
-        const prevW = prev ? Array.from(prev.Messages) : [];
-        const nextW = next ? Array.from(next.Messages) : [];
+        const fmt = (w) => (w ? w.messages.map((m) => `${m.role}:${h(JSON.stringify(m.parts))}`).join('|') : 'null');
+        const prevW = prev ? prev.messages : [];
+        const nextW = next ? next.messages : [];
         const minLen = Math.min(prevW.length, nextW.length);
         const diffs = [];
         for (let i = 0; i < minLen; i += 1) {
-          const a = h(JSON.stringify(prevW[i].Parts));
-          const b = h(JSON.stringify(nextW[i].Parts));
-          if (a !== b) diffs.push(`msg[${i}] ${prevW[i].Role}:${a} != ${nextW[i].Role}:${b}`);
+          const a = h(JSON.stringify(prevW[i].parts));
+          const b = h(JSON.stringify(nextW[i].parts));
+          if (a !== b) diffs.push(`msg[${i}] ${prevW[i].role}:${a} != ${nextW[i].role}:${b}`);
         }
         if (prevW.length !== nextW.length) diffs.push(`len ${prevW.length} != ${nextW.length}`);
         // system 内容差异定位
-        const prevSys = Array.from(prevW[0]?.Parts ?? [])[0]?.fields?.[0] ?? '';
-        const nextSys = Array.from(nextW[0]?.Parts ?? [])[0]?.fields?.[0] ?? '';
+        const prevSys = Array.from(prevW[0]?.parts ?? [])[0]?.text ?? '';
+        const nextSys = Array.from(nextW[0]?.parts ?? [])[0]?.text ?? '';
         if (typeof prevSys === 'string' && typeof nextSys === 'string' && prevSys !== nextSys) {
           let at = -1;
           const max = Math.min(prevSys.length, nextSys.length);
@@ -314,7 +314,7 @@ export class StrictMockProvider {
           console.error(`[SEAL-SYS] prevTail=${prevSys.slice(-160).replace(/\n/g, '\\n')}`);
           console.error(`[SEAL-SYS] nextTail=${nextSys.slice(-160).replace(/\n/g, '\\n')}`);
         } else {
-          console.error(`[SEAL-SYS] equal-content prevLen=${prevSys.length} nextLen=${nextSys.length} prevParts=${JSON.stringify(prevW[0]?.Parts)} nextParts=${JSON.stringify(nextW[0]?.Parts)}`);
+          console.error(`[SEAL-SYS] equal-content prevLen=${prevSys.length} nextLen=${nextSys.length} prevParts=${JSON.stringify(prevW[0]?.parts)} nextParts=${JSON.stringify(nextW[0]?.parts)}`);
         }
         console.error(`[SEAL-DIAG] session=${sessionId} reason=${selection.sealBroken.reason} prev=[${fmt(prev)}] next=[${fmt(next)}]`);
         console.error(`[SEAL-DIFF] ${diffs.join(' || ') || '(no message diff — tools/model differ)'}`);

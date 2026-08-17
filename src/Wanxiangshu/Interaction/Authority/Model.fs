@@ -156,6 +156,9 @@ module PromptAuthority =
     /// *creates* the run — and its id derives from the physical message that
     /// does not exist yet at claim time. An empty-string sentinel would make
     /// "no run yet" and "run with a blank id" the same value.
+    /// DSL-state-combination: domain — optional logical/authority/agent/receipt
+    /// facets describe one dispatch claim and its evidence, not a continuation
+    /// program.
     type PromptClaim =
         {
             PromptKey: PromptKey
@@ -193,6 +196,8 @@ module PromptAuthority =
           PayloadDigest: string
           PhysicalUserMessageId: PhysicalUserMessageId }
 
+    /// DSL-state-combination: domain — the two optional authority profiles
+    /// represent durable before/active evidence; they are not stage latches.
     type PromptAuthorityProjection =
         {
             LastAuthorityProfile: AuthorityExecutionProfile option
@@ -297,6 +302,37 @@ module PromptAuthority =
           Tier: AgentTier
           PeerName: string }
 
+    /// Parse the tier/role segments with fail-closed handling for unknown values.
+    let private parseTierAndRole
+        (trimmed: string)
+        (parts: string array)
+        : Result<ParsedAgentName, AgentNameRejection> =
+        match ManagedAgentCatalog.tryParseTier parts.[0], ManagedAgentCatalog.tryParseRole parts.[1] with
+        | None, _
+        | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
+        | Some tier, Some role ->
+            Ok
+                { Name = trimmed
+                  Role = role
+                  Tier = tier
+                  PeerName = ManagedAgentCatalog.peerNameOf tier role }
+
+    /// Parse a non-legacy candidate after the required non-empty check.
+    let private parseStructuredAgentName (trimmed: string) : Result<ParsedAgentName, AgentNameRejection> =
+        let parts = trimmed.Split([| '-' |], 2)
+
+        if parts.Length <> 2 then
+            Error(AgentNameRejection.Malformed trimmed)
+        else
+            parseTierAndRole trimmed parts
+
+    /// Parse a non-empty name while rejecting all legacy aliases.
+    let private parseNonBlankAgentName (trimmed: string) : Result<ParsedAgentName, AgentNameRejection> =
+        if ManagedAgentCatalog.isLegacyAgentName (trimmed.ToLowerInvariant()) then
+            Error(AgentNameRejection.LegacyAgentName trimmed)
+        else
+            parseStructuredAgentName trimmed
+
     /// AGENT-002 and AGENT-003: parse `fast-ROLE` / `deep-ROLE` and derive the peer.
     ///
     /// The ONE parser for this format. Labels, legacy set, and peer derivation all
@@ -305,26 +341,7 @@ module PromptAuthority =
         if String.IsNullOrWhiteSpace value then
             Error(AgentNameRejection.Malformed value)
         else
-            let trimmed = value.Trim()
-            let lower = trimmed.ToLowerInvariant()
-
-            if ManagedAgentCatalog.isLegacyAgentName lower then
-                Error(AgentNameRejection.LegacyAgentName trimmed)
-            else
-                let parts = trimmed.Split([| '-' |], 2)
-
-                if parts.Length <> 2 then
-                    Error(AgentNameRejection.Malformed trimmed)
-                else
-                    match ManagedAgentCatalog.tryParseTier parts.[0], ManagedAgentCatalog.tryParseRole parts.[1] with
-                    | None, _
-                    | _, None -> Error(AgentNameRejection.UnknownManagedAgent trimmed)
-                    | Some tier, Some role ->
-                        Ok
-                            { Name = trimmed
-                              Role = role
-                              Tier = tier
-                              PeerName = ManagedAgentCatalog.peerNameOf tier role }
+            parseNonBlankAgentName (value.Trim())
 
     /// String-error form, for the fact-fold and claim paths that only report.
     let parseAgentName (value: string) : Result<string * Role * AgentTier * string, string> =
@@ -568,15 +585,16 @@ module PromptAuthority =
         | Role.Distiller
         | Role.Blogger -> false
 
+    let private strengthReplicaCapabilities (role: Role) : Set<ToolPermission> =
+        match strengthReplicaEligibleRole role with
+        | true -> strengthReplicaReadonly
+        | false -> Set.empty
+
     /// AGENT-007: ordinary requests use role permissions; StrengthReplica uses
     /// its own narrower request contract and fails closed for every ineligible role.
     let toolCapabilitiesFor (role: Role) (requestKind: ProviderRequestKind) : Set<ToolPermission> =
         match requestKind with
-        | ProviderRequestKind.StrengthReplica ->
-            if strengthReplicaEligibleRole role then
-                strengthReplicaReadonly
-            else
-                Set.empty
+        | ProviderRequestKind.StrengthReplica -> strengthReplicaCapabilities role
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash

@@ -34,6 +34,32 @@ const observation = (result) => {
   return result.observation
 }
 
+test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_unknown_authority_kind_fails_closed', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-invalid-'))
+  try {
+    const opened = await journal.JournalSurface_bootWithWriterId(base, 'writer-invalid', 'rt-invalid', 4242, '2026-01-01T00:00:00Z')
+    assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+    try {
+      const result = await dispatch.sendContinuation(
+        capturingPort(),
+        opened.journal,
+        'ses-invalid',
+        'reject malformed profile',
+        'ProviderRetryAttempt',
+        { ...profileFor(), authorityKind: 'UnknownRoot' },
+        'deep-coder',
+        'Await',
+      )
+      assert.equal(result.ok, false)
+      assert.match(result.error, /Unknown authority root kind/)
+    } finally {
+      journal.JournalSurface_dispose(opened.journal)
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[DISPATCH-PROTOCOL-010] PROMPT_006_send_payload_carries_agent_and_no_model', async () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-send-format-'))
   try {

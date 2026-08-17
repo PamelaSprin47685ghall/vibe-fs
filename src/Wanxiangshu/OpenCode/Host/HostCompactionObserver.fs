@@ -56,6 +56,47 @@ module HostCompactionObserver =
     /// No journal means no durable epoch and nothing to reanchor. Silent rather
     /// than an error: a journal-less run has no PrefixEpoch to retire, so there is
     /// no state that could drift.
+    let private raiseOnStartupFailure verdict =
+        match verdict with
+        | CompactionGateVerdict.Satisfied -> ()
+        | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
+
+    let private applyStartupVerdict (scope: PluginRuntimeScope) verdict =
+        if scope.TryClaimStartupProbe() then raiseOnStartupFailure verdict
+
+    let private runStartupProbe
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (messages: SessionMessage list)
+        : unit =
+        match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
+        | None -> ()
+        | Some verdict -> applyStartupVerdict scope verdict
+
+    let private observeStartupProbe
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (messages: SessionMessage list)
+        : unit =
+        if scope.IsStartupProbeOpen then runStartupProbe scope sessionId messages
+
+    let private observedCompactions messages =
+        messages
+        |> List.filter (fun message -> HostCompactionPolicy.isContainableCompaction message.IsCompaction)
+        |> List.map (fun message -> ProviderRunIdentity.create message.Id)
+
+    let private reanchorObserved durable sessionId observed : Task =
+        task {
+            match! HostCompactionGate.reanchorObserved durable sessionId observed with
+            | Ok None
+            | Ok(Some _) -> ()
+            | Error reason -> HostCompactionGate.logReanchorFailure sessionId reason
+        }
+
+    let private observeDurable journal sessionId messages : Task =
+        let observed = observedCompactions messages
+        if List.isEmpty observed then task { return () } else reanchorObserved journal sessionId observed
+
     let observe
         (scope: PluginRuntimeScope)
         (journal: AgentJournal option)
@@ -72,41 +113,9 @@ module HostCompactionObserver =
             | FamilyRecovery.FamilyReady _ -> ()
 
             // HOST-006 prevention layer's second half: the runtime probe.
-            //
-            // Judged before containment, and once per plugin instance. If the Host
-            // compacts outside the configuration the plugin can reach, the correct
-            // response is to refuse to run — not to reanchor and carry on, which would
-            // hide the condition behind behaviour that looks correct.
-            if scope.IsStartupProbeOpen then
-                match HostCompactionGate.judgeStartup scope.CompactionSettingGap sessionId messages with
-                | None -> () // Not a completed first turn yet; the probe stays armed.
-                | Some verdict ->
-                    if scope.TryClaimStartupProbe() then
-                        match verdict with
-                        | CompactionGateVerdict.Satisfied -> ()
-                        | failed -> raise (InvalidOperationException(HostCompactionPolicy.describeVerdict failed))
+            observeStartupProbe scope sessionId messages
 
             match journal with
             | None -> ()
-            | Some durable ->
-                let observed =
-                    messages
-                    |> List.filter (fun message -> HostCompactionPolicy.isContainableCompaction message.IsCompaction)
-                    |> List.map (fun message -> ProviderRunIdentity.create message.Id)
-
-                if List.isEmpty observed then
-                    ()
-                else
-                    match! HostCompactionGate.reanchorObserved durable sessionId observed with
-                    | Ok None
-                    | Ok(Some _) -> ()
-                    // A failed append here is not fatal to the turn that just
-                    // completed. PERSIST-003's fail-closed path already owns a poisoned
-                    // journal; what this must not do is throw inside the reconcile loop
-                    // and leave `Running` set, which would stop every later pass for
-                    // this session.
-                    | Error reason ->
-                        HostCompactionGate.logReanchorFailure sessionId reason
-                        ()
-
+            | Some durable -> do! observeDurable durable sessionId messages
         }

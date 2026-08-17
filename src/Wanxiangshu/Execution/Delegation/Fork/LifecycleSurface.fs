@@ -13,38 +13,32 @@ module ForkLifecycleSurface =
         let run = ChildRun.create "agent-1" "run-1" "fast-coder" Role.Manager "prompt" epoch
         if runtimeCancelled || action = "cancel" then ChildRun.cancel run
 
-        let mutable status = "Busy"
-        let mutable active = ChildRun.isActive run
-        let mutable cancelled = ChildRun.isCancelled run
-        let mutable completed = ChildRun.isCompleted run
-        let mutable label = ""
-
-        if action = "complete" then
-            let payload =
-                { AgentId = "agent-1"
-                  ChildSessionId = None
-                  RunId = "run-1"
-                  Role = Role.Manager
-                  AuthorityRoot = None
-                  ProviderRun = None
-                  WorkRecord = "completed"
-                  Directory = None }
-            let completion = ChildRun.makeCompleted run (AgentCompletionOutcome.AgentCompleted payload) epoch
-            ChildRun.tryComplete run completion |> ignore
-            status <- "Idle"
-            active <- false
-            completed <- true
-            label <- "completed"
-        elif action = "fail" || action = "interrupt" || action = "abandon" then
-            let completion = ChildRun.makeFailed run message epoch
-            ChildRun.tryComplete run completion |> ignore
-            status <- if action = "interrupt" then "Interrupted" else if action = "abandon" then "Closed" else "Idle"
-            active <- false
-            completed <- true
-            label <- message
-        elif cancelled then
-            status <- "Closed"
-            active <- false
+        let cancelled = ChildRun.isCancelled run
+        let status, active, completed, label =
+            if action = "complete" then
+                let payload =
+                    { AgentId = "agent-1"
+                      ChildSessionId = None
+                      RunId = "run-1"
+                      Role = Role.Manager
+                      AuthorityRoot = None
+                      ProviderRun = None
+                      WorkRecord = "completed"
+                      Directory = None }
+                let completion = ChildRun.makeCompleted run (AgentCompletionOutcome.AgentCompleted payload) epoch
+                ChildRun.tryComplete run completion |> ignore
+                "Idle", false, true, "completed"
+            elif action = "fail" || action = "interrupt" || action = "abandon" then
+                let completion = ChildRun.makeFailed run message epoch
+                ChildRun.tryComplete run completion |> ignore
+                (if action = "interrupt" then "Interrupted" else if action = "abandon" then "Closed" else "Idle"),
+                false,
+                true,
+                message
+            elif cancelled then
+                "Closed", false, ChildRun.isCompleted run, ""
+            else
+                "Busy", ChildRun.isActive run, ChildRun.isCompleted run, ""
 
         box
             {| agentId = run.AgentId

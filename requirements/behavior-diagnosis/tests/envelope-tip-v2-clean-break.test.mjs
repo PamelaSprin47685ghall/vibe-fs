@@ -89,14 +89,12 @@ test('WHAT[BD-008] ENFORCER_072_ScoreVectorRef_era_entry_is_refused_at_envelope_
   }
 })
 
-test('WHAT[BD-012] PERSIST_005_envelope_dual_decodes_legacy_observation_tags', () => {
+test('WHAT[BD-012] PERSIST_005_envelope_rejects_pre_cutover_observation_tags', () => {
   const line = blog.serializeEnvelope(envelope(observationFact()))
   assert.equal(line.includes('BlogObservationCommitted'), true)
   assert.equal(line.includes('BlogEntryCommitted'), false)
 
-  const legacy = line.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
-  const decoded = blog.deserializeEnvelope(legacy)
-  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(decoded.value.case, 'BlogObservationCommitted')
-  assert.equal(decoded.value.line, line)
+  const preCutover = line.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
+  const decoded = blog.deserializeEnvelope(preCutover)
+  assert.equal(decoded.ok, false)
 })

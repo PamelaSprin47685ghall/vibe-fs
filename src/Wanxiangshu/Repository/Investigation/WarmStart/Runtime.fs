@@ -68,6 +68,51 @@ module RepositoryWarmStart =
           Score = hit.Score
           TotalLines = hit.TotalLines }
 
+    let private trySearch (search: Search) repo query =
+        task {
+            try
+                return! search query repo RepositoryWarmStartPrompt.TopKPerKeyword
+            with _ ->
+                // One query is an optimization shard; its failure
+                // cannot fail or serialize the invocation.
+                return []
+        }
+
+    let private runSearchShard (search: Search) repo (ordinal, query) _ =
+        task {
+            let! hits = trySearch search repo query
+
+            let neutral =
+                hits
+                |> List.truncate RepositoryWarmStartPrompt.TopKPerKeyword
+                |> List.mapi (fun index hit -> toHint ordinal (index + 1) hit)
+
+            return
+                { RepositoryWarmStartSearch.Ordinal = ordinal
+                  Query = query
+                  Hints = neutral }
+        }
+
+    let private collectAtWorkspace (search: Search) (workspaceDirectory: string option) keywords =
+        task {
+            match workspaceDirectory with
+            | None -> return Ok None
+            | Some repo when String.IsNullOrWhiteSpace repo || not (Directory.Exists repo) -> return Ok None
+            | Some repo ->
+                let indexed = keywords |> List.mapi (fun index query -> index + 1, query)
+
+                let! searches =
+                    Parallel.mapBounded
+                        RepositoryWarmStartPrompt.MaxKeywords
+                        CancellationToken.None
+                        (runSearchShard search repo)
+                        indexed
+
+                // Parallel.mapBounded preserves input ordering; sorting makes
+                // keyword-ordinal merge explicit and implementation-independent.
+                return Ok(Some(searches |> List.sortBy (fun item -> item.Ordinal)))
+        }
+
     let private collectWithSearch
         (search: Search)
         (role: Role)
@@ -83,43 +128,7 @@ module RepositoryWarmStart =
             elif not (RepositoryWarmStartPrompt.isDirectConsumer role) then
                 return Error "repository warm-start keywords are only available to Coder, Inspector, or DevOps targets"
             else
-                match workspaceDirectory with
-                | None -> return Ok None
-                | Some repo when String.IsNullOrWhiteSpace repo || not (Directory.Exists repo) -> return Ok None
-                | Some repo ->
-                    let indexed = keywords |> List.mapi (fun index query -> index + 1, query)
-
-                    let! searches =
-                        Parallel.mapBounded
-                            RepositoryWarmStartPrompt.MaxKeywords
-                            CancellationToken.None
-                            (fun (ordinal, query) _ ->
-                                task {
-                                    let! hits =
-                                        task {
-                                            try
-                                                return! search query repo RepositoryWarmStartPrompt.TopKPerKeyword
-                                            with _ ->
-                                                // One query is an optimization shard; its failure
-                                                // cannot fail or serialize the invocation.
-                                                return []
-                                        }
-
-                                    let neutral =
-                                        hits
-                                        |> List.truncate RepositoryWarmStartPrompt.TopKPerKeyword
-                                        |> List.mapi (fun index hit -> toHint ordinal (index + 1) hit)
-
-                                    return
-                                        { RepositoryWarmStartSearch.Ordinal = ordinal
-                                          Query = query
-                                          Hints = neutral }
-                                })
-                            indexed
-
-                    // Parallel.mapBounded preserves input ordering; sorting makes
-                    // keyword-ordinal merge explicit and implementation-independent.
-                    return Ok(Some(searches |> List.sortBy (fun item -> item.Ordinal)))
+                return! collectAtWorkspace search workspaceDirectory keywords
         }
 
     let prepareWithSearch

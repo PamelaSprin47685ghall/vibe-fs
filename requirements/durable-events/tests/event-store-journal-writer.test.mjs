@@ -141,3 +141,7 @@ test('WHAT[DURABLE-EVENTS-012] journal_writer_source_has_no_snapshot_CAS_or_Git_
   assert.doesNotMatch(source, /OpenSnapshot|CompareAndSwapRef|IGitRawStore|RootOid|StoreSnapshot/)
   assert.match(source, /store\.Append/)
 })
+
+test('WHAT[DURABLE-EVENTS-013] journal_surface_does_not_mint_terminal_proof_from_forged_strings', () => {
+  assert.equal(Object.hasOwn(journal, 'JournalSurface_recordTerminalCompletion'), false)
+})

@@ -171,23 +171,18 @@ module PluginHooks =
                     do! magicTodo.Before toolInput toolOutput
                 }
 
+            let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
+                let toolName = if isNull toolInput then "" else string (toolInput?tool)
+                let sessionId = if isNull toolInput then "" else string (toolInput?sessionID)
+                let rendered = if isNull toolOutput then "" else string (toolOutput?output)
+
+                if not (System.String.IsNullOrWhiteSpace sessionId) then
+                    observationCollector.Collect(sessionId, toolName, toolInput?args, rendered)
+
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     do! magicTodo.After toolInput toolOutput
-
-                    if casebookEnabled then
-                        let toolName = if isNull toolInput then "" else string (toolInput?tool)
-
-                        let sessionId =
-                            if isNull toolInput then
-                                ""
-                            else
-                                string (toolInput?sessionID)
-
-                        let rendered = if isNull toolOutput then "" else string (toolOutput?output)
-
-                        if not (System.String.IsNullOrWhiteSpace sessionId) then
-                            observationCollector.Collect(sessionId, toolName, toolInput?args, rendered)
+                    if casebookEnabled then collectCasebookObservation toolInput toolOutput
                 }
 
             // HOST-009: the object handed to the Host carries Host hooks and
@@ -287,8 +282,8 @@ module PluginHooks =
 
             let client = if isNull input then null else input?client
 
-            if not (isNull client) then
-                try
+            let configureClient () : Task =
+                task {
                     let! toolModule = importToolModule ()
 
                     let onRunStarted =
@@ -306,11 +301,7 @@ module PluginHooks =
 
                     let finalityReviewerTimeoutMs =
                         let configured: obj = input?finalityReviewerTimeoutMs
-
-                        if isNull configured then
-                            None
-                        else
-                            Some(unbox<int> configured)
+                        if isNull configured then None else Some(unbox<int> configured)
 
                     let casebookToolSpecs =
                         match workspaceDirectory with
@@ -345,8 +336,17 @@ module PluginHooks =
                         fatalHook
                             "plugin-hook-command-before-failed"
                             (pairedHook (box (ExplicitSessionResume.before journal snapshotOpt adoptExisting)))
-                with ex ->
-                    raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
+                }
+
+            let guardedClientConfiguration () : Task =
+                task {
+                    try
+                        do! configureClient ()
+                    with ex ->
+                        raise (InvalidOperationException(sprintf "Failed to load OpenCode tool module: %s" ex.Message))
+                }
+
+            if not (isNull client) then do! guardedClientConfiguration ()
 
             return box hooks
         }

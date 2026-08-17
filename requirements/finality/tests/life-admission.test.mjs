@@ -20,6 +20,17 @@ const emptyWorld = worldOf([])
 const agentOwnerEnding = (opening) =>
   finality.endingAdmission(emptyWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', opening)
 
+test('WHAT[FINALITY-022] unknown authority kind and tier fail closed', () => {
+  const unknownKind = finality.endingAdmission(emptyWorld, 'forged-root', 'root-1', 'fast-manager', 'deep-manager', 'fast', { assignmentText: 'work' })
+  assert.equal(unknownKind.ok, false)
+  assert.match(unknownKind.error, /unknown authority kind/)
+
+  const unknownTier = finality.endingAdmission(emptyWorld, 'agent-owner-root', 'root-1', 'fast-manager', 'deep-manager', 'forged', { assignmentText: 'work' })
+  assert.equal(unknownTier.ok, false)
+  assert.match(unknownTier.error, /unknown tier/)
+  assert.equal(finality.tryHumanRootOpening(emptyWorld, 'forged-root', 'root-1', 'root-1'), false)
+})
+
 test('WHAT[FINALITY-022] AgentOwner migration is admitted only before any Life history', () => {
   const opening = { assignmentText: 'work' }
 

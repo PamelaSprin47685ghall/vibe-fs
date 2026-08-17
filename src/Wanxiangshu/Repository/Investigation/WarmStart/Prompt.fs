@@ -59,41 +59,49 @@ module RepositoryWarmStartPrompt =
 
     /// Newline normalization + trim + blank removal + stable exact dedupe.
     /// Exact means case-sensitive by design.
+    let private collectKeywordItem acc seen index (items: string array) =
+        let item = items.[index].Trim()
+
+        if item = "" || Set.contains item seen then
+            acc, seen
+        else
+            item :: acc, Set.add item seen
+
+    let private collectKeywords (items: string array) =
+        let rec loop acc seen index =
+            if index >= items.Length || List.length acc >= MaxKeywords then
+                List.rev acc
+            else
+                let nextAcc, nextSeen = collectKeywordItem acc seen index items
+                loop nextAcc nextSeen (index + 1)
+
+        loop [] Set.empty 0
+
     let normalizeKeywords (raw: string) : string list =
         if String.IsNullOrWhiteSpace raw then
             []
         else
-            let normalized = SyntheticToml.normalizeNewlines raw
-
-            let rec loop acc seen index (items: string array) =
-                if index >= items.Length || List.length acc >= MaxKeywords then
-                    List.rev acc
-                else
-                    let item = items.[index].Trim()
-
-                    if item = "" || Set.contains item seen then
-                        loop acc seen (index + 1) items
-                    else
-                        loop (item :: acc) (Set.add item seen) (index + 1) items
-
-            loop [] Set.empty 0 (normalized.Split '\n')
+            raw
+            |> SyntheticToml.normalizeNewlines
+            |> fun normalized -> normalized.Split '\n'
+            |> collectKeywords
 
     let private hintIdentity (hint: RepositoryWarmStartHint) =
         hint.FilePath, hint.StartLine, hint.EndLine, hint.Content
 
     let stableDedupeHints (hints: RepositoryWarmStartHint list) : RepositoryWarmStartHint list =
-        let rec loop acc seen remaining =
-            match remaining with
-            | [] -> List.rev acc
-            | head :: tail ->
+        hints
+        |> List.fold
+            (fun (acc, seen) head ->
                 let key = hintIdentity head
 
                 if Set.contains key seen then
-                    loop acc seen tail
+                    acc, seen
                 else
-                    loop (head :: acc) (Set.add key seen) tail
-
-        loop [] Set.empty hints
+                    head :: acc, Set.add key seen)
+            ([], Set.empty)
+        |> fst
+        |> List.rev
 
     let private renderSearch (search: RepositoryWarmStartSearch) =
         SyntheticToml.tableArrayEntry
@@ -128,6 +136,19 @@ module RepositoryWarmStartPrompt =
         =
         SyntheticToml.document instructions (bodyBlocks searches hints omitted)
 
+    let rec private fitToBudget render fallback kept omitted =
+        let rendered = render kept omitted
+
+        if SyntheticToml.byteCount rendered <= MaxWarmStartBytes then
+            rendered
+        else
+            trimOverBudget render fallback kept omitted
+
+    and private trimOverBudget render fallback kept omitted =
+        match List.rev kept with
+        | [] -> fallback
+        | _ :: restRev -> fitToBudget render fallback (List.rev restRev) (omitted + 1)
+
     /// Render while preserving whole TOML entries. If the authority header alone
     /// exceeds the warm-start byte budget, fail open to the raw charge rather than
     /// truncating authority text.
@@ -141,17 +162,11 @@ module RepositoryWarmStartPrompt =
         let originalCount = searches |> List.sumBy (fun search -> List.length search.Hints)
         let initialOmitted = max 0 (originalCount - List.length orderedHints)
 
-        let rec fit kept omitted =
-            let rendered = renderDocument instructions searches kept omitted
-
-            if SyntheticToml.byteCount rendered <= MaxWarmStartBytes then
-                rendered
-            else
-                match List.rev kept with
-                | [] -> charge
-                | _ :: restRev -> fit (List.rev restRev) (omitted + 1)
-
-        fit orderedHints initialOmitted
+        fitToBudget
+            (fun kept omitted -> renderDocument instructions searches kept omitted)
+            charge
+            orderedHints
+            initialOmitted
 
     /// Add low-trust repository tables to an already-rendered authoritative
     /// provider prompt (ForkChildPayload). The 64 KiB budget applies only to the
@@ -170,15 +185,10 @@ module RepositoryWarmStartPrompt =
         let originalCount = searches |> List.sumBy (fun search -> List.length search.Hints)
         let initialOmitted = max 0 (originalCount - List.length orderedHints)
 
-        let rec fit kept omitted =
-            let appendix =
-                SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
-
-            if SyntheticToml.byteCount appendix <= MaxWarmStartBytes then
-                basePrompt.TrimEnd() + "\n\n" + appendix
-            else
-                match List.rev kept with
-                | [] -> basePrompt
-                | _ :: restRev -> fit (List.rev restRev) (omitted + 1)
-
-        fit orderedHints initialOmitted
+        fitToBudget
+            (fun kept omitted ->
+                let appendix = SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
+                basePrompt.TrimEnd() + "\n\n" + appendix)
+            basePrompt
+            orderedHints
+            initialOmitted

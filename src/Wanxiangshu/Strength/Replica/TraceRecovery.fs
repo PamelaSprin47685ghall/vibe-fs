@@ -62,6 +62,40 @@ module StrengthTraceRecovery =
 
             calls @ results)
 
+    let private matchesAt expected observed width index =
+        let window = observed |> List.skip index |> List.truncate width
+
+        if List.length window <> width then
+            false
+        else
+            List.zip window expected
+            |> List.forall (fun (actual, (kind, toolName, body)) ->
+                actual.Kind = kind && actual.ToolName = toolName && actual.Body = body)
+
+    let private contiguousRange observed width index : Result<StrengthTraceRange, string> =
+        let window = observed |> List.skip index |> List.truncate width
+        let first = List.head window
+
+        let contiguous =
+            window
+            |> List.mapi (fun offset part -> part.CursorSequence = first.CursorSequence + int64 offset)
+            |> List.forall id
+
+        if not contiguous then
+            Error "Strength XTrace match is not a contiguous cursor range"
+        else
+            let last = List.last window
+
+            Ok
+                { StartInclusive = first.CursorSequence
+                  EndExclusive = last.CursorSequence + 1L }
+
+    let private resolveMatches observed width matches : Result<StrengthTraceRange option, string> =
+        match matches with
+        | [] -> Ok None
+        | [ index ] -> contiguousRange observed width index |> Result.map Some
+        | _ -> Error "Strength XTrace recovery is ambiguous"
+
     /// Recover the exact XTrace range after a crash between XTrace append and the
     /// StrengthFramesTraced append. Matching is semantic because XTrace correctly
     /// discarded cross-session wire call ids. Exactly one contiguous match is
@@ -76,39 +110,8 @@ module StrengthTraceRecovery =
             Ok None
         else
             let width = List.length expected
-
-            let matchesAt index =
-                let window = observed |> List.skip index |> List.truncate width
-
-                if List.length window <> width then
-                    false
-                else
-                    List.zip window expected
-                    |> List.forall (fun (actual, (kind, toolName, body)) ->
-                        actual.Kind = kind && actual.ToolName = toolName && actual.Body = body)
-
             let matches =
-                [ 0 .. max -1 (List.length observed - width) ] |> List.filter matchesAt
+                [ 0 .. max -1 (List.length observed - width) ]
+                |> List.filter (matchesAt expected observed width)
 
-            match matches with
-            | [] -> Ok None
-            | [ index ] ->
-                let window = observed |> List.skip index |> List.truncate width
-                let first = List.head window
-
-                let contiguous =
-                    window
-                    |> List.mapi (fun offset part -> part.CursorSequence = first.CursorSequence + int64 offset)
-                    |> List.forall id
-
-                if not contiguous then
-                    Error "Strength XTrace match is not a contiguous cursor range"
-                else
-                    let last = List.last window
-
-                    Ok(
-                        Some
-                            { StartInclusive = first.CursorSequence
-                              EndExclusive = last.CursorSequence + 1L }
-                    )
-            | _ -> Error "Strength XTrace recovery is ambiguous"
+            resolveMatches observed width matches

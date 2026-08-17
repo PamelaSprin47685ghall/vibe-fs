@@ -55,6 +55,9 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.OpenCode
 
+/// DSL-state-combination: domain — this is a single reconciled provider-turn
+/// observation; optional metadata fields preserve evidence absence and never
+/// encode a next-step cursor.
 type ReconciledTurn =
     {
         SessionId: SessionId
@@ -99,6 +102,9 @@ type ReconciledTurnContext =
       Quiescence: QuiescencePermit option
       Delivery: ReconciledTurnDelivery }
 
+/// DSL-state-combination: physical — this process-local binding snapshots
+/// observed run/message identities and optional host metadata; it is not durable
+/// workflow state or a continuation program counter.
 type ActiveRunBinding =
     {
         SessionId: SessionId

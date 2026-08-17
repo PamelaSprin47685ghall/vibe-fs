@@ -76,62 +76,60 @@ module PluginHostWiring =
         task {
             let input = boot.Input
             let scope = boot.Scope
+            let workspaceDirectory = boot.WorkspaceDirectory
+
+            let completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort : Task<Host> =
+                task {
+                    BookkeeperRuntime.setSessionPort sessionPort
+                    scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
+                    scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
+
+                    for KeyValue(childId, parentId) in scope.Sessions.SessionParents do
+                        scope.Sessions.OwnedSessions.Add childId |> ignore
+                        scope.Sessions.OwnedSessions.Add parentId |> ignore
+
+                    // STRENGTH-006..008: borrow the same unified EventStore already
+                    // acquired by AgentJournal boot.
+                    let strengthDurability =
+                        match boot.Journal, workspaceDirectory with
+                        | Some _, Some workspace ->
+                            WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
+                            |> Option.map StrengthDurability.create
+                        | _ -> None
+
+                    // Keep the causal wait bridge on the root workspace.
+                    if SharedState.RootWorkspace.IsNone then
+                        SharedState.RootWorkspace <- workspaceDirectory
+                        CausalWaitHub.setWorkspace workspaceDirectory
+
+                    CasebookLifecycle.setEnabled workspaceDirectory
+
+                    let! wired =
+                        HostSignalBootstrap.wire
+                            sessionPort
+                            eventPort
+                            snapshotOpt
+                            boot.Journal
+                            strengthDurability
+                            scope
+                            input
+                            workspaceDirectory
+                            (Some CasebookLifecycle.tryFinalizeInspector)
+                            (Some CasebookLifecycle.cleanupInspector)
+
+                    return
+                        { EventPort = eventPort
+                          SessionPort = sessionPort
+                          SnapshotOpt = snapshotOpt
+                          Wired = wired
+                          SharedTerminalKey = terminalKey
+                          SharedTerminalPort = sharedTerminalPort
+                          GitTreePort = boot.GitTreePort
+                          StrengthDurability = strengthDurability }
+                }
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
-                BookkeeperRuntime.setSessionPort sessionPort
-                scope.AttachSharedTerminal(terminalKey, sharedTerminalPort)
-                scope.AttachSatelliteRuntime(SatelliteRuntime sessionPort)
-
-                for KeyValue(childId, parentId) in scope.Sessions.SessionParents do
-                    scope.Sessions.OwnedSessions.Add childId |> ignore
-                    scope.Sessions.OwnedSessions.Add parentId |> ignore
-
-                let workspaceDirectory = boot.WorkspaceDirectory
-
-                // STRENGTH-006..008: borrow the same unified EventStore already
-                // acquired by AgentJournal boot. Keep the handle in the composition
-                // root rather than PluginRuntimeScope so Journal and EventStore
-                // writers never become one dual-write owner.
-                let strengthDurability =
-                    match boot.Journal, workspaceDirectory with
-                    | Some _, Some workspace ->
-                        WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
-                        |> Option.map StrengthDurability.create
-                    | _ -> None
-
-                // Causal wait bridge must stay on the root workspace so E2E
-                // diagnostics (host.workDir) can read active waits. Later worktree
-                // plugin boots must not redirect the process-local hub.
-                if SharedState.RootWorkspace.IsNone then
-                    SharedState.RootWorkspace <- workspaceDirectory
-                    CausalWaitHub.setWorkspace workspaceDirectory
-
-                // CASE-003/010: CasebookLifecycle collector enablement (marker-gated).
-                // SpikePlugin only Collects / enables — store IO stays in Lifecycle.
-                CasebookLifecycle.setEnabled workspaceDirectory
-
-                let! wired =
-                    HostSignalBootstrap.wire
-                        sessionPort
-                        eventPort
-                        snapshotOpt
-                        boot.Journal
-                        strengthDurability
-                        scope
-                        input
-                        workspaceDirectory
-                        (Some CasebookLifecycle.tryFinalizeInspector)
-                        (Some CasebookLifecycle.cleanupInspector)
-
-                return
-                    { EventPort = eventPort
-                      SessionPort = sessionPort
-                      SnapshotOpt = snapshotOpt
-                      Wired = wired
-                      SharedTerminalKey = terminalKey
-                      SharedTerminalPort = sharedTerminalPort
-                      GitTreePort = boot.GitTreePort
-                      StrengthDurability = strengthDurability }
+                return! completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort
         }

@@ -179,6 +179,54 @@ module HostSessionNudge =
             PromptDispatcher.AwaitMode.Detached
             None
 
+    let private continuationTargetValidation
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (effectiveAgent: string) : Result<unit, string> =
+        let pairValidation =
+            if effectiveAgent <> profile.SelectedAgent && effectiveAgent <> profile.PeerAgent then
+                Error "Assistance target is outside the active Authority Root agent pair"
+            else
+                Ok()
+
+        pairValidation
+        |> Result.bind (fun () ->
+            PromptAuthority.parseAgentName effectiveAgent
+            |> Result.bind (fun (_, role, _, _) ->
+                if role <> profile.CanonicalRole then
+                    Error "Assistance target role differs from the active Authority Root"
+                else
+                    Ok()))
+
+    let private sendContinuationToValidatedAgent
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (kind: PromptAuthority.ContinuationKind)
+        (effectiveAgent: string)
+        (directory: string option)
+        (awaitMode: PromptDispatcher.AwaitMode)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<Result<PromptKey, string>> =
+        task {
+            match continuationTargetValidation profile effectiveAgent with
+            | Error error -> return Error error
+            | Ok() ->
+                let rt = PromptDispatcher.forJournal durable
+
+                return!
+                    rt.SendContinuation
+                        sessionPort
+                        sessionId
+                        prompt
+                        kind
+                        profile
+                        effectiveAgent
+                        (liveDirectory directory)
+                        awaitMode
+                        None
+        }
+
     /// PROMPT-018: assistance continuation with an explicit execution binding.
     /// This bypasses fallback cursor selection but not PromptAuthority. The target
     /// must be one of the Authority Root's immutable same-role pair.
@@ -198,28 +246,54 @@ module HostSessionNudge =
             | false, None, _ -> return Error "No journal: an assistance continuation cannot be claimed"
             | false, Some _, None -> return Error "No active authority profile"
             | false, Some durable, Some profile ->
-                if effectiveAgent <> profile.SelectedAgent && effectiveAgent <> profile.PeerAgent then
-                    return Error "Assistance target is outside the active Authority Root agent pair"
-                else
-                    match PromptAuthority.parseAgentName effectiveAgent with
-                    | Error error -> return Error error
-                    | Ok(_, role, _, _) when role <> profile.CanonicalRole ->
-                        return Error "Assistance target role differs from the active Authority Root"
-                    | Ok _ ->
-                        let rt = PromptDispatcher.forJournal durable
-
-                        return!
-                            rt.SendContinuation
-                                sessionPort
-                                sessionId
-                                prompt
-                                kind
-                                profile
-                                effectiveAgent
-                                (liveDirectory directory)
-                                awaitMode
-                                None
+                return!
+                    sendContinuationToValidatedAgent
+                        sessionPort
+                        sessionId
+                        prompt
+                        kind
+                        effectiveAgent
+                        directory
+                        awaitMode
+                        durable
+                        profile
         }
+
+    let private sendInteractionRepairWithProfile
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (requestId: BloggerRequestId)
+        (terminalProviderRun: ProviderRunIdentity)
+        (repairKind: string)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<Result<PromptKey, string>> =
+        let rt = PromptDispatcher.forJournal durable
+
+        if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
+            Task.FromResult(Error "Interaction repair already claimed for this provider run")
+        else
+            let agent = agentForActiveCursor journal sessionId profile
+
+            // Blogger repair must know whether Host transport accepted or
+            // refused this nudge so a hard refusal can immediately advance
+            // to AABB. Await waits only the SendPrompt transport result; it
+            // never waits for provider execution/slots.
+            rt.SendInteractionRepair
+                sessionPort
+                sessionId
+                prompt
+                requestId
+                terminalProviderRun
+                repairKind
+                profile
+                agent
+                (liveDirectory directory)
+                PromptDispatcher.AwaitMode.Await
+                None
 
     /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
     ///
@@ -245,30 +319,18 @@ module HostSessionNudge =
             | false, None, _ -> return Error "No journal: an interaction repair cannot be claimed"
             | false, Some _, None -> return Error "No active authority profile"
             | false, Some durable, Some profile ->
-                let rt = PromptDispatcher.forJournal durable
-
-                if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
-                    return Error "Interaction repair already claimed for this provider run"
-                else
-                    let agent = agentForActiveCursor journal sessionId profile
-
-                    // Blogger repair must know whether Host transport accepted or
-                    // refused this nudge so a hard refusal can immediately advance
-                    // to AABB. Await waits only the SendPrompt transport result; it
-                    // never waits for provider execution/slots.
-                    return!
-                        rt.SendInteractionRepair
-                            sessionPort
-                            sessionId
-                            prompt
-                            requestId
-                            terminalProviderRun
-                            repairKind
-                            profile
-                            agent
-                            (liveDirectory directory)
-                            PromptDispatcher.AwaitMode.Await
-                            None
+                return!
+                    sendInteractionRepairWithProfile
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        requestId
+                        terminalProviderRun
+                        repairKind
+                        durable
+                        profile
         }
 
     [<RequireQualifiedAccess>]
@@ -343,6 +405,39 @@ module HostSessionNudge =
                         profile
         }
 
+    let private sendManagerIdleWithProfile
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (lifeId: ManagerLifeId)
+        (conditionKey: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<Result<PromptKey, string>> =
+        let rt = PromptDispatcher.forJournal durable
+
+        if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
+            Task.FromResult(Error "Manager idle encouragement already claimed for this terminal")
+        else
+            let agent = agentForActiveCursor journal sessionId profile
+
+            // PROMPT-007 Detached: idle encouragement does not wait for PhysicalAccepted.
+            rt.SendManagerIdleEncouragement
+                sessionPort
+                sessionId
+                prompt
+                lifeId
+                conditionKey
+                terminalProviderRun
+                profile
+                agent
+                (liveDirectory directory)
+                PromptDispatcher.AwaitMode.Detached
+                None
+
     /// GLORY-029: one Manager idle encouragement per exact terminal occasion.
     /// Durable ClaimSequences dedupe duplicate delivery/restart replay of that
     /// terminal; fresh ProviderRun identities remain intentionally unbounded.
@@ -362,27 +457,18 @@ module HostSessionNudge =
             | false, None, _ -> return Error "No journal: a manager idle encouragement cannot be claimed"
             | false, Some _, None -> return Error "No active authority profile"
             | false, Some durable, Some profile ->
-                let rt = PromptDispatcher.forJournal durable
-
-                if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
-                    return Error "Manager idle encouragement already claimed for this terminal"
-                else
-                    let agent = agentForActiveCursor journal sessionId profile
-
-                    // PROMPT-007 Detached: idle encouragement does not wait for PhysicalAccepted.
-                    return!
-                        rt.SendManagerIdleEncouragement
-                            sessionPort
-                            sessionId
-                            prompt
-                            lifeId
-                            conditionKey
-                            terminalProviderRun
-                            profile
-                            agent
-                            (liveDirectory directory)
-                            PromptDispatcher.AwaitMode.Detached
-                            None
+                return!
+                    sendManagerIdleWithProfile
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        lifeId
+                        conditionKey
+                        terminalProviderRun
+                        durable
+                        profile
         }
 
     // ── idle-derived continuation admission（HOST-004）────────────────────────

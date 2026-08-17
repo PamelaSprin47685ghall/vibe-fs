@@ -16,6 +16,9 @@ type StreamId =
     | Process of ProcessId
 
 /// One durable journal line (PERSIST-001).
+/// DSL-state-combination: domain — stream and optional provider-run identity
+/// route one durable fact envelope; absence means the fact has no run, not a
+/// workflow stage.
 type Envelope =
     {
         RuntimeId: RuntimeId
@@ -40,6 +43,14 @@ module Envelope =
 
     let private extra = Extra.empty |> Extra.withInt64
 
+    let private compareAcrossRuntimes (a: Envelope) (b: Envelope) : int =
+        let byObservation = compare a.ObservedAt b.ObservedAt
+
+        if byObservation <> 0 then
+            byObservation
+        else
+            String.Compare(RuntimeId.value a.RuntimeId, RuntimeId.value b.RuntimeId, StringComparison.Ordinal)
+
     /// PERSIST-001 ordering: within a runtime by LocalSeq, across runtimes by
     /// observation time with the runtime id as the tie-break.
     ///
@@ -50,12 +61,7 @@ module Envelope =
         if a.RuntimeId = b.RuntimeId then
             compare (LocalSeq.value a.LocalSeq) (LocalSeq.value b.LocalSeq)
         else
-            let byObservation = compare a.ObservedAt b.ObservedAt
-
-            if byObservation <> 0 then
-                byObservation
-            else
-                String.Compare(RuntimeId.value a.RuntimeId, RuntimeId.value b.RuntimeId, StringComparison.Ordinal)
+            compareAcrossRuntimes a b
 
     /// PERSIST-001: the line is the durable artifact, so its bytes must not depend
     /// on the machine that wrote it.
@@ -80,14 +86,14 @@ module Envelope =
 
     /// PERSIST-005: a pre-0.5.0 / pre-tip-v2 line is refused, never guessed into shape.
     /// Tip v2 must be checked here (Boot reads envelopes) not only in FactCodec.deserializeFact:
-    /// Auto-decode of BlogObservationCommitted (or legacy BlogEntryCommitted) without
-    /// TipRuleId yields an opaque Thoth error, Boot truncates the stream mid-file, later
-    /// Abandon/Commit vanish, and fold then dies on "already has open request" — a lie
-    /// about the real cause.
+    /// Auto-decode of BlogObservationCommitted without TipRuleId yields an opaque Thoth error,
+    /// Boot truncates the stream mid-file, later Abandon/Commit vanish, and fold then dies on
+    /// "already has open request" — a lie about the real cause. Pre-cutover observation tags
+    /// are not decoded.
     let deserialize (json: string) : Result<Envelope, string> =
         if FactCodec.containsLegacyFallbackFields json then
             Error FactCodec.pre050MigrationMessage
         elif FactCodec.containsLegacyScoreVectorEntry json then
             Error FactCodec.tipV2CleanBreakMessage
         else
-            Decode.Auto.fromString<Envelope> (FactCodec.rewriteLegacyObservationTags json, extra = extra)
+            Decode.Auto.fromString<Envelope> (json, extra = extra)

@@ -59,13 +59,14 @@ function formatOwner(owner) {
 
 function formatProducer(producer) {
   if (!producer) return 'none';
-  if (producer.tag === 'external') {
-    const ids = Array.isArray(producer.identity)
-      ? producer.identity.map((p) => `${p.k || p[0]}=${p.v || p[1]}`).join(',')
+  const { tag: producerTag, identity, kind, owner } = producer;
+  if (producerTag === 'external') {
+    const ids = Array.isArray(identity)
+      ? identity.map((p) => `${p.k || p[0]}=${p.v || p[1]}`).join(',')
       : '';
-    return `external:${producer.kind}${ids ? `{${ids}}` : ''}`;
+    return `external:${kind}${ids ? `{${ids}}` : ''}`;
   }
-  return `workflow:${formatOwner(producer.owner)}`;
+  return `workflow:${formatOwner(owner)}`;
 }
 
 function formatFrontier(frontier) {

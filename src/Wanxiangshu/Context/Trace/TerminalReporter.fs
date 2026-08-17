@@ -67,6 +67,40 @@ open Wanxiangshu.Strength
 /// cohort lifecycle / JoinGuard / IdleRepair / LoopSensor.
 module TerminalReporter =
 
+    let private reportResolvedRole
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (wasAborted: bool)
+        (sessionWideText: string)
+        (role: Role)
+        : Task<bool * bool> =
+        task {
+            let runResult: AgentRunResult =
+                { SessionId = turn.SessionId
+                  AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                  ProviderRun = turn.ProviderRun
+                  Role = AgentRoleIdentity.toRole role
+                  Directory = turn.Directory
+                  TerminalText = sessionWideText
+                  TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
+
+            if runResult.IsValid then
+                do! XTraceCapture.captureTerminal journal turn
+
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
+                |> ignore
+
+                return wasAborted, true
+            else
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed "completed with empty terminal output")
+                |> ignore
+
+                return wasAborted, false
+        }
+
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
     /// XTrace terminal segment, and report Completed / Failed. Also clears the
     /// session's abort bookkeeping flag for the caller.
@@ -89,27 +123,12 @@ module TerminalReporter =
 
                 return wasAborted, false
             | Some role ->
-                let runResult: AgentRunResult =
-                    { SessionId = turn.SessionId
-                      AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
-                      ProviderRun = turn.ProviderRun
-                      Role = AgentRoleIdentity.toRole role
-                      Directory = turn.Directory
-                      TerminalText = sessionWideText
-                      TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
-
-                if runResult.IsValid then
-                    do! XTraceCapture.captureTerminal journal turn
-
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
-                    |> ignore
-
-                    return wasAborted, true
-                else
-                    eventPort.NotifyTerminal
-                        turn.SessionId
-                        (TerminalOutcome.Failed "completed with empty terminal output")
-                    |> ignore
-
-                    return wasAborted, false
+                return!
+                    reportResolvedRole
+                        eventPort
+                        journal
+                        turn
+                        wasAborted
+                        sessionWideText
+                        role
         }

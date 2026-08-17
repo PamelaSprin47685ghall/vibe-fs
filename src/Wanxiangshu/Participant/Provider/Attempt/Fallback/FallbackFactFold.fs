@@ -54,6 +54,11 @@ module FallbackFactFold =
     /// REVIEW-003's causal proof can only fail on a line that could not have been
     /// written by a correct writer, so absorbing it would mean replaying a
     /// journal into a state the domain forbids.
+    let private fallbackOffsetRejection factName decodeError =
+        match decodeError with
+        | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
+            reject factName $"cursor advance rejected: corrupt offset byte {value} (FALLBACK-002)"
+
     let private fallbackOutcome factName projection result =
         match result with
         | Ok updated -> Ok updated
@@ -64,10 +69,38 @@ module FallbackFactFold =
             reject factName "cursor advance has no cursor to advance: FALLBACK-001 requires an accepted Authority Root"
         | Error InvalidTransition ->
             reject factName "cursor advance violates FALLBACK-007 (offset or count is not the successor)"
-        | Error(InvalidFallbackOffset decodeError) ->
-            match decodeError with
-            | AgentPairCursor.FallbackOffsetDecodeError.InvalidFallbackOffset value ->
-                reject factName $"cursor advance rejected: corrupt offset byte {value} (FALLBACK-002)"
+        | Error(InvalidFallbackOffset decodeError) -> fallbackOffsetRejection factName decodeError
+
+    let private decodeOffsets previousOffset nextOffset =
+        match
+            AgentPairCursor.FallbackOffsetCodec.ofByte previousOffset,
+            AgentPairCursor.FallbackOffsetCodec.ofByte nextOffset
+        with
+        | Error decodeError, _
+        | _, Error decodeError -> Error(InvalidFallbackOffset decodeError)
+        | Ok previous, Ok next -> Ok(previous, next)
+
+    let private applyCursorAdvance
+        identity
+        previousOffset
+        nextOffset
+        consecutiveFailureCount
+        session =
+        match session.Fallback with
+        | None -> Error NoCursor
+        | Some current ->
+            // FALLBACK-002 codec boundary: an illegal wire byte is a
+            // corrupt/forged line — typed refusal, never an exception
+            // and never a fake Append CommitUnknown.
+            decodeOffsets previousOffset nextOffset
+            |> Result.bind (fun (previous, next) ->
+                FallbackProjection.applyAdvance
+                    identity
+                    previous
+                    next
+                    consecutiveFailureCount
+                    current
+                |> Result.map (fun updated -> { session with Fallback = Some updated }))
 
     let fold (projection: AgentProjectionSet) (fact: FallbackFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── fallback ────────────────────────────────────────────────────────
@@ -85,26 +118,12 @@ module FallbackFactFold =
                     // An advance for a run with no cursor cannot be validated:
                     // FALLBACK-001 says the cursor is created by the Authority
                     // Root, so its absence means the root fact is missing.
-                    match session.Fallback with
-                    | None -> Error NoCursor
-                    | Some current ->
-                        // FALLBACK-002 codec boundary: an illegal wire byte is a
-                        // corrupt/forged line — typed refusal, never an exception
-                        // and never a fake Append CommitUnknown.
-                        match
-                            AgentPairCursor.FallbackOffsetCodec.ofByte payload.PreviousOffset,
-                            AgentPairCursor.FallbackOffsetCodec.ofByte payload.NextOffset
-                        with
-                        | Error decodeError, _
-                        | _, Error decodeError -> Error(InvalidFallbackOffset decodeError)
-                        | Ok previousOffset, Ok nextOffset ->
-                            FallbackProjection.applyAdvance
-                                identity
-                                previousOffset
-                                nextOffset
-                                payload.ConsecutiveFailureCount
-                                current
-                            |> Result.map (fun updated -> { session with Fallback = Some updated }))
+                    applyCursorAdvance
+                        identity
+                        payload.PreviousOffset
+                        payload.NextOffset
+                        payload.ConsecutiveFailureCount
+                        session)
                 projection
             |> fallbackOutcome "FallbackCursorAdvanced" projection
 

@@ -71,22 +71,7 @@ test('WHAT[DURABLE-EVENTS-003] PERSIST_001_handle_abandoned_pins_abandoned_at_of
   assert.equal(decoded.line, line, 'offset must normalise to +00:00')
 })
 
-test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_completed_without_completion_ref_gets_nulls_injected', () => {
-  const line = factCodec.encode(handleCompleted())
-  const stripped = line
-    .replace(/,"CompletionRef":null/g, '')
-    .replace(/,"CompletionDigest":null/g, '')
-    .replace(/"CompletionRef":null,/g, '')
-    .replace(/"CompletionDigest":null,/g, '')
-  assert.equal(stripped.includes('CompletionRef'), false)
-  assert.equal(stripped.includes('CompletionDigest'), false)
-
-  const decoded = factCodec.decode(stripped)
-  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(decoded.case, 'HandleCompleted')
-})
-
-test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_completed_with_completion_ref_passes_through', () => {
+test('WHAT[DURABLE-EVENTS-002] handle_completed_with_completion_fields_round_trips_canonically', () => {
   const line = factCodec.encode(handleCompleted({
     ParentSessionId: 'ses_hc2',
     Handle: 'h-hc2',
@@ -100,33 +85,50 @@ test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_completed_with_completion_ref_pa
   assert.equal(decoded.line, line)
 })
 
-test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_linked_without_ownership_defaults_to_durable_parent', () => {
-  const line = factCodec.encode(handleLinked())
-  assert.equal(line.includes('Ownership'), true)
-  const stripped = line.replace(/"Ownership":"DurableParentHandle",?/, '')
-  assert.equal(stripped.includes('Ownership'), false)
-
-  const decoded = factCodec.decode(stripped)
-  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.equal(decoded.line, line)
+test('WHAT[DURABLE-EVENTS-002] handle_completed_missing_completion_fields_is_rejected_without_decode_migration', () => {
+  const line = factCodec.encode(handleCompleted())
+  const missing = line
+    .replace(/,"CompletionRef":null/g, '')
+    .replace(/,"CompletionDigest":null/g, '')
+    .replace(/"CompletionRef":null,/g, '')
+    .replace(/"CompletionDigest":null,/g, '')
+  assert.equal(missing.includes('CompletionRef'), false)
+  assert.equal(missing.includes('CompletionDigest'), false)
+  assert.equal(factCodec.decode(missing).ok, false)
 })
 
-test('WHAT[DURABLE-EVENTS-002] MIGRATION_handle_linked_without_byname_replays_with_machine_name_fallback_marker', () => {
-  const line = factCodec.encode(handleLinked({
-    ParentSessionId: 'ses_hl_legacy',
-    ChildSessionId: 'ses_hl_legacy_child',
-    Handle: 'h-hl-legacy',
-    TargetAgent: 'fast-coder',
-    Byname: 'Ada',
-    CanonicalRole: 'Coder',
-  }))
-  const stripped = line.replace(/"Byname":"Ada",?/, '')
-  assert.equal(stripped.includes('Byname'), false)
+test('WHAT[DURABLE-EVENTS-002] malformed_completion_and_ownership_labels_fail_closed', () => {
+  assert.throws(
+    () => factCodec.encode(handleCompleted({ Kind: 'forged-kind' })),
+    /unknown completion kind/i,
+  )
+  assert.throws(
+    () => factCodec.encode(handleLinked({ CanonicalRole: 'forged-role' })),
+    /unknown role/i,
+  )
+  assert.throws(
+    () => factCodec.encode(handleLinked({ Ownership: 'forged-ownership' })),
+    /unknown ownership/i,
+  )
+  assert.throws(
+    () => factCodec.encode({
+      family: 'Execution',
+      case: 'HandleAbandoned',
+      payload: {
+        ParentSessionId: 'ses_hc',
+        Handle: 'h-hc',
+        Reason: 'forged-reason',
+        AbandonedAt: '2026-01-01T00:00:00Z',
+      },
+    }),
+    /unknown abandon reason/i,
+  )
+})
 
-  const decoded = factCodec.decode(stripped)
-  assert.equal(decoded.ok, true, decoded.ok ? '' : decoded.error)
-  assert.match(decoded.line, /"Byname":""/)
-  assert.match(decoded.line, /"TargetAgent":"fast-coder"/)
+test('WHAT[DURABLE-EVENTS-009] historical_unanchored_guideline_is_refused_without_rewrite', () => {
+  const legacy = JSON.stringify({ PairProgrammingGuidelineAppended: { Ordinal: 1, MarkerText: 'legacy' } })
+  const decoded = factCodec.decode(legacy)
+  assert.equal(decoded.ok, false)
 })
 
 test('WHAT[DURABLE-EVENTS-007] PERSIST_005_unparseable_json_is_a_decode_error_not_a_throw', () => {

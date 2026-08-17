@@ -61,6 +61,9 @@ type PtyRecord =
       Command: string
       StartedAt: DateTimeOffset }
 
+/// DSL-state-combination: physical — this read-only runtime snapshot combines
+/// status, active-run identity, and completion-cell state derived from the
+/// process-local ChildRun resource; it is not a durable workflow cursor.
 type AgentRecord =
     {
         AgentId: string

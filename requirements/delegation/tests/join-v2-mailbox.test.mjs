@@ -21,9 +21,9 @@ test('WHAT[DELEG-019] JOIN_MAILBOX_deadline_signal_is_not_operator_abort', () =>
 })
 test('WHAT[DELEG-019] JOIN_MAILBOX_completion_batch_preserves_order', () => {
   const wire = join.renderBatch('english', [
-    { kind: 'completed', agentId: 'first', agentName: 'first', workRecord: 'one' },
-    { kind: 'completed', agentId: 'second', agentName: 'second', workRecord: 'two' },
-    { kind: 'completed', agentId: 'third', agentName: 'third', workRecord: 'three' },
+    { kind: 'completed', agentId: 'first', agentName: 'first', role: 'Coder', runId: 'run-first', workRecord: 'one' },
+    { kind: 'completed', agentId: 'second', agentName: 'second', role: 'Coder', runId: 'run-second', workRecord: 'two' },
+    { kind: 'completed', agentId: 'third', agentName: 'third', role: 'Coder', runId: 'run-third', workRecord: 'three' },
   ])
   assert.ok(wire.indexOf('first') < wire.indexOf('second'))
   assert.ok(wire.indexOf('second') < wire.indexOf('third'))

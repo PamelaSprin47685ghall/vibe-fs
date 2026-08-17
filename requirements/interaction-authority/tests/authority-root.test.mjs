@@ -26,6 +26,15 @@ const register = (root) => authority.registerAuthority(root, authority.empty)
 const continuation = (key, root, kind = 'ManagerGuard', agent = 'fast-coder', payload = 'payload') =>
   authority.claimContinuation(key, 'ses_a', kind, root, agent, payload)
 
+test('WHAT[INTERACTION-AUTHORITY-003] IA_003_malformed_profile_role_tier_and_root_kind_fail_closed', () => {
+  const root = rootFor()
+  for (const field of ['canonicalRole', 'selectedTier', 'authorityKind']) {
+    const result = authority.registerAuthority({ ...root, [field]: 'unknown' }, authority.empty)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /unknown (role|tier|authority root kind)/)
+  }
+})
+
 // INTERACTION-AUTHORITY-001: only an explicit physical-message promotion crosses into authority.
 test('WHAT[INTERACTION-AUTHORITY-001] IA_001_physical_message_promotes_to_authority_root', () => {
   assert.equal(authority.promotePhysical('msg_u1'), 'msg_u1')

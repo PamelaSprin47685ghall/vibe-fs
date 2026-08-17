@@ -33,6 +33,9 @@ open Wanxiangshu.Strength.Prediction
 /// CompanionProjectionBuilder already interleaves tip/frame provider messages with the
 /// same front-zip; this type names the unit. Physical journal events are
 /// `BlogObservationCommitted` / `BlogObservationsSquashed` (no second store).
+/// DSL-state-combination: domain — tip identity and optional frame evidence
+/// form one rulebook observation unit; missing evidence is an explicit fact,
+/// not a workflow stage.
 type ObservationUnit =
     {
         TipName: string option

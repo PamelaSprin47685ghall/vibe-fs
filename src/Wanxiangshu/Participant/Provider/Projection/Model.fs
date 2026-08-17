@@ -53,6 +53,9 @@ module ProviderProjection =
     /// Compared by exact bytes. Because it carries IDs it is only meaningful
     /// within one Session's timeline; comparing it across Sessions is
     /// meaningless, not merely strict.
+    /// DSL-state-combination: physical — provider/model/variant options are
+    /// wire identity facets for one rendered request; they are external protocol
+    /// metadata, not business lifecycle state.
     type ProviderWireProjection =
         {
             ProviderId: string option

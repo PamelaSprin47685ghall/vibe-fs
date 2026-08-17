@@ -128,6 +128,9 @@ type StrengthFramesIntent =
 /// `CommittedPrefix` 是 Journal `ActivePrefixEpoch.Snapshot` 的 Domain 形态——
 /// `ActivePrefixEpoch` 整体（EpochId / ReanchoredRuns / fold 校验）留在 Journal，
 /// Domain 只取可表达的 `PrefixSnapshot`（与 `PrefixProbeSelection` 相同的拆分）。
+/// DSL-state-combination: domain — optional committed-prefix/reanchor facets
+/// are projection evidence for one provider attempt; no field represents a
+/// next-action stage.
 type ProjectionSnapshot =
     {
         /// X 当前 provider-visible 语义投影（transform 边界 `decodeMessageView |> toSemantic`）。

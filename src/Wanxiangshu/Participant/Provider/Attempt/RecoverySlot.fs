@@ -147,14 +147,16 @@ module RecoverySlot =
     /// `aabbConsumed` is FALLBACK-008's one-repair budget for this occasion. Passed in
     /// rather than tracked here because the budget is per unusable terminal and the
     /// Dispatcher already owns it (PROMPT-005); a second counter could disagree.
+    let private onCompletedInvalidMain (aabbConsumed: bool) : SlotDecision =
+        if aabbConsumed then
+            SlotDecision.AbandonRoundProduct
+        else
+            SlotDecision.RepairOnce
+
     let onMainOutcome (kind: ProviderRequestKind) (aabbConsumed: bool) (outcome: AttemptOutcome) : SlotDecision =
         match outcome with
         | AttemptOutcome.Completed -> SlotDecision.CommitMain(ProviderRequestKind.clearsFailureCountOnSuccess kind)
-        | AttemptOutcome.CompletedInvalid ->
-            if aabbConsumed then
-                SlotDecision.AbandonRoundProduct
-            else
-                SlotDecision.RepairOnce
+        | AttemptOutcome.CompletedInvalid -> onCompletedInvalidMain aabbConsumed
         | AttemptOutcome.Failed
         | AttemptOutcome.Aborted -> SlotDecision.FailSlot
 

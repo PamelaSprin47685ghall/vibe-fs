@@ -96,21 +96,23 @@ module HookDispatcher =
         with _ ->
             ()
 
+    let private installAtPath path shimBody =
+        match classifyExistingHook (tryReadHook path) with
+        | Installed ->
+            writeShim path shimBody
+            Installed
+        | AlreadyOwned ->
+            writeShim path shimBody
+            AlreadyOwned
+        | ForeignHook _ -> ForeignHook path
+        | DiagnoseIncomplete reason -> DiagnoseIncomplete reason
+
     let installOrDiagnose (hooksDir: string) (kind: HookKind) (shimBody: string) : HookInstallVerdict =
         if not (containsOwnershipMarker shimBody) then
             DiagnoseIncomplete(sprintf "%s: shim body missing ownership marker" IncompleteDiagnosis)
         else
             let path = joinPath hooksDir (hookFileName kind)
-
-            match classifyExistingHook (tryReadHook path) with
-            | Installed ->
-                writeShim path shimBody
-                Installed
-            | AlreadyOwned ->
-                writeShim path shimBody
-                AlreadyOwned
-            | ForeignHook _ -> ForeignHook path
-            | DiagnoseIncomplete reason -> DiagnoseIncomplete reason
+            installAtPath path shimBody
 
     let shimHeaderComment =
         sprintf "# %s\n# ownership: Wanxiangshu HookDispatcher" OwnershipMarker
@@ -167,30 +169,35 @@ module HookDispatcher =
             GitSubject.execIn workspace [| "config"; "--add"; sprintf "remote.%s.fetch" remote; expected |]
             |> ignore
 
+    let private ensureRemoteRefs workspace =
+        for remote in remotes workspace do
+            ensureRemoteStoreFetchRefspec workspace remote
+
+    let private ensureWorkspace workspace : Result<unit, string> =
+        let hooksDir = hooksDirectory workspace
+
+        let verdicts =
+            [ HookKind.ReferenceTransaction; HookKind.PrePush ]
+            |> List.map (fun kind -> kind, installOrDiagnose hooksDir kind (shimBody kind))
+
+        match
+            verdicts
+            |> List.tryPick (fun (_, verdict) ->
+                match verdict with
+                | ForeignHook path -> Some(sprintf "%s: foreign hook at %s" IncompleteDiagnosis path)
+                | DiagnoseIncomplete reason -> Some reason
+                | Installed
+                | AlreadyOwned -> None)
+        with
+        | Some error -> Error error
+        | None ->
+            ensureRemoteRefs workspace
+            Ok()
+
     /// Startup-only ensure. There is intentionally no fetch/pull/push here.
     /// Both installed hooks later launch the same standalone FULL converge path.
     let ensure (workspace: string) : Result<unit, string> =
         try
-            let hooksDir = hooksDirectory workspace
-
-            let verdicts =
-                [ HookKind.ReferenceTransaction; HookKind.PrePush ]
-                |> List.map (fun kind -> kind, installOrDiagnose hooksDir kind (shimBody kind))
-
-            match
-                verdicts
-                |> List.tryPick (fun (_, verdict) ->
-                    match verdict with
-                    | ForeignHook path -> Some(sprintf "%s: foreign hook at %s" IncompleteDiagnosis path)
-                    | DiagnoseIncomplete reason -> Some reason
-                    | Installed
-                    | AlreadyOwned -> None)
-            with
-            | Some error -> Error error
-            | None ->
-                for remote in remotes workspace do
-                    ensureRemoteStoreFetchRefspec workspace remote
-
-                Ok()
+            ensureWorkspace workspace
         with ex ->
             Error(sprintf "%s: %s" IncompleteDiagnosis ex.Message)

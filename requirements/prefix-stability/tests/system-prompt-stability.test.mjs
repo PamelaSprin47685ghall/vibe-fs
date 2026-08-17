@@ -43,13 +43,13 @@ test('WHAT[PREFIX-STABILITY-002] PROMPT_019_each_canonical_role_has_one_stable_p
 })
 
 test('WHAT[PREFIX-STABILITY-002] PROMPT_019_effective_agent_changes_by_tier_not_prompt_identity', () => {
-  const managerFast = delegation.vocabulary('Manager', 'Fast', OWNER)
-  const managerDeep = delegation.vocabulary('Manager', 'Deep', OWNER)
-  const reviewerFast = delegation.vocabulary('Reviewer', 'Fast', OWNER)
-  const reviewerDeep = delegation.vocabulary('Reviewer', 'Deep', OWNER)
+  const inspectorFast = delegation.vocabulary('Inspector', 'Fast', OWNER)
+  const inspectorDeep = delegation.vocabulary('Inspector', 'Deep', OWNER)
+  const coderFast = delegation.vocabulary('Coder', 'Fast', OWNER)
+  const coderDeep = delegation.vocabulary('Coder', 'Deep', OWNER)
 
-  assert.notEqual(managerFast.agent, managerDeep.agent)
-  assert.notEqual(reviewerFast.agent, reviewerDeep.agent)
+  assert.notEqual(inspectorFast.agent, inspectorDeep.agent)
+  assert.notEqual(coderFast.agent, coderDeep.agent)
   assert.equal(profile('Manager', 'Fast').systemPromptId, profile('Manager', 'Deep').systemPromptId)
   assert.equal(profile('Reviewer', 'Fast').systemPromptId, profile('Reviewer', 'Deep').systemPromptId)
 })

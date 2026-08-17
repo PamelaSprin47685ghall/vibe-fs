@@ -137,14 +137,62 @@ module RecordWorkflow =
             | None -> return RecordReadiness.Unavailable "canonical LWR is unavailable"
         }
 
+    let private bloggerCoverageCanAdvance (snapshot: ProjectionSet) (bloggerSessionId: SessionId) =
+        match Map.tryFind bloggerSessionId snapshot.AgentProjections.HandleByChildSession with
+        | Some { Lifecycle = HandleLifecycle.Abandoned _ }
+        | Some { Lifecycle = HandleLifecycle.Retired } -> false
+        | _ -> true
+
     let private coverageCanAdvance (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
-        match SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations with
-        | None -> true
-        | Some bloggerSessionId ->
-            match Map.tryFind bloggerSessionId snapshot.AgentProjections.HandleByChildSession with
-            | Some { Lifecycle = HandleLifecycle.Abandoned _ }
-            | Some { Lifecycle = HandleLifecycle.Retired } -> false
-            | _ -> true
+        SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations
+        |> Option.map (bloggerCoverageCanAdvance snapshot)
+        |> Option.defaultValue true
+
+    let private materializeWithCoverage
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (requiresChronicle: bool)
+        : Task<RecordReadiness> =
+        task {
+            match! materialize journal snapshot reviewerSessionId requiresChronicle with
+            | RecordReadiness.Ready record -> return RecordReadiness.Ready record
+            | RecordReadiness.Unavailable _ when coverageCanAdvance snapshot reviewerSessionId ->
+                return RecordReadiness.AwaitJournal
+            | other -> return other
+        }
+
+    let private readinessForGuard
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requiresTerminalFrontier: bool)
+        (guard: ReviewGuardProjection)
+        : Task<RecordReadiness> =
+        task {
+            match guard.CurrentBarrierId = Some barrierId, guard.TerminalFrontier with
+            | false, _ -> return RecordReadiness.Unavailable "review barrier no longer matches the finality member"
+            | true, Some frontier when frontier.BarrierId <> barrierId ->
+                return RecordReadiness.Unavailable "terminal frontier no longer matches the finality barrier"
+            | true, Some _ -> return! materializeWithCoverage journal snapshot reviewerSessionId true
+            | true, None when requiresTerminalFrontier -> return RecordReadiness.AwaitJournal
+            | true, None -> return! materialize journal snapshot reviewerSessionId false
+        }
+
+    let private readinessForSession
+        (journal: AgentJournal)
+        (snapshot: ProjectionSet)
+        (reviewerSessionId: SessionId)
+        (barrierId: ReviewBarrierId)
+        (requiresTerminalFrontier: bool)
+        (session: SessionAgentProjection) =
+        task {
+            match session.ReviewGuard with
+            | None -> return RecordReadiness.Unavailable "review barrier is unavailable"
+            | Some guard ->
+                return! readinessForGuard journal snapshot reviewerSessionId barrierId requiresTerminalFrontier guard
+        }
 
     let readiness
         (journal: AgentJournal)
@@ -157,22 +205,7 @@ module RecordWorkflow =
             match AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections with
             | None -> return RecordReadiness.Unavailable "reviewer projection is unavailable"
             | Some session ->
-                match session.ReviewGuard with
-                | None -> return RecordReadiness.Unavailable "review barrier is unavailable"
-                | Some guard when guard.CurrentBarrierId <> Some barrierId ->
-                    return RecordReadiness.Unavailable "review barrier no longer matches the finality member"
-                | Some guard ->
-                    match guard.TerminalFrontier with
-                    | Some frontier when frontier.BarrierId <> barrierId ->
-                        return RecordReadiness.Unavailable "terminal frontier no longer matches the finality barrier"
-                    | Some _ ->
-                        match! materialize journal snapshot reviewerSessionId true with
-                        | RecordReadiness.Ready record -> return RecordReadiness.Ready record
-                        | RecordReadiness.Unavailable _ when coverageCanAdvance snapshot reviewerSessionId ->
-                            return RecordReadiness.AwaitJournal
-                        | other -> return other
-                    | None when requiresTerminalFrontier -> return RecordReadiness.AwaitJournal
-                    | None -> return! materialize journal snapshot reviewerSessionId false
+                return! readinessForSession journal snapshot reviewerSessionId barrierId requiresTerminalFrontier session
         }
 
     let awaitCanonicalWorkRecord

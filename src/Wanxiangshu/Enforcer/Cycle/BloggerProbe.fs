@@ -200,22 +200,19 @@ module BloggerRecoveryProbe =
 
     let private claimRunCandidate (prefix: string) (suffix: string) (scope: string) (sequence: int) : string option =
         let runLength = scope.Length - prefix.Length - suffix.Length
+        let runStart = min prefix.Length scope.Length
+        let runId = scope.Substring(runStart, max 0 runLength)
 
-        if sequence <= 0 then
-            None
-        elif runLength <= 0 then
-            None
-        elif not (scope.StartsWith(prefix, System.StringComparison.Ordinal)) then
-            None
-        elif not (scope.EndsWith(suffix, System.StringComparison.Ordinal)) then
+        if
+            sequence <= 0
+            || runLength <= 0
+            || not (scope.StartsWith(prefix, System.StringComparison.Ordinal))
+            || not (scope.EndsWith(suffix, System.StringComparison.Ordinal))
+            || System.String.IsNullOrWhiteSpace runId
+        then
             None
         else
-            let runId = scope.Substring(prefix.Length, runLength)
-
-            if System.String.IsNullOrWhiteSpace runId then
-                None
-            else
-                Some runId
+            Some runId
 
     /// When the claimed terminal is absent from the Host snapshot, recover its run id
     /// from the exact request-scoped ClaimSequences shape:

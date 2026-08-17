@@ -84,18 +84,21 @@ module ProviderResources =
         else
             None
 
+    let private requireLanguageResource semanticPath lang =
+        if not (exists lang semanticPath) then
+            raise (
+                InvalidOperationException(
+                    sprintf
+                        "provider resource missing for %s: %s (HOST-026 / ARCH-016 Gate C)"
+                        (ProviderLanguage.label lang)
+                        semanticPath
+                )
+            )
+
     /// ARCH-016 Gate C hook: both locale leaves must exist for a semantic path.
     let requireLanguagePair (semanticPath: string) : unit =
         for lang in [ ProviderLanguage.English; ProviderLanguage.SimplifiedChinese ] do
-            if not (exists lang semanticPath) then
-                raise (
-                    InvalidOperationException(
-                        sprintf
-                            "provider resource missing for %s: %s (HOST-026 / ARCH-016 Gate C)"
-                            (ProviderLanguage.label lang)
-                            semanticPath
-                    )
-                )
+            requireLanguageResource semanticPath lang
 
     /// Layout smoke: provider tree root present.
     let languageRootsPresent () : bool = PackageResources.exists "provider"

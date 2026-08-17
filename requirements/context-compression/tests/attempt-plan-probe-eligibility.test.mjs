@@ -61,6 +61,14 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_armed_work_main_carries_the_probe
   assert.equal(plan.noProbeReason, undefined)
 })
 
+test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_invalid_role_tier_and_kind_fail_closed', () => {
+  for (const input of [{ role: 'unknown' }, { tier: 'unknown' }, { kind: 'unknown' }]) {
+    const result = planner.attemptPlan(input)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /unknown (role|tier|request kind)/)
+  }
+})
+
 test('WHAT[CONTEXT-COMPRESSION-009] CTX_011_a_refused_candidate_falls_back_to_the_committed_epoch_with_a_reason', () => {
   // The ordinary outcome when an armed slot has nothing to work with. The request still
   // goes out; only the reason is recorded, for diagnostics.

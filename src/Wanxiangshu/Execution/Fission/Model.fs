@@ -65,6 +65,11 @@ module FissionPrompt =
 
     /// INTRA-PARTICIPANT-PARALLELISM-002: a line is a lane. Preserve every byte
     /// except newline normalization and one ergonomic trailing LF.
+    let private validateLanePrompts lines =
+        match lines |> List.tryFindIndex String.IsNullOrWhiteSpace with
+        | Some index -> Error(FissionRejectReason.EmptyLanePrompt index)
+        | None -> Ok()
+
     let parse (value: string) : Result<ParsedFissionPrompts, FissionRejectReason> =
         let normalized = normalizeNewlines value
         let lines = normalized.Split('\n') |> Array.toList
@@ -72,12 +77,10 @@ module FissionPrompt =
         if List.length lines < 2 then
             Error FissionRejectReason.TooFewLanes
         else
-            match lines |> List.tryFindIndex String.IsNullOrWhiteSpace with
-            | Some index -> Error(FissionRejectReason.EmptyLanePrompt index)
-            | None ->
-                Ok
-                    { Count = List.length lines
-                      Lanes = lines |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) }
+            validateLanePrompts lines
+            |> Result.map (fun () ->
+                { Count = List.length lines
+                  Lanes = lines |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) })
 
 [<RequireQualifiedAccess>]
 type FissionCompletionAffinity =

@@ -30,6 +30,9 @@ open Wanxiangshu.Strength.Prediction
 /// Typed rather than pre-composed text, because ARCH-010 requires the instruction/data split to be
 /// decided by the producer and not inferred by a renderer: `Assignment` is the task, the other two
 /// are context the child may read but must not mistake for the task.
+/// DSL-state-combination: domain — assignment and optional context/payload are
+/// one immutable fork request; absence means no supplied evidence, never a next
+/// action or lifecycle latch.
 type ForkChildAssignment =
     {
         /// The manager's request. Always present: a fork with no assignment is not a fork.

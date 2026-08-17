@@ -185,6 +185,18 @@ module HorizonTool =
         else
             lines
 
+    let private appendHandleLinesForRoster
+        language
+        journal
+        snapshot
+        runtimeByAgentId
+        agentLines
+        handles =
+        task {
+            for handle in HandleProjection.listable handles do
+                do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
+        }
+
     let private executeWithJournal language (scope: ToolRuntimeScope) context (journal: AgentJournal) =
         task {
             match scope.RuntimeFor context with
@@ -203,9 +215,7 @@ module HorizonTool =
                     agents |> List.map (fun record -> record.AgentId, record) |> Map.ofList
 
                 let agentLines = ResizeArray<string>()
-
-                for handle in HandleProjection.listable durableHandles do
-                    do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
+                do! appendHandleLinesForRoster language journal snapshot runtimeByAgentId agentLines durableHandles
 
                 let agentLines = agentLines |> Seq.toList
 

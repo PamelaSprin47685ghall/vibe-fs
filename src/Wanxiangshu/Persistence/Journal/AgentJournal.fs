@@ -64,6 +64,65 @@ module JournalAppendFailure =
                 rejection.Fact
                 rejection.Reason
 
+module private AgentJournalInternals =
+
+    let applyDerivedSuccessToSession
+        (sessionId: SessionId)
+        (projection: ProjectionSet)
+        (session: SessionAgentProjection) =
+        match session.Fallback with
+        | None -> projection
+        | Some fallback ->
+            let updatedSession =
+                { session with
+                    Fallback = Some(FallbackProjection.recordSuccess fallback) }
+
+            { projection with
+                AgentProjections =
+                    { projection.AgentProjections with
+                        Sessions = Map.add sessionId updatedSession projection.AgentProjections.Sessions } }
+
+    let applyDerivedSuccess (sessionId: SessionId) (projection: ProjectionSet) =
+        match AgentProjection.tryFind sessionId projection.AgentProjections with
+        | None -> projection
+        | Some session -> applyDerivedSuccessToSession sessionId projection session
+
+    let awaitAdvancedChange
+        (lastChange: JournalChange option)
+        (fromRevision: JournalRevision)
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>)
+        : Task<JournalChange> =
+        match lastChange with
+        | Some change -> Task.FromResult change
+        | None ->
+            let tcs = TaskCompletionSource<JournalChange>()
+            waiters.Add(fromRevision, tcs)
+            tcs.Task
+
+    let registerWaiter
+        (fromRevision: JournalRevision)
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>) =
+        let tcs = TaskCompletionSource<JournalChange>()
+        waiters.Add(fromRevision, tcs)
+        tcs.Task
+
+    let partitionWaiters
+        (revision: JournalRevision)
+        (change: JournalChange)
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>) =
+        let ready, kept =
+            waiters
+            |> Seq.toList
+            |> List.partition (fun (subRev, _) -> JournalRevision.isAfter revision subRev)
+
+        ready |> List.map (fun (_, tcs) -> tcs, change), kept
+
+    let notifyWaiters (notify: (TaskCompletionSource<JournalChange> * JournalChange) list) =
+        for tcs, change in notify do
+            AsyncSupport.trySetResult tcs change |> ignore
+
+open AgentJournalInternals
+
 /// The single durable journal for one runtime.
 ///
 /// PERSIST-008: `Snapshot` is integrated state, never a replay. Appending folds
@@ -99,24 +158,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     member this.Snapshot: ProjectionSet =
         lock gate (fun () ->
             derivedFallbackSuccesses
-            |> Set.fold
-                (fun projection sessionId ->
-                    match AgentProjection.tryFind sessionId projection.AgentProjections with
-                    | None -> projection
-                    | Some session ->
-                        match session.Fallback with
-                        | None -> projection
-                        | Some fallback ->
-                            let updatedSession =
-                                { session with
-                                    Fallback = Some(FallbackProjection.recordSuccess fallback) }
-
-                            { projection with
-                                AgentProjections =
-                                    { projection.AgentProjections with
-                                        Sessions =
-                                            Map.add sessionId updatedSession projection.AgentProjections.Sessions } })
-                this.CanonicalProjection)
+            |> Set.fold (fun projection sessionId -> applyDerivedSuccess sessionId projection) this.CanonicalProjection)
 
     /// Current revision under the same gate as Snapshot (Join handshake).
     member _.Revision: JournalRevision = lock gate (fun () -> revision)
@@ -142,19 +184,12 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     member _.AwaitChangeFrom(fromRevision: JournalRevision) : Task<JournalChange> =
         lock gate (fun () ->
             if JournalRevision.isAfter revision fromRevision then
-                match lastChange with
-                | Some change -> Task.FromResult change
-                | None ->
-                    // Revision advanced without a process-local lastChange (boot
-                    // only). Wait for the next successful fold rather than hang
-                    // on a synthetic envelope.
-                    let tcs = TaskCompletionSource<JournalChange>()
-                    waiters.Add(fromRevision, tcs)
-                    tcs.Task
+                // Revision advanced without a process-local lastChange (boot
+                // only). Wait for the next successful fold rather than hang
+                // on a synthetic envelope.
+                awaitAdvancedChange lastChange fromRevision waiters
             else
-                let tcs = TaskCompletionSource<JournalChange>()
-                waiters.Add(fromRevision, tcs)
-                tcs.Task)
+                registerWaiter fromRevision waiters)
 
     /// Append one fact and fold it.
     ///
@@ -209,68 +244,69 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
             | Error err -> return Error err
         }
 
+    member private this.PublishCommitted(envelope: Envelope) =
+        lock gate (fun () ->
+            // The EventStore append already validated and committed the
+            // canonical Integrator transition. AgentJournal only observes
+            // Current and publishes its process-local revision wake.
+            let updated = this.Snapshot
+            revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
+
+            let change =
+                { Revision = revision
+                  Envelope = envelope }
+
+            lastChange <- Some change
+            let ready, kept = partitionWaiters revision change waiters
+            waiters.Clear()
+
+            for item in kept do
+                waiters.Add item
+
+            (updated, envelope), ready)
+
+    member private this.AppendAndPublish
+        (stream: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: Fact)
+        : Task<Result<(ProjectionSet * Envelope) * (TaskCompletionSource<JournalChange> * JournalChange) list, JournalAppendFailure>> =
+        task {
+            let! appended = writer.Append stream providerRun fact
+
+            match appended with
+            | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure))
+            | Rejected(eventId, reason) ->
+                let failure =
+                    FactRejected(
+                        eventId,
+                        { Fact = "semantic-cut"
+                          Reason = reason }
+                    )
+
+                // A durable cut-tail makes the history recoverable; it does
+                // NOT make the current in-memory runtime trustworthy. The
+                // exact bug class that produced the cut may already have
+                // mutated process-local ownership, caches or pending tasks.
+                // Kill now rather than letting a caller downgrade this to a
+                // tool consequence and continue emitting effects.
+                FatalProcess.trip "journal-semantic-cut" (JournalAppendFailure.describe failure)
+                return Error failure
+            | Committed envelope -> return Ok(this.PublishCommitted envelope)
+        }
+
     member private this.AppendEnvelope
         (stream: StreamId)
         (providerRun: ProviderRunIdentity option)
         (fact: Fact)
         : Task<Result<ProjectionSet * Envelope, JournalAppendFailure>> =
         task {
-            let! result, notify =
-                task {
-                    match! writer.Append stream providerRun fact with
-                    | CommitUnknown(eventId, failure) -> return Error(WriteUnknown(eventId, failure)), []
-                    | Rejected(eventId, reason) ->
-                        let failure =
-                            FactRejected(
-                                eventId,
-                                { Fact = "semantic-cut"
-                                  Reason = reason }
-                            )
+            let! result = this.AppendAndPublish stream providerRun fact
 
-                        // A durable cut-tail makes the history recoverable; it does
-                        // NOT make the current in-memory runtime trustworthy. The
-                        // exact bug class that produced the cut may already have
-                        // mutated process-local ownership, caches or pending tasks.
-                        // Kill now rather than letting a caller downgrade this to a
-                        // tool consequence and continue emitting effects.
-                        FatalProcess.trip "journal-semantic-cut" (JournalAppendFailure.describe failure)
-                        return Error failure, []
-                    | Committed envelope ->
-                        return
-                            lock gate (fun () ->
-                                // The EventStore append already validated and committed the
-                                // canonical Integrator transition. AgentJournal only observes
-                                // Current and publishes its process-local revision wake.
-                                let updated = this.Snapshot
-                                revision <- JournalRevision.create (LocalSeq.value envelope.LocalSeq)
-
-                                let change =
-                                    { Revision = revision
-                                      Envelope = envelope }
-
-                                lastChange <- Some change
-
-                                let ready = ResizeArray<TaskCompletionSource<JournalChange> * JournalChange>()
-                                let kept = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
-
-                                for subRev, tcs in waiters do
-                                    if JournalRevision.isAfter revision subRev then
-                                        ready.Add(tcs, change)
-                                    else
-                                        kept.Add(subRev, tcs)
-
-                                waiters.Clear()
-
-                                for item in kept do
-                                    waiters.Add item
-
-                                Ok(updated, envelope), List.ofSeq ready)
-                }
-
-            for tcs, change in notify do
-                AsyncSupport.trySetResult tcs change |> ignore
-
-            return result
+            match result with
+            | Error failure -> return Error failure
+            | Ok((updated, envelope), notify) ->
+                notifyWaiters notify
+                return Ok(updated, envelope)
         }
 
     interface IDisposable with

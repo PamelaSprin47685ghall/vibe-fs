@@ -35,23 +35,27 @@ module CasebookDraftStore =
     let private drafts = Dictionary<string, CasebookDraft>()
     let private gate = obj ()
 
+    let private updateQuestion draft q =
+        match List.rev draft.Turns with
+        | last :: earlier when last.A.IsNone ->
+            { Turns = List.rev ({ last with Q = q } :: earlier) }
+        | _ -> { Turns = draft.Turns @ [ { Q = q; A = None } ] }
+
+    let private updateAnswer draft a =
+        match List.rev draft.Turns with
+        | last :: earlier -> { Turns = List.rev ({ last with A = Some a } :: earlier) }
+        | [] -> { Turns = [ { Q = ""; A = Some a } ] }
+
     let setQ (sessionId: string) (q: string) =
         lock gate (fun () ->
             match drafts.TryGetValue sessionId with
-            | true, draft ->
-                match List.rev draft.Turns with
-                | last :: earlier when last.A.IsNone ->
-                    drafts.[sessionId] <- { Turns = List.rev ({ last with Q = q } :: earlier) }
-                | _ -> drafts.[sessionId] <- { Turns = draft.Turns @ [ { Q = q; A = None } ] }
+            | true, draft -> drafts.[sessionId] <- updateQuestion draft q
             | false, _ -> drafts.[sessionId] <- { Turns = [ { Q = q; A = None } ] })
 
     let setA (sessionId: string) (a: string) =
         lock gate (fun () ->
             match drafts.TryGetValue sessionId with
-            | true, draft ->
-                match List.rev draft.Turns with
-                | last :: earlier -> drafts.[sessionId] <- { Turns = List.rev ({ last with A = Some a } :: earlier) }
-                | [] -> drafts.[sessionId] <- { Turns = [ { Q = ""; A = Some a } ] }
+            | true, draft -> drafts.[sessionId] <- updateAnswer draft a
             | false, _ -> drafts.[sessionId] <- { Turns = [ { Q = ""; A = Some a } ] })
 
     let tryTake (sessionId: string) : CasebookDraft option =

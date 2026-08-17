@@ -43,35 +43,40 @@ type WorktreeResource
     member _.Identity = identity
     member _.MarkDurable() = releaseOnDispose <- false
 
-    member _.Release() =
+    member private _.ReleaseOutcome worktree branchResult =
+        match worktree, branchResult with
+        | Ok(), Ok() ->
+            released <- true
+            Ok()
+        | Error left, Error right -> Error(sprintf "worktree=%s; branch=%s" left right)
+        | Error error, _ -> Error("worktree=" + error)
+        | _, Error error -> Error("branch=" + error)
+
+    member this.Release() =
         task {
             if released then
                 return Ok()
             else
                 let! worktree = git.RemoveWorktree path
                 let! branchResult = git.DeleteBranch identity
-
-                match worktree, branchResult with
-                | Ok(), Ok() ->
-                    released <- true
-                    return Ok()
-                | Error left, Error right -> return Error(sprintf "worktree=%s; branch=%s" left right)
-                | Error error, _ -> return Error("worktree=" + error)
-                | _, Error error -> return Error("branch=" + error)
+                return this.ReleaseOutcome worktree branchResult
         }
+
+    member private this.DisposeRelease() =
+        WorktreeDisposal.asValueTask (
+            task {
+                try
+                    let! _ = this.Release()
+                    ()
+                with _ ->
+                    ()
+            }
+        )
 
     interface IAsyncDisposable with
         member this.DisposeAsync() =
             if releaseOnDispose then
-                WorktreeDisposal.asValueTask (
-                    task {
-                        try
-                            let! _ = this.Release()
-                            ()
-                        with _ ->
-                            ()
-                    }
-                )
+                this.DisposeRelease()
             else
                 WorktreeDisposal.asValueTask (AsyncSupport.completedTask ())
 
@@ -156,13 +161,15 @@ module WorktreeCommands =
             return outcome code stdout stderr
         }
 
+    let private finishWorktree acc currentPath currentBranch =
+        match currentPath with
+        | Some path -> List.rev ((path, currentBranch) :: acc)
+        | None -> List.rev acc
+
     let private parseList lines =
         let rec loop acc currentPath currentBranch rest =
             match rest with
-            | [] ->
-                match currentPath with
-                | Some path -> List.rev ((path, currentBranch) :: acc)
-                | None -> List.rev acc
+            | [] -> finishWorktree acc currentPath currentBranch
             | "" :: tail ->
                 let next =
                     currentPath |> Option.map (fun path -> path, currentBranch) |> Option.toList

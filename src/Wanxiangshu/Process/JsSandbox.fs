@@ -138,6 +138,18 @@ module JsSandbox =
     /// `deadlineMs` bounds the synchronous segment via the vm timeout; the
     /// injected proxy bounds async segments. `outputBoundBytes` bounds the
     /// serialized result (JS-054.2).
+    let private decodeRunResult (json: string) (outputBoundBytes: int) : Result<string, JsFailure> =
+        if json.StartsWith hostFailedPrefix then
+            Error(decodeHostFailed json)
+        elif json.StartsWith failedPrefix then
+            Error(decodeProgramFailed json)
+        elif json.StartsWith invalidReturnPrefix then
+            Error JsFailure.InvalidReturnValue
+        elif json.Length > outputBoundBytes then
+            Error(JsFailure.ResultTooLarge None)
+        else
+            Ok json
+
     let run
         (wrappedSource: string)
         (api: obj)
@@ -147,22 +159,9 @@ module JsSandbox =
         task {
             try
                 let context = createContext (createObj [ "api" ==> api ])
-
-                let promise =
-                    runInContext wrappedSource context (createObj [ "timeout" ==> deadlineMs ])
-
+                let promise = runInContext wrappedSource context (createObj [ "timeout" ==> deadlineMs ])
                 let! json = promise :?> Task<string>
-
-                if json.StartsWith hostFailedPrefix then
-                    return Error(decodeHostFailed json)
-                elif json.StartsWith failedPrefix then
-                    return Error(decodeProgramFailed json)
-                elif json.StartsWith invalidReturnPrefix then
-                    return Error JsFailure.InvalidReturnValue
-                elif json.Length > outputBoundBytes then
-                    return Error(JsFailure.ResultTooLarge None)
-                else
-                    return Ok json
+                return decodeRunResult json outputBoundBytes
             with ex ->
                 return Error(classifySyncError ex)
         }

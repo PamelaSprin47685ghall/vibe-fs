@@ -84,27 +84,81 @@ module MagicTodoHostCodec =
     [<Emit("JSON.parse($0)")>]
     let private parseJson (json: string) : obj = jsNative
 
+    let private nonEmptyNameOrText (field: string) (text: string) : Result<string, string> =
+        if field = "name" && String.IsNullOrWhiteSpace text then
+            Error "todowrite obligation.name must be a non-empty string"
+        else
+            Ok text
+
+    let private requiredTextValue (field: string) (value: obj) : Result<string, string> =
+        if isString value then
+            nonEmptyNameOrText field (unbox<string> value)
+        else
+            Error(sprintf "todowrite.%s must be a string" field)
+
     let private requiredText (row: obj) (field: string) : Result<string, string> =
         if isNull row || isNull row?(field) then
             Error(sprintf "todowrite obligation item requires field '%s'" field)
         else
-            let value = row?(field)
-
-            if isString value then
-                let text = unbox<string> value
-
-                if field = "name" && String.IsNullOrWhiteSpace text then
-                    Error "todowrite obligation.name must be a non-empty string"
-                else
-                    Ok text
-            else
-                Error(sprintf "todowrite.%s must be a string" field)
+            requiredTextValue field (row?(field))
 
     let private decodeObligationRow (row: obj) : Result<MagicTodo.Obligation, string> =
         match requiredText row "name", requiredText row "work" with
         | Ok name, Ok work -> Ok { Name = name; Work = work }
         | Error error, _
         | _, Error error -> Error error
+
+    let private finalizeDecoded
+        (args: obj)
+        (workingOn: string)
+        (acc: MagicTodo.Obligation list) : Result<MagicTodo.TodoWriteInput, string> =
+        let obligations = List.rev acc
+
+        match MagicTodo.validateWorkingOn workingOn obligations with
+        | Error(MagicTodo.WorkingOnValidationError.MustBeEmptyForEmptyAccount actual) ->
+            Error(sprintf "todowrite.workingOn must be empty when obligations is empty; got '%s'" actual)
+        | Error(MagicTodo.WorkingOnValidationError.MustMatchObligationName actual) ->
+            Error(sprintf "todowrite.workingOn must match an obligation name; got '%s'" actual)
+        | Ok() ->
+            let decoded: MagicTodo.TodoWriteInput =
+                { PlanComplete = unbox<bool> args?planComplete
+                  WorkingOn = workingOn
+                  Obligations = obligations }
+
+            Ok decoded
+
+    let rec private decodeRows
+        (args: obj)
+        (workingOn: string)
+        (remaining: obj list)
+        (acc: MagicTodo.Obligation list)
+        (seen: Set<string>) : Result<MagicTodo.TodoWriteInput, string> =
+        match remaining with
+        | [] -> finalizeDecoded args workingOn acc
+        | row :: tail -> decodeNextRow args workingOn tail acc seen row
+
+    and private decodeNextRow
+        (args: obj)
+        (workingOn: string)
+        (tail: obj list)
+        (acc: MagicTodo.Obligation list)
+        (seen: Set<string>)
+        (row: obj) =
+        match decodeObligationRow row with
+        | Error error -> Error error
+        | Ok obligation -> decodeRowWithUniqueness args workingOn tail acc seen obligation
+
+    and private decodeRowWithUniqueness
+        (args: obj)
+        (workingOn: string)
+        (tail: obj list)
+        (acc: MagicTodo.Obligation list)
+        (seen: Set<string>)
+        (obligation: MagicTodo.Obligation) =
+        if Set.contains obligation.Name seen then
+            Error(sprintf "todowrite duplicate obligation name '%s'" obligation.Name)
+        else
+            decodeRows args workingOn tail (obligation :: acc) (Set.add obligation.Name seen)
 
     let tryDecodeInput (args: obj) : Result<MagicTodo.TodoWriteInput, string> =
         if isNull args || isNull args?planComplete then
@@ -123,33 +177,7 @@ module MagicTodoHostCodec =
             let workingOn = unbox<string> args?workingOn
             let rows = unbox<obj array> args?obligations
 
-            let rec decode remaining acc seen =
-                match remaining with
-                | [] ->
-                    let obligations = List.rev acc
-
-                    match MagicTodo.validateWorkingOn workingOn obligations with
-                    | Error(MagicTodo.WorkingOnValidationError.MustBeEmptyForEmptyAccount actual) ->
-                        Error(sprintf "todowrite.workingOn must be empty when obligations is empty; got '%s'" actual)
-                    | Error(MagicTodo.WorkingOnValidationError.MustMatchObligationName actual) ->
-                        Error(sprintf "todowrite.workingOn must match an obligation name; got '%s'" actual)
-                    | Ok() ->
-                        let decoded: MagicTodo.TodoWriteInput =
-                            { PlanComplete = unbox<bool> args?planComplete
-                              WorkingOn = workingOn
-                              Obligations = obligations }
-
-                        Ok decoded
-                | row :: tail ->
-                    match decodeObligationRow row with
-                    | Error error -> Error error
-                    | Ok obligation ->
-                        if Set.contains obligation.Name seen then
-                            Error(sprintf "todowrite duplicate obligation name '%s'" obligation.Name)
-                        else
-                            decode tail (obligation :: acc) (Set.add obligation.Name seen)
-
-            decode (Array.toList rows) [] Set.empty
+            decodeRows args workingOn (Array.toList rows) [] Set.empty
 
     let canonicalInput (args: obj) : string = CanonicalJson.canonicalJson args
 

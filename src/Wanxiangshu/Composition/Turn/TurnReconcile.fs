@@ -65,12 +65,21 @@ module TurnReconcile =
             | head :: tail when head.Id = userAddress -> Some tail
             | _ :: tail -> skipUntilUser tail
 
-        match skipUntilUser messages with
-        | None -> None
-        | Some afterUser ->
-            afterUser
-            |> List.filter (fun message -> message.Role = "assistant")
-            |> List.tryLast
+        skipUntilUser messages
+        |> Option.map (List.filter (fun message -> message.Role = "assistant"))
+        |> Option.bind List.tryLast
+
+    let private resolveAssistant
+        (messages: SessionMessage list)
+        (root: string)
+        (physical: string)
+        =
+        findAssistantAfter messages physical
+        |> Option.orElseWith (fun () ->
+            if physical = root then
+                None
+            else
+                findAssistantAfter messages root)
 
     /// Reconcile a full snapshot against an active run binding.
     ///
@@ -83,14 +92,12 @@ module TurnReconcile =
     /// `PhysicalUserMessageId`, because PROMPT-002 makes the promotion one-way and
     /// there is deliberately no inverse.
     let reconcile (messages: SessionMessage list) (binding: ActiveRunBinding) : ReconciledTurn option =
-        match binding.AuthorityRootUserMessageId with
-        | None -> None
-        | Some declaredRootId ->
+        binding.AuthorityRootUserMessageId
+        |> Option.bind (fun declaredRootId ->
             let declaredRoot = AuthorityRootUserMessageId.value declaredRootId
 
-            match resolveRoot messages declaredRoot with
-            | None -> None
-            | Some root ->
+            resolveRoot messages declaredRoot
+            |> Option.bind (fun root ->
                 let declaredPhysical =
                     binding.PhysicalUserMessageId
                     |> Option.map PhysicalUserMessageId.value
@@ -99,28 +106,14 @@ module TurnReconcile =
                 let declaredPhysicalIsContinuationUser =
                     binding.ContinuationMessageIds.Contains declaredPhysical
 
-                match
-                    resolvePhysical messages declaredRoot root declaredPhysical declaredPhysicalIsContinuationUser
-                with
-                | None -> None
-                | Some physical ->
-                    let assistant =
-                        findAssistantAfter messages physical
-                        |> Option.orElseWith (fun () ->
-                            if physical = root then
-                                None
-                            else
-                                findAssistantAfter messages root)
-
-                    match assistant with
-                    | None -> None
-                    | Some assistant ->
-                        Some(
-                            CompletedTurnClassifier.buildTurn
-                                binding.SessionId
-                                (PhysicalUserMessageId.create physical)
-                                (AuthorityRootUserMessageId.create root)
-                                assistant
-                                binding.Role
-                                binding.Directory
-                        )
+                resolvePhysical messages declaredRoot root declaredPhysical declaredPhysicalIsContinuationUser
+                |> Option.bind (fun physical ->
+                    resolveAssistant messages root physical
+                    |> Option.map (fun assistant ->
+                        CompletedTurnClassifier.buildTurn
+                            binding.SessionId
+                            (PhysicalUserMessageId.create physical)
+                            (AuthorityRootUserMessageId.create root)
+                            assistant
+                            binding.Role
+                            binding.Directory))))

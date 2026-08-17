@@ -60,6 +60,9 @@ type BloggerCompletion =
       NextCoverableTurnCutoffExclusive: int
       NextCoveredPrefixDigest: string }
 
+/// DSL-state-combination: domain — this durable Companion projection combines
+/// frame history, optional effective text, session identity and XTrace evidence;
+/// none of these fields is a process continuation cursor.
 type CompanionMemory =
     {
         Blog: BlogProjectionState

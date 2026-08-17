@@ -29,25 +29,46 @@ module HostSignalSubscribe =
         { IsConnected = true
           ReconnectAttempts = 0 }
 
+    let private subscribeValue events listen onSignalEvent =
+        let callback = box onSignalEvent
+        let subscription = listen?call (events, callback)
+
+        if isNull subscription then
+            Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned no subscription"
+        else
+            Ok
+                { Health = alwaysHealthy
+                  Dispose = fun () -> invokeDisposer subscription }
+
+    let private trySubscribeValue events listen onSignalEvent =
+        try
+            subscribeValue events listen onSignalEvent
+        with ex ->
+            Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
+
     let private subscribeListen (events: obj) (onSignalEvent: obj -> unit) : Result<HostSignalSubscription, string> =
         let listen = events?listen
 
         if isNull listen then
             Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen unavailable"
         else
-            try
-                let callback = box onSignalEvent
+            trySubscribeValue events listen onSignalEvent
 
-                let subscription = listen?call (events, callback)
+    let private clientEvents client =
+        if not (isNull client) && not (isNull client?events) then Some client?events else None
 
-                if isNull subscription then
-                    Error "OPENCODE-SIGNAL-SUBSCRIBE: events.listen returned no subscription"
-                else
-                    Ok
-                        { Health = alwaysHealthy
-                          Dispose = fun () -> invokeDisposer subscription }
-            with ex ->
-                Error(sprintf "OPENCODE-SIGNAL-SUBSCRIBE: %s" ex.Message)
+    let private listenTargetFromInput input =
+        if not (isNull input?events) then Some input?events else clientEvents input?client
+
+    let private listenTarget input =
+        if isNull input then None else listenTargetFromInput input
+
+    let private subscribeTarget events onSignalEvent =
+        match subscribeListen events onSignalEvent with
+        | Ok localSub -> Ok(Some localSub, "events.listen")
+        | Error localError ->
+            Diagnostic.fatal "signal-subscribe-failed" [ "result", localError ]
+            Error localError
 
     let trySubscribe
         (input: obj)
@@ -55,26 +76,7 @@ module HostSignalSubscribe =
         (_timerPort: ITimerPort option)
         : Task<Result<HostSignalSubscription option * string, string>> =
         task {
-            let listenTarget =
-                if isNull input then
-                    None
-                elif not (isNull input?events) then
-                    Some input?events
-                else
-                    let client = input?client
-
-                    if not (isNull client) && not (isNull client?events) then
-                        Some client?events
-                    else
-                        None
-
-            match listenTarget with
-            | Some events ->
-                match subscribeListen events onSignalEvent with
-                | Ok localSub -> return Ok(Some localSub, "events.listen")
-                | Error localError ->
-                    Diagnostic.fatal "signal-subscribe-failed" [ "result", localError ]
-                    return Error localError
-
+            match listenTarget input with
+            | Some events -> return subscribeTarget events onSignalEvent
             | None -> return Ok(None, "local-event-hook")
         }

@@ -213,17 +213,13 @@ module JsGlobFs =
                 raw
 
         let trimmed = line.Trim()
+        let negated = trimmed.StartsWith("!")
+        let body = if negated then trimmed.Substring(1) else trimmed
 
-        if trimmed = "" || trimmed.StartsWith("#") then
+        if trimmed = "" || trimmed.StartsWith("#") || body = "" then
             None
         else
-            let negated = trimmed.StartsWith("!")
-            let body = if negated then trimmed.Substring(1) else trimmed
-
-            if body = "" then
-                None
-            else
-                parseIgnoreBody baseRel negated body
+            parseIgnoreBody baseRel negated body
 
     let private loadIgnoreFile (filePath: string) (baseRel: string) : IgnoreRule list =
         match JsUtf8Fs.readUtf8 filePath with

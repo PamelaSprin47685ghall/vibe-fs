@@ -15,6 +15,9 @@ type SessionBindingIntent =
     | Preserve
     | ExplicitExecutionOverride
 
+/// DSL-state-combination: physical — optional host/provider request fields
+/// are one OpenCode boundary payload; BindingIntent is transport policy, not a
+/// business execution state.
 type OpenCodePromptOptions =
     {
         Model: OpencodeModel option
@@ -144,16 +147,12 @@ module OpenCodePort =
         else
             Fable.Core.JS.JSON.parse body
 
-    let private tryWorkDirectory (input: obj) =
-        if isNull input || isNull input?directory then
-            None
-        else
-            let directory = unbox<string> input?directory
+    let private tryNonBlankDirectory (input: obj) =
+        let directory = unbox<string> input?directory
+        if String.IsNullOrWhiteSpace directory then None else Some directory
 
-            if String.IsNullOrWhiteSpace directory then
-                None
-            else
-                Some directory
+    let private tryWorkDirectory (input: obj) =
+        if isNull input || isNull input?directory then None else tryNonBlankDirectory input
 
     let private readResponseTextSafe (response: obj) : Task<string> =
         task {

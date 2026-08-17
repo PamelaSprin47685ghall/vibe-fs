@@ -12,7 +12,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { assertJsData, assertOpaque, isJsData } from '../../verification-system/tests/support/js-contract.mjs'
-import { validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
+import { isBuildVerificationOnlyBaseline, run as runBoundaryGate } from '../../../scripts/checks/js-boundary-gate.mjs'
+import { usesSurface, validateSurfaceManifest } from '../../../scripts/checks/js-surface-manifest.mjs'
 import {
   BUILD_VERIFICATION_FILES,
   SURFACE_MANIFEST,
@@ -56,13 +57,23 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_fro
   }
 
   assert.deepEqual(excess, [], `forbidden patterns beyond the approved migration ledger must be absent: ${excess.join('; ')}`)
-  if (!existsSync(baselinePath)) assert.deepEqual(actual, {}, 'the ledger may disappear only after absolute zero')
+  if (!existsSync(baselinePath)) {
+    assert.deepEqual(actual, {}, 'the ledger may disappear only after absolute zero')
+  } else if (Object.keys(actual).length === 0) {
+    assert.equal(
+      isBuildVerificationOnlyBaseline(baseline),
+      true,
+      'zero semantic debt requires a deleted ledger or explicit build-verification exemptions',
+    )
+  }
 })
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_scanned', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-semantic-zone-'))
-  const fixturePath = join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', 'zone-probe.mjs')
-  mkdirSync(dirname(fixturePath), { recursive: true })
+  const fixturePaths = ['zone-probe.mjs', 'zone-probe.js'].map((name) =>
+    join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', name),
+  )
+  mkdirSync(dirname(fixturePaths[0]), { recursive: true })
   const entriesCall = ['Object.', 'entries'].join('')
   const fixtureSource = [
     'import { leak } ',
@@ -76,23 +87,51 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002c_whole_semantic_test_zone_is_
   ].join('')
 
   try {
-    writeFileSync(fixturePath, fixtureSource)
+    for (const fixturePath of fixturePaths) writeFileSync(fixturePath, fixtureSource)
     const scanned = scanAll(join(temporaryRoot, 'requirements'))
-    const hits = scanned[relativePath(fixturePath)]
-    assert.ok(hits && hits.length > 0, `generated support fixture must be scanned: ${JSON.stringify(scanned)}`)
-    assert.ok(hits.some((hit) => hit.rule === 'deep-dist-import'), 'generated fixture must report its internal import')
-    assert.ok(hits.some((hit) => hit.rule === 'du-shape'), 'generated fixture must report its representation access')
-    const discoveryHits = hits.filter((hit) => hit.rule === 'export-discovery' || hit.rule === 'mangled-lookup')
-    assert.ok(
-      discoveryHits.length >= 2,
-      'generated fixture must report emitted-name discovery and both mangled prefix/suffix lookups',
-    )
+    for (const fixturePath of fixturePaths) {
+      const hits = scanned[relativePath(fixturePath)]
+      assert.ok(hits && hits.length > 0, `generated support fixture must be scanned: ${JSON.stringify(scanned)}`)
+      assert.ok(hits.some((hit) => hit.rule === 'deep-dist-import'), 'generated fixture must report its internal import')
+      assert.ok(hits.some((hit) => hit.rule === 'du-shape'), 'generated fixture must report its representation access')
+      const discoveryHits = hits.filter((hit) => hit.rule === 'export-discovery' || hit.rule === 'mangled-lookup')
+      assert.ok(
+        discoveryHits.length >= 2,
+        'generated fixture must report emitted-name discovery and both mangled prefix/suffix lookups',
+      )
+    }
   } finally {
     rmSync(temporaryRoot, { recursive: true, force: true })
   }
 })
 
-// ── 003: law → owner → source → compiled surface → contract evidence ────────
+test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002d_zero-debt_generate_removes_empty_ledger', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-boundary-ledger-'))
+  const baselinePath = join(temporaryRoot, 'js-boundary-baseline.json')
+  try {
+    writeFileSync(baselinePath, '{}\n')
+    assert.equal(runBoundaryGate({ args: ['--generate', `--out=${baselinePath}`], root: ROOT }), 0)
+    assert.equal(existsSync(baselinePath), false)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002e_build-verification_ledger_exemption_survives_zero-debt_cleanup', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-boundary-exemption-'))
+  const baselinePath = join(temporaryRoot, 'js-boundary-baseline.json')
+  const exemption = { [BUILD_VERIFICATION_FILES.values().next().value]: { 'fable-modules': 1 } }
+  try {
+    writeFileSync(baselinePath, `${JSON.stringify(exemption)}\n`)
+    assert.equal(runBoundaryGate({ args: ['--generate', `--out=${baselinePath}`], root: ROOT }), 0)
+    assert.deepEqual(JSON.parse(readFileSync(baselinePath, 'utf8')), exemption)
+    assert.equal(runBoundaryGate({ args: [`--out=${baselinePath}`], root: ROOT }), 0)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
+// ── 003: law → owner → surface → compiled surface → contract evidence ────────
 
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry', () => {
   const failures = validateSurfaceManifest(SURFACE_MANIFEST, ROOT)
@@ -106,6 +145,45 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_every_registered_surface_has_
 
 test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree', () => {
   assert.deepEqual(validateSurfaceManifest(SURFACE_MANIFEST, ROOT), [])
+})
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_unauthorized_evidence', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-manifest-'))
+  const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
+  const ownerProof = join(temporaryRoot, 'requirements', 'owner', 'PROOF.md')
+  const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
+  const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
+  const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
+  const testFile = join(temporaryRoot, 'requirements', 'owner', 'tests', 'surface.test.mjs')
+  mkdirSync(dirname(ownerWhat), { recursive: true })
+  mkdirSync(dirname(source), { recursive: true })
+  mkdirSync(dirname(dist), { recursive: true })
+  mkdirSync(dirname(testFile), { recursive: true })
+
+  try {
+    writeFileSync(ownerWhat, '# OWNER-001\n')
+    writeFileSync(ownerProof, '| OWNER-001 | executable evidence |\n')
+    writeFileSync(source, 'module Owner.Surface\n')
+    writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
+    writeFileSync(dist, 'export const value = 1\n')
+    writeFileSync(testFile, ['import * as surface ', 'from ', "'../../../dist/Owner/Surface.js'\nvoid surface\n"].join(''))
+    const entry = {
+      module: 'Owner/Surface.js',
+      owner: 'owner',
+      laws: ['OWNER-001'],
+      source: 'src/Wanxiangshu/Owner/Surface.fs',
+      representation: 'json',
+      kind: 'pure',
+    }
+
+    assert.equal(usesSurface(readFileSync(testFile, 'utf8'), entry.module), true)
+    assert.match(validateSurfaceManifest([entry], temporaryRoot).join('\n'), /no active contract test WHAT law authorizes/)
+
+    rmSync(dist)
+    assert.match(validateSurfaceManifest([entry], temporaryRoot).join('\n'), /missing emitted surface/)
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
 })
 
 // ── 004: a debt-bearing helper is not a new direct test subject ─────────────

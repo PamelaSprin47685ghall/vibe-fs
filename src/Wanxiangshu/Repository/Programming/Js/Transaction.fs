@@ -84,19 +84,23 @@ module JsTransaction =
     /// JS-014: a rewrite whose original text no longer matches the current
     /// file content is a conflict; no implicit retry. Create targets have no
     /// freshness constraint (they must be absent — enforced by validateTargets).
+    let private rewriteFreshness (readCurrent: string -> string option) path originalText =
+        if readCurrent path = Some originalText then
+            None
+        else
+            Some(JsFailure.FileChanged path)
+
+    let private freshnessFailure (readCurrent: string -> string option) mutation =
+        match mutation with
+        | JsStagedMutation.Rewrite(path, originalText, _) -> rewriteFreshness readCurrent path originalText
+        | JsStagedMutation.Create _ -> None
+
     let validateFreshness
         (readCurrent: string -> string option)
         (mutations: JsStagedMutation list)
         : Result<unit, JsFailure> =
         mutations
-        |> List.tryPick (fun mutation ->
-            match mutation with
-            | JsStagedMutation.Rewrite(path, originalText, _) ->
-                if readCurrent path = Some originalText then
-                    None
-                else
-                    Some(JsFailure.FileChanged path)
-            | JsStagedMutation.Create _ -> None)
+        |> List.tryPick (freshnessFailure readCurrent)
         |> function
             | Some failure -> Error failure
             | None -> Ok()

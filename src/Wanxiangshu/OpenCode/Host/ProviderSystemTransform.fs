@@ -134,26 +134,48 @@ module ProviderSystemTransform =
         system
         |> Array.map (fun text -> if canonical text = expected then nextPrompt else text)
 
+    let private sessionTransformInput (input: obj) (output: obj) =
+        if
+            not (isNull input)
+            && not (isNull output)
+            && not (isNull input?sessionID)
+            && not (String.IsNullOrWhiteSpace(string input?sessionID))
+            && not (isNull output?system)
+        then
+            Some(string input?sessionID, unbox<string array> output?system)
+        else
+            None
+
+    let private replaceBookkeeperSystem lang sessionText output system =
+        if BookkeeperRuntime.isAttached sessionText then
+            let oldPrompt = PromptResources.loadBookkeeperSystemFor ProviderLanguage.English
+            let nextPrompt = PromptResources.loadBookkeeperSystemFor lang
+            output?system <- replaceOwnedSegment oldPrompt nextPrompt system
+            true
+        else
+            false
+
+    let private replaceRoleSystem journal sid lang output system =
+        match roleFor journal sid with
+        | None -> ()
+        | Some role ->
+            let oldPrompt = catalogPrompt (RuntimeResources.current().Prompts) role
+            let nextPrompt = localizedRolePrompt lang role
+            output?system <- replaceOwnedSegment oldPrompt nextPrompt system
+
+    let private transformSystem journal sessionText output system =
+        let sid = SessionId.create sessionText
+        let lang = ProviderLanguageBinding.ensureRoot sid
+
+        if replaceBookkeeperSystem lang sessionText output system then
+            ()
+        else
+            replaceRoleSystem journal sid lang output system
+
     let create (journal: AgentJournal option) : obj -> obj -> Task<unit> =
         fun input output ->
             task {
-                if not (isNull input) && not (isNull output) && not (isNull input?sessionID) then
-                    let sessionText = string input?sessionID
-
-                    if not (String.IsNullOrWhiteSpace sessionText) && not (isNull output?system) then
-                        let sid = SessionId.create sessionText
-                        let lang = ProviderLanguageBinding.ensureRoot sid
-                        let system: string array = unbox output?system
-
-                        if BookkeeperRuntime.isAttached sessionText then
-                            let oldPrompt = PromptResources.loadBookkeeperSystemFor ProviderLanguage.English
-                            let nextPrompt = PromptResources.loadBookkeeperSystemFor lang
-                            output?system <- replaceOwnedSegment oldPrompt nextPrompt system
-                        else
-                            match roleFor journal sid with
-                            | None -> ()
-                            | Some role ->
-                                let oldPrompt = catalogPrompt (RuntimeResources.current().Prompts) role
-                                let nextPrompt = localizedRolePrompt lang role
-                                output?system <- replaceOwnedSegment oldPrompt nextPrompt system
+                match sessionTransformInput input output with
+                | None -> ()
+                | Some(sessionText, system) -> transformSystem journal sessionText output system
             }

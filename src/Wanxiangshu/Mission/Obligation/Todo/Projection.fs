@@ -74,6 +74,9 @@ module MagicTodoProjection =
           ReviewerSessionId: SessionId }
 
     /// Per-Life Magic Todo derived view.
+    /// DSL-state-combination: domain — checkpoint locators and optional reviewer
+    /// state are durable event-integral evidence; each records facts already
+    /// observed and none selects the next workflow step.
     type LifeMagicTodoState =
         {
             LifeId: ManagerLifeId

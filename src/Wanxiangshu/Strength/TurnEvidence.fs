@@ -94,6 +94,15 @@ module StrengthTurnEvidence =
             StrengthPrimarySymbol.TextOnly
         | [] -> StrengthPrimarySymbol.Other
 
+    let private promoteOutcome targetProviderRun turn =
+        match turn.Outcome with
+        | ReconcileProgram.TurnCompleted
+        | ReconcileProgram.TurnNeedsContinuation _ ->
+            StrengthPromotion.decide targetProviderRun turn.ProviderRun (classifyParts turn.Parts)
+        | ReconcileProgram.TurnFailed _
+        | ReconcileProgram.TurnAborted _
+        | ReconcileProgram.TurnInProgress -> StrengthPromotionDecision.AwaitOrAbandon
+
     let promotionDecision
         (targetProviderRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
         (turn: ReconciledTurn)
@@ -101,10 +110,4 @@ module StrengthTurnEvidence =
         if targetProviderRun <> turn.ProviderRun then
             StrengthPromotionDecision.IgnoreWrongRun
         else
-            match turn.Outcome with
-            | ReconcileProgram.TurnCompleted
-            | ReconcileProgram.TurnNeedsContinuation _ ->
-                StrengthPromotion.decide targetProviderRun turn.ProviderRun (classifyParts turn.Parts)
-            | ReconcileProgram.TurnFailed _
-            | ReconcileProgram.TurnAborted _
-            | ReconcileProgram.TurnInProgress -> StrengthPromotionDecision.AwaitOrAbandon
+            promoteOutcome targetProviderRun turn

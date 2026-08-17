@@ -62,30 +62,28 @@ module WorkspaceEventStore =
 
                 store)
 
+    let private lookupCurrent commonDir : IEventStore option =
+        lock gate (fun () ->
+            match shared.TryGetValue commonDir with
+            | true, entry -> Some entry.Store
+            | false, _ -> None)
+
     /// Borrow the already-owned process-local store without changing ownership.
     let tryCurrent (commonDir: string) : IEventStore option =
-        if String.IsNullOrWhiteSpace commonDir then
-            None
-        else
-            lock gate (fun () ->
-                match shared.TryGetValue commonDir with
-                | true, entry -> Some entry.Store
-                | false, _ -> None)
+        if String.IsNullOrWhiteSpace commonDir then None else lookupCurrent commonDir
+
+    let private decrementEntry commonDir (entry: SharedEntry) =
+        let remaining = entry.RefCount - 1
+        if remaining <= 0 then shared.Remove commonDir |> ignore else entry.RefCount <- remaining
+
+    let private releaseOwned commonDir =
+        lock gate (fun () ->
+            match shared.TryGetValue commonDir with
+            | true, entry -> decrementEntry commonDir entry
+            | false, _ -> ())
 
     let release (commonDir: string) =
-        if String.IsNullOrWhiteSpace commonDir then
-            ()
-        else
-            lock gate (fun () ->
-                match shared.TryGetValue commonDir with
-                | true, entry ->
-                    let remaining = entry.RefCount - 1
-
-                    if remaining <= 0 then
-                        shared.Remove commonDir |> ignore
-                    else
-                        entry.RefCount <- remaining
-                | false, _ -> ())
+        if String.IsNullOrWhiteSpace commonDir then () else releaseOwned commonDir
 
     let bootPort (commonDir: string) : IJournalEventStoreBoot =
         let store = acquire commonDir

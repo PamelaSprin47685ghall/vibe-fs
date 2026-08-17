@@ -170,10 +170,13 @@ module FallbackProjection =
     /// `AgentPairCursor.effectiveAgent pair projection.Cursor` directly rather
     /// than through a wrapper here — a second definition of that lookup would be
     /// the same knowledge in two places.
+    let private cursorMayContinue (budget: int) (cursor: AgentPairCursor.FallbackCursor) =
+        match AgentPairCursor.recoveryVerdict budget cursor with
+        | AgentPairCursor.MayContinue _ -> true
+        | AgentPairCursor.Exhausted _ -> false
+
     let mayContinue (budget: int) (current: FallbackProjection) =
         if current.Exhausted then
             false
         else
-            match AgentPairCursor.recoveryVerdict budget current.Cursor with
-            | AgentPairCursor.MayContinue _ -> true
-            | AgentPairCursor.Exhausted _ -> false
+            cursorMayContinue budget current.Cursor

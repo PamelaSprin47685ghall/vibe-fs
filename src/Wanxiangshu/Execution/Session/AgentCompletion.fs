@@ -20,6 +20,8 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+/// DSL-state-combination: domain — optional child-session identity and role
+/// qualify one immutable failure fact; neither is a continuation token.
 type AgentFailurePayload =
     {
         AgentId: string
@@ -50,6 +52,9 @@ type AgentFailurePayload =
 /// `WorkRecordSnapshot` (B with digest/freshness/coverage metadata) are both gone:
 /// one self-contained record replaces the pair, and runtime-only metadata never
 /// reaches the LLM-visible wire (EXEC-004).
+/// DSL-state-combination: domain — optional child/session/provider identities
+/// are evidence facets of one terminal completion payload, not independent
+/// workflow stages.
 type AgentCompletionPayload =
     {
         AgentId: string
@@ -237,59 +242,15 @@ module PtyJoinItem =
         | PtyFailed f -> f.PtyId
         | PtyAborted a -> a.PtyId
 
-    /// PtyAborted projects with Code = "PTY_ABORTED" so ofRunCompletion can recover it;
-    /// never map abort to a generic business AgentFailed without that discriminant.
-    let abortedCode = "PTY_ABORTED"
-
 /// Canonical RunCompletion → typed JoinItem projection (agent vs PTY).
 module JoinItem =
-    /// Agent durable → AgentItem. PTY via isPtyRun; Code=PTY_ABORTED recovers PtyAborted.
-    let ofRunCompletion (isPtyRun: bool) (completion: RunCompletion) : JoinItem =
-        if isPtyRun then
-            match completion.Outcome with
-            | AgentCompleted payload ->
-                PtyItem(
-                    PtyExited
-                        { PtyId = completion.RunId
-                          Outcome = payload.WorkRecord
-                          Closed = true }
-                )
-            | AgentFailed payload when payload.Code = PtyJoinItem.abortedCode ->
-                PtyItem(
-                    PtyAborted
-                        { PtyId = completion.RunId
-                          Outcome = payload.Message
-                          Closed = true
-                          Code = payload.Code
-                          Message = payload.Message }
-                )
-            | AgentFailed payload ->
-                PtyItem(
-                    PtyFailed
-                        { PtyId = completion.RunId
-                          Outcome = payload.Message
-                          Closed = true
-                          Code = payload.Code
-                          Message = payload.Message }
-                )
-            | AgentAbandoned(_, reason) ->
-                // PTY type has no abandoned case; surface as failed with ABANDONED code.
-                PtyItem(
-                    PtyFailed
-                        { PtyId = completion.RunId
-                          Outcome = reason
-                          Closed = true
-                          Code = "ABANDONED"
-                          Message = reason }
-                )
-        else
-            match completion.Outcome with
-            | AgentCompleted payload -> AgentItem(AgentCompletedItem payload)
-            | AgentFailed payload -> AgentItem(AgentFailedItem payload)
-            | AgentAbandoned(agentId, reason) -> AgentItem(AgentAbandonedItem(agentId, reason))
-
-    /// Direct wrap: agent RunCompletion without PTY classification.
-    let ofAgentRunCompletion (completion: RunCompletion) : JoinItem = ofRunCompletion false completion
+    /// Durable agent completion → AgentItem. PTY facts stay PtyJoinItem through
+    /// `ofPtyJoinItem`; this projection has one canonical agent input.
+    let ofAgentRunCompletion (completion: RunCompletion) : JoinItem =
+        match completion.Outcome with
+        | AgentCompleted payload -> AgentItem(AgentCompletedItem payload)
+        | AgentFailed payload -> AgentItem(AgentFailedItem payload)
+        | AgentAbandoned(agentId, reason) -> AgentItem(AgentAbandonedItem(agentId, reason))
 
     /// PTY mailbox fact stays PtyJoinItem through join wire (EXEC-020).
     let ofPtyJoinItem (item: PtyJoinItem) : JoinItem = PtyItem item

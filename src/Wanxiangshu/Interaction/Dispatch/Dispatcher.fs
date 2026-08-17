@@ -135,25 +135,24 @@ module PromptDispatcher =
             (physicalMessageId: PhysicalUserMessageId)
             (explicitAgent: string option)
             : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
-            match explicitAgent with
-            | None -> Task.FromResult(Error "HumanRoot requires an explicit managed agent (fast-* / deep-*)")
-            | Some agent ->
-                match
+            let profileResult: Result<PromptAuthority.AuthorityExecutionProfile, string> =
+                explicitAgent
+                |> Option.map (fun agent ->
                     PromptAuthorityRun.createAuthorityRoot
                         HostDigest.sha256Hex
                         this.RuntimeId
                         sessionId
                         PromptAuthority.RootAuthorityKind.HumanRoot
                         physicalMessageId
-                        agent
-                with
-                | Error error -> Task.FromResult(Error error)
-                | Ok profile ->
-                    task {
-                        match! this.RegisterAuthority profile with
-                        | Error error -> return Error error
-                        | Ok() -> return Ok profile
-                    }
+                        agent)
+                |> Option.defaultValue (Error "HumanRoot requires an explicit managed agent (fast-* / deep-*)")
+
+
+            taskResult {
+                let! profile = profileResult
+                do! this.RegisterAuthority profile
+                return profile
+            }
 
         /// PROMPT-005 `Abandoned` for an explicit current-process send failure.
         /// Restart reconciliation no longer calls this: process death is not authority
@@ -218,8 +217,9 @@ module PromptDispatcher =
             : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
             let projection = this.ProjectionFor sessionId
 
-            match Map.tryFind key projection.PendingClaims with
-            | Some claim ->
+            let acceptClaim
+                (claim: PromptAuthority.PromptClaim)
+                : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
                 match claim.Origin, claim.EffectiveAgent with
                 | PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot,
                   Some agent -> this.AcceptPhysicalAgentOwnerRoot key sessionId physicalMessageId agent
@@ -229,10 +229,15 @@ module PromptDispatcher =
                     )
                 | _ ->
                     Task.FromResult(Error(sprintf "PromptKey %s is not a pending AgentOwnerRoot" (PromptKey.value key)))
-            | None ->
+
+            let acceptExisting () : Task<Result<PromptAuthority.AuthorityExecutionProfile, string>> =
                 match projection.ActiveLogicalRun with
                 | Some profile -> Task.FromResult(Ok profile)
                 | None -> Task.FromResult(Error(sprintf "Unknown AgentOwnerRoot claim: %s" (PromptKey.value key)))
+
+            match Map.tryFind key projection.PendingClaims with
+            | Some claim -> acceptClaim claim
+            | None -> acceptExisting ()
 
         /// PROMPT-003: a continuation reached physical acceptance. Returns the
         /// kind it was claimed as, read before the fact is written because writing

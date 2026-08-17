@@ -33,22 +33,25 @@ module ProviderLanguage =
         | ProviderLanguage.SimplifiedChinese -> "zh-CN"
 
     /// Accept resource dirs and common aliases (`en`, `zh-CN`, `zh`, `english`, …).
+    let private parseNormalized (normalized: string) : ProviderLanguage option =
+        match normalized with
+        | "en"
+        | "eng"
+        | "english" -> Some ProviderLanguage.English
+        | "zh-cn"
+        | "zh"
+        | "zh_cn"
+        | "chs"
+        | "simplifiedchinese"
+        | "simplified-chinese"
+        | "cn" -> Some ProviderLanguage.SimplifiedChinese
+        | _ -> None
+
     let tryParse (raw: string) : ProviderLanguage option =
         if String.IsNullOrWhiteSpace raw then
             None
         else
-            match raw.Trim().ToLowerInvariant() with
-            | "en"
-            | "eng"
-            | "english" -> Some ProviderLanguage.English
-            | "zh-cn"
-            | "zh"
-            | "zh_cn"
-            | "chs"
-            | "simplifiedchinese"
-            | "simplified-chinese"
-            | "cn" -> Some ProviderLanguage.SimplifiedChinese
-            | _ -> None
+            raw.Trim().ToLowerInvariant() |> parseNormalized
 
     let parse (raw: string) : ProviderLanguage =
         match tryParse raw with

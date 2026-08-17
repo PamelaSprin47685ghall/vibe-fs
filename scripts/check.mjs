@@ -11,7 +11,6 @@ const checks = [
   join(root, 'checks/spec.mjs'),
   join(root, 'checks/architecture.mjs'),
   join(root, 'checks/dsl-ownership.mjs'),
-  join(root, 'checks/dsl-ownership-ratchet.mjs'),
   join(root, 'checks/fsharp-control-pyramid.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
@@ -42,13 +41,6 @@ for (const script of checks) {
   // --threshold freezes current Direct-CE debt baseline; must only ever decrease.
   // P0→P2-3c: 157→13. P2-2 Host boundary open allowlist: 13→0.
   if (script.endsWith('dsl-ownership.mjs')) args.push('--threshold=0')
-  // Per-file ratchet against the frozen baseline (missing baseline fails with a --generate hint).
-  if (script.endsWith('dsl-ownership-ratchet.mjs')) {
-    args.push(
-      `--baseline=${join(root, 'checks/dsl-ownership-ratchet-baseline.json')}`,
-      '--root=src/Wanxiangshu',
-    )
-  }
   // STRUCTURED-WORKFLOW-016: nested lexical decisions are frozen per file; new debt fails.
   if (script.endsWith('fsharp-control-pyramid.mjs')) {
     args.push(

@@ -93,6 +93,72 @@ module HostForkRunLifecycle =
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.
     /// Claim runs only after JoinableCompletion proof succeeds (fail closed).
+    let private claimPendingRun
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (run: PendingHostRun) =
+        lock gate (fun () ->
+            match pendingRuns.TryGetValue run.AgentId with
+            | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
+                run.Finished <- true
+                pendingRuns.Remove run.AgentId |> ignore
+                true, run.Subscription
+            | _ -> false, None)
+
+    let private committedOutcome
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (proof: JoinableCompletion)
+        (run: PendingHostRun)
+        (agentOutcome: AgentCompletionOutcome) =
+        task {
+            match! ChildRecoveryWorkflow.commitJoinable journal parentId proof with
+            | Ok() -> return agentOutcome
+            | Error error ->
+                return
+                    AgentCompletion.failed
+                        run.AgentId
+                        ("run-" + run.AgentId)
+                        (Some run.Role)
+                        (Some run.ChildId)
+                        "PERSIST"
+                        (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
+        }
+
+    let private startClaimDelivery
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (proof: JoinableCompletion)
+        (agentOutcome: AgentCompletionOutcome) : Task =
+        task {
+            let! finalOutcome =
+                match journal with
+                | None -> Task.FromResult agentOutcome
+                | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
+
+            run.Source.SetResult finalOutcome
+        }
+        :> Task
+
+    let private deliverClaimedCompletion
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (gate: obj)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (proof: JoinableCompletion)
+        (agentOutcome: AgentCompletionOutcome) : Task =
+        let claimed, subscriptionToDispose = claimPendingRun gate pendingRuns run
+
+        if claimed then
+            subscriptionToDispose
+            |> Option.iter (fun subscription -> subscription.Dispose())
+
+            startClaimDelivery journal parentId run proof agentOutcome
+        else
+            Task.FromResult(())
+
     let private deliverProvenCompletion
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -106,54 +172,7 @@ module HostForkRunLifecycle =
         | Error _ ->
             // Fail closed: leave run Active / pending for a later proven terminal.
             Task.FromResult(())
-        | Ok proof ->
-            let claimed, subscriptionToDispose =
-                lock gate (fun () ->
-                    match pendingRuns.TryGetValue run.AgentId with
-                    | true, current when obj.ReferenceEquals(current.Token, run.Token) && not run.Finished ->
-                        run.Finished <- true
-                        pendingRuns.Remove run.AgentId |> ignore
-                        true, run.Subscription
-                    | _ -> false, None)
-
-            if claimed then
-                subscriptionToDispose
-                |> Option.iter (fun subscription -> subscription.Dispose())
-
-                // EXEC-009: durable blob + HandleCompleted is the agent fact source (GREEN-5).
-                // Join re-reads Journal; mailbox is wake-only for agents.
-                // P0 §十: sole production owner of recordCompletion is ChildRecoveryWorkflow.
-                let runId = "run-" + run.AgentId
-                let childId = run.ChildId
-
-                // Terminal callbacks are synchronous Host notifications, so the
-                // durable claim continues as an explicit detached Task. The Task
-                // itself preserves the ordering: SetResult happens only after the
-                // HandleCompleted commit has resolved.
-                task {
-                    let! finalOutcome =
-                        match journal with
-                        | None -> Task.FromResult agentOutcome
-                        | Some _ ->
-                            task {
-                                match! ChildRecoveryWorkflow.commitJoinable journal parentId proof with
-                                | Ok() -> return agentOutcome
-                                | Error error ->
-                                    return
-                                        AgentCompletion.failed
-                                            run.AgentId
-                                            runId
-                                            (Some run.Role)
-                                            (Some childId)
-                                            "PERSIST"
-                                            (sprintf "EXEC-009/PERSIST-002 HandleCompleted append failed: %s" error)
-                            }
-
-                    run.Source.SetResult finalOutcome
-                }
-                :> Task
-            else
-                Task.FromResult(())
+        | Ok proof -> deliverClaimedCompletion pendingRuns gate journal parentId run proof agentOutcome
 
     let complete
         (gate: obj)

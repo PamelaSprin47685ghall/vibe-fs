@@ -154,14 +154,17 @@ module ObservationCodec =
                       Uncertainties = uncertainties }
         }
 
+    let private decodeObject raw =
+        match required "type" asString raw with
+        | Error error -> Error error
+        | Ok "SemanticAssessment" -> decodeSemanticAssessment raw
+        | Ok "Candidates" -> decodeCandidates raw
+        | Ok "Investigation" -> decodeInvestigation raw
+        | Ok "Synthesis" -> decodeSynthesis raw
+        | Ok kind -> Error($"unknown observation.type: {kind}")
+
     let decode raw =
         if isNullish raw || jsType raw <> "object" || isArray raw then
             Error "observation must be object"
         else
-            match required "type" asString raw with
-            | Error error -> Error error
-            | Ok "SemanticAssessment" -> decodeSemanticAssessment raw
-            | Ok "Candidates" -> decodeCandidates raw
-            | Ok "Investigation" -> decodeInvestigation raw
-            | Ok "Synthesis" -> decodeSynthesis raw
-            | Ok kind -> Error($"unknown observation.type: {kind}")
+            decodeObject raw

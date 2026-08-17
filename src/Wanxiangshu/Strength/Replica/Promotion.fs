@@ -50,6 +50,12 @@ type StrengthPromotionDecision =
 [<RequireQualifiedAccess>]
 module StrengthPromotion =
 
+    let private decideOutput evidence =
+        match evidence with
+        | StrengthProviderOutputEvidence.RealOutput -> StrengthPromotionDecision.Promote
+        | StrengthProviderOutputEvidence.TransportOnly
+        | StrengthProviderOutputEvidence.NoOutput -> StrengthPromotionDecision.AwaitOrAbandon
+
     /// STRENGTH-007: ProviderRunIdentity is the causal consumption identity.
     /// A run outcome label is intentionally not an input: a failed/aborted run
     /// that already emitted real provider output still proves the provider saw
@@ -62,7 +68,4 @@ module StrengthPromotion =
         if targetProviderRun <> observedProviderRun then
             StrengthPromotionDecision.IgnoreWrongRun
         else
-            match outputEvidence with
-            | StrengthProviderOutputEvidence.RealOutput -> StrengthPromotionDecision.Promote
-            | StrengthProviderOutputEvidence.TransportOnly
-            | StrengthProviderOutputEvidence.NoOutput -> StrengthPromotionDecision.AwaitOrAbandon
+            decideOutput outputEvidence

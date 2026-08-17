@@ -141,6 +141,15 @@ module PtyTiming =
                     disposed <- true
                     entries.Clear() }
 
+        let fireOne (id: int) (completion: TaskCompletionSource<unit>) (cancelled: bool ref) =
+            if not cancelled.Value then
+                cancelled.Value <- true
+                removeId id
+                AsyncSupport.trySetResult completion () |> ignore
+
+        let fireDue due =
+            for id, _, completion, cancelled in due do fireOne id completion cancelled
+
         let advance (milliseconds: int) =
             if disposed then
                 ()
@@ -152,11 +161,7 @@ module PtyTiming =
                     |> Seq.filter (fun (_, fireAt, _, cancelled) -> not cancelled.Value && fireAt <= nowMs)
                     |> Seq.toList
 
-                for id, _, completion, cancelled in due do
-                    if not cancelled.Value then
-                        cancelled.Value <- true
-                        removeId id
-                        AsyncSupport.trySetResult completion () |> ignore
+                fireDue due
 
         { Port = port
           Advance = advance

@@ -49,6 +49,9 @@ type BloggerDeltaPart =
     | MediaOmitted of mediaType: string option
 
 /// One rendered part: which role it came from (message parts only) plus the part.
+/// DSL-state-combination: domain — role, rendered part and truncation marker
+/// are one immutable transcript item; truncation records an observed byte-bound
+/// fact, not a workflow stage.
 type BloggerDeltaItem =
     {
         Role: string

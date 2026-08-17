@@ -243,6 +243,19 @@ module CohortWorkflow =
                    GitTreeHash = request.GitTreeHash
                    IsNewReviewer = prepared.IsNew |})
 
+    let private recordEnlistmentIfNew
+        existingMember
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        life
+        request
+        slot
+        prepared
+        (barrierId: ReviewBarrierId) : Task =
+        match existingMember with
+        | Some _ -> AsyncSupport.completedTask ()
+        | None -> recordEnlistedFact journal managerSessionId life request slot prepared barrierId
+
     let private prepareSlotAndOpen
         (reviewerPort: FinalityReviewerPort)
         (journal: AgentJournal)
@@ -275,8 +288,16 @@ module CohortWorkflow =
             match! reviewerPort.PrepareSession physicalRequest with
             | Error error -> return Error error
             | Ok prepared ->
-                if existingMember.IsNone then
-                    do! recordEnlistedFact journal managerSessionId life request slot prepared barrierId
+                do!
+                    recordEnlistmentIfNew
+                        existingMember
+                        journal
+                        managerSessionId
+                        life
+                        request
+                        slot
+                        prepared
+                        barrierId
 
                 return!
                     openBarrierAndRememberMember

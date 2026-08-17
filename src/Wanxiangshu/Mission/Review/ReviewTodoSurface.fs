@@ -44,16 +44,29 @@ module ReviewTodoSurface =
     let private callOf value = ToolCallId.create (text value)
     let private runOf value = ProviderRunIdentity.create (text value)
 
-    let private verdictOf value =
+    let private verdictResult value : Result<ProcessReviewVerdict, string> =
         match text value with
+        | "PERFECT"
+        | "Perfect" -> Ok ProcessReviewVerdict.Perfect
         | "REVISE"
-        | "Revise" -> ProcessReviewVerdict.Revise
-        | _ -> ProcessReviewVerdict.Perfect
+        | "Revise" -> Ok ProcessReviewVerdict.Revise
+        | unknown -> Error(sprintf "unknown review verdict: %s" unknown)
+
+    let private physicalEvidenceResult value : Result<PhysicalSuccessEvidence, string> =
+        match text value with
+        | "RecoveredCompletedToolPart" -> Ok PhysicalSuccessEvidence.RecoveredCompletedToolPart
+        | "LiveAfterSuccess" -> Ok PhysicalSuccessEvidence.LiveAfterSuccess
+        | unknown -> Error(sprintf "unknown physical success evidence: %s" unknown)
+
+    let private verdictOf value =
+        match verdictResult value with
+        | Ok verdict -> verdict
+        | Error error -> invalidArg "Verdict" error
 
     let private physicalEvidenceOf value =
-        match text value with
-        | "RecoveredCompletedToolPart" -> PhysicalSuccessEvidence.RecoveredCompletedToolPart
-        | _ -> PhysicalSuccessEvidence.LiveAfterSuccess
+        match physicalEvidenceResult value with
+        | Ok evidence -> evidence
+        | Error error -> invalidArg "PhysicalSuccessEvidence" error
 
     let private factOf (caseName: string) (payload: obj) : MagicTodoFact =
         match caseName with
@@ -123,7 +136,21 @@ module ReviewTodoSurface =
             MagicTodoFact.TodoReviewConcluded concluded
         | other -> failwith $"ReviewTodoSurface: unknown Magic Todo fact '{other}'"
 
-    let factJson (caseName: string) (payload: obj) = MagicTodoFactCodec.encode (factOf caseName payload)
+    let private factValidation (caseName: string) (payload: obj) : Result<unit, string> =
+        match caseName with
+        | "TodoWriteAccepted" -> physicalEvidenceResult (field payload "PhysicalSuccessEvidence") |> Result.map (fun _ -> ())
+        | "TodoReviewConcluded" -> verdictResult (field payload "Verdict") |> Result.map (fun _ -> ())
+        | _ -> Ok()
+
+    let private encodedFact (caseName: string) (payload: obj) : string =
+        match factValidation caseName payload with
+        | Error error -> invalidArg "payload" error
+        | Ok() -> MagicTodoFactCodec.encode (factOf caseName payload)
+
+    let factJson (caseName: string) (payload: obj) : obj =
+        match factValidation caseName payload with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok() -> box (encodedFact caseName payload)
 
     let ids (sha256: obj) (lifeId: string) (callId: string) : obj =
         let hash (value: string) = emitJsExpr (sha256, value) "$0($1)"
@@ -141,7 +168,7 @@ module ReviewTodoSurface =
     let newProjection () = MagicTodoProjectionSurface.create ()
 
     let fold (projection: MagicTodoProjectionHandle) (eventId: string) (caseName: string) (payload: obj) : obj =
-        MagicTodoProjectionSurface.fold projection eventId (factJson caseName payload)
+        MagicTodoProjectionSurface.fold projection eventId (encodedFact caseName payload)
 
     let view (projection: MagicTodoProjectionHandle) (lifeId: string) : obj =
         MagicTodoProjectionSurface.view projection lifeId
@@ -153,7 +180,7 @@ module ReviewTodoSurface =
         (caseName: string)
         (payload: obj)
         : Task<obj> =
-        ObligationJournalSurface.appendMagicTodo handle sessionId providerRun (factJson caseName payload)
+        ObligationJournalSurface.appendMagicTodo handle sessionId providerRun (encodedFact caseName payload)
 
     let tryConclude (handle: JournalHandle) (lifeId: string) (writeId: string) : Task<obj> =
         task {

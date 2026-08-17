@@ -116,6 +116,9 @@ type FinalityRequestProjection =
 /// Life, is it activated, where is the compression floor, is a suicide active,
 /// what was the last rejection, is there a blessing, is the Life complete". It
 /// never answers "what runs next" (ARCH-001).
+/// DSL-state-combination: domain — optional finality/rejection/blessing and
+/// completion evidence are durable facets of one Manager Life; they do not encode
+/// what action executes next.
 type LifeProjection =
     {
         LifeId: ManagerLifeId

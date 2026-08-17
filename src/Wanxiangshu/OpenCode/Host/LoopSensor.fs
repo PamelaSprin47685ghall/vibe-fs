@@ -38,6 +38,29 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
 
     let keyOf (sessionId: SessionId) = SessionId.value sessionId
 
+    let reportAbortOutcome (sessionId: SessionId) (outcome: Result<unit, string>) =
+        match outcome with
+        | Ok() -> Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
+        | Error reason ->
+            Diagnostic.emit
+                "loop-kill"
+                [ "session_id", SessionId.value sessionId
+                  "result", "abort-failed"
+                  "provider_error", reason ]
+
+    let abortAndReport (abortSession: SessionId -> Task<Result<unit, string>>) (sessionId: SessionId) : Task =
+        task {
+            try
+                let! outcome = abortSession sessionId
+                reportAbortOutcome sessionId outcome
+            with ex ->
+                Diagnostic.emit
+                    "loop-kill"
+                    [ "session_id", SessionId.value sessionId
+                      "result", "abort-failed"
+                      "provider_error", ex.Message ]
+        }
+
     member _.IsArmed(sessionId: SessionId) =
         lock gate (fun () -> armed.Contains(keyOf sessionId))
 
@@ -82,45 +105,27 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                    | None -> [])
 
             Diagnostic.emit "loop-kill" fields
-
-            task {
-                try
-                    let! outcome = abortSession sessionId
-
-                    match outcome with
-                    | Ok() ->
-                        Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
-                    | Error reason ->
-                        Diagnostic.emit
-                            "loop-kill"
-                            [ "session_id", SessionId.value sessionId
-                              "result", "abort-failed"
-                              "provider_error", reason ]
-                with ex ->
-                    Diagnostic.emit
-                        "loop-kill"
-                        [ "session_id", SessionId.value sessionId
-                          "result", "abort-failed"
-                          "provider_error", ex.Message ]
-            }
-            |> ignore
+            abortAndReport abortSession sessionId |> ignore
         else
             Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "ignored-duplicate" ]
+
+    member private this.Evaluate (delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation =
+        lock gate (fun () ->
+            let detector = this.DetectorFor delta.SessionId
+            LoopDetector.pushText detector delta.Delta)
+
+    member private this.KillIfLoop (delta: LoopEventCodec.TextDelta) (evaluation: LoopDetector.Evaluation) =
+        if evaluation.IsLoop then
+            this.Kill delta.SessionId (Some evaluation.WeightedDistinctTokenCount) evaluation.Step
+
+    member private this.ObserveOwned (delta: LoopEventCodec.TextDelta) =
+        match isOwned delta.SessionId, this.IsArmed delta.SessionId with
+        | false, _
+        | true, true -> ()
+        | true, false -> this.KillIfLoop delta (this.Evaluate delta)
 
     /// Feed one Host raw event. Non-text-delta events are no-ops.
     member this.Observe(raw: obj) =
         match LoopEventCodec.tryDecodeTextDelta raw with
         | None -> ()
-        | Some delta ->
-            if not (isOwned delta.SessionId) then
-                ()
-            elif this.IsArmed delta.SessionId then
-                ()
-            else
-                let evaluation =
-                    lock gate (fun () ->
-                        let detector = this.DetectorFor delta.SessionId
-                        LoopDetector.pushText detector delta.Delta)
-
-                if evaluation.IsLoop then
-                    this.Kill delta.SessionId (Some evaluation.WeightedDistinctTokenCount) evaluation.Step
+        | Some delta -> this.ObserveOwned delta

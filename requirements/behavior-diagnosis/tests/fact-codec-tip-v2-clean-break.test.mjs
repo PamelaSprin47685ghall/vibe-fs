@@ -78,20 +78,13 @@ test('WHAT[BD-012] PERSIST_005_observation_encode_writes_new_tags_only', () => {
   assert.equal(encodedSquash.includes('BlogSquashCommitted'), false)
 })
 
-test('WHAT[BD-012] PERSIST_005_legacy_observation_tags_dual_decode_to_new_names', () => {
+test('WHAT[BD-012] PERSIST_005_fact_codec_rejects_pre_cutover_observation_tags', () => {
   const committed = blog.serializeFact(observation())
-  const legacyCommitted = committed.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
-  assert.equal(legacyCommitted.includes('BlogEntryCommitted'), true)
-
-  const decodedCommitted = blog.deserializeFact(legacyCommitted)
-  assert.equal(decodedCommitted.ok, true, decodedCommitted.ok ? '' : decodedCommitted.error)
-  assert.equal(decodedCommitted.case, 'BlogObservationCommitted')
-  assert.equal(decodedCommitted.line, committed)
+  const preCutoverCommitted = committed.replaceAll('BlogObservationCommitted', 'BlogEntryCommitted')
+  assert.equal(preCutoverCommitted.includes('BlogEntryCommitted'), true)
+  assert.equal(blog.deserializeFact(preCutoverCommitted).ok, false)
 
   const encodedSquash = blog.serializeFact(squashed())
-  const legacySquashed = encodedSquash.replaceAll('BlogObservationsSquashed', 'BlogSquashCommitted')
-  const decodedSquashed = blog.deserializeFact(legacySquashed)
-  assert.equal(decodedSquashed.ok, true, decodedSquashed.ok ? '' : decodedSquashed.error)
-  assert.equal(decodedSquashed.case, 'BlogObservationsSquashed')
-  assert.equal(decodedSquashed.line, encodedSquash)
+  const preCutoverSquash = encodedSquash.replaceAll('BlogObservationsSquashed', 'BlogSquashCommitted')
+  assert.equal(blog.deserializeFact(preCutoverSquash).ok, false)
 })

@@ -106,6 +106,21 @@ module PrefixEpochProjection =
         && a.CoveredPrefixDigest = b.CoveredPrefixDigest
         && a.FrozenRecordPrefixDigest = b.FrozenRecordPrefixDigest
 
+    let private rebaseSnapshot
+        (nextEpoch: PrefixEpochId)
+        (candidate: PrefixSnapshot)
+        (state: ActivePrefixEpoch)
+        : Result<ActivePrefixEpoch, PrefixFoldRejection> =
+        match state.Snapshot with
+        | Some committed when candidate.CutoffExclusive < committed.CutoffExclusive ->
+            Error(PrefixFoldRejection.CutoffRetreated(committed.CutoffExclusive, candidate.CutoffExclusive))
+        | Some committed when sameCandidate candidate committed -> Error PrefixFoldRejection.CandidateNotNew
+        | _ ->
+            Ok
+                { state with
+                    EpochId = nextEpoch
+                    Snapshot = Some candidate }
+
     /// PERSIST-010 `PrefixRebaseCommitted`: a probe produced a valid terminal, so
     /// its candidate becomes the committed epoch.
     ///
@@ -125,15 +140,7 @@ module PrefixEpochProjection =
         elif nextEpoch <> PrefixEpochId.next previousEpoch then
             Error PrefixFoldRejection.NonSequentialPrefixEpoch
         else
-            match state.Snapshot with
-            | Some committed when candidate.CutoffExclusive < committed.CutoffExclusive ->
-                Error(PrefixFoldRejection.CutoffRetreated(committed.CutoffExclusive, candidate.CutoffExclusive))
-            | Some committed when sameCandidate candidate committed -> Error PrefixFoldRejection.CandidateNotNew
-            | _ ->
-                Ok
-                    { state with
-                        EpochId = nextEpoch
-                        Snapshot = Some candidate }
+            rebaseSnapshot nextEpoch candidate state
 
     /// PERSIST-010 `ContextReanchored`: HOST-006 containment.
     ///

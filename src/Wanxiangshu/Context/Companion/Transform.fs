@@ -135,6 +135,158 @@ module CompanionTransform =
                 bindSquashPlan scope journal value
                 value)
 
+    let private tryMessageSessionId message =
+        if isNull message?info?sessionID then
+            None
+        else
+            Some(unbox<string> message?info?sessionID)
+
+    let private tryMessageRole message =
+        if isNull message?info?agent then
+            None
+        else
+            Some(unbox<string> message?info?agent)
+
+    let private tryMessageContext message =
+        if isNull message || isNull message?info then
+            None
+        else
+            Some(tryMessageSessionId message, tryMessageRole message)
+
+    let private updateMaterializedBlogger
+        (scope: PluginRuntimeScope)
+        (companion: CompanionHost)
+        (journal: AgentJournal option)
+        (sessionId: string)
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (projection: ProviderProjection.ProviderSemanticProjection)
+        : Task<unit> =
+        task {
+            let floorSequence =
+                match journal with
+                | None -> None
+                | Some durable ->
+                    ManagerOpeningFloor.floorSequence
+                        (SessionId.create sessionId)
+                        (AgentJournal.snapshot durable).AgentProjections
+
+            let effectiveIngested =
+                floorSequence
+                |> Option.map (fun floor -> max blog.Coverage.IngestedThroughSequence floor)
+                |> Option.defaultValue blog.Coverage.IngestedThroughSequence
+
+            let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
+
+            let hasMaterial =
+                BloggerDelta.nextChunk
+                    BloggerDelta.DeltaLimitBytes
+                    ingestCursor
+                    blog.Coverage.CoverableTurnCutoffExclusive
+                    projection.Messages
+                |> Option.isSome
+
+            if hasMaterial then
+                let! bloggerId = companion.EnsureBloggerAsync()
+
+                let! _ =
+                    BloggerCoordinator.onMainMaterial
+                        scope.ParkedTransformHost
+                        companion
+                        journal
+                        (SessionId.create sessionId)
+                        bloggerId
+                        projection
+
+                ()
+        }
+
+    let private transformNonSatellite
+        (companions: Dictionary<string, CompanionHost>)
+        (gate: obj)
+        (scope: PluginRuntimeScope)
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (onBloggerCreated: (SessionId -> unit) option)
+        (workspaceDirectory: string option)
+        (sessionId: string)
+        (rawMessages: obj list)
+        (rawOutObj: obj)
+        : Task<unit> =
+        task {
+            let companion =
+                ensureCompanion
+                    companions
+                    gate
+                    scope
+                    sessionPort
+                    journal
+                    onBloggerCreated
+                    workspaceDirectory
+                    sessionId
+
+            // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
+            companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
+
+            let projection =
+                ProviderWireCapture.decodeMessageView rawMessages
+                |> ProviderProjection.toSemantic
+
+            // No child until there is a real X gap. Empty fixture transforms
+            // (HOST-009 positional hooks) must not require Host transport.
+            let blog, xTrace =
+                match journal with
+                | Some j ->
+                    let sessions = (AgentJournal.snapshot j).AgentProjections.Sessions
+                    let session = sessions |> Map.tryFind (SessionId.create sessionId)
+
+                    (session
+                     |> Option.bind (fun s -> s.Blog)
+                     |> Option.defaultValue BlogProjection.empty),
+                    (session
+                     |> Option.bind (fun s -> s.XTrace)
+                     |> Option.defaultValue XTraceProjection.empty)
+                | None -> companion.Memory.Blog, companion.Memory.XTrace
+
+            do! updateMaterializedBlogger scope companion journal sessionId blog xTrace projection
+        }
+
+    let private processSession
+        (companions: Dictionary<string, CompanionHost>)
+        (gate: obj)
+        (scope: PluginRuntimeScope)
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (onBloggerCreated: (SessionId -> unit) option)
+        (workspaceDirectory: string option)
+        (sessionId: string)
+        (rawMessages: obj list)
+        (rawOutObj: obj)
+        : Task<unit> =
+        task {
+            let isSatelliteSession =
+                match journal with
+                | None -> true
+                | Some j ->
+                    SessionAssociationProjection.isSatellite
+                        (SessionId.create sessionId)
+                        (AgentJournal.snapshot j).AgentProjections.Associations
+
+            if not isSatelliteSession then
+                return!
+                    transformNonSatellite
+                        companions
+                        gate
+                        scope
+                        sessionPort
+                        journal
+                        onBloggerCreated
+                        workspaceDirectory
+                        sessionId
+                        rawMessages
+                        rawOutObj
+        }
+
     /// Main-session transform: Host view unchanged; material decision is sole coordinator.
     let handleCompanionTransform
         (companions: Dictionary<string, CompanionHost>)
@@ -158,25 +310,7 @@ module CompanionTransform =
                     && not (isNull message?info?id)
                     && (unbox<string> message?info?id).StartsWith("companion-b-head"))
 
-            let messageContext =
-                rawMessages
-                |> List.tryPick (fun message ->
-                    if isNull message || isNull message?info then
-                        None
-                    else
-                        let messageSessionId =
-                            if isNull message?info?sessionID then
-                                None
-                            else
-                                Some(unbox<string> message?info?sessionID)
-
-                        let role =
-                            if isNull message?info?agent then
-                                None
-                            else
-                                Some(unbox<string> message?info?agent)
-
-                        Some(messageSessionId, role))
+            let messageContext = rawMessages |> List.tryPick tryMessageContext
 
             match messageContext with
             | Some(Some messageSessionId, _) when not (isNull inObj) && isNull inObj?sessionID ->
@@ -194,88 +328,16 @@ module CompanionTransform =
                 && not (String.IsNullOrWhiteSpace sessionId)
                 && not (isNull rawOutObj?messages)
             then
-                let isSatelliteSession =
-                    match journal with
-                    | None -> true
-                    | Some j ->
-                        SessionAssociationProjection.isSatellite
-                            (SessionId.create sessionId)
-                            (AgentJournal.snapshot j).AgentProjections.Associations
-
-                if not isSatelliteSession then
-                    let companion =
-                        ensureCompanion
-                            companions
-                            gate
-                            scope
-                            sessionPort
-                            journal
-                            onBloggerCreated
-                            workspaceDirectory
-                            sessionId
-
-                    // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
-                    companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
-
-                    let projection =
-                        ProviderWireCapture.decodeMessageView rawMessages
-                        |> ProviderProjection.toSemantic
-
-                    // No child until there is a real X gap. Empty fixture transforms
-                    // (HOST-009 positional hooks) must not require Host transport.
-                    let blog, xTrace =
-                        match journal with
-                        | Some j ->
-                            let sessions = (AgentJournal.snapshot j).AgentProjections.Sessions
-                            let session = sessions |> Map.tryFind (SessionId.create sessionId)
-
-                            (session
-                             |> Option.bind (fun s -> s.Blog)
-                             |> Option.defaultValue BlogProjection.empty),
-                            (session
-                             |> Option.bind (fun s -> s.XTrace)
-                             |> Option.defaultValue XTraceProjection.empty)
-                        | None -> companion.Memory.Blog, companion.Memory.XTrace
-
-                    // GLORY-023 / TODO-001: Opening floor also gates the cheap
-                    // prefilter (BlindPlan Pre-T1 dynamic / Post-T1 WorkRecordStart).
-                    let floorSequence =
-                        match journal with
-                        | None -> None
-                        | Some durable ->
-                            ManagerOpeningFloor.floorSequence
-                                (SessionId.create sessionId)
-                                (AgentJournal.snapshot durable).AgentProjections
-
-                    let effectiveIngested =
-                        floorSequence
-                        |> Option.map (fun floor -> max blog.Coverage.IngestedThroughSequence floor)
-                        |> Option.defaultValue blog.Coverage.IngestedThroughSequence
-
-                    let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
-
-                    // Cheap prefilter only: skip EnsureBlogger when the Host view has
-                    // nothing past the ingest cursor. Birth gate (Next>Prev) still
-                    // runs inside onMainMaterial via mainContextFromChunk.
-                    let hasMaterial =
-                        BloggerDelta.nextChunk
-                            BloggerDelta.DeltaLimitBytes
-                            ingestCursor
-                            blog.Coverage.CoverableTurnCutoffExclusive
-                            projection.Messages
-                        |> Option.isSome
-
-                    if hasMaterial then
-                        let! bloggerId = companion.EnsureBloggerAsync()
-
-                        let! _ =
-                            BloggerCoordinator.onMainMaterial
-                                scope.ParkedTransformHost
-                                companion
-                                journal
-                                (SessionId.create sessionId)
-                                bloggerId
-                                projection
-
-                        ()
+                return!
+                    processSession
+                        companions
+                        gate
+                        scope
+                        sessionPort
+                        journal
+                        onBloggerCreated
+                        workspaceDirectory
+                        sessionId
+                        rawMessages
+                        rawOutObj
         }

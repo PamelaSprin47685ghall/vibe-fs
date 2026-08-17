@@ -27,8 +27,8 @@
  * declares it cannot use it to smuggle a message rewrite past the barrier.
  */
 
+import { isDeepStrictEqual } from 'node:util';
 import { assistanceBindingPrefixHolds, isAppendOnlyPrefix, wireOf } from './provider-wire.js';
-import { equals } from '../../../../../dist/fable_modules/fable-library-js.5.13.0/Util.js';
 
 export const BOUNDARY_KINDS = [
   'epoch-switch',
@@ -82,14 +82,14 @@ const messagesStillAppendOnly = (previousWire, nextWire) =>
 
 /** SyncDelegate Returned→Completion keeps model/system/messages and replaces only tools. */
 const requestKindKeepsPrefix = (previousWire, nextWire) =>
-  isAppendOnlyPrefix({ ...previousWire, Tools: nextWire.Tools }, nextWire);
+  isAppendOnlyPrefix({ ...previousWire, tools: nextWire.tools }, nextWire);
 
 /** `previous` with `next`'s model fields, so only the messages/tools/system differ. */
 const withModelOf = (previousWire, nextWire) => ({
   ...previousWire,
-  ProviderId: nextWire.ProviderId,
-  ModelId: nextWire.ModelId,
-  Variant: nextWire.Variant,
+  providerId: nextWire.providerId,
+  modelId: nextWire.modelId,
+  variant: nextWire.variant,
 });
 
 /**
@@ -104,7 +104,7 @@ const withModelOf = (previousWire, nextWire) => ({
  * system bytes by construction. The probe's own claim is about the MESSAGE
  * prefix; the declaration admits the whole recovery request.
  */
-const probeKeepsFixedParts = (previousWire, nextWire) => equals(previousWire.Tools, nextWire.Tools);
+const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
 /**
  * Decide one chat request against the session's seal.

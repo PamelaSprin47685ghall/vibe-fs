@@ -42,37 +42,37 @@ module ProviderWireCapture =
             { WirePart = wirePart
               HostToolPartId = hostToolPartId })
 
+    let private providerRunOf role rawObj info =
+        match role with
+        | "assistant" ->
+            ProviderWireDecode.firstString rawObj [ "id" ]
+            |> Option.orElse (ProviderWireDecode.firstString info [ "id" ])
+            |> Option.map ProviderRunIdentity.create
+        | _ -> None
+
+    let private decodeCapturedMessageBody rawObj : CapturedWireMessage option =
+        let info = ProviderWireDecode.infoObject rawObj
+
+        let role =
+            ProviderWireDecode.firstString rawObj [ "role" ]
+            |> Option.orElse (ProviderWireDecode.firstString info [ "role" ])
+            |> Option.defaultValue ""
+            |> fun value -> value.ToLowerInvariant()
+
+        let parts =
+            ProviderWireDecode.rawArray (ProviderWireDecode.readField rawObj "parts")
+            |> List.choose capturePart
+
+        match String.IsNullOrWhiteSpace role && List.isEmpty parts with
+        | true -> None
+        | false ->
+            Some
+                { Role = role
+                  ProviderRun = providerRunOf role rawObj info
+                  Parts = parts }
+
     let decodeCapturedMessage (rawObj: obj) : CapturedWireMessage option =
-        if isNull rawObj then
-            None
-        else
-            let info = ProviderWireDecode.infoObject rawObj
-
-            let role =
-                ProviderWireDecode.firstString rawObj [ "role" ]
-                |> Option.orElse (ProviderWireDecode.firstString info [ "role" ])
-                |> Option.defaultValue ""
-                |> fun value -> value.ToLowerInvariant()
-
-            let parts =
-                ProviderWireDecode.rawArray (ProviderWireDecode.readField rawObj "parts")
-                |> List.choose capturePart
-
-            if String.IsNullOrWhiteSpace role && List.isEmpty parts then
-                None
-            else
-                let providerRun =
-                    if role = "assistant" then
-                        ProviderWireDecode.firstString rawObj [ "id" ]
-                        |> Option.orElse (ProviderWireDecode.firstString info [ "id" ])
-                        |> Option.map ProviderRunIdentity.create
-                    else
-                        None
-
-                Some
-                    { Role = role
-                      ProviderRun = providerRun
-                      Parts = parts }
+        if isNull rawObj then None else decodeCapturedMessageBody rawObj
 
     let decodeMessage (rawObj: obj) : WireMessage option =
         decodeCapturedMessage rawObj
@@ -164,21 +164,23 @@ module ProviderWireCapture =
         |> List.tryLast
         |> Option.flatten
 
+    let private formalTextOfMessage (message: CapturedWireMessage) =
+        message.Parts
+        |> List.choose (fun (part: CapturedWirePart) ->
+            match part.WirePart with
+            | WireText text -> Some text
+            | WireReasoning _
+            | WireToolCall _
+            | WireToolResult _
+            // COMPANION-005: B is prose. Media contributes no formal text, and
+            // CTX-013 forbids inventing any — a caption here would become a
+            // claim about image content that nothing verified.
+            | WireMedia _ -> None)
+        |> String.concat ""
+
     /// HOST-005: this turn's formal assistant text, excluding reasoning and tool
     /// parts. The Companion B record is built from it (COMPANION-005).
     let formalText (rawObj: obj) : string =
-        match decodeMessage rawObj with
+        match decodeCapturedMessage rawObj with
         | None -> ""
-        | Some message ->
-            message.Parts
-            |> List.choose (fun part ->
-                match part with
-                | WireText text -> Some text
-                | WireReasoning _
-                | WireToolCall _
-                | WireToolResult _
-                // COMPANION-005: B is prose. Media contributes no formal text, and
-                // CTX-013 forbids inventing any — a caption here would become a
-                // claim about image content that nothing verified.
-                | WireMedia _ -> None)
-            |> String.concat ""
+        | Some message -> formalTextOfMessage message

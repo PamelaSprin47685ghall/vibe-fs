@@ -125,6 +125,64 @@ module ManagerIdle =
             conditionKey
             (ProviderRunIdentity.value terminalProviderRun)
 
+    let private idleClaimed
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (life: LifeProjection)
+        (kindKey: string) =
+        match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
+        | Some durable, Some profile ->
+            PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey turn.ProviderRun
+        | _ -> false
+
+    let private sendIdleEncouragement
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (turn: ReconciledTurn)
+        (journal: AgentJournal option)
+        (life: LifeProjection)
+        (kindKey: string)
+        (kind: IdleEncouragementKind) =
+        task {
+            match!
+                HostSessionNudge.trySendIdleManagerEncouragement
+                    quiescence
+                    permit
+                    sessionPort
+                    turn.SessionId
+                    (idleEncouragement turn.SessionId kind)
+                    turn.Directory
+                    journal
+                    life.LifeId
+                    kindKey
+                    turn.ProviderRun
+            with
+            | HostSessionNudge.IdleContinuationOutcome.Sent _
+            | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+            | HostSessionNudge.IdleContinuationOutcome.Failed error ->
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+        }
+
+    let private processQuiescent
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (nudgeSent: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (turn: ReconciledTurn)
+        (life: LifeProjection)
+        (permit: QuiescencePermit)
+        (kind: IdleEncouragementKind)
+        (kindKey: string)
+        (processKey: string) =
+        if idleClaimed journal turn life kindKey then
+            AsyncSupport.completedTask ()
+        else
+            nudgeSent.Add processKey |> ignore
+            sendIdleEncouragement quiescence permit sessionPort eventPort turn journal life kindKey kind :> Task
+
     let encourageLabor
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -143,35 +201,16 @@ module ManagerIdle =
 
         match context.Quiescence with
         | Some permit when not (nudgeSent.Contains processKey) ->
-            let idleAlreadyClaimed =
-                match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
-                | Some durable, Some profile ->
-                    PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey turn.ProviderRun
-                | _ -> false
-
-            if idleAlreadyClaimed then
-                AsyncSupport.completedTask ()
-            else
-                nudgeSent.Add processKey |> ignore
-
-                task {
-                    match!
-                        HostSessionNudge.trySendIdleManagerEncouragement
-                            quiescence
-                            permit
-                            sessionPort
-                            turn.SessionId
-                            (idleEncouragement turn.SessionId kind)
-                            turn.Directory
-                            journal
-                            life.LifeId
-                            kindKey
-                            turn.ProviderRun
-                    with
-                    | HostSessionNudge.IdleContinuationOutcome.Sent _
-                    | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
-                    | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
-                }
-                :> Task
+            processQuiescent
+                sessionPort
+                eventPort
+                journal
+                nudgeSent
+                quiescence
+                turn
+                life
+                permit
+                kind
+                kindKey
+                processKey
         | _ -> AsyncSupport.completedTask ()

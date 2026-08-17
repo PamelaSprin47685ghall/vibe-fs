@@ -34,7 +34,9 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes test.skip / test.todo / t.
     "test.todo('WHAT[B-002] todo is not proof', () => {})",
     "t.test('WHAT[B-003] nested counts', () => {})",
     "t.test.skip('WHAT[B-004] nested skip counts', () => {})",
-    "test.only('WHAT[B-005] only remains executable', () => {})",
+    "t.test.todo('WHAT[B-005] nested todo counts', () => {})",
+    "t.test.fails('WHAT[B-006] nested fails remains executable', () => {})",
+    "test.only('WHAT[B-007] only remains executable', () => {})",
   ].join('\n')
   const calls = scanTestSource('<virtual>', src)
   assert.deepEqual(
@@ -44,7 +46,9 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner recognizes test.skip / test.todo / t.
       ['WHAT[B-002] todo is not proof', 'todo'],
       ['WHAT[B-003] nested counts', 'active'],
       ['WHAT[B-004] nested skip counts', 'skip'],
-      ['WHAT[B-005] only remains executable', 'active'],
+      ['WHAT[B-005] nested todo counts', 'todo'],
+      ['WHAT[B-006] nested fails remains executable', 'active'],
+      ['WHAT[B-007] only remains executable', 'active'],
     ],
   )
 })
@@ -79,6 +83,17 @@ test('WHAT[REQUIREMENT-SYSTEM-018] scanner rejects duplicate, non-leading, and m
       [null, []],
     ],
   )
+})
+
+test('WHAT[REQUIREMENT-SYSTEM-018] scanner ignores declarations, constructors, and methods named test', () => {
+  const src = [
+    "function test('WHAT[G-001] declaration is not a call site') {}",
+    "new test('WHAT[G-002] constructor is not a proof case')",
+    'class Fixture { test(title) {} }',
+    "test('WHAT[G-003] actual call remains visible', () => {})",
+  ].join('\n')
+  const calls = scanTestSource('<virtual>', src)
+  assert.deepEqual(calls.map((call) => call.title), ['WHAT[G-003] actual call remains visible'])
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner sees nested test calls in template expressions', () => {

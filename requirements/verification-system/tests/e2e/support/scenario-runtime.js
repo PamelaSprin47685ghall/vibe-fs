@@ -70,7 +70,7 @@ export class ScenarioRuntime {
    * needs — `orchestrator-publish` reviews twice, before and after the rebase. Treating
    * the second child as a rebind would either throw or silently orphan the first.
    */
-  bind(alias, sessionId) {
+  bindAlias(alias, sessionId) {
     const bound = this.bindings.get(alias) ?? new Set();
     bound.add(sessionId);
     this.bindings.set(alias, bound);

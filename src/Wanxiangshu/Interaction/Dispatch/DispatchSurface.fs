@@ -9,7 +9,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 /// Dispatch-owned JavaScript boundary. Host ports stay opaque and durable
@@ -19,13 +18,14 @@ open Wanxiangshu.Persistence.Journal
 module DispatchSurface =
 
     type private PlainSessionPort(raw: obj) =
-        let typed = unbox<ISessionHostPort> raw
+        let typed = unbox<Wanxiangshu.OpenCode.ISessionHostPort> raw
         let sendPrompt = raw?``SendPrompt``
+        // DSL-MUTABLE: buffer — latest physical send observation for the JS result
         let mutable lastObservation: obj = null
 
         member _.LastObservation = lastObservation
 
-        interface ISessionHostPort with
+        interface Wanxiangshu.OpenCode.ISessionHostPort with
             member _.SubscribeTerminal(sessionId, listener) = typed.SubscribeTerminal(sessionId, listener)
 
             member _.SendPrompt(sessionId, text, options) =
@@ -56,7 +56,7 @@ module DispatchSurface =
             member _.ListChildren(parent) = typed.ListChildren parent
             member _.FamilyRootOf(sessionId) = typed.FamilyRootOf sessionId
 
-    let internal sessionPort (port: obj) : ISessionHostPort = PlainSessionPort(port) :> ISessionHostPort
+    let internal sessionPort (port: obj) : Wanxiangshu.OpenCode.ISessionHostPort = PlainSessionPort(port) :> Wanxiangshu.OpenCode.ISessionHostPort
 
     let admittedWithReceipt (value: string) : Outcome.SendOutcome =
         Outcome.SendOutcome.AdmittedWithReceipt(TransportReceipt.create value)
@@ -114,7 +114,7 @@ module DispatchSurface =
             let adapter = PlainSessionPort(port)
             let! result =
                 runtime.SendAgentOwnerRoot
-                    (adapter :> ISessionHostPort)
+                    (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
                     (SessionId.create session)
                     text
                     agent
@@ -146,18 +146,28 @@ module DispatchSurface =
         | Ok(_, role, tier, peer) ->
             let peerAgent = if isNull value?peerAgent then peer else string value?peerAgent
 
-            Ok
-                { SessionId = SessionId.create (string value?session)
-                  LogicalRunId = LogicalRunId.create (string value?logicalRun)
-                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (string value?authorityRoot)
-                  AuthorityKind =
-                    match string value?authorityKind with
-                    | "AgentOwnerRoot" -> PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                    | _ -> PromptAuthority.RootAuthorityKind.HumanRoot
-                  SelectedAgent = selectedAgent
-                  PeerAgent = peerAgent
-                  CanonicalRole = role
-                  SelectedTier = tier }
+            match string value?authorityKind with
+            | "AgentOwnerRoot" ->
+                Ok
+                    { SessionId = SessionId.create (string value?session)
+                      LogicalRunId = LogicalRunId.create (string value?logicalRun)
+                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (string value?authorityRoot)
+                      AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+                      SelectedAgent = selectedAgent
+                      PeerAgent = peerAgent
+                      CanonicalRole = role
+                      SelectedTier = tier }
+            | "HumanRoot" ->
+                Ok
+                    { SessionId = SessionId.create (string value?session)
+                      LogicalRunId = LogicalRunId.create (string value?logicalRun)
+                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (string value?authorityRoot)
+                      AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
+                      SelectedAgent = selectedAgent
+                      PeerAgent = peerAgent
+                      CanonicalRole = role
+                      SelectedTier = tier }
+            | unknown -> Error(sprintf "Unknown authority root kind: %s" unknown)
 
     let private awaitModeOf (value: string) =
         if isNull value then
@@ -184,7 +194,7 @@ module DispatchSurface =
                 let adapter = PlainSessionPort(port)
                 let! result =
                     runtime.SendContinuation
-                        (adapter :> ISessionHostPort)
+                        (adapter :> Wanxiangshu.OpenCode.ISessionHostPort)
                         (SessionId.create session)
                         text
                         kind

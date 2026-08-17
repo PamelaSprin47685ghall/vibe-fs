@@ -68,9 +68,10 @@ module LoopDetector =
         detector.Step <- step
         detector.LastSeenTokenStep.[token] <- step
 
-    let pushText (detector: Detector) (text: string) : Evaluation =
-        if not (String.IsNullOrEmpty text) then
-            for token in TokenEncoding.encode text do
-                pushToken detector token
+    let private pushTokens (detector: Detector) (text: string) =
+        for token in TokenEncoding.encode text do
+            pushToken detector token
 
+    let pushText (detector: Detector) (text: string) : Evaluation =
+        if not (String.IsNullOrEmpty text) then pushTokens detector text
         evaluate detector

@@ -63,6 +63,9 @@ type XTraceProjectionState =
         Terminal: (BlobRef * BlobDigest) option
     }
 
+/// DSL-state-combination: domain — optional tool/provider/host identities are
+/// provenance facets of one immutable trace part, not independent execution
+/// stages or mutable continuation state.
 and XTracePartRef =
     {
         Cursor: XTraceCursor
@@ -120,6 +123,25 @@ module XTraceProjection =
         | part :: _ -> part.Cursor.Sequence + 1L
         | [] -> 0L
 
+    let private parseGeneration (token: string) =
+        match System.Int32.TryParse token with
+        | true, n when n >= 0 -> n
+        | _ -> 0
+
+    let rec private collectCurrentGeneration maxGen acc remaining =
+        match remaining with
+        | [] -> List.rev acc
+        | part :: tail when part.Generation > maxGen -> collectCurrentGeneration part.Generation [ part ] tail
+        | part :: tail when part.Generation = maxGen -> collectCurrentGeneration maxGen (part :: acc) tail
+        | _ :: tail -> collectCurrentGeneration maxGen acc tail
+
+    let private cursorAfterSearch searchable =
+        match List.tryLast searchable with
+        | Some last ->
+            { TurnIndex = last.Turn + 1
+              PartIndex = 0 }
+        | None -> { TurnIndex = 0; PartIndex = 0 }
+
     /// COMPANION-003: capture the opening task verbatim. Idempotent: replaying
     /// the same text changes nothing; a DIFFERENT text is refused (PERSIST-010).
     let applyOpening
@@ -149,10 +171,7 @@ module XTraceProjection =
             let rest = provenance.Substring(2)
             let slash = rest.IndexOf('/')
             let token = if slash < 0 then rest else rest.Substring(0, slash)
-
-            match System.Int32.TryParse token with
-            | true, n when n >= 0 -> n
-            | _ -> 0
+            parseGeneration token
         else
             0
 
@@ -217,15 +236,7 @@ module XTraceProjection =
     let currentGenerationParts (parts: XTracePartRef list) : XTracePartRef list =
         match parts with
         | [] -> []
-        | first :: rest ->
-            let rec collect maxGen acc remaining =
-                match remaining with
-                | [] -> List.rev acc
-                | part :: tail when part.Generation > maxGen -> collect part.Generation [ part ] tail
-                | part :: tail when part.Generation = maxGen -> collect maxGen (part :: acc) tail
-                | _ :: tail -> collect maxGen acc tail
-
-            collect first.Generation [ first ] rest
+        | first :: rest -> collectCurrentGeneration first.Generation [ first ] rest
 
     /// Map an ingest cursor (sequence of the last COVERED part) to the semantic
     /// cursor of the first UNCOVERED part. `>` not `>=`: the coverage sequence
@@ -247,9 +258,4 @@ module XTraceProjection =
         | Some part ->
             { TurnIndex = part.Turn
               PartIndex = part.PartIndex }
-        | None ->
-            match List.tryLast searchable with
-            | Some last ->
-                { TurnIndex = last.Turn + 1
-                  PartIndex = 0 }
-            | None -> { TurnIndex = 0; PartIndex = 0 }
+        | None -> cursorAfterSearch searchable

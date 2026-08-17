@@ -51,8 +51,7 @@ export const isInfrastructurePath = (file) => {
     rel.includes('/Git/') ||
     rel.includes('/Host/') ||
     rel.includes('/Composition/') ||
-    rel.includes('/Resources/') ||
-    rel.endsWith('Surface.fs')
+    rel.includes('/Resources/')
   )
 }
 
@@ -106,43 +105,48 @@ export const hasDslMutableDeclaration = (lines, i) => {
 export const CONTROL_STATE_EXEMPT = new Set([])
 
 
-/**
- * Host-facing Session adapters may open OpenCode/Process/Infrastructure.
- * Basename allowlist only — other Session/Application files stay fail-closed.
- * These files compose Host ports / PromptDispatcher extensions / Pty backends.
- */
-/**
- * Host-facing Session adapters may open OpenCode/Process/Infrastructure.
+/** Host-facing Session adapters may open OpenCode/Process/Infrastructure.
  *
  * TASK.md §4 (PR 0 rotation): basename allowlist is too wide — any file named
  * Runtime.fs / Host.fs / Workflow.fs / Types.fs would inherit physical-boundary
  * power. Authorization is now exact-path: a new Host adapter must be named
  * here explicitly, and a rename/move turns RED until the entry is updated.
- * The 54 paths below are exactly the files that today open
- * Wanxiangshu.Infrastructure|OpenCode|Process (probed 2026-08-16); the
- * previous 24 needless basename entries (files that never touch those
- * namespaces) were dropped — they carried phantom authority.
+ * The exact paths below are the files that today own an explicit
+ * Infrastructure|OpenCode|Process boundary. Surface adapters are registered
+ * individually; a basename never grants authority and a rename/move turns RED
+ * until its owner path is reviewed.
  */
 export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Change/Host/Host.fs',
   'src/Wanxiangshu/Change/Host/ReviewRunner.fs',
   'src/Wanxiangshu/Change/Host/SessionDirectories.fs',
   'src/Wanxiangshu/Change/Host/Types.fs',
+  // JS-native surfaces that are themselves physical adapters. These are
+  // explicit paths, never basename authority: a neighboring Surface.fs has
+  // no physical-boundary exemption unless it is registered here.
+  'src/Wanxiangshu/Change/Surface.fs',
+  'src/Wanxiangshu/Change/Host/Surface.fs',
   'src/Wanxiangshu/Composition/Turn/Workflow.fs',
   'src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs',
   'src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs',
   'src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs',
   'src/Wanxiangshu/Context/Companion/Host.fs',
   'src/Wanxiangshu/Context/Companion/HostBlogger.fs',
+  'src/Wanxiangshu/Context/Companion/RuntimeSurface.fs',
   'src/Wanxiangshu/Context/Companion/Transform.fs',
+  'src/Wanxiangshu/Context/Companion/CompressionSurface.fs',
   'src/Wanxiangshu/Context/Prefix/Wire.fs',
   'src/Wanxiangshu/Context/Trace/Capture.fs',
   'src/Wanxiangshu/Context/Trace/TerminalReporter.fs',
+  'src/Wanxiangshu/Context/Trace/XTraceSurface.fs',
   'src/Wanxiangshu/Enforcer/Continuation.fs',
   'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs',
   'src/Wanxiangshu/Enforcer/Cycle/Decode.fs',
   'src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs',
+  'src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs',
   'src/Wanxiangshu/Enforcer/Guidance/Tip.fs',
+  'src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs',
+  'src/Wanxiangshu/Enforcer/BlogSurface.fs',
   'src/Wanxiangshu/Enforcer/Host.fs',
   'src/Wanxiangshu/Enforcer/Repair.fs',
   'src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs',
@@ -150,40 +154,57 @@ export const HOST_BOUNDARY_OPEN_PATHS = new Set([
   'src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs',
   'src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs',
   'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs',
+  'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs',
   'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs',
   'src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs',
   'src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs',
+  'src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs',
   'src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs',
   'src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Ingress.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Recovery.fs',
+  'src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs',
+  'src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs',
   'src/Wanxiangshu/Interaction/Dispatch/Send.fs',
   'src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs',
+  'src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs',
   'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs',
   'src/Wanxiangshu/Mission/Manager/Background.fs',
   'src/Wanxiangshu/Mission/Manager/Idle.fs',
   'src/Wanxiangshu/Mission/Manager/JobHandoff.fs',
   'src/Wanxiangshu/Mission/Manager/Workflow.fs',
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs',
+  'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs',
   'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
+  'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs',
   'src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
   'src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs',
   'src/Wanxiangshu/Mission/Review/TodoProcess.fs',
+  'src/Wanxiangshu/Mission/Review/Assurance/Surface.fs',
   'src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs',
+  'src/Wanxiangshu/Participant/Provider/Projection/Surface.fs',
+  'src/Wanxiangshu/Participant/Provider/LanguageSurface.fs',
   'src/Wanxiangshu/Persistence/Journal/FactCodec.fs',
+  'src/Wanxiangshu/Persistence/Journal/Surface.fs',
+  'src/Wanxiangshu/Process/Surface.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs',
+  'src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs',
   'src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs',
+  'src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs',
   'src/Wanxiangshu/Strength/OpenCode/Speculate.fs',
   'src/Wanxiangshu/Strength/Replica/Runtime.fs',
   'src/Wanxiangshu/Strength/Replica/Transform.fs',
+  'src/Wanxiangshu/Strength/Surface.fs',
+  'src/Wanxiangshu/Verification/TemporalSurface.fs',
   'src/Wanxiangshu/Strength/TurnEvidence.fs',
 ])
 
 export const isHostBoundaryOpenPath = (file) => {
-  const rel = norm(String(file))
-  return HOST_BOUNDARY_OPEN_PATHS.has(rel)
+  const normalized = norm(String(file))
+  return [...HOST_BOUNDARY_OPEN_PATHS].some((path) => normalized === path || normalized.endsWith(`/${path}`))
 }
 
 export const FORBIDDEN = [
@@ -191,7 +212,7 @@ export const FORBIDDEN = [
   // 1-2 lines carry a precise `// DSL-MUTABLE: <category>` declaration. Any
   // production file may use the declaration; there is no path whitelist. The
   // preceding-line check is applied in scanText.
-  { gate: 'mutable', pattern: /\blet mutable\b/, label: 'let mutable without DSL-MUTABLE declaration', skipIf: (file) => String(file).endsWith('Surface.fs') },
+  { gate: 'mutable', pattern: /\blet mutable\b/, label: 'let mutable without DSL-MUTABLE declaration' },
   { gate: 'flow-lift', pattern: /\bFlow\.(?:lift|create)\b/, label: 'Flow.lift / Flow.create' },
   {
     // FLOW-002/FLOW-006 second-runtime forms. Catches realistic bypass shapes:
@@ -335,10 +356,18 @@ const CONTROL_STATE_REASON_BLOCKERS = [
   'bounded-recursion',
 ]
 
-/** True when `lines` carries, near `index`, a structurally valid ControlState reason. */
+/** True when `lines[index]` and a valid reason share one contiguous doc block.
+ * A nearby reason belonging to another declaration must not legalize ControlState.
+ */
 export const hasValidControlStateReason = (lines, index) => {
-  const from = Math.max(0, index - 8)
-  const to = Math.min(lines.length - 1, index + 8)
+  const isDocLine = (line) => /^\s*\/\/\//.test(line)
+  if (!isDocLine(lines[index] ?? '')) return false
+
+  let from = index
+  while (from > 0 && isDocLine(lines[from - 1])) from--
+  let to = index
+  while (to + 1 < lines.length && isDocLine(lines[to + 1])) to++
+
   for (let j = from; j <= to; j++) {
     const m = /\/\/\/\s*DSL-control-state-reason:\s*(.+)/.exec(lines[j])
     if (!m) continue
@@ -390,8 +419,11 @@ export function scanStateProducts(text, file = '<synthetic>') {
     }
   }
 
-  // Walk each record definition and classify its state-typed fields.
-  const recordStart = /^\s*(?:type|and)\s+(\w+)\s*=\s*\{\s*$/
+  // Walk each record definition and classify its state-typed fields. Records
+  // may put `{` on the declaration line or on the following line; both forms
+  // are common in the production tree and must share the same fail-closed path.
+  const declaration = /^\s*(?:type|and)\s+(?:private\s+|internal\s+|public\s+)?(\w+)\s*=\s*(.*)$/
+  const bodyOpen = /^\s*\{\s*$/
   const recordEnd = /^\s*\}\s*$/
   // ce.md §13.1: the field rule must also read `mutable Foo: Type` so a
   // mutable-record state machine cannot slip past state-product. A plain
@@ -407,45 +439,77 @@ export function scanStateProducts(text, file = '<synthetic>') {
     return definedDus.has(t)
   }
 
+  const collectDoc = (index) => {
+    const doc = []
+    for (let j = index - 1; j >= 0; j--) {
+      const t = lines[j].trim()
+      if (t === '') continue
+      if (/^\[</.test(t)) continue
+      if (/^\/\//.test(t) && !/^\/\/\//.test(t)) continue
+      if (!/^\/\/\//.test(t)) break
+      doc.unshift(lines[j])
+    }
+    return doc
+  }
+
+  const emit = (rec) => {
+    const stateFields = rec.fields.filter((f) => stateType(f.type))
+    const classified = rec.doc.some((l) =>
+      STATE_COMBINATION_CATEGORIES.some((c) => l.includes(`DSL-state-combination: ${c}`)),
+    )
+    if (stateFields.length >= 2 && !classified) {
+      violations.push({
+        gate: 'state-product',
+        file,
+        line: rec.line,
+        text:
+          `record '${rec.name}' combines ${stateFields.length} independent state axes ` +
+          `(${stateFields.map((f) => f.name).join(', ')}) without a ` +
+          '/// DSL-state-combination: domain|physical classification',
+      })
+    }
+  }
+
+  let pending = null
   let rec = null
   for (let i = 0; i < lines.length; i++) {
-    const sm = recordStart.exec(lines[i])
-    if (sm) {
-      rec = { name: sm[1], fields: [], line: i + 1, doc: [] }
-      for (let j = i - 1; j >= 0; j--) {
-        const t = lines[j].trim()
-        if (t === '') continue
-        if (/^\[</.test(t)) continue
-        if (/^\/\//.test(t) && !/^\/\/\//.test(t)) continue
-        if (!/^\/\/\//.test(t)) break
-        rec.doc.unshift(lines[j])
-      }
-      continue
-    }
-    if (!rec) continue
-    if (recordEnd.test(lines[i])) {
-      const stateFields = rec.fields.filter((f) => stateType(f.type))
-      const classified = rec.doc.some((l) =>
-        STATE_COMBINATION_CATEGORIES.some((c) => l.includes(`DSL-state-combination: ${c}`)),
-      )
-      if (stateFields.length >= 2 && !classified) {
-        violations.push({
-          gate: 'state-product',
-          file,
-          line: rec.line,
-          text:
-            `record '${rec.name}' combines ${stateFields.length} independent state axes ` +
-            `(${stateFields.map((f) => f.name).join(', ')}) without a ` +
-            '/// DSL-state-combination: domain|physical classification',
-        })
-      }
+    const dm = declaration.exec(lines[i])
+    if (dm) {
+      if (rec) emit(rec)
       rec = null
+      pending = { name: dm[1], line: i + 1, doc: collectDoc(i) }
+      if (bodyOpen.test(dm[2])) {
+        rec = { ...pending, fields: [] }
+        pending = null
+      }
       continue
     }
-    const mf = mutableFieldLine.exec(lines[i])
-    const fm = mf ?? fieldLine.exec(lines[i])
-    if (fm) rec.fields.push({ name: fm[1], type: fm[2], isMutable: mf !== null })
+
+    if (rec) {
+      if (recordEnd.test(lines[i])) {
+        emit(rec)
+        rec = null
+        continue
+      }
+      const mf = mutableFieldLine.exec(lines[i])
+      const fm = mf ?? fieldLine.exec(lines[i])
+      if (fm) rec.fields.push({ name: fm[1], type: fm[2], isMutable: mf !== null })
+      continue
+    }
+
+    if (pending) {
+      const trimmed = lines[i].trim()
+      if (bodyOpen.test(lines[i])) {
+        rec = { ...pending, fields: [] }
+        pending = null
+      } else if (trimmed !== '' && !trimmed.startsWith('//')) {
+        // A case or another non-record body means the declaration was a DU,
+        // abbreviation, or member block. Do not carry it into the next type.
+        pending = null
+      }
+    }
   }
+  if (rec) emit(rec)
   return violations
 }
 

@@ -19,15 +19,26 @@ open Wanxiangshu.Strength
 /// Pure view of one ChildRun's physical completion/cancellation state.
 module ChildRunProjection =
 
+    let private statusOfCompletion completion =
+        match completion.Outcome with
+        | AgentFailed payload when payload.Code = "INTERRUPTED" -> AgentStatus.Interrupted
+        | AgentAbandoned _ -> AgentStatus.Closed
+        | _ -> AgentStatus.Idle
+
+    let private statusOfStoredValue storedValue =
+        storedValue |> Option.map statusOfCompletion |> Option.defaultValue AgentStatus.Idle
+
+    let private lastStatusOfCompletion completion =
+        match completion.Outcome with
+        | AgentFailed payload when payload.Code = "INTERRUPTED" -> Some payload.Message
+        | AgentAbandoned(_, reason) -> Some reason
+        | _ -> Some(AgentCompletion.status completion.Outcome)
+
+    let private lastStatusOfStoredValue storedValue = storedValue |> Option.bind lastStatusOfCompletion
+
     let status runtimeCancelled (run: ChildRun) =
         if run.Completion.IsCompleted then
-            match run.Completion.StoredValue with
-            | Some completion ->
-                match completion.Outcome with
-                | AgentFailed payload when payload.Code = "INTERRUPTED" -> AgentStatus.Interrupted
-                | AgentAbandoned _ -> AgentStatus.Closed
-                | _ -> AgentStatus.Idle
-            | None -> AgentStatus.Idle
+            statusOfStoredValue run.Completion.StoredValue
         elif runtimeCancelled || run.Cancellation.IsCancellationRequested then
             AgentStatus.Closed
         else
@@ -35,16 +46,7 @@ module ChildRunProjection =
 
     let toRecord runtimeCancelled (agentId: string) (run: ChildRun) =
         let lastStatus =
-            if run.Completion.IsCompleted then
-                match run.Completion.StoredValue with
-                | Some completion ->
-                    match completion.Outcome with
-                    | AgentFailed payload when payload.Code = "INTERRUPTED" -> Some payload.Message
-                    | AgentAbandoned(_, reason) -> Some reason
-                    | _ -> Some(AgentCompletion.status completion.Outcome)
-                | None -> None
-            else
-                None
+            if run.Completion.IsCompleted then lastStatusOfStoredValue run.Completion.StoredValue else None
 
         { AgentId = agentId
           Agent = run.AgentName

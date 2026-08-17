@@ -2,7 +2,6 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System.Threading.Tasks
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 
 /// JS-native provider fetch boundary. The Host schema, Casebook index, replay,
@@ -14,7 +13,7 @@ module CasebookFetchSurface =
         (unbox<EventStoreHandle> value).Store
 
     let contract (toolModule: obj) (workspaceRoot: string) (store: obj) : obj =
-        let spec = FetchTool.spec (ToolHostCodec.factory toolModule) workspaceRoot (storeOf store)
+        let spec = Wanxiangshu.OpenCode.FetchTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule) workspaceRoot (storeOf store)
 
         box
             {| name = spec.Name
@@ -23,6 +22,6 @@ module CasebookFetchSurface =
                execute =
                    fun args context ->
                        task {
-                           let! result = spec.Execute (HostToolArguments args) (ToolHostCodec.decodeContext context)
-                           return ToolResultBound.bound result
+                           let! result = spec.Execute (Wanxiangshu.OpenCode.HostToolArguments args) (Wanxiangshu.OpenCode.ToolHostCodec.decodeContext context)
+                           return Wanxiangshu.Host.Contract.ToolResultBound.bound result
                        } |}

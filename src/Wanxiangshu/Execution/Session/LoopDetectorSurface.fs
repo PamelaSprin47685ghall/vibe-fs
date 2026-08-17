@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Execution.Session
 
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Foundation.Identity
 
 /// JavaScript boundary for loop-detector and text-delta semantics.
@@ -53,12 +52,12 @@ module LoopDetectorSurface =
         LoopDetector.pushText detector text |> evaluationView
 
     let isLoopTextDelta (raw: obj) : bool =
-        LoopEventCodec.isLoopTextDelta raw
+        Wanxiangshu.OpenCode.LoopEventCodec.isLoopTextDelta raw
 
     let tryDecodeTextDelta (raw: obj) : obj =
-        match LoopEventCodec.tryDecodeTextDelta raw with
+        match Wanxiangshu.OpenCode.LoopEventCodec.tryDecodeTextDelta raw with
         | None -> null
-        | Some (delta: LoopEventCodec.TextDelta) ->
+        | Some (delta: Wanxiangshu.OpenCode.LoopEventCodec.TextDelta) ->
             box
                 {| sessionId = SessionId.value delta.SessionId
                    messageId = delta.MessageId

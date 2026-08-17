@@ -115,6 +115,12 @@ test('WHAT[CONTEXT-COMPRESSION-007] CTX_007_a_failed_squash_fails_the_slot_witho
 
 // ── CTX-007: the main request ──────────────────────────────────────────────
 
+test('WHAT[CONTEXT-COMPRESSION-007] FALLBACK_011_unknown_kind_and_outcome_fail_closed', () => {
+  assert.equal(slot.onMain({ kind: 'unknown', outcome: 'Completed' }).ok, false)
+  assert.equal(slot.onMain({ kind: requestKind.workMain, outcome: 'unknown' }).ok, false)
+  assert.equal(slot.onSquash('unknown').ok, false)
+})
+
 test('WHAT[CONTEXT-COMPRESSION-007] FALLBACK_011_only_a_business_main_success_clears_the_failure_count', () => {
   const clears = (kind) => slot.onMain({ kind, outcome: 'Completed' }).clearsFailureCount
 

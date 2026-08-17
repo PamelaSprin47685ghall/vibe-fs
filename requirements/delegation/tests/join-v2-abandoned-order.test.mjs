@@ -6,7 +6,7 @@ import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 
 test('WHAT[DELEG-015] JOIN_V2_abandoned_order_is_stable_after_completed_items', () => {
   const wire = join.renderBatch('english', [
-    { kind: 'completed', agentId: 'a1', agentName: 'first', workRecord: 'one' },
+    { kind: 'completed', agentId: 'a1', agentName: 'first', role: 'Coder', runId: 'run-a1', workRecord: 'one' },
     { kind: 'abandoned', agentId: 'a2', agentName: 'second', reason: 'gone' },
   ])
   assert.ok(wire.indexOf('first') < wire.indexOf('second'))

@@ -68,22 +68,46 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
         }
 
     let latestBlogText (blog: BlogProjectionState) : Task<Result<BlogText option, string>> =
+        let finishFrames acc : Result<BlogText option, string> =
+            match List.rev acc with
+            | [] -> Ok None
+            | values -> Ok(Some(String.concat "\n\n" values))
+
         let rec readFrames (frames: BlogFrame list) acc =
             task {
                 match frames with
-                | [] ->
-                    match List.rev acc with
-                    | [] -> return Ok None
-                    | values -> return Ok(Some(String.concat "\n\n" values))
-                | frame :: tail ->
-                    match! blobWriter.Read frame.TextRef with
-                    | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
-                        return! readFrames tail (text :: acc)
-                    | Ok _ -> return Error(sprintf "blob digest mismatch: %s" (BlobDigest.value frame.Digest))
-                    | Error error -> return Error error
+                | [] -> return finishFrames acc
+                | frame :: tail -> return! readFrame frame tail acc
+            }
+
+        and readFrame (frame: BlogFrame) tail acc =
+            task {
+                match! blobWriter.Read frame.TextRef with
+                | Ok text when HostDigest.sha256Hex text = BlobDigest.value frame.Digest ->
+                    return! readFrames tail (text :: acc)
+                | Ok _ -> return Error(sprintf "blob digest mismatch: %s" (BlobDigest.value frame.Digest))
+                | Error error -> return Error error
             }
 
         readFrames (BlogProjection.frames blog) []
+
+    let loadSession (session: SessionAgentProjection) : Task<Result<CompanionMemory option, string>> =
+        task {
+            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+
+            match! latestBlogText blog with
+            | Error error -> return Error error
+            | Ok latestB ->
+                return
+                    Ok(
+                        Some
+                            { Blog = blog
+                              EffectiveFrames = latestB
+                              BloggerSessionId =
+                                session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId)
+                              XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }
+                    )
+        }
 
     interface ICompanionDurablePort with
         member _.Load(sessionId: SessionId) : Task<Result<CompanionMemory option, string>> =
@@ -92,21 +116,7 @@ type AgentJournalCompanionPort(journal: AgentJournal) =
 
                 match Map.tryFind sessionId projection.AgentProjections.Sessions with
                 | None -> return Ok None
-                | Some session ->
-                    let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-
-                    match! latestBlogText blog with
-                    | Error error -> return Error error
-                    | Ok latestB ->
-                        return
-                            Ok(
-                                Some
-                                    { Blog = blog
-                                      EffectiveFrames = latestB
-                                      BloggerSessionId =
-                                        session.Companion |> Option.bind (fun companion -> companion.BloggerSessionId)
-                                      XTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty }
-                            )
+                | Some session -> return! loadSession session
             }
 
         member _.LinkBlogger(sessionId, bloggerSessionId, bloggerAgent) =

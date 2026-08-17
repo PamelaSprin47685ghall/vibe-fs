@@ -99,6 +99,9 @@ type CandidateProposal =
       Cost: float
       Provenance: string list }
 
+/// DSL-state-combination: domain — action lifecycle status is combined with
+/// optional semantic equivalence/dependency keys as epistemic-domain facts; no
+/// field encodes a runtime continuation or execution cursor.
 type CognitiveAction =
     { Id: string
       Kind: ActionKind

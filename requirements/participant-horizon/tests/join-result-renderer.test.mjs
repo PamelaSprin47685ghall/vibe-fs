@@ -5,8 +5,8 @@ import { parse as parseToml } from 'smol-toml'
 import * as join from '../../../dist/Execution/Delegation/Fork/OpenCode/JoinSurface.js'
 
 const LEGACY_DTO = /\b(status|count|ordinal|kind|agent|code|message)\s*=|\[\[result\]\]|\[error\]/
-const completed = (over = {}) => ({ kind: 'completed', agentId: 'a1', agentName: 'fast-coder', workRecord: '', ...over })
-const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'deep-reviewer', code: 'E1', message: 'boom', ...over })
+const completed = (over = {}) => ({ kind: 'completed', agentId: 'a1', agentName: 'fast-coder', role: 'Coder', runId: 'run-a1', workRecord: '', ...over })
+const failed = (over = {}) => ({ kind: 'failed', agentId: 'a1', agentName: 'deep-reviewer', role: 'Reviewer', runId: 'run-a1', code: 'E1', message: 'boom', ...over })
 const pty = (kind, over = {}) => ({ kind, ptyId: 'pty-1', terminalLabel: 'npm test', outcome: 'exit 0', code: '', message: '', ...over, ...(kind ? { kind } : {}) })
 
 const assertClean = (wire, label) => assert.ok(!LEGACY_DTO.test(wire), `${label}: ${wire}`)

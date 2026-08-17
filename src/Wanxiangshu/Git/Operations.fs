@@ -147,6 +147,12 @@ module GitOperations =
                 return Ok()
         }
 
+    let private mergeFailure message =
+        if isRefMoved message then
+            OrchestratorConstants.targetRefMovedError
+        else
+            message
+
     let private mergeFf
         (runner: Command -> Task<int * string * string>)
         repoPath
@@ -160,14 +166,8 @@ module GitOperations =
                 return! verifyHead runner repoPath candidate
             else
                 let message = failure mergeOut mergeError
-
-                return
-                    Error(
-                        if isRefMoved message then
-                            OrchestratorConstants.targetRefMovedError
-                        else
-                            message
-                    )
+                let classified = mergeFailure message
+                return Error classified
         }
 
     /// ff-only publish inside the short Integration Gate (ORCH-005).

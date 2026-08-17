@@ -89,13 +89,6 @@ module FactCodec =
             let hasTipRuleId = json.IndexOf("\"TipRuleId\"", StringComparison.Ordinal) >= 0
             hasScoreVector || not hasTipRuleId
 
-    /// Dual-decode: physical writes use BlogObservationCommitted /
-    /// BlogObservationsSquashed; journals may still carry the pre-cutover tags.
-    let rewriteLegacyObservationTags (json: string) : string =
-        json
-            .Replace("\"BlogEntryCommitted\"", "\"BlogObservationCommitted\"")
-            .Replace("\"BlogSquashCommitted\"", "\"BlogObservationsSquashed\"")
-
     /// HOST-013 anchored replay clean break: the legacy unanchored
     /// `PairProgrammingGuidelineAppended` carried only Ordinal / CallId /
     /// MarkerText. Its transcript position cannot be recovered without a
@@ -151,107 +144,6 @@ module FactCodec =
     let serializeFact (fact: Fact) : string =
         Encode.Auto.toString (0, pinToUtc fact, extra = extra)
 
-    /// Evidence → Decision: one JSON string step after an opening quote.
-    let private skipJsonString (json: string) (startAfterQuote: int) : int =
-        let rec skipString j =
-            if j >= json.Length then j
-            elif json.[j] = '\\' then skipString (j + 2)
-            elif json.[j] = '"' then j + 1
-            else skipString (j + 1)
-
-        skipString startAfterQuote
-
-    type private ObjectScanStep =
-        | Exhausted
-        | Found of closeIndex: int
-        | Advance of nextIndex: int * nextDepth: int
-
-    /// Evidence → Decision: one brace-depth step inside an auto-encoded payload object.
-    let private stepJsonObjectScan (json: string) (i: int) (depth: int) : ObjectScanStep =
-        if i >= json.Length then
-            Exhausted
-        elif json.[i] = '{' then
-            Advance(i + 1, depth + 1)
-        elif json.[i] = '}' && depth = 1 then
-            Found i
-        elif json.[i] = '}' then
-            Advance(i + 1, depth - 1)
-        elif json.[i] = '"' then
-            Advance(skipJsonString json (i + 1), depth)
-        else
-            Advance(i + 1, depth)
-
-    let private findMatchingObjectClose (json: string) (openBrace: int) : int option =
-        let rec loop i depth =
-            match stepJsonObjectScan json i depth with
-            | Exhausted -> None
-            | Found close -> Some close
-            | Advance(nextIndex, nextDepth) -> loop nextIndex nextDepth
-
-        loop (openBrace + 1) 1
-
-    /// Locate the first object after a DU case marker; None when marker/brace/close missing.
-    let private tryObjectCloseAfterMarker (json: string) (caseMarker: string) : int option =
-        let start = json.IndexOf(caseMarker, StringComparison.Ordinal)
-
-        if start < 0 then None
-        elif json.IndexOf('{', start) < 0 then None
-        else findMatchingObjectClose json (json.IndexOf('{', start))
-
-    /// Insert auto-encoded optional fields before the payload object's closing brace.
-    let private insertFieldsBeforeObjectClose (json: string) (caseMarker: string) (fields: string) : string =
-        match tryObjectCloseAfterMarker json caseMarker with
-        | None -> json
-        | Some close ->
-            let before = json.Substring(0, close)
-            let after = json.Substring(close)
-            let trimmed = before.TrimEnd()
-
-            let needsComma =
-                trimmed.Length > 0
-                && trimmed.[trimmed.Length - 1] <> '{'
-                && trimmed.[trimmed.Length - 1] <> ','
-
-            let piece = if needsComma then "," + fields else fields
-            before + piece + after
-
-    /// 0.5.1 → 0.5.2: `HandleCompleted` gained `CompletionRef` / `CompletionDigest`.
-    /// Old lines lack both keys; inject null so Decode maps them to `None`.
-    let private migrateHandleCompleted (json: string) : string =
-        if json.IndexOf("\"HandleCompleted\"", StringComparison.Ordinal) < 0 then
-            json
-        elif json.IndexOf("\"CompletionRef\"", StringComparison.Ordinal) >= 0 then
-            json
-        else
-            // Anonymous-record payload is the object after the case name. Insert the
-            // two optional fields before its closing brace of that object. A single
-            // first-object close is enough: HandleCompleted's payload has no nested
-            // objects that open before the outer close in the auto-encoded shape.
-            insertFieldsBeforeObjectClose json "\"HandleCompleted\"" "\"CompletionRef\":null,\"CompletionDigest\":null"
-
-    /// GLORY-002 / SURFACE-006: `HandleLinked` gained `Ownership`. Old lines
-    /// lack the key; inject `DurableParentHandle` so replay keeps the pre-change
-    /// meaning (every legacy handle was parent-visible).
-    let private migrateHandleOwnership (json: string) : string =
-        if json.IndexOf("\"HandleLinked\"", StringComparison.Ordinal) < 0 then
-            json
-        elif json.IndexOf("\"Ownership\"", StringComparison.Ordinal) >= 0 then
-            json
-        else
-            insertFieldsBeforeObjectClose json "\"HandleLinked\"" "\"Ownership\":\"DurableParentHandle\""
-
-    /// EXEC-002: `HandleLinked` gained a provider presentation identity (`Byname`)
-    /// distinct from the Host machine binding (`TargetAgent`). Historical facts
-    /// predate that distinction, so an empty Byname asks the fold to fall back to
-    /// TargetAgent without fabricating a new logical identity during replay.
-    let private migrateHandleByname (json: string) : string =
-        if json.IndexOf("\"HandleLinked\"", StringComparison.Ordinal) < 0 then
-            json
-        elif json.IndexOf("\"Byname\"", StringComparison.Ordinal) >= 0 then
-            json
-        else
-            insertFieldsBeforeObjectClose json "\"HandleLinked\"" "\"Byname\":\"\""
-
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
             Error pre050MigrationMessage
@@ -260,12 +152,5 @@ module FactCodec =
         elif containsLegacyUnanchoredGuideline json then
             Error legacyGuidelineCleanBreakMessage
         else
-            Decode.Auto.fromString<Fact> (
-                json
-                |> migrateHandleCompleted
-                |> migrateHandleOwnership
-                |> migrateHandleByname
-                |> rewriteLegacyObservationTags,
-                extra = extra
-            )
+            Decode.Auto.fromString<Fact> (json, extra = extra)
             |> Result.map pinToUtc

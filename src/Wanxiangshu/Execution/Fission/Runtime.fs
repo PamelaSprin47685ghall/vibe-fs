@@ -50,6 +50,22 @@ module FissionRuntime =
     let private deliveryKey groupId completionId laneIndex =
         groupId + "\u001f" + completionId + "\u001f" + string laneIndex
 
+    let private disposeSafely (resource: IDisposable) =
+        try
+            resource.Dispose()
+        with _ ->
+            ()
+
+    let private disposeGroupResources
+        (groupResources: Dictionary<string, ResizeArray<IDisposable>>)
+        (groupId: string)
+        : unit =
+        match groupResources.TryGetValue groupId with
+        | true, resources ->
+            resources |> Seq.iter disposeSafely
+            groupResources.Remove groupId |> ignore
+        | false, _ -> ()
+
     let bindLane groupId ownerSessionId laneIndex laneCount laneSessionId =
         let binding =
             { GroupId = groupId
@@ -126,25 +142,20 @@ module FissionRuntime =
                     current |> Seq.toList
                 | false, _ -> [])
 
-        for resource in resources do
-            try
-                resource.Dispose()
-            with _ ->
-                ()
+        resources |> Seq.iter disposeSafely
+
+    let private observerForGroup groupId =
+        lock gate (fun () ->
+            match childObservers.TryGetValue groupId with
+            | true, callback -> Some callback
+            | false, _ -> None)
 
     let notifyChildCreated laneSessionId handleId childSessionId =
         match tryLane laneSessionId with
         | None -> ()
         | Some binding ->
             bindHandleAffinity binding.OwnerSessionId handleId binding.LaneIndex
-
-            let observer =
-                lock gate (fun () ->
-                    match childObservers.TryGetValue binding.GroupId with
-                    | true, callback -> Some callback
-                    | false, _ -> None)
-
-            observer
+            observerForGroup binding.GroupId
             |> Option.iter (fun callback -> callback binding.LaneIndex handleId childSessionId)
 
     let tryHandleAffinity ownerSessionId handleId =
@@ -172,18 +183,7 @@ module FissionRuntime =
 
             groupIds |> Array.iter (fun groupId -> childObservers.Remove groupId |> ignore)
 
-            groupIds
-            |> Array.iter (fun groupId ->
-                match groupResources.TryGetValue groupId with
-                | true, resources ->
-                    for resource in resources do
-                        try
-                            resource.Dispose()
-                        with _ ->
-                            ()
-
-                    groupResources.Remove groupId |> ignore
-                | false, _ -> ())
+            groupIds |> Array.iter (disposeGroupResources groupResources)
 
             handleAffinities.Keys
             |> Seq.filter (fun key -> key.StartsWith(ownerKey + "\u001f"))

@@ -108,6 +108,15 @@ module CausalAwait =
         task {
             use lease = observer.Enter descriptor
 
+            let interpretWinner continueLoop winnerObj =
+                task {
+                    match unbox<Choice<unit, unit>> winnerObj with
+                    | Choice1Of2() -> return! continueLoop ()
+                    | Choice2Of2() ->
+                        lease.MarkExit DiagnosticWaitExit.WaitTimedOut
+                        return Error DiagnosticWaitExit.WaitTimedOut
+                }
+
             let rec loop () =
                 task {
                     match tryRead () with
@@ -129,12 +138,7 @@ module CausalAwait =
                             }
 
                         let! winnerObj = emitJsExpr (taggedSignal, taggedDeadline) "Promise.race([$0, $1])": Task<obj>
-
-                        match unbox<Choice<unit, unit>> winnerObj with
-                        | Choice1Of2() -> return! loop ()
-                        | Choice2Of2() ->
-                            lease.MarkExit DiagnosticWaitExit.WaitTimedOut
-                            return Error DiagnosticWaitExit.WaitTimedOut
+                        return! interpretWinner loop winnerObj
                 }
 
             return! loop ()

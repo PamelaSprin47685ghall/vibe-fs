@@ -98,8 +98,23 @@ module SyncDelegateSurface =
 
         loop 1000
 
-    let private roleOf (value: string) =
-        if value.Equals("Coder", StringComparison.OrdinalIgnoreCase) then SyncDelegateRole.Coder else SyncDelegateRole.Inspector
+    let private roleOf (value: string) : Result<SyncDelegateRole, string> =
+        if String.IsNullOrWhiteSpace value then
+            Error "role is required"
+        elif value.Equals("Coder", StringComparison.OrdinalIgnoreCase) then
+            Ok SyncDelegateRole.Coder
+        elif value.Equals("Inspector", StringComparison.OrdinalIgnoreCase) then
+            Ok SyncDelegateRole.Inspector
+        else
+            Error(sprintf "unknown role: %s" value)
+
+    let private outcomeOf (value: string) : Result<ReconcileProgram.TurnOutcome, string> =
+        match value with
+        | "TurnCompleted" -> Ok(ReconcileProgram.TurnCompleted)
+        | "TurnFailed" -> Ok(ReconcileProgram.TurnFailed "transient provider failure")
+        | "TurnNeedsContinuation" -> Ok(ReconcileProgram.TurnNeedsContinuation "retry")
+        | "TurnAborted" -> Ok(ReconcileProgram.TurnAborted "aborted")
+        | _ -> Error(sprintf "unknown outcome: %s" value)
 
     let private roleValue =
         function
@@ -198,37 +213,43 @@ module SyncDelegateSurface =
     let invoke (value: obj) (owner: string) (role: string) (question: string) : Task<obj> =
         task {
             let harness = unbox<Harness> value
-            let! result = harness.Runtime.Invoke(owner, roleOf role, question)
+            match roleOf role with
+            | Error error -> return box {| ok = false; error = error |}
+            | Ok role ->
+                let! result = harness.Runtime.Invoke(owner, role, question)
 
-            return
-                match result with
-                | Ok workRecord -> box {| ok = true; value = workRecord |}
-                | Error error -> box {| ok = false; error = error |}
+                return
+                    match result with
+                    | Ok workRecord -> box {| ok = true; value = workRecord |}
+                    | Error error -> box {| ok = false; error = error |}
         }
 
     /// Settle the current managed child through the real HandleTurn path.
     let settle (value: obj) (owner: string) (role: string) (answer: string) (runId: string) : Task<bool> =
         task {
             let harness = unbox<Harness> value
-            match! waitForReadyCall harness.Runtime (SessionId.create owner) (roleOf role) with
-            | None -> return false
-            | Some child ->
-                    let turn =
-                        { SessionId = child
-                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                          ProviderRun = ProviderRunIdentity.create runId
-                          Role = Some(roleValue (roleOf role))
-                          Directory = None
-                          Parts = [||]
-                          Finish = Some "stop"
-                          ErrorName = None
-                          Model = None
-                          Outcome = ReconcileProgram.TurnCompleted
-                          Observation = None }
+            match roleOf role with
+            | Error _ -> return false
+            | Ok role ->
+                match! waitForReadyCall harness.Runtime (SessionId.create owner) role with
+                | None -> return false
+                | Some child ->
+                        let turn =
+                            { SessionId = child
+                              PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
+                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
+                              ProviderRun = ProviderRunIdentity.create runId
+                              Role = Some(roleValue role)
+                              Directory = None
+                              Parts = [||]
+                              Finish = Some "stop"
+                              ErrorName = None
+                              Model = None
+                              Outcome = ReconcileProgram.TurnCompleted
+                              Observation = None }
 
-                    harness.Answers.[SessionId.value child] <- answer
-                    return! harness.Runtime.HandleTurn(turn, None)
+                        harness.Answers.[SessionId.value child] <- answer
+                        return! harness.Runtime.HandleTurn(turn, None)
         }
 
     let observeTurn
@@ -241,61 +262,66 @@ module SyncDelegateSurface =
         : Task<bool> =
         task {
             let harness = unbox<Harness> value
-            match! waitForReadyCall harness.Runtime (SessionId.create owner) (roleOf role) with
-            | None -> return false
-            | Some child ->
-                    let outcome =
-                        match outcomeName with
-                        | "TurnFailed" -> ReconcileProgram.TurnFailed "transient provider failure"
-                        | "TurnNeedsContinuation" -> ReconcileProgram.TurnNeedsContinuation "retry"
-                        | "TurnAborted" -> ReconcileProgram.TurnAborted "aborted"
-                        | _ -> ReconcileProgram.TurnCompleted
-                    if outcomeName = "TurnCompleted" then
-                        harness.Answers.[SessionId.value child] <- answer
-                    let turn =
-                        { SessionId = child
-                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                          ProviderRun = ProviderRunIdentity.create runId
-                          Role = Some(roleValue (roleOf role))
-                          Directory = None
-                          Parts = [||]
-                          Finish = Some "stop"
-                          ErrorName = None
-                          Model = None
-                          Outcome = outcome
-                          Observation = None }
-                    return! harness.Runtime.HandleTurn(turn, None)
+            match roleOf role, outcomeOf outcomeName with
+            | Error _, _
+            | _, Error _ -> return false
+            | Ok role, Ok outcome ->
+                match! waitForReadyCall harness.Runtime (SessionId.create owner) role with
+                | None -> return false
+                | Some child ->
+                        if outcomeName = "TurnCompleted" then
+                            harness.Answers.[SessionId.value child] <- answer
+                        let turn =
+                            { SessionId = child
+                              PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
+                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
+                              ProviderRun = ProviderRunIdentity.create runId
+                              Role = Some(roleValue role)
+                              Directory = None
+                              Parts = [||]
+                              Finish = Some "stop"
+                              ErrorName = None
+                              Model = None
+                              Outcome = outcome
+                              Observation = None }
+                        return! harness.Runtime.HandleTurn(turn, None)
         }
 
     let child (value: obj) (owner: string) (role: string) : obj =
         let harness = unbox<Harness> value
-        match harness.Runtime.TryFind(SessionId.create owner, roleOf role) with
-        | Some sessionId -> box (SessionId.value sessionId)
-        | None -> null
+        match roleOf role with
+        | Error _ -> null
+        | Ok role ->
+            match harness.Runtime.TryFind(SessionId.create owner, role) with
+            | Some sessionId -> box (SessionId.value sessionId)
+            | None -> null
 
     let vocabulary (roleName: string) (tierName: string) (scope: string) : obj =
-        let role = if roleName.Equals("Coder", StringComparison.OrdinalIgnoreCase) then SyncDelegateRole.Coder else SyncDelegateRole.Inspector
-        let tier = if tierName.Equals("Deep", StringComparison.OrdinalIgnoreCase) then AgentTier.Deep else AgentTier.Fast
-        let key = DedicatedDelegateKey.create (ReuseScopeId.create scope) role
-        box
-            {| tier = SyncDelegate.tierLabel (SyncDelegate.tierForOwner tier)
-               agent = SyncDelegate.agentNameFor role tier
-               scope = ReuseScopeId.value key.Scope
-               role = SyncDelegate.roleLabel key.Role |}
+        match roleOf roleName with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok role ->
+            let tier = if not (isNull tierName) && tierName.Equals("Deep", StringComparison.OrdinalIgnoreCase) then AgentTier.Deep else AgentTier.Fast
+            let key = DedicatedDelegateKey.create (ReuseScopeId.create scope) role
+            box
+                {| tier = SyncDelegate.tierLabel (SyncDelegate.tierForOwner tier)
+                   agent = SyncDelegate.agentNameFor role tier
+                   scope = ReuseScopeId.value key.Scope
+                   role = SyncDelegate.roleLabel key.Role |}
     let childCount (value: obj) : int =
         let harness = unbox<Harness> value
         harness.Children.Count
 
     let batchOrder (roleName: string) (toolNames: string array) (currentCall: string) : obj =
-        let role = if roleName.Equals("Coder", StringComparison.OrdinalIgnoreCase) then SyncDelegateRole.Coder else SyncDelegateRole.Inspector
-        let order =
-            toolNames
-            |> Array.choose (fun name ->
-                match SyncDelegate.tryRoleOfToolName name with
-                | Some matched when matched = role -> Some name
-                | _ -> None)
-        box {| order = order; currentPresent = order |> Array.exists (fun name -> name = currentCall) |}
+        match roleOf roleName with
+        | Error error -> box {| ok = false; error = error |}
+        | Ok role ->
+            let order =
+                toolNames
+                |> Array.choose (fun name ->
+                    match SyncDelegate.tryRoleOfToolName name with
+                    | Some matched when matched = role -> Some name
+                    | _ -> None)
+            box {| order = order; currentPresent = order |> Array.exists (fun name -> name = currentCall) |}
 
     let invokeBatch
         (value: obj)
@@ -308,23 +334,26 @@ module SyncDelegateSurface =
         : Task<obj> =
         task {
             let harness = unbox<Harness> value
-            let batch =
-                { ProviderRun = ProviderRunIdentity.create providerRun
-                  CallOrder = callOrder |> Array.toList |> List.map ToolCallId.create
-                  CurrentCall = ToolCallId.create callId }
-            let! result =
-                harness.Runtime.InvokeBatchPrepared(
-                    owner,
-                    roleOf role,
-                    charge,
-                    batch,
-                    (fun () -> Task.FromResult charge)
-                )
-            return
-                match result with
-                | Ok(SyncDelegateInvocationResult.WorkRecord record) -> box {| kind = "WorkRecord"; value = record |}
-                | Ok(SyncDelegateInvocationResult.MergedInto canonical) -> box {| kind = "MergedInto"; canonical = ToolCallId.value canonical |}
-                | Error error -> box {| kind = "Error"; error = error |}
+            match roleOf role with
+            | Error error -> return box {| kind = "Error"; error = error |}
+            | Ok role ->
+                let batch =
+                    { ProviderRun = ProviderRunIdentity.create providerRun
+                      CallOrder = callOrder |> Array.toList |> List.map ToolCallId.create
+                      CurrentCall = ToolCallId.create callId }
+                let! result =
+                    harness.Runtime.InvokeBatchPrepared(
+                        owner,
+                        role,
+                        charge,
+                        batch,
+                        (fun () -> Task.FromResult charge)
+                    )
+                return
+                    match result with
+                    | Ok(SyncDelegateInvocationResult.WorkRecord record) -> box {| kind = "WorkRecord"; value = record |}
+                    | Ok(SyncDelegateInvocationResult.MergedInto canonical) -> box {| kind = "MergedInto"; canonical = ToolCallId.value canonical |}
+                    | Error error -> box {| kind = "Error"; error = error |}
         }
 
 

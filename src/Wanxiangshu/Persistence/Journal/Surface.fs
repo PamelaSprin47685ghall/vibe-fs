@@ -8,17 +8,14 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
-open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle private (journal: AgentJournal, release: unit -> unit) =
+    // DSL-MUTABLE: resource — one-shot physical journal disposal latch
     let mutable disposed = false
 
     member internal _.Journal =
@@ -116,7 +113,7 @@ module JournalSurface =
         task {
             let commonDirectory = RuntimePath.gitCommonDir workspace
             let runtimeDirectory = RuntimePath.forWorkspace workspace
-            let boot = WorkspaceEventStore.bootPort commonDirectory
+            let boot = Wanxiangshu.OpenCode.WorkspaceEventStore.bootPort commonDirectory
 
             let openJournal runtimeId processIdValue processStartedAt =
                 task {
@@ -183,44 +180,6 @@ module JournalSurface =
                 match result with
                 | Ok projection -> box {| ok = true; projection = projectionToJs projection |}
                 | Error error -> box {| ok = false; error = error.ToString() |}
-        }
-
-    /// Prove and durably record one terminal completion through the HandleController.
-    /// The JournalHandle and JoinableCompletion remain opaque; callers provide only
-    /// parent/agent/child identities, finality and body text.
-    let recordTerminalCompletion
-        (handle: JournalHandle)
-        (parentId: string)
-        (agentId: string)
-        (childSessionId: string)
-        (status: string)
-        (body: string)
-        : Task<obj> =
-        task {
-            let handleId = HandleController.agentHandle (str agentId)
-            let evidence =
-                if status.Equals("failed", StringComparison.OrdinalIgnoreCase) then
-                    TerminalEvidence.failed (str agentId) handleId (SessionId.create (str childSessionId)) (str body)
-                else
-                    TerminalEvidence.completed (str agentId) handleId (SessionId.create (str childSessionId)) (str body)
-
-            match JoinableCompletion.tryFromProvenTerminal evidence with
-            | Error error -> return box {| ok = false; error = error.ToString() |}
-            | Ok completion ->
-                let! result =
-                    HandleController.recordCompletion
-                        (Some handle.Journal)
-                        (SessionId.create (str parentId))
-                        completion
-
-                match result with
-                | Ok() ->
-                    return
-                        box
-                            {| ok = true
-                               finality = JoinableCompletion.kind completion |> string
-                               body = JoinableCompletion.body completion |}
-                | Error error -> return box {| ok = false; error = error.ToString() |}
         }
 
     let appendManagerLifecycle (handle: JournalHandle) (stream: obj) (fact: obj) : Task<obj> =

@@ -77,104 +77,74 @@ module ProviderWireDecode =
     /// step markers, patches, files and compaction entries never enter a
     /// projection: the model never saw them, so including them would make the
     /// prefix-cache check fail on content that was never sent.
+    let private decodeToolState stateObj callId name partObj =
+        // Host session-shaped tool parts carry the call and its completed result
+        // together. Completed/error states project as results; all other states
+        // remain pending calls.
+        match readString stateObj "status" with
+        | Some "completed" ->
+            let result =
+                firstCanonical stateObj [ "output"; "result"; "content" ]
+                |> Option.defaultValue "null"
+
+            Some(WireToolResult(ToolCallId.create callId, result))
+        | Some "error" ->
+            let result =
+                firstCanonical stateObj [ "error"; "errorText"; "output" ]
+                |> Option.defaultValue "null"
+
+            Some(WireToolResult(ToolCallId.create callId, result))
+        | _ ->
+            let args =
+                firstCanonical stateObj [ "input" ]
+                |> Option.orElse (firstCanonical partObj [ "args"; "arguments" ])
+                |> Option.defaultValue "{}"
+
+            Some(WireToolCall(ToolCallId.create callId, name, args))
+
+    let private decodeToolCallPart partObj =
+        // REVIEW-004 needs the call id, so a tool call without one is not usable
+        // evidence. Dropped rather than given an empty id.
+        match firstString partObj [ "callID"; "callId"; "id" ], firstString partObj [ "tool"; "name" ] with
+        | Some callId, Some name -> decodeToolState (readField partObj "state") callId name partObj
+        | _ -> None
+
+    let private decodeNonNullPart partObj =
+        let kind =
+            readString partObj "type"
+            |> Option.defaultValue ""
+            |> fun value -> value.ToLowerInvariant()
+
+        match kind with
+        | "text" -> readString partObj "text" |> Option.map WireText
+        | "reasoning"
+        | "thinking" -> firstString partObj [ "text"; "reasoning" ] |> Option.map WireReasoning
+        | "tool-call"
+        | "tool_call"
+        | "tool" -> decodeToolCallPart partObj
+        | "tool-result"
+        | "tool_result" ->
+            let result =
+                firstCanonical partObj [ "result"; "output"; "content" ]
+                |> Option.defaultValue "null"
+
+            firstString partObj [ "callID"; "callId"; "id" ]
+            |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
+        | kind when kind.StartsWith "tool-" ->
+            let result =
+                firstCanonical partObj [ "output"; "errorText"; "result"; "content" ]
+                |> Option.defaultValue "null"
+
+            firstString partObj [ "toolCallId"; "callID"; "callId"; "id" ]
+            |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
+        | "file" ->
+            firstString partObj [ "url" ]
+            |> Option.map (fun url ->
+                WireMedia(firstString partObj [ "mime"; "mediaType" ], HostDigest.sha256Hex url))
+        | _ -> None
+
     let decodePart (partObj: obj) : WirePart option =
-        if isNull partObj then
-            None
-        else
-            let kind =
-                readString partObj "type"
-                |> Option.defaultValue ""
-                |> fun value -> value.ToLowerInvariant()
-
-            match kind with
-            | "text" -> readString partObj "text" |> Option.map WireText
-
-            | "reasoning"
-            | "thinking" -> firstString partObj [ "text"; "reasoning" ] |> Option.map WireReasoning
-
-            | "tool-call"
-            | "tool_call"
-            | "tool" ->
-                // REVIEW-004 needs the call id, so a tool call without one is not
-                // usable evidence. Dropped rather than given an empty id, which
-                // would let "no identity" look like a real one.
-                match firstString partObj [ "callID"; "callId"; "id" ], firstString partObj [ "tool"; "name" ] with
-                | None, _
-                | _, None -> None
-                | Some callId, Some name ->
-                    // Host session-shaped tool part (message-v2.ts): one part
-                    // carries the call AND its completed result — `{ type:
-                    // "tool", tool, callID, state: { status, input, output?,
-                    // error? } }`. The result the model saw is `state.output`
-                    // (or `state.error`). A completed/errored tool part projects
-                    // as the RESULT, while only a pending call (this
-                    // request's own previous assistant turn, or a legacy shape
-                    // with no state object) projects as the call.
-                    let stateObj = readField partObj "state"
-
-                    match readString stateObj "status" with
-                    | Some "completed" ->
-                        let result =
-                            firstCanonical stateObj [ "output"; "result"; "content" ]
-                            |> Option.defaultValue "null"
-
-                        Some(WireToolResult(ToolCallId.create callId, result))
-                    | Some "error" ->
-                        let result =
-                            firstCanonical stateObj [ "error"; "errorText"; "output" ]
-                            |> Option.defaultValue "null"
-
-                        Some(WireToolResult(ToolCallId.create callId, result))
-                    | _ ->
-                        let args =
-                            firstCanonical stateObj [ "input" ]
-                            |> Option.orElse (firstCanonical partObj [ "args"; "arguments" ])
-                            |> Option.defaultValue "{}"
-
-                        Some(WireToolCall(ToolCallId.create callId, name, args))
-
-            | "tool-result"
-            | "tool_result" ->
-                let result =
-                    firstCanonical partObj [ "result"; "output"; "content" ]
-                    |> Option.defaultValue "null"
-
-                firstString partObj [ "callID"; "callId"; "id" ]
-                |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
-
-            // Host 1.18.10's assembled tool part: `{ type: "tool-<tool>", state:
-            // "output-available"|"output-error", toolCallId, input, output?,
-            // errorText? }` (message-v2.ts). The result the model actually saw is
-            // `output` (or `errorText` on failure). Preserve it as typed wire data;
-            // challenge verification is owned by ReviewBarrierWorkflow.
-            | kind when kind.StartsWith "tool-" ->
-                let result =
-                    firstCanonical partObj [ "output"; "errorText"; "result"; "content" ]
-                    |> Option.defaultValue "null"
-
-                firstString partObj [ "toolCallId"; "callID"; "callId"; "id" ]
-                |> Option.map (fun callId -> WireToolResult(ToolCallId.create callId, result))
-
-            // A Host `FilePart` (`{ type: "file", mime, url, filename? }`). The model
-            // genuinely saw it, so ARCH-004's prefix check and COMPANION-011's cutoff
-            // proof must both account for it.
-            //
-            // The DIGEST goes into the projection, not the bytes. Two different
-            // images digest differently, so every question either projection answers
-            // gets the same answer as it would from the bytes — while the projection
-            // stays a value small enough to hold per request instead of megabytes of
-            // base64.
-            //
-            // `url` is the identity: for an inline image it is the data URL, and for
-            // a referenced one it is the location. A file whose url is missing is
-            // dropped rather than digested as empty, which would make every such
-            // part compare equal to every other.
-            | "file" ->
-                firstString partObj [ "url" ]
-                |> Option.map (fun url ->
-                    WireMedia(firstString partObj [ "mime"; "mediaType" ], HostDigest.sha256Hex url))
-
-            | _ -> None
+        if isNull partObj then None else decodeNonNullPart partObj
 
     let messagesFromTransformOutput (output: obj) : obj list =
         unbox<obj array> output?messages |> Array.toList
@@ -241,21 +211,21 @@ module ProviderWireDecode =
     /// before the Host has bound the run.
     ///
     /// Returns `None` when there are zero, multiple, or malformed session ids.
+    let private sessionIdOfMessage (msg: obj) : string option =
+        if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
+            Some(unbox<string> msg?info?sessionID)
+        else
+            None
+
+    let private projectionSessionIdFromMessageArray (messages: obj array) : string option =
+        let sessionIds = messages |> Array.choose sessionIdOfMessage |> Array.distinct
+
+        match sessionIds with
+        | [| sessionId |] -> Some sessionId
+        | _ -> None
+
     let projectionSessionIdFromMessages (output: obj) : string option =
         if isNull output || isNull output?messages then
             None
         else
-            let messages = unbox<obj array> output?messages
-
-            let sessionIds =
-                messages
-                |> Array.choose (fun msg ->
-                    if not (isNull msg) && not (isNull msg?info) && not (isNull msg?info?sessionID) then
-                        Some(unbox<string> msg?info?sessionID)
-                    else
-                        None)
-                |> Array.distinct
-
-            match sessionIds with
-            | [| sessionId |] -> Some sessionId
-            | _ -> None
+            projectionSessionIdFromMessageArray (unbox<obj array> output?messages)

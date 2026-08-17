@@ -62,14 +62,14 @@ type JoinAttemptRegistry() =
     let gate = obj ()
     let active = Dictionary<string, ResizeArray<JoinAttemptLease>>()
 
+    let removeLease (key: string) (list: ResizeArray<JoinAttemptLease>) (lease: JoinAttemptLease) =
+        list.Remove lease |> ignore
+        if list.Count = 0 then active.Remove key |> ignore
+
     let unregister (key: string) (lease: JoinAttemptLease) =
         lock gate (fun () ->
             match active.TryGetValue key with
-            | true, list ->
-                list.Remove lease |> ignore
-
-                if list.Count = 0 then
-                    active.Remove key |> ignore
+            | true, list -> removeLease key list lease
             | false, _ -> ())
 
     interface IJoinAttemptRegistry with

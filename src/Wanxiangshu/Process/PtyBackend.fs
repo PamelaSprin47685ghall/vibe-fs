@@ -29,6 +29,44 @@ module PtyBackend =
     open PtySession
     open PtySupervisor
 
+    let private completeExit (exitTcs: TaskCompletionSource<unit>) : unit =
+        try exitTcs.SetResult(()) with _ -> ()
+
+    let private failPendingWrites
+        (super: PtySupervisor)
+        (port: PtyPort)
+        (id: PtyId)
+        (msg: string)
+        : unit =
+        port.FailRead(id, msg)
+        for (_, tcsOpt) in takePending super id do
+            tcsOpt |> Option.iter (fun t -> t.SetResult(Error msg))
+        drop super id |> ignore
+        port.Complete(id, Error msg)
+
+    let private spawnCommand
+        (super: PtySupervisor)
+        (port: PtyPort)
+        (id: PtyId)
+        (cmd: string)
+        (cwd: string)
+        : Task<Result<unit, string>> =
+        task {
+            let exitTcs = TaskCompletionSource<unit>()
+            port.RegisterExitTask(id, exitTcs.Task)
+
+            try
+                do! ensureSpawn super
+                let term = spawnSync super cmd cwd
+                attach super port id term exitTcs
+                return Ok()
+            with ex ->
+                completeExit exitTcs
+                let msg = sprintf "PTY spawn failed: %s" ex.Message
+                failPendingWrites super port id msg
+                return Error msg
+        }
+
     let private handle
         (super: PtySupervisor)
         (port: PtyPort)
@@ -37,31 +75,7 @@ module PtyBackend =
         : Task<Result<unit, string>> =
         task {
             match command with
-            | PtyCommand.Spawn(cmd, cwd) ->
-                let exitTcs = TaskCompletionSource<unit>()
-                port.RegisterExitTask(id, exitTcs.Task)
-
-                try
-                    do! ensureSpawn super
-                    let term = spawnSync super cmd cwd
-                    attach super port id term exitTcs
-                    return Ok()
-                with ex ->
-                    try
-                        exitTcs.SetResult(())
-                    with _ ->
-                        ()
-
-                    let msg = sprintf "PTY spawn failed: %s" ex.Message
-                    // Flush any parked reader and pending pre-attach writes.
-                    port.FailRead(id, msg)
-
-                    for (_, tcsOpt) in takePending super id do
-                        tcsOpt |> Option.iter (fun t -> t.SetResult(Error msg))
-
-                    drop super id |> ignore
-                    port.Complete(id, Error msg)
-                    return Error msg
+            | PtyCommand.Spawn(cmd, cwd) -> return! spawnCommand super port id cmd cwd
             | other -> return! applyLive super port id other
         }
 

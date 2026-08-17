@@ -252,9 +252,29 @@ const isPropertyToken = (tokens, index) => {
   return previous?.value === '.' || previous?.value === '?' || previous?.value === '#'
 }
 
+// Names that look like test calls in declarations/constructors are not proof cases.
+const isDeclarationOrConstructorTarget = (tokens, index) => {
+  const previous = tokens[index - 1]?.value
+  if (previous === 'function' || previous === 'new' || previous === 'class') return true
+  return previous === '*' && tokens[index - 2]?.value === 'function'
+}
+
+const closesWithMethodBody = (tokens, open) => {
+  let depth = 0
+  for (let index = open; index < tokens.length; index++) {
+    const value = tokens[index].value
+    if (value === '(') depth++
+    else if (value === ')') {
+      depth--
+      if (depth === 0) return tokens[index + 1]?.value === '{'
+    }
+  }
+  return false
+}
+
 const callShapeAt = (tokens, index) => {
   const token = tokens[index]
-  if (!token || token.kind !== 'identifier' || isPropertyToken(tokens, index)) return null
+  if (!token || token.kind !== 'identifier' || isPropertyToken(tokens, index) || isDeclarationOrConstructorTarget(tokens, index)) return null
 
   const next = tokens[index + 1]
   if (token.value === 'test') {
@@ -301,8 +321,9 @@ export function scanTestSource(file, source) {
   for (let index = 0; index < tokens.length; index++) {
     const shape = callShapeAt(tokens, index)
     if (!shape) continue
-    const call = tokens[index]
     const titleToken = readTitleToken(tokens, shape.open)
+    if (!titleToken && closesWithMethodBody(tokens, shape.open)) continue
+    const call = tokens[index]
     const title = titleToken?.value ?? null
     const { whatIds, anchor } = titleParts(title)
     calls.push({

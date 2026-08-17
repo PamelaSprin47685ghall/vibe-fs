@@ -82,21 +82,15 @@ module EnforcerRepair =
         |> Option.bind (fun cycles -> BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles)
 
     let private isBlogToolPart (part: obj) : bool =
-        if isNull part then
-            false
-        else
-            let kind =
-                if isNull part?``type`` then
-                    ""
-                else
-                    unbox<string> part?``type``
+        let kind =
+            if isNull part || isNull part?``type`` then "" else unbox<string> part?``type``
 
-            let name =
-                if not (isNull part?tool) then unbox<string> part?tool
-                elif not (isNull part?name) then unbox<string> part?name
-                else ""
+        let name =
+            if not (isNull part) && not (isNull part?tool) then unbox<string> part?tool
+            elif not (isNull part) && not (isNull part?name) then unbox<string> part?name
+            else ""
 
-            kind = "tool" && name = "chronicle"
+        kind = "tool" && name = "chronicle"
 
     let chronicleCallCount (rawMessages: obj list) : int =
         match EnforcerCycleDecode.lastAssistantStep rawMessages with
@@ -104,12 +98,10 @@ module EnforcerRepair =
         | Some(_, parts, _) -> parts |> List.filter isBlogToolPart |> List.length
 
     let private blogPartStatus (part: obj) : string option =
-        if isNull part || isNull part?state then
+        if isNull part || isNull part?state || isNull part?state?status then
             None
         else
-            match part?state?status with
-            | null -> None
-            | value -> Some(unbox<string> value)
+            Some(unbox<string> part?state?status)
 
     /// pending/running blog: Host will re-enter after tool completion — not pure prose.
     let hasIncompleteBlogTool (rawMessages: obj list) : bool =
@@ -140,17 +132,15 @@ module EnforcerRepair =
         | Some(_, parts, _) -> parts |> List.exists isBlogToolPart
 
     let private blogPartInterrupted (part: obj) : bool =
-        if isNull part || isNull part?state then
+        if
+            isNull part
+            || isNull part?state
+            || isNull part?state?metadata
+            || isNull part?state?metadata?interrupted
+        then
             false
         else
-            let meta = part?state?metadata
-
-            if isNull meta then
-                false
-            else
-                match meta?interrupted with
-                | null -> false
-                | value -> unbox<bool> value = true
+            unbox<bool> part?state?metadata?interrupted = true
 
     /// Host abort/cleanup terminal: `SessionProcessor.cleanup` marks every hanging
     /// tool `status=error` + `metadata.interrupted=true`
@@ -186,22 +176,23 @@ module EnforcerRepair =
 
     /// Extract the requestKey from an interaction-repair synthetic user message.
     let repairRequestKey (message: obj) : string option =
-        if isNull message then
-            None
-        else
-            let info = if isNull message?info then message else message?info
+        let info =
+            if isNull message then null
+            elif isNull message?info then message
+            else message?info
 
-            if
-                not (isNull info)
-                && not (isNull info?source)
-                && unbox<string> info?source = "interaction-repair"
-                && not (isNull info?synthetic)
-                && unbox<bool> info?synthetic
-                && not (isNull info?requestKey)
-            then
-                Some(unbox<string> info?requestKey)
-            else
-                None
+        if
+            not (isNull message)
+            && not (isNull info)
+            && not (isNull info?source)
+            && unbox<string> info?source = "interaction-repair"
+            && not (isNull info?synthetic)
+            && unbox<bool> info?synthetic
+            && not (isNull info?requestKey)
+        then
+            Some(unbox<string> info?requestKey)
+        else
+            None
 
     /// ENFORCER-060/061: InteractionRepair via Projection algebra (PROJ-008 Step4).
     ///

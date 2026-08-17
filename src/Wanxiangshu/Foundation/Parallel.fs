@@ -35,12 +35,10 @@ type private JsTcs<'T>() =
             false
         else
             completed <- true
-
-            match resolveFn with
-            | Some f ->
+            resolveFn
+            |> Option.fold (fun _ f ->
                 f res
-                true
-            | None -> false
+                true) false
 
 type private AsyncSemaphore(maxCount: int) =
     // DSL-MUTABLE: resource — remaining permit count of the semaphore
@@ -84,6 +82,21 @@ module Parallel =
     [<Emit("Promise.all($0)")>]
     let private promiseAll (promises: obj array) : Task<obj array> = jsNative
 
+    let private runBoundedWork
+        (semaphore: AsyncSemaphore)
+        (cancellation: CancellationToken)
+        (action: 't -> CancellationToken -> Task<'u>)
+        (item: 't)
+        : Task<'u> =
+        task {
+            do! semaphore.WaitAsync(cancellation)
+
+            try
+                return! action item cancellation
+            finally
+                semaphore.Release()
+        }
+
     let mapBounded
         (maxConcurrency: int)
         (cancellation: CancellationToken)
@@ -103,15 +116,7 @@ module Parallel =
 
                 let workTasks =
                     indexedItems
-                    |> Array.map (fun item ->
-                        task {
-                            do! semaphore.WaitAsync(cancellation)
-
-                            try
-                                return! action item cancellation
-                            finally
-                                semaphore.Release()
-                        })
+                    |> Array.map (runBoundedWork semaphore cancellation action)
 
                 let promises = workTasks |> Array.map box
                 let! resultsObj = promiseAll promises

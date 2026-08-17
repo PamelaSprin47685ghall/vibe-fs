@@ -102,6 +102,7 @@ module DistillationSurface =
             | kind -> Error(ForkError.NotFound(textField value "error" (sprintf "%s:%s" kind agentId)))
 
     let private runtimeOf (runtime: obj) : Distillation.IDistillationRuntime =
+        // DSL-MUTABLE: resource — await/readiness correlation key
         let mutable lastAwaitedAgent = ""
 
         { new Distillation.IDistillationRuntime with

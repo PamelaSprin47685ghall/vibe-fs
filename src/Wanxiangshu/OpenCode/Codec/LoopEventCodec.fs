@@ -19,20 +19,18 @@ module LoopEventCodec =
           Field: string option
           Delta: string }
 
-    let private trySessionIdFromProperties (raw: obj) : SessionId option =
-        if isNull raw then
+    let private trySessionIdProperties (properties: obj) : SessionId option =
+        if isNull properties then
             None
+        elif not (isNull properties?sessionID) then
+            Some(SessionId.create (unbox<string> properties?sessionID))
+        elif not (isNull properties?sessionId) then
+            Some(SessionId.create (unbox<string> properties?sessionId))
         else
-            let properties = raw?properties
+            None
 
-            if isNull properties then
-                None
-            elif not (isNull properties?sessionID) then
-                Some(SessionId.create (unbox<string> properties?sessionID))
-            elif not (isNull properties?sessionId) then
-                Some(SessionId.create (unbox<string> properties?sessionId))
-            else
-                None
+    let private trySessionIdFromProperties (raw: obj) : SessionId option =
+        if isNull raw then None else trySessionIdProperties raw?properties
 
     let private trySessionId (raw: obj) : SessionId option =
         HostEventCodec.trySessionId raw

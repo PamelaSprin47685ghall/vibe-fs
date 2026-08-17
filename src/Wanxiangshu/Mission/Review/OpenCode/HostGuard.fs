@@ -146,6 +146,61 @@ module HostReviewGuard =
     let private releaseKey (nudgeKey: string) =
         lock SharedState.ReviewGuardNudgeGate (fun () -> SharedState.ReviewGuardNudges.Remove nudgeKey |> ignore)
 
+    let private guardOutcomeFromSend
+        (nudgeKey: string)
+        (sent: Result<PromptKey, string>) =
+        match sent with
+        | Ok key -> GuardNudgeOutcome.Sent key
+        | Error error ->
+            releaseKey nudgeKey
+            GuardNudgeOutcome.Failed error
+
+    let private sendReservedGuardNudge
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (targetSessionId: SessionId)
+        (continuationKind: PromptAuthority.ContinuationKind)
+        (nudgeKey: string)
+        (prompt: string) =
+        task {
+            let recordedDir = sessionDirectory targetSessionId
+            let worktreeIsAlive =
+                recordedDir
+                |> Option.map (fun dir -> Directory.Exists dir && File.Exists(Path.Combine(dir, "AGENTS.md")))
+                |> Option.defaultValue true
+
+            if not worktreeIsAlive then
+                releaseKey nudgeKey
+                return GuardNudgeOutcome.NoLongerRequired
+            else
+                let! sent =
+                    HostSessionNudge.sendContinuationResult
+                        sessionPort
+                        targetSessionId
+                        prompt
+                        continuationKind
+                        recordedDir
+                        (Some durable)
+                        PromptDispatcher.AwaitMode.Await
+                        None
+
+                return guardOutcomeFromSend nudgeKey sent
+        }
+
+    let private sendGuardForDurable
+        (sessionPort: ISessionHostPort)
+        (durable: AgentJournal)
+        (targetSessionId: SessionId)
+        (occasion: GuardNudgeOccasion)
+        (prompt: string) =
+        let continuationKind = kindForOccasion occasion
+        let nudgeKey = guardNudgeKey targetSessionId occasion
+
+        if not (tryReserve nudgeKey durable targetSessionId continuationKind) then
+            Task.FromResult GuardNudgeOutcome.AlreadyOutstanding
+        else
+            sendReservedGuardNudge sessionPort durable targetSessionId continuationKind nudgeKey prompt
+
     let private sendGuardNudge
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
@@ -157,44 +212,24 @@ module HostReviewGuard =
             match journal with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
             | Some durable ->
-                let continuationKind = kindForOccasion occasion
-                let nudgeKey = guardNudgeKey targetSessionId occasion
+                return! sendGuardForDurable sessionPort durable targetSessionId occasion prompt
+        }
 
-                // Synchronous check+reservation is the atomic point. Rejected /
-                // dead-worktree / Failed releases; admitted/unknown keeps it
-                // (PROMPT-011: no second license while physical acceptance is unresolved).
-                if not (tryReserve nudgeKey durable targetSessionId continuationKind) then
-                    return GuardNudgeOutcome.AlreadyOutstanding
-                else
-                    let recordedDir = sessionDirectory targetSessionId
-
-                    let worktreeIsAlive =
-                        match recordedDir with
-                        | None -> true
-                        | Some dir -> Directory.Exists dir && File.Exists(Path.Combine(dir, "AGENTS.md"))
-
-                    if not worktreeIsAlive then
-                        releaseKey nudgeKey
-                        return GuardNudgeOutcome.NoLongerRequired
-                    else
-                        // PROMPT-006: Model=None. HostSessionNudge resolves Agent from the
-                        // Authority Root's fallback cursor, so it is not passed here.
-                        let! sent =
-                            HostSessionNudge.sendContinuationResult
-                                sessionPort
-                                targetSessionId
-                                prompt
-                                continuationKind
-                                recordedDir
-                                (Some durable)
-                                PromptDispatcher.AwaitMode.Await
-                                None
-
-                        match sent with
-                        | Ok key -> return GuardNudgeOutcome.Sent key
-                        | Error error ->
-                            releaseKey nudgeKey
-                            return GuardNudgeOutcome.Failed error
+    let private nudgeDurableReviewer
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal)
+        (sessionId: SessionId) =
+        task {
+            match currentBarrier journal sessionId with
+            | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an open review barrier"
+            | Some barrierId ->
+                return!
+                    sendGuardNudge
+                        sessionPort
+                        (Some journal)
+                        sessionId
+                        (GuardNudgeOccasion.MissingVerdict barrierId)
+                        (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
         }
 
     let nudgeReviewer
@@ -202,21 +237,9 @@ module HostReviewGuard =
         (journal: AgentJournal option)
         (sessionId: SessionId)
         : Task<GuardNudgeOutcome> =
-        task {
-            match journal with
-            | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal"
-            | Some durable ->
-                match currentBarrier durable sessionId with
-                | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an open review barrier"
-                | Some barrierId ->
-                    return!
-                        sendGuardNudge
-                            sessionPort
-                            journal
-                            sessionId
-                            (GuardNudgeOccasion.MissingVerdict barrierId)
-                            (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-        }
+        match journal with
+        | None -> Task.FromResult(GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal")
+        | Some durable -> nudgeDurableReviewer sessionPort durable sessionId
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.

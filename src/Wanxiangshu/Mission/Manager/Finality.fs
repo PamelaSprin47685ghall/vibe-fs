@@ -45,6 +45,19 @@ module ManagerFinality =
         | Some request when ManagerLifecycleProjection.isOpen request -> LaborAdmission.FinalityOwnsLife
         | _ -> LaborAdmission.LaborMayContinue
 
+    let private classifyOpenFinalityRequest
+        (toolCallId: ToolCallId option)
+        (request: FinalityRequestProjection) =
+        match toolCallId with
+        | Some callId when callId = request.ToolCallId -> EndingDisposition.ResumeRequest request
+        | _ when Map.isEmpty request.Members -> EndingDisposition.RecoverRequestWithoutReviewers request
+        | _ -> EndingDisposition.WaitForCurrentRequest
+
+    let private classifyCompletedLife (life: LifeProjection) =
+        match life.LastBlessing with
+        | Some blessing -> EndingDisposition.CompleteBlessedLife blessing
+        | None -> EndingDisposition.BeginFinality
+
     /// Interpret one suicide call against the durable Life. Pre-T1 BlindPlan
     /// (no accepted plan commitment) stays at the Planning Table.
     let classifyEnding
@@ -52,19 +65,11 @@ module ManagerFinality =
         (life: LifeProjection)
         (hasPlanCommitment: bool)
         : EndingDisposition =
-        if not hasPlanCommitment then
-            EndingDisposition.ContinuePlanning
-        elif life.Completed then
-            EndingDisposition.AlreadyCompleted
-        else
-            match life.ActiveFinality with
-            | Some request when ManagerLifecycleProjection.isOpen request ->
-                match toolCallId with
-                | Some callId when callId = request.ToolCallId -> EndingDisposition.ResumeRequest request
-                | _ when Map.isEmpty request.Members -> EndingDisposition.RecoverRequestWithoutReviewers request
-                | _ -> EndingDisposition.WaitForCurrentRequest
-            | Some request when toolCallId = Some request.ToolCallId -> EndingDisposition.ResumeRequest request
-            | _ ->
-                match life.LastBlessing with
-                | Some blessing -> EndingDisposition.CompleteBlessedLife blessing
-                | None -> EndingDisposition.BeginFinality
+        match hasPlanCommitment, life.Completed, life.ActiveFinality with
+        | false, _, _ -> EndingDisposition.ContinuePlanning
+        | true, true, _ -> EndingDisposition.AlreadyCompleted
+        | true, false, Some request when ManagerLifecycleProjection.isOpen request ->
+            classifyOpenFinalityRequest toolCallId request
+        | true, false, Some request when toolCallId = Some request.ToolCallId ->
+            EndingDisposition.ResumeRequest request
+        | true, false, _ -> classifyCompletedLife life

@@ -510,6 +510,14 @@ test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_renamed_record_state_axes_are_
   )
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-005] DSL_OWNERSHIP_multiline_record_state_axes_are_reported', () => {
+  const hits = scanText(readFixture('state-axes-multiline.fs'), 'src/Wanxiangshu/Execution/Snapshot.fs')
+  assert.ok(
+    hits.some((hit) => hit.gate === 'state-product'),
+    'records with a body brace on the next line must not evade state-product',
+  )
+})
+
 // DSL-005/007: a record carrying `mutable foo:` state fields must produce a
 // state-product violation. A
 // production file with this fixture is therefore rejected by the CLI gate.
@@ -619,6 +627,24 @@ test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_control_state_requires_structu
   assert.deepEqual(scanText(source, 'src/Wanxiangshu/Session/Sample.fs'), [])
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-003] DSL_OWNERSHIP_control_state_reason_cannot_cross_declarations', () => {
+  const source = [
+    'module Sample',
+    '/// DSL-control-state-reason: ce-equivalent=none; blockers=function-call,match!,return!,resource-scope,waiter,bounded-recursion; evidence=other-declaration',
+    'type Allowed =',
+    '    | A',
+    '    | B',
+    '',
+    '/// DSL-class: ControlState',
+    'type Forbidden =',
+    '    | A',
+    '    | B',
+  ].join('\n')
+  assert.ok(
+    scanText(source, 'src/Wanxiangshu/Session/Sample.fs').some((hit) => hit.gate === 'program-counter'),
+    'a reason in another declaration doc block must not legalize ControlState',
+  )
+})
 
 test('WHAT[STRUCTURED-WORKFLOW-007] DSL_OWNERSHIP_host_boundary_open_is_not_gate_red', () => {
   const source = ['module Sample', 'open Wanxiangshu.OpenCode', 'open Wanxiangshu.Process'].join('\n')

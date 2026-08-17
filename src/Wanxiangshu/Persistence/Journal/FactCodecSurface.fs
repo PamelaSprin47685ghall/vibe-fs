@@ -27,15 +27,17 @@ module FactCodecSurface =
 
     let private completionKindOf (value: obj) =
         match text value with
+        | "Terminal" -> HandleCompletionKind.Terminal
         | "SendFailure" -> HandleCompletionKind.SendFailure
         | "Cancelled" -> HandleCompletionKind.Cancelled
-        | _ -> HandleCompletionKind.Terminal
+        | other -> failwith $"FactCodecSurface: unknown completion kind '{other}'"
 
     let private abandonReasonOf (value: obj) =
         match text value with
+        | "ParentCancelled" -> HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> HandleAbandonReason.HostSessionGone
-        | _ -> HandleAbandonReason.ParentCancelled
+        | other -> failwith $"FactCodecSurface: unknown abandon reason '{other}'"
 
     let private roleOf (value: obj) =
         AgentRoleIdentity.roleOfString (text value)
@@ -44,7 +46,8 @@ module FactCodecSurface =
     let private ownershipOf (value: obj) =
         match text value with
         | "HostOwnedHidden" -> HandleOwnership.HostOwnedHidden
-        | _ -> HandleOwnership.DurableParentHandle
+        | "DurableParentHandle" -> HandleOwnership.DurableParentHandle
+        | other -> failwith $"FactCodecSurface: unknown ownership '{other}'"
 
     let private factOfJs (value: obj) : Fact =
         let family = text (value?family)

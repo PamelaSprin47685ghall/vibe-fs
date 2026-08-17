@@ -64,27 +64,26 @@ module ExecutionFactFold =
     /// a replay re-syncs the index to the same record — idempotent by
     /// construction.
     let private syncHandleIndex (parentId: SessionId) (handle: HandleId) (projection: AgentProjectionSet) =
-        match AgentProjection.tryFind parentId projection with
-        | Some session ->
-            match session.Handles with
-            | Some handles ->
-                match HandleProjection.tryFind handle handles with
-                | Some record ->
-                    { projection with
-                        HandleByChildSession = Map.add record.ChildSessionId record projection.HandleByChildSession }
-                | None -> projection
-            | None -> projection
+        let record =
+            AgentProjection.tryFind parentId projection
+            |> Option.bind (fun session ->
+                session.Handles
+                |> Option.bind (fun handles -> HandleProjection.tryFind handle handles))
+
+        match record with
+        | Some record ->
+            { projection with
+                HandleByChildSession = Map.add record.ChildSessionId record projection.HandleByChildSession }
         | None -> projection
+
+    let private canonicalByname byname targetAgent =
+        if System.String.IsNullOrWhiteSpace byname then targetAgent else byname
 
     let fold (projection: AgentProjectionSet) (fact: ExecutionFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── execution handles ───────────────────────────────────────────────
         match fact with
         | ExecutionFactCases.HandleLinked payload ->
-            let byname =
-                if System.String.IsNullOrWhiteSpace payload.Byname then
-                    payload.TargetAgent
-                else
-                    payload.Byname
+            let byname = canonicalByname payload.Byname payload.TargetAgent
 
             AgentProjection.tryUpdate
                 payload.ParentSessionId

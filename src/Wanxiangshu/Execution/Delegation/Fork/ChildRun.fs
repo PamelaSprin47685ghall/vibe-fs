@@ -154,6 +154,40 @@ module ChildRunProgram =
     /// Run `work` and return the resulting RunCompletion.
     /// Cancellation and exceptions are mapped into the Result channel.
     /// `now` stamps CompletedAt (composition supplies IClockPort).
+    let private completeValidated
+        (run: ChildRun)
+        (work: CancellationToken -> Task<AgentCompletionOutcome>)
+        (ct: CancellationToken)
+        (now: unit -> DateTimeOffset)
+        (identityResult: Result<bool, AgentError>) =
+        task {
+            match identityResult with
+            | Ok true ->
+                let! outcome = work ct
+                return Ok(ChildRun.makeCompleted run outcome (now ()))
+            | _ -> return Error(AgentError.InvalidFork "Child run identity does not match managed agent")
+        }
+
+    let private runValidated
+        (run: ChildRun)
+        (work: CancellationToken -> Task<AgentCompletionOutcome>)
+        (ct: CancellationToken)
+        (now: unit -> DateTimeOffset) : Task<Result<RunCompletion, AgentError>> =
+        task {
+            try
+                let! identityResult =
+                    AgentProgram.runAgentFlow
+                        { SessionId = run.AgentId
+                          AgentName = run.AgentName }
+                        ct
+                        (AgentProgram.validateSession run.AgentName)
+
+                return! completeValidated run work ct now identityResult
+            with
+            | :? OperationCanceledException -> return Error AgentError.ParentCancelled
+            | ex -> return Error(AgentError.HostFailure ex.Message)
+        }
+
     let run
         (run: ChildRun)
         (work: CancellationToken -> Task<AgentCompletionOutcome>)
@@ -164,20 +198,5 @@ module ChildRunProgram =
             if ct.IsCancellationRequested then
                 return Error AgentError.ParentCancelled
             else
-                try
-                    let! identityResult =
-                        AgentProgram.runAgentFlow
-                            { SessionId = run.AgentId
-                              AgentName = run.AgentName }
-                            ct
-                            (AgentProgram.validateSession run.AgentName)
-
-                    match identityResult with
-                    | Ok true ->
-                        let! outcome = work ct
-                        return Ok(ChildRun.makeCompleted run outcome (now ()))
-                    | _ -> return Error(AgentError.InvalidFork "Child run identity does not match managed agent")
-                with
-                | :? OperationCanceledException -> return Error AgentError.ParentCancelled
-                | ex -> return Error(AgentError.HostFailure ex.Message)
+                return! runValidated run work ct now
         }

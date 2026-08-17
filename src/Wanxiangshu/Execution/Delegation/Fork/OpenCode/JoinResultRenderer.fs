@@ -162,17 +162,25 @@ module JoinResultRenderer =
     let private joinBlocks (blocks: string list) : string =
         (String.concat "\n\n" (blocks |> List.filter (fun s -> s <> ""))) + "\n"
 
+    let private fallbackByname (agentId: string) (agentNameRaw: string) =
+        match ManagedAgent.tryParse agentNameRaw with
+        | Some agent -> agent.Name
+        | None -> agentNameRaw
+
     let private byname (resolveAgentName: string -> string) (agentId: string) (agentNameRaw: string) : string =
         let presented = resolveAgentName agentId
 
         if not (String.IsNullOrWhiteSpace presented) then
             presented.Trim()
         elif not (String.IsNullOrWhiteSpace agentNameRaw) then
-            match ManagedAgent.tryParse agentNameRaw with
-            | Some agent -> agent.Name
-            | None -> agentNameRaw
+            fallbackByname agentId agentNameRaw
         else
             agentId
+
+    let private tryParseInt (value: string) : int option =
+        match Int32.TryParse value with
+        | true, code -> Some code
+        | false, _ -> None
 
     let private tryParseExitCode (outcome: string) : int option =
         let trimmed = outcome.Trim()
@@ -180,35 +188,29 @@ module JoinResultRenderer =
         if String.IsNullOrWhiteSpace trimmed then
             None
         elif trimmed.StartsWith("exit ", StringComparison.OrdinalIgnoreCase) then
-            let rest = trimmed.Substring(5).Trim()
-
-            match Int32.TryParse rest with
-            | true, code -> Some code
-            | false, _ -> None
+            trimmed.Substring(5).Trim() |> tryParseInt
         else
-            match Int32.TryParse trimmed with
-            | true, code -> Some code
-            | false, _ -> None
+            tryParseInt trimmed
+
+    let private outputText (outcome: string) (detail: string option) (exitCode: int option) =
+        match detail, exitCode with
+        | Some text, _ when not (String.IsNullOrWhiteSpace text) -> text
+        | _, Some _ -> ""
+        | _, None -> outcome
 
     let private terminalBody (outcome: string) (detail: string option) : string list =
+        let exitCode = tryParseExitCode outcome
         let fields =
-            match tryParseExitCode outcome with
+            match exitCode with
             | Some code -> [ SyntheticToml.field "exit_code" (string code) ]
             | None -> []
 
-        let outputText =
-            match detail with
-            | Some text when not (String.IsNullOrWhiteSpace text) -> text
-            | _ ->
-                match tryParseExitCode outcome with
-                | Some _ -> ""
-                | None -> outcome
+        let output = outputText outcome detail exitCode
 
-        if String.IsNullOrWhiteSpace outputText then
+        if String.IsNullOrWhiteSpace output then
             fields
         else
-            fields
-            @ [ SyntheticToml.field "output" (SyntheticToml.renderString outputText) ]
+            fields @ [ SyntheticToml.field "output" (SyntheticToml.renderString output) ]
 
     let private terminalLabel lang (resolveTerminalLabel: string -> string) (ptyId: string) =
         let resolved = resolveTerminalLabel ptyId
@@ -316,6 +318,34 @@ module JoinResultRenderer =
                 payload.Outcome
                 (Some payload.Message)
 
+    let private renderAgentItem
+        (lang: ProviderLanguage)
+        (resolveAgentName: string -> string)
+        (agentItem: AgentJoinItem)
+        : string =
+        let nameStub =
+            match agentItem with
+            | AgentCompletedItem p ->
+                { RunId = p.RunId
+                  AgentName = ""
+                  Role = p.Role
+                  Outcome = AgentCompleted p
+                  CompletedAt = DateTimeOffset.UtcNow }
+            | AgentFailedItem p ->
+                { RunId = p.RunId
+                  AgentName = ""
+                  Role = defaultArg p.Role Role.Distiller
+                  Outcome = AgentFailed p
+                  CompletedAt = DateTimeOffset.UtcNow }
+            | AgentAbandonedItem(agentId, reason) ->
+                { RunId = "abandoned-" + agentId
+                  AgentName = ""
+                  Role = Role.Distiller
+                  Outcome = AgentAbandoned(agentId, reason)
+                  CompletedAt = DateTimeOffset.UtcNow }
+
+        renderAgentJoinItem lang resolveAgentName nameStub agentItem
+
     let private renderJoinItem
         (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
@@ -323,29 +353,7 @@ module JoinResultRenderer =
         (item: JoinItem)
         : string =
         match item with
-        | AgentItem agentItem ->
-            let nameStub =
-                match agentItem with
-                | AgentCompletedItem p ->
-                    { RunId = p.RunId
-                      AgentName = ""
-                      Role = p.Role
-                      Outcome = AgentCompleted p
-                      CompletedAt = DateTimeOffset.UtcNow }
-                | AgentFailedItem p ->
-                    { RunId = p.RunId
-                      AgentName = ""
-                      Role = defaultArg p.Role Role.Distiller
-                      Outcome = AgentFailed p
-                      CompletedAt = DateTimeOffset.UtcNow }
-                | AgentAbandonedItem(agentId, reason) ->
-                    { RunId = "abandoned-" + agentId
-                      AgentName = ""
-                      Role = Role.Distiller
-                      Outcome = AgentAbandoned(agentId, reason)
-                      CompletedAt = DateTimeOffset.UtcNow }
-
-            renderAgentJoinItem lang resolveAgentName nameStub agentItem
+        | AgentItem agentItem -> renderAgentItem lang resolveAgentName agentItem
         | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
 
     /// EXEC-004 / EXEC-018 / EXEC-020: JoinItem batch (production JoinTool path).

@@ -42,14 +42,14 @@ module Pty =
             callbacks.[token] <- abort
             token)
 
+    let private removeCallback parentId token (callbacks: Dictionary<int, unit -> unit>) =
+        callbacks.Remove token |> ignore
+        if callbacks.Count = 0 then parentAborters.Remove parentId |> ignore
+
     let unregisterParentAbort (parentId: string) (token: int) =
         lock parentGate (fun () ->
             match parentAborters.TryGetValue parentId with
-            | true, callbacks ->
-                callbacks.Remove token |> ignore
-
-                if callbacks.Count = 0 then
-                    parentAborters.Remove parentId |> ignore
+            | true, callbacks -> removeCallback parentId token callbacks
             | _ -> ())
 
     let abortParent (parentId: string) =

@@ -8,7 +8,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
-open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 
@@ -34,7 +33,7 @@ module CasebookBookkeeperSurface =
 
     /// Configure the opaque Host session capability used by BookkeeperRuntime.
     let setSessionPort (port: obj) : unit =
-        BookkeeperRuntime.setSessionPort (unbox<ISessionHostPort> port)
+        BookkeeperRuntime.setSessionPort (unbox<Wanxiangshu.OpenCode.ISessionHostPort> port)
 
     let resetSessionPort () : unit = BookkeeperRuntime.resetSessionPort ()
 
@@ -58,9 +57,9 @@ module CasebookBookkeeperSurface =
     /// Execute one provider program against the currently bound transaction.
     /// Host argument/context decoding and ToolResultBound remain owner-private.
     let runProgram (sessionId: string) (program: string) : Task<string> =
-        let args = HostToolArguments(createObj [ "program" ==> program ])
+        let args = Wanxiangshu.OpenCode.HostToolArguments(createObj [ "program" ==> program ])
 
-        let context: HostToolContext =
+        let context: Wanxiangshu.OpenCode.HostToolContext =
             { SessionId = sessionId
               Agent = None
               ToolCallId = None
@@ -75,7 +74,7 @@ module CasebookBookkeeperSurface =
 
     /// Provider-visible metadata without exposing ToolSpec or HostSchema.
     let contract (toolModule: obj) : obj =
-        let spec = JsBookkeeperTool.spec (ToolHostCodec.factory toolModule)
+        let spec = JsBookkeeperTool.spec (Wanxiangshu.OpenCode.ToolHostCodec.factory toolModule)
 
         box
             {| name = spec.Name
@@ -102,7 +101,7 @@ module CasebookBookkeeperSurface =
 
     let completed (value: string) : obj =
         box
-            (TerminalOutcome.Completed
+            (Wanxiangshu.OpenCode.TerminalOutcome.Completed
                 { SessionId = SessionId.create value
                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "bookkeeper"
                   ProviderRun = ProviderRunIdentity.create "bookkeeper"

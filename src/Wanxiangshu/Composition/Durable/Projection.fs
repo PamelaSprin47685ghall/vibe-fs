@@ -61,6 +61,9 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 /// it arrives. "No fact yet" and "an empty projection" are different claims and
 /// must stay distinguishable — collapsing them is how a missing fact starts
 /// looking like a satisfied precondition.
+/// DSL-state-combination: domain — this aggregate is the durable per-session
+/// projection of independently-owned fact families; each optional field is a
+/// bounded-context projection, not an execution cursor.
 type SessionAgentProjection =
     {
         Companion: CompanionProjection option

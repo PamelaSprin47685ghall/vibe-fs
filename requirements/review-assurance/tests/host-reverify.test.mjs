@@ -218,6 +218,42 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_terminal_before_second_judgement_
   }
 })
 
+test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_rejects_completed_terminal_with_unknown_role', async () => {
+  let live
+  live = await liveOrchestrator({
+    sessionBehaviour: {
+      onSendPrompt: (reviewerId) => {
+        queueMicrotask(() =>
+          live.sessions.notifyTerminal(reviewerId, {
+            kind: 'Completed',
+            sessionId: reviewerId,
+            authorityRoot: 'root-invalid-role',
+            providerRun: 'run-invalid-role',
+            role: 'NotARealRole',
+            terminalText: 'should not complete',
+            turnFormalText: 'should not complete',
+          }),
+        )
+      },
+    },
+  })
+  const worktree = gitDir('rv-invalid-role')
+  try {
+    const result = await reviewHost.reverify(
+      hostSurface.managerPort(live.host),
+      'hostfw-invalid-role',
+      'ses_mgr_invalid_role',
+      worktree,
+      'bar_invalid_role',
+    )
+    assert.equal(result.ok, false)
+    assert.match(result.error, /invalid role/)
+  } finally {
+    live.cleanup()
+    rmSync(worktree, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_forks_a_deep_reviewer_and_fails_closed_without_a_journal', async () => {
   const live = await liveOrchestrator({ journal: false })
   const worktree = gitDir('rvf')

@@ -93,6 +93,24 @@ type PluginStrengthScope() =
     // DSL-MUTABLE: resource — process-local Strength fuse latch
     let mutable strengthFuseReason: string option = None
 
+    let observeFirst key feature symbol =
+        strengthPendingFirst.Remove key |> ignore
+
+        let next, firstReadonly =
+            StrengthPredictor.observeFirst feature symbol strengthPredictorState
+
+        strengthPredictorState <- next
+
+        if firstReadonly then
+            strengthPendingSecond.[key] <- feature
+
+    let observeSecond key symbol =
+        match strengthPendingSecond.TryGetValue key with
+        | true, feature ->
+            strengthPendingSecond.Remove key |> ignore
+            strengthPredictorState <- StrengthPredictor.observeSecond feature symbol strengthPredictorState
+        | false, _ -> ()
+
     member _.StrengthRuntime = strengthRuntime
 
     member _.AttachStrengthReplicaRuntime(runtime: StrengthReplicaRuntime) = strengthReplicaRuntime <- Some runtime
@@ -134,22 +152,8 @@ type PluginStrengthScope() =
         let key = SessionId.value sessionId
 
         match strengthPendingFirst.TryGetValue key with
-        | true, (targetRun, feature) when targetRun = providerRun ->
-            strengthPendingFirst.Remove key |> ignore
-
-            let next, firstReadonly =
-                StrengthPredictor.observeFirst feature symbol strengthPredictorState
-
-            strengthPredictorState <- next
-
-            if firstReadonly then
-                strengthPendingSecond.[key] <- feature
-        | _ ->
-            match strengthPendingSecond.TryGetValue key with
-            | true, feature ->
-                strengthPendingSecond.Remove key |> ignore
-                strengthPredictorState <- StrengthPredictor.observeSecond feature symbol strengthPredictorState
-            | false, _ -> ()
+        | true, (targetRun, feature) when targetRun = providerRun -> observeFirst key feature symbol
+        | _ -> observeSecond key symbol
 
         let recent =
             match strengthRecentPrimary.TryGetValue key with

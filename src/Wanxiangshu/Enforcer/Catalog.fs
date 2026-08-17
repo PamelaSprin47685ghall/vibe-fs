@@ -51,6 +51,50 @@ module EnforcerCatalog =
 
     /// schemaVersion kept for test/facade compatibility (folder loader always passes 1).
     /// non-empty rules, unique Name/RuleId/FieldName, order 1..N, non-empty texts.
+    let private validateDuplicates (rules: EnforcerRule list) : Result<unit, string> =
+        let nameDupes = rules |> List.map (fun r -> r.Name) |> duplicates
+        let idDupes = rules |> List.map (fun r -> r.RuleId) |> duplicates
+        let fieldDupes = rules |> List.map (fun r -> r.FieldName) |> duplicates
+
+        if not (List.isEmpty nameDupes) then
+            Error(sprintf "enforcer catalog duplicate rule name: %s" (String.concat ", " nameDupes))
+        elif not (List.isEmpty idDupes) then
+            Error(sprintf "enforcer catalog duplicate rule id: %s" (String.concat ", " idDupes))
+        elif not (List.isEmpty fieldDupes) then
+            Error(sprintf "enforcer catalog duplicate field: %s" (String.concat ", " fieldDupes))
+        else
+            Ok()
+
+    let private validateOrder (rules: EnforcerRule list) : Result<EnforcerRule list, string> =
+        let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
+        let orders = ordered |> List.map (fun r -> r.LexicalOrder)
+        let expected = [ 1 .. List.length rules ]
+
+        if orders <> expected then
+            Error(sprintf "enforcer catalog lexicalOrder must be contiguous 1..%d" (List.length rules))
+        else
+            Ok ordered
+
+    let private validateContents (ordered: EnforcerRule list) : Result<EnforcerRule list, string> =
+        match
+            ordered
+            |> List.tryFind (fun r ->
+                not (isNonEmpty r.Name)
+                || not (isNonEmpty r.RuleId)
+                || not (isNonEmpty r.FieldName)
+                || not (isNonEmpty r.EnforcerText)
+                || not (isNonEmpty r.MainText)
+                || r.Name <> r.RuleId
+                || r.Name <> r.FieldName)
+        with
+        | Some bad ->
+            Error(
+                sprintf
+                    "enforcer catalog empty text or identity mismatch on rule ordinal %d"
+                    bad.LexicalOrder
+            )
+        | None -> Ok ordered
+
     let validate (schemaVersion: int) (rules: EnforcerRule list) : Result<EnforcerRule list, string> =
         let n = List.length rules
 
@@ -59,54 +103,18 @@ module EnforcerCatalog =
         elif n = 0 then
             Error "enforcer catalog must contain at least one rule"
         else
-            let nameDupes = rules |> List.map (fun r -> r.Name) |> duplicates
-            let idDupes = rules |> List.map (fun r -> r.RuleId) |> duplicates
-            let fieldDupes = rules |> List.map (fun r -> r.FieldName) |> duplicates
+            validateDuplicates rules
+            |> Result.bind (fun () -> validateOrder rules)
+            |> Result.bind validateContents
 
-            if not (List.isEmpty nameDupes) then
-                Error(sprintf "enforcer catalog duplicate rule name: %s" (String.concat ", " nameDupes))
-            elif not (List.isEmpty idDupes) then
-                Error(sprintf "enforcer catalog duplicate rule id: %s" (String.concat ", " idDupes))
-            elif not (List.isEmpty fieldDupes) then
-                Error(sprintf "enforcer catalog duplicate field: %s" (String.concat ", " fieldDupes))
-            else
-                let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
-                let orders = ordered |> List.map (fun r -> r.LexicalOrder)
-                let expected = [ 1..n ]
-
-                if orders <> expected then
-                    Error(sprintf "enforcer catalog lexicalOrder must be contiguous 1..%d" n)
-                else
-                    match
-                        ordered
-                        |> List.tryFind (fun r ->
-                            not (isNonEmpty r.Name)
-                            || not (isNonEmpty r.RuleId)
-                            || not (isNonEmpty r.FieldName)
-                            || not (isNonEmpty r.EnforcerText)
-                            || not (isNonEmpty r.MainText)
-                            || r.Name <> r.RuleId
-                            || r.Name <> r.FieldName)
-                    with
-                    | Some bad ->
-                        Error(
-                            sprintf
-                                "enforcer catalog empty text or identity mismatch on rule ordinal %d"
-                                bad.LexicalOrder
-                        )
-                    | None -> Ok ordered
 
     /// ENFORCER-021: exact field/TipName → rule. No fuzzy match (ENFORCER-024).
     let tryFindByField (field: string) (rules: EnforcerRule list) : EnforcerRule option =
-        if isNull field then
+        if isNull field || field.Trim().Length = 0 then
             None
         else
             let trimmed = field.Trim()
-
-            if trimmed.Length = 0 then
-                None
-            else
-                rules |> List.tryFind (fun r -> r.FieldName = trimmed || r.Name = trimmed)
+            rules |> List.tryFind (fun r -> r.FieldName = trimmed || r.Name = trimmed)
 
     /// Provider enum values: TipName list in lexical (LexicalOrder) order.
     let fieldNames (rules: EnforcerRule list) : string list =

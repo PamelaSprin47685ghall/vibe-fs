@@ -136,6 +136,21 @@ module ReviewerWorkflow =
         | None -> AsyncSupport.completedTask ()
         | Some(attempt, frontier) -> writeAttemptClosed (Option.get journal) turn attempt frontier
 
+    let private reportResolvedReviewerRun
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (runResult: AgentRunResult) =
+        task {
+            if runResult.IsValid then
+                do! XTraceCapture.captureTerminal journal turn
+                do! appendAttemptClosed journal turn
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult) |> ignore
+            else
+                do! appendAttemptClosed journal turn
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output") |> ignore
+        }
+
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
     /// XTrace terminal segment, close the carried attempt, and report.
     /// `allowToolOnlyFallback` lets an active Finality CE report a tool-only
@@ -180,29 +195,7 @@ module ReviewerWorkflow =
                       TerminalText = sessionWideText
                       TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
-                // EXEC-006: `IsValid` is the single place that decides whether a
-                // completed run carries terminal output.
-                if runResult.IsValid then
-                    // COMPANION-003: capture the XTrace terminal segment.
-                    // Idempotent (PERSIST-010).
-                    do! XTraceCapture.captureTerminal journal turn
-
-                    // REVIEW-013/017: the turn is over and its XTrace converged;
-                    // freeze the attempt's closure frontier now.
-                    do! appendAttemptClosed journal turn
-
-                    eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Completed runResult)
-                    |> ignore
-                else
-                    // The turn still ended — an attempt it recorded is closed so
-                    // the conclusion is not left waiting for a terminal text
-                    // that will never come.
-                    do! appendAttemptClosed journal turn
-
-                    eventPort.NotifyTerminal
-                        turn.SessionId
-                        (TerminalOutcome.Failed "completed with empty terminal output")
-                    |> ignore
+                return! reportResolvedReviewerRun eventPort journal turn runResult
         }
 
     let private reportContinuationFailure

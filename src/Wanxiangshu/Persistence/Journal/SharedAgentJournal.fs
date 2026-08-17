@@ -25,6 +25,45 @@ module SharedAgentJournal =
     let private gate = obj ()
     let private shared = Dictionary<string, SharedJournal>()
 
+    let private registerInstance
+        (directory: string)
+        (ready: Task<Result<AgentJournal, FoldRejection>>)
+        (journal: AgentJournal) =
+        lock gate (fun () ->
+            match shared.TryGetValue directory with
+            | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> entry.Instance <- Some journal
+            | _ -> ())
+
+    let private removeOpening
+        (directory: string)
+        (ready: Task<Result<AgentJournal, FoldRejection>>) =
+        lock gate (fun () ->
+            match shared.TryGetValue directory with
+            | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> shared.Remove directory |> ignore
+            | _ -> ())
+
+    let private releaseExisting
+        (directory: string)
+        (entry: SharedJournal)
+        (target: AgentJournal) =
+        let remaining = entry.RefCount - 1
+
+        if remaining <= 0 then
+            shared.Remove directory |> ignore
+            (target :> IDisposable).Dispose()
+        else
+            entry.RefCount <- remaining
+
+    let private releaseEntry (directory: string) (entry: SharedJournal) (target: AgentJournal) =
+        match entry.Instance with
+        | Some instance when obj.ReferenceEquals(instance, target) -> releaseExisting directory entry target
+        | _ -> ()
+
+    let private releaseTarget (target: AgentJournal) =
+        lock gate (fun () ->
+            for KeyValue(directory, entry) in shared |> Seq.toList do
+                releaseEntry directory entry target)
+
     /// PERSIST-004: an unfoldable journal stops startup.
     ///
     /// Returns the rejection instead of throwing, so the composition root decides
@@ -60,34 +99,14 @@ module SharedAgentJournal =
         task {
             match! ready with
             | Ok journal ->
-                lock gate (fun () ->
-                    match shared.TryGetValue directory with
-                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> entry.Instance <- Some journal
-                    | _ -> ())
-
+                registerInstance directory ready journal
                 return Ok journal
             | Error err ->
-                lock gate (fun () ->
-                    match shared.TryGetValue directory with
-                    | true, entry when obj.ReferenceEquals(entry.Ready, ready) -> shared.Remove directory |> ignore
-                    | _ -> ())
-
+                removeOpening directory ready
                 return Error err
         }
 
     let release (journal: AgentJournal option) =
         match journal with
         | None -> ()
-        | Some target ->
-            lock gate (fun () ->
-                for KeyValue(directory, entry) in shared |> Seq.toList do
-                    match entry.Instance with
-                    | Some instance when obj.ReferenceEquals(instance, target) ->
-                        let remaining = entry.RefCount - 1
-
-                        if remaining <= 0 then
-                            shared.Remove directory |> ignore
-                            (target :> IDisposable).Dispose()
-                        else
-                            entry.RefCount <- remaining
-                    | _ -> ())
+        | Some target -> releaseTarget target

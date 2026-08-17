@@ -46,6 +46,11 @@ module EnforcementProjection =
 
         if n <= limit then tips else tips |> List.skip (n - limit)
 
+    let private fieldNameAtCommit (record: EnforcementCycleRecord) =
+        match record.FieldNameAtCommit with
+        | Some f when not (isNull f) && f.Trim().Length > 0 -> f
+        | _ -> record.TipRuleId
+
     /// Apply the enforcement half of BlogObservationCommitted.
     /// Duplicate ProviderRun → Error (ENFORCER-154). Caller may absorb as idempotent.
     /// Appends RecentTips and keeps last RecentTipLimit (ENFORCER-070).
@@ -61,11 +66,7 @@ module EnforcementProjection =
                     (ProviderRunIdentity.value record.ProviderRun)
             )
         | None ->
-            let fieldName =
-                match record.FieldNameAtCommit with
-                | Some f when not (isNull f) && f.Trim().Length > 0 -> f
-                | _ -> record.TipRuleId
-
+            let fieldName = fieldNameAtCommit record
             let tip =
                 { RuleId = record.TipRuleId
                   FieldName = fieldName
@@ -88,17 +89,17 @@ module EnforcementProjection =
     /// frame range (ENFORCER observation co-move; imperfect if a prior squash frame is
     /// among the covered range, but improves residual vs independent tip lifetime).
     let applySquash (count: int) (state: EnforcementProjectionState) : EnforcementProjectionState =
-        if count <= 0 then
+        let n = List.length state.RecentTips
+        let drop =
+            if count <= 0 then 0
+            elif count < n then count
+            else n
+
+        if drop = 0 then
             state
         else
-            let n = List.length state.RecentTips
-            let drop = if count < n then count else n
-
-            if drop = 0 then
-                state
-            else
-                { state with
-                    RecentTips = List.skip drop state.RecentTips }
+            { state with
+                RecentTips = List.skip drop state.RecentTips }
 
     let tryFindByProviderRun (run: ProviderRunIdentity) (state: EnforcementProjectionState) =
         Map.tryFind run state.ByProviderRun

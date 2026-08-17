@@ -8,7 +8,6 @@ open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.OpenCode
 
 /// Context-compression runtime owner. One opaque PluginRuntimeScope owns the
 /// physical Blogger park/flight/drain resources; companion recovery waiters and
@@ -28,7 +27,8 @@ module CompanionRuntimeSurface =
     let private optionalText (value: obj) : string option =
         if isNullish value then None else Some(text value)
 
-    let private scopeOf (value: obj) : PluginRuntimeScope = unbox<PluginRuntimeScope> value
+    let private scopeOf (value: obj) : Wanxiangshu.OpenCode.PluginRuntimeScope =
+        unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value
     let private hostOf (value: obj) : IParkedTransformHost = (scopeOf value).ParkedTransformHost
     let private companionOf (value: obj) : Companion = unbox<Companion> value
 
@@ -111,8 +111,8 @@ module CompanionRuntimeSurface =
 
     /// Isolate physical shared-flight state before a semantic runtime test.
     let createScope () : obj =
-        SharedState.clearBloggerFlightsForTests ()
-        box (new PluginRuntimeScope(None))
+        Wanxiangshu.OpenCode.SharedState.clearBloggerFlightsForTests ()
+        box (new Wanxiangshu.OpenCode.PluginRuntimeScope(None))
 
     let createParked (sessionId: string) (lifetimeMs: int) : obj =
         box (new ParkedTransform(sessionId, TimeSpan.FromMilliseconds(float lifetimeMs)))

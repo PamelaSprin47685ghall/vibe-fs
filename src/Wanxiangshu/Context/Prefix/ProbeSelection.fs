@@ -71,6 +71,89 @@ module PrefixProbeSelection =
         && candidate.CoveredPrefixDigest = committed.CoveredPrefixDigest
         && candidate.FrozenRecordPrefixDigest = committed.FrozenRecordPrefixDigest
 
+    let private validateCoverage
+        (coverableCutoff: int)
+        (requestStartCutoff: int)
+        (committedSnapshot: PrefixSnapshot option)
+        : Result<int * int, NoCandidateReason> =
+        let candidateCutoff = min coverableCutoff requestStartCutoff
+
+        let committedCutoff =
+            committedSnapshot
+            |> Option.map (fun snapshot -> snapshot.CutoffExclusive)
+            |> Option.defaultValue 0
+
+        if coverableCutoff <= 0 then
+            Error NoCandidateReason.NoCoverage
+        elif candidateCutoff <= 0 then
+            Error NoCandidateReason.CoverageNotAheadOfRequest
+        elif candidateCutoff < committedCutoff then
+            Error(NoCandidateReason.WouldRetreat(committedCutoff, candidateCutoff))
+        else
+            Ok(candidateCutoff, committedCutoff)
+
+    let private finishCandidate
+        (sha256: string -> string)
+        (mainSessionId: SessionId)
+        (committedEpoch: PrefixEpochId)
+        (coveredDigest: string)
+        (frozenRecordPrefixRef: BlobRef)
+        (frozenRecordPrefixDigest: BlobDigest)
+        (committedSnapshot: PrefixSnapshot option)
+        (candidateCutoff: int)
+        : Result<PrefixProbe, NoCandidateReason> =
+        let sealRoot =
+            CompanionIdentity.sealRoot
+                sha256
+                mainSessionId
+                committedEpoch
+                candidateCutoff
+                coveredDigest
+                frozenRecordPrefixDigest
+
+        let candidate =
+            { FrozenRecordPrefixRef = frozenRecordPrefixRef
+              FrozenRecordPrefixDigest = frozenRecordPrefixDigest
+              CutoffExclusive = candidateCutoff
+              CoveredPrefixDigest = coveredDigest
+              SealRoot = sealRoot
+              SyntheticMessageId = CompanionIdentity.companionMemoryMessageId sha256 sealRoot }
+
+        match committedSnapshot with
+        | Some existing when sameAsCommitted candidate existing ->
+            Error NoCandidateReason.NotNewerThanCommitted
+        | _ ->
+            Ok
+                { ProbeId = sha256 (sealRoot + "|probe")
+                  BasedOnEpochId = committedEpoch
+                  Candidate = candidate }
+
+    let private proveCandidate
+        (sha256: string -> string)
+        (mainSessionId: SessionId)
+        (committedEpoch: PrefixEpochId)
+        (coveredDigest: string)
+        (frozenRecordPrefixRef: BlobRef)
+        (frozenRecordPrefixDigest: BlobDigest)
+        (committedSnapshot: PrefixSnapshot option)
+        (recomputeDigest: int -> string)
+        (candidateCutoff: int)
+        : Result<PrefixProbe, NoCandidateReason> =
+        let recomputed = recomputeDigest candidateCutoff
+
+        if recomputed <> coveredDigest then
+            Error(NoCandidateReason.CutoffProofFailed(coveredDigest, recomputed))
+        else
+            finishCandidate
+                sha256
+                mainSessionId
+                committedEpoch
+                coveredDigest
+                frozenRecordPrefixRef
+                frozenRecordPrefixDigest
+                committedSnapshot
+                candidateCutoff
+
     /// CTX-011, steps 1 through 9.
     ///
     /// `committedEpoch` / `committedSnapshot` are the two fields of the Journal's
@@ -105,64 +188,22 @@ module PrefixProbeSelection =
         (recomputeDigest: int -> string)
         : Result<PrefixProbe, NoCandidateReason> =
         // Step 1. The candidate may cover no more than either side allows.
-        let candidateCutoff = min coverableCutoff requestStartCutoff
-
-        if coverableCutoff <= 0 then
-            Error NoCandidateReason.NoCoverage
-        elif candidateCutoff <= 0 then
-            Error NoCandidateReason.CoverageNotAheadOfRequest
-        else
-            let committedCutoff =
+        validateCoverage coverableCutoff requestStartCutoff committedSnapshot
+        |> Result.bind (fun (candidateCutoff, _) ->
+            // Step 5, before the identity comparison. The digest must be proven
+            // against X's current prefix even when the candidate turns out to be
+            // identical to what is committed: a matching identity computed from a
+            // stale numbering is not evidence of anything.
+            proveCandidate
+                sha256
+                mainSessionId
+                committedEpoch
+                coveredDigest
+                frozenRecordPrefixRef
+                frozenRecordPrefixDigest
                 committedSnapshot
-                |> Option.map (fun snapshot -> snapshot.CutoffExclusive)
-                |> Option.defaultValue 0
-
-            // Step 2a. CTX-011 forbids the covered range going backwards.
-            if candidateCutoff < committedCutoff then
-                Error(NoCandidateReason.WouldRetreat(committedCutoff, candidateCutoff))
-            else
-                // Step 5, before the identity comparison. The digest must be proven
-                // against X's current prefix even when the candidate turns out to be
-                // identical to what is committed: a matching identity computed from a
-                // stale numbering is not evidence of anything.
-                let recomputed = recomputeDigest candidateCutoff
-
-                if recomputed <> coveredDigest then
-                    Error(NoCandidateReason.CutoffProofFailed(coveredDigest, recomputed))
-                else
-                    // Steps 6 and 7. The seal is derived from the candidate's identity
-                    // plus the epoch it was built from, so promoting it later needs no
-                    // regeneration (CTX-012).
-                    let sealRoot =
-                        CompanionIdentity.sealRoot
-                            sha256
-                            mainSessionId
-                            committedEpoch
-                            candidateCutoff
-                            coveredDigest
-                            frozenRecordPrefixDigest
-
-                    let candidate =
-                        { FrozenRecordPrefixRef = frozenRecordPrefixRef
-                          FrozenRecordPrefixDigest = frozenRecordPrefixDigest
-                          CutoffExclusive = candidateCutoff
-                          CoveredPrefixDigest = coveredDigest
-                          SealRoot = sealRoot
-                          SyntheticMessageId = CompanionIdentity.companionMemoryMessageId sha256 sealRoot }
-
-                    // Step 2b. Equal cutoff with a tighter FrozenRecordPrefix is a legitimate new
-                    // candidate — a Y squash makes B more compact without covering more
-                    // X turns — so identity is the test, not the cutoff alone.
-                    match committedSnapshot with
-                    | Some existing when sameAsCommitted candidate existing ->
-                        Error NoCandidateReason.NotNewerThanCommitted
-                    | _ ->
-                        // Step 8. The probe rides on the attempt profile (PROMPT-008),
-                        // which is what keeps it valid for exactly one attempt.
-                        Ok
-                            { ProbeId = sha256 (sealRoot + "|probe")
-                              BasedOnEpochId = committedEpoch
-                              Candidate = candidate }
+                recomputeDigest
+                candidateCutoff)
 
     let describeNoCandidate (reason: NoCandidateReason) =
         match reason with

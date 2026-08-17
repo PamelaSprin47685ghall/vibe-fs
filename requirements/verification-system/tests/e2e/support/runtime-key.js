@@ -34,13 +34,12 @@
 
 import { messageText, semanticOf } from './provider-wire.js';
 import { extractToolNames } from './strict-mock-matches.js';
-import { toArray as listToArray } from '../../../../../dist/fable_modules/fable-library-js.5.13.0/List.js';
-// HOST-013: the production constants, read from the build artifact rather than
-// copied, so a rewording of the marker text fails here instead of silently
-// making every marker-shaped assistant count as a real step.
+// HOST-013: the production constant comes through its registered JS surface,
+// so a rewording of the marker text fails here instead of silently making every
+// marker-shaped assistant count as a real step.
 import {
   source as pairProgrammingThoughtSource,
-} from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtTransform.js';
+} from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js';
 
 // ── lane ────────────────────────────────────────────────────────────────────
 
@@ -205,7 +204,7 @@ export function turnOf(body) {
   const index = lastUserIndex(messages);
   if (index < 0) return null;
 
-  const projected = listToArray(semanticOf({ messages: [messages[index]] }).Messages);
+  const projected = semanticOf({ messages: [messages[index]] }).messages;
   return projected.length === 0 ? null : messageText(projected[0]);
 }
 

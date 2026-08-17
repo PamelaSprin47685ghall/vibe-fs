@@ -123,7 +123,31 @@ module FinalityHostPort =
         let openingAssignment () =
             ProviderProse.render (ProviderProse.languageOf managerSessionId) HostReviewPrompt.Opening Map.empty
 
-        let prepareSession (request: FinalityReviewerRequest) =
+        let forkReviewerSession (request: FinalityReviewerRequest) : Task<Result<PreparedReviewer, string>> =
+            task {
+                match!
+                    runtime.Fork(
+                        request.AgentId,
+                        Role.Reviewer,
+                        reviewerAgentName,
+                        openingAssignment (),
+                        None,
+                        ownership = HandleOwnership.HostOwnedHidden,
+                        deferSend = true
+                    )
+                with
+                | Error error -> return Error error
+                | Ok _ ->
+                    match runtime.TryChildSession request.AgentId with
+                    | Some childId ->
+                        return
+                            Ok
+                                { ReviewerSessionId = childId
+                                  IsNew = true }
+                    | None -> return Error "reviewer session was not created"
+            }
+
+        let prepareSession (request: FinalityReviewerRequest) : Task<Result<PreparedReviewer, string>> =
             task {
                 match request.ReviewerSessionId with
                 | Some existing ->
@@ -133,36 +157,23 @@ module FinalityHostPort =
                         Ok
                             { ReviewerSessionId = existing
                               IsNew = false }
-                | None ->
-                    match!
-                        runtime.Fork(
-                            request.AgentId,
-                            Role.Reviewer,
-                            reviewerAgentName,
-                            openingAssignment (),
-                            None,
-                            ownership = HandleOwnership.HostOwnedHidden,
-                            deferSend = true
-                        )
-                    with
-                    | Error error -> return Error error
-                    | Ok _ ->
-                        match runtime.TryChildSession request.AgentId with
-                        | None -> return Error "reviewer session was not created"
-                        | Some childId ->
-                            return
-                                Ok
-                                    { ReviewerSessionId = childId
-                                      IsNew = true }
+                | None -> return! forkReviewerSession request
             }
 
-        let startReview (memberInfo: EnlistedMember) =
+        let startReview (memberInfo: EnlistedMember) : Task<Result<unit, string>> =
             task {
                 if memberInfo.IsNew then
                     return! runtime.SendDeferredFirstPrompt memberInfo.AgentId
                 else
                     match!
-                        runtime.Fork(memberInfo.AgentId, Role.Reviewer, reviewerAgentName, openingAssignment (), None)
+                        runtime.Fork(
+                            memberInfo.AgentId,
+                            Role.Reviewer,
+                            reviewerAgentName,
+                            openingAssignment (),
+                            None,
+                            ownership = HandleOwnership.HostOwnedHidden
+                        )
                     with
                     | Error error -> return Error error
                     | Ok _ -> return Ok()
@@ -224,19 +235,21 @@ module FinalityHostPort =
               SendRevisionSteer = sendRevisionSteer
               AbortReviewer = fun reviewerSessionId -> scope.Sessions.AbortSession reviewerSessionId |> ignore }
 
+        let readManagerTree port =
+            let current = port.GetTreeHash().Trim()
+
+            if String.IsNullOrWhiteSpace current then
+                Error "manager Git tree is empty"
+            else
+                Ok(GitTreeHash.create current)
+
         let treePort: FinalityTreePort =
             { ReadManagerTree =
                 fun sessionId ->
                     try
-                        match scope.TreePortFor(SessionId.value sessionId) with
-                        | None -> Error "manager Git tree is unavailable"
-                        | Some port ->
-                            let current = port.GetTreeHash().Trim()
-
-                            if String.IsNullOrWhiteSpace current then
-                                Error "manager Git tree is empty"
-                            else
-                                Ok(GitTreeHash.create current)
+                        scope.TreePortFor(SessionId.value sessionId)
+                        |> Option.map readManagerTree
+                        |> Option.defaultValue (Error "manager Git tree is unavailable")
                     with ex ->
                         Error ex.Message }
 

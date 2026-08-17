@@ -145,6 +145,31 @@ module StaticTools =
         |> List.map (fun name -> name, Set.contains name allowedNames)
         |> Map.ofList
 
+    let private defaultPermission allowed name = if Set.contains name allowed then "allow" else "deny"
+
+    let private jsPermission role name =
+        if name = jsToolName role && hasFsCapability role then "allow" else "deny"
+
+    let private permissionFor allowed role name =
+        match name, role with
+        | "commission", Role.Manager -> "deny"
+        | "fork", Role.Orchestrator -> "deny"
+        | "commission", Role.Orchestrator -> "allow"
+        | "open-terminal", Role.DevOps
+        | "send-terminal", Role.DevOps
+        | "read-terminal", Role.DevOps
+        | "signal-terminal", Role.DevOps -> "allow"
+        | "fork", Role.DevOps -> "deny"
+        | "query-shell", Role.Inspector -> "allow"
+        | "run", Role.Inspector -> "deny"
+        | "run", Role.DevOps -> "allow"
+        | "query-shell", Role.DevOps -> "deny"
+        | "write", Role.DevOps
+        | "edit", Role.DevOps -> "deny"
+        | "js-bookkeeper", _ -> "deny"
+        | name, _ when name.StartsWith "js-" -> jsPermission role name
+        | _ -> defaultPermission allowed name
+
     let permissionObj (role: Role) : obj =
         let allowed = Roles.permissions role |> namesForPermissions
 
@@ -155,39 +180,7 @@ module StaticTools =
             [ yield "*", box "deny"
               yield "external_directory", box "allow"
               for name in knownToolNames do
-                  match name, role with
-                  // Manager owns fork; Orchestrator owns commission (both from Fork).
-                  | "commission", Role.Manager -> yield name, box "deny"
-                  | "fork", Role.Orchestrator -> yield name, box "deny"
-                  | "commission", Role.Orchestrator -> yield name, box "allow"
-                  // DevOps owns terminal verbs; never fork through Pty.
-                  | "open-terminal", Role.DevOps
-                  | "send-terminal", Role.DevOps
-                  | "read-terminal", Role.DevOps
-                  | "signal-terminal", Role.DevOps -> yield name, box "allow"
-                  | "fork", Role.DevOps -> yield name, box "deny"
-                  // Exec verb split: Inspector = query-shell; DevOps = run.
-                  | "query-shell", Role.Inspector -> yield name, box "allow"
-                  | "run", Role.Inspector -> yield name, box "deny"
-                  | "run", Role.DevOps -> yield name, box "allow"
-                  | "query-shell", Role.DevOps -> yield name, box "deny"
-                  // DevOps may inspect and delegate behavior, never write/edit directly.
-                  | "write", Role.DevOps
-                  | "edit", Role.DevOps -> yield name, box "deny"
-                  // JS-001: the generated js-* tool is allowed iff this role has
-                  // a filesystem capability and the name is this role's own.
-                  // js-bookkeeper is Bookkeeper-attachment only (gated at registry).
-                  | "js-bookkeeper", _ -> yield name, box "deny"
-                  | name, _ when name.StartsWith "js-" ->
-                      yield
-                          name,
-                          box (
-                              if name = jsToolName role && hasFsCapability role then
-                                  "allow"
-                              else
-                                  "deny"
-                          )
-                  | _ -> yield name, box (if Set.contains name allowed then "allow" else "deny") ]
+                  yield name, box (permissionFor allowed role name) ]
 
         createObj pairs
 

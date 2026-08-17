@@ -149,23 +149,31 @@ module EnforcerHost =
                 |> List.groupBy (fun part -> part.Turn)
                 |> List.sortBy fst
 
+            let semanticPart (part: XTracePartRef) (body: string) =
+                match part.Kind with
+                | "text" -> Some(ProviderProjection.SemanticText body)
+                | "reasoning" -> Some(ProviderProjection.SemanticReasoning body)
+                | "tool_call" ->
+                    part.ToolName
+                    |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
+                | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
+                | "media_omitted" ->
+                    let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
+                    Some(ProviderProjection.SemanticMedia(mediaType, ""))
+                | _ -> None
+
             let readSemanticPart (part: XTracePartRef) =
                 task {
                     match! journal.Writer.BlobWriter.Read part.TextRef with
                     | Error _ -> return None
-                    | Ok body ->
-                        return
-                            match part.Kind with
-                            | "text" -> Some(ProviderProjection.SemanticText body)
-                            | "reasoning" -> Some(ProviderProjection.SemanticReasoning body)
-                            | "tool_call" ->
-                                part.ToolName
-                                |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
-                            | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
-                            | "media_omitted" ->
-                                let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
-                                Some(ProviderProjection.SemanticMedia(mediaType, ""))
-                            | _ -> None
+                    | Ok body -> return semanticPart part body
+                }
+
+            let addSemanticPart (semanticParts: ResizeArray<_>) (part: XTracePartRef) =
+                task {
+                    match! readSemanticPart part with
+                    | Some semantic -> semanticParts.Add semantic
+                    | None -> ()
                 }
 
             let readTurn (_turn, parts) =
@@ -181,9 +189,7 @@ module EnforcerHost =
                     let semanticParts = ResizeArray<_>()
 
                     for part in ordered do
-                        match! readSemanticPart part with
-                        | Some semantic -> semanticParts.Add semantic
-                        | None -> ()
+                        do! addSemanticPart semanticParts part
 
                     if semanticParts.Count = 0 then
                         return None
@@ -194,12 +200,17 @@ module EnforcerHost =
                                   ProviderProjection.SemanticMessage.Parts = semanticParts |> Seq.toList }
                 }
 
+            let addMessage (messages: ResizeArray<_>) turn =
+                task {
+                    match! readTurn turn with
+                    | Some message -> messages.Add message
+                    | None -> ()
+                }
+
             let messages = ResizeArray<_>()
 
             for turn in byTurn do
-                match! readTurn turn with
-                | Some message -> messages.Add message
-                | None -> ()
+                do! addMessage messages turn
 
             return
                 { ProviderId = None

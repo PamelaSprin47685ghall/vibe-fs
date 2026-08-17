@@ -44,8 +44,6 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
   `publishDecision` / `isTerminalOutcome`）
 - 静态门禁：`scripts/checks/dsl-ownership.mjs`（positive 结构门，`--threshold=0`）、
   `scripts/checks/g4r-ce-vocabulary.mjs`（CE vocabulary absence + raw-time，`--phase=hard`）
-- 迁移 ratchet（cutover 后删除）：`scripts/checks/dsl-ownership-ratchet.mjs`、
-  `g4r-ce-vocabulary.mjs` 的 obsolete-controller 部分
 
 ## proof 概览（见 PROOF.md）
 
@@ -54,7 +52,7 @@ Physical Adapter     真的碰 OpenCode / Git / process / timer（Infrastructure
   → `requirements/structured-workflow/tests/`
 - NEW（3 文件，已单跑绿）：`workflow-surface.test.mjs`、`recovery-reentry.test.mjs`、
   `semantic-vocabulary.test.mjs`
-- REUSE：`tests/unit/verify/{dsl-ownership,dsl-ownership-ratchet,g4r-ce-vocabulary}.test.mjs`、
+- REUSE：`tests/unit/verify/{dsl-ownership,g4r-ce-vocabulary}.test.mjs`、
   `requirements/verification-system/tests/guide-contract.test.mjs`、`requirements/effect-accounting/tests/join-aborted-not-terminal.test.mjs`
   （effect-accounting 交叉）、`tests/unit/temporal/**`（time-capability/causal-wait 交叉）
 

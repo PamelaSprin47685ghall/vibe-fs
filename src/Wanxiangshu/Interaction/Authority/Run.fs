@@ -189,6 +189,19 @@ module PromptAuthorityRun =
             ClaimSequences =
                 Map.add scope (PromptAuthority.nextClaimSequence scope projection) projection.ClaimSequences }
 
+    let private acceptedContinuationEvidence
+        (physicalMessageId: PhysicalUserMessageId)
+        (origin: PromptAuthority.PromptOrigin)
+        (projection: PromptAuthority.PromptAuthorityProjection) =
+        match origin with
+        | PromptAuthority.PromptOrigin.Continuation continuation ->
+            { projection with
+                AcceptedContinuationIds =
+                    Map.add physicalMessageId continuation projection.AcceptedContinuationIds }
+        | PromptAuthority.PromptOrigin.AuthorityRoot _
+        | PromptAuthority.PromptOrigin.HostInternal
+        | PromptAuthority.PromptOrigin.UnknownOrigin -> projection
+
     /// PROMPT-005 `PhysicalAccepted`: a real Host message id resolved a claim.
     ///
     /// The landing is kept as typed `AcceptedDispatch` evidence keyed by
@@ -226,14 +239,7 @@ module PromptAuthorityRun =
                             landed
                             projection.AcceptedDispatches }
 
-            match claim.Origin with
-            | PromptAuthority.PromptOrigin.Continuation continuation ->
-                { withEvidence with
-                    AcceptedContinuationIds =
-                        Map.add physicalMessageId continuation withEvidence.AcceptedContinuationIds }
-            | PromptAuthority.PromptOrigin.AuthorityRoot _
-            | PromptAuthority.PromptOrigin.HostInternal
-            | PromptAuthority.PromptOrigin.UnknownOrigin -> withEvidence
+            acceptedContinuationEvidence physicalMessageId claim.Origin withEvidence
 
     /// PROMPT-005 `Abandoned`. Must not change the Active Logical Run.
     ///
@@ -251,6 +257,22 @@ module PromptAuthorityRun =
                     Map.remove
                         (PromptAuthority.acceptedDispatchKey claim.SessionId claim.PayloadDigest)
                         projection.AcceptedDispatches }
+
+    /// Resolve every origin other than an already-accepted continuation. The
+    /// tuple makes the precedence visible while keeping unknown input fail-closed.
+    let private resolveUnacceptedOrigin
+        (promptKey: PromptKey option)
+        (hostCompaction: bool)
+        (projection: PromptAuthority.PromptAuthorityProjection)
+        : PromptAuthority.PromptOrigin =
+        let pending = promptKey |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims)
+
+        match pending, promptKey, projection.ActiveLogicalRun, hostCompaction with
+        | Some claim, _, _, _ -> claim.Origin
+        | None, _, _, true -> PromptAuthority.PromptOrigin.HostInternal
+        | None, Some _, Some { AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot }, _ ->
+            PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
+        | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
 
     /// PROMPT-009 resolution order, evaluated top to bottom:
     ///
@@ -271,12 +293,4 @@ module PromptAuthorityRun =
         : PromptAuthority.PromptOrigin =
         match Map.tryFind physicalMessageId projection.AcceptedContinuationIds with
         | Some continuation -> PromptAuthority.PromptOrigin.Continuation continuation
-        | None ->
-            match promptKey |> Option.bind (fun key -> Map.tryFind key projection.PendingClaims) with
-            | Some claim -> claim.Origin
-            | None when hostCompaction -> PromptAuthority.PromptOrigin.HostInternal
-            | None ->
-                match promptKey, projection.ActiveLogicalRun with
-                | Some _, Some { AuthorityKind = PromptAuthority.RootAuthorityKind.AgentOwnerRoot } ->
-                    PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-                | _ -> PromptAuthority.PromptOrigin.UnknownOrigin
+        | None -> resolveUnacceptedOrigin promptKey hostCompaction projection

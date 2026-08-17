@@ -62,6 +62,61 @@ module HostForkBusyNudge =
     /// used to fall through to `sessions.SendChildPromptFireAndForget`, which reaches
     /// the Host prompt endpoint directly with no claim, no PromptKey and no recovery
     /// anchor — the exact bypass package A removed elsewhere. It fails closed instead.
+    let private managedBusyAgent
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (agent: string)
+        : string =
+        let trimmed = if String.IsNullOrWhiteSpace agent then "" else agent.Trim()
+        if trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then trimmed else profile.SelectedAgent
+
+    let private sendResult sent : Result<unit, string> =
+        match sent with
+        | Ok _ -> Ok()
+        | Error err -> Error err
+
+    let private sendWithProfile
+        (sessions: ISessionHostPort)
+        (j: AgentJournal)
+        (childId: SessionId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (agent: string)
+        (directory: string option)
+        (prompt: string) =
+        task {
+            let busyAgent = managedBusyAgent profile agent
+            let rt = PromptDispatcher.forJournal j
+            let syntheticPrompt = SyntheticToml.document [ prompt ] []
+
+            let! sent =
+                rt.SendContinuation
+                    sessions
+                    childId
+                    syntheticPrompt
+                    PromptAuthority.ContinuationKind.BusyAgentNudge
+                    profile
+                    busyAgent
+                    directory
+                    PromptDispatcher.AwaitMode.Detached
+                    None
+
+            return sendResult sent
+        }
+
+    let private sendWithJournal
+        (sessions: ISessionHostPort)
+        (j: AgentJournal)
+        (childId: SessionId)
+        (agent: string)
+        (directory: string option)
+        (prompt: string) =
+        task {
+            let snapshot = AgentJournal.snapshot j
+
+            match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
+            | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
+            | Some profile -> return! sendWithProfile sessions j childId profile agent directory prompt
+        }
+
     let send
         (sessions: ISessionHostPort)
         (_parentId: SessionId)
@@ -76,47 +131,7 @@ module HostForkBusyNudge =
             match journal with
             | None ->
                 return Error "Busy nudge requires an AgentJournal: PROMPT-005 admits no sender outside the Dispatcher"
-            | Some j ->
-                let snapshot = AgentJournal.snapshot j
-
-                match PromptAuthorityLedger.activeProfile childId snapshot.AgentProjections with
-                | None -> return Error "Busy nudge requires ActiveLogicalRun on child session"
-                | Some profile ->
-                    // In-flight nudge must keep the handle's managed agent.
-                    // Replacing it with the fallback Peer would switch Deep → Fast
-                    // mid-conversation (prefix break + unjustified downgrade).
-                    // Empty / unknown names keep SelectedAgent; they never follow
-                    // the cursor and never invent fast-ROLE.
-                    let busyAgent =
-                        let trimmed = if String.IsNullOrWhiteSpace agent then "" else agent.Trim()
-
-                        if trimmed = profile.SelectedAgent || trimmed = profile.PeerAgent then
-                            trimmed
-                        else
-                            profile.SelectedAgent
-
-                    let rt = PromptDispatcher.forJournal j
-
-                    // Busy-nudge requirement only: commentize multi-line guidance.
-                    // Do not wrap an already-rendered ForkChildPayload on this path.
-                    let syntheticPrompt = SyntheticToml.document [ prompt ] []
-
-                    // PROMPT-007 Detached: busy nudge does not wait for PhysicalAccepted.
-                    let! sent =
-                        rt.SendContinuation
-                            sessions
-                            childId
-                            syntheticPrompt
-                            PromptAuthority.ContinuationKind.BusyAgentNudge
-                            profile
-                            busyAgent
-                            directory
-                            PromptDispatcher.AwaitMode.Detached
-                            None
-
-                    match sent with
-                    | Ok _ -> return Ok()
-                    | Error err -> return Error err
+            | Some j -> return! sendWithJournal sessions j childId agent directory prompt
         }
 
     let sender sessions parentId journal directoryOf =

@@ -29,13 +29,14 @@
  * next Fable upgrade — or, worse, on this tree, which is at 5.13.0.
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as ForkModule from '../../../../../dist/Execution/Delegation/Fork/Surface.js';
+import * as BloggerModule from '../../../../../dist/Context/Companion/Blogger/TomlSurface.js';
+import * as SyntheticModule from '../../../../../dist/Foundation/SyntheticTomlSurface.js';
 
-const BUILD_ROOT = fileURLToPath(new URL('../../../../../dist/', import.meta.url));
 const REPO_ROOT = fileURLToPath(new URL('../../../../..', import.meta.url));
-const FABLE_MODULES = join(BUILD_ROOT, 'fable_modules');
 
 const asInstructionDocument = (body) => {
   const normalized = String(body).replace(/\r\n/g, '\n').replace(/\r/g, '\n').trimEnd();
@@ -47,68 +48,25 @@ const readProviderDocument = (semanticPath) =>
     readFileSync(join(REPO_ROOT, 'resources', 'provider', semanticPath, 'en.md'), 'utf8'),
   );
 
-const fableLibraryDir = (() => {
-  const candidates = readdirSync(FABLE_MODULES).filter((entry) => entry.startsWith('fable-library-js.'));
-
-  if (candidates.length !== 1) {
-    throw new Error(
-      `expected exactly one fable-library-js.* in ${FABLE_MODULES}, found: ${candidates.join(', ') || '(none)'}`,
-    );
-  }
-
-  return join(FABLE_MODULES, candidates[0]);
-})();
-
-const { ofArray } = await import(join(fableLibraryDir, 'List.js'));
-
-const [ForkModule, BloggerModule, SyntheticModule] = await Promise.all([
-  import(join(BUILD_ROOT, 'Execution/Delegation/Fork/Payload.js')),
-  import(join(BUILD_ROOT, 'Context/Companion/Blogger/Toml.js')),
-  import(join(BUILD_ROOT, 'Foundation/SyntheticToml.js')),
-]);
-
-/** An F# list from an array, or an already-converted list left alone. */
-const toList = (items) => (Array.isArray(items) ? ofArray(items) : items);
+const forkInstructions = ForkModule.instructions('en');
 
 // ── SyntheticToml: the canonical writer ──────────────────────────────────────
 
 export const renderString = (text) => SyntheticModule.renderString(text);
 export const comment = (text) => SyntheticModule.comment(text);
 export const field = (name, renderedValue) => SyntheticModule.field(name, renderedValue);
-export const tableArrayEntry = (name, fields) => SyntheticModule.tableArrayEntry(name, toList(fields));
+export const tableArrayEntry = (name, fields) => SyntheticModule.tableArrayEntry(name, fields);
 export const byteCount = (text) => SyntheticModule.byteCount(text);
 
-/** `document` emits as `document$`: the plain name would collide with the DOM global. */
-export const syntheticDocument = (instructions, body) =>
-  SyntheticModule.document$(toList(instructions), toList(body));
+export const syntheticDocument = (instructions, body) => SyntheticModule.renderDocument(instructions, body);
 
 // ── ForkChildPayload: the forked child's first prompt ─────────────────────────
 
-const forkReadLines = (semanticPath) =>
-  readFileSync(join(REPO_ROOT, 'resources', 'provider', semanticPath, 'en.md'), 'utf8')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .trimEnd()
-    .split('\n');
-
-const forkReadOne = (semanticPath) => forkReadLines(semanticPath).join('\n');
-
-const forkDefaultProse = () =>
-  new ForkModule.ForkChildInstructions(
-    toList(forkReadLines(ForkModule.ForkChildPayload_BasePath)),
-    forkReadOne(ForkModule.ForkChildPayload_CommissionerRecordPath),
-    forkReadOne(ForkModule.ForkChildPayload_AttachmentPath),
-    forkReadOne(ForkModule.ForkChildPayload_RequirementsPath),
-  );
-
-/** The instruction lines every forked child receives, as a JS array. */
-export const forkBaseInstructions = forkReadLines(ForkModule.ForkChildPayload_BasePath);
-
-export const forkCommissionerRecordInstruction = forkReadOne(
-  ForkModule.ForkChildPayload_CommissionerRecordPath,
-);
-export const forkAttachmentInstruction = forkReadOne(ForkModule.ForkChildPayload_AttachmentPath);
-export const forkRequirementsInstruction = forkReadOne(ForkModule.ForkChildPayload_RequirementsPath);
+/** The instruction prose every forked child receives, as JS-native values. */
+export const forkBaseInstructions = forkInstructions.Base;
+export const forkCommissionerRecordInstruction = forkInstructions.CommissionerRecord;
+export const forkAttachmentInstruction = forkInstructions.Attachment;
+export const forkRequirementsInstruction = forkInstructions.Requirements;
 /** @deprecated use forkCommissionerRecordInstruction */
 export const forkParentWorkRecordInstruction = forkCommissionerRecordInstruction;
 
@@ -120,60 +78,43 @@ export const forkPayload = ({
   attachment,
   originalUserRequirements = [],
   payload,
-}) => {
-  const record = commissionerRecord ?? parentWorkRecord
-  return ForkModule.ForkChildPayload_render(
-    forkDefaultProse(),
-    new ForkModule.ForkChildAssignment(
-      assignment,
-      record ?? undefined,
-      attachment ?? undefined,
-      toList(originalUserRequirements),
-      payload ?? undefined,
-    ),
-  );
-};
+}) => ForkModule.render('en', {
+  Assignment: assignment,
+  CommissionerRecord: commissionerRecord ?? parentWorkRecord ?? null,
+  Attachment: attachment ?? null,
+  RootRequirements: originalUserRequirements,
+  Payload: payload ?? null,
+});
 
 export const forkRelay = (assignment, commissionerRecord, requirements = [], payload) =>
-  ForkModule.ForkChildPayload_relay(
-    forkDefaultProse(),
-    assignment,
-    commissionerRecord ?? undefined,
-    undefined,
-    toList(requirements),
-    payload ?? undefined,
-  );
+  ForkModule.render('en', {
+    Assignment: assignment,
+    CommissionerRecord: commissionerRecord ?? null,
+    Attachment: null,
+    RootRequirements: requirements,
+    Payload: payload ?? null,
+  });
 
 /** The anchor a scenario declaration uses: the first base instruction, as it appears rendered. */
 export const forkAnchor = () => comment(forkBaseInstructions[0]);
 
 // ── BloggerToml: the Companion delta ─────────────────────────────────────────
 
-const part = (caseName, fields) => {
-  const cases = BloggerModule.BloggerDeltaPart.prototype.cases();
-  const tag = cases.indexOf(caseName);
+const part = (kind, payload = {}) => ({ Kind: kind, ...payload });
 
-  if (tag < 0) {
-    throw new Error(`BloggerDeltaPart has no case '${caseName}'. Cases: ${cases.join(', ')}`);
-  }
-
-  return new BloggerModule.BloggerDeltaPart(tag, fields);
-};
-
-export const bloggerText = (text) => part('TextPart', [text]);
-export const bloggerReasoning = (text) => part('ReasoningPart', [text]);
-export const bloggerToolCall = (tool, args) => part('ToolCallPart', [tool, args]);
-export const bloggerToolResult = (text) => part('ToolResultPart', [text]);
-export const bloggerImageOmitted = (mediaType) => part('ImageOmitted', [mediaType]);
-export const bloggerMediaOmitted = (mediaType) => part('MediaOmitted', [mediaType]);
+export const bloggerText = (text) => part('text', { Text: text });
+export const bloggerReasoning = (text) => part('reasoning', { Text: text });
+export const bloggerToolCall = (tool, args) => part('toolCall', { Tool: tool, Args: args });
+export const bloggerToolResult = (text) => part('toolResult', { Text: text });
+export const bloggerImageOmitted = (mediaType) => part('imageOmitted', { MediaType: mediaType });
+export const bloggerMediaOmitted = (mediaType) => part('mediaOmitted', { MediaType: mediaType });
 
 export const bloggerItem = ({ role, part: itemPart, truncated = false }) =>
-  new BloggerModule.BloggerDeltaItem(role, itemPart, truncated);
+  ({ Role: role, Part: itemPart, Truncated: truncated });
 
-export const bloggerDocument = (items) => BloggerModule.BloggerToml_render(toList(items));
+export const bloggerDocument = (items) => BloggerModule.render(items);
 
-export const bloggerDocumentWith = (instructions, items) =>
-  BloggerModule.BloggerToml_renderWith(toList(instructions), toList(items));
+export const bloggerDocumentWith = (instructions, items) => BloggerModule.renderWith(instructions, items);
 
 // ── ManagerLifecyclePrompt: GLORY activation / idle / undecidable ─────────────
 // Instruction-only SyntheticToml documents (already comment-prefixed).

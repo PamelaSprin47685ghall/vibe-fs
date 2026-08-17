@@ -248,7 +248,8 @@ WHAT proposition 必须至少被一个非 skip、非 todo 的 test case 证明�
 **机器结构**：一个 proof case = 一个实际的 `test()` 或 `t.test()` call site（含 nested
 call）。其唯一 primary tag 是 title 开头的 `WHAT[<CURRENT-WHAT-ID>]`；tag 必须是 WHAT.md
 中的完整三位编号 ID。scanner 以 token/结构边界识别 call site，不把注释、字符串、正则、
-模板静态文本、`describe`/hook/alias 当作 proof case。`test.skip` 与 `test.todo` 仍须带
+模板静态文本、函数/类声明、构造器调用、method body、`describe`/hook/alias 当作 proof
+case。`test.skip` 与 `test.todo` 仍须带
 恰一个 tag，但 state 永远不满足 proof。
 
 **PROOF 边**：PROOF.md 中显式 executable anchor（`tests/file.test.mjs::exact test title`
