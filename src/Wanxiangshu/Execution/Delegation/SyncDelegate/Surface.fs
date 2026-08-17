@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session.Attachment
@@ -75,6 +76,27 @@ module SyncDelegateSurface =
                 |> Task.FromResult
 
             member _.FamilyRootOf sessionId = sessionId
+
+    [<Emit("setImmediate($0)")>]
+    let private queueImmediate (callback: unit -> unit) : unit = jsNative
+
+    let private nextTurn () : Task<unit> =
+        let tcs = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+        queueImmediate (fun () -> AsyncSupport.trySetResult tcs () |> ignore)
+        tcs.Task
+
+    let private waitForReadyCall (runtime: SyncDelegateRuntime) (owner: SessionId) (role: SyncDelegateRole) : Task<SessionId option> =
+        let rec loop remaining =
+            task {
+                match runtime.TryFind(owner, role) with
+                | Some child when runtime.HasOpeningCursor child -> return Some child
+                | _ when remaining <= 0 -> return None
+                | _ ->
+                    do! nextTurn ()
+                    return! loop (remaining - 1)
+            }
+
+        loop 1000
 
     let private roleOf (value: string) =
         if value.Equals("Coder", StringComparison.OrdinalIgnoreCase) then SyncDelegateRole.Coder else SyncDelegateRole.Inspector
@@ -188,25 +210,25 @@ module SyncDelegateSurface =
     let settle (value: obj) (owner: string) (role: string) (answer: string) (runId: string) : Task<bool> =
         task {
             let harness = unbox<Harness> value
-            match harness.Runtime.TryFind(SessionId.create owner, roleOf role) with
+            match! waitForReadyCall harness.Runtime (SessionId.create owner) (roleOf role) with
             | None -> return false
             | Some child ->
-                let turn =
-                    { SessionId = child
-                      PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                      ProviderRun = ProviderRunIdentity.create runId
-                      Role = Some(roleValue (roleOf role))
-                      Directory = None
-                      Parts = [||]
-                      Finish = Some "stop"
-                      ErrorName = None
-                      Model = None
-                      Outcome = ReconcileProgram.TurnCompleted
-                      Observation = None }
+                    let turn =
+                        { SessionId = child
+                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
+                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
+                          ProviderRun = ProviderRunIdentity.create runId
+                          Role = Some(roleValue (roleOf role))
+                          Directory = None
+                          Parts = [||]
+                          Finish = Some "stop"
+                          ErrorName = None
+                          Model = None
+                          Outcome = ReconcileProgram.TurnCompleted
+                          Observation = None }
 
-                harness.Answers.[SessionId.value child] <- answer
-                return! harness.Runtime.HandleTurn(turn, None)
+                    harness.Answers.[SessionId.value child] <- answer
+                    return! harness.Runtime.HandleTurn(turn, None)
         }
 
     let observeTurn
@@ -219,31 +241,31 @@ module SyncDelegateSurface =
         : Task<bool> =
         task {
             let harness = unbox<Harness> value
-            match harness.Runtime.TryFind(SessionId.create owner, roleOf role) with
+            match! waitForReadyCall harness.Runtime (SessionId.create owner) (roleOf role) with
             | None -> return false
             | Some child ->
-                let outcome =
-                    match outcomeName with
-                    | "TurnFailed" -> ReconcileProgram.TurnFailed "transient provider failure"
-                    | "TurnNeedsContinuation" -> ReconcileProgram.TurnNeedsContinuation "retry"
-                    | "TurnAborted" -> ReconcileProgram.TurnAborted "aborted"
-                    | _ -> ReconcileProgram.TurnCompleted
-                if outcomeName = "TurnCompleted" then
-                    harness.Answers.[SessionId.value child] <- answer
-                let turn =
-                    { SessionId = child
-                      PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                      AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                      ProviderRun = ProviderRunIdentity.create runId
-                      Role = Some(roleValue (roleOf role))
-                      Directory = None
-                      Parts = [||]
-                      Finish = Some "stop"
-                      ErrorName = None
-                      Model = None
-                      Outcome = outcome
-                      Observation = None }
-                return! harness.Runtime.HandleTurn(turn, None)
+                    let outcome =
+                        match outcomeName with
+                        | "TurnFailed" -> ReconcileProgram.TurnFailed "transient provider failure"
+                        | "TurnNeedsContinuation" -> ReconcileProgram.TurnNeedsContinuation "retry"
+                        | "TurnAborted" -> ReconcileProgram.TurnAborted "aborted"
+                        | _ -> ReconcileProgram.TurnCompleted
+                    if outcomeName = "TurnCompleted" then
+                        harness.Answers.[SessionId.value child] <- answer
+                    let turn =
+                        { SessionId = child
+                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
+                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
+                          ProviderRun = ProviderRunIdentity.create runId
+                          Role = Some(roleValue (roleOf role))
+                          Directory = None
+                          Parts = [||]
+                          Finish = Some "stop"
+                          ErrorName = None
+                          Model = None
+                          Outcome = outcome
+                          Observation = None }
+                    return! harness.Runtime.HandleTurn(turn, None)
         }
 
     let child (value: obj) (owner: string) (role: string) : obj =

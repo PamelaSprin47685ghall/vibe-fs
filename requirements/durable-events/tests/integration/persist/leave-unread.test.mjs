@@ -43,7 +43,7 @@ test('WHAT[DURABLE-EVENTS-009] local_EventStore_never_reads_or_rewrites_any_lega
     execFileSync('git', ['init', '--quiet', repo])
     const commonDir = join(repo, '.git')
     const planted = plant(commonDir)
-    const local = eventStore.EventStoreSurface_create(commonDir, 'fresh-writer')
+    const local = eventStore.create(commonDir, 'fresh-writer')
     const event = {
       id: 'a'.repeat(40),
       stream: 'leave-unread/new',
@@ -53,8 +53,8 @@ test('WHAT[DURABLE-EVENTS-009] local_EventStore_never_reads_or_rewrites_any_lega
       payloadRefs: [],
     }
 
-    const result = await eventStore.EventStoreSurface_append(local, [event])
-    eventStore.EventStoreSurface_dispose(local)
+    const result = await eventStore.append(local, [event])
+    eventStore.dispose(local)
     assert.equal(result.ok, true, `append failed: ${JSON.stringify(result.error)}`)
 
     for (const [path, before] of planted) {

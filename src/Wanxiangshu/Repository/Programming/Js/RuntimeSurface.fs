@@ -6,12 +6,12 @@ open Wanxiangshu.Process
 /// JS runtime owner boundary for bindings and sandbox execution. The mutable
 /// staging buffer and sandbox failure union remain opaque; observations cross
 /// as plain result objects.
-type private JsBindingsHandle(api: obj, staging: ResizeArray<JsStagedMutation>) =
-    member _.Api = api
-    member _.Staging = staging
-
 [<RequireQualifiedAccess>]
 module JsRuntimeSurface =
+
+    type private JsBindingsHandle(api: obj, staging: ResizeArray<JsStagedMutation>) =
+        member _.Api = api
+        member _.Staging = staging
 
     let createApi (root: string) : obj =
         let staging = ResizeArray<JsStagedMutation>()

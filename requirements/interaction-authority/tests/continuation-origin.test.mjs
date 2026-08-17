@@ -54,7 +54,6 @@ test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseabl
     'JoinGuard',
     'ManagerGuard',
     'ReviewerGuard',
-    'ReviewConfirmation',
     'BusyAgentNudge',
     'ProviderRetryAttempt',
     'NeedHelpEscalation',
@@ -76,7 +75,7 @@ test('WHAT[INTERACTION-AUTHORITY-008] IA_008_resolution_order_is_accepted_then_c
   const root = rootFor('fast-coder', 'msg_u1', 'AgentOwnerRoot')
   let state = register(root)
 
-  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ReviewConfirmation', root, 'fast-coder', 'pd-c')
+  const claimed = authority.claimContinuation('pk_claimed', 'ses_a', 'ReviewerGuard', root, 'fast-coder', 'pd-c')
   state = authority.registerClaim(claimed, state)
   const accepted = authority.claimContinuation('pk_accepted', 'ses_a', 'BusyAgentNudge', root, 'fast-coder', 'pd-a')
   state = authority.registerClaim(accepted, state)

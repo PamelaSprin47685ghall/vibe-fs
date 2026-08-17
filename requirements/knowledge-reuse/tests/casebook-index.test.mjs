@@ -21,8 +21,8 @@ const caseRec = (sessionId, q, a, observations = []) => ({
 })
 const openStore = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-index-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'casebook-index')
-  return { dir, handle, close: () => { eventStore.EventStoreSurface_dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
+  const handle = eventStore.create(dir, 'casebook-index')
+  return { dir, handle, close: () => { eventStore.dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
 }
 
 // Index tests share a process-local epoch cache; each durable fixture remains

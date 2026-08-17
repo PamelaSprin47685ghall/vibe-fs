@@ -7,12 +7,12 @@ open Fable.Core.JsInterop
 /// Registered mv/rm owner boundary. The Host factory and ToolSpec records stay
 /// opaque while names, argument vocabulary and bounded execution cross as JS
 /// values.
-type private FileMutationHandle(spec: ToolSpec, registered: obj) =
-    member _.Spec = spec
-    member _.Registered = registered
-
 [<RequireQualifiedAccess>]
 module FileMutationSurface =
+
+    type private FileMutationHandle(spec: ToolSpec, registered: obj) =
+        member _.Spec = spec
+        member _.Registered = registered
 
     [<Emit("$0.execute($1, $2)")>]
     let private invokeRegistered (registered: obj) (args: obj) (context: obj) : Task<obj> = jsNative

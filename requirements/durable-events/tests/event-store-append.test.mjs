@@ -26,29 +26,29 @@ const event = (n, parents = [], type = 'JobRequested', payload = { n }) => ({
 
 test('WHAT[DURABLE-EVENTS-001] append_commits_complete_canonical_line_then_updates_Current', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'append-proof')
+  const store = eventStore.create(dir, 'append-proof')
   try {
     const e = event(1)
-    const r = await eventStore.EventStoreSurface_append(store, [e])
+    const r = await eventStore.append(store, [e])
     assert.equal(r.ok, true)
-    const found = eventStore.EventStoreSurface_read(store, id(1))
+    const found = eventStore.read(store, id(1))
     assert.ok(found)
     assert.equal(found.id, id(1))
     const text = await readFile(path.join(dir, 'wanxiang', 'events', 'append-proof.ndjson'), 'utf8')
     assert.equal(text.endsWith('\n'), true)
     assert.equal(text.trim().split('\n').length, 1)
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_same_feature_can_succeed_next', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'semantic-cut-proof')
+  const store = eventStore.create(dir, 'semantic-cut-proof')
   try {
     const bad = event(10, [], 'InspectorCaseCaptured', {})
-    const first = await eventStore.EventStoreSurface_append(store, [bad])
+    const first = await eventStore.append(store, [bad])
     assert.equal(first.ok, true, 'semantic failure is durable, not a storage append failure')
     assert.equal(first.cuts.length, 1)
     assert.equal(first.cuts[0].failedEventId, id(10))
@@ -63,20 +63,20 @@ test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_sa
     assert.equal(afterBad[1].payload.rule, 'Casebook')
 
     const good = event(11, [10], 'InspectorCaseAccessed', { session_id: 'case-after-cut' })
-    const second = await eventStore.EventStoreSurface_append(store, [good])
+    const second = await eventStore.append(store, [good])
     assert.equal(second.ok, true)
     assert.equal(second.cuts.length, 0, 'cut is self-limited; future feature use retries normally')
 
-    const reopened = eventStore.EventStoreSurface_create(dir, 'semantic-cut-reopen')
+    const reopened = eventStore.create(dir, 'semantic-cut-reopen')
     try {
-      const replayed = eventStore.EventStoreSurface_read(reopened, id(11))
+      const replayed = eventStore.read(reopened, id(11))
       assert.ok(replayed)
       assert.equal(replayed.id, id(11), 'replay preserves bad → reset → good timeline')
     } finally {
-      eventStore.EventStoreSurface_dispose(reopened)
+      eventStore.dispose(reopened)
     }
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -103,52 +103,52 @@ test('WHAT[DURABLE-EVENTS-021] every_live_semantic_cut_boundary_trips_process_fa
 
 test('WHAT[DURABLE-EVENTS-007] append_rejects_missing_parent_without_writing_bytes', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'missing-parent-proof')
+  const store = eventStore.create(dir, 'missing-parent-proof')
   try {
     const file = path.join(dir, 'wanxiang', 'events', 'missing-parent-proof.ndjson')
     assert.equal(existsSync(file), false)
-    const r = await eventStore.EventStoreSurface_append(store, [event(2, [99])])
+    const r = await eventStore.append(store, [event(2, [99])])
     assert.equal(r.ok, false)
     assert.equal(existsSync(file), false, 'rejected structural append creates no writer file')
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-007] append_rejects_cycle_in_one_batch_before_durability', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'cycle-proof')
+  const store = eventStore.create(dir, 'cycle-proof')
   try {
     const a = event(1, [2])
     const b = event(2, [1])
-    const r = await eventStore.EventStoreSurface_append(store, [a, b])
+    const r = await eventStore.append(store, [a, b])
     assert.equal(r.ok, false)
     const file = path.join(dir, 'wanxiang', 'events', 'cycle-proof.ndjson')
     assert.equal(existsSync(file), false, 'rejected structural append creates no writer file')
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-007] append_rejects_unknown_event_type_fail_closed', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'unknown-type-proof')
+  const store = eventStore.create(dir, 'unknown-type-proof')
   try {
-    const r = await eventStore.EventStoreSurface_append(store, [event(1, [], 'UnknownFutureEvent')])
+    const r = await eventStore.append(store, [event(1, [], 'UnknownFutureEvent')])
     assert.equal(r.ok, false)
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-004] append_task_does_not_return_until_the_cross_process_store_lock_is_released', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'lock-release-proof')
+  const store = eventStore.create(dir, 'lock-release-proof')
   try {
-    const r = await eventStore.EventStoreSurface_append(store, [event(1)])
+    const r = await eventStore.append(store, [event(1)])
     assert.equal(r.ok, true)
     assert.equal(
       existsSync(path.join(dir, 'wanxiang.lock')),
@@ -156,7 +156,7 @@ test('WHAT[DURABLE-EVENTS-004] append_task_does_not_return_until_the_cross_proce
       'Append release must happen before lock file is removed',
     )
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })

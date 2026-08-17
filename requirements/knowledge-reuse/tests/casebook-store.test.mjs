@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { EventStoreSurface_create as createEventStore, EventStoreSurface_dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
+import { create as createEventStore, dispose as disposeEventStore } from '../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../dist/Repository/Knowledge/Casebook/Surface.js'
 
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })

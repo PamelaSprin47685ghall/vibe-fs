@@ -20,9 +20,9 @@ const event = (id, writer) => ({
   payload: { writer },
   payloadRefs: [],
 })
-const open = (repo, writerId) => eventStore.EventStoreSurface_create(join(repo, '.git'), writerId)
+const open = (repo, writerId) => eventStore.create(join(repo, '.git'), writerId)
 const append = async (handle, value) => {
-  const result = await eventStore.EventStoreSurface_append(handle, [value])
+  const result = await eventStore.append(handle, [value])
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
 }
 const hook = (repo, kind = 'pre-push', arg = 'origin', input = '') => spawnSync(
@@ -48,7 +48,7 @@ test('WHAT[DURABLE-CONVERGENCE-009] pre_push_hook_process_uploads_one_local_writ
     try {
       await append(local, event('a'.repeat(40), 'a'))
     } finally {
-      eventStore.EventStoreSurface_dispose(local)
+      eventStore.dispose(local)
     }
     assertHookOk(hook(repo))
     const oid = readRemoteStoreOid(ws.bare)
@@ -68,7 +68,7 @@ test('WHAT[DURABLE-CONVERGENCE-009] second_machine_hook_imports_remote_writer_tr
     try {
       await append(localA, event('a'.repeat(40), 'a'))
     } finally {
-      eventStore.EventStoreSurface_dispose(localA)
+      eventStore.dispose(localA)
     }
     assertHookOk(hook(a))
 
@@ -78,9 +78,9 @@ test('WHAT[DURABLE-CONVERGENCE-009] second_machine_hook_imports_remote_writer_tr
     assert.equal(existsSync(join(b, '.git', 'wanxiang', 'events', 'writer-a.ndjson')), true)
     const reopenedB = open(b, 'writer-b-after-sync')
     try {
-      assert.deepEqual(eventStore.EventStoreSurface_read(reopenedB, 'a'.repeat(40)), event('a'.repeat(40), 'a'))
+      assert.deepEqual(eventStore.read(reopenedB, 'a'.repeat(40)), event('a'.repeat(40), 'a'))
     } finally {
-      eventStore.EventStoreSurface_dispose(reopenedB)
+      eventStore.dispose(reopenedB)
     }
   } finally {
     ws.cleanup()
@@ -98,8 +98,8 @@ test('WHAT[DURABLE-CONVERGENCE-009] two_offline_clients_converge_by_whole_writer
       await append(localA, event('a'.repeat(40), 'a'))
       await append(localB, event('b'.repeat(40), 'b'))
     } finally {
-      eventStore.EventStoreSurface_dispose(localA)
-      eventStore.EventStoreSurface_dispose(localB)
+      eventStore.dispose(localA)
+      eventStore.dispose(localB)
     }
 
     assertHookOk(hook(a))

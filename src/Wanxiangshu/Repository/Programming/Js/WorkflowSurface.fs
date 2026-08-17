@@ -5,11 +5,11 @@ open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Opaque workflow outcome. The semantic observation functions expose the
 /// commit report and failure algebra without leaking JsToolOutcome's union.
-type private JsWorkflowOutcomeHandle(outcome: JsToolWorkflow.JsToolOutcome) =
-    member _.Value = outcome
-
 [<RequireQualifiedAccess>]
 module JsWorkflowSurface =
+
+    type private JsWorkflowOutcomeHandle(outcome: JsToolWorkflow.JsToolOutcome) =
+        member _.Value = outcome
 
     let private outcomeOf (value: obj) =
         (unbox<JsWorkflowOutcomeHandle> value).Value

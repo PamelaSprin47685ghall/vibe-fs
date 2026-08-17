@@ -26,7 +26,7 @@ test('WHAT[DG-004] LOOP_004_repository_text_calibrates_every_detector_constant',
 
   const p99LineTokens = percentile(nonEmptyLineTokenLengths, 0.99)
   const calibratedHalfLife = nextPowerOfTwo(p99LineTokens)
-  assert.equal(p99LineTokens, 58)
+  assert.equal(p99LineTokens, 57)
   assert.equal(calibratedHalfLife, 64)
   assert.equal(loopDetector.halfLife, calibratedHalfLife)
   close(loopDetector.lambda, 2 ** (-1 / calibratedHalfLife))

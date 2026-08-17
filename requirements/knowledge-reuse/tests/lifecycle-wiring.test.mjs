@@ -18,13 +18,13 @@ const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
-  const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'lifecycle-wiring')
+  const handle = eventStore.create(join(dir, '.git'), 'lifecycle-wiring')
   return {
     dir,
     handle,
-    reopen: (writerId) => eventStore.EventStoreSurface_create(join(dir, '.git'), writerId),
+    reopen: (writerId) => eventStore.create(join(dir, '.git'), writerId),
     cleanup: () => {
-      eventStore.EventStoreSurface_dispose(handle)
+      eventStore.dispose(handle)
       rmSync(dir, { recursive: true, force: true })
     },
   }
@@ -59,7 +59,7 @@ test('WHAT[KNOWLEDGE-REUSE-002] lifecycle_notePrompt_noteAnswer_tryFinalize_crea
       assert.match(String(second.error), /already finalized/)
       assert.equal((await casebook.fetchCase(handle, 10, key)).value.a, publishedA)
     } finally {
-      eventStore.EventStoreSurface_dispose(handle)
+      eventStore.dispose(handle)
     }
   } finally {
     bookkeeper.resetSessionPort()
@@ -120,7 +120,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advanc
       assert.equal(initialResult.ok, true)
       initial = initialResult.value.lastAccessOrder
     } finally {
-      eventStore.EventStoreSurface_dispose(initialHandle)
+      eventStore.dispose(initialHandle)
     }
 
     const directHandle = reopen('lifecycle-access-direct')
@@ -131,7 +131,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advanc
       assert.equal(directResult.ok, true)
       direct = directResult.value.lastAccessOrder
     } finally {
-      eventStore.EventStoreSurface_dispose(directHandle)
+      eventStore.dispose(directHandle)
     }
     assert.ok(direct >= initial)
 
@@ -143,7 +143,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advanc
       assert.equal(hostResult.ok, true)
       host = hostResult.value.lastAccessOrder
     } finally {
-      eventStore.EventStoreSurface_dispose(hostHandle)
+      eventStore.dispose(hostHandle)
     }
     assert.ok(host >= direct)
   } finally {
@@ -156,7 +156,7 @@ test('WHAT[KNOWLEDGE-REUSE-008] lifecycle_touchAccess_and_touchCaseAccess_advanc
 test('WHAT[KNOWLEDGE-REUSE-009] lifecycle_disabled_marker_skips_publication', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-off-'))
   execFileSync('git', ['init', '--quiet', dir])
-  const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'lifecycle-off')
+  const handle = eventStore.create(join(dir, '.git'), 'lifecycle-off')
   try {
     lifecycle.enable(dir)
     const key = 'insp-off'
@@ -166,7 +166,7 @@ test('WHAT[KNOWLEDGE-REUSE-009] lifecycle_disabled_marker_skips_publication', as
     assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
   } finally {
     lifecycle.disable()
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })

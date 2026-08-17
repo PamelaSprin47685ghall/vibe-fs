@@ -54,11 +54,11 @@ export const scriptedBookkeeperPort = () => {
 }
 
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
-const openStore = (dir, writerId) => eventStore.EventStoreSurface_create(join(dir, '.git'), writerId)
+const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
 test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-refresh-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'bookkeeper-session-refresh')
+  const handle = eventStore.create(dir, 'bookkeeper-session-refresh')
   const { port, createCalls, programCalls, prompts } = scriptedBookkeeperPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -76,7 +76,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_boo
     assert.equal(fetched.value.a, CANONICAL_A)
   } finally {
     bookkeeper.resetSessionPort()
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -109,7 +109,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_n
     lifecycle.noteAnswer(key, 'cleanup A')
     lifecycle.cleanup(key)
     assert.equal(createCalls.length, before)
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
   } finally {
     bookkeeper.resetSessionPort()
     lifecycle.disable()
@@ -119,7 +119,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_n
 
 test('WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_session_port_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-noport-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'bookkeeper-session-noport')
+  const handle = eventStore.create(dir, 'bookkeeper-session-noport')
   try {
     bookkeeper.resetSessionPort()
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -132,7 +132,7 @@ test('WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_session_port_keeps_old_case', as
     assert.equal(fetched.value.q, 'Q keep')
     assert.equal(fetched.value.a, 'A keep')
   } finally {
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })

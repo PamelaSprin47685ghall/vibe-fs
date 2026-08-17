@@ -7,22 +7,9 @@ open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation.Identity
 
-/// Opaque capability for one process-local EventStore writer.
-/// The underlying F# store and Integrator never cross the semantic boundary.
-type EventStoreHandle private (store: IEventStore) =
-    let mutable disposed = false
-
-    member internal _.Store =
-        if disposed then
-            invalidOp "EventStore handle is disposed"
-
-        store
-
-    member internal _.Dispose() = disposed <- true
-
-    static member internal Create(store: IEventStore) = EventStoreHandle(store)
-[<RequireQualifiedAccess>]
-module EventStoreSurface =
+/// Process-local EventStore owner surface. JS callers receive unprefixed
+/// operations; EventStoreHandle remains an opaque capability.
+module Surface =
 
     let private str (value: obj) : string =
         if isNull value then "" else string value
@@ -101,7 +88,7 @@ module EventStoreSurface =
         | AppendError.AppendFailed reason -> box {| code = "AppendFailed"; reason = reason |}
 
     /// Create a process-local writer capability. The caller owns its lifecycle.
-    let create (commonDir: string) (writerId: string) : EventStoreHandle =
+    let create (commonDir: string, writerId: string) : EventStoreHandle =
         EventStoreHandle.Create(EventStore.createLocal commonDir writerId (CanonicalIntegrator.create()))
 
     /// Release a writer capability. Further operations fail rather than using a
@@ -109,7 +96,7 @@ module EventStoreSurface =
     let dispose (handle: EventStoreHandle) : unit = handle.Dispose()
 
     /// Append JS-native events and return only the durable receipt.
-    let append (handle: EventStoreHandle) (events: obj array) : Task<obj> =
+    let append (handle: EventStoreHandle, events: obj array) : Task<obj> =
         task {
             let parsed = events |> Array.toList |> List.map eventOfJs
             let! result = handle.Store.Append parsed
@@ -124,19 +111,19 @@ module EventStoreSurface =
         }
 
     /// Read one durable event by identity. A missing event is `null`.
-    let read (handle: EventStoreHandle) (eventId: string) : obj =
+    let read (handle: EventStoreHandle, eventId: string) : obj =
         match handle.Store.TryEvent(EventId.create eventId) with
         | None -> null
         | Some envelope -> envelopeToJs envelope
 
     /// Read all structural heads for one stream.
-    let heads (handle: EventStoreHandle) (streamId: string) : string array =
+    let heads (handle: EventStoreHandle, streamId: string) : string array =
         handle.Store.TryHeads(EventStreamId.create streamId)
         |> List.map EventId.value
         |> List.toArray
 
     /// Read the unique structural head, or `null` when the stream is forked/empty.
-    let head (handle: EventStoreHandle) (streamId: string) : obj =
+    let head (handle: EventStoreHandle, streamId: string) : obj =
         match handle.Store.TryHead(EventStreamId.create streamId) with
         | None -> null
         | Some eventId -> box (EventId.value eventId)

@@ -105,7 +105,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q3')), true)
 
-    const store = eventStore.EventStoreSurface_create(join(dir, '.git'), 'g6-inspector-fetch')
+    const store = eventStore.create(join(dir, '.git'), 'g6-inspector-fetch')
     const fetched = await casebook.fetchCase(store, 10, delegateId)
     assert.equal(fetched.ok, true)
     assert.notEqual(fetched.value, null, 'Case exists after finalize')
@@ -115,7 +115,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
     assert.equal(fetched.value.a, CANONICAL_A)
     assert.equal(String(fetched.value.a).includes('evidence:'), false)
     assert.equal(String(fetched.value.a).includes('digest'), false)
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
   } finally {
     bookkeeper.resetSessionPort()
     lifecycle.disable()

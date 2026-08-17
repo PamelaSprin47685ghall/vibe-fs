@@ -18,13 +18,13 @@ export const createLocalEventStore = ({ commonDir, writerId } = {}) => {
   }
 
   mkdirSync(gitCommonDir, { recursive: true })
-  const store = EventStore.EventStoreSurface_create(gitCommonDir, writerId ?? randomUUID().replaceAll('-', ''))
+  const store = EventStore.create(gitCommonDir, writerId ?? randomUUID().replaceAll('-', ''))
 
   return {
     commonDir: gitCommonDir,
     store,
     close: () => {
-      EventStore.EventStoreSurface_dispose(store)
+      EventStore.dispose(store)
       if (ownedBase) rmSync(ownedBase, { recursive: true, force: true })
     },
   }

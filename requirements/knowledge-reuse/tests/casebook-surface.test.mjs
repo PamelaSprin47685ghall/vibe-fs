@@ -31,9 +31,9 @@ const openStore = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-surface-'))
   return {
     dir,
-    handle: eventStore.EventStoreSurface_create(dir, 'casebook-surface'),
+    handle: eventStore.create(dir, 'casebook-surface'),
     close() {
-      eventStore.EventStoreSurface_dispose(this.handle)
+      eventStore.dispose(this.handle)
       rmSync(dir, { recursive: true, force: true })
     },
   }

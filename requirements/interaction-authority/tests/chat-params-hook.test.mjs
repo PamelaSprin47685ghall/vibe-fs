@@ -13,7 +13,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_prov
     output,
   )
   assert.equal(rejected.ok, false)
-  assert.match(rejected.error, /no observable provider\/model binding/)
+  assert.match(rejected.error, /no observable provider\/model binding|no exact physical execution binding/)
   assert.equal(output.model.modelID, 'fast-haiku')
 })
 

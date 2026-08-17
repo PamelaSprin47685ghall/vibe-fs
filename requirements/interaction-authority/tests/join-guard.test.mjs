@@ -22,8 +22,9 @@ test('WHAT[INTERACTION-AUTHORITY-010] PROMPT_010_generic_repair_family_is_bounde
 
 test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_contract_fails_closed_without_durable_authority', () => {
   const source = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs'), 'utf8')
+  const nudge = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
   assert.match(source, /Join guard nudge requires an AgentJournal/)
-  assert.match(source, /No active authority profile/)
+  assert.match(nudge, /No active authority profile/)
   assert.match(source, /ContinuationKind\.JoinGuard/)
   assert.match(source, /AlreadyOutstanding/)
 })

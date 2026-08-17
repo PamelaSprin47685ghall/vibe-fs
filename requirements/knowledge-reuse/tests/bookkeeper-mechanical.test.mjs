@@ -15,12 +15,12 @@ import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-s
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'bookkeeper-mechanical')
+  const handle = eventStore.create(dir, 'bookkeeper-mechanical')
   return {
     dir,
     handle,
     cleanup: () => {
-      eventStore.EventStoreSurface_dispose(handle)
+      eventStore.dispose(handle)
       rmSync(dir, { recursive: true, force: true })
     },
   }

@@ -53,12 +53,12 @@ module JsFilesystemSurface =
 
     let findAnchor (textValue: string) (declaration: obj) (occurrence: int) : obj =
         match JsAnchorFs.findAnchor textValue (anchorOf declaration) occurrence with
-        | Ok(startIndex, endIndex) -> box {| ok = true; value = [| startIndex; endIndex |] |}
+        | Ok(startIndex, endIndex) -> box {| ok = true; value = [| box startIndex; box endIndex |] |}
         | Error failure -> failureResult failure
 
     let requireUnique (textValue: string) (declaration: obj) : obj =
         match JsAnchorFs.requireUnique textValue (anchorOf declaration) with
-        | Ok(startIndex, endIndex) -> box {| ok = true; value = [| startIndex; endIndex |] |}
+        | Ok(startIndex, endIndex) -> box {| ok = true; value = [| box startIndex; box endIndex |] |}
         | Error failure -> failureResult failure
 
     let grep (root: string) (declaration: obj) (pattern: string) : obj =

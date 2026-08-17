@@ -31,7 +31,7 @@ const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observatio
 
 test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-err-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'bookkeeper-synthesis-error')
+  const handle = eventStore.create(dir, 'bookkeeper-synthesis-error')
   const { port } = failingPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -47,14 +47,14 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_injected_synthesizer_error_keeps_old_cas
     assert.equal(fetched.value.observations[0].contentHash, casebook.contentHash('hello'))
   } finally {
     bookkeeper.resetSessionPort()
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesizer_runs_once_per_stale_refresh', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-once-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'bookkeeper-synthesis-once')
+  const handle = eventStore.create(dir, 'bookkeeper-synthesis-once')
   const { port, createCalls, programCalls } = scriptedBookkeeperPort()
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
@@ -68,7 +68,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_synthesizer_runs_once_per_stale_refresh'
     assert.equal(programCalls.length >= 1, true)
   } finally {
     bookkeeper.resetSessionPort()
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -90,7 +90,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAn
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
 
-    const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'bookkeeper-synthesis-finalize-read')
+    const handle = eventStore.create(join(dir, '.git'), 'bookkeeper-synthesis-finalize-read')
     const fetched = await casebook.fetchCase(handle, 10, key)
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.notEqual(fetched.value.a, rawA)
@@ -102,7 +102,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_uses_synthesizer_not_raw_noteAn
     assert.equal(second.ok, false)
     assert.match(String(second.error), /already finalized/)
     assert.equal((await casebook.fetchCase(handle, 10, key)).value.a, publishedA)
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
   } finally {
     bookkeeper.resetSessionPort()
     lifecycle.disable()
@@ -125,10 +125,10 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_cleanup_never_synthesizes', async () => 
     lifecycle.cleanup(key)
     assert.equal(createCalls.length, 0)
     assert.equal(programCalls.length, 0)
-    const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'bookkeeper-synthesis-cleanup-read')
+    const handle = eventStore.create(join(dir, '.git'), 'bookkeeper-synthesis-cleanup-read')
     const fetched = await casebook.fetchCase(handle, 10, key)
     assert.equal(fetched.value, null)
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
   } finally {
     bookkeeper.resetSessionPort()
     lifecycle.disable()

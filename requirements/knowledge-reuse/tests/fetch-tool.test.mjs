@@ -17,8 +17,8 @@ import { CANONICAL_A, CANONICAL_Q, scriptedBookkeeperPort } from './bookkeeper-s
 const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-fetch-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'fetch-tool')
-  return { dir, handle, cleanup: () => { eventStore.EventStoreSurface_dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
+  const handle = eventStore.create(dir, 'fetch-tool')
+  return { dir, handle, cleanup: () => { eventStore.dispose(handle); rmSync(dir, { recursive: true, force: true }) } }
 }
 const factory = { tool: { schema: { string: () => ({}) } } }
 const buildTool = (dir, handle) => fetchSurface.contract(factory, dir, handle)

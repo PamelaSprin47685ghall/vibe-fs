@@ -73,48 +73,48 @@ test('WHAT[DURABLE-EVENTS-014] DURABLE_EVENTS_014_k_way_merge_is_deterministic_w
 
 test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_concurrent_heads_remain_distinct_in_structural_Current', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'conflict-proof')
+  const store = eventStore.create(dir, 'conflict-proof')
   try {
-    assert.equal((await eventStore.EventStoreSurface_append(store, [make({ id: A, stream: 'job/conflict' })])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(store, [make({ id: B, stream: 'job/conflict' })])).ok, true)
+    assert.equal((await eventStore.append(store, [make({ id: A, stream: 'job/conflict' })])).ok, true)
+    assert.equal((await eventStore.append(store, [make({ id: B, stream: 'job/conflict' })])).ok, true)
 
-    assert.deepEqual(eventStore.EventStoreSurface_heads(store, 'job/conflict').sort(), [A, B])
-    assert.equal(eventStore.EventStoreSurface_head(store, 'job/conflict'), null, 'a fork must not masquerade as a unique head')
+    assert.deepEqual(eventStore.heads(store, 'job/conflict').sort(), [A, B])
+    assert.equal(eventStore.head(store, 'job/conflict'), null, 'a fork must not masquerade as a unique head')
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-008] DURABLE_EVENTS_008_resolution_naming_all_heads_collapses_structural_Current', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'resolution-proof')
+  const store = eventStore.create(dir, 'resolution-proof')
   try {
-    assert.equal((await eventStore.EventStoreSurface_append(store, [make({ id: A, stream: 'job/resolution' })])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(store, [make({ id: B, stream: 'job/resolution' })])).ok, true)
+    assert.equal((await eventStore.append(store, [make({ id: A, stream: 'job/resolution' })])).ok, true)
+    assert.equal((await eventStore.append(store, [make({ id: B, stream: 'job/resolution' })])).ok, true)
     assert.equal(
-      (await eventStore.EventStoreSurface_append(store, [make({ id: D, stream: 'job/resolution', eventType: 'JobConflictResolved', parents: [A, B] })])).ok,
+      (await eventStore.append(store, [make({ id: D, stream: 'job/resolution', eventType: 'JobConflictResolved', parents: [A, B] })])).ok,
       true,
     )
 
-    assert.deepEqual(eventStore.EventStoreSurface_heads(store, 'job/resolution'), [D])
-    assert.equal(eventStore.EventStoreSurface_head(store, 'job/resolution'), D)
+    assert.deepEqual(eventStore.heads(store, 'job/resolution'), [D])
+    assert.equal(eventStore.head(store, 'job/resolution'), D)
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_007_unknown_authoritative_event_type_is_rejected_before_durability', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'unknown-type-fold')
+  const store = eventStore.create(dir, 'unknown-type-fold')
   try {
-    const result = await eventStore.EventStoreSurface_append(store, [make({ id: A, eventType: 'TotallyUnknownEventType' })])
+    const result = await eventStore.append(store, [make({ id: A, eventType: 'TotallyUnknownEventType' })])
     assert.equal(result.ok, false)
     assert.equal(result.error.code, 'StorageInvalid')
     assert.equal(result.error.error.code, 'UnknownEventType')
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })

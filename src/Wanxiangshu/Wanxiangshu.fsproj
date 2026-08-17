@@ -551,6 +551,7 @@
     <Compile Include="Repository/Programming/Js/ToolsBindings.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Persistence/EventStore/CanonicalIntegrator.fs"/>
+    <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fs"/>

@@ -31,11 +31,11 @@ const withStore = async (writerId, fn) => {
   const root = mkdtempSync(join(tmpdir(), `wxs-replica-${writerId}-`))
   const commonDir = join(root, '.git')
   mkdirSync(commonDir, { recursive: true })
-  const handle = eventStore.EventStoreSurface_create(commonDir, writerId)
+  const handle = eventStore.create(commonDir, writerId)
   try {
     await fn(handle)
   } finally {
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(root, { recursive: true, force: true })
   }
 }
@@ -74,10 +74,10 @@ test('WHAT[DURABLE-CONVERGENCE-004] concurrent heads are preserved as structural
   await withStore('writer-conflict', async (store) => {
     const a = make(A, [], 'replica/conflict')
     const b = make(B, [], 'replica/conflict')
-    assert.equal((await eventStore.EventStoreSurface_append(store, [a])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(store, [b])).ok, true)
-    assert.deepEqual(eventStore.EventStoreSurface_heads(store, 'replica/conflict').sort(), [A, B].sort())
-    assert.equal(eventStore.EventStoreSurface_head(store, 'replica/conflict') == null, true, 'conflict must not masquerade as one linear head')
+    assert.equal((await eventStore.append(store, [a])).ok, true)
+    assert.equal((await eventStore.append(store, [b])).ok, true)
+    assert.deepEqual(eventStore.heads(store, 'replica/conflict').sort(), [A, B].sort())
+    assert.equal(eventStore.head(store, 'replica/conflict') == null, true, 'conflict must not masquerade as one linear head')
   })
 })
 
@@ -86,10 +86,10 @@ test('WHAT[DURABLE-CONVERGENCE-005] resolution with all competing heads collapse
     const a = make(A, [], 'replica/resolution')
     const b = make(B, [], 'replica/resolution')
     const resolution = make(R, [A, B], 'replica/resolution', 'JobConflictResolved', { winner: A })
-    assert.equal((await eventStore.EventStoreSurface_append(store, [a])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(store, [b])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(store, [resolution])).ok, true)
-    assert.deepEqual(eventStore.EventStoreSurface_heads(store, 'replica/resolution'), [R])
-    assert.equal(eventStore.EventStoreSurface_head(store, 'replica/resolution'), R)
+    assert.equal((await eventStore.append(store, [a])).ok, true)
+    assert.equal((await eventStore.append(store, [b])).ok, true)
+    assert.equal((await eventStore.append(store, [resolution])).ok, true)
+    assert.deepEqual(eventStore.heads(store, 'replica/resolution'), [R])
+    assert.equal(eventStore.head(store, 'replica/resolution'), R)
   })
 })

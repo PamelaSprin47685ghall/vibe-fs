@@ -8,7 +8,7 @@ import * as store from '../../../dist/Persistence/EventStore/Surface.js'
 
 test('WHAT[EFFECT-ACCOUNTING-006] write_after_dispose_returns_explicit_unknown_not_pretended_commit', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wxs-effect-unknown-'))
-  const handle = store.EventStoreSurface_create(directory, 'writer-unknown')
+  const handle = store.create(directory, 'writer-unknown')
   const event = {
     id: 'event-unknown-1',
     stream: 'session/ses_006',
@@ -18,12 +18,12 @@ test('WHAT[EFFECT-ACCOUNTING-006] write_after_dispose_returns_explicit_unknown_n
     payloadRefs: [],
   }
 
-  const healthy = await store.EventStoreSurface_append(handle, [event])
+  const healthy = await store.append(handle, [event])
   assert.equal(healthy.ok, true, JSON.stringify(healthy.error ?? ''))
-  store.EventStoreSurface_dispose(handle)
+  store.dispose(handle)
 
   await assert.rejects(
-    () => store.EventStoreSurface_append(handle, [event]),
+    () => store.append(handle, [event]),
     /disposed|writer|unknown|invalid/i,
   )
 })

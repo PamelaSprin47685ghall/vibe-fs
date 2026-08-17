@@ -49,6 +49,6 @@ test('WHAT[INTERACTION-AUTHORITY-013] AGENT_031_deep_binding_uses_consultation_c
 
   const source = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs'), 'utf8')
   assert.match(source, /NeedHelpAdvice/)
-  assert.match(source, /deep-inquiry/)
+  assert.match(source, /ManagedAgentCatalog\.nameOf AgentTier\.Deep Role\.Inquiry/)
   assert.match(source, /NeedHelpEscalation/)
 })

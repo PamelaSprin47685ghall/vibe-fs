@@ -517,12 +517,19 @@ module ModelRouting =
                 agent
             )
 
+    let hasRuntime () : bool =
+        lock sharedGate (fun () -> sharedRuntime.IsSome)
+
     let tryReserveManaged (sessionId: SessionId) (agent: string) =
-        current().TryReserveManaged(SessionId.value sessionId, agent)
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.TryReserveManaged(SessionId.value sessionId, agent)
+        | None -> None
 
     let tryLease (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) (agent: string) =
-        current()
-            .TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.TryLease(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId, agent)
+        | None -> None
 
     let releaseExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with

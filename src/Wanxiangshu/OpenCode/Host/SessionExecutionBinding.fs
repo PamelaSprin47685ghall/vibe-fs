@@ -279,27 +279,30 @@ module SessionExecutionBinding =
         (agent: string)
         (model: OpencodeModel)
         =
-        match ModelRouting.tryLease sessionId physicalUserMessageId agent with
-        | None ->
-            Error(
-                sprintf
-                    "PROMPT-006: managed provider execution %s has no model-routing lease"
-                    (PhysicalUserMessageId.value physicalUserMessageId)
-            )
-        | Some target when ModelRouting.sameTarget target model -> Ok true
-        | Some target ->
-            let expected = ModelRouting.toOpenCodeModel target
+        if not (ModelRouting.hasRuntime ()) then
+            Ok true
+        else
+            match ModelRouting.tryLease sessionId physicalUserMessageId agent with
+            | None ->
+                Error(
+                    sprintf
+                        "PROMPT-006: managed provider execution %s has no model-routing lease"
+                        (PhysicalUserMessageId.value physicalUserMessageId)
+                )
+            | Some target when ModelRouting.sameTarget target model -> Ok true
+            | Some target ->
+                let expected = ModelRouting.toOpenCodeModel target
 
-            Error(
-                sprintf
-                    "PROMPT-006: provider model/reasoning drift (%s/%s[%s] -> %s/%s[%s])"
-                    expected.providerID
-                    expected.modelID
-                    (expected.variant |> Option.defaultValue "<missing>")
-                    model.providerID
-                    model.modelID
-                    (model.variant |> Option.defaultValue "<missing>")
-            )
+                Error(
+                    sprintf
+                        "PROMPT-006: provider model/reasoning drift (%s/%s[%s] -> %s/%s[%s])"
+                        expected.providerID
+                        expected.modelID
+                        (expected.variant |> Option.defaultValue "<missing>")
+                        model.providerID
+                        model.modelID
+                        (model.variant |> Option.defaultValue "<missing>")
+                )
 
     [<RequireQualifiedAccess>]
     type private ProviderExpectation =

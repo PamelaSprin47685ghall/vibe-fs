@@ -81,7 +81,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_c
     assert.equal(bookkeeperPort.createCalls.length, 1, 'exactly one Bookkeeper CreateChildSession')
     assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'js-bookkeeper invoked')
 
-    const store = eventStore.EventStoreSurface_create(join(dir, '.git'), 'g6-host-fetch')
+    const store = eventStore.create(join(dir, '.git'), 'g6-host-fetch')
     const published = await casebook.fetchCase(store, 10, delegateId)
     assert.equal(published.ok, true)
     assert.notEqual(published.value, null, 'Case exists after ReuseScope close')
@@ -106,7 +106,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_c
     const still = await casebook.fetchCase(store, 10, delegateId)
     assert.equal(still.value.sessionId, delegateId, 'original Case retained after refused second finalize')
     assert.equal(syncDelegate.childCount(runtime), 1, 'createChild stays once after scope close')
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
   } finally {
     bookkeeper.resetSessionPort()
     lifecycle.disable()

@@ -1,4 +1,1962 @@
+你的时间无限。神挡杀神，佛挡杀佛，做到做无可做。你的并发限制为 10 个槽，连你自己在内，尽量用满。你是本仓库的唯一所有者，所有问题都是你的问题，不要推脱责任。要热爱工作，积极工作，不要总想提前结束，否则会很无聊。
+除了 TASK.md 以外，你最终把所有存量测试负面门禁全部压降到 0 。在本次任务中，你的上下文和时间都是无限的。
 本文件是需求，也是台账。每解决一部分，就编辑本文件改成一部分完成时，然后 git commit。要并发工作，不需要按次序工作。
+
+---
+
+对，而且我认为这可能是这次 JS surface 迁移带来的**第二个、甚至更有价值的发现**：
+
+> 第一阶段把 Fable ABI 从测试世界剥掉；第二阶段会把“伪装成数据结构的控制流”从 F# 世界里剥出来。
+
+现在很多以前藏得很深的东西开始显形：`state / phase / currentStage / pending / armed / joinInFlight / ...`，甚至概念上的 `1 → 2 → 3 → 4 → 5`。这不一定意味着“应该把整数改成 DU”。很多时候正确答案恰恰是：
+
+> **这个 state 根本不应该存在。它只是 instruction pointer；应该由 F# CE / task workflow 的调用栈表达。**
+
+仓库自己的 normative contract 已经说得非常狠：业务流程应该由 `task {}`、`let!`、`match!`、`return!`、`try/finally`、有界递归直接表达，禁止把“程序下一步去哪”编码为长期状态。
+
+所以我建议下一阶段正式从 **Semantic Surface Hardening** 再推进成：
+
+# Operation Ghostbuster：消灭隐式状态机
+
+---
+
+## 一、第一原则：看到 `state = 1,2,3,4,5`，先不要改成 enum
+
+这是最重要的提醒。
+
+很容易出现这种“修复”：
+
+```fsharp
+// before
+let mutable state = 1
+
+// after
+type State =
+    | Preparing
+    | CallingProvider
+    | Waiting
+    | Persisting
+    | Done
+```
+
+代码看起来漂亮了。
+
+但如果这些 case 的真实含义是：
+
+```text
+Preparing       = 下一段执行 prepare()
+CallingProvider = 下一段执行 callProvider()
+Waiting         = 等 await
+Persisting      = 下一段执行 append()
+Done            = return
+```
+
+那么你只是把：
+
+```text
+integer program counter
+```
+
+升级成：
+
+```text
+strongly typed program counter
+```
+
+**架构没有改善。**
+
+仓库自己的 `STRUCTURED-WORKFLOW-003` 正是在禁止这个：如果删除这个字段后，可以用普通函数调用、`match!`、`return!`、resource scope 或有界递归表达相同顺序，那么它就是 program counter。
+
+所以第一个机械问题永远是：
+
+> **这个状态描述世界，还是描述代码执行到哪里？**
+
+---
+
+# 二、所有“状态”先强制分成五类
+
+以后任何看到 `State / Phase / Stage / Pending / Done / Active / Armed / generation / step`，不允许直接改代码。
+
+先分类。
+
+## A. Domain fact —— 留下来
+
+例如：
+
+```fsharp
+type ReviewOutcome =
+    | Approved
+    | Rejected of reason
+```
+
+如果真实外部 observer 会关心这个区别，即使实现完全重写仍然存在：
+
+**这是领域状态。**
+
+保留 DU。
+
+甚至应该 durable。
+
+---
+
+## B. Durable evidence —— 留下来，但不是 workflow state
+
+例如：
+
+```text
+FinalityRequested happened
+ReviewerEnlisted happened
+PublicationCommitted happened
+ChildCompleted happened
+```
+
+这描述：
+
+> 世界已经发生什么。
+
+这些应该成为 durable facts。
+
+Recovery：
+
+```text
+facts
+ ↓ fold
+projection
+ ↓
+重新做决策
+```
+
+而不是：
+
+```text
+stage = 4
+ ↓
+jump back into step 4
+```
+
+你们现在的 structured-workflow contract 也明确规定 recovery 应是：
+
+> Journal fold → facts → 重入普通 workflow，而不是恢复执行位置。
+
+---
+
+## C. Physical resource state —— 可以 mutable
+
+例如仓库里的：
+
+```fsharp
+TaskCompletionSource
+CancellationTokenSource
+listener Live flag
+shared resource RefCount
+child Exited receipt
+PTY buffer
+```
+
+这些不是业务流程。
+
+比如 `ChildProcess.Exited` 的注释非常准确：它表示是否真的收到 process exit，而不是“kill 已经执行到哪一步”。
+
+这种：
+
+```text
+physical fact
+```
+
+保留。
+
+不要 CE 洁癖。
+
+---
+
+## D. Algorithm scratch —— 可以 mutable
+
+例如 binary search：
+
+```fsharp
+let mutable low
+let mutable high
+let mutable best
+```
+
+只是局部算法实现，而且函数返回后消失。
+
+仓库当前也明确允许这类 `algorithm-scratch`。
+
+不要浪费时间“函数式纯化”它。
+
+---
+
+## E. Control state / program counter —— 必须消灭
+
+例如：
+
+```text
+state = 1
+state = 2
+currentStage
+nextAction
+waitingForFoo
+readyForBar
+reviewStage
+shouldContinue
+slotArmed
+```
+
+如果它本质回答：
+
+> 下一段代码跑什么？
+
+这是本轮真正的目标。
+
+**不要改名。不要换 DU。不要 serialize 得更漂亮。删除这个 state axis。**
+
+---
+
+# 三、给工程师一个五秒钟判断法
+
+看到一个状态字段，问：
+
+> **假如我把实现从状态机改成直线 CE，这个状态对产品使用者仍有意义吗？**
+
+如果：
+
+### Yes
+
+很可能是：
+
+```text
+domain state / durable evidence / physical state
+```
+
+继续判断。
+
+### No
+
+基本就是：
+
+```text
+program counter
+```
+
+删。
+
+仓库自己的 enforcer 其实已经给出了几乎一样的判据：
+
+> 如果换一种 control structure 后 external domain observer 根本不在乎这个字段，就不要把它变成 authoritative state。
+
+---
+
+# 四、标准重构：`state = 1 → 2 → 3 → 4` 应该怎样消失
+
+假设发现：
+
+```fsharp
+let mutable state = 1
+let mutable result = None
+
+while state <> 5 do
+    match state with
+    | 1 ->
+        prepare()
+        state <- 2
+
+    | 2 ->
+        let! response = provider.Send(...)
+        result <- Some response
+        state <- 3
+
+    | 3 ->
+        match result with
+        | Some response when valid response ->
+            state <- 4
+        | _ ->
+            state <- 5
+
+    | 4 ->
+        do! persist(...)
+        state <- 5
+
+    | _ ->
+        state <- 5
+```
+
+不要得到：
+
+```fsharp
+type WorkflowState =
+    | Preparing
+    | Sending
+    | Validating
+    | Persisting
+    | Finished
+```
+
+正确目标：
+
+```fsharp
+let run input =
+    task {
+        let prepared = prepare input
+
+        let! response =
+            provider.Send prepared
+
+        match validate response with
+        | Error error ->
+            return Error error
+
+        | Ok accepted ->
+            do! persist accepted
+            return Ok accepted
+    }
+```
+
+`state` 整个概念消失。
+
+这就是：
+
+```text
+state 1 → function entry
+
+state 2 → let!
+
+state 3 → match
+
+state 4 → do!
+
+state 5 → return
+```
+
+**CE 本身就是状态机，但它是隐式、局部、结构化、无法被业务代码误当作 data 的状态机。**
+
+这正是你想要的“隐式状态机”。
+
+---
+
+# 五、循环也不要变成 `state`
+
+例如：
+
+```fsharp
+state <- Waiting
+while state = Waiting do
+    let! observation = poll()
+    if done observation then
+        state <- Completed
+```
+
+如果这只是：
+
+> 等到某个 observation 满足 criteria。
+
+写：
+
+```fsharp
+let rec awaitCompletion () =
+    task {
+        let! observation = observe ()
+
+        match classify observation with
+        | Complete value ->
+            return value
+
+        | Continue ->
+            return! awaitCompletion ()
+    }
+```
+
+当然必须有明确 boundedness / wake criterion。
+
+你们现有 architecture 已经把“有界递归”列为正式 CE vocabulary。
+
+---
+
+# 六、真正有价值的 state machine 应该拆成 `Decision + Workflow`
+
+这里尤其重要。
+
+不要把所有状态逻辑都塞进 CE。
+
+理想结构：
+
+```text
+Facts
+  ↓
+Pure Decision
+  ↓
+Decision DU
+  ↓
+CE Workflow
+  ↓
+Effects
+```
+
+例如：
+
+```fsharp
+type Decision =
+    | AlreadyDone of Completion
+    | NeedProviderAttempt of Request
+    | NeedReconcile of OperationId
+    | Blocked of Reason
+```
+
+这是合法 DU。
+
+为什么？
+
+因为它不是：
+
+> 下一条 instruction 地址。
+
+它是：
+
+> **当前已知现实意味着什么。**
+
+然后：
+
+```fsharp
+let rec run context =
+    task {
+        let facts = context.ReadFacts()
+
+        match decide facts with
+        | AlreadyDone completion ->
+            return completion
+
+        | NeedProviderAttempt request ->
+            let! outcome = context.Provider.Send request
+            do! context.Record outcome
+            return! run context
+
+        | NeedReconcile operation ->
+            let! evidence = context.Reconcile operation
+            do! context.Record evidence
+            return! run context
+
+        | Blocked reason ->
+            return Error reason
+    }
+```
+
+这非常强。
+
+因为：
+
+```text
+Decision DU = semantic state
+CE call stack = execution state
+durable facts = recovery state
+```
+
+三者完全分开。
+
+---
+
+# 七、不要持久化 CE 的位置
+
+这是本轮必须零容忍的一条。
+
+假设：
+
+```text
+provider call
+   ↓
+persist result
+   ↓
+publish
+```
+
+crash 发生在中间。
+
+错误方案：
+
+```json
+{
+  "stage": 3
+}
+```
+
+然后 restart：
+
+```text
+stage = 3 → execute publish
+```
+
+正确方案：
+
+```text
+durable facts:
+    RequestAccepted
+    ResultPersisted
+    no Published fact
+```
+
+重启：
+
+```fsharp
+run projection
+```
+
+普通决策自然得到：
+
+```text
+NeedPublish
+```
+
+**不是“恢复第 3 步”。**
+
+这是巨大的区别。
+
+前者：
+
+```text
+recovery = deserialize continuation
+```
+
+后者：
+
+```text
+recovery = reconsider reality
+```
+
+---
+
+# 八、你现在应该做一次正式的 State-Machine Census
+
+不要等工程师“顺手发现”。
+
+把它变成正式项目。
+
+建议：
+
+```text
+cleanup/control-state-ledger.md
+```
+
+一行一个 candidate：
+
+| Candidate                    | Owner       | Current representation | Classification     | Verdict     |
+| ---------------------------- | ----------- | ---------------------- | ------------------ | ----------- |
+| Foo.state 1..5               | foo         | int                    | program-counter    | DELETE → CE |
+| Bar.currentStage             | bar         | DU                     | program-counter    | DELETE → CE |
+| Child.Exited                 | process     | bool ref               | physical evidence  | KEEP        |
+| SharedPort.RefCount          | persistence | int                    | physical resource  | KEEP        |
+| ReviewOutcome                | finality    | DU                     | domain vocabulary  | KEEP        |
+| hasStarted + done + retrying | xyz         | bool product           | implicit lifecycle | REFACTOR    |
+
+然后多两列：
+
+```text
+CE replacement
+Durable facts needed for reentry
+```
+
+例如：
+
+```text
+Foo.state
+→ task { let! ...; match ... }
+→ facts: AttemptStarted / AttemptCommitted
+```
+
+---
+
+# 九、我会从当前 `DSL-MUTABLE` annotations 反向审计
+
+这次迁移已经留下了一个非常好的 census 数据源。
+
+你们仓库现在有大量：
+
+```text
+DSL-MUTABLE: resource
+DSL-MUTABLE: single-flight
+DSL-state-combination: physical
+```
+
+而搜索结果里 `resource` annotation 本身就有很多处。
+
+不要把 annotation 当作“已经审过”。
+
+现在反过来问：
+
+> **这个注释是在解释 reality，还是在给 mutable 发赦免券？**
+
+---
+
+# 十、我会把现有 annotations 分成 Green / Yellow / Red
+
+## Green：一眼就是物理资源
+
+例如：
+
+```text
+TaskCompletionSource completion latch
+listener identity + Live disposal flag
+SharedPort RefCount
+child-process Exited receipt
+byte buffer count
+CancellationToken
+```
+
+这些无需迁 CE。
+
+仓库里 SharedTerminalBus 的 `RefCount`、WorkspaceEventStore 的 `RefCount` 都属于很典型的物理资源 ownership。
+
+---
+
+## Yellow：需要人工证明
+
+例如：
+
+```text
+joinInFlight
+startupProbeDone
+bloggerCreateFailed
+frozen + dirty
+fullReplayUsed
+```
+
+我不是说这些一定错。
+
+但这种名字开始回答：
+
+```text
+“某种行为现在处于什么阶段？”
+```
+
+例如仓库里确实存在：
+
+```fsharp
+let mutable joinInFlight = false
+```
+
+并标记为 single-flight。
+
+它可能真的是 concurrency admission latch。
+
+也可能实际是：
+
+> 用 bool 表示 Join workflow 已经走到某阶段。
+
+必须逐个证明。
+
+---
+
+## Red：任何 numeric / enum step pointer
+
+例如：
+
+```text
+state = 1
+step = 4
+CurrentStage = Persisting
+NextAction = RetryProvider
+ResumeAt = AwaitReviewer
+```
+
+除非产品真的公开承诺这个状态：
+
+**默认判 program counter。**
+
+不是“需要证明它错”。
+
+而是：
+
+> owner 必须证明它为什么不是错。
+
+---
+
+# 十一、尤其不要让 `DSL-class: ControlState` 变成新的逃生门
+
+这里我会特别严格。
+
+目前 gate 允许这种东西：
+
+```fsharp
+/// DSL-class: ControlState
+/// DSL-control-state-reason:
+/// ce-equivalent=none;
+/// blockers=function-call,match!,return!,resource-scope,waiter,bounded-recursion;
+type Mode = ...
+```
+
+然后 scanner 放行。
+
+机制上它其实只是检查 reason 字符串里有没有那些 blocker token。
+
+这很容易退化成：
+
+> “只要写一句我真的不能用 CE，就允许第二状态机。”
+
+我会改变政策。
+
+### Domain/Application/Session
+
+```text
+DSL-class: ControlState
+= hard RED
+```
+
+没有 annotation exemption。
+
+### Infrastructure / Process physical runtime
+
+非常少量可以有类似控制 state，但必须证明它实际上是：
+
+```text
+physical protocol state
+```
+
+而不是 business workflow。
+
+甚至最好改名：
+
+```text
+ControlState
+```
+
+这个 category 本身都值得废除。
+
+因为在你们这套 architecture 中：
+
+> **如果它真是合法的，它通常应该能被归类为 DomainVocabulary 或 PhysicalResource。**
+
+剩下的“ControlState”很可能就是漏洞桶。
+
+---
+
+# 十二、同样警惕 `DSL-state-combination: physical`
+
+你们 gate 目前规定：
+
+> 多状态轴必须显式分类为 `domain|physical`，但机械 gate 只证明“已分类”，不能代替人工语义判断。
+
+这句话非常正确。
+
+所以接下来不要：
+
+```text
+gate 红
+→ 加 /// DSL-state-combination: physical
+→ green
+→ done
+```
+
+这会重演刚刚 surface migration 的错误。
+
+正确流程：
+
+```text
+gate 红
+ ↓
+列出全部轴
+ ↓
+计算 Cartesian state space
+ ↓
+哪些组合现实存在？
+ ↓
+每个轴 owner 是谁？
+ ↓
+是否其实是一个 CE flow？
+ ↓
+最后才允许 annotation
+```
+
+---
+
+# 十三、对 flag product 做“状态空间爆炸测试”
+
+假设：
+
+```fsharp
+{
+    Started: bool
+    Waiting: bool
+    RetryPending: bool
+    Cancelled: bool
+    Completed: bool
+}
+```
+
+理论上：
+
+```text
+2^5 = 32
+```
+
+个状态。
+
+让工程师真的写表：
+
+```text
+00000 valid?
+00001 valid?
+00010 valid?
+...
+11111 valid?
+```
+
+如果真实合法状态只有：
+
+```text
+Created
+Running
+Waiting
+Cancelled
+Completed
+Failed
+```
+
+那这个 record 就应该死亡。
+
+仓库自己的 `phase-flag-accumulation` enforcer 已经准确说出这一点：每加一个 bool 都倍增 representable worlds，如果实际上只是一个 lifecycle，就在制造现实不存在的组合。
+
+---
+
+# 十四、但再问一步：这个 lifecycle DU 是否也应该死亡？
+
+假如你把 flags：
+
+```text
+started
+waiting
+retrying
+done
+```
+
+改成：
+
+```fsharp
+type State =
+    | Created
+    | Sending
+    | Waiting
+    | Retrying
+    | Finished
+```
+
+先别庆祝。
+
+再问：
+
+> `Sending / Waiting / Retrying` 是产品世界，还是调用栈位置？
+
+如果仍然是控制位置：
+
+继续删。
+
+最后可能只剩：
+
+```fsharp
+type Outcome =
+    | Completed of ...
+    | Failed of ...
+```
+
+中间：
+
+```text
+sending
+waiting
+retrying
+```
+
+全部由 CE 表达。
+
+---
+
+# 十五、一个非常实用的三级压缩
+
+发现状态机以后，连续做三轮：
+
+### Round 1：去 primitive
+
+```text
+1/2/3/4
+→ named alternatives
+```
+
+只是为了理解。
+
+**不要提交为终态。**
+
+---
+
+### Round 2：去假的 state
+
+问每个 case：
+
+```text
+domain fact?
+physical fact?
+execution location?
+```
+
+execution location 全删。
+
+---
+
+### Round 3：压成 facts + decision + CE
+
+最终：
+
+```text
+Durable Facts
+      ↓
+Projection
+      ↓
+Pure Decision
+      ↓
+CE effects
+```
+
+这才提交。
+
+---
+
+# 十六、JS tests 在这轮应该变得更“故事化”
+
+这是上一轮 migration 的成果，现在正好利用。
+
+不要测试：
+
+```js
+assert.equal(surface.stateName(x), 'WaitingForReview')
+```
+
+除非 `WaitingForReview` 真是产品 contract。
+
+应该测试：
+
+```js
+const world = finality.project([
+  lifeOpened(),
+  finalityRequested(),
+])
+
+const result =
+  await finality.continue(world, effects)
+
+assert.deepEqual(effects.calls, [
+  ...
+])
+```
+
+或者更黑盒：
+
+```js
+await workflow.run(...)
+
+assert.deepEqual(observedDurableFacts(), [
+  ...
+])
+```
+
+如果内部从：
+
+```text
+5-state machine
+```
+
+重写成：
+
+```text
+2 nested CE functions
+```
+
+JS test 一个字不动。
+
+---
+
+# 十七、状态机迁 CE 的标准 recipe
+
+给工程师直接照抄。
+
+## Step 1 — 找 entry point
+
+找到：
+
+```fsharp
+Run
+Execute
+Process
+Handle
+Continue
+Resume
+Advance
+Tick
+```
+
+之类主入口。
+
+---
+
+## Step 2 — 列 transition table
+
+不要先改代码。
+
+写：
+
+```text
+State 1 + X → State 2 + effect A
+State 2 + Y → State 3
+State 3 + Z → State 2
+State 3 + Q → State 5
+```
+
+把隐藏状态机完整画出来。
+
+---
+
+## Step 3 — 给每个 state 写一句“现实含义”
+
+如果写出来是：
+
+```text
+“下一步要调用 Foo”
+```
+
+标：
+
+```text
+PC
+```
+
+如果：
+
+```text
+“remote provider 已确认 commit”
+```
+
+标：
+
+```text
+FACT
+```
+
+如果：
+
+```text
+“当前 process 持有 semaphore permit”
+```
+
+标：
+
+```text
+RESOURCE
+```
+
+---
+
+## Step 4 — PC states 全部删除
+
+替换：
+
+```text
+next Foo
+→ function call
+
+wait Foo
+→ let!
+
+branch Foo
+→ match!
+
+continue
+→ return!
+
+cleanup
+→ use / try-finally
+
+repeat
+→ bounded recursion
+```
+
+---
+
+## Step 5 — FACT states 改成 facts / projection
+
+不要保存在 controller state。
+
+例如：
+
+```fsharp
+state <- ProviderCommitted
+```
+
+改成：
+
+```fsharp
+do! journal.Append ProviderCommitted
+```
+
+然后 projection 得到：
+
+```fsharp
+ProviderCommit = Some ...
+```
+
+---
+
+## Step 6 — RESOURCE states 收进 resource owner
+
+例如：
+
+```text
+permit held
+subscription active
+child exit observed
+```
+
+放到：
+
+```text
+Semaphore
+Subscription
+ChildProcess
+Mailbox
+```
+
+对象生命周期里。
+
+workflow 只 `use!/try-finally`。
+
+---
+
+## Step 7 — 写 pure `decide`
+
+如果 CE 中出现很多复杂 condition：
+
+```fsharp
+match projection, context, policy with ...
+```
+
+抽成：
+
+```fsharp
+decide : Facts -> Context -> Decision
+```
+
+不要抽成：
+
+```fsharp
+nextState : State -> Event -> State
+```
+
+除非这真的是领域 automaton。
+
+这是巨大区别。
+
+---
+
+## Step 8 — CE 解释 Decision
+
+```fsharp
+match decide facts with
+| Done x ->
+    return x
+
+| NeedFoo input ->
+    let! output = foo input
+    do! record output
+    return! run ()
+
+| NeedBar input ->
+    ...
+```
+
+---
+
+## Step 9 — recovery 从入口重跑
+
+删除：
+
+```text
+resume
+resumeAt
+restoreContinuation
+switch(stage)
+```
+
+重启只做：
+
+```text
+load facts
+fold projection
+run normal entrypoint
+```
+
+---
+
+## Step 10 — 删除旧状态类型
+
+不是留：
+
+```text
+[<Obsolete>]
+LegacyState
+```
+
+如果没有 compatibility creditor：
+
+删。
+
+---
+
+# 十八、迁移顺序不要按文件，按“最臭的状态机”排序
+
+我建议建立 severity score。
+
+每个 candidate：
+
+```text
++5 persisted/shared program counter
++4 numeric states
++4 multiple control flags
++3 crash recovery reads it
++3 effect branch depends on it
++2 crosses subsystem boundary
++2 mutable
++2 Surface currently exposes it
++1 named Stage/Phase/Step
+```
+
+优先最高分。
+
+特别是：
+
+```text
+persisted PC
+shared mutable PC
+recovery PC
+```
+
+三个最危险。
+
+因为它们把 implementation sequencing 变成 architecture。
+
+---
+
+# 十九、当前仓库里我会优先人工复核这些 yellow zones
+
+从现有 annotations 看，我会优先看：
+
+```text
+joinInFlight
+startupProbeDone
+bloggerCreateTask/bloggerCreateFailed
+fullReplayUsed
+frozen/dirty snapshot pair
+cancelDrainTask
+engineTask
+```
+
+不是说它们都错。
+
+而是它们最容易从：
+
+```text
+physical single-flight
+```
+
+悄悄滑成：
+
+```text
+workflow phase latch
+```
+
+比如 `joinInFlight` 当前被明确标成 single-flight。
+
+审查问题不是：
+
+> “有没有 DSL-MUTABLE 注释？”
+
+而是：
+
+> “如果 Join 改成另一种 CE decomposition，这个 bool 还代表独立的物理 ownership 吗？”
+
+如果 yes，留。
+
+如果 no，删。
+
+---
+
+# 二十、Surface migration 现在也要反向促进 CE migration
+
+这是最漂亮的一点。
+
+上一轮你问：
+
+> “为了 JS surface，我为什么必须暴露这个 state？”
+
+现在进一步：
+
+> **如果很难给某个 workflow 设计干净的 JS semantic surface，是不是因为内部还存在 program counter？**
+
+例如 surface 被迫提供：
+
+```js
+advance()
+resume()
+setStage()
+markStepDone()
+stateName()
+```
+
+这几乎就是 alarm。
+
+一个好的 workflow surface 应更接近：
+
+```js
+run(input)
+observe(result)
+```
+
+或者：
+
+```js
+decide(facts)
+```
+
+而不是：
+
+```js
+manually drive interpreter
+```
+
+所以给 surface review 新增一条：
+
+> **Surface 是否正在暴露或代替某个隐式 interpreter？**
+
+若 yes：
+
+先修 F# architecture，再修 surface。
+
+---
+
+# 二十一、我还会新增一个新的 architecture gate：数字状态扫描
+
+不要只靠 `CurrentStage` blacklist。
+
+加入启发式 detector，至少报警：
+
+```text
+match <identifier containing state/stage/phase/step> with
+| 0 ->
+| 1 ->
+| 2 ->
+```
+
+以及：
+
+```text
+state <- state + 1
+step <- step + 1
+phase <- 3
+```
+
+还有：
+
+```text
+Dictionary<..., int> // 后续作为 branch discriminator
+```
+
+不一定全部 hard fail。
+
+但进入 census。
+
+机械 gate 的作用不是证明罪名，而是：
+
+> **不允许这种东西继续隐身。**
+
+---
+
+# 二十二、再加一个 transition-density detector
+
+一个 type 如果：
+
+```text
+很多函数：
+  read state
+  match state
+  mutate state
+```
+
+就非常可疑。
+
+尤其：
+
+```text
+match state with
+...
+state <- ...
+```
+
+在同一函数/类型反复出现。
+
+建立 heuristic：
+
+```text
+state read count
+state write count
+branch-on-state count
+```
+
+超过阈值：
+
+```text
+STATE-MACHINE-CANDIDATE
+```
+
+然后人工分类 A/B/C/D/E。
+
+比只靠名字强很多。
+
+---
+
+# 二十三、`ControlState` exemption 我建议最终归零
+
+当前 architecture 已经事实上宣称：
+
+> F# 宿主语言本身就是业务 workflow runtime。
+
+那么长期看：
+
+```text
+DSL-class: ControlState
+```
+
+应该是：
+
+```text
+count = 0
+```
+
+不是：
+
+```text
+“只要写够 blocker 就行”
+```
+
+当前 scanner 的 blocker list 包括 function-call、`match!`、`return!`、resource-scope、waiter、bounded recursion。
+
+我建议把这个机制当作 migration scaffold：
+
+```text
+ControlState exemption baseline
+  ↓ only shrink
+  ↓
+0
+  ↓
+delete exemption mechanism
+```
+
+非常类似刚刚删掉 `domain.mjs`。
+
+不要让 migration mechanism 变 permanent architecture feature。
+
+---
+
+# 二十四、最终你想达到的代码视觉应该非常明显
+
+坏代码读起来：
+
+```text
+读 stage
+检查 flag
+改 phase
+保存 next state
+resume
+advance
+tick
+dispatch state
+```
+
+好代码读起来应该像故事：
+
+```fsharp
+task {
+    let! observation = observe context
+
+    match decide observation with
+    | Complete completion ->
+        return completion
+
+    | NeedReview review ->
+        let! verdict = requestReview review
+        do! record verdict
+        return! run context
+
+    | NeedRepair repair ->
+        let! result = repair repair
+        do! record result
+        return! run context
+}
+```
+
+业务词汇：
+
+```text
+observe
+review
+repair
+record
+complete
+```
+
+控制词汇：
+
+```text
+let!
+match
+return!
+```
+
+完全交给语言。
+
+这才是你们 `structured-workflow` 的精髓：
+
+> **领域名词描述世界；宿主语言语法描述程序如何流动。**
+
+---
+
+# 二十五、我建议接下来正式开三个并行 wave
+
+**Wave A — State-machine census。** 全库扫描 numeric state、stage/phase/step、bool clusters、mutable transition density、`ControlState` annotations。只分类，不急着修改。目标是得到有限、可信的 control-state ledger。
+
+**Wave B — Top-10 Ghost Exorcism。** 按上面的 severity score 选十个最危险的：尤其是 persisted/shared/recovery-sensitive program counter。每一个完整做到“transition table → fact/resource/PC 分类 → PC 删除 → pure decision → CE workflow → recovery reentry → JS behavioral proof”。
+
+**Wave C — Gate hardening。** `ControlState` exemption ratchet 到 0；numeric state detector 加入 gate；`DSL-state-combination: physical` 新增人工 proof creditor；annotation 不能仅靠字符串变绿。
+
+每完成一个 candidate，都必须做两个 canary：
+
+```text
+内部重新排列 CE sequencing
+→ JS tests GREEN
+
+破坏一条 observable semantic promise
+→ JS tests RED
+```
+
+这和上一轮 surface migration 是完全同一哲学，只是现在把刀继续向内推进。
+
+---
+
+我会把这一轮最终的成功指标定成一句非常有辨识度的话：
+
+> **数据结构里不再保存“程序做到哪了”；数据只保存“世界发生了什么”。程序做到哪，由 F# CE 自己知道。**
+
+再激进一点：
+
+> **如果 crash 之后必须知道上一份调用栈执行到了第几行才能恢复，那么 architecture 还没有完成。**
+
+真正完成时，进程可以死在任何 `let!` 前后；重启以后只需要重新读取 durable reality，然后从普通 workflow 入口再次回答：
+
+> **“根据现在真实存在的事实，接下来应该做什么？”**
+
+这会比单纯消灭 mangled names 深得多。它实际上是在把整个系统从**持久化的解释器**改造成**事实驱动的结构化程序**。
+
+---
+
+现在的状态和上一版已经有**质变**。我不会再评价为“工程师只是在把脏东西藏进 support”。那一阶段基本过去了。
+
+我的总体判断是：
+
+> **“测试失去 Fable/implementation authority”这场迁移已经基本成功；但“生产代码本身形成真正小而稳定的 semantic components”还没有完成。**
+>
+> 当前最大的债务已经从 **测试侧** 转移到了 **production Surface 层**。
+
+我会给当前状态大约 **7.5/10**。测试边界治理接近成熟，但 semantic decomposition 还明显欠火候。
+
+## 已经真正做对的部分
+
+最重要的进步是，之前我严厉批评的作弊路线确实被堵上了。scanner 现在覆盖完整的 `requirements/**/tests/**/*.mjs` 区域，包括 support、fixture、helper、e2e、integration；不再允许把 `.fields`、deep dist import、mangled lookup 搬到 support 文件里逃避检测。
+
+旧的 `verification-system/tests/support/domain` 和 `glory.mjs` 已经在 semantic zone 零引用后删除；legacy ledger 也明确记录 `domain.mjs` 和 boundary baseline 已删除。 这点非常重要：**旧世界是真的被删除了，不只是绕开。**
+
+Surface registry 也不再只是一个“合法化字符串 allowlist”。现在 manifest 至少要求 `module + owner + laws + source + representation + kind`，并验证 owner 的 WHAT、PROOF、生产 source、fsproj Compile 和真实 test import。 
+
+Finality 也是一个明显的真实进步。现在测试直接用：
+
+```js
+{
+  kind: 'finality-requested',
+  sessionId: '...',
+  lifeId: '...',
+  ...
+}
+```
+
+而不是 `ManagerLifecycleFact`、`FSharpList`、DU tags。测试只看到 JS lifecycle vocabulary。
+
+所以，“JS 测试不知道 Fable”这一目标，我认为已经**基本兑现**。
+
+---
+
+# 现在最大的问题变了：Surface inflation
+
+状态摘要已经写到 **129 个 registered surfaces**。
+
+数量本身不是罪。但结合当前代码形态，我认为现在已经出现：
+
+> **把原来测试侧的复杂性大量搬进 production Surface 的风险。**
+
+也就是说，以前是：
+
+```text
+JS test
+  ↓
+giant interop/domain facade
+  ↓
+F# internals
+```
+
+现在有些地方正在变成：
+
+```text
+JS test
+  ↓
+giant production Surface
+  ↓
+F# internals
+```
+
+后者当然比前者好得多，因为 boundary 正式化、JS-native 化了。
+
+但它还不是我们想要的终态：
+
+```text
+JS
+ ↓
+small semantic component
+```
+
+---
+
+# 最明显的反例：`ProcessSurface`
+
+它现在实际上包含：
+
+```text
+clock/timer
+deadline
+process command
+process estimates
+cancellation
+child process
+output
+spool
+PTY ids
+PTY commands
+PTY ports
+PTY sessions
+PTY supervisor
+completion mailbox
+join interrupts
+TaskCompletionSource wrappers
+...
+```
+
+而且甚至有：
+
+```fsharp
+mockWaitChild
+unitTaskSource
+unitTaskResolve
+createCancellationToken
+completionMailboxCreate
+```
+
+例如 `mockWaitChild` 在 production Surface 里直接构造一个假 ChildProcess。
+
+还有：
+
+```fsharp
+unitTaskSource ()
+unitTaskResolve ...
+```
+
+直接把 `TaskCompletionSource` 包成 opaque test handle。
+
+以及直接构造、驱动 `CompletionMailbox`。
+
+这已经越过了我的警戒线。
+
+这些东西中有些确实拥有 semantic law，例如 mailbox。
+
+但：
+
+> `mockWaitChild` 和 `unitTaskSource` **不是产品 semantic API。它们是测试 harness primitive。**
+
+这正是你最开始不希望发生的事情：
+
+> “不是接口就干脆不能用。”
+
+现在只是把“测试后门”从 JS support 移到了 F# production Surface。
+
+---
+
+# Finality 也还有同样的问题，只是隐蔽一些
+
+`FinalitySurface` 已经非常好地把 JS lifecycle vocabulary 和 F# representation 隔开了。
+
+但是为了调用 production fold，它内部会制造：
+
+```fsharp
+RuntimeId = "rt-finality-surface"
+ObservedAt = 2026-01-01
+EventId = e0001 ...
+```
+
+
+
+这是一个非常有价值的 architecture signal：
+
+> **Finality 的 semantic law 仍然依赖了一些本不属于 Finality law 的 envelope/persistence plumbing。**
+
+Surface 正在帮测试**伪造 irrelevant implementation context**。
+
+正确的下一步不是把这个伪造写得更漂亮。
+
+而是把 core 再拆：
+
+```text
+Lifecycle facts
+       ↓
+Finality projection / decision
+```
+
+应该能够脱离：
+
+```text
+RuntimeId
+ObservedAt
+synthetic EventId
+physical Envelope
+```
+
+独立成立。
+
+然后 persistence integration 另外证明。
+
+这样 `FinalitySurface` 就不再需要制造假世界。
+
+---
+
+# 还有一个更深的 governance 漏洞：manifest 只证明“登记”，没证明“权限范围”
+
+这是我目前最担心的机制问题。
+
+`Process/Surface.js` 在 manifest 中被登记为：
+
+```text
+owner = time-capability
+laws  = TIME-001 ... TIME-007
+```
+
+
+
+但大量 `process-execution` 测试实际上用同一个 Surface 证明：
+
+```text
+PROC-001
+PROC-002
+PROC-003
+PROC-004
+PROC-006
+PROC-007
+PROC-008
+PROC-009
+PROC-010
+```
+
+例如 `PROC-001`、`PROC-006`、`PROC-010` 等测试都直接 import `Process/Surface.js`。
+
+而当前 manifest validator 最终只要求：
+
+> 至少有某个 `.test.mjs` import 这个 surface。
+
+
+
+它没有证明：
+
+```text
+这个 test 的 WHAT law
+        ↓
+是否属于该 surface 声明的 laws
+```
+
+所以目前仍可能发生：
+
+```text
+做一个巨大的万能 Surface
+        ↓
+给它登记几个合法 law
+        ↓
+其他 package 全都拿来用
+```
+
+这就是下一版 gate 最该堵的洞。
+
+---
+
+# Boundary parsing 还有一个严重质量问题：大量 silent fallback
+
+这是现在另一个需要立即整改的地方。
+
+例如 `StrengthSurface`：
+
+```fsharp
+unknown role    -> Coder
+unknown tier    -> Deep
+unknown budget  -> K0
+unknown request -> WorkMain
+```
+
+
+
+这非常不好。
+
+外部输入：
+
+```js
+{ role: 'Codre' }
+```
+
+不应该悄悄变：
+
+```text
+Coder
+```
+
+应该：
+
+```text
+{ ok: false, error: { kind: 'unknown-role', value: 'Codre' } }
+```
+
+或者明确 throw contract violation。
+
+同类问题 Finality 也有：
+
+```fsharp
+unknown role -> Coder
+
+ownership != "host-owned-hidden"
+          -> DurableParentHandle
+```
+
+
+
+甚至 completion kind：
+
+```text
+send-failure -> SendFailure
+cancelled    -> Cancelled
+anything else -> Terminal
+```
+
+
+
+这等于：
+
+> JS-native boundary 虽然稳定了，但开始**替 caller 猜语义**。
+
+这必须 fail closed。
+
+否则新的 stable JS API 会产生比 mangled name 更危险的 silent wrong answer。
+
+---
+
+# 文档也已经明显落后于代码
+
+当前状态摘要说：
+
+* `domain` 已删除；
+* package-local contract authority 已经零 semantic consumer；
+* 只剩 build-verification exemption。
+
+但同一份仓库里的旧 roadmap 还写：
+
+> 225 文件有 debt、328/355 文件仍 import domain.mjs。 
+
+这部分已经不是“保守状态”。
+
+是 stale documentation。
+
+应该删掉历史数字或明确移到 historical record。
+
+---
+
+# 所以我会重新给项目定性
+
+**第一阶段已经完成：Test Authority Removal。**
+
+这件事现在可以相当有信心地说做成了：
+
+```text
+JS tests
+   × Fable ABI
+   × mangled names
+   × FSharpList/DU runtime
+   × internal dist imports
+   × domain.mjs
+```
+
+现在进入的是完全不同的第二阶段：
+
+> **Semantic Surface Hardening**
+
+重点已经不应该是“继续增加 surface”。
+
+反而应该暂停追求 surface 数量，开始**删、缩、拆、收权**。
+
+我现在最希望下一轮看到的不是：
+
+```text
+129 surfaces
+→ 160 surfaces
+```
+
+而是看到类似：
+
+```text
+ProcessSurface
+  - mockWaitChild
+  - TaskSource helpers
+  - fake cancellation machinery
+        ↓
+真实 JS-friendly ports
+
+FinalitySurface
+  - synthetic Envelope
+        ↓
+pure Finality algebra
+
+StrengthSurface
+  - silent defaults
+  - broad multi-subsystem aggregation
+        ↓
+small fail-closed semantic owners
+```
+
+以及一个新的硬 gate：
+
+> **一个 test 的 WHAT law，只能使用 manifest 明确授权给该 law（或显式依赖 law）的 semantic surface。**
+
+这样才能阻止 `ProcessSurface` 这种万能通行证重新出现。
+
+所以现在我的评价已经从上次的：
+
+> **“主要是表面收拢，深层重构不足。”**
+
+升级为：
+
+> **“测试侧 clean break 已经基本成功；工程师终于进入了真正的问题。但现在 production Surface 层正在成为新的复杂性堆积点，下一步必须从‘造边界’转向‘让边界后面真的存在小而自洽的 semantic components’。”**
+
+这是明显的进步，而且已经到了值得继续深挖、而不是推倒重来的状态。
 
 ---
 

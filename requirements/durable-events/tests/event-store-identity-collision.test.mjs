@@ -116,5 +116,5 @@ test('WHAT[DURABLE-EVENTS-003] distinct_EventIds_are_both_retained', () => {
 })
 
 test('WHAT[DURABLE-EVENTS-016] StoreTypes_exposes_canonical_store_ref', () => {
-  assert.equal(eventStore.EventStoreSurface_canonicalStoreRef, 'refs/wanxiang/store')
+  assert.equal(eventStore.canonicalStoreRef, 'refs/wanxiang/store')
 })

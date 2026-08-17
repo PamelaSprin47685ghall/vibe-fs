@@ -79,7 +79,6 @@ module CompletedTurnSurface =
         (role: string)
         (completed: bool)
         (finish: string)
-        (errorName: string)
         (parts: obj)
         : bool =
         let roleValue = optionalRole role
@@ -88,7 +87,7 @@ module CompletedTurnSurface =
             CompletedTurnClassifier.classifyOutcome
                 completed
                 (optionalText (box finish))
-                (optionalText (box errorName))
+                None
                 typedParts
 
         CompletedTurnClassifier.needsInteractionRepair roleValue classified typedParts

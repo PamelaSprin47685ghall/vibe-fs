@@ -8,12 +8,12 @@ open Wanxiangshu.OpenCode
 
 /// Generated js-* Host boundary. Host schema factories and ToolSpec records are
 /// opaque; the registered tool exposes only metadata and bounded execution.
-type private JsRegisteredToolHandle(spec: ToolSpec, registered: obj) =
-    member _.Spec = spec
-    member _.Registered = registered
-
 [<RequireQualifiedAccess>]
 module JsToolHostSurface =
+
+    type private JsRegisteredToolHandle(spec: ToolSpec, registered: obj) =
+        member _.Spec = spec
+        member _.Registered = registered
 
     [<Emit("$0.execute($1, $2)")>]
     let private invokeRegistered (registered: obj) (args: obj) (context: obj) : Task<obj> = jsNative

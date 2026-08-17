@@ -353,6 +353,14 @@ type SyncDelegateRuntime
                 return false
         }
 
+    /// True once the provider-owned opening capture has assigned a bounded cursor.
+    member _.HasOpeningCursor(sessionId: SessionId) : bool =
+        match store.TryPeekCallByDelegate sessionId with
+        | Some call ->
+            call.Invocations.Length > 0
+            && call.Invocations |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
+        | None -> false
+
     member _.CancelSession(sessionId: SessionId) : unit =
         let asOwnerScope = ReuseScope.ofSession sessionId
 

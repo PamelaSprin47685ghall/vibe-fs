@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
@@ -10,6 +11,9 @@ open Wanxiangshu.Repository.Programming.Js.OpenCode
 /// this edge; ToolPermission and JsSurface stay inside the owner.
 [<RequireQualifiedAccess>]
 module JsGeneratorSurface =
+
+    [<Emit("undefined")>]
+    let private jsUndefined: obj = jsNative
 
     let private permissionOf (label: string) : ToolPermission option =
         match label with
@@ -135,7 +139,11 @@ module JsGeneratorSurface =
         else JsToolGenerator.isGeneratedToolName role (permissionsOfLabels permissionLabels) toolName
 
     let memberBinding (role: string) (permissionLabels: string array) (memberName: string) : obj =
-        if not (roleExists role) then null
-        else JsToolGenerator.memberBinding role (permissionsOfLabels permissionLabels) memberName |> Option.map box |> Option.toObj
+        if not (roleExists role) then
+            jsUndefined
+        else
+            match JsToolGenerator.memberBinding role (permissionsOfLabels permissionLabels) memberName with
+            | Some binding -> box binding
+            | None -> jsUndefined
 
     let permissionLabels (role: string) : string array = canonicalLabels role

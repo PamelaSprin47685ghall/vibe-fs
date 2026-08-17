@@ -25,15 +25,15 @@ const remove = async (dir) => rm(dir, { recursive: true, force: true })
 
 test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_one_process_is_one_unbounded_writer_file_with_no_segments', async () => {
   const gitCommonDir = await commonDir()
-  const store = eventStore.EventStoreSurface_create(gitCommonDir, 'writer-proof-a')
+  const store = eventStore.create(gitCommonDir, 'writer-proof-a')
   try {
     const first = Array.from({ length: 4 }, (_, i) => event(hexId(i + 1), i + 1))
-    assert.equal((await eventStore.EventStoreSurface_append(store, first)).ok, true)
+    assert.equal((await eventStore.append(store, first)).ok, true)
     const file = path.join(gitCommonDir, 'wanxiang', 'events', 'writer-proof-a.ndjson')
     const prefix = await readFile(file)
 
     const many = Array.from({ length: 160 }, (_, i) => event(hexId(i + 100), i + 100))
-    assert.equal((await eventStore.EventStoreSurface_append(store, many)).ok, true)
+    assert.equal((await eventStore.append(store, many)).ok, true)
     const after = await readFile(file)
 
     assert.equal(after.subarray(0, prefix.length).equals(prefix), true, 'append must preserve every prior byte')
@@ -43,7 +43,7 @@ test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_one_process_is_one_unbounded_w
     assert.deepEqual(files, ['writer-proof-a.ndjson'], 'history size must not create 000000/segment/chunk files')
     assert.equal(files.some((name) => /^\d+\.ndjson$/.test(name)), false)
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     await remove(path.dirname(gitCommonDir))
   }
 })
@@ -74,17 +74,17 @@ test('WHAT[DURABLE-EVENTS-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_
 
 test('WHAT[DURABLE-EVENTS-005] DURABLE_EVENTS_005_each_process_writer_id_names_a_distinct_file_without_machine_identity', async () => {
   const gitCommonDir = await commonDir()
-  const a = eventStore.EventStoreSurface_create(gitCommonDir, 'writer-a')
-  const b = eventStore.EventStoreSurface_create(gitCommonDir, 'writer-b')
+  const a = eventStore.create(gitCommonDir, 'writer-a')
+  const b = eventStore.create(gitCommonDir, 'writer-b')
   try {
-    assert.equal((await eventStore.EventStoreSurface_append(a, [event(hexId(0xa1), 1)])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(b, [event(hexId(0xb1), 2)])).ok, true)
+    assert.equal((await eventStore.append(a, [event(hexId(0xa1), 1)])).ok, true)
+    assert.equal((await eventStore.append(b, [event(hexId(0xb1), 2)])).ok, true)
 
     const files = (await readdir(path.join(gitCommonDir, 'wanxiang', 'events'))).sort()
     assert.deepEqual(files, ['writer-a.ndjson', 'writer-b.ndjson'])
   } finally {
-    eventStore.EventStoreSurface_dispose(a)
-    eventStore.EventStoreSurface_dispose(b)
+    eventStore.dispose(a)
+    eventStore.dispose(b)
     await remove(path.dirname(gitCommonDir))
   }
 })

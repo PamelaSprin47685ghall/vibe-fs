@@ -25,35 +25,35 @@ const withTemp = (fn) => {
 
 test('WHAT[DURABLE-EVENTS-001] append_only_prior_writer_bytes_are_a_strict_prefix_after_new_fact', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'append-law')
+  const store = eventStore.create(dir, 'append-law')
   try {
     const file = join(dir, 'wanxiang', 'events', 'append-law.ndjson')
-    await eventStore.EventStoreSurface_append(store, [event(id(1))])
+    await eventStore.append(store, [event(id(1))])
     const before = await readFile(file)
-    await eventStore.EventStoreSurface_append(store, [event(id(2), [id(1)])])
+    await eventStore.append(store, [event(id(2), [id(1)])])
     const after = await readFile(file)
     assert.equal(after.subarray(0, before.length).equals(before), true)
     assert.ok(after.length > before.length)
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
 
 test('WHAT[DURABLE-EVENTS-005] one_writer_is_one_file_regardless_of_history_size', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'one-file-law')
+  const store = eventStore.create(dir, 'one-file-law')
   try {
     let parent = null
     for (let n = 1; n <= 128; n += 1) {
       const next = id(n)
-      await eventStore.EventStoreSurface_append(store, [event(next, parent ? [parent] : [])])
+      await eventStore.append(store, [event(next, parent ? [parent] : [])])
       parent = next
     }
     const files = await readdir(join(dir, 'wanxiang', 'events'))
     assert.deepEqual(files, ['one-file-law.ndjson'])
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -69,15 +69,15 @@ test('WHAT[DURABLE-EVENTS-017] append_path_has_no_Git_object_or_ref_capability',
 
 test('WHAT[DURABLE-EVENTS-006] duplicate_same_identity_is_idempotent_but_collision_is_rejected', async () => {
   const dir = withTemp((base) => base)
-  const store = eventStore.EventStoreSurface_create(dir, 'collision-law')
+  const store = eventStore.create(dir, 'collision-law')
   try {
     const same = event(id(1))
-    assert.equal((await eventStore.EventStoreSurface_append(store, [same])).ok, true)
-    assert.equal((await eventStore.EventStoreSurface_append(store, [same])).ok, true)
+    assert.equal((await eventStore.append(store, [same])).ok, true)
+    assert.equal((await eventStore.append(store, [same])).ok, true)
     const conflict = { ...same, payload: { id: 'different' } }
-    assert.equal((await eventStore.EventStoreSurface_append(store, [conflict])).ok, false)
+    assert.equal((await eventStore.append(store, [conflict])).ok, false)
   } finally {
-    eventStore.EventStoreSurface_dispose(store)
+    eventStore.dispose(store)
     rmSync(dir, { recursive: true, force: true })
   }
 })

@@ -19,7 +19,7 @@ const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observatio
 
 test('WHAT[KNOWLEDGE-REUSE-010] G6_G_universal_loop_archive_finalize_fetch', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-universal-'))
-  const handle = eventStore.EventStoreSurface_create(dir, 'universal-archive')
+  const handle = eventStore.create(dir, 'universal-archive')
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const c1 = record('reuse-scope-1', 'Q1', 'A1', [fileRead('a.txt', casebook.contentHash('hello'))])
@@ -27,7 +27,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_universal_loop_archive_finalize_fetch', asy
     assert.equal((await casebook.finalize(handle, c1)).ok, false)
     assert.equal((await casebook.fetchCase(handle, 10, 'reuse-scope-1')).value.a, 'A1')
   } finally {
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
     rmSync(dir, { recursive: true, force: true })
   }
 })
@@ -48,7 +48,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     lifecycle.noteAnswer(key, rawA)
     assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
 
-    const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'universal-lifecycle-read')
+    const handle = eventStore.create(join(dir, '.git'), 'universal-lifecycle-read')
     const fetched = await casebook.fetchCase(handle, 10, key)
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.notEqual(fetched.value.a, rawA)
@@ -68,7 +68,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     assert.equal(after.value.q, CANONICAL_Q)
     assert.equal(createCalls.length, 2)
     assert.equal(after.value.observations[0].contentHash, casebook.contentHash('drift'))
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
   } finally {
     bookkeeper.resetSessionPort()
     lifecycle.disable()
@@ -87,9 +87,9 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_cancel_session_cleanup_no_publication', asy
     lifecycle.collect(key, 'read', { path: 'x.txt' }, 'body')
     lifecycle.noteAnswer(key, 'A')
     lifecycle.cleanup(key)
-    const handle = eventStore.EventStoreSurface_create(join(dir, '.git'), 'universal-cancel-read')
+    const handle = eventStore.create(join(dir, '.git'), 'universal-cancel-read')
     assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
-    eventStore.EventStoreSurface_dispose(handle)
+    eventStore.dispose(handle)
   } finally {
     lifecycle.disable()
     rmSync(dir, { recursive: true, force: true })
