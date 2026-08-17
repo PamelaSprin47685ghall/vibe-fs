@@ -47,6 +47,19 @@ export const BUILD_VERIFICATION_FILES = new Set([
   'requirements/verification-system/tests/support/coverage-policy.mjs',
 ])
 
+/** Physical host-shape canaries (HOST-BOUNDARY-019): their subject is the raw
+ *  Host SDK snapshot / Fable representation itself — locating a ToolPart,
+ *  proving run-id equivalence, or observing a projection requires reading the
+ *  exact raw shape. Routing these through a semantic surface would hide
+ *  precisely what the canary exists to prove. */
+export const HOST_PHYSICAL_CANARY_FILES = new Set([
+  'requirements/host-boundary/tests/host-message-projection.test.mjs',
+  'requirements/host-boundary/tests/host-session-context.test.mjs',
+  'requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs',
+  'requirements/host-boundary/tests/magic-todo-host-canaries.test.mjs',
+  'requirements/host-boundary/tests/session-snapshot-locality.test.mjs',
+])
+
 /**
  * Registered semantic-surface manifest (JS-SEMANTIC-SURFACE-002/003).
  *
@@ -454,6 +467,8 @@ export const SURFACE_MANIFEST = [
       'EPI-010',
       'EPI-011',
       'EPI-012',
+      'EPI-013',
+      'EPI-014',
     ],
     source: 'src/Wanxiangshu/Sphinx/Surface.fs',
     representation: 'opaque-capability',
@@ -1653,6 +1668,7 @@ export const scanAll = (root = REQUIREMENTS_ROOT) => {
   for (const abs of semanticTestFiles(root)) {
     const rel = relative(process.cwd(), abs).replace(/\\/g, '/')
     if (BUILD_VERIFICATION_FILES.has(rel)) continue
+    if (HOST_PHYSICAL_CANARY_FILES.has(rel)) continue
     const hits = scanFile(abs, rel)
     if (hits.length > 0) out[rel] = hits
   }
