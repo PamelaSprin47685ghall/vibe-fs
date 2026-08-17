@@ -39,8 +39,11 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 ```
 
 `name` 在同一 obligation 存续期间稳定；`work` 是自然语言描述该义务仍欠什么。
-`workingOn` 是当前实际工作焦点：非空 account 时必须精确等于其中一个 obligation `name`；空 account
-时必须是空字符串。它只决定 Host compatibility sink 的活动行，不是 obligation status，也不进入
+`workingOn` 是当前实际工作焦点。provider 输入在边界归一化：非空 account 时 exact `name` 优先；若未
+命中，则以 Levenshtein 编辑距离选择最近 obligation `name`，并列时按 provider obligations 原顺序取
+第一个；空 account 一律归一为空字符串。因此进入 durable account 后 `workingOn` 始终精确等于一个
+obligation `name`（或空 account 时为 `""`），provider 的焦点拼写错误属于可恢复业务输入而不是
+infrastructure failure。它只决定 Host compatibility sink 的活动行，不是 obligation status，也不进入
 `CurrentObligations`。Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；
 不得在真正 discharge 后仅为「曾出现在计划中」而保留。
 

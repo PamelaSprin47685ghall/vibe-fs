@@ -114,19 +114,12 @@ module MagicTodoHostCodec =
         (acc: MagicTodo.Obligation list)
         : Result<MagicTodo.TodoWriteInput, string> =
         let obligations = List.rev acc
+        let decoded: MagicTodo.TodoWriteInput =
+            { PlanComplete = unbox<bool> args?planComplete
+              WorkingOn = MagicTodo.normalizeWorkingOn workingOn obligations
+              Obligations = obligations }
 
-        match MagicTodo.validateWorkingOn workingOn obligations with
-        | Error(MagicTodo.WorkingOnValidationError.MustBeEmptyForEmptyAccount actual) ->
-            Error(sprintf "todowrite.workingOn must be empty when obligations is empty; got '%s'" actual)
-        | Error(MagicTodo.WorkingOnValidationError.MustMatchObligationName actual) ->
-            Error(sprintf "todowrite.workingOn must match an obligation name; got '%s'" actual)
-        | Ok() ->
-            let decoded: MagicTodo.TodoWriteInput =
-                { PlanComplete = unbox<bool> args?planComplete
-                  WorkingOn = workingOn
-                  Obligations = obligations }
-
-            Ok decoded
+        Ok decoded
 
     let rec private decodeRows
         (args: obj)

@@ -283,7 +283,15 @@ reanchor / recovery（COMPANION-014 / CTX-016）。Blogger effectiveStart =
 `max(RecordCoverage, Life.WorkRecordStart)`；WorkRecordStart 由 LifeOpened / XTrace
 Opening cursor 纯推导，不是 Stage；不绑回 `WorkActivated`（TODO-001）。
 
+同一 X session 的 prefix replacement 是**自己的历史替换自己的旧前缀**：冻结正文用 canonical
+LifecycleWorkRecord（`includeOpening=true`），provider wire 外层是 Companion memory preamble +
+`<work-log>…</work-log>`。这里不是 delegation hand-off，禁止把该同 session memory 结构化成
+`commissioner_record` / `attached_work_record`；这两个字段只属于父→子 delegation wire plane。
+正文若因原始用户文本或历史事实自然提到这些词，不属于结构性违规。
+
 **含义/动机**：旅程可缩短，章程不可缩短。Opening floor 是结构性 cursor，不是状态机判断。
+“自己就是自己”也必须在 wire identity 上成立；把 self-memory 标成 commissioner history 会把
+同一 session 的过去伪造成另一参与者的历史，并错误继承 delegation 的 authority 语义。
 
 **边界**：floor 的推导类型（`ManagerOpeningFloor`）语义归 work-record（WORK-RECORD-015）；
 本命题拥有「Y 不得吞 Opening」这一半。

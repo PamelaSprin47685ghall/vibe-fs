@@ -102,6 +102,39 @@ test('WHAT[OBLIGATION-LEDGER-025] before returns without waiting for snapshot or
   }
 })
 
+test('WHAT[OBLIGATION-LEDGER-002] before repairs a non-matching workingOn to the nearest obligation instead of failing the hook', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-workingon-repair-'))
+  const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_workingon_repair', 4242, '2026-08-11T00:00:00Z')
+  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
+  const snapshot = { GetMessages: () => new Promise(() => {}) }
+  try {
+    const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
+    const output = {
+      args: {
+        planComplete: false,
+        workingOn: 'synthesize-evidence-into-road',
+        obligations: [
+          { name: 'synthesize-evidence-road', work: 'Synthesize the evidence.' },
+          { name: 'ship', work: 'Ship the result.' },
+        ],
+      },
+    }
+
+    await hooks.Before(
+      { tool: 'todowrite', sessionID: 'ses-workingon-repair', callID: 'call-workingon-repair' },
+    )(output)
+
+    assert.equal(output.args.workingOn, 'synthesize-evidence-into-road', 'raw provider input stays intact for locality identity')
+    assert.deepEqual(output.args.todos, [
+      { content: 'synthesize-evidence-road: Synthesize the evidence.', status: 'in_progress', priority: 'medium' },
+      { content: 'ship: Ship the result.', status: 'pending', priority: 'medium' },
+    ])
+  } finally {
+    journal.JournalSurface_dispose(boot.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[OBLIGATION-LEDGER-009] malformed obligation shape is the provider-red class', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-syntax-red-'))
   const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_syntax_red', 4242, '2026-08-11T00:00:00Z')

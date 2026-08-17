@@ -38,13 +38,10 @@ module MagicTodoObligationCodec =
         with error ->
             Error error.Message
 
-    let private validateInput (input: TodoWriteInput) =
-        match MagicTodo.validateWorkingOn input.WorkingOn input.Obligations with
-        | Ok() -> Ok input
-        | Error(WorkingOnValidationError.MustBeEmptyForEmptyAccount actual) ->
-            Error(sprintf "todowrite.workingOn must be empty when obligations is empty; got '%s'" actual)
-        | Error(WorkingOnValidationError.MustMatchObligationName actual) ->
-            Error(sprintf "todowrite.workingOn must match an obligation name; got '%s'" actual)
+    let private normalizeInput (input: TodoWriteInput) =
+        Ok
+            { input with
+                WorkingOn = MagicTodo.normalizeWorkingOn input.WorkingOn input.Obligations }
 
     /// Decode the provider-facing call object explicitly; snapshot locality binds
     /// the raw commitment declaration, focus pointer, and obligation account together.
@@ -56,6 +53,6 @@ module MagicTodoObligationCodec =
                       WorkingOn = get.Required.Field "workingOn" Decode.string
                       Obligations = get.Required.Field "obligations" (Decode.list obligationDecoder) }))
                 json
-            |> Result.bind validateInput
+            |> Result.bind normalizeInput
         with error ->
             Error error.Message

@@ -71,17 +71,56 @@ module MagicTodo =
           WorkingOn: string
           Obligations: ObligationList }
 
-    [<RequireQualifiedAccess>]
-    type WorkingOnValidationError =
-        | MustBeEmptyForEmptyAccount of actual: string
-        | MustMatchObligationName of actual: string
+    let private levenshteinDistance (left: string) (right: string) : int =
+        let rightCharacters = right |> Seq.toList
 
-    let validateWorkingOn (workingOn: string) (items: ObligationList) : Result<unit, WorkingOnValidationError> =
-        match items with
-        | [] when workingOn = "" -> Ok()
-        | [] -> Error(WorkingOnValidationError.MustBeEmptyForEmptyAccount workingOn)
-        | _ when items |> List.exists (fun item -> item.Name = workingOn) -> Ok()
-        | _ -> Error(WorkingOnValidationError.MustMatchObligationName workingOn)
+        let nextRow rowIndex leftCharacter previous =
+            let rec build leftValue previousDiagonal previousTail characters reversed =
+                match characters, previousTail with
+                | rightCharacter :: remainingCharacters, previousAbove :: remainingPrevious ->
+                    let insertion = leftValue + 1
+                    let deletion = previousAbove + 1
+                    let substitution = previousDiagonal + if leftCharacter = rightCharacter then 0 else 1
+                    let value = min insertion (min deletion substitution)
+
+                    build
+                        value
+                        previousAbove
+                        remainingPrevious
+                        remainingCharacters
+                        (value :: reversed)
+                | [], [] -> List.rev reversed
+                | _ -> failwith "levenshtein row shape mismatch"
+
+            match previous with
+            | previousHead :: previousTail ->
+                build rowIndex previousHead previousTail rightCharacters [ rowIndex ]
+            | [] -> failwith "levenshtein requires an initial column"
+
+        let _, finalRow =
+            left
+            |> Seq.fold
+                (fun (rowIndex, previous) leftCharacter ->
+                    let nextIndex = rowIndex + 1
+                    nextIndex, nextRow nextIndex leftCharacter previous)
+                (0, [ 0..right.Length ])
+
+        finalRow |> List.last
+
+    /// Canonicalise the provider's focus pointer at the input boundary.
+    /// Exact names win. A misspelling resolves to the nearest obligation name by
+    /// Levenshtein distance; ties preserve provider obligation order. With no
+    /// obligations there is no valid focus, so the canonical pointer is empty.
+    let normalizeWorkingOn (workingOn: string) (items: ObligationList) : string =
+        match items |> List.tryFind (fun item -> item.Name = workingOn) with
+        | Some exact -> exact.Name
+        | None ->
+            items
+            |> List.mapi (fun ordinal item -> levenshteinDistance workingOn item.Name, ordinal, item.Name)
+            |> List.sortBy (fun (distance, ordinal, _) -> distance, ordinal)
+            |> List.tryHead
+            |> Option.map (fun (_, _, name) -> name)
+            |> Option.defaultValue ""
 
     [<RequireQualifiedAccess>]
     type ProcessReviewVerdict =

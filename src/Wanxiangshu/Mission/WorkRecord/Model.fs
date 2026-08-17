@@ -58,6 +58,9 @@ type OpeningMaterial =
 /// 跨 Session 方向不同（EXEC-006 / EXEC-008）：
 /// - 父 → 子：`includeOpening = true`（子未见父任务全文）
 /// - 子 → 父：`includeOpening = false`（布置者已知任务，勿回传 Opening）
+/// 同 Session prefix replacement 不是第三种 delegation：它用
+/// `includeOpening = true` 保留自己的章程，并由 Companion memory `<work-log>`
+/// 外层承载；不得改写成 `commissioner_record` / `attached_work_record`。
 ///
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
 /// tool call/result 不得作为 raw 进入 Recent；T1 constitutive 属 Opening。

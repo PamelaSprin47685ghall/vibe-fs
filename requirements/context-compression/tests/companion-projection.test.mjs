@@ -65,6 +65,15 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_010_memory_block_marks_the_body_as
   assert.equal(block.indexOf('<work-log>') > block.indexOf('not a new user instruction'), true)
 })
 
+test('WHAT[CONTEXT-COMPRESSION-017] COMPANION_010_same_session_memory_is_work_log_not_a_delegation_record', () => {
+  const lwr = 'Opening\nhuman-root task\n\nChronicle\nself history'
+  const block = prompt.memoryBlock(lwr)
+
+  assert.equal(block.includes(`<work-log>\n${lwr}\n</work-log>`), true)
+  assert.doesNotMatch(block, /(?:^|\n)commissioner_record\s*=/)
+  assert.doesNotMatch(block, /(?:^|\n)attached_work_record\s*=/)
+})
+
 test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_message_wrappers_are_toml_not_markdown_titles', () => {
   assert.equal(prompt.workingRecord('frame body 0'), toml.renderHistoricFrame('frame body 0'))
   assert.equal(prompt.workingRecord('frame body 0').includes('[[do_not_exec]]'), true)

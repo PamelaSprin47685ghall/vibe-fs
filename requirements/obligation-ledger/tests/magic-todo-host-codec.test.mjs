@@ -32,12 +32,34 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
   assert.equal(missingWorkingOn.ok, false)
   assert.equal(missingWorkingOn.error, 'todowrite.workingOn is required')
 
-  const unknownWorkingOn = host.decodeInput({ planComplete: false, workingOn: 'proof', obligations: [{ name: 'bridge', work: 'x' }] })
-  assert.equal(unknownWorkingOn.ok, false)
-  assert.equal(unknownWorkingOn.error, "todowrite.workingOn must match an obligation name; got 'proof'")
+  const misspelledWorkingOn = host.decodeInput({
+    planComplete: false,
+    workingOn: 'synthesize-evidence-into-road',
+    obligations: [
+      { name: 'synthesize-evidence-road', work: 'x' },
+      { name: 'ship', work: 'y' },
+    ],
+  })
+  assert.equal(misspelledWorkingOn.ok, true, misspelledWorkingOn.ok ? '' : misspelledWorkingOn.error)
+  assert.equal(misspelledWorkingOn.value.workingOn, 'synthesize-evidence-road')
+
+  const tiedWorkingOn = host.decodeInput({
+    planComplete: false,
+    workingOn: 'cat',
+    obligations: [
+      { name: 'bat', work: 'first nearest' },
+      { name: 'hat', work: 'second nearest' },
+    ],
+  })
+  assert.equal(tiedWorkingOn.ok, true, tiedWorkingOn.ok ? '' : tiedWorkingOn.error)
+  assert.equal(tiedWorkingOn.value.workingOn, 'bat')
 
   const zeroWork = host.decodeInput({ planComplete: true, workingOn: '', obligations: [] })
   assert.equal(zeroWork.ok, true, zeroWork.ok ? '' : zeroWork.error)
+
+  const zeroWorkWithStrayFocus = host.decodeInput({ planComplete: true, workingOn: 'anything', obligations: [] })
+  assert.equal(zeroWorkWithStrayFocus.ok, true, zeroWorkWithStrayFocus.ok ? '' : zeroWorkWithStrayFocus.error)
+  assert.equal(zeroWorkWithStrayFocus.value.workingOn, '')
 
   const malformed = host.decodeInput({ planComplete: false, workingOn: 'bridge', obligations: [{ name: 1, work: 'x' }] })
   assert.equal(malformed.ok, false)

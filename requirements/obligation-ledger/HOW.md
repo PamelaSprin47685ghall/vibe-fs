@@ -123,6 +123,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 
 | 内容 | 说明 |
 |---|---|
+| provider `workingOn` decode-time canonicalization | exact obligation name 优先；未命中时按 Levenshtein 编辑距离选最近 name，并列按 provider obligations 原顺序取第一个；空 account 归一为 `""`。这是 authoring 边界容错，进入 durable account 后仍保持 exact focus invariant |
 | Host TodoTable compatibility sink（`content=name: work` / `status=(name=workingOn ? in_progress : pending)` / `priority=medium`） | **compatibility 不写成永久需求**。它是当前 Host V1 的兼容 UI 投影；未来 sink 可整体替换，canonical obligation 语义不变。sink 永不反推 canonical（OBLIGATION-LEDGER-015 是永久命题；sink 字段形态是 HOW） |
 | `todowrite` schema / `planComplete` / `name`/`work` 字段名 / T1 文案具体 wording | 当前 authoring surface；`provider-language` 拥有本地化字节，本包拥有 commitment 语义 |
 | `ReviewFrontier` / `ReviewWorkStartCursor` 的具体 cursor 算法 | 与 `semantic-trace`（cursor 表示）、`work-record`（LWR 有界）、`review-assurance`（assignment 范围）交界；本包只引用 |

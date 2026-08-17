@@ -42,6 +42,11 @@
 - delta 可含 tool 作压缩输入；LWR gap 剔 raw tool（COMPANION-007，同源不同投影）。
 - BloggerRequestMaterialized / BloggerRequestAbandoned / BlogObservationCommitted /
   BlogObservationsSquashed 四事实构成 Y 的 request cycle；`BloggerCycleProjection` 记录 receipt。
+- X 的 same-session prefix replacement 不走 `ForkChildPayload`：`Context/Prefix/Wire.fs` 以本 X 的
+  Opening + coverable Y frames 直接 `LifecycleWorkRecord.render true`，随后
+  `CompanionPrompt.companionMemoryBlock` 包成 memory preamble + `<work-log>…</work-log>`。
+  `commissioner_record` / `attached_work_record` 是父→子 delegation envelope 的字段，不是
+  self-memory 的字段。
 
 ### 1.4.1 连续 catch-up：live Current → refresh → park → wake → live Current
 
