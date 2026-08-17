@@ -89,21 +89,24 @@ module private SessionWire =
         | SessionOutcome.Failure failure ->
             result failure.Handle (InquiryResult.Error (failureMessage failure.Failure))
 
+    let applyResumeResult (handle: string) (entry: SessionEntry) (nextState: EpistemicState) (result: InquiryResult) (sessions: Dictionary<string, SessionEntry>) : SessionOutcome =
+        match result with
+        | InquiryResult.Error message ->
+            SessionOutcome.Failure { Handle = Some handle; State = Some entry.State; Failure = SessionFailure.KernelRejected message }
+        | InquiryResult.Yield _ ->
+            sessions[handle] <- { State = nextState; Lifecycle = SessionLifecycle.Active }
+            SessionOutcome.Success { Handle = handle; State = nextState; Result = result }
+        | InquiryResult.Answered answer ->
+            sessions[handle] <- { State = nextState; Lifecycle = SessionLifecycle.Answered answer }
+            SessionOutcome.Success { Handle = handle; State = nextState; Result = result }
+
     let resumeActive (handle: string) (entry: SessionEntry) (observation: Observation) (sessions: Dictionary<string, SessionEntry>) : SessionOutcome =
         match entry.Lifecycle with
         | SessionLifecycle.Answered _ ->
             SessionOutcome.Failure { Handle = Some handle; State = Some entry.State; Failure = SessionFailure.AlreadyAnswered }
         | SessionLifecycle.Active ->
             let nextState, result = Policy.resume entry.State observation
-            match result with
-            | InquiryResult.Error message ->
-                SessionOutcome.Failure { Handle = Some handle; State = Some entry.State; Failure = SessionFailure.KernelRejected message }
-            | InquiryResult.Yield _ ->
-                sessions[handle] <- { State = nextState; Lifecycle = SessionLifecycle.Active }
-                SessionOutcome.Success { Handle = handle; State = nextState; Result = result }
-            | InquiryResult.Answered answer ->
-                sessions[handle] <- { State = nextState; Lifecycle = SessionLifecycle.Answered answer }
-                SessionOutcome.Success { Handle = handle; State = nextState; Result = result }
+            applyResumeResult handle entry nextState result sessions
 
     let decodeAndResume (resumeFn: string * Observation -> SessionOutcome) (handle: string) (rawObservation: obj) : obj =
         match Codec.decodeObservation rawObservation with
@@ -139,28 +142,28 @@ type SessionStore() =
             StartOutcome.Started(handle, state, result)
 
     member _.ResumeObservation(handle: string, observation: Observation) : SessionOutcome =
-        if String.IsNullOrWhiteSpace handle then
+        let isBlank = String.IsNullOrWhiteSpace handle
+        match isBlank, sessions.TryGetValue handle with
+        | true, _ ->
             SessionOutcome.Failure { Handle = None; State = None; Failure = SessionFailure.MissingHandle }
-        else
-            match sessions.TryGetValue handle with
-            | false, _ ->
-                SessionOutcome.Failure { Handle = Some handle; State = None; Failure = SessionFailure.UnknownHandle }
-            | true, entry ->
-                SessionWire.resumeActive handle entry observation sessions
+        | false, (false, _) ->
+            SessionOutcome.Failure { Handle = Some handle; State = None; Failure = SessionFailure.UnknownHandle }
+        | false, (true, entry) ->
+            SessionWire.resumeActive handle entry observation sessions
 
     member this.Start(question: string) : obj =
         this.StartTyped(question) |> SessionWire.startOutcomeToObj
 
     member this.Resume(handle: string, rawObservation: obj) : obj =
-        if String.IsNullOrWhiteSpace handle then
+        let isBlank = String.IsNullOrWhiteSpace handle
+        match isBlank, sessions.TryGetValue handle with
+        | true, _ ->
             SessionWire.result None (InquiryResult.Error "missing handle")
-        else
-            match sessions.TryGetValue handle with
-            | false, _ ->
-                SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
-            | true, _ ->
-                let resumeFn (h, obs) = this.ResumeObservation(h, obs)
-                SessionWire.decodeAndResume resumeFn handle rawObservation
+        | false, (false, _) ->
+            SessionWire.result (Some handle) (InquiryResult.Error "unknown handle")
+        | false, (true, _) ->
+            let resumeFn (h, obs) = this.ResumeObservation(h, obs)
+            SessionWire.decodeAndResume resumeFn handle rawObservation
 
 module Session =
 
