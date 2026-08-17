@@ -30,13 +30,15 @@ module SyncDelegateSurface =
             runtime: SyncDelegateRuntime,
             scope: ToolRuntimeScope,
             children: ResizeArray<SessionId>,
-            answers: Dictionary<string, string>
+            answers: Dictionary<string, string>,
+            ownerPrefix: string
         ) =
         member _.Journal = journal
         member _.Runtime = runtime
         member _.Scope = scope
         member _.Children = children
         member _.Answers = answers
+        member _.OwnerSession(owner: string) = SessionId.create (ownerPrefix + owner)
 
         member _.Dispose() =
             runtime.Dispose()
@@ -73,11 +75,15 @@ module SyncDelegateSurface =
                 |> Seq.filter (fun child ->
                     (SessionId.value child)
                         .StartsWith((SessionId.value parent) + "-child-", StringComparison.Ordinal))
-                |> Seq.map (fun child ->
-                    { SessionId = child
-                      ParentSessionId = Some parent
-                      Title = Some "managed delegate"
-                      Agent = Some "fast-inspector" })
+                |> Seq.collect (fun child ->
+                    [ { SessionId = child
+                        ParentSessionId = Some parent
+                        Title = Some "managed delegate"
+                        Agent = Some "fast-inspector" }
+                      { SessionId = child
+                        ParentSessionId = Some parent
+                        Title = Some "managed delegate"
+                        Agent = Some "fast-coder" } ])
                 |> Seq.toList
                 |> Ok
                 |> Task.FromResult
@@ -143,7 +149,7 @@ module SyncDelegateSurface =
 
             let! result =
                 EventStoreJournalWriter.resumeOrCreate (
-                    RuntimeId.create "sync-delegate-surface",
+                    RuntimeId.create (sprintf "sync-delegate-surface-%s" (ToolHostCodec.digest directory)),
                     1,
                     DateTimeOffset.UtcNow,
                     store
@@ -207,7 +213,8 @@ module SyncDelegateSurface =
                     None
                 )
 
-            return box (Harness(journal, runtime, scope, children, answers))
+            let ownerPrefix = sprintf "sync-delegate-surface-%s-" (ToolHostCodec.digest directory)
+            return box (Harness(journal, runtime, scope, children, answers, ownerPrefix))
         }
 
     /// Execute the real InspectorTool specification against the opaque scope and
@@ -247,7 +254,7 @@ module SyncDelegateSurface =
             match roleOf role with
             | Error error -> return box {| ok = false; error = error |}
             | Ok role ->
-                let! result = harness.Runtime.Invoke(owner, role, question)
+                let! result = harness.Runtime.Invoke(SessionId.value (harness.OwnerSession owner), role, question)
 
                 return
                     match result with
@@ -263,7 +270,7 @@ module SyncDelegateSurface =
             match roleOf role with
             | Error _ -> return false
             | Ok role ->
-                match! waitForReadyCall harness.Runtime (SessionId.create owner) role with
+                match! waitForReadyCall harness.Runtime (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
                     let turn =
@@ -299,7 +306,7 @@ module SyncDelegateSurface =
             | Error _, _
             | _, Error _ -> return false
             | Ok role, Ok outcome ->
-                match! waitForReadyCall harness.Runtime (SessionId.create owner) role with
+                match! waitForReadyCall harness.Runtime (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
                     if outcomeName = "TurnCompleted" then
@@ -328,7 +335,7 @@ module SyncDelegateSurface =
         match roleOf role with
         | Error _ -> null
         | Ok role ->
-            match harness.Runtime.TryFind(SessionId.create owner, role) with
+            match harness.Runtime.TryFind(harness.OwnerSession owner, role) with
             | Some sessionId -> box (SessionId.value sessionId)
             | None -> null
 
@@ -393,7 +400,13 @@ module SyncDelegateSurface =
                       CurrentCall = ToolCallId.create callId }
 
                 let! result =
-                    harness.Runtime.InvokeBatchPrepared(owner, role, charge, batch, (fun () -> Task.FromResult charge))
+                    harness.Runtime.InvokeBatchPrepared(
+                        SessionId.value (harness.OwnerSession owner),
+                        role,
+                        charge,
+                        batch,
+                        (fun () -> Task.FromResult charge)
+                    )
 
                 return
                     match result with

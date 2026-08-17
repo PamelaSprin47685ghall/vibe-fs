@@ -62,7 +62,7 @@ const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}` 
         NextFrameEpochId: nextEpoch,
         CoveredFrameCount: count,
         TextRef: `blob-s${n}`,
-        TextDigest: if count = 1 then 'sha-e1' else `sha-s${n}`,
+        TextDigest: count === 1 ? 'sha-e1' : `sha-s${n}`,
         ProviderRun: run,
       },
     },

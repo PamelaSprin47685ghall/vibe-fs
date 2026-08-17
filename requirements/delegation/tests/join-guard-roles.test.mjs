@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 const model = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/Model.fs', import.meta.url), 'utf8')
 const policy = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs', import.meta.url), 'utf8')
 test('WHAT[DELEG-019] JOIN_GUARD_roles_are_explicit', () => {
-  assert.match(model, /Role\.Coder|Role\.Inspector|Role\.Manager/)
+  assert.match(model, /Role: Role|Role\.Coder|Role\.Inspector|Role\.Manager/)
   assert.match(policy, /TerminalPolicy/)
 })
 test('WHAT[DELEG-019] JOIN_GUARD_unknown_role_is_not_silently_manager', () => {

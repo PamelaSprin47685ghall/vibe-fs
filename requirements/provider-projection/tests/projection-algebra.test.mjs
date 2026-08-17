@@ -36,10 +36,6 @@ const projectionIntent = {
   }),
   insertRepair: (value) => Projection.insertRepair(value.requestKey ?? value.RequestKey ?? value),
   get suppressTransportOnly() { return Projection.suppressTransportOnly },
-  appendReviewChallenge: (value = {}) => Projection.appendReviewChallenge({
-    textVersion: value.textVersion ?? value.TextVersion ?? 1,
-    prompt: value.prompt ?? value.Prompt ?? '# challenge\\n',
-  }),
   get reanchorAfterCompaction() { return Projection.reanchorAfterCompaction },
 }
 
@@ -94,7 +90,6 @@ const projectionSnapshot = {
 }
 
 const projectionConstants = { RepairInstruction: Projection.repairInstruction }
-const reviewChallenge = { textVersion: 1, prompt: '# challenge\\n', text: '# challenge\\n' }
 const items = (value) => value
 
 // ── PROJ-006: fail-closed conflicts, order-independent ─────────────────────
@@ -319,8 +314,6 @@ const REPAIR_INSTRUCTION =
   projectionConstants.RepairInstruction ??
   '# Protocol repair\n\nCall the blog tool exactly once with non-empty text. Do not answer in prose.'
 
-const REVIEW_CHALLENGE_PROMPT = reviewChallenge.prompt
-
 const wireOf = (raw) => providerProjection.decodeMessageView(items(raw)).messages
 
 const stage3Snapshot = (raw, extras = {}) =>
@@ -410,22 +403,6 @@ test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_
   )
 })
 
-test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_AppendReviewChallenge_smoke_appends_challenge_text', () => {
-  const raw = [{ info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
-  const snapshot = stage3Snapshot(raw)
-  const intent = projectionIntent.appendReviewChallenge({ TextVersion: reviewChallenge.textVersion })
-
-  assert.deepEqual(planNames([intent]), ['AppendReviewChallenge'])
-
-  const view = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
-  const texts = view.flatMap((m) => m.parts.map((p) => p.text)).filter(Boolean)
-  assert.equal(
-    texts.some((t) => t === REVIEW_CHALLENGE_PROMPT || t === reviewChallenge.text || t.includes(reviewChallenge.text)),
-    true,
-    'rendered view must carry the challenge Prompt bytes',
-  )
-})
-
 test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_ReanchorAfterCompaction_smoke_is_wire_noop', () => {
   const raw = [
     { info: { id: 'm1', role: 'user' }, parts: [{ type: 'text', text: 'before' }] },
@@ -461,10 +438,9 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_prefix_mutual_exclusion_stil
 
 test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_canonical_order_is_rank_sorted_regardless_of_input_order', () => {
   // Rank:
-  // 0 Keep/Activate | 1 BlogFrames | 2 Repair | 3 Suppress | 4 Challenge | 5 Reanchor
+  // 0 Keep/Activate | 1 BlogFrames | 2 Repair | 3 Suppress | 4 Reanchor
   const shuffled = [
     projectionIntent.reanchorAfterCompaction,
-    projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
     projectionIntent.suppressTransportOnly,
     projectionIntent.insertRepair({ RequestKey: 'k' }),
     projectionIntent.insertBlogFrames({ RequestKind: 'normal' }),
@@ -476,7 +452,6 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_canonical_order_is_rank_sort
     'InsertBlogFrames',
     'InsertRepair',
     'SuppressTransportOnly',
-    'AppendReviewChallenge',
     'ReanchorAfterCompaction',
   ])
 })
@@ -507,16 +482,6 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_same_RequestKey_Repair_is_id
       projectionIntent.insertRepair({ RequestKey: 'same' }),
     ]),
     ['InsertRepair'],
-  )
-})
-
-test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_same_version_Challenge_is_idempotent', () => {
-  assert.deepEqual(
-    planNames([
-      projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
-      projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
-    ]),
-    ['AppendReviewChallenge'],
   )
 })
 
@@ -557,24 +522,6 @@ test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_Activate_plus_Reanchor_is_Co
   ])
   assert.equal(result.ok, false)
   assert.equal(result.conflict, 'ConflictingPrefixLifecycle')
-})
-
-test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_different_Challenge_versions_conflict', () => {
-  const result = projectionAlgebra.plan([
-    projectionIntent.appendReviewChallenge({ TextVersion: 1 }),
-    projectionIntent.appendReviewChallenge({ TextVersion: 2 }),
-  ])
-  assert.equal(result.ok, false)
-  assert.equal(result.conflict, 'ConflictingReviewChallenge')
-})
-
-test('WHAT[PROVIDER-PROJECTION-006] PROJ_008_step3a_different_Challenge_prompts_conflict', () => {
-  const result = projectionAlgebra.plan([
-    projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: '# a\n' }),
-    projectionIntent.appendReviewChallenge({ TextVersion: 1, Prompt: '# b\n' }),
-  ])
-  assert.equal(result.ok, false)
-  assert.equal(result.conflict, 'ConflictingReviewChallenge')
 })
 
 // ── permutation independence ───────────────────────────────────────────────

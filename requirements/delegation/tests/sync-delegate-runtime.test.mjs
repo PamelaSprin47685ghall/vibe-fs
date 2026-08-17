@@ -39,13 +39,17 @@ for (const role of ['Inspector', 'Coder']) {
   })
 }
 
-test('WHAT[DELEG-021] SYNC_RUNTIME_same_role_reuses_one_child_and_merges_pending_calls', async () => {
+test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion', async () => {
   const h = await live()
   try {
     const first = sync.invoke(h, 'owner-sync', 'Inspector', 'first')
-    const second = sync.invoke(h, 'owner-sync', 'Inspector', 'second')
-    assert.equal(await settle(h, 'owner-sync', 'Inspector', 'combined answer', 'run-merge'), true)
+    const firstChild = await waitForChild(h, 'owner-sync', 'Inspector')
+    assert.equal(await settle(h, 'owner-sync', 'Inspector', 'first answer', 'run-first'), true)
     assert.equal((await first).ok, true)
+
+    const second = sync.invoke(h, 'owner-sync', 'Inspector', 'second')
+    assert.equal(await waitForChild(h, 'owner-sync', 'Inspector'), firstChild)
+    assert.equal(await settle(h, 'owner-sync', 'Inspector', 'second answer', 'run-second'), true)
     assert.equal((await second).ok, true)
     assert.equal(sync.childCount(h), 1)
   } finally { sync.dispose(h) }

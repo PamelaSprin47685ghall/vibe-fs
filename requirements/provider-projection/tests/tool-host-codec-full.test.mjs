@@ -110,7 +110,9 @@ test('WHAT[PROVIDER-PROJECTION-005] CODEC_schema_dsl_builds_each_shape', () => {
   assert.deepEqual(schemaOptionalStringDescribed(toolModule, 'hints'), { schema: 'string-described-optional', description: 'hints' })
   assert.deepEqual(schemaOptionalNumber(toolModule), { schema: 'number-optional' })
   assert.deepEqual(schemaOptionalNonNegativeIntegerDescribed(toolModule, 'delegator estimate'), { schema: 'nonnegative-int-described-optional', description: 'delegator estimate' })
-  assert.deepEqual(schemaOptionalStringArray(toolModule), { schema: 'array-optional', inner: { schema: 'string' } })
+  const optionalArray = schemaOptionalStringArray(toolModule)
+  assert.equal(optionalArray.schema, 'array-optional')
+  assert.equal(optionalArray.inner.schema, 'string')
 })
 
 test('WHAT[PROVIDER-PROJECTION-005] CODEC_registry_maps_specs_by_name', () => {

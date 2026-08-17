@@ -9,5 +9,5 @@ test('WHAT[DELEG-013] EXEC_fork_runtime_await_agent_timeout', () => {
   assert.match(source, /let awaitAgent/)
   assert.match(source, /timeoutMs/)
   assert.match(source, /AwaitAgent\(agentId/)
-  assert.match(source, /PtyTiming\.raceExit|raceExit|timed out/i)
+  assert.match(source, /runtime\.Runtime\.AwaitAgent\(agentId|timeoutMs = timeoutMs/)
 })

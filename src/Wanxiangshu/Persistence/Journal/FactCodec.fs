@@ -102,6 +102,9 @@ module FactCodec =
         && (json.IndexOf("\"CompletionRef\"", StringComparison.Ordinal) < 0
             || json.IndexOf("\"CompletionDigest\"", StringComparison.Ordinal) < 0)
 
+    let containsLegacyUnanchoredGuideline (json: string) =
+        json.IndexOf("\"PairProgrammingGuidelineAppended\"", StringComparison.Ordinal) >= 0
+
     let legacyGuidelineCleanBreakMessage =
         "Wanxiangshu HOST-013 requires anchored PairProgrammingGuidelineAnchored facts; legacy unanchored PairProgrammingGuidelineAppended journals are not supported (anchored replay clean break).\nArchive or remove the old Wanxiangshu runtime journal before starting."
 

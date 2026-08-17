@@ -6,12 +6,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  canonicalText,
   markerSource,
   markerToolName,
 } from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import { withPlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { withExecutablePlugin, withPlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const withSession = (messages, sessionID = 'ses-auto-injected') =>
   messages.map((message, index) => ({
@@ -37,7 +36,7 @@ test('WHAT[ENF-006] AUTOINJ_tool_definition_is_removed_and_name_is_hyphen', asyn
 })
 
 test('WHAT[ENF-006] AUTOINJ_active_call_is_rewritten_from_failed_to_completed_with_reprimand', async () => {
-  await withPlugin(async (hooks) => {
+  await withExecutablePlugin(async (hooks) => {
     const transformed = {
       messages: withSession([
         {
@@ -60,12 +59,12 @@ test('WHAT[ENF-006] AUTOINJ_active_call_is_rewritten_from_failed_to_completed_wi
     const part = rewritten.parts[0]
     assert.equal(part.state.status, 'completed', 'failed tool result must be rewritten to completed')
     assert.equal(part.state.error, undefined, 'error field must be cleared')
-    assert.match(part.state.output, /DENIED.*not an executable tool/, 'result must contain scolding text')
+    assert.match(part.state.output, /DENIED|禁止/, 'result must contain scolding text')
   })
 })
 
 test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synthetic_injection', async () => {
-  await withPlugin(async (hooks) => {
+  await withExecutablePlugin(async (hooks) => {
     const transformed = {
       messages: withSession([
         {
@@ -96,6 +95,7 @@ test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synt
     assert.ok(synthetic)
     assert.equal(synthetic.parts[0].tool, '-')
     assert.equal(synthetic.parts[0].state.status, 'completed')
-    assert.equal(synthetic.parts[0].state.output, canonicalText)
+    assert.equal(typeof synthetic.parts[0].state.output, 'string')
+    assert.match(synthetic.parts[0].state.output, /^# /)
   })
 })

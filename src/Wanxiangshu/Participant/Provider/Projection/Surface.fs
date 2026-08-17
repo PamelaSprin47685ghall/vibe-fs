@@ -318,7 +318,6 @@ module ProjectionSurface =
         | ProjectionIntent.ActivatePrefixEpoch _ -> "ActivatePrefixEpoch"
         | ProjectionIntent.InsertBlogFrames _ -> "InsertBlogFrames"
         | ProjectionIntent.InsertRepair _ -> "InsertRepair"
-        | ProjectionIntent.AppendReviewChallenge _ -> "AppendReviewChallenge"
         | ProjectionIntent.UseStrengthMirror _ -> "UseStrengthMirror"
         | ProjectionIntent.InsertStrengthFrames _ -> "InsertStrengthFrames"
         | ProjectionIntent.SuppressTransportOnly -> "SuppressTransportOnly"
@@ -339,7 +338,6 @@ module ProjectionSurface =
                    activation = activationToJs activation |}
         | ProjectionIntent.InsertBlogFrames _ -> box {| kind = "InsertBlogFrames" |}
         | ProjectionIntent.InsertRepair _ -> box {| kind = "InsertRepair" |}
-        | ProjectionIntent.AppendReviewChallenge _ -> box {| kind = "AppendReviewChallenge" |}
         | ProjectionIntent.UseStrengthMirror _ -> box {| kind = "UseStrengthMirror" |}
         | ProjectionIntent.InsertStrengthFrames _ -> box {| kind = "InsertStrengthFrames" |}
         | ProjectionIntent.SuppressTransportOnly -> box {| kind = "SuppressTransportOnly" |}
@@ -350,7 +348,6 @@ module ProjectionSurface =
         | ProjectionConflict.ConflictingPrefixSelection _ -> "ConflictingPrefixSelection"
         | ProjectionConflict.ConflictingBlogFrames -> "ConflictingBlogFrames"
         | ProjectionConflict.ConflictingRepair -> "ConflictingRepair"
-        | ProjectionConflict.ConflictingReviewChallenge -> "ConflictingReviewChallenge"
         | ProjectionConflict.ConflictingPrefixLifecycle -> "ConflictingPrefixLifecycle"
         | ProjectionConflict.ConflictingStrengthFrames _ -> "ConflictingStrengthFrames"
         | ProjectionConflict.StrengthCandidateWrongTarget _ -> "StrengthCandidateWrongTarget"

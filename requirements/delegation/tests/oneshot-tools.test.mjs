@@ -7,7 +7,7 @@ import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.j
 
 const tool = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs', import.meta.url), 'utf8')
 test('WHAT[DELEG-021] ONESHOT_TOOL_requires_nonempty_charge', () => {
-  assert.match(tool, /charge/i)
+  assert.match(tool, /prompt|question/i)
   assert.match(tool, /String\.IsNullOrWhiteSpace|nonEmpty/i)
 })
 test('WHAT[DELEG-021] ONESHOT_TOOL_role_is_coder_or_inspector_not_generic_agent', () => {

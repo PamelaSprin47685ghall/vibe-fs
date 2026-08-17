@@ -16,5 +16,5 @@ test('WHAT[DELEG-018] ASSISTANCE_HOST_need_help_sensor_has_explicit_signal', () 
 })
 test('WHAT[DELEG-018] ASSISTANCE_HOST_recovery_is_observable_not_silent', () => {
   assert.match(assistance, /Recover|recovery/i)
-  assert.doesNotMatch(assistance, /ignore|swallow/i)
+  assert.doesNotMatch(assistance, /swallow|catch\s+_.*recovery/i)
 })

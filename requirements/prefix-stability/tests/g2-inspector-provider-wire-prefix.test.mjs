@@ -173,7 +173,7 @@ test('WHAT[PREFIX-STABILITY-001] G2_inspector_Q1_Q2_Q3_provider_wire_append_only
     )
 
     const changedAnswer = mutatedWire(wireQ2, (value) => {
-      value.messages[1].parts[0].text = 'answer Q1 changed'
+      value.messages[0].parts[0].text = 'Q1 changed'
       return value
     })
     assert.equal(providerProjection.isAppendOnlyPrefix(wireQ1, changedAnswer), false, 'historical byte mutation breaks PREFIX LAW')
