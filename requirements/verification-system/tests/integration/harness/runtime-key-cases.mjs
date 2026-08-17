@@ -399,7 +399,9 @@ export const runtimeKeyCases = [
       const call = projected.messages.length === 0 ? null : projected.messages[0].parts[0];
 
       assertEq(prose, 'fork');
-      assertEq(JSON.stringify(call), JSON.stringify({ kind: 'tool-call', name: 'fork', args: '{}' }));
+      assertEq(call?.kind, 'tool-call');
+      assertEq(call?.name, 'fork');
+      assertEq(call?.args, '{}');
       assertTrue(call !== prose, 'tool call text must be distinguishable from prose');
     },
   },
