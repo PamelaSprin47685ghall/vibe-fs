@@ -13,7 +13,6 @@ import {
   idleEncouragementPostT1,
   idleEncouragementPreT1,
   managerSystemPrompt,
-  planningTail,
   rejected,
   reawakening as managerReawakening,
   reawakeningText,
@@ -237,7 +236,6 @@ test('WHAT[FINALITY-004] first birth golden bytes: planning commitment is irreve
   assert.ok(birth.parts[1].text.includes('planning work'))
   assert.ok(birth.parts[1].text.includes('planComplete=true'))
   assert.ok(birth.parts[1].text.match(/irreversible|cannot be undone|never returns to false/i))
-  assert.equal(planningTail().includes('Do not perform any actual work'), true)
 })
 
 test('WHAT[FINALITY-022] reawakening golden bytes', async () => {

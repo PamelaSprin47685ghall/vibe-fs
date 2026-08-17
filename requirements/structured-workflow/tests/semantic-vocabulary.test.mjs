@@ -6,13 +6,20 @@
 // never an anonymous middleware pipeline. The vocabulary lives in Application
 // (shape/dsl-structured-program.md): it is not a Domain pure rule, not an
 // Infrastructure adapter.
+//
+// Source-tree proof: each vocabulary name is a `let` in its owner Application
+// module. Build-verification (guide-contract.test.mjs) proves the emitted
+// modules load and the names are callable. This semantic test proves the
+// naming contract without loading internal dist modules.
 
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
-const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
+const ROOT = new URL('../../../', import.meta.url).pathname
+const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 /**
  * Production named-vocabulary surface, one entry per Application module.
@@ -31,19 +38,22 @@ const VOCABULARY_SURFACES = {
 /** DSL-013 rejected shapes: implementation-action names, not business promises. */
 const REJECTED_PREFIX = /^(execute|process|handle|do|retry|run|perform|with)[A-Z]/
 
-test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_named_vocabulary_surface_exists_in_Application', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_named_vocabulary_surface_exists_in_Application', () => {
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
-    const mod = await load(modulePath)
+    const source = readSrc(`src/Wanxiangshu/${modulePath}.fs`)
     for (const name of names) {
-      assert.equal(typeof mod[name], 'function', `${modulePath} must export '${name}'`)
+      assert.match(
+        source,
+        new RegExp(`\\blet(?: rec)?(?: private)? ${name}\\b`),
+        `${modulePath} must define '${name}' as a let binding`,
+      )
     }
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', () => {
   const bad = []
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
-    const mod = await load(modulePath)
     for (const name of names) {
       if (REJECTED_PREFIX.test(name)) bad.push(`${modulePath}.${name}`)
     }
@@ -51,21 +61,25 @@ test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_vocabulary_names_declare_business_pro
   assert.deepEqual(bad, [], 'vocabulary names must not be implementation-action labels')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-013] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-013] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', () => {
   // DSL-015: semantic decorators must be named Vocabulary or a named call
   // site. A global DecoratorBase / MiddlewarePipeline / IWorkflowDecorator
-  // framework is banned. Assert the production vocabulary modules expose no
+  // framework is banned. Assert the production vocabulary modules define no
   // such framework shape.
   const frameworkNames = ['DecoratorBase', 'MiddlewarePipeline', 'IWorkflowDecorator', 'WorkflowBuilder']
+  const bad = []
   for (const modulePath of Object.keys(VOCABULARY_SURFACES)) {
-    const mod = await load(modulePath)
+    const source = readSrc(`src/Wanxiangshu/${modulePath}.fs`)
     for (const name of frameworkNames) {
-      assert.equal(name in mod, false, `${modulePath} must not export ${name}`)
+      if (new RegExp(`\\b(?:type|let) ${name}\\b`).test(source)) {
+        bad.push(`${modulePath} must not define ${name}`)
+      }
     }
   }
+  assert.deepEqual(bad, [], bad.join('; '))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real production definition', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real production definition', () => {
   // DSL-014 / STRUCTURED-WORKFLOW-012: compressed Semantic Vocabulary must be
   // backed by its own temporal/behavioral proof. The proof obligation table
   // (HOW §3.4) is that registration: each row names a compressed vocabulary
@@ -74,8 +88,6 @@ test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real 
   // production tree (the compression actually happens at a named call site),
   // and the table must cover exactly the vocabularies it registers. A row
   // naming a nonexistent definition would be compression without proof.
-  const root = new URL('../../../', import.meta.url).pathname
-
   const OBLIGATIONS = [
     ['ManagerBackground.ensureSettled', 'Mission/Manager/Background.fs'],
     ['ManagerIdle.encourageLabor', 'Mission/Manager/Idle.fs'],
@@ -88,8 +100,8 @@ test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real 
     ['Orchestrator.publishEventually', 'Change/Program.fs'],
   ]
 
-  // Table completeness: HOW §3.4 registers exactly these nine.
-  const how = readFileSync(join(root, 'requirements/structured-workflow/HOW.md'), 'utf8')
+  // Table completeness: HOW §3.3 registers exactly these nine.
+  const how = readFileSync(join(ROOT, 'requirements/structured-workflow/HOW.md'), 'utf8')
   const tableSection = how.slice(how.indexOf('### 3.3'), how.indexOf('### 3.3.1'))
   for (const [vocab] of OBLIGATIONS) {
     assert.match(tableSection, new RegExp(`\\| \`${vocab.replace('.', '\\.')}\``), `HOW §3.4 must register ${vocab}`)
@@ -99,7 +111,7 @@ test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real 
   // owner path the table names — the compression is observable, not fictional.
   for (const [vocab, file] of OBLIGATIONS) {
     const short = vocab.split('.').pop()
-    const production = readFileSync(join(root, `src/Wanxiangshu/${file}`), 'utf8')
+    const production = readSrc(`src/Wanxiangshu/${file}`)
     assert.match(
       production,
       new RegExp(`\\blet(?: rec)?(?: private)? ${short}\\b`),

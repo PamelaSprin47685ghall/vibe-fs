@@ -263,3 +263,89 @@ test('WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_cont
     assert.equal(knowsCompiledSurface, true, `quarantine ${file} must prove it knows a compiled/representation subject`)
   }
 })
+
+// ── 007: scanner regression — three bypasses that must fail ─────────────────
+
+test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002f_template_dist_import_is_detected', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-template-import-'))
+  const fixturePath = join(temporaryRoot, 'requirements', 'probe', 'tests', 'probe.test.mjs')
+  mkdirSync(dirname(fixturePath), { recursive: true })
+  try {
+    // Split the template pattern so the scanner does not see this test file
+    // itself as debt — the fixture is the subject, not this charter test.
+    const distPart = ['dist', '/${modulePath}.'].join('')
+    const jsPart = ['j', 's`, import.meta.url).pathname)'].join('')
+    const fixtureSource = [
+      'const load = (modulePath) => import(new ',
+      'URL(`../../../',
+      distPart,
+      jsPart,
+      '\nexport const probe = () => load("Internal/Module")',
+    ].join('')
+    writeFileSync(fixturePath, fixtureSource)
+    const scanned = scanAll(join(temporaryRoot, 'requirements'))
+    const hits = scanned[relativePath(fixturePath)]
+    assert.ok(
+      hits && hits.some((hit) => hit.rule === 'template-dist-import'),
+      'new URL template dynamic import of dist must be detected as debt',
+    )
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004b_support_to_support_transitive_edge_is_scanned', () => {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-transitive-edge-'))
+  const testPath = join(temporaryRoot, 'requirements', 'probe', 'tests', 'probe.test.mjs')
+  const supportA = join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', 'a.mjs')
+  const supportB = join(temporaryRoot, 'requirements', 'probe', 'tests', 'support', 'b.mjs')
+  mkdirSync(dirname(supportA), { recursive: true })
+  try {
+    writeFileSync(testPath, "import './support/a.mjs'\n")
+    writeFileSync(supportA, "import './b.mjs'\n")
+    writeFileSync(supportB, "export const x = 1\n")
+    const edges = semanticImportEdges(join(temporaryRoot, 'requirements'))
+    const edgeStrings = edges.map((e) => `${relativePath(e.importer)} -> ${relativePath(e.target)}`)
+    assert.ok(
+      edgeStrings.some((s) => s.includes('a.mjs') && s.includes('b.mjs')),
+      `support→support transitive edge must be traversed: ${edgeStrings.join('; ')}`,
+    )
+  } finally {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_string_and_recognizes_active_imports', () => {
+  const module = 'Owner/Surface.js'
+  const deadStringSource = [
+    `import { value } from '../../../dist/${module}'`,
+    "// const value = 'Owner/Surface.js'",
+    "const label = 'value'",
+    'export const noop = () => null',
+  ].join('\n')
+  assert.equal(usesSurface(deadStringSource, module), false, 'binding name in a string/comment is not an active use')
+
+  const activeDefaultSource = [
+    `import surface from '../../../dist/${module}'`,
+    'export const call = () => surface()',
+  ].join('\n')
+  assert.equal(usesSurface(activeDefaultSource, module), true, 'active default import must be recognized')
+
+  const activeNamedSource = [
+    `import { value as v } from '../../../dist/${module}'`,
+    'export const call = () => v()',
+  ].join('\n')
+  assert.equal(usesSurface(activeNamedSource, module), true, 'active named import with alias must be recognized')
+
+  const activeNamespaceSource = [
+    `import * as surface from '../../../dist/${module}'`,
+    'export const call = () => surface.value()',
+  ].join('\n')
+  assert.equal(usesSurface(activeNamespaceSource, module), true, 'active namespace import must be recognized')
+
+  const deadDefaultSource = [
+    `import surface from '../../../dist/${module}'`,
+    'export const noop = () => null',
+  ].join('\n')
+  assert.equal(usesSurface(deadDefaultSource, module), false, 'imported but never referenced default binding is not active')
+})

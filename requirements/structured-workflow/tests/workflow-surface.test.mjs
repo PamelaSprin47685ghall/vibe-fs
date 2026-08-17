@@ -6,58 +6,85 @@
 // (DSL-002 / ARCH-008). Execution/Agent/Errors + Context/Companion/Errors +
 // Foundation/Outcome are pure domain fact types consumed by those CE programs,
 // not control-state tags.
+//
+// The registered Foundation/OutcomeSurface is the owner contract for outcome
+// vocabulary. Workflow entrypoint existence is proved via source-tree
+// inspection — build-verification (guide-contract.test.mjs) proves the emitted
+// modules load and export callable functions.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+
 import * as outcomeSurface from '../../../dist/Foundation/OutcomeSurface.js'
 
-const load = (modulePath) => import(new URL(`../../../dist/${modulePath}.js`, import.meta.url).pathname)
+const ROOT = new URL('../../../', import.meta.url).pathname
+const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[STRUCTURED-WORKFLOW-001] SW_001_workflow_entrypoints_are_the_exported_surface', async () => {
-  const manager = await load('Mission/Manager/Workflow')
-  const reviewer = await load('Mission/Review/Judgement/Workflow')
-  const turn = await load('Composition/Turn/Workflow')
-
-  assert.equal(typeof manager.observe, 'function')
-  assert.equal(typeof manager.observeIdle, 'function')
-  assert.equal(typeof reviewer.observe, 'function')
-  assert.equal(typeof turn.observe, 'function')
+test('WHAT[STRUCTURED-WORKFLOW-001] SW_001_workflow_entrypoints_are_the_exported_surface', () => {
+  // Source-tree proof: each workflow module defines its named entrypoint as a
+  // `let` — the direct-CE contract (STRUCTURED-WORKFLOW-001). Build-verification
+  // (guide-contract.test.mjs) proves the emitted modules load and the
+  // entrypoints are callable.
+  const entrypoints = [
+    ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observe'],
+    ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observeIdle'],
+    ['src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs', 'observe'],
+    ['src/Wanxiangshu/Composition/Turn/Workflow.fs', 'observe'],
+  ]
+  const missing = []
+  for (const [file, name] of entrypoints) {
+    const source = readSrc(file)
+    if (!new RegExp(`\\blet(?: rec)?(?: private)? ${name}\\b`).test(source)) {
+      missing.push(`${file}: ${name}`)
+    }
+  }
+  assert.deepEqual(missing, [], `workflow entrypoints must exist in production source: ${missing.join('; ')}`)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_counter_shaped_names', async () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_002_workflow_modules_export_no_program_counter_shaped_names', () => {
   // DSL-002 / ARCH-008: the direct workflow owner exposes story entrypoints,
-  // never a stored business stage. Check those named entrypoints directly;
-  // emitted export enumeration is not a semantic contract.
-  const manager = await load('Mission/Manager/Workflow')
-  const reviewer = await load('Mission/Review/Judgement/Workflow')
-  const turn = await load('Composition/Turn/Workflow')
-
-  assert.equal(typeof manager.observe, 'function')
-  assert.equal(typeof manager.observeIdle, 'function')
-  assert.equal(typeof reviewer.observe, 'function')
-  assert.equal(typeof turn.observe, 'function')
+  // never a stored business stage. Source-tree proof: no Stage/Phase/NextAction
+  // let bindings in the workflow modules.
+  const workflowFiles = [
+    'src/Wanxiangshu/Mission/Manager/Workflow.fs',
+    'src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs',
+    'src/Wanxiangshu/Composition/Turn/Workflow.fs',
+  ]
+  const programCounter = /\b(?:let|type)\s+\w*(?:Stage|Phase|NextAction|CurrentStage|RunState)\b/
+  const bad = []
+  for (const file of workflowFiles) {
+    const source = readSrc(file)
+    if (programCounter.test(source)) bad.push(file)
+  }
+  assert.deepEqual(bad, [], `workflow modules must not define program-counter-shaped names: ${bad.join('; ')}`)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', async () => {
-  const agent = await load('Execution/Agent/Errors')
-  const companion = await load('Context/Companion/Errors')
-  const outcome = await load('Foundation/Outcome')
-
-  // Context/error vocabularies now live with their owning domains after the
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_003_domain_flow_and_outcome_types_are_domain_facts', () => {
+  // Context/error vocabularies live with their owning domains after the
   // rotation-2 split; neither module is a Flow AST or program position.
-  for (const t of ['AgentContext', 'AgentError']) {
-    assert.equal(typeof agent[t], 'function', `Execution/Agent/Errors must export ${t}`)
-  }
-  for (const t of ['CompanionContext', 'CompanionError']) {
-    assert.equal(typeof companion[t], 'function', `Context/Companion/Errors must export ${t}`)
-  }
+  // Source-tree proof: the error types are defined as F# record/union types.
+  const agentErrors = readSrc('src/Wanxiangshu/Execution/Agent/Errors.fs')
+  assert.match(agentErrors, /\btype AgentContext\b/, 'Execution/Agent/Errors must define AgentContext')
+  assert.match(agentErrors, /\btype AgentError\b/, 'Execution/Agent/Errors must define AgentError')
+
+  const companionErrors = readSrc('src/Wanxiangshu/Context/Companion/Errors.fs')
+  assert.match(companionErrors, /\btype CompanionContext\b/, 'Context/Companion/Errors must define CompanionContext')
+  assert.match(companionErrors, /\btype CompanionError\b/, 'Context/Companion/Errors must define CompanionError')
 
   // AgentRunResult is the completion payload of a successful agent run
   // (EXEC-006): typed physical facts plus terminal output, validated by
   // IsValid. No transport parts, no stage latch.
-  assert.equal(typeof outcome.AgentRunResult, 'function')
-  assert.equal(typeof outcome.AgentRunResult__get_IsValid, 'function')
-  assert.equal(typeof outcome.AgentRunFailure, 'function')
+  const outcome = readSrc('src/Wanxiangshu/Foundation/Outcome.fs')
+  assert.match(outcome, /\btype AgentRunResult\b/, 'Foundation/Outcome must define AgentRunResult')
+  assert.match(outcome, /\btype AgentRunFailure\b/, 'Foundation/Outcome must define AgentRunFailure')
+  // EXEC-006: IsValid rejects empty terminal text — the JS-native surface
+  // exposes this without the test touching Fable record internals.
+  assert.equal(outcomeSurface.isValidAgentRunResult(''), false)
+  assert.equal(outcomeSurface.isValidAgentRunResult('  '), false)
+  assert.equal(outcomeSurface.isValidAgentRunResult('terminal output'), true)
 
   const sendOutcomeCases = outcomeSurface.sendOutcomeKinds()
   assert.deepEqual(sendOutcomeCases, [

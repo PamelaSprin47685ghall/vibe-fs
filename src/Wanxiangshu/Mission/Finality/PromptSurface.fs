@@ -36,9 +36,6 @@ module PromptSurface =
             {| parts = projection.Parts |> List.map narrativePartView |> List.toArray
                text = ManagerNarrative.renderText projection |}
 
-    let planningTail () : string =
-        rawResource ManagerNarrative.Path.PlanningTail
-
     let reawakeningPrefix () : string =
         let lines = (rawResource ManagerNarrative.Path.Reawakening).Split '\n'
         if lines.Length = 0 then "" else lines.[0]

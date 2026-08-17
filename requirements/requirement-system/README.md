@@ -43,7 +43,8 @@ tests/      本包拥有的可执行 proof
    spec-rules 的纯规则回归在 `tests/spec-rules.test.mjs`）。
 3. `requirements/README.md`：48 包树入口导航（2026-08-14 cutover 后承担导航职责）。
 4. `tests/change-lifecycle.test.mjs`：WHAT-013/014/015 机器面（Completed 不作当前依据 pin +
-   blocker 四步 + AGENTS 小修复豁免；Active 原文冻结仍人工）。
+   blocker 四步 + AGENTS 小修复豁免 + `activeBodyViolations` / `frozenOriginViolations` 纯验证器：
+   Active 冻结 origin 边界、跨版本原文不变、段白名单、禁止 progress·commit·code-snapshot 段）。
 
 ## proof 概览
 

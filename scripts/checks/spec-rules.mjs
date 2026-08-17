@@ -162,3 +162,124 @@ export const navigationProblems = (navigation, directory, files) => {
       .sort((a, b) => a.file.localeCompare(b.file)),
   }
 }
+
+// ── Active change-file body contract (REQUIREMENT-SYSTEM-013) ───────────────
+
+const ACTIVE_ALLOWED_SECTIONS = new Set([
+  'Original proposal',
+  'Work origin',
+  'Remaining work',
+  'Completion criteria',
+  'Blockers',
+  'Amendments',
+  'Final outcome',
+])
+
+const ACTIVE_FORBIDDEN_SECTION_RE =
+  /^(Progress|Commits?|Commit log|Code snapshot|Completion percentage|Diff|Changelog)$/i
+
+const isChangeIdentity = (title) => /^CHG-\d+/i.test(title)
+
+/**
+ * Validate an Active change-file body against REQUIREMENT-SYSTEM-013.
+ *
+ * Pure: takes file text, returns violation objects `{ rule, line, msg }`.
+ * Does NOT read `changes/active/`, does NOT infer lifecycle status from prose
+ * — the caller decides what to feed (live file, fixture, or direct string).
+ *
+ * Rules:
+ *   frozen-origin    — must carry an `Original proposal` or `Work origin` heading
+ *   unknown-section  — every section heading must be in the Active whitelist
+ *   forbidden-section — no Progress / Commits / Code snapshot / Completion
+ *                      percentage / Diff / Changelog headings (named refinement)
+ *
+ * "Frozen" (original text not rewritten over time) needs version history and
+ * remains human review; this validator checks the structural boundary only.
+ */
+export const activeBodyViolations = (text) => {
+  const findings = []
+  const headings = []
+
+  text.split('\n').forEach((content, index) => {
+    const match = /^(#{1,6})\s+(.+?)\s*$/.exec(content)
+    if (match) headings.push({ title: match[2], line: index + 1 })
+  })
+
+  const sections = headings.filter((h) => !isChangeIdentity(h.title))
+
+  const hasOrigin = sections.some(
+    (h) => h.title === 'Original proposal' || h.title === 'Work origin',
+  )
+  if (!hasOrigin) {
+    findings.push({
+      rule: 'frozen-origin',
+      line: 0,
+      msg: 'Active must carry a frozen Original proposal / Work origin heading',
+    })
+  }
+
+  for (const h of sections) {
+    if (ACTIVE_FORBIDDEN_SECTION_RE.test(h.title)) {
+      findings.push({
+        rule: 'forbidden-section',
+        line: h.line,
+        msg: `Active forbids progress/commit/code-snapshot section: ${h.title}`,
+      })
+    } else if (!ACTIVE_ALLOWED_SECTIONS.has(h.title)) {
+      findings.push({
+        rule: 'unknown-section',
+        line: h.line,
+        msg: `Active section "${h.title}" is not in the allowed whitelist`,
+      })
+    }
+  }
+
+  return findings
+}
+
+const originSection = (text) => {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => /^#{1,6}\s+(Original proposal|Work origin)\s*$/.test(line))
+  if (start < 0) return null
+
+  const body = []
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (/^#{1,6}\s+/.test(lines[index])) break
+    body.push(lines[index])
+  }
+  return {
+    start: start + 1,
+    body: body.join('\n').replace(/\n+$/, ''),
+  }
+}
+
+/**
+ * Compare the frozen origin section across two revisions of an Active file.
+ *
+ * Pure: callers provide the previous and current text. The function does not
+ * inspect git history or infer lifecycle state from a path.
+ */
+export const frozenOriginViolations = (before, after) => {
+  const previous = originSection(before)
+  const current = originSection(after)
+  const findings = []
+
+  if (!previous || !current) {
+    findings.push({
+      rule: 'frozen-origin-missing',
+      line: current?.start ?? 0,
+      msg: 'Both Active revisions must carry an Original proposal / Work origin section',
+    })
+    return findings
+  }
+
+  if (previous.body !== current.body) {
+    findings.push({
+      rule: 'frozen-origin-mutated',
+      line: current.start,
+      msg: 'Active Original proposal / Work origin text must remain byte-identical',
+    })
+  }
+
+  return findings
+}

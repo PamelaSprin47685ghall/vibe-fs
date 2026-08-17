@@ -22,8 +22,7 @@ open System
 open Wanxiangshu.Foundation
 
 /// GLORY-014/064/074 + SURFACE-004: BlindPlan lifecycle text owner.
-/// Legacy PlanningTail bytes stay frozen for decode; production Birth /
-/// Reawakening use Planning Table (§7.4.1).
+/// Production Birth / Reawakening use Planning Table (§7.4.1).
 /// Prose meaning lives in `resources/provider/lifecycle/manager/**`; this module
 /// owns semantic paths + pure SyntheticToml assembly (PROMPT-019).
 module ManagerNarrative =
@@ -53,10 +52,6 @@ module ManagerNarrative =
 
         [<Literal>]
         let ForkReturnedPreT1 = "lifecycle/manager/fork-returned-pre-t1"
-
-        /// GLORY-014: legacy planning tail — inert decode / migration only.
-        [<Literal>]
-        let PlanningTail = "lifecycle/manager/planning-tail"
 
     /// GLORY-015: synthetic narrative source identity for duplicate detection.
     [<Literal>]

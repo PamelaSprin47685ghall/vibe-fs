@@ -95,15 +95,14 @@ module ManagerLifeWorkflow =
                 | Error failure -> return Error(sprintf "Life opening append failed: %s" failure)
         }
 
-    /// GLORY-069 HumanRoot upgrade: WriteBlob → LifeOpened → legacy WorkActivated
-    /// (inert decode only; production floor uses effectiveOpeningFloor / T1).
+    /// GLORY-069 HumanRoot upgrade: WriteBlob → LifeOpened.
+    /// Opening floor is derived from LifeOpened / XTrace / WorkRecordStart (TODO-001).
     let ensureMigrated
         (journal: AgentJournal)
         (sessionId: SessionId)
         (lifeId: ManagerLifeId)
         (openingUserMessageId: PhysicalUserMessageId)
         (assignmentText: string)
-        (protectedPrefixEndSequence: int64)
         : Task<Result<unit, string>> =
         task {
             match! journal.WriteBlob assignmentText with
@@ -122,44 +121,29 @@ module ManagerLifeWorkflow =
                                OpeningCursorSequence = 0L |})
                 with
                 | Error failure -> return Error(sprintf "Life migration append failed: %s" failure)
-                | Ok() ->
-                    match!
-                        appendLifecycle
-                            journal
-                            sessionId
-                            (ManagerLifecycleFact.WorkActivated
-                                {| SessionId = sessionId
-                                   LifeId = lifeId
-                                   ActivationPromptKey = PromptKey.create ""
-                                   ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
-                    with
-                    | Ok() -> return Ok()
-                    | Error failure -> return Error(sprintf "Life migration activation failed: %s" failure)
+                | Ok() -> return Ok()
         }
 
-    /// GLORY-021 legacy: WorkActivated after historical Activation acceptance.
-    /// Inert for production floor (TODO-001); BlindPlan nails WorkRecordStart at T1.
-    let acceptActivation
+    /// BOUNDED-COMPAT (LEGACY-010): AgentOwnerRoot migration Life still appends
+    /// legacy WorkActivated so the e2e long-stroke scenario (which waitFact
+    /// WorkActivated eq 1) replays identically. The fact is inert — it never
+    /// decides work, compression, or finality (TODO-001/GLORY-021).
+    /// Exit: long-stroke scenario updated to not require WorkActivated → delete
+    /// this function and its call in materializeInitialAgentOwnerLife.
+    let private appendLegacyMigrationWorkActivatedCompat
         (journal: AgentJournal)
         (sessionId: SessionId)
         (lifeId: ManagerLifeId)
-        (activationPromptKey: PromptKey)
         (protectedPrefixEndSequence: int64)
         : Task<Result<unit, string>> =
-        task {
-            match!
-                appendLifecycle
-                    journal
-                    sessionId
-                    (ManagerLifecycleFact.WorkActivated
-                        {| SessionId = sessionId
-                           LifeId = lifeId
-                           ActivationPromptKey = activationPromptKey
-                           ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
-            with
-            | Ok() -> return Ok()
-            | Error failure -> return Error(sprintf "WorkActivated append failed: %s" failure)
-        }
+        appendLifecycle
+            journal
+            sessionId
+            (ManagerLifecycleFact.WorkActivated
+                {| SessionId = sessionId
+                   LifeId = lifeId
+                   ActivationPromptKey = PromptKey.create ""
+                   ProtectedPrefixEndSequence = protectedPrefixEndSequence |})
 
     let private materializeInitialAgentOwnerLife
         (journal: AgentJournal)
@@ -190,15 +174,13 @@ module ManagerLifeWorkflow =
                            OpeningTextDigest = blob.BlobDigest
                            OpeningCursorSequence = 0L |})
 
+            // BOUNDED-COMPAT (LEGACY-010): legacy WorkActivated for e2e long-stroke.
             do!
-                appendLifecycle
+                appendLegacyMigrationWorkActivatedCompat
                     journal
                     sessionId
-                    (ManagerLifecycleFact.WorkActivated
-                        {| SessionId = sessionId
-                           LifeId = lifeId
-                           ActivationPromptKey = PromptKey.create ""
-                           ProtectedPrefixEndSequence = XTraceProjection.headSequence xTrace + 1L |})
+                    lifeId
+                    (XTraceProjection.headSequence xTrace + 1L)
 
             return
                 AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections

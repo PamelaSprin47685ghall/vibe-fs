@@ -38,6 +38,16 @@ export const proofHasLaw = (text, law) =>
 
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 
+/** Remove string literals so a binding name inside a string is not a use.
+ *
+ * Single/double-quoted strings do not span newlines in JS; template literals do.
+ */
+const stripStrings = (text) =>
+  text
+    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
+
 /** Require a direct static/dynamic import in a .test.mjs source, not a comment. */
 export const importsSurface = (source, module) => {
   if (!source.includes(`dist/${module}`)) return false
@@ -50,18 +60,28 @@ export const importsSurface = (source, module) => {
  * A contract import is evidence only when its binding is used after the import.
  * Merely importing an emitted module from a dead helper does not prove an
  * executable semantic contract.
+ *
+ * Lexical binding-use check: strips comments/strings, then proves the imported
+ * binding appears as an identifier in executable code after the import clause.
+ * Recognizes default, namespace, and named import forms (including `as`).
  */
 export const usesSurface = (source, module) => {
   if (!source.includes(`dist/${module}`)) return false
   const text = stripComments(source)
   const target = escapeRegExp(module)
-  const staticPattern = new RegExp(`\\bimport\\s+([\\s\\S]+?)\\s+from\\s*['"][^'"]*dist/${target}['"]`, 'g')
+
+  // Static import: `import <clause> from '...dist/<module>'`
+  // The clause cannot contain another `import` keyword (that would be a
+  // different statement), so we exclude it from the capture.
+  const staticPattern = new RegExp(`\\bimport\\s+((?:(?!\\bimport\\b)[\\s\\S])+?)\\s+from\\s*['"][^'"]*dist/${target}['"]`, 'g')
   let match
   while ((match = staticPattern.exec(text)) !== null) {
     const clause = match[1].trim()
     const bindings = []
+    // Namespace: `* as ns`
     const namespace = clause.match(/\*\s+as\s+([A-Za-z_$][\w$]*)/)
     if (namespace) bindings.push(namespace[1])
+    // Named: `{ a, b as c }`
     const named = clause.match(/\{([\s\S]*)\}/)
     if (named) {
       for (const item of named[1].split(',')) {
@@ -69,23 +89,28 @@ export const usesSurface = (source, module) => {
         if (local && /^[A-Za-z_$][\w$]*$/.test(local)) bindings.push(local)
       }
     }
-    const defaultBinding = clause.match(/^([A-Za-z_$][\\w$]*)/)
+    // Default: the identifier before `{` or `*`, if any
+    const defaultBinding = clause.match(/^([A-Za-z_$][\w$]*)\s*(?:,|$|\{|\*)/)
     if (defaultBinding) bindings.push(defaultBinding[1])
     const rest = text.slice(match.index + match[0].length)
-    if (bindings.some((binding) => new RegExp(`\\b${escapeRegExp(binding)}\\b`).test(rest))) return true
+    const codeAfter = stripStrings(rest)
+    if (bindings.some((binding) => new RegExp(`\\b${escapeRegExp(binding)}\\b`).test(codeAfter))) return true
   }
 
+  // Dynamic import assigned to a variable: `const m = import('...dist/<module>')`
   const dynamicPattern = new RegExp(`\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*(?:await\\s+)?import\\s*\\(\\s*['"][^'"]*dist/${target}['"]\\s*\\)`, 'g')
   while ((match = dynamicPattern.exec(text)) !== null) {
     const rest = text.slice(match.index + match[0].length)
-    if (new RegExp(`\\b${escapeRegExp(match[1])}\\b`).test(rest)) return true
+    if (new RegExp(`\\b${escapeRegExp(match[1])}\\b`).test(stripStrings(rest))) return true
   }
 
+  // Destructured dynamic import: `const { a, b } = import('...dist/<module>')`
   const destructuredPattern = new RegExp(`\\b(?:const|let|var)\\s+\\{([^}]+)\\}\\s*=\\s*(?:await\\s+)?import\\s*\\(\\s*['"][^'"]*dist/${target}['"]\\s*\\)`, 'g')
   while ((match = destructuredPattern.exec(text)) !== null) {
     const rest = text.slice(match.index + match[0].length)
     const bindings = match[1].split(',').map((item) => item.trim().split(/\s+as\s+|\s*:\s*/).at(-1)?.trim()).filter(Boolean)
-    if (bindings.some((binding) => new RegExp(`\\b${escapeRegExp(binding)}\\b`).test(rest))) return true
+    const codeAfter = stripStrings(rest)
+    if (bindings.some((binding) => new RegExp(`\\b${escapeRegExp(binding)}\\b`).test(codeAfter))) return true
   }
   return false
 }
@@ -179,8 +204,8 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
       fail(`${label}: ${compileStem}.fs is not compiled by Wanxiangshu.fsproj`)
     }
 
-    const importedBy = typeof entry.module === 'string' ? executableSources.filter(({ source }) => importsSurface(source, entry.module)) : []
-    const activeBy = typeof entry.module === 'string' ? executableSources.filter(({ source }) => usesSurface(source, entry.module)) : []
+    const importedBy = typeof entry.module === 'string' ? testSources.filter(({ source }) => importsSurface(source, entry.module)) : []
+    const activeBy = typeof entry.module === 'string' ? testSources.filter(({ source }) => usesSurface(source, entry.module)) : []
     const authorizedBy = activeBy.filter(({ file, source }) => {
       const sourceLaws = new Set(whatIds(source))
       return laws.some((law) => {
