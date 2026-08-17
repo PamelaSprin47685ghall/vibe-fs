@@ -3,15 +3,6 @@ import * as HostSignalSurface from '../../../../dist/OpenCode/Host/HostSignalSur
 
 const sha256Hex = (value) => createHash('sha256').update(String(value)).digest('hex')
 
-export const wireProjection = {
-  transform: ({ journal, sessionId, physicalUser, snapshot, armed = false, cutoff = 0 } = {}) => {
-    if (!journal || !sessionId || !physicalUser || !snapshot) return { ok: false, error: !journal ? 'journal required' : !sessionId ? 'session id required' : !physicalUser ? 'physical user required' : 'snapshot required' }
-    if (!armed) return { ok: true, changed: false, consumed: false, output: snapshot }
-    const messages = Array.isArray(snapshot.messages) ? snapshot.messages.slice(0, cutoff || snapshot.messages.length) : []
-    return { ok: true, changed: true, consumed: true, output: { ...snapshot, messages }, promoted: true }
-  },
-}
-
 export const signalRouter = (owned = new Set(), onSignal = () => {}) => {
   const ownedSessions = new Set(owned)
   const observe = (raw) => {

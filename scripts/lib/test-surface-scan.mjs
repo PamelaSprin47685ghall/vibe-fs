@@ -478,6 +478,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Context/Prefix/XWireSurface.js',
+    owner: 'host-boundary',
+    laws: ['HOST-BOUNDARY-020', 'HOST-BOUNDARY-021'],
+    source: 'src/Wanxiangshu/Context/Prefix/XWireSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Repository/Investigation/WarmStartSurface.js',
     owner: 'repository-investigation',
     laws: [

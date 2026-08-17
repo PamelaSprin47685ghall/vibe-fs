@@ -485,6 +485,7 @@
     <Compile Include="OpenCode/Host/GitTree.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionGate.fs"/>
     <Compile Include="Context/Prefix/Wire.fs"/>
+    <Compile Include="Context/Prefix/XWireSurface.fs"/>
     <Compile Include="OpenCode/Host/TurnRuntimePreparation.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Host.fs"/>
     <Compile Include="Execution/Fission/Surface.fs"/>

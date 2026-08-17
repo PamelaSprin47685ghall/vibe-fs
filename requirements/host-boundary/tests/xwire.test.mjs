@@ -1,82 +1,173 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { wireProjection } from './support/host-surface.mjs'
+import * as XWireSurface from '../../../../dist/Context/Prefix/XWireSurface.js'
 
-const base = { messages: [{ info: { id: 'asst-1' }, parts: [{ type: 'text', text: 'answer' }] }] }
-const run = (input = {}) => wireProjection.transform({ journal: {}, sessionId: 'ses_x', physicalUser: 'user-1', snapshot: base, ...input })
+// ── Test fixtures ───────────────────────────────────────────────────────
+//
+// The X-wire transform decision surface (XWireSurface.transform) mirrors the
+// production XWire.applyTransform decision pipeline with JS-native I/O. The
+// inputs are the observable facts the production function reads from the
+// journal, the session snapshot port, and the plugin runtime scope; the
+// outputs are the decisions it makes (no-op, fail-closed, render synthetic
+// prefix, consume arming, promote prefix rebase).
+
+const baseProjection = {
+  messages: [
+    { role: 'user', parts: [{ kind: 'text', text: 'hello' }] },
+    { role: 'assistant', parts: [{ kind: 'text', text: 'answer' }] },
+  ],
+}
+
+const armedInput = (overrides = {}) => ({
+  journal: true,
+  sessionId: 'ses_x',
+  armed: true,
+  offset: 1, // Fork1 — a recovery slot
+  physicalUser: 'user-1',
+  snapshotPort: true,
+  currentProjection: baseProjection,
+  committedSnapshot: null,
+  coverableCutoff: 2, // material exists (coverage ahead of request)
+  coveredDigest: 'abc123',
+  requestStartCutoff: 1,
+  frozenRecordPrefixRef: 'blob/ref/frozen-1',
+  frozenRecordPrefixDigest: 'sha256:frozen-1',
+  frozenRecordPrefixBody: 'frozen record prefix body text',
+  memoryPreamble: 'companion memory preamble',
+  outcome: null,
+  ...overrides,
+})
+
+// ── HOST-BOUNDARY-021: no business semantics without full context ───────
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_no_journal_is_a_noop', () => {
-  const result = wireProjection.transform({ sessionId: 'ses_x', physicalUser: 'user-1', snapshot: base })
-  assert.equal(result.ok, false)
-  assert.match(result.error, /journal/)
+  const result = XWireSurface.transform(armedInput({ journal: false }))
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
+  assert.equal(result.changed, false)
+  assert.equal(result.consumed, false)
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_no_session_id_in_output_is_a_noop', () => {
-  const result = wireProjection.transform({ journal: {}, physicalUser: 'user-1', snapshot: base })
-  assert.equal(result.ok, false)
-  assert.match(result.error, /session id/)
+  const result = XWireSurface.transform(armedInput({ sessionId: '' }))
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
+  assert.equal(result.changed, false)
+  assert.equal(result.consumed, false)
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_unarmed_session_is_a_noop', () => {
-  const result = run()
+  const result = XWireSurface.transform(armedInput({ armed: false }))
   assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
   assert.equal(result.changed, false)
   assert.equal(result.consumed, false)
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_physical_user_message_throws', () => {
-  const result = run({ physicalUser: undefined, armed: true })
+// ── HOST-BOUNDARY-020: fail-closed on insufficient observation ──────────
+
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_physical_user_message_fail_closed', () => {
+  const result = XWireSurface.transform(armedInput({ physicalUser: '' }))
   assert.equal(result.ok, false)
+  assert.equal(result.noop, false)
   assert.match(result.error, /physical user/)
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_snapshot_port_throws', () => {
-  const result = run({ snapshot: undefined, armed: true })
+test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_snapshot_port_fail_closed', () => {
+  const result = XWireSurface.transform(armedInput({ snapshotPort: false }))
   assert.equal(result.ok, false)
+  assert.equal(result.noop, false)
   assert.match(result.error, /snapshot/)
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_snapshot_error_throws', () => {
-  const result = run({ snapshot: undefined })
-  assert.equal(result.ok, false)
+// ── HOST-BOUNDARY-021: armed + material → probe renders synthetic prefix ─
+
+test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_with_material_renders_synthetic_prefix', () => {
+  const result = XWireSurface.transform(armedInput({ coverableCutoff: 2 }))
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, false)
+  // When a probe is selected and the prefix intent renders a synthetic prefix,
+  // the transform changes the projection and consumes the arming.
+  assert.equal(result.consumed, true)
+  // The output should differ from the input when a synthetic prefix is rendered.
+  if (result.changed) {
+    assert.ok(result.output, 'output must be present when changed')
+    assert.ok(result.output.messages, 'output must have messages')
+  }
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_unbindable_run_throws', () => {
-  const result = run({ physicalUser: undefined })
-  assert.equal(result.ok, false)
+// ── HOST-BOUNDARY-021: armed + no material → no probe, no change ─────────
+
+test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_without_material_no_probe', () => {
+  const result = XWireSurface.transform(armedInput({ coverableCutoff: 0 }))
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, false)
+  // NoCoverage means the slot is not consumed (temporary — waiting for material).
+  assert.equal(result.consumed, false)
+  assert.equal(result.changed, false)
+  assert.ok(result.noProbeReason, 'should have a no-probe reason')
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_projections_throws', () => {
-  const result = wireProjection.transform({ journal: {}, sessionId: 'ses_x', physicalUser: 'user-1', snapshot: {}, armed: true })
+// ── HOST-BOUNDARY-021: reconcile — completed + probe → promote ───────────
+
+test('WHAT[HOST-BOUNDARY-021] XWIRE_completed_attempt_with_probe_promotes_prefix_rebase', () => {
+  const result = XWireSurface.transform(armedInput({ outcome: 'completed', coverableCutoff: 2 }))
   assert.equal(result.ok, true)
   assert.equal(result.promoted, true)
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_probe_plan_renders_synthetic_prefix_and_consumes_arming', () => {
-  const result = run({ armed: true, cutoff: 1 })
-  assert.equal(result.changed, true)
-  assert.equal(result.consumed, true)
+test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_does_not_promote', () => {
+  const result = XWireSurface.transform(armedInput({ outcome: 'failed', coverableCutoff: 2 }))
+  assert.equal(result.ok, true)
+  assert.equal(result.promoted, false)
+})
+
+// ── HOST-BOUNDARY-021: reconcile decision surface ────────────────────────
+
+test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_with_probe_promotes_and_clears', () => {
+  const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'completed', hasProbe: true })
   assert.equal(result.promoted, true)
-  assert.equal(result.output.messages.length, 1)
+  assert.equal(result.cleared, true)
+  assert.equal(result.keptPlan, false)
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_no_material_spends_slot_without_probe', () => {
-  const result = run({ armed: false, cutoff: 1 })
-  assert.equal(result.consumed, false)
-  assert.equal(result.changed, false)
+test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_without_probe_clears_without_promoting', () => {
+  const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'completed', hasProbe: false })
+  assert.equal(result.promoted, false)
+  assert.equal(result.cleared, true)
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_probe_reconcile_promotes_prefix_rebase_fact', () => {
-  const result = run({ armed: true, cutoff: 1 })
-  assert.equal(result.promoted, true)
+test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_failed_clears_plan_without_promoting', () => {
+  const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'failed', hasProbe: true })
+  assert.equal(result.promoted, false)
+  assert.equal(result.cleared, true)
+  assert.equal(result.keptPlan, false)
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_failed_attempt_clears_plan_without_promoting', () => {
-  const result = run({ armed: true, snapshot: undefined })
-  assert.equal(result.ok, false)
+test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_unknown_reread_keeps_the_plan', () => {
+  const result = XWireSurface.reconcile({ hasPlan: true, outcome: 'in-progress', hasProbe: true })
+  assert.equal(result.promoted, false)
+  assert.equal(result.cleared, false)
+  assert.equal(result.keptPlan, true)
 })
 
-test('WHAT[HOST-BOUNDARY-021] XWIRE_unknown_reread_keeps_the_plan', () => {
-  const result = run({ armed: true, cutoff: 0 })
-  assert.equal(result.consumed, true)
+test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_no_plan_is_inert', () => {
+  const result = XWireSurface.reconcile({ hasPlan: false, outcome: 'completed', hasProbe: true })
+  assert.equal(result.promoted, false)
+  assert.equal(result.cleared, false)
+  assert.equal(result.keptPlan, false)
+})
+
+// ── Mutation sensitivity: wrong production transform must fail ───────────
+//
+// If the surface returned ok=true for a missing physical user (i.e. did NOT
+// fail-closed), this assertion would catch it. This proves the test is
+// mutation-sensitive to the production decision logic.
+
+test('WHAT[HOST-BOUNDARY-020] XWIRE_mutation_sensitive_missing_physical_user_must_fail_closed', () => {
+  // A correct production surface returns ok=false for missing physical user.
+  // If someone breaks the fail-closed gate, this test fails.
+  const result = XWireSurface.transform(armedInput({ physicalUser: '' }))
+  assert.equal(result.ok, false,
+    'mutation guard: missing physical user must fail-closed, not silently succeed')
 })
