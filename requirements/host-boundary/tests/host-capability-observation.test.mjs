@@ -2,34 +2,28 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
 import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurface.js'
-import * as HostCompactionPolicy from '../../../dist/Host/CompactionPolicy.js'
-import { ofArray, toArray, tryLast, filter } from '../../../dist/fable_modules/fable-library-js.5.13.0/List.js'
+import * as CompactionPolicySurface from '../../../dist/Host/Contract/CompactionPolicySurface.js'
 
 const sha256Hex = (value) => createHash('sha256').update(String(value)).digest('hex')
 
-const requiredSettings = toArray(HostCompactionPolicy.HostCompactionPolicy_requiredSettings)
-const settingPaths = requiredSettings.map((s) => toArray(s.Path).join('.'))
-const judgeFirstTurn = (pseudoRuns) =>
-  HostCompactionPolicy.HostCompactionPolicy_judgeFirstTurn(undefined, undefined, pseudoRuns)
-const isContainableCompaction = HostCompactionPolicy.HostCompactionPolicy_isContainableCompaction
-const nextReanchor = (items, isReanchored) =>
-  HostCompactionPolicy.HostCompactionPolicy_nextReanchor(ofArray(items), isReanchored)
+const requiredSettings = CompactionPolicySurface.requiredSettings()
+const judgeFirstTurn = (pseudoRuns) => CompactionPolicySurface.judgeFirstTurn('ses_probe', pseudoRuns)
 
 test('WHAT[HOST-BOUNDARY-007] HOST_006_prevention_requires_compaction_settings_off_and_autocontinue_off', () => {
-  assert.deepEqual(settingPaths, ['compaction.auto', 'compaction.prune', 'compaction.autocontinue'])
-  assert.deepEqual(requiredSettings.map((s) => s.Required), [false, false, false])
-  assert.equal(HostCompactionPolicy.HostCompactionPolicy_autoContinueEnabled, false)
+  assert.deepEqual(requiredSettings.map((s) => s.path), ['compaction.auto', 'compaction.prune', 'compaction.autocontinue'])
+  assert.deepEqual(requiredSettings.map((s) => s.required), [false, false, false])
+  assert.equal(CompactionPolicySurface.autoContinueEnabled(), false)
 })
 
 test('WHAT[HOST-BOUNDARY-007] HOST_006_first_turn_probe_is_the_only_startup_verdict', () => {
-  assert.equal(judgeFirstTurn(0).tag, 0) // Satisfied
-  assert.equal(judgeFirstTurn(1).tag, 2) // CompactedDespiteSettings
+  assert.equal(judgeFirstTurn(0).kind, 'Satisfied')
+  assert.equal(judgeFirstTurn(1).kind, 'CompactedDespiteSettings')
 })
 
 test('WHAT[HOST-BOUNDARY-007] HOST_006_containment_folds_observation_and_reanchors_newest_unhandled_once', () => {
-  assert.equal(isContainableCompaction(true), true)
-  assert.equal(nextReanchor([8], () => false), 8)
-  assert.equal(nextReanchor([8], () => true), undefined)
+  assert.equal(CompactionPolicySurface.isContainableCompaction(true), true)
+  assert.equal(CompactionPolicySurface.nextReanchor(['run_8'], () => false), 'run_8')
+  assert.equal(CompactionPolicySurface.nextReanchor(['run_8'], () => true), null)
 })
 
 test('WHAT[HOST-BOUNDARY-003] HOST_003_host_signal_is_a_typed_wake_never_a_fact_carrier', () => {
