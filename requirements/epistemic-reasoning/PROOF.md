@@ -9,10 +9,10 @@
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
-| EPI-001 认识状态是 sufficient state | `tests/kernel.test.mjs`（`start_yields_semantic_assessment_request`） | MOVE | `node --test requirements/epistemic-reasoning/tests/kernel.test.mjs` |
-| EPI-002 Kernel 拥有 continuation/closure/停止 | `tests/kernel.test.mjs`（`fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge`）+ `tests/mcp-handle.test.mjs`（`handle_is_opaque_process_local_session_key`、`full_co_yield_path_preserves_kernel_continuation`） | MOVE | 对应文件 `node --test` |
+| EPI-001 认识状态是 sufficient state | `tests/kernel.test.mjs`（`start_yields_semantic_assessment_request`）+ `tests/mcp-wire-characterization.test.mjs`（`start_yield_wire_format_has_content_text_json`） | MOVE | 对应文件 `node --test` |
+| EPI-002 Kernel 拥有 continuation/closure/停止 | `tests/kernel.test.mjs`（`fsharp_kernel_has_no_agent_host_domain_dependency_and_sdk_stays_at_mcp_edge`）+ `tests/mcp-handle.test.mjs`（`handle_is_opaque_process_local_session_key`、`full_co_yield_path_preserves_kernel_continuation`）+ `tests/mcp-wire-characterization.test.mjs`（`answered_wire_format_has_status_and_answer`） | MOVE | 对应文件 `node --test` |
 | EPI-003 权威状态显式拥有认识基底 | `tests/semantics.test.mjs`（`ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence`）+ `tests/mcp-handle.test.mjs`（`full_co_yield_path_preserves_grounded_epistemic_basis`） | MOVE | 对应文件 `node --test` |
-| EPI-004 Pending Request 契约 | `tests/kernel.test.mjs`（`resume_rejects_observation_that_does_not_match_pending_kernel_request`）+ `tests/mcp-handle.test.mjs`（`mcp_server_surface_is_exactly_start_and_resume`）+ `tests/sphinx-mcp-kernel.test.mjs`（`AGENT_030_kernel_identity_and_commands`） | MOVE | 对应文件 `node --test` |
+| EPI-004 Pending Request 契约 | `tests/kernel.test.mjs`（`resume_rejects_observation_that_does_not_match_pending_kernel_request`）+ `tests/mcp-handle.test.mjs`（`mcp_server_surface_is_exactly_start_and_resume`）+ `tests/sphinx-mcp-kernel.test.mjs`（`AGENT_030_kernel_identity_and_commands`）+ `tests/decoder-parity.test.mjs`（`decode and decodeSemanticAssessmentObservation produce same result for SemanticAssessment raw`、`decode and decodeCandidatesObservation produce same result for Candidates raw`、`decode and decodeInvestigationObservation produce same result for Investigation raw`、`decode and decodeSynthesisObservation produce same result for Synthesis raw`、`decode rejects unknown observation type`）+ `tests/mcp-wire-characterization.test.mjs`（`error_wire_format_has_status_and_error_string`、`kernel_reject_does_not_advance_revision`） | MOVE | 对应文件 `node --test` |
 | EPI-005 Proposal ≠ Evidence（No Free Information） | `tests/kernel.test.mjs`（`semantic_assessment_and_candidates_are_control_observations_not_world_evidence`、`candidate_question_must_be_investigated_before_it_can_affect_answer`）+ `tests/semantics.test.mjs`（`synthesis_is_information_propagation_not_information_acquisition`） | MOVE | `node --test requirements/epistemic-reasoning/tests/kernel.test.mjs`；`node --test requirements/epistemic-reasoning/tests/semantics.test.mjs` |
 | EPI-006 Evidence 保留 source/dependency | `tests/bayes.test.mjs`（`same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice`、`same_dependency_group_is_not_counted_as_independent_evidence_twice`） | MOVE | `node --test requirements/epistemic-reasoning/tests/bayes.test.mjs` |
 | EPI-007 RootContract 保留分布 | `tests/kernel.test.mjs`（`contract_keeps_distribution_after_semantic_assessment`）+ `tests/semantics.test.mjs`（`later_semantic_assessment_updates_control_belief_without_creating_evidence`）+ `tests/methodology.test.mjs`（`method_library_preserves_phase0_kernel_and_extends_without_pipeline_semantics`、`why_question_activates_multiple_generators_from_distribution_and_facets`、`predictive_polar_question_activates_base_rate_and_falsification`） | MOVE | 对应文件 `node --test` |
@@ -53,6 +53,8 @@ synthesis-boundary
 
 ## 验证状态
 
-- 8 个 MOVE 文件 + helper 单跑绿：`kernel` 7、`semantics` 4、`mcp-handle` 4、`bayes` 5、
-  `search` 3、`mcts` 3、`represent` 5、`methodology` 3（共 34 pass，2026-08-14）。
+- 10 个 MOVE 文件 + helper：`kernel` 7、`semantics` 4、`mcp-handle` 4、`bayes` 5、
+  `search` 3、`mcts` 3、`represent` 5、`methodology` 3（共 34 pass，2026-08-14）；
+  `decoder-parity` 5（新增 2026-08-17，pending `node scripts/build.mjs` + `node --test` 验证）；
+  `mcp-wire-characterization` 4（新增 2026-08-17，pending `node scripts/build.mjs` + `node --test` 验证）。
 - `support.mjs` 为 helper（非 `*.test.mjs`），runner 不误发现；test-boundary 门不扫描。

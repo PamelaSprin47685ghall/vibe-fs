@@ -200,6 +200,35 @@ module SphinxSurface =
         storeOf store
         |> fun value -> value.TryState handle |> Option.map (Closure.close >> stateView) |> Option.toObj
 
+    let private observationTypeName (observation: Observation) : string =
+        match observation with
+        | SemanticAssessmentObservation _ -> "SemanticAssessment"
+        | CandidatesObservation _ -> "Candidates"
+        | InvestigationObservation _ -> "Investigation"
+        | SynthesisObservation _ -> "Synthesis"
+
+    let private decodeResult (result: Result<Observation, string>) : obj =
+        match result with
+        | Ok observation ->
+            box {| ok = true; observationType = observationTypeName observation |}
+        | Error error ->
+            box {| ok = false; error = error |}
+
+    let decode (raw: obj) : obj =
+        ObservationCodec.decode raw |> decodeResult
+
+    let decodeSemanticAssessmentObservation (raw: obj) : obj =
+        ObservationCodec.decodeSemanticAssessment raw |> decodeResult
+
+    let decodeCandidatesObservation (raw: obj) : obj =
+        ObservationCodec.decodeCandidates raw |> decodeResult
+
+    let decodeInvestigationObservation (raw: obj) : obj =
+        ObservationCodec.decodeInvestigation raw |> decodeResult
+
+    let decodeSynthesisObservation (raw: obj) : obj =
+        ObservationCodec.decodeSynthesis raw |> decodeResult
+
     let mcpServer (store: obj) : obj = McpServer.create (storeOf store)
 
     let serverName = SphinxMcp.serverName

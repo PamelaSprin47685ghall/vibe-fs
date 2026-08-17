@@ -21,7 +21,7 @@ module ObservationCodec =
                   Intents = intents }
         }
 
-    let private decodeSemanticAssessment raw =
+    let decodeSemanticAssessment raw =
         decodeAssessment raw |> Result.map SemanticAssessmentObservation
 
     let private decodeCandidate raw =
@@ -116,13 +116,13 @@ module ObservationCodec =
                   Prior = if Double.IsNaN prior then None else Some prior }
         }
 
-    let private decodeCandidates raw =
+    let decodeCandidates raw =
         result {
             let! items = required "items" (asArray decodeCandidate) raw
             return CandidatesObservation items
         }
 
-    let private decodeInvestigation raw =
+    let decodeInvestigation raw =
         result {
             let! actionKey = required "actionKey" asString raw
             let! semanticAssessment = optional "semanticAssessment" (decodeAssessment >> Result.map Some) None raw
@@ -141,7 +141,7 @@ module ObservationCodec =
                       Candidates = candidates }
         }
 
-    let private decodeSynthesis raw =
+    let decodeSynthesis raw =
         result {
             let! text = required "text" asString raw
             let! findingKeys = optional "findingKeys" stringList [] raw
