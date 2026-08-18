@@ -28,8 +28,8 @@
   "dependencies": {
     "@fable-org/fable-library-js": "^2.5.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "bun-pty": "^0.4.8",
-    "gpt-tokenizer": "^3.4.0",
+    "bun-pty": "^0.4.10",
+    "gpt-tokenizer": "^4.0.0",
     "proper-lockfile": "^4.1.2",
     "zod": "^4.4.3"
   },
@@ -37,9 +37,8 @@
     "bun-pty": "$bun-pty"
   },
   "devDependencies": {
-    "@opencode-ai/plugin": "^1.17.4",
-    "eventsource": "^3.0.7",
-    "opencode-ai": "1.18.14",
-    "smol-toml": "1.7.0"
+    "@opencode-ai/plugin": "^1.18.18",
+    "opencode-ai": "1.18.18",
+    "smol-toml": "1.8.0"
   }
 }

@@ -29,6 +29,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Process
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
@@ -334,7 +335,7 @@ module XWire =
                             (fun error -> sprintf "X-wire run binding failed: %A" error)
                             (Error rejection)
                 | ProviderRunBinding.Observation.ProjectionNotVisibleYet when remainingReads > 1 ->
-                    do! Task.Delay ProviderRunBinding.projectionCatchupDelayMilliseconds
+                    do! PtyTiming.timerTask ProviderRunBinding.projectionCatchupDelayMilliseconds
                     return! read (remainingReads - 1)
                 | ProviderRunBinding.Observation.ProjectionNotVisibleYet ->
                     return
