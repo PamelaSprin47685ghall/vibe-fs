@@ -61,12 +61,12 @@ import "wanxiangshu"
 `private: true` 商业软件，不从公共 npm 默认源分发。从 tarball 或私有 registry 安装：
 
 ```bash
-npm install ./wanxiangshu-0.8.2.tgz
+npm install ./wanxiangshu-0.8.3.tgz
 # 或
 npm install wanxiangshu --registry <your-private-registry>
 ```
 
-版本以 `package.json` 的 `version` 为准（当前 **0.8.2**）。
+版本以 `package.json` 的 `version` 为准（当前 **0.8.3**）。
 
 ### OpenCode 配置
 
@@ -90,7 +90,7 @@ npm install wanxiangshu --registry <your-private-registry>
 安装并在 OpenCode 注册插件后，Orchestrator 发起任务，Manager 分解并管理子会话，子角色按工具面分工：
 
 ```bash
-npm install ./wanxiangshu-0.8.2.tgz
+npm install ./wanxiangshu-0.8.3.tgz
 # 在 OpenCode 注册插件后启动会话
 ```
 

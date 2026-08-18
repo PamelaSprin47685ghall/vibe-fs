@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- （空）
+
+## 0.8.3
+
+- 依赖整备：bun-pty `^0.4.10`、gpt-tokenizer `^4.0.0`（`o200k_base` API 不变，滴定常量未漂移）、@opencode-ai/plugin `^1.18.18`、opencode-ai `1.18.18`、smol-toml `1.8.0`；删除零引用的 `eventsource`。Fable 5.13.0 / fable-library-js 2.5.1 已是最新。
+- HOST-BOUNDARY-008 projection catch-up 事件驱动化：armed retry 的 bounded re-read 改由 session `message.updated` 信号唤醒（`MessageVisibilityHub`，ITimerPort deadline 仅作无信号 backstop）；消除 Fable 5.13.0 把 `Task.Delay` 编译为 fable-library-js 未导出的 `delay`、导致 dist 模块图不可加载的根因。authoritative suite 回到 0 fail。
+
 - Managed agent 默认温度硬编码为 1.0：`chat.params` hook 在校验 observed provider 绑定的同时，对 managed agent provider request 输出投影 `temperature = 1.0`；非 managed 会话保持 untouched。
 
 - Managed model routing 改为 `~/.config/opencode/wanxiangshu.mjs` 单一 authority：同步 `route(role, running)` 返回 `{ model, reasoning } | null`；`running` 是同一 OpenCode process 跨 root/worktree plugin instance 共享的 session×EffectiveAgent lease multiset，`null` 形成事件驱动 backpressure，不推进 provider AABB failure。
