@@ -126,3 +126,37 @@ module FallbackFactFold =
                             Fallback = session.Fallback |> Option.map FallbackProjection.applyExhausted })
                     projection
             )
+
+        | FallbackFactCases.FallbackSucceeded payload ->
+            let identity =
+                { SessionId = payload.SessionId
+                  LogicalRunId = payload.LogicalRunId
+                  AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+                  ProviderRun = payload.ProviderRun }
+
+            match AgentProjection.tryFind payload.SessionId projection.AgentProjections with
+            | None ->
+                reject
+                    "FallbackSucceeded"
+                    "cursor success has no cursor to clear: FALLBACK-001 requires an accepted Authority Root"
+            | Some session ->
+                match session.Fallback with
+                | None ->
+                    reject
+                        "FallbackSucceeded"
+                        "cursor success has no cursor to clear: FALLBACK-001 requires an accepted Authority Root"
+                | Some current ->
+                    if
+                        current.LogicalRunId <> identity.LogicalRunId
+                        || current.AuthorityRootUserMessageId <> identity.AuthorityRootUserMessageId
+                    then
+                        Ok projection
+                    else
+                        Ok(
+                            updateSession
+                                payload.SessionId
+                                (fun s ->
+                                    { s with
+                                        Fallback = Some(FallbackProjection.recordSuccess current) })
+                                projection
+                        )

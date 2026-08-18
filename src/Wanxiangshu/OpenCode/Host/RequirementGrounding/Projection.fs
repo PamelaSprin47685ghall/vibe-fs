@@ -40,7 +40,8 @@ module RequirementGroundingProjection =
 
     let occurrences state = List.rev state.OccurrencesRev
 
-    let groundedKeys state = state.Grounded |> Set.toList |> List.sort
+    let groundedKeys state =
+        state.Grounded |> Set.toList |> List.sort
 
     let nextOrdinal state =
         match state.OccurrencesRev with
@@ -53,7 +54,8 @@ module RequirementGroundingProjection =
         if Set.contains key state.Grounded || Map.containsKey key state.Pending then
             state
         else
-            { state with Pending = Map.add key snapshot state.Pending }
+            { state with
+                Pending = Map.add key snapshot state.Pending }
 
     let applyAnchored occurrence state =
         let key = occurrenceKey occurrence

@@ -173,7 +173,11 @@ module OrdinaryTurnWorkflow =
                     completeAgent ()
 
             if terminalValid then
-                AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
+                match journal with
+                | Some j ->
+                    let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
+                    ()
+                | None -> ()
 
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
                 return ()

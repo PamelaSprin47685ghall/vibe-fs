@@ -34,7 +34,8 @@ module RequirementGroundingSurface =
                            journal = (JournalHandleBox handle :> obj) |}
         }
 
-    let disposeJournal journal = JournalSurface.dispose (journalHandleOf journal)
+    let disposeJournal journal =
+        JournalSurface.dispose (journalHandleOf journal)
 
     let requestPaths journal workspace sessionId (paths: string array) : Task<obj> =
         task {
@@ -82,7 +83,10 @@ module RequirementGroundingSurface =
 
             return
                 match result with
-                | Ok messages -> box {| ok = true; value = messages |> List.toArray |}
+                | Ok messages ->
+                    box
+                        {| ok = true
+                           value = messages |> List.toArray |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
@@ -97,4 +101,6 @@ module RequirementGroundingSurface =
 
     let source = RequirementGroundingTransform.source
     let cursorSeparator = RequirementGroundingTransform.cursorSeparator
-    let isGroundingRead raw = RequirementGroundingTransform.isGroundingRead raw
+
+    let isGroundingRead raw =
+        RequirementGroundingTransform.isGroundingRead raw

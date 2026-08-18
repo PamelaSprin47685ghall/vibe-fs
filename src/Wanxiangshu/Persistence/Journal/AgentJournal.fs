@@ -78,28 +78,6 @@ module JournalAppendFailure =
 
 module private AgentJournalInternals =
 
-    let applyDerivedSuccessToSession
-        (sessionId: SessionId)
-        (projection: ProjectionSet)
-        (session: SessionAgentProjection)
-        =
-        match session.Fallback with
-        | None -> projection
-        | Some fallback ->
-            let updatedSession =
-                { session with
-                    Fallback = Some(FallbackProjection.recordSuccess fallback) }
-
-            { projection with
-                AgentProjections =
-                    { projection.AgentProjections with
-                        Sessions = Map.add sessionId updatedSession projection.AgentProjections.Sessions } }
-
-    let applyDerivedSuccess (sessionId: SessionId) (projection: ProjectionSet) =
-        match AgentProjection.tryFind sessionId projection.AgentProjections with
-        | None -> projection
-        | Some session -> applyDerivedSuccessToSession sessionId projection session
-
     let awaitAdvancedChange
         (lastChange: JournalChange option)
         (fromRevision: JournalRevision)
@@ -148,9 +126,6 @@ open AgentJournalInternals
 /// check → subscribe → recheck → await (see `AwaitChangeFrom`).
 type AgentJournal internal (writer: IJournalWriter, initialProjection: ProjectionSet) =
     let gate = obj ()
-    // DSL-MUTABLE: resource — non-durable derived fallback-success overlay only.
-    // Durable EventEnvelope integration belongs exclusively to CanonicalIntegrator.
-    let mutable derivedFallbackSuccesses = Set.empty<SessionId>
     // DSL-MUTABLE: resource — journal revision cursor
     let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
     // DSL-MUTABLE: resource — last journal change notification payload
@@ -170,10 +145,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         | Some current -> unbox<ProjectionSet> current
         | None -> initialProjection
 
-    member this.Snapshot: ProjectionSet =
-        lock gate (fun () ->
-            derivedFallbackSuccesses
-            |> Set.fold (fun projection sessionId -> applyDerivedSuccess sessionId projection) this.CanonicalProjection)
+    member this.Snapshot: ProjectionSet = lock gate (fun () -> this.CanonicalProjection)
 
     /// Current revision under the same gate as Snapshot (Join handshake).
     member _.Revision: JournalRevision = lock gate (fun () -> revision)
@@ -182,15 +154,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     member this.SnapshotWithRevision: ProjectionSet * JournalRevision =
         lock gate (fun () -> this.Snapshot, revision)
 
-    /// FALLBACK-004: apply the success transition derived from a completed Host
-    /// snapshot. This is an in-memory projection update, not a journal fact: only
-    /// an existing session and its existing Fallback option may be changed.
-    member this.RecordDerivedFallbackSuccess(sessionId: SessionId) : unit =
-        lock gate (fun () ->
-            match AgentProjection.tryFind sessionId this.CanonicalProjection.AgentProjections with
-            | Some session when session.Fallback.IsSome ->
-                derivedFallbackSuccesses <- Set.add sessionId derivedFallbackSuccesses
-            | _ -> ())
+
 
     /// Wait until a successful fold advances past `fromRevision`.
     ///
@@ -380,11 +344,7 @@ module AgentJournal =
     let awaitChangeFrom (fromRevision: JournalRevision) (journal: AgentJournal) : Task<JournalChange> =
         journal.AwaitChangeFrom fromRevision
 
-    /// FALLBACK-004: derive success from a valid completed turn without appending
-    /// a fact. Missing journals, sessions, and fallback projections are all no-op.
-    let recordDerivedFallbackSuccess (journal: AgentJournal option) (sessionId: SessionId) : unit =
-        journal
-        |> Option.iter (fun value -> value.RecordDerivedFallbackSuccess sessionId)
+
 
     let handleProjection (journal: AgentJournal) (sessionId: SessionId) : AgentLinkageProjection =
         AgentProjection.tryFind sessionId (snapshot journal).AgentProjections

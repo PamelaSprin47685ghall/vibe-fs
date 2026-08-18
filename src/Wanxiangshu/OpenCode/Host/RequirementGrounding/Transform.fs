@@ -17,10 +17,14 @@ module RequirementGroundingTransform =
     let toolName = "read"
     let cursorSeparator = PairProgrammingThoughtTransform.cursorGuidanceSeparator
 
-    let private tryString value = if isNull value then None else Some(string value)
+    let private tryString value =
+        if isNull value then None else Some(string value)
 
     let private sourceOf raw =
-        if isNull raw || isNull raw?info || isNull raw?info?source then None else tryString raw?info?source
+        if isNull raw || isNull raw?info || isNull raw?info?source then
+            None
+        else
+            tryString raw?info?source
 
     let isGroundingRead raw = sourceOf raw = Some source
 
@@ -30,18 +34,20 @@ module RequirementGroundingTransform =
         else
             let parts = unbox<obj array> raw?parts
 
-            if parts.Length = 0 || isNull parts.[0]?callID then None else Some(string parts.[0]?callID)
+            if parts.Length = 0 || isNull parts.[0]?callID then
+                None
+            else
+                Some(string parts.[0]?callID)
 
     let stableCallId sessionId workspace packageName digest index =
         let input =
-            String.concat
-                "\u0000"
-                [ sessionId; workspace; packageName; digest; string index ]
+            String.concat "\u0000" [ sessionId; workspace; packageName; digest; string index ]
 
         "requirement-grounding-read-" + (HostDigest.sha256Hex input).Substring(0, 24)
 
     let private escapeAttribute (value: string) =
-        value.Replace("&", "&amp;")
+        value
+            .Replace("&", "&amp;")
             .Replace("\"", "&quot;")
             .Replace("<", "&lt;")
             .Replace(">", "&gt;")
@@ -52,7 +58,10 @@ module RequirementGroundingTransform =
         + escapeAttribute path
         + "\">\n"
         + resultBytes
-        + (if resultBytes.EndsWith("\n", StringComparison.Ordinal) then "" else "\n")
+        + (if resultBytes.EndsWith("\n", StringComparison.Ordinal) then
+               ""
+           else
+               "\n")
         + "</requirement_read>"
 
     let private buildReadMessage (read: RequirementGroundingAnchoredRead) : obj =
@@ -90,12 +99,11 @@ module RequirementGroundingTransform =
         | TranscriptGap.After address -> Set.contains (TranscriptMessageAddress.value address) addresses
 
     let private placeable addresses occurrence =
-        gapPresent addresses occurrence.CallGap && gapPresent addresses occurrence.ResultGap
+        gapPresent addresses occurrence.CallGap
+        && gapPresent addresses occurrence.ResultGap
 
     let private occurrenceReads occurrences predicate =
-        occurrences
-        |> List.filter predicate
-        |> List.collect _.Reads
+        occurrences |> List.filter predicate |> List.collect _.Reads
 
     let private appendReads (output: ResizeArray<obj>) reads =
         reads |> List.iter (buildReadMessage >> output.Add)
@@ -118,9 +126,7 @@ module RequirementGroundingTransform =
 
     let private replayOrdinary realMessages occurrences =
         let addresses =
-            realMessages
-            |> List.choose ProviderWireDecode.hostMessageId
-            |> Set.ofList
+            realMessages |> List.choose ProviderWireDecode.hostMessageId |> Set.ofList
 
         let active = occurrences |> List.filter (placeable addresses)
         let output = ResizeArray<obj>()
@@ -135,10 +141,8 @@ module RequirementGroundingTransform =
         match ProviderWireDecode.hostMessageId message with
         | None -> []
         | Some address ->
-            occurrenceReads
-                active
-                (fun occurrence ->
-                    occurrence.ResultGap = TranscriptGap.After(TranscriptMessageAddress.create address))
+            occurrenceReads active (fun occurrence ->
+                occurrence.ResultGap = TranscriptGap.After(TranscriptMessageAddress.create address))
             |> List.map _.CursorResultBytes
 
     let private projectCursorMessage active message =
@@ -152,9 +156,7 @@ module RequirementGroundingTransform =
 
     let private replayCursor realMessages occurrences =
         let addresses =
-            realMessages
-            |> List.choose ProviderWireDecode.hostMessageId
-            |> Set.ofList
+            realMessages |> List.choose ProviderWireDecode.hostMessageId |> Set.ofList
 
         let active = occurrences |> List.filter (placeable addresses)
 
@@ -191,7 +193,9 @@ module RequirementGroundingTransform =
           ResultGap = resultGap }
 
     let private appendOneRequested journal sessionId callGap resultGap snapshot =
-        let next = RequirementGroundingRuntime.nextOrdinal journal (SessionId.create sessionId)
+        let next =
+            RequirementGroundingRuntime.nextOrdinal journal (SessionId.create sessionId)
+
         let value = occurrence sessionId next callGap resultGap snapshot
 
         taskResult {
@@ -215,7 +219,11 @@ module RequirementGroundingTransform =
         loop snapshots
 
     let private validateSyntheticHistory history rawMessages =
-        let knownCallIds = history |> List.collect _.Reads |> List.map (_.CallId >> ToolCallId.value) |> Set.ofList
+        let knownCallIds =
+            history
+            |> List.collect _.Reads
+            |> List.map (_.CallId >> ToolCallId.value)
+            |> Set.ofList
 
         let orphaned =
             rawMessages
@@ -226,7 +234,10 @@ module RequirementGroundingTransform =
         if List.isEmpty orphaned then
             Ok(rawMessages |> List.filter (isGroundingRead >> not))
         else
-            Error("synthetic grounding reads without durable record: " + String.Join(", ", orphaned))
+            Error(
+                "synthetic grounding reads without durable record: "
+                + String.Join(", ", orphaned)
+            )
 
     let private anchorRequested journal sessionId realMessages providerId history pending =
         if List.isEmpty pending then
@@ -235,7 +246,10 @@ module RequirementGroundingTransform =
             taskResult {
                 let! callGap, resultGap = PairProgrammingThoughtTransform.decideCurrentPlacement realMessages
                 do! appendRequested journal sessionId callGap resultGap pending
-                let committed = RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
+
+                let committed =
+                    RequirementGroundingRuntime.occurrences journal (SessionId.create sessionId)
+
                 return replay providerId realMessages committed
             }
 

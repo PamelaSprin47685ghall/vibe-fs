@@ -169,6 +169,34 @@ module FallbackLedger =
                 | Ok _ -> return! appendAdvanced journal budget sessionId providerRun reason current next
         }
 
+    let recordConfirmedSuccess
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        : Task<Result<unit, string>> =
+        task {
+            match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
+            | None -> return Error "NoActiveRun: no cursor for session"
+            | Some current ->
+                if current.Cursor.ConsecutiveFailureCount = 0 then
+                    return Ok()
+                else
+                    let succeeded =
+                        FallbackFact.FallbackSucceeded
+                            {| SessionId = sessionId
+                               LogicalRunId = current.LogicalRunId
+                               AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
+                               ProviderRun = providerRun |}
+
+                    let! appended =
+                        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) succeeded journal
+
+                    return
+                        appended
+                        |> Result.map (fun _ -> ())
+                        |> Result.mapError JournalAppendFailure.describe
+        }
+
     let admitConfirmedFailure journal budget sessionId providerRun reason =
         task {
             let! outcome = recordConfirmedFailure journal budget sessionId providerRun reason

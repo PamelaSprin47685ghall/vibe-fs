@@ -25,13 +25,20 @@ module RequirementGroundingRepositorySurface =
                 JournalSurface.boot workspace "requirement-grounding-js-surface" 0 (DateTimeOffset.UtcNow.ToString("O"))
 
             if isNull opened?ok || not (unbox<bool> opened?ok) then
-                return Error(if isNull opened?error then "journal boot failed" else string opened?error)
+                return
+                    Error(
+                        if isNull opened?error then
+                            "journal boot failed"
+                        else
+                            string opened?error
+                    )
             else
                 let handle = unbox<JournalHandle> opened?journal
                 return Ok(RuntimeHandle(handle, workspace, sessionId))
         }
 
-    let dispose runtime = JournalSurface.dispose (runtimeOf runtime).Handle
+    let dispose runtime =
+        JournalSurface.dispose (runtimeOf runtime).Handle
 
     let private summary (runtime: RuntimeHandle) (outcome: JsToolWorkflow.JsToolOutcome) =
         let handle = runtime.Handle
@@ -95,10 +102,10 @@ module RequirementGroundingRepositorySurface =
                 | Error error -> return raise (InvalidOperationException error)
                 | Ok nativeDecision ->
                     let programPackages =
-                        GroundingCatalog.snapshotsForPaths workspace [ path ]
-                        |> List.map _.PackageName
+                        GroundingCatalog.snapshotsForPaths workspace [ path ] |> List.map _.PackageName
 
-                    let! programDecision = RequirementGroundingGate.programAdmission (Some journal) workspace sessionId [ path ]
+                    let! programDecision =
+                        RequirementGroundingGate.programAdmission (Some journal) workspace sessionId [ path ]
 
                     return
                         box

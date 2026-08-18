@@ -70,15 +70,19 @@ module RequirementGroundingRuntime =
 
         loop snapshots 0
 
-    let requestPaths (journal: AgentJournal) workspace sessionId paths : Task<Result<RequirementGroundingDecision, string>> =
+    let requestPaths
+        (journal: AgentJournal)
+        workspace
+        sessionId
+        paths
+        : Task<Result<RequirementGroundingDecision, string>> =
         task {
             let snapshots = GroundingCatalog.snapshotsForPaths workspace paths
             let before = stateFor journal sessionId
 
             let needsGrounding =
                 snapshots
-                |> List.exists (fun snapshot ->
-                    not (RequirementGroundingProjection.isSnapshotGrounded snapshot before))
+                |> List.exists (fun snapshot -> not (RequirementGroundingProjection.isSnapshotGrounded snapshot before))
 
             match! requestMissing journal sessionId snapshots with
             | Error error -> return Error error

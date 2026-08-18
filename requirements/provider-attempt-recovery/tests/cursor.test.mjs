@@ -25,6 +25,7 @@ const {
   authorityRootAccepted,
   fallbackCursorAdvanced,
   fallbackExhausted,
+  fallbackSucceeded,
   envelope: ownerEnvelope,
   fallbackFactCaseNames,
 } = fallbackOwner
@@ -633,19 +634,56 @@ test('WHAT[PAR-007] FALLBACK_007_an_advance_naming_another_run_is_absorbed_not_a
   })
 })
 
-test('WHAT[PAR-004] FALLBACK_007_success_writes_no_fact_so_no_journal_line_zeroes_the_count', () => {
-  // The clause is explicit: `ConsecutiveFailureCount = 0` is derived from a
-  // successful provider attempt proven by the Host snapshot (HOST-004), not
-  // persisted. A success fact would be a second writer for the cursor, which
-  // FALLBACK-003 forbids.
-  //
-  // Asserted as absence over the whole fact union, because a new fact is exactly
-  // how this guarantee would be lost — and it would look like a feature.
+test('WHAT[PAR-004] FALLBACK_004_success_is_a_durable_fact_that_zeroes_the_count', async () => {
   const names = fallbackFactCaseNames
-
   assert.deepEqual(
     names.slice().sort(),
-    ['FallbackCursorAdvanced', 'FallbackExhausted'],
-    'the cursor has exactly two durable facts: one advance, one terminal',
+    ['FallbackCursorAdvanced', 'FallbackExhausted', 'FallbackSucceeded'],
+    'the cursor has three durable facts: advance, terminal, and success',
+  )
+
+  const succeeded = fallbackSucceeded({
+    session: SESSION,
+    logicalRun: RUN,
+    authorityRoot: ROOT,
+    providerRun: 'run_success_1',
+  })
+  const foldedOnce = foldFacts([rootFact(), advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }), succeeded])
+  assert.equal(foldedOnce.ok, true, foldedOnce.ok ? '' : JSON.stringify(foldedOnce.error))
+  assert.deepEqual(
+    { offset: fallbackOf(foldedOnce.value).offset, failures: fallbackOf(foldedOnce.value).failures },
+    { offset: 1, failures: 0 },
+    'success zeroes the count but parks the offset',
+  )
+
+  const foldedDup = foldFacts([
+    rootFact(),
+    advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
+    succeeded,
+    succeeded,
+  ])
+  assert.equal(foldedDup.ok, true, foldedDup.ok ? '' : JSON.stringify(foldedDup.error))
+  assert.deepEqual(
+    { offset: fallbackOf(foldedDup.value).offset, failures: fallbackOf(foldedDup.value).failures },
+    { offset: 1, failures: 0 },
+    'duplicate success is idempotent',
+  )
+
+  const staleSuccess = fallbackSucceeded({
+    session: SESSION,
+    logicalRun: 'run_other',
+    authorityRoot: 'msg_other',
+    providerRun: 'run_success_stale',
+  })
+  const foldedStale = foldFacts([
+    rootFact(),
+    advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
+    staleSuccess,
+  ])
+  assert.equal(foldedStale.ok, true, foldedStale.ok ? '' : JSON.stringify(foldedStale.error))
+  assert.deepEqual(
+    { offset: fallbackOf(foldedStale.value).offset, failures: fallbackOf(foldedStale.value).failures },
+    { offset: 1, failures: 1 },
+    'success naming a superseded run is absorbed, not applied',
   )
 })

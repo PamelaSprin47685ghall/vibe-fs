@@ -49,7 +49,7 @@ codec 边界（`FallbackOffsetCodec.ofByte/toByte`）。反序列化遇到非法
 | 失败 | 前进一格（mod 4） | +1 | 不变 | 可因 Offset 侧变化而变 |
 | 成功 | 不变 | 归零 | 不变 | 不变 |
 
-成功**不写** cursor 事实——归零由 Host snapshot 的 Completed 派生（无第二写入口）。Offset 在
+成功**写入** `FallbackSucceeded` 事实——归零由该 durable fact 的 fold 派生（仍由唯一 owner ledger 写入，Offset 不变、`ConsecutiveFailureCount` 归零、dedupe 窗口清空；重复/旧 ProviderRun 幂等）。Offset 在
 成功时不复位：一次失败后成功的 Run 会停在奇数 Offset，这是合法状态（见 PAR-011 的 parked-cursor
 陷阱）。
 

@@ -200,10 +200,7 @@ module HostSignalBootstrap =
             message?model <- box routed
 
     let private ensureToolsObject (message: obj) : obj =
-        if isNull message?tools then
-            createObj []
-        else
-            message?tools
+        if isNull message?tools then createObj [] else message?tools
 
     let private projectFissionToolVisibility hasPhysicalParent output =
         if FissionRequestProjection.apply hasPhysicalParent then

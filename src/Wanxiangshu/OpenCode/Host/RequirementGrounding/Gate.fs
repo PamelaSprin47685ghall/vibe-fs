@@ -29,7 +29,8 @@ module RequirementGroundingGate =
             let text = string value?(name)
             if String.IsNullOrWhiteSpace text then None else Some text
 
-    let private distinct values = values |> List.choose id |> List.distinct
+    let private distinct values =
+        values |> List.choose id |> List.distinct
 
     let private mutationPaths (toolName: string) (args: obj) =
         match toolName.ToLowerInvariant() with
@@ -42,7 +43,10 @@ module RequirementGroundingGate =
         | _ -> []
 
     let private absoluteCandidate workspace candidate =
-        if pathIsAbsolute candidate then candidate else pathJoin (workspace, candidate)
+        if pathIsAbsolute candidate then
+            candidate
+        else
+            pathJoin (workspace, candidate)
 
     let private grepPaths workspace args output =
         let direct =
@@ -57,10 +61,16 @@ module RequirementGroundingGate =
             else
                 let candidate = line.Substring(0, colon).Trim()
                 let absolute = absoluteCandidate workspace candidate
-                if candidate = "" || not (existsSync absolute) then None else Some candidate
+
+                if candidate = "" || not (existsSync absolute) then
+                    None
+                else
+                    Some candidate
 
         let rendered = if isNull output then "" else string output
-        direct @ (rendered.Split('\n') |> Array.toList |> List.choose fromLine) |> List.distinct
+
+        direct @ (rendered.Split('\n') |> Array.toList |> List.choose fromLine)
+        |> List.distinct
 
     let private observationPaths (workspace: string) (toolName: string) (args: obj) (output: obj) =
         match toolName.ToLowerInvariant() with
@@ -76,15 +86,19 @@ module RequirementGroundingGate =
     let private requestMatched journal workspace sessionId paths =
         match journal with
         | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
-        | Some durable ->
-            RequirementGroundingRuntime.requestPaths durable workspace (SessionId.create sessionId) paths
+        | Some durable -> RequirementGroundingRuntime.requestPaths durable workspace (SessionId.create sessionId) paths
 
     let private request journal workspace sessionId paths =
         let matched =
-            if List.isEmpty paths then [] else GroundingCatalog.snapshotsForPaths workspace paths
+            if List.isEmpty paths then
+                []
+            else
+                GroundingCatalog.snapshotsForPaths workspace paths
 
-        if List.isEmpty matched then Task.FromResult(Ok emptyDecision)
-        else requestMatched journal workspace sessionId paths
+        if List.isEmpty matched then
+            Task.FromResult(Ok emptyDecision)
+        else
+            requestMatched journal workspace sessionId paths
 
     let before
         (journal: AgentJournal option)
@@ -92,9 +106,23 @@ module RequirementGroundingGate =
         (toolInput: obj)
         (toolOutput: obj)
         : Task<Result<RequirementGroundingDecision, string>> =
-        let toolName = if isNull toolInput || isNull toolInput?tool then "" else string toolInput?tool
-        let sessionId = if isNull toolInput || isNull toolInput?sessionID then "" else string toolInput?sessionID
-        let args = if isNull toolOutput || isNull toolOutput?args then null else toolOutput?args
+        let toolName =
+            if isNull toolInput || isNull toolInput?tool then
+                ""
+            else
+                string toolInput?tool
+
+        let sessionId =
+            if isNull toolInput || isNull toolInput?sessionID then
+                ""
+            else
+                string toolInput?sessionID
+
+        let args =
+            if isNull toolOutput || isNull toolOutput?args then
+                null
+            else
+                toolOutput?args
 
         match workspace with
         | None -> Task.FromResult(Ok emptyDecision)
@@ -107,17 +135,41 @@ module RequirementGroundingGate =
         (toolInput: obj)
         (toolOutput: obj)
         : Task<Result<RequirementGroundingDecision, string>> =
-        let toolName = if isNull toolInput || isNull toolInput?tool then "" else string toolInput?tool
-        let sessionId = if isNull toolInput || isNull toolInput?sessionID then "" else string toolInput?sessionID
-        let args = if isNull toolInput || isNull toolInput?args then null else toolInput?args
-        let output = if isNull toolOutput || isNull toolOutput?output then null else toolOutput?output
+        let toolName =
+            if isNull toolInput || isNull toolInput?tool then
+                ""
+            else
+                string toolInput?tool
+
+        let sessionId =
+            if isNull toolInput || isNull toolInput?sessionID then
+                ""
+            else
+                string toolInput?sessionID
+
+        let args =
+            if isNull toolInput || isNull toolInput?args then
+                null
+            else
+                toolInput?args
+
+        let output =
+            if isNull toolOutput || isNull toolOutput?output then
+                null
+            else
+                toolOutput?output
 
         match workspace with
         | None -> Task.FromResult(Ok emptyDecision)
         | Some root when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(Ok emptyDecision)
         | Some root -> request journal root sessionId (observationPaths root toolName args output)
 
-    let programAdmission journal workspace sessionId paths : Task<Result<unit, Wanxiangshu.Repository.Programming.Js.JsFailure>> =
+    let programAdmission
+        journal
+        workspace
+        sessionId
+        paths
+        : Task<Result<unit, Wanxiangshu.Repository.Programming.Js.JsFailure>> =
         task {
             match! request journal workspace sessionId paths with
             | Error _ -> return Error Wanxiangshu.Repository.Programming.Js.JsFailure.RequirementGroundingRequired

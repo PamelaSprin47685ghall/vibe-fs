@@ -10,3 +10,6 @@ module FallbackFact =
 
     let inline FallbackExhausted payload =
         AgentFact.Fallback(FallbackFactCases.FallbackExhausted payload)
+
+    let inline FallbackSucceeded payload =
+        AgentFact.Fallback(FallbackFactCases.FallbackSucceeded payload)

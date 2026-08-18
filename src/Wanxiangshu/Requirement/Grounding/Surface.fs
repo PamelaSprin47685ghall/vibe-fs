@@ -17,5 +17,8 @@ module Surface =
                digest = snapshot.Digest
                materials =
                 snapshot.Materials
-                |> List.map (fun material -> box {| path = material.Path; result = material.ResultBytes |})
+                |> List.map (fun material ->
+                    box
+                        {| path = material.Path
+                           result = material.ResultBytes |})
                 |> List.toArray |}

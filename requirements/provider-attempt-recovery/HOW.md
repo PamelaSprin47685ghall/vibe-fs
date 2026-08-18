@@ -42,9 +42,10 @@ FallbackCursorAdvanced = { SessionId; LogicalRunId; AuthorityRootUserMessageId
                            ProviderRun; PreviousOffset; NextOffset; ConsecutiveFailureCount; Reason }
 FallbackExhausted      = { SessionId; LogicalRunId; AuthorityRootUserMessageId
                            FinalConsecutiveFailureCount; FinalOffset }
+FallbackSucceeded     = { SessionId; LogicalRunId; AuthorityRootUserMessageId; ProviderRun }
 ```
 
-成功不写 cursor 事实：归零从 Host snapshot 的 Completed 派生（PAR-004 无第二写入口）。
+成功写入 `FallbackSucceeded = { SessionId; LogicalRunId; AuthorityRootUserMessageId; ProviderRun }` 事实并由 fold 落到同一 projection（PAR-004）：归零、Offset 不变、dedupe 清空；重复/旧 run 幂等，restart 后 replay 等价。
 
 ## 历史与弃权
 
@@ -54,7 +55,7 @@ FallbackExhausted      = { SessionId; LogicalRunId; AuthorityRootUserMessageId
   `invalidOp`（持久化损坏是可预见失败）；选 `Result<FallbackOffset, FallbackOffsetDecodeError>`。
 - **armed 标志**：拒把 armed 写盘或仅凭持久化奇数 Offset 判定（上次主请求成功时 Offset 可停奇数）；
   选内存局部 `armedByFailure`，崩溃后归零（安全侧）。
-- **成功写归零事实**：拒多一个 `FallbackCursorAdvanced` 变体（VERIFY-005 单一写入口）；选派生。
+- **成功写归零事实**：选 owner-owned `FallbackSucceeded` durable fact（单一 ledger 写入口、fold 归零、Offset 不变、dedupe 清空、幂等）；拒分散 Host snapshot 派生 overlay。
 - **侧循环判死 vs 预算判死**：拒侧上限（换侧是合法恢复策略）；判死收敛到有界预算。
 - **Host Attempt vs 领域计数**：拒混用（量纲不同，重启会错误清零/耗尽）。
 - **预算固定 vs 动态**：拒按模型/上下文调阈值（不可测，特例森林）；固定有限正整数。

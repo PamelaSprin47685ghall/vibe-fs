@@ -127,9 +127,15 @@ module ManagerJobHandoff =
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (terminalValid: bool)
-        =
-        if terminalValid then
-            AgentJournal.recordDerivedFallbackSuccess journal turn.SessionId
+        : Task<unit> =
+        task {
+            if terminalValid then
+                match journal with
+                | Some j ->
+                    let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
+                    ()
+                | None -> ()
+        }
 
     let private completeCompleted
         (eventPort: IEventObservationPort)
@@ -141,7 +147,7 @@ module ManagerJobHandoff =
             match tryJobProgress journal turn.SessionId with
             | Some progress when isTransferred turn.Outcome progress ->
                 let! _, terminalValid = TerminalReporter.complete eventPort journal abortedSessions turn
-                recordFallbackSuccessIfValid journal turn terminalValid
+                do! recordFallbackSuccessIfValid journal turn terminalValid
                 return HandoffOutcome.Transferred
             | _ -> return HandoffOutcome.ManagerOwnsTurn
         }

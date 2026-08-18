@@ -950,7 +950,13 @@ module FissionTool =
             | Ok parsed -> return! executeParsed scope ctx language parsed
         }
 
-    let private executeForCaller (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) language (caller: SessionId) =
+    let private executeForCaller
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        language
+        (caller: SessionId)
+        =
         task {
             match! scope.Sessions.TryGetParentSession caller with
             | Error _ -> return consequence language Path.Unavailable

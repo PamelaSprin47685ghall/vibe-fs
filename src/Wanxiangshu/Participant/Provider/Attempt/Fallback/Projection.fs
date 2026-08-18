@@ -153,10 +153,9 @@ module FallbackProjection =
 
     /// FALLBACK-004: success clears the budget and leaves Offset alone.
     ///
-    /// Derived from the Host snapshot, not from a journal fact — that is what
-    /// keeps FALLBACK-003's single writer intact (FALLBACK-007). The dedupe
-    /// window clears too: a later failure is a new attempt, and stale keys would
-    /// let it be mistaken for a replay.
+    /// Applied from the durable FallbackSucceeded fact (owner-owned, single
+    /// writer). The dedupe window clears too: a later failure is a new attempt,
+    /// and stale keys would let it be mistaken for a replay.
     let recordSuccess (current: FallbackProjection) =
         { current with
             Cursor = AgentPairCursor.recordSuccess current.Cursor

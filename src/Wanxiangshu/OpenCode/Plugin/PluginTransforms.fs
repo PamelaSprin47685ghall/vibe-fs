@@ -597,11 +597,13 @@ module PluginTransforms =
         | Some durable, Some _, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
             task {
                 let messages = unbox<obj array> outObj?messages |> Array.toList
+
                 let! projected =
                     Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingTransform.tryProject
                         durable
                         sessionId
                         messages
+
                 do! applyProjection sessionId projected
             }
         | _ -> Task.FromResult()
@@ -836,13 +838,7 @@ module PluginTransforms =
                 // REQUIREMENT-GROUNDING-007/012: permanent requirement reads use
                 // the same append-only placement discipline, after HOST-013 so
                 // ordinary and Cursor order is always pseudo-skill → read(s).
-                do!
-                    projectRequirementGrounding
-                        journal
-                        workspaceDirectory
-                        projectionSessionIdOpt
-                        sessionPort
-                        outObj
+                do! projectRequirementGrounding journal workspaceDirectory projectionSessionIdOpt sessionPort outObj
 
                 injectBloggerChronicleThought journal projectionSessionIdOpt outObj
 

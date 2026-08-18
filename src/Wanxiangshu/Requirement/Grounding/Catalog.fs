@@ -41,9 +41,7 @@ module GroundingCatalog =
     [<Emit("$0.isFile()")>]
     let private isFile (stat: obj) : bool = jsNative
 
-    type ScopeRule =
-        { Include: bool
-          Pattern: string }
+    type ScopeRule = { Include: bool; Pattern: string }
 
     type PackageDescriptor =
         { Name: string
@@ -61,14 +59,21 @@ module GroundingCatalog =
             resolved
 
     let private absolutePath root path =
-        if pathIsAbsolute path then pathResolve path else pathResolve (pathJoin (root, path))
+        if pathIsAbsolute path then
+            pathResolve path
+        else
+            pathResolve (pathJoin (root, path))
 
     let private workspaceRelative root path =
         let relative = pathRelative (root, absolutePath root path) |> slash
 
         if relative = "" then
             Some ""
-        elif relative = ".." || relative.StartsWith("../", StringComparison.Ordinal) || pathIsAbsolute relative then
+        elif
+            relative = ".."
+            || relative.StartsWith("../", StringComparison.Ordinal)
+            || pathIsAbsolute relative
+        then
             None
         else
             Some relative
@@ -101,7 +106,8 @@ module GroundingCatalog =
                   Pattern = pattern }
 
     let private parseRule (packageName: string) (raw: string) =
-        ruleBody raw |> Option.bind (fun (includeRule, pattern) -> validateRule packageName includeRule pattern)
+        ruleBody raw
+        |> Option.bind (fun (includeRule, pattern) -> validateRule packageName includeRule pattern)
 
     let private directoryExists path =
         try
@@ -117,9 +123,7 @@ module GroundingCatalog =
         else
             let text = readFileSync (path, "utf8")
 
-            text.Split('\n')
-            |> Array.toList
-            |> List.choose (parseRule packageName)
+            text.Split('\n') |> Array.toList |> List.choose (parseRule packageName)
 
     let private tryPackage requirementsRoot name =
         let root = pathJoin (requirementsRoot, name)
@@ -147,10 +151,17 @@ module GroundingCatalog =
 
     let private externalMatch relativePath package =
         package.Rules
-        |> List.fold (fun included rule -> if matches rule.Pattern relativePath then rule.Include else included) false
+        |> List.fold
+            (fun included rule ->
+                if matches rule.Pattern relativePath then
+                    rule.Include
+                else
+                    included)
+            false
 
     let private packageMatches relativePath package =
         let selfPrefix = "requirements/" + package.Name + "/"
+
         relativePath = "requirements/" + package.Name
         || relativePath.StartsWith(selfPrefix, StringComparison.Ordinal)
         || externalMatch relativePath package
@@ -160,10 +171,7 @@ module GroundingCatalog =
 
         match workspaceRelative root path with
         | None -> []
-        | Some relativePath ->
-            discover root
-            |> List.filter (packageMatches relativePath)
-            |> List.sortBy _.Name
+        | Some relativePath -> discover root |> List.filter (packageMatches relativePath) |> List.sortBy _.Name
 
     let private collectTests packageRoot =
         let testsRoot = pathJoin (packageRoot, "tests")

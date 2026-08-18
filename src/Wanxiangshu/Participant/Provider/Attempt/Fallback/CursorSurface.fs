@@ -268,6 +268,14 @@ module CursorSurface =
                finalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount")
                finalOffset = intValue (field value "finalOffset") |}
 
+    let fallbackSucceeded (value: obj) : obj =
+        box
+            {| kind = "FallbackSucceeded"
+               session = text (field value "session")
+               logicalRun = text (field value "logicalRun")
+               authorityRoot = text (field value "authorityRoot")
+               providerRun = text (field value "providerRun") |}
+
     let envelope (value: obj) : obj =
         box
             {| session = text (field value "session")
@@ -304,6 +312,12 @@ module CursorSurface =
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                    FinalConsecutiveFailureCount = intValue (field value "finalConsecutiveFailureCount")
                    FinalOffset = byte (intValue (field value "finalOffset")) |}
+        | "FallbackSucceeded" ->
+            FallbackFact.FallbackSucceeded
+                {| SessionId = SessionId.create (text (field value "session"))
+                   LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
+                   AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
+                   ProviderRun = ProviderRunIdentity.create (text (field value "providerRun")) |}
         | other -> failwith $"CursorSurface: unsupported fallback fact '{other}'"
 
     let private envelopeOf (value: obj) : Envelope =
@@ -358,7 +372,7 @@ module CursorSurface =
         values |> Array.toList |> List.map envelopeOf |> foldTyped |> foldResult
 
     let fallbackFactCaseNames: string array =
-        [| "FallbackCursorAdvanced"; "FallbackExhausted" |]
+        [| "FallbackCursorAdvanced"; "FallbackExhausted"; "FallbackSucceeded" |]
 
     /// Open the first logical run through the existing PromptDispatcher owner.
     /// The JournalHandle is opaque to callers; only this fallback boundary unwraps
