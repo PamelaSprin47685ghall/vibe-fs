@@ -339,9 +339,28 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 新建 regression：有 live cycle 返回正常 provider result；无 live cycle 产生 typed no-live-cycle 路径并 abort；Host adapter 最终仍按 SDK 合同暴露 `CHRONICLE_NO_LIVE_CYCLE`；不得靠 regex 私有函数体证明。
 - 完成证据：Chronicle focused test green；`rg -n 'return raise \(InvalidOperationException\(NoLiveCycleError\)\)' src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs` = 0；若仍存在 `InvalidOperationException(NoLiveCycleError)`，只能位于 `ToolSpec.Execute` 最后一公里 adapter。
 
+## OBL-012 — chat.message pending supersession 不得穿透 fatal membrane
+
+当前 `ModelRoutingRuntime.cancelDemand` 用 `OperationCanceledException()` 表示“同 SessionId 更新 physical message / owner cleanup 取消旧 pending demand”；这是 EMR-004 规定的正常生命周期结果。`HostSignalBootstrap.chatMessageHook` await 该 Task 后，异常穿过 `PluginHostInterop.fatalHook`，被误分类为 `plugin-hook-chat-message-failed`；Fable 默认取消异常 message 为空，因此现场只见 `{"operation":"plugin-hook-chat-message-failed","result":""}`，并触发 process fatal。
+
+- [ ] `src/Wanxiangshu/OpenCode/Host/ModelRouting.fs`
+  - pending acquisition 的 supersede/cancel 改为封闭 typed outcome；不得再用 exception 代表正常 demand 生命周期。
+  - scheduler/invariant 真实异常仍保持 exception/fatal 语义，不得被 cancellation 分支吞掉。
+- [ ] `src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs`
+  - `chat.message` 收到 superseded acquisition 后成功短路；不得继续 model projection、PromptIngress、capability commit，也不得进入 `fatalHook`。
+- [ ] `src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs`
+  - JS proof surface 显式编码 acquisition outcome；不得靠 rejected Promise 区分 superseded。
+- [ ] `requirements/execution-model-routing/WHAT.md`、`HOW.md`
+  - 明确 superseded pending demand 是预期 typed outcome，旧 Host hook 必须无副作用成功收敛；fatal 只保留 invariant/scheduler break。
+- [ ] `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`
+  - 把 superseded/cancel regression 从 `assert.rejects` 改为 typed outcome 断言。
+- [ ] `requirements/execution-model-routing/tests/process-shared-routing.test.mjs`
+  - 增加真实 plugin-hook regression：容量阻塞旧 physical message → 同 SessionId 新 message supersede；旧 `chat.message` Promise 必须 resolve、不得打印 fatal，fresh message 正常取得 lease。
+- 完成证据：focused execution-model-routing tests green；`rg -n 'trySetCanceled demand\.Completion|assert\.rejects\(old\)|assert\.rejects\(blocked\)' src/Wanxiangshu/OpenCode/Host requirements/execution-model-routing/tests` = 0；标准 `check/build/verification-system` 全绿。
+
 ## OBL-011 — 最终验收与义务账自删除
 
-只有 OBL-001..010 全部真实闭合后执行。不得提前把本节改成“完成时”。
+只有 OBL-001..010、OBL-012 全部真实闭合后执行。不得提前把本节改成“完成时”。
 
 - [ ] `node scripts/check.mjs` exit 0。
 - [ ] `node scripts/build.mjs` exit 0，仍为 Fable-only；不得用 `dotnet build` 代替。
