@@ -112,72 +112,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - 每项完成前至少运行该项列出的 focused tests；最终删除本节前必须同时通过：
   `node scripts/check.mjs`、`node scripts/build.mjs`、`node requirements/verification-system/tests/run.mjs`。authoritative verification 必须 0 fail；不得把失败标成“已知问题”后宣称完成。
 
-## OBL-002 — Change recovery 第二状态机归零：durable facts → 同一普通 CE
-
-当前明确违规链：`JobProgress → recoveryAction → JobRecoveryAction → resumeFromDurableFacts → Resume*/Attempt*/Backfill* effects`。`JobProgress` 中 commit/conflict/head/barrier 是 durable evidence，可以留；“下一步去哪”的 `JobRecoveryAction` 不能留。
-
-- [ ] `src/Wanxiangshu/Change/Projection.fs`
-  - 删除 `type JobRecoveryAction`。
-  - 删除 `OrchestratorProjection.recoveryAction` 作为 control-token producer。
-  - `rebasedCandidateAction`、`publishClaimAction` 若保留，返回值必须改成领域判断/现实分类，不得是 `AttemptPublish/RebaseAndReviewAgain/BackfillPublished` 这类 opcode。
-  - `JobProgress` 只保存已经发生的 durable evidence；case 注释不得再用“进入某 loop/下一步执行”定义其意义。
-- [ ] `src/Wanxiangshu/Change/Program.fs`
-  - 删除 `resumeFromDurableFacts`、`recoveryFromProgress`、`recoveryFor` 这棵 recovery interpreter。
-  - 删除仅为解释 `JobRecoveryAction` 存在的 `resumeAwaitManager`、`resumeAttemptPublish`、`resumeBackfill`、`resumeCleanUp` 分支；必要业务动作收进普通 semantic CE vocabulary。
-  - `run` fresh/restart 共用一个 semantic entry：读取 durable projection/现实 head → 纯判断 → 直接 CE effect → 记录 fact → 必要时有界重入。
-  - conflict 时“同一 Manager 在同一 worktree 继续解决”是业务语义，可继续调用 Manager capability；但不得通过 `JobRecoveryAction.ResumeConflictResolution` 跨 seam 传程序位置。
-- [ ] `src/Wanxiangshu/Change/Surface.fs`
-  - 删除 `recoveryAction` JS API 与 `ResumeManager/ResumeConflictResolution/AttemptPublish/BackfillPublished/RebaseAndReviewAgain/CleanUp/FailClosed` control-token encoding。
-- [ ] `src/Wanxiangshu/Change/Types.fs`
-  - 审核 `ResumeManager` capability：只允许作为“要求同一 Manager 继续处理已记录 conflict”的物理/领域能力；若它仍承担“从内部步骤恢复”的协议职责，拆掉并改名到完整业务承诺。
-- [ ] `src/Wanxiangshu/Change/Runtime.fs`
-  - 审核 `ContinueManager`/`ResumeManager` call path；显式用户 continuation 与 crash recovery 必须分开，后者不得依赖 execution position。
-- [ ] `requirements/change-integration/tests/job.test.mjs`
-- [ ] `requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs`
-- [ ] `requirements/effect-accounting/tests/effect-facts.test.mjs`
-  - 删除 `change.recoveryAction(...).kind` 断言；改成从 durable fact prefix 重入 production workflow，观察 Git/Manager/journal effects 与 terminal outcome。
-- [ ] `requirements/crash-reconciliation/HOW.md`
-- [ ] `requirements/effect-accounting/HOW.md`
-  - 删除把 `recoveryAction` 当当前架构的文字；描述 facts/evidence → 普通 CE reentry。
-- [ ] `requirements/structured-workflow/tests/recovery-reentry.test.mjs`
-  - 增加针对 Change seam 的 regression：production 不得重新出现 `JobRecoveryAction`、`OrchestratorProjection.recoveryAction`、`resumeFromDurableFacts` 或等价 NextAction dispatcher。
-- 完成证据：
-  - `rg -n 'JobRecoveryAction|recoveryAction|resumeFromDurableFacts|recoveryFromProgress|recoveryFor' src/Wanxiangshu/Change requirements/change-integration requirements/effect-accounting requirements/crash-reconciliation` 对旧 symbol = 0；
-  - change-integration + effect-accounting + structured-workflow recovery tests green；
-  - crash prefix canaries 覆盖 ManagerStarted、CandidateReady、ConflictPending、RebasedCandidateReady、PublishClaimed、terminal 六类现实并收敛到同一 `run`。
-
-## OBL-005 — Fallback success 不得靠 AgentJournal 进程内 overlay 篡改 Snapshot
-
-当前 `AgentJournal.Snapshot = canonical projection + derivedFallbackSuccesses overlay` 与“当前状态是 durable facts 积分”冲突。这里选择统一事件模型：**成功也必须形成 owner-owned durable fact**；不得通过收窄宝典文字为现状开例外。
-
-- [ ] `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs`
-  - 增加成功事实（命名按 owner vocabulary，例如 `FallbackSucceeded`），载荷至少绑定 `SessionId/ProviderRunIdentity`，只表达“该 logical run 已确认成功”；Offset 不变、`ConsecutiveFailureCount` 归零。
-- [ ] `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs`
-  - 增 typed constructor。
-- [ ] `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs`
-  - fold success fact → `FallbackProjection.recordSuccess`；duplicate/旧 run 的幂等与 identity 规则必须明确。
-- [ ] `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs`
-  - `recordSuccess` 保持纯 transition；不直接读 Host/snapshot。
-- [ ] `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs`
-  - 让 success/failure 都从同一 owner ledger 形成 durable append 决策；禁止 success 另走 Journal overlay。
-- [ ] `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs`
-  - typed fact surface/codec 列表加入成功事实；JS 只看语义，不看 Journal overlay。
-- [ ] `src/Wanxiangshu/Persistence/Journal/AgentJournal.fs`
-  - 删除 `derivedFallbackSuccesses`、`applyDerivedSuccessToSession`、`applyDerivedSuccess`、`RecordDerivedFallbackSuccess`、module-level `recordDerivedFallbackSuccess`。
-  - `Snapshot` 必须只返回 canonical Integrator Current；不得叠 process-local domain override。
-- [ ] `src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs`
-- [ ] `src/Wanxiangshu/Mission/Manager/JobHandoff.fs`
-  - terminal success 从 `recordDerivedFallbackSuccess` 改为 append owner-owned success fact；写盘失败按 Journal 失败语义处理，不能静默把内存当成功。
-- [ ] `requirements/provider-attempt-recovery/WHAT.md`
-  - 修改 PAR-004 当前“成功不写 cursor 事实”条款：success fact 是已发生事实，不是第二 cursor writer；Offset 仍不复位，失败 advancement 与成功 reset 的 fold ownership 均唯一。
-- [ ] `requirements/provider-attempt-recovery/HOW.md`
-  - 删除“Host snapshot Completed 派生、无第二写入口”的旧实现描述。
-- [ ] `requirements/provider-attempt-recovery/tests/cursor.test.mjs`
-  - 删除 `FALLBACK_007_success_writes_no_fact...`；替换为 success fact replay、restart 后 count 仍为 0、Offset 不变、重复 success 幂等。
-- [ ] `requirements/context-compression/tests/recovery-slot.test.mjs`
-  - 保证 parked odd Offset 行为在 durable success replay 后仍成立；不得依赖 process-local overlay。
-- 完成证据：`rg -n 'derivedFallbackSuccesses|RecordDerivedFallbackSuccess|recordDerivedFallbackSuccess|success_writes_no_fact|成功不写 cursor 事实' src requirements` = 0；provider-attempt-recovery + context-compression focused tests green；fresh process replay 得到与 pre-crash Snapshot 相同 fallback state。
-
 ## OBL-007 — LEGACY-005：四个历史 decoder detector 在 horizon 到期时整组删除
 
 债权人 = 历史 durable bytes；当前 census 曾报告 0，但退出只能由 OBL-006 的 tracked census + 明确 retention horizon 证明。外部条件未满足前本项保持 `[ ]`，不得写“已完成/有界所以完成”。
@@ -239,7 +173,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `node scripts/build.mjs` exit 0，仍为 Fable-only；不得用 `dotnet build` 代替。
 - [ ] `node requirements/verification-system/tests/run.mjs` exit 0，authoritative fail count = 0。
 - [ ] `git status --short` 只包含本次预期改动；无 ignored verifier 被当验收依赖。
-- [ ] 对 OBL-002/003/004/005/010 的 forbidden symbols 分别执行账内 `rg`，结果 = 0。
+- [ ] 对 OBL-003/004/010 的 forbidden symbols 分别执行账内 `rg`，结果 = 0。
 - [ ] 对 OBL-007/008：若外部 exit condition 尚未满足，则**不得执行本项，也不得宣称全仓清零**；义务继续留在这里。
 - [ ] 最后一个义务完成的同一提交删除本“当前义务账”已完成条目；若一个未完成义务都不剩，删除整个本节。Git history 负责记录做过多少轮、删过多少代码、过去有什么数字。
 
