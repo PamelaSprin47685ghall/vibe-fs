@@ -102,15 +102,6 @@ module HostSignalBootstrap =
             not (String.IsNullOrWhiteSpace agent)
             && (ManagedAgent.requiredNames |> List.contains agent))
 
-    let private outputSessionId (output: obj) =
-        let message = if isNull output then null else output?message
-
-        if isNull message || isNull message?sessionID then
-            None
-        else
-            string message?sessionID
-            |> fun value -> value.Trim() |> SessionId.create |> Some
-
     let private externalAdmission sessionId physicalUserMessageId explicitAgent =
         match managedAgent explicitAgent, physicalUserMessageId with
         | Some agent, Some physical -> ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent)
@@ -148,11 +139,8 @@ module HostSignalBootstrap =
         | None -> ChatExecutionAdmission.NoRoute
         | Some durable -> pendingAdmission durable sessionId physicalUserMessageId promptKey
 
-    let private chatExecutionAdmission journal (decoded: PromptIngressCodec.DecodedMessage) output =
-        let sessionId =
-            decoded.SessionId |> Option.orElseWith (fun () -> outputSessionId output)
-
-        match decoded.IsHostCompaction, sessionId, decoded.PromptKey with
+    let private chatExecutionAdmission journal (decoded: PromptIngressCodec.DecodedMessage) =
+        match decoded.IsHostCompaction, decoded.SessionId, decoded.PromptKey with
         | true, _, _ -> ChatExecutionAdmission.NoRoute
         | false, Some sid, Some promptKey -> pluginAdmission journal sid decoded.PhysicalUserMessageId promptKey
         | false, Some sid, None -> externalAdmission sid decoded.PhysicalUserMessageId decoded.ExplicitAgent
@@ -596,18 +584,11 @@ module HostSignalBootstrap =
             let requireDurabilityActivation () =
                 match durabilityActivation.Value with
                 | Ok() -> ()
-                | Error error ->
-                    Diagnostic.fatal "durability-activation-failed" [ "result", error ]
+                | Error error -> Diagnostic.fatal "durability-activation-failed" [ "result", error ]
 
             let signalExternalJoinWake (decoded: PromptIngressCodec.DecodedMessage) =
-                match
-                    decoded.SessionId,
-                    decoded.PhysicalUserMessageId,
-                    decoded.PromptKey,
-                    decoded.IsHostCompaction
-                with
-                | Some sessionId, Some _, None, false ->
-                    scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
+                match decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction with
+                | Some sessionId, Some _, None, false -> scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
                 | _ -> ()
 
             let observePhysicalAdmission output sessionId physicalId =
@@ -630,7 +611,7 @@ module HostSignalBootstrap =
 
             let continueOrdinaryChatMessage decoded input output =
                 task {
-                    let admission = chatExecutionAdmission journal decoded output
+                    let admission = chatExecutionAdmission journal decoded
                     let! routedExecution = routeChatExecution scope admission
 
                     match routedExecution with

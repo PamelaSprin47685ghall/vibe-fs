@@ -172,7 +172,10 @@ module FactCodec =
                 | Some canonical -> decodeMagicTodoCanonical canonical
                 | None -> failwith "not a MagicTodo fact")
 
-        try decodeMagicTodoFact decoder json with _ -> None
+        try
+            decodeMagicTodoFact decoder json
+        with _ ->
+            None
 
     let serializeFact (fact: Fact) : string =
         match fact with

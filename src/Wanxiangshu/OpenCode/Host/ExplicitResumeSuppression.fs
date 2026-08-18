@@ -16,10 +16,8 @@ open Wanxiangshu.Foundation.Identity
 module ExplicitResumeSuppression =
 
     type private PendingBriefing =
-        {
-            MaterialWitness: string
-            Text: string
-        }
+        { MaterialWitness: string
+          Text: string }
 
     [<RequireQualifiedAccess>]
     type PhysicalMaterialObservation =
@@ -112,6 +110,7 @@ module ExplicitResumeSuppression =
         lock gate (fun () ->
             let sessionKey = SessionId.value sessionId
             let marked = outputHasMarker output
+
             let existing =
                 match markedPhysicalBySession.TryGetValue sessionKey with
                 | true, physical -> Some physical

@@ -93,16 +93,16 @@ module Envelope =
     let serialize (envelope: Envelope) : string =
         match envelope.Fact with
         | MagicTodo magicTodo ->
-            Encode.toString 0 (
-                Encode.object
+            Encode.toString
+                0
+                (Encode.object
                     [ "RuntimeId", Encode.string (RuntimeId.value envelope.RuntimeId)
                       "LocalSeq", Encode.int64 (LocalSeq.value envelope.LocalSeq)
                       "ObservedAt", Encode.datetimeOffset (envelope.ObservedAt.ToOffset TimeSpan.Zero)
                       "EventId", Encode.string (EventId.value envelope.EventId)
                       "Stream", streamEncoder envelope.Stream
                       "ProviderRun", providerRunEncoder envelope.ProviderRun
-                      "Fact", Encode.object [ "MagicTodo", Encode.string (MagicTodoFactCodec.encode magicTodo) ] ]
-            )
+                      "Fact", Encode.object [ "MagicTodo", Encode.string (MagicTodoFactCodec.encode magicTodo) ] ])
         | _ ->
             Encode.Auto.toString (
                 0,
@@ -140,7 +140,9 @@ module Envelope =
         let decoder: Decoder<Envelope> =
             Decode.object (fun get ->
                 let canonical =
-                    get.Required.Field "Fact" (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
+                    get.Required.Field
+                        "Fact"
+                        (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
 
                 match MagicTodoFactCodec.tryDecode canonical with
                 | Ok fact ->
@@ -153,7 +155,10 @@ module Envelope =
                       Fact = Fact.MagicTodo fact }
                 | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
 
-        try decodeMagicTodoEnvelope decoder json with _ -> None
+        try
+            decodeMagicTodoEnvelope decoder json
+        with _ ->
+            None
 
     let private deserializeCurrentEnvelope json =
         match tryDecodeMagicTodoEnvelope json with

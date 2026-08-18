@@ -279,7 +279,9 @@ module ModelRouting =
 
         let cancelDemand demand =
             removeDemand demand
-            AsyncSupport.trySetResult demand.Completion ModelRoutingAcquisition.Superseded |> ignore
+
+            AsyncSupport.trySetResult demand.Completion ModelRoutingAcquisition.Superseded
+            |> ignore
 
         let failDemand (error: exn) (demand: PendingDemand) =
             try
@@ -315,7 +317,9 @@ module ModelRouting =
         let commit demand target =
             rememberExecution demand target
             removeDemand demand
-            AsyncSupport.trySetResult demand.Completion (ModelRoutingAcquisition.Acquired target) |> ignore
+
+            AsyncSupport.trySetResult demand.Completion (ModelRoutingAcquisition.Acquired target)
+            |> ignore
 
         let commitScheduled demand scheduled =
             match scheduled with

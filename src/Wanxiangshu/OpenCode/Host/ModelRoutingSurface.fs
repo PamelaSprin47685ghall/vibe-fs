@@ -54,10 +54,7 @@ module ModelRoutingSurface =
             box
                 {| kind = "Acquired"
                    target = targetObject target |}
-        | ModelRoutingAcquisition.Superseded ->
-            box
-                {| kind = "Superseded"
-                   target = null |}
+        | ModelRoutingAcquisition.Superseded -> box {| kind = "Superseded"; target = null |}
 
     let private targetOf (value: obj) : ModelRoutingTarget =
         if isNullish value then

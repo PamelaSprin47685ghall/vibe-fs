@@ -123,6 +123,16 @@ module MagicTodoProjectionSurface =
 
     let private checkpointView (checkpoint: MagicTodoProjection.CheckpointRecord) : obj =
 
+        let inputDigest =
+            MagicTodoProjection.acceptedEvidence checkpoint
+            |> Option.map (fun e -> e.InputDigest)
+            |> Option.toObj
+
+        let outputDigest =
+            MagicTodoProjection.acceptedEvidence checkpoint
+            |> Option.map (fun e -> e.OutputDigest)
+            |> Option.toObj
+
         box
             {| managerSessionId = SessionId.value checkpoint.ManagerSessionId
                todoWriteId = TodoWriteId.value checkpoint.TodoWriteId
@@ -134,6 +144,17 @@ module MagicTodoProjectionSurface =
                baseTodoDigest = BlobDigest.value checkpoint.BaseTodoDigest
                proposedTodoRef = BlobRef.value checkpoint.ProposedTodoRef
                proposedTodoDigest = BlobDigest.value checkpoint.ProposedTodoDigest
+               accepted = MagicTodoProjection.isAccepted checkpoint
+               inputDigest = inputDigest
+               outputDigest = outputDigest
+               assignment =
+                MagicTodoProjection.assignment checkpoint
+                |> Option.map assignmentView
+                |> Option.toObj
+               concluded =
+                MagicTodoProjection.conclusion checkpoint
+                |> Option.map conclusionView
+                |> Option.toObj
                lifecycle = lifecycleView checkpoint.Lifecycle |}
 
     let internal rejectionView rejection : obj =

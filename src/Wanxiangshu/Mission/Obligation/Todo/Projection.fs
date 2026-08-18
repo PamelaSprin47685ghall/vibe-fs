@@ -180,7 +180,8 @@ module MagicTodoProjection =
         | CheckpointLifecycle.Assigned(evidence, _)
         | CheckpointLifecycle.Concluded(evidence, _, _) -> Some evidence
 
-    let isAccepted (checkpoint: CheckpointRecord) : bool = acceptedEvidence checkpoint |> Option.isSome
+    let isAccepted (checkpoint: CheckpointRecord) : bool =
+        acceptedEvidence checkpoint |> Option.isSome
 
     let assignment (checkpoint: CheckpointRecord) : TodoProcessReviewAssigned option =
         match checkpoint.Lifecycle with
@@ -303,8 +304,10 @@ module MagicTodoProjection =
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         match acceptedEvidence cp with
         | Some evidence when
-            evidence.InputDigest = payload.InputDigest && evidence.OutputDigest = payload.OutputDigest
-            -> Ok state
+            evidence.InputDigest = payload.InputDigest
+            && evidence.OutputDigest = payload.OutputDigest
+            ->
+            Ok state
         | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
         | None -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
 
@@ -326,7 +329,9 @@ module MagicTodoProjection =
             { InputDigest = payload.InputDigest
               OutputDigest = payload.OutputDigest }
 
-        let cp = { cp with Lifecycle = CheckpointLifecycle.Accepted accepted }
+        let cp =
+            { cp with
+                Lifecycle = CheckpointLifecycle.Accepted accepted }
 
         let firstAccepted =
             life.FirstAcceptedCheckpoint |> Option.orElse (Some payload.TodoWriteId)
@@ -434,6 +439,7 @@ module MagicTodoProjection =
         (state: MagicTodoProjectionState)
         =
         let key = writeKey payload.TodoWriteId
+
         let cp =
             { cp with
                 Lifecycle = CheckpointLifecycle.Concluded(accepted, assignment, payload) }
@@ -552,7 +558,7 @@ module MagicTodoProjection =
             Error(MagicTodoFoldRejection.IdentityCorruption "InputDigest")
         | Some cp when cp.SemanticVersion <> payload.SemanticVersion ->
             Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
-        | Some ({ Lifecycle = CheckpointLifecycle.Prepared } as cp) -> Ok(acceptCheckpoint payload cp life state)
+        | Some({ Lifecycle = CheckpointLifecycle.Prepared } as cp) -> Ok(acceptCheckpoint payload cp life state)
         | Some cp -> requireAcceptedReplay cp payload state
 
     let foldAssigned
@@ -588,7 +594,7 @@ module MagicTodoProjection =
             Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
         | Some { Lifecycle = CheckpointLifecycle.Concluded(_, _, existing) } ->
             requireConcludedReplay existing payload state
-        | Some ({ Lifecycle = CheckpointLifecycle.Assigned(accepted, assignment) } as cp) ->
+        | Some({ Lifecycle = CheckpointLifecycle.Assigned(accepted, assignment) } as cp) ->
             result {
                 do! requireAssignmentMatchesConcluded assignment payload
                 do! requirePendingMatchesConclude life payload

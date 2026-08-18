@@ -135,3 +135,35 @@ test('WHAT[EMR-004] EMR_004_superseded_pending_chat_message_resolves_without_fat
     else process.env.WANXIANGSHU_NO_FATAL_EXIT = previousFatalExit
   }
 })
+
+test('WHAT[EMR-009] EMR_009_chat_message_routes_when_session_id_is_carried_on_output_message', async () => {
+  const previousHome = process.env.HOME
+  process.env.HOME = home
+  let hooks
+
+  try {
+    hooks = await createPlugin('output-session-workspace')
+    await hooks.config(managedConfig())
+
+    const output = {
+      message: {
+        id: 'msg-output-only',
+        role: 'user',
+        sessionID: 'ses-output-only',
+        agent: 'fast-coder',
+        model: { providerID: 'host', modelID: 'placeholder' },
+      },
+      parts: [],
+    }
+
+    await hooks['chat.message']({ messageID: 'msg-output-only' }, output)
+    assert.deepEqual(
+      [output.message.model.providerID, output.message.model.modelID, output.message.model.variant],
+      ['provider', 'model-a', 'none'],
+      'chat.message must decode sessionID from output.message and route successfully',
+    )
+  } finally {
+    if (hooks) await hooks.dispose()
+    process.env.HOME = previousHome
+  }
+})

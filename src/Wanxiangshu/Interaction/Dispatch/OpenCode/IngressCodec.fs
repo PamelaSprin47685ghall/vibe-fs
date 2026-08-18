@@ -95,17 +95,26 @@ module PromptIngressCodec =
         || (readString message "mode"
             |> Option.exists (fun mode -> mode.Equals("compaction", StringComparison.OrdinalIgnoreCase)))
 
-    let private sessionIdOf (input: obj) =
-        if isNull input then
-            None
-        elif not (isNull input?session) then
-            Some(SessionId.create (unbox<string> input?session))
-        elif not (isNull input?sessionID) then
-            Some(SessionId.create (unbox<string> input?sessionID))
-        elif not (isNull input?sessionId) then
-            Some(SessionId.create (unbox<string> input?sessionId))
-        else
-            None
+    let private sessionIdOf (input: obj) (output: obj) =
+        let fromSource (source: obj) =
+            if isNull source then
+                None
+            elif not (isNull source?sessionID) then
+                Some(unbox<string> source?sessionID)
+            elif not (isNull source?sessionId) then
+                Some(unbox<string> source?sessionId)
+            elif not (isNull source?session) then
+                Some(unbox<string> source?session)
+            else
+                None
+
+        let message = if isNull output then null else output?message
+        let info = if isNull output then null else output?info
+
+        [ fromSource input; fromSource output; fromSource message; fromSource info ]
+        |> List.tryPick id
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.map (fun value -> SessionId.create (value.Trim()))
 
     let private messageIdOf (input: obj) (output: obj) =
         let physical (value: string) =
@@ -162,7 +171,7 @@ module PromptIngressCodec =
             | texts -> Some(String.concat "\n" texts)
 
     let decode (input: obj) (output: obj) : DecodedMessage =
-        { SessionId = sessionIdOf input
+        { SessionId = sessionIdOf input output
           PhysicalUserMessageId = messageIdOf input output
           ExplicitAgent = [ input; output ] |> List.tryPick agentOf
           PromptKey = promptKeyOf input output
