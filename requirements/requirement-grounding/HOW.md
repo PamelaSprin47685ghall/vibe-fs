@@ -83,6 +83,52 @@ existing real transcript
 不要把 grounding read 插在旧 user/tool history 中间。历史 anchor 缺失时也和 pair projection 一样不重定位；
 事实保留，完整 transcript 恢复后再在原 anchor replay。
 
+### Cursor 投影
+
+Cursor 沿用 `PairProgrammingThoughtTransform` 已有 terminal-result suffix 路径，而不是构造 synthetic
+`read` call。建议 anchored tool projection payload 同时保存：
+
+```text
+CanonicalPath
+ReadArgs
+ResultBytes
+CallId
+CallGap
+ResultGap
+```
+
+ordinary provider 用这些字段恢复正常 read call/result；Cursor 只消费 `CanonicalPath + ResultBytes + ResultGap`。suffix 顺序固定：
+
+```text
+terminal result bytes
+NUL+BOM + pair-programming skill-content       # 若存在
+NUL+BOM + cursor requirement-read envelope #1
+NUL+BOM + cursor requirement-read envelope #2
+...
+```
+
+Cursor requirement-read envelope 是 ordinary read result 的**最小来源补充**。因为没有 call half，必须把
+workspace-relative path 作为稳定 source-path attribute 放在正文外层；正文 bytes 不改写。推荐使用单一、确定性、可转义的
+XML-like 形状，例如：
+
+```text
+<requirement_read path="requirements/finality/WHAT.md">\n
+<ordinary read result bytes exactly as observed>\n
+</requirement_read>
+```
+
+这里的 tag/attribute 是 Cursor projection HOW，可由 provider-projection 以后整体替换；永久语义只有三点：
+result-only、path provenance 自足、正文 bytes 不被改写。path 必须 canonical + workspace-relative，并进行
+确定性 attribute escaping。禁止塞 package/digest/grounding 标记；这些只存在于内部 durable fact。
+
+若 ordinary `read` 将来增加 offset/limit 等参数，Cursor attribute 仍只负责恢复“哪个文件”这一缺失来源；
+range/截断事实若已经体现在 ordinary result bytes 中就不得重复编码，若仅存在于 call-side metadata，则应由
+provider-projection 定义同样最小的 result-local attributes。原则是不复制可从正文恢复的事实，也不让 Cursor
+丢失 ordinary read 本来通过 call half 明确表达的 provenance。
+
+Cursor 历史 suffix 与 ordinary pair 一样按 occurrence 原字节 replay。首次生成 envelope 后应冻结最终 Cursor
+bytes，而不是每轮由 `CanonicalPath + ResultBytes` 重新 render，以避免 renderer 演进破坏 prefix cache。
+
 纯 `glob`/目录 list 只返回路径名时不触发；grep 一旦返回源码行即触发其实际 match file。
 
 ## 5. mutation gate
@@ -105,7 +151,8 @@ repository-programming 的 target set 可能由用户程序计算得到。它已
 
 推荐新增 typed `RequirementGroundingReadAnchored` semantic occurrence，进入当前 participant trace。一个
 package digest 可对应多条 read occurrence；每条保存 `{ Workspace; Package; Digest; Ordinal; CallId; Args;
-ResultBytes; CallGap; ResultGap }`。coverage projection 只需由完整 occurrence 集 fold 出 `(Workspace,Package,Digest)`
+CanonicalPath; ResultBytes; CursorResultBytes; CallGap; ResultGap }`。`CursorResultBytes` 是首次 occurrence
+形成时已完成 path attribute 包裹的冻结字节；coverage projection 只需由完整 occurrence 集 fold 出 `(Workspace,Package,Digest)`
 identity set；planner O(1)/有界查集合，不扫描 prompt 文本。
 
 这里应优先**泛化现有 pair-programming gap projection**，而不是再造第二套 transcript 插入算法：pair guideline

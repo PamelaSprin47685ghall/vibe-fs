@@ -58,6 +58,12 @@ call/result bytes 与 transcript gap 锚定，之后只从 durable fact 原位 r
 当前尾部追加一组新的普通 read，旧 wire 仍是新 wire 的前缀。若当前尾部同时有 pair-programming 伪
 `skill`，先放已有的伪 skill，再放 requirement reads；顺序一旦形成永久不变。
 
+Cursor 是唯一需要保留 provider 差异的地方。它和现有 pair-programming 一样把 synthetic 内容拼在真实
+terminal result 后面，因此没有 read call 可以携带 `filePath`。如果只拼正文，连续读 WHY/WHAT/HOW/tests
+后模型无法知道每段来自哪里。正确补偿不是发明新的 grounding protocol，而是让 result 自身带最小来源
+source-path attribute：只说“读的是哪个 workspace-relative 文件”，正文仍是 read 的原始结果。这样 ordinary provider
+保留完整 call provenance，Cursor 用 result-local provenance 补齐同一事实。
+
 ## 为什么它必须是万象术能力，而不是本仓脚本
 
 这个问题并不属于万象术源码本身。任何把当前产品语义整理成 `requirements/<package>/` 并愿意

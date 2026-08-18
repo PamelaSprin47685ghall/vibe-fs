@@ -15,12 +15,15 @@
   wildmatch 写法但采用正向语义：普通行纳入，`!` 行排除例外。
 - **触碰即关联**：真正把源码内容交给 provider，或准备对文件产生 mutation 时，按实际路径
   求出全部适用 package。
-- **read 等价**：自动 grounding 没有特殊 renderer；provider 只看到正常 `read` tool-call/tool-result，
-  路径、range、裁剪、错误与来源语义都复用模型主动 read 的同一实现。
+- **read 等价**：ordinary provider 只看到正常 `read` tool-call/tool-result，路径、range、裁剪、错误与
+  来源语义都复用模型主动 read 的同一实现；Cursor 是唯一形状特判。
 - **永久投影**：第一次自动 read 的 call/result 原始字节与 gap anchor 进入 durable history；后续轮次只
   原位重放，不重新读文件、不重算、不移动，因此旧 provider wire 始终是新 wire 的稳定前缀。
 - **固定落位**：与 pair-programming 伪 `skill` 在同一追加点出现时，顺序固定为“伪 skill → requirement
   reads”；新 digest 只在当前尾部追加新 reads，历史 reads 永不改写。
+- **Cursor 同源特判**：Cursor 不伪造 read call，只在 terminal result 的 `NUL+BOM` suffix 中先保留伪
+  skill payload、再追加 requirement read results；每段 result 用稳定 source-path attribute 标明来源文件，正文保持
+  ordinary read 原字节。
 - **读与改不同**：第一次读取可在同一 continuation 补做这些普通 read；第一次修改若发现
   未 grounding 的 package，必须在 effect 前停下，先完成普通 read，下一次明确修改才可执行。
 - **一次性**：grounding identity = workspace + package + package-content digest；同一 participant

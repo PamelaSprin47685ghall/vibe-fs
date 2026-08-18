@@ -12,20 +12,20 @@ spec，不计 active proof；因此 REQUIREMENT-SYSTEM-018 strict trace 应继�
 | REQUIREMENT-GROUNDING-004 | `tests/scope-resolution.test.mjs` | OPEN / GAP-017 | overlap 返回全 package set + stable order |
 | REQUIREMENT-GROUNDING-005 | `tests/grounding-delivery.test.mjs` | OPEN / GAP-018 | material 文件闭包、稳定排序与 digest；无 provider-visible bundle |
 | REQUIREMENT-GROUNDING-006 | `tests/grounding-delivery.test.mjs` | OPEN / GAP-018 | 同 digest 一次；内容变更可重新 grounding；workspace 隔离 |
-| REQUIREMENT-GROUNDING-007 | `tests/opencode-gate.test.mjs` | OPEN / GAP-019 | 自动 grounding 与普通 read wire 完全一致；首次 occurrence gap-anchored；同 gap 固定在 pair pseudo-skill 后；后续 byte-identical replay |
+| REQUIREMENT-GROUNDING-007 | `tests/opencode-gate.test.mjs` | OPEN / GAP-019 | ordinary 自动 grounding 与普通 read wire 完全一致；Cursor 只在 terminal result 的 NUL+BOM suffix 中先 skill 后 read-result，并以稳定 source-path attribute 补回缺失的 call-side provenance；历史 byte-identical replay |
 | REQUIREMENT-GROUNDING-008 | `tests/opencode-gate.test.mjs` | OPEN / GAP-019 | 首次 ungrounded mutation 零 effect；grounding 后新调用才执行 |
 | REQUIREMENT-GROUNDING-009 | `tests/repository-programming-gate.test.mjs` | OPEN / GAP-020 | multi-file staged effect union；缺 grounding 全丢弃、零 partial commit/auto-rerun |
 | REQUIREMENT-GROUNDING-010 | `tests/repository-programming-gate.test.mjs` | OPEN / GAP-020 | native/custom 同一 policy；换工具不能绕过 |
 | REQUIREMENT-GROUNDING-011 | `tests/grounding-delivery.test.mjs` | OPEN / GAP-018 | 普通 read observation 不造 HumanRoot、不改 role/capability |
-| REQUIREMENT-GROUNDING-012 | `tests/grounding-delivery.test.mjs` | OPEN / GAP-018 | typed anchored-read occurrence；retry/restart 原字节原位 replay；新 digest 只尾部追加；prefix law；internal loader 无递归 |
+| REQUIREMENT-GROUNDING-012 | `tests/grounding-delivery.test.mjs` | OPEN / GAP-018 | typed anchored-read occurrence 同时冻结 ordinary pair 与 Cursor path-attributed result suffix；retry/restart 原字节原位 replay；新 digest 只尾部追加；prefix law；internal loader 无递归 |
 
 ## GAP 事实源
 
 | GAP | 缺口 | 关闭条件 |
 |---|---|---|
 | GAP-017 | scope catalog / APPLIES-TO matcher 尚不存在 production owner | `scope-resolution.test.mjs` 全部从 todo 转 active，命中正式 JS semantic surface，单跑绿 |
-| GAP-018 | material/digest/durable anchored-read projection 与 authority-negative read projection 尚不存在 | `grounding-delivery.test.mjs` 全部 active；证明 restart 原位 replay、digest append-only、prefix law、dedupe/authority |
-| GAP-019 | OpenCode native file observation/mutation 尚未经过 grounding gate，且尚无“自动 grounding ≡ 主动 read + 永久 gap projection”的 oracle | `opencode-gate.test.mjs` active；真实 transform canary 证明普通 read wire 等价、pair pseudo-skill 后固定落位、byte-identical replay + mutation zero-effect defer |
+| GAP-018 | material/digest/durable anchored-read projection 与 authority-negative read projection 尚不存在 | `grounding-delivery.test.mjs` 全部 active；证明 ordinary/Cursor 两种冻结 bytes、restart 原位 replay、digest append-only、prefix law、dedupe/authority |
+| GAP-019 | OpenCode native file observation/mutation 尚未经过 grounding gate，且尚无 ordinary-read 与 Cursor-result-only 双投影 oracle | `opencode-gate.test.mjs` active；真实 transform canary 证明 ordinary read wire 等价；Cursor NUL+BOM 顺序=skill→source-path-attributed read results、无 call half、正文原字节；mutation zero-effect defer |
 | GAP-020 | repository-programming 动态 multi-file effect set 尚未接 grounding，跨工具 no-bypass 无 oracle | `repository-programming-gate.test.mjs` active；transaction staging + native/custom equivalence 绿 |
 
 ## 运行

@@ -53,17 +53,28 @@ content digest。同一 participant provider context 已经完成同一 identity
 ## REQUIREMENT-GROUNDING-007：自动 grounding = 永久锚定的普通 read 投影
 
 当一次 provider-facing 文件观察将 covered source content 暴露给 participant（例如 read 或返回
-源码片段的 grep）时，所有未 grounding package 的 material 必须通过与 participant 主动调用 `read`
-**完全相同**的 provider-visible tool-call/tool-result 语义进入 horizon：同一 read capability、同一路径与
-range 规则、同一输出裁剪/错误语义、同一 source attribution。禁止 `GroundingBundle`、特殊 system 文本、
-特殊 tool result wrapper 或其它 provider-visible grounding 协议。若完整 material 需要多次 read，则按普通
-read 的分页/range 方式产生多次正常 read。
+源码片段的 grep）时，所有未 grounding package 的 material 必须按 ordinary provider 与 Cursor 两种既有
+Host 投影分别进入 horizon。ordinary provider 与 participant 主动调用 `read` **完全相同**：同一 read
+capability、同一路径与 range 规则、同一输出裁剪/错误语义、同一 source attribution、同一 tool-call/
+tool-result 语义。禁止 `GroundingBundle`、特殊 system 文本或其它 grounding 专用协议。若完整 material
+需要多次 read，则按普通 read 的分页/range 方式产生多次读取。
 
 这些自动 read 不是每轮重新执行文件系统读取，而是在首次 grounding 时把当次普通 read 的 call/result
 **原始 provider-visible 字节 + transcript gap anchor** 固化成永久历史 occurrence；后续 provider turn 只按
 同一 anchor、同一字节 replay。新 occurrence 只能追加在当前 wire 的追加区，禁止插回已经发送的 prefix。
 若同一 gap 同时产生现有 pair-programming 伪 `skill({ name: "" })` occurrence 与 requirement grounding，
 固定顺序为 **伪 skill → requirement read(s)**。仅列路径而不暴露源码内容的目录枚举不强制 grounding。
+
+Cursor 是唯一 provider-visible 形状例外，走与现有 pair-programming Cursor 特判相同的末端 suffix 机制：不伪造不存在的
+`read` tool-call half，而是在真实 terminal tool result 后按 `NUL+BOM` 分隔依次追加 requirement read
+result。若同一 terminal result 同时承载 pair-programming guideline 与 requirement grounding，顺序固定为
+**原 terminal result → `NUL+BOM` → 伪 skill payload → `NUL+BOM` → requirement read result(s)**。
+
+Cursor 缺少 read call args，因此每个追加的 requirement read result 必须在其自身稳定 envelope 上携带
+workspace-relative source-path attribute，使模型仅凭 result bytes 就能无歧义知道“这段内容读自哪个文件”。
+attribute 只补回 Cursor 丢失的 call-side provenance，不得承载 package identity、grounding digest、authority
+或其它隐藏控制信息。文件正文仍必须是 ordinary `read` 的原始 result bytes；同一路径 attribute + 正文的
+最终字节一经 occurrence 落盘即冻结，replay 不重新读取、不重新格式化。
 
 **证据**：→ PROOF.md `REQUIREMENT-GROUNDING-007`。
 
@@ -110,6 +121,10 @@ call/result gap anchor；retry、Host restart、普通 continuation 都从该事
 当前文件、不重新 renderer、不移动 placement。package 内容变化形成新 digest 时，只在当前追加区新增新的
 grounding reads；旧 occurrence 永不改写。不得仅靠 process-local Set、扫描 prompt 文本或 session 外临时文件
 去重。内部 material loader 自己读取 `requirements/<package>/` 不递归触发新的 provider grounding。
+
+同一 occurrence 必须同时足以确定 ordinary provider 的完整 read pair 与 Cursor 的 result-only suffix。Cursor
+投影使用同一冻结 result bytes，并额外使用该 read 的 canonical workspace-relative path 生成 source-path
+attribute；禁止从当前文件系统、当前 tool args 或当前 package catalog 反推历史路径。
 
 同一 epoch 内 grounding 前后的 provider wire 必须满足 `prefix-stability` 的 append-only prefix law；不得通过
 切 PrefixEpoch、重锚或重排历史来掩盖 grounding projection 的前缀漂移。
