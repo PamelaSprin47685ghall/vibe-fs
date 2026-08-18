@@ -131,6 +131,11 @@ module Envelope =
     let private providerRunDecoder: Decoder<ProviderRunIdentity option> =
         Decode.option (Decode.string |> Decode.map ProviderRunIdentity.create)
 
+    let private decodeMagicTodoEnvelope decoder json =
+        match Decode.fromString decoder json with
+        | Ok envelope -> Some envelope
+        | Error _ -> None
+
     let private tryDecodeMagicTodoEnvelope (json: string) : Envelope option =
         let decoder: Decoder<Envelope> =
             Decode.object (fun get ->
@@ -148,11 +153,12 @@ module Envelope =
                       Fact = Fact.MagicTodo fact }
                 | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
 
-        try
-            match Decode.fromString decoder json with
-            | Ok envelope -> Some envelope
-            | Error _ -> None
-        with _ -> None
+        try decodeMagicTodoEnvelope decoder json with _ -> None
+
+    let private deserializeCurrentEnvelope json =
+        match tryDecodeMagicTodoEnvelope json with
+        | Some envelope -> Ok envelope
+        | None -> Decode.Auto.fromString<Envelope> (json, extra = extra)
 
     let deserialize (json: string) : Result<Envelope, string> =
         if FactCodec.containsLegacyFallbackFields json then
@@ -160,6 +166,4 @@ module Envelope =
         elif FactCodec.containsLegacyScoreVectorEntry json then
             Error FactCodec.tipV2CleanBreakMessage
         else
-            match tryDecodeMagicTodoEnvelope json with
-            | Some envelope -> Ok envelope
-            | None -> Decode.Auto.fromString<Envelope> (json, extra = extra)
+            deserializeCurrentEnvelope json

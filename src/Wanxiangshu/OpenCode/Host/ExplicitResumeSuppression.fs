@@ -27,6 +27,11 @@ module ExplicitResumeSuppression =
         | ReplacedExplicitResume
         | Ordinary
 
+    [<RequireQualifiedAccess>]
+    type BriefingMaterialization =
+        | ExplicitResume
+        | Ordinary
+
     [<Literal>]
     let MetadataKey = "wanxiangshu_explicit_resume"
 
@@ -68,25 +73,33 @@ module ExplicitResumeSuppression =
                 { MaterialWitness = materialWitness
                   Text = text })
 
+    let private materializeStagedBriefing (output: obj) (pending: PendingBriefing) : BriefingMaterialization =
+        if outputHasMarker output then
+            BriefingMaterialization.ExplicitResume
+        elif isNull output || not (outputContainsWitness output pending.MaterialWitness) then
+            BriefingMaterialization.Ordinary
+        else
+            output?parts <- Array.append (existingParts output) [| markedTextPart pending.Text |]
+            BriefingMaterialization.ExplicitResume
+
+    let private classifyExistingMaterial (output: obj) : BriefingMaterialization =
+        if outputHasMarker output then
+            BriefingMaterialization.ExplicitResume
+        else
+            BriefingMaterialization.Ordinary
+
     /// Materialize the staged disclosure on the real chat.message material.
     /// Hosts that already forwarded command output carry the marker themselves;
     /// in that case the pending handoff is only consumed, never duplicated.
-    let materializePendingBriefing (sessionId: SessionId) (output: obj) : bool =
+    let materializePendingBriefing (sessionId: SessionId) (output: obj) : BriefingMaterialization =
         lock gate (fun () ->
             let sessionKey = SessionId.value sessionId
 
             match pendingBriefingBySession.TryGetValue sessionKey with
-            | false, _ -> outputHasMarker output
+            | false, _ -> classifyExistingMaterial output
             | true, pending ->
                 pendingBriefingBySession.Remove sessionKey |> ignore
-
-                if outputHasMarker output then
-                    true
-                elif isNull output || not (outputContainsWitness output pending.MaterialWitness) then
-                    false
-                else
-                    output?parts <- Array.append (existingParts output) [| markedTextPart pending.Text |]
-                    true)
+                materializeStagedBriefing output pending)
 
     /// chat.message is the physical-material boundary. Same marked material keeps
     /// its suppression across provider retries; a later ordinary user material on

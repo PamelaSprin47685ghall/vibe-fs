@@ -53,17 +53,23 @@ test('WHAT[EMR-007] EMR_007_chat_message_closes_the_old_idle_window_before_model
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const chatHook = host.slice(host.indexOf('let chatMessageHook ='), host.indexOf('let cancelSignals'))
   const barrier = host.slice(host.indexOf('let observePhysicalAdmission'), host.indexOf('let chatMessageHook ='))
+  const ordinaryRouting = host.slice(
+    host.indexOf('let continueOrdinaryChatMessage'),
+    host.indexOf('let chatMessageHook ='),
+  )
   const revoke = barrier.indexOf('Quiescence.ObservePhysicalUserMessage')
   const invoke = chatHook.indexOf('observePhysicalAdmission output sessionId physicalId')
-  const classify = chatHook.indexOf('let admission = chatExecutionAdmission')
-  const acquire = chatHook.indexOf('let! routedExecution = routeChatExecution')
+  const ordinaryCall = chatHook.indexOf('continueOrdinaryChatMessage decoded input output')
+  const classify = ordinaryRouting.indexOf('let admission = chatExecutionAdmission')
+  const acquire = ordinaryRouting.indexOf('let! routedExecution = routeChatExecution')
 
   assert.notEqual(revoke, -1, 'chat.message must close the preceding idle-send window')
   assert.notEqual(invoke, -1, 'chat.message must invoke the named physical admission barrier')
+  assert.notEqual(ordinaryCall, -1, 'ordinary routing must cross the named boundary after physical admission')
   assert.notEqual(classify, -1)
   assert.notEqual(acquire, -1)
-  assert.ok(invoke < classify, 'physical ingress barrier must run before routing classification')
-  assert.ok(invoke < acquire, 'old idle authority must die before the new model lease can be superseded')
+  assert.ok(invoke < ordinaryCall, 'physical ingress barrier must run before ordinary routing begins')
+  assert.ok(classify < acquire, 'routing classification must precede managed model acquisition')
 })
 
 test('WHAT[EMR-008] SPEC_INV_fast_and_deep_physical_model_equality_is_not_an_eligibility_gate', async () => {

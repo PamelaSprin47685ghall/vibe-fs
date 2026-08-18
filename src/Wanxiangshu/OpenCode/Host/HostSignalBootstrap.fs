@@ -628,6 +628,16 @@ module HostSignalBootstrap =
                     commitExecutionCapability routedExecution
                 }
 
+            let continueOrdinaryChatMessage decoded input output =
+                task {
+                    let admission = chatExecutionAdmission journal decoded output
+                    let! routedExecution = routeChatExecution scope admission
+
+                    match routedExecution with
+                    | RoutedChatExecution.Superseded -> ()
+                    | _ -> do! continueRoutedChatMessage routedExecution decoded input output
+                }
+
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
@@ -641,10 +651,10 @@ module HostSignalBootstrap =
                         // then materialize it on the real chat.message before any owner
                         // policy can observe the turn. Hosts that already forwarded the
                         // marked part only consume the pending handoff here.
-                        let materializedExplicitResume =
+                        let materialization =
                             match decoded.SessionId with
                             | Some sessionId -> ExplicitResumeSuppression.materializePendingBriefing sessionId output
-                            | None -> false
+                            | None -> ExplicitResumeSuppression.BriefingMaterialization.Ordinary
 
                         let knownExplicitResume =
                             match decoded.SessionId, decoded.PhysicalUserMessageId with
@@ -652,7 +662,10 @@ module HostSignalBootstrap =
                                 ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
                             | _ -> false
 
-                        let explicitResume = materializedExplicitResume || knownExplicitResume
+                        let explicitResume =
+                            match materialization with
+                            | ExplicitResumeSuppression.BriefingMaterialization.ExplicitResume -> true
+                            | ExplicitResumeSuppression.BriefingMaterialization.Ordinary -> knownExplicitResume
 
                         // CRASH-018: bind the disclosure marker to this exact
                         // physical user material before any routing/reconcile wake
@@ -680,12 +693,7 @@ module HostSignalBootstrap =
                             // Keyless external roots use their explicit managed agent;
                             // plugin prompts use PendingClaim.EffectiveAgent. Host message
                             // agent/model fields are never authority for a continuation.
-                            let admission = chatExecutionAdmission journal decoded output
-                            let! routedExecution = routeChatExecution scope admission
-
-                            match routedExecution with
-                            | RoutedChatExecution.Superseded -> ()
-                            | _ -> do! continueRoutedChatMessage routedExecution decoded input output
+                            do! continueOrdinaryChatMessage decoded input output
                     }
 
             let cancelSignals (ids: SessionId seq) =

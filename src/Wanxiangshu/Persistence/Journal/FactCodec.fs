@@ -155,27 +155,35 @@ module FactCodec =
             )
         | other -> other
 
+    let private decodeMagicTodoCanonical canonical =
+        match MagicTodoFactCodec.tryDecode canonical with
+        | Ok fact -> Fact.MagicTodo fact
+        | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason)
+
+    let private decodeMagicTodoFact decoder json =
+        match Decode.fromString decoder json with
+        | Ok fact -> Some fact
+        | Error _ -> None
+
     let private tryDecodeMagicTodo (json: string) : Fact option =
         let decoder: Decoder<Fact> =
             Decode.object (fun get ->
                 match get.Optional.Field "MagicTodo" Decode.string with
-                | Some canonical ->
-                    match MagicTodoFactCodec.tryDecode canonical with
-                    | Ok fact -> Fact.MagicTodo fact
-                    | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason)
+                | Some canonical -> decodeMagicTodoCanonical canonical
                 | None -> failwith "not a MagicTodo fact")
 
-        try
-            match Decode.fromString decoder json with
-            | Ok fact -> Some fact
-            | Error _ -> None
-        with _ -> None
+        try decodeMagicTodoFact decoder json with _ -> None
 
     let serializeFact (fact: Fact) : string =
         match fact with
         | MagicTodo magicTodo ->
             Encode.Auto.toString (0, {| MagicTodo = MagicTodoFactCodec.encode magicTodo |}, extra = extra)
         | other -> Encode.Auto.toString (0, pinToUtc other, extra = extra)
+
+    let private deserializeCurrentFact json =
+        match tryDecodeMagicTodo json with
+        | Some fact -> Ok fact
+        | None -> Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc
 
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
@@ -187,6 +195,4 @@ module FactCodec =
         elif containsHandleCompletedMissingCompletionFields json then
             Error "HandleCompleted requires CompletionRef and CompletionDigest; decode migration is not supported."
         else
-            match tryDecodeMagicTodo json with
-            | Some fact -> Ok fact
-            | None -> Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc
+            deserializeCurrentFact json
