@@ -1,0 +1,7 @@
+# Positive path set. Patterns are repository-root relative and use gitignore wildmatch syntax.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/scripts/checks/spec.mjs
+/scripts/checks/spec-rules.mjs
+/scripts/checks/requirement-trace.mjs
+/scripts/lib/requirement-trace.mjs

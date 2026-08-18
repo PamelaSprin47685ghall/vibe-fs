@@ -16,7 +16,14 @@ WHAT.md     唯一 normative 合同（编号命题，每条有测试落点）
 HOW.md      实现模型与约束（非 normative；含「历史与弃权」）
 PROOF.md    测试落点表（每条 WHAT 命题 → 测试）
 tests/      本包拥有的可执行 proof（*.test.mjs）
+APPLIES-TO  可选的正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=排除例外
 ```
+
+`APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只声明“哪些仓库路径在
+阅读或修改时应关联这个 package”。同一个源码文件可以同时命中多个 package；未提供该文件的
+package 不参加自动路径关联。这个约定为可复用的 `requirement-grounding` 能力预留：万象术在
+OpenCode 中开发任何采用同类 `requirements/<package>/` 结构的项目时，都可按相同方式发现相关
+规范，而不是把万象术自身源码路径写死进运行时。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
