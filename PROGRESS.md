@@ -21,36 +21,26 @@
 
 ## 验证状态
 
-- `node scripts/check.mjs` 绿(含 fsharp-control-pyramid)。
-- `node scripts/build.mjs` 绿(144 registered surfaces,+MessageVisibilitySurface)。
-- `node requirements/verification-system/tests/run.mjs` 绿:3235/0。
-- integration + distribution package suites 绿。
-- focused:message-visibility.test.mjs(事件唤醒/无信号 deadline/跨 session 隔离/waiter 不泄漏)+ host010 全绿。
+- `node scripts/check.mjs` 绿：672 WHAT / 3257 tests 闭合，fsharp-control-pyramid=0。
+- `node scripts/build.mjs` 绿：144 registered surfaces。
+- `node requirements/verification-system/tests/run.mjs` 绿：3241/0。
+- integration harness 275/0；distribution package suites 全绿。
+- focused：message-visibility、Persona、routing、Bookkeeper/G6、SyncDelegate、manager plugin contract 全绿。
+- `npm run format-build-test` 完整发布阶梯 exit 0；`npm pack --dry-run` 产出 0.8.3、1829 files。
 
-## 阻塞:e2e Long Stroke 红(pre-existing,非本线引入)
+## e2e Long Stroke 已修复
 
-- 现象:10 个 mock provider 请求后停滞,watchdog 5s silence;blocked expectation = blogger.0;journal 尾部 BloggerRequestMaterialized ×2 后无 provider dispatch。
-- 10 个请求时序实测 trace:
-  1. `strength-canary-title.0` (strength-canary-owner)
-  2. `strength-canary-replica.0` (replica 0)
-  3. `blogger.0` attempt 1 (strength companion blogger, chronicle tool-call)
-  4. `blogger.0` attempt 2 (chronicle tool-call)
-  5. `strength-canary-replica.1` (replica 1)
-  6. `blogger.0` attempt 3 (chronicle tool-call)
-  7. `strength-canary-owner.0` (owner 完成)
-  8. `needhelp-owner-title.0` (needhelp-owner title)
-  9. `needhelp-owner-fast.0` (needhelp fast 启动并被 NeedHelpSensor 命中 sentinel abort)
-  10. `blogger.0` attempt 4 (needhelp companion blogger, chronicle tool-call)
-- 根因排查进展:
-  - `needhelp-owner-fast.0` 命中 sentinel 后触发 `sessionPort.AbortSession`，产生 `AbortWake`（`context.Quiescence = None`）。
-  - `withFreshAssistanceQuiescence` 在 `AbortWake` 时先 mark owner claim 并延迟到 `IdleWake` 执行 `sendEscalationContinuation`。
-  - 同期 `needhelp-owner` 的 transform 触发 `CompanionTransform` 启动了新的 Blogger session，派发了 `blogger.0` attempt 4。
-  - Blogger attempt 4 调用 `chronicle` 成功后由 `EnforcerHost.handleContinuation` 给出 `StopPhysicalRun` 并 abort 该 Blogger session。
-  - 待排查点：`needhelp-owner-fast.0` 的 `SessionIdle` 事件到达后，`AssistanceHost` 的 `sendEscalationContinuation` 派发 `needhelp-owner-deep.0`（或 `ModelRouting.acquireManagedExecution`）与 Blogger 停机之间的交汇状态。
-- bisect 定位:first bad = `c6ecba617` "Fix recovery and execution lease boundaries"。
+- 第一根因不是 `ModelRouting` 容量：preflow `prompt_async` 只把 agent 写进 session create，未写进物理 user message。c6ecba617 后 Authority 边界正确 fail-closed → 无 `AuthorityRootAccepted` / `SessionPersona` → `NeedHelpSensor` 不接管 sentinel abort。preflow 现显式携 agent。
+- 显式 Authority 暴露三条真实 Host 缺口：
+  - managed child / internal lane 已继承 Persona，却在自己的 fast Authority profile 上重算 Persona；`CreateChildSession` / sibling lane 现先继承，`SessionExecutionBinding` 区分 internal root，Authority 只消费冻结身份。
+  - staged Inspector 在 owner ReuseScope `CaseFinalize` 前被物理删除并丢 Persona/ProviderLanguage；identity 现保留到 finalization，Bookkeeper 用无 physical parent 的 sibling lane，完成后立即 drop。
+  - Enforcer `StopPhysicalRun` 在 messages transform 内 await 同一 Host abort，形成 self-deadlock；现 fire-and-observe，abort `Ok` 后用 exact trailing `PhysicalUserMessageId` 释放 lease。
+- 原 Long Stroke finality script 只发首个 judge 后 terminal，永远没有同一 physical prompt 的第二个 PERFECT → unconfirmed reviewer roster 线性增长、enlist facts 二次增长。fixture 现首轮 REVISE 后，后续每轮同 physical prompt 发送两个 PERFECT，再 terminal；runaway ceiling 从 785/3750 收紧到 700/3350。
+- G2 删除 canary 先显式 retire 两个 Companion Blogger，避免在 active Host stream 上递归 delete。
+- trace-free 完整 Long Stroke 连续全绿：journal 622–647，SSE 3118–3213；完整发布阶梯终验 629/3136，均低于 700/3350 ceiling。focused Persona 8/0、routing 14/0、Bookkeeper/G6 18/0。
 
-## 待办
+## 发布闭环
 
-- [ ] 深入定位 c6ecba617 中 `AssistanceHost.sendEscalationContinuation` / `ModelRouting` / Blogger 停止在 `needhelp` 边界处的调度停滞根因并修复。
-- [ ] `npm run format-build-test` 全绿(e2e 段)后打 tag v0.8.3。
-- [ ] AGENTS.md 义务账:OBL-001 的 11 fail 已随根因修复清零,验收后可勾销对应条目。
+- OBL-001A–F focused proof 132/0；原 11 个 authoritative failures 清零，已从 AGENTS.md 义务账删除。
+- 未实现的 requirement-grounding 材料移入 `proposals/requirement-grounding/`；active requirements 仅保留可执行闭环。
+- 本文件对应的 release commit 由 tag `v0.8.3` 标识。

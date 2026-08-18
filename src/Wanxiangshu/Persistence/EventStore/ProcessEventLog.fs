@@ -284,7 +284,9 @@ module ProcessEventLog =
         names
         |> List.iter (fun name ->
             let identity = statSync (join2 directory name) |> statIdentity
-            hashUpdateText hash (label + "\u0000" + name + "\u0000" + identity + "\n") |> ignore)
+
+            hashUpdateText hash (label + "\u0000" + name + "\u0000" + identity + "\n")
+            |> ignore)
 
     let private physicalStats directory names =
         names

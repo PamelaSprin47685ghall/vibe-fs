@@ -42,7 +42,21 @@ module HostSessionDeletion =
             | None -> ()
         }
 
+    let private finalizeRetainedInspector
+        (scope: PluginRuntimeScope)
+        (workspaceDirectory: string option)
+        (finalizeInspector: string -> string -> Task<Result<unit, string>>)
+        (inspectorId: SessionId)
+        : Task =
+        task {
+            try
+                do! finalizeInspectorIfRoot workspaceDirectory finalizeInspector inspectorId
+            finally
+                scope.DropSessionIdentity(SessionId.value inspectorId)
+        }
+
     let private closeInspector
+        (scope: PluginRuntimeScope)
         (runtime: SyncDelegateRuntime)
         (workspaceDirectory: string option)
         (finalizeInspector: string -> string -> Task<Result<unit, string>>)
@@ -50,11 +64,12 @@ module HostSessionDeletion =
         : Task =
         task {
             match runtime.TryFindForScopeClose(sessionId, SyncDelegateRole.Inspector) with
-            | Some inspectorId -> do! finalizeInspectorIfRoot workspaceDirectory finalizeInspector inspectorId
             | None -> ()
+            | Some inspectorId -> do! finalizeRetainedInspector scope workspaceDirectory finalizeInspector inspectorId
         }
 
     let private cleanupRuntime
+        (scope: PluginRuntimeScope)
         (runtimeOpt: SyncDelegateRuntime option)
         (workspaceDirectory: string option)
         (finalizeInspector: string -> string -> Task<Result<unit, string>>)
@@ -64,7 +79,7 @@ module HostSessionDeletion =
         task {
             match runtimeOpt with
             | Some runtime ->
-                do! closeInspector runtime workspaceDirectory finalizeInspector sessionId
+                do! closeInspector scope runtime workspaceDirectory finalizeInspector sessionId
                 runtime.CancelSession sessionId
             | None -> ()
 
@@ -111,6 +126,7 @@ module HostSessionDeletion =
             if not stagedInspector then
                 do!
                     cleanupRuntime
+                        scope
                         scope.SyncDelegateRuntime
                         workspaceDirectory
                         finalizeInspector
@@ -119,6 +135,11 @@ module HostSessionDeletion =
 
             scope.Sessions.Quiescence.DropSession sessionId
             ExplicitResumeSuppression.dropSession sessionId
-            do! scope.DisposeSession(SessionId.value sessionId)
+
+            if stagedInspector then
+                do! scope.DisposeSessionPreservingIdentity(SessionId.value sessionId)
+            else
+                do! scope.DisposeSession(SessionId.value sessionId)
+
             signalReconciler signal
         }

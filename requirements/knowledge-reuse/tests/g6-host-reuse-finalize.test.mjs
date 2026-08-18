@@ -78,7 +78,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_G_host_reusable_inspector_one_finalize_then_c
     bookkeeper.setSessionPort(bookkeeperPort.port)
     const first = await lifecycle.tryFinalize(dir, delegateId)
     assert.equal(first.ok, true, `exactly one finalize ok: ${JSON.stringify(first.error)}`)
-    assert.equal(bookkeeperPort.createCalls.length, 1, 'exactly one Bookkeeper CreateChildSession')
+    assert.equal(bookkeeperPort.createCalls.length, 1, 'exactly one detached Bookkeeper sibling lane')
     assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'js-bookkeeper invoked')
 
     const store = eventStore.create(join(dir, '.git'), 'g6-host-fetch')

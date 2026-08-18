@@ -60,13 +60,22 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module PersonaBinding =
 
-    /// Authority Root: Role × initial SelectedTier → SessionPersona (bind-once).
-    let ensureFromAuthority (profile: PromptAuthority.AuthorityExecutionProfile) : string =
+    let private bindAuthorityPersona (profile: PromptAuthority.AuthorityExecutionProfile) =
         let persona = PersonaCatalog.persona profile.CanonicalRole profile.SelectedTier
 
         match SessionPersona.bindOnce profile.SessionId persona with
         | Ok bound -> bound
         | Error msg -> raise (InvalidOperationException msg)
+
+    /// Authority Root: Role × initial SelectedTier → SessionPersona (bind-once).
+    let ensureFromAuthority (profile: PromptAuthority.AuthorityExecutionProfile) : string =
+        let inheritsOwnerPersona =
+            SessionExecutionBinding.tryParent profile.SessionId |> Option.isSome
+            || SessionExecutionBinding.isInternalRoot profile.SessionId
+
+        match SessionPersona.tryGet profile.SessionId, inheritsOwnerPersona with
+        | Some inherited, true -> inherited
+        | _ -> bindAuthorityPersona profile
 
     /// InternalLeaf / attached child: inherit owner SessionPersona; never re-read tier.
     let ensureInherited (ownerId: SessionId) (childId: SessionId) : string =

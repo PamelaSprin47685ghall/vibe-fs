@@ -132,9 +132,7 @@ module GitGateway =
         task {
             let! expected = raw.ReadRef(trackingRef remote)
 
-            return
-                expected |> Option.map (fun oid -> { RootOid = RootOid.create oid }),
-                expected
+            return expected |> Option.map (fun oid -> { RootOid = RootOid.create oid }), expected
         }
 
     let private publishIfNeeded run remote remoteKnownCurrent expectedRemote (merged: StoreSnapshot) =

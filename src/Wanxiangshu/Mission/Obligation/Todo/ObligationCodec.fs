@@ -37,7 +37,9 @@ module MagicTodoObligationCodec =
     let private obligationDecoder: Decoder<Obligation> =
         Decode.object (fun get ->
             { Name = get.Required.Field "name" Decode.string
-              Horizon = get.Optional.Field "horizon" horizonDecoder |> Option.defaultValue ObligationHorizon.Near
+              Horizon =
+                get.Optional.Field "horizon" horizonDecoder
+                |> Option.defaultValue ObligationHorizon.Near
               Work = get.Required.Field "work" Decode.string })
 
     let encode (items: ObligationList) : string =

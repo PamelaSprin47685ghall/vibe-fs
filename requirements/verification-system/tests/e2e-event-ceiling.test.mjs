@@ -86,12 +86,10 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   const source = readFileSync(path.join(dir, 'e2e/scenarios/long-stroke.toml'), 'utf8');
   const result = compileScenario(source, { name: 'long-stroke.toml' });
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
-  // REVIEW-013/017 cutover: reviewer judge bind now appends ProviderInputSealed
-  // and each reviewer turn closes with ReviewAttemptClosed — legitimate topology
-  // change, re-measured at 751-777 durable envelopes and 3527-3651 SSE frames
-  // (post-cutover Host nondeterminism is wider on both); journal pinned at 785
-  // and SSE at 3750, above the highest observed but an order of magnitude below
-  // any runaway storm.
-  assert.equal(result.scenario.setup.maxJournalEvents, 785);
-  assert.equal(result.scenario.setup.maxSseEvents, 3750);
+  // Explicit preflow authority, real K2 traffic, detached Bookkeeper finalization,
+  // and same-physical dual-PERFECT review measured 622-647 durable envelopes and
+  // 3118-3213 SSE frames. Pins 700/3350 retain Host-ordering slack while failing
+  // before an unconfirmed-reviewer roster can grow quadratically.
+  assert.equal(result.scenario.setup.maxJournalEvents, 700);
+  assert.equal(result.scenario.setup.maxSseEvents, 3350);
 });

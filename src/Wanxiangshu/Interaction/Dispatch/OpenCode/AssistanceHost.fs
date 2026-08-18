@@ -16,7 +16,6 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -104,9 +103,6 @@ type AssistanceHost
         onChildOwned: SessionId -> unit,
         ?clock: IClockPort
     ) =
-
-    [<Emit("console.error($0)")>]
-    let logFile (s: string) : unit = jsNative
 
     [<Literal>]
     let HandlePrefix = "needhelp-"
@@ -620,7 +616,6 @@ type AssistanceHost
 
     let sendEscalationContinuation (turn: ReconciledTurn) (profile: PromptAuthority.AuthorityExecutionProfile) role =
         let deep = ManagedAgentCatalog.nameOf AgentTier.Deep role
-        logFile (sprintf "[ASSIST-ESCALATE] sending deep continuation for session=%s deep=%s" (SessionId.value turn.SessionId) deep)
 
         task {
             match!
@@ -632,11 +627,8 @@ type AssistanceHost
                     (escalationPrompt turn.SessionId)
                     turn.Directory
             with
-            | Ok key ->
-                logFile (sprintf "[ASSIST-ESCALATE-OK] sent deep continuation for session=%s key=%s" (SessionId.value turn.SessionId) (PromptKey.value key))
-                return AssistanceTurnDisposition.Handled
+            | Ok _ -> return AssistanceTurnDisposition.Handled
             | Error error ->
-                logFile (sprintf "[ASSIST-ESCALATE-ERR] error=%s for session=%s" error (SessionId.value turn.SessionId))
                 Diagnostic.emit
                     "needhelp"
                     [ "session_id", SessionId.value turn.SessionId
@@ -658,15 +650,12 @@ type AssistanceHost
         (continueAfterIdle: unit -> Task<AssistanceTurnDisposition>)
         =
         markOwnerClaim turn
-        logFile (sprintf "[ASSIST-QUIESCENCE] session=%s quiescence=%b isArmed=%b isClaimed=%b" (SessionId.value turn.SessionId) context.Quiescence.IsSome (sensor.IsArmed(turn.SessionId, turn.ProviderRun)) (isClaimedOwnerAttempt turn))
 
         let execute () =
             task {
                 if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
-                    logFile (sprintf "[ASSIST-TRYTAKE-FALSE] session=%s" (SessionId.value turn.SessionId))
                     return AssistanceTurnDisposition.Handled
                 else
-                    logFile (sprintf "[ASSIST-TRYTAKE-TRUE] session=%s" (SessionId.value turn.SessionId))
                     return! continueAfterIdle ()
             }
 
@@ -880,10 +869,9 @@ type AssistanceHost
     let handleOwnerSideTurn (context: ReconciledTurnContext) (turn: ReconciledTurn) =
         let isArmed = sensor.IsArmed(turn.SessionId, turn.ProviderRun)
         let isClaimed = isClaimedOwnerAttempt turn
-        logFile (sprintf "[ASSIST-HANDLE-OWNER] session=%s isArmed=%b isClaimed=%b outcome=%A quiescence=%b" (SessionId.value turn.SessionId) isArmed isClaimed turn.Outcome context.Quiescence.IsSome)
+
         match turn.Outcome with
-        | ReconcileProgram.TurnAborted _ when isArmed ->
-            handleOwnerRequest context
+        | ReconcileProgram.TurnAborted _ when isArmed -> handleOwnerRequest context
         | ReconcileProgram.TurnAborted _
         | ReconcileProgram.TurnFailed _ when isClaimed ->
             // HOST-027: once exact NEEDHELP has claimed this physical owner

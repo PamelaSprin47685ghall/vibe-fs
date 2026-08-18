@@ -30,6 +30,7 @@ import {
 } from './journal-observer.js';
 import { WAIT_FACT_WINDOW_MS } from './time-budget.js';
 import { isAppendOnlyPrefix, sealHolds, wireOf } from './provider-wire.js';
+import { awaitSessionSettled } from './session-quiescence.js';
 
 /** ≤50ms wall guard matching scenario-driver FACT_WAKE_GUARD_MS. */
 const FACT_WAKE_GUARD_MS = 50;
@@ -131,6 +132,8 @@ export function assertNeedHelpAssistance(scenario) {
     'needhelp-owner-fast.0',
     'needhelp-owner-deep.0',
     'needhelp-consult.0',
+    'needhelp-consult-replica.0',
+    'needhelp-consult-replica.1',
     'needhelp-owner-advice.0',
   ]) {
     assert.equal(scenario.provider.matchCount(id), 1, `NEEDHELP: ${id} must be delivered exactly once`);
@@ -164,8 +167,12 @@ export function assertNeedHelpAssistance(scenario) {
   assert.equal(hiddenInquiryLinks.length, 1, 'NEEDHELP: deep request must create exactly one hidden deep-inquiry consultation');
 
   const requests = scenario.provider.requests ?? [];
-  const consultation = requests.filter((request) => lastUserText(request).startsWith('# How should this agent resolve its current difficulty?'));
-  assert.equal(consultation.length, 1, 'NEEDHELP: consultation provider request must occur exactly once');
+  const consultation = requests.filter(
+    (request) =>
+      lastUserText(request).startsWith('# How should this agent resolve its current difficulty?') &&
+      requestTools(request).includes('inspect'),
+  );
+  assert.equal(consultation.length, 1, 'NEEDHELP: direct consultation provider request must occur exactly once');
   assert.match(
     lastUserText(consultation[0]),
     /NEEDHELP_LONG_STROKE_CANARY/,
@@ -450,8 +457,9 @@ export async function holdChildC1UntilLabor(scenario) {
 /**
  * One Reviewer protocol owns Finality and publish review. The Long Stroke injects
  * exactly one adversity verdict into that protocol: the first barrier judge is
- * REVISE; once that reviewer reaches its terminal text, every later barrier judge
- * is PERFECT. No alternate prompt/tool surface is manufactured for Finality.
+ * REVISE; after its terminal text, every later barrier request returns two distinct
+ * PERFECT judge calls under the same physical prompt, then terminal text. No alternate
+ * prompt/tool surface is manufactured for Finality.
  */
 export async function bindFinalityReviseThenPerfect(scenario) {
   const runtime = scenario.provider?._scenario;
@@ -460,8 +468,13 @@ export async function bindFinalityReviseThenPerfect(scenario) {
   const verdictEntry = runtime.scenario.entries.find(
     (entry) => entry.turnId === 'barrier-reviewer' && entry.step === 0,
   );
+  const confirmationEntry = runtime.scenario.entries.find(
+    (entry) => entry.turnId === 'barrier-reviewer' && entry.step === 1,
+  );
   assert.ok(verdictEntry, 'long-stroke: unified barrier-reviewer verdict entry is required');
+  assert.ok(confirmationEntry, 'long-stroke: unified barrier-reviewer confirmation entry is required');
 
+  const perfectJudge = { type: 'tool-call', tool: 'judge', args: { verdict: 'PERFECT' } };
   const setVerdict = (verdict) => {
     verdictEntry.respond = { type: 'tool-call', tool: 'judge', args: { verdict } };
   };
@@ -475,7 +488,10 @@ export async function bindFinalityReviseThenPerfect(scenario) {
     originalConsume(body, selection, context);
     if (!firstBarrierTerminalSeen && selection?.entry?.id === 'barrier-reviewer.1') {
       firstBarrierTerminalSeen = true;
-      setVerdict('PERFECT');
+      queueMicrotask(() => {
+        setVerdict('PERFECT');
+        confirmationEntry.respond = perfectJudge;
+      });
     }
   };
 }
@@ -754,6 +770,41 @@ export function extractInspectorIdFromOwnerRequests(requests) {
     if (match) return match[1];
   }
   return null;
+}
+
+const taggedValue = (value) => (Array.isArray(value) ? value.at(-1) : value);
+
+export async function retireCompanionForDeletion(scenario, ownerSessionId) {
+  const findBloggerSessionId = () =>
+    factPayloads(scenario.host.workDir, 'CompanionBloggerLinked')
+      .filter((payload) => taggedValue(payload?.SessionId) === ownerSessionId)
+      .map((payload) => taggedValue(payload?.BloggerSessionId))
+      .find((sessionId) => typeof sessionId === 'string' && sessionId.length > 0) ?? null;
+
+  let bloggerSessionId = findBloggerSessionId();
+  if (bloggerSessionId === null) {
+    bloggerSessionId = await new Promise((resolve, reject) => {
+      let stop = () => {};
+      const timer = setTimeout(() => {
+        stop();
+        reject(new Error(`Companion Blogger was not linked for owner ${ownerSessionId}`));
+      }, WAIT_FACT_WINDOW_MS);
+      stop = watchJournal(scenario.host.workDir, () => {
+        scenario.eventCeilings?.checkJournal?.();
+        const found = findBloggerSessionId();
+        if (found === null) return;
+        clearTimeout(timer);
+        stop();
+        resolve(found);
+      });
+    });
+  }
+
+  const aborted = await scenario.client.abort(bloggerSessionId);
+  assert.equal(aborted.ok, true, `Companion Blogger ${bloggerSessionId} abort failed`);
+  const settled = await awaitSessionSettled(scenario, bloggerSessionId, WAIT_FACT_WINDOW_MS);
+  assert.equal(settled, true, `Companion Blogger ${bloggerSessionId} did not settle`);
+  return bloggerSessionId;
 }
 
 /**

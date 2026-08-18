@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation.SyncDelegate
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Session.Attachment
@@ -25,17 +24,58 @@ open Wanxiangshu.Persistence.Journal
 /// observe only invocation promises and child identities.
 [<RequireQualifiedAccess>]
 module SyncDelegateSurface =
+    type private PromptReadiness() =
+        let admitted = Dictionary<string, int>()
+        let completed = Dictionary<string, int>()
+        let waiters = Dictionary<string, TaskCompletionSource<unit>>()
+
+        let count (source: Dictionary<string, int>) key =
+            match source.TryGetValue key with
+            | true, value -> value
+            | false, _ -> 0
+
+        member _.Mark(sessionId: SessionId) =
+            let key = SessionId.value sessionId
+            admitted[key] <- count admitted key + 1
+
+            match waiters.TryGetValue key with
+            | true, waiter ->
+                waiters.Remove key |> ignore
+                AsyncSupport.trySetResult waiter () |> ignore
+            | false, _ -> ()
+
+        member _.Complete(sessionId: SessionId) =
+            let key = SessionId.value sessionId
+            completed[key] <- count completed key + 1
+
+        member _.Wait(sessionId: SessionId) : Task<unit> =
+            let key = SessionId.value sessionId
+
+            if count admitted key > count completed key then
+                Task.FromResult()
+            else
+                match waiters.TryGetValue key with
+                | true, waiter -> waiter.Task
+                | false, _ ->
+                    let waiter =
+                        TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+                    waiters.Add(key, waiter)
+                    waiter.Task
+
     type private Harness
         (
             journal: AgentJournal,
             runtime: SyncDelegateRuntime,
             scope: ToolRuntimeScope,
+            readiness: PromptReadiness,
             children: ResizeArray<SessionId>,
             ownerPrefix: string
         ) =
         member _.Journal = journal
         member _.Runtime = runtime
         member _.Scope = scope
+        member _.Readiness = readiness
         member _.Children = children
         member _.OwnerSession(owner: string) = SessionId.create (ownerPrefix + owner)
 
@@ -44,13 +84,14 @@ module SyncDelegateSurface =
             (scope :> IDisposable).Dispose()
             (journal :> IDisposable).Dispose()
 
-    type private SessionPort(children: ResizeArray<SessionId>) =
+    type private SessionPort(children: ResizeArray<SessionId>, readiness: PromptReadiness) =
         interface ISessionHostPort with
             member _.SubscribeTerminal(_, _) =
                 { new IDisposable with
                     member _.Dispose() = () }
 
-            member _.SendPrompt(_, _, _) =
+            member _.SendPrompt(sessionId, _, _) =
+                readiness.Mark sessionId
                 Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create "msg-physical"))
 
             member _.AbortSession _ = Task.FromResult(Ok())
@@ -89,32 +130,23 @@ module SyncDelegateSurface =
 
             member _.FamilyRootOf sessionId = sessionId
 
-    [<Emit("setImmediate($0)")>]
-    let private queueImmediate (callback: unit -> unit) : unit = jsNative
-
-    let private nextTurn () : Task<unit> =
-        let tcs =
-            TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-        queueImmediate (fun () -> AsyncSupport.trySetResult tcs () |> ignore)
-        tcs.Task
-
     let private waitForReadyCall
         (runtime: SyncDelegateRuntime)
+        (readiness: PromptReadiness)
         (owner: SessionId)
         (role: SyncDelegateRole)
         : Task<SessionId option> =
-        let rec loop remaining =
-            task {
-                match runtime.TryFind(owner, role) with
-                | Some child when runtime.HasOpeningCursor child -> return Some child
-                | _ when remaining <= 0 -> return None
-                | _ ->
-                    do! nextTurn ()
-                    return! loop (remaining - 1)
-            }
+        task {
+            match runtime.TryFind(owner, role) with
+            | None -> return None
+            | Some child ->
+                do! readiness.Wait child
 
-        loop 1000
+                if runtime.HasOpeningCursor child then
+                    return Some child
+                else
+                    return None
+        }
 
     let private roleOf (value: string) : Result<SyncDelegateRole, string> =
         if String.IsNullOrWhiteSpace value then
@@ -169,7 +201,8 @@ module SyncDelegateSurface =
             let! journal = createJournal directory
             // DSL-MUTABLE: resource — session id backing registry for SessionPort
             let children = ResizeArray<SessionId>()
-            let sessions = SessionPort(children) :> ISessionHostPort
+            let readiness = PromptReadiness()
+            let sessions = SessionPort(children, readiness) :> ISessionHostPort
             let dispatcher = PromptDispatcher.Runtime(journal)
             let attached = new AttachedSessionRuntime()
             let gate = new SessionQuiescenceGate()
@@ -218,7 +251,7 @@ module SyncDelegateSurface =
             let ownerPrefix =
                 sprintf "sync-delegate-surface-%s-" (ToolHostCodec.digest directory)
 
-            return box (Harness(journal, runtime, scope, children, ownerPrefix))
+            return box (Harness(journal, runtime, scope, readiness, children, ownerPrefix))
         }
 
     /// Execute the real InspectorTool specification against the opaque scope and
@@ -266,6 +299,16 @@ module SyncDelegateSurface =
                     | Error error -> box {| ok = false; error = error |}
         }
 
+    let private handleTurn (harness: Harness) (child: SessionId) (turn: ReconciledTurn) =
+        task {
+            let! handled = harness.Runtime.HandleTurn(turn, None)
+
+            if handled then
+                harness.Readiness.Complete child
+
+            return handled
+        }
+
     /// Settle the current managed child through the real HandleTurn path.
     let settle (value: obj) (owner: string) (role: string) (answer: string) (runId: string) : Task<bool> =
         task {
@@ -274,7 +317,7 @@ module SyncDelegateSurface =
             match roleOf role with
             | Error _ -> return false
             | Ok role ->
-                match! waitForReadyCall harness.Runtime (harness.OwnerSession owner) role with
+                match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
                     let parts =
@@ -297,7 +340,7 @@ module SyncDelegateSurface =
                           Outcome = ReconcileProgram.TurnCompleted
                           Observation = None }
 
-                    return! harness.Runtime.HandleTurn(turn, None)
+                    return! handleTurn harness child turn
         }
 
     let observeTurn
@@ -315,7 +358,7 @@ module SyncDelegateSurface =
             | Error _, _
             | _, Error _ -> return false
             | Ok role, Ok outcome ->
-                match! waitForReadyCall harness.Runtime (harness.OwnerSession owner) role with
+                match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
                     let parts =
@@ -338,7 +381,7 @@ module SyncDelegateSurface =
                           Outcome = outcome
                           Observation = None }
 
-                    return! harness.Runtime.HandleTurn(turn, None)
+                    return! handleTurn harness child turn
         }
 
     let child (value: obj) (owner: string) (role: string) : obj =

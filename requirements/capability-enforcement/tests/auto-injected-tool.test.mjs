@@ -23,6 +23,20 @@ const withSession = (messages, sessionID = 'ses-auto-injected') =>
     },
   }))
 
+const admitManagedRoot = async (hooks, sessionID = 'ses-auto-injected') => {
+  const output = {
+    message: {
+      id: `root-${sessionID}`,
+      role: 'user',
+      sessionID,
+      agent: 'fast-coder',
+      model: { providerID: 'host', modelID: 'placeholder' },
+    },
+    parts: [],
+  }
+  await hooks['chat.message']({ sessionID, agent: 'fast-coder' }, output)
+}
+
 test('WHAT[ENF-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_registered', async () => {
   assert.equal(markerToolName, 'skill')
   assert.equal(rolePredicate('skill', 'coder'), false, 'Host-owned skill is not a plugin role tool')
@@ -37,6 +51,7 @@ test('WHAT[ENF-006] AUTOINJ_skill_wire_stays_host_owned_and_is_not_plugin_regist
 
 test('WHAT[ENF-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_real_skill_names', async () => {
   await withExecutablePlugin(async (hooks) => {
+    await admitManagedRoot(hooks)
     const transformed = {
       messages: withSession([
         {
@@ -59,6 +74,11 @@ test('WHAT[ENF-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_r
             state: { status: 'completed', input: { name: 'pdfs' }, output: 'real skill output' },
           }],
         },
+        {
+          role: 'user',
+          info: { id: 'root-ses-auto-injected' },
+          parts: [{ type: 'text', text: 'hello' }],
+        },
       ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
@@ -79,6 +99,7 @@ test('WHAT[ENF-006] AUTOINJ_active_empty_skill_call_is_denied_without_touching_r
 
 test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synthetic_injection', async () => {
   await withExecutablePlugin(async (hooks) => {
+    await admitManagedRoot(hooks)
     const transformed = {
       messages: withSession([
         {
@@ -93,7 +114,11 @@ test('WHAT[ENF-006] AUTOINJ_tryInject_rewrites_active_call_while_preserving_synt
             },
           ],
         },
-        { role: 'user', info: { id: 'user-1' }, parts: [{ type: 'text', text: 'hello' }] },
+        {
+          role: 'user',
+          info: { id: 'root-ses-auto-injected' },
+          parts: [{ type: 'text', text: 'hello' }],
+        },
       ]),
     }
 

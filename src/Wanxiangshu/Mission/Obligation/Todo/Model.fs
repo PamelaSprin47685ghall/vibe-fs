@@ -238,13 +238,17 @@ module MagicTodo =
         loop 0 Set.empty items
 
     let validateTodoWriteInput (input: TodoWriteInput) : Result<TodoWriteInput, MagicTodoReject> =
-        let exactFocus = input.Obligations |> List.tryFind (fun item -> item.Name = input.WorkingOn)
+        let exactFocus =
+            input.Obligations |> List.tryFind (fun item -> item.Name = input.WorkingOn)
 
         match input.Obligations, exactFocus with
         | [], _ -> Ok { input with WorkingOn = "" }
         | items, _ when not (items |> List.exists isNear) -> Error MagicTodoReject.NoNearObligation
         | _, Some item when not (isNear item) -> Error(MagicTodoReject.WorkingOnNotNear item.Name)
-        | items, _ -> Ok { input with WorkingOn = normalizeWorkingOn input.WorkingOn items }
+        | items, _ ->
+            Ok
+                { input with
+                    WorkingOn = normalizeWorkingOn input.WorkingOn items }
 
     /// More than one distinct todowrite call in one assistant message is a call
     /// protocol error. Same ToolCallId replay remains one physical attempt.

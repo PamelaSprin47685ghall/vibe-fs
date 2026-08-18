@@ -63,23 +63,17 @@ description = "G4R-3 The Long Stroke: orchestrator shell, one OpenCode world thr
 pass = "Long Stroke orch-shell: join-wake+interrupted/user_message, provider-fallback, REVISE→FinalityRejected→Blessed→LifeCompleted, gitConflictProof→ConflictDetected→Published (no restart)."
 
 # Event ceilings (fail-closed on dead loops; primary over silence watchdog):
-#   maxJournalEvents — EventStore envelope ceiling for the complete 66-step legal stroke. With the
-#                      three-call Inspector batch regression in G2, full strict traversals observed
-#                      730–733 durable envelopes; 740 was the pinned legal upper bound. The
-#                      REVIEW-013/017 cutover appends ProviderInputSealed on every judge bind and
-#                      ReviewAttemptClosed on every reviewer turn (a legitimate topology change), so
-#                      the complete stroke was re-measured at 751–769 durable envelopes across runs
-#                      (post-cutover Host nondeterminism is wider); 785 is the pinned upper bound —
-#                      above the highest observed, still an order of magnitude below any dead loop.
-#   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversal. Full strict
-#                      traversals observed 3553–3614 frames before the cutover; the REVIEW-013/017
-#                      reviewer closure/seal facts emit more Host frames, re-measured at 3527–3651;
-#                      3750 keeps a narrow (<3% over observed max) allowance for the wider
-#                      post-cutover nondeterminism.
+#   maxJournalEvents — complete 63-step legal stroke after explicit preflow authority, real K2
+#                      StrengthReplica traffic, detached Bookkeeper finalization, and direct
+#                      same-physical dual-PERFECT review. Two complete strict traversals measured
+#                      622–647 envelopes; 700 catches the former unconfirmed-reviewer roster growth
+#                      before it can hide behind a widened timeout.
+#   maxSseEvents     — OpenCode SSE excluding server.heartbeat for the same traversals measured
+#                      3118–3213 frames; 3350 preserves a narrow Host-ordering allowance.
 #                      Both pins are machine-checked runaway ceilings, not wall-clock budgets; a
 #                      future legitimate topology change must re-measure the complete stroke first.
 # magicTodoHostCanary: Phase 0 real-host A/E/G/H wrapper (sole OpenCode lifetime).
-setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-batch-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 785, maxSseEvents = 3750, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
+setup = { strict = true, magicTodoHostCanary = true, preFlowTurns = ["strength-canary-title", "strength-canary-replica", "strength-canary-owner", "needhelp-owner-title", "needhelp-owner-fast", "needhelp-owner-deep", "needhelp-consult-title", "needhelp-consult", "needhelp-consult-replica", "needhelp-owner-advice", "g2-inspector-title", "g2-inspector-owner", "g2-inspector-batch-owner", "g2-inspector-child-title", "g2-inspector-q1", "g2-inspector-q2", "g2-inspector-q3", "g2-inspector-batch", "g6-bookkeeper-title", "g6-bookkeeper-finalize"], env = { WANXIANGSHU_STRENGTH_MODE = "dry-run", WANXIANGSHU_STRENGTH_DRY_RUN_BUDGET = "K2" }, maxJournalEvents = 700, maxSseEvents = 3350, project = { files = { "AGENTS.md" = "long stroke\n", "README.md" = "# long-stroke\n", "read_probe.txt" = "long-stroke-read-probe\n", ".wanxiang/casebook/.keep" = "" } } }
 session = { agent = "fast-orchestrator", bind = ["title", "fast-orchestrator"] }
 prompt = { agent = "fast-orchestrator", text = "Ship publish_proof.txt to the target branch through the long stroke." }
 
@@ -87,6 +81,8 @@ must = [
   "needhelp-owner-fast.0",
   "needhelp-owner-deep.0",
   "needhelp-consult.0",
+  "needhelp-consult-replica.0",
+  "needhelp-consult-replica.1",
   "needhelp-owner-advice.0",
   "g2-inspector-owner.0",
   "g2-inspector-q1.0",
@@ -108,7 +104,6 @@ must = [
   "conflict-resume.0",
   "coder-resolve.0",
   "barrier-reviewer.0",
-  "reviewer-confirm.0",
   # orch.2 = join harvest text after Published (orch-unhappy Stroke 6). EXEC-016
   "orch.2",
 ]
@@ -123,6 +118,8 @@ flow = [
   { assertDeliveries = { id = "needhelp-owner-fast.0", eq = 1 } },
   { assertDeliveries = { id = "needhelp-owner-deep.0", eq = 1 } },
   { assertDeliveries = { id = "needhelp-consult.0", eq = 1 } },
+  { assertDeliveries = { id = "needhelp-consult-replica.0", eq = 1 } },
+  { assertDeliveries = { id = "needhelp-consult-replica.1", eq = 1 } },
   { assertDeliveries = { id = "needhelp-owner-advice.0", eq = 1 } },
   { assertDeliveries = { id = "g2-inspector-q1.0", eq = 2 } },
   { assertDeliveries = { id = "g2-inspector-q2.0", eq = 1 } },
@@ -242,6 +239,7 @@ id = "strength-canary-replica"
 internal = true
 user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
 tools = ["glob", "grep", "read"]
+forbiddenTools = ["edit"]
 
   [[turn.step]]
   respond = { type = "tool-calls", calls = [{ tool = "read", args = { filePath = "README.md" } }, { tool = "read", args = { filePath = "AGENTS.md" } }] }
@@ -256,7 +254,6 @@ lane = "strength-canary-owner"
 user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
 
   [[turn.step]]
-  runtimeStep = 2
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
 
 [[turn]]
@@ -302,9 +299,23 @@ user = "# How should this agent resolve its current difficulty?"
 id = "needhelp-consult"
 internal = true
 user = "# How should this agent resolve its current difficulty?"
+tools = ["fission", "inspect", "skill"]
 
   [[turn.step]]
   respond = { type = "text", text = "Independent NEEDHELP perspective: preserve the original charge, verify the strongest assumption, then continue." }
+
+[[turn]]
+id = "needhelp-consult-replica"
+internal = true
+user = "# How should this agent resolve its current difficulty?"
+tools = ["glob", "grep", "read"]
+forbiddenTools = ["edit"]
+
+  [[turn.step]]
+  respond = { type = "tool-call", tool = "read", args = { filePath = "README.md" } }
+
+  [[turn.step]]
+  respond = { type = "text", text = "Consultation StrengthReplica completed its bounded readonly investigation." }
 
 [[turn]]
 id = "needhelp-owner-advice"
@@ -466,7 +477,7 @@ internal = true
 user = "# The account is not yet ready to entrust."
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", work = "Run the long stroke through publish_proof.txt." }] } }
+  respond = { type = "tool-call", tool = "todowrite", args = { planComplete = true, workingOn = "long-stroke", obligations = [{ name = "long-stroke", horizon = "near", work = "Run the long stroke through publish_proof.txt." }] } }
 
   [[turn.step]]
   respond = { type = "text", text = "Blind plan obligations recorded." }
@@ -632,17 +643,10 @@ tools = ["glob", "grep", "read", "judge"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
+  # First adversity request terminates here after REVISE. The causal binder changes
+  # this step to the second PERFECT judge for every later request.
   [[turn.step]]
-  respond = { type = "text", text = "Reviewer submitted the current verdict." }
-
-[[turn]]
-id = "reviewer-confirm"
-internal = true
-user = "# Nope, let's re-evaluate: does it really fully satisfy the original task without cutting corners?"
-tools = ["judge"]
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
+  respond = { type = "text", text = "Reviewer submitted the revision verdict." }
 
   [[turn.step]]
   respond = { type = "text", text = "Reviewer confirmed the tree." }

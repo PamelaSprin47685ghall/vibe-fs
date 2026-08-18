@@ -74,20 +74,35 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_mode
     { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
   )
 
+  const inputModel = {
+    id: 'deep-opus',
+    providerID: 'anthropic',
+    capabilities: { temperature: true },
+    variants: { high: { reasoning: { effort: 'high' } }, low: {} },
+    options: {},
+  }
+  const output = { options: { existing: 'sentinel' } }
+
   const observed = chatParams.apply(
     {
       sessionID: 'ses_chat_params_child_4',
       agent: 'deep-coder',
-      model: { id: 'deep-opus', providerID: 'anthropic', capabilities: { temperature: true } },
+      model: inputModel,
       message: {
         model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
       },
     },
-    {},
+    output,
   )
 
   assert.equal(observed.ok, true, observed.error)
   assert.equal(observed.temperature, 1)
+  assert.equal(output.temperature, 1)
+  assert.equal(output.options.temperature, 1)
+  assert.equal(output.options.existing, 'sentinel')
+  assert.equal(inputModel.variants.high.temperature, 1)
+  assert.equal(inputModel.variants.low.temperature, 1)
+  assert.equal(inputModel.options.temperature, 1)
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', () => {
@@ -100,12 +115,18 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_w
     { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
   )
 
-  const output = {}
+  const inputModel = {
+    id: 'o3-mini',
+    providerID: 'openai',
+    capabilities: { temperature: false },
+    variants: { high: {} },
+  }
+  const output = { options: {} }
   const observed = chatParams.apply(
     {
       sessionID: 'ses_chat_params_child_5',
       agent: 'deep-coder',
-      model: { id: 'o3-mini', providerID: 'openai', capabilities: { temperature: false } },
+      model: inputModel,
       message: {
         model: { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
       },
@@ -116,6 +137,8 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_w
   assert.equal(observed.ok, true, observed.error)
   assert.equal(observed.temperature, undefined)
   assert.equal(output.temperature, undefined)
+  assert.equal(output.options.temperature, undefined)
+  assert.equal(inputModel.variants.high.temperature, undefined)
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_agentless_root_does_not_invent_binding', () => {

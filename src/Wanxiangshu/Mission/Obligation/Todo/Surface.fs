@@ -39,7 +39,8 @@ module MagicTodoSurface =
         let ObligationNameDescription = "lifecycle/magic-todo/obligation-name-description"
 
         [<Literal>]
-        let ObligationHorizonDescription = "lifecycle/magic-todo/obligation-horizon-description"
+        let ObligationHorizonDescription =
+            "lifecycle/magic-todo/obligation-horizon-description"
 
         [<Literal>]
         let ObligationWorkDescription = "lifecycle/magic-todo/obligation-work-description"

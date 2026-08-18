@@ -20,7 +20,10 @@ const failingPort = () => {
   let seq = 0
   return {
     port: {
-      CreateChildSession: async () => bookkeeper.acceptedSession(`bk-fail-${++seq}`),
+      CreateChildSession: async () => {
+        throw new Error('Bookkeeper must not attach to a deleted physical parent')
+      },
+      CreateSiblingSession: async () => bookkeeper.acceptedSession(`bk-fail-${++seq}`),
       AbortSession: async () => bookkeeper.aborted(),
       SubscribeTerminal: () => ({ Dispose: () => {} }),
       SendPrompt: async () => bookkeeper.failedPrompt('injected synth failure'),

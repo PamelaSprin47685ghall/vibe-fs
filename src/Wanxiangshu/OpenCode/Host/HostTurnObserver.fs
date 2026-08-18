@@ -71,13 +71,9 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
-open Fable.Core
 
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
-
-    [<Emit("console.error($0)")>]
-    let private logFile (s: string) : unit = jsNative
 
     let private notifyBloggerRecovery (sessionId: SessionId) (companion: CompanionHost) =
         match companion.BloggerSession with
@@ -89,7 +85,6 @@ module HostTurnObserver =
             notifyBloggerRecovery sessionId companion
 
     let private armRecoveryIfEligible (scope: PluginRuntimeScope) isFissionOwner (turn: ReconciledTurn) =
-        logFile (sprintf "[OBS-ARM] session=%s isFissionOwner=%b outcome=%A" (SessionId.value turn.SessionId) isFissionOwner turn.Outcome)
         match isFissionOwner, turn.Outcome with
         | false, (ReconcileProgram.TurnFailed _ | ReconcileProgram.TurnAborted _) ->
             scope.ArmRecovery turn.SessionId
@@ -303,7 +298,6 @@ module HostTurnObserver =
         : Task =
         task {
             let turn = context.Turn
-            logFile (sprintf "[OBS-TURN] session=%s role=%A outcome=%A quiescence=%b" (SessionId.value turn.SessionId) turn.Role turn.Outcome context.Quiescence.IsSome)
 
             // HOST-027: assistance is classified from the exact armed ProviderRun
             // before Strength, family recovery, SyncDelegate, fallback, or ordinary

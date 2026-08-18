@@ -76,20 +76,7 @@ type PrefixCoverage = { HostEpochId; CutoffExclusive; CoveredPrefixDigest; Cover
 
 ## 5. 历史与弃权
 
-### 5.1 源 → 覆盖映射
-
-| 源 | 信息落点 |
-|---|---|
-| 历史 HOST-005/006 | WHAT-001/002/003/004/009；WHY §1/§3 |
-| 历史 COMPANION-003/007/008/012/014 | WHAT-001/005/006/007/009/010 |
-| 历史 why/context（probe 失败不写事实） | WHAT-008；WHY §4.3 |
-| 历史 why/strength + 历史 change（strength） | WHAT-008；WHY §4.1 |
-| 历史 change（cursor-pair-hint）§12（prefix/idempotence scope） | 与 HOST-013 互斥 → 本包只记「XTrace 无 synthetic 正文」；主体归 prefix-stability（见该包 HOW §5） |
-| 历史 change（cache）（HOST-013 anchored prefix） | 同上；anchor 语义归 prefix-stability |
-| 历史 COVERAGE（HOST-005 / COMPANION-003/007/008 行） | WHAT-001..010 的 owner 裁决 |
-| 历史 EVIDENCE（semantic-trace 行） | HOW §1 的实现路径 |
-
-### 5.2 弃权（GARBAGE / 明确不归本包）
+### 5.1 弃权（GARBAGE / 明确不归本包）
 
 - **UI delta / usage / cost / timestamp 的「计量格式」**：HOST-005 只要求它们不进 XTrace；
   它们是否别处该记、怎么记，不是本包命题（journal 诊断有独立 owner）。

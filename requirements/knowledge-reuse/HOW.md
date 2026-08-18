@@ -46,13 +46,13 @@ opaque. Durable Casebook operations receive an opaque EventStoreSurface handle.
 | `src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs` | `CasebookDraftStore`（session → Q/A turns 的内存 draft） |
 | `src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs` | `refreshStale`（CaseRefresh：freeze → transaction → stability verify → Refreshed） |
 | `src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperStaging.fs` | `beginTransaction` / `snapshot` / `apply` / `take` / `abort`（js-bookkeeper 的 staged 变换） |
-| `src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs` | `BookkeeperRequest = CaseRefresh | CaseFinalize`；`bindSession` / `unbindSession` / `tryTxId` / `runTransaction`（CreateChildSession + `js-bookkeeper` only + staging） |
+| `src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs` | `BookkeeperRequest = CaseRefresh | CaseFinalize`；`bindSession` / `unbindSession` / `tryTxId` / `runTransaction`（CreateSiblingSession physical-root lane + `js-bookkeeper` only + staging） |
 | `src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs` | `js-bookkeeper(program)` spec + execute：case SDK（`setQuestion`/`setAnswer` 各至多一次）+ runtime base class；无 filesystem capability |
 | `src/Wanxiangshu/OpenCode/Tools/FetchTool.fs` | `fetch(shelfmark)` spec + execute：shelfmark 解析 → replay → Fresh/Refreshed/Stale consequence；`fetchGate`/`fetchInFlight`（same-worktree single-flight） |
 
 ### Session 交叉（不归本包 HOW 主体）
 
-Bookkeeper child 生命周期（`fast-bookkeeper`/`deep-bookkeeper`、Clerk/Curator Persona、InternalLeaf + Attached）由 Session/Process 侧持有（历史 shape/casebook Bookkeeper 身份边界）；本包只消费 `BookkeeperRequest` 契约（KNOWLEDGE-REUSE-006）。
+Bookkeeper child 生命周期（`fast-bookkeeper`/`deep-bookkeeper`、Clerk/Curator Persona、InternalLeaf + Attached）由 Session/Process 侧持有（历史 shape/casebook Bookkeeper 身份边界）；staged SyncInspector 的 Persona/ProviderLanguage 在物理 delete 后保留到 owner ReuseScope 的 `CaseFinalize` 结束；Bookkeeper 以无 physical parent 的 sibling lane 创建，避免等待已删除 Host parent，同时继承 commissioner identity，finalize 后由 Host deletion scope drop。本包只消费 `BookkeeperRequest` 契约（KNOWLEDGE-REUSE-006）。
 
 ## 主流程
 

@@ -6,7 +6,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  canonicalText,
   markerSource,
   markerToolName,
 } from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
@@ -61,6 +60,20 @@ const withSession = (messages, sessionID = 'ses-capability-manager') =>
       sessionID,
     },
   }))
+
+const admitManagedRoot = async (hooks, sessionID = 'ses-capability-manager') => {
+  const output = {
+    message: {
+      id: `root-${sessionID}`,
+      role: 'user',
+      sessionID,
+      agent: 'fast-manager',
+      model: { providerID: 'host', modelID: 'placeholder' },
+    },
+    parts: [],
+  }
+  await hooks['chat.message']({ sessionID, agent: 'fast-manager' }, output)
+}
 
 const fullConfig = () => ({
   agent: Object.fromEntries(
@@ -150,7 +163,6 @@ test('WHAT[ENF-001] MANAGER_role_permission_matrix_is_owned_by_RolesSurface', ()
 test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_keeps_canonical_text', async () => {
   assert.equal(markerToolName, 'skill')
   assert.equal(typeof markerSource, 'string')
-  assert.equal(typeof canonicalText, 'string')
   const client = {
     session: {
       abort: async () => ({ data: {} }),
@@ -163,10 +175,11 @@ test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_k
     },
   }
   await withPluginClient(client, async (hooks) => {
+    await admitManagedRoot(hooks)
     assert.equal(hooks.tool.skill, undefined, 'skill remains Host-owned')
     const transformed = {
       messages: withSession([
-        { role: 'user', info: { id: 'user-1' }, parts: [{ type: 'text', text: 'hello' }] },
+        { role: 'user', info: { id: 'root-ses-capability-manager' }, parts: [{ type: 'text', text: 'hello' }] },
       ]),
     }
     await hooks['experimental.chat.messages.transform']({}, transformed)
@@ -178,8 +191,11 @@ test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_k
     assert.equal(marker.parts?.[0]?.tool, markerToolName)
     assert.deepEqual(marker.parts?.[0]?.state?.input, { name: '' })
     assert.equal(marker.parts?.[0]?.state?.status, 'completed')
-    assert.match(marker.parts?.[0]?.state?.output ?? '', /^<skill_content name="">\n/)
-    assert.ok(marker.parts?.[0]?.state?.output?.includes(canonicalText.trim()), 'marker keeps canonical pair-programming text')
+    const markerOutput = marker.parts?.[0]?.state?.output ?? ''
+    assert.match(markerOutput, /^<skill_content name="">\n/)
+    assert.match(markerOutput, /\[NEEDHELP\]/)
+    assert.match(markerOutput, /todowrite/i)
+    assert.match(markerOutput, /ready frontier/i)
     assert.equal(hooks.tool[markerToolName], undefined, 'wire marker borrows the Host-owned skill name without plugin registration')
   })
 })
@@ -201,7 +217,7 @@ test('WHAT[ENF-009] MANAGER_non_repository_fork_keywords_are_rejected_before_chi
       { calling: 'navigator', name: 'Web Road', charge: 'browse', keywords: 'repository clue' },
       { sessionID: 'ses-manager-contract', agent: 'fast-manager' },
     )
-    assert.match(result, /only available when fork targets Coder, Inspector, or DevOps/i)
+    assert.match(result, /fork targets Coder, Inspector, or DevOps|fork 目标为 Coder、Inspector 或 DevOps/i)
     assert.equal(createdIds.length, 0)
   })
 })

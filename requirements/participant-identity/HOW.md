@@ -9,7 +9,8 @@
 | `Role` DU + `AgentTier` | `src/Wanxiangshu/Kernel/Roles.fs` | 10 个 office 身份 + Fast/Deep 两档 |
 | 名称/peer/分组公式 | `src/Wanxiangshu/Domain/ManagedAgentCatalog.fs` | `nameOf`/`peerNameOf`/`managerForkableRoles`/`bookkeeperNames`；peer 是公式不是表 |
 | Persona 解析 | `src/Wanxiangshu/Session/PersonaCatalog.fs` | `persona role tier`（Role × initial tier）；`bookkeeperPersona`；`inheritFrom` |
-| Persona 冻结 | `PersonaCatalog.SessionPersona` | `bindOnce`：同值幂等、异值拒绝；`clearAllForTests`（测试钩子） |
+| Persona 冻结 | `Participant/Persona/SessionPersona.fs` + `OpenCode/Host/{PersonaBinding,Sessions}.fs` | root 由 `Role × initial tier` bind-once；`CreateChildSession` 在发送任何 AgentOwnerRoot 前继承 owner Persona，后续 `SessionExecutionBinding.tryParent` child 或 `isInternalRoot` internal lane 的 authority 只消费已冻结继承，不按自身 fast/deep binding 重算 |
+| Persona 退休 | `OpenCode/Host/{HostSessionDeletion,PluginRuntimeScope,PluginSessionScope}.fs` | staged SyncInspector 的物理 delete 只清执行资源；Persona/ProviderLanguage 保留到 owner ReuseScope 的 CaseFinalize 完成，随后立即 drop；plugin dispose 兜底清除 retained identity |
 | agent 名解析 | `src/Wanxiangshu/Domain/PromptAuthority.fs` `parseAgentNameTyped` | `fast-ROLE`/`deep-ROLE` → `{Name; Role; Tier; PeerName}`；legacy/未知/畸形三分拒绝 |
 | prompt identity | `PromptAuthority.systemPromptIdFor` | 只依赖 `CanonicalRole`（tier 不参与，PID-005） |
 | profile 组装 | `PromptAuthority.buildAttemptExecutionProfile` + `Domain/AttemptPlanner.fs` | `EffectiveAgent` 随 fallback cursor 动；`SystemPromptId`/Persona 不动 |
@@ -65,7 +66,7 @@
 | PID-007 | `tests/catalog.test.mjs` `WHAT[PID-007] peer_is_same_role_opposite_tier_and_symmetric`；Bookkeeper pair 同律见 `WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role` | MOVE；旧 pair-model 互异 proof 已废弃，model equality 归 `execution-model-routing` EMR-008 | `node --test requirements/participant-identity/tests/catalog.test.mjs` |
 | PID-008 | `tests/session-execution-binding.test.mjs` `WHAT[PID-008] root_requires_external_agent_proof_then_model_is_scheduler_owned`、`WHAT[PID-008] parented_session_uses_stable_agent_lease_and_authorized_peer_only`、`WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease`（证明 EffectiveAgent preserve/override、synthetic SendPrompt 保持 `Model=None`、物理 `(SessionId, PhysicalUserMessageId)` execution admission 才取得 base/peer lease；managed model authority/supersession/释放语义由 `execution-model-routing` EMR-006/007/009 接管） | REUSE + GAP-016 | `node --test requirements/participant-identity/tests/session-execution-binding.test.mjs`；model 部分见 execution-model-routing PROOF |
 | PID-009 | `tests/catalog.test.mjs` `WHAT[PID-009] bookkeeper_pair_has_machine_identity_and_peer_but_no_public_role`（机器身份 + 无 public Role）+ `tests/session-persona.test.mjs` `WHAT[PID-009] bookkeeperPersona_is_clerk_or_curator_machine_persona` | MOVE | `node --test requirements/participant-identity/tests/{catalog,session-persona}.test.mjs` |
-| PID-010 | `tests/session-persona.test.mjs` `WHAT[PID-010] child_session_persona_inherits_owner_persona`（`inheritFromOwner` 后 replica = 'Engineer'） | MOVE | 同上 |
+| PID-010 | `tests/session-persona.test.mjs` `WHAT[PID-010] child_session_persona_inherits_owner_persona`（primitive law）+ `requirements/verification-system/tests/e2e/entry.test.mjs` Long Stroke（deep-inquiry owner 的 fast-inquiry StrengthReplica 真实 Host canary） | MOVE + REUSE | `node --test requirements/participant-identity/tests/session-persona.test.mjs`；e2e 命令见 verification-system |
 
 ### 移动文件
 

@@ -25,9 +25,12 @@ export const scriptedBookkeeperPort = () => {
   let seq = 0
   const port = {
     CreateChildSession: async () => {
+      throw new Error('Bookkeeper must not attach to a deleted physical parent')
+    },
+    CreateSiblingSession: async (_ownerSessionId, physicalParentId) => {
       seq += 1
       const child = `bk-child-${seq}`
-      createCalls.push({ child })
+      createCalls.push({ child, physicalParentId })
       return bookkeeper.acceptedSession(child)
     },
     AbortSession: async () => bookkeeper.aborted(),
@@ -69,6 +72,7 @@ test('WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_boo
     assert.equal(refreshed.ok, true)
     assert.equal(refreshed.value, true)
     assert.equal(createCalls.length, 1)
+    assert.equal(createCalls[0].physicalParentId, undefined)
     assert.equal(programCalls.length >= 1, true)
     assert.equal(prompts.some((text) => String(text).includes('CaseRefresh')), true)
     const fetched = await casebook.fetchCase(handle, 10, 's-session-refresh')
@@ -97,6 +101,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] CASE010_finalize_create_child_once_and_cleanup_n
     lifecycle.noteAnswer(key, 'Unified EventStore only.')
     assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
     assert.equal(createCalls.length, 1)
+    assert.equal(createCalls[0].physicalParentId, undefined)
     assert.equal(programCalls.length >= 1, true)
     assert.equal(prompts.some((text) => String(text).includes('CaseFinalize')), true)
 

@@ -199,12 +199,14 @@ module StaticTools =
                 [ "mode", box "primary"
                   "permission", permissionObj role
                   "prompt", box text
-                  "temperature", box 1.0 ]
+                  "temperature", box 1.0
+                  "options", box (createObj [ "temperature", box 1.0 ]) ]
         | _ ->
             createObj
                 [ "mode", box "primary"
                   "permission", permissionObj role
-                  "temperature", box 1.0 ]
+                  "temperature", box 1.0
+                  "options", box (createObj [ "temperature", box 1.0 ]) ]
 
     let private hiddenAgent (role: Role) (systemPrompt: string) : obj =
         createObj
@@ -212,7 +214,8 @@ module StaticTools =
               "hidden", box true
               "permission", permissionObj role
               "prompt", box systemPrompt
-              "temperature", box 1.0 ]
+              "temperature", box 1.0
+              "options", box (createObj [ "temperature", box 1.0 ]) ]
 
     /// The only values accepted by the OpenCode judge tool.  Keep this
     /// parser deliberately independent of assistant text: a verdict is a tool
@@ -251,7 +254,8 @@ module StaticTools =
               "hidden", box true
               "permission", permissionObj Role.Distiller
               "prompt", box prompt
-              "temperature", box 1.0 ]
+              "temperature", box 1.0
+              "options", box (createObj [ "temperature", box 1.0 ]) ]
 
     let browserAgentConfig (prompt: string option) : obj = primaryAgent Role.Browser prompt
 

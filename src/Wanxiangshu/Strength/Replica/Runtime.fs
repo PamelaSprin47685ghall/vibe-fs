@@ -583,10 +583,6 @@ type StrengthReplicaRuntime
             let! promptModel =
                 StrengthReplicaRuntimeLogic.acquireOptionalModelOrAbort sessions tryAcquireModel replica fastAgent
 
-            // AGENT-028/029 / STRENGTH-004: inherit owner Persona + language;
-            // ExecutionBinding alone switches to fast-<role>.
-            PersonaBinding.ensureInherited owner replica |> ignore
-
             let capabilities =
                 PromptAuthority.toolCapabilitiesFor managed.Role ProviderRequestKind.StrengthReplica
 

@@ -21,6 +21,8 @@ module SessionExecutionBinding =
     let private parents = Dictionary<string, string>()
     // DSL-MUTABLE: resource — session agent binding map
     let private agents = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — internal execution roots without logical parent bindings
+    let private internalRoots = HashSet<string>()
     // Accepted plugin prompt execution identity awaiting the provider transform
     // that answers that exact PromptKey. Process-local only; restart
     // intentionally forgets it and therefore cannot resume old sends.
@@ -92,6 +94,7 @@ module SessionExecutionBinding =
     let bind (parentId: SessionId) (childId: SessionId) (agent: string option) =
         lock gate (fun () ->
             let childKey = SessionId.value childId
+            internalRoots.Remove childKey |> ignore
             rememberParent childKey (SessionId.value parentId)
 
             match agent |> Option.bind nonEmpty with
@@ -105,7 +108,14 @@ module SessionExecutionBinding =
     let bindInternalRoot (sessionId: SessionId) (agent: string option) =
         match agent |> Option.bind nonEmpty with
         | None -> invalidOp "PROMPT-006: internal root requires a managed agent binding"
-        | Some selected -> lock gate (fun () -> agents.[SessionId.value sessionId] <- selected)
+        | Some selected ->
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                internalRoots.Add key |> ignore
+                agents.[key] <- selected)
+
+    let isInternalRoot (sessionId: SessionId) =
+        lock gate (fun () -> internalRoots.Contains(SessionId.value sessionId))
 
     let tryParent (sessionId: SessionId) =
         lock gate (fun () ->
@@ -264,6 +274,7 @@ module SessionExecutionBinding =
         lock gate (fun () ->
             let key = SessionId.value sessionId
             parents.Remove key |> ignore
+            internalRoots.Remove key |> ignore
             agents.Remove key |> ignore
             providerAttemptBindings.Remove key |> ignore
 

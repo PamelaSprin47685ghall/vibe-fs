@@ -183,6 +183,7 @@ type InjectedSessionPort
         taskResult {
             try
                 SessionExecutionBinding.bindInternalRoot laneId agent
+                PersonaBinding.ensureInherited ownerSessionId laneId |> ignore
                 ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
                 return laneId
             with ex ->
@@ -226,6 +227,7 @@ type InjectedSessionPort
             let! childId = port.CreateChildSession hostParentId options
             registerChild rootId childId
             SessionExecutionBinding.bind parentId childId options.Agent
+            PersonaBinding.ensureInherited parentId childId |> ignore
             // HOST-026: inherit owner/commissioner language (parentId), not family root.
             ProviderLanguageBinding.ensureInherited parentId childId |> ignore
             return childId

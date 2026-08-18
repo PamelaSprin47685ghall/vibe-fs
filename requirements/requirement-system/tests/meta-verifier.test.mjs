@@ -278,7 +278,7 @@ test('WHAT[REQUIREMENT-SYSTEM-006] tree entry and INDEX name the same package se
     'requirements/README.md tree entry and requirements-design/INDEX.md must name the same package set',
   )
 
-  assert.equal(fromIndex.length, 49, `expected 49 packages in INDEX, found ${fromIndex.length}`)
+  assert.equal(fromIndex.length, 48, `expected 48 packages in INDEX, found ${fromIndex.length}`)
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton', () => {

@@ -107,7 +107,7 @@ test('WHAT[KNOWLEDGE-REUSE-010] G6_inspector_tool_sync_delegate_lifecycle_bookke
     bookkeeper.setSessionPort(bookkeeperPort.port)
     const first = await lifecycle.tryFinalize(dir, delegateId)
     assert.equal(first.ok, true, `tryFinalize ok: ${JSON.stringify(first.error)}`)
-    assert.equal(bookkeeperPort.createCalls.length, 1, 'Bookkeeper CreateChildSession once')
+    assert.equal(bookkeeperPort.createCalls.length, 1, 'detached Bookkeeper sibling lane once')
     assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'js-bookkeeper must reshape Q and A in one program')
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q1')), true)

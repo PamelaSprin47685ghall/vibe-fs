@@ -99,20 +99,9 @@ distribution → 特殊：所有声明 runtime resource 的 semantic packages（
 
 本包只依赖「上述资源**在 artifact 中可得**」，不获得任何一行的语义 ownership。语义包负责内容正确性（Gate C 双语锚点、rulebook 契约、office 后果等）。
 
-## 7. 历史与弃权（非 normative 收纳）
+## 7. 历史与弃权
 
-| 源 | 信息 | 裁决 | 落点 |
-|---|---|---|---|
-| 历史 why/enforcer「分发：单一打包 vs dist 双副本/代码 fallback」 | 拒双副本（掩盖打包错误）；拒代码内 fallback catalog（坏包静默成功）；resource 随 npm pack 单份发布 | EVIDENCE | WHY.md 考古；DISTRIBUTION-005/006；本文件 §2/§3 |
-| 历史 why/enforcer「元数据：catalog.json vs 目录即清单」 | 拒 JSON 第二真相；lexical order 由扫描派生 | EVIDENCE | DISTRIBUTION-006；§3 |
-| 历史 change（repository-warm-start）§10 Resource bounds | `MaxKeywords=8 / TopKPerKeyword=4 / MaxHintsTotal=24 / MaxWarmStartBytes=64KiB`——warm-start **hint 预算**，非 artifact 资源闭包 | 弃权（GARBAGE 于本包） | 归 `repository-investigation`/`knowledge-reuse`；本包不拥有 |
-| 历史 verify 条款（VERIFY-001/002 第 5 层、Release gate、VERIFY-006） | 分层结构、晋级纪律、`repeat-until-pass` 禁令、watchdog 治理 | 弃权（HOW 于本包，机制归 `verification-system`） | DISTRIBUTION-007 只取「release proof 覆盖 closure」 |
-| 历史 architecture 条款（ARCH-*，2026-08-14 归档） | 分层所有权、资源读取仅在 `Infrastructure/Resources/`、入口 `dist/OpenCode/Plugin/Plugin.js` | HOW | §3 |
-| `README.md` §构建与打包/运行时资源/故障排查 | tarball = dist + resources + metadata；不得含 src/scripts/requirements/artifacts；`resources/prompts/*` 已删 | HOW | §1/§2 |
-| npm 必须永久是分发介质 | 当前实现用 npm package；换介质不改命题 | HOW（独立 change test 通过） | WHY.md |
-| `dist/`/`resources/` 路径名必须永久 | 现行 HOW/contract evidence；改名需同步全部测试与 README | HOW | §1 |
-| version bump / release cadence | 版本号、发布节奏是发布管理，非 closure 命题 | HOW | 不落命题 |
-| release/package proof 强度（分层多强、watchdog 多严） | 横向治理 | 弃权 | `verification-system` |
+迁移历史由 Git 保存；当前实现边界见 §1–§6，当前 proof 见下方落点表。
 
 ## 8. 已知 GAP 与 cutover 待办
 

@@ -64,6 +64,9 @@ open Wanxiangshu.Strength
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope() =
+    // DSL-MUTABLE: resource — identities retained through staged Inspector finalization.
+    let retainedSessionIdentities = HashSet<string>()
+
     // HOST-012: 跨实例共享（模块级单例）——worktree 独立插件实例的 fork→verdict
     // 链必须读写同一份。每实例独有状态（OwnedSessions、UserMessageBindings、
     // Companions 等）保持 per-instance。
@@ -119,9 +122,15 @@ type PluginSessionScope() =
             // sessionId may itself be a Blogger child being deleted.
             [ sessionId ]
 
+    member _.DropSessionIdentity(sessionId: string) =
+        retainedSessionIdentities.Remove sessionId |> ignore
+        let sid = SessionId.create sessionId
+        SessionProviderLanguage.drop sid
+        SessionPersona.drop sid
+
     /// Session deletion drops every per-instance registry entry for this
     /// session (mirror of DisposeSession's per-session cleanup).
-    member this.ClearSession(sessionId: string) =
+    member this.ClearSession(sessionId: string, preserveIdentity: bool) =
         match this.Companions.TryGetValue sessionId with
         | true, companion ->
             this.Companions.Remove sessionId |> ignore
@@ -136,9 +145,13 @@ type PluginSessionScope() =
         this.SessionDirectories.Remove sessionId |> ignore
         this.VerdictSessions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
+
+        if preserveIdentity then
+            retainedSessionIdentities.Add sessionId |> ignore
+        else
+            this.DropSessionIdentity sessionId
+
         let sid = SessionId.create sessionId
-        SessionProviderLanguage.drop sid
-        SessionPersona.drop sid
         // HOST-004 Q-10: a deleted session's idle permits die forever.
         this.Quiescence.DropSession sid
         // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.
@@ -152,6 +165,9 @@ type PluginSessionScope() =
             (companion :> IDisposable).Dispose()
 
         this.Companions.Clear()
+
+        for sessionId in retainedSessionIdentities |> Seq.toArray do
+            this.DropSessionIdentity sessionId
 
         let routed =
             Seq.append this.ModelRoutingSessions this.OwnedSessions

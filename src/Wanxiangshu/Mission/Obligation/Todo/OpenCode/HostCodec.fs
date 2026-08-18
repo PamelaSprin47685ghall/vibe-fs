@@ -136,8 +136,7 @@ module MagicTodoHostCodec =
         | Ok decoded -> Ok decoded
         | Error MagicTodo.MagicTodoReject.NoNearObligation ->
             Error "todowrite non-empty obligations require at least one near obligation"
-        | Error(MagicTodo.MagicTodoReject.WorkingOnNotNear _) ->
-            Error "todowrite.workingOn must name a near obligation"
+        | Error(MagicTodo.MagicTodoReject.WorkingOnNotNear _) -> Error "todowrite.workingOn must name a near obligation"
         | Error _ -> Error "todowrite input failed semantic validation"
 
     let rec private decodeRows

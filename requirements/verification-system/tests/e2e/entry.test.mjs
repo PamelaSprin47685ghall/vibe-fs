@@ -44,6 +44,7 @@ import {
   NEEDHELP_CANARY_PROMPT,
   armNeedHelpCausalHolds,
   assertNeedHelpAssistance,
+  retireCompanionForDeletion,
   assertG2InspectorBatchCoalescing,
   assertG2InspectorPrefixLaw,
   assertG6BookkeeperFinalize,
@@ -101,6 +102,7 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
     body: {
       parts: [{ type: 'text', text: prompt }],
+      ...(agent ? { agent } : {}),
     },
   });
   assert.ok(response.ok, `${lane} prompt failed: ${JSON.stringify(response.data)}`);
@@ -118,6 +120,7 @@ const runNeedHelpPreFlow = async (scenario) => {
   const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
     body: {
       parts: [{ type: 'text', text: NEEDHELP_CANARY_PROMPT }],
+      agent: 'fast-coder',
     },
   });
   assert.ok(response.ok, `NEEDHELP pre-flow prompt failed: ${JSON.stringify(response.data)}`);
@@ -126,6 +129,7 @@ const runNeedHelpPreFlow = async (scenario) => {
   // therefore proves both earlier abort/reconcile transitions happened, while
   // still letting us arm a turn-scoped terminal oracle without racing the mock.
   await scenario.provider.waitForExpectation('needhelp-owner-advice.0');
+  await scenario.provider.waitForExpectation('needhelp-consult-replica.1');
   const finalTurn = scenario.turn.start(sessionID);
   holds.releaseFinal();
   await finalTurn.awaitTerminal();
@@ -145,6 +149,7 @@ const waitCaptured = async (scenario) => {
 
 const preFlowCanaries = async (scenario) => {
   await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'deep-coder');
+  await scenario.provider.waitForExpectation('strength-canary-replica.1');
 
   for (const step of ['strength-canary-replica.0', 'strength-canary-replica.1']) {
     assert.equal(
@@ -193,6 +198,10 @@ const preFlowCanaries = async (scenario) => {
   assert.ok(batchPrompt.ok, `g2 inspector batch prompt failed: ${JSON.stringify(batchPrompt.data)}`);
   await batchTurn.awaitTerminal();
   assertG2InspectorBatchCoalescing(scenario, g2.inspectorSessionId);
+  await Promise.all([
+    retireCompanionForDeletion(scenario, inspectorOwnerId),
+    retireCompanionForDeletion(scenario, g2.inspectorSessionId),
+  ]);
 
   const deleted = await scenario.client.deleteSession(inspectorOwnerId);
   assert.ok(deleted.ok, `G6 owner session.deleted failed: ${JSON.stringify(deleted.data)}`);

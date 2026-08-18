@@ -105,8 +105,7 @@ module MagicTodoMembraneSurface =
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName _) ->
                 "DuplicateObligationName"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.NoNearObligation) -> "NoNearObligation"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.WorkingOnNotNear _) ->
-                "WorkingOnNotNear"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.WorkingOnNotNear _) -> "WorkingOnNotNear"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.IdentityCorruption _) -> "IdentityCorruption"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.AwaitingConsumableReview _) ->
                 "AwaitingConsumableReview"

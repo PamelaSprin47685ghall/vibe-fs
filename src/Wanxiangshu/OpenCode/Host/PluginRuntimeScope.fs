@@ -404,7 +404,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             | Some owner -> owner.HasLivePty sessionId
             | None -> false)
 
-    member this.DisposeSession(sessionId: string) : Task =
+    member private this.DisposeSessionCore(sessionId: string, preserveIdentity: bool) : Task =
         task {
             let owner = lock toolRuntimeGate (fun () -> toolRuntime)
 
@@ -415,7 +415,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             // C6 item 27: waiters are keyed by BloggerSessionId. When the MAIN is
             // deleted, cancel the linked Blogger's parked waiter + request slots too.
             let linkedBloggerKeys = sessions.LinkedBloggerKeys sessionId
-            sessions.ClearSession sessionId
+            sessions.ClearSession(sessionId, preserveIdentity)
             recovery.ClearSession sessionId
             strength.ClearSession sessionId
             this.LoopSensor.DropSession(SessionId.create sessionId)
@@ -432,6 +432,14 @@ type PluginRuntimeScope(journal: AgentJournal option) =
                 recovery.ClearAttemptPlansFor key
         }
         :> Task
+
+    member this.DisposeSession(sessionId: string) =
+        this.DisposeSessionCore(sessionId, false)
+
+    member this.DisposeSessionPreservingIdentity(sessionId: string) =
+        this.DisposeSessionCore(sessionId, true)
+
+    member _.DropSessionIdentity(sessionId: string) = sessions.DropSessionIdentity sessionId
 
     member private _.TakeReconcileDrain() : Task =
         let shutdown = reconcileShutdown

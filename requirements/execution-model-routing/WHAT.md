@@ -82,6 +82,8 @@ Strength/assistance/fallback 改档仍通过既有 EffectiveAgent authority；sc
 
 active lease 的普通完成释放必须携带 **exact physical identity**：Host terminal `message.updated` 的 assistant `parentID` 指向触发该 provider execution 的 `PhysicalUserMessageId`，只有 `(SessionId, parentID)` 与 current lease 完全匹配时才能删除该 occurrence。`finish="tool-calls"` 只结束一个 provider step，同一 physical execution 仍会经工具继续，因此不得释放；只接受 assistant error，或已 completed 且 finish 不是 `tool-calls` 的最终 assistant。迟到的旧 terminal 对已经 reuse 到新 PhysicalUserMessageId 的同一 SessionId 必须是 no-op。
 
+physical adapter 若在 provider dispatch 前决定 suppress 当前 execution（例如 Enforcer `StopPhysicalRun`），必须从当前 wire transcript 取得 exact trailing `PhysicalUserMessageId`。adapter 先发起 Host abort、立即退出正在被 abort 的 transform callback；不得在该 callback 内 await 同一 abort，否则形成 self-deadlock。Host 接受 abort 后才以 `(SessionId, PhysicalUserMessageId)` 精确释放 lease；abort 失败则保留 lease，等待真实 terminal/supersede/delete 证据。
+
 `SessionIdle` 与 typed `AttemptAborted` 只带 SessionId，因此只能作为 wake / quiescence / abort observation，**不得直接删除 active model lease**；否则 A 的迟到 coarse signal 可以误删刚由 B 的 `chat.message` 建立的 lease。`SessionDeleted`、scope cleanup 与 plugin shutdown 因为销毁整个 owner，可按 SessionId 强制清理 current lease/pending。除此之外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution 被 supersede 的直接物理证据，必须在新 admission 内原子释放旧 lease，即使 Host 没有先发 exact terminal。每个实际 lease 删除一个 `running` occurrence，重复 cleanup 幂等，并触发 EMR-004 pending-demand 重算。
 
 同一 admission 还必须先使上一 terminal 的 idle-derived continuation permit 失效：`chat.message`

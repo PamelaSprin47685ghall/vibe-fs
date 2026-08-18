@@ -68,23 +68,34 @@ module WriterStreamSync =
     let private parseCacheLine (line: string) =
         match line.Split('\t') with
         | [| "w"; encodedName; statIdentity; oid |] when validHex 40 oid ->
-            Some(true, decodeFileName encodedName, { StatIdentity = statIdentity; Oid = GitObjectId.create oid })
+            Some(
+                true,
+                decodeFileName encodedName,
+                { StatIdentity = statIdentity
+                  Oid = GitObjectId.create oid }
+            )
         | [| "p"; encodedName; statIdentity; oid |] when validHex 40 oid ->
-            Some(false, decodeFileName encodedName, { StatIdentity = statIdentity; Oid = GitObjectId.create oid })
+            Some(
+                false,
+                decodeFileName encodedName,
+                { StatIdentity = statIdentity
+                  Oid = GitObjectId.create oid }
+            )
         | _ -> None
 
     let private parseCacheEntry state (line: string) =
         match state, parseCacheLine line with
-        | Some(writers, payloads), Some(true, name, file) ->
-            Some(Map.add name file writers, payloads)
-        | Some(writers, payloads), Some(false, name, file) ->
-            Some(writers, Map.add name file payloads)
+        | Some(writers, payloads), Some(true, name, file) -> Some(Map.add name file writers, payloads)
+        | Some(writers, payloads), Some(false, name, file) -> Some(writers, Map.add name file payloads)
         | _ -> None
 
     let private parseCacheHeader (line: string) =
         match line.Split('\t') with
-        | [| version; fingerprint; root |]
-            when version = materializationCacheVersion && validHex 64 fingerprint && validHex 40 root ->
+        | [| version; fingerprint; root |] when
+            version = materializationCacheVersion
+            && validHex 64 fingerprint
+            && validHex 40 root
+            ->
             Some(fingerprint, root)
         | _ -> None
 
@@ -126,12 +137,7 @@ module WriterStreamSync =
     let private cacheFileLine kind statByName (entry: TreeEntry) =
         let statIdentity = Map.find entry.Name statByName
 
-        String.concat
-            "\t"
-            [ kind
-              encodeFileName entry.Name
-              statIdentity
-              GitObjectId.value entry.Oid ]
+        String.concat "\t" [ kind; encodeFileName entry.Name; statIdentity; GitObjectId.value entry.Oid ]
 
     let private writeMaterializationCache
         commonDir
@@ -239,8 +245,7 @@ module WriterStreamSync =
             return snapshot
         }
 
-    let private materializeAndCache raw commonDir =
-        materializeLocal raw commonDir
+    let private materializeAndCache raw commonDir = materializeLocal raw commonDir
 
     let private readRequiredTree (raw: IGitRawStore) (oid: GitObjectId) (label: string) =
         task {
@@ -280,10 +285,11 @@ module WriterStreamSync =
 
     let private remoteEntryNeeded cacheFiles currentStats (entry: TreeEntry) =
         match Map.tryFind entry.Name cacheFiles, Map.tryFind entry.Name currentStats with
-        | Some cached, Some currentStat
-            when entry.Mode = blobMode
-                 && cached.StatIdentity = currentStat
-                 && cached.Oid = entry.Oid ->
+        | Some cached, Some currentStat when
+            entry.Mode = blobMode
+            && cached.StatIdentity = currentStat
+            && cached.Oid = entry.Oid
+            ->
             false
         | _ -> true
 
@@ -302,20 +308,14 @@ module WriterStreamSync =
             let writerStats = ProcessEventLog.writerPhysicalStats commonDir |> Map.ofList
 
             let neededWriterEntries =
-                changedRemoteEntries
-                    (cacheFiles (fun value -> value.Writers) cache)
-                    writerStats
-                    writerEntries
+                changedRemoteEntries (cacheFiles (fun value -> value.Writers) cache) writerStats writerEntries
 
             let! writerBlobs = readBlobList raw neededWriterEntries
             let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
             let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir |> Map.ofList
 
             let neededPayloadEntries =
-                changedRemoteEntries
-                    (cacheFiles (fun value -> value.Payloads) cache)
-                    payloadStats
-                    payloadEntries
+                changedRemoteEntries (cacheFiles (fun value -> value.Payloads) cache) payloadStats payloadEntries
 
             let! payloadBlobs = readBlobList raw neededPayloadEntries
             return List.map writerTextFromBlob writerBlobs, payloadBlobs
@@ -339,8 +339,7 @@ module WriterStreamSync =
                 |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
 
             match writers, payloads with
-            | Some writerTree, Some payloadTree ->
-                return! readRemoteTrees raw cache commonDir writerTree payloadTree
+            | Some writerTree, Some payloadTree -> return! readRemoteTrees raw cache commonDir writerTree payloadTree
             | _ -> return! Error(asStorage "sync root must contain writers/ and payloads/")
         }
 

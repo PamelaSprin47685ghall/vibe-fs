@@ -334,7 +334,7 @@ module BookkeeperRuntime =
             let txId = Guid.NewGuid().ToString("N")
             BookkeeperStaging.beginTransaction txId q a
 
-            let! created = sessions.CreateChildSession(SessionId.create ownerSessionId, childOptions txId)
+            let! created = sessions.CreateSiblingSession(SessionId.create ownerSessionId, None, childOptions txId)
 
             match created with
             | Error err ->

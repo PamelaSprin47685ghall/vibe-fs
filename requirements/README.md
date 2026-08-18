@@ -22,13 +22,12 @@ APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignor
 
 `APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只补充声明“这个
 package 还覆盖哪些包外仓库路径”。同一个源码文件可以同时命中多个 package；未提供该文件的
-package 仍天然覆盖自身目录，只是不额外关联包外路径。这个约定为可复用的 `requirement-grounding` 能力预留：万象术在
-OpenCode 中开发任何采用同类 `requirements/<package>/` 结构的项目时，都可按相同方式发现相关
-规范，而不是把万象术自身源码路径写死进运行时。
+package 仍天然覆盖自身目录，只是不额外关联包外路径。尚未实现的自动 grounding 语义保留在
+[`proposals/requirement-grounding`](../proposals/requirement-grounding/WHAT.md)，不冒充当前 active package。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 49 包索引
+## 48 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -118,7 +117,6 @@ OpenCode 中开发任何采用同类 `requirements/<package>/` 结构的项目�
 | [repository-investigation](repository-investigation/WHAT.md) | repository claim 由可定位可追溯真实 observation 建立。 |
 | [knowledge-reuse](knowledge-reuse/WHAT.md) | 历史 repository knowledge 是 best-effort cache/hint，不冒充当前证明。 |
 | [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、all-or-nothing surface。 |
-| [requirement-grounding](requirement-grounding/WHAT.md) | 读写代码时按项目自己的路径范围自动带入相关 requirement 文档与测试，同一内容版本不重复注入。 |
 
 ### 12. Optimization / epistemics
 | Package | 一句话 WHY |

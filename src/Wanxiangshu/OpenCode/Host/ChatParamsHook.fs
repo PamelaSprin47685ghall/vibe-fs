@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
@@ -93,8 +94,42 @@ module ChatParamsHook =
             input?model?capabilities?temperature <> box false
 
     let private applyManagedTemperature (input: obj) (output: obj) =
-        if not (isNull output) && supportsTemperature input then
-            output?temperature <- 1.0
+        if supportsTemperature input then
+            emitJsStatement
+                (input, output, 1.0)
+                """
+                if ($1 && typeof $1 === 'object') {
+                    $1.temperature = $2;
+                    if ($1.options && typeof $1.options === 'object') {
+                        $1.options.temperature = $2;
+                    }
+                }
+                if ($0 && typeof $0 === 'object' && $0.model && typeof $0.model === 'object') {
+                    if (!$0.model.options || typeof $0.model.options !== 'object') {
+                        $0.model.options = {};
+                    }
+                    $0.model.options.temperature = $2;
+                    if ($0.model.variants && typeof $0.model.variants === 'object') {
+                        for (const k of Object.keys($0.model.variants)) {
+                            if ($0.model.variants[k] && typeof $0.model.variants[k] === 'object') {
+                                $0.model.variants[k].temperature = $2;
+                            }
+                        }
+                    }
+                    const vName = $0.message && $0.message.model && typeof $0.message.model.variant === 'string'
+                        ? $0.message.model.variant.trim()
+                        : '';
+                    if (vName) {
+                        if (!$0.model.variants || typeof $0.model.variants !== 'object') {
+                            $0.model.variants = {};
+                        }
+                        if (!$0.model.variants[vName] || typeof $0.model.variants[vName] !== 'object') {
+                            $0.model.variants[vName] = {};
+                        }
+                        $0.model.variants[vName].temperature = $2;
+                    }
+                }
+            """
 
     let private handleInput (input: obj) (output: obj) =
         match trySessionAndAgent input with

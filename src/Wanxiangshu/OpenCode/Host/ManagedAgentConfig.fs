@@ -117,6 +117,13 @@ module ManagedAgentConfig =
         if not (isNull owned?temperature) then
             entry?temperature <- owned?temperature
 
+        if not (isNull owned?options) then
+            entry?options <- owned?options
+        elif isNull entry?options then
+            entry?options <- createObj [ "temperature", box 1.0 ]
+        else
+            entry?options?temperature <- 1.0
+
     let private ownedConfigForRole (role: Role) : obj =
         let prompts = RuntimeResources.current().Prompts
 

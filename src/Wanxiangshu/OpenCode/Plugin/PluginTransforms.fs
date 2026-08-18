@@ -315,6 +315,34 @@ module PluginTransforms =
             let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId ctx)
             BloggerRecoveryProbe.repairState durable sid requestKey terminalRun rawMessages
 
+    let private handlePhysicalStopResult
+        (sid: SessionId)
+        (sessionId: string)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        result
+        =
+        match result with
+        | Ok() -> physicalUserMessageId |> Option.iter (ModelRouting.releasePhysicalExecution sid)
+        | Error error ->
+            Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
+
+    let private requestPhysicalStop
+        (sessionPort: ISessionHostPort)
+        (sid: SessionId)
+        (sessionId: string)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        =
+        task {
+            try
+                let! result = sessionPort.AbortSession sid
+                handlePhysicalStopResult sid sessionId physicalUserMessageId result
+            with ex ->
+                Diagnostic.emit
+                    "enforcer-stop-physical-run"
+                    [ "session_id", sessionId; "result", "abort-exception: " + ex.Message ]
+        }
+        |> ignore
+
     let private applyContinuationOutcome
         (sessionPort: ISessionHostPort)
         (sid: SessionId)
@@ -334,8 +362,7 @@ module PluginTransforms =
 
                 Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", reason ]
 
-                let! _ = sessionPort.AbortSession sid
-                ()
+                requestPhysicalStop sessionPort sid sessionId (ProviderWireCapture.lastUserMessageId bloggerMessages)
         }
 
     let private runEnforcerWhenFamilyReady

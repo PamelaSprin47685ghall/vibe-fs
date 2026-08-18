@@ -136,4 +136,4 @@ enum」的可见性过滤 → `participant-horizon`。
 personhood」这一连续性判据。
 
 证据：`session-persona.test.mjs` `AGENT_028_SessionPersona_bind_once_and_inherit`
-（`inheritFromOwner` 后 `tryGet(replica) = 'Engineer'`）。
+（primitive law）+ `requirements/verification-system/tests/e2e/entry.test.mjs` Long Stroke（真实 Host 中 deep owner → fast StrengthReplica 与 SyncInspector → Bookkeeper 均保持 owner Persona）。
