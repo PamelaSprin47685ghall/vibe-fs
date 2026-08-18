@@ -613,17 +613,26 @@ module HostSignalBootstrap =
                     reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
                 | ExplicitResumeSuppression.PhysicalMaterialObservation.Ordinary -> ()
 
+            let projectExternalManagedFissionVisibility (decoded: PromptIngressCodec.DecodedMessage) output =
+                match decoded.SessionId, decoded.PromptKey, managedAgent decoded.ExplicitAgent with
+                | Some sessionId, None, Some _ ->
+                    let hasPhysicalParent =
+                        scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
+
+                    projectFissionToolVisibility hasPhysicalParent output
+                | _ -> ()
+
             let continueRoutedChatMessage routedExecution decoded input output =
                 task {
                     projectRoutedModel output routedExecution
 
                     match routedExecution with
-                    | RoutedChatExecution.ExternalManaged(sessionId, _, _, _)
                     | RoutedChatExecution.PluginManaged(_, { SessionId = sessionId }, _, _, _) ->
                         let hasPhysicalParent =
                             scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
 
                         projectFissionToolVisibility hasPhysicalParent output
+                    | RoutedChatExecution.ExternalManaged _
                     | RoutedChatExecution.NoRoute
                     | RoutedChatExecution.Superseded -> ()
 
@@ -650,6 +659,12 @@ module HostSignalBootstrap =
                         // execution-model-routing. The authority path re-decodes inside
                         // createHook; this local value only gates routing + join wake.
                         let decoded = PromptIngressCodec.decode input output
+
+                        // INTRA-PARTICIPANT-PARALLELISM-013: request-local origin
+                        // narrowing is independent of business-root admission. In
+                        // particular, CRASH-018 explicit /continue still performs a
+                        // provider turn even though it deliberately skips PromptIngress.
+                        projectExternalManagedFissionVisibility decoded output
 
                         // CRASH-018: command.execute.before has no physical message id.
                         // Carry its dynamic restart disclosure across that one Host seam,

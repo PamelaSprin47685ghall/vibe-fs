@@ -152,11 +152,9 @@ module HostMessageProjection =
         match messages with
         | [] -> []
         | [ single ] -> [ single ]
-        | first :: (second :: _ as rest) ->
-            if isUserRole first && isUserRole second then
-                first :: createAssistantDotMessage () :: intersperseAssistantBetweenConsecutiveUsers rest
-            else
-                first :: intersperseAssistantBetweenConsecutiveUsers rest
+        | first :: (second :: _ as rest) when isUserRole first && isUserRole second ->
+            first :: createAssistantDotMessage () :: intersperseAssistantBetweenConsecutiveUsers rest
+        | first :: rest -> first :: intersperseAssistantBetweenConsecutiveUsers rest
 
     let sanitizeMessage (raw: obj) : obj =
         if isNull raw then raw else sanitizeNonNull raw

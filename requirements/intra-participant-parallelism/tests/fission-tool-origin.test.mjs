@@ -41,6 +41,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
           sessionID,
           agent: 'fast-manager',
           model: { providerID: 'host', modelID: 'placeholder' },
+          tools: { fork: true, join: true, horizon: true, suicide: true },
         },
         parts: [{ type: 'text', text: 'root work' }],
       }
@@ -48,6 +49,10 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] real root chat message carries a r
       await hooks['chat.message']({ sessionID, agent: 'fast-manager' }, output)
 
       assert.equal(output.message.tools?.fission, false)
+      assert.equal(output.message.tools?.fork, true)
+      assert.equal(output.message.tools?.join, true)
+      assert.equal(output.message.tools?.horizon, true)
+      assert.equal(output.message.tools?.suicide, true)
     })
   })
 })

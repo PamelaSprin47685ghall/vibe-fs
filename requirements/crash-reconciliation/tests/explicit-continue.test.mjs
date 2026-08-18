@@ -98,7 +98,15 @@ test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_
 
     assert.deepEqual(
       providerOutput.messages,
-      [oldUser, continueUser],
+      [
+        oldUser,
+        {
+          info: { role: 'assistant' },
+          role: 'assistant',
+          parts: [{ type: 'text', text: '.' }],
+        },
+        continueUser,
+      ],
       '/continue exact material must bypass ordinary semantic message transforms',
     )
 

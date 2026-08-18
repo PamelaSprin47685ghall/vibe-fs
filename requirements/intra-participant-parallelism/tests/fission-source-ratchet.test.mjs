@@ -69,6 +69,9 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] request visibility and tool adapte
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   assert.match(bootstrap, /FissionRequestProjection\.apply/)
   assert.match(bootstrap, /SessionParents\.ContainsKey/)
+  const externalProjectionAt = bootstrap.indexOf('projectExternalManagedFissionVisibility decoded output')
+  const explicitResumeAt = bootstrap.indexOf('if explicitResume then')
+  assert.ok(externalProjectionAt >= 0 && externalProjectionAt < explicitResumeAt, 'root tool deny must precede explicit-resume routing bypass')
 
   const tool = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
   const executeAt = tool.indexOf('let private execute (scope: ToolRuntimeScope)')
