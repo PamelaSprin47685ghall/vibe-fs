@@ -5,9 +5,8 @@
 # Kolmogorov 标准工作流程
 
 - 工作流程
-  proposal(禁止未经用户同意删除任何未实现的 proposal) 
-  → 更新 why → what → 阅读相关的规范文档理解为什么要这么做 → 调整测试 → how
-  → 代码实现 → 检查全绿
+  → 更新 why → what → 阅读相关的规范文档理解为什么要这么做 → 调整测试 → how → GAP
+  → 代码实现 → 检查全绿 → GAP Closed → 结束
 - 两种典型失败
   - 写完才想起看文档
     代码已经按旧语义定型，要么返工，要么把旧语义固化，导致规范与代码偏离。
@@ -357,6 +356,23 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `requirements/execution-model-routing/tests/process-shared-routing.test.mjs`
   - 增加真实 plugin-hook regression：容量阻塞旧 physical message → 同 SessionId 新 message supersede；旧 `chat.message` Promise 必须 resolve、不得打印 fatal，fresh message 正常取得 lease。
 - 完成证据：focused execution-model-routing tests green；`rg -n 'trySetCanceled demand\.Completion|assert\.rejects\(old\)|assert\.rejects\(blocked\)' src/Wanxiangshu/OpenCode/Host requirements/execution-model-routing/tests` = 0；标准 `check/build/verification-system` 全绿。
+
+## OBL-013 — `/continue` restart briefing 必须进入真实 physical user material
+
+现场 session 证明 `command.execute.before` 生成的 `[wanxiangshu restart briefing]` 没有进入真实 Host user message；provider 只看见静态 command template 中“Use the ... briefing attached to this command”，随后只能猜测上次 `todowrite` 是否完成。第一次重新提交 account 已返回 accepted 后，后续 provider step 仍被普通 Manager narrative / transform 当业务 turn 处理，模型继续重复同一 `todowrite`。
+
+- [ ] `requirements/crash-reconciliation/WHY.md`、`WHAT.md`、`HOW.md`、`requirements/GAP.md`
+  - CRASH-018 明确 command hook → `chat.message` 是一条待证明的物理通路；禁止静态 template 引用未进入 provider material 的“attached briefing”。
+  - `/continue` 整个 exact physical material（含 tool-result 后续 provider step）必须是 disclosure-only：不得进入普通 PromptIngress、Manager narrative、Companion/XTrace/Strength/Pair/Blogger 等业务 transform。
+- [ ] `requirements/crash-reconciliation/tests/explicit-continue.test.mjs`
+  - 新增真实边界 regression：`command.execute.before` 的输出**不得由测试手工塞进** `chat.message`；模拟 Host 只携带 command template 的 physical user material，生产 hook 必须把动态 briefing 一次性 materialize 到该真实 message，并让 messages transform 保持 disclosure-only。
+- [ ] `src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs`
+- [ ] `src/Wanxiangshu/OpenCode/Host/ExplicitResumeSuppression.fs`
+- [ ] `src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs`
+- [ ] `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`
+  - `command.execute.before` 生成 briefing 后建立 process-local、one-shot resume handoff；`chat.message` 在获得真实 `PhysicalUserMessageId` 时把它 materialize 并立刻转成 exact-material marker，兼容 Host 已转发 marker 的情况且不得重复插入。
+  - exact resume material 的 `chat.message` 不得创建 AuthorityRoot/PromptKey continuation 或业务 routing side effect；provider messages transform 走最小 disclosure path，仅保留 Host 必需的 wire sanitization。
+- 完成证据：`explicit-continue.test.mjs` focused green，且 regression 不再手工转发 command output parts；真实 material 中可见 `[wanxiangshu restart briefing]` + typed marker；同一 material 的 transform 不注入普通 Manager/Companion/Strength/Pair/Blogger 内容；标准 `check/build/verification-system` 全绿。
 
 ## OBL-011 — 最终验收与义务账自删除
 

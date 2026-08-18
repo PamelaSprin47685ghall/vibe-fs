@@ -15,6 +15,12 @@ open Wanxiangshu.Foundation.Identity
 /// No session-end/idle/abort signal is required for correctness.
 module ExplicitResumeSuppression =
 
+    type private PendingBriefing =
+        {
+            MaterialWitness: string
+            Text: string
+        }
+
     [<RequireQualifiedAccess>]
     type PhysicalMaterialObservation =
         | ExplicitResume
@@ -33,12 +39,54 @@ module ExplicitResumeSuppression =
     let private gate = obj ()
     // DSL-MUTABLE: resource — marked physical material registry per session
     let private markedPhysicalBySession = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — one-shot command→chat.message transport handoff.
+    // command.execute.before has no PhysicalUserMessageId, so the dynamic briefing
+    // waits here only until the Host presents the next physical material.
+    let private pendingBriefingBySession = Dictionary<string, PendingBriefing>()
 
     [<Emit("""(() => {
       const parts = Array.isArray($0?.parts) ? $0.parts : [];
       return parts.some((part) => part?.metadata?.wanxiangshu_explicit_resume === true);
     })()""")>]
     let private outputHasMarker (_output: obj) : bool = jsNative
+
+    [<Emit("""(() => {
+      const parts = Array.isArray($0?.parts) ? $0.parts : [];
+      return parts.some((part) => String(part?.text ?? '').includes($1));
+    })()""")>]
+    let private outputContainsWitness (_output: obj) (_witness: string) : bool = jsNative
+
+    let private existingParts (output: obj) : obj array =
+        if isNull output || isNull output?parts then
+            [||]
+        else
+            unbox<obj array> output?parts
+
+    let stageBriefing (sessionId: SessionId) (materialWitness: string) (text: string) : unit =
+        lock gate (fun () ->
+            pendingBriefingBySession.[SessionId.value sessionId] <-
+                { MaterialWitness = materialWitness
+                  Text = text })
+
+    /// Materialize the staged disclosure on the real chat.message material.
+    /// Hosts that already forwarded command output carry the marker themselves;
+    /// in that case the pending handoff is only consumed, never duplicated.
+    let materializePendingBriefing (sessionId: SessionId) (output: obj) : bool =
+        lock gate (fun () ->
+            let sessionKey = SessionId.value sessionId
+
+            match pendingBriefingBySession.TryGetValue sessionKey with
+            | false, _ -> outputHasMarker output
+            | true, pending ->
+                pendingBriefingBySession.Remove sessionKey |> ignore
+
+                if outputHasMarker output then
+                    true
+                elif isNull output || not (outputContainsWitness output pending.MaterialWitness) then
+                    false
+                else
+                    output?parts <- Array.append (existingParts output) [| markedTextPart pending.Text |]
+                    true)
 
     /// chat.message is the physical-material boundary. Same marked material keeps
     /// its suppression across provider retries; a later ordinary user material on
@@ -51,17 +99,22 @@ module ExplicitResumeSuppression =
         lock gate (fun () ->
             let sessionKey = SessionId.value sessionId
             let marked = outputHasMarker output
-            let hadMarked = markedPhysicalBySession.ContainsKey sessionKey
+            let existing =
+                match markedPhysicalBySession.TryGetValue sessionKey with
+                | true, physical -> Some physical
+                | false, _ -> None
 
             if marked then
                 markedPhysicalBySession.[sessionKey] <- PhysicalUserMessageId.value physicalId
-            else
-                markedPhysicalBySession.Remove sessionKey |> ignore
 
-            match marked, hadMarked with
+            match marked, existing with
             | true, _ -> PhysicalMaterialObservation.ExplicitResume
-            | false, true -> PhysicalMaterialObservation.ReplacedExplicitResume
-            | false, false -> PhysicalMaterialObservation.Ordinary)
+            | false, Some current when current = PhysicalUserMessageId.value physicalId ->
+                PhysicalMaterialObservation.ExplicitResume
+            | false, Some _ ->
+                markedPhysicalBySession.Remove sessionKey |> ignore
+                PhysicalMaterialObservation.ReplacedExplicitResume
+            | false, None -> PhysicalMaterialObservation.Ordinary)
 
     let isPhysicalMaterial (sessionId: SessionId) (physicalId: PhysicalUserMessageId) : bool =
         lock gate (fun () ->
@@ -71,7 +124,10 @@ module ExplicitResumeSuppression =
 
     /// Cleanup only. Exact-new-material replacement is the correctness boundary.
     let dropSession (sessionId: SessionId) : unit =
-        lock gate (fun () -> markedPhysicalBySession.Remove(SessionId.value sessionId) |> ignore)
+        lock gate (fun () ->
+            let sessionKey = SessionId.value sessionId
+            markedPhysicalBySession.Remove sessionKey |> ignore
+            pendingBriefingBySession.Remove sessionKey |> ignore)
 
     /// The provider-facing transform always receives the current user request as
     /// the trailing real message. Historical `/continue` messages may remain in

@@ -25,7 +25,8 @@ durable facts + 可信物理 observation 重新进入普通程序，不能从缓
 - outcome unknown 的外部 effect 被当作「未发生」而重放（requested≠accepted 的分型被绕过）；
 - 恢复发明永久 `RecoveryStage` 程序计数器，而不是重入普通 workflow 入口；
 - 证据 ambiguous / multiple / missing 时不是 fail closed，而是挑一个最像的继续；
-- 没有 fresh evidence 却自动发出 effect（恢复期间自动 continuation、自动 join）。
+- 没有 fresh evidence 却自动发出 effect（恢复期间自动 continuation、自动 join）；
+- 用户显式 `/continue` 后，系统声称有 restart briefing，却没有把该 briefing 放进本次真实 provider-visible user material；LLM 因而只能从旧 transcript 猜「上次大概做到哪」，把已经成功的新 tool result 再解释成仍未完成并原地重试。
 
 ## 与相邻包的边界
 

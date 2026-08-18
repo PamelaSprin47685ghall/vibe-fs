@@ -636,6 +636,24 @@ module HostSignalBootstrap =
                         // createHook; this local value only gates routing + join wake.
                         let decoded = PromptIngressCodec.decode input output
 
+                        // CRASH-018: command.execute.before has no physical message id.
+                        // Carry its dynamic restart disclosure across that one Host seam,
+                        // then materialize it on the real chat.message before any owner
+                        // policy can observe the turn. Hosts that already forwarded the
+                        // marked part only consume the pending handoff here.
+                        let materializedExplicitResume =
+                            match decoded.SessionId with
+                            | Some sessionId -> ExplicitResumeSuppression.materializePendingBriefing sessionId output
+                            | None -> false
+
+                        let knownExplicitResume =
+                            match decoded.SessionId, decoded.PhysicalUserMessageId with
+                            | Some sessionId, Some physicalId ->
+                                ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
+                            | _ -> false
+
+                        let explicitResume = materializedExplicitResume || knownExplicitResume
+
                         // CRASH-018: bind the disclosure marker to this exact
                         // physical user material before any routing/reconcile wake
                         // can interpret the turn. A later unmarked physical user
@@ -650,16 +668,24 @@ module HostSignalBootstrap =
                             observePhysicalAdmission output sessionId physicalId
                         | _ -> ()
 
-                        // EMR-009 / PROMPT-006: route from typed authority evidence.
-                        // Keyless external roots use their explicit managed agent;
-                        // plugin prompts use PendingClaim.EffectiveAgent. Host message
-                        // agent/model fields are never authority for a continuation.
-                        let admission = chatExecutionAdmission journal decoded output
-                        let! routedExecution = routeChatExecution scope admission
+                        if explicitResume then
+                            // Disclosure is transport/reconciliation context, not a new
+                            // business root. The Host still performs the provider turn;
+                            // Wanxiangshu does not mint PromptIngress/AuthorityRoot,
+                            // acquire a managed business lease, wake joins, or commit a
+                            // continuation capability for this physical material.
+                            ()
+                        else
+                            // EMR-009 / PROMPT-006: route from typed authority evidence.
+                            // Keyless external roots use their explicit managed agent;
+                            // plugin prompts use PendingClaim.EffectiveAgent. Host message
+                            // agent/model fields are never authority for a continuation.
+                            let admission = chatExecutionAdmission journal decoded output
+                            let! routedExecution = routeChatExecution scope admission
 
-                        match routedExecution with
-                        | RoutedChatExecution.Superseded -> ()
-                        | _ -> do! continueRoutedChatMessage routedExecution decoded input output
+                            match routedExecution with
+                            | RoutedChatExecution.Superseded -> ()
+                            | _ -> do! continueRoutedChatMessage routedExecution decoded input output
                     }
 
             let cancelSignals (ids: SessionId seq) =

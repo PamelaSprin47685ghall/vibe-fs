@@ -25,9 +25,14 @@ module ExplicitSessionResume =
     [<Literal>]
     let CommandName = "continue"
 
+    [<Literal>]
+    let private CommandMaterialWitness = "[wanxiangshu explicit continue]"
+
     let private commandTemplate =
-        "The user explicitly requested session continuation after an OpenCode/Wanxiangshu process restart. "
-        + "Use the Wanxiangshu restart briefing attached to this command. Do not assume the interrupted tool completed."
+        CommandMaterialWitness
+        + "\nThe user explicitly requested session continuation after an OpenCode/Wanxiangshu process restart. "
+        + "Read the [wanxiangshu restart briefing] part in this same user material before acting. "
+        + "If that part is absent, do not infer the interrupted tool state; report the missing disclosure instead."
 
     let private commandsOf (config: obj) =
         if isNull config?command then
@@ -210,7 +215,9 @@ module ExplicitSessionResume =
     let private resumeSession journal snapshot adopt parentId arguments output : Task<unit> =
         task {
             let! items = observations journal snapshot adopt parentId
-            appendVisiblePart output (renderBriefing items arguments)
+            let briefing = renderBriefing items arguments
+            ExplicitResumeSuppression.stageBriefing parentId CommandMaterialWitness briefing
+            appendVisiblePart output briefing
         }
 
     let private runContinue journal snapshot adopt input output : Task<unit> =

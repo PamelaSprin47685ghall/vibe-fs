@@ -8,6 +8,8 @@ test('WHAT[CRASH-018] CRASH_018_continue_registers_a_visible_command', () => {
   resume.registerCommand(config)
   assert.equal(typeof config.command.continue.template, 'string')
   assert.match(config.command.continue.template, /explicitly requested session continuation/i)
+  assert.match(config.command.continue.template, /same user material/i)
+  assert.doesNotMatch(config.command.continue.template, /briefing attached to this command/i)
   assert.match(config.command.continue.description, /resume this session/i)
 })
 
@@ -40,7 +42,7 @@ test('WHAT[CRASH-018] CRASH_018_resume_briefing_keeps_unverified_children_visibl
   assert.match(output.parts[0].text, /- none/)
 })
 
-test('WHAT[CRASH-018] CRASH_018_marked_continue_material_suppresses_the_old_active_root_on_idle', async () => {
+test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_stays_disclosure_only', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ses_continue_exact_material'
     const oldRootID = `root-${sessionID}`
@@ -57,15 +59,27 @@ test('WHAT[CRASH-018] CRASH_018_marked_continue_material_suppresses_the_old_acti
     )
     assert.equal(commandOutput.parts[0].metadata?.wanxiangshu_explicit_resume, true)
 
-    // /continue is not a new AuthorityRoot and has no PromptKey. chat.message
-    // must still bind it as the exact physical material reconciliation follows.
+    // Real OpenCode does not promise that command.execute.before output.parts are
+    // copied into the physical user message. Reproduce that boundary: chat.message
+    // receives only the command template and production must materialize the
+    // staged dynamic briefing itself. The test must not hand-forward commandOutput.
+    const config = {}
+    resume.registerCommand(config)
+    const physicalOutput = {
+      message: { id: continueID, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: config.command.continue.template }],
+    }
+
     await hooks['chat.message'](
       { sessionID, messageID: continueID },
-      {
-        message: { id: continueID, sessionID, role: 'user' },
-        parts: commandOutput.parts,
-      },
+      physicalOutput,
     )
+
+    const materialized = physicalOutput.parts.filter(
+      (part) => part.metadata?.wanxiangshu_explicit_resume === true,
+    )
+    assert.equal(materialized.length, 1, 'chat.message must materialize the pending briefing exactly once')
+    assert.match(materialized[0].text, /\[wanxiangshu restart briefing\]/)
 
     const oldUser = {
       info: { id: oldRootID, sessionID, role: 'user' },
@@ -73,12 +87,19 @@ test('WHAT[CRASH-018] CRASH_018_marked_continue_material_suppresses_the_old_acti
     }
     const continueUser = {
       info: { id: continueID, sessionID, role: 'user' },
-      parts: commandOutput.parts,
+      parts: physicalOutput.parts,
     }
 
+    const providerOutput = { messages: [oldUser, continueUser] }
     await hooks['experimental.chat.messages.transform'](
       { sessionID },
-      { messages: [oldUser, continueUser] },
+      providerOutput,
+    )
+
+    assert.deepEqual(
+      providerOutput.messages,
+      [oldUser, continueUser],
+      '/continue exact material must bypass ordinary semantic message transforms',
     )
 
     runtime.pushHostMessage(sessionID, oldUser)
@@ -103,6 +124,36 @@ test('WHAT[CRASH-018] CRASH_018_marked_continue_material_suppresses_the_old_acti
       runtime.prompts.length,
       promptCount,
       '/continue disclosure must not repair the previous active root or emit any detached prompt',
+    )
+  })
+})
+
+test('WHAT[CRASH-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_ordinary_material', async () => {
+  await withExecutablePlugin(async (hooks) => {
+    const sessionID = 'ses_continue_handoff_superseded'
+    const commandOutput = { parts: [] }
+
+    await hooks['command.execute.before'](
+      { command: 'continue', sessionID, arguments: '' },
+      commandOutput,
+    )
+    assert.equal(commandOutput.parts[0].metadata?.wanxiangshu_explicit_resume, true)
+
+    const ordinaryID = 'msg-after-abandoned-continue'
+    const ordinaryOutput = {
+      message: { id: ordinaryID, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: 'ordinary user work after the command was abandoned' }],
+    }
+
+    await hooks['chat.message'](
+      { sessionID, messageID: ordinaryID },
+      ordinaryOutput,
+    )
+
+    assert.equal(
+      ordinaryOutput.parts.some((part) => part.metadata?.wanxiangshu_explicit_resume === true),
+      false,
+      'a stale command handoff must be discarded rather than attached to a newer ordinary material',
     )
   })
 })

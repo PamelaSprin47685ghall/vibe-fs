@@ -713,21 +713,29 @@ module PluginTransforms =
                         else
                             None)
 
-                projectionSessionIdOpt |> Option.iter wired.RegisterOwned
-
-                match strengthReplicaRuntime projectionSessionIdOpt scope with
-                | Some runtime ->
-                    // STRENGTH-004/009: Replica uses exactly one request-plan
-                    // writer plus its mirror/K gate. XTrace, Manager narrative,
-                    // Companion, Enforcer, Pair and Review are owner-only.
-                    do! XWire.applyTransform snapshotOpt journal scope outObj
-                    let! handled = runtime.HandleTransform outObj
-                    requireReplicaHandled handled
-
+                if ExplicitResumeSuppression.isCurrentMaterial outObj then
+                    // CRASH-018: the exact /continue material stays disclosure-only
+                    // for every provider step, including steps after tool results.
+                    // Do not reinterpret it through ordinary semantic transforms.
                     let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                     let sanitized = HostMessageProjection.sanitizeMessages currentMessages
                     HostMessageProjection.replaceMessagesInPlace outObj sanitized
-                | None -> do! normalTransform projectionSessionIdOpt inObj outObj
+                else
+                    projectionSessionIdOpt |> Option.iter wired.RegisterOwned
+
+                    match strengthReplicaRuntime projectionSessionIdOpt scope with
+                    | Some runtime ->
+                        // STRENGTH-004/009: Replica uses exactly one request-plan
+                        // writer plus its mirror/K gate. XTrace, Manager narrative,
+                        // Companion, Enforcer, Pair and Review are owner-only.
+                        do! XWire.applyTransform snapshotOpt journal scope outObj
+                        let! handled = runtime.HandleTransform outObj
+                        requireReplicaHandled handled
+
+                        let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+                        let sanitized = HostMessageProjection.sanitizeMessages currentMessages
+                        HostMessageProjection.replaceMessagesInPlace outObj sanitized
+                    | None -> do! normalTransform projectionSessionIdOpt inObj outObj
             }
 
         transform
