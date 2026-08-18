@@ -46,10 +46,15 @@ module MagicTodoAdmission =
           ProviderInputDigest: string }
 
     /// Optional frozen Prepared for same-ToolCallId replay.
+    [<RequireQualifiedAccess>]
+    type ExistingPreparedAcceptance =
+        | PreparedOnly
+        | Accepted
+
     type ExistingPrepared =
         { Identity: PreparedIdentity
           TodoWriteId: TodoWriteId
-          Accepted: bool }
+          Acceptance: ExistingPreparedAcceptance }
 
     /// Result of Magic before admission prior to mutating Host args / appending Prepared.
     /// The control algebra is identical for historical and clean-break plans; only
@@ -94,9 +99,9 @@ module MagicTodoAdmission =
             | true, true, true -> Ok()
 
         let replayCheck =
-            match existing.Accepted with
-            | true -> acceptedReplayCheck ()
-            | false -> MagicTodo.checkPreparedReplay existing.Identity observed
+            match existing.Acceptance with
+            | ExistingPreparedAcceptance.Accepted -> acceptedReplayCheck ()
+            | ExistingPreparedAcceptance.PreparedOnly -> MagicTodo.checkPreparedReplay existing.Identity observed
 
         match replayCheck with
         | Error e -> AdmissionOutcome.Rejected e

@@ -74,7 +74,7 @@ module JudgeTool =
             judgement.ReviewerSessionId
             snapshot.AgentProjections.MagicTodo
         |> Option.bind (fun checkpoint ->
-            checkpoint.Assignment
+            MagicTodoProjection.assignment checkpoint
             |> Option.bind (fun assignment ->
                 AgentProjection.tryFind judgement.ReviewerSessionId snapshot.AgentProjections
                 |> Option.bind (fun session -> session.ReviewGuard)

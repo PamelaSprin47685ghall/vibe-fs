@@ -96,15 +96,23 @@ module TodoProcessReviewProgram =
             ReviewProjection.closedAttemptOf attempt guard
             |> Option.map (fun closure -> verdict, attempt, closure))
 
+    let private concludePrerequisiteOfCheckpoint (checkpoint: MagicTodoProjection.CheckpointRecord) =
+        match
+            MagicTodoProjection.conclusion checkpoint,
+            MagicTodoProjection.assignment checkpoint,
+            MagicTodoProjection.isAccepted checkpoint
+        with
+        | Some _, _, _ -> ConcludePrerequisite.AlreadyConcluded
+        | None, Some assignment, true -> ConcludePrerequisite.Assigned(checkpoint, assignment)
+        | _ -> ConcludePrerequisite.Missing "assignment missing"
+
     let private concludePrerequisite
         (life: MagicTodoProjection.LifeMagicTodoState)
         (writeId: TodoWriteId)
         : ConcludePrerequisite =
         match Map.tryFind (writeKey writeId) life.Checkpoints with
-        | Some { Concluded = Some _ } -> ConcludePrerequisite.AlreadyConcluded
-        | Some cp when cp.Accepted && cp.Assignment.IsSome ->
-            ConcludePrerequisite.Assigned(cp, Option.get cp.Assignment)
-        | _ -> ConcludePrerequisite.Missing "assignment missing"
+        | Some checkpoint -> concludePrerequisiteOfCheckpoint checkpoint
+        | None -> ConcludePrerequisite.Missing "assignment missing"
 
     let private closedVerdict
         (snapshot: ProjectionSet)
@@ -301,15 +309,22 @@ module TodoProcessReviewProgram =
         | None -> ProducerPresence.Absent "reviewer session missing"
         | Some reviewer -> presenceForReviewer snapshot assignment reviewer
 
+    let private presenceForCheckpoint
+        (snapshot: ProjectionSet)
+        (checkpoint: MagicTodoProjection.CheckpointRecord)
+        : ProducerPresence =
+        match MagicTodoProjection.conclusion checkpoint, MagicTodoProjection.assignment checkpoint with
+        | Some _, _ -> ProducerPresence.Present
+        | None, Some assignment -> presenceForAssignment snapshot assignment
+        | None, None -> ProducerPresence.Absent "assignment missing"
+
     let private presenceForLife
         (snapshot: ProjectionSet)
         (life: MagicTodoProjection.LifeMagicTodoState)
         (writeId: TodoWriteId)
         : ProducerPresence =
         match Map.tryFind (writeKey writeId) life.Checkpoints with
-        | Some { Concluded = Some _ } -> ProducerPresence.Present
-        | Some checkpoint when checkpoint.Assignment.IsSome ->
-            presenceForAssignment snapshot (Option.get checkpoint.Assignment)
+        | Some checkpoint -> presenceForCheckpoint snapshot checkpoint
         | _ -> ProducerPresence.Absent "assignment missing"
 
     /// REVIEW-017/018: Journal wait is legal only while a process-review producer exists.

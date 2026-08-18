@@ -82,29 +82,46 @@ module MagicTodoProjectionSurface =
                 {| reference = BlobRef.value reference
                    digest = BlobDigest.value digest |}
 
-    let private checkpointView (checkpoint: MagicTodoProjection.CheckpointRecord) : obj =
-        let assignment =
-            checkpoint.Assignment
-            |> Option.map (fun value ->
-                box
-                    {| todoReviewId = TodoReviewId.value value.TodoReviewId
-                       dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
-                       reviewerSessionId = SessionId.value value.ReviewerSessionId
-                       reviewWorkStart = int value.ReviewWorkStartCursor.Sequence
-                       managerReviewFrontier = int value.ManagerReviewFrontier.Sequence |})
-            |> Option.toObj
+    let private assignmentView (value: TodoProcessReviewAssigned) : obj =
+        box
+            {| todoReviewId = TodoReviewId.value value.TodoReviewId
+               dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
+               reviewerSessionId = SessionId.value value.ReviewerSessionId
+               reviewWorkStart = int value.ReviewWorkStartCursor.Sequence
+               managerReviewFrontier = int value.ManagerReviewFrontier.Sequence |}
 
-        let concluded =
-            checkpoint.Concluded
-            |> Option.map (fun value ->
-                box
-                    {| todoReviewId = TodoReviewId.value value.TodoReviewId
-                       dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
-                       reviewerSessionId = SessionId.value value.ReviewerSessionId
-                       verdict = ProcessReviewVerdict.wire value.Verdict
-                       workRecordRef = BlobRef.value value.WorkRecordRef
-                       workRecordDigest = BlobDigest.value value.WorkRecordDigest |})
-            |> Option.toObj
+    let private conclusionView (value: TodoReviewConcluded) : obj =
+        box
+            {| todoReviewId = TodoReviewId.value value.TodoReviewId
+               dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
+               reviewerSessionId = SessionId.value value.ReviewerSessionId
+               verdict = ProcessReviewVerdict.wire value.Verdict
+               workRecordRef = BlobRef.value value.WorkRecordRef
+               workRecordDigest = BlobDigest.value value.WorkRecordDigest |}
+
+    let private lifecycleView (lifecycle: MagicTodoProjection.CheckpointLifecycle) : obj =
+        match lifecycle with
+        | CheckpointLifecycle.Prepared -> box {| kind = "Prepared" |}
+        | CheckpointLifecycle.Accepted accepted ->
+            box
+                {| kind = "Accepted"
+                   inputDigest = accepted.InputDigest
+                   outputDigest = accepted.OutputDigest |}
+        | CheckpointLifecycle.Assigned(accepted, assignment) ->
+            box
+                {| kind = "Assigned"
+                   inputDigest = accepted.InputDigest
+                   outputDigest = accepted.OutputDigest
+                   assignment = assignmentView assignment |}
+        | CheckpointLifecycle.Concluded(accepted, assignment, concluded) ->
+            box
+                {| kind = "Concluded"
+                   inputDigest = accepted.InputDigest
+                   outputDigest = accepted.OutputDigest
+                   assignment = assignmentView assignment
+                   concluded = conclusionView concluded |}
+
+    let private checkpointView (checkpoint: MagicTodoProjection.CheckpointRecord) : obj =
 
         box
             {| managerSessionId = SessionId.value checkpoint.ManagerSessionId
@@ -117,11 +134,7 @@ module MagicTodoProjectionSurface =
                baseTodoDigest = BlobDigest.value checkpoint.BaseTodoDigest
                proposedTodoRef = BlobRef.value checkpoint.ProposedTodoRef
                proposedTodoDigest = BlobDigest.value checkpoint.ProposedTodoDigest
-               accepted = checkpoint.Accepted
-               inputDigest = checkpoint.InputDigest |> optionString
-               outputDigest = checkpoint.OutputDigest |> optionString
-               assignment = assignment
-               concluded = concluded |}
+               lifecycle = lifecycleView checkpoint.Lifecycle |}
 
     let internal rejectionView rejection : obj =
         MagicTodoProjectionEncoding.rejectionView rejection

@@ -282,9 +282,7 @@ test('WHAT[OBLIGATION-LEDGER-012] T1 accept derives the process-review duties (S
     assert.equal(accepted.value.needsDedicatedEnlist, true)
     const snapshot = membrane.MagicTodoMembraneSurface_snapshot(handle, life)
     assert.equal(snapshot.checkpoints.length, 1)
-    assert.equal(snapshot.checkpoints[0].accepted, true)
-    assert.equal(snapshot.checkpoints[0].assignment, null)
-    assert.equal(snapshot.checkpoints[0].concluded, null)
+    assert.equal(snapshot.checkpoints[0].lifecycle.kind, 'Accepted')
   })
 })
 

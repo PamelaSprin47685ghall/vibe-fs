@@ -82,6 +82,11 @@ open Wanxiangshu.Mission.Review
 /// success against that receipt before Accepted.
 module MagicTodoMembrane =
 
+    [<RequireQualifiedAccess>]
+    type PreparedBridgeAcceptance =
+        | AwaitingAcceptance
+        | Accepted of outputDigest: string
+
     type PreparedBridge =
         { ManagerSessionId: SessionId
           ManagerLifeId: ManagerLifeId
@@ -90,8 +95,7 @@ module MagicTodoMembrane =
           BaseObligations: ObligationList
           SubmittedObligations: ObligationList
           PreviousReview: PreviousReviewView option
-          AlreadyAccepted: bool
-          AcceptedOutputDigest: string option }
+          Acceptance: PreparedBridgeAcceptance }
 
     type AcceptOutcome =
         { EnrichedResult: string
@@ -197,7 +201,11 @@ module MagicTodoMembrane =
                   BaseTodoDigest = BlobDigest.value checkpoint.BaseTodoDigest
                   ToolPartOrdinal = checkpoint.ToolPartOrdinal }
               TodoWriteId = checkpoint.TodoWriteId
-              Accepted = checkpoint.Accepted })
+              Acceptance =
+                if MagicTodoProjection.isAccepted checkpoint then
+                    MagicTodoAdmission.ExistingPreparedAcceptance.Accepted
+                else
+                    MagicTodoAdmission.ExistingPreparedAcceptance.PreparedOnly })
 
     let private preparedFromCheckpoint
         (lifeId: ManagerLifeId)
@@ -225,8 +233,7 @@ module MagicTodoMembrane =
         (baseObligations: ObligationList)
         (proposal: ObligationList)
         (previousReview: PreviousReviewView option)
-        (alreadyAccepted: bool)
-        (acceptedOutputDigest: string option)
+        (acceptance: PreparedBridgeAcceptance)
         =
         { ManagerSessionId = managerSessionId
           ManagerLifeId = lifeId
@@ -235,8 +242,12 @@ module MagicTodoMembrane =
           BaseObligations = baseObligations
           SubmittedObligations = proposal
           PreviousReview = previousReview
-          AlreadyAccepted = alreadyAccepted
-          AcceptedOutputDigest = acceptedOutputDigest }
+          Acceptance = acceptance }
+
+    let private bridgeAcceptance (checkpoint: MagicTodoProjection.CheckpointRecord) : PreparedBridgeAcceptance =
+        match MagicTodoProjection.acceptedEvidence checkpoint with
+        | Some accepted -> PreparedBridgeAcceptance.Accepted accepted.OutputDigest
+        | None -> PreparedBridgeAcceptance.AwaitingAcceptance
 
     let private snapshotMatchesSubmitted
         (locality: MagicTodoLocality.LocalizedToolCall)
@@ -292,8 +303,7 @@ module MagicTodoMembrane =
                     currentObligations
                     proposal
                     previousReview
-                    checkpoint.Accepted
-                    checkpoint.OutputDigest
+                    (bridgeAcceptance checkpoint)
         }
 
     let private freshPrepareBridge
@@ -343,8 +353,7 @@ module MagicTodoMembrane =
                     currentObligations
                     preparedPlan.Proposed
                     previousReview
-                    false
-                    None
+                    PreparedBridgeAcceptance.AwaitingAcceptance
         }
 
     let private materializeAdmission
@@ -454,16 +463,16 @@ module MagicTodoMembrane =
         }
 
     let private acceptIdempotent
-        (acceptedOutputDigest: string option)
+        (acceptedOutputDigest: string)
         (observedOutputDigest: string)
         : Result<AcceptOutcome, AcceptRejection> =
-        match acceptedOutputDigest with
-        | Some digest when digest = observedOutputDigest ->
+        if acceptedOutputDigest = observedOutputDigest then
             Ok
                 { EnrichedResult = ""
                   NeedsDedicatedEnlist = false
                   NeedsEnsureReview = false }
-        | _ -> Error AcceptRejection.OutputDigestMismatch
+        else
+            Error AcceptRejection.OutputDigestMismatch
 
     let private previousReviewBody (lang: ProviderLanguage) (previousReview: PreviousReviewView option) =
         match previousReview with
@@ -539,7 +548,7 @@ module MagicTodoMembrane =
             return
                 { EnrichedResult = enrichedResult
                   NeedsDedicatedEnlist = life.Dedicated.IsNone
-                  NeedsEnsureReview = checkpoint |> Option.bind (fun value -> value.Concluded) |> Option.isNone }
+                  NeedsEnsureReview = checkpoint |> Option.bind MagicTodoProjection.conclusion |> Option.isNone }
         }
 
     let accept
@@ -550,11 +559,11 @@ module MagicTodoMembrane =
         (observedOutputDigest: string)
         : Task<Result<AcceptOutcome, AcceptRejection>> =
         task {
-            if bridge.Prepared.ProviderInputDigest <> observedInputDigest then
-                return Error AcceptRejection.InputDigestMismatch
-            elif bridge.AlreadyAccepted then
-                return acceptIdempotent bridge.AcceptedOutputDigest observedOutputDigest
-            else
+            match bridge.Prepared.ProviderInputDigest = observedInputDigest, bridge.Acceptance with
+            | false, _ -> return Error AcceptRejection.InputDigestMismatch
+            | true, PreparedBridgeAcceptance.Accepted outputDigest ->
+                return acceptIdempotent outputDigest observedOutputDigest
+            | true, PreparedBridgeAcceptance.AwaitingAcceptance ->
                 return! acceptFresh journal bridge physical observedInputDigest observedOutputDigest
         }
 

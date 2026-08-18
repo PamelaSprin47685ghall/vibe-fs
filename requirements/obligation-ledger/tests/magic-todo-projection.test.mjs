@@ -151,6 +151,36 @@ test('WHAT[OBLIGATION-LEDGER-010] Accepted supersedes Current immediately', () =
   const lifeState = projection.MagicTodoProjectionSurface_view(acceptedState(), life)
   assert.equal(lifeState.currentObligations.reference, 'proposal-list')
   assert.equal(lifeState.currentObligations.digest, 'proposal-digest')
+  assert.deepEqual(lifeState.checkpoints[0].lifecycle, {
+    kind: 'Accepted',
+    inputDigest: 'provider-input-digest',
+    outputDigest: 'output-digest',
+  })
+})
+
+test('WHAT[OBLIGATION-LEDGER-018] checkpoint lifecycle is tagged Prepared Accepted Assigned Concluded', () => {
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
+  assert.deepEqual(projection.MagicTodoProjectionSurface_view(handle, life).checkpoints[0].lifecycle, { kind: 'Prepared' })
+
+  ok(foldMagic(handle, accepted))
+  assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).checkpoints[0].lifecycle.kind, 'Accepted')
+
+  ok(foldMagic(handle, enlisted))
+  ok(foldMagic(handle, assigned))
+  assert.equal(projection.MagicTodoProjectionSurface_view(handle, life).checkpoints[0].lifecycle.kind, 'Assigned')
+
+  ok(foldMagic(handle, concluded))
+  const lifecycle = projection.MagicTodoProjectionSurface_view(handle, life).checkpoints[0].lifecycle
+  assert.equal(lifecycle.kind, 'Concluded')
+  assert.equal(lifecycle.concluded.verdict, 'REVISE')
+})
+
+test('WHAT[OBLIGATION-LEDGER-018] assignment cannot jump directly from Prepared', () => {
+  const handle = projection.MagicTodoProjectionSurface_create()
+  ok(foldMagic(handle, prepared, 'prepared-fact-ref'))
+  ok(foldMagic(handle, enlisted))
+  assert.equal(error(foldMagic(handle, assigned)).code, 'AssignmentWithoutAccepted')
 })
 
 test('WHAT[OBLIGATION-LEDGER-011] REVISE conclusion cannot roll back CurrentObligations', () => {
@@ -162,7 +192,7 @@ test('WHAT[OBLIGATION-LEDGER-011] REVISE conclusion cannot roll back CurrentObli
   const lifeState = projection.MagicTodoProjectionSurface_view(handle, life)
   assert.equal(lifeState.currentObligations.reference, 'proposal-list')
   assert.equal(lifeState.currentObligations.digest, 'proposal-digest')
-  assert.equal(lifeState.checkpoints[0].concluded.verdict, 'REVISE')
+  assert.equal(lifeState.checkpoints[0].lifecycle.concluded.verdict, 'REVISE')
 })
 
 test('WHAT[OBLIGATION-LEDGER-012] rejects a conclusion with no matching assignment', () => {

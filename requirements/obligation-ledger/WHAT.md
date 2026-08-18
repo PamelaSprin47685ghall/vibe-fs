@@ -376,6 +376,8 @@ Opening 永久 raw 的保护语义属 `work-record`。
 
 `planComplete` 的单调性必须用增量 projection evidence 表达：每个 Accepted append 至多 O(1) 更新 `FirstPlanCommitment`（首次 accepted true 的 checkpoint identity，Once-set）与最近 committed checkpoint locator；查询 `isPlanCommitted` / T1 anchor / committed lag-1 predecessor 均为 O(1)。Dedicated reviewer 的反向定位同样必须由增量 keyed locator 回答：enlist/replacement 时维护 `ReviewerLifeBySession`，按 reviewer session 查询 process-review authority 时不得扫描全部 Life。**不得**通过 `AcceptedOrder |> scan/find/filter` 或 `ByLife |> Map.tryPick` 在热路径重新求当前业务事实；完整历史/全表扫描只可用于离线审计，不是业务查询 API。
 
+单个 checkpoint 的增量 projection 必须是封闭 lifecycle：`Prepared → Accepted → Assigned → Concluded`。后态携带前态必需证据：Accepted 携带 input/output digest，Assigned 同时携带 accepted evidence 与 exact assignment，Concluded 同时携带 accepted evidence、assignment 与 conclusion。禁止 `accepted: bool + nullable digest/assignment/conclusion` 这类可构造矛盾世界的 product。JS owner surface 只暴露稳定的语义 tag 与该 case 合法字段，不暴露 F# union ordinal。
+
 升级兼容：旧 `TodoWritePrepared` payload 没有 `PlanCompleteDeclared` 时必须 decode 为 **true**。理由不是猜测，而是旧协议的 provider contract 已把任何 accepted todowrite 定义为 complete-plan checkpoint；把缺字段解释为 false 会在升级后逆转既有 T1。新 semantic version 的 payload 则必须显式携带 bool，不得省略。
 
 这些字段表达“某 commitment 已经发生”与“最近哪次 committed checkpoint 已发生”，属于领域证据，不是 Stage/Phase/program counter。不得新增或恢复为控制状态：

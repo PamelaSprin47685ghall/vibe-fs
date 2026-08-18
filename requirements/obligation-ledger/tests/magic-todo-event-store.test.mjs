@@ -67,7 +67,11 @@ test('WHAT[OBLIGATION-LEDGER-018] persists typed prepared identity through Agent
     assert.equal(live.checkpoints.length, 1)
     assert.equal(live.checkpoints[0].providerInputDigest, 'digest:provider-input')
     assert.equal(live.checkpoints[0].planCompleteDeclared, true)
-    assert.equal(live.checkpoints[0].accepted, true)
+    assert.deepEqual(live.checkpoints[0].lifecycle, {
+      kind: 'Accepted',
+      inputDigest: 'digest:provider-input',
+      outputDigest: 'digest:output',
+    })
     assert.equal(live.firstPlanCommitment, write)
     journal.JournalSurface_dispose(booted)
 
@@ -76,7 +80,11 @@ test('WHAT[OBLIGATION-LEDGER-018] persists typed prepared identity through Agent
     assert.ok(recovered, 'Magic Todo prepared fact must survive EventStore boot')
     assert.equal(recovered.checkpoints[0].providerInputDigest, 'digest:provider-input')
     assert.equal(recovered.checkpoints[0].planCompleteDeclared, true)
-    assert.equal(recovered.checkpoints[0].accepted, true)
+    assert.deepEqual(recovered.checkpoints[0].lifecycle, {
+      kind: 'Accepted',
+      inputDigest: 'digest:provider-input',
+      outputDigest: 'digest:output',
+    })
     assert.equal(recovered.firstPlanCommitment, write)
     assert.equal(recovered.checkpoints[0].toolCallId, call)
     assert.equal(recovered.checkpoints[0].reviewFrontier, 7)

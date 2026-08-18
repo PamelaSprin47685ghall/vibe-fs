@@ -190,7 +190,7 @@ module DedicatedTodoReviewerRuntime =
         (checkpoint: MagicTodoProjection.CheckpointRecord)
         (capturedMessages: SessionMessage list option)
         : Result<XTraceCursor, string> =
-        match checkpoint.Assignment, capturedMessages with
+        match MagicTodoProjection.assignment checkpoint, capturedMessages with
         | Some assigned, _ -> Ok assigned.ManagerReviewFrontier
         | None, None -> Ok checkpoint.ReviewFrontier
         | None, Some messages ->
@@ -381,7 +381,7 @@ module DedicatedTodoReviewerRuntime =
         (enlisted: DedicatedTodoReviewerEnlisted)
         (reviewId: TodoReviewId)
         : Task<Result<unit, string>> =
-        match checkpoint.Assignment with
+        match MagicTodoProjection.assignment checkpoint with
         | Some _ -> Task.FromResult(Ok())
         | None ->
             ReviewBarrier.openBarrier
@@ -399,7 +399,7 @@ module DedicatedTodoReviewerRuntime =
         (enlisted: DedicatedTodoReviewerEnlisted)
         (managerReviewFrontier: XTraceCursor)
         : Task<Result<unit, string>> =
-        match checkpoint.Assignment with
+        match MagicTodoProjection.assignment checkpoint with
         | Some _ -> Task.FromResult(Ok())
         | None ->
             appendAssigned
@@ -610,15 +610,19 @@ module DedicatedTodoReviewerRuntime =
         | NotAccepted
         | Ready of MagicTodoProjection.CheckpointRecord
 
+    let private admitExistingCheckpoint (checkpoint: MagicTodoProjection.CheckpointRecord) =
+        match MagicTodoProjection.conclusion checkpoint, MagicTodoProjection.isAccepted checkpoint with
+        | Some _, _ -> AlreadyConcluded
+        | None, false -> NotAccepted
+        | None, true -> Ready checkpoint
+
     let private admitCheckpoint
         (life: MagicTodoProjection.LifeMagicTodoState)
         (writeId: TodoWriteId)
         : CheckpointAdmission =
         match Map.tryFind (writeKey writeId) life.Checkpoints with
         | None -> CheckpointMissing
-        | Some { Concluded = Some _ } -> AlreadyConcluded
-        | Some checkpoint when not checkpoint.Accepted -> NotAccepted
-        | Some checkpoint -> Ready checkpoint
+        | Some checkpoint -> admitExistingCheckpoint checkpoint
 
     let private admitManagerLife
         (journal: AgentJournal)
@@ -725,7 +729,7 @@ module DedicatedTodoReviewerRuntime =
                     handleId
                     enlisted.ReviewerSessionId
                     agentName
-                    checkpoint.Assignment.IsNone
+                    (MagicTodoProjection.assignment checkpoint |> Option.isNone)
 
             let prepared: TodoWritePrepared =
                 { ManagerSessionId = managerSessionId

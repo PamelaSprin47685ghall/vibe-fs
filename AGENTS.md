@@ -146,25 +146,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - change-integration + effect-accounting + structured-workflow recovery tests green；
   - crash prefix canaries 覆盖 ManagerStarted、CandidateReady、ConflictPending、RebasedCandidateReady、PublishClaimed、terminal 六类现实并收敛到同一 `run`。
 
-## OBL-003 — Magic Todo checkpoint lifecycle 用 ADT 消灭非法组合
-
-当前 `CheckpointRecord` 允许 `Accepted=false + Assignment=Some`、`Accepted=false + Concluded=Some`、Accepted 但 digest 缺失等类型层非法世界；运行时 guard 不是终态。
-
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs`
-  - 把 `CheckpointRecord.Accepted: bool`、`InputDigest: string option`、`OutputDigest: string option`、`Assignment: TodoProcessReviewAssigned option`、`Concluded: TodoReviewConcluded option` 改为封闭 lifecycle ADT。
-  - 推荐最小形状：common immutable identity + `Prepared` / `Accepted` / `Assigned` / `Concluded` 四个构造；后态必须携带前态必需证据，不能靠 option 猜。
-  - `foldPrepared/foldAccepted/foldAssigned/foldConcluded` 穷尽匹配 lifecycle；`requireAcceptedReplay`、`requireAssignmentForConclude`、`requirePendingMatchesConclude` 中只为防非法 record product 存在的分支应消失。
-  - `PendingReviewCheckpoint` 若只是 O(1) locator 可以保留，但必须能由 lifecycle invariant 证明其指向 Accepted/Assigned 未 Concluded；不能成为第二真相源。
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs`
-  - `checkpointView` 改为 JS-native tagged lifecycle；不要继续输出 `accepted + nullable assignment + nullable concluded` 的可矛盾 product。
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs`
-  - codec proof 适配新的 typed lifecycle，不得把内部 ADT ordinal/tag 当公开 contract。
-- [ ] `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs`
-  - 增加 Prepared→Accepted→Assigned→Concluded 正向序列、非法跳跃 fail-closed、duplicate replay 幂等；断言领域结果，不拼内部非法对象。
-- [ ] `requirements/obligation-ledger/WHAT.md`、`HOW.md`
-  - OBLIGATION-LEDGER-018 对“事实 + 增量 projection”描述与新 ADT 同步；不得新增 Stage/Phase wording。
-- 完成证据：`rg -n 'Accepted: bool|Assignment: TodoProcessReviewAssigned option|Concluded: TodoReviewConcluded option' src/Wanxiangshu/Mission/Obligation/Todo` = 0；obligation-ledger projection tests green。
-
 ## OBL-005 — Fallback success 不得靠 AgentJournal 进程内 overlay 篡改 Snapshot
 
 当前 `AgentJournal.Snapshot = canonical projection + derivedFallbackSuccesses overlay` 与“当前状态是 durable facts 积分”冲突。这里选择统一事件模型：**成功也必须形成 owner-owned durable fact**；不得通过收窄宝典文字为现状开例外。

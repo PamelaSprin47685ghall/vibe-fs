@@ -49,6 +49,17 @@ open Wanxiangshu.Foundation.Identity
 /// CurrentObligations; Concluded only closes the lag-1 review obligation.
 module MagicTodoProjection =
 
+    type AcceptedCheckpointEvidence =
+        { InputDigest: string
+          OutputDigest: string }
+
+    [<RequireQualifiedAccess>]
+    type CheckpointLifecycle =
+        | Prepared
+        | Accepted of AcceptedCheckpointEvidence
+        | Assigned of AcceptedCheckpointEvidence * TodoProcessReviewAssigned
+        | Concluded of AcceptedCheckpointEvidence * TodoProcessReviewAssigned * TodoReviewConcluded
+
     type CheckpointRecord =
         { ManagerSessionId: SessionId
           TodoWriteId: TodoWriteId
@@ -63,11 +74,7 @@ module MagicTodoProjection =
           ReviewFrontier: XTraceCursor
           SemanticVersion: string
           PreparedFactRef: EventId
-          InputDigest: string option
-          OutputDigest: string option
-          Accepted: bool
-          Assignment: TodoProcessReviewAssigned option
-          Concluded: TodoReviewConcluded option }
+          Lifecycle: CheckpointLifecycle }
 
     type DedicatedReviewerState =
         { DedicatedReviewerId: DedicatedReviewerId
@@ -166,6 +173,29 @@ module MagicTodoProjection =
 
     let isPlanCommitted (life: LifeMagicTodoState) : bool = life.FirstPlanCommitment.IsSome
 
+    let acceptedEvidence (checkpoint: CheckpointRecord) : AcceptedCheckpointEvidence option =
+        match checkpoint.Lifecycle with
+        | CheckpointLifecycle.Prepared -> None
+        | CheckpointLifecycle.Accepted evidence
+        | CheckpointLifecycle.Assigned(evidence, _)
+        | CheckpointLifecycle.Concluded(evidence, _, _) -> Some evidence
+
+    let isAccepted (checkpoint: CheckpointRecord) : bool = acceptedEvidence checkpoint |> Option.isSome
+
+    let assignment (checkpoint: CheckpointRecord) : TodoProcessReviewAssigned option =
+        match checkpoint.Lifecycle with
+        | CheckpointLifecycle.Prepared
+        | CheckpointLifecycle.Accepted _ -> None
+        | CheckpointLifecycle.Assigned(_, assigned)
+        | CheckpointLifecycle.Concluded(_, assigned, _) -> Some assigned
+
+    let conclusion (checkpoint: CheckpointRecord) : TodoReviewConcluded option =
+        match checkpoint.Lifecycle with
+        | CheckpointLifecycle.Concluded(_, _, concluded) -> Some concluded
+        | CheckpointLifecycle.Prepared
+        | CheckpointLifecycle.Accepted _
+        | CheckpointLifecycle.Assigned _ -> None
+
     /// Pending process-review obligation: the protocol admits at most one.
     let pendingReviewObligation (life: LifeMagicTodoState) : CheckpointRecord option =
         life.PendingReviewCheckpoint
@@ -175,7 +205,7 @@ module MagicTodoProjection =
     let consumablePreviousReview (life: LifeMagicTodoState) : TodoReviewConcluded option =
         life.LatestAcceptedCheckpoint
         |> Option.bind (fun writeId -> Map.tryFind (writeKey writeId) life.Checkpoints)
-        |> Option.bind (fun checkpoint -> checkpoint.Concluded)
+        |> Option.bind conclusion
 
     /// True when a new TodoWritePrepared may proceed past lag-1 await.
     /// `AwaitingConsumableReview` is the wait signal for deferred prepare / suicide
@@ -259,11 +289,7 @@ module MagicTodoProjection =
               ReviewFrontier = payload.ReviewFrontier
               SemanticVersion = payload.SemanticVersion
               PreparedFactRef = preparedFactRef
-              InputDigest = None
-              OutputDigest = None
-              Accepted = false
-              Assignment = None
-              Concluded = None }
+              Lifecycle = CheckpointLifecycle.Prepared }
 
         putLife
             { life with
@@ -275,13 +301,12 @@ module MagicTodoProjection =
         (payload: TodoWriteAccepted)
         (state: MagicTodoProjectionState)
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
-        match cp.InputDigest, cp.OutputDigest with
-        | Some inputDigest, Some outputDigest when
-            inputDigest = payload.InputDigest && outputDigest = payload.OutputDigest
-            ->
-            Ok state
-        | Some _, Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
-        | _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
+        match acceptedEvidence cp with
+        | Some evidence when
+            evidence.InputDigest = payload.InputDigest && evidence.OutputDigest = payload.OutputDigest
+            -> Ok state
+        | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedDigest")
+        | None -> Error(MagicTodoFoldRejection.IdentityCorruption "AcceptedState")
 
     let private commitmentAfterAccept (life: LifeMagicTodoState) (writeId: TodoWriteId) (planCompleteDeclared: bool) =
         match life.FirstPlanCommitment with
@@ -297,11 +322,11 @@ module MagicTodoProjection =
         =
         let key = writeKey payload.TodoWriteId
 
-        let cp =
-            { cp with
-                Accepted = true
-                InputDigest = Some payload.InputDigest
-                OutputDigest = Some payload.OutputDigest }
+        let accepted =
+            { InputDigest = payload.InputDigest
+              OutputDigest = payload.OutputDigest }
+
+        let cp = { cp with Lifecycle = CheckpointLifecycle.Accepted accepted }
 
         let firstAccepted =
             life.FirstAcceptedCheckpoint |> Option.orElse (Some payload.TodoWriteId)
@@ -348,16 +373,25 @@ module MagicTodoProjection =
         : Result<MagicTodoProjectionState, MagicTodoFoldRejection> =
         let key = writeKey payload.TodoWriteId
 
-        match cp.Assignment with
-        | Some existing when existing = payload -> Ok state
-        | Some _ -> Error(MagicTodoFoldRejection.IdentityCorruption "TodoProcessReviewAssigned")
-        | None ->
+        match cp.Lifecycle with
+        | CheckpointLifecycle.Assigned(_, existing)
+        | CheckpointLifecycle.Concluded(_, existing, _) when existing = payload -> Ok state
+        | CheckpointLifecycle.Assigned _
+        | CheckpointLifecycle.Concluded _ ->
+            Error(MagicTodoFoldRejection.IdentityCorruption "TodoProcessReviewAssigned")
+        | CheckpointLifecycle.Accepted accepted ->
             Ok(
                 putLife
                     { life with
-                        Checkpoints = Map.add key { cp with Assignment = Some payload } life.Checkpoints }
+                        Checkpoints =
+                            Map.add
+                                key
+                                { cp with
+                                    Lifecycle = CheckpointLifecycle.Assigned(accepted, payload) }
+                                life.Checkpoints }
                     state
             )
+        | CheckpointLifecycle.Prepared -> Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
 
     let private requireConcludedReplay
         (existing: TodoReviewConcluded)
@@ -368,14 +402,6 @@ module MagicTodoProjection =
             Ok state
         else
             Error(MagicTodoFoldRejection.IdentityCorruption "TodoReviewConcluded")
-
-    let private requireAssignmentForConclude
-        (cp: CheckpointRecord)
-        (key: string)
-        : Result<TodoProcessReviewAssigned, MagicTodoFoldRejection> =
-        match cp.Assignment with
-        | None -> Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
-        | Some assignment -> Ok assignment
 
     let private requireAssignmentMatchesConcluded
         (assignment: TodoProcessReviewAssigned)
@@ -402,12 +428,15 @@ module MagicTodoProjection =
     let private concludeCheckpoint
         (payload: TodoReviewConcluded)
         (cp: CheckpointRecord)
+        (accepted: AcceptedCheckpointEvidence)
         (assignment: TodoProcessReviewAssigned)
         (life: LifeMagicTodoState)
         (state: MagicTodoProjectionState)
         =
         let key = writeKey payload.TodoWriteId
-        let cp = { cp with Concluded = Some payload }
+        let cp =
+            { cp with
+                Lifecycle = CheckpointLifecycle.Concluded(accepted, assignment, payload) }
 
         putLife
             { life with
@@ -523,8 +552,8 @@ module MagicTodoProjection =
             Error(MagicTodoFoldRejection.IdentityCorruption "InputDigest")
         | Some cp when cp.SemanticVersion <> payload.SemanticVersion ->
             Error(MagicTodoFoldRejection.IdentityCorruption "SemanticVersion")
-        | Some cp when cp.Accepted -> requireAcceptedReplay cp payload state
-        | Some cp -> Ok(acceptCheckpoint payload cp life state)
+        | Some ({ Lifecycle = CheckpointLifecycle.Prepared } as cp) -> Ok(acceptCheckpoint payload cp life state)
+        | Some cp -> requireAcceptedReplay cp payload state
 
     let foldAssigned
         (payload: TodoProcessReviewAssigned)
@@ -535,7 +564,8 @@ module MagicTodoProjection =
 
         match Map.tryFind key life.Checkpoints with
         | None
-        | Some { Accepted = false } -> Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
+        | Some { Lifecycle = CheckpointLifecycle.Prepared } ->
+            Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
         | Some cp ->
             result {
                 let! dedicated = requireDedicatedForAssign life
@@ -552,14 +582,17 @@ module MagicTodoProjection =
 
         match Map.tryFind key life.Checkpoints with
         | None
-        | Some { Accepted = false } -> Error(MagicTodoFoldRejection.ConcludedWithoutAccepted key)
-        | Some { Concluded = Some existing } -> requireConcludedReplay existing payload state
-        | Some cp ->
+        | Some { Lifecycle = CheckpointLifecycle.Prepared } ->
+            Error(MagicTodoFoldRejection.ConcludedWithoutAccepted key)
+        | Some { Lifecycle = CheckpointLifecycle.Accepted _ } ->
+            Error(MagicTodoFoldRejection.AssignmentWithoutAccepted key)
+        | Some { Lifecycle = CheckpointLifecycle.Concluded(_, _, existing) } ->
+            requireConcludedReplay existing payload state
+        | Some ({ Lifecycle = CheckpointLifecycle.Assigned(accepted, assignment) } as cp) ->
             result {
-                let! assignment = requireAssignmentForConclude cp key
                 do! requireAssignmentMatchesConcluded assignment payload
                 do! requirePendingMatchesConclude life payload
-                return concludeCheckpoint payload cp assignment life state
+                return concludeCheckpoint payload cp accepted assignment life state
             }
 
     let foldDedicatedEnlisted
