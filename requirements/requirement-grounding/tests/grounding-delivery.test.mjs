@@ -26,11 +26,44 @@ const terminalRead = (path) => [{
   parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
-test('WHAT[REQUIREMENT-GROUNDING-005] plans one stable material set from canonical docs APPLIES-TO and package test sources without a provider-visible bundle', () => {
+test('WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    writeFileSync(join(dir, 'requirements', 'alpha', 'PROOF.md'), 'proof\n', 'utf8')
+    writeFileSync(join(dir, 'requirements', 'alpha', 'notes.txt'), 'not guidance\n', 'utf8')
+
+    const opened = await host.createJournal(dir)
+    assert.equal(opened.ok, true)
+    const source = join(dir, 'src', 'main.fs')
+    const requested = await host.requestPaths(opened.journal, dir, 's-material', [source])
+    assert.equal(requested.needsGrounding, true)
+    const projected = await host.projectWithJournal(opened.journal, 's-material', terminalRead(source))
+    assert.equal(projected.ok, true)
+
+    const injectedPaths = projected.value
+      .filter((message) => message.info?.source === host.source)
+      .map((message) => message.parts[0].state.input.filePath)
+      .map((path) => path.replaceAll('\\', '/'))
+      .map((path) => path.slice(path.indexOf('/requirements/') + 1))
+
+    assert.deepEqual(injectedPaths, [
+      'requirements/alpha/HOW.md',
+      'requirements/alpha/PROOF.md',
+      'requirements/alpha/WHAT.md',
+      'requirements/alpha/WHY.md',
+    ])
+    assert.ok(injectedPaths.every((path) => path.endsWith('.md')))
+    assert.equal(injectedPaths.some((path) => path.includes('/tests/')), false)
+    assert.equal(injectedPaths.some((path) => path.endsWith('/APPLIES-TO')), false)
+    host.disposeJournal(opened.journal)
+  } finally { cleanup() }
+})
+
+test('WHAT[REQUIREMENT-GROUNDING-005] package self materialization keeps its package-owned test closure', () => {
   const { dir, cleanup } = sandbox()
   try {
     const snapshot = grounding.materializePackage(dir, 'alpha')
-    assert.deepEqual(snapshot.materials.map((x) => x.path), [
+    assert.deepEqual(snapshot.materials.map((material) => material.path), [
       'requirements/alpha/WHY.md',
       'requirements/alpha/WHAT.md',
       'requirements/alpha/HOW.md',
@@ -38,8 +71,6 @@ test('WHAT[REQUIREMENT-GROUNDING-005] plans one stable material set from canonic
       'requirements/alpha/tests/a.test.mjs',
       'requirements/alpha/tests/z.test.mjs',
     ])
-    assert.equal(typeof snapshot.digest, 'string')
-    assert.equal(snapshot.materials[1].result, 'what-v1\n')
   } finally { cleanup() }
 })
 
@@ -56,6 +87,9 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest iden
     await host.projectWithJournal(journal, 's-dedupe', terminalRead(source))
     const same = await host.requestPaths(journal, dir, 's-dedupe', [source])
     assert.equal(same.needsGrounding, false)
+    writeFileSync(join(dir, 'requirements', 'alpha', 'tests', 'a.test.mjs'), 'a-v2\n', 'utf8')
+    const testOnlyChange = await host.requestPaths(journal, dir, 's-dedupe', [source])
+    assert.equal(testOnlyChange.needsGrounding, false, 'external APPLIES-TO identity excludes tests/**')
     writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'what-v2\n', 'utf8')
     const changed = await host.requestPaths(journal, dir, 's-dedupe', [source])
     assert.equal(changed.needsGrounding, true)

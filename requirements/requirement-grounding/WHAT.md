@@ -33,12 +33,16 @@ wildmatch 匹配语法：空行与 `#` 注释忽略；普通匹配行把包外�
 
 **证据**：→ HOW.md `REQUIREMENT-GROUNDING-004`。
 
-## REQUIREMENT-GROUNDING-005：grounding material = 当前 package 文档 + 测试源码
+## REQUIREMENT-GROUNDING-005：APPLIES-TO 外部命中只注入同层 Markdown
 
-一个 package 的 grounding material set 由读取时实际存在的 `README.md`、`WHY.md`、`WHAT.md`、
-`HOW.md`、`APPLIES-TO`，以及递归 `tests/**/*.test.mjs` 组成；按稳定路径顺序读取。
-不存在的可选文件省略，不从 package 外猜补材料。material set 是内部规划概念，不得作为新的
-provider-visible bundle/message/result 形状出现。
+当 package 是因为包外路径命中 `APPLIES-TO` 而进入 grounding 时，自动 material set **只能**包含
+`requirements/<package>/` 根目录直接子级中实际存在的 `*.md` 普通文件，并按文件名确定性排序。
+不得递归进入子目录，因此 `tests/**` 永远不能由 `APPLIES-TO` 外部命中自动注入；`APPLIES-TO`
+自身是 scope metadata，也不得作为 provider-visible read material 注入。
+
+若触碰的是 `requirements/<package>/**` 自身路径，则仍属于 package self coverage，可使用 package-owned
+material closure；本条只收窄 `APPLIES-TO` 建立的包外自动 grounding。material set 始终只是内部规划概念，
+不得作为新的 provider-visible bundle/message/result 形状出现。
 
 **证据**：→ HOW.md `REQUIREMENT-GROUNDING-005`。
 

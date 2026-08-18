@@ -27,11 +27,15 @@ test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_companion_onl
   assert.doesNotMatch(helper, /PairProgrammingThoughtTransform|skillContent|"tool"|"status"|"source"|"synthetic"/)
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_default_off_and_exact_model_allowlisted', () => {
-  assert.match(source, /let private bloggerChronicleThoughtModelIds\s*:\s*Set<string>\s*=\s*Set\.empty/)
+test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_enabled_for_step_3_5_flash_model_prefix', () => {
+  assert.match(
+    source,
+    /let private bloggerChronicleThoughtModelPrefixes\s*:\s*string list\s*=\s*\[\s*"step-3\.5-flash"\s*\]/,
+  )
   assert.match(source, /SessionExecutionBinding\.currentProviderModel/)
-  assert.match(source, /Set\.contains model\.modelID bloggerChronicleThoughtModelIds/)
-  assert.doesNotMatch(source, /StartsWith\([^\n]*bloggerChronicleThoughtModelIds|Contains\([^\n]*bloggerChronicleThoughtModelIds/)
+  assert.match(source, /model\.modelID\.StartsWith\(prefix, StringComparison\.Ordinal\)/)
+  assert.match(source, /List\.exists[^\n]*bloggerChronicleThoughtModelPrefixes/)
+  assert.doesNotMatch(source, /providerID[^\n]*step-3\.5-flash|Contains\([^\n]*step-3\.5-flash/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_the_last_semantic_injection_before_sanitize', () => {

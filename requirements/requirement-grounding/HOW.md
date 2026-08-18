@@ -27,21 +27,20 @@ RequirementGroundingRuntime.requestPaths(journal, workspace, session, paths)
 
 当前实现复用 `Repository/Programming/Js/GlobFs.fs` 的 `matchesPathPattern`；没有第二套 pattern 方言。
 
-## 3. material set 与 digest
+## 3. material profile 与 digest
 
-material set 顺序固定：
+resolver 先区分触发来源：
 
-```text
-README.md
-WHY.md
-WHAT.md
-HOW.md
-APPLIES-TO
-tests/**/*.test.mjs  # lexical path order
-```
+- **package self coverage**：路径位于 `requirements/<package>/**`；保留 package-owned material closure。
+- **APPLIES-TO external coverage**：路径只因 manifest 的包外规则命中；只 materialize
+  `requirements/<package>/` 根目录直接子级的 `*.md` 普通文件，文件名 lexical order。
 
-只包含实际存在文件。内部 planner 对 canonical `(path, bytes)` 序列计算 digest。这样相同包名不同
-workspace 不碰撞；内容不变时即使重复触碰多个文件也只自动读取一次。这个 material set/digest 只用于
+external profile 不递归目录，所以 `tests/**` 不进入自动 grounding；`APPLIES-TO` 只用于 scope resolution，
+也不进入 external provider read。若同一次 effect set 对同一 package 同时出现 self 与 external 命中，self
+profile 胜出，避免同 package 生成两份互相竞争的 snapshot。
+
+内部 planner 对最终 canonical `(path, bytes)` 序列计算 digest。这样相同包名不同 workspace 不碰撞；
+同一 external Markdown 集内容不变时即使重复触碰多个源码文件也只自动读取一次。material set/digest 只用于
 规划与去重，不形成 provider-visible bundle。
 
 ## 4. provider observation path：一次读取，horizon 内永久投影
@@ -206,7 +205,7 @@ grounding state。
 | REQUIREMENT-GROUNDING-002 | `tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-002] treats a package own requirements subtree as implicit coverage that APPLIES-TO cannot cancel` | NEW / GAP-018 CLOSED | implicit self coverage |
 | REQUIREMENT-GROUNDING-003 | `tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-003] evaluates APPLIES-TO as ordered positive wildmatch includes with bang exclusions` | NEW / GAP-018 CLOSED | positive ordered matcher |
 | REQUIREMENT-GROUNDING-004 | `tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-004] returns every overlapping package in deterministic package-name order` | NEW / GAP-018 CLOSED | overlap union |
-| REQUIREMENT-GROUNDING-005 | `tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-005] plans one stable material set from canonical docs APPLIES-TO and package test sources without a provider-visible bundle` | NEW / GAP-019 CLOSED | material closure/order/digest |
+| REQUIREMENT-GROUNDING-005 | `tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest` | NEW / GAP-019 CLOSED | external material profile/order/digest |
 | REQUIREMENT-GROUNDING-006 | `tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest identity while allowing changed package content to ground again` | NEW / GAP-019 CLOSED | digest dedupe + invalidation |
 | REQUIREMENT-GROUNDING-007 | `tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes` | NEW / GAP-020 CLOSED | ordinary/Cursor projection + production order |
 | REQUIREMENT-GROUNDING-008 | `tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-008] defers the first ungrounded mutation with zero file effect and never auto-replays the old call` | NEW / GAP-020 CLOSED | zero-effect defer + expected nonfatal hook rejection |

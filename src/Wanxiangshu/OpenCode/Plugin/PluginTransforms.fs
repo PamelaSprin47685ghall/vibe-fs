@@ -614,16 +614,16 @@ module PluginTransforms =
         | ProviderLanguage.English ->
             "For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly."
 
-    let private bloggerChronicleThoughtModelIds: Set<string> = Set.empty
+    let private bloggerChronicleThoughtModelPrefixes: string list = [ "step-3.5-flash" ]
 
     let private bloggerChronicleThoughtEnabled (projectionSessionIdOpt: string option) =
-        if Set.isEmpty bloggerChronicleThoughtModelIds then
-            false
-        else
-            projectionSessionIdOpt
-            |> Option.map SessionId.create
-            |> Option.bind SessionExecutionBinding.currentProviderModel
-            |> Option.exists (fun model -> Set.contains model.modelID bloggerChronicleThoughtModelIds)
+        projectionSessionIdOpt
+        |> Option.map SessionId.create
+        |> Option.bind SessionExecutionBinding.currentProviderModel
+        |> Option.exists (fun model ->
+            List.exists
+                (fun prefix -> model.modelID.StartsWith(prefix, StringComparison.Ordinal))
+                bloggerChronicleThoughtModelPrefixes)
 
     let private rawMessageRole (message: obj) =
         if isNull message then

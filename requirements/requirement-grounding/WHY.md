@@ -8,7 +8,7 @@
 
 依靠 AGENTS.md 写一句“改代码前先看 requirements”也不够。长任务会压缩上下文，不同子任务
 会各自进入仓库，工具表会演进，模型会替换。流程纪律无法回答更具体的问题：**当前正在触碰的
-这个路径，到底受哪些 package 约束？这些 package 当前版本的规范和测试，当前执行者真的看过吗？**
+这个路径，到底受哪些 package 约束？这些 package 当前版本的规范，当前执行者真的看过吗？**
 
 ## 为什么必须由路径建立 grounding
 
@@ -19,13 +19,16 @@
 路径关联不是 semantic ownership 的替代品。一个文件可以同时承载多个 package 的实现；命中
 多个范围就应同时 grounding 多个包，而不是强迫“一个文件只能归一个包”。
 
-## 为什么测试源码也要进入上下文
+## 为什么 APPLIES-TO 外部 grounding 不再自动读测试
 
-WHAT 告诉执行者“什么必须为真”，HOW 告诉它当前实现结构与证据落点；真正的测试
-源码则展示仓库怎样把这些边界变成可红行为。只读散文而不读测试，Agent 很容易写出“语义看似
-合理、实际破坏既有 oracle”的实现。反过来只读测试，也可能把偶然实现细节误当产品真理。
+`APPLIES-TO` 的职责是把一段包外代码快速连到它的 requirement guidance，而不是把整个 requirement
+package 镜像进 provider context。递归注入 `tests/**` 会让一次普通源码 read 携带大量实现级 oracle，既增加
+context 压力，也让“路径相关规范”退化成“自动导入整个测试树”。
 
-因此 grounding material set 必须把 package 文档与 package-local test source 作为一个整体纳入自动读取。
+因此包外路径由 `APPLIES-TO` 命中时，只自动读取 `requirements/<package>/` **同一层**的 `*.md`。
+这会自然包含 WHAT/HOW/WHY 等当前 package 的直接 Markdown，也允许项目增加同层说明文档；不会递归进入
+`tests/`，也不会把 `APPLIES-TO` manifest 自己当成模型需要阅读的规范正文。若执行者随后直接进入
+`requirements/<package>/**` 工作，则 self coverage 仍可携带 package-owned material。
 
 ## 为什么第一次修改必须停在 effect 前
 
@@ -40,7 +43,7 @@ WHAT 告诉执行者“什么必须为真”，HOW 告诉它当前实现结构�
 
 ## 为什么不能每次都重复读取
 
-把完整 WHY/WHAT/HOW/tests 每次读文件都自动 read 一遍，会迅速淹没上下文，也破坏稳定前缀。
+把完整 requirement material 每次读文件都自动 read 一遍，会迅速淹没上下文，也破坏稳定前缀。
 但简单按包名永久去重又会产生另一个错误：任务进行中 package 内容真的发生变化，旧 grounding
 继续冒充当前版本。
 
@@ -60,12 +63,12 @@ call/result bytes 与 transcript gap 锚定；只要还在同一 horizon，就�
 `skill`，先放已有的伪 skill，再放 requirement reads；在该 horizon 内顺序一旦形成就不再改写。
 
 但 durable 历史不等于跨压缩永久可见。X→Y / `ContextReanchored` 已经明确换了 provider horizon；若还把
-旧 requirement reads（尤其 WHY/WHAT/HOW/tests/APPLIES-TO）全部 replay 回 Y，压缩就只删了 work history，
+旧 requirement reads 全部 replay 回 Y，压缩就只删了 work history，
 辅助材料却无限累积。因此重锚只退休 provider-visible grounding coverage，不删 occurrence；之后相关路径
 再次进入视野时，再按正常触发逐步 grounding。
 
 Cursor 是唯一需要保留 provider 差异的地方。它和现有 pair-programming 一样把 synthetic 内容拼在真实
-terminal result 后面，因此没有 read call 可以携带 `filePath`。如果只拼正文，连续读 WHY/WHAT/HOW/tests
+terminal result 后面，因此没有 read call 可以携带 `filePath`。如果只拼正文，连续读多个 Markdown
 后模型无法知道每段来自哪里。正确补偿不是发明新的 grounding protocol，而是让 result 自身带最小来源
 source-path attribute：只说“读的是哪个 workspace-relative 文件”，正文仍是 read 的原始结果。这样 ordinary provider
 保留完整 call provenance，Cursor 用 result-local provenance 补齐同一事实。

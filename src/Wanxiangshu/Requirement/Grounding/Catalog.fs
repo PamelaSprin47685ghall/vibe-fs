@@ -48,6 +48,10 @@ module GroundingCatalog =
           Root: string
           Rules: ScopeRule list }
 
+    type private MatchKind =
+        | PackageSelf
+        | AppliesTo
+
     let private slash (value: string) = value.Replace('\\', '/')
 
     let canonicalWorkspace (workspace: string) =
@@ -159,12 +163,21 @@ module GroundingCatalog =
                     included)
             false
 
-    let private packageMatches relativePath package =
+    let private selfMatch relativePath package =
         let selfPrefix = "requirements/" + package.Name + "/"
 
         relativePath = "requirements/" + package.Name
         || relativePath.StartsWith(selfPrefix, StringComparison.Ordinal)
-        || externalMatch relativePath package
+
+    let private matchKind relativePath package =
+        if selfMatch relativePath package then
+            Some PackageSelf
+        elif externalMatch relativePath package then
+            Some AppliesTo
+        else
+            None
+
+    let private packageMatches relativePath package = matchKind relativePath package |> Option.isSome
 
     let resolve workspace path =
         let root = canonicalWorkspace workspace
@@ -201,24 +214,22 @@ module GroundingCatalog =
 
     let private docNames = [ "README.md"; "WHY.md"; "WHAT.md"; "HOW.md"; "APPLIES-TO" ]
 
-    let materialize workspace packageName =
-        let root = canonicalWorkspace workspace
+    let private directMarkdownPaths packageRoot =
+        readdirSync packageRoot
+        |> Array.toList
+        |> List.filter (fun name -> name.EndsWith(".md", StringComparison.Ordinal))
+        |> List.filter (fun name ->
+            let full = pathJoin (packageRoot, name)
 
-        let package =
-            discover root
-            |> List.tryFind (fun candidate -> candidate.Name = packageName)
-            |> Option.defaultWith (fun () -> invalidArg "packageName" ("unknown requirement package: " + packageName))
+            try
+                isFile (statSync full)
+            with _ ->
+                false)
+        |> List.sort
 
-        let documentPaths =
-            docNames
-            |> List.choose (fun name ->
-                let full = pathJoin (package.Root, name)
-                if existsSync full then Some name else None)
-
-        let testPaths = collectTests package.Root |> List.map (fun path -> "tests/" + path)
-
+    let private materializePaths root package packageRelativePaths =
         let materials =
-            documentPaths @ testPaths
+            packageRelativePaths
             |> List.map (fun packageRelative ->
                 let full = pathJoin (package.Root, packageRelative)
 
@@ -235,9 +246,49 @@ module GroundingCatalog =
           Digest = HostDigest.sha256Hex digestInput
           Materials = materials }
 
+    let private materializeSelf root package =
+        let documentPaths =
+            docNames
+            |> List.choose (fun name ->
+                let full = pathJoin (package.Root, name)
+                if existsSync full then Some name else None)
+
+        let testPaths = collectTests package.Root |> List.map (fun path -> "tests/" + path)
+        materializePaths root package (documentPaths @ testPaths)
+
+    let private materializeAppliesTo root package =
+        // APPLIES-TO is only path-association metadata. External source matches
+        // receive the package's direct Markdown guidance and never recursively
+        // import package tests or the manifest itself into provider context.
+        directMarkdownPaths package.Root |> materializePaths root package
+
+    let materialize workspace packageName =
+        let root = canonicalWorkspace workspace
+
+        let package =
+            discover root
+            |> List.tryFind (fun candidate -> candidate.Name = packageName)
+            |> Option.defaultWith (fun () -> invalidArg "packageName" ("unknown requirement package: " + packageName))
+
+        materializeSelf root package
+
     let snapshotsForPaths workspace paths =
+        let root = canonicalWorkspace workspace
+        let packages = discover root
+
         paths
-        |> List.collect (resolve workspace)
-        |> List.distinctBy _.Name
-        |> List.sortBy _.Name
-        |> List.map (fun package -> materialize workspace package.Name)
+        |> List.choose (workspaceRelative root)
+        |> List.collect (fun relativePath ->
+            packages
+            |> List.choose (fun package ->
+                matchKind relativePath package |> Option.map (fun kind -> package, kind)))
+        |> List.groupBy (fun (package, _) -> package.Name)
+        |> List.sortBy fst
+        |> List.map (fun (_, matches) ->
+            let package = matches |> List.head |> fst
+            let hasSelfMatch = matches |> List.exists (fun (_, kind) -> kind = PackageSelf)
+
+            if hasSelfMatch then
+                materializeSelf root package
+            else
+                materializeAppliesTo root package)
