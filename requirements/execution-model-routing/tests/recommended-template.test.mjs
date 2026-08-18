@@ -45,7 +45,7 @@ test('WHAT[EMR-005] EMR_005_recommended_resource_is_only_a_policy_template', asy
 
 test('WHAT[EMR-005] EMR_005_recommended_template_counts_capacity_by_provider_across_models', async () => {
   const { default: route } = await import(`${templateUrl.href}?provider=${Date.now()}`)
-  const occupied = Array.from({ length: 4 }, () => ({
+  const occupied = Array.from({ length: 8 }, () => ({
     model: 'opencode-go/deepseek-v4-flash',
     reasoning: 'low',
   }))

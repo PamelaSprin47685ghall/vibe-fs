@@ -23,6 +23,9 @@
    VerdictSessions），不能是 Journal writer——实测第二实例读不到主实例 verdict（why/host.md §3/§7）。
 6. **不修改 OpenCode 本体**（ARCH-003）。只挂现有 Hook/SDK；修改 Host core = 每次升级维护一个
    fork，且与 upstream 契约脱节。
+7. **reasoning 不是 visible text 的替身**。HOST-016 只负责把空 content 变成结构合法的非空
+   content；把 reasoning/thinking 原文复制进 synthetic text 会改变 provider transcript 语义，甚至把
+   仅属于模型内部通道的内容伪装成可见 assistant 文本。需要结构占位时只发送无语义 `"."`。
 
 ## RED 是什么样
 

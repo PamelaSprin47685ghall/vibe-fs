@@ -4,56 +4,70 @@
 // or null for a new conversation. It is a preference hint, not occupancy.
 // Return a target to acquire it, or null to wait for an occupancy change.
 
+// Provider-level concurrency limits (maximum concurrent active leases per provider).
+const PROVIDER_LIMITS = {
+  'ollama-cloud': 16,
+  'opencode-go': 8,
+  'stepfun': 8,
+  'cursor': 4,
+  'neuralwatt': 4,
+}
+
+const DEFAULT_LIMIT = 4
+
 const providerOf = (model) => model.slice(0, model.indexOf('/'))
 
-const providerCount = (running, model) =>
-  running.filter((item) => providerOf(item.model) === providerOf(model)).length
-
-const available = (running, [model, , limit]) => providerCount(running, model) < limit
+const isAvailable = (running, model) => {
+  const provider = providerOf(model)
+  const limit = PROVIDER_LIMITS[provider] ?? DEFAULT_LIMIT
+  const count = running.filter((item) => providerOf(item.model) === provider).length
+  return count < limit
+}
 
 const targetOf = ([model, reasoning]) => ({ model, reasoning })
 
 const pick = (running, previous, candidates) => {
-  const preferred = previous && candidates.find(
-    ([model, reasoning]) => model === previous.model && reasoning === previous.reasoning,
-  )
-
-  if (preferred && available(running, preferred)) return targetOf(preferred)
+  if (previous) {
+    const preferred = candidates.find(
+      ([model, reasoning]) => model === previous.model && reasoning === previous.reasoning,
+    )
+    if (preferred && isAvailable(running, preferred[0])) return targetOf(preferred)
+  }
 
   for (const candidate of candidates) {
-    if (available(running, candidate)) return targetOf(candidate)
+    if (isAvailable(running, candidate[0])) return targetOf(candidate)
   }
   return null
 }
 
 const FASTEST = [
-  ['ollama-cloud/gemma4:31b', 'none', 16],
-  ['opencode-go/deepseek-v4-flash', 'none', 16],
+  ['ollama-cloud/gemma4:31b', 'none'],
+  ['opencode-go/deepseek-v4-flash', 'none'],
 ]
 
 const FASTEST_II = [
-  ['opencode-go/deepseek-v4-flash', 'none', 16],
+  ['opencode-go/deepseek-v4-flash', 'none'],
 ]
 
 const FASTER = [
-  ['stepfun/step-3.5-flash-2603', 'none', 8],
+  ['stepfun/step-3.5-flash-2603', 'none'],
 ]
 
 const MEDIUM = [
-  ['opencode-go/deepseek-v4-flash', 'low', 8],
+  ['opencode-go/deepseek-v4-flash', 'low'],
 ]
 
 const HIGHER = [
-  ['cursor/cursor-grok-4.6-xhigh', 'xhigh', 4],
-  ['neuralwatt/glm-5.2-flex', 'high', 4],
+  ['cursor/cursor-grok-4.6-xhigh', 'xhigh'],
+  ['neuralwatt/glm-5.2-flex', 'high'],
 ]
 
 const FAST_BROWSER = [
-  ['ollama-cloud/minimax-m3', 'none', 8],
+  ['ollama-cloud/minimax-m3', 'none'],
 ]
 
 const DEEP_BROWSER = [
-  ['opencode-go/minimax-m3', 'none', 4],
+  ['opencode-go/minimax-m3', 'none'],
 ]
 
 const pools = new Map([

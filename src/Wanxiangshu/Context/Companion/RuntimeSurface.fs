@@ -282,6 +282,9 @@ module CompanionRuntimeSurface =
     let isDrainOpen (scope: obj) (sessionId: string) : bool =
         hostOf scope |> fun host -> host.IsDrainOpen sessionId
 
+    let sealRuntime (scope: obj) (sessionId: string) : unit =
+        BloggerRuntimeHost.forceSealRuntime (hostOf scope) sessionId
+
     let blocksNewRequest (durableSealed: bool) (hasFlightValue: bool) (drainOpenValue: bool) : bool =
         BloggerRuntime.blocksNewRequest durableSealed hasFlightValue drainOpenValue
 

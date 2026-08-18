@@ -66,6 +66,14 @@ XTrace head 冻成 drain frontier。否则 drain 期间新到的真实 material 
 COMPANION-005 / ENFORCER-047/050 的既有行为。process death 是另一条边界：按 CRASH-017/018，旧
 invocation 已中断，restart 不得把这里的“持续等待”解释成跨进程自动恢复。
 
+### 4.8 park/seal 不能撤销已经起飞的 Blogger 请求
+
+park waiter、drain window 与 physical flight 是三个正交物理事实。取消 waiter 或关闭 drain 只影响
+“还要不要等待/还准不准起新请求”，不能把已经交给 provider、可能马上返回 `chronicle` tool call 的
+flight 从注册表删除。否则会制造确定的竞态：provider 已生成合法 tool call → 本地先清 flight → tool
+execute 重查 `HasFlight=false` → 把合法在途调用误判成 stale no-live-cycle。flight 只由 cycle terminal
+commit、显式 abandon/fail 或 session disposal 释放；seal 只阻止新 work，并让当前 flight 自然收尾。
+
 ## 5. 与相邻包的边界
 
 | 看似相邻 | 为什么不归本包 |

@@ -13,56 +13,70 @@
 // or null for a new conversation. It is a preference hint, not occupancy.
 // Return a target to acquire it, or null to wait for an occupancy change.
 
-const providerOf = (model) => model.slice(0, model.indexOf('/'))
+// Provider-level concurrency limits (maximum concurrent active leases per provider).
+const PROVIDER_LIMITS = {
+  "ollama-cloud": 16,
+  "opencode-go": 8,
+  "stepfun": 8,
+  "cursor": 4,
+  "neuralwatt": 4,
+}
 
-const providerCount = (running, model) =>
-  running.filter((item) => providerOf(item.model) === providerOf(model)).length
+const DEFAULT_LIMIT = 4
 
-const available = (running, [model, , limit]) => providerCount(running, model) < limit
+const providerOf = (model) => model.slice(0, model.indexOf("/"))
+
+const isAvailable = (running, model) => {
+  const provider = providerOf(model)
+  const limit = PROVIDER_LIMITS[provider] ?? DEFAULT_LIMIT
+  const count = running.filter((item) => providerOf(item.model) === provider).length
+  return count < limit
+}
 
 const targetOf = ([model, reasoning]) => ({ model, reasoning })
 
 const pick = (running, previous, candidates) => {
-  const preferred = previous && candidates.find(
-    ([model, reasoning]) => model === previous.model && reasoning === previous.reasoning,
-  )
-
-  if (preferred && available(running, preferred)) return targetOf(preferred)
+  if (previous) {
+    const preferred = candidates.find(
+      ([model, reasoning]) => model === previous.model && reasoning === previous.reasoning,
+    )
+    if (preferred && isAvailable(running, preferred[0])) return targetOf(preferred)
+  }
 
   for (const candidate of candidates) {
-    if (available(running, candidate)) return targetOf(candidate)
+    if (isAvailable(running, candidate[0])) return targetOf(candidate)
   }
   return null
 }
 
 const FASTEST = [
-  ["ollama-cloud/gemma4:31b", "none", 16],
-  ["opencode-go/deepseek-v4-flash", "none", 16],
+  ["ollama-cloud/gemma4:31b", "none"],
+  ["opencode-go/deepseek-v4-flash", "none"],
 ]
 
 const FASTEST_II = [
-  ["opencode-go/deepseek-v4-flash", "none", 16],
+  ["opencode-go/deepseek-v4-flash", "none"],
 ]
 
 const FASTER = [
-  ["stepfun/step-3.5-flash-2603", "none", 8],
+  ["stepfun/step-3.5-flash-2603", "none"],
 ]
 
 const MEDIUM = [
-  ["opencode-go/deepseek-v4-flash", "low", 8],
+  ["opencode-go/deepseek-v4-flash", "low"],
 ]
 
 const HIGHER = [
-  ["cursor/cursor-grok-4.6-xhigh", "xhigh", 4],
-  ["neuralwatt/glm-5.2-flex", "high", 4],
+  ["cursor/cursor-grok-4.6-xhigh", "xhigh"],
+  ["neuralwatt/glm-5.2-flex", "high"],
 ]
 
 const FAST_BROWSER = [
-  ["ollama-cloud/minimax-m3", "none", 8],
+  ["ollama-cloud/minimax-m3", "none"],
 ]
 
 const DEEP_BROWSER = [
-  ["opencode-go/minimax-m3", "none", 4],
+  ["opencode-go/minimax-m3", "none"],
 ]
 
 const pools = new Map([
@@ -97,11 +111,11 @@ export default function route(role, running, previous) {
 }
 ```
 
-这就是推荐的 MJS 风格：**小纯函数 + 明确常量 + 显式 role 表 + provider 聚合计数 + `previous` 优先 + 顺序 `pick` + 满载 `null`**。同一 provider 下无论 model/reasoning 是否不同都合并占用 provider budget；上一 target 只有在仍属于当前候选且其 provider 未满时才优先。不依赖闭包外可变状态，不读时钟/网络/Host，不把模型策略藏进 runtime。
+这就是推荐的 MJS 风格：**小纯函数 + 明确常量 + Provider 独立并发上限表 (`PROVIDER_LIMITS`) + 显式 role 表 + provider 聚合计数 + `previous` 优先 + 顺序 `pick` + 满载 `null`**。同一 provider 下无论 model/reasoning 是否不同都合并占用 provider budget；上一 target 只有在仍属于当前候选且其 provider 未满时才优先。不依赖闭包外可变状态，不读时钟/网络/Host，不把模型策略藏进 runtime。
 
-当前推荐模型对应此前七档意图：最快非推理 `ollama-cloud/gemma4:31b` / `opencode-go/deepseek-v4-flash`；快速只读 `stepfun/step-3.5-flash-2603`；常规中档 `opencode-go/deepseek-v4-flash` low；高档 `cursor/cursor-grok-4.6-xhigh` xhigh / `neuralwatt/glm-5.2-flex` high；Browser 分别使用 `ollama-cloud/minimax-m3` 与 `opencode-go/minimax-m3` 的非推理档，fast/deep 两个 role 可保留不同 admission limit。
+当前推荐模型对应此前七档意图：最快非推理 `ollama-cloud/gemma4:31b` / `opencode-go/deepseek-v4-flash`；快速只读 `stepfun/step-3.5-flash-2603`；常规中档 `opencode-go/deepseek-v4-flash` low；高档 `cursor/cursor-grok-4.6-xhigh` xhigh / `neuralwatt/glm-5.2-flex` high；Browser 分别使用 `ollama-cloud/minimax-m3` 与 `opencode-go/minimax-m3` 的非推理档。Provider 级别的并发上限统一在 `PROVIDER_LIMITS` 表中明确声明。
 
-这些模型名/limit 是**首次生成模板的当前推荐值**，不是 runtime schema。推荐模板把第三列 limit 解释为候选 provider 的 admission limit；同 provider 的其它 model/reasoning occurrence 也计入。用户可以直接编辑整个 MJS：删掉七档、换模型、换计数方法、让 fast/deep 共池都合法。已有文件在升级时绝不被新模板覆盖。
+这些模型名/limit 是**首次生成模板的当前推荐值**，不是 runtime schema。推荐模板把 Provider 级别的并发上限集中在 `PROVIDER_LIMITS` 中；同 provider 的其它 model/reasoning occurrence 统一计入。用户可以直接编辑整个 MJS：删掉七档、换模型、换计数方法、调整各 provider 上限都合法。已有文件在升级时绝不被新模板覆盖。
 
 `model` 必须是完整非空 `provider/model`；裸 `modelID` 非法，因为 provider 同样属于 MJS routing authority。`reasoning` 直接映射 OpenCode 的 reasoning/variant 档位，非推理显式写 `none`。返回值结构之外的策略信息不穿过 ABI。
 

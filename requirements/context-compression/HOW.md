@@ -62,6 +62,9 @@
 - quiet 不是直接 stop：normal commit、idempotent receipt、stale catch-up、protocol-repair re-entry 必须汇合到
   同一个 `ParkTransform` 边界。在同一存活执行内先 park，只有 durable seal / cancel 或 park waiter 既有
   physical lifetime 才能解除等待；这些是既存终止/物理边界，不得被解释成“caught-up 已完成”的业务判据。
+- waiter/drain/flight 三者分权：`CancelParked` 只取消 waiter 并清 PendingOffer；`forceSealRuntime` 只关闭
+  drain、清 PendingOffer、取消 waiter。二者都保留已有 `CurrentRequest` flight，直到 commit、abandon/fail
+  或 session disposal 显式 `ClearCurrentRequest`/删除 SharedState flight。
 - process death 直接中断旧 tool/continuation；普通 Host restart 不重新挂起这个 waiter、不 replay 旧 cycle、
   不补 terminal。跨进程语义完全服从 CRASH-017/018；显式 `/continue` 也不续跑旧 Blogger invocation。
 

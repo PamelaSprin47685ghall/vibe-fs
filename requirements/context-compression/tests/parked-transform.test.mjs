@@ -115,6 +115,32 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_clears_staged_context_wi
   assert.equal(await waiter, true)
 })
 
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_park_does_not_revoke_an_existing_physical_flight', () => {
+  const scope = parkedTransform.scope()
+  const key = 'ses-blogger'
+  parkedTransform.setCurrentRequest(scope, key, main('already-flying'))
+
+  parkedTransform.cancelParked(scope, key)
+
+  assert.equal(parkedTransform.hasFlight(scope, key), true)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key)?.toml, 'already-flying')
+  parkedTransform.clearCurrentRequest(scope, key)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_closes_drain_without_revoking_an_existing_physical_flight', () => {
+  const scope = parkedTransform.scope()
+  const key = 'ses-blogger'
+  parkedTransform.setCurrentRequest(scope, key, main('seal-in-flight'))
+  parkedTransform.setDrainWindow(scope, key, parkedTransform.openDrain('root-1'))
+
+  parkedTransform.sealRuntime(scope, key)
+
+  assert.equal(parkedTransform.isDrainOpen(scope, key), false)
+  assert.equal(parkedTransform.hasFlight(scope, key), true)
+  assert.equal(parkedTransform.peekCurrentRequest(scope, key)?.toml, 'seal-in-flight')
+  parkedTransform.clearCurrentRequest(scope, key)
+})
+
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent_under_the_same_scope', async () => {
   const scope = parkedTransform.scope()
   const a = parkedTransform.park(scope, 'ses-a', 60_000)

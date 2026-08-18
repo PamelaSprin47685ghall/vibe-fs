@@ -318,6 +318,12 @@ stale-cycle catch-up 与 protocol-repair 后的重入；任何 recovery/re-entry
 CRASH-017/018，旧 tool/continuation 已中断，新 Host 不得自动恢复、重放或补 terminal；显式 `/continue`
 也只能公开断点并重新登记 surviving child，不能续跑旧 Blogger tool invocation。
 
+`ParkTransform` waiter、drain window 与 `CurrentRequest`/physical flight 必须独立拥有生命周期：
+`CancelParked` 只取消 waiter + PendingOffer，durable seal 只关闭 drain + PendingOffer/waiter；二者均不得
+清除已经存在的 flight。已起飞 request 的 ownership 只能在 cycle terminal commit、显式 abandon/fail
+或 session disposal 时释放。由此已被 provider 生成的 `chronicle` tool call 在 Host 真正 execute 前不会
+因为 seal/park 清理而瞬间失去 live-cycle 资格。
+
 **含义/动机**：200 KiB 只限制单次输入，不限制一次 wake 的总追平量。冻结 frontier 会降低吞吐并
 改变 material 可见时序；把 quiet 当完成则把持续 Companion 变成依赖下一次用户/主会话动作的离散批处理。
 `ParkTransform`/pending offer 只承载物理等待与唤醒，不得成为业务 Stage/程序计数器；业务流程仍由

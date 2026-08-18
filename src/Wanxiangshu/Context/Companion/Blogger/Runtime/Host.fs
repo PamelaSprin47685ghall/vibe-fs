@@ -48,10 +48,10 @@ module BloggerRuntimeHost =
             (scope.HasFlight bloggerKey)
             (scope.IsDrainOpen bloggerKey)
 
-    /// Close drain + clear CurrentRequest/PendingOffer + cancel park waiter.
+    /// Close drain + drop PendingOffer + cancel park waiter.
+    /// Existing physical flight ownership survives until its terminal owner clears it.
     let forceSealRuntime (scope: IParkedTransformHost) (bloggerKey: string) : unit =
         scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
-        scope.ClearCurrentRequest bloggerKey
         scope.TryTakePendingOffer bloggerKey |> ignore
         scope.CancelParked bloggerKey
 

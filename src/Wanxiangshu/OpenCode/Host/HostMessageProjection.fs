@@ -112,7 +112,7 @@ module HostMessageProjection =
 
     let private fallbackText (role: string) (reasoningText: string option) : string =
         match reasoningText with
-        | Some r -> r
+        | Some _ -> "."
         | None -> if role.ToLowerInvariant() = "assistant" then "..." else "#"
 
     let private withFallbackTextPart (raw: obj) (rawParts: obj array) (text: string) : obj =

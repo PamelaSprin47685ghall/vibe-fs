@@ -5,16 +5,16 @@ import * as HostMessageProjection from '../../../dist/OpenCode/Host/HostMessageP
 const sanitizeMessage = HostMessageProjection.sanitizeMessage
 const sanitizeMessages = (messages) => messages.map(HostMessageProjection.sanitizeMessage)
 
-test('WHAT[HOST-BOUNDARY-011] HOST_016_assistant_message_with_only_reasoning_gets_text_part_from_reasoning', () => {
+test('WHAT[HOST-BOUNDARY-011] HOST_016_assistant_message_with_only_reasoning_gets_semantically_empty_dot_text', () => {
   const raw = { info: { id: 'asst_1', role: 'assistant' }, parts: [{ type: 'reasoning', text: 'Step-by-step thinking content' }] }
   const result = sanitizeMessage(raw)
   assert.equal(result.parts.at(-1).type, 'text')
-  assert.equal(result.parts.at(-1).text, 'Step-by-step thinking content')
+  assert.equal(result.parts.at(-1).text, '.')
 })
 
-test('WHAT[HOST-BOUNDARY-011] HOST_016_assistant_message_with_thinking_type_gets_text_part', () => {
+test('WHAT[HOST-BOUNDARY-011] HOST_016_assistant_message_with_thinking_type_gets_semantically_empty_dot_text', () => {
   const result = sanitizeMessage({ info: { role: 'assistant' }, parts: [{ type: 'thinking', thinking: 'Deep reasoning text' }] })
-  assert.equal(result.parts.at(-1).text, 'Deep reasoning text')
+  assert.equal(result.parts.at(-1).text, '.')
 })
 
 test('WHAT[HOST-BOUNDARY-011] HOST_016_assistant_message_with_empty_parts_gets_ellipsis_fallback', () => {
@@ -44,5 +44,5 @@ test('WHAT[HOST-BOUNDARY-011] HOST_016_sanitizeMessages_processes_whole_array', 
   ]
   const result = sanitizeMessages(raw)
   assert.equal(result[0].parts[0].text, 'Hi')
-  assert.equal(result[1].parts.at(-1).text, 'Thinking')
+  assert.equal(result[1].parts.at(-1).text, '.')
 })

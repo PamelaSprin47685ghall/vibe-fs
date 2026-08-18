@@ -137,11 +137,7 @@ type PluginBloggerScope() =
                     parked.Remove sessionId |> ignore
                 | false, _ -> ()
 
-                pendingOffer.Remove sessionId |> ignore
-                // Park cancel/timeout leaves the logical Blogger idle, not disposed.
-                // Seal is durable: park cancel clears flight; the next entry's
-                // durable check re-blocks when still sealed. Drain slot is preserved.
-                lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove sessionId |> ignore))
+                pendingOffer.Remove sessionId |> ignore)
 
         member this.HasParked(sessionId: string) : bool =
             lock parkedGate (fun () -> parked.ContainsKey sessionId)

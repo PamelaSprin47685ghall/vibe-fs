@@ -158,8 +158,9 @@ missing-verdict 的 occasion 必须是 durable `ReviewBarrierId`，不得使用�
 
 ## HOST-BOUNDARY-011：空 Content 预防（HOST-016）
 
-**规范**：交付上游 provider 前：无 `tool_calls` 的 `assistant` 消息若无 text part 或 text 为空，
-以 reasoning/thinking 文本（或默认 `"..."`）填充 text part；`user` 消息 text 为空填充 `"#"`。
+**规范**：交付上游 provider 前：无 `tool_calls` 的 `assistant` 消息若只有 reasoning/thinking、没有
+非空 text part，则追加无语义 text part `"."`；若连 reasoning/thinking 也没有，则使用默认 `"..."`。
+`user` 消息 text 为空填充 `"#"`。禁止把 reasoning/thinking 原文复制成 synthetic text。
 禁止向上游发送空 content 消息（上游 400 `messages[i].content cannot be empty`）。
 
 **含义/动机**：依赖外部网关/厂商容错实现不一；在 transform 末尾兜底是唯一可靠位置
