@@ -72,6 +72,33 @@ No segment/chunk/index/delta protocol.
 WANXIANG_GIT_SYNC_ACTIVE prevents Git operations performed by the hook from recursively entering sync.
 ```
 
+Hot path:
+
+```text
+successful full materialization
+  → persist non-authoritative {physical-stat-fingerprint, root-oid}
+
+next hook under the same store lock
+  → stat fingerprint only
+  → hit + same remote root = reuse root; no writer/payload body reads; no remote blob reads
+  → miss/different root = compare per-file cached stat + cached blob OID
+      unchanged local file → reuse prior blob OID
+      unchanged remote entry → do not read/decompress blob
+      changed file only → read/import/blobify that file
+    then canonical validate + refresh cache
+
+reference-transaction(observed current root):
+  candidate == observed → no push
+
+pre-push:
+  expected := local refs/remotes/<remote>/wanxiang/store
+  lease-push candidate directly
+  lease rejected → fetch/discover current root → full retry
+```
+
+cache 从不参与 durable correctness：metadata 不匹配/parse 失败即 miss；完整 path 仍是唯一 validation owner。
+这等价于 Git index 的 stat-cache 角色——只证明“可以复用已验证 materialization”，不创造新事实。
+
 ### 4. Dumb remote 与 hook（`Infrastructure/Git/HookDispatcher.fs`）
 
 ```text

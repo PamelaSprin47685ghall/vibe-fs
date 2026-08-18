@@ -128,6 +128,25 @@ module GitGateway =
                 return Error(transportError stdout stderr)
         }
 
+    let private readTrackedRemote (raw: IGitRawStore) remote =
+        task {
+            let! expected = raw.ReadRef(trackingRef remote)
+
+            return
+                expected |> Option.map (fun oid -> { RootOid = RootOid.create oid }),
+                expected
+        }
+
+    let private publishIfNeeded run remote remoteKnownCurrent expectedRemote (merged: StoreSnapshot) =
+        task {
+            let next = RootOid.value merged.RootOid
+
+            if remoteKnownCurrent && expectedRemote = Some next then
+                return Ok()
+            else
+                return! pushSnapshot run remote expectedRemote merged
+        }
+
     /// Full bidirectional convergence. `observedRemote` is only an optimization
     /// for reference-transaction: the algorithm after root discovery is identical
     /// to pre-push. Lease races refetch and repeat boundedly.
@@ -139,16 +158,19 @@ module GitGateway =
         (remote: string)
         (observedRemote: StoreSnapshot option)
         : Task<Result<StoreSnapshot, ConvergeError>> =
-        let rec loop remoteSnapshot expectedRemote retriesLeft =
+        let rec loop remoteSnapshot expectedRemote remoteKnownCurrent retriesLeft =
             taskResult {
                 let! merged = WriterStreamSync.syncWriterStreams raw commonDir remoteSnapshot
-                let! pushResult = pushSnapshot run remote expectedRemote merged |> TaskResultCE.ofTask
+
+                let! pushResult =
+                    publishIfNeeded run remote remoteKnownCurrent expectedRemote merged
+                    |> TaskResultCE.ofTask
 
                 match pushResult with
                 | Ok() -> return merged
                 | Error _ when retriesLeft > 0 ->
                     let! nextSnapshot, nextExpected = discoverRemote run remote
-                    return! loop nextSnapshot nextExpected (retriesLeft - 1)
+                    return! loop nextSnapshot nextExpected true (retriesLeft - 1)
                 | Error _ when maxRetries <= 0 -> return! Error ConvergeError.ConvergeCasRejected
                 | Error _ -> return! Error ConvergeError.ConvergeRetryExhausted
             }
@@ -157,10 +179,10 @@ module GitGateway =
             match observedRemote with
             | Some snapshot ->
                 let expected = Some(RootOid.value snapshot.RootOid)
-                return! loop (Some snapshot) expected maxRetries
+                return! loop (Some snapshot) expected true maxRetries
             | None ->
-                let! snapshot, expected = discoverRemote run remote
-                return! loop snapshot expected maxRetries
+                let! snapshot, expected = readTrackedRemote raw remote |> TaskResultCE.ofTask
+                return! loop snapshot expected false maxRetries
         }
 
     /// Estimate for hook-process Git transport (fetch / push / ls-remote).

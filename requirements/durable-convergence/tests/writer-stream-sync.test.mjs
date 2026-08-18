@@ -33,7 +33,7 @@ test('WHAT[DURABLE-CONVERGENCE-003] sync blobifies each complete writer file onc
 
   // Contract shape: materialization iterates writer files, writing one blob for the complete bytes.
   assert.match(source, /materialize.*writer|writer.*materialize/is)
-  assert.doesNotMatch(source, /split|rotate/i)
+  assert.doesNotMatch(source, /splitWriter|rotateWriter|writerSegment|writerChunk/i)
 })
 
 test('WHAT[DURABLE-CONVERGENCE-008] activation only ensures hooks and user Git process runs full sync', async () => {

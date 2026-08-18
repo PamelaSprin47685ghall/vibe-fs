@@ -40,6 +40,8 @@ replica 同时存在，且任一 process crash 后其内存可以全部消失。
 - 相同 object set 在 replica A 折叠成世界 W1、在 replica B 折叠成 W2 → 分叉真相。
 - 自然 fork 被误判 StorageInvalid → 历史永久不可恢复。
 - 单向 Pull/Push 让 remote 永远落后（Local={A,B}, Remote={A,C} 成功同步后仍不对称）。
+- no-op hook 仍重读/重解码全部 writer+payload、重建全部 Git objects，或在 pre-push 先做
+  `ls-remote + fetch` 再开始 lease → 同步成本随历史总量增长，普通 Git 操作被历史体积绑架。
 - dumb server 开始理解 domain event → server 变成第二套领域运行时。
 - `Merge(Projection1, Projection2)` 式合并 → 投影层面的 LWW/漂移。
 

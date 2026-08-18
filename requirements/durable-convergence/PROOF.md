@@ -11,6 +11,7 @@ node --test requirements/durable-convergence/tests/replica-merge-laws.test.mjs
 node --test requirements/durable-convergence/tests/writer-stream-sync.test.mjs
 node --test requirements/durable-convergence/tests/event-store-converge.test.mjs
 node --test requirements/durable-convergence/tests/dumb-remote-no-domain.test.mjs
+node --test requirements/durable-convergence/tests/hook-performance-fast-path.test.mjs
 node --test requirements/durable-convergence/tests/integration/persist/dumb-server.test.mjs
 ```
 
@@ -27,10 +28,11 @@ node --test requirements/durable-convergence/tests/integration/persist/dumb-serv
 | DURABLE-CONVERGENCE-007 | `tests/writer-stream-sync.test.mjs::sync does not integrate business history` + `requirements/durable-events/tests/canonical-integrator.test.mjs` | NEW/FROZEN + CROSS/FROZEN |
 | DURABLE-CONVERGENCE-008 | `tests/event-store-converge.test.mjs::reference-transaction and pre-push both call the same full bidirectional converge` + `tests/event-store-converge.test.mjs::reference-transaction observed root changes discovery only not sync direction` + `tests/event-store-converge.test.mjs::lease race refetches and repeats the same k-way sync boundedly` + `tests/event-store-converge.test.mjs::product process has no fetch pull push remote API` + `tests/event-store-converge.test.mjs::hook-internal Git commands are recursion guarded and pre-push is not reentered` + `tests/writer-stream-sync.test.mjs::activation only ensures hooks and user Git process runs full sync` | NEW/FROZEN |
 | DURABLE-CONVERGENCE-009 | `tests/dumb-remote-no-domain.test.mjs::dumb remote fixture has no Wanxiang domain or server-side logic` + `tests/integration/persist/dumb-server.test.mjs::dumb_remote_helper_has_no_Wanxiang_domain_or_projection_logic` + `tests/integration/persist/dumb-server.test.mjs::pre_push_hook_process_uploads_one_local_writer_file_to_bare_remote_store_ref` + `tests/integration/persist/dumb-server.test.mjs::second_machine_hook_imports_remote_writer_truth_without_any_running_Wanxiang_process` + `tests/integration/persist/dumb-server.test.mjs::two_offline_clients_converge_by_whole_writer_files_and_repeat_is_idempotent` | NEW/FROZEN |
+| DURABLE-CONVERGENCE-010 | `tests/hook-performance-fast-path.test.mjs::no-op sync reuses stat-fingerprint materialization instead of rereading durable bytes` + `tests/hook-performance-fast-path.test.mjs::near-equal worst path reads and blobifies only changed files` + `tests/hook-performance-fast-path.test.mjs::pre-push starts from tracking ref and only discovers remote after lease rejection` + `tests/hook-performance-fast-path.test.mjs::confirmed same-root convergence does not publish an empty snapshot` | NEW |
 
 ## 统计
 
-- WHAT 命题：9；PROOF 行：9。
+- WHAT 命题：10；PROOF 行：10。
 - 统一 k-way primitive：`Infrastructure/Persist/EventKWayMerge.fs`，由 `CanonicalIntegrator` 与 `WriterStreamSync` 共同调用。
 - remote sync trigger：plugin Load Phase 零 Git mutation；durability activation 才 `HookDispatcher.ensure`；实际执行由 `resources/git/wanxiang-hook.mjs` → `HookSync` 独立进程完成。
 - GAP：0。
