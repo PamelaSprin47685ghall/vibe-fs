@@ -9,7 +9,7 @@
 
 - `src/Wanxiangshu/Infrastructure/OpenCode/Tools/JudgeTool.fs`：
   - `spec` 返回 `{ Name = "judge"; Arguments = ["verdict", enumSchema ["PERFECT"; "REVISE"]] }`——**只有** `verdict` 一个参数，无描述字段（REVIEW-JUDGEMENT-001）。
-  - 成功回执走 `tool/judge/received` 文案（`Your judgment has been received.`），**不 echo verdict**；`description` 文案明言「It does not echo the verdict」。
+  - 成功回执走 `tool/judge/received` 文案（`Your judgment has been received, please conclude the conversation.` / `你的判断已被收下，请你结束对话。`），**不 echo verdict**；再次调用走 `tool/judge/already-judged` 文案（`You have already made a judgment, please conclude the conversation.` / `你已经做出过判断了，现在请你结束对话。`）；`description` 文案明言「It does not echo the verdict」。
   - `execute` 把 `verdict` 文本交给 `StaticTools.reviewerVerdictOfString` 解析，任何非 `PERFECT/REVISE` 值 → `Path.VerdictMustBePerfectOrRevise`。
   - fail-closed 分支（非 Reviewer、无 barrier、无 tree、binding 失败）→ `notReceived`，不落 verdict 事实。这些分支的因果侧（seal binding）归 `review-assurance`。
 - `src/Wanxiangshu/Tools/StaticTools.fs`：

@@ -57,3 +57,12 @@ module JudgeSurface =
 
     let receipt (language: string) =
         ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/received"
+
+    let alreadyJudged (language: string) =
+        ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/already-judged"
+
+    let markVerdictSubmitted (sessionId: string) : unit =
+        SharedState.VerdictSessions.Add(sessionId) |> ignore
+
+    let clearVerdictSessions () : unit =
+        SharedState.VerdictSessions.Clear()

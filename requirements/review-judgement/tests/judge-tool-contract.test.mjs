@@ -46,8 +46,17 @@ test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_reviewer_provider_instructions_name_
 test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_receipt_does_not_echo_the_verdict', () => {
   const received = judge.receipt('English')
   const description = provider.readText('English', 'tool/judge/description')
-  assert.equal(received, 'Your judgment has been received.')
+  assert.equal(received, 'Your judgment has been received, please conclude the conversation.')
   assert.equal(/PERFECT|REVISE/.test(received), false)
   assert.match(description, /does not echo the verdict/i)
   assert.match(description, /does not mutate source/i)
+})
+
+test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_already_judged_receipt_prompts_to_conclude', () => {
+  const zh = judge.alreadyJudged('SimplifiedChinese')
+  const en = judge.alreadyJudged('English')
+  assert.equal(zh, '你已经做出过判断了，现在请你结束对话。')
+  assert.equal(en, 'You have already made a judgment, please conclude the conversation.')
+  assert.equal(/PERFECT|REVISE/.test(zh), false)
+  assert.equal(/PERFECT|REVISE/.test(en), false)
 })

@@ -1,1 +1,1 @@
-Your judgment has been received.
+Your judgment has been received, please conclude the conversation.

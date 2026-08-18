@@ -499,6 +499,9 @@ type ToolRuntimeScope
     member _.MarkVerdictSubmitted(reviewerId: string) =
         lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
 
+    member _.HasVerdictSubmitted(reviewerId: string) =
+        lock gate (fun () -> verdictSessions.Contains reviewerId)
+
     member _.RunOwnedWork(start: unit -> Task) : bool =
         let admitted =
             lock ownedWorkGate (fun () ->

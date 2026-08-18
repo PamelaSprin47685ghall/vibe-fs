@@ -26,6 +26,9 @@ module JudgeTool =
         let Received = "tool/judge/received"
 
         [<Literal>]
+        let AlreadyJudged = "tool/judge/already-judged"
+
+        [<Literal>]
         let NotReceived = "tool/judge/not-received"
 
         [<Literal>]
@@ -57,6 +60,9 @@ module JudgeTool =
 
     let private received ctx =
         ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.Received ] []
+
+    let private alreadyJudged ctx =
+        ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.AlreadyJudged ] []
 
     let private challenged ctx =
         ToolHostCodec.tomlObjectWithInstructions
@@ -139,7 +145,6 @@ module JudgeTool =
                 finish (received context)
 
             let challenge () =
-                scope.MarkVerdictSubmitted context.SessionId
                 finish (challenged context)
 
             let reject () =
@@ -156,37 +161,49 @@ module JudgeTool =
         else
             recordProcessJudgement scope context judgement
 
+    [<RequireQualifiedAccess>]
+    type private ExecutionDecision =
+        | Refused of reasonPath: string
+        | AlreadyJudged
+        | Proceed of ReviewJudgement
+
+    let private decideExecution
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (context: HostToolContext)
+        : ExecutionDecision =
+        let isReviewer = scope.RoleFor context = Some Role.Reviewer
+        let hasSession = not (String.IsNullOrWhiteSpace context.SessionId)
+        let isSubmitted = hasSession && scope.HasVerdictSubmitted context.SessionId
+        let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
+        let physicalUserMsg =
+            if hasSession then
+                scope.CurrentPhysicalUserMessage context.SessionId
+            else
+                None
+
+        match isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg with
+        | false, _, _, _, _, _, _ -> ExecutionDecision.Refused Path.NotFromReviewer
+        | _, false, _, _, _, _, _ -> ExecutionDecision.Refused Path.NoActiveIdentity
+        | _, _, true, _, _, _, _ -> ExecutionDecision.AlreadyJudged
+        | _, _, _, Error _, _, _, _ -> ExecutionDecision.Refused Path.VerdictMustBePerfectOrRevise
+        | _, _, _, _, None, _, _
+        | _, _, _, _, _, None, _
+        | _, _, _, _, _, _, None -> ExecutionDecision.Refused Path.CouldNotBind
+        | true, true, false, Ok value, Some toolCallId, Some providerRunId, Some physicalUserMessageId ->
+            ExecutionDecision.Proceed
+                { ReviewerSessionId = SessionId.create context.SessionId
+                  PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessageId
+                  ProviderRun = providerRunId
+                  ToolCallId = toolCallId
+                  Verdict = value }
+
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
-            let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
-
-            let validated =
-                if scope.RoleFor context <> Some Role.Reviewer then
-                    Error Path.NotFromReviewer
-                elif String.IsNullOrWhiteSpace context.SessionId then
-                    Error Path.NoActiveIdentity
-                else
-                    match
-                        verdict,
-                        context.ToolCallId,
-                        context.ProviderRunId,
-                        scope.CurrentPhysicalUserMessage context.SessionId
-                    with
-                    | Error _, _, _, _ -> Error Path.VerdictMustBePerfectOrRevise
-                    | _, None, _, _
-                    | _, _, None, _
-                    | _, _, _, None -> Error Path.CouldNotBind
-                    | Ok value, Some toolCallId, Some providerRunId, Some physicalUserMessageId ->
-                        Ok
-                            { ReviewerSessionId = SessionId.create context.SessionId
-                              PhysicalUserMessageId = PhysicalUserMessageId.create physicalUserMessageId
-                              ProviderRun = providerRunId
-                              ToolCallId = toolCallId
-                              Verdict = value }
-
-            match validated with
-            | Error reason -> return notReceived context reason
-            | Ok judgement -> return! dispatchJudgement scope context judgement
+            match decideExecution scope args context with
+            | ExecutionDecision.Refused reason -> return notReceived context reason
+            | ExecutionDecision.AlreadyJudged -> return alreadyJudged context
+            | ExecutionDecision.Proceed judgement -> return! dispatchJudgement scope context judgement
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

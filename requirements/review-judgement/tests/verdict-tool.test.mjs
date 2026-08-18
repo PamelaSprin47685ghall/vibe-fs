@@ -1,4 +1,3 @@
-// REVIEW-JUDGEMENT-001: executable judge tool and public contract.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
@@ -63,4 +62,18 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_reviewer_requires_a_tool_call_id_before_r
     assert.match(result, /(?:could not be bound to the current review turn|无法绑定到当前审查轮次)/i)
     assert.doesNotMatch(result, /\berror\s*=/)
   })
+})
+
+test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_subsequent_call_returns_already_judged_message', async () => {
+  try {
+    await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+      await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
+      judge.markVerdictSubmitted('ses-reviewer')
+      const result = await hooks.tool.judge.execute({ verdict: 'PERFECT' }, hostContext({ toolCallId: 'call-1', providerRunId: 'run-1' }))
+      assert.match(result, /(?:You have already made a judgment, please conclude the conversation|你已经做出过判断了，现在请你结束对话)/i)
+      assert.doesNotMatch(result, /(?:judgment was not received|你的判断未被收下)/i)
+    })
+  } finally {
+    judge.clearVerdictSessions()
+  }
 })
