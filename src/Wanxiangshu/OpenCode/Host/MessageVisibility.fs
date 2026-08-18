@@ -23,13 +23,15 @@ type MessageVisibilityHub(timerPort: ITimerPort) =
     let waiters = Dictionary<string, ResizeArray<VisibilityWaiter>>()
     let gate = obj ()
 
+    let dropKeyWhenEmpty (key: string) (list: ResizeArray<VisibilityWaiter>) =
+        if list.Count = 0 then
+            waiters.Remove key |> ignore
+
     let removeWaiter (key: string) (waiter: VisibilityWaiter) =
         match waiters.TryGetValue key with
         | true, list ->
             list.Remove waiter |> ignore
-
-            if list.Count = 0 then
-                waiters.Remove key |> ignore
+            dropKeyWhenEmpty key list
         | _ -> ()
 
     let settle (key: string) (waiter: VisibilityWaiter) =
