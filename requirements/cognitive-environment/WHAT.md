@@ -140,6 +140,18 @@ capability 时考虑委派/分裂。提示不得宣称 participant 拥有其实�
 停止工作或停止调用工具。X 的计量与 replace/retain 语义归 `delegation`（DELEG-022）；本包只拥有 provider
 该如何理解这个 measurement 的 craft。
 
+### COGNITIVE-ENVIRONMENT-015：Blogger 每次 provider 请求临时获得 chronicle-direct thought nudge
+
+Blogger 的每次普通 provider transform 都在当前 request frontier 注入且只注入一个临时 thought nudge：
+简体中文为「对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。」；English 为
+「For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly.」
+文案跟随该 Blogger session 已绑定的 provider language。
+
+该 nudge 只属于当次 provider-facing transform：不写 Journal、不进入 durable projection、不形成下一次请求必须
+replay 的历史。重复 transform 必须先移除同 source 的旧临时 marker，再按当前 frontier 重建一个；Blogger 之外
+不得注入。wire 可借用 injection-only completed synthetic `skill({ name: "" })` 形状，但 active empty-name skill
+仍然禁止模型主动调用。
+
 ## 反向覆盖
 
 本包吸收的 OWNED clause（COVERAGE.md 归属）：PROMPT-015、PROMPT-016、AGENT-031（NEEDHELP 正常协作

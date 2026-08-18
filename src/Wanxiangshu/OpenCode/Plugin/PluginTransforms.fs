@@ -571,6 +571,103 @@ module PluginTransforms =
         else
             injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 
+    let private bloggerChronicleThoughtSource = "blogger-chronicle-thought"
+
+    let private bloggerChronicleThoughtText (language: ProviderLanguage) =
+        match language with
+        | ProviderLanguage.SimplifiedChinese ->
+            "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
+        | ProviderLanguage.English ->
+            "For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly."
+
+    let private isBloggerChronicleThought (message: obj) =
+        not (isNull message)
+        && not (isNull message?info)
+        && not (isNull message?info?source)
+        && string message?info?source = bloggerChronicleThoughtSource
+
+    let private rawMessageRole (message: obj) =
+        if isNull message then
+            ""
+        elif not (isNull message?info) && not (isNull message?info?role) then
+            string message?info?role
+        elif not (isNull message?role) then
+            string message?role
+        else
+            ""
+
+    let private bloggerChronicleThoughtCallId
+        (projectionSessionIdOpt: string option)
+        (messages: obj list)
+        =
+        let frontier =
+            messages
+            |> List.tryLast
+            |> Option.bind ProviderWireDecode.hostMessageId
+            |> Option.defaultValue "start"
+
+        let digest =
+            HostDigest.sha256Hex(
+                String.concat "\u001f" [ defaultArg projectionSessionIdOpt ""; bloggerChronicleThoughtSource; frontier ]
+            )
+
+        bloggerChronicleThoughtSource + "-" + digest.Substring(0, 24)
+
+    let private bloggerChronicleThoughtMessage (callId: string) (text: string) =
+        let part =
+            createObj
+                [ "type", box "tool"
+                  "tool", box PairProgrammingThoughtTransform.toolName
+                  "callID", box callId
+                  "state",
+                  box (
+                      createObj
+                          [ "status", box "completed"
+                            "input", box (createObj [ "name", box PairProgrammingThoughtTransform.skillName ])
+                            "output", box (PairProgrammingThoughtTransform.skillContent text)
+                            "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
+                  ) ]
+
+        createObj
+            [ "info",
+              box (
+                  createObj
+                      [ "id", box callId
+                        "role", box "assistant"
+                        "source", box bloggerChronicleThoughtSource
+                        "synthetic", box true ]
+              )
+              "parts", box [| part |] ]
+
+    let private insertBloggerChronicleThoughtAtFrontier (marker: obj) (messages: obj list) =
+        match List.rev messages with
+        | last :: rest when rawMessageRole last = "user" -> List.rev rest @ [ marker; last ]
+        | _ -> messages @ [ marker ]
+
+    let private injectBloggerChronicleThought
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId
+            when SessionAssociationProjection.isCompanion
+                (SessionId.create sessionId)
+                (AgentJournal.snapshot durable).AgentProjections.Associations ->
+            let messages =
+                unbox<obj array> outObj?messages
+                |> Array.toList
+                |> List.filter (isBloggerChronicleThought >> not)
+
+            let callId = bloggerChronicleThoughtCallId projectionSessionIdOpt messages
+            let text = bloggerChronicleThoughtText (languageFor projectionSessionIdOpt)
+            let marker = bloggerChronicleThoughtMessage callId text
+
+            HostMessageProjection.replaceMessagesInPlace
+                outObj
+                (insertBloggerChronicleThoughtAtFrontier marker messages)
+        | _ -> ()
+
     let private strengthReplicaRuntime
         (projectionSessionIdOpt: string option)
         (scope: PluginRuntimeScope)
@@ -690,6 +787,8 @@ module PluginTransforms =
                 // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
                 do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
+
+                injectBloggerChronicleThought journal projectionSessionIdOpt outObj
 
                 // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                 // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。

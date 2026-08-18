@@ -13,6 +13,7 @@
 | 005/011 | `resources/provider/role/*/`（无 fast/deep 字样）；`Session/CompanionPrompt.fs` 等使用 `PromptResources` 组合；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | 自我模型稳定；`prompt-stability` 测试（byte-stability）归 `prefix-stability`/`participant-identity` |
 | 012 | `resources/provider/role/reviewer/*` + `resources/provider/library/reviewer/quality-ledger/*`；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | REVIEW-012：双 PERFECT 不入 prompt |
 | 013 | `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`；HOST-013 transform（`Infrastructure/OpenCode/Host/*`）把同一 canonical 正文投影到 wire；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | craft 单源；并发文案用持续重算的 ready frontier 表达因果调度，不把 wave/DAG 变成 barrier；`cursor-pair-hint.md`/`pair-parallel-tools.md`/`increase-strength.md` 考古 |
+| 015 | `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`；`requirements/cognitive-environment/tests/blogger-chronicle-thought.test.mjs` | Blogger-only ephemeral marker：locale 取 session binding；每次 transform 先 strip 同 source 临时 marker，再按当前 frontier 注入一个 completed synthetic empty-skill wire；不走 Journal/GuidelineProjection |
 
 ## 关键机制：PromptResources 是唯一组合源
 
@@ -82,6 +83,7 @@ INDEX.md 依赖骨架：`cognitive-environment → participant-identity, office-
 | 012 | `tests/cognitive-environment.test.mjs::CE_012_reviewer_prompt_carries_role_law_and_ledger_without_process_mechanics`（Reviewer prompt 不灌输 PERFECT 流程机制）；REUSE：`requirements/cognitive-environment/tests/prompt-semantic-depth.test.mjs::PROMPT_depth_Inquiry_Sphinx_capability_requires_Kernel_self_model`（Kernel self-model 面归 `epistemic-reasoning`）+ `PROMPT_depth_no_universal_closing_report_schema_in_role_laws`（固定 report schema 不进认知层）；Reviewer prompt 组合面由 `resources/provider/role/reviewer/*` 承载 | REUSE | `node --test requirements/cognitive-environment/tests/prompt-semantic-depth.test.mjs` |
 | 013 | `tests/cognitive-environment.test.mjs::CE_agent_031_pair_hint_teaches_needhelp_as_normal_collaboration` + `CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers` + `CE_pair_hint_encourages_filling_concurrency_slots` + `CE_pair_hint_teaches_abstract_then_commit_without_wavering` + `CE_pair_hint_reserves_empty_skill_name_without_disabling_real_skills`；REUSE：`requirements/cognitive-environment/tests/pair-thought-transform.test.mjs::PAIR_HINT_canonical_text_encourages_needhelp_and_continuous_ready_frontier_without_global_N`（SPLIT@cutover：正文 craft → 本包；anchor/replay 机制 → `prefix-stability`/`provider-projection`） | NEW + REUSE | `node --test requirements/cognitive-environment/tests/cognitive-environment.test.mjs requirements/cognitive-environment/tests/pair-thought-transform.test.mjs` |
 | 014 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs` `CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages` | REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
+| 015 | `tests/blogger-chronicle-thought.test.mjs` `BLOGGER_CHRONICLE_THOUGHT_*` | NEW | `node --test requirements/cognitive-environment/tests/blogger-chronicle-thought.test.mjs` |
 
 | COGNITIVE-ENVIRONMENT-001 | `tests/cognitive-environment.test.mjs::CE_prompt_015_one_system_prompt_per_role` | NEW | `node --test requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
 | COGNITIVE-ENVIRONMENT-003 | `tests/cognitive-environment.test.mjs::CE_prompt_015_canonical_composition_common_law_role_law_office_library` | NEW | 同上 |
@@ -89,8 +91,8 @@ INDEX.md 依赖骨架：`cognitive-environment → participant-identity, office-
 | COGNITIVE-ENVIRONMENT-005 | `tests/cognitive-environment.test.mjs::CE_prompt_015_no_tier_split_duplicates` | NEW | 同上 |
 
 
-- 命题数：14
-- NEW：1 个文件（`cognitive-environment.test.mjs`），15 个断言 test
+- 命题数：15
+- NEW：2 个文件（`cognitive-environment.test.mjs`、`blogger-chronicle-thought.test.mjs`）
 - MOVE：0（本包无单-owner 现有测试文件；prompt-semantic-depth 是 SPLIT，留在原处）
 - REUSE：6 处（prompt-semantic-depth、language-parity-gate、session-persona、pair-thought-transform、session-flattening、provider-prose-ownership）
 
