@@ -20,8 +20,8 @@
 
 ## DG-002：传感器是 ARCH-002 的定点例外
 
-`LoopSensor` 只做一件事：从 Host 流式事件中提取 `field=text` 的新增文本，喂给 detector；非
-text delta 事件是 no-op。不变量：
+`LoopSensor` 只做一件事：从 Host 流式事件中提取 assistant 文本与 reasoning / thinking 思考流
+的 delta 文本，喂给 detector；非文本 delta 事件（如 tool 等）是 no-op。不变量：
 1. 传感器不得写 Journal 业务事实（除 LOOP-006 强杀路径副作用）；
 2. 传感器不得从 delta 推断 terminal / completion / tool 结果 / Authority；
 3. 传感器不得把原始 payload 交给 Reconciler 或 FallbackController；
@@ -103,8 +103,8 @@ mayContinue 则发 `ProviderRetryAttempt` continuation，否则 `FallbackExhaust
 ## DG-010：作用域与豁免
 
 必须检测：插件 Owned 的 managed WorkSession / CompanionSession / BloggerSession 中正在进行的
-assistant 文本流（field=text）。必须忽略：非 Owned session、reasoning 字段 delta、compaction
-pseudo-run（HOST-006）、title / 非 managed 的 Host 内部 run、已 LoopKillArmed 的同一 attempt 的
+assistant 文本流（包含 field=text 正文与 reasoning / thinking 思考流）。必须忽略：非 Owned session、
+compaction pseudo-run（HOST-006）、title / 非 managed 的 Host 内部 run、已 LoopKillArmed 的同一 attempt 的
 后续 delta。
 
 ## DG-011：continuation 是独立叶子

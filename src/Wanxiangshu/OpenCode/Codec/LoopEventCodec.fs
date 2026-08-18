@@ -45,6 +45,15 @@ module LoopEventCodec =
         else
             Some(string value)
 
+    let private isTextualDeltaField =
+        function
+        | "text"
+        | "reasoning"
+        | "thinking"
+        | "model_thought"
+        | "reasoning_content" -> true
+        | _ -> false
+
     let private textDeltaField (properties: obj) =
         if isNull properties?field then
             Some "text"
@@ -53,14 +62,14 @@ module LoopEventCodec =
 
     let private decodeTextDeltaProperties (sessionId: SessionId) (properties: obj) : TextDelta option =
         match textDeltaField properties, stringField properties?delta with
-        | Some "text", Some delta when delta.Length > 0 ->
+        | Some field, Some delta when isTextualDeltaField field && delta.Length > 0 ->
             Some
                 { SessionId = sessionId
                   MessageId =
                     stringField properties?messageID
                     |> Option.orElse (stringField properties?messageId)
                   PartId = stringField properties?partID |> Option.orElse (stringField properties?partId)
-                  Field = Some "text"
+                  Field = Some field
                   Delta = delta }
         | _ -> None
 
@@ -77,9 +86,8 @@ module LoopEventCodec =
         | "message.part.delta" -> true
         | _ -> false
 
-    /// Only `message.part.delta` with `field = "text"` (or missing field — Host
-    /// historically omits it for text parts). Reasoning deltas are ignored so a
-    /// long thinking loop does not kill a still-productive formal text stream.
+    /// Only `message.part.delta` with textual fields (`field = "text"` or missing field,
+    /// or reasoning/thinking stream fields). Non-textual deltas (e.g. tool) are ignored.
     let tryDecodeTextDelta (rawInput: obj) : TextDelta option =
         let raw = HostEventCodec.unwrap rawInput
 

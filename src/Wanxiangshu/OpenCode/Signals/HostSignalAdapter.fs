@@ -67,9 +67,9 @@ type HostSignalRouter
 
     /// HOST-027 part classification and LOOP-009 text detection both observe the
     /// same raw stream events. NeedHelp records part.updated before the matching
-    /// delta; the composition root may then suppress reasoning deltas from the
-    /// LoopSensor. Model routing also observes exact terminal assistant identity;
-    /// none of these callbacks turns a fragment into a business HostSignal.
+    /// delta. LoopSensor observes all textual and reasoning stream deltas. Model
+    /// routing also observes exact terminal assistant identity; none of these
+    /// callbacks turns a fragment into a business HostSignal.
     member _.Observe(raw: obj) =
         observePhysicalExecutionEnd raw
 

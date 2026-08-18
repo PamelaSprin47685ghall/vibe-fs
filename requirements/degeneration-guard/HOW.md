@@ -7,7 +7,7 @@
 | 模块 | 角色 | 对应命题 |
 |---|---|---|
 | `src/Wanxiangshu/Execution/Session/LoopDetector.fs` | `gpt-tokenizer/o200k_base` + 指数衰减 weighted-distinct token detector | DG-003/004/005 |
-| `src/Wanxiangshu/OpenCode/Host/LoopSensor.fs` | transport 边沿观测器：持有 per-session detectors 与进程内 `LoopKillArmed` 集合；Observe 只吃 text delta；命中 → TryArm → AbortSession | DG-002/006/007/008 |
+| `src/Wanxiangshu/OpenCode/Host/LoopSensor.fs` | transport 边沿观测器：持有 per-session detectors 与进程内 `LoopKillArmed` 集合；Observe 吃 text 与 reasoning delta；命中 → TryArm → AbortSession | DG-002/006/007/008 |
 | `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs` | loop-kill armed abort 桥接到 `recordConfirmedFailure("loop-kill")` | DG-009 |
 | `src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs` | TurnAborted 消费边界：命中 LoopKillArmed → 清标记 → 标准 recovery；未命中 → 普通 abort | DG-007/009 |
 | `requirements/degeneration-guard/tests/loop-calibration*.mjs` | 扫仓库全部 strict UTF-8 文字，重放 half-life / normal / midpoint 滴定 | DG-004 |
@@ -89,7 +89,7 @@ DEPENDS ON：`provider-attempt-recovery`（桥接目标：命中后由标准 rec
 | 命题 | 落点测试（文件 + test 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
 | DG-001 低多样性 loop vs 正常多样输出 | `tests/loop-detector.test.mjs`：`LOOP_003_single_token_repetition_converges_to_theoretical_loop`、`LOOP_003_diverse_programmatic_text_stays_normal`、Markdown table / ASCII graph 两个 normal fixture | MOVE+NEW | `node --test requirements/degeneration-guard/tests/loop-detector.test.mjs` |
-| DG-002 传感器只吃 text delta、不写业务事实 | `tests/loop-sensor.test.mjs`：`LOOP_002_sensor_observes_text_delta_only`、`LOOP_007_reasoning_deltas_are_ignored`；`tests/loop-detector.test.mjs`：`LOOP_009_text_delta_decodes_fail_closed` | MOVE | 各文件 `node --test` |
+| DG-002 传感器只吃 text / reasoning delta、不写业务事实 | `tests/loop-sensor.test.mjs`：`LOOP_002_sensor_observes_text_delta_only`、`LOOP_007_reasoning_deltas_trigger_loop_kill`；`tests/loop-detector.test.mjs`：`LOOP_009_text_delta_decodes_fail_closed` | MOVE | 各文件 `node --test` |
 | DG-003 token weighted-distinct 指标 | `tests/loop-detector.test.mjs`：fresh prior、o200k exact step/reference score、whitespace/punctuation 也是 token、single-token loop、diverse programmatic、Markdown table、ASCII graph；`tests/loop-detector-memory.test.mjs`：单次越阈无 latch / 无 consecutive-hit 要求 | MOVE+NEW | 各文件 `node --test` |
 | DG-004 固定参数 + 全仓滴定 | `tests/loop-calibration.test.mjs`：Git tracked+unignored strict UTF-8 全文；当前非空行 token p99=59 → half-life=64；正常端=全文最低 weighted-distinct；异常端=理论 1；threshold=中线。当前统计基线随语料派生，feel free to modify；`tests/loop-detector.test.mjs` 校验 production 常量关系 | NEW | `node --test requirements/degeneration-guard/tests/loop-calibration.test.mjs requirements/degeneration-guard/tests/loop-detector.test.mjs` |
 | DG-005 O(1) 更新与 vocabulary-bounded 内存 | `tests/loop-detector-memory.test.mjs`：`LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length`；`tests/loop-detector.test.mjs`：reference recurrence exactness | NEW | 各文件 `node --test` |

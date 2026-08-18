@@ -194,19 +194,30 @@ test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
     delta: 'aaaa',
   })
 
-  assert.equal(
-    loopDetector.tryDecodeTextDelta({
-      type: 'message.part.delta',
-      properties: {
-        sessionID: 'ses_loop',
-        field: 'reasoning',
+  for (const field of ['reasoning', 'model_thought', 'thinking', 'reasoning_content']) {
+    assert.deepEqual(
+      loopDetector.tryDecodeTextDelta({
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'ses_loop',
+          messageID: 'msg_a',
+          partID: 'prt_1',
+          field,
+          delta: 'zzzz',
+        },
+      }),
+      {
+        sessionId: 'ses_loop',
+        messageId: 'msg_a',
+        partId: 'prt_1',
+        field,
         delta: 'zzzz',
       },
-    }),
-    null,
-  )
+      `field=${field} must decode`,
+    )
+  }
 
-  for (const field of ['model_thought', 'thinking', 'tool', 'reasoning_content']) {
+  for (const field of ['tool', 'tool_call', 'custom_metadata']) {
     assert.equal(
       loopDetector.tryDecodeTextDelta({
         type: 'message.part.delta',

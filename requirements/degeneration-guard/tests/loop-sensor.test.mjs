@@ -72,8 +72,8 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
     },
   })
 
-  // Non-text fields never decode → Observe is a pure no-op (no arm, no abort).
-  for (const field of ['reasoning', 'model_thought', 'thinking']) {
+  // Non-textual fields never decode → Observe is a pure no-op (no arm, no abort).
+  for (const field of ['tool', 'tool_call', 'custom_metadata']) {
     assert.equal(loopDetector.tryDecodeTextDelta(rawDelta('ses_text', field, loopText('r'))), null)
     loopSensor.observe(sensor, rawDelta('ses_text', field, loopText('r')))
   }
@@ -81,7 +81,7 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
   assert.deepEqual(aborts, [])
   assert.equal(loopSensor.isArmed(sensor, 'ses_text'), false)
 
-  // field=text is the only accepted stream; low diversity arms + aborts.
+  // field=text is accepted; low diversity arms + aborts.
   assert.deepEqual(loopDetector.tryDecodeTextDelta(rawDelta('ses_text', 'text', 'abcd')), {
     sessionId: 'ses_text',
     messageId: 'msg_a',
@@ -123,7 +123,7 @@ test('WHAT[DG-010] LOOP_007_unowned_and_armed_deltas_are_ignored', async () => {
   assert.deepEqual(aborts, ['ses_owned'])
 })
 
-test('WHAT[DG-002] LOOP_007_reasoning_deltas_are_ignored', async () => {
+test('WHAT[DG-002] LOOP_007_reasoning_deltas_trigger_loop_kill', async () => {
   const aborts = []
   const sensor = loopSensor.create({
     owned: ['ses_owned'],
@@ -132,14 +132,21 @@ test('WHAT[DG-002] LOOP_007_reasoning_deltas_are_ignored', async () => {
     },
   })
 
-  // Reasoning never reaches the detector (codec fail-closed).
-  assert.equal(
+  // Reasoning stream decodes and triggers loop kill when low diversity.
+  assert.deepEqual(
     loopDetector.tryDecodeTextDelta(rawDelta('ses_owned', 'reasoning', loopText('q'))),
-    null,
+    {
+      sessionId: 'ses_owned',
+      messageId: 'msg_a',
+      partId: 'prt_1',
+      field: 'reasoning',
+      delta: loopText('q'),
+    },
   )
   loopSensor.observe(sensor, rawDelta('ses_owned', 'reasoning', loopText('q')))
-  await wait(8)
-  assert.deepEqual(aborts, [])
+  await wait(15)
+  assert.deepEqual(aborts, ['ses_owned'])
+  assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), true)
 })
 
 test('WHAT[DG-007] LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {

@@ -480,10 +480,7 @@ module HostSignalBootstrap =
                 HostSignalRouter(
                     scope.Sessions.OwnedSessions,
                     onSignal,
-                    onLoopEvent =
-                        (fun raw ->
-                            if not (needHelpSensor.IsReasoningDelta raw) then
-                                loopSensor.Observe raw),
+                    onLoopEvent = loopSensor.Observe,
                     onNeedHelpEvent = needHelpSensor.Observe,
                     onPhysicalExecutionEnd =
                         (fun sessionId physicalUserMessageId ->
