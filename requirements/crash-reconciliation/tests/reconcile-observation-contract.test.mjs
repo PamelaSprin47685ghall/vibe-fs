@@ -9,8 +9,9 @@ const decisionName = (remaining, evidence, wake = reconcile.retryWake()) =>
   reconcile.decisionName(reconcile.decideStep(wake, remaining, evidence))
 
 test('WHAT[CRASH-003] unknown_effect_without_quiescence_is_not_replayed', () => {
-  // Exhausted non-actionable evidence stops without replay. Unknown only
-  // publishes after a fresh idle/quiescence observation.
+  // HOST-BOUNDARY-005: no read is authorized by a counter. Non-actionable
+  // evidence stops without replay. Unknown only publishes after a fresh
+  // idle/quiescence observation.
   assert.equal(decisionName(0, reconcile.evidenceSnapshotError('transient')), 'StopPass')
   assert.equal(decisionName(0, reconcile.evidenceNoTurn()), 'StopPass')
 
@@ -23,8 +24,8 @@ test('WHAT[CRASH-003] unknown_effect_without_quiescence_is_not_replayed', () => 
     'Publish',
   )
 
-  // A bounded causal reread remains a reread rather than a premature decision.
-  assert.equal(decisionName(3, reconcile.evidenceUnknown(), reconcile.retryWake()), 'Reread')
+  // The counter is a pure compatibility surface — no Reread is produced.
+  assert.equal(decisionName(3, reconcile.evidenceUnknown(), reconcile.retryWake()), 'StopPass')
 })
 
 test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', () => {
@@ -35,8 +36,8 @@ test('WHAT[CRASH-003] reconcile_decision_has_no_business_repair_vocabulary', () 
     decisionName(0, reconcile.evidenceUnknown(), reconcile.idleWake('ses-a', 1)),
     decisionName(0, reconcile.evidenceNoTurn(), reconcile.retryWake()),
   ])
-  assert.deepEqual([...names].sort(), ['Publish', 'Reread', 'StopPass'])
-  assert.equal([...names].some((name) => /Repair|Resend|Rollback|Abort|Replay/i.test(name)), false)
+  assert.deepEqual([...names].sort(), ['Publish', 'StopPass'])
+  assert.equal([...names].some((name) => /Repair|Resend|Rollback|Abort|Replay|Reread/i.test(name)), false)
 })
 
 test('WHAT[CRASH-007] turn_unknown_is_snapshot_observation_not_turn_outcome', () => {

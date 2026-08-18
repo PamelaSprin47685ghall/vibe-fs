@@ -54,6 +54,6 @@ test('WHAT[REVIEW-ASSURANCE-010] REVIEW_CE_004_transient_reviewer_failures_remai
   assert.match(source, /Some Role\.Reviewer, _, _ -> do! observeIdleOrdinary context/)
   assert.match(
     source,
-    /match turn\.Role, turn\.Outcome with[\s\S]*?\| Some Role\.Reviewer, ReconcileProgram\.TurnCompleted ->[\s\S]*?ReviewerWorkflow\.observe[\s\S]*?\| Some Role\.Reviewer, _ -> do! observeOrdinary context/,
+    /match turn\.Role, turn\.Observation, turn\.Outcome with[\s\S]*?\| Some Role\.Reviewer, _, ReconcileProgram\.TurnCompleted ->[\s\S]*?ReviewerWorkflow\.observe[\s\S]*?\| Some Role\.Reviewer, _, _ -> do! observeIdleOrdinary context/,
   )
 })

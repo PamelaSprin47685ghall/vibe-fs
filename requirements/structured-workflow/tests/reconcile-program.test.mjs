@@ -65,71 +65,53 @@ test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_001: isTerminalOutcome cla
 
 // ── decideStep: bounded causal reread → next pure decision ───────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_003: decideStep bounds causal rereads and stops on exhaustion', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_003: decideStep produces one decision per causal edge (HOST-BOUNDARY-005)', () => {
   assert.equal(typeof reconcileSurface.decideStep, 'function')
   assert.equal(typeof reconcileSurface.decisionName, 'function')
   assert.equal(typeof reconcileSurface.clearsContinuationCandidate, 'function')
 
-  // Non-terminal evidence with budget remaining → Reread.
-  assert.equal(name(3, evidence.snapshotError('transient')), 'Reread')
-  assert.equal(name(3, evidence.noTurn()), 'Reread')
-  assert.equal(name(3, evidence.provisional('TurnInProgress')), 'Reread')
-  assert.equal(name(3, evidence.provisional('TurnNeedsContinuation')), 'Reread')
-  assert.equal(name(3, evidence.unknown()), 'Reread')
+  // HOST-BOUNDARY-005: no read is authorized by a counter. decideStep returns
+  // the exhausted decision directly — Reread is never produced by a remaining
+  // counter. A later read needs a new coarse Host signal or exact
+  // projection-change edge.
+  //
+  // SnapshotError / NoTurn → StopPass (nothing to act on).
+  assert.equal(name(3, evidence.snapshotError('transient')), 'StopPass')
+  assert.equal(name(3, evidence.noTurn()), 'StopPass')
 
-  // Non-terminal with budget exhausted → fail closed per evidence kind: nothing
-  // to act on (SnapshotError/NoTurn) keeps StopPass; Provisional publishes the
-  // stop text; Unknown Publishes a stable observation only when the pass
-  // carries idle evidence (HOST-004 rev.3 / rabbit §7) — retry/failure wakes
-  // prove observation stability, not quiescence, and never hand off.
-  assert.equal(name(0, evidence.snapshotError('transient')), 'StopPass')
-  assert.equal(name(0, evidence.noTurn()), 'StopPass')
-  assert.equal(name(0, evidence.provisional('TurnInProgress')), 'Publish')
-  assert.equal(name(0, evidence.provisional('TurnNeedsContinuation')), 'Publish')
-  assert.equal(name(0, evidence.unknown(), wake.retry()), 'StopPass')
-  assert.equal(name(0, evidence.unknown(), wake.failure()), 'StopPass')
-  assert.equal(name(0, evidence.unknown(), wake.idle('ses-a', 1)), 'Publish')
+  // Provisional: IdleWake → Publish (quiescent, belongs to business repair);
+  // Retry/Failure/Abort → StopPass (provider status can race the public
+  // session projection; Scheduler parks and the exact terminal edge re-kicks).
+  assert.equal(name(3, evidence.provisional('TurnInProgress'), wake.idle('ses-a', 1)), 'Publish')
+  assert.equal(name(3, evidence.provisional('TurnNeedsContinuation'), wake.idle('ses-a', 1)), 'Publish')
+  assert.equal(name(3, evidence.provisional('TurnInProgress'), wake.retry()), 'StopPass')
+  assert.equal(name(3, evidence.provisional('TurnNeedsContinuation'), wake.retry()), 'StopPass')
+  assert.equal(name(3, evidence.provisional('TurnInProgress'), wake.failure()), 'StopPass')
+  assert.equal(name(3, evidence.provisional('TurnInProgress'), wake.abort()), 'StopPass')
 
-  // Unknown clears continuation candidate; provisional keeps it.
-  assert.equal(
-    reconcileSurface.clearsContinuationCandidate(
-      reconcileSurface.decideStep(wake.retry(), 3, evidence.unknown()),
-    ),
-    true,
-  )
-  assert.equal(
-    reconcileSurface.clearsContinuationCandidate(
-      reconcileSurface.decideStep(wake.retry(), 3, evidence.provisional('TurnInProgress')),
-    ),
-    false,
-  )
+  // Unknown: IdleWake → Publish; Retry/Failure/Abort → StopPass.
+  assert.equal(name(3, evidence.unknown(), wake.retry()), 'StopPass')
+  assert.equal(name(3, evidence.unknown(), wake.failure()), 'StopPass')
+  assert.equal(name(3, evidence.unknown(), wake.abort()), 'StopPass')
+  assert.equal(name(3, evidence.unknown(), wake.idle('ses-a', 1)), 'Publish')
 
   // Terminal → Publish regardless of remaining and wake.
   assert.equal(name(0, evidence.terminal('TurnCompleted')), 'Publish')
   assert.equal(name(3, evidence.terminal('TurnAborted')), 'Publish')
   assert.equal(name(3, evidence.terminal('TurnFailed')), 'Publish')
 
-  // HOST-004: an exhausted operator-abort wake must not Publish Unknown /
-  // Provisional (business must not mint InteractionRepair / bare "#");
-  // it StopPasses until the real TurnAborted terminal.
-  assert.equal(name(0, evidence.unknown(), wake.abort()), 'StopPass')
-  assert.equal(name(0, evidence.provisional('TurnInProgress'), wake.abort()), 'StopPass')
-  assert.equal(name(0, evidence.provisional('TurnNeedsContinuation'), wake.abort()), 'StopPass')
-  // Bounded reread still allowed under abort so a genuine TurnAborted can settle.
-  assert.equal(name(3, evidence.unknown(), wake.abort()), 'Reread')
-
   // Session cleared → StopPass.
   assert.equal(name(3, evidence.sessionCleared()), 'StopPass')
 
-  // Reread decrements remaining (no time/backoff information carried).
-  const rereadDecision = reconcileSurface.decideStep(
-    wake.retry(),
-    3,
-    evidence.provisional('TurnInProgress'),
+  // No Reread is produced: the counter is a pure compatibility surface.
+  assert.equal(
+    reconcileSurface.decisionName(reconcileSurface.decideStep(wake.retry(), 3, evidence.unknown())),
+    'StopPass',
   )
-  assert.equal(reconcileSurface.decisionName(rereadDecision), 'Reread')
-  assert.equal(rereadDecision.rereadsRemaining, 2)
-  assert.equal(reconcileSurface.clearsContinuationCandidate(rereadDecision), false)
+  assert.equal(
+    reconcileSurface.decisionName(reconcileSurface.decideStep(wake.retry(), 3, evidence.provisional('TurnInProgress'))),
+    'StopPass',
+  )
 })
 
 // ── publishDecision: consumed (terminal) vs provisional maps ─────────────────

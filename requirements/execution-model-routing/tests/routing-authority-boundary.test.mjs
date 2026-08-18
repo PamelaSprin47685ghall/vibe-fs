@@ -42,7 +42,7 @@ test('WHAT[EMR-007] EMR_007_exact_terminal_identity_releases_capacity_not_coarse
   assert.match(codec, /tryDecodePhysicalExecutionEnd/)
   assert.match(codec, /isMessageUpdated = not \(isNull raw\) && eventTypeOf raw = "message\.updated"/)
   assert.match(codec, /info\?parentID/)
-  assert.match(host, /onPhysicalExecutionEnd = ModelRouting\.releasePhysicalExecution/)
+  assert.match(host, /onPhysicalExecutionEnd =\s*\(fun .* ->[\s\S]*ModelRouting\.releasePhysicalExecution/)
   assert.doesNotMatch(host, /SessionIdle sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
   assert.doesNotMatch(host, /AttemptAborted sessionId[\s\S]{0,260}ModelRouting\.releaseExecution sessionId/)
   assert.doesNotMatch(ordinary, /ModelRouting\.(releaseExecution|releaseSession)/,
