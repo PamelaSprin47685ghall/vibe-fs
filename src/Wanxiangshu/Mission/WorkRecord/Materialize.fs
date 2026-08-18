@@ -271,7 +271,7 @@ module LifecycleWorkRecordProjection =
     let private immediateOpeningEnd (trace: XTraceItem list) =
         match trace with
         | first :: _ -> { Sequence = first.Cursor.Sequence + 1L }
-        | [] -> XTrace.originCursor
+        | [] -> XTraceCursor.originCursor
 
     let private resolveOpeningEnd
         (life: LifeProjection option)

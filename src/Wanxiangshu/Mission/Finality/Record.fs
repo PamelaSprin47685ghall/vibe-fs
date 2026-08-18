@@ -118,7 +118,7 @@ module RecordWorkflow =
         (requiresChronicle: bool)
         : Task<RecordReadiness> =
         task {
-            let fullCanonicalCoverage = Some { IngestedThrough = XTrace.originCursor }
+            let fullCanonicalCoverage = Some { IngestedThrough = XTraceCursor.originCursor }
 
             match!
                 LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshot

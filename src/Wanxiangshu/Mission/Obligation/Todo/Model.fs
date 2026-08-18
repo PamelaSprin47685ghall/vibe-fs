@@ -1,25 +1,10 @@
 namespace Wanxiangshu.Mission.Obligation.Todo
 
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Host
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
 
 open System
 open System.Text
 open Wanxiangshu.Foundation
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 
 /// Magic Todo Checkpoint Protocol — GrandRewrite clean-break algebra.
@@ -289,7 +274,7 @@ module MagicTodo =
         | [ _ ] -> None
         | items -> items |> List.rev |> List.skip 1 |> List.tryHead
 
-    let workRecordStart (openingCursor: XTraceCursor) : XTraceCursor = XTrace.nextCursor openingCursor
+    let workRecordStart (openingCursor: XTraceCursor) : XTraceCursor = XTraceCursor.nextCursor openingCursor
 
     /// Process-review consumption is a reviewer-knowledge frontier, not the
     /// Manager's current compression/opening floor. The first checkpoint starts
@@ -322,12 +307,12 @@ module MagicTodo =
                 part.Kind = "tool_result"
                 && part.Cursor.Sequence > t1CallCursor.Sequence
                 && part.ToolCallId = Some t1ToolCallId)
-            |> Option.map (fun part -> XTrace.nextCursor part.Cursor)
+            |> Option.map (fun part -> XTraceCursor.nextCursor part.Cursor)
 
         let candidate =
             match afterResult with
             | Some boundary -> boundary
-            | None -> XTrace.nextCursor t1CallCursor
+            | None -> XTraceCursor.nextCursor t1CallCursor
 
         let minimum = workRecordStart openingCursor
 

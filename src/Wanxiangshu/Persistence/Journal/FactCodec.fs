@@ -8,6 +8,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Mission.Obligation.Todo
+open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 
 /// Fact serialization (PERSIST-005).
 module FactCodec =
@@ -153,8 +155,27 @@ module FactCodec =
             )
         | other -> other
 
+    let private tryDecodeMagicTodo (json: string) : Fact option =
+        let decoder: Decoder<Fact> =
+            Decode.object (fun get ->
+                match get.Optional.Field "MagicTodo" Decode.string with
+                | Some canonical ->
+                    match MagicTodoFactCodec.tryDecode canonical with
+                    | Ok fact -> Fact.MagicTodo fact
+                    | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason)
+                | None -> failwith "not a MagicTodo fact")
+
+        try
+            match Decode.fromString decoder json with
+            | Ok fact -> Some fact
+            | Error _ -> None
+        with _ -> None
+
     let serializeFact (fact: Fact) : string =
-        Encode.Auto.toString (0, pinToUtc fact, extra = extra)
+        match fact with
+        | MagicTodo magicTodo ->
+            Encode.Auto.toString (0, {| MagicTodo = MagicTodoFactCodec.encode magicTodo |}, extra = extra)
+        | other -> Encode.Auto.toString (0, pinToUtc other, extra = extra)
 
     let deserializeFact (json: string) : Result<Fact, string> =
         if containsLegacyFallbackFields json then
@@ -166,4 +187,6 @@ module FactCodec =
         elif containsHandleCompletedMissingCompletionFields json then
             Error "HandleCompleted requires CompletionRef and CompletionDigest; decode migration is not supported."
         else
-            Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc
+            match tryDecodeMagicTodo json with
+            | Some fact -> Ok fact
+            | None -> Decode.Auto.fromString<Fact> (json, extra = extra) |> Result.map pinToUtc

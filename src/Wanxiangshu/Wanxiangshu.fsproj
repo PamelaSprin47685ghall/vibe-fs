@@ -16,6 +16,7 @@
     <Compile Include="AssemblyInfo.fs"/>
     <Compile Include="Host/Digest.fs"/>
     <Compile Include="Foundation/Identity.fs"/>
+    <Compile Include="Context/Trace/Cursor.fs"/>
     <Compile Include="Foundation/Roles.fs"/>
     <Compile Include="Foundation/RolesSurface.fs"/>
     <Compile Include="Foundation/McpLaunch.fs"/>
@@ -62,6 +63,8 @@
     <Compile Include="Change/Facts.fs"/>
     <Compile Include="OpenCode/Host/Facts.fs"/>
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Model.fs"/>
+    <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
     <Compile Include="Composition/Durable/Fact.fs"/>
     <Compile Include="Interaction/Authority/Fact.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Fact.fs"/>
@@ -89,9 +92,7 @@
     <Compile Include="Host/CompactionPolicy.fs"/>
     <Compile Include="Participant/Provider/Projection/Model.fs"/>
     <Compile Include="Context/Trace/Model.fs"/>
-    <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/ObligationCodec.fs"/>
-    <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
     <Compile Include="Mission/Obligation/Todo/PrefixEpoch.fs"/>
     <Compile Include="Mission/Obligation/Todo/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/Admission.fs"/>
@@ -173,6 +174,7 @@
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fs"/>
     <Compile Include="Persistence/EventStore/WriterStreamSync.fs"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
+    <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
     <Compile Include="Persistence/Journal/FactCodec.fs"/>
     <Compile Include="Persistence/Journal/Envelope.fs"/>
     <Compile Include="Persistence/Journal/EventStoreJournalCodec.fs"/>
@@ -181,7 +183,6 @@
     <Compile Include="Mission/Manager/Life/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/Admission.fs"/>
     <Compile Include="Mission/Obligation/Todo/Projection.fs"/>
-    <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoProjectionSurface.fs"/>
     <Compile Include="Context/Companion/Blogger/Projection.fs"/>

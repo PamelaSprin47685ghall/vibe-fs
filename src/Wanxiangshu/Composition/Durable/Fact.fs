@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -42,5 +43,4 @@ module Fact =
         | Runtime of RuntimeFact
         | Agent of AgentFact
         | ManagerLifecycle of ManagerLifecycleFact
-        /// Typed Magic Todo facts cross this earlier journal boundary as canonical bytes.
-        | MagicTodo of payload: string
+        | MagicTodo of MagicTodoFacts.MagicTodoFact

@@ -355,13 +355,13 @@ module XTraceSurface =
     let private cursorView (cursor: XTraceCursor) : obj =
         box {| sequence = int cursor.Sequence |}
 
-    let originCursor: obj = cursorView XTrace.originCursor
+    let originCursor: obj = cursorView XTraceCursor.originCursor
 
     let next (cursor: obj) : obj =
-        cursorOfPlain cursor |> XTrace.nextCursor |> cursorView
+        cursorOfPlain cursor |> XTraceCursor.nextCursor |> cursorView
 
     let isAfter (nextCursor: obj) (previous: obj) : bool =
-        XTrace.isAfter (cursorOfPlain nextCursor) (cursorOfPlain previous)
+        XTraceCursor.isAfter (cursorOfPlain nextCursor) (cursorOfPlain previous)
 
     let sliceBetween (start: obj) (endExclusive: obj) (values: obj array) : obj array =
         XTrace.sliceBetween (cursorOfPlain start) (cursorOfPlain endExclusive) (itemList values)

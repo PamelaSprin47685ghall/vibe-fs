@@ -16,14 +16,6 @@ open Wanxiangshu.Participant.Provider.Projection
 
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 
-/// COMPANION-003 / HOST-005: X 的唯一原始语义轨迹。
-///
-/// `XTraceCursor` 在 X 生命周期内严格单调，独立于 Host transcript 的临时数组
-/// 下标与 semantic turn 编号——Host compaction 会作废后者（HOST-006 重锚），
-/// 但 XTrace 与 RecordCoverage 是 durable lifecycle facts，不得随 compaction
-/// 清零或重读（COMPANION-008）。因此 cursor 是自增序列，不是 turn/part 坐标。
-type XTraceCursor = { Sequence: int64 }
-
 /// 一个 XTrace 语义事实。`Provenance` 保存 session/run/message/part 归属供
 /// 证明与恢复使用，renderer 永不输出它（HOST-005）。
 type XTraceItem =
@@ -31,9 +23,6 @@ type XTraceItem =
       Provenance: string
       Role: string
       Part: SemanticPart }
-
-/// COMPANION-003: Y 已消化到哪（决定 LWR gap 起点）。可落在 turn 中间。
-type RecordCoverage = { IngestedThrough: XTraceCursor }
 
 /// COMPANION-003 / CTX-011: prefix replacement 的证明量。只在完整 Host turn
 /// 边界推进，受 Host compaction epoch 约束。
@@ -45,13 +34,6 @@ type PrefixCoverage =
 
 [<RequireQualifiedAccess>]
 module XTrace =
-
-    let originCursor = { Sequence = 0L }
-
-    let nextCursor (cursor: XTraceCursor) : XTraceCursor = { Sequence = cursor.Sequence + 1L }
-
-    /// 严格单调比较。同 cursor 重复 append 是 PERSIST-010 的拒绝条件。
-    let isAfter (next: XTraceCursor) (previous: XTraceCursor) = next.Sequence > previous.Sequence
 
     /// `cursor >= start` 且 `cursor < endExclusive` 的 items。
     let sliceBetween (start: XTraceCursor) (endExclusive: XTraceCursor) (items: XTraceItem list) =
@@ -67,8 +49,8 @@ module XTrace =
     /// 当前 head：最后一条 item 之后的位置。空轨迹为 origin。
     let head (items: XTraceItem list) : XTraceCursor =
         match items |> List.tryLast with
-        | Some item -> nextCursor item.Cursor
-        | None -> originCursor
+        | Some item -> XTraceCursor.nextCursor item.Cursor
+        | None -> XTraceCursor.originCursor
 
     /// 从 SemanticMessage 平铺为带 role 的语义 part 序列。
     ///

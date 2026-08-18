@@ -238,7 +238,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (fact: MagicTodoFact)
         : Task<Result<MagicTodoAppendReceipt, JournalAppendFailure>> =
         task {
-            match! this.AppendEnvelope stream providerRun (fact |> MagicTodoFactCodec.encode |> Fact.MagicTodo) with
+            match! this.AppendEnvelope stream providerRun (Fact.MagicTodo fact) with
             | Ok(updated, envelope) ->
                 return
                     Ok

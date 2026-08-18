@@ -139,10 +139,7 @@ module JournalPayloadClosure =
         let refs =
             match fact with
             | Fact.Runtime _ -> []
-            | Fact.MagicTodo payload ->
-                MagicTodoFactCodec.tryDecode payload
-                |> Result.map MagicTodoFactCodec.payloadRefs
-                |> Result.defaultValue []
+            | Fact.MagicTodo fact -> MagicTodoFactCodec.payloadRefs fact
             | Fact.Agent(AgentFact.Execution(ExecutionFactCases.HandleCompleted p)) ->
                 (p.CompletionRef
                  |> Option.toList

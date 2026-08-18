@@ -21,7 +21,9 @@ module ObligationEnvelopeSurface =
         StreamId.Session(SessionId.create sessionId)
 
     let serializeMagicTodoEnvelope (typed: string) : string =
-        FactCodec.serializeFact (Fact.MagicTodo typed)
+        match MagicTodoFactCodec.tryDecode typed with
+        | Error error -> failwith ("ObligationEnvelopeSurface: invalid MagicTodo payload: " + error)
+        | Ok fact -> FactCodec.serializeFact (Fact.MagicTodo fact)
 
     let deserializeMagicTodoEnvelope (encoded: string) : obj =
         match FactCodec.deserializeFact encoded with
@@ -30,20 +32,23 @@ module ObligationEnvelopeSurface =
             box
                 {| ok = true
                    case = "MagicTodo"
-                   payload = typed |}
+                   payload = MagicTodoFactCodec.encode typed |}
         | Ok _ ->
             box
                 {| ok = false
                    error = "not a MagicTodo fact" |}
 
     let private envelopeForMagic (sessionId: string) (providerRun: string) (typed: string) : Envelope =
-        { RuntimeId = RuntimeId.create "obligation-ledger-surface"
-          LocalSeq = LocalSeq.create 1L
-          ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-          EventId = EventId.create "obligation-ledger-surface-event"
-          Stream = streamOfSession sessionId
-          ProviderRun = Some(ProviderRunIdentity.create providerRun)
-          Fact = Fact.MagicTodo typed }
+        match MagicTodoFactCodec.tryDecode typed with
+        | Error error -> failwith ("ObligationEnvelopeSurface: invalid MagicTodo payload: " + error)
+        | Ok fact ->
+            { RuntimeId = RuntimeId.create "obligation-ledger-surface"
+              LocalSeq = LocalSeq.create 1L
+              ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+              EventId = EventId.create "obligation-ledger-surface-event"
+              Stream = streamOfSession sessionId
+              ProviderRun = Some(ProviderRunIdentity.create providerRun)
+              Fact = Fact.MagicTodo fact }
 
     let foldMagicEnvelope (sessionId: string) (providerRun: string) (typed: string) : obj =
         match Fold.foldEnvelope Fold.empty (envelopeForMagic sessionId providerRun typed) with

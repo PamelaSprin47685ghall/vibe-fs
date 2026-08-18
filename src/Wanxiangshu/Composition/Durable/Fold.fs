@@ -78,10 +78,9 @@ module Fold =
         | AgentFact.Fission fission -> FissionFactFold.fold projection fission
         | AgentFact.Delegation delegation -> DelegationFactFold.fold projection delegation
 
-    let private foldMagicTodo (projection: ProjectionSet) (eventId: EventId) payload =
-        match MagicTodoFactCodec.tryDecode payload with
-        | Error reason -> reject "MagicTodo" ("invalid canonical payload: " + reason)
-        | Ok(MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2 rebase) ->
+    let private foldMagicTodo (projection: ProjectionSet) (eventId: EventId) (fact: MagicTodoFacts.MagicTodoFact) =
+        match fact with
+        | MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2 rebase ->
             ProjectionUpdate.tryUpdatePrefix
                 rebase.SessionId
                 (PrefixEpochProjection.applyRebase
@@ -98,7 +97,7 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
-        | Ok fact ->
+        | fact ->
             MagicTodoProjection.fold eventId projection.AgentProjections.MagicTodo fact
             |> Result.mapError (fun rejection ->
                 { Fact = "MagicTodo"
@@ -192,7 +191,7 @@ module Fold =
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
-        | MagicTodo payload -> foldMagicTodo projection envelope.EventId payload
+        | MagicTodo fact -> foldMagicTodo projection envelope.EventId fact
         | ManagerLifecycle fact ->
             // GLORY-010: lifecycle facts fold onto the session's lifecycle
             // projection. Replays are idempotent inside the projection fold;
