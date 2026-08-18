@@ -8,7 +8,7 @@
 //
 // The drain *mechanics* (await ConsumableReview, REVISE report delivery) live
 // in FinalityTool.execute and are covered by the membrane / magic-todo domain
-// suites (REUSE in PROOF.md); this file locks the pure disposition algebra:
+// suites (REUSE in HOW.md); this file locks the pure disposition algebra:
 //   - no accepted planComplete=true commitment       → continue-planning
 //     (TODO-010 zero-checkpoint fail closed, GLORY-039)
 //   - completed Life                                  → already-completed

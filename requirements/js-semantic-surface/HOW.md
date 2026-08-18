@@ -104,3 +104,35 @@ production 时越过 registered surface 直连 internal dist」。
 - `SURFACE-001..006` 历史编号在本包收编（见 WHAT 头部）；引用它们的包无需改动。
 - `JS-001..020`（repository-programming HOW 的 js-tools capability 编号）不归本包。
 - 本包不拥有已删除的 `domain.mjs` 的历史实现细节，只拥有「测试到不了 Fable mechanics」这条边。
+
+## DEPENDS ON
+
+- `requirement-system`（surface 必须跟着 semantic owner 分布；「测试需要，所以 export
+  internal」永不成立的前提是 assertion 级 owner 规则）。
+- `verification-system`（本包宪法是可红、fail-closed 的证明规则；proof ladder 与 wired
+  gate 机制由 verification-system 治理）。
+
+## 验证与测试落点
+
+落点类型：`NEW`（本包 tests/）/ `GATE`（静态门禁，`node scripts/check.mjs` 集成执行）/
+`PENDING`（由后续 P 阶段 gate 落地，见 HOW）。运行命令均为仓库根目录相对。每条 WHAT 命题恰一行。
+
+| 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
+|---|---|---|---|
+| JS-SEMANTIC-SURFACE-001 | `requirements/js-semantic-surface/tests/surface-charter.test.mjs`（test: WHAT[JS-SEMANTIC-SURFACE-001] JS_SURFACE_001_all_semantic_tests_are_mjs） | NEW | node --test requirements/js-semantic-surface/tests/surface-charter.test.mjs |
+| JS-SEMANTIC-SURFACE-002 | `surface-charter.test.mjs`（tests: WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002_forbidden_patterns_absent_from_semantic_tests、JS_SURFACE_002c_whole_semantic_test_zone_is_scanned、JS_SURFACE_002d_zero-debt_generate_removes_empty_ledger、JS_SURFACE_002e_build-verification_ledger_exemption_survives_zero-debt_cleanup、JS_SURFACE_002b_registered_surfaces_exist_in_the_production_source_tree）；`scripts/checks/js-boundary-gate.mjs`（whole-zone `.mjs`/`.js` ratchet, no silent regeneration, zero-debt ledger terminal） | NEW + GATE | node --test ... / node scripts/check.mjs |
+| JS-SEMANTIC-SURFACE-003 | `surface-charter.test.mjs`（tests: WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_law_owner_surface_registry、JS_SURFACE_003_every_registered_surface_has_a_contract_test）；`scripts/checks/js-surface-manifest.mjs`（owner WHAT/PROOF/source/Compile/emitted dist/active WHAT-authorized import evidence） | NEW + GATE | node --test ... / node scripts/check.mjs |
+| JS-SEMANTIC-SURFACE-004 | `surface-charter.test.mjs`（test: WHAT[JS-SEMANTIC-SURFACE-004] JS_SURFACE_004_helper_not_directly_tested）；`semanticImportEdges` scans every package test dependency, including support/fixtures/e2e/integration | NEW + GATE | node --test requirements/js-semantic-surface/tests/surface-charter.test.mjs |
+| JS-SEMANTIC-SURFACE-005 | P5 `requirements/verification-system/tests/support/js-contract.mjs`（`assertJsData` / `assertOpaque` validator）+ `surface-charter.test.mjs`（test: WHAT[JS-SEMANTIC-SURFACE-005] JS_SURFACE_005_js_native_representation_rules） | NEW | node --test requirements/js-semantic-surface/tests/surface-charter.test.mjs |
+| JS-SEMANTIC-SURFACE-006 | `surface-charter.test.mjs`（test: WHAT[JS-SEMANTIC-SURFACE-006] JS_SURFACE_006_fable_representation_not_contract）；P2 gate scans Fable tokens and permits an absent baseline only at zero; absent `domain.meta` is a terminal cleanup, not a required file | NEW + GATE | node --test ... / node scripts/check.mjs |
+
+### 语义 anchor
+
+无 anchor id（META 包）；机器事实由 surface-charter + js-boundary-gate + js-contract 承担。
+
+### 人工评审承接表
+
+- 新增 semantic surface 但无 contract test pin 名字 → JS-SEMANTIC-SURFACE-003
+- 「测试需要」成为 export internal 的理由 → JS-SEMANTIC-SURFACE-002
+- surface 翻译在 owner boundary 之外（中央 god facade） → JS-SEMANTIC-SURFACE-003
+- Fable 升级破坏 semantic tests（quarantine 外） → JS-SEMANTIC-SURFACE-006

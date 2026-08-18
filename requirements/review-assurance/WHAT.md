@@ -1,7 +1,7 @@
 # WHAT — review-assurance
 
 > 本文是 `review-assurance` 包的**唯一 normative 合同**。每条命题都是当前世界必须同时成立的事实。
-> 证据指针（→ PROOF.md 行号）指向本包 PROOF.md 的落点表。
+> 证据指针（→ HOW.md 行号）指向本包 HOW.md 的落点表。
 
 ## 术语（本包内定义）
 
@@ -23,7 +23,7 @@
 
 **边界**：REVISE 的 cohort 关闭语义（REVIEW-002）归 `finality`；本命题只冻结确认条件的代数与「REVISE 中断确认链」。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-001`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-001`。
 
 ## REVIEW-ASSURANCE-002：单次 PERFECT 不足；challenge 因果只能由 typed physical identity 建立
 
@@ -33,7 +33,7 @@
 
 **边界**：challenge 文案与本地化只归 provider prose；tool result 的 Host delivery 归 Host/tool protocol，本包只拥有 direct CE 调用 judgement delivery capabilities 的顺序。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-002`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-002`。
 
 ## REVIEW-ASSURANCE-003：attempt identity 五元组；同 run 额外 PERFECT 不计数
 
@@ -43,7 +43,7 @@
 
 **边界**：Finality 用完整五元组；TodoProcessReview 只以 run/call 标识 terminal judge（不分配 barrier witness 语义）→ REVIEW-ASSURANCE-011。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-003`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-003`。
 
 ## REVIEW-ASSURANCE-004：confirmed 是派生谓词，禁止存储布尔
 
@@ -53,7 +53,7 @@
 
 **边界**：`ConfirmedReviewWitness` 只服务 FinalityReview 与 Orchestrator 复审；process 评审不产生、不消费它（REVIEW-ASSURANCE-011）。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-004`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-004`。
 
 ## REVIEW-ASSURANCE-005：witness 自包含；Guard 不依赖外围 Map
 
@@ -63,7 +63,7 @@
 
 **边界**：Manager 面是否可见 Guard（REVIEW-007）→ `finality`/`participant-horizon`；本命题只管 witness 本身的自包含性。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-005`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-005`。
 
 ## REVIEW-ASSURANCE-006：tree 变化使 witness 失效；不删除历史；新 barrier 需全新双 PERFECT
 
@@ -73,7 +73,7 @@
 
 **边界**：rebase 的发布门（ff publish）→ `change-integration`；本命题只冻结 witness 失效代数。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-006`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-006`。
 
 ## REVIEW-ASSURANCE-007：physical binding fail-closed；禁止 provider-input seal
 
@@ -83,7 +83,7 @@
 
 **边界**：exact execution binding 的实现归 `host-boundary`；review CE 只比较强类型 identity，并以 `AwaitJudgement()` 与 delivery capability 的源码顺序证明 challenge 已先返回。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-007`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-007`。
 
 ## REVIEW-ASSURANCE-008：VerdictKnown 与 ConsumableReview 两段式；禁止提前 Concluded
 
@@ -93,7 +93,7 @@
 
 **边界**：Rk 派生与节拍 → `obligation-ledger`；LWR 的表示 → `work-record`；本命题冻结两段式分型与消费门槛。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-008`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-008`。
 
 ## REVIEW-ASSURANCE-009：record-ready 同 snapshot、排他 frontier、事件驱动、无轮询、waiter 可恢复
 
@@ -103,7 +103,7 @@
 
 **边界**：等待机制的因果可观测性 → `causal-wait`；「process-local waiter 消失即放弃」禁令的本包侧即本命题。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-009`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-009`。
 
 ## REVIEW-ASSURANCE-010：基础设施失败永远不是 PERFECT/REVISE
 
@@ -113,7 +113,7 @@
 
 **边界**：undecidable 的 crash 恢复细节 → `crash-reconciliation`；本命题只冻结「不伪 REVISE、不伪 Concluded、义务 outstanding」。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-010`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-010`。
 
 ## REVIEW-ASSURANCE-011：process verdict 与 terminal witness 代数分离，互不计数
 
@@ -123,7 +123,7 @@
 
 **边界**：过程判断的语义本身 → `review-judgement`；enlist/graduate 生命周期 → `finality`/`managed-session-lifecycle`。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-011`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-011`。
 
 ## REVIEW-ASSURANCE-012：可消费证据 request-range bounded；session head 不能冒充
 
@@ -133,7 +133,7 @@
 
 **边界**：LWR 的表示/物化/三标题 → `work-record`；本命题只冻结「可消费证据必须 request-bounded」与 frontier 冻结。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-012`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-012`。
 
 ## REVIEW-ASSURANCE-013：review requirement 以 Authority Root 标识；确认只清除其覆盖的 requirements
 
@@ -143,7 +143,7 @@
 
 **边界**：Authority Root 语义 → `participant-identity`/`interaction-authority`；Manager 面可见性（REVIEW-007）→ `finality`/`participant-horizon`；本命题只冻结 requirement 的身份绑定与覆盖清除。
 
-**证据**：→ PROOF.md `REVIEW-ASSURANCE-013`。
+**证据**：→ HOW.md `REVIEW-ASSURANCE-013`。
 
 ---
 

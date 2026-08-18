@@ -1,6 +1,6 @@
 # crash-reconciliation — 唯一 normative 合同
 
-条款 ID 前缀：`CRASH-`。本文每个命题都是**当前世界必须同时成立的事实**；测试落点见 PROOF.md。
+条款 ID 前缀：`CRASH-`。本文每个命题都是**当前世界必须同时成立的事实**；测试落点见 HOW.md。
 术语：durable facts = EventStore 中已提交的不可变事件；可信物理观察 = Host SDK snapshot、
 Git ref/head、PTY onExit 等可复核的外部事实；process-local 状态 = 仅存在于当前进程内存的
 标志/permit/waiter/sensor。

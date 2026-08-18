@@ -3,7 +3,7 @@
 条款前缀：`FINALITY-`。
 本文件是 finality 包的**唯一 normative 合同**。跨域机制（obligation-ledger、review-assurance、
 participant-horizon、work-record、crash-reconciliation）只引用本包命题，不复制合同。
-历史与弃权、实现模型见 `HOW.md`；每条命题的证明落点见 `PROOF.md`。
+历史与弃权、实现模型见 `HOW.md`；每条命题的证明落点见 `HOW.md`。
 
 词汇：`suicide` = Manager 的终结工具调用（当前字面名，HOW）；`FinalityRequest` = 一次终结评审
 请求；`cohort` = 该请求的 Reviewer 集合；`Life` = 一个 Manager 生命；`life completion` =
@@ -19,7 +19,7 @@ review, handle, and ManagerJob history objects/IDs. It returns JSON-shaped objec
 its folded `World` is an opaque capability that callers only pass back. Tests do not
 construct F# facts/unions, inspect Fable representations, or import package-internal
 compiled modules. The owner and executable contract evidence are registered in
-`PROOF.md`.
+`HOW.md`.
 
 
 ## FINALITY-001：suicide 只属 Manager，且是终结的专门入口
@@ -32,7 +32,7 @@ compiled modules. The owner and executable contract evidence are registered in
 
 **边界**：`suicide` 字面工具名与叙事风格是当前实现（HOW），不是永久合同。
 
-**证据** → PROOF.md 行 F-1。
+**证据** → HOW.md 行 F-1。
 
 ## FINALITY-002：终结资格建立在 obligations + current tree + qualified review evidence 上
 
@@ -46,7 +46,7 @@ witness）；(3) 终结经验分型（本包：rejection / blessed / rest 各自
 **边界**：三部分各自的内部机制分别归 obligation-ledger / review-assurance；本包只拥有组合契约与
 participant 经验。
 
-**证据** → PROOF.md 行 F-2。
+**证据** → HOW.md 行 F-2。
 
 ## FINALITY-003：受理前置条件按序验证；任一失败不建任何评审对象
 
@@ -59,7 +59,7 @@ last_words、ToolCallId、ProviderRun、无 outstanding/completed-awaiting-join 
 
 **边界**：资源检查的 Host 侧实现（child/PTY/worktree）属 host-boundary；本包拥有「失败即零创建」。
 
-**证据** → PROOF.md 行 F-3。
+**证据** → HOW.md 行 F-3。
 
 ## FINALITY-004：无 plan commitment 时不得进入 Finality
 
@@ -71,7 +71,7 @@ Pre-T1 的 `planComplete=false` planning checkpoints 不构成终结资格；T1 
 
 **边界**：判定输入 `isPlanCommitted` 来自 obligation-ledger 的 durable projection；本包拥有门禁本身。
 
-**证据** → PROOF.md 行 F-4。
+**证据** → HOW.md 行 F-4。
 
 ## FINALITY-005：suicide 是唯一 tail drain
 
@@ -84,7 +84,7 @@ drain。禁止再调一次 todowrite flush——那会创造 R(k+1) 无限后移
 **边界**：「Rk 产生后必须被消费」的账本侧义务见 `obligation-ledger` OBLIGATION-LEDGER-022；
 本包拥有「消费动作发生在 suicide」。
 
-**证据** → PROOF.md 行 F-5。
+**证据** → HOW.md 行 F-5。
 
 ## FINALITY-006：drain 结果分型
 
@@ -101,7 +101,7 @@ Manager 用后续 todowrite 修正（TODO-005/010）。
 
 **边界**：报告物化与 record-ready 属 review-assurance；账本不被评审涂改属 obligation-ledger。
 
-**证据** → PROOF.md 行 F-6。
+**证据** → HOW.md 行 F-6。
 
 ## FINALITY-007：无机械 terminal-todo completeness gate
 
@@ -113,7 +113,7 @@ PERFECT/REVISE，不另造机械 terminal-todo completeness gate（TODO-010）�
 
 **边界**：obligations 是否为真由 obligation-ledger 的账本 + process review 判定。
 
-**证据** → PROOF.md 行 F-7。
+**证据** → HOW.md 行 F-7。
 
 ## FINALITY-008：受理顺序必须 durable
 
@@ -128,7 +128,7 @@ durable last_words → `FinalityRequested` → 递归 cohort CE（roster 见 FIN
 
 **边界**：barrier 的 witness/seal 机制属 review-assurance；`FinalityRequested` 事实形态见 HOW。
 
-**证据** → PROOF.md 行 F-8。
+**证据** → HOW.md 行 F-8。
 
 ## FINALITY-009：roster 与 Dedicated 毕业
 
@@ -144,7 +144,7 @@ barrier 再入 roster（GLORY-003/045；TODO-010）。
 **边界**：process PERFECT ≠ terminal first PERFECT（FINALITY-010）；roster 推导的纯函数在
 `Composition/Bridges/FinalityReview/FinalityReviewCohort.fs`。
 
-**证据** → PROOF.md 行 F-9。
+**证据** → HOW.md 行 F-9。
 
 ## FINALITY-010：graduate 只由 enlistment + 合法 confirmed witness 推导
 
@@ -158,7 +158,7 @@ dual-PERFECT 链（新 request/barrier/tree/authority root；可复用同一 phy
 **边界**：dual-PERFECT witness 的因果代数（challenge/seal/same-barrier/different-run）属
 review-assurance；本包拥有「谁有资格毕业、process 证明不计入」。
 
-**证据** → PROOF.md 行 F-10。
+**证据** → HOW.md 行 F-10。
 
 ## FINALITY-011：REVISE 立即关闭 cohort；FinalityRejected 另行 record-ready
 
@@ -174,7 +174,7 @@ continuation capability 与 cohort 立即关闭：不发送 confirmation/challen
 **边界**：record-ready 判定 / 同 snapshot 物化属 review-assurance；本包拥有关闭语义与
 rejection 经验（FINALITY-013/014）。
 
-**证据** → PROOF.md 行 F-11。
+**证据** → HOW.md 行 F-11。
 
 ## FINALITY-012：双轨交付 sibling steer
 
@@ -191,7 +191,7 @@ TOML）交给 Manager，**不得**并入工具结果字符串、**不得**静默
 **边界**：sibling 记录的物化与 fail-closed 属 review-assurance；steer 的指令文案见 HOW
 （SURFACE-005 约束）。
 
-**证据** → PROOF.md 行 F-12。
+**证据** → HOW.md 行 F-12。
 
 ## FINALITY-013：三种经验分型；Acceptance ≠ rest
 
@@ -214,7 +214,7 @@ evidence 是另一事实（GLORY-076）。idempotent replay 重放原 result，�
 
 **边界**：文案逐字字节属 `provider-language` / SURFACE-004；本包拥有经验分型的语义。
 
-**证据** → PROOF.md 行 F-13。
+**证据** → HOW.md 行 F-13。
 
 ## FINALITY-014：拒绝后同一 Life 继续；Rejected request 永不 blessing
 
@@ -227,7 +227,7 @@ best-effort cancel，但不 Dispose 未 graduate session；下次 suicide 建新
 
 **边界**：继续工作的 checkpoint 语义属 obligation-ledger。
 
-**证据** → PROOF.md 行 F-14。
+**证据** → HOW.md 行 F-14。
 
 ## FINALITY-015：未 graduate session 不 Dispose；Dedicated process duty 保留
 
@@ -242,7 +242,7 @@ todowrite process reviews，至少保留到 `LifeCompleted`（或 proven-loss re
 **边界**：dedicated session 的物理生命周期归 `managed-session-lifecycle`；process duty 义务见
 obligation-ledger OBLIGATION-LEDGER-020。
 
-**证据** → PROOF.md 行 F-15。
+**证据** → HOW.md 行 F-15。
 
 ## FINALITY-016：Blessed 不结束 Life；minor-work 继续
 
@@ -258,7 +258,7 @@ Finishing 保护名字（GLORY-076 法则）。
 
 **边界**：tree 重读与 witness 有效性属 review-assurance；LWR bundle 物化属 work-record。
 
-**证据** → PROOF.md 行 F-16。
+**证据** → HOW.md 行 F-16。
 
 ## FINALITY-017：rest = 第二次 suicide（last_words 即最终答案）
 
@@ -274,7 +274,7 @@ Manager 深思后的最终答案（why「成功输出逐字等于 last_words」�
 
 **边界**：last_words 进入 LWR Recent work 的表示属 work-record。
 
-**证据** → PROOF.md 行 F-17。
+**证据** → HOW.md 行 F-17。
 
 ## FINALITY-018：Manager deferred completion
 
@@ -286,7 +286,7 @@ REVISE 直接返回 work-record prompt；Blessing 返回 minor-work continuation
 
 **边界**：completion 停放的 turn 机制属 interaction-authority / host-boundary 交叉。
 
-**证据** → PROOF.md 行 F-18。
+**证据** → HOW.md 行 F-18。
 
 ## FINALITY-019：Manager 面无 Review Guard；idle 只发鼓励
 
@@ -299,7 +299,7 @@ Manager 普通 idle 仅发送 FINALITY 之外的四行鼓励 continuation；它�
 
 **边界**：idle continuation 的 durable occasion identity 属 interaction-authority；本包只定义 Manager 的 plan-commitment 条件与何时允许鼓励。这里没有 Life 级/condition 级次数预算。
 
-**证据** → PROOF.md 行 F-19。
+**证据** → HOW.md 行 F-19。
 
 ## FINALITY-020：隐藏机制不变成 Manager checklist
 
@@ -317,7 +317,7 @@ OBLIGATION-LEDGER-023 与 participant-horizon；该例外不得扩大为暴露�
 **边界**：信息准入边界（哪些词/哪些句可见）的 admission 归 participant-horizon；本包只拥有
 「hidden terminal mechanism 不变成 Manager checklist、只暴露 consequence」。
 
-**证据** → PROOF.md 行 F-20。
+**证据** → HOW.md 行 F-20。
 
 ## FINALITY-021：状态只来自 typed facts
 
@@ -333,7 +333,7 @@ retention 所需事实；**不得**保存 rejected/confirmed bool product 或下
 
 **边界**：无持久程序计数器的一般法则属 structured-workflow。
 
-**证据** → PROOF.md 行 F-21。
+**证据** → HOW.md 行 F-21。
 
 ## FINALITY-022：Life 开启条件与隔离
 
@@ -362,7 +362,7 @@ migration 也不能在 completion 后自激重生。
 **边界**：HumanRoot authority closure → `interaction-authority`；XTrace 不清空与 cursor range 物化属
 semantic-trace；Magic Todo canonical 空账属 obligation-ledger。
 
-**证据** → PROOF.md 行 F-22。
+**证据** → HOW.md 行 F-22。
 
 ## FINALITY-023：Opening durable 顺序与改写幂等
 
@@ -375,7 +375,7 @@ identity = SessionId + ManagerLifeId + PhysicalUserMessageId + narrative source�
 **边界**：OpeningMaterial 的表示与压缩 floor 属 work-record；seal 机制属 review-assurance /
 prefix-stability 交叉。
 
-**证据** → PROOF.md 行 F-23。
+**证据** → HOW.md 行 F-23。
 
 ## FINALITY-024：工作期输入不改写；持续完成使命
 
@@ -388,7 +388,7 @@ Post-T1：规划与执行是同一活动；Planning、Delegation、child 或命�
 
 **边界**：Pre-T1 不扛路的规划边界属 obligation-ledger（OBLIGATION-LEDGER-017）。
 
-**证据** → PROOF.md 行 F-24。
+**证据** → HOW.md 行 F-24。
 
 ## FINALITY-025：旧 journal 语义
 
@@ -402,7 +402,7 @@ OBLIGATION-LEDGER-019（GLORY-069）。
 
 **边界**：migration 的 decode 机制属 durable-events。
 
-**证据** → PROOF.md 行 F-25。
+**证据** → HOW.md 行 F-25。
 
 ## FINALITY-026：undecidable 是合法结局经验；绝不伪造
 
@@ -418,7 +418,7 @@ Manager 去「修复」系统（why「REVISE 是正常业务结果」「失败�
 **边界**：record-ready / 恢复机制属 review-assurance + crash-reconciliation；本包拥有
 outcome 分型与 Life 继续语义。
 
-**证据** → PROOF.md 行 F-26。
+**证据** → HOW.md 行 F-26。
 
 ## FINALITY-027：后台资源义务
 
@@ -430,7 +430,7 @@ idle 鼓励（GLORY-038/EXEC-016/GLORY-029）。
 
 **边界**：JoinGuard 的 turn 机制属 interaction-authority。
 
-**证据** → PROOF.md 行 F-27。
+**证据** → HOW.md 行 F-27。
 
 ## FINALITY-028：ManagerJob 不复活
 
@@ -441,4 +441,4 @@ idle 鼓励（GLORY-038/EXEC-016/GLORY-029）。
 
 **边界**：Orchestrator 的 Job 语义属 dispatch-protocol 交叉。
 
-**证据** → PROOF.md 行 F-28。
+**证据** → HOW.md 行 F-28。

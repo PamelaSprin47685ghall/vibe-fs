@@ -1,6 +1,6 @@
 # WHAT — knowledge-reuse 的唯一 normative 合同
 
-> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `PROOF.md`）。
+> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `HOW.md`）。
 > 边界（DOES NOT OWN）写在各条「边界」；更完整的弃权记录在 `HOW.md` §历史与弃权。
 
 ## Semantic owner boundary
@@ -13,7 +13,7 @@ provider fetch tool. Delegation's registered `SyncDelegateSurface.fs` owns the r
 runtime used by the G6 integration path. Every boundary accepts only plain JS values plus
 opaque EventStore/session capabilities and returns JS-native observations/results; F# model,
 workflow, collection, result, Host codec, Journal, and runtime representations do not cross.
-The contracts are proved by the package tests named in `PROOF.md`.
+The contracts are proved by the package tests named in `HOW.md`.
 
 
 **规范陈述**：Inspector Casebook 是 best-effort semantic cache：每个 Case 保存 Q&A 与可重放的 repository observations；后续 Inspector 可 fetch 并按当前 worktree 重放。不建立知识数据库，不引入 commit history / feature Git history，不保证历史 Q/A 可追溯为产品 API，不用 timestamp 判断 freshness 或 merge winner，不改变 subject worktree。
@@ -22,7 +22,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：Case 内容（Q/A 具体值）无 owner（缓存内容不是规范）；「复用规则」才是本包。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-001 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-001 行。
 
 ## KNOWLEDGE-REUSE-002 — Case 内容：Q/A 逐字 + observations
 
@@ -32,7 +32,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：ToolResultBound 的 bound 语义本身 → `host-boundary`（ARCH-012 交叉）。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-002 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-002 行。
 
 ## KNOWLEDGE-REUSE-003 — observation capture 是 typed 的
 
@@ -42,7 +42,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：观察本身如何被工具产生（read/glob/grep 的语义）→ `repository-programming`/`repository-investigation` 交叉；本命题只管「Case 里的 observation 从哪来、如何规范化」。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-003 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-003 行。
 
 ## KNOWLEDGE-REUSE-004 — fetch 语义：shelfmark + 先重放
 
@@ -52,7 +52,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：warm-start/semantic search 的低信任提示 → `repository-investigation`；本命题只管 Case fetch 路径。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-004 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-004 行。
 
 ## KNOWLEDGE-REUSE-005 — freshness ≠ correctness proof
 
@@ -62,7 +62,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：「什么构成当前事实」→ `repository-investigation`；「replay 本身是否可靠」由 capture/replay 实现决定（HOW）。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-005 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-005 行。
 
 ## KNOWLEDGE-REUSE-006 — Bookkeeper 契约与取证边界
 
@@ -72,7 +72,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：Bookkeeper 的 Persona（Clerk/Curator）、机器身份（`fast-bookkeeper`/`deep-bookkeeper`）、session 形态（InternalLeaf + Attached）→ HOW + `participant-identity`/`session-ontology` 交叉；「无取证权 + 原子 staged 变换」才是本命题。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-006 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-006 行。
 
 ## KNOWLEDGE-REUSE-007 — Case 的 durable authority = 统一 EventStore
 
@@ -82,7 +82,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：EventStore 物理层 → `durable-events`；dumb-remote 同步 → `durable-convergence`/`change-integration` 交叉。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-007 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-007 行。
 
 ## KNOWLEDGE-REUSE-008 — LRU 有界性：淘汰是事件
 
@@ -92,7 +92,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：具体 capacity / prune key 权重 → HOW 常数。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-008 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-008 行。
 
 ## KNOWLEDGE-REUSE-009 — feature opt-in 双门
 
@@ -102,7 +102,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：marker 目录名（`.wanxiang/casebook`）与检测机制 → HOW。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-009 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-009 行。
 
 ## KNOWLEDGE-REUSE-010 — lifecycle：exactly-one finalize
 
@@ -112,7 +112,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：ReuseScope 生命周期本身 → `managed-session-lifecycle`/`session-ontology` 交叉；本命题是「何时 finalize」的 Casebook 语义。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-010 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-010 行。
 
 ## KNOWLEDGE-REUSE-011 — 并发：显式 DomainConflict，禁 LWW
 
@@ -122,7 +122,7 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：general replica convergence / set union / DomainConflict 物理机制 → `durable-convergence`（本包消费）；本命题是「Case 对象必须显式 conflict、不 LWW」的对象语义。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-011 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-011 行。
 
 ## KNOWLEDGE-REUSE-012 — 低信任 index：只暴露 shelfmark + canonical Q
 
@@ -132,4 +132,4 @@ The contracts are proved by the package tests named in `PROOF.md`.
 
 **边界**：epoch freeze 机制本身 → `prefix-stability`/`provider-projection` 交叉；「可见面只有 shelfmark + canonical Q」才是本命题。
 
-**证据**：→ `PROOF.md` KNOWLEDGE-REUSE-012 行。
+**证据**：→ `HOW.md` KNOWLEDGE-REUSE-012 行。

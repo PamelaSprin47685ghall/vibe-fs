@@ -1,7 +1,7 @@
 # delegation — 可观察合同
 
 本文件是 `delegation` 包的唯一 normative 语义合同。每条命题 = 当前世界必须同时成立的事实。
-证据指针 → `PROOF.md`。边界 → `HOW.md`「边界与弃权」。
+证据指针 → `HOW.md`。边界 → `HOW.md`「边界与弃权」。
 
 ## DELEG-001：委托 = 语义 charge + entitled office + 逻辑 owner + bounded 返回后果
 
@@ -238,7 +238,7 @@ owner 生命周期约束保证咨询不脱管。
 advice 的 prompt 渲染 → `provider-projection` + `prefix-stability`；「何时鼓励求助」→ `cognitive-environment`。
 
 证据：NEW `requirements/delegation/tests/assistance-host.test.mjs`（JS-native authority surface 证明 assistance continuation 保持 authority root，advice 不伪装为 provider retry）；REUSE `requirements/host-boundary/tests/needhelp-sensor.test.mjs`；真实 consultation/advice 路由由 verification-system Long Stroke e2e 的 `assertNeedHelpAssistance` 证明
-（host 面，见 PROOF.md SPLIT@cutover 注记：sentinel 识别归 `interaction-authority`，consultation 委托语义归本包）。
+（host 面，见 HOW.md SPLIT@cutover 注记：sentinel 识别归 `interaction-authority`，consultation 委托语义归本包）。
 
 ## DELEG-019：fork child 首 prompt 是 typed 语义载荷，不是自由文本
 

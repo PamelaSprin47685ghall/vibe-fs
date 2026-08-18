@@ -4,25 +4,13 @@
 //
 // 本测试扫描 requirements/ 全树，断言五个结构事实：
 //   1. INDEX（requirements/INDEX.md 表 + requirements/README.md 树入口）
-//      中当前全部 49 个包都有 requirements/<pkg>/{README,WHY,WHAT,HOW,PROOF}.md；
-//   2. 每个 WHAT.md 的每个 `<PACKAGE>-NNN` 命题 ID（标题定义）在 PROOF.md
+//      中当前全部 49 个包都有 requirements/<pkg>/{WHY,WHAT,HOW}.md 与 tests/；
+//   2. 每个 WHAT.md 的每个 `<PACKAGE>-NNN` 命题 ID（标题定义）在 HOW.md
 //      表格中有行（按包名 + ID 交叉检查）；
-//   3. 每个 PROOF.md 落点引用的测试文件真实存在；
+//   3. 每个 HOW.md 落点引用的测试文件真实存在；
 //   4. requirements/ 下不存在 INDEX 之外的包目录；
-//   5. 每个包 README/WHY/WHAT 中出现的 DEPENDS ON 引用集合 ⊆ INDEX 依赖骨架
+//   5. 每个包 WHY/WHAT/HOW 中出现的 DEPENDS ON 引用集合 ⊆ INDEX 依赖骨架
 //      （允许子集，不允许多出边）。
-//
-// green only after full migration lands；中途缺失包是预期中间状态。
-// 中途红有两种，均为预期：缺包（当前 49 包未全落地）与已落地但尚不完整
-// （PROOF 占位、落点缺失、WHAT/PROOF 尚未对齐）的包。
-// 两个 test() 分工：
-//   - `已迁移包结构一致`：只检查 5 份文档齐备的包，失败精确到包与原因。
-//     本包（requirement-system / verification-system）现在必须干净；删一个
-//     已存在包的 PROOF 行立即在失败列表中出现该包（可红性）。
-//   - `全量迁移状态`：当前 49 包 × 5 文档 + 无 INDEX 外目录。迁移中途必然红，
-//     红的内容精确到「哪个包缺哪个文件」，cutover 全量落地后转绿。
-//
-// 依赖骨架源是 requirements/INDEX.md（live manifest，2026-08-14 cutover 迁入）。
 
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
@@ -37,14 +25,14 @@ const TREE_ENTRY = join(REQUIREMENTS, 'README.md')
 
 const read = (path) => readFileSync(path, 'utf8')
 
-const REQUIRED_DOCS = ['README.md', 'WHY.md', 'WHAT.md', 'HOW.md', 'PROOF.md']
+const REQUIRED_DOCS = ['WHY.md', 'WHAT.md', 'HOW.md']
 
 // ── 解析 INDEX 包清单 ────────────────────────────────────────────────────────
 
-/** requirements/README.md 树入口：`[pkg](pkg/README.md)` 链接。 */
+/** requirements/README.md 树入口：`[pkg](pkg/WHAT.md)` 或 `[pkg](pkg/README.md)` 链接。 */
 const packageNamesFromTreeEntry = () => {
   const text = read(TREE_ENTRY)
-  const names = [...text.matchAll(/\]\(([a-z][a-z0-9-]*)\/README\.md\)/g)].map((m) => m[1])
+  const names = [...text.matchAll(/\]\(([a-z][a-z0-9-]*)(?:\/(?:WHAT|WHY|README)\.md|\/)?\)/g)].map((m) => m[1])
   return [...new Set(names)]
 }
 
@@ -89,11 +77,13 @@ const dependencySkeleton = () => {
 const DEPENDS_ON_TRIGGER = /^\s*(?:#+\s*|\*\*\s*)?DEPENDS\s+ON\b/i
 
 /**
- * 从单个包的 README/WHY/WHAT 中收集「声明为依赖」的包名集合。
+ * 从单个包的 WHY/WHAT/HOW 中收集「声明为依赖」的包名集合。
  * 只认 DEPENDS ON 声明行及其后续非空、非标题的延续行；散文里的跨包引用不算。
  */
 const declaredDependencies = (pkg, docRel, allNames) => {
-  const text = read(join(REQUIREMENTS, pkg, docRel))
+  const filePath = join(REQUIREMENTS, pkg, docRel)
+  if (!existsSync(filePath)) return new Set()
+  const text = read(filePath)
   const declared = new Set()
   let collecting = false
   for (const line of text.split('\n')) {
@@ -117,7 +107,7 @@ const collectNames = (line, allNames, self, out) => {
   }
 }
 
-// ── 命题 ID 与 PROOF 交叉 ────────────────────────────────────────────────────
+// ── 命题 ID 与 HOW 交叉 ────────────────────────────────────────────────────
 
 const propositionIds = (pkg) => {
   const text = read(join(REQUIREMENTS, pkg, 'WHAT.md'))
@@ -131,16 +121,14 @@ const propositionIds = (pkg) => {
 }
 
 /**
- * PROOF.md 中命中该命题 ID 的行。ID 可出现在行首格或第二格，接受多种形式：
+ * HOW.md 中命中该命题 ID 的行。ID 可出现在行首格或第二格，接受多种形式：
  * 完整 ID（`| REQUIREMENT-SYSTEM-001 |`、第二格 `DISPATCH-PROTOCOL-002/003`）、
  * 裸编号（`| 006/007 |`，仅行首格，避免与测试锚点里的三位数字误配）。
  */
 const proofRowsFor = (pkg, id) => {
-  const text = read(join(REQUIREMENTS, pkg, 'PROOF.md'))
+  const text = read(join(REQUIREMENTS, pkg, 'HOW.md'))
   const full = new RegExp(`\\b${id}\\b`)
   const bare = new RegExp(`\\b${id.slice(-3)}\\b`)
-  // 第二格可能携带合并 ID 列表（`DISPATCH-PROTOCOL-002/003`、`005/006/010`），
-  // 按分隔符切 token 后逐 token 匹配；锚点里的 `_015_` 不产生词边界，不会误配。
   const idTokens = (cell) => cell.split(/[\s/,–—]+/).filter(Boolean)
   const rows = []
   for (const line of text.split('\n')) {
@@ -191,22 +179,22 @@ const docFailures = (pkg) => {
   return failures
 }
 
-/** 对单个「已迁移」包跑 PROOF 反向检查（命题有行、落点文件存在）。 */
+/** 对单个「已迁移」包跑 HOW 落点反向检查（命题有行、落点文件存在）。 */
 const proofFailures = (pkg) => {
   const failures = []
   for (const id of propositionIds(pkg)) {
     if (proofRowsFor(pkg, id).length === 0) {
-      failures.push(`${pkg}: WHAT proposition ${id} has no row in PROOF.md`)
+      failures.push(`${pkg}: WHAT proposition ${id} has no row in HOW.md`)
     }
   }
 
-  const proofText = read(join(REQUIREMENTS, pkg, 'PROOF.md'))
-  for (const line of proofText.split('\n')) {
+  const howText = read(join(REQUIREMENTS, pkg, 'HOW.md'))
+  for (const line of howText.split('\n')) {
     if (!line.startsWith('|')) continue
     for (const token of landingFileTokens(line)) {
       const resolved = resolveLanding(pkg, token)
       if (!existsSync(resolved)) {
-        failures.push(`${pkg}: PROOF landing file missing: ${token}`)
+        failures.push(`${pkg}: HOW landing file missing: ${token}`)
       }
     }
   }
@@ -216,7 +204,7 @@ const proofFailures = (pkg) => {
 /** 对单个「已迁移」包跑依赖声明 ⊆ 骨架检查。 */
 const depFailures = (pkg, allNames, skeleton) => {
   const failures = []
-  for (const doc of ['README.md', 'WHY.md', 'WHAT.md']) {
+  for (const doc of ['WHY.md', 'WHAT.md', 'HOW.md']) {
     const declared = declaredDependencies(pkg, doc, allNames)
     const allowed = skeleton.get(pkg) ?? new Set()
     for (const dep of declared) {
@@ -230,7 +218,7 @@ const depFailures = (pkg, allNames, skeleton) => {
 
 // ── 五个 test()：每个恰一个 primary WHAT ─────────────────────────────────────
 
-test('WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all five documents', () => {
+test('WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all three documents', () => {
   const allNames = packageNamesFromIndexTables()
   const missing = []
   for (const pkg of allNames) {
@@ -241,12 +229,11 @@ test('WHAT[REQUIREMENT-SYSTEM-003] every INDEX package carries all five document
   assert.deepEqual(
     missing,
     [],
-    'every INDEX package must carry README/WHY/WHAT/HOW/PROOF; missing (expected while migration is mid-flight):\n' +
-      missing.join('\n'),
+    'every INDEX package must carry WHY/WHAT/HOW; missing:\n' + missing.join('\n'),
   )
 })
 
-test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a PROOF row and a live landing file', () => {
+test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a proof row and a live landing file', () => {
   const allNames = packageNamesFromIndexTables()
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
@@ -259,7 +246,6 @@ test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a PROOF row and a 
   for (const pkg of migrated) {
     failures.push(...proofFailures(pkg))
   }
-  // 删一个已存在包的 PROOF 行 → 该包进入此失败列表（可红性）。
   assert.deepEqual(
     failures,
     [],
@@ -268,9 +254,6 @@ test('WHAT[REQUIREMENT-SYSTEM-004] every WHAT proposition has a PROOF row and a 
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-001] every product truth has exactly one owner package', () => {
-  // 机器落点（PROOF L8）：requirements/ 无 INDEX 外目录 —— 每个包目录都出现在 INDEX
-  // 中，即每个语义 owner 唯一且被索引。语义归属裁决（WHY/independent-change/failure
-  // meaning）由 cutover 设计期人工完成（历史见 git），本 test 锁物理唯一性。
   const fromIndex = packageNamesFromIndexTables()
   const dirs = readdirSync(REQUIREMENTS)
     .filter((entry) => statSync(join(REQUIREMENTS, entry)).isDirectory())
@@ -281,11 +264,7 @@ test('WHAT[REQUIREMENT-SYSTEM-001] every product truth has exactly one owner pac
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-002] package identity is the name, not the physical layout', () => {
-  // 结构检查只绑定「包名 + 5 份固定文档名」；不读取任何 manifest 格式
-  // （TOML/JSON/…）或目录布局细节，因此整体更换物理布局不改变任何 WHAT。
-  assert.deepEqual(REQUIRED_DOCS, ['README.md', 'WHY.md', 'WHAT.md', 'HOW.md', 'PROOF.md'])
-  // 无 manifest 参与：requirements/<pkg>/ 下不存在强制格式文件（meta-verifier 从不
-  // 读取 .toml/.json manifest；本 test 即机器证明）。
+  assert.deepEqual(REQUIRED_DOCS, ['WHY.md', 'WHAT.md', 'HOW.md'])
   assert.ok(!existsSync(join(REQUIREMENTS, 'requirement-system/package.toml')), 'no manifest format may enter the tree contract')
 })
 
@@ -323,7 +302,6 @@ test('WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX sk
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-017] meta-verifier executes as the machine proof', () => {
-  // 本测试自身即机器执行：文件存在、随 run.mjs 全量运行、上述断言可红。
   assert.ok(
     existsSync(join(REQUIREMENTS, 'requirement-system/tests/meta-verifier.test.mjs')),
     'meta-verifier.test.mjs must exist and run as the REQUIREMENT-SYSTEM-017 machine proof',

@@ -1,6 +1,6 @@
 # context-compression — WHAT（唯一 normative 合同）
 
-条款前缀：`CONTEXT-COMPRESSION-`。证据指针 → `PROOF.md` 对应行号。
+条款前缀：`CONTEXT-COMPRESSION-`。证据指针 → `HOW.md` 对应行号。
 
 ---
 
@@ -333,4 +333,4 @@ F# CE 的等待与继续直接表达（STRUCTURED-WORKFLOW-001/002/003）。
 `ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier`；
 `tests/blogger-convergence-gaps.test.mjs`
 `C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current`；跨包 restart 边界 REUSE
-`requirements/crash-reconciliation/tests/explicit-continue.test.mjs` 的 CRASH-017/018；PROOF.md 第 018 行。
+`requirements/crash-reconciliation/tests/explicit-continue.test.mjs` 的 CRASH-017/018；HOW.md 第 018 行。

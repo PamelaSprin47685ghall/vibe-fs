@@ -1,7 +1,7 @@
 # office-capability — 可观察合同
 
 本文件是 `office-capability` 包的唯一 normative 语义合同。每条命题 = 当前世界必须同时成立的事实。
-证据指针 → `PROOF.md`。边界 → `HOW.md`「边界与弃权」。
+证据指针 → `HOW.md`。边界 → `HOW.md`「边界与弃权」。
 
 ## OFF-001：office 由 entitled consequence 定义，不由 persona 名 / 工具名 / 权限清单定义
 

@@ -1,6 +1,6 @@
 # WHAT —— 唯一 normative 合同（interaction-authority）
 
-> 当前世界必须同时成立的事实。每条命题的测试落点见 [`PROOF.md`](PROOF.md)（锚点 `R1`..`R17`）。
+> 当前世界必须同时成立的事实。每条命题的测试落点见 [`HOW.md`](HOW.md)（锚点 `R1`..`R17`）。
 > 术语在本文件首次出现处定义；「延续」「Logical Run」等概念引用自 `session-ontology` 与
 > `participant-identity`，本包只拥有 authority 判定。
 
@@ -21,7 +21,7 @@
 - 含义：类型系统承载这条不变量——「从物理消息到 authority root」只有一个 crossing，且该 crossing
   只在 `PhysicalAccepted` 已建立后发生（`PromptAuthorityRun.createAuthorityRoot`）。
 - 边界：没有从 `TransportReceipt` 到 `AuthorityRootUserMessageId` 的函数（那是 dispatch 的事）。
-- 证据：→ PROOF.md R1。
+- 证据：→ HOW.md R1。
 
 ## INTERACTION-AUTHORITY-002 — 形态不是 authority 证据
 
@@ -30,7 +30,7 @@ Authority 身份证据；身份只能由 typed 来源机制证明（PROMPT-001�
 
 - 含义：正文形态分析永远不能替代 provenance 判定。
 - 边界：本包不裁决 TOML 布局/转义（`provider-projection`）。
-- 证据：→ PROOF.md R1。
+- 证据：→ HOW.md R1。
 
 ## INTERACTION-AUTHORITY-003 — Root 独占权
 
@@ -49,7 +49,7 @@ ClaimSequences 清空（`PromptAuthorityRun.registerAuthority`），并（经调
 - 边界：「Root 不得改变 Companion 关联 / SessionPersona」分别归 `session-ontology` /
   `participant-identity`；「Root 不得选择/覆盖 model ID（发送恒 `Model=None`）」归
   `dispatch-protocol`（`AuthorityExecutionProfile` 没有 model 字段，不可表达）。
-- 证据：→ PROOF.md R2、R4。
+- 证据：→ HOW.md R2、R4。
 
 ## INTERACTION-AUTHORITY-004 — Continuation 禁区
 
@@ -62,7 +62,7 @@ SelectedAgent/PeerAgent/CanonicalRole/SelectedTier、不更新 LastAuthorityProf
   `AuthorityRootUserMessageId = Some`），只携带当前 Fallback cursor 选的 `EffectiveAgent`。
 - 边界：物理请求使用哪个 `EffectiveAgent` 由 cursor 决定（`provider-attempt-recovery` 消费）；
   本包只保证 continuation 不得改写 authority。
-- 证据：→ PROOF.md R3。
+- 证据：→ HOW.md R3。
 
 ## INTERACTION-AUTHORITY-005 — 四类 provenance 与两种 Root
 
@@ -80,7 +80,7 @@ type PromptOrigin =
 
 - 含义：枚举是闭世界——缺一个 kind，对应 prompt 会落 UnknownOrigin 并在 dispatch 处 fail-closed。
 - 边界：枚举成员本身是 HOW（可增删），「任何成员都是 continuation 而非 root」是 WHAT。
-- 证据：→ PROOF.md R5。
+- 证据：→ HOW.md R5。
 
 ## INTERACTION-AUTHORITY-006 — HumanRoot 必须显式命名 managed agent
 
@@ -91,14 +91,14 @@ type PromptOrigin =
   （`AgentNameRejection = LegacyAgentName | UnknownManagedAgent | Malformed`），调用方可分支。
 - 边界：精确的 legacy 名单与错误文案 = 迁移 ratchet（HOW/弃权，见 HOW.md）；「必须显式 agent 且
   失败关闭」是 WHAT。
-- 证据：→ PROOF.md R6。
+- 证据：→ HOW.md R6。
 
 ## INTERACTION-AUTHORITY-007 — UnknownOrigin fail-closed
 
 `UnknownOrigin` 不得更新 profile、不得启用 Fallback、不得发 continuation（PROMPT-004）。
 
 - 含义：无法证明身份的东西被拒绝，而不是被猜测。
-- 证据：→ PROOF.md R7。
+- 证据：→ HOW.md R7。
 
 ## INTERACTION-AUTHORITY-008 — 来源解析优先级
 
@@ -113,7 +113,7 @@ accepted HostMessageId → claimed PromptKey → Host compaction/synthetic → r
   也报告 compaction（compaction 先读会把真实工作标成 HostInternal 而丢出 Logical Run）。
 - 边界：`accepted HostMessageId` 与 `claimed PromptKey` 的匹配**机制**（key 组成、claim 表）归
   `dispatch-protocol`；「匹配到什么 provenance 类别」归本包。
-- 证据：→ PROOF.md R7。
+- 证据：→ HOW.md R7。
 
 ## INTERACTION-AUTHORITY-009 — 纯函数永不推断 HumanRoot
 
@@ -123,7 +123,7 @@ HumanRoot；未证明的消息落 UnknownOrigin 并 fail-closed。已激活的 H
 
 - 含义：HumanRoot 只能由 `PromptIngress` 在 ActiveProfile 缺席 + 显式有效 agent 时授予；
   mid-run 的 UnknownOrigin + 有效 agent **不得**抬成 HumanRoot。
-- 证据：→ PROOF.md R7、R8。
+- 证据：→ HOW.md R7、R8。
 
 ## INTERACTION-AUTHORITY-010 — 自动 continuation 必须有稳定 occasion identity；次数预算由 feature 自己定义
 
@@ -145,7 +145,7 @@ Blogger exact-one chronicle 协议是显式例外：它的 durable repair occasi
 Manager idle automatic encouragement **没有跨 terminal 的次数预算**。它的 durable occasion identity 必须包含 exact `ProviderRunIdentity`；同一 terminal/idle occasion 重放幂等，但每个新的 completed Manager terminal 都获得新的 encouragement occasion，即使仍处同一个 pre-T1/post-T1 condition。Life/condition 只参与语义分类与审计，不得把 fresh terminal 压成 silent no-op。JoinGuard/ReviewGuard 仍由各自稳定 session/barrier occasion key 去重。
 
 - 边界：repair/fallback 的业务结局与次数预算 → `provider-attempt-recovery` / 各 feature；本包拥有自动 prompt 的 durable occasion identity，并保证同一 occasion 不重复获得 authority。
-- 证据：→ PROOF.md R9、R12。
+- 证据：→ HOW.md R9、R12。
 
 ## INTERACTION-AUTHORITY-011 — authority 是原子 profile 内的稳定子记录
 
@@ -157,7 +157,7 @@ SelectedAgent、PeerAgent、CanonicalRole、SelectedTier）在 Logical Run 内�
   message / Role map / fallback projection 临时拼装。
 - 边界：`ToolCapabilitySet` 同源 → `capability-enforcement`；`ProjectionChoice` → `prefix-stability`；
   ProviderRunIdentity bind-once → `host-boundary`；record 字段集 → HOW。
-- 证据：→ PROOF.md R2、R4。
+- 证据：→ HOW.md R2、R4。
 
 ## INTERACTION-AUTHORITY-012 — assistance 是 continuation，不是 fallback 失败
 
@@ -175,7 +175,7 @@ system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset Fall
 - 边界：sentinel 检测/arm/abort 机制 → `host-boundary`；deep 命中后的 consultation child →
   `delegation`；Pair Hint wire → `provider-projection` + `prefix-stability`；craft 正文 →
   `cognitive-environment`。
-- 证据：→ PROOF.md R10、R11。
+- 证据：→ HOW.md R10、R11。
 
 ## INTERACTION-AUTHORITY-013 — fast→deep escalation 是 authority continuity
 
@@ -183,7 +183,7 @@ system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset Fall
 只有 `EffectiveAgent` 改变，其余全部不变（AGENT-031 本包半边）。
 
 - 含义：escalation 不改 authority、不改 profile、不改 cursor 位置。
-- 证据：→ PROOF.md R11。
+- 证据：→ HOW.md R11。
 
 ## INTERACTION-AUTHORITY-014 — Nudge / JoinGuard 是 Continuation
 
@@ -192,7 +192,7 @@ Nudge 与 JoinGuard 都是 Continuation，不创建新 Authority（EXEC-007 / EX
 - 含义：idle/join 场景的续推永远走 continuation 通道，不许静默开新 root，也不许由 continuation 自己的新 terminal 生成无限续推预算。
 - 边界：outstanding-background 的判定（listable handles / active jobs / live PTY）归
   `delegation` / `managed-session-lifecycle`；「只发 JoinGuard continuation」归本包。
-- 证据：→ PROOF.md R12。
+- 证据：→ HOW.md R12。
 
 ## INTERACTION-AUTHORITY-015 — external-user ingress 不授予 authority
 
@@ -204,7 +204,7 @@ External-user ingress 只打断**当前** join wait：不取消 mailbox/runtime/
   future join。
 - 边界：join 的等待/中断机制（JoinInterruptReason、registry fan-out）归 `delegation`；
   「ingress 不给 authority」归本包。
-- 证据：→ PROOF.md R7、R8、R13。
+- 证据：→ HOW.md R7、R8、R13。
 
 ## INTERACTION-AUTHORITY-016 — Root claim 不进入 continuation 映射
 
@@ -213,7 +213,7 @@ AgentOwnerRoot claim 的接受（`acceptClaim`）**不**把消息记入 `Accepte
 
 - 含义：接受后的 root 物理消息在 `resolveKnownOrigin` 中仍是 UnknownOrigin——
   「这条消息曾经是 root」不是「这条消息是 continuation」的证据。
-- 证据：→ PROOF.md R4。
+- 证据：→ HOW.md R4。
 
 ## INTERACTION-AUTHORITY-017 — continuation 只能接续 active run
 
@@ -221,7 +221,7 @@ Continuation 的归属只看 `ActiveLogicalRun`，绝不回退到 `LastAuthority
 不得被 continuation 续上（PROMPT-004/003）。
 
 - 含义：stale profile 正是「必须不能冒充 active run」的东西。
-- 证据：→ PROOF.md R3、R7。
+- 证据：→ HOW.md R3、R7。
 
 ## INTERACTION-AUTHORITY-018 — HumanRoot Manager 的 LifeCompleted 原子释放 active run
 
@@ -240,7 +240,7 @@ message 因无 active run 只能 fail closed，绝不能复活旧 run。
   不是两个 durable 事实；避免 LifeCompleted 已落盘但 close append 失败的两阶段裂缝。
 - 边界：`LifeCompleted` 的业务资格与 AgentOwner migration Life 归 `finality`；普通 session / child 的
   物理 retirement 归 `managed-session-lifecycle`。
-- 证据：→ PROOF.md R18。
+- 证据：→ HOW.md R18。
 
 ## 反向覆盖核对（COVERAGE.md 归属）
 

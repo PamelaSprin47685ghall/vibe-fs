@@ -1,6 +1,6 @@
 # provider-attempt-recovery — 唯一 normative 合同
 
-条款 ID 前缀：`PAR-`。本文每个命题都是**当前世界必须同时成立的事实**；测试落点见 PROOF.md。
+条款 ID 前缀：`PAR-`。本文每个命题都是**当前世界必须同时成立的事实**；测试落点见 HOW.md。
 术语：Logical Run = 一次 Authority Root 决定的对话生命周期；ProviderRunIdentity = 一次物理
 provider attempt 的稳定身份；cursor = FallbackCursor（Offset + ConsecutiveFailureCount）。
 

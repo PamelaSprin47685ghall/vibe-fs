@@ -2,7 +2,7 @@
 
 命题前缀：`SESSION-ONTOLOGY-`。全部命题描述**当前世界必须同时成立**的事实。
 来源：旧 host/companion/execution/agent 条款（HOST-008/015、COMPANION-001/002、EXEC-026/028、
-AGENT-001/024，2026-08-14 归档）与历史 why/host §15。落点见 `PROOF.md`。
+AGENT-001/024，2026-08-14 归档）与历史 why/host §15。落点见 `HOW.md`。
 
 ---
 
@@ -18,7 +18,7 @@ Bookkeeper / StrengthReplica 是短命叶子，二者不共享执行能力边界
 **边界**：本命题只定分类轴本身；具体有哪些 `AttachmentKind`、kind 之间的生命周期机制不归本命题。
 
 **证据**：类型 `src/Wanxiangshu/Kernel/SessionOwnership.fs`；派生视图
-`Execution/Session/Association.fs` `SessionOwnershipClassification`；→ PROOF.md `SESSION-ONTOLOGY-001/002`。
+`Execution/Session/Association.fs` `SessionOwnershipClassification`；→ HOW.md `SESSION-ONTOLOGY-001/002`。
 
 ## SESSION-ONTOLOGY-002：ExecutionClass 与 Ownership 是正交且穷尽的组合
 
@@ -31,7 +31,7 @@ Logical Run、Authority、Fallback 临时推导（历史 proof/host 条款「正
 **边界**：分类不暗示任何 lifecycle 行为（复用/取消/retire 归 `managed-session-lifecycle`）。
 
 **证据**：`session-ownership-ratchet` gate 问卷 `owner` 字段 + `session-ontology-classification`；
-→ PROOF.md `SESSION-ONTOLOGY-002`。
+→ HOW.md `SESSION-ONTOLOGY-002`。
 
 ## SESSION-ONTOLOGY-003：Dedicated SyncInspector / SyncCoder = Work + Attached
 
@@ -46,7 +46,7 @@ context 问题。「复用 Teacher 的调用代数，不复用 Teacher 的 Sessi
 生命周期归 `managed-session-lifecycle`。
 
 **证据**：`SyncDelegateAssociationHints.dedicatedExecutionClass = Work`、
-`dedicatedOwnership(owner, role)`；→ PROOF.md `SESSION-ONTOLOGY-003`。
+`dedicatedOwnership(owner, role)`；→ HOW.md `SESSION-ONTOLOGY-003`。
 
 ## SESSION-ONTOLOGY-004：Companion / Bookkeeper / StrengthReplica = InternalLeaf + Attached
 
@@ -59,7 +59,7 @@ context 问题。「复用 Teacher 的调用代数，不复用 Teacher 的 Sessi
 （STRENGTH-004/014）；本命题只定分类 cell。
 
 **证据**：`StrengthReplicaAssociationHints.executionClass = InternalLeaf`；`tryClassify` 对
-Companion 给出 `InternalLeaf + Attached(owner, Companion)`；→ PROOF.md `SESSION-ONTOLOGY-004/001`。
+Companion 给出 `InternalLeaf + Attached(owner, Companion)`；→ HOW.md `SESSION-ONTOLOGY-004/001`。
 
 ## SESSION-ONTOLOGY-005：Attached 恰好一个 logical owner；Attached SessionId ≠ owner
 
@@ -69,7 +69,7 @@ owner（自链被拒）。
 **含义/动机**：逻辑归属是 durable 事实；「谁是我的 owner」只能有一个答案，否则级联取消/恢复分叉。
 
 **证据**：`SessionAssociationProjection.linkSatellite` 拒绝 `SelfLink`；`tryOwnerOf` 单向回答；
-→ PROOF.md `SESSION-ONTOLOGY-005`（REUSE `context/session-association.test.mjs`）。
+→ HOW.md `SESSION-ONTOLOGY-005`（REUSE `context/session-association.test.mjs`）。
 ## SESSION-ONTOLOGY-006：物理 Host parent 恒为 family root；逻辑归属只由 journal 承载
 
 **规范**：任何 managed child（fork child、one-shot child、Companion Blogger、SyncInspector/SyncCoder、
@@ -84,7 +84,7 @@ Host 树深度恒为 2。归属关系不由物理 parentID 承载，只由 durab
 `managed-session-lifecycle`（HOST-015 restore matching）；本命题只定「物理 ≠ 逻辑」事实。
 
 **证据**：`InjectedSessionPort.FamilyRootOf` / `childParents`（`Infrastructure/OpenCode/Host/Sessions.fs`）；
-`SatelliteRuntime` 从 family root 查询 children；→ PROOF.md `SESSION-ONTOLOGY-006`。
+`SatelliteRuntime` 从 family root 查询 children；→ HOW.md `SESSION-ONTOLOGY-006`。
 
 ## SESSION-ONTOLOGY-007：durable SessionAssociation 是事实，正交分类是派生视图
 
@@ -98,7 +98,7 @@ FactCodec（`Execution/Session/Association.fs` 头注释）。
 **边界**：`ManagedSessionKind` 案例本身是 durable codec 形状（HOW），不是长期 ontology 的替代。
 
 **证据**：`SessionOwnershipClassification_executionClassOf/classifyLegacy/tryClassify`；
-→ PROOF.md `SESSION-ONTOLOGY-007`。
+→ HOW.md `SESSION-ONTOLOGY-007`。
 
 ## SESSION-ONTOLOGY-008：关联写不变量（link 拒绝集合）
 
@@ -111,7 +111,7 @@ FactCodec（`Execution/Session/Association.fs` 头注释）。
 map O(1) 回答，无第二索引可分歧（PERSIST-008）。
 
 **证据**：`SessionAssociationProjection.linkSatellite/unlink`；
-→ PROOF.md `SESSION-ONTOLOGY-008`（REUSE `context/session-association.test.mjs` 17 锚点）。
+→ HOW.md `SESSION-ONTOLOGY-008`（REUSE `context/session-association.test.mjs` 17 锚点）。
 
 ## SESSION-ONTOLOGY-009：Work + Root 恰有一个 Companion；Work + Attached Sync* 的 Companion 可选
 
@@ -123,7 +123,7 @@ map O(1) 回答，无第二索引可分歧（PERSIST-008）。
 
 **边界**：Y 的 frame/squash/投影语义归 `context-compression`/`semantic-trace`/`work-record`。
 
-**证据**：`linkSatellite` 双向写入 + `tryBloggerOf`；→ PROOF.md `SESSION-ONTOLOGY-009`。
+**证据**：`linkSatellite` 双向写入 + `tryBloggerOf`；→ HOW.md `SESSION-ONTOLOGY-009`。
 
 ## SESSION-ONTOLOGY-010：runtime topology 不决定分类
 
@@ -134,7 +134,7 @@ Authority / Fallback 临时决定（HOST-008 不变量）；「有没有 Compani
 **含义/动机**：把拓扑绑到身份会让换执行者 = 换人、换 Peer = 换世界（历史 why/host §21）。
 
 **证据**：`SessionAssociationProjection.isCompanion` 只读 durable kind，无任何 role 参数；
-→ PROOF.md `SESSION-ONTOLOGY-010`。
+→ HOW.md `SESSION-ONTOLOGY-010`。
 
 ## SESSION-ONTOLOGY-011：StrengthReplica 不是 SatelliteKind；owner 至多一个 active；不跨 decision 复用
 
@@ -146,7 +146,7 @@ Authority / Fallback 临时决定（HOST-008 不变量）；「有没有 Compani
 恢复；跨 decision 复用 transcript 会把上个猜测的历史漏进下个猜测。
 
 **证据**：`StrengthReplicaAssociationHints`（`executionClass = InternalLeaf`、
-`isStrengthReplicaAttachment`、`tryStrengthReplica`）；→ PROOF.md `SESSION-ONTOLOGY-011`。
+`isStrengthReplicaAttachment`、`tryStrengthReplica`）；→ HOW.md `SESSION-ONTOLOGY-011`。
 
 ## SESSION-ONTOLOGY-012：Bookkeeper 绑定具体 transactionId，不与 Companion / Sync* 混用
 
@@ -155,7 +155,7 @@ Companion / Sync* 身份混用（HOST-008 不变量）。
 
 **含义/动机**：Bookkeeper 是 fetch 的 ephemeral leaf；txId 使同一 transaction 的恢复/审计可定位。
 
-**证据**：`AttachmentKind.Bookkeeper` 构造携带 payload；→ PROOF.md `SESSION-ONTOLOGY-012`
+**证据**：`AttachmentKind.Bookkeeper` 构造携带 payload；→ HOW.md `SESSION-ONTOLOGY-012`
 （REUSE `kernel/sync-delegate.test.mjs` `HOST_008_AttachmentKind_bookkeeper_carries_transaction_id`）。
 
 ## SESSION-ONTOLOGY-013：canonical durable role label 稳定（不随 DU 改名漂移）
@@ -170,7 +170,7 @@ durable 字符串，否则旧 journal 全部解码失败。
 **边界**：Role 的身份规则本体归 `participant-identity`；本命题只拥有「Host-wire 解析 + canonical
 label 稳定性」这一可观察面。
 
-**证据**：`roleName(Role.Manager) = 'manager'` 等；→ PROOF.md `SESSION-ONTOLOGY-013`。
+**证据**：`roleName(Role.Manager) = 'manager'` 等；→ HOW.md `SESSION-ONTOLOGY-013`。
 
 ## SESSION-ONTOLOGY-014：Student/Teacher 不存在（G3 absence）
 
@@ -183,7 +183,7 @@ label 稳定性」这一可观察面。
 
 **证据**：`session-ownership-ratchet` gate 拒绝 `kinds.Teacher`
 （`session_ownership_matrix_rejects_unexpected_kind`）；`SatelliteKind` 单案例；
-→ PROOF.md `SESSION-ONTOLOGY-014`。
+→ HOW.md `SESSION-ONTOLOGY-014`。
 
 ## GARBAGE / 弃权（不进入 WHAT）
 

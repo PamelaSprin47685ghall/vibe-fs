@@ -1,6 +1,6 @@
 # change-integration — 可观察合同
 
-本文件是 `change-integration` 包的唯一 normative 语义合同。证据指针 → `PROOF.md`。
+本文件是 `change-integration` 包的唯一 normative 语义合同。证据指针 → `HOW.md`。
 
 ## CHGINT-001：独立道路进共享 ref 走 publish lifecycle
 

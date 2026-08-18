@@ -1,6 +1,6 @@
 # WHAT — distribution 的唯一 normative 合同
 
-> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `PROOF.md`）。
+> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `HOW.md`）。
 > 边界（DOES NOT OWN）写在各条「边界」；更完整的弃权记录在 `HOW.md` §历史与弃权。
 
 ## DISTRIBUTION-001 — artifact 同时携带编译代码与 runtime semantic resources（closure 单点）
@@ -11,7 +11,7 @@
 
 **边界**：不拥有 `resources/**` 内部 prose/rule 的业务意义（→ 各 semantic owner）；不决定具体打包工具/介质（→ HOW）。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-001 行。
+**证据**：→ `HOW.md` DISTRIBUTION-001 行。
 
 ## DISTRIBUTION-002 — runtime resource lookup 独立于 caller cwd
 
@@ -21,7 +21,7 @@
 
 **边界**：不拥有「cwd 具体是什么」——只保证查找结果与 cwd 无关。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-002 行（本包 NEW oracle 主战场）。
+**证据**：→ `HOW.md` DISTRIBUTION-002 行（本包 NEW oracle 主战场）。
 
 ## DISTRIBUTION-003 — manifest main/exports 与实际 shipped paths 一致
 
@@ -31,7 +31,7 @@
 
 **边界**：不要求 `main`/`exports` 的字符串格式（`./` 前缀等）固定——HOW；只要求一致性 + 可达性。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-003 行。
+**证据**：→ `HOW.md` DISTRIBUTION-003 行。
 
 ## DISTRIBUTION-004 — package contents 由明确 whitelist 决定
 
@@ -41,7 +41,7 @@
 
 **边界**：`files` 的具体成员集合是 HOW（当前恰好两个 root，未来可合法增加 runtime root）；本命题只要求"明确白名单 + 排除禁令类"。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-004 行。
+**证据**：→ `HOW.md` DISTRIBUTION-004 行。
 
 ## DISTRIBUTION-005 — build/test 消费与发布相同的 compiled production bytes
 
@@ -51,7 +51,7 @@
 
 **边界**：Fable/fantomas 等构建工具的具体实现是 HOW；本命题只要求"唯一产物 + 测试与发布同源"。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-005 行。
+**证据**：→ `HOW.md` DISTRIBUTION-005 行。
 
 ## DISTRIBUTION-006 — 资源加载仅经 Infrastructure/Resources/，缺失 fail fast
 
@@ -61,7 +61,7 @@
 
 **边界**：资源缺失时上层具体如何反应（启动失败 vs 其它）由消费方语义决定；本命题只要求"读不到就失败，不伪装"。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-006 行。
+**证据**：→ `HOW.md` DISTRIBUTION-006 行。
 
 ## DISTRIBUTION-007 — release proof 覆盖 artifact closure
 
@@ -71,7 +71,7 @@
 
 **边界**：阶梯的分层结构、晋级纪律、watchdog 等横向治理归 `verification-system`；本命题只要求 release proof **覆盖** closure 各面。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-007 行。
+**证据**：→ `HOW.md` DISTRIBUTION-007 行。
 
 ## DISTRIBUTION-008 — 特殊依赖：semantic packages 的 runtime resources 在 artifact 中可得
 
@@ -81,4 +81,4 @@
 
 **边界**：资源内容的正确性/双语锚点/语义深度归各 semantic owner（`provider-language` Gate C、`behavior-diagnosis` rulebook 契约等）。
 
-**证据**：→ `PROOF.md` DISTRIBUTION-008 行。
+**证据**：→ `HOW.md` DISTRIBUTION-008 行。

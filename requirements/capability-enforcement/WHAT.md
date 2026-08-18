@@ -1,7 +1,7 @@
 # capability-enforcement — 可观察合同
 
 本文件是 `capability-enforcement` 包的唯一 normative 语义合同。每条命题 = 当前世界必须同时成立的事实。
-证据指针 → `PROOF.md`。边界 → `HOW.md`「边界与弃权」。
+证据指针 → `HOW.md`。边界 → `HOW.md`「边界与弃权」。
 
 ## ENF-001：每次 provider attempt 有一个 canonical ToolCapabilitySet，由 CanonicalRole × RequestKind 唯一决定
 

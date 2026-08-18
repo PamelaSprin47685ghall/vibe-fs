@@ -3,7 +3,7 @@
 本文件是 `js-semantic-surface` 包的**唯一 normative 合同**。WHY/HOW/PROOF 非 normative。
 
 命题编号 `JS-SEMANTIC-SURFACE-NNN`；每条命题 = 当前世界必须同时成立的事实。证据指针 →
-`PROOF.md` 行号。引用别的包一律用包名，不复制其它包命题。
+`HOW.md` 行号。引用别的包一律用包名，不复制其它包命题。
 
 历史编号收编：`SURFACE-001..006`（provider-language / provider-projection / finality /
 participant-horizon / verification-system 的交叉引用）在本包落地为正式条款
@@ -24,7 +24,7 @@ support、fixtures、helpers、e2e、integration 依赖区不写 F#，不引入�
 （`requirement-system`）。编译产物验证（quarantine）测试仍可能直接消费 `dist`，见
 JS-SEMANTIC-SURFACE-002 边界。
 
-**证据指针**：→ PROOF.md L13。
+**证据指针**：→ HOW.md L13。
 
 ## JS-SEMANTIC-SURFACE-002：JS semantic tests 只能调用正式 semantic surface
 
@@ -46,7 +46,7 @@ contract-test 全部闭合时才能成为正式入口；登记、死 import、�
 `domain.mjs` 已删除（退场完成）；已有 package-local `*-contract.mjs` 的 baseline 当前为空，
 任何新 adapter 都直接 RED。
 
-**证据指针**：→ PROOF.md L14。
+**证据指针**：→ HOW.md L14。
 
 ## JS-SEMANTIC-SURFACE-003：值得独立测试的 law 必须有独立 semantic owner + JS surface
 
@@ -62,7 +62,7 @@ JS representation → semantic input → owner → semantic output → JS repres
 **边界**：本命题管「law → owner → surface 的归属关系」；具体 surface 文件命名
 （`Surface.fs` / `Api.fs` / `Contract.fs`）是 HOW。
 
-**证据指针**：→ PROOF.md L15。
+**证据指针**：→ HOW.md L15。
 
 ## JS-SEMANTIC-SURFACE-004：不拥有独立 law 的 helper 不直接测试
 
@@ -76,7 +76,7 @@ JS tests（positive canary），破坏真实 promise 必须让 JS tests 失败�
 **边界**：本命题管「测试 subject 的选择」；helper 的具体归属与证明义务由
 `requirement-system` 的 assertion 级 owner 规则承接。
 
-**证据指针**：→ PROOF.md L16。
+**证据指针**：→ HOW.md L16。
 
 ## JS-SEMANTIC-SURFACE-005：semantic data 跨边界必须是 JS-native representation
 
@@ -94,7 +94,7 @@ epoch milliseconds，JS 构造不了 Fable DateTimeOffset。
 **边界**：opaque handle 不是 semantic data，是 capability token；测试不能 inspect 其
 fields/prototype。representation 校验器（`assertJsData` / `assertOpaque`）是 HOW/P5。
 
-**证据指针**：→ PROOF.md L17。
+**证据指针**：→ HOW.md L17。
 
 ## JS-SEMANTIC-SURFACE-006：Fable runtime representation 不属于 semantic contract
 
@@ -112,4 +112,4 @@ absolute prohibition。
 **边界**：本命题管「Fable 形状不是 contract」；contract 的语义内容归各产品包 WHAT。
 compiler/build verification quarantine 是唯一有资格知道 Fable 的测试类（见 002 边界）。
 
-**证据指针**：→ PROOF.md L18。
+**证据指针**：→ HOW.md L18。

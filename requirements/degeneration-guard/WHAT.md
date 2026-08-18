@@ -1,6 +1,6 @@
 # degeneration-guard — 唯一 normative 合同
 
-条款 ID 前缀：`DG-`。本文每个命题都是当前世界必须同时成立的事实；测试落点见 PROOF.md。
+条款 ID 前缀：`DG-`。本文每个命题都是当前世界必须同时成立的事实；测试落点见 HOW.md。
 术语：attempt = 一次绑定 `ProviderRunIdentity` 的物理 provider run；detector =
 `LoopDetector`（token + 指数衰减 weighted-distinct 的纯检测器）；sensor = `LoopSensor`（transport
 边沿观测器，持有 per-session detector 与进程内 `LoopKillArmed` 集合）。

@@ -3,7 +3,7 @@
 条款前缀：`OBLIGATION-LEDGER-`。
 本文件是 obligation-ledger 包的**唯一 normative 合同**。跨域机制（finality、review-assurance、
 work-record、prefix-stability、participant-horizon、effect-accounting）只引用本包命题，不复制合同。
-历史与弃权、实现模型见 `HOW.md`；每条命题的证明落点见 `PROOF.md`。
+历史与弃权、实现模型见 `HOW.md`；每条命题的证明落点见 `HOW.md`。
 
 词汇：`Tk` = 第 k 个 `TodoWriteAccepted`；`Pk` = Tk 提交的完整 obligation account；
 `Dk` = Tk 对应 provider submission 的原始 `planComplete`；`Ek = D1 ∨ ... ∨ Dk` = Tk 后的有效 commitment latch；
@@ -26,7 +26,7 @@ work-record、prefix-stability、participant-horizon、effect-accounting）只�
 **边界**：阶段语义（无持久程序计数器）由 `structured-workflow` 拥有；本包只拥有「账本不伪装进度」。
 Provider surface 的 schema 形态是当前实现（HOW），不是永久合同。
 
-**证据** → PROOF.md 行 O-1。
+**证据** → HOW.md 行 O-1。
 
 ## OBLIGATION-LEDGER-002：obligations wire 与 CurrentObligations 定义
 
@@ -53,7 +53,7 @@ infrastructure failure。它只决定 Host compatibility sink 的活动行，不
 **边界**：`name`/`work` 字段名与 schema 具体形态是当前 surface（HOW）；「accepted account 即当前」的
 supersession 语义见 OBLIGATION-LEDGER-010。
 
-**证据** → PROOF.md 行 O-2。
+**证据** → HOW.md 行 O-2。
 
 ## OBLIGATION-LEDGER-003：禁止用 status 枚举伪装进度
 
@@ -66,7 +66,7 @@ truthful account 判断，不另造机械枚举机（TODO-003）。
 **边界**：Host TodoTable 的 status 字段是 compatibility sink 投影（HOW，OBLIGATION-LEDGER-015）：
 `workingOn` 命中的 row → `in_progress`，其它 row → `pending`；不得反推 canonical obligation truth。
 
-**证据** → PROOF.md 行 O-3。
+**证据** → HOW.md 行 O-3。
 
 ## OBLIGATION-LEDGER-004：planning work 只在 commitment 前合法
 
@@ -81,7 +81,7 @@ Pre-T1 账本中诚实记录；真正不可逆的边界由 `planComplete` commit
 **边界**：Host 不得按 `plan` / `survey` 等自然语言关键词分类；唯一机器判据是 durable commitment latch。
 T1 commitment 见 OBLIGATION-LEDGER-016。
 
-**证据** → PROOF.md 行 O-4。
+**证据** → HOW.md 行 O-4。
 
 ## OBLIGATION-LEDGER-005：obligation 必须可闭环，不得只是空槽位
 
@@ -96,7 +96,7 @@ mission result / closure evidence。`placeholder: planning`、`TBD`、裸阶段�
 分类器会把脆弱启发式重新变成隐藏状态机。`MagicTodoHostCodec` 不得出现
 `placeholder: planning` / `TBD` 之类的分类样本（见 PROOF O-5 的静态断言）。
 
-**证据** → PROOF.md 行 O-5。
+**证据** → HOW.md 行 O-5。
 
 ## OBLIGATION-LEDGER-006：obligation identity / 连续性
 
@@ -108,7 +108,7 @@ blank name 同样语法拒绝。禁止靠 `work` 文本猜 identity；Host 内�
 
 **边界**：语法拒绝属于「允许 provider 红字」的类别（OBLIGATION-LEDGER-009 分型）。
 
-**证据** → PROOF.md 行 O-6。
+**证据** → HOW.md 行 O-6。
 
 ## OBLIGATION-LEDGER-007：admission —— 同 message 多个已 materialize todowrite 全拒、单 inflight
 
@@ -128,7 +128,7 @@ Admission 是「一次一账」的协议纪律。
 **边界**：admission 的语法/协议拒绝是 provider 红字类别；infra 不变量失败走
 OBLIGATION-LEDGER-009 的 fatal 分支。
 
-**证据** → PROOF.md 行 O-7。
+**证据** → HOW.md 行 O-7。
 
 ## OBLIGATION-LEDGER-008：Same ToolCallId replay 幂等
 
@@ -143,7 +143,7 @@ OBLIGATION-LEDGER-009 的 fatal 分支。
 **边界**：`TodoWriteAccepted.PreparedFactRef` 必须是 append 对应 `TodoWritePrepared` 返回的真实
 Journal `EventId`；fold 拒绝不匹配的引用（见 PROOF O-8）。
 
-**证据** → PROOF.md 行 O-8。
+**证据** → HOW.md 行 O-8。
 
 ## OBLIGATION-LEDGER-009：失败分型（三态）
 
@@ -169,7 +169,7 @@ Prepared/Accepted identity corruption、hidden reviewer producer/assignment/runt
 
 **边界**：infra fatal 的进程级 kill 机制由 `crash-reconciliation` 拥有；本包只拥有分型判定。
 
-**证据** → PROOF.md 行 O-9。
+**证据** → HOW.md 行 O-9。
 
 ## OBLIGATION-LEDGER-010：Accepted 立即 supersede CurrentObligations
 
@@ -189,7 +189,7 @@ CurrentObligations(after Tk) = Pk
 
 **边界**：`BaseObligations` 只用于 replay identity 与 reviewer 对照，不是待恢复的旧 current。
 
-**证据** → PROOF.md 行 O-10。
+**证据** → HOW.md 行 O-10。
 
 ## OBLIGATION-LEDGER-011：REVISE 不拥有 obligation state
 
@@ -210,7 +210,7 @@ account，而不是由系统回滚（why「CurrentObligations：Accepted superse
 **边界**：PERFECT/REVISE 的**判断语义**归 `review-judgement`；「何时可消费」归 `review-assurance`。
 本包只拥有「账本不被评审涂改」。
 
-**证据** → PROOF.md 行 O-11。
+**证据** → HOW.md 行 O-11。
 
 ## OBLIGATION-LEDGER-012：checkpoint + review obligation 的 SSOT = TodoWriteAccepted
 
@@ -224,7 +224,7 @@ Accepted ↔ obligation 一一对应；被拒/非 admission 不建 review。每�
 **边界**：评审义务的**执行**（ensureReview、assignment、ConsumableReview 物化）属 review-assurance
 与 `work-record`；本包拥有「Accepted 派生 Rk」与「1:1 对应」。
 
-**证据** → PROOF.md 行 O-12。
+**证据** → HOW.md 行 O-12。
 
 ## OBLIGATION-LEDGER-013：1:1 lag-1 过程评审节拍
 
@@ -247,7 +247,7 @@ ConsumableReview → **必须作为合法因果等待**直至 `TodoReviewConclud
 **边界**：等待期间暴露 reviewer/runtime/snapshot/Journal/locality 基础设施异常 → 不是 tool
 failure，Host 必须 `Diagnostic.fatal`（OBLIGATION-LEDGER-009）。
 
-**证据** → PROOF.md 行 O-13。
+**证据** → HOW.md 行 O-13。
 
 ## OBLIGATION-LEDGER-014：可消费结论 = ConsumableReview；VerdictKnown 不足
 
@@ -274,7 +274,7 @@ ConsumableReview(k) ≡ TodoReviewConcluded(k)
 **边界**：record-ready 的物化机制与同 snapshot 等待由 `review-assurance` 拥有；本包拥有
 「账本消费的 gate：ConsumableReview 才可被 T(k+1)/drain 消费」。
 
-**证据** → PROOF.md 行 O-14。
+**证据** → HOW.md 行 O-14。
 
 ## OBLIGATION-LEDGER-015：canonical 单真相源 vs Host compatibility sink
 
@@ -313,7 +313,7 @@ Removal:   删 CompatibilityTodoRow / obligationsToCompatibilityRows / replaceCo
 
 Exit 达成前 sink 合法但只有 bounded 居留权；达成即删，不设第二兼容层。
 
-**证据** → PROOF.md 行 O-15。
+**证据** → HOW.md 行 O-15。
 
 ## OBLIGATION-LEDGER-016：T1 commitment 与 Opening 关闭
 
@@ -343,7 +343,7 @@ true 解释，并继续要求 mission-debt account。这个不可逆性是真实
 **边界**：OpeningMaterial / WorkRecordStart 的 LWR 表示与压缩 floor 属 `work-record`；system
 prompt 字节稳定属 `participant-identity` + `prefix-stability`；T1 文案具体 wording 是 HOW。
 
-**证据** → PROOF.md 行 O-16。
+**证据** → HOW.md 行 O-16。
 
 ## OBLIGATION-LEDGER-017：Manager BlindPlan Opening（无生产 Activation）
 
@@ -361,7 +361,7 @@ cache 并泄露「你已携带任务」（why「生命周期」裁决）。历�
 **边界**：`WorkRecordStart` 由 `LifeOpened` / XTrace Opening cursor **纯推导**，不是 Stage fact；
 Opening 永久 raw 的保护语义属 `work-record`。
 
-**证据** → PROOF.md 行 O-17。
+**证据** → HOW.md 行 O-17。
 
 ## OBLIGATION-LEDGER-018：恢复只从 durable facts；禁止程序计数器与平行证据
 
@@ -393,7 +393,7 @@ kind/id/status/priority provider 冷状态
 
 **边界**：Direct CE / 无持久程序计数器的一般法则属 `structured-workflow`；O(1) projection 查询、先 commit 后 fold 属 `durable-events`；本包只定义哪些 obligation facts 必须被增量投影。平行 LWR 禁令的 LWR 侧属 `work-record`。
 
-**证据** → PROOF.md 行 O-18。
+**证据** → HOW.md 行 O-18。
 
 ## OBLIGATION-LEDGER-019：新 Life 账本为空；仅升级瞬间一次 legacy seed
 
@@ -416,7 +416,7 @@ adopt；同 session 后续新 Life 禁止再次从 Host TodoTable 反推 seed（
 
 **边界**：已 completed Life 不回放 Magic Todo；升级后 `WorkActivated` 仅 inert（OBLIGATION-LEDGER-017）。
 
-**证据** → PROOF.md 行 O-19。
+**证据** → HOW.md 行 O-19。
 
 ## OBLIGATION-LEDGER-020：Dedicated 过程 Reviewer 每 Life 一个 logical
 
@@ -448,7 +448,7 @@ graduate 拆开是独立生命周期。
 **边界**：dedicated session 的创建/退休/graduate 的 session 生命周期归 `managed-session-lifecycle`；
 Manager 不可见 dedicated session/barrier/witness 的 admission 归 `participant-horizon`。
 
-**证据** → PROOF.md 行 O-20。
+**证据** → HOW.md 行 O-20。
 
 ## OBLIGATION-LEDGER-021：desired lag-1 cutoff 仅由 committed Accepted 子链推导
 
@@ -471,7 +471,7 @@ commitment 后的 Accepted 子链才是 TodoCheckpoint cutoff 的事实源。sea
 **边界**：PrefixEpoch / `ActivePrefixEpoch` SSOT、`PrefixCoverage` 与 rebase 机制属
 `prefix-stability`；本包只拥有「desired cutoff 的事实源 = Accepted 链」。
 
-**证据** → PROOF.md 行 O-21。
+**证据** → HOW.md 行 O-21。
 
 ## OBLIGATION-LEDGER-022：评审义务的产生 / 消费账本侧规则（含 tail drain 义务）
 
@@ -485,7 +485,7 @@ commitment 后的 Accepted 子链才是 TodoCheckpoint cutoff 的事实源。sea
 
 **边界**：与 finality 的交界：OBLIGATION-LEDGER-022 定义义务，FINALITY-* 定义终结如何消费它。
 
-**证据** → PROOF.md 行 O-22。
+**证据** → HOW.md 行 O-22。
 
 ## OBLIGATION-LEDGER-023：MagicTodoManagerGuideline 的 Manager-only 语义
 
@@ -502,7 +502,7 @@ Blogger 合同（why「Manager 表面」裁决）。
 **边界**：隐藏 reviewer 的**可见性 admission**（哪些可见、哪些禁止）归 `participant-horizon`；
 本包只拥有 guideline 的账本语义内容。
 
-**证据** → PROOF.md 行 O-23。
+**证据** → HOW.md 行 O-23。
 
 ## OBLIGATION-LEDGER-024：tool.definition 唯一广告点；V2 门禁
 
@@ -519,7 +519,7 @@ Manager checklist（GLORY-002 交叉）。
 
 **边界**：description 的逐字文案与本地化属 `provider-language`；工具描述的具体措辞是 HOW。
 
-**证据** → PROOF.md 行 O-24。
+**证据** → HOW.md 行 O-24。
 
 ## OBLIGATION-LEDGER-025：before 合同（materialization 与 Prepared 冻结）
 
@@ -555,7 +555,7 @@ XTrace。随后当前 pending call 使用 fresh XTrace head + 同 message 本 ca
 **边界**：ReviewFrontier 的 XTrace 表示依赖 `semantic-trace`；snapshot 唯一定位（sessionID+callID
 → ToolPart/assistant/run/ordinal/XTrace range）是 host-boundary canary（HOST-025），本包引用。
 
-**证据** → PROOF.md 行 O-25。
+**证据** → HOW.md 行 O-25。
 
 ## OBLIGATION-LEDGER-026：after 合同（Accepted → ensureReview → 富化 result）
 
@@ -581,4 +581,4 @@ XTrace。随后当前 pending call 使用 fresh XTrace head + 同 message 本 ca
 **边界**：physical success 的 Requested/Accepted 双路径分型属 `effect-accounting`；富化 result 的
 安全 seal（Manager-facing LWR 不 regex 清洗）属 finality safety-seal 交叉（TODO-013）。
 
-**证据** → PROOF.md 行 O-26。
+**证据** → HOW.md 行 O-26。

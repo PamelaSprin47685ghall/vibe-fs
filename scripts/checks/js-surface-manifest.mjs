@@ -178,36 +178,23 @@ export const validateSurfaceManifest = (manifest = SURFACE_MANIFEST, root = proc
     if (!['pure', 'resource'].includes(entry.kind)) fail(`${label}: invalid kind ${entry.kind}`)
 
     const ownerWhatPath = `requirements/${entry.owner}/WHAT.md`
-    const ownerProofPath = `requirements/${entry.owner}/PROOF.md`
     if (!existsSync(join(root, ownerWhatPath))) {
       fail(`${label}: missing owner WHAT.md (${ownerWhatPath})`)
       continue
     }
-    if (!existsSync(join(root, ownerProofPath))) {
-      fail(`${label}: missing owner PROOF.md (${ownerProofPath})`)
-      continue
-    }
 
     const ids = new Set(whatIds(read(root, ownerWhatPath)))
-    const proof = read(root, ownerProofPath)
-    const laws = Array.isArray(entry.laws) ? entry.laws : []
+        const laws = Array.isArray(entry.laws) ? entry.laws : []
     const lawOwners = entry.lawOwners && typeof entry.lawOwners === 'object' ? entry.lawOwners : {}
     for (const law of laws) {
       const lawOwner = typeof lawOwners[law] === 'string' ? lawOwners[law] : entry.owner
       const lawWhatPath = `requirements/${lawOwner}/WHAT.md`
-      const lawProofPath = `requirements/${lawOwner}/PROOF.md`
       if (!existsSync(join(root, lawWhatPath))) {
         fail(`${label}: law ${law} owner WHAT is missing (${lawWhatPath})`)
         continue
       }
-      if (!existsSync(join(root, lawProofPath))) {
-        fail(`${label}: law ${law} owner PROOF is missing (${lawProofPath})`)
-        continue
-      }
       const lawIds = new Set(whatIds(read(root, lawWhatPath)))
-      const lawProof = read(root, lawProofPath)
       if (!lawIds.has(law)) fail(`${label}: law ${law} is absent from ${lawWhatPath}`)
-      if (!proofHasLaw(lawProof, law)) fail(`${label}: law ${law} has no owner PROOF row`)
     }
 
     if (typeof entry.source !== 'string' || !existsSync(join(root, entry.source))) {

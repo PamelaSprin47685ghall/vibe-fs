@@ -1,7 +1,7 @@
 # guidance-delivery — WHAT（唯一 normative 合同）
 
 > 命题 = 当前世界必须同时成立的事实。编号 `GUIDANCE-DELIVERY-NNN`（下文简称
-> `GD-NNN`）。每条末尾的证据指针 → `PROOF.md` 行号。
+> `GD-NNN`）。每条末尾的证据指针 → `HOW.md` 行号。
 > 边界：diagnosis 是否成立归 `behavior-diagnosis`；provider projection mechanics
 > 归 `provider-projection`；horizon admission general law 归 `participant-horizon`；
 > interaction authority 创建/继续权归 `interaction-authority`。
@@ -27,7 +27,7 @@ TipSemanticCoverage    哪些 TipName 的 full main.md 语义此刻仍可从当�
   （ENFORCER-071）；把二者压成一个 durable bool 必然在 reanchor 后误删已交付
   事实或假装全文仍在。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_002/006`；
-  `tip-delivery-projection.test.mjs` `TDP_001/002/004/005`；`PROOF.md` 行 10。
+  `tip-delivery-projection.test.mjs` `TDP_001/002/004/005`；`HOW.md` 行 10。
 
 ### GD-002 首次交付 = Full main.md
 
@@ -39,7 +39,7 @@ owner 语言取叶子）。Full 且 occurrence ∉ Frontier → append
 - 含义：Main 第一次不只看到名字，它完整看到「问题意味着什么/现在做什么/为什么/
   不要做什么/如何验证/何时算完成」（Rulebook §14）。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_001`；
-  `PROOF.md` 行 11。
+  `HOW.md` 行 11。
 
 ### GD-003 重复交付 = IdentityOnly，不重复全文
 
@@ -50,7 +50,7 @@ owner 语言取叶子）。Full 且 occurrence ∉ Frontier → append
 - 含义：dedupe 的落点——第一次教完整处置协议，后续用稳定身份唤醒已有语义，
   避免无界全文膨胀（Rulebook §15）。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_002`；
-  `tip-delivery-projection.test.mjs` `TDP_002/003`；`PROOF.md` 行 13。
+  `tip-delivery-projection.test.mjs` `TDP_002/003`；`HOW.md` 行 13。
 
 ### GD-004 交付决策只 fold durable facts，restart-safe
 
@@ -62,7 +62,7 @@ restart / recovery / crash / retry 后判定不漂移。
 - 含义：第一次/重复判定在重启后仍正确（Rulebook §16/A46）；内存集合会忘记或分叉。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_003`
   （latest 与 resolve 一致）；`tip-delivery-projection.test.mjs` `TDP_001/002`；
-  `PROOF.md` 行 14。
+  `HOW.md` 行 14。
 
 ### GD-005 reanchor/compaction：语义恢复 ≠ 新 occurrence
 
@@ -73,7 +73,7 @@ restart / recovery / crash / retry 后判定不漂移。
 - 含义：压缩改变 horizon 形状，但不重写已发生的交付历史；Main 不会因 compaction
   丢失处置手册，也不会把恢复误记成又一次世界教训。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_006`；
-  `tip-delivery-projection.test.mjs` `TDP_004/005`；`PROOF.md` 行 15。
+  `tip-delivery-projection.test.mjs` `TDP_004/005`；`HOW.md` 行 15。
 
 ## B. 决策路径
 
@@ -85,7 +85,7 @@ owner Main session 再取最近已提交 tip。无 tip / 无 association / 目�
 
 - 含义：交付永远挂在 owner Main 上；解析失败就安静地不给，不编造。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_004/005`；
-  `latest-tip-nudge.test.mjs` `ENFORCER_TIP_NUDGE_002/003`；`PROOF.md` 行 16。
+  `latest-tip-nudge.test.mjs` `ENFORCER_TIP_NUDGE_002/003`；`HOW.md` 行 16。
 
 ### GD-007 `latestTipGuidance` / `latestTipNudge` 同义
 
@@ -94,7 +94,7 @@ owner Main session 再取最近已提交 tip。无 tip / 无 association / 目�
 
 - 含义：旧命名不复活旧语义；对外只有一条交付文本路径。
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_003`；
-  `latest-tip-nudge.test.mjs` `ENFORCER_TIP_NUDGE_001`；`PROOF.md` 行 17。
+  `latest-tip-nudge.test.mjs` `ENFORCER_TIP_NUDGE_001`；`HOW.md` 行 17。
 
 ## C. audience 分离
 
@@ -109,7 +109,7 @@ Main Full/Identity 交付；`previous_enforcer_tip` 是低信任 Blogger 历史
   Blogger system 或检测散文冒充 Main 指令都是违规。
 - 证据：`audience-separation.test.mjs` `AUDIENCE_001/002/003`；REUSE
   `requirements/guidance-delivery/tests/tip-v2-delivery.test.mjs` `ENFORCER_TIP_13`
-  （work record 含 previous_enforcer_tip 块）；`PROOF.md` 行 18。
+  （work record 含 previous_enforcer_tip 块）；`HOW.md` 行 18。
 
 ### GD-009 交付不创建 interaction authority
 
@@ -123,7 +123,7 @@ fake-user message、不 mint 新 Authority Root；delivery 不改变 authority/p
 - 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_001`（交付形状 =
   tip header + main.md）；`latest-tip-nudge.test.mjs` `CTX_002_GUIDELINE_001/002`
   （auto-injected marker 机制）；`audience-separation.test.mjs` `AUDIENCE_003`；
-  `PROOF.md` 行 19。
+  `HOW.md` 行 19。
 
 ### GD-010（已删除 2026-08-15）
 
@@ -145,7 +145,7 @@ MarkerText; CallGap; ResultGap }` 持久化（HOST-013）：`MarkerText` = provi
 - 含义：历史交付是 EventStore 事实不是文件旁路；restart 后 Main 看到的就是当时
   收到的那一版（Rulebook §17）。
 - 证据：`guideline-projection.test.mjs` `GP_001..006`；`latest-tip-nudge.test.mjs`
-  `CTX_002_GUIDELINE_001/002`（marker 正文透传）；`PROOF.md` 行 20。
+  `CTX_002_GUIDELINE_001/002`（marker 正文透传）；`HOW.md` 行 20。
 
 ### GD-012 新 occurrence 只消费当前 calibration projection，随后冻结最终 MarkerText
 

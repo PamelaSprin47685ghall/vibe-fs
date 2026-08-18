@@ -1,6 +1,6 @@
 # execution-model-routing — WHAT
 
-本文件是 `execution-model-routing` 包的唯一 normative 语义合同。每条命题 = 当前世界必须同时成立的事实。证据指针 → `PROOF.md`。
+本文件是 `execution-model-routing` 包的唯一 normative 语义合同。每条命题 = 当前世界必须同时成立的事实。证据指针 → `HOW.md`。
 
 ## EMR-001：唯一模型调度 authority = `~/.config/opencode/wanxiangshu.mjs`；缺失时原子创建推荐模板
 

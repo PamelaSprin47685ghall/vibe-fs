@@ -76,7 +76,7 @@ if (explain) {
     print(`\nproves\n  WHAT[${id}]\n\nnormative source\n  ${rel(w.file)}:${w.line}\n  ${w.heading}`)
     const edges = graph.proofEdges.filter((edge) => edge.file === test.file && edge.line === test.line && edge.whatId === id)
     if (edges.length === 0) {
-      print(`\nproof edges\n  (none — PROOF.md has no exact anchor for this test)`)
+      print(`\nproof edges\n  (none — HOW.md has no exact anchor for this test)`)
       failed = true
     } else {
       print('\nproof edges')
@@ -127,7 +127,7 @@ for (const what of graph.unproved) {
 
 for (const what of graph.proofMissing) {
   if (what.deleted || !inScope(what.package)) continue
-  add(rel(what.file), what.line, 'TRACE_PROOF_MISSING', `${what.id} has no PROOF.md row in ${what.package}`)
+  add(rel(what.file), what.line, 'TRACE_PROOF_MISSING', `${what.id} has no HOW.md row in ${what.package}`)
 }
 
 // An explicit PROOF anchor is an executable edge, not a file existence claim.

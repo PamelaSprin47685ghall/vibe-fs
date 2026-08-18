@@ -1,7 +1,7 @@
 # WHAT — provider-projection
 
 > 本文件是本包的**唯一 normative 合同**。所有命题同时为真；世界 RED 当且仅当某条命题被违反。
-> 每条命题的证据指针 → `PROOF.md` 对应行。
+> 每条命题的证据指针 → `HOW.md` 对应行。
 
 命题前缀：`PROVIDER-PROJECTION-`。
 

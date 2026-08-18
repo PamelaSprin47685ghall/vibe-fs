@@ -124,7 +124,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 若重新滴定后的 `NormalWeightedDistinctCount` 变化，同步 `NormalWeightedDistinctCount` 与派生 threshold；`HalfLife` 只能由滴定结论决定。
 - [ ] `requirements/degeneration-guard/WHAT.md`
   - 把 DG-004 “当前 p99=56” 与所有派生数更新成一次 fresh calibration 的真实结果；“当前统计只是派生基线”规则保持不变。
-- [ ] `requirements/degeneration-guard/HOW.md`、`requirements/degeneration-guard/PROOF.md`
+- [ ] `requirements/degeneration-guard/HOW.md`
   - 删除/同步任何旧派生数与 proof 描述。
 - 完成证据：`node --test requirements/degeneration-guard/tests/loop-calibration.test.mjs` green；生产常量与 test 动态计算逐项相等。
 
@@ -138,7 +138,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs`
   - 保持 `acquire/release/same` 为 Host-owned resource surface；**不得为了测试重新添加** `appendClosed`、`hasCurrent` 这两个 test facade。
   - 若 durable-events proof 缺一个真正可支持的“提交一条业务事件”能力，必须放到拥有该业务 fact 的正式 surface，而不是给 WorkspaceEventStore 增 test helper。
-- [ ] `requirements/durable-events/PROOF.md`
+- [ ] `requirements/durable-events/HOW.md`
   - proof anchor 对齐重写后的行为测试。
 - 完成证据：`node --test requirements/durable-events/tests/workspace-event-store-host.test.mjs` green；`rg -n 'WorkspaceEventStoreSurface_(appendClosed|hasCurrent)' requirements src` = 0。
 
@@ -151,7 +151,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 保持 `OrchestratorFactCases.WorktreeCreateRequested/WorktreeCreated/...` 的真实所有权；不得把 cases 搬回 `Composition/Durable/Fact.fs` 取悦测试。
 - [ ] `src/Wanxiangshu/Composition/Durable/Fact.fs`
   - 只保留 outer routing vocabulary；不得重新定义 Change 的 case family。
-- [ ] `requirements/effect-accounting/HOW.md`、`requirements/effect-accounting/README.md`、`requirements/effect-accounting/PROOF.md`
+- [ ] `requirements/effect-accounting/HOW.md`
   - 清掉旧 `Change/Orchestration/OrchestratorProjection.fs` / central-Fact 路径与旧 recoveryAction 布局描述，改指当前 owner 与行为 proof。
 - 完成证据：`node --test requirements/effect-accounting/tests/effect-facts.test.mjs` green；移动 `Change/Facts.fs` 之外的非契约 helper 不应破坏该 test。
 
@@ -163,7 +163,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 用 `MagicTodoMembraneSurface_openLife/prepare/accept` 与真实 opaque journal/prepared handles 证明 before/prepare/accept 语义；不要从 JS 重新 drive F# hook internals。
 - [ ] `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs`
   - 保持 JS-native semantic API；不得添加 `createHooks` compatibility wrapper。
-- [ ] `requirements/host-boundary/PROOF.md`、`requirements/obligation-ledger/PROOF.md`
+- [ ] `requirements/host-boundary/HOW.md`、`requirements/obligation-ledger/HOW.md`
   - 更新 exact test anchors。
 - 完成证据：上述两个 test files green；`rg -n 'MagicTodoMembraneSurface_createHooks' requirements src` = 0。
 
@@ -174,7 +174,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 不暴露 `Map`、F# record、整个 internal state 作为替代。
 - [ ] `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs`
   - enlist 后 query 命中；replacement 后 old session=null/new session=life；测试走正式 query，不读 opaque state internals。
-- [ ] `requirements/obligation-ledger/PROOF.md`
+- [ ] `requirements/obligation-ledger/HOW.md`
   - O-18 anchor 对齐该 query law。
 - 完成证据：`node --test requirements/obligation-ledger/tests/magic-todo-projection.test.mjs` green；热路径 grep 不出现 `ByLife |> Map.tryPick`。
 
@@ -185,7 +185,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - contract 明确当前职责：EventStore boot/resume 属 `EventStoreJournalWriter` / workspace Host；`AgentJournal` 只从已 fold projection + writer 构造，再负责 append/snapshot/revision。
 - [ ] `src/Wanxiangshu/Persistence/Journal/AgentJournal.fs`
   - **不得重加** `createFromEventStore` forwarding facade；保持 `createFromProjection` 单一构造入口。
-- [ ] `requirements/verification-system/PROOF.md`
+- [ ] `requirements/verification-system/HOW.md`
   - 更新 guide-contract anchor/描述。
 - 完成证据：`node --test requirements/verification-system/tests/guide-contract.test.mjs` green；`rg -n 'createFromEventStore' src requirements` = 0。
 
@@ -215,7 +215,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 删除 `change.recoveryAction(...).kind` 断言；改成从 durable fact prefix 重入 production workflow，观察 Git/Manager/journal effects 与 terminal outcome。
 - [ ] `requirements/crash-reconciliation/HOW.md`
 - [ ] `requirements/effect-accounting/HOW.md`
-- [ ] `requirements/effect-accounting/README.md`
   - 删除把 `recoveryAction` 当当前架构的文字；描述 facts/evidence → 普通 CE reentry。
 - [ ] `requirements/structured-workflow/tests/recovery-reentry.test.mjs`
   - 增加针对 Change seam 的 regression：production 不得重新出现 `JobRecoveryAction`、`OrchestratorProjection.recoveryAction`、`resumeFromDurableFacts` 或等价 NextAction dispatcher。
@@ -239,7 +238,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - codec proof 适配新的 typed lifecycle，不得把内部 ADT ordinal/tag 当公开 contract。
 - [ ] `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs`
   - 增加 Prepared→Accepted→Assigned→Concluded 正向序列、非法跳跃 fail-closed、duplicate replay 幂等；断言领域结果，不拼内部非法对象。
-- [ ] `requirements/obligation-ledger/WHAT.md`、`HOW.md`、`PROOF.md`
+- [ ] `requirements/obligation-ledger/WHAT.md`、`HOW.md`
   - OBLIGATION-LEDGER-018 对“事实 + 增量 projection”描述与新 ADT 同步；不得新增 Stage/Phase wording。
 - 完成证据：`rg -n 'Accepted: bool|Assignment: TodoProcessReviewAssigned option|Concluded: TodoReviewConcluded option' src/Wanxiangshu/Mission/Obligation/Todo` = 0；obligation-ledger projection tests green。
 
@@ -309,7 +308,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - terminal success 从 `recordDerivedFallbackSuccess` 改为 append owner-owned success fact；写盘失败按 Journal 失败语义处理，不能静默把内存当成功。
 - [ ] `requirements/provider-attempt-recovery/WHAT.md`
   - 修改 PAR-004 当前“成功不写 cursor 事实”条款：success fact 是已发生事实，不是第二 cursor writer；Offset 仍不复位，失败 advancement 与成功 reset 的 fold ownership 均唯一。
-- [ ] `requirements/provider-attempt-recovery/HOW.md`、`PROOF.md`
+- [ ] `requirements/provider-attempt-recovery/HOW.md`
   - 删除“Host snapshot Completed 派生、无第二写入口”的旧实现描述。
 - [ ] `requirements/provider-attempt-recovery/tests/cursor.test.mjs`
   - 删除 `FALLBACK_007_success_writes_no_fact...`；替换为 success fact replay、restart 后 count 仍为 0、Offset 不变、重复 success 幂等。
@@ -358,10 +357,9 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs`
   - 删除只为四个历史 detector 存在的 diagnostic/absence tests；保留当前 format 的正向 codec laws。
 - [ ] `requirements/durable-events/HOW.md`
-- [ ] `requirements/durable-events/PROOF.md`
-- [ ] `requirements/behavior-diagnosis/PROOF.md`
-- [ ] `requirements/effect-accounting/PROOF.md`
-- [ ] `requirements/verification-system/PROOF.md`
+- [ ] `requirements/behavior-diagnosis/HOW.md`
+- [ ] `requirements/effect-accounting/HOW.md`
+- [ ] `requirements/verification-system/HOW.md`
 - [ ] `cleanup/legacy-ledger.md`
   - 删除 LEGACY-005 当前架构描述与 ledger row。
 - 退出条件：所有受支持 workspace 在 retention horizon 之后由 `scripts/checks/legacy-horizon-census.mjs` 得到四 detector 全 0，且无支持中的 deployment 能再制造/提交这些旧 bytes。
@@ -384,7 +382,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `requirements/obligation-ledger/tests/magic-todo-host-canaries.test.mjs`
 - [ ] `requirements/host-boundary/tests/magic-todo-membrane-canaries.test.mjs`
   - 删除只证明 V1 `todos[{content,status,priority}]` 投影的 canaries；保留 canonical obligations / Host hook semantic tests。
-- [ ] `requirements/obligation-ledger/WHAT.md`、`HOW.md`、`README.md`、`PROOF.md`
+- [ ] `requirements/obligation-ledger/WHAT.md`、`HOW.md`
   - OBLIGATION-LEDGER-015 中永久部分只剩“canonical 单真相源、sink 不得反推”；V1 具体字段/Removal 过渡文字在 creditor 退役后删除。
 - [ ] `cleanup/legacy-ledger.md`
   - 删除 LEGACY-006 row。
@@ -413,8 +411,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 在 BD-006/BD-017 所属边界明确 no-live-cycle 是可预见 protocol outcome；Host exception 仅为 physical adapter encoding，不是领域错误模型。
 - [ ] `requirements/behavior-diagnosis/HOW.md`
   - 记录 typed decision → abort effect → Host error encoding 的单向边界。
-- [ ] `requirements/behavior-diagnosis/PROOF.md`
-  - 增 proof anchor。
 - [ ] `requirements/behavior-diagnosis/tests/chronicle-no-live-cycle.test.mjs`
   - 新建 regression：有 live cycle 返回正常 provider result；无 live cycle 产生 typed no-live-cycle 路径并 abort；Host adapter 最终仍按 SDK 合同暴露 `CHRONICLE_NO_LIVE_CYCLE`；不得靠 regex 私有函数体证明。
 - 完成证据：Chronicle focused test green；`rg -n 'return raise \(InvalidOperationException\(NoLiveCycleError\)\)' src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs` = 0；若仍存在 `InvalidOperationException(NoLiveCycleError)`，只能位于 `ToolSpec.Execute` 最后一公里 adapter。

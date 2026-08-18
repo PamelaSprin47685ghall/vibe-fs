@@ -152,8 +152,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-002] JS_SURFACE_002b_registered_surfaces_exist_in
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or_unauthorized_evidence', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-manifest-'))
   const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
-  const ownerProof = join(temporaryRoot, 'requirements', 'owner', 'PROOF.md')
-  const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
+    const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
   const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
   const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
   const testFile = join(temporaryRoot, 'requirements', 'owner', 'tests', 'surface.test.mjs')
@@ -164,8 +163,7 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003_manifest_rejects_unemitted_or
 
   try {
     writeFileSync(ownerWhat, '# OWNER-001\n')
-    writeFileSync(ownerProof, '| OWNER-001 | executable evidence |\n')
-    writeFileSync(source, 'module Owner.Surface\n')
+        writeFileSync(source, 'module Owner.Surface\n')
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
     writeFileSync(testFile, ['import * as surface ', 'from ', `'${distImport('../../../', 'Owner/Surface.js')}'\nvoid surface\n`].join(''))
@@ -361,10 +359,8 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003c_usesSurface_rejects_dead_str
 test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorized_active_consumer', () => {
   const temporaryRoot = mkdtempSync(join(tmpdir(), 'js-surface-unauth-'))
   const ownerWhat = join(temporaryRoot, 'requirements', 'owner', 'WHAT.md')
-  const ownerProof = join(temporaryRoot, 'requirements', 'owner', 'PROOF.md')
-  const rogueWhat = join(temporaryRoot, 'requirements', 'rogue', 'WHAT.md')
-  const rogueProof = join(temporaryRoot, 'requirements', 'rogue', 'PROOF.md')
-  const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
+    const rogueWhat = join(temporaryRoot, 'requirements', 'rogue', 'WHAT.md')
+    const source = join(temporaryRoot, 'src', 'Wanxiangshu', 'Owner', 'Surface.fs')
   const fsproj = join(temporaryRoot, 'src', 'Wanxiangshu', 'Wanxiangshu.fsproj')
   const dist = join(temporaryRoot, 'dist', 'Owner', 'Surface.js')
   const ownerTest = join(temporaryRoot, 'requirements', 'owner', 'tests', 'owner.test.mjs')
@@ -378,10 +374,8 @@ test('WHAT[JS-SEMANTIC-SURFACE-003] JS_SURFACE_003d_manifest_rejects_unauthorize
 
   try {
     writeFileSync(ownerWhat, '# OWNER-001\n')
-    writeFileSync(ownerProof, '| OWNER-001 | `tests/owner.test.mjs::WHAT[OWNER-001] authorized` |\n')
-    writeFileSync(rogueWhat, '# ROGUE-001\n')
-    writeFileSync(rogueProof, '| ROGUE-001 | `tests/rogue.test.mjs::WHAT[ROGUE-001] rogue proof` |\n')
-    writeFileSync(source, 'module Owner.Surface\n')
+        writeFileSync(rogueWhat, '# ROGUE-001\n')
+        writeFileSync(source, 'module Owner.Surface\n')
     writeFileSync(fsproj, '<Project><ItemGroup><Compile Include="Owner/Surface.fs"/></ItemGroup></Project>')
     writeFileSync(dist, 'export const value = 1\n')
     // Authorized: owner dir + matching WHAT tag

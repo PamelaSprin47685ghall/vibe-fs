@@ -2,7 +2,7 @@
 
 命题前缀：`HOST-BOUNDARY-`。全部命题描述**当前世界必须同时成立**的事实。
 来源：旧 host/architecture 条款（HOST-001..027、ARCH-002/003/012，2026-08-14 归档）与
-历史 completed changes（cache / reconciler-event-driven-de-polling）。落点见 `PROOF.md`。
+历史 completed changes（cache / reconciler-event-driven-de-polling）。落点见 `HOW.md`。
 
 ---
 
@@ -22,7 +22,7 @@ lease；该 observation 不得被包装成 `HostSignal`、不得携带 terminal 
 **含义/动机**：碎片顺序/形状随 Host 版本漂移；把因果绑在传输噪声上（why/host.md §4）。
 
 **证据**：`HostEventCodec`（`isHostSignalEvent` / `tryDecode` 在 codec 边界丢弃 fragment）；
-→ PROOF.md `HOST-BOUNDARY-001`（MOVE `host001-fragment-events.test.mjs`）。
+→ HOW.md `HOST-BOUNDARY-001`（MOVE `host001-fragment-events.test.mjs`）。
 
 ## HOST-BOUNDARY-002：允许进入业务层的信号是闭集，且分型正确
 
@@ -35,7 +35,7 @@ abort error 必须解码为 typed `AttemptAborted`（撤销当前 attempt 的 id
 **含义/动机**：把 ProviderError 当 AttemptAborted（或反之）会让 fallback 预算被 assistance/用户
 取消污染；分型是 fallback 正确性的前提（why/host.md §1）。
 
-**证据**：`HostSignalAdapter` + `HostEventCodec`；→ PROOF.md `HOST-BOUNDARY-002`
+**证据**：`HostSignalAdapter` + `HostEventCodec`；→ HOW.md `HOST-BOUNDARY-002`
 （MOVE `host001-fragment-events.test.mjs` `HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary`；
 REUSE `codec/signals.test.mjs`）。
 
@@ -50,7 +50,7 @@ message id（FALLBACK-003）；`ProviderRetry.Attempt` 只用于诊断与唤醒�
 retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
 
 **证据**：`Infrastructure/OpenCode/Signals/HostSignal.fs`；
-→ PROOF.md `HOST-BOUNDARY-003`（NEW `host-capability-observation`；MOVE `host001-fragment-events`）。
+→ HOW.md `HOST-BOUNDARY-003`（NEW `host-capability-observation`；MOVE `host001-fragment-events`）。
 
 ## HOST-BOUNDARY-004：TurnUnknown 是 reconciliation 私有观测，不是 TurnOutcome
 
@@ -60,7 +60,7 @@ retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
 
 **含义/动机**：把「观测不到」当「业务结局」会制造假 terminal / 假 missing-final-report。
 
-**证据**：`ReconcileProgram.SnapshotObservation` / `TurnOutcome`；→ PROOF.md `HOST-BOUNDARY-004`
+**证据**：`ReconcileProgram.SnapshotObservation` / `TurnOutcome`；→ HOW.md `HOST-BOUNDARY-004`
 （REUSE `domain/reconcile-program.test.mjs` + `codec/signals.test.mjs`）。
 
 ## HOST-BOUNDARY-005：Reconciler 快照观测 machinery（single-flight / dirty / 有界因果重读）
@@ -72,7 +72,7 @@ retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
 **含义/动机**：轮询把时间推进当业务状态探测（A 类病态）；事件驱动只对真实信号反应。
 
 **证据**：`Composition/Turn/Scheduler.fs`（Scheduler：queued/active/generation/
-wake）；→ PROOF.md `HOST-BOUNDARY-005`（REUSE `execution/reconcile-idle-early.test.mjs`、
+wake）；→ HOW.md `HOST-BOUNDARY-005`（REUSE `execution/reconcile-idle-early.test.mjs`、
 `domain/reconcile-program.test.mjs`）。
 
 ## HOST-BOUNDARY-006：同一 raw part 的 Parts/ToolParts 状态投影一致
@@ -84,7 +84,7 @@ ToolCall` + `ToolParts = Pending`；`state.status = completed|error` → `Parts 
 
 **含义/动机**：分叉投影会把已失败 execution 重新表示成 in-flight，错误抑制 interaction repair。
 
-**证据**：`SessionSnapshotPort.projectMessages`；→ PROOF.md `HOST-BOUNDARY-006`
+**证据**：`SessionSnapshotPort.projectMessages`；→ HOW.md `HOST-BOUNDARY-006`
 （MOVE `session-snapshot-locality.test.mjs` `HOST-004_keeps_failed_session_tool_state_consistent...`）。
 
 ## HOST-BOUNDARY-007：compaction 观测 gate — prevention + containment
@@ -101,7 +101,7 @@ ToolCall` + `ToolParts = Pending`；`state.status = completed|error` → `Parts 
 恢复失败/容量信号语义归 `context-compression`。本命题只拥有「观测 gate + fail-closed」。
 
 **证据**：`Domain/HostCompactionPolicy.fs`（requiredSettings / autoContinueEnabled /
-judgeFirstTurn / nextReanchor）；`HostCompactionGate/Observer`；→ PROOF.md `HOST-BOUNDARY-007`
+judgeFirstTurn / nextReanchor）；`HostCompactionGate/Observer`；→ HOW.md `HOST-BOUNDARY-007`
 （NEW `host-capability-observation`）。
 
 ## HOST-BOUNDARY-008：Transform→ProviderRunIdentity 因果读；0/≥2 fail closed
@@ -121,7 +121,7 @@ parent/completed/latest/compaction 条件解决可见性竞态。
 **含义/动机**：same-root 猜测在 Host 重排消息时假绿；宁可 fail closed，不赌同一身。
 
 **证据**：`ProviderRunBinding` / `TurnBinding`（消费因果读）；`Context/Prefix/Wire.fs`
-（armed retry 的 bounded snapshot catch-up）；→ PROOF.md `HOST-BOUNDARY-008`
+（armed retry 的 bounded snapshot catch-up）；→ HOW.md `HOST-BOUNDARY-008`
 （NEW `tests/host010-run-id-equivalence.test.mjs`：bindableRun id ≡ ToolContext.messageID encoding；
 共时 Host 穿线仍由 Long Stroke 物理契约承担）
 
@@ -134,7 +134,7 @@ closed。禁止用 after 的 callID 与别处 messageID 猜测配对；禁止使
 
 **含义/动机**：身份半边是 hook 面的物理现实；猜配对 = 假绿（历史 shape/host HOST-011）。
 
-**证据**：`Tools/ToolContext.fs`、`ToolHostCodec`；→ PROOF.md `HOST-BOUNDARY-009`
+**证据**：`Tools/ToolContext.fs`、`ToolHostCodec`；→ HOW.md `HOST-BOUNDARY-009`
 （REUSE `plugin/tool-host-codec.test.mjs` `HOST-011`）。
 
 ## HOST-BOUNDARY-010：多实例边界 — 共享身份注册表，每实例私有状态；不跨 await
@@ -154,7 +154,7 @@ missing-verdict 的 occasion 必须是 durable `ReviewBarrierId`，不得使用�
 共享 Journal writer 会折叠写盘。
 
 **证据**：`Infrastructure/OpenCode/Host/SharedState.fs`、`PluginRuntimeScope.fs`；
-→ PROOF.md `HOST-BOUNDARY-010`（REUSE `host/shared-state.test.mjs`）。
+→ HOW.md `HOST-BOUNDARY-010`（REUSE `host/shared-state.test.mjs`）。
 
 ## HOST-BOUNDARY-011：空 Content 预防（HOST-016）
 
@@ -165,7 +165,7 @@ missing-verdict 的 occasion 必须是 durable `ReviewBarrierId`，不得使用�
 **含义/动机**：依赖外部网关/厂商容错实现不一；在 transform 末尾兜底是唯一可靠位置
 （why/host.md §8）。
 
-**证据**：`HostMessageProjection.sanitizeMessage/sanitizeMessages`；→ PROOF.md `HOST-BOUNDARY-011`
+**证据**：`HostMessageProjection.sanitizeMessage/sanitizeMessages`；→ HOW.md `HOST-BOUNDARY-011`
 （MOVE `host-message-projection.test.mjs`）。
 
 ## HOST-BOUNDARY-012：sessionID+callID 定位 canary；不能唯一 fail closed（HOST-025）
@@ -177,7 +177,7 @@ messageID。
 
 **含义/动机**：membrane 与 deferred prepare 的定位基础；不能唯一证明 = 上线即错配。
 
-**证据**：`SessionSnapshotPort.locateToolCall`；→ PROOF.md `HOST-BOUNDARY-012`
+**证据**：`SessionSnapshotPort.locateToolCall`；→ HOW.md `HOST-BOUNDARY-012`
 （MOVE `session-snapshot-locality.test.mjs` `TODO-004_*` 定位断言）。
 ## HOST-BOUNDARY-013：HOST-027 reasoning sensor — 只认 reasoning delta，每 run 一次
 
@@ -194,7 +194,7 @@ abort cause 分离归 `degeneration-guard`；consultation child 归 `delegation`
 「reasoning sensor 的识别/armed 边界」。
 
 **证据**：`NeedHelpEventCodec` + `NeedHelpSensor`（rolling suffix / armed identity / tryTake）；
-→ PROOF.md `HOST-BOUNDARY-013`（MOVE `needhelp-sensor.test.mjs`）。
+→ HOW.md `HOST-BOUNDARY-013`（MOVE `needhelp-sensor.test.mjs`）。
 
 ## HOST-BOUNDARY-014：不修改 OpenCode 本体；只用现有 Hook/SDK（ARCH-003）
 
@@ -205,7 +205,7 @@ abort cause 分离归 `degeneration-guard`；consultation child 归 `delegation`
 **含义/动机**：修改 Host core = 每次升级维护 fork；依赖未公开 API = 无声漂移。
 
 **证据**：`Infrastructure/OpenCode/Plugin/PluginTransforms.fs`（hook 顺序收敛）、
-`OpenCodePort`；→ PROOF.md `HOST-BOUNDARY-014`（REUSE `plugin/host-hooks.test.mjs`）。
+`OpenCodePort`；→ HOW.md `HOST-BOUNDARY-014`（REUSE `plugin/host-hooks.test.mjs`）。
 
 ## HOST-BOUNDARY-015：tool 文本结果有界（ARCH-012）
 
@@ -215,7 +215,7 @@ UTF-8 ≤51200 字节时逐字返回；超限时输出固定 marker + 确定性�
 
 **含义/动机**：结果 wire 有界是 Host 稳定契约；截断只影响返回 wire，不改内部完整事实来源。
 
-**证据**：`Process/LargeGate.fs` / `Domain/ToolResultBound.fs`；→ PROOF.md `HOST-BOUNDARY-015`
+**证据**：`Process/LargeGate.fs` / `Domain/ToolResultBound.fs`；→ HOW.md `HOST-BOUNDARY-015`
 （REUSE `context/tool-result-bound.test.mjs`）。
 
 ## HOST-BOUNDARY-016：HostEventPort 按 provider run 去重 + sticky replay（观察可靠性）
@@ -228,7 +228,7 @@ provider run 的 Completed 与 failed/aborted outcome 不去重；late subscribe
 outcome 完成新 run。
 
 **证据**：`Infrastructure/OpenCode/Host/Events.js`（`Events_HostEventPort`）；
-→ PROOF.md `HOST-BOUNDARY-016`（MOVE `events-port.test.mjs`）。
+→ HOW.md `HOST-BOUNDARY-016`（MOVE `events-port.test.mjs`）。
 
 ## HOST-BOUNDARY-017：Host 身份观察 + managed config 投影适配（HostSessionContext / ManagedAgentConfig）
 
@@ -247,16 +247,16 @@ card DOES NOT OWN 之外的产品决策）。
 
 **含义/动机**：fork 是产品级决策，不是 adapter 内部优化；它改变所有 capability 的维护契约。
 
-**证据**：ARCH-003（只用现有 Hook/SDK）；→ PROOF.md `HOST-BOUNDARY-018`（REUSE
+**证据**：ARCH-003（只用现有 Hook/SDK）；→ HOW.md `HOST-BOUNDARY-018`（REUSE
 `plugin/host-hooks.test.mjs`）。
 
 ## HOST-BOUNDARY-019：Host capability 缺口必须由 canary/contract proof 证明
 
-**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、因果读唯一性、managed request model mutation 是否真正进入 provider）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或假设上游默认值（HOST-019/024/025 blocking canaries；PROOF.md Magic Todo membrane 现行 canary 清单；模型路由物理 canary 见 `requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs`）。
+**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、因果读唯一性、managed request model mutation 是否真正进入 provider）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或假设上游默认值（HOST-019/024/025 blocking canaries；HOW.md Magic Todo membrane 现行 canary 清单；模型路由物理 canary 见 `requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs`）。
 
 **含义/动机**：未验证能力 = 上线首炸；`HostContractUnsupported` 是显式失败而非悄悄降级。
 
-**证据**：本包 proof 表全部 canary + PROOF.md Magic Todo membrane canary 清单；→ PROOF.md
+**证据**：本包 proof 表全部 canary + HOW.md Magic Todo membrane canary 清单；→ HOW.md
 `HOST-BOUNDARY-019`。
 
 ## HOST-BOUNDARY-020：观察不足或多解时 fail closed（家族原则）
@@ -268,7 +268,7 @@ HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重�
 **含义/动机**：安全侧失败是 Host 边界的总纪律：宁缺证明，不赌同一身（why/host.md §6）。
 
 **证据**：`session-snapshot-locality`（`Ambiguous`）、`needhelp-sensor`（armed 唯一）、
-`host001-fragment-events`（codec 丢弃）；→ PROOF.md `HOST-BOUNDARY-020`。
+`host001-fragment-events`（codec 丢弃）；→ HOW.md `HOST-BOUNDARY-020`。
 
 ## HOST-BOUNDARY-021：plugin load/init 不得执行业务语义或反向调用 Host
 
@@ -283,7 +283,7 @@ HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重�
 
 **含义/动机**：Host 在等待 plugin init 时，plugin 反调同一 Host 会形成自举环；把 recovery 藏进 constructor 还会让一个 feature 的历史状态劫持整个 Host 启动。Load/Activation 分界把「能加载」与「某项业务能恢复」彻底解耦。
 
-**证据**：`OpenCode/Plugin/PluginBoot.fs`、`HostSignalBootstrap.fs`、`WorkspaceEventStore.fs` 的 load-purity gate；→ PROOF.md `HOST-BOUNDARY-021`。
+**证据**：`OpenCode/Plugin/PluginBoot.fs`、`HostSignalBootstrap.fs`、`WorkspaceEventStore.fs` 的 load-purity gate；→ HOW.md `HOST-BOUNDARY-021`。
 
 ## GARBAGE / 弃权（不进入 WHAT）
 

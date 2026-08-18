@@ -1,6 +1,6 @@
 # WHAT — repository-programming 的唯一 normative 合同
 
-> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `PROOF.md`）。
+> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `HOW.md`）。
 > 边界（DOES NOT OWN）写在各条「边界」；更完整的弃权记录在 `HOW.md` §历史与弃权。
 
 ## REPOSITORY-PROGRAMMING-001 — capability-projected surface，无第二权限矩阵
@@ -11,7 +11,7 @@
 
 **边界**：不裁决「capability 从哪来」（→ `office-capability`）；不拥有同构律本身（→ `capability-enforcement`，本包应用它）。`js-` 前缀名与 `Read/Write/Edit/Glob/Grep` 枚举名是当前 HOW，非永久合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-001 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-001 行。
 
 ## REPOSITORY-PROGRAMMING-002 — 四层同构应用到编程面
 
@@ -21,7 +21,7 @@
 
 **边界**：内置工具（`read`/`edit`/`write`/`glob`/`grep`/`patch`）不是 JS capability projection 的第五层，也不是 alias（其可见性由既有 ToolPermission 决定 → `capability-enforcement`/`office-capability` 交叉）。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-002 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-002 行。
 
 ## REPOSITORY-PROGRAMMING-003 — 确定性生成
 
@@ -31,7 +31,7 @@
 
 **边界**：`js-<roleName>` 的命名规则是 HOW（`JsToolGenerator.toolNameFor`），可随语言替换。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-003 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-003 行。
 
 ## REPOSITORY-PROGRAMMING-004 — generated-name gate
 
@@ -41,7 +41,7 @@
 
 **边界**：内置工具名（`read` 等）的可见性不归本包裁决（→ `capability-enforcement`/`office-capability`）。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-004 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-004 行。
 
 ## REPOSITORY-PROGRAMMING-005 — 编程面诚实：无不存在的方法、无不可见推荐
 
@@ -51,7 +51,7 @@
 
 **边界**：builtin 工具是否长期 coexist 由产品决定（→ HOW/历史与弃权），本包不拥有该决定；本命题只约束编程面与推荐文案的诚实性。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-005 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-005 行。
 
 ## REPOSITORY-PROGRAMMING-006 — sandbox 无 ambient OS authority
 
@@ -61,7 +61,7 @@
 
 **边界**：`new Function` 的具体实现、具体 bound 数值（deadline ms、memory bytes）是 HOW 常数；「有界、可杀、无 ambient authority」才是合同。进程/PTY 的真实 execution 语义 → `process-execution`。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-006 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-006 行。
 
 ## REPOSITORY-PROGRAMMING-007 — file()/FileView：immutable 快照与 anchor 代数
 
@@ -71,7 +71,7 @@
 
 **边界**：正则引擎的具体语义（JS RegExp）是 HOW；「有序、可消歧、位移是字符串下标」才是合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-007 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-007 行。
 
 ## REPOSITORY-PROGRAMMING-008 — glob()：gitignore/wildmatch 确定性枚举
 
@@ -81,7 +81,7 @@
 
 **边界**：具体 maxEntries 数值、glob 实现（`Infrastructure/JsGlobFs.fs`）是 HOW。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-008 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-008 行。
 
 ## REPOSITORY-PROGRAMMING-009 — grep()：Grep capability 投影为 Host member
 
@@ -91,7 +91,7 @@
 
 **边界**：builtin `grep` RPC 独立存在（其 schema/权限 → `capability-enforcement` 交叉）；具体 maxMatches 数值是 HOW。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-009 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-009 行。
 
 ## REPOSITORY-PROGRAMMING-010 — rewrite()/write() 分离（Edit ≠ Write）
 
@@ -101,7 +101,7 @@
 
 **边界**：`mv`/`rm` 的 POSIX 语义在 REPOSITORY-PROGRAMMING-020；「Edit/Write 是两个 capability」才是本命题。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-010 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-010 行。
 
 ## REPOSITORY-PROGRAMMING-011 — JSON-compatible return，commit 前校验
 
@@ -111,7 +111,7 @@
 
 **边界**：值编码规则（TOML 如何表达每种值）→ `provider-projection`；本命题只要求「commit 前校验 + 合法集合」。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-011 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-011 行。
 
 ## REPOSITORY-PROGRAMMING-012 — transaction staging；durable prepare 只经统一 EventStore
 
@@ -121,7 +121,7 @@
 
 **边界**：EventStore 本身 → `durable-events`；Requested/Prepared/Committed 效果分型 → `effect-accounting`；本命题是「staging 先行 + 单一 durable substrate」的编程面合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-012 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-012 行。
 
 ## REPOSITORY-PROGRAMMING-013 — multi-file all-or-nothing commit
 
@@ -131,7 +131,7 @@
 
 **边界**：外部不服从 transaction ownership 的进程在底层多次文件替换之间观察到短暂 mixed view，不属于本合同隐藏的事实（历史 change（js-capability-projected-tools）§63）。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-013 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-013 行。
 
 ## REPOSITORY-PROGRAMMING-014 — conflict detection：FILE_CHANGED fail closed
 
@@ -141,7 +141,7 @@
 
 **边界**：完整数据库级 phantom serializability 不承诺；「所有实际读取文件和 mutation preimages 提交前重新验证」才是合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-014 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-014 行。
 
 ## REPOSITORY-PROGRAMMING-015 — normal rollback；crash 后不自动恢复工具
 
@@ -151,7 +151,7 @@
 
 **边界**：未来若 session `/continue` 需要处理中断 transaction，只能把 `Prepared` + 当前文件事实公开给 LLM/显式恢复 workflow，由新意图决定修复；仍禁止 feature store、隐式 replay 与 constructor recovery。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-015 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-015 行。
 
 ## REPOSITORY-PROGRAMMING-016 — Synthetic TOML 结果面：两份文档，无 status discriminator
 
@@ -166,7 +166,7 @@
 
 **边界**：值编码细节（引号、裸字段先于表、integer/float 规则）→ `provider-projection`（`SyntheticToml`）；本命题只锁定文档形状与无 discriminator。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-016 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-016 行。
 
 ## REPOSITORY-PROGRAMMING-017 — 并行调用绝对安全
 
@@ -176,7 +176,7 @@
 
 **边界**：Host 的具体串行执行实现位于 plugin 边界（`tests/integration/plugin/`，REUSE）；本包证明编程面合同（模型被教导可并行 + 事务 re-snapshot 语义）。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-017 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-017 行。
 
 ## REPOSITORY-PROGRAMMING-018 — failure algebra：稳定失败码，不伪装异常
 
@@ -186,7 +186,7 @@
 
 **边界**：异常只留给程序无法继续的事故（进程崩溃、Host 故障）。失败文档形状 → REPOSITORY-PROGRAMMING-016。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-018 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-018 行。
 
 ## REPOSITORY-PROGRAMMING-019 — program return 在 commit 前诚实编码；return 与 commit 耦合
 
@@ -196,7 +196,7 @@
 
 **边界**：结果渲染（TOML 形状）→ REPOSITORY-PROGRAMMING-016。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-019 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-019 行。
 
 ## REPOSITORY-PROGRAMMING-020 — mv/rm 文件变换的 POSIX 语义
 
@@ -206,7 +206,7 @@
 
 **边界**：这些工具只进 Coder 矩阵等角色门禁 → `office-capability`/`capability-enforcement` 交叉（AGENT-016）；「POSIX 变换语义」才是本命题。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-020 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-020 行。
 
 ## REPOSITORY-PROGRAMMING-021 — 静态门禁：禁手写 per-role js-* 变体
 
@@ -216,7 +216,7 @@
 
 **边界**：门禁机制本身是共享 checker（`scripts/checks/js-surface-gate.mjs`，MECHANISM）；本命题拥有的是「生成面唯一 + 无手写变体」的语义。同构律本身 → `capability-enforcement`（其 `capability-isomorphism-gate.mjs` 拥有 schema/runtime gate 同源）。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-021 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-021 行。
 
 ## REPOSITORY-PROGRAMMING-022 — 工具选择也属于正确性：description 必须让失败经验现身说法
 
@@ -226,4 +226,4 @@
 
 **边界**：具体事故数字（例如约 8k → 31k）、比喻、第一人称措辞、文案长度与双语表达属于 HOW，可替换；永久合同是「description 以具体失败记忆教授高层 primitive 的适用边界，并给出可执行的下一步」，且不得因此推荐当前 capability surface 中不存在的方法（仍受 002/005 约束）。
 
-**证据**：→ `PROOF.md` REPOSITORY-PROGRAMMING-022 行。
+**证据**：→ `HOW.md` REPOSITORY-PROGRAMMING-022 行。

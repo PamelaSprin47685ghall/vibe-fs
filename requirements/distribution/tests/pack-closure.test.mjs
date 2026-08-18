@@ -6,7 +6,7 @@
 // closure 中完整可得。
 //
 // 不 spawn `npm pack`（与 tests/integration/package/* 头注释同一设计决定）；真实
-// tarball membership 由 release proof L5 `npm pack --dry-run` 承担（见 PROOF.md）。
+// tarball membership 由 release proof L5 `npm pack --dry-run` 承担（见 HOW.md）。
 // 本测试读仓库内 package.json + dist/ + resources/ 的实际路径，作为 pack 的静态前置。
 // 只 import：node: 内置。
 

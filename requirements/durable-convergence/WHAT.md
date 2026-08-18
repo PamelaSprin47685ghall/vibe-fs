@@ -1,6 +1,6 @@
 # WHAT —— durable-convergence（唯一 normative 合同）
 
-条款前缀 `DURABLE-CONVERGENCE-`。每条的落点测试见 `PROOF.md`。
+条款前缀 `DURABLE-CONVERGENCE-`。每条的落点测试见 `HOW.md`。
 来源：历史 change（storage）（§5.3、§10、§11–§19、§38、§42、§48）、
 历史 what/casebook（CASE-011）、历史 COVERAGE persist 小节
 （PERSIST-003 split）。
@@ -15,7 +15,7 @@
 不是策略。
 **边界**：同 EventId 异 bytes 的 identity-collision 裁决（fail closed）归
 `durable-events`（003）；本命题只钉「不同 EventId 永不因冲突丢失」。
-**证据**：→ PROOF.md 001。
+**证据**：→ HOW.md 001。
 
 ## DURABLE-CONVERGENCE-002 —— k-way merge 是统一 primitive
 
@@ -27,7 +27,7 @@ deterministic：`merge(A, merge(B,C)) = merge(merge(A,B), C)`、`merge(A,B) = me
 **含义/动机**：统一 primitive 是并发模型的地基——boot/recovery 和 remote sync 共用同一个 k-way
 ordering/identity primitive；ordinary local append 只延长自己的单 writer file，不需要先全局 merge。
 **边界**：writer file / blob 的物理映射见 003 与 `durable-events` 005/011/018。
-**证据**：→ PROOF.md 002。
+**证据**：→ HOW.md 002。
 
 ## DURABLE-CONVERGENCE-003 —— 生产 writer-stream k-way merge ≡ union oracle
 
@@ -39,7 +39,7 @@ EventId→blob index、Git structural merge 或 delta protocol。
 **含义/动机**：一个 process 一个完整文件让单机多进程与多机完全同构；生产算法只处理 k 个顺序流，
 而不是 Git tree 的物理偶然结构。
 **边界**：same EventId 异 canonical bytes → identity collision；业务含义只由 canonical Integrator 解释。
-**证据**：→ PROOF.md 003。
+**证据**：→ HOW.md 003。
 
 ## DURABLE-CONVERGENCE-004 —— 合法并发 fork → DomainConflict，非 StorageInvalid
 
@@ -52,7 +52,7 @@ deterministic conflict state。Storage 层永不因自然 fork 进入不可恢�
 「forbidden fork」指业务不可接受态，由 projection 表达并经 resolution 收敛。
 **边界**：「不把 DomainConflict 升级为全局 corruption」的反向钉死见
 `durable-events` 008；本命题是正向表达律。
-**证据**：→ PROOF.md 004。
+**证据**：→ HOW.md 004。
 
 ## DURABLE-CONVERGENCE-005 —— resolution event 以全部 heads 为 parents 才收敛
 
@@ -64,7 +64,7 @@ deterministic conflict state。Storage 层永不因自然 fork 进入不可恢�
 **含义/动机**：收敛不是遗忘：resolution 必须承认并覆盖它裁决的每个分支，否则未来重放
 无法重建「为什么离开 conflict」。
 **边界**：resolution 的领域语义（裁决了什么、为什么）归各 domain owner。
-**证据**：→ PROOF.md 005。
+**证据**：→ HOW.md 005。
 
 ## DURABLE-CONVERGENCE-006 —— 禁止 wall_clock/revision LWW
 
@@ -77,7 +77,7 @@ deterministic tie 最多只能作为 **projection 层**从完整历史派生当�
 是 projection 规则（如 Casebook 从完整 history 派生 `CurrentCase(session)`），不是
 replication 规则。
 **边界**：Casebook 对象层面的禁 LWW 语义归 `knowledge-reuse`；本命题钉 general merge 律。
-**证据**：→ PROOF.md 006。
+**证据**：→ HOW.md 006。
 
 ## DURABLE-CONVERGENCE-007 —— 相同 merged history → 同一个 Integrator Current
 
@@ -87,7 +87,7 @@ Current；唯一 Integrator 与注册规则由 `durable-events` 014/019 保证�
 
 **含义/动机**：Current 不是第二真相源；它只是唯一正规积分器对完整事实历史的最终积分状态。
 **边界**：业务 integration rule 的语义归各 domain owner。
-**证据**：→ PROOF.md 007。
+**证据**：→ HOW.md 007。
 
 ## DURABLE-CONVERGENCE-008 —— durability activation ensure hooks；用户 Git 进程独立触发双向 sync
 
@@ -110,7 +110,7 @@ remote；`pre-push` 也在用户 push 真正发送普通 refs 前执行同一完
 **含义/动机**：`Local={A,B}, Remote={A,C}` 成功后都是 `{A,B,C}`；`git push` 可能发生在 Wanxiangshu 完全未运行时，
 因此同步执行权必须属于已安装 hook，而不是某个 process-local EventStore/GitGateway object。
 **边界**：transport 物理故障（offline/auth/lease contention）可使 remote pending，但不得撤销已本地 committed facts。
-**证据**：→ PROOF.md 008。
+**证据**：→ HOW.md 008。
 
 ## DURABLE-CONVERGENCE-009 —— dumb remote 无 domain 逻辑
 
@@ -123,4 +123,4 @@ post-receive projection、Wanxiang-specific server API。
 逻辑塞进 server 等于再造一套领域运行时。
 **边界**：hook 安装/chain 的安全规则（不覆盖用户 hook）→ `Infrastructure/Git` 实现面
 （proof 见 `durable-events` 的 hook-dispatcher 测试）。
-**证据**：→ PROOF.md 009。
+**证据**：→ HOW.md 009。

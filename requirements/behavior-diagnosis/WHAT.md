@@ -1,7 +1,7 @@
 # behavior-diagnosis — WHAT（唯一 normative 合同）
 
 > 命题 = 当前世界必须同时成立的事实。编号 `BEHAVIOR-DIAGNOSIS-NNN`（下文简称
-> `BD-NNN`）。每条末尾的证据指针 → `PROOF.md` 行号。
+> `BD-NNN`）。每条末尾的证据指针 → `HOW.md` 行号。
 > 边界：诊断如何/何时展示给 Main、feedback dedupe/coverage 归 `guidance-delivery`；
 > `chronicle` 工具名/权限归 `capability-enforcement`；score vector 是已弃权历史。
 
@@ -17,7 +17,7 @@ TipName = provider tip enum 值 = durable RuleId = FieldName，四者恒等。�
   集合、`tip` 枚举、Main guide 查找命名空间与校验清单。
 - 边界：目录的物理格式/命名规则本身不归本包（是资源实现细节）；本包消费「目录 =
   身份」这个不变量。
-- 证据：`catalog.test.mjs` `ENFORCER_170_*`；`PROOF.md` 行 10。
+- 证据：`catalog.test.mjs` `ENFORCER_170_*`；`HOW.md` 行 10。
 
 ### BD-002 装载 fail-fast，零 fallback
 
@@ -26,7 +26,7 @@ TipName = provider tip enum 值 = durable RuleId = FieldName，四者恒等。�
 
 - 含义：坏包必须当场暴露，不能静默成功（历史 why/enforcer 三连拒之一）。
 - 证据：`catalog.test.mjs`、`catalog-validation.test.mjs`；打包路径由
-  `requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs`（REUSE）覆盖；`PROOF.md` 行 11。
+  `requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs`（REUSE）覆盖；`HOW.md` 行 11。
 
 ### BD-003 Domain 校验合同
 
@@ -36,7 +36,7 @@ EnforcerText / MainText（及装载派生字段）trim 后非空。N 不硬编�
 120，由测试锁定，不写进 Domain）。
 
 - 含义：身份唯一 + 顺序连续 + 正文非空是检测语料可用的最低门槛。
-- 证据：`catalog-validation.test.mjs` `ENFORCER_170_validate_*`（11 条）；`PROOF.md` 行 12。
+- 证据：`catalog-validation.test.mjs` `ENFORCER_170_validate_*`（11 条）；`HOW.md` 行 12。
 
 ### BD-004 检测语料全量、确定性进入 Blogger system
 
@@ -46,7 +46,7 @@ EnforcerText / MainText（及装载派生字段）trim 后非空。N 不硬编�
 
 - 含义：Blogger 在开始判断前已看到全部检测规则，不需要 lookup/search 工具
   （Rulebook §8/§10）；检测语料不因检索机制而残缺。
-- 证据：`rulebook-system-composition.test.mjs` `SYSTEM_001/002/004`；`PROOF.md` 行 13。
+- 证据：`rulebook-system-composition.test.mjs` `SYSTEM_001/002/004`；`HOW.md` 行 13。
 
 ### BD-005 本地化叶子同样完整
 
@@ -55,7 +55,7 @@ TipName/RuleId/FieldName 恒等。装载按语言定位叶子，无跨语言 fal
 
 - 含义：检测边界不因语言而塌缩；语言绑定是 `provider-language` 的领地，本包只
   保证每个语言世界都有完整检测语料。
-- 证据：`rulebook-system-composition.test.mjs` `SYSTEM_003`；`PROOF.md` 行 13–14。
+- 证据：`rulebook-system-composition.test.mjs` `SYSTEM_003`；`HOW.md` 行 13–14。
 
 ## B. tip 身份与枚举（codec）
 
@@ -68,7 +68,7 @@ TipName/RuleId/FieldName 恒等。装载按语言定位叶子，无跨语言 fal
 - 含义：诊断必须有「观察了什么 + 选中哪条规则」两个要素，缺一不可成立
   （ENFORCER-022/023/061）。
 - 边界：`chronicle` 工具名与权限归 `capability-enforcement`；这里只锁参数语义。
-- 证据：`codec.test.mjs` `ENFORCER_023_*`、`ENFORCER_022_*`；`PROOF.md` 行 15–17。
+- 证据：`codec.test.mjs` `ENFORCER_023_*`、`ENFORCER_022_*`；`HOW.md` 行 15–17。
 
 ### BD-007 tip 精确映射，无 fuzzy
 
@@ -79,7 +79,7 @@ fuzzy / Damerau–Levenshtein / 默认 tip 修复。查找前 trim。
 - 含义：诊断不能在「最接近的规则」上成立（历史 why/enforcer 1.4）；
   未知输入不得被强行解释成某条工程规则。
 - 证据：`codec.test.mjs` `ENFORCER_021_*`、`ENFORCER_024_fuzzy_or_misspelled_*`；
-  `PROOF.md` 行 15–17。
+  `HOW.md` 行 15–17。
 
 ### BD-008 无 score path
 
@@ -89,7 +89,7 @@ decode 面无 `Scores` / `parseScore` / 数值严重度 surface；额外 numeric
 
 - 含义：诊断是「一条 tip」，不是评分向量（ENFORCER-024/072/073 clean break）。
 - 证据：`codec.test.mjs` `ENFORCER_024_extra_numeric_properties_are_ignored`、
-  `catalog.test.mjs` `ENFORCER_170_no_bridge_fields_on_rule`；`PROOF.md` 行 15–17。
+  `catalog.test.mjs` `ENFORCER_170_no_bridge_fields_on_rule`；`HOW.md` 行 15–17。
 
 ## C. Cycle 归并与有效性
 
@@ -103,7 +103,7 @@ InteractionRepair → AABB 有界修复。
 
 - 含义：`chronicle` 是一次观察的原子提交口，不是可 map/reduce 的批量接口。多调用若被防御性
   merge，会把「模型没遵守 exactly-once 协议」伪装成成功，并让后续 nudge/AABB 时序失去唯一失败点。
-- 证据：`enforcer-cycle-protocol.test.mjs` `ENFORCER_042_multi_call_*`；`PROOF.md` 行 18。
+- 证据：`enforcer-cycle-protocol.test.mjs` `ENFORCER_042_multi_call_*`；`HOW.md` 行 18。
 
 ### BD-010 Cycle 身份 fail-closed
 
@@ -115,7 +115,7 @@ BD-009 在 commit 前转入协议修复，不再以 deterministic merge 兜底�
 - 含义：cardinality violation 是可修复的模型协议失败；身份缺失是无法证明事实归属的存储边界失败，
   两者不得混成同一种 fatal/merge 行为。
 - 证据：`identity-fail-closed.test.mjs` `ENFORCER_043_*`；
-  `enforcer-cycle-protocol.test.mjs` `ENFORCER_042_multi_call_*`；`PROOF.md` 行 19。
+  `enforcer-cycle-protocol.test.mjs` `ENFORCER_042_multi_call_*`；`HOW.md` 行 19。
 
 ### BD-011 fail-closed 硬界
 
@@ -125,7 +125,7 @@ canonical text > 512 KiB UTF-8；evidence > 128 KiB UTF-8。tool call 数不再�
 score/severity 参数。
 
 - 含义：防拒绝服务与不可控提交（ENFORCER-042 §13.2）；界是硬墙不是启发式。
-- 证据：`bounds.test.mjs`（4 条，驱动真实 `handleContinuation`）；`PROOF.md` 行 20。
+- 证据：`bounds.test.mjs`（4 条，驱动真实 `handleContinuation`）；`HOW.md` 行 20。
 
 ## D. 原子 occurrence
 
@@ -142,7 +142,7 @@ BlogEntry 派生。
   `requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs`
   `C0_no_EnforcementCycleCommitted_fact`、`enforcer-cycle-protocol.test.mjs`
   `ENFORCER_host_completed_blog_with_live_request_commits_and_advances_coverage`；
-  `PROOF.md` 行 21。
+  `HOW.md` 行 21。
 
 ### BD-013 Coverage 严格推进门
 
@@ -155,7 +155,7 @@ cursor/cutoff/epoch 与投影不一致 → `KnownNotCommitted`（可恢复弃置
 - 含义：诊断只建立在覆盖推进的事实上；因果前置不能靠重新从 XTrace head 推导
   （ENFORCER-045/154）。
 - 证据：`coverage-birth-gate.test.mjs` `ENFORCER_045_*`；REUSE
-  `enforcer-cycle-commit-branches.test.mjs` `ENFORCER_precheck_*`；`PROOF.md` 行 22。
+  `enforcer-cycle-commit-branches.test.mjs` `ENFORCER_precheck_*`；`HOW.md` 行 22。
 
 ### BD-014 每 cycle 恰好一个 tip occurrence
 
@@ -165,7 +165,7 @@ cursor/cutoff/epoch 与投影不一致 → `KnownNotCommitted`（可恢复弃置
 
 - 含义：occurrence 有独立身份、有界可回溯（ENFORCER-070/154）；重放不重数。
 - 证据：REUSE `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs`
-  `ENFORCER_TIP_08/09/10/11`；`PROOF.md` 行 23。
+  `ENFORCER_TIP_08/09/10/11`；`HOW.md` 行 23。
 
 ## E. Observation 配对
 
@@ -179,7 +179,7 @@ tip-anchored 视图丢弃无 tip 的 frame（不发明 tip）。禁止 tips∥fr
 - 含义：Blogger 回看历史时能直接看到「当时我看到这些事实 → 所以我选了这条 tip」，
   不需要把两个数组重新 join（Rulebook §2）。
 - 证据：MOVE `observation-pair.test.mjs` `RULEBOOK_OBS_001..008`、
-  `observation-projection.test.mjs` `OBS_PROJ_001/002/004`；`PROOF.md` 行 24。
+  `observation-projection.test.mjs` `OBS_PROJ_001/002/004`；`HOW.md` 行 24。
 
 ### BD-016 历史压缩不创造新 occurrence
 
@@ -193,7 +193,7 @@ squash（`BlogObservationsSquashed`）把最老 K 个 frame 折叠为一个 Squa
   occurrence」这一半。
 - 证据：MOVE `observation-projection.test.mjs` `OBS_PROJ_003`；REUSE
   `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_12`、
-  `paired-history-eval.test.mjs` `A42_PAIRED_HISTORY_*`；`PROOF.md` 行 25。
+  `paired-history-eval.test.mjs` `A42_PAIRED_HISTORY_*`；`HOW.md` 行 25。
 
 ## F. 无效 cycle 的协议修复（cycle 生命周期一部分）
 
@@ -221,4 +221,4 @@ terminal 再次 idle，则该 idle 机会记录一次通用 Fallback confirmed f
   本包只锁「无效 cycle 的修复入口与有界性」。
 - 证据：REUSE `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`
   `ENFORCER_060_*`、`ENFORCER_061_*`、`ENFORCER_068_*`、`LOOP_006_*`；
-  `PROOF.md` 行 26。
+  `HOW.md` 行 26。

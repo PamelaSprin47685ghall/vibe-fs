@@ -1,9 +1,9 @@
 # speculative-investigation — WHAT
 
 > 本页是**唯一 normative 合同**：当前世界必须同时成立的编号命题。每条命题 = 标题 +
-> 规范陈述 + 含义/动机 + 边界 + 证据指针（→ PROOF.md）。
+> 规范陈述 + 含义/动机 + 边界 + 证据指针（→ HOW.md）。
 > 历史断言、迁移沉积、被拒方案**不是**命题（见 HOW.md「历史与弃权」）。
-> 前缀 `SPEC-INV-`。测试落点表见 `PROOF.md`。
+> 前缀 `SPEC-INV-`。测试落点表见 `HOW.md`。
 
 源条款：历史 what/strength STRENGTH-001..012（本包主导全部 12 条，COVERAGE.md 单-owner
 裁决）；历史 why/shape/how/proof strength 条款、历史 change（strength）。
@@ -23,7 +23,7 @@ Strength 从不成为任务正确性的必要条件。
 **边界**：不定义「普通 Work Session 的正常形态」本身（归各领域 owner）；只保证 Strength
 的介入与缺席不可区分。
 
-**证据**：PROOF.md SPEC-INV-001 行（host-policy K0/canary、host-canary-k0 REUSE）。
+**证据**：HOW.md SPEC-INV-001 行（host-policy K0/canary、host-canary-k0 REUSE）。
 
 ## SPEC-INV-002：Eligible opportunity
 
@@ -38,7 +38,7 @@ InteractionRepair、prefix probe、Reviewer/finality、Attached 或 InternalLeaf
 **边界**：role/request-kind 的枚举与 profile 语义由 `participant-identity`/`office-capability`
 定义；本命题只规定「eligible 集合」这一事实。
 
-**证据**：PROOF.md SPEC-INV-002 行（authority-policy、host-canary-k0 REUSE）。
+**证据**：HOW.md SPEC-INV-002 行（authority-policy、host-canary-k0 REUSE）。
 
 ## SPEC-INV-003：预算单位 K
 
@@ -51,7 +51,7 @@ completion 终止 speculation，正文永不注入 primary。
 
 **边界**：K 的数值与枚举是当前实现选择（HOW）；「K 是 provider request 单位」是命题。
 
-**证据**：PROOF.md SPEC-INV-003 行（batch-collector、replica-transform REUSE）。
+**证据**：HOW.md SPEC-INV-003 行（batch-collector、replica-transform REUSE）。
 
 ## SPEC-INV-004：Replica authority
 
@@ -69,7 +69,7 @@ schema/gate，不来自 prompt 自觉。
 **边界**：persona/language 继承的语义定义 → `participant-identity`；read/glob/grep 的
 capability 投影 → `capability-enforcement`；fallback cursor 语义 → `provider-attempt-recovery`。
 
-**证据**：PROOF.md SPEC-INV-004 行（authority-policy、runtime/host-canary-k0 REUSE）。
+**证据**：HOW.md SPEC-INV-004 行（authority-policy、runtime/host-canary-k0 REUSE）。
 
 ## SPEC-INV-005：Candidate frame
 
@@ -86,7 +86,7 @@ owner session、DecisionId、request/exchange ordinal 与 semantic digest 确定
 **边界**：digest/byte 上限的数值与 canonical 化具体规则 → HOW；「确定性派生 + 只收真实
 交换」是命题。
 
-**证据**：PROOF.md SPEC-INV-005 行（frame-projection、projection-adapter REUSE）。
+**证据**：HOW.md SPEC-INV-005 行（frame-projection、projection-adapter REUSE）。
 
 ## SPEC-INV-006：Prepared / unpromoted ≠ 历史
 
@@ -113,7 +113,7 @@ cross-boundary invariant（HANDOFF §18.6）：canonical trace 侧由 semantic-t
 不复制其命题，只在本命题声明「不得进入历史」这一侧。EventStore envelope/payload_refs
 substrate 语义 → `durable-events`。
 
-**证据**：PROOF.md SPEC-INV-006 行（commit-promotion、store/durability-port/lifecycle-recovery
+**证据**：HOW.md SPEC-INV-006 行（commit-promotion、store/durability-port/lifecycle-recovery
 REUSE、integration lifecycle REUSE）。
 
 ## SPEC-INV-007：Promotion 只由消费证据产生
@@ -134,7 +134,7 @@ Promoted 的 frame 是不可删除的语义历史。**
 **边界**：ReconciledTurn/ProviderRun 的通用语义 → 各领域 owner；「Promotion 的资格条件」是
 本命题。
 
-**证据**：PROOF.md SPEC-INV-007 行（commit-promotion、turn-evidence、lifecycle-recovery/
+**证据**：HOW.md SPEC-INV-007 行（commit-promotion、turn-evidence、lifecycle-recovery/
 store REUSE）。
 
 ## SPEC-INV-008：Replay 与 XTrace closure
@@ -154,7 +154,7 @@ frame，永不消化 Candidate。
 **边界**：XTrace cursor、Companion coverage 的 owner → `semantic-trace`/`context-compression`；
 本命题只规定「Promoted → 确定性重建 → Traced 记录」这一侧。
 
-**证据**：PROOF.md SPEC-INV-008 行（lifecycle-recovery、frame-projection/projection-algebra
+**证据**：HOW.md SPEC-INV-008 行（lifecycle-recovery、frame-projection/projection-algebra
 REUSE、integration lifecycle REUSE）。
 
 ## SPEC-INV-009：Projection 与 no-reflection
@@ -178,7 +178,7 @@ base selection 同时出现均为 ProjectionConflict。
 **边界**：ProjectionAlgebra 通用性质 → `provider-projection`；Pair marker / Host sanitization 的
 writer 顺序 → 各自 owner（本命题只规定 Strength frame 的相对位置）。
 
-**证据**：PROOF.md SPEC-INV-009 行（projection-algebra、projection-adapter、frame-projection
+**证据**：HOW.md SPEC-INV-009 行（projection-algebra、projection-adapter、frame-projection
 REUSE）。
 
 ## SPEC-INV-010：Predictor 与 control
@@ -202,7 +202,7 @@ metadata 或 Host-internal cost class，不能从 Fast/Deep 名字推断。K1 �
 **边界**：predictor 的具体特征/分桶模型 → HOW；「label 只来自 shadow/control、control
 restart-stable、K 门禁独立」是命题。
 
-**证据**：PROOF.md SPEC-INV-010 行（authority-policy、predictor-rollout REUSE）。
+**证据**：HOW.md SPEC-INV-010 行（authority-policy、predictor-rollout REUSE）。
 
 ## SPEC-INV-011：失败、取消与熔断
 
@@ -221,7 +221,7 @@ replay/recover，已有 Candidate 只按其已绑定 target run 完成或自然�
 **边界**：owner cancellation 的通用级联语义 → `managed-session-lifecycle`；canary 指纹的
 具体格式 → HOW。
 
-**证据**：PROOF.md SPEC-INV-011 行（host-policy、commit-promotion、host-canary-k0 REUSE）。
+**证据**：HOW.md SPEC-INV-011 行（host-policy、commit-promotion、host-canary-k0 REUSE）。
 
 ## SPEC-INV-012：模型不可见、系统可审计
 
@@ -237,7 +237,7 @@ features/score、cost estimate、promotion evidence 与 failure reason。Host-on
 **边界**：diagnostics/EventStore 的存储语义 → `durable-events`；「哪些字节对模型可见」的
 投影规则 → `provider-projection`。
 
-**证据**：PROOF.md SPEC-INV-012 行（invisibility REUSE、projection-algebra REUSE）。
+**证据**：HOW.md SPEC-INV-012 行（invisibility REUSE、projection-algebra REUSE）。
 
 ## SPEC-INV-013：DryRun = 可见、真实、非阻塞、零 Promotion 的 shadow execution
 
@@ -256,4 +256,4 @@ provider bytes，不得产生 `StrengthCandidatePrepared` / `StrengthCandidatePr
 **边界**：Treatment 仍可因需要消费 Candidate 而等待有界结果；Shadow/K0 可完全不创建 Replica。
 OpenCode child 的可见性/attached ontology 归 `session-ontology`/Host，本命题只钉 Strength 对该能力的使用。
 
-**证据**：→ PROOF.md SPEC-INV-013。
+**证据**：→ HOW.md SPEC-INV-013。

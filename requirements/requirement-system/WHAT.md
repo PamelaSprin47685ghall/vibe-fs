@@ -1,9 +1,9 @@
 # WHAT：requirement-system 必须成立的规则
 
-本文件是 `requirement-system` 的**唯一 normative 合同**。WHY/HOW/PROOF 非 normative。
+本文件是 `requirement-system` 的**唯一 normative 合同**。WHY/HOW 非 normative。
 
 命题编号 `REQUIREMENT-SYSTEM-NNN`；每条命题 = 当前世界必须同时成立的事实。证据指针 →
-`PROOF.md` 行号。引用别的包一律用包名，不复制其它包命题。
+`HOW.md` 行号。引用别的包一律用包名，不复制其它包命题。
 
 ---
 
@@ -19,7 +19,7 @@ owner；不存在无 owner、双 owner 或互相矛盾的 normative authority。
 事实内容。文件/模块共址不是 owner 判据；owner 由 WHY + independent-change + failure
 meaning 裁决。
 
-**证据指针**：→ PROOF.md L8。
+**证据指针**：→ HOW.md L8。
 
 ## REQUIREMENT-SYSTEM-002：包身份独立于物理布局
 
@@ -29,10 +29,10 @@ meaning 裁决。
 **含义/动机**：独立变化测试——把 manifest 从 TOML 改为其它机器格式、重排包目录，所有产品
 WHAT 不动。schema 未裁决期间不得为投机格式建 verifier 依赖。
 
-**边界**：5 份文档文件名（README/WHY/WHAT/HOW/PROOF）当前是迁移契约规定的固定结构，属
+**边界**：3 份文档文件名（WHY/WHAT/HOW）与 tests/ 目录当前是迁移契约规定的固定结构，属
 HOW 的可换面；包名一旦进入 INDEX 即稳定。
 
-**证据指针**：→ PROOF.md L9。
+**证据指针**：→ HOW.md L9。
 
 ## REQUIREMENT-SYSTEM-003：全部包同时为真
 
@@ -44,7 +44,7 @@ guarantee consumption，不表示优先级、冻结或 override。
 
 **边界**：dependency 不排序、不冻结；被依赖包不因下游消费而获得对下游命题的 authority。
 
-**证据指针**：→ PROOF.md L10。
+**证据指针**：→ HOW.md L10。
 
 ## REQUIREMENT-SYSTEM-004：每个 executable proof 恰一个 owner
 
@@ -57,7 +57,7 @@ guarantee consumption，不表示优先级、冻结或 override。
 **边界**：本命题管「断言归属」；「怎么证明、如何可红」归 `verification-system`。cutover
 时按断言逐条拆 oracle（SPLIT@cutover，见 HOW.md）。
 
-**证据指针**：→ PROOF.md L11。
+**证据指针**：→ HOW.md L11。
 
 ## REQUIREMENT-SYSTEM-005：无裸规范权威
 
@@ -69,12 +69,12 @@ normative authority」= 连元规则都有归属文件。
 
 **边界**：导航文件可以引用与路由，不可以定义；`CHG-NNN` 是 Change 编号，不是产品 Clause。
 
-**证据指针**：→ PROOF.md L12。
+**证据指针**：→ HOW.md L12。
 
 ## REQUIREMENT-SYSTEM-006：索引完整性
 
 **规范陈述**：requirements/ 树只含 INDEX 列出的包目录；当前 49 个包每个都有
-`{README,WHY,WHAT,HOW,PROOF}.md`；树入口（requirements/README.md）与
+`{WHY,WHAT,HOW}.md` 与 `tests/`；树入口（requirements/README.md）与
 `requirements/INDEX.md` 命名同一包集。
 
 **含义/动机**：包清单是机器可校验的边界；目录级越界（INDEX 外神秘包）与文件级残缺
@@ -82,12 +82,12 @@ normative authority」= 连元规则都有归属文件。
 
 **边界**：包数量（当前 49）是设计期结果不是稳定 API；但「树 == 索引」的封闭性永久成立。
 
-**证据指针**：→ PROOF.md L13。
+**证据指针**：→ HOW.md L13。
 
 ## REQUIREMENT-SYSTEM-007：WHAT 是唯一 normative 合同
 
 **规范陈述**：WHAT.md 是 package 的唯一 normative semantic contract；WHY 解释理由、
-HOW 说明实现（不另造 normative owner）、PROOF 指向证据。正式产品语义只定义在被认可的
+HOW 说明实现与测试落点（不另造 normative owner）。正式产品语义只定义在被认可的
 正式层（`requirements/<pkg>/WHAT.md`），README/AGENTS/CHANGELOG/
 Changes 不是规范正文。
 
@@ -96,7 +96,7 @@ Changes 不是规范正文。
 
 **边界**：本命题定义「哪个文件是合同」，不定义合同内容（各产品包 WHAT）。
 
-**证据指针**：→ PROOF.md L14。
+**证据指针**：→ HOW.md L14。
 
 ## REQUIREMENT-SYSTEM-008：条款 ID 唯一性与稳定性
 
@@ -108,7 +108,7 @@ Changes 不是规范正文。
 
 **边界**：ID 前缀表与当前 5 层文件层级是当前 HOW（迁移载体），ID 稳定性原则本身是 WHAT。
 
-**证据指针**：→ PROOF.md L15。
+**证据指针**：→ HOW.md L15。
 
 ## REQUIREMENT-SYSTEM-009：条款层归属
 
@@ -121,7 +121,7 @@ Changes 不是规范正文。
 
 **边界**：当前 5 层目录是迁移前载体；cutover 后各层职责按同构并入 requirements/ 树。
 
-**证据指针**：→ PROOF.md L16。
+**证据指针**：→ HOW.md L16。
 
 ## REQUIREMENT-SYSTEM-010：生命周期停用；废止路径不引用；实现不依赖 Change 历史
 
@@ -137,7 +137,7 @@ proposed/active/completed 生命周期目录；正式语义只存在于 `require
 **边界**：deferred 未来材料归 `proposals/`（见 REQUIREMENT-SYSTEM-011）；归档树路径的
 字面引用由 `scripts/checks/spec.mjs` 全仓禁引门禁机器可红。
 
-**证据指针**：→ PROOF.md L17。
+**证据指针**：→ HOW.md L17。
 
 ## REQUIREMENT-SYSTEM-011：用户所有权与启动授权
 
@@ -151,7 +151,7 @@ proposed/active/completed 生命周期目录；正式语义只存在于 `require
 
 **边界**：本条是过程合同（人工评审承接）；机制停用后无机器可红面。
 
-**证据指针**：→ PROOF.md L18。
+**证据指针**：→ HOW.md L18。
 
 ## REQUIREMENT-SYSTEM-012：单文件 Change 生命周期（停用）
 
@@ -166,7 +166,7 @@ Proposal/Status/Decision/Outcome 文件；不引入 manifest、中央注册表�
 **边界**：正文追加内容（Active work、Amendments、Blockers、Final outcome）允许，不得改写
 冻结的 Original proposal（重启时有效）。
 
-**证据指针**：→ PROOF.md L19。
+**证据指针**：→ HOW.md L19。
 
 ## REQUIREMENT-SYSTEM-013：Active/Completed 合同
 
@@ -185,7 +185,7 @@ REQUIREMENT-SYSTEM-010 `changeDependencyReferences` 承接。Active 冻结 origi
 `changes/active/` 若被重新启用，
 必须带 Original proposal / Work origin 标题。
 
-**证据指针**：→ PROOF.md L20。
+**证据指针**：→ HOW.md L20。
 
 ## REQUIREMENT-SYSTEM-014：矛盾与 blocker
 
@@ -199,7 +199,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 本条管流程）。机器面锁 WHAT-014 四步原文（删步即红）；是否在一次实现中真正停下，仍由
 人工评审承接。
 
-**证据指针**：→ PROOF.md L21。
+**证据指针**：→ HOW.md L21。
 
 ## REQUIREMENT-SYSTEM-015：直接闭环小变更
 
@@ -212,7 +212,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 
 **边界**：若工作已由用户指定 Change 启动，仍按单文件生命周期闭环。
 
-**证据指针**：→ PROOF.md L22。 AGENTS.md 文档生命周期节由 `tests/change-lifecycle.test.mjs` 锁定。
+**证据指针**：→ HOW.md L22。 AGENTS.md 文档生命周期节由 `tests/change-lifecycle.test.mjs` 锁定。
 
 ## REQUIREMENT-SYSTEM-016：依赖声明 ⊆ 骨架
 
@@ -225,13 +225,13 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **边界**：骨架已于 2026-08-14 cutover 迁入 `requirements/INDEX.md`。本命题管「边不超集」，
 不管边的理由（理由逐条写各包 HOW）。
 
-**证据指针**：→ PROOF.md L23。
+**证据指针**：→ HOW.md L23。
 
 ## REQUIREMENT-SYSTEM-017：meta-verifier 机器执行
 
 **规范陈述**：存在一个可执行 meta-verifier（`requirements/requirement-system/tests/meta-verifier.test.mjs`）
-扫描 requirements/ 全树，机器断言：5 文档齐备、WHAT 命题 ID 在 PROOF 中有行、落点测试文件
-真实存在、无 INDEX 外目录、DEPENDS ON ⊆ 骨架；删一个已存在包的 PROOF 行必须变红。
+扫描 requirements/ 全树，机器断言：WHY/WHAT/HOW 齐备、WHAT 命题在 HOW/tests 中有落点、落点测试文件
+真实存在、无 INDEX 外目录、DEPENDS ON ⊆ 骨架；删一个已存在包的 HOW 测试落点行必须变红。
 
 **含义/动机**：树结构合同若只活在散文里就是裸权威；meta-verifier 把 REQUIREMENT-SYSTEM-
 003/004/006/007/016 变成可红测试。「绿」可以检查，「红」有失败价值。
@@ -239,7 +239,7 @@ Amendment 继续。普通规范冲突不得由实现者按偏好选边。
 **边界**：meta-verifier 只查结构事实，不裁决语义归属内容；归属裁决在 2026-08-14
 cutover 设计期完成（历史见 git）。
 
-**证据指针**：→ PROOF.md L24。
+**证据指针**：→ HOW.md L24。
 
 ## REQUIREMENT-SYSTEM-018：可执行证明双向可追溯
 
@@ -255,13 +255,13 @@ call）。其唯一 primary tag 是 title 开头的 `WHAT[<CURRENT-WHAT-ID>]`；
 case。`test.skip` 与 `test.todo` 仍须带
 恰一个 tag，但 state 永远不满足 proof。
 
-**PROOF 边**：PROOF.md 中显式 executable anchor（`tests/file.test.mjs::exact test title`
+**PROOF 边**：HOW.md 中显式 executable anchor（`tests/file.test.mjs::exact test title`
 或同等精确 title anchor）必须解析到仍存在、line/title/state 可定位且 WHAT ID 相同的
 active call site；缺失、重复、WHAT 不同、skip/todo 或已删除 anchor 都是 dangling edge，
 不得以文件存在代替闭合。未标明 executable anchor 的文件/命令/人工证据仍是结构索引，
 不被 scanner 猜成 test edge。
 
-**含义/动机**：WHAT → PROOF → test 的正向边已由 meta-verifier 检查；缺的是反方向
+**含义/动机**：WHAT → HOW → test 的正向边已由 meta-verifier 检查；缺的是反方向
  test → WHAT。没有反向边，测试可以偷偷创造第二套需求体系，而文档漏测无人发现。双向
 闭环使每个 test 的存在理由机器可答（`requirement-trace --explain`），使每个 WHAT 的
 活性机器可验（零 active test = 命题失效）。「一个 test 只回答一个 WHAT」保证 failure
@@ -272,4 +272,4 @@ meaning 唯一；两条命题若无法分别测试，优先回头合并命题而
 proof。`requirements/**/tests/e2e/` 与 `tests/integration/` 下的 `*.test.mjs` 仍属于
 同一 call-site 扫描宇宙；不以目录、文件名或历史注释推断 ownership。
 
-**证据指针**：→ PROOF.md L25。
+**证据指针**：→ HOW.md L25。

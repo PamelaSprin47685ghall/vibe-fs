@@ -463,7 +463,7 @@ const proofEdgesForRow = ({ proofFile, proofLine, rowText, whatIds, testsByFile,
 }
 
 const readProofRows = (requirementsRoot, tests) => {
-  const proofFiles = walk(requirementsRoot, ['.md']).filter((file) => file.endsWith('/PROOF.md'))
+  const proofFiles = walk(requirementsRoot, ['.md']).filter((file) => file.endsWith('/HOW.md'))
   const testsByFile = new Map()
   for (const test of tests) {
     if (!testsByFile.has(test.file)) testsByFile.set(test.file, [])
@@ -480,9 +480,24 @@ const readProofRows = (requirementsRoot, tests) => {
     const packageIds = whatHeadings(whatText).map(({ id }) => id)
     const byTail = new Map(packageIds.map((id) => [id.slice(-3), id]))
     const lines = readFileSync(file, 'utf8').split('\n')
+    let inProofSection = false
+
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index]
+      const headerMatch = line.match(/^#{1,6}\s+(.*)$/)
+      if (headerMatch) {
+        const headerText = headerMatch[1].trim()
+        if (/验证|落点|证明|命题\s*→|Focused acceptance|PROOF/i.test(headerText)) {
+          inProofSection = true
+        } else if (/^##\s+/.test(line)) {
+          inProofSection = false
+        }
+      }
+
       if (!line.startsWith('|')) continue
+      if (/^\|\s*(?:命题|WHAT|ID)\s*\|/i.test(line) || /落点|测试/i.test(line)) {
+        inProofSection = true
+      }
       // Skip header separator rows (|---|---|) and column header rows.
       if (/^\|[-:\s|]+\|?$/.test(line)) continue
       const cells = line.split('|')
@@ -493,28 +508,23 @@ const readProofRows = (requirementsRoot, tests) => {
       const ids = []
       for (const token of proofIdTokens(cell1)) {
         if (/^\d{3}$/.test(token) && byTail.has(token)) ids.push(byTail.get(token))
-        else if (!/^\d{3}$/.test(token)) ids.push(token)
+        else if (!/^\d{3}$/.test(token) && packageIds.includes(token)) ids.push(token)
       }
       for (const token of proofIdTokens(cell2)) {
         if (/^\d{3}$/.test(token) && byTail.has(token)) ids.push(byTail.get(token))
-        else if (!/^\d{3}$/.test(token)) ids.push(token)
+        else if (!/^\d{3}$/.test(token) && packageIds.includes(token)) ids.push(token)
       }
       for (const match of cell1.matchAll(/(?:^|[\s,、/–—])([0-9]{3})(?=$|[\s,、/–—])/g)) {
         if (byTail.has(match[1])) ids.push(byTail.get(match[1]))
       }
       const uniqueIds = [...new Set(ids)]
-      // The full row text (all cells) is needed for pathReferences and
-      // anchor matching: PROOF.md formats vary, and test paths may appear in
-      // any column beyond the first two.
       const rowText = cells.slice(1, -1).join(' | ').replace(/`/g, '')
       const rawRowText = cells.slice(1, -1).join(' | ')
       const refs = pathReferences(rawRowText, file, requirementsRoot)
-      // A PROOF row is executable evidence only when it references at least
-      // one .test.mjs path. A prose-only row (law ID + narrative, no test
-      // path) is not proof — it is a false green waiting to happen.
+
       if (refs.length > 0) {
         for (const id of uniqueIds) proofIds.add(`${packageName}:${id}`)
-      } else if (uniqueIds.length > 0) {
+      } else if (uniqueIds.length > 0 && inProofSection) {
         proseOnlyProof.push({ proofFile: file, proofLine: index + 1, whatIds: uniqueIds, rowText: rawRowText.trim() })
       }
       proofEdges.push(...proofEdgesForRow({ proofFile: file, proofLine: index + 1, rowText: rawRowText, whatIds: uniqueIds, testsByFile, requirementsRoot }))
@@ -523,11 +533,6 @@ const readProofRows = (requirementsRoot, tests) => {
   return { proofIds, proofEdges, proseOnlyProof }
 }
 
-/**
- * Build the full graph for one requirements tree.
- * Returns WHAT nodes, all test-zone call sites, exact proof edges, and closure
- * classifications consumed by the requirement-trace gate.
- */
 export function buildTraceGraph(requirementsRoot) {
   const whats = new Map()
   const whatFiles = walk(requirementsRoot, ['.md']).filter((file) => file.endsWith('/WHAT.md'))

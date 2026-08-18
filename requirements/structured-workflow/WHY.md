@@ -151,4 +151,4 @@ physical adapter。这样业务调用树才具有缩放不变性，而不是把 
 8. 子 workflow 暴露执行位置或物理 presence，父 workflow 据此驱动下一业务效果，导致
    Direct-CE 在模块接缝失去结构闭包。
 
-每条对应 WHAT.md 的命题；可执行证据见 PROOF.md。
+每条对应 WHAT.md 的命题；可执行证据见 HOW.md。

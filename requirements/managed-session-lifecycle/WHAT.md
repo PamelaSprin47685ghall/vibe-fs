@@ -2,7 +2,7 @@
 
 命题前缀：`MANAGED-SESSION-`。全部命题描述**当前世界必须同时成立**的事实。
 来源：旧 host/execution/companion 条款（HOST-008/009/015、EXEC-006/009/014/017/022/026/028/031，
-2026-08-14 归档）、历史 change（universal §11/13/17、cache §17）。落点见 `PROOF.md`。
+2026-08-14 归档）、历史 change（universal §11/13/17、cache §17）。落点见 `HOW.md`。
 
 ---
 
@@ -15,7 +15,7 @@ owner；各 AttachmentKind 只提供 payload/terminal 策略，不得复制所�
 **含义/动机**：所有权事实单一 owner；否则崩溃恢复与级联取消分叉（WHY §1）。
 
 **证据**：`Session/AttachedSessionRuntime.fs`（`GetOrCreate/TryFind/Remove/RemoveByDelegateSession`）；
-→ PROOF.md `MANAGED-SESSION-001`。
+→ HOW.md `MANAGED-SESSION-001`。
 
 ## MANAGED-SESSION-002：创建协议 = 先写关联，再发首个 prompt
 
@@ -26,7 +26,7 @@ prompt（HOST-009）；反向关联必须在首个 prompt 前存在，transform 
 **含义/动机**：prompt 发出后 transform 即可查询关联；晚写关联会让首轮 transform 把 leaf 当普通
 Work 处理。
 
-**证据**：`SatelliteRuntime.start`（`spec.Link` 先于返回 lease）；→ PROOF.md `MANAGED-SESSION-002`
+**证据**：`SatelliteRuntime.start`（`spec.Link` 先于返回 lease）；→ HOW.md `MANAGED-SESSION-002`
 （REUSE `satellite-runtime.test.mjs` 的 create 路径）。
 
 ## MANAGED-SESSION-003：restart 恢复判据 — 匹配则复用，无关联新建，冲突 fail closed
@@ -39,7 +39,7 @@ Replacement **不是 direct repoint**：当 durable owner 仍链接旧 child 时
 loss 后替换，不确定 fail closed。
 
 **证据**：`SatelliteRuntime.start`（`Reused | Replacement | Created` + 冲突错误）；`HostForkRestart`；
-→ PROOF.md `MANAGED-SESSION-003`（REUSE `satellite-runtime` + `host-fork-restart`）。
+→ HOW.md `MANAGED-SESSION-003`（REUSE `satellite-runtime` + `host-fork-restart`）。
 
 ## MANAGED-SESSION-004：Reusable 与 OneShot 是两条互斥生命周期
 
@@ -50,7 +50,7 @@ reusable：completion 后不 retire / 不 dispose，同 scope 续问复用同一
 **含义/动机**：把 dispose-after 套在 reusable 上 = 每轮丢 context；把 reusable 当 one-shot =
 永远在重建。
 
-**证据**：`HostForkRuntime.Reuse`（reuse 不 spawn）；→ PROOF.md `MANAGED-SESSION-004`
+**证据**：`HostForkRuntime.Reuse`（reuse 不 spawn）；→ HOW.md `MANAGED-SESSION-004`
 （MOVE `host-fork-agent.test.mjs`；REUSE `sync-delegate-runtime.test.mjs`）。
 
 ## MANAGED-SESSION-005：ReuseScope 是 Dedicated 绑定的生命周期 key
@@ -63,7 +63,7 @@ deterministic delegate tier，复用既有 child 时沿用已绑定 managed agen
 scope）跨多个 owner session 仍复用同一 dedicated Session（universal.md §11）。
 
 **证据**：`AttachedSessionRuntime`（key = scope + role）；`ReuseScope.ofSession/compatible`；
-→ PROOF.md `MANAGED-SESSION-005`（NEW `attached-session-runtime.test.mjs`）。
+→ HOW.md `MANAGED-SESSION-005`（NEW `attached-session-runtime.test.mjs`）。
 
 ## MANAGED-SESSION-006：Handle 四态；tombstone 与 abandon 不可回退
 
@@ -75,7 +75,7 @@ fork」（EXEC-009）。
 **含义/动机**：tombstone 是防重复投递与防身份回收的物理事实；回退 = 重放历史改变结局。
 
 **证据**：`HandleProjection`（`linkNamed/complete/abandon/retire`）；`HandleController.consume`；
-→ PROOF.md `MANAGED-SESSION-006`（REUSE `execution/handle.test.mjs`）。
+→ HOW.md `MANAGED-SESSION-006`（REUSE `execution/handle.test.mjs`）。
 
 ## MANAGED-SESSION-007：completion cell 单赋值；第一个赢家唯一
 
@@ -89,7 +89,7 @@ completion，再触发 process fatal。不得为了同步返回 send-failure 而
 **含义/动机**：覆盖写 = 同一 handle 两个结局；join 必须只读到稳定唯一的完成事实。
 
 **证据**：`HandleProjection.complete` 拒绝 `AlreadyCompleted`；`HandleController.recordCompletion`；
-→ PROOF.md `MANAGED-SESSION-007`（REUSE `execution/handle.test.mjs`）。
+→ HOW.md `MANAGED-SESSION-007`（REUSE `execution/handle.test.mjs`）。
 
 ## MANAGED-SESSION-008：retire 是 consume 的唯一写口
 
@@ -99,7 +99,7 @@ completion 不可再返回。
 
 **含义/动机**：唯一 consume 路径 + tombstone = 投递 exactly-once（restart 视角）。
 
-**证据**：`HandleController.consume`（`AlreadyRetired` / `AppendFailed`）；→ PROOF.md
+**证据**：`HandleController.consume`（`AlreadyRetired` / `AppendFailed`）；→ HOW.md
 `MANAGED-SESSION-008`（REUSE `execution/handle.test.mjs` `EXEC_004_join_may_only_retire...`）。
 
 ## MANAGED-SESSION-009：abandon 是 durable terminal；parent cancel 逐 child 写
@@ -118,7 +118,7 @@ Finality blessing 对 hidden reviewer 只取消当前 physical attempt、保留 
 
 **含义/动机**：父取消 = 子全部止损；逐 child 使恢复与审计逐条可定位。
 
-**证据**：`HandleController.cancelChildren` / `recordAbandon`；→ PROOF.md `MANAGED-SESSION-009`
+**证据**：`HandleController.cancelChildren` / `recordAbandon`；→ HOW.md `MANAGED-SESSION-009`
 （REUSE `execution/handle-abandoned.test.mjs` + `host-fork-agent` 的 abandoned 拒绝）。
 
 ## MANAGED-SESSION-010：HostOwnedHidden handle 对父不可见
@@ -130,7 +130,7 @@ Finality blessing 对 hidden reviewer 只取消当前 physical attempt、保留 
 **含义/动机**：`run` 同步掌控 Distiller 生命周期；若 hidden 泄漏进 `listable`，会阻塞 caller 的
 suicide（`distiller-ownership.test.mjs` 头注释回归）。
 
-**证据**：`HandleProjection.parentVisible` + 视图过滤；→ PROOF.md `MANAGED-SESSION-010`
+**证据**：`HandleProjection.parentVisible` + 视图过滤；→ HOW.md `MANAGED-SESSION-010`
 （MOVE `distiller-ownership.test.mjs`）。
 
 ## MANAGED-SESSION-011：proven permanent loss 才有 replacement 资格；replacement 必须显式迁移 durable association
@@ -139,7 +139,7 @@ suicide（`distiller-ownership.test.mjs` 头注释回归）。
 
 对允许 Replacement 的 attachment，状态迁移必须是 `old durable link → Close(old) → Link(new)`；不能把 `Link(new)` 当作覆盖赋值。只有新 child 创建成功且 old association 被合法关闭后，新关联才能提交。**每一次 ensure 都必须重新读取当前 durable association**；构造时捕获的一次性 restored id、进程内 `bloggerId` 或 successful-flight cache 都不能在 cache invalidation / send failure 后取代 durable truth。否则进程缓存一清空就会把仍存在的 old durable link“忘掉”，误走 Created→`Link(new)`，把合法 recovery 变成 COMPANION-002 semantic cut。失败 ensure 的 single-flight cache 必须失效，避免一次冲突把未来所有 ensure 永久钉在同一个 rejected Task 上。
 
-**证据**：`SatelliteRuntime.start/linkLease`（journal-linked child 不在 merged candidates → Replacement；Close→Link；冲突 → Error）；→ PROOF.md `MANAGED-SESSION-011`（REUSE `satellite-runtime`）。
+**证据**：`SatelliteRuntime.start/linkLease`（journal-linked child 不在 merged candidates → Replacement；Close→Link；冲突 → Error）；→ HOW.md `MANAGED-SESSION-011`（REUSE `satellite-runtime`）。
 ## MANAGED-SESSION-012：Child Run 生命周期与父背景记录分离
 
 **规范**：Child Run 生命周期（active / cancel / completion cell 单赋值 / 物理状态投影
@@ -149,7 +149,7 @@ suicide（`distiller-ownership.test.mjs` 头注释回归）。
 **含义/动机**：子运行状态是物理事实；父的「他还在跑/已结束」不得与父自己的工作记录互相污染。
 
 **证据**：`Session/ChildRun.fs` + `ChildRunProjection.fs`（`status`/`toRecord`）；
-→ PROOF.md `MANAGED-SESSION-012`（MOVE `child-run-projection.test.mjs`）。
+→ HOW.md `MANAGED-SESSION-012`（MOVE `child-run-projection.test.mjs`）。
 
 ## MANAGED-SESSION-013：restart 按 durable handle 投影 re-enlist child
 
@@ -163,7 +163,7 @@ active → RecoveredActive、terminal → re-enlist、abandoned/retired → 原�
 **边界**：generic 恢复协议与 permit 线性序归 `crash-reconciliation`（EXEC-023）；假 abort 的
 outcome 分型归 `effect-accounting`（EXEC-022）——本命题只拥有「handle 投影恢复出的合法结果」。
 
-**证据**：`Session/HostForkRestart.fs`；→ PROOF.md `MANAGED-SESSION-013`（REUSE
+**证据**：`Session/HostForkRestart.fs`；→ HOW.md `MANAGED-SESSION-013`（REUSE
 `host-fork-restart.test.mjs`）。
 
 ## MANAGED-SESSION-014：Dedicated Session 生命周期 = OwnerReuseScope 生命周期
@@ -175,7 +175,7 @@ retire/release（universal.md §17；EXEC-026 §B 不变量 6）；「owner Sess
 **含义/动机**：同一 scope 跨多个 owner session 复用；scope 未关而 retire = 丢 hot knowledge。
 
 **证据**：`SyncDelegateRuntime`（G6 删除 child 时 retire live binding 但为 owner scope close
-保留）→ PROOF.md `MANAGED-SESSION-014`（REUSE `sync-delegate-runtime.test.mjs`）。
+保留）→ HOW.md `MANAGED-SESSION-014`（REUSE `sync-delegate-runtime.test.mjs`）。
 
 ## MANAGED-SESSION-015：handle 是 agent id；同一 handle restart 后绑同一 child
 
@@ -185,7 +185,7 @@ id 派生虚构 session（`HandleController.linkNamed` 注释）。
 
 **含义/动机**：第二身份 = 一张需要持续同步的映射表；虚构 session = 每次操作静默 no-op 的幽灵资源。
 
-**证据**：`HandleController.agentHandle/linkNamed`；→ PROOF.md `MANAGED-SESSION-015`
+**证据**：`HandleController.agentHandle/linkNamed`；→ HOW.md `MANAGED-SESSION-015`
 （REUSE `execution/handle.test.mjs` `EXEC_009_a_linked_handle_records_the_child_session_it_drives`）。
 
 ## GARBAGE / 弃权（不进入 WHAT）

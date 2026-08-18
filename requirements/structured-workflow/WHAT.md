@@ -2,7 +2,7 @@
 
 > 本文是 `structured-workflow` 包的**唯一 normative 合同**。当前世界必须同时成立下列
 > 全部命题。历史断言、迁移沉积、被拒方案不在此列（见 HOW.md「历史与弃权」）。
-> 每条命题的测试落点见 PROOF.md §1 表对应行。
+> 每条命题的测试落点见 HOW.md §1 表对应行。
 
 条款来源映射：历史五层 docs（dsl-structured-program/flow/architecture/loop/execution，2026-08-14 归档）
 的 OWNED Clause（COVERAGE.md 归属）与本包 boundary card 的 OWNS。反向下述全部
@@ -26,7 +26,7 @@ structured-workflow OWNED Clause 均已落到下列命题或显式驳斥/移交�
 - 「有界递归」的界限（具体预算）由具体领域条款定义；本命题只要求调用链显式接收并
   使用有限预算，不以无限循环/重试为业务默认。
 
-**证据**：PROOF.md §1 第 1 行。
+**证据**：HOW.md §1 第 1 行。
 
 ---
 
@@ -51,7 +51,7 @@ Step continuation AST
 - Process 层物理命令形状豁免（`isProcessCommandPath`），因为那是物理请求类型化
   （EXEC-010），不是业务解释器。
 
-**证据**：PROOF.md §1 第 2 行。
+**证据**：HOW.md §1 第 2 行。
 
 ---
 
@@ -77,7 +77,7 @@ Step continuation AST
   `EstimatedRunningSeconds`、`RecoveryStageProbe`）、fold 拒绝 token（`Already*`）是
   真实事物或拒绝事实，不是行为 bool（dsl-ownership allowlist 语义）。
 
-**证据**：PROOF.md §1 第 3 行。
+**证据**：HOW.md §1 第 3 行。
 
 ---
 
@@ -93,7 +93,7 @@ business token 表），改名不改变判定。
 **边界**：本命题只钉「不作程序计数器」；`Owner`/`Lease` 作为 session-ontology /
 managed-session-lifecycle 的**真实物理归属**词汇时合法——物理资源归属不是程序位置。
 
-**证据**：PROOF.md §1 第 4 行。
+**证据**：HOW.md §1 第 4 行。
 
 ---
 
@@ -111,7 +111,7 @@ managed-session-lifecycle 的**真实物理归属**词汇时合法——物理�
 **边界**：门禁只守卫「未分类即红」，不替代 DSL-002/005 的人工语义判断（正交组合
 人工证明见 HOW.md §3.4.1）。
 
-**证据**：PROOF.md §1 第 5 行。
+**证据**：HOW.md §1 第 5 行。
 
 ---
 
@@ -126,7 +126,7 @@ managed-session-lifecycle 的**真实物理归属**词汇时合法——物理�
 **边界**：同一文件内两个 DU 相同 case 集**不**触发（门目标是跨 bounded context 重复）；
 bounded context 内单一定义 + 显式转换理由 = 合法。
 
-**证据**：PROOF.md §1 第 6 行。
+**证据**：HOW.md §1 第 6 行。
 
 ---
 
@@ -180,7 +180,7 @@ OpenCode Contract）。
   不为测试便利新增生产 export。
 - Vocabulary 不得下沉 OpenCode tool adapter、不得上提为与 owner 无关的纯规则层。
 
-**证据**：PROOF.md §1 第 7 行。
+**证据**：HOW.md §1 第 7 行。
 
 ---
 
@@ -200,7 +200,7 @@ state-product 与 physical-owner proof 约束。纯语义路径（无 `/OpenCode
 **边界**：豁免按**具体类型**用结构化 annotation 表达，禁止目录级/文件级整体豁免；
 目录级豁免逃逸 → RED。
 
-**证据**：PROOF.md §1 第 8 行。
+**证据**：HOW.md §1 第 8 行。
 
 ---
 
@@ -220,7 +220,7 @@ Reviewer/Student/Manager/Join 生命周期。
   `crash-reconciliation`；本命题只钉「重入普通流程、无执行位置恢复」。
 - 恢复 evidence 不足时 fail closed，不猜测旧流程执行到哪一步。
 
-**证据**：PROOF.md §1 第 9 行。
+**证据**：HOW.md §1 第 9 行。
 
 ---
 
@@ -237,7 +237,7 @@ Reviewer/Student/Manager/Join 生命周期。
 
 **边界**：适配器内部实现有界原语除外；有界递归的具体预算由领域条款定义。
 
-**证据**：PROOF.md §1 第 10 行。
+**证据**：HOW.md §1 第 10 行。
 
 ---
 
@@ -261,7 +261,7 @@ reviewer 是否能够合理知道调用者在等待什么语义？
 - 命名 review 义务（DSL-013 五问：名字声明什么承诺 / 隐藏哪些时序 / 哪个 proof 证明 /
   是否改变 trace / crash 后从什么 durable evidence 重入）见 HOW.md §3.5。
 
-**证据**：PROOF.md §1 第 11 行。
+**证据**：HOW.md §1 第 11 行。
 
 ---
 
@@ -280,7 +280,7 @@ rebase/review…），但被压缩的 Vocabulary **必须拥有自己的 tempora
 历史 DSL proof 条款高阶 Vocabulary 证明义务表）；新增高阶
 Vocabulary 必须追加该表一行并挂可观察效果测试。
 
-**证据**：PROOF.md §1 第 12 行。
+**证据**：HOW.md §1 第 12 行。
 
 ---
 
@@ -300,7 +300,7 @@ module decorator 叠加允许（composition root 或明确 port-wiring module）
 **边界**：transparent decorator 仍须标明「不改变 trace」；语义 decorator / 压缩
 Vocabulary 必须能指出对应 proof（DSL-014 联动）。
 
-**证据**：PROOF.md §1 第 13 行。
+**证据**：HOW.md §1 第 13 行。
 
 ---
 
@@ -316,7 +316,7 @@ Vocabulary 必须能指出对应 proof（DSL-014 联动）。
 **边界**：proof ladder（static → pure → temporal → adapter → Long Stroke）的层级选择
 与晋级规则 → `verification-system`；本命题只钉「证明什么」的语义姿态。
 
-**证据**：PROOF.md §1 第 14 行。
+**证据**：HOW.md §1 第 14 行。
 
 ---
 
@@ -337,7 +337,7 @@ durable facts，禁止 Stage/布尔/时间猜）。
 - join 中断后果（`JoinWaitOutcome.Interrupted`、Esc 语义）→ `delegation` /
   `managed-session-lifecycle`。
 
-**证据**：PROOF.md §1 第 15 行。
+**证据**：HOW.md §1 第 15 行。
 
 ---
 
@@ -368,7 +368,7 @@ durable facts，禁止 Stage/布尔/时间猜）。
 - `taskResult` / `result` 等具体实现词汇见 HOW.md §3.3.1；规范只要求 plumbing 不重复
   手写成 nested decision。
 
-**证据**：PROOF.md §1 第 16 行。
+**证据**：HOW.md §1 第 16 行。
 
 ---
 
@@ -407,7 +407,7 @@ runtime。结构闭包要求业务调用树具有缩放不变性：缩小是有�
 - recovery 仍遵守 STRUCTURED-WORKFLOW-009：fold durable facts 后从 semantic entry
   重入，不能以“组合”名义恢复内部 continuation。
 
-**证据**：PROOF.md §1 第 17 行。
+**证据**：HOW.md §1 第 17 行。
 
 ---
 

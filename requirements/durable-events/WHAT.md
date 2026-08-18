@@ -1,6 +1,6 @@
 # WHAT —— durable-events（唯一 normative 合同）
 
-条款前缀 `DURABLE-EVENTS-`。每条的落点测试见 `PROOF.md`。
+条款前缀 `DURABLE-EVENTS-`。每条的落点测试见 `HOW.md`。
 来源：历史五层 persist 条款（PERSIST-001..010）、
 历史 change（storage）（§1–§48）、历史 COVERAGE persist 小节。
 
@@ -19,7 +19,7 @@ interop facade。持久资源由 opaque capability 句柄承载，并必须显�
 
 The F# production internals may retain domain types; only these owner surfaces translate them at
 JS boundaries. A semantic law must name one owner, its source, representation, and proof anchor in
-`PROOF.md`; a monolithic test helper that imports multiple domain owners is not a contract surface.
+`HOW.md`; a monolithic test helper that imports multiple domain owners is not a contract surface.
 
 ## DURABLE-EVENTS-001 —— Event 是唯一 durable truth；append-only
 
@@ -29,7 +29,7 @@ append tombstone/retirement event；committed event 永远不可修改、覆盖�
 
 **含义/动机**：历史只增长、不回写。错误事实通过新事实纠正，否则重放无法回到同一局面。
 **边界**：各 event 的**业务语义**归各 domain owner；本命题只钉「事实如何被存储与演化」。
-**证据**：→ PROOF.md 001。
+**证据**：→ HOW.md 001。
 
 ## DURABLE-EVENTS-002 —— EventEnvelope 无版本；additive vocabulary
 
@@ -44,7 +44,7 @@ fail closed（见 007）。
 historical-event compatibility。已 committed 的 `event_type` 语义冻结，旧 decoder 永久有效。
 **边界**：领域事实的语义解释不归本包；「哪个 event_type 是合法的」由
 `AuthoritativeEventTypes`（store 层 vocabulary）+ 各 domain 词汇表共同决定。
-**证据**：→ PROOF.md 002。
+**证据**：→ HOW.md 002。
 
 ## DURABLE-EVENTS-003 —— canonical JSON 是 identity 协议
 
@@ -56,7 +56,7 @@ codepoint 升序（递归）；`parents` / `payload_refs` 先去重再按 canoni
 **含义/动机**：canonicalization 不是实现细节，是 identity 协议——若 `[A,B]` vs `[B,A]`、
 key 顺序、数字格式、Unicode escaping 不冻结，重放身份就会漂移。
 **边界**：merge 层如何用 identity 做 set-union 见 `durable-convergence`。
-**证据**：→ PROOF.md 003。
+**证据**：→ HOW.md 003。
 
 ## DURABLE-EVENTS-004 —— local append 的提交原语 = 完整 NDJSON 行
 
@@ -69,7 +69,7 @@ retry handle 仍存活时提前完成。运行时 append **不得**创建 Git bl
 **含义/动机**：本地事件真相就是裸 append-only 文件；Git 是同步编码，不是在线数据库。
 一次事实提交的物理成本只与新事实 bytes 有关，不再与 Git object/tree/index 数量有关。
 **边界**：remote Git 操作触发的 blobification / remote ref publish 见 018 与 `durable-convergence`。
-**证据**：→ PROOF.md 004。
+**证据**：→ HOW.md 004。
 
 ## DURABLE-EVENTS-005 —— Process = single writer；一个进程一个永久增长文件
 
@@ -81,7 +81,7 @@ retry handle 仍存活时提前完成。运行时 append **不得**创建 Git bl
 **含义/动机**：single-writer append 本身已经消除了本地多进程写冲突；机器只是 transport
 位置，不是事件模型的一层。多进程与多机都只是若干互不共享 WriterId 的有序输入流。
 **边界**：这些 writer streams 如何汇合见 `durable-convergence` k-way merge。
-**证据**：→ PROOF.md 005。
+**证据**：→ HOW.md 005。
 
 ## DURABLE-EVENTS-006 —— commit outcome 只由本地事实存在性判定
 
@@ -95,7 +95,7 @@ async release 必须先关闭新准入，再 drain release 前已准入的 seria
 **含义/动机**：remote 是否同步成功与“本地事实有没有发生”是两件事。把 Git ref 当 commit
 witness 会把网络/remote 可用性重新塞回本地 critical path。
 **边界**：remote publication failure 归同步层；外部效果的 outcome-unknown policy 归 `effect-accounting`。
-**证据**：→ PROOF.md 006。
+**证据**：→ HOW.md 006。
 
 ## DURABLE-EVENTS-007 —— StorageInvalid 全局 fail closed
 
@@ -106,7 +106,7 @@ Append/Publish CAS retry 耗尽且 EventId 仍不在 store。**禁止**跳过坏
 
 **含义/动机**：第一个不可能的事件即停——跳过中间坏对象继续，后续事实就建在错基上。
 **边界**：合法并发 fork 不是 StorageInvalid（见 008 与 `durable-convergence`）。
-**证据**：→ PROOF.md 007。
+**证据**：→ HOW.md 007。
 
 ## DURABLE-EVENTS-008 —— 并发 fork 不升级为全局 corruption
 
@@ -117,7 +117,7 @@ competing facts，绝不因自然 fork 把 store 永久打成不可恢复。禁�
 **含义/动机**：append-only union 必然能产生物理合法 fork；它与「全局不可恢复」必须正交。
 冲突如何表达与裁决是 `durable-convergence` 的正向律，本命题只钉「不得混淆两类错误」。
 **边界**：DomainConflict 的确定性表达、resolution 收敛 → `durable-convergence`。
-**证据**：→ PROOF.md 008。
+**证据**：→ HOW.md 008。
 
 ## DURABLE-EVENTS-009 —— 无 schema/store generation；所有旧物理布局 shock cutover
 
@@ -130,7 +130,7 @@ competing facts，绝不因自然 fork 把 store 永久打成不可恢复。禁�
 **含义/动机**：这是明确的数据休克切换：允许丢弃旧 durable history，换取零永久兼容路径、
 零旧布局启动扫描。旧 Git objects 是否继续存在只由普通 Git object reachability/GC 决定，新代码不认识它们。
 **边界**：只有新 `.git/wanxiang/events|payloads` 与新 remote `writers/`/`payloads/` snapshot 属当前协议。
-**证据**：→ PROOF.md 009。
+**证据**：→ HOW.md 009。
 
 ## DURABLE-EVENTS-010 —— 单一 universal durable substrate = `.git` 内本地事件文件
 
@@ -142,7 +142,7 @@ journal/blob/store/ref、按 domain 拆 backend 非法。业务 `stream_id` 不�
 **含义/动机**：用户 working tree 看不见运行态证据，同时运行时仍只是普通 append-only 文件；
 不用 Git object graph 承担数据库职责。
 **边界**：静态 repository content（resources/docs/Change）仍走普通 Git；remote 编码见 011/018。
-**证据**：→ PROOF.md 010。
+**证据**：→ HOW.md 010。
 
 ## DURABLE-EVENTS-011 —— Git blob 只存在于 remote sync 边界；一 writer 文件 = 一 blob
 
@@ -155,7 +155,7 @@ Wanxiangshu/OpenCode 主进程不主动发起 fetch/pull/push，也不是 sync �
 **含义/动机**：本地文件是身份稳定的真相，blob OID 只是某次同步快照的内容寻址编码。
 Wanxiangshu 不参与 Git pack/delta 优化，也不让它反向污染 append hot path。
 **边界**：remote root 如何列出 writer→blob 与双方替换见 `durable-convergence`。
-**证据**：→ PROOF.md 011。
+**证据**：→ HOW.md 011。
 
 ## DURABLE-EVENTS-012 —— PayloadRef 与本地 payload closure
 
@@ -170,7 +170,7 @@ dangling ref → StorageInvalid。remote sync 时 payload 文件才编码为 Git
 只有真实 lowercase-sha256 content-address 才是 payload reference，非 content-address 的占位值不是
 payload dependency，不进入 closure。
 **边界**：digest 算法与 remote tree layout 是 HOW；业务只见 opaque PayloadRef。
-**证据**：→ PROOF.md 012。
+**证据**：→ HOW.md 012。
 
 ## DURABLE-EVENTS-013 —— 查询只读正规 Integrator 的 Current；先 commit 后 integrate
 
@@ -184,7 +184,7 @@ canonical 行 append/payload closure，再把同一 EventEnvelope 交给 Integra
 **边界**：Integrator 的注册模型见 019；各业务状态字段意义归对应 domain owner。Terminal
 completion proof 只能由 ChildRecovery/Host lifecycle owner 产生；Persistence Journal surface
 不接受任意字符串来伪造 terminal evidence。
-**证据**：→ PROOF.md 013。
+**证据**：→ HOW.md 013。
 
 ## DURABLE-EVENTS-014 —— k-way 输入顺序 + 确定性积分
 
@@ -195,7 +195,7 @@ bytes fail closed。业务模块不得自行重排历史。
 
 **含义/动机**：单机多进程和多机分布式没有两套算法——都是若干有序 writer streams 的 k-way merge。
 **边界**：k-way merge 的代数/transport 收敛归 `durable-convergence`；业务积分只消费其输出。
-**证据**：→ PROOF.md 014。
+**证据**：→ HOW.md 014。
 
 ## DURABLE-EVENTS-015 —— business fold 不变量 owner（PERSIST-010）
 
@@ -211,7 +211,7 @@ PrefixCoverage-complete-turn）、`ContextReanchored`（Epoch+1、同一消息 i
 **边界**：各 fact 的业务语义（XTrace/coverage/epoch 的意义）归
 `semantic-trace`/`work-record`/`context-compression`/`prefix-stability`/`obligation-ledger`
 等 domain owner；本包只拥有「不满足即拒绝」这一条红线。
-**证据**：→ PROOF.md 015。
+**证据**：→ HOW.md 015。
 
 ## DURABLE-EVENTS-016 —— 所有权红线：Git 物理概念不外泄
 
@@ -222,7 +222,7 @@ PrefixCoverage-complete-turn）、`ContextReanchored`（Epoch+1、同一消息 i
 
 **含义/动机**：把「事实的语义」与「事实的物理存放」隔离；领域语义不随存储机制漂移。
 **边界**：这条红线的静态门禁与 fixture 见 PROOF 016。
-**证据**：→ PROOF.md 016。
+**证据**：→ HOW.md 016。
 
 ## DURABLE-EVENTS-017 —— local append 复杂度不得依赖 history / Git
 
@@ -232,7 +232,7 @@ EventId 分布、历史 event 数、writer 文件当前大小都不得改变 app
 
 **含义/动机**：这是对本次性能根因的结构性封口；不能再用 index/tree 优化去修一个本不该存在的在线 Git 数据库。
 **边界**：OS flush/fsync policy 是 HOW；remote sync 成本不属于 local append latency。
-**证据**：→ PROOF.md 017。
+**证据**：→ HOW.md 017。
 
 ## DURABLE-EVENTS-018 —— remote 操作才同步；同步替换 local + remote truth snapshot
 
@@ -246,7 +246,7 @@ Git remote 操作触发独立 hook 进程同步 EventStore。hook 必须在 Open
 **含义/动机**：同步是用户 Git 操作的副作用，不是 Wanxiangshu runtime 的第二个生命周期。`git push` 可以发生在
 OpenCode 已退出以后，仍必须同步成功。全量文件很大也先保持 KISS；优化必须由真实 profiling 重新证明需要。
 **边界**：remote ref/lease/transport failures 归 `durable-convergence`；本命题只钉 trigger 与物理粒度。
-**证据**：→ PROOF.md 018。
+**证据**：→ HOW.md 018。
 
 ## DURABLE-EVENTS-019 —— 唯一 canonical Integrator；业务只注册 integration oracle
 
@@ -261,7 +261,7 @@ CE program、同一组注册规则。独立 remote-sync hook 可以为**纯物�
 不会因恢复/在线/feature helper 分裂成多个状态机或手写 fold。
 **边界**：业务 rule 内部可维护自己被分配的 Current 槽位，但 orchestration/registration/history iteration
 只属于 Integrator；实现必须使用 F# CE DSL，不引入事件状态机。
-**证据**：→ PROOF.md 019。
+**证据**：→ HOW.md 019。
 
 ## DURABLE-EVENTS-020 —— plugin load 只验证物理可读性；业务 replay/RuntimeStarted 延迟到 activation
 
@@ -271,7 +271,7 @@ CE program、同一组注册规则。独立 remote-sync hook 可以为**纯物�
 
 **边界**：结构损坏（无法解析 canonical envelope、缺失必需 payload）属于物理 store unreadable，可拒绝该 workspace durable capability；业务规则冲突/unknown domain state 不得升级成 plugin-load failure，由 021 的 self-limited cut-tail 语义承接。
 
-**证据**：→ PROOF.md 020。
+**证据**：→ HOW.md 020。
 
 ## DURABLE-EVENTS-021 —— semantic failure 仍写 durable cut-tail，但**当前进程必须 fatal**
 
@@ -285,4 +285,4 @@ CE program、同一组注册规则。独立 remote-sync hook 可以为**纯物�
 
 **边界**：malformed canonical bytes、identity collision、missing parent/payload、unknown authoritative event type 仍属 DURABLE-EVENTS-007 的 StorageInvalid；这些不是 semantic cut。
 
-**证据**：→ PROOF.md 021。
+**证据**：→ HOW.md 021。

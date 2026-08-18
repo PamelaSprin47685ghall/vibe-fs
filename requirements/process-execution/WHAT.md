@@ -1,6 +1,6 @@
 # process-execution — 可观察合同
 
-本文件是 `process-execution` 包的唯一 normative 语义合同。证据指针 → `PROOF.md`。
+本文件是 `process-execution` 包的唯一 normative 语义合同。证据指针 → `HOW.md`。
 
 ## PROC-001：终端四动词四 contract
 
@@ -104,7 +104,7 @@ Mailbox 双通道：agent 完成路径只发 `Pulse`（结果读 Journal）；PT
 
 边界：Journal 的权威性与 fold → `durable-events`；permit 门重入 → `crash-reconciliation`。
 
-证据：REUSE `requirements/delegation/tests/join-v2-mailbox.test.mjs`（`EXEC_018_drain_available_returns_two_completions_in_publish_order`——PTY 队列 FIFO）；`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT 注记见 PROOF.md）。
+证据：REUSE `requirements/delegation/tests/join-v2-mailbox.test.mjs`（`EXEC_018_drain_available_returns_two_completions_in_publish_order`——PTY 队列 FIFO）；`requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（Distiller 定向等待，SPLIT 注记见 HOW.md）。
 
 ## PROC-009：物理输出捕获有界；spool 是蒸馏输入
 

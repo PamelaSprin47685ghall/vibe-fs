@@ -149,7 +149,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
   const tests = join(packageRoot, 'tests')
   const testFile = join(tests, 'case.test.mjs')
   const whatFile = join(packageRoot, 'WHAT.md')
-  const proofFile = join(packageRoot, 'PROOF.md')
+  const proofFile = join(packageRoot, 'HOW.md')
   mkdirSync(packageRoot, { recursive: true })
   mkdirSync(tests, { recursive: true })
   try {
@@ -199,7 +199,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph rejects prose-only proof rows with no e
   const tests = join(packageRoot, 'tests')
   const testFile = join(tests, 'case.test.mjs')
   const whatFile = join(packageRoot, 'WHAT.md')
-  const proofFile = join(packageRoot, 'PROOF.md')
+  const proofFile = join(packageRoot, 'HOW.md')
   mkdirSync(packageRoot, { recursive: true })
   mkdirSync(tests, { recursive: true })
   try {

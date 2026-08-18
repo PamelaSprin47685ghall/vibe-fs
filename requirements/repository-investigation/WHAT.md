@@ -1,6 +1,6 @@
 # WHAT — repository-investigation 的唯一 normative 合同
 
-> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `PROOF.md`）。
+> 命题 = 当前世界必须同时成立的事实。每条命题有测试落点（见 `HOW.md`）。
 > 边界（DOES NOT OWN）写在各条「边界」；更完整的弃权记录在 `HOW.md` §历史与弃权。
 
 ## REPOSITORY-INVESTIGATION-001 — repository claim 必须由真实观察建立
@@ -11,7 +11,7 @@
 
 **边界**：旧 Case 的复用规则（重放 → freshness hint）→ `knowledge-reuse`；外部 web facts → `external-investigation`；「当前事实如何被真实观察」才是本命题。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-001 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-001 行。
 
 ## REPOSITORY-INVESTIGATION-002 — observation 可定位、可追溯
 
@@ -21,7 +21,7 @@
 
 **边界**：index 的可见面（shelfmark + canonical Q）→ `knowledge-reuse`；「观察本身必须可定位」才是本命题。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-002 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-002 行。
 
 ## REPOSITORY-INVESTIGATION-003 — evidence acquisition 与 semantic reasoning 分层
 
@@ -31,7 +31,7 @@
 
 **边界**：Inquiry 的工具面（{inspect, sphinx MCP}）与 Inspector 的权限集由 `capability-enforcement`/`office-capability` 裁决；本命题是「思考不产生证据」的语义边界。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-003 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-003 行。
 
 ## REPOSITORY-INVESTIGATION-004 — cheapest adequate observation，足够即停止
 
@@ -41,7 +41,7 @@
 
 **边界**：具体搜索/读取策略（怎么选工具）是 Inspector 的 craft（HOW）；「最便宜充分 + 足够即停」才是合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-004 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-004 行。
 
 ## REPOSITORY-INVESTIGATION-005 — observation 因果只读
 
@@ -51,7 +51,7 @@
 
 **边界**：repository mutation 的合法面 → `repository-programming`；进程执行 → `process-execution`；Casebook 的 replay 重放也遵循只读（fetch 不写 subject → `knowledge-reuse` 交叉）。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-005 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-005 行。
 
 ## REPOSITORY-INVESTIGATION-006 — warm-start/semantic search 命中是低信任 orientation，须真实观察确认
 
@@ -61,7 +61,7 @@
 
 **边界**：Casebook 复用（hint 能否被 cache）→ `knowledge-reuse`；Semble 的进程/启动机制 → HOW（`host-boundary` 交叉）。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-006 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-006 行。
 
 ## REPOSITORY-INVESTIGATION-007 — explicit keywords 每次 fresh search；无 keywords 零工作
 
@@ -71,7 +71,7 @@
 
 **边界**：normalize 的具体规则（LF 分行/trim/稳定 dedupe/`MaxKeywords`）是 HOW 细节（bounds 见 REPOSITORY-INVESTIGATION-009）；「显式 + fresh + 零 keywords 零工作」才是合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-007 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-007 行。
 
 ## REPOSITORY-INVESTIGATION-008 — keywords 只对直接消费者；repoPath 只用真实 WorkspaceDirectory
 
@@ -81,7 +81,7 @@
 
 **边界**：谁能通过 invocation DAG 携带 keywords 由既有 delegation/tool surface 裁决（→ `delegation`/`office-capability`）；「直接消费者门 + 真实路径」才是本命题。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-008 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-008 行。
 
 ## REPOSITORY-INVESTIGATION-009 — warm-start 有界且确定
 
@@ -91,4 +91,4 @@
 
 **边界**：具体 bound 数值（`MaxKeywords=8`/`TopKPerKeyword=4`/`MaxHintsTotal=24`/`MaxWarmStartBytes=64 KiB`）是 HOW 常数（HANDOFF §12）；「有界 + 确定 + fail-open」才是合同。
 
-**证据**：→ `PROOF.md` REPOSITORY-INVESTIGATION-009 行。
+**证据**：→ `HOW.md` REPOSITORY-INVESTIGATION-009 行。

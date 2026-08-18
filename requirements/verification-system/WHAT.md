@@ -3,7 +3,7 @@
 本文件是 `verification-system` 的**唯一 normative 合同**。WHY/HOW/PROOF 非 normative。
 
 命题编号 `VERIFICATION-SYSTEM-NNN`；每条命题 = 当前世界必须同时成立的事实。证据指针 →
-`PROOF.md` 行号。引用别的包一律用包名，不复制其它包命题。
+`HOW.md` 行号。引用别的包一律用包名，不复制其它包命题。
 
 ---
 
@@ -28,7 +28,7 @@ gate 清单；两者被 `tests/proof-ladder.test.mjs` 钉住，层序重排即�
 
 **边界**：本命题管「分层原则与层序 pin」，不管任一产品事实内容；具体产品断言回各产品包。
 
-**证据指针**：→ PROOF.md L8。
+**证据指针**：→ HOW.md L8。
 
 ## VERIFICATION-SYSTEM-002：One World——恰一个 Long Stroke
 
@@ -43,7 +43,7 @@ multi-canary / worker pool / 每 scenario 一个 world 冒充覆盖面。
 2026-08-14 退休，由永久 One World 门 `e2e-watchdog-feed`（sole top-level entry、无 cases/ 通道）
 与 proof-ladder 层序 pin 承接。
 
-**证据指针**：→ PROOF.md L9。
+**证据指针**：→ HOW.md L9。
 
 ## VERIFICATION-SYSTEM-003：晋级阶梯，禁止跨级
 
@@ -62,7 +62,7 @@ e2e-watchdog-feed / e2e-event-ceiling 承接；g4r-freeze 已退休）+ 唯一 L
 模型已返回 tool-call，**不证明 Host 已开始执行 tool**；注入前必须先观察真实 Host ToolPart 的 running
 状态，禁止用调度运气或 fixed sleep 代替该物理 barrier。答不出则不得留在 e2e。
 
-**证据指针**：→ PROOF.md L10。
+**证据指针**：→ HOW.md L10。
 
 ## VERIFICATION-SYSTEM-004：verifier 必须可红
 
@@ -75,7 +75,7 @@ unbend.md`）与「删掉回归没有任何测试变红」都是同一件事：�
 **边界**：本命题管「可红」；每个具体断言的可红 fixture 归该断言 owner（每 assertion 恰
 一个 owner，见 `requirement-system`）。本包只拥有 layer-0 门禁机制自身的回归。
 
-**证据指针**：→ PROOF.md L11。
+**证据指针**：→ HOW.md L11。
 
 ## VERIFICATION-SYSTEM-005：fail-closed
 
@@ -91,7 +91,7 @@ envelope、未绑定 ID、互斥 intent 组合都属于 fail-closed 义务（VER
 **边界**：各产品包的 fail-closed 行为断言（envelope 损坏等）归对应包；本命题管传播
 机制与通用义务。
 
-**证据指针**：→ PROOF.md L12。
+**证据指针**：→ HOW.md L12。
 
 ## VERIFICATION-SYSTEM-006：因果推进门禁
 
@@ -107,7 +107,7 @@ provider 流量 / 生命周期噪声不算进展；背景车道进展只记录�
 **边界**：waitFact 的 `renewOn` 是 proof 剧本声明，不进生产事实/Journal/运行时配置。
 e2e top-level 测试不得直接调用 `watchdog.advance`（只经 support 因果原语）。
 
-**证据指针**：→ PROOF.md L13。
+**证据指针**：→ HOW.md L13。
 
 ### 禁止退化清单
 
@@ -156,7 +156,7 @@ race 是代数（可枚举的交错），不是调度彩票。
 **边界**：时钟/定时 capability 本身归 `time-capability`；本命题管「证明不得依赖墙钟」。
 facade 层的时区无关性（`requirements/verification-system/tests/domain.meta.test.mjs`）是本命题在契约面的落点之一。
 
-**证据指针**：→ PROOF.md L14。
+**证据指针**：→ HOW.md L14。
 
 ## VERIFICATION-SYSTEM-008：契约面语言边界
 
@@ -174,7 +174,7 @@ fail closed）。
 **边界**：facade 文件本身是 MECHANISM（VERIFY-008 文本规定 facade 需要元测试）；具体
 产品契约面断言归各产品包。
 
-**证据指针**：→ PROOF.md L15。
+**证据指针**：→ HOW.md L15。
 
 ## VERIFICATION-SYSTEM-009：静态门禁命中真实路径
 
@@ -188,7 +188,7 @@ run.mjs、entry.test.mjs、wired gate）必须是真实存在的文件。
 **边界**：本命题管「门禁自身指向真实路径」；具体扫描范围（扫哪些源码）归各语义门禁的
 owner。
 
-**证据指针**：→ PROOF.md L16。
+**证据指针**：→ HOW.md L16。
 
 ## VERIFICATION-SYSTEM-010：验收判据不可放宽
 
@@ -205,7 +205,7 @@ Amendment 协议双保险。
 **边界**：机器可红面 = 只降不升断言；人类过程面（谁有权宣布 Deferred）归
 `requirement-system` 013/014。
 
-**证据指针**：→ PROOF.md L17。
+**证据指针**：→ HOW.md L17。
 
 ## VERIFICATION-SYSTEM-011：覆盖率门禁分母完整
 
@@ -220,7 +220,7 @@ Amendment 协议双保险。
 **边界**：覆盖门禁的机器载体是 `requirements/verification-system/tests/run.mjs --coverage`（MECHANISM，lead 集成时
 执行）；本命题的落点当前为 REUSE + cutover 拆分计划（SPLIT@cutover）。
 
-**证据指针**：→ PROOF.md L18。
+**证据指针**：→ HOW.md L18。
 
 ## VERIFICATION-SYSTEM-012：行数不是门禁，也不做任何机械行数检查
 
@@ -236,7 +236,7 @@ advisory 本身没有失败价值：不判红的「检查」只会让人以为�
 **边界**：本命题管「行数不得成为门、不得被机械检查」；各语义门禁的 allowlist 内容归各包。
 
 **证据指针**：`requirements/verification-system/tests/no-line-count-check.test.mjs`
-（结构性 absence：本包 tests 与 scripts/checks 内无行数检查指纹）；→ PROOF.md L19。
+（结构性 absence：本包 tests 与 scripts/checks 内无行数检查指纹）；→ HOW.md L19。
 
 ## VERIFICATION-SYSTEM-013：JS 语义边界终态清零
 
@@ -261,4 +261,4 @@ owner；覆盖率分母归 VERIFY-011；行数检查归 VERIFY-012。
 **证据指针**：`requirements/verification-system/tests/js-boundary-gate.test.mjs`
 （6 项终态 invariants：scanAll 零债务 / boundary gate 通过 / 无包本地 contract 适配器 /
 豁免仅限 compiler/distribution/host-canary / 无 interop/domain facade 导入 / surface manifest 非空）；
-→ PROOF.md L20。
+→ HOW.md L20。

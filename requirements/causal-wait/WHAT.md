@@ -1,6 +1,6 @@
 # WHAT — causal-wait（唯一 normative 合同）
 
-> 本文件是 `causal-wait` 的唯一 normative 语义合同。每条命题必须同时为真；测试落点见 `PROOF.md`。
+> 本文件是 `causal-wait` 的唯一 normative 语义合同。每条命题必须同时为真；测试落点见 `HOW.md`。
 > 术语首次出现给定义；引用精确到 `src/...fs` 与测试文件。
 
 ---
@@ -13,7 +13,7 @@
 
 **边界**：`WaitKind` / `Subject` 字符串仅供 diagnostics render，不是 Domain vocabulary、不进 decision。E2E watchdog 是证明 harness（归 `verification-system`），其因果续期语义（`renewOn` 显式归因，waitfact-causal-renewal）消费本条：背景写入只记录不续期。
 
-**证据指针**：→ `PROOF.md` CAUSAL-001 行。
+**证据指针**：→ `HOW.md` CAUSAL-001 行。
 
 ---
 
@@ -25,7 +25,7 @@
 
 **边界**：具体等待条件与 producer 语义由各业务 owner 提供 typed descriptor；本包提供通用诊断词汇与注册机制，不含 Manager/Reviewer/Student 等业务 case。
 
-**证据指针**：→ `PROOF.md` CAUSAL-002 行。
+**证据指针**：→ `HOW.md` CAUSAL-002 行。
 
 ---
 
@@ -37,7 +37,7 @@
 
 **边界**：gate 文件本体在 `scripts/checks/`（本轮不移动）；本包拥有「观测不进 Journal / 不进决策」这条产品事实，gate 是其 enforcement。E2E 的 `causal-waits.json` 桥文件（`CausalWaitBridge`）是诊断输出，不是 Journal，业务代码不得读它。
 
-**证据指针**：→ `PROOF.md` CAUSAL-003 行。
+**证据指针**：→ `HOW.md` CAUSAL-003 行。
 
 ---
 
@@ -49,7 +49,7 @@
 
 **边界**：`CausalWaitHub` 的 `observer`（Enter-only 包装）与 `reader` 是进程内单例的两面；观测 registry 本身（active dict + ring buffer + sequence）是合法物理 mutable 资源（DSL-MUTABLE），不承载业务控制流。
 
-**证据指针**：→ `PROOF.md` CAUSAL-004 行。
+**证据指针**：→ `HOW.md` CAUSAL-004 行。
 
 ---
 
@@ -61,7 +61,7 @@
 
 **边界**：deadline 能力本体归 `time-capability`；本包规定等待**优先事件驱动**并在需要时把 deadline 作为 escape 参与 race。业务状态探测（有界因果重读、`ReconcileDecision`）归 `host-boundary`。
 
-**证据指针**：→ `PROOF.md` CAUSAL-005 行。
+**证据指针**：→ `HOW.md` CAUSAL-005 行。
 
 ---
 
@@ -73,7 +73,7 @@
 
 **边界**：取消/超时的**业务后果**（如 `JoinWaitOutcome.Interrupted`）归消费方（`delegation` 等）；本包只保证观测生命周期终止。历史是**有界** ring buffer（默认容量 256），不无界增长。
 
-**证据指针**：→ `PROOF.md` CAUSAL-006 行。
+**证据指针**：→ `HOW.md` CAUSAL-006 行。
 
 ---
 
@@ -85,7 +85,7 @@
 
 **边界**：frontier 的**渲染**（`CausalWaitBridge.toPlainObject` 的 JSON、E2E 的 `formatCausalSection`）是诊断机制（与 verification-system 交叉）；**算法**（`ofSnapshot` 纯函数）归本包。
 
-**证据指针**：→ `PROOF.md` CAUSAL-007 行。
+**证据指针**：→ `HOW.md` CAUSAL-007 行。
 
 ---
 
@@ -97,7 +97,7 @@
 
 **边界**：`QuiescencePermit` 的 reconcile machinery（single-flight / dirty latch / 因果重读 / `TurnOutcome` 分类）归 `host-boundary`；「观测稳定≠静止资格、不写 Journal、不参与 crash recovery」的**非权威性**归本包。
 
-**证据指针**：→ `PROOF.md` CAUSAL-008 行。
+**证据指针**：→ `HOW.md` CAUSAL-008 行。
 
 ---
 

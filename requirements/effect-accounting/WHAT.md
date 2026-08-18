@@ -1,6 +1,6 @@
 # WHAT —— effect-accounting（唯一 normative 合同）
 
-条款前缀 `EFFECT-ACCOUNTING-`。每条的落点测试见 `PROOF.md`。
+条款前缀 `EFFECT-ACCOUNTING-`。每条的落点测试见 `HOW.md`。
 来源：历史五层 persist 条款（PERSIST-009）、
 历史 why/what execution（EXEC-020/021/022）、
 历史 COVERAGE persist 小节、历史 PROOF-MAP
@@ -17,7 +17,7 @@ intent）与 Accepted/Created/Published（已确认物理发生）。它们是�
 造成重复 effect 或虚假成功。
 **边界**：typed 事实的存储/append 机制 → `durable-events`；Prompt 特有 policy →
 `dispatch-protocol`。
-**证据**：→ PROOF.md 001。
+**证据**：→ HOW.md 001。
 
 ## EFFECT-ACCOUNTING-002 —— Requested-only = outcome unknown
 
@@ -27,7 +27,7 @@ intent）与 Accepted/Created/Published（已确认物理发生）。它们是�
 
 **含义/动机**：未知是第三种状态，不是「未发生」或「成功」的别名。
 **边界**：未知后的重试政策见 005；「未知 ≠ failure」的另一实例（agent completion）见 007。
-**证据**：→ PROOF.md 002。
+**证据**：→ HOW.md 002。
 
 ## EFFECT-ACCOUNTING-003 —— durable intent 先于权威内存状态更新
 
@@ -40,7 +40,7 @@ intent）与 Accepted/Created/Published（已确认物理发生）。它们是�
 记账会让 effect 发生而系统不知道。
 **边界**：session.create 例外（不引入 `SessionCreateRequested`，accepted 证据 = 链接事实
 `HandleLinked`）见 HOW。
-**证据**：→ PROOF.md 003。
+**证据**：→ HOW.md 003。
 
 ## EFFECT-ACCOUNTING-004 —— Accepted 不折回 Requested；重复 acceptance 幂等
 
@@ -51,7 +51,7 @@ retry）必须幂等：不改变已确认状态、不产生副作用。
 **含义/动机**：CommitUnknown retry 可能重放 Requested——已确认的 effect 绝不能被撤销；
 重复确认无害。
 **边界**：错误事实用新事实纠正（append-only 推论），不是 rewrite。
-**证据**：→ PROOF.md 004。
+**证据**：→ HOW.md 004。
 
 ## EFFECT-ACCOUNTING-005 —— reconciliation 先查物理 effect identity；禁盲重试
 
@@ -63,7 +63,7 @@ retry）必须幂等：不改变已确认状态、不产生副作用。
 **含义/动机**：未知 ≠ 未发生；未证实的重试是重复 effect 的配方。
 **边界**：各效果的 reconcile 具体算法（git worktree list / ref 核对 / PromptRecovery /
 OrchestratorSweep）归各自的 domain/change-integration；本命题钉「先证后重试」律。
-**证据**：→ PROOF.md 005。
+**证据**：→ HOW.md 005。
 
 ## EFFECT-ACCOUNTING-006 —— outcome-unknown 显式分型，不假装 committed
 
@@ -74,7 +74,7 @@ OrchestratorSweep）归各自的 domain/change-integration；本命题钉「先�
 **含义/动机**：结局未知是可 reconcile 的第三态；判定手段（canonical root witness）由
 `durable-events` 提供，本命题钉「怎么表达与消费它」。
 **边界**：writer poisoned 后的恢复路径 → `crash-reconciliation`。
-**证据**：→ PROOF.md 006。
+**证据**：→ HOW.md 006。
 
 ## EFFECT-ACCOUNTING-007 —— aborted ≠ terminal（false finality）
 
@@ -101,7 +101,7 @@ Exit:      可观察坏数据为零（census / instrumentation 证据）→ 删 
            / tryMigrateRetiredFalseAbort / migrateOutcomeToUnit，保留 detect → refuse
 ```
 
-**证据**：→ PROOF.md 007。
+**证据**：→ HOW.md 007。
 
 ## EFFECT-ACCOUNTING-008 —— typed 效果家族实例（Worktree/Publish/Blogger）
 
@@ -113,7 +113,7 @@ Blogger（`BloggerRequestMaterialized` → Entry/SquashCommitted）、Todo（`To
 **含义/动机**：分型不是理论：每个实例都必须是 typed 对，且各自可核对。
 **边界**：各实例的业务编排归各 domain owner（`change-integration`/`obligation-ledger`/
 blogger 域）；本命题钉「typed 对」这一共性。
-**证据**：→ PROOF.md 008。
+**证据**：→ HOW.md 008。
 
 ## EFFECT-ACCOUNTING-009 —— PublishClaimed 三分支 fixed order
 
@@ -127,7 +127,7 @@ blogger 域）；本命题钉「typed 对」这一共性。
 **含义/动机**：「先查物理 effect identity」的精确实例：ref 是否已前移到 rebased commit
 是发布效果的物理身份。
 **边界**：rebase/ff 的编排算法 → `change-integration`。
-**证据**：→ PROOF.md 009。
+**证据**：→ HOW.md 009。
 
 ## EFFECT-ACCOUNTING-010 —— 0.5.1 通用 DurableEffect union 拒绝
 
@@ -137,7 +137,7 @@ blogger 域）；本命题钉「typed 对」这一共性。
 **含义/动机**：typed facts 取代通用 union；历史 marker 是 pre-0.5.1 沉积，进入
 one-shot 迁移信息路径。
 **边界**：canonical/identity 机制 → `durable-events`。
-**证据**：→ PROOF.md 010。
+**证据**：→ HOW.md 010。
 
 ## EFFECT-ACCOUNTING-011 —— TodoWriteAccepted 必须精确指名 Prepared
 
@@ -149,7 +149,7 @@ InputDigest/SemanticVersion 失配 → IdentityCorruption，拒绝。Accepted �
 **含义/动机**：Accepted 必须能追溯到它确认的那一次 Request——效果身份是精确的，
 不是「最近一个」。
 **边界**：Todo checkpoint 的义务/评审语义 → `obligation-ledger`。
-**证据**：→ PROOF.md 011。
+**证据**：→ HOW.md 011。
 
 ## EFFECT-ACCOUNTING-012 —— 先证后重试的实例律
 
@@ -161,4 +161,4 @@ claim 被 fold 拒绝（claim 必须基于已 committed 的 witness）。
 **含义/动机**：把 005 的律落到具体效果：等待/重试由证据门决定，不由计时器或猜测决定。
 **边界**：Prompt 的 PromptKey/no-resend 细节 → `dispatch-protocol`；Todo 评审 →
 `obligation-ledger`。
-**证据**：→ PROOF.md 012。
+**证据**：→ HOW.md 012。

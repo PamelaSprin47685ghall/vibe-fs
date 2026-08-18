@@ -1,9 +1,9 @@
 # epistemic-reasoning — WHAT
 
 > 本页是**唯一 normative 合同**：当前世界必须同时成立的编号命题。每条命题 = 标题 +
-> 规范陈述 + 含义/动机 + 边界 + 证据指针（→ PROOF.md）。
+> 规范陈述 + 含义/动机 + 边界 + 证据指针（→ HOW.md）。
 > 历史断言、迁移沉积、被拒方案**不是**命题（见 HOW.md「历史与弃权」）。
-> 前缀 `EPI-`。测试落点表见 `PROOF.md`。
+> 前缀 `EPI-`。测试落点表见 `HOW.md`。
 
 源条款：历史 what/sphinx SPHINX-001..010（本包主导全部 10 条，COVERAGE.md 单-owner
 裁决）；历史 why/shape/how/proof sphinx 条款、历史 change（Sphinx）。
@@ -23,7 +23,7 @@ CognitiveActions、Budget、PendingRequest；A*/MCTS/Bayes/Representation 只作
 **边界**：不规定状态的具体 record 布局（HOW）；只规定「sufficient state 这一事实 + 权威
 状态必须显式拥有认识基底」。
 
-**证据**：PROOF.md EPI-001 行（kernel `start_yields_semantic_assessment_request`、
+**证据**：HOW.md EPI-001 行（kernel `start_yields_semantic_assessment_request`、
 semantics）。
 
 ## EPI-002：Kernel 拥有 continuation、closure 与停止
@@ -39,7 +39,7 @@ Stop 与其它动作处于同一比较空间。
 **边界**：Kernel 的具体调度算法（当前 `Value.bestOpenAction`/`stopDominates`）是 HOW；
 「谁拥有决策权」是命题。
 
-**证据**：PROOF.md EPI-002 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`、
+**证据**：HOW.md EPI-002 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`、
 mcp-handle `full_co_yield_path_preserves_kernel_continuation`）。
 
 ## EPI-003：权威状态显式拥有认识基底
@@ -56,7 +56,7 @@ claim 无法伪装成证据。
 **边界**：Canonical Answer 的 wire 形态（当前 `answer` 字段布局）是 HOW；「基底分列 +
 ungrounded 标记」是命题。
 
-**证据**：PROOF.md EPI-003 行（semantics `ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence`、
+**证据**：HOW.md EPI-003 行（semantics `ungrounded_model_finding_is_retained_as_claim_but_never_promoted_to_evidence`、
 mcp-handle `full_co_yield_path_preserves_grounded_epistemic_basis`）。
 
 ## EPI-004：Pending Request 契约
@@ -79,7 +79,7 @@ SynthesizeRequest         ↔ Synthesis
 **边界**：Request/Observation 的 wire 编码（当前 JSON 形状）是 HOW（`host-boundary`）；
 「同型契约 + 错型不前进」是命题。
 
-**证据**：PROOF.md EPI-004 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`）。
+**证据**：HOW.md EPI-004 行（kernel `resume_rejects_observation_that_does_not_match_pending_kernel_request`）。
 
 ## EPI-005：Proposal ≠ Evidence；No Free Information
 
@@ -102,7 +102,7 @@ SemanticAssessment、候选问题、方法建议、价值估计、Synthesis 文�
 **边界**：`Evidence.Count` 是当前实现的观测面；「分槽语义」是命题。Investigation 如何产生
 Evidence 的具体规则 → HOW（`Absorb.fs`）。
 
-**证据**：PROOF.md EPI-005 行（kernel `semantic_assessment_and_candidates_are_control_observations_not_world_evidence`、
+**证据**：HOW.md EPI-005 行（kernel `semantic_assessment_and_candidates_are_control_observations_not_world_evidence`、
 semantics `synthesis_is_information_propagation_not_information_acquisition`）。
 
 ## EPI-006：Evidence 保留 source/dependency；同源重复不伪装独立支持
@@ -117,7 +117,7 @@ semantics `synthesis_is_information_propagation_not_information_acquisition`）�
 
 **边界**：dependency key 的具体格式 → HOW；「identity = semantic + dependency」是命题。
 
-**证据**：PROOF.md EPI-006 行（bayes `same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice`、
+**证据**：HOW.md EPI-006 行（bayes `same_semantic_evidence_from_independent_dependency_groups_is_preserved_twice`、
 `same_dependency_group_is_not_counted_as_independent_evidence_twice`）。
 
 ## EPI-007：RootContract 保留分布，可随新语义观测更新
@@ -135,7 +135,7 @@ AnswerContract belief；Facets 独立多标签参与方法适用度。该 belief
 **边界**：form/facet 的具体权重与派生产物（当前 `deriveRootContract`）是 HOW；「保留分布 +
 可更新 + 不增证据」是命题。
 
-**证据**：PROOF.md EPI-007 行（kernel `contract_keeps_distribution_after_semantic_assessment`、
+**证据**：HOW.md EPI-007 行（kernel `contract_keeps_distribution_after_semantic_assessment`、
 semantics `later_semantic_assessment_updates_control_belief_without_creating_evidence`、
 methodology `why_question_activates_multiple_generators_from_distribution_and_facets`）。
 
@@ -159,7 +159,7 @@ U(a)    = U(stop) + ΔV(a)
 **边界**：数值系数（0.65、`CurrentAnswerLoss` 的具体形状）是当前实现（HOW）；「root-relative
 + gateway + 同空间比较」是命题。
 
-**证据**：PROOF.md EPI-008 行（semantics `gateway_gain_can_make_low_immediate_gain_question_worth_asking`、
+**证据**：HOW.md EPI-008 行（semantics `gateway_gain_can_make_low_immediate_gain_question_worth_asking`、
 kernel `closure_is_idempotent_at_fixed_point`）。
 
 ## EPI-009：概率只接受合格数值证据
@@ -183,7 +183,7 @@ answer，也不生成伪精确数值。
 **边界**：prior 选择与 normalization 的具体算法 → HOW（`Bayes.update`）；「资格门 +
 dependency 组内单代表」是命题。
 
-**证据**：PROOF.md EPI-009 行（bayes `bayesian_posterior_requires_explicit_numeric_qualification`、
+**证据**：HOW.md EPI-009 行（bayes `bayesian_posterior_requires_explicit_numeric_qualification`、
 `qualified_independent_evidence_updates_posterior`、`unqualified_item_cannot_mask_qualified_evidence_from_same_dependency_group`）。
 
 ## EPI-010：经典算法是可验证退化求解器
@@ -204,7 +204,7 @@ dependency 组内单代表」是命题。
 **边界**：solver 的具体实现（`Search.solveGraph`、`MonteCarlo.run`）是 HOW；「必须是真退化 +
 统计不冒充证据」是命题。算法名本身不是 ontology。
 
-**证据**：PROOF.md EPI-010 行（search `graph_astar_degenerates_to_standard_g_plus_h_shortest_path`、
+**证据**：HOW.md EPI-010 行（search `graph_astar_degenerates_to_standard_g_plus_h_shortest_path`、
 `graph_astar_reopens_closed_node_when_better_g_is_discovered`、`graph_astar_rejects_negative_cost_graph`；
 mcts `mcts_selection_expansion_rollout_backup_prefers_high_value_branch`、
 `graph_mcts_shares_transposition_statistics_by_semantic_node_key`、`uct_for_unvisited_node_is_infinite`）。
@@ -230,7 +230,7 @@ triangulation 的独立来源价值。
 **边界**：等价类的具体 class key 格式（当前 `classKey`）是 HOW；「只有 Kernel-owned 或
 semantic+dependency 同一才可判重」是命题。
 
-**证据**：PROOF.md EPI-011 行（represent `wire_equivalence_hint_cannot_force_kernel_merge`、
+**证据**：HOW.md EPI-011 行（represent `wire_equivalence_hint_cannot_force_kernel_merge`、
 `same_kernel_identity_merges_candidate_provenance_instead_of_erasing_it`、
 `same_question_from_independent_dependency_groups_is_not_false_deduplicated`、
 `pareto_incomparable_equivalent_representations_both_survive`）。
@@ -249,7 +249,7 @@ posterior 质量。
 **边界**：closure 的同步顺序与循环上限（当前最多 16 轮 guard）是 HOW；「closure 幂等 +
 纯计算不增证据」是命题。
 
-**证据**：PROOF.md EPI-012 行（kernel `closure_is_idempotent_at_fixed_point`、semantics
+**证据**：HOW.md EPI-012 行（kernel `closure_is_idempotent_at_fixed_point`、semantics
 `synthesis_is_information_propagation_not_information_acquisition`）。
 
 ## EPI-013：MCP affordance 面忠实翻译 Kernel continuation
@@ -270,7 +270,7 @@ UNKNOWN_HANDLE 是当前明确接受的边界（persistence 是独立的未来�
 **边界**：wire 形状细节与 tool description 文案是 HOW；legacy `resume` 保留为兼容工具但不在
 推荐面。
 
-**证据**：PROOF.md EPI-013 行（mcp-handle `mcp_server_surface_exposes_phase_tools_and_legacy_resume`、
+**证据**：HOW.md EPI-013 行（mcp-handle `mcp_server_surface_exposes_phase_tools_and_legacy_resume`、
 mcp-contract、mcp-stdio）。
 
 ## EPI-014：MCP server 身份元数据与 shipped manifest 一致
@@ -284,4 +284,4 @@ kernel-controlled 使用 instructions。
 
 **边界**：instructions 文案是 HOW。
 
-**证据**：PROOF.md EPI-014 行（mcp-stdio initialize serverInfo.version）。
+**证据**：HOW.md EPI-014 行（mcp-stdio initialize serverInfo.version）。

@@ -1,6 +1,6 @@
 # work-record — WHAT（唯一 normative 合同）
 
-条款前缀：`WORK-RECORD-`。证据指针 → `PROOF.md` 对应行号。
+条款前缀：`WORK-RECORD-`。证据指针 → `HOW.md` 对应行号。
 
 ---
 

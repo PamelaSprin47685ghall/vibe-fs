@@ -1,7 +1,7 @@
 # WHAT —— 唯一 normative 合同
 
 命题前缀 `PARTICIPANT-HORIZON-`。每条都是**当前世界必须同时成立**的事实。
-证据指针 → [`PROOF.md`](PROOF.md)。
+证据指针 → [`HOW.md`](HOW.md)。
 
 ## 准入法则（positive admission law）
 

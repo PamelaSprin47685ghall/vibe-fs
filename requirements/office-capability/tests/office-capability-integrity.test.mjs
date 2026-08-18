@@ -8,7 +8,7 @@
  *
  * The anchor regexes mirror the ids in scripts/checks/semantic-anchors.mjs
  * OFFICE_CAPABILITY_ANCHORS / OFFICE_CAPABILITY_NEGATIVES, which are declared
- * owned by office-capability (see PROOF.md anchor list). The catalog itself is
+ * owned by office-capability (see HOW.md anchor list). The catalog itself is
  * exercised by the shared Gate F fixture tests (language-parity-gate.test.mjs);
  * this file is the live-repo canary that scans the real resources.
  *

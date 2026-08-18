@@ -1,7 +1,7 @@
 # semantic-trace — WHAT（唯一 normative 合同）
 
 条款前缀：`SEMANTIC-TRACE-`。每条命题都是**当前世界必须同时成立**的事实。
-证据指针 → `PROOF.md` 对应行号。
+证据指针 → `HOW.md` 对应行号。
 
 ---
 

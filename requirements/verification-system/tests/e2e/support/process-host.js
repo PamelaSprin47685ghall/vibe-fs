@@ -251,8 +251,14 @@ export class ProcessHost {
     }
   }
 
-  _onStdout(s) { ringPush(this._stdoutBuffer, s, STDOUT_RING_MAX); }
-  _onStderr(s) { ringPush(this._stderrBuffer, s, STDOUT_RING_MAX); }
+  _onStdout(s) {
+    if (process.env.DEBUG) process.stdout.write(s);
+    ringPush(this._stdoutBuffer, s, STDOUT_RING_MAX);
+  }
+  _onStderr(s) {
+    if (process.env.DEBUG) process.stderr.write(s);
+    ringPush(this._stderrBuffer, s, STDOUT_RING_MAX);
+  }
   _onChildExit(code, signal) {
     this._exitInfo = { code, signal, time: Date.now() };
     if (!this._stopped) {

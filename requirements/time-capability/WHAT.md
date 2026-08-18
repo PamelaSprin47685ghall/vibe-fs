@@ -1,6 +1,6 @@
 # WHAT — time-capability（唯一 normative 合同）
 
-> 本文件是 `time-capability` 的唯一 normative 语义合同。每条命题必须同时为真；测试落点见 `PROOF.md`。
+> 本文件是 `time-capability` 的唯一 normative 语义合同。每条命题必须同时为真；测试落点见 `HOW.md`。
 > 术语首次出现给定义；引用精确到 `src/...fs` 与测试文件。
 
 ---
@@ -13,7 +13,7 @@
 
 **边界**：`Process/` 与 `Infrastructure/` 是物理适配器层，允许直接接触 Node timer / `DateTimeOffset.UtcNow`（`Process/ProcessRunner.fs` 第 92 行 `let clock = fun () -> DateTimeOffset.UtcNow` 是物理层合法形态）；业务层禁止。`ITimerPort` / `IClockPort` 的名字本身是 HOW（`Temporal.fs` 头注释：Contract only，无 Node/setTimeout/Fable JS）。
 
-**证据指针**：→ `PROOF.md` TIME-001 行。
+**证据指针**：→ `HOW.md` TIME-001 行。
 
 ---
 
@@ -25,7 +25,7 @@
 
 **边界**：具体超时预算数值（DevOps 10s、process hard limit）是消费方 HOW；`Deadline` 类型与函数是时间能力本身，归本包。`ProcessEstimate.effectiveDeadline`（`Process/ProcessRequest.fs`，min(3×estimate, HardLimit)）是 process-execution 对 deadline 的应用，不重复归本包。
 
-**证据指针**：→ `PROOF.md` TIME-002 行。
+**证据指针**：→ `HOW.md` TIME-002 行。
 
 ---
 
@@ -37,7 +37,7 @@
 
 **边界**：虚拟实现的**测试适配**（`requirements/verification-system/tests/support/domain/host.mjs` 的 `timerPort` / `clockPort` facade）属于 test support，不归本包；虚拟实现的**生产类型**（`PtyTiming.fs`）是本包证据。`PtyTiming.timerTask`（无取消面的 fire-and-forget 延时）是物理适配器内部机制，归 HOW。
 
-**证据指针**：→ `PROOF.md` TIME-003 行。
+**证据指针**：→ `HOW.md` TIME-003 行。
 
 ---
 
@@ -49,7 +49,7 @@
 
 **边界**：该静态扫描**机制**归 `structured-workflow`（`g4r-ce-vocabulary` gate 的 CE vocabulary 扫描）与 `verification-system`（可红门禁）；本包只拥有「业务层不读 ambient 时间」这条产品事实，并消费该 gate 作为 enforcement。`HOST-013` 的 `SessionStartedAt` 经 `IClockPort` 计量不碰 ambient `UtcNow` 是本条在 Host 场景的实例。
 
-**证据指针**：→ `PROOF.md` TIME-004 行。
+**证据指针**：→ `HOW.md` TIME-004 行。
 
 ---
 
@@ -61,7 +61,7 @@
 
 **边界**：具体业务规则（如「超过 10s 结束 join 等待」）归消费方（`process-execution` / `delegation`）；「值不等于判断」这条元规则归本包。`requirements/verification-system/tests/support/temporal-harness.mjs` 的「One World / Pure Time」是这条原则的 proof 侧证据（REUSE）。
 
-**证据指针**：→ `PROOF.md` TIME-005 行。
+**证据指针**：→ `HOW.md` TIME-005 行。
 
 ---
 
@@ -73,7 +73,7 @@
 
 **边界**：`WaitEscape` 类型与等待语义归 `causal-wait`；本包只提供被引用的时刻值来源（`Deadline`/`IClockPort`）。
 
-**证据指针**：→ `PROOF.md` TIME-006 行。
+**证据指针**：→ `HOW.md` TIME-006 行。
 
 ---
 
@@ -85,7 +85,7 @@
 
 **边界**：elapsed 文案及与 tip/estimate/guideline 的 occurrence composition → `guidance-delivery` GD-012；历史 MarkerText byte freeze → `prefix-stability` PREFIX-STABILITY-011；本包只拥有时间原点与采样规则。elapsed 不是 authority，不触发 abort、deadline、fallback 或任何执行分支（TIME-005）。
 
-**证据指针**：→ `PROOF.md` TIME-007 行。
+**证据指针**：→ `HOW.md` TIME-007 行。
 
 ---
 

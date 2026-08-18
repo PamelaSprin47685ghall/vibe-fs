@@ -1,6 +1,6 @@
 # output-distillation — 可观察合同
 
-本文件是 `output-distillation` 包的唯一 normative 语义合同。证据指针 → `PROOF.md`。
+本文件是 `output-distillation` 包的唯一 normative 语义合同。证据指针 → `HOW.md`。
 
 ## DISTILL-001：大输出有损但诚实地压成 bounded observation
 
@@ -125,7 +125,7 @@ map/reduce、chunk、session id 属机器 Assignment，不进 provider 工具面
 证据：anchor `no-execution`（distiller Role Law 双语命中，与 `process-execution` 边界互证）；
 `tests/distiller-role-contract.test.mjs` 通过 `OpenCode/Tools/DistillationSurface.fs` 断言零权限与唯一 `run` 执行面；REUSE
 `requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_*` 断言 run ≠ distill，见
-`process-execution` PROOF.md）。
+`process-execution` HOW.md）。
 
 ## DISTILL-011：Large Gate 与输出预算合同一致；禁无界缓冲
 
@@ -154,7 +154,7 @@ wins、release 泵队）；输出预算合同（estimate → threshold）与 gat
 边界只限制 tool 返回 wire，不改变内部完整结果的事实来源。
 
 证据：REUSE `requirements/output-distillation/tests/tool-host-codec-full.test.mjs`（ToolResultBound 面，SPLIT 注记见
-PROOF.md：wire 渲染 owner → `provider-projection`）。
+HOW.md：wire 渲染 owner → `provider-projection`）。
 
 ## DISTILL-013：蒸馏不返回 chunk 统计仪表盘
 

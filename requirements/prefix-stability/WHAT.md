@@ -1,6 +1,6 @@
 # prefix-stability — WHAT（唯一 normative 合同）
 
-条款前缀：`PREFIX-STABILITY-`。证据指针 → `PROOF.md` 对应行号。
+条款前缀：`PREFIX-STABILITY-`。证据指针 → `HOW.md` 对应行号。
 
 ---
 

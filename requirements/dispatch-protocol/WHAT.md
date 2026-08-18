@@ -1,6 +1,6 @@
 # WHAT —— 唯一 normative 合同（dispatch-protocol）
 
-> 当前世界必须同时成立的事实。每条命题的测试落点见 [`PROOF.md`](PROOF.md)（锚点 `R1`..`R11`）。
+> 当前世界必须同时成立的事实。每条命题的测试落点见 [`HOW.md`](HOW.md)（锚点 `R1`..`R11`）。
 
 ```text
 术语：
@@ -17,7 +17,7 @@ failure continuation、Orchestrator 冲突提示、SyncDelegate 首发与 idle n
 `PromptDispatcher`；禁止第二 writer 直接 `prompt_async`（PROMPT-005 / 历史 shape/prompt 条款）。
 
 - 含义：发出去的每一条内部消息都有 claim 记录，恢复才能凭 PromptKey 找到它。
-- 证据：→ PROOF.md R5、R6。
+- 证据：→ HOW.md R5、R6。
 
 ## DISPATCH-PROTOCOL-002 — 四态 claim 生命周期
 
@@ -39,7 +39,7 @@ failure、Submitted 或 PhysicalAccepted，也不得调用真实 Host port。
 
 - 含义：claim 先于发送持久化（durability 是 sequencing 前提）；`acceptanceCallback` 只在
   PhysicalAccepted 后触发。
-- 证据：→ PROOF.md R1。
+- 证据：→ HOW.md R1。
 
 ## DISPATCH-PROTOCOL-003 — transport receipt ≠ 物理消息身份
 
@@ -48,7 +48,7 @@ failure、Submitted 或 PhysicalAccepted，也不得调用真实 Host port。
 
 - 含义：四阶段链保持完整——receipt 只升级到 Submitted；物理落地必须由后续 `chat.message` 建立。
 - 边界：crossing 缺席（receipt 永远到不了 root）的另一半归 `interaction-authority`。
-- 证据：→ PROOF.md R1、R2。
+- 证据：→ HOW.md R1、R2。
 
 ## DISPATCH-PROTOCOL-004 — physical acceptance 只由真实物理证据建立
 
@@ -57,7 +57,7 @@ Host 尾部找到携带同一 PromptKey 的 `role=user` 消息（recovery）。`
 
 - 含义：Authoroty Root 只有在真实物理消息证明后才生效（`AcceptPhysicalAgentOwnerRoot` 先写
   PhysicalAccepted 再 RegisterAuthority，顺序不可倒）。
-- 证据：→ PROOF.md R4。
+- 证据：→ HOW.md R4。
 
 ## DISPATCH-PROTOCOL-005 — PromptKey 是确定性幂等身份
 
@@ -71,7 +71,7 @@ PromptKey = digest(SessionId, LogicalRunId, AuthorityRootUserMessageId,
 同一 logical dispatch 在任何进程派生同一 key；任一组件变化都移动 key（PROMPT-011）。
 
 - 含义：恢复能凭 key 匹配 Host 消息回 pending claim；随机 GUID 无法服务（重启后派生不同 key）。
-- 证据：→ PROOF.md R2。
+- 证据：→ HOW.md R2。
 
 ## DISPATCH-PROTOCOL-006 — 同 payload 的两个独立 logical act 仍可区分
 
@@ -80,7 +80,7 @@ PromptKey = digest(SessionId, LogicalRunId, AuthorityRootUserMessageId,
 （PROMPT-011）。
 
 - 含义：「同一 Guard 连发两次」是两个 key，不是看起来像重复的一个 key。
-- 证据：→ PROOF.md R2、R3。
+- 证据：→ HOW.md R2、R3。
 
 ## DISPATCH-PROTOCOL-007 — uncertain physical outcome 不自动重发
 
@@ -88,7 +88,7 @@ PromptKey = digest(SessionId, LogicalRunId, AuthorityRootUserMessageId,
 
 - 含义：Host 可能已接受消息并开始 provider run；重发会在已落地的消息之外制造第二次逻辑效果；自动 abandon 又会把未知结果伪装成已收尾。
 - 边界：物理证据窗口仍可有界；restart-count recovery budget 已退役。
-- 证据：→ PROOF.md R3、R4。
+- 证据：→ HOW.md R3、R4。
 
 ## DISPATCH-PROTOCOL-008 — at-most-one logical effect，不虚构 exactly-once
 
@@ -97,7 +97,7 @@ delivery，不用时间窗口代替 PromptKey，不把 `accepted-*` 当物理落
 （PROMPT-011 禁止清单）。
 
 - 含义：unknown 宁可挂起也不重复；预算耗尽时放弃（Abandoned），而非伪装成功。
-- 证据：→ PROOF.md R3、R4。
+- 证据：→ HOW.md R3、R4。
 
 ## DISPATCH-PROTOCOL-009 — Detached 在 durable claim 后立即交还控制；不得等待槽、Host run 或 PhysicalAccepted
 
@@ -106,14 +106,14 @@ delivery，不用时间窗口代替 PromptKey，不把 `accepted-*` 当物理落
 若 Detached 已返回后 `prompt_async` 异步 rejection，则 acceptance 已不可可靠判定：当前进程必须 fatal，claim 保持可审计 pending/unknown，**绝不**自动重发。需要在**本次决策内**知道 Host transport 是否拒绝（例如 Blogger nudge 失败后立即转 AABB、JoinGuard/ReviewGuard 失败后释放 reservation、同步 NeedHelp/SyncDelegate 调用）的调用方必须显式选择 `AwaitMode.Await`；这里的 Await 只等待 `ISessionHostPort.SendPrompt` transport 结果，仍不得等待 managed model capacity、provider execution 或 child terminal。只有像 fork AgentOwnerRoot 这种调用方不能以 transport settle 作为返回前置条件的路径才使用 Detached。这样 fork 不被 child slot/run 阻塞，而需要同步决定“发送失败后下一步”的协议仍能拿到确定 transport 结果。
 
 - 含义：Detached 仍返回 PromptKey、仍写 claim/submit；调用方成功只证明本地 dispatch 已交给 Host async enqueue，不证明 provider 已运行或物理消息已落地。
-- 证据：→ PROOF.md R5。
+- 证据：→ HOW.md R5。
 
 ## DISPATCH-PROTOCOL-010 — Root / dispatch 不得选择、等待或覆盖 model
 
 发送恒 `Model = None`；`AuthorityExecutionProfile` 没有 model 字段，「Authority Root 覆盖 model」结构性不可表达（PROMPT-002 的 dispatch 半边）。`SendPrompt` 也不得为了补 model 调 scheduler；managed physical model 只在 Host `chat.message` execution admission 由 `execution-model-routing` 解析。
 
 - 含义：root 抬不了 model，fork/continuation dispatch 也不因 model capacity 阻塞。
-- 证据：→ PROOF.md R2。
+- 证据：→ HOW.md R2。
 
 ## DISPATCH-PROTOCOL-011 — 插件 user-shaped message 一律经 PROMPT-005
 
@@ -125,7 +125,7 @@ PromptKey / typed origin metadata；禁止 keyless internal sender（PROMPT-012 
   无需文本启发式。
 - 边界：wake 本身归 `delegation`；「keyless ⇒ 非插件生产」的 authority 后果归
   `interaction-authority` 消费。
-- 证据：→ PROOF.md R6、R7。
+- 证据：→ HOW.md R6、R7。
 
 ## 反向覆盖核对（COVERAGE.md 归属）
 

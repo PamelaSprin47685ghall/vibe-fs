@@ -1,7 +1,7 @@
 # WHAT — review-judgement
 
 > 本文是 `review-judgement` 包的**唯一 normative 合同**。每条命题都是当前世界必须同时成立的事实。
-> 证据指针（→ PROOF.md 行号）指向本包 PROOF.md 的落点表。
+> 证据指针（→ HOW.md 行号）指向本包 HOW.md 的落点表。
 
 ## 术语（本包内定义）
 
@@ -21,7 +21,7 @@
 
 **边界**：`judge` 被哪些角色可用、fail-closed 分支（非 Reviewer 拒绝、无 barrier 拒绝、binding 失败）属于工具执行面；其中「无法绑定 ProviderRunIdentity 则不确认」的因果侧归 `review-assurance`（REVIEW-010）。本命题只管 verdict 语义与工具形态本身。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-001`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-001`。
 
 ## REVIEW-JUDGEMENT-002：acceptance 与 rejection 都必须由 discrimination 挣得
 
@@ -31,7 +31,7 @@
 
 **边界**：defect 的具体分类（哪些 observation 构成 material defect）由 materiality 规则（REVIEW-JUDGEMENT-004/006）给出；本命题只冻结「双方都要挣得」这个总则。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-002`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-002`。
 
 ## REVIEW-JUDGEMENT-003：判断相对 root requirement 与当前被审对象，不是 reviewer mood
 
@@ -41,7 +41,7 @@
 
 **边界**：root requirement 的 identity（Authority Root）与 horizon 边界属于 `participant-horizon`；本命题只要求 judgement 的**参照系**。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-003`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-003`。
 
 ## REVIEW-JUDGEMENT-004：material defect 才能 withhold acceptance；non-blocking workmanship 与 acceptance 共存
 
@@ -51,7 +51,7 @@
 
 **边界**：材料性判定本身是判断（不可机械打分）——本命题禁止「小编辑自动 REVISE」与「大改动自动重要」，要求追后果。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-004`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-004`。
 
 ## REVIEW-JUDGEMENT-005：PERFECT ≠ 全知/字面无瑕；REVISE 必须购买实质更好/更真的结果
 
@@ -61,7 +61,7 @@
 
 **边界**：REVISE 之后系统如何关 cohort / 回灌报告（REVIEW-002 / GLORY-044）归 `finality`/`review-assurance`；本命题只冻结 PERFECT/REVISE 的语义门槛。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-005`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-005`。
 
 ## REVIEW-JUDGEMENT-006：evidence、inference、preference 与 defect 有不同 epistemic 地位
 
@@ -71,7 +71,7 @@
 
 **边界**：evidence 的采集/溯源（repository 观察、external provenance）归 `repository-investigation` / `external-investigation`；本命题只管 Reviewer **判断时**的证据运用。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-006`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-006`。
 
 ## REVIEW-JUDGEMENT-007：Examiner's Ledger 与 Rulebook 是判断方向，不是 checklist / 固定 report schema
 
@@ -81,7 +81,7 @@
 
 **边界**：提示词的组合/装载权威（Role Law 经 PromptResources 组合）归 `cognitive-environment`（REVIEW-012）；本命题拥有的是「判断方向内容 ≠ checklist」的语义。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-007`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-007`。
 
 ## REVIEW-JUDGEMENT-008：过程评审的 verdict 是一次真实判断：一次 durable judge 即 terminal
 
@@ -91,7 +91,7 @@
 
 **边界**：Rk 的 1:1 派生与消费节拍 → `obligation-ledger`；「过程 verdict 不进入 terminal witness 代数」的计数规则 → `review-assurance`（REVIEW-020 / GLORY-058）；可消费报告的 record-ready 条件 → `review-assurance`（REVIEW-014）。本命题只冻结「过程评审是一次真实、一次性的判断」。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-008`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-008`。
 
 ## REVIEW-JUDGEMENT-009：拒绝必须把伤口说清；不发明 obligation 来显得谨慎
 
@@ -101,7 +101,7 @@
 
 **边界**：拒绝后 Manager 的 continuation 语义（GLORY-054 拒绝后同一 Life 继续）归 `finality`；本命题只管拒绝本身的诚实性。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-009`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-009`。
 
 ## REVIEW-JUDGEMENT-010：不得奖励自信、不得惩罚不熟悉、不得因口味拒绝
 
@@ -111,7 +111,7 @@
 
 **边界**：行为诊断（Enforcer）的 pathology 判定归 `behavior-diagnosis`；本命题只管 Reviewer 判断时的排除项。
 
-**证据**：→ PROOF.md `REVIEW-JUDGEMENT-010`。
+**证据**：→ HOW.md `REVIEW-JUDGEMENT-010`。
 
 ---
 
