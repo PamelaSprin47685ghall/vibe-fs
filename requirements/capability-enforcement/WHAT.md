@@ -49,6 +49,11 @@ ToolRegistry execution gate（rolePredicate + gateExecute） → Host 配置异�
 Manager、Coder、Inspector、Browser、Inquiry；本包只证明该 entitlement 从同一 `Roles.permissions`
 投影到 Attempt profile、Host schema 与 runtime gate，不维护第二份 Fission role 表。
 
+tool-owned physical-origin 约束可以在最终 provider request 再做一次只减不增的收窄；例如
+INTRA-PARTICIPANT-PARALLELISM-013 对无 physical parent 的 managed root 投影 `fission=false`，而不从
+Manager/Coder/Inspector/Browser/Inquiry 的 office entitlement 中删除 Fission。执行 gate 必须保留同一
+origin 约束，防止客户端绕过 schema；这种收窄不得反向扩大任一 role capability。
+
 含义/动机：历史 change（js-capability-projected-tools） 的按 RequestKind 分叉案例——能力
 「可以完全不同」但方向只能是收窄。
 

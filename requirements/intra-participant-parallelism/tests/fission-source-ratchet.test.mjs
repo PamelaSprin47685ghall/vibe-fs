@@ -64,3 +64,28 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] sibling creation is a distinct Hos
   assert.match(port, /CreateSession/)
   assert.match(port, /parentID/)
 })
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] request visibility and tool adapter both enforce origin before use', () => {
+  const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  assert.match(bootstrap, /FissionRequestProjection\.apply/)
+  assert.match(bootstrap, /SessionParents\.ContainsKey/)
+
+  const tool = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
+  const executeAt = tool.indexOf('let private execute (scope: ToolRuntimeScope)')
+  assert.ok(executeAt >= 0, 'fission execute adapter must exist')
+  const executeBlock = tool.slice(executeAt)
+  assert.match(executeBlock, /executeForCaller/, 'outer execute must enter the origin gate before parser work')
+  assert.doesNotMatch(executeBlock, /FissionPrompt\.parse/, 'outer execute must not parse before origin admission')
+
+  const callerAt = tool.indexOf('let private executeForCaller')
+  const subsessionAt = tool.indexOf('let private executeForSubsession')
+  assert.ok(callerAt >= 0, 'physical-origin helper must exist')
+  const callerBlock = tool.slice(callerAt, executeAt)
+  assert.match(callerBlock, /TryGetParentSession/, 'origin helper must precheck physical parent')
+  assert.match(callerBlock, /Ok\(Some _\) -> return! executeForSubsession/)
+
+  assert.ok(subsessionAt >= 0, 'eligible subsession parser helper must exist')
+  const subsessionBlock = tool.slice(subsessionAt, callerAt)
+  assert.match(subsessionBlock, /FissionPrompt\.parse/, 'eligible subsessions still use the canonical parser')
+  assert.match(tool, /FissionAdmission\.admit/, 'Domain admission keeps the authoritative second origin gate')
+})

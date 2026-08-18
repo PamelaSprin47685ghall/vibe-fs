@@ -8,8 +8,8 @@
 
 Fission tool 在 old caller tool context 中：
 
-1. 解析 prompts；解析失败立即返回，无副作用。
-2. 读取 old caller physical parent。`None` = user-facing/root，立即 `InvalidOrigin`；不得 reserve、读 LWR、写 durable fact、create lane 或 interrupt。
+1. 读取 old caller physical parent。`None` = user-facing/root，立即返回明确的 root-origin consequence；不得读取/解析 prompts，更不得 reserve、读 LWR、写 durable fact、create lane 或 interrupt。
+2. 只有 parent 存在时才解析 prompts；解析失败立即返回，无副作用。Domain admission 随后再次读取 parent，作为 authoritative TOCTOU/fail-closed gate。
 3. 从 Authority/Profile 取 current managed agent/role；从 canonical LWR port 取 old caller record。
 4. 预留一个 process-local admission slot，防同 owner 两次并发 fission。
 5. 对每 lane 创建 fresh Host session，创建参数里的 `parentID` 使用 **old caller 的 parentID**，而不是 old caller id。
@@ -39,7 +39,9 @@ Fission-specific durable facts建议最小化为 admission、lane materialized/c
 
 ## 7. Tool surface 与 prefix stability
 
-Fission 的 provider-visible schema 不按 turn 动态增删。一个 session 的 tool set 必须稳定，避免破坏 provider prefix/KV cache。subsession-only 是 execute admission 的 origin invariant；tool description 同步声明该限制，减少 root agent 误调用。若未来要让 root 与 subsession 拥有不同 schema，必须在 session 创建/agent binding 时一次冻结，而不是在后续 turn 改 tools。
+Fission 的 office entitlement 仍由稳定的 role matrix 提供；root/subsession 不复制两套 AgentConfig。物理 `chat.message` 已经是每条 request 的 typed tool-map 边界，因此在这里按稳定 session-origin 投影：`SessionParents` 无 parent 的 managed root 强制 `message.tools.fission=false`；有 parent 的 subsession 不写 origin deny，继续继承 role entitlement。一个 physical SessionId 的 parent relation 在其生命周期内稳定，所以该 projection 不会随普通 turn 抖动；它只是把本来就不具备 origin 资格的 root capability 在 provider 前消掉。
+
+`tool.definition` 不能承担这件事：Host contract 的 definition hook 没有 session identity，只能改 description/parameters。`chat.params` 也不是 authority owner。执行侧仍在 `fission.execute` 最外层做 parent precheck，并在 Domain admission 再查一次；tool description 同步声明限制只是 affordance，不是安全边界。
 
 ## 8. 当前 vocabulary 映射
 
@@ -83,7 +85,7 @@ Role/Persona/Binding 本体（`participant-identity`）；role consequence catal
 | INTRA-PARTICIPANT-PARALLELISM-010 | `tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors` | Fission durable fact/projection/recovery anchor 存在；禁止 session-fork guessing path |
 | INTRA-PARTICIPANT-PARALLELISM-011 | `tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-011] second admission while active is rejected as AlreadyFissioned until release` | same owner second active admission → AlreadyFissioned |
 | INTRA-PARTICIPANT-PARALLELISM-012 | `tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary` | role matrix entitlement 与 registry gate 同一 `ToolPermission.Fission` source；fast/deep 不分叉 |
-| INTRA-PARTICIPANT-PARALLELISM-013 | `tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] user-facing root caller is rejected before fission reserves or creates anything` | physical parent absent 的 user-facing/root caller fail closed；只允许 parent lookup，未 reserve、未读 LWR、未 create lane、未 interrupt |
+| INTRA-PARTICIPANT-PARALLELISM-013 | `tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] user-facing root caller is rejected before fission reserves or creates anything` + `WHAT[INTRA-PARTICIPANT-PARALLELISM-013] root provider request suppresses fission while a subsession inherits office entitlement`；`tests/fission-tool-origin.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] forced root fission rejects origin before parsing prompts`；`tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-013] request visibility and tool adapter both enforce origin before use` | physical parent absent 的 user-facing/root caller fail closed；provider request 显式 `fission=false`；subsession 不被 origin projection 误伤；强行调用先报 origin、后置 parser；Domain admission 保留第二道 parent gate |
 
 ### Focused acceptance
 

@@ -54,6 +54,10 @@ Fission 的 role entitlement 必须从 office consequence/capability 的单一 p
 
 Fission 的 origin gate 与 role entitlement 正交：caller 必须能证明自己是 physical subsession（`parent(oldCaller)=Some _`）。`parent(oldCaller)=None` 的 user-facing/root session 必须在任何 lane create、LWR materialization、durable admission 或 owner interrupt 之前 fail closed；不得把 root 替换成 sibling roots。该拒绝不得占用 active-group slot。
 
+同一个 origin 事实还必须在 provider request 形成前收窄 tool surface：managed user-facing/root session 的每条物理 user request 都必须显式投影 `tools.fission=false`，因此模型不得在 provider-visible tool list 中看到 Fission；有 physical parent 的 subsession 不得被该 origin projection 误伤，继续由 INTRA-PARTICIPANT-PARALLELISM-012 的 role entitlement 决定是否可见。该 request-local deny 只收窄 entitlement，不修改 `Roles.permissions`，也不得把 root/subsession 做成两套 office。
+
+即使 Host/客户端绕过 provider schema 强行调用 `fission`，tool adapter 也必须在读取/解析 `prompts` 之前先验证 physical parent。root 必须返回明确的 invalid-origin consequence，不得先返回 `TooFewLanes`、capacity、active-group 等与 origin 无关的错误。Domain admission 内的 parent check 继续保留为第二道 authoritative gate，不能因 adapter precheck 而删除。
+
 ## DEPENDS ON
 
 `participant-identity`, `session-ontology`, `managed-session-lifecycle`, `office-capability`, `capability-enforcement`, `participant-horizon`, `work-record`, `process-execution`, `durable-events`, `crash-reconciliation`.

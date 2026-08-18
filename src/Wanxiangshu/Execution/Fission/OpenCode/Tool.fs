@@ -103,6 +103,9 @@ module FissionTool =
         let TooFew = "tool/fission/too-few"
 
         [<Literal>]
+        let InvalidOrigin = "tool/fission/invalid-origin"
+
+        [<Literal>]
         let Capacity = "tool/fission/capacity"
 
         [<Literal>]
@@ -822,6 +825,7 @@ module FissionTool =
             let admissionRuntime = FissionAdmission.createWithHooks deps hooks
 
             match! FissionAdmission.admit admissionRuntime owner parsed with
+            | Error FissionRejectReason.InvalidOrigin -> return consequence language Path.InvalidOrigin
             | Error FissionRejectReason.AlreadyFissioned -> return consequence language Path.AlreadyActive
             | Error FissionRejectReason.CapacityExceeded -> return consequence language Path.Capacity
             | Error _ -> return consequence language Path.Unavailable
@@ -930,9 +934,13 @@ module FissionTool =
             | Some toolCallId, Some durable -> return! executeWithJournal scope ctx language parsed toolCallId durable
         }
 
-    let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =
+    let private executeForSubsession
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        (language: ProviderLanguage)
+        =
         task {
-            let language = languageOf ctx
             let prompts = args.Text "prompts"
 
             match FissionPrompt.parse prompts with
@@ -940,6 +948,24 @@ module FissionTool =
             | Error(FissionRejectReason.EmptyLanePrompt _) -> return consequence language Path.TooFew
             | Error _ -> return consequence language Path.Unavailable
             | Ok parsed -> return! executeParsed scope ctx language parsed
+        }
+
+    let private executeForCaller (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) language (caller: SessionId) =
+        task {
+            match! scope.Sessions.TryGetParentSession caller with
+            | Error _ -> return consequence language Path.Unavailable
+            | Ok None -> return consequence language Path.InvalidOrigin
+            | Ok(Some _) -> return! executeForSubsession scope args ctx language
+        }
+
+    let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (ctx: HostToolContext) =
+        task {
+            let language = languageOf ctx
+
+            if String.IsNullOrWhiteSpace ctx.SessionId then
+                return consequence language Path.Unavailable
+            else
+                return! executeForCaller scope args ctx language (SessionId.create ctx.SessionId)
         }
 
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =

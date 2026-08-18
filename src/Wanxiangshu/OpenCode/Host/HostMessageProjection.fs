@@ -14,7 +14,8 @@ open Fable.Core.JsInterop
 /// original `msgs` binding).
 ///
 /// HOST-016: 对 provider-facing 消息做非空 content 兜底保障，避免仅 reasoning
-/// 或空 content 在上游 API 报 messages[i].content cannot be empty 400 错误。
+/// 或空 content 在上游 API 报 messages[i].content cannot be empty 400 错误；
+/// 并在连续 user 消息之间插入 assistant "." 占位消息，避免上游报角色非交替错误。
 module HostMessageProjection =
 
     let private readField (value: obj) (name: string) : obj =
@@ -28,10 +29,13 @@ module HostMessageProjection =
         |> ignore
 
     let private readRole (raw: obj) : string =
-        let info = readField raw "info"
-        let fromInfo = if isNull info then null else readField info "role"
-        let chosen = if isNull fromInfo then readField raw "role" else fromInfo
-        if isNull chosen then "" else unbox<string> chosen
+        if isNull raw then
+            ""
+        else
+            let info = readField raw "info"
+            let fromInfo = if isNull info then null else readField info "role"
+            let chosen = if isNull fromInfo then readField raw "role" else fromInfo
+            if isNull chosen then "" else unbox<string> chosen
 
     let private readParts (raw: obj) : obj array =
         let parts = readField raw "parts"
@@ -132,7 +136,32 @@ module HostMessageProjection =
             let reasoningText = rawParts |> Array.tryPick reasoningFromPart
             withFallbackTextPart raw rawParts (fallbackText role reasoningText)
 
+    let private createAssistantDotMessage () : obj =
+        createObj
+            [ "info", box (createObj [ "role", box "assistant" ])
+              "role", box "assistant"
+              "parts", box [| createObj [ "type", box "text"; "text", box "." ] |] ]
+
+    let private isUserRole (raw: obj) : bool =
+        if isNull raw then
+            false
+        else
+            (readRole raw).ToLowerInvariant() = "user"
+
+    let rec private intersperseAssistantBetweenConsecutiveUsers (messages: obj list) : obj list =
+        match messages with
+        | [] -> []
+        | [ single ] -> [ single ]
+        | first :: (second :: _ as rest) ->
+            if isUserRole first && isUserRole second then
+                first :: createAssistantDotMessage () :: intersperseAssistantBetweenConsecutiveUsers rest
+            else
+                first :: intersperseAssistantBetweenConsecutiveUsers rest
+
     let sanitizeMessage (raw: obj) : obj =
         if isNull raw then raw else sanitizeNonNull raw
 
-    let sanitizeMessages (messages: obj list) : obj list = messages |> List.map sanitizeMessage
+    let sanitizeMessages (messages: obj list) : obj list =
+        messages
+        |> List.map sanitizeMessage
+        |> intersperseAssistantBetweenConsecutiveUsers

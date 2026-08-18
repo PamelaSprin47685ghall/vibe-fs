@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -17,6 +18,14 @@ open Wanxiangshu.OpenCode
 /// and publishes only a JSON-shaped observation for the logical-owner law. It
 /// keeps Host capabilities private; callers cannot obtain emitted turn values.
 module FissionHostSurface =
+
+    /// INTRA-PARTICIPANT-PARALLELISM-013: expose the exact request-local
+    /// provider tool projection without exposing Host session registries.
+    let projectFissionToolVisibility (hasPhysicalParent: bool) (tools: obj) : obj =
+        if FissionRequestProjection.apply hasPhysicalParent then
+            tools?fission <- box false
+
+        tools
 
     type private CallFlags() =
         // DSL-MUTABLE: single-flight — one-shot continuation sent latch.

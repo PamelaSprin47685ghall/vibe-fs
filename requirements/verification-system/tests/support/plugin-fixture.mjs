@@ -58,6 +58,11 @@ const stubClient = (createdIds, prompts, messages, abortedIds) => {
         })
         return { data: { id } }
       },
+      get: async (args) => {
+        const id = args?.path?.id ?? args?.sessionID ?? args?.sessionId
+        const child = childSessions.find((candidate) => candidate.id === id)
+        return { data: child ?? { id } }
+      },
       children: async (args) => ({
         data: childSessions.filter((child) => child.parentID === args?.path?.id),
       }),

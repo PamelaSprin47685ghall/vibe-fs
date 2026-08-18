@@ -156,14 +156,14 @@ missing-verdict 的 occasion 必须是 durable `ReviewBarrierId`，不得使用�
 **证据**：`Infrastructure/OpenCode/Host/SharedState.fs`、`PluginRuntimeScope.fs`；
 → HOW.md `HOST-BOUNDARY-010`（REUSE `host/shared-state.test.mjs`）。
 
-## HOST-BOUNDARY-011：空 Content 预防（HOST-016）
+## HOST-BOUNDARY-011：空 Content 预防与连续 User 消息插桩（HOST-016）
 
 **规范**：交付上游 provider 前：无 `tool_calls` 的 `assistant` 消息若只有 reasoning/thinking、没有
 非空 text part，则追加无语义 text part `"."`；若连 reasoning/thinking 也没有，则使用默认 `"..."`。
-`user` 消息 text 为空填充 `"#"`。禁止把 reasoning/thinking 原文复制成 synthetic text。
+`user` 消息 text 为空填充 `"#"`。若出现连续两个 `user` 消息，中间必须插入 `role="assistant"`、text 为 `"."` 的 assistant 消息，防止上游 API 报角色非交替或连续用户消息错误。禁止把 reasoning/thinking 原文复制成 synthetic text。
 禁止向上游发送空 content 消息（上游 400 `messages[i].content cannot be empty`）。
 
-**含义/动机**：依赖外部网关/厂商容错实现不一；在 transform 末尾兜底是唯一可靠位置
+**含义/动机**：依赖外部网关/厂商容错实现不一，且部分上游 API 严格要求消息角色交替；在 transform 末尾兜底是唯一可靠位置
 （why/host.md §8）。
 
 **证据**：`HostMessageProjection.sanitizeMessage/sanitizeMessages`；→ HOW.md `HOST-BOUNDARY-011`

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as HostBoundarySurface from '../../../dist/OpenCode/Host/HostBoundarySurface.js'
 import * as HostMessageProjection from '../../../dist/OpenCode/Host/HostMessageProjection.js'
 
 const sanitizeMessage = HostMessageProjection.sanitizeMessage
-const sanitizeMessages = (messages) => messages.map(HostMessageProjection.sanitizeMessage)
+const sanitizeMessages = HostBoundarySurface.sanitizeMessages
 
 test('WHAT[HOST-BOUNDARY-011] HOST_016_assistant_message_with_only_reasoning_gets_semantically_empty_dot_text', () => {
   const raw = { info: { id: 'asst_1', role: 'assistant' }, parts: [{ type: 'reasoning', text: 'Step-by-step thinking content' }] }
@@ -45,4 +46,49 @@ test('WHAT[HOST-BOUNDARY-011] HOST_016_sanitizeMessages_processes_whole_array', 
   const result = sanitizeMessages(raw)
   assert.equal(result[0].parts[0].text, 'Hi')
   assert.equal(result[1].parts.at(-1).text, '.')
+})
+
+test('WHAT[HOST-BOUNDARY-011] HOST_016_consecutive_user_messages_get_assistant_dot_inserted_between_them', () => {
+  const raw = [
+    { info: { role: 'user' }, parts: [{ type: 'text', text: 'First user message' }] },
+    { info: { role: 'user' }, parts: [{ type: 'text', text: 'Second user message' }] },
+  ]
+  const result = sanitizeMessages(raw)
+  assert.equal(result.length, 3)
+  assert.equal(result[0].parts[0].text, 'First user message')
+  assert.equal(result[1].role, 'assistant')
+  assert.equal(result[1].info.role, 'assistant')
+  assert.equal(result[1].parts[0].type, 'text')
+  assert.equal(result[1].parts[0].text, '.')
+  assert.equal(result[2].parts[0].text, 'Second user message')
+})
+
+test('WHAT[HOST-BOUNDARY-011] HOST_016_three_consecutive_user_messages_get_assistant_dot_between_each_pair', () => {
+  const raw = [
+    { role: 'user', content: 'Msg 1' },
+    { role: 'user', content: 'Msg 2' },
+    { role: 'user', content: 'Msg 3' },
+  ]
+  const result = sanitizeMessages(raw)
+  assert.equal(result.length, 5)
+  assert.equal(result[0].content, 'Msg 1')
+  assert.equal(result[1].role, 'assistant')
+  assert.equal(result[1].parts[0].text, '.')
+  assert.equal(result[2].content, 'Msg 2')
+  assert.equal(result[3].role, 'assistant')
+  assert.equal(result[3].parts[0].text, '.')
+  assert.equal(result[4].content, 'Msg 3')
+})
+
+test('WHAT[HOST-BOUNDARY-011] HOST_016_alternating_messages_remain_untouched_without_extra_assistant', () => {
+  const raw = [
+    { info: { role: 'user' }, parts: [{ type: 'text', text: 'U1' }] },
+    { info: { role: 'assistant' }, parts: [{ type: 'text', text: 'A1' }] },
+    { info: { role: 'user' }, parts: [{ type: 'text', text: 'U2' }] },
+  ]
+  const result = sanitizeMessages(raw)
+  assert.equal(result.length, 3)
+  assert.equal(result[0].parts[0].text, 'U1')
+  assert.equal(result[1].parts[0].text, 'A1')
+  assert.equal(result[2].parts[0].text, 'U2')
 })

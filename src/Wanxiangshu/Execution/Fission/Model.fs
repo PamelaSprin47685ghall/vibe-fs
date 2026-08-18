@@ -192,3 +192,11 @@ module FissionConvergence =
             |> List.forall (fun completionId -> FissionDelivery.pendingTargets completionId delivery |> List.isEmpty)
 
         laneCount >= 2 && completeLaneSet && allBroadcastsDelivered
+
+[<RequireQualifiedAccess>]
+module FissionRequestProjection =
+
+    /// INTRA-PARTICIPANT-PARALLELISM-013: physical origin may only narrow the
+    /// office entitlement. `true` means the provider request must carry
+    /// `fission=false`.
+    let apply (hasPhysicalParent: bool) : bool = not hasPhysicalParent

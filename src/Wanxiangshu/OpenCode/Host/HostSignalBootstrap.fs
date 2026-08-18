@@ -199,6 +199,19 @@ module HostSignalBootstrap =
             let routed = model
             message?model <- box routed
 
+    let private ensureToolsObject (message: obj) : obj =
+        if isNull message?tools then
+            createObj []
+        else
+            message?tools
+
+    let private projectFissionToolVisibility hasPhysicalParent output =
+        if FissionRequestProjection.apply hasPhysicalParent then
+            let message = requireOutputMessage output
+            let tools = ensureToolsObject message
+            tools?fission <- box false
+            message?tools <- tools
+
     let private acceptPluginExecution
         (runtime: PromptDispatcher.Runtime)
         (claim: PromptAuthority.PromptClaim)
@@ -603,6 +616,17 @@ module HostSignalBootstrap =
             let continueRoutedChatMessage routedExecution decoded input output =
                 task {
                     projectRoutedModel output routedExecution
+
+                    match routedExecution with
+                    | RoutedChatExecution.ExternalManaged(sessionId, _, _, _)
+                    | RoutedChatExecution.PluginManaged(_, { SessionId = sessionId }, _, _, _) ->
+                        let hasPhysicalParent =
+                            scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
+
+                        projectFissionToolVisibility hasPhysicalParent output
+                    | RoutedChatExecution.NoRoute
+                    | RoutedChatExecution.Superseded -> ()
+
                     requireDurabilityActivation ()
                     signalExternalJoinWake decoded
                     do! promptIngressHook input output

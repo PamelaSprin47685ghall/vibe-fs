@@ -97,6 +97,17 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] user-facing root caller is rejecte
   assert.equal(fission.isActive(runtime, owner), false)
 })
 
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] root provider request suppresses fission while a subsession inherits office entitlement', () => {
+  assert.deepEqual(
+    fissionHost.projectFissionToolVisibility(false, { fork: true, fission: true }),
+    { fork: true, fission: false },
+  )
+  assert.deepEqual(
+    fissionHost.projectFissionToolVisibility(true, { fork: true }),
+    { fork: true },
+  )
+})
+
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-004] partial create or start failure rolls back every created lane and never interrupts old caller', async () => {
   for (const options of [{ failCreateAt: 1 }, { failStartAt: 1 }]) {
     const { events, runtime } = harness(options)
