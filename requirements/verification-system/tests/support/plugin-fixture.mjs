@@ -640,8 +640,8 @@ export const sampleObligationTodoWriteArgs = () => ({
   planComplete: true,
   workingOn: 'membrane',
   obligations: [
-    { name: 'membrane', work: 'implement the production membrane' },
-    { name: 'canaries', work: 'write permanent contract canaries' },
+    { name: 'membrane', horizon: 'near', work: 'implement the production membrane' },
+    { name: 'canaries', horizon: 'far', work: 'write permanent contract canaries' },
   ],
 })
 
@@ -661,9 +661,10 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
           additionalProperties: false,
           properties: {
             name: { type: 'string', minLength: 1 },
+            horizon: { type: 'string', enum: ['near', 'mid', 'far'] },
             work: { type: 'string' },
           },
-          required: ['name', 'work'],
+          required: ['name', 'horizon', 'work'],
         },
       },
     },
@@ -683,9 +684,10 @@ export const sampleObligationTodoWriteAdvertisement = () => ({
           additionalProperties: false,
           properties: {
             name: { type: 'string', minLength: 1 },
+            horizon: { type: 'string', enum: ['near', 'mid', 'far'] },
             work: { type: 'string' },
           },
-          required: ['name', 'work'],
+          required: ['name', 'horizon', 'work'],
         },
       },
     },

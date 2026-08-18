@@ -36,7 +36,18 @@ module MagicTodoSemanticSurface =
           SyntheticMessageId = text value?syntheticId }
 
     let private obligationOf (value: obj) : Obligation =
+        let horizonText = text (value?horizon)
+
+        let horizon =
+            if String.IsNullOrWhiteSpace horizonText then
+                ObligationHorizon.Near
+            else
+                horizonText
+                |> ObligationHorizon.tryParse
+                |> Option.defaultWith (fun () -> invalidArg "horizon" "expected near, mid, or far")
+
         { Name = text (value?name)
+          Horizon = horizon
           Work = text (value?work) }
 
     let private obligationsOf (value: obj) : ObligationList =
@@ -47,7 +58,11 @@ module MagicTodoSemanticSurface =
 
     let private obligationsToJs (items: ObligationList) : obj array =
         items
-        |> List.map (fun item -> box {| name = item.Name; work = item.Work |})
+        |> List.map (fun item ->
+            box
+                {| name = item.Name
+                   horizon = ObligationHorizon.wire item.Horizon
+                   work = item.Work |})
         |> List.toArray
 
     let private rejectCode reject =
@@ -63,6 +78,11 @@ module MagicTodoSemanticSurface =
         | MagicTodoReject.DuplicateObligationName name ->
             box
                 {| code = "DuplicateObligationName"
+                   name = name |}
+        | MagicTodoReject.NoNearObligation -> box {| code = "NoNearObligation" |}
+        | MagicTodoReject.WorkingOnNotNear name ->
+            box
+                {| code = "WorkingOnNotNear"
                    name = name |}
         | MagicTodoReject.IdentityCorruption field ->
             box

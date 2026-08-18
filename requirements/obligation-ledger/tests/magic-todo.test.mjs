@@ -6,7 +6,7 @@ const sha256 = (value) => `digest:${value}`
 const life = 'manager-life'
 const firstCall = 'first-call'
 const secondCall = 'second-call'
-const obligation = (name, work) => ({ name, work })
+const obligation = (name, work, horizon = 'near') => ({ name, horizon, work })
 const ok = (result) => {
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
   return result.value
@@ -26,7 +26,7 @@ const localized = (callId, ordinal, frontier, digest) => ({
 
 const items = [
   obligation('implementation', 'Implement the requested behavior.'),
-  obligation('verification', 'Verify the behavior with evidence.'),
+  obligation('verification', 'Verify the behavior with evidence.', 'far'),
 ]
 
 test('WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-visible cold state', () => {
@@ -34,13 +34,25 @@ test('WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-
   assert.doesNotMatch(wire, /"id"|"status"|"priority"/)
 })
 
-test('WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/work with stable digest input', () => {
+test('WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/horizon/work with stable digest input', () => {
   const wire = todo.canonicalObligationListWire(items)
   assert.equal(
     wire,
-    '[{"name":"implementation","work":"Implement the requested behavior."},{"name":"verification","work":"Verify the behavior with evidence."}]',
+    '[{"name":"implementation","horizon":"near","work":"Implement the requested behavior."},{"name":"verification","horizon":"far","work":"Verify the behavior with evidence."}]',
   )
   assert.equal(todo.obligationListDigest(sha256, items), `digest:${wire}`)
+})
+
+test('WHAT[OBLIGATION-LEDGER-027] horizon is planning resolution, not provider-visible lifecycle state', () => {
+  const wire = todo.canonicalObligationListWire([
+    obligation('now', 'Close the directly actionable unit.', 'near'),
+    obligation('next', 'Preserve the next meaningful outcome.', 'mid'),
+    obligation('later', 'Cover the remaining outcome without premature steps.', 'far'),
+  ])
+  assert.match(wire, /"horizon":"near"/)
+  assert.match(wire, /"horizon":"mid"/)
+  assert.match(wire, /"horizon":"far"/)
+  assert.doesNotMatch(wire, /"status"|"phase"|"priority"/)
 })
 
 test('WHAT[OBLIGATION-LEDGER-006] rejects blank and duplicate obligation names as call syntax', () => {

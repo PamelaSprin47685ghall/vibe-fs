@@ -8,5 +8,7 @@
 
 无论哪种关系，空 placeholder、裸阶段名、遗漏有后果的工作、没有证据却声称已经解除义务，以及为了让道路看起来更短而误导性删项，都是缺陷。
 
+还要从 `workingOn` 的执行前沿判断规划分辨率：active frontier 必须是可直接闭环的 `near`；`mid` 应保留下一层有意义结果/依赖而不提前展开内部步骤；`far` 应以粗粒度完整覆盖所有已知剩余债务。要求完整 coverage，不要求均匀 decomposition。horizon 只是规划分辨率，绝不是 status、priority、phase 或经过时间。
+
 只回复一次 judge tool call：PERFECT 或 REVISE。
 Process PERFECT 不是 terminal Finality witness。

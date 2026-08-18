@@ -67,7 +67,7 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 
 /// The only raw Host boundary for the GrandRewrite Magic Todo account.
-/// Provider input is `{ planComplete: bool, workingOn: string, obligations: [{ name, work }] }`;
+/// Provider input is `{ planComplete: bool, workingOn: string, obligations: [{ name, horizon, work }] }`;
 /// the built-in Host executor still receives its legacy `{ todos: [{ content,status,priority }] }`
 /// sink shape. New provider semantics never round-trip through that sink.
 module MagicTodoHostCodec =
@@ -102,11 +102,23 @@ module MagicTodoHostCodec =
         else
             requiredTextValue field (row?(field))
 
+    let private requiredHorizon (row: obj) : Result<MagicTodo.ObligationHorizon, string> =
+        requiredText row "horizon"
+        |> Result.bind (fun value ->
+            match MagicTodo.ObligationHorizon.tryParse value with
+            | Some horizon -> Ok horizon
+            | None -> Error "todowrite.horizon must be one of near, mid, far")
+
     let private decodeObligationRow (row: obj) : Result<MagicTodo.Obligation, string> =
-        match requiredText row "name", requiredText row "work" with
-        | Ok name, Ok work -> Ok { Name = name; Work = work }
-        | Error error, _
-        | _, Error error -> Error error
+        match requiredText row "name", requiredHorizon row, requiredText row "work" with
+        | Ok name, Ok horizon, Ok work ->
+            Ok
+                { Name = name
+                  Horizon = horizon
+                  Work = work }
+        | Error error, _, _
+        | _, Error error, _
+        | _, _, Error error -> Error error
 
     let private finalizeDecoded
         (args: obj)
@@ -115,12 +127,18 @@ module MagicTodoHostCodec =
         : Result<MagicTodo.TodoWriteInput, string> =
         let obligations = List.rev acc
 
-        let decoded: MagicTodo.TodoWriteInput =
+        let input: MagicTodo.TodoWriteInput =
             { PlanComplete = unbox<bool> args?planComplete
-              WorkingOn = MagicTodo.normalizeWorkingOn workingOn obligations
+              WorkingOn = workingOn
               Obligations = obligations }
 
-        Ok decoded
+        match MagicTodo.validateTodoWriteInput input with
+        | Ok decoded -> Ok decoded
+        | Error MagicTodo.MagicTodoReject.NoNearObligation ->
+            Error "todowrite non-empty obligations require at least one near obligation"
+        | Error(MagicTodo.MagicTodoReject.WorkingOnNotNear _) ->
+            Error "todowrite.workingOn must name a near obligation"
+        | Error _ -> Error "todowrite input failed semantic validation"
 
     let rec private decodeRows
         (args: obj)
@@ -223,6 +241,9 @@ module MagicTodoHostCodec =
 
         properties?name?description <-
             box (ProviderProse.render lang MagicTodoSurface.Path.ObligationNameDescription Map.empty)
+
+        properties?horizon?description <-
+            box (ProviderProse.render lang MagicTodoSurface.Path.ObligationHorizonDescription Map.empty)
 
         properties?work?description <-
             box (ProviderProse.render lang MagicTodoSurface.Path.ObligationWorkDescription Map.empty)

@@ -234,7 +234,18 @@ module ReviewTodoSurface =
                 values
                 |> Array.toList
                 |> List.map (fun item ->
+                    let horizonText = strField item "horizon"
+
+                    let horizon =
+                        if String.IsNullOrWhiteSpace horizonText then
+                            MagicTodo.ObligationHorizon.Near
+                        else
+                            horizonText
+                            |> MagicTodo.ObligationHorizon.tryParse
+                            |> Option.defaultWith (fun () -> invalidArg "horizon" "expected near, mid, or far")
+
                     { Name = strField item "name"
+                      Horizon = horizon
                       Work = strField item "work" })
 
         MagicTodoProcessReview.renderAssignmentUserMessage

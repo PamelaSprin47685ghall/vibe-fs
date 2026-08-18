@@ -14,6 +14,9 @@ Manager 是长期 mission 的执行者。系统随时要回答同一个问题：
 - **reviewer 拥有账本写权**：PERFECT/REVISE 决定哪个 account 才「真正生效」，
   制造 accepted-but-not-current 半态、回滚语义和第二 writer；崩溃恢复要重演 merge 策略。
 - **崩溃后只能猜**：用内存 Stage、布尔组合、时间猜测恢复，而不是重放 durable Accepted 链。
+- **未来被等分辨率过度展开**：只给模型平面的 `{name,work}` 而不表达相对当前执行前沿的距离，会诱导它把
+  当前动作、下一层结果和遥远结果拆成同一粒度。近处因此不够可执行，远处则提前制造大量脆弱步骤；计划
+  遇到新证据时只能大面积重写。反过来，只保留少数大目标又会让当前前沿失去可闭环动作。
 
 **obligation-ledger 保证：当前 owed work 有一个唯一真相源（last `TodoWriteAccepted` 对应的完整
 account）。`planComplete=false` 时它可以诚实记录把计划做完仍欠的 planning work；第一次 accepted
@@ -23,6 +26,11 @@ obligation name，而不是把业务 authoring mistake 升级成 infrastructure 
 能把一行投影为 `in_progress`、其余投影为 `pending`；它不把
 status 枚举带回 canonical obligation。该单调关系由 Journal fold 从 Accepted facts 纯推导，任何阶段机、
 reviewer settlement 或 Host UI 表都无权改写它。**
+
+**同一账本还必须是一张随执行前沿移动的透视图：`workingOn` 是观察原点；近处义务展开到可直接闭环，
+中处只保留下一层有意义结果与依赖，远处以粗粒度 outcome 覆盖全部已知剩余债务而延迟内部拆解。完整计划
+要求 complete coverage，不要求 uniform decomposition。距离改变时允许重写粒度；这种 `near/mid/far`
+分辨率不是 status、phase、priority、时间估算，也不形成第二状态机。**
 
 ## 2. 独立存在测试（Independent Change Test）
 
@@ -43,6 +51,8 @@ RED = 满足下列任一：
 4. 崩溃恢复不重放 Accepted 链而靠 Stage / 布尔 / 时间猜；
 5. 同一 message 多个**已 materialize** todowrite 有 winner 仲裁，或 infra 失败被降格成 tool 红字；Host
    流式构造期间尚无 input 的 pending ToolPart 空壳不算第二份账。
+6. 当前执行前沿没有可直接闭环的细粒度义务，或遥远债务被迫以与当前动作相同的细粒度提前展开；
+   `near/mid/far` 被解释成 status/phase/priority/time，而不是相对规划分辨率。
 
 ## 4. 历史考古（为什么曾经 RED）
 

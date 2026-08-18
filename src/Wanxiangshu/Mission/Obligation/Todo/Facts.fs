@@ -50,7 +50,7 @@ module MagicTodoFacts =
             /// Raw provider commitment declaration frozen before physical execution.
             /// It is an observed business fact, not a workflow stage.
             PlanCompleteDeclared: bool
-            /// Digest of canonical `{planComplete,obligations:[{name,work}]}` provider arguments.
+            /// Digest of canonical `{planComplete,workingOn,obligations:[{name,horizon,work}]}` provider arguments.
             ProviderInputDigest: string
             /// Exclusive frontier immediately before this tool-call in the Life.
             ReviewFrontier: XTraceCursor

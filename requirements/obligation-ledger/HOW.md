@@ -1,14 +1,14 @@
 # obligation-ledger — HOW
 
-行为合同见 `WHAT.md`（OBLIGATION-LEDGER-001..026）。本文件只描述实现模型与约束，非 normative。
+行为合同见 `WHAT.md`（OBLIGATION-LEDGER-001..027）。本文件只描述实现模型与约束，非 normative。
 
 ## 1. 目标模块地图（本次大修）
 
 | 层 | 模块 | 职责 | 命题 |
 |---|---|---|---|
-| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/Model.fs` | Obligation / provider input 值对象、纯 validation、identity、纯 decision；不得读 Journal/Host | 001-009/016 |
+| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/Model.fs` | Obligation / horizon / provider input 值对象、纯 validation、identity、纯 decision；不得读 Journal/Host | 001-009/016/027 |
 | Domain | `src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs` | 只定义已发生事实：Prepared/Accepted/reviewer/legacy seed；不定义 Stage/NextAction | 008/010/012/018/019 |
-| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs` | provider/blob wire codec；外部协议解码，不解释业务流程 | 002/024 |
+| Domain | `src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs` | provider/blob wire codec；新 provider wire 严格要求 horizon；历史 durable blob/input migration 只在 codec ingress 收敛成 typed horizon，不解释业务流程 | 002/024/027 |
 | Journal | `src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs` | **O(1) 增量积分**：Current、pending review locator、first plan commitment、latest/previous committed checkpoint、dedicated reviewer locator；append 后单步 fold | 010-021 |
 | Journal | `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs` | typed fact codec；boot 时可从 event history 重建 projection，但普通业务查询不得 replay | 008/018 |
 | Application | `src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs` | **Direct F# `task {}` CE**：读取当前 projection facts → `let!/match` → 调用具名 capabilities → append facts；恢复调用同一入口 | 007-014/018/022/025/026 |
@@ -106,6 +106,23 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 
 `TodoWritePrepared.PlanCompleteDeclared` 保存 provider 原始 bool；旧 payload 缺字段按 `true` migration decode（旧协议本身即 complete-plan contract）。`foldAccepted` 在 `FirstPlanCommitment=None && declared=true` 时 once-set T1 locator。之后每次 Accepted O(1) 推进 `PreviousCommittedCheckpoint/LatestCommittedCheckpoint`，所以 provider 后续声明 false 也无需扫描历史即可得到 effective true。Pre-T1 false checkpoints 不进入 committed lag-1 cutoff；T1 自身无 prior；之后 cutoff 直接读 `PreviousCommittedCheckpoint`。
 
+### horizon progressive elaboration（OBLIGATION-LEDGER-027）
+
+`ObligationHorizon = Near | Mid | Far` 是封闭 ADT，canonical wire 固定编码为 `near|mid|far`。它是 owed-work
+事实的一部分，因此进入 blob/digest/review wire；但 Projection 不为 horizon 建 phase/status machine，也不据此
+分支 workflow。`workingOn` 是唯一执行前沿：Host provider decode 要求非空 account 至少一个 Near，exact
+`workingOn` 只能命中 Near；拼写未命中时只在 Near 集合内做 Levenshtein 归一。空 account 仍归一为 `""`。
+
+新 tool definition 严格 require `{name,horizon,work}`。为了重放升级前已 durable 的 v4 bytes，durable blob 与
+snapshot input codec 允许缺 horizon 的历史 obligation 在 ingress 全部映射为 `Near`：旧协议没有记录距离，
+保留其原先“平面、同分辨率”事实比猜测 Mid/Far 更诚实。下一份新 account 再由 Manager 按当前前沿重新投影。
+这只是旧 bytes → 新 typed world 的单向 migration；新 Host provider decode 不接受缺失 horizon，也不会重新写出
+旧形状。新写入使用 `magic-todo.v5`。
+
+provider prose 冻结一条 authoring law：complete coverage ≠ uniform decomposition。Near 是 execution-sized，
+Mid 是 next-outcome-sized，Far 是 coverage-sized；靠近前沿时下一份完整 account 以更细 obligations 替换粗 parent，
+不保留 parent+children 双重计债。
+
 ## 3. 历史与弃权
 
 ### GARBAGE —— 不进入 WHAT 的历史沉积
@@ -113,7 +130,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | 内容 | 裁决理由 |
 |---|---|
 | `settled` / `proposed` / `semanticMerge` 三态 + status min-merge | GrandRewrite clean break 删除；reviewer 不拥有账本写权（TODO-005）。源码 production path 不得出现（静态 proof 断言，PROOF O-11） |
-| provider `kind` / `id` / `status` / `priority` 冷状态 | 删除；wire 只有 top-level `planComplete` + `workingOn` + `{name,work}` obligations。`planComplete` 是单调业务承诺；`workingOn` 是单一当前焦点指针，不是 item status state |
+| provider `kind` / `id` / `status` / `priority` 冷状态 | 删除；wire 只有 top-level `planComplete` + `workingOn` + `{name,horizon,work}` obligations。`planComplete` 是单调业务承诺；`workingOn` 是单一当前焦点指针；`horizon` 是相对规划分辨率，二者都不是 item status state |
 | `TodoPlanningStage` / `ReviewStage` / `AwaitingReview` bool / `TodoStage` PC | 程序计数器；恢复只从 durable facts（TODO-012） |
 | 生产 Activation 资格门 / `WorkActivated` 资格门 / `PlanningTail` / Birth/Labor floor | planning→Activation 两阶段删除；`acceptActivation` / `applyAcceptedActivation` / wire Activation 检测已删除（无 creditor）；`WorkActivated` 仅 inert legacy decode，writer 已删除 2026-08-17（LEGACY-010 closed），e2e long-stroke 已解耦（TODO-001/GLORY-018..021）。不在本包 WHAT 中写成命题 |
 | 第二套 PrefixEpoch / 平行 LWR renderer | 单一 SSOT（TODO-009/012） |
@@ -124,8 +141,9 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | 内容 | 说明 |
 |---|---|
 | provider `workingOn` decode-time canonicalization | exact obligation name 优先；未命中时按 Levenshtein 编辑距离选最近 name，并列按 provider obligations 原顺序取第一个；空 account 归一为 `""`。这是 authoring 边界容错，进入 durable account 后仍保持 exact focus invariant |
+| provider `horizon` / progressive elaboration | current surface 为 `near|mid|far` enum；只度量相对 `workingOn` 前沿的展开分辨率。新 provider input 严格 require；旧 durable v4 bytes 只在 codec ingress migration。不得进入 Projection workflow control |
 | Host TodoTable compatibility sink（`content=name: work` / `status=(name=workingOn ? in_progress : pending)` / `priority=medium`） | **compatibility 不写成永久需求**。它是当前 Host V1 的兼容 UI 投影；未来 sink 可整体替换，canonical obligation 语义不变。sink 永不反推 canonical（OBLIGATION-LEDGER-015 是永久命题；sink 字段形态是 HOW） |
-| `todowrite` schema / `planComplete` / `name`/`work` 字段名 / T1 文案具体 wording | 当前 authoring surface；`provider-language` 拥有本地化字节，本包拥有 commitment 语义 |
+| `todowrite` schema / `planComplete` / `name`/`horizon`/`work` 字段名 / T1 文案具体 wording | 当前 authoring surface；`provider-language` 拥有本地化字节，本包拥有 commitment + perspective 语义 |
 | `ReviewFrontier` / `ReviewWorkStartCursor` 的具体 cursor 算法 | 与 `semantic-trace`（cursor 表示）、`work-record`（LWR 有界）、`review-assurance`（assignment 范围）交界；本包只引用 |
 | bridge / `TodoWritePrepared` 的具体字段 | 当前事实形态；bridge 只可搬运一次 Host effect-shell 的 ephemeral 数据，不得保存业务 stage；语义合同以 WHAT 为准 |
 | `MagicTodoManagerGuideline` / Planning Table / T1 revelation 的逐字文案 | `provider-language` / SURFACE-004 拥有冻结字节；本包只拥有账本语义（OBLIGATION-LEDGER-023/016） |
@@ -153,7 +171,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 - review evidence / witness / seal 的可消费性 → `review-assurance`
 - Finality 接受资格与 cohort / blessed / rest → `finality`
 - Host TodoTable / UI sink 的具体实现 → HOW（compatibility 不是永久需求）
-- 当前 `todowrite` schema、`planComplete`/`name`/`work` 字段名、T1 文案具体 wording → HOW / `provider-projection` / `provider-language`
+- 当前 `todowrite` schema、`planComplete`/`name`/`horizon`/`work` 字段名、T1 文案具体 wording → HOW / `provider-projection` / `provider-language`
 - Direct CE / 禁止第二 runtime / 恢复重入普通 workflow 的一般法则 → `structured-workflow`
 - Manager Persona / Role Law → `participant-identity` / `office-capability`
 - desired cutoff 的 PrefixEpoch seal 机制 → `prefix-stability`
@@ -163,7 +181,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 
 ## 验证与测试落点
 
-行为合同：`WHAT.md`（OBLIGATION-LEDGER-001..026）。实现模型：`HOW.md`。
+行为合同：`WHAT.md`（OBLIGATION-LEDGER-001..027）。实现模型：`HOW.md`。
 
 ### 测试资产
 
@@ -181,7 +199,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | `prefix-epoch-cutoff.test.mjs` | NEW + REWRITE | committed lag-1 locator | 2 |
 | `obligation-ledger-workflow-contract.test.mjs` | NEW | Direct CE / O(1) projection / 无第二 runtime 静态合同 | 3 |
 
-本目录顶层实际为 12 个 test 文件，当前 runner **81/81 GREEN**；其中还包括 `lifecycle-opening.test.mjs`（2）、`magic-todo-host-canaries.test.mjs`（6）与 `magic-todo-membrane.test.mjs`（18）。
+本目录顶层实际为 12 个 test 文件，当前 runner **92/92 GREEN**；其中还包括 `lifecycle-opening.test.mjs`、`magic-todo-host-canaries.test.mjs` 与 `magic-todo-membrane.test.mjs`。
 
 #### REUSE（留在原处；跨包 SPLIT@cutover）
 
@@ -196,7 +214,7 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | 命题 | 落点测试（文件 + 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
 | O-1 001 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-001] canonical obligation wire carries no provider-visible cold state`；`tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology...` | MOVE | `node --test requirements/obligation-ledger/tests/magic-todo.test.mjs` |
-| O-2 002 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/work with stable digest input`；`tests/magic-todo-host-codec.test.mjs` `WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and obligations` | MOVE | `node --test requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
+| O-2 002 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-002] canonical obligation wire is exactly name/horizon/work with stable digest input`；`tests/magic-todo-host-codec.test.mjs` `WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and obligations` | MOVE + REWRITE | `node --test requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs` |
 | O-3 003 | `tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-003] clean break...`；`tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-001]` wire doesNotMatch | MOVE | 见 O-1 |
 | O-4 004 | `tests/magic-todo-provider-boundary.test.mjs`：Pre-T1 `planComplete=false` 明确允许 concrete planning work；effective true 后才启用 completion-counterfactual mission-debt 纪律；Host 无 planning 关键词分类 | REWRITE | `node --test requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
 | O-5 005 | `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-005] empty placeholders remain invalid while concrete planning tasks are valid`：placeholder/TBD 等无 concrete owed work 的空槽位在 false/true 两侧都非法；具体 planning task 在 false 侧合法 | REWRITE | 见 O-4 |
@@ -218,15 +236,16 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 | O-21 021 | `WHAT[OBLIGATION-LEDGER-021]` `tests/prefix-epoch-cutoff.test.mjs`：false planning checkpoints 不产生 committed predecessor；T1 无 prior；T1 后每次 Accepted（即使 raw false）使用 O(1) PreviousCommitted locator；EvidenceKind 仍为 TodoCheckpoint | REWRITE | `node --test requirements/obligation-ledger/tests/prefix-epoch-cutoff.test.mjs` |
 | O-22 022 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-022] blocks Finality until plan commitment, not merely until any checkpoint`（false planning checkpoint 不授予 Finality 资格；drain 执行见 `requirements/finality/HOW.md`） | REWRITE | 见 O-1 |
 | O-23 023 | `tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-023] manager guideline freezes ledger discipline as Manager-only content`（含 `manager-guideline/en.md`、`zh-CN.md` 断言） | MOVE | 见 O-4 |
-| O-24 024 | `tests/magic-todo-host-codec.test.mjs` `WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parameters, and jsonSchema`；REUSE canaries `WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, and jsonSchema...`、`WHAT[OBLIGATION-LEDGER-024] jsonSchema ternary: both parameters and jsonSchema are replaced together` | MOVE + REUSE | 见 O-2 |
+| O-24 024 | `tests/magic-todo-host-codec.test.mjs` `WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parameters, and jsonSchema`（同时锁 `horizon` enum/description）；REUSE canaries `WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, and jsonSchema...`、`WHAT[OBLIGATION-LEDGER-024] jsonSchema ternary: both parameters and jsonSchema are replaced together` | MOVE + REWRITE + REUSE | 见 O-2 |
 | O-25 025 | REUSE membrane `WHAT[OBLIGATION-LEDGER-025] openLife and compatibility injection do not wait for snapshot IO`、`WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provider input is still empty`、`WHAT[OBLIGATION-LEDGER-025] before materializes the exact provider input including planComplete`、`WHAT[OBLIGATION-LEDGER-025] materialization fails closed when the provider input differs`、`WHAT[OBLIGATION-LEDGER-025] materialized snapshot input must still match tool.execute.before args`；`tests/magic-todo-after.test.mjs` `deferred prepare synchronizes the Host snapshot before freezing ReviewFrontier`；`requirements/semantic-trace/tests/x-trace-locality.test.mjs` 交叉证明 pending/captured 两条 locality 都忽略空 stub 且保留真实 sibling | REUSE + ADD | membrane SPLIT@cutover；locality 交叉见 semantic-trace |
 | O-26 026 | REUSE `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs` `WHAT[OBLIGATION-LEDGER-026] first accepted checkpoint reviewer assignment is AgentOwnerRoot, independent of plan commitment`、`WHAT[OBLIGATION-LEDGER-026] reentry decides resend from durable dispatch evidence, never an XTrace head watermark`、`WHAT[OBLIGATION-LEDGER-026] the assignment is durable before the physical send freezes the reviewer frontier`、`WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees the report and Current never rolls back`、`WHAT[OBLIGATION-LEDGER-026] prepare without open life is a structured rejection, never a provider red path`、`WHAT[OBLIGATION-LEDGER-026] accepted planComplete=false carries no T1 entrustment revelation`、`WHAT[OBLIGATION-LEDGER-026] first accepted planComplete=true reveals entrustment in the enriched result`、`WHAT[OBLIGATION-LEDGER-026] enriched result after a concluded PERFECT review is silent about the previous review`；REUSE canaries `WHAT[OBLIGATION-LEDGER-026] after runs when executor succeeds`、`WHAT[OBLIGATION-LEDGER-026] after does not run when executor throws` | REUSE | membrane SPLIT@cutover |
+| O-27 027 | `tests/magic-todo.test.mjs` `WHAT[OBLIGATION-LEDGER-027] horizon is planning resolution, not provider-visible lifecycle state`；`tests/magic-todo-host-codec.test.mjs` horizon required/enum + non-empty Near + workingOn→Near；`tests/magic-todo-provider-boundary.test.mjs` `WHAT[OBLIGATION-LEDGER-027] provider prose freezes progressive elaboration around workingOn` | NEW | `node --test requirements/obligation-ledger/tests/magic-todo.test.mjs requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs` |
 
 ### 覆盖统计
 
-- 命题 26 / 落点 26；本次是同包语义重构，不新增 phase/status 命题。
-- GAP：0。O-16 monotone commitment、O-18 Direct CE/O(1) projection/reverse locator 均已有 RED→GREEN proof。
-- 本包顶层 12 个 test 文件，当前 **81/81 GREEN**；另有 sink integration 2/2 与 review-assurance 的 consumable-review 9/9 交叉证明。
+- 命题 27 / 落点 27；O-27 新增 planning-resolution 命题，不新增 phase/status 命题。
+- GAP：0。O-27 已由 typed `ObligationHorizon`、strict Host decode、v4→typed ingress migration、provider prose 与 Host canary 闭合；horizon 不进入 workflow control。
+- 本包顶层 12 个 test 文件，当前 **92/92 GREEN**；另有 Host boundary Magic Todo canaries **27/27 GREEN**。
 - REUSE 文件的 cutover 拆分：membrane（effect-accounting / host-boundary）、host-canaries（host-boundary）、sink（HOW）、lifecycle（finality / participant-horizon / provider-language）——见上表 SPLIT@cutover。
 
 ### semantic anchor id（semantic-anchors.mjs，MECHANISM 逐 ID 归包）

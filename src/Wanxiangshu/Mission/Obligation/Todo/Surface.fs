@@ -39,6 +39,9 @@ module MagicTodoSurface =
         let ObligationNameDescription = "lifecycle/magic-todo/obligation-name-description"
 
         [<Literal>]
+        let ObligationHorizonDescription = "lifecycle/magic-todo/obligation-horizon-description"
+
+        [<Literal>]
         let ObligationWorkDescription = "lifecycle/magic-todo/obligation-work-description"
 
         [<Literal>]
@@ -71,9 +74,10 @@ module MagicTodoSurface =
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "work"],
+        "required": ["name", "horizon", "work"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
+          "horizon": { "type": "string", "enum": ["near", "mid", "far"] },
           "work": { "type": "string" }
         }
       }

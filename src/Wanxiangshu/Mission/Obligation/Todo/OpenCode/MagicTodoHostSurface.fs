@@ -21,7 +21,11 @@ module MagicTodoHostSurface =
                workingOn = input.WorkingOn
                obligations =
                 input.Obligations
-                |> List.map (fun item -> box {| name = item.Name; work = item.Work |})
+                |> List.map (fun item ->
+                    box
+                        {| name = item.Name
+                           horizon = MagicTodo.ObligationHorizon.wire item.Horizon
+                           work = item.Work |})
                 |> List.toArray |}
 
     let decodeInput (args: obj) : obj =
@@ -36,8 +40,19 @@ module MagicTodoHostSurface =
         obligations
         |> Array.toList
         |> List.map (fun row ->
+            let horizonText = text (row?horizon)
+
+            let horizon =
+                if String.IsNullOrWhiteSpace horizonText then
+                    MagicTodo.ObligationHorizon.Near
+                else
+                    horizonText
+                    |> MagicTodo.ObligationHorizon.tryParse
+                    |> Option.defaultWith (fun () -> invalidArg "horizon" "expected near, mid, or far")
+
             let item: MagicTodo.Obligation =
                 { Name = text (row?name)
+                  Horizon = horizon
                   Work = text (row?work) }
 
             item)

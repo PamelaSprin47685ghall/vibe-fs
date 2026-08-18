@@ -61,7 +61,8 @@ test('WHAT[OBLIGATION-LEDGER-024] definition replaces description, parameters, a
   // fields do not cross the horizon. The original executor decoder stays V1.
   assert.equal(defined.parameters.properties.planComplete.type, 'boolean')
   const providerItem = defined.parameters.properties.obligations.items
-  assert.deepEqual(providerItem.required, ['name', 'work'])
+  assert.deepEqual(providerItem.required, ['name', 'horizon', 'work'])
+  assert.deepEqual(providerItem.properties.horizon.enum, ['near', 'mid', 'far'])
   assert.equal(providerItem.properties.id, undefined)
   assert.equal(providerItem.properties.kind, undefined)
   assert.equal(providerItem.properties.status, undefined)

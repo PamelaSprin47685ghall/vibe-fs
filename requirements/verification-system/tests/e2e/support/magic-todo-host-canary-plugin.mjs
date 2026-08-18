@@ -71,11 +71,12 @@ const argsCarryObligations = (args) =>
   && typeof args?.workingOn === 'string'
   && Array.isArray(args?.obligations)
   && args.obligations.length > 0
-  && args.obligations.some((row) => row?.name === args.workingOn)
+  && args.obligations.some((row) => row?.name === args.workingOn && row?.horizon === 'near')
   && args.obligations.every((row) =>
     row
     && typeof row === 'object'
     && typeof row.name === 'string'
+    && ['near', 'mid', 'far'].includes(row.horizon)
     && typeof row.work === 'string'
     && legacyProviderFields.every((field) => !hasOwn(row, field)));
 
@@ -429,8 +430,12 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
   if (!definition) throw new Error('HOST_CANARY_B: missing definition.json (todowrite definition never observed)');
   if (!before) throw new Error('HOST_CANARY_A/H: missing before.json (todowrite before never observed)');
   if (!after) throw new Error('HOST_CANARY_E/G/H: missing after.json (todowrite after never observed)');
-  if (definition.advertisesObligations !== true || definition.leaksLegacyProviderFields === true) {
-    throw new Error(`HOST_CANARY_B: production definition must expose planComplete:boolean + workingOn:string + obligations{name,work}: ${JSON.stringify(definition)}`);
+  if (
+    definition.advertisesObligations !== true
+    || definition.advertisesPerspectiveHorizon !== true
+    || definition.leaksLegacyProviderFields === true
+  ) {
+    throw new Error(`HOST_CANARY_B: production definition must expose planComplete:boolean + workingOn:string + obligations{name,horizon,work}: ${JSON.stringify(definition)}`);
   }
 
   // ── A: durable provider obligations vs executor compatibility args ────────
@@ -441,7 +446,7 @@ export const assertMagicTodoHostCanariesAEGH = (dir, opts = {}) => {
     throw new Error('HOST_CANARY_A: production before must mutate the original args object in place');
   }
   if (!argsCarryObligations(before.preBeforeArgs)) {
-    throw new Error('HOST_CANARY_A: pre-before args must carry planComplete + workingOn + provider obligations{name,work}');
+    throw new Error('HOST_CANARY_A: pre-before args must carry planComplete + workingOn + provider obligations{name,horizon,work}');
   }
   if (
     !argsCarryObligations(before.postBeforeArgs)
@@ -609,7 +614,11 @@ export default {
               && hookOutput?.parameters?.properties?.workingOn?.type === 'string'
               && Array.isArray(item?.required)
               && item.required.includes('name')
+              && item.required.includes('horizon')
               && item.required.includes('work'),
+            advertisesPerspectiveHorizon:
+              Array.isArray(properties?.horizon?.enum)
+              && deepStable(properties.horizon.enum) === deepStable(['near', 'mid', 'far']),
             leaksLegacyProviderFields:
               ['id', 'kind', 'status', 'priority', 'content'].some((field) => hasOwn(properties, field)),
             observedAt: Date.now(),

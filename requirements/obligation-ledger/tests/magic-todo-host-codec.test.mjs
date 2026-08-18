@@ -7,8 +7,8 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
     planComplete: false,
     workingOn: 'bridge',
     obligations: [
-      { name: 'bridge', work: 'Review the bridge' },
-      { name: 'proof', work: 'Close the proof' },
+      { name: 'bridge', horizon: 'near', work: 'Review the bridge' },
+      { name: 'proof', horizon: 'mid', work: 'Close the proof' },
     ],
   })
 
@@ -16,11 +16,11 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
   assert.equal(decoded.value.planComplete, false)
   assert.equal(decoded.value.workingOn, 'bridge')
   assert.deepEqual(decoded.value.obligations, [
-    { name: 'bridge', work: 'Review the bridge' },
-    { name: 'proof', work: 'Close the proof' },
+    { name: 'bridge', horizon: 'near', work: 'Review the bridge' },
+    { name: 'proof', horizon: 'mid', work: 'Close the proof' },
   ])
 
-  const missingCommitment = host.decodeInput({ workingOn: 'bridge', obligations: [{ name: 'bridge', work: 'x' }] })
+  const missingCommitment = host.decodeInput({ workingOn: 'bridge', obligations: [{ name: 'bridge', horizon: 'near', work: 'x' }] })
   assert.equal(missingCommitment.ok, false)
   assert.equal(missingCommitment.error, 'todowrite.planComplete is required')
 
@@ -28,7 +28,7 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
   assert.equal(nonBooleanCommitment.ok, false)
   assert.equal(nonBooleanCommitment.error, 'todowrite.planComplete must be a boolean')
 
-  const missingWorkingOn = host.decodeInput({ planComplete: false, obligations: [{ name: 'bridge', work: 'x' }] })
+  const missingWorkingOn = host.decodeInput({ planComplete: false, obligations: [{ name: 'bridge', horizon: 'near', work: 'x' }] })
   assert.equal(missingWorkingOn.ok, false)
   assert.equal(missingWorkingOn.error, 'todowrite.workingOn is required')
 
@@ -36,8 +36,8 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
     planComplete: false,
     workingOn: 'synthesize-evidence-into-road',
     obligations: [
-      { name: 'synthesize-evidence-road', work: 'x' },
-      { name: 'ship', work: 'y' },
+      { name: 'synthesize-evidence-road', horizon: 'near', work: 'x' },
+      { name: 'ship', horizon: 'far', work: 'y' },
     ],
   })
   assert.equal(misspelledWorkingOn.ok, true, misspelledWorkingOn.ok ? '' : misspelledWorkingOn.error)
@@ -47,8 +47,8 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
     planComplete: false,
     workingOn: 'cat',
     obligations: [
-      { name: 'bat', work: 'first nearest' },
-      { name: 'hat', work: 'second nearest' },
+      { name: 'bat', horizon: 'near', work: 'first nearest' },
+      { name: 'hat', horizon: 'near', work: 'second nearest' },
     ],
   })
   assert.equal(tiedWorkingOn.ok, true, tiedWorkingOn.ok ? '' : tiedWorkingOn.error)
@@ -61,11 +61,11 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
   assert.equal(zeroWorkWithStrayFocus.ok, true, zeroWorkWithStrayFocus.ok ? '' : zeroWorkWithStrayFocus.error)
   assert.equal(zeroWorkWithStrayFocus.value.workingOn, '')
 
-  const malformed = host.decodeInput({ planComplete: false, workingOn: 'bridge', obligations: [{ name: 1, work: 'x' }] })
+  const malformed = host.decodeInput({ planComplete: false, workingOn: 'bridge', obligations: [{ name: 1, horizon: 'near', work: 'x' }] })
   assert.equal(malformed.ok, false)
   assert.equal(malformed.error, 'todowrite.name must be a string')
 
-  const missingWork = host.decodeInput({ planComplete: false, workingOn: 'bridge', obligations: [{ name: 'bridge' }] })
+  const missingWork = host.decodeInput({ planComplete: false, workingOn: 'bridge', obligations: [{ name: 'bridge', horizon: 'near' }] })
   assert.equal(missingWork.ok, false)
   assert.equal(missingWork.error, "todowrite obligation item requires field 'work'")
 
@@ -73,20 +73,55 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
     planComplete: true,
     workingOn: 'same',
     obligations: [
-      { name: 'same', work: 'first' },
-      { name: 'same', work: 'second' },
+      { name: 'same', horizon: 'near', work: 'first' },
+      { name: 'same', horizon: 'near', work: 'second' },
     ],
   })
   assert.equal(duplicateName.ok, false)
   assert.equal(duplicateName.error, "todowrite duplicate obligation name 'same'")
+
+  const missingHorizon = host.decodeInput({
+    planComplete: false,
+    workingOn: 'bridge',
+    obligations: [{ name: 'bridge', work: 'x' }],
+  })
+  assert.equal(missingHorizon.ok, false)
+  assert.equal(missingHorizon.error, "todowrite obligation item requires field 'horizon'")
+
+  const invalidHorizon = host.decodeInput({
+    planComplete: false,
+    workingOn: 'bridge',
+    obligations: [{ name: 'bridge', horizon: 'urgent', work: 'x' }],
+  })
+  assert.equal(invalidHorizon.ok, false)
+  assert.equal(invalidHorizon.error, "todowrite.horizon must be one of near, mid, far")
+
+  const nonNearFocus = host.decodeInput({
+    planComplete: true,
+    workingOn: 'ship',
+    obligations: [
+      { name: 'prepare', horizon: 'near', work: 'Prepare the immediate change.' },
+      { name: 'ship', horizon: 'far', work: 'Ship the complete result.' },
+    ],
+  })
+  assert.equal(nonNearFocus.ok, false)
+  assert.equal(nonNearFocus.error, "todowrite.workingOn must name a near obligation")
+
+  const noNear = host.decodeInput({
+    planComplete: true,
+    workingOn: 'ship',
+    obligations: [{ name: 'ship', horizon: 'far', work: 'Ship the complete result.' }],
+  })
+  assert.equal(noNear.ok, false)
+  assert.equal(noNear.error, 'todowrite non-empty obligations require at least one near obligation')
 })
 
 test('WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every other obligation to pending', () => {
   assert.deepEqual(
     host.projectCompatibilityRows('proof', [
-      { name: 'bridge', work: 'Review bridge' },
-      { name: 'proof', work: 'Close proof' },
-      { name: 'ship', work: 'Ship result' },
+      { name: 'bridge', horizon: 'near', work: 'Review bridge' },
+      { name: 'proof', horizon: 'near', work: 'Close proof' },
+      { name: 'ship', horizon: 'far', work: 'Ship result' },
     ]),
     [
       { content: 'bridge: Review bridge', status: 'pending', priority: 'medium' },
@@ -97,7 +132,7 @@ test('WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every ot
 })
 
 test('WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 compatibility view', () => {
-  const args = { planComplete: false, workingOn: 'provider-only', obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }] }
+  const args = { planComplete: false, workingOn: 'provider-only', obligations: [{ name: 'provider-only', horizon: 'near', work: 'must remain durable provider input' }] }
   const output = { args }
   host.replaceCompatibilityArgs(output, [
     { content: 'bridge: Review bridge', status: 'in_progress', priority: 'medium' },
@@ -107,7 +142,7 @@ test('WHAT[OBLIGATION-LEDGER-015] projects obligations into a non-enumerable V1 
   assert.deepEqual(output.args, {
     planComplete: false,
     workingOn: 'provider-only',
-    obligations: [{ name: 'provider-only', work: 'must remain durable provider input' }],
+    obligations: [{ name: 'provider-only', horizon: 'near', work: 'must remain durable provider input' }],
   })
   assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
   assert.deepEqual(output.args.todos, [
@@ -130,8 +165,16 @@ test('WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parame
   assert.match(output.parameters.properties.planComplete.description, /false/i)
   assert.match(output.parameters.properties.planComplete.description, /true/i)
   assert.match(output.parameters.properties.planComplete.description, /irreversible|cannot.*return|forever|不可逆|永久/i)
+  assert.match(output.parameters.properties.planComplete.description, /coverage|覆盖/i)
+  assert.match(output.parameters.properties.planComplete.description, /uniform|均匀/i)
   assert.equal(output.jsonSchema.properties.planComplete.description, output.parameters.properties.planComplete.description)
-  assert.deepEqual(output.parameters.properties.obligations.items.required, ['name', 'work'])
+  assert.deepEqual(output.parameters.properties.obligations.items.required, ['name', 'horizon', 'work'])
+  assert.deepEqual(output.parameters.properties.obligations.items.properties.horizon.enum, ['near', 'mid', 'far'])
+  assert.match(output.parameters.properties.obligations.items.properties.horizon.description, /frontier|前沿/i)
+  assert.match(output.parameters.properties.obligations.items.properties.horizon.description, /not.*status|不是.*status|不是.*状态/i)
+  assert.match(output.parameters.properties.obligations.items.properties.horizon.description, /near/i)
+  assert.match(output.parameters.properties.obligations.items.properties.horizon.description, /mid/i)
+  assert.match(output.parameters.properties.obligations.items.properties.horizon.description, /far/i)
   assert.match(output.parameters.properties.obligations.items.properties.name.description, /planComplete/i)
   assert.match(output.parameters.properties.obligations.items.properties.name.description, /planning/i)
   assert.match(output.parameters.properties.obligations.items.properties.name.description, /placeholder/i)
@@ -141,6 +184,7 @@ test('WHAT[OBLIGATION-LEDGER-024] advertises planComplete in description, parame
   assert.match(output.parameters.properties.obligations.items.properties.work.description, /TBD/i)
   assert.equal(output.jsonSchema.properties.obligations.items.properties.name.description, output.parameters.properties.obligations.items.properties.name.description)
   assert.equal(output.jsonSchema.properties.obligations.items.properties.work.description, output.parameters.properties.obligations.items.properties.work.description)
+  assert.equal(output.jsonSchema.properties.obligations.items.properties.horizon.description, output.parameters.properties.obligations.items.properties.horizon.description)
   assert.equal(output.parameters.properties.obligations.items.properties.status, undefined)
   assert.equal(output.parameters.properties.obligations.items.properties.id, undefined)
 })

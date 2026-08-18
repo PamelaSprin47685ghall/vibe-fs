@@ -17,7 +17,8 @@ work-record、prefix-stability、participant-horizon、effect-accounting）只�
 **规范**：`CurrentObligations` 始终描述「在当前 relation 下仍欠什么」。Pre-T1（`Ek=false`）时，
 它可以诚实记录把计划做完仍欠的调查、分析、分解、验证与决策；Post-T1（`Ek=true`）时，它只描述
 为了真正满足用户请求仍需成为真的 mission work / evidence / condition。它不携带 `kind` / `id` /
-`status` / `priority` 之类 provider-visible 冷状态，也没有 alias。
+`status` / `priority` 之类 provider-visible 冷状态，也没有 alias。每项 obligation 可以携带相对当前执行前沿
+的 `horizon` 分辨率；该值只回答“现在应展开到多细”，不是生命周期状态。
 
 **含义 / 动机**：Manager 生命周期唯一诚实的进度表示是「现在还欠什么」，不是伪造 status。
 强迫 Pre-T1 账本假装只有 mission debt 会诱使模型把 planning work 改名成假的实现义务；显式 commitment
@@ -33,24 +34,30 @@ Provider surface 的 schema 形态是当前实现（HOW），不是永久合同�
 **规范**：
 
 ```text
-todowrite(planComplete: bool, workingOn: string, obligations: [{ name: string, work: string }])
+todowrite(planComplete: bool, workingOn: string, obligations: [{ name: string, horizon: near|mid|far, work: string }])
 CurrentObligations = last accepted obligations list
 effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 ```
 
-`name` 在同一 obligation 存续期间稳定；`work` 是自然语言描述该义务仍欠什么。
-`workingOn` 是当前实际工作焦点。provider 输入在边界归一化：非空 account 时 exact `name` 优先；若未
-命中，则以 Levenshtein 编辑距离选择最近 obligation `name`，并列时按 provider obligations 原顺序取
-第一个；空 account 一律归一为空字符串。因此进入 durable account 后 `workingOn` 始终精确等于一个
-obligation `name`（或空 account 时为 `""`），provider 的焦点拼写错误属于可恢复业务输入而不是
-infrastructure failure。它只决定 Host compatibility sink 的活动行，不是 obligation status，也不进入
-`CurrentObligations`。Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；
-不得在真正 discharge 后仅为「曾出现在计划中」而保留。
+`name` 在同一 obligation 存续期间稳定；`work` 是自然语言描述该义务仍欠什么；`horizon` 是相对当前
+`workingOn` 执行前沿的规划分辨率：`near` 可直接着手并独立闭环，`mid` 保留下一层有意义结果/依赖但不
+预展开内部步骤，`far` 以粗粒度 outcome 覆盖更远的已知剩余债务并延迟内部拆解。
 
-**含义 / 动机**：wire 唯一语言是显式 `planComplete` + `workingOn` + `{name, work}` account；`CurrentObligations`
+`workingOn` 是当前实际工作焦点，也是 horizon 的透视原点。非空 account 必须至少有一个 `near` obligation，
+且规范化后的 `workingOn` 必须精确命名一个 `near` obligation；exact 输入若指向 `mid/far` 属调用语义错误。
+provider 输入拼写未 exact 命中时，只在 `near` obligations 中按 Levenshtein 编辑距离选择最近 `name`，并列按
+provider 原顺序取第一个；空 account 一律归一为空字符串。因此进入 durable account 后 `workingOn` 始终
+指向可执行前沿，provider 的焦点拼写错误仍是可恢复 authoring mistake。`workingOn` 只决定当前焦点/Host
+compatibility sink 活动行，不是 obligation status，也不进入 `CurrentObligations`。
+
+Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；不得在真正 discharge
+后仅为「曾出现在计划中」而保留。粗 obligation 被接近并细化时，以新暴露的 obligations 替换它；不得为
+保存历史同时保留 coarse parent 与其完整 children，制造重复债务。
+
+**含义 / 动机**：wire 唯一语言是显式 `planComplete` + `workingOn` + `{name,horizon,work}` account；`CurrentObligations`
 与 commitment latch 都由 Journal fold 从 Accepted/Prepared identity 纯推导，任何其它 writer 不得改动。
 
-**边界**：`name`/`work` 字段名与 schema 具体形态是当前 surface（HOW）；「accepted account 即当前」的
+**边界**：`name`/`horizon`/`work` 字段名与 schema 具体形态是当前 surface（HOW）；「accepted account 即当前」的
 supersession 语义见 OBLIGATION-LEDGER-010。
 
 **证据** → HOW.md 行 O-2。
@@ -407,7 +414,7 @@ kind/id/status/priority provider 冷状态
 ```
 
 seed 必须在该 Life **首次 Magic provider request 之前**完成：从 Host old TodoTable 取 seed →
-投影为 obligations `{name,work}` → append `LegacyTodoSeedAdopted` → 把 current account 注入
+投影为 obligations `{name,horizon=near,work}` → append `LegacyTodoSeedAdopted` → 把 current account 注入
 Manager provider-visible context。禁止 position/content 猜 identity；禁止等第一轮 todowrite 才
 adopt；同 session 后续新 Life 禁止再次从 Host TodoTable 反推 seed（TODO-011）。
 
@@ -500,7 +507,8 @@ conversation relation，不是 persisted phase）
 Blogger 合同（why「Manager 表面」裁决）。
 
 **边界**：隐藏 reviewer 的**可见性 admission**（哪些可见、哪些禁止）归 `participant-horizon`；
-本包只拥有 guideline 的账本语义内容。
+本包只拥有 guideline 的账本语义内容。guideline 还必须冻结 progressive elaboration：完整覆盖不等于均匀
+展开，近处细、远处粗，随着 `workingOn` 前沿推进再把将近的粗 obligation 细化。
 
 **证据** → HOW.md 行 O-23。
 
@@ -508,8 +516,8 @@ Blogger 合同（why「Manager 表面」裁决）。
 
 **规范**：`tool.definition` 是 provider-visible V2 schema 的**唯一** Host 侧广告点，必须同时更新
 `parameters` / `jsonSchema` / `description`；只改一处导致组装不一致 → fail closed（HOST-018）。
-description 覆盖 Manager 可见纪律（与 002/003/004/006/013/016 一致），包括 `planComplete` 的
-Pre-T1 用法与单调不可回退语义；**禁止**泄露隐藏编排
+description 覆盖 Manager 可见纪律（与 002/003/004/006/013/016/027 一致），包括 `planComplete` 的
+Pre-T1 用法与单调不可回退语义，以及 complete coverage ≠ uniform decomposition 的 horizon 透视纪律；**禁止**泄露隐藏编排
 （dedicated reviewer、hidden agent/session、Finality cohort、barrier、witness、2N，TODO-013）。
 definition 改广告 schema 不自动替换原 executor decode schema；before 额外挂载 V1 compatibility view，
 该 view 不得改写 provider-visible enumerable input（HOST-018/020）。
@@ -539,7 +547,7 @@ before live args → decode obligations → compatibility projection → executo
 ```
 
 `TodoWritePrepared` 冻结 provider 原始 `planComplete` + canonical
-`{planComplete,workingOn,obligations:[{name,work}]}` `ProviderInputDigest` 与 BaseObligations / Submitted digests、
+`{planComplete,workingOn,obligations:[{name,horizon,work}]}` `ProviderInputDigest` 与 BaseObligations / Submitted digests、
 `ReviewFrontier`（本 tool-call 前 exclusive cursor，绑 ManagerLifeId）。冻结它之前必须先从 full Host
 snapshot 定位当前 provider run，并把**该 run 之前的完整 transcript prefix**同步进 XTrace；这样此前已经
 发生但 transform capture 尚未来得及写入的 Scout/join/assistant 材料不会落在 frontier 之后，同时当前
@@ -582,3 +590,24 @@ XTrace。随后当前 pending call 使用 fresh XTrace head + 同 message 本 ca
 安全 seal（Manager-facing LWR 不 regex 清洗）属 finality safety-seal 交叉（TODO-013）。
 
 **证据** → HOW.md 行 O-26。
+
+## OBLIGATION-LEDGER-027：透视粒度 —— complete coverage，不 uniform decomposition
+
+**规范**：每份非空 account 是从当前 `workingOn` 执行前沿向未来看的透视图，detail 随距离衰减：
+
+1. `near`：execution-sized；不需要另一次重大规划决定即可直接着手，并有独立 closure evidence。
+2. `mid`：outcome-sized；下一层结果、必要依赖与边界已经知道，但内部步骤暂不展开。
+3. `far`：coverage-sized；保留所有已知剩余用户可见 debt/outcome 的覆盖面，内部实现路径允许未知并延迟拆解。
+4. 随执行前沿推进，允许同一债务 `far → mid → near` 逐步细化；这不是状态迁移记录，而是下一份完整 account
+   对当前事实的重新投影。细化后 coarse parent 被新 account supersede，不与 children 并存计债。
+5. `planComplete=true` 只要求道路已经完整到可托付：near 前沿可执行、mid 暴露关键结果/依赖、far 完整覆盖
+   已知 mission debt。禁止把“完整”解释成“所有未来工作都拆成 near 粒度”。
+
+**含义 / 动机**：模型只有平面 `{name,work}` 时倾向把整条未来道路一次性 WBS 化；这既提前绑定未知实现，
+又稀释当前动作。horizon 把“覆盖完整性”和“展开分辨率”拆成正交事实，使账本能同时做到近处可执行、
+远处不漏债且不过拟合。
+
+**边界**：`horizon` 不是 priority、status、phase、ETA 或 wall-clock 距离；Host/Projection 不得据此驱动工作流
+控制流。它只影响 provider authoring 分辨率与 reviewer 对账本粒度的语义判断。
+
+**证据** → HOW.md 行 O-27。

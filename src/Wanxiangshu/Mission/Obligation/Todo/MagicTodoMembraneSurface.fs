@@ -59,7 +59,18 @@ module MagicTodoMembraneSurface =
             values
             |> Array.toList
             |> List.map (fun value ->
+                let horizonText = text (value?horizon)
+
+                let horizon =
+                    if String.IsNullOrWhiteSpace horizonText then
+                        ObligationHorizon.Near
+                    else
+                        horizonText
+                        |> ObligationHorizon.tryParse
+                        |> Option.defaultWith (fun () -> invalidArg "horizon" "expected near, mid, or far")
+
                 { Name = text (value?name)
+                  Horizon = horizon
                   Work = text (value?work) })
 
     let private blobView reference digest =
@@ -93,6 +104,9 @@ module MagicTodoMembraneSurface =
                 "EmptyObligationName"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName _) ->
                 "DuplicateObligationName"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.NoNearObligation) -> "NoNearObligation"
+            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.WorkingOnNotNear _) ->
+                "WorkingOnNotNear"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.IdentityCorruption _) -> "IdentityCorruption"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.AwaitingConsumableReview _) ->
                 "AwaitingConsumableReview"

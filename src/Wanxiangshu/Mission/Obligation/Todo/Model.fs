@@ -55,12 +55,36 @@ module MagicTodo =
 
     /// Semantic version frozen into Prepared / Accepted facts.
     [<Literal>]
-    let SemanticVersion = "magic-todo.v4"
+    let SemanticVersion = "magic-todo.v5"
 
     // ── Provider account ───────────────────────────────────────────────────
 
-    /// The only provider-visible todo item shape after GrandRewrite.
-    type Obligation = { Name: string; Work: string }
+    [<RequireQualifiedAccess>]
+    type ObligationHorizon =
+        | Near
+        | Mid
+        | Far
+
+    [<RequireQualifiedAccess>]
+    module ObligationHorizon =
+        let wire =
+            function
+            | ObligationHorizon.Near -> "near"
+            | ObligationHorizon.Mid -> "mid"
+            | ObligationHorizon.Far -> "far"
+
+        let tryParse =
+            function
+            | "near" -> Some ObligationHorizon.Near
+            | "mid" -> Some ObligationHorizon.Mid
+            | "far" -> Some ObligationHorizon.Far
+            | _ -> None
+
+    /// Provider-visible owed work plus its resolution relative to the current frontier.
+    type Obligation =
+        { Name: string
+          Horizon: ObligationHorizon
+          Work: string }
 
     type ObligationList = Obligation list
 
@@ -104,15 +128,18 @@ module MagicTodo =
 
         finalRow |> List.last
 
+    let private isNear (item: Obligation) = item.Horizon = ObligationHorizon.Near
+
     /// Canonicalise the provider's focus pointer at the input boundary.
-    /// Exact names win. A misspelling resolves to the nearest obligation name by
-    /// Levenshtein distance; ties preserve provider obligation order. With no
-    /// obligations there is no valid focus, so the canonical pointer is empty.
+    /// The execution frontier is always one Near obligation. Misspellings resolve
+    /// only within Near obligations; Mid/Far are deliberately not executable focus.
     let normalizeWorkingOn (workingOn: string) (items: ObligationList) : string =
-        match items |> List.tryFind (fun item -> item.Name = workingOn) with
+        let candidates = items |> List.filter isNear
+
+        match candidates |> List.tryFind (fun item -> item.Name = workingOn) with
         | Some exact -> exact.Name
         | None ->
-            items
+            candidates
             |> List.mapi (fun ordinal item -> levenshteinDistance workingOn item.Name, ordinal, item.Name)
             |> List.sortBy (fun (distance, ordinal, _) -> distance, ordinal)
             |> List.tryHead
@@ -142,6 +169,8 @@ module MagicTodo =
         | MultipleTodowriteInMessage of callIds: string list
         | EmptyObligationName of ordinal: int
         | DuplicateObligationName of name: string
+        | NoNearObligation
+        | WorkingOnNotNear of name: string
         | IdentityCorruption of field: string
         | AwaitingConsumableReview of pendingTodoWriteId: string
         | FirstSuicideWithoutCheckpoint
@@ -184,7 +213,12 @@ module MagicTodo =
     /// Byte-stable durable/provider account body.
     let canonicalObligationListWire (items: ObligationList) : string =
         items
-        |> List.map (fun item -> sprintf """{"name":%s,"work":%s}""" (jsonString item.Name) (jsonString item.Work))
+        |> List.map (fun item ->
+            sprintf
+                """{"name":%s,"horizon":%s,"work":%s}"""
+                (jsonString item.Name)
+                (jsonString (ObligationHorizon.wire item.Horizon))
+                (jsonString item.Work))
         |> String.concat ","
         |> sprintf "[%s]"
 
@@ -202,6 +236,15 @@ module MagicTodo =
             | head :: tail -> loop (ordinal + 1) (Set.add head.Name seen) tail
 
         loop 0 Set.empty items
+
+    let validateTodoWriteInput (input: TodoWriteInput) : Result<TodoWriteInput, MagicTodoReject> =
+        let exactFocus = input.Obligations |> List.tryFind (fun item -> item.Name = input.WorkingOn)
+
+        match input.Obligations, exactFocus with
+        | [], _ -> Ok { input with WorkingOn = "" }
+        | items, _ when not (items |> List.exists isNear) -> Error MagicTodoReject.NoNearObligation
+        | _, Some item when not (isNear item) -> Error(MagicTodoReject.WorkingOnNotNear item.Name)
+        | items, _ -> Ok { input with WorkingOn = normalizeWorkingOn input.WorkingOn items }
 
     /// More than one distinct todowrite call in one assistant message is a call
     /// protocol error. Same ToolCallId replay remains one physical attempt.
