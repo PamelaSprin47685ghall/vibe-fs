@@ -214,6 +214,14 @@ module HostEventCodec =
     let private messageInfoSessionId (info: obj) =
         nonEmptyFieldText info "sessionID" |> Option.map SessionId.create
 
+    /// Session owning a message lifecycle event (`message.updated`): the id sits
+    /// on properties.info for this family, not on the payload root.
+    let tryMessageSessionId (rawInput: obj) : SessionId option =
+        let raw = unwrap rawInput
+
+        tryReadSessionId raw
+        |> Option.orElseWith (fun () -> messageInfoSessionId (messageInfo raw))
+
     let private physicalParentId (info: obj) =
         nonEmptyFieldText info "parentID" |> Option.map PhysicalUserMessageId.create
 

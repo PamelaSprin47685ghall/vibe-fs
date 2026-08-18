@@ -136,6 +136,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// Optional until HostSignalBootstrap wires abort + ownership.
     // DSL-MUTABLE: resource — loop sensor attachment slot
     let mutable loopSensor: LoopSensor option = None
+    // DSL-MUTABLE: resource — message-visibility hub attachment slot
+    let mutable messageVisibility: MessageVisibilityHub option = None
     // DSL-MUTABLE: resource — NEEDHELP reasoning sensor attachment slot
     let mutable needHelpSensor: NeedHelpSensor option = None
     // DSL-MUTABLE: resource — satellite runtime attachment slot
@@ -226,6 +228,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | None -> Task.FromResult()
 
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
+
+    member _.AttachMessageVisibility(hub: MessageVisibilityHub) = messageVisibility <- Some hub
+
+    /// None until the signal stack wires the hub; the catch-up re-read then
+    /// falls back to its bounded immediate form.
+    member _.MessageVisibility = messageVisibility
 
     member _.AttachNeedHelpSensor(sensor: NeedHelpSensor) = needHelpSensor <- Some sensor
 

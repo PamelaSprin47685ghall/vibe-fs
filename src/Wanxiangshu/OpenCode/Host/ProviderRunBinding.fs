@@ -18,8 +18,9 @@ module ProviderRunBinding =
 
     /// Maximum public-snapshot reads used by the physical Host seam when the
     /// only evidence missing is the not-yet-projected assistant message.
-    /// First read is immediate; subsequent reads are separated by the delay
-    /// below. Identity rejections are never retried.
+    /// First read is immediate; later reads wait on the session's
+    /// `message.updated` signal with the budget below as deadline backstop.
+    /// Identity rejections are never retried.
     let projectionCatchupMaxReads = 6
 
     let projectionCatchupDelayMilliseconds = 10

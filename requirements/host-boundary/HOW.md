@@ -29,7 +29,9 @@ ToolPart/assistant/run/ordinal（0/≥2 → `Ambiguous` fail-closed）。`HostSe
 Provider-run 因果绑定把“identity 判断”与“Host projector 可见性”分开：
 `ProviderRunBinding.observeBindableRun` 只把纯 `NoBindableRun` 分类成 `ProjectionNotVisibleYet`；
 `AmbiguousRun` / `NotLatestRun` 保持非重试 rejection。`Context/Prefix/Wire.fs` 的 armed retry
-在这个 typed 暂态上做短暂 bounded reread，后续 snapshot 一旦出现唯一 incomplete assistant
+在这个 typed 暂态上做事件驱动的 bounded reread：重读等待由 `MessageVisibilityHub` 挂在
+session 的 `message.updated` 信号上（事件 = 快路径），ITimerPort deadline 只做无信号时的
+backstop（预算仍由 `projectionCatchupMaxReads/DelayMilliseconds` 封顶）；后续 snapshot 一旦出现唯一 incomplete assistant
 即继续；预算耗尽仍以 `NoBindableRun` fail closed。这里的等待只让**同一已发布物理事实**变得
 可见，不用时间推导业务状态，也不改变 bindableRun 的四条件。
 

@@ -29,7 +29,6 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Process
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
@@ -315,7 +314,16 @@ module XWire =
         | None, Some NoCandidateReason.NoCoverage -> ()
         | None, _ -> scope.ClearRecovery sessionId
 
+    let private awaitProjectionSignal
+        (messageVisibility: MessageVisibilityHub option)
+        (sessionId: SessionId)
+        : Task<unit> =
+        match messageVisibility with
+        | Some hub -> hub.AwaitChange sessionId ProviderRunBinding.projectionCatchupDelayMilliseconds
+        | None -> Task.FromResult(())
+
     let private bindProviderRunAfterProjectionCatchup
+        (messageVisibility: MessageVisibilityHub option)
         (snapshotPort: ISessionSnapshotPort)
         (sessionId: SessionId)
         (physical: PhysicalUserMessageId)
@@ -331,11 +339,9 @@ module XWire =
                 | ProviderRunBinding.Observation.Bound assistant -> return assistant
                 | ProviderRunBinding.Observation.Rejected rejection ->
                     return
-                        requireOkMapped
-                            (fun error -> sprintf "X-wire run binding failed: %A" error)
-                            (Error rejection)
+                        requireOkMapped (fun error -> sprintf "X-wire run binding failed: %A" error) (Error rejection)
                 | ProviderRunBinding.Observation.ProjectionNotVisibleYet when remainingReads > 1 ->
-                    do! PtyTiming.timerTask ProviderRunBinding.projectionCatchupDelayMilliseconds
+                    do! awaitProjectionSignal messageVisibility sessionId
                     return! read (remainingReads - 1)
                 | ProviderRunBinding.Observation.ProjectionNotVisibleYet ->
                     return
@@ -357,7 +363,8 @@ module XWire =
         (rawMessages: obj list)
         : Task<unit> =
         task {
-            let! assistant = bindProviderRunAfterProjectionCatchup snapshotPort sessionId physical
+            let! assistant =
+                bindProviderRunAfterProjectionCatchup scope.MessageVisibility snapshotPort sessionId physical
 
             let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable

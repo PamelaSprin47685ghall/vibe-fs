@@ -431,6 +431,8 @@
     <Compile Include="Context/Companion/Blogger/Runtime/Abandon.fs"/>
     <Compile Include="OpenCode/Host/LoopSensor.fs"/>
     <Compile Include="OpenCode/Host/LoopSensorSurface.fs"/>
+    <Compile Include="OpenCode/Host/MessageVisibility.fs"/>
+    <Compile Include="OpenCode/Host/MessageVisibilitySurface.fs"/>
     <Compile Include="Enforcer/Guidance/Tip.fs"/>
     <Compile Include="Enforcer/Cycle/Decode.fs"/>
     <Compile Include="Enforcer/Cycle/Commit.fs"/>
