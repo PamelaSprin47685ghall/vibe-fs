@@ -54,9 +54,6 @@ module MagicTodoObligationCodec =
     let private normalizeInput (input: TodoWriteInput) =
         match MagicTodo.validateTodoWriteInput input with
         | Ok normalized -> Ok normalized
-        | Error MagicTodoReject.NoNearObligation ->
-            Error "todowrite non-empty obligations require at least one near obligation"
-        | Error(MagicTodoReject.WorkingOnNotNear _) -> Error "todowrite.workingOn must name a near obligation"
         | Error _ -> Error "todowrite input failed semantic validation"
 
     /// Decode the provider-facing call object explicitly; snapshot locality binds

@@ -110,8 +110,9 @@ Error 允许 `invalidOp`（provider 红字）。REVISE 是正常业务结果，�
 
 `ObligationHorizon = Near | Mid | Far` 是封闭 ADT，canonical wire 固定编码为 `near|mid|far`。它是 owed-work
 事实的一部分，因此进入 blob/digest/review wire；但 Projection 不为 horizon 建 phase/status machine，也不据此
-分支 workflow。`workingOn` 是唯一执行前沿：Host provider decode 要求非空 account 至少一个 Near，exact
-`workingOn` 只能命中 Near；拼写未命中时只在 Near 集合内做 Levenshtein 归一。空 account 仍归一为 `""`。
+分支 workflow。Host provider decode 不把 horizon 当 admission gate：exact `workingOn` 可命中任意 horizon；
+拼写未命中时在全部 obligations 中做 Levenshtein 归一。非空 account 没有 Near 也可 accepted；规划分辨率是否
+合理交给 process review / provider guidance 判断。空 account 仍归一为 `""`。
 
 新 tool definition 严格 require `{name,horizon,work}`。为了重放升级前已 durable 的 v4 bytes，durable blob 与
 snapshot input codec 允许缺 horizon 的历史 obligation 在 ingress 全部映射为 `Near`：旧协议没有记录距离，

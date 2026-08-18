@@ -6,6 +6,6 @@
 
 从 `workingOn` 维护有透视的 account：`near` 是执行粒度，`mid` 是下一层结果粒度，`far` 是剩余道路的粗粒度 coverage。要求完整覆盖，不要求均匀 decomposition；不要把整个未来一次性炸成 near 大小的步骤。工作接近执行前沿时，再按 `far → mid → near` 细化，并用新暴露的 obligations 替换粗 parent。
 
-commitment 之后，让 living mission obligations 保持真实：仍欠的工作继续保留，只有真正解除后才移除；证据揭示新的 mission debt 时如实加入。每份非空 account 的 `workingOn` 都必须精确命名当前执行前沿实际正在推进的唯一 `near` obligation；`mid` 与 `far` 不进入 active focus。实际焦点一旦切换就立即同步更新。空 account 使用 `workingOn=""`。每一份 accepted account 都立即成为当前（Current）account；process review 可以批评它，但无权决定它是否 Current。
+commitment 之后，让 living mission obligations 保持真实：仍欠的工作继续保留，只有真正解除后才移除；证据揭示新的 mission debt 时如实加入。每份非空 account 的 `workingOn` 都精确命名当前实际正在推进的 obligation；优先把 active focus 细化成可直接闭环的 `near`，但 horizon 分辨率不阻断记账，process review 可以批评它。实际焦点一旦切换就立即同步更新。空 account 使用 `workingOn=""`。每一份 accepted account 都立即成为当前（Current）account；process review 可以批评它，但无权决定它是否 Current。
 
 无论哪种关系，都不要用空 placeholder、裸阶段名或延后内容的槽位冒充 obligation。

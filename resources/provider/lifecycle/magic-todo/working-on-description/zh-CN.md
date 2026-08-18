@@ -1,1 +1,1 @@
-当前执行前沿正在实际推进的唯一 obligation 名称。它必须精确匹配某个 horizon=`near` 的 `obligations[].name`；`mid` 与 `far` 明确位于 active frontier 之外。当 `obligations` 为空时，使用空字符串。它只是用于 Host 进度显示的当前焦点指针，不是 obligation status 或完成信号。实际工作焦点一旦切换，就同步更新它。
+当前实际正在推进、作为规划透视前沿（frontier）的唯一 obligation 名称。优先让 active focus 使用可直接闭环的 horizon=`near`；若当前 account 的分解暂时仍是 `mid/far`，照实指向正在推进的 obligation，Host 不会因此拒绝记账，process review 可继续指出分辨率问题。当 `obligations` 为空时，使用空字符串。它只是用于 Host 进度显示的当前焦点指针，不是 obligation status 或完成信号。实际工作焦点一旦切换，就同步更新它。

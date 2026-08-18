@@ -46,6 +46,9 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Enforcer.Guidance
 
 /// Shared session-scoped projection-update algebra for the fold families
 /// (formerly private helpers of `Fold`). `prefixOutcome` is shared by the
@@ -110,6 +113,14 @@ module ProjectionUpdate =
                     { session with
                         PrefixEpoch = Some updated }))
             projection
+
+    let retireAuxiliaryInjectionVisibility (session: SessionAgentProjection) =
+        { session with
+            TipDelivery = session.TipDelivery |> Option.map TipDeliveryProjection.applyReanchor
+            Guidelines = session.Guidelines |> Option.map GuidelineProjection.applyReanchor
+            RequirementGrounding =
+                session.RequirementGrounding
+                |> Option.map RequirementGroundingProjection.applyReanchor }
 
     let updateReviewGuard sessionId apply projection =
         updateSession

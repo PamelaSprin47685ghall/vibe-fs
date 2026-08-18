@@ -43,11 +43,12 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 `workingOn` 执行前沿的规划分辨率：`near` 可直接着手并独立闭环，`mid` 保留下一层有意义结果/依赖但不
 预展开内部步骤，`far` 以粗粒度 outcome 覆盖更远的已知剩余债务并延迟内部拆解。
 
-`workingOn` 是当前实际工作焦点，也是 horizon 的透视原点。非空 account 必须至少有一个 `near` obligation，
-且规范化后的 `workingOn` 必须精确命名一个 `near` obligation；exact 输入若指向 `mid/far` 属调用语义错误。
-provider 输入拼写未 exact 命中时，只在 `near` obligations 中按 Levenshtein 编辑距离选择最近 `name`，并列按
-provider 原顺序取第一个；空 account 一律归一为空字符串。因此进入 durable account 后 `workingOn` 始终
-指向可执行前沿，provider 的焦点拼写错误仍是可恢复 authoring mistake。`workingOn` 只决定当前焦点/Host
+`workingOn` 是当前实际工作焦点，也是 horizon 的透视原点。非空 account 中，规范化后的 `workingOn` 必须
+精确命名一个 obligation，但 horizon 不参与 admission；exact 输入指向 `near|mid|far` 均合法，整份 account
+暂时没有 `near` 也不得阻断 TodoWrite。provider 输入拼写未 exact 命中时，在全部 obligations 中按 Levenshtein
+编辑距离选择最近 `name`，并列按 provider 原顺序取第一个；空 account 一律归一为空字符串。`near/mid/far`
+仍是 review 可评价的规划质量事实，但绝不是 Host 执行许可。provider 的焦点拼写/分辨率失配是可恢复
+authoring mistake。`workingOn` 只决定当前焦点/Host
 compatibility sink 活动行，不是 obligation status，也不进入 `CurrentObligations`。
 
 Keep while owed；remove when earned by work。不得仅为让路看起来更短而删仍欠义务；不得在真正 discharge

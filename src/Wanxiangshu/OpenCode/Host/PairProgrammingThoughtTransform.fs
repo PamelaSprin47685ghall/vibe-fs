@@ -466,34 +466,36 @@ module PairProgrammingThoughtTransform =
             clonedMessage?parts <- box clonedParts
             Some clonedMessage
 
+    let private stripKnownCursorSuffixes (suffixTexts: string list) (originalPart: obj) : obj =
+        let stripKnown (value: string) =
+            (value, suffixTexts)
+            ||> List.fold (fun current text ->
+                current.Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal))
+
+        let originalState = originalPart?state
+        let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
+
+        match partStatus originalPart with
+        | Some "completed" when isString originalState?output ->
+            clonedState?output <- box (stripKnown (unbox<string> originalState?output))
+        | Some "error" when isString originalState?error ->
+            clonedState?error <- box (stripKnown (unbox<string> originalState?error))
+        | Some "error" when isString originalState?output ->
+            clonedState?output <- box (stripKnown (unbox<string> originalState?output))
+        | _ -> ()
+
+        let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
+        clonedPart?state <- clonedState
+        clonedPart
+
     let stripCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
         let parts = rawParts rawMsg
 
         match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
         | None -> rawMsg
         | Some index ->
-            let stripKnown value =
-                (value, suffixTexts)
-                ||> List.fold (fun current text ->
-                    current.Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal))
-
-            let originalPart = parts.[index]
-            let originalState = originalPart?state
-            let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
-
-            match partStatus originalPart with
-            | Some "completed" when isString originalState?output ->
-                clonedState?output <- box (stripKnown (unbox<string> originalState?output))
-            | Some "error" when isString originalState?error ->
-                clonedState?error <- box (stripKnown (unbox<string> originalState?error))
-            | Some "error" when isString originalState?output ->
-                clonedState?output <- box (stripKnown (unbox<string> originalState?output))
-            | _ -> ()
-
-            let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-            clonedPart?state <- clonedState
             let clonedParts = Array.copy parts
-            clonedParts.[index] <- clonedPart
+            clonedParts.[index] <- stripKnownCursorSuffixes suffixTexts parts.[index]
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
             clonedMessage

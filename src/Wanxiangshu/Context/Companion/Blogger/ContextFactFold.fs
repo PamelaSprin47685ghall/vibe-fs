@@ -44,8 +44,6 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.OpenCode.Host.PairProgramming
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 module ContextFactFold =
 
@@ -259,11 +257,7 @@ module ContextFactFold =
                     |> Result.map (fun retired ->
                         { session with
                             PrefixEpoch = Some retired
-                            Blog = session.Blog |> Option.map BlogProjection.applyReanchor
-                            TipDelivery = session.TipDelivery |> Option.map TipDeliveryProjection.applyReanchor
-                            Guidelines = session.Guidelines |> Option.map GuidelineProjection.applyReanchor
-                            RequirementGrounding =
-                                session.RequirementGrounding
-                                |> Option.map RequirementGroundingProjection.applyReanchor }))
+                            Blog = session.Blog |> Option.map BlogProjection.applyReanchor }
+                        |> ProjectionUpdate.retireAuxiliaryInjectionVisibility))
                 projection
             |> prefixOutcome "ContextReanchored" projection

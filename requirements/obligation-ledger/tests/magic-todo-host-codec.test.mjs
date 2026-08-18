@@ -104,16 +104,27 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
       { name: 'ship', horizon: 'far', work: 'Ship the complete result.' },
     ],
   })
-  assert.equal(nonNearFocus.ok, false)
-  assert.equal(nonNearFocus.error, "todowrite.workingOn must name a near obligation")
+  assert.equal(nonNearFocus.ok, true, nonNearFocus.ok ? '' : nonNearFocus.error)
+  assert.equal(nonNearFocus.value.workingOn, 'ship')
 
   const noNear = host.decodeInput({
     planComplete: true,
     workingOn: 'ship',
     obligations: [{ name: 'ship', horizon: 'far', work: 'Ship the complete result.' }],
   })
-  assert.equal(noNear.ok, false)
-  assert.equal(noNear.error, 'todowrite non-empty obligations require at least one near obligation')
+  assert.equal(noNear.ok, true, noNear.ok ? '' : noNear.error)
+  assert.equal(noNear.value.workingOn, 'ship')
+
+  const misspelledFarFocus = host.decodeInput({
+    planComplete: true,
+    workingOn: 'shp',
+    obligations: [
+      { name: 'prepare', horizon: 'near', work: 'Prepare the immediate change.' },
+      { name: 'ship', horizon: 'far', work: 'Ship the complete result.' },
+    ],
+  })
+  assert.equal(misspelledFarFocus.ok, true, misspelledFarFocus.ok ? '' : misspelledFarFocus.error)
+  assert.equal(misspelledFarFocus.value.workingOn, 'ship')
 })
 
 test('WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every other obligation to pending', () => {

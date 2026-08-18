@@ -44,19 +44,25 @@ WHAT 告诉执行者“什么必须为真”，HOW 告诉它当前实现结构�
 但简单按包名永久去重又会产生另一个错误：任务进行中 package 内容真的发生变化，旧 grounding
 继续冒充当前版本。
 
-因此去重对象不是“包名”，而是 `(workspace, package, content digest)`。同一上下文已经收到同一
-digest 就不重复；内容变化形成新 grounding identity，允许重新交付。
+因此去重对象不是“包名”，而是 `(workspace, package, content digest)` 加当前 provider horizon 的
+coverage。同一 horizon 已收到同一 digest 就不重复；内容变化形成新 grounding identity，允许重新交付；
+`ContextReanchored` 则让旧 coverage 退出 Y，即使 digest 未变，下一次真实触发也必须重新交付。
 
-## 为什么要做成永久投影，而不是每轮重新注入
+## 为什么要在同一 horizon 做 durable 锚定，而不是每轮重新注入
 
 模型第一次真正读到 requirement 后，这些 read 已经是历史事实。后续每轮若重新读取当前文件、重新
 组装 tool result 或重新决定插入位置，哪怕语义内容相同，也可能改动已发送 prefix 的字节，直接击穿
 provider KV cache。正确做法与现有 pair-programming guideline 一样：第一次发生时把普通 read 的 exact
-call/result bytes 与 transcript gap 锚定，之后只从 durable fact 原位 replay。
+call/result bytes 与 transcript gap 锚定；只要还在同一 horizon，就只从 durable fact 原位 replay。
 
 这也解决了“规范后来变了怎么办”：历史那次 read 不应该被未来文件内容反向改写。package digest 改变时，
 当前尾部追加一组新的普通 read，旧 wire 仍是新 wire 的前缀。若当前尾部同时有 pair-programming 伪
-`skill`，先放已有的伪 skill，再放 requirement reads；顺序一旦形成永久不变。
+`skill`，先放已有的伪 skill，再放 requirement reads；在该 horizon 内顺序一旦形成就不再改写。
+
+但 durable 历史不等于跨压缩永久可见。X→Y / `ContextReanchored` 已经明确换了 provider horizon；若还把
+旧 requirement reads（尤其 WHY/WHAT/HOW/tests/APPLIES-TO）全部 replay 回 Y，压缩就只删了 work history，
+辅助材料却无限累积。因此重锚只退休 provider-visible grounding coverage，不删 occurrence；之后相关路径
+再次进入视野时，再按正常触发逐步 grounding。
 
 Cursor 是唯一需要保留 provider 差异的地方。它和现有 pair-programming 一样把 synthetic 内容拼在真实
 terminal result 后面，因此没有 read call 可以携带 `filePath`。如果只拼正文，连续读 WHY/WHAT/HOW/tests

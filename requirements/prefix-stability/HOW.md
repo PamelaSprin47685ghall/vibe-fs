@@ -57,9 +57,11 @@ type ActivePrefixEpoch =
 ### 1.4 fold 接线（`Context/Companion/Blogger/ContextFactFold.fs`）
 
 - `PrefixRebaseCommitted` → `tryUpdatePrefix` + `PrefixEpochProjection.applyRebase`。
-- `ContextReanchored` → **一个** session 级更新原子做两件事：prefix 退休 +
-  PrefixCoverage 归零（`BlogProjection.applyReanchor`）；Frames / RecordCoverage /
-  XTrace 存活（COMPANION-008）。原子性结构性保证，不靠读者追踪两步。
+- `ContextReanchored` → **一个** session 级更新原子完成一个冷边界：prefix 退休 +
+  PrefixCoverage 归零（`BlogProjection.applyReanchor`）+ 当前 auxiliary-injection visibility 退休
+  （`GuidelineProjection.applyReanchor` / `RequirementGroundingProjection.applyReanchor` /
+  `TipDeliveryProjection.applyReanchor`）。Frames / RecordCoverage / XTrace 与 durable injection
+  occurrence history 存活（COMPANION-008 / CTX-019）。原子性结构性保证，不靠读者追踪多步。
 - TodoCheckpoint（`PrefixRebaseCommittedV2`，`EvidenceKind=TodoCheckpoint`）经同一
   `tryUpdatePrefix` 路径——无第二 SSOT（CTX-015）。
 

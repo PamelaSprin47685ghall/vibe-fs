@@ -113,18 +113,15 @@ module MagicTodo =
 
         finalRow |> List.last
 
-    let private isNear (item: Obligation) = item.Horizon = ObligationHorizon.Near
-
     /// Canonicalise the provider's focus pointer at the input boundary.
-    /// The execution frontier is always one Near obligation. Misspellings resolve
-    /// only within Near obligations; Mid/Far are deliberately not executable focus.
+    /// Horizon is planning resolution, not admission authority. Misspellings resolve
+    /// against the whole account so bookkeeping remains available even when the
+    /// provider's current decomposition is imperfect.
     let normalizeWorkingOn (workingOn: string) (items: ObligationList) : string =
-        let candidates = items |> List.filter isNear
-
-        match candidates |> List.tryFind (fun item -> item.Name = workingOn) with
+        match items |> List.tryFind (fun item -> item.Name = workingOn) with
         | Some exact -> exact.Name
         | None ->
-            candidates
+            items
             |> List.mapi (fun ordinal item -> levenshteinDistance workingOn item.Name, ordinal, item.Name)
             |> List.sortBy (fun (distance, ordinal, _) -> distance, ordinal)
             |> List.tryHead
@@ -154,8 +151,6 @@ module MagicTodo =
         | MultipleTodowriteInMessage of callIds: string list
         | EmptyObligationName of ordinal: int
         | DuplicateObligationName of name: string
-        | NoNearObligation
-        | WorkingOnNotNear of name: string
         | IdentityCorruption of field: string
         | AwaitingConsumableReview of pendingTodoWriteId: string
         | FirstSuicideWithoutCheckpoint
@@ -223,14 +218,9 @@ module MagicTodo =
         loop 0 Set.empty items
 
     let validateTodoWriteInput (input: TodoWriteInput) : Result<TodoWriteInput, MagicTodoReject> =
-        let exactFocus =
-            input.Obligations |> List.tryFind (fun item -> item.Name = input.WorkingOn)
-
-        match input.Obligations, exactFocus with
-        | [], _ -> Ok { input with WorkingOn = "" }
-        | items, _ when not (items |> List.exists isNear) -> Error MagicTodoReject.NoNearObligation
-        | _, Some item when not (isNear item) -> Error(MagicTodoReject.WorkingOnNotNear item.Name)
-        | items, _ ->
+        match input.Obligations with
+        | [] -> Ok { input with WorkingOn = "" }
+        | items ->
             Ok
                 { input with
                     WorkingOn = normalizeWorkingOn input.WorkingOn items }

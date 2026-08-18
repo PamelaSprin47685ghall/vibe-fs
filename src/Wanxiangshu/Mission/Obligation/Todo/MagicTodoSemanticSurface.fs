@@ -79,11 +79,6 @@ module MagicTodoSemanticSurface =
             box
                 {| code = "DuplicateObligationName"
                    name = name |}
-        | MagicTodoReject.NoNearObligation -> box {| code = "NoNearObligation" |}
-        | MagicTodoReject.WorkingOnNotNear name ->
-            box
-                {| code = "WorkingOnNotNear"
-                   name = name |}
         | MagicTodoReject.IdentityCorruption field ->
             box
                 {| code = "IdentityCorruption"
