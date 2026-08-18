@@ -26,6 +26,13 @@ idle-derived continuation 能力（QuiescenceGate 属 causal-wait，本包只拥
 ToolPart/assistant/run/ordinal（0/≥2 → `Ambiguous` fail-closed）。`HostSessionContext.read`
 从 raw event 提取 `(sessionId, agent)`；`roleOf` 经 `AgentRoleIdentity`。
 
+Provider-run 因果绑定把“identity 判断”与“Host projector 可见性”分开：
+`ProviderRunBinding.observeBindableRun` 只把纯 `NoBindableRun` 分类成 `ProjectionNotVisibleYet`；
+`AmbiguousRun` / `NotLatestRun` 保持非重试 rejection。`Context/Prefix/Wire.fs` 的 armed retry
+在这个 typed 暂态上做短暂 bounded reread，后续 snapshot 一旦出现唯一 incomplete assistant
+即继续；预算耗尽仍以 `NoBindableRun` fail closed。这里的等待只让**同一已发布物理事实**变得
+可见，不用时间推导业务状态，也不改变 bindableRun 的四条件。
+
 ### Reconciler（`Composition/Turn/Scheduler.fs`）
 
 `Scheduler` 持有 queued/active/generation/wake：同 session 信号合并、最多一个 drain、

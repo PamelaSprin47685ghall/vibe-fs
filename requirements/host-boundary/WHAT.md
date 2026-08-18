@@ -111,9 +111,17 @@ user、`id` 为 session 内 assistant 最大者 → 命中**恰好一个**才绑
 compaction / summary 路径 → fail closed。唯一性前提是单 actor 写 assistant（HOST-010；
 历史 how/host 引理 1–4）。
 
+Host 的公开 session snapshot 可以短暂落后于同一 Host 已接受的 `message.updated`。因此在
+**物理 snapshot 可见性边界**，第一次 `NoBindableRun` 只允许被解释为“projection 尚未赶上”的
+暂态，并做**有界重读**；一旦后续 snapshot 出现满足上述四条件的唯一 assistant 即绑定。窗口
+耗尽仍返回 `NoBindableRun`。`AmbiguousRun` / `NotLatestRun`、snapshot 读取错误，以及
+compaction/summary 永远不是 projection-lag 重试理由，必须立即/最终 fail closed。禁止通过放宽
+parent/completed/latest/compaction 条件解决可见性竞态。
+
 **含义/动机**：same-root 猜测在 Host 重排消息时假绿；宁可 fail closed，不赌同一身。
 
-**证据**：`ProviderRunBinding` / `TurnBinding`（消费因果读）；→ PROOF.md `HOST-BOUNDARY-008`
+**证据**：`ProviderRunBinding` / `TurnBinding`（消费因果读）；`Context/Prefix/Wire.fs`
+（armed retry 的 bounded snapshot catch-up）；→ PROOF.md `HOST-BOUNDARY-008`
 （NEW `tests/host010-run-id-equivalence.test.mjs`：bindableRun id ≡ ToolContext.messageID encoding；
 共时 Host 穿线仍由 Long Stroke 物理契约承担）
 

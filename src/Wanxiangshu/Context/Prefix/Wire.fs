@@ -314,6 +314,37 @@ module XWire =
         | None, Some NoCandidateReason.NoCoverage -> ()
         | None, _ -> scope.ClearRecovery sessionId
 
+    let private bindProviderRunAfterProjectionCatchup
+        (snapshotPort: ISessionSnapshotPort)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        : Task<SessionMessage> =
+        let physicalId = PhysicalUserMessageId.value physical
+
+        let rec read remainingReads =
+            task {
+                let! snapshotResult = snapshotPort.GetMessages sessionId
+                let messages = requireOk snapshotResult
+
+                match ProviderRunBinding.observeBindableRun physicalId messages with
+                | ProviderRunBinding.Observation.Bound assistant -> return assistant
+                | ProviderRunBinding.Observation.Rejected rejection ->
+                    return
+                        requireOkMapped
+                            (fun error -> sprintf "X-wire run binding failed: %A" error)
+                            (Error rejection)
+                | ProviderRunBinding.Observation.ProjectionNotVisibleYet when remainingReads > 1 ->
+                    do! Task.Delay ProviderRunBinding.projectionCatchupDelayMilliseconds
+                    return! read (remainingReads - 1)
+                | ProviderRunBinding.Observation.ProjectionNotVisibleYet ->
+                    return
+                        requireOkMapped
+                            (fun error -> sprintf "X-wire run binding failed: %A" error)
+                            (Error ProviderRunBinding.Rejection.NoBindableRun)
+            }
+
+        read ProviderRunBinding.projectionCatchupMaxReads
+
     let private planArmedWorkMainRetry
         (snapshotPort: ISessionSnapshotPort)
         (durable: AgentJournal)
@@ -325,13 +356,7 @@ module XWire =
         (rawMessages: obj list)
         : Task<unit> =
         task {
-            let! snapshotResult = snapshotPort.GetMessages sessionId
-            let messages = requireOk snapshotResult
-
-            let assistant =
-                requireOkMapped
-                    (fun rejection -> sprintf "X-wire run binding failed: %A" rejection)
-                    (ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages)
+            let! assistant = bindProviderRunAfterProjectionCatchup snapshotPort sessionId physical
 
             let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable
