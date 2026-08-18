@@ -42,12 +42,18 @@ Witness ID 必须指向已持久化 `ConfirmedReviewWitness`；`ConflictDetected
 
 ### 恢复（ORCH-007）
 
-Fold 取每个活跃 Job 的最后事实，决定**唯一**恢复动作；PublishClaimed 三分支固定顺序不可换：
+`program` 读取 durable projection 的 `JobProgress`，直接 match 每个 case 调用对应 CE effect。
+fresh start（无 projection 或 `ManagerStarted`）与 restart 共用同一 `awaitAndPublish` entry。
+`JobProgress` 只保存物理证据（commit、head snapshot、conflict files），不保存程序位置。
+`classifyRebasedCandidate` / `classifyPublishClaim` 返回领域分类（`RebasedCandidateReality` /
+`PublishClaimReality`），Program.fs match 分类决定 CE effect——不存在 control-token dispatcher。
+
+PublishClaimed 三分支固定顺序不可换：
 
 ```text
-1. currentHead = rebasedCommit   → ff 已完成，补写 Published（幂等）
-2. currentHead = ExpectedHead    → 从未 ff；短 gate + 再确认 head → ff-only → Published
-3. 其它                          → claim 过期；丢弃旧 post-rebase witness；回 rebaseReviewPublishLoop
+1. currentHead = rebasedCommit   → AlreadyFastForwarded → 补写 Published（幂等）
+2. currentHead = ExpectedHead    → PublishReady → 短 gate + 再确认 head → ff-only → Published
+3. 其它                          → ClaimExpired → 丢弃旧 post-rebase witness；回 rebaseReviewPublishLoop
 ```
 
 禁止：恢复时新建 worktree 或换 Manager；跳过 post-rebase review；用文件系统状态代替事实。

@@ -32,12 +32,11 @@ WorktreeEffects：Map<WorktreeIdentity, WorktreeEffectStatus>
   acceptWorktree：Requested → Created；重复 Created 幂等
 JobProgress：ManagerStarted | CandidateReady | ConflictPending | RebasedCandidateReady
   | PublishClaimed {| RebasedCommit; ExpectedHead |} | Published | Failed | Abandoned
-recoveryAction（ORCH-007，三分支固定顺序）——见 WHAT 009：
-  | PublishClaimed claim ->
-      currentHead = None                       → FailClosed "GetTargetHead failed; ORCH-008"
-      head = claim.RebasedCommit               → BackfillPublished（ff 已发生，只缺事实）
-      head = claim.ExpectedHead                → AttemptPublish（目标未变，重试 ff）
-      _                                        → RebaseAndReviewAgain（witness 作废）
+classifyPublishClaim（ORCH-007，三分支固定顺序）——见 WHAT 009：
+  currentHead = None                       → HeadUnreadable（ORCH-008 fail closed）
+  head = claim.RebasedCommit               → AlreadyFastForwarded（ff 已发生，只缺事实）
+  head = claim.ExpectedHead                → PublishReady（目标未变，重试 ff）
+  _                                        → ClaimExpired（witness 作废）
 ```
 
 ## fold 拒绝回归（`Change/Fold.fs`）

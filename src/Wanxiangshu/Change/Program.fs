@@ -304,10 +304,10 @@ module OrchestratorProgram =
         }
         |> mapTask asVerdict
 
-    // ── ORCH-007 recovery ───────────────────────────────────────────────────
+    // ── ORCH-007 reentry from durable facts ─────────────────────────────────
 
     /// Pre-rebase review and candidate registration, shared by the fresh run and the
-    /// `ResumeManager` recovery path.
+    /// `ManagerStarted` reentry path.
     let private afterManager (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         taskResult {
             do! reviewRound deps job "pre-rebase" 0
@@ -317,7 +317,9 @@ module OrchestratorProgram =
         }
         |> mapTask asVerdict
 
-    let private resumeAwaitManager (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+    /// Await the Manager, then review + register candidate + publish.
+    /// One entry for both fresh start and `ManagerStarted` reentry.
+    let private awaitAndPublish (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         taskResult {
             do!
                 deps.Manager.AwaitManager job.JobId
@@ -328,7 +330,9 @@ module OrchestratorProgram =
         }
         |> mapTask asVerdict
 
-    let private resumeConflictResolution
+    /// ORCH-003/007: hand a rebase conflict back to the SAME Manager in the SAME
+    /// worktree, then re-enter the publish loop.
+    let private resolveConflict
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (conflict:
@@ -352,7 +356,8 @@ module OrchestratorProgram =
         | TargetMoved -> publishEventually deps job 0
         | Landed commit -> settleLanded deps job commit
 
-    let private resumeAttemptPublish
+    /// ORCH-005: re-enter the short CAS window for a publish claim.
+    let private attemptPublish
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (claim:
@@ -366,17 +371,16 @@ module OrchestratorProgram =
         }
         |> mapTask asVerdict
 
-    let private resumeBackfill
+    /// ORCH-007 branch 1: the ff already happened and only the fact is missing.
+    /// Written without re-acquiring the gate — there is no ref mutation left to
+    /// protect, and taking the lock would block a job that still has real work.
+    let private backfillPublished
         (deps: OrchestratorProgramDeps)
         (job: ManagerJob)
         (landed:
             {| RebasedCommit: CommitHash
                ResultingTargetHead: CommitHash |})
         =
-        // ORCH-007 branch 1: the ff already happened and only the fact is
-        // missing. Written without re-acquiring the gate — there is no ref
-        // mutation left to protect, and taking the lock would block a job that
-        // still has real work.
         taskResult {
             do!
                 append
@@ -398,7 +402,8 @@ module OrchestratorProgram =
         }
         |> mapTask asVerdict
 
-    let private resumeCleanUp (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+    /// Terminal job: release the worktree, nothing is owed.
+    let private cleanUp (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         taskResult {
             do!
                 releaseTerminalWorktree deps job
@@ -408,69 +413,95 @@ module OrchestratorProgram =
         }
         |> mapTask asVerdict
 
-    /// Resume a job from its last durable fact.
-    ///
-    /// `recoveryAction` decides; this only executes. Adding a second condition here
-    /// would put the recovery decision in two places, and ORCH-007's fixed branch
-    /// order only holds if there is one.
-    let private resumeFromDurableFacts (deps: OrchestratorProgramDeps) (job: ManagerJob) (action: JobRecoveryAction) =
-        match action with
-        | ResumeManager -> resumeAwaitManager deps job
-        | RebaseReviewPublish _ -> publishEventually deps job 0
-        | ResumeConflictResolution conflict -> resumeConflictResolution deps job conflict
-        | AttemptPublish claim -> resumeAttemptPublish deps job claim
-        | BackfillPublished landed -> resumeBackfill deps job landed
-        | RebaseAndReviewAgain -> publishEventually deps job 0
-        | CleanUp -> resumeCleanUp deps job
-        | FailClosed reason -> Task.FromResult(failed job reason)
-
-    /// ORCH-007: recovery decision once durable progress exists past ManagerStarted.
-    let private recoveryFromProgress (deps: OrchestratorProgramDeps) (job: ManagerJob) (value: ManagerJobProjection) =
+    /// ORCH-008: read the target head; fail closed on failure rather than
+    /// falling back to HEAD.
+    let private readTargetHead (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {
-            match value.Progress with
-            | JobProgress.ManagerStarted -> return None
-            | _ ->
-                let! head = deps.Git.GetTargetHead job.TargetRef
-                let currentHead = Result.toOption head
-                return Some(OrchestratorProjection.recoveryAction currentHead value)
+            let! head = deps.Git.GetTargetHead job.TargetRef
+            return Result.toOption head
         }
 
-    /// ORCH-007: the recovery action for a job that already has durable progress.
+    /// ORCH-007: re-enter from a rebased candidate. Reads the target head and
+    /// classifies the reality to decide the CE effect.
+    let private reenterRebasedCandidate (deps: OrchestratorProgramDeps) (job: ManagerJob) (rebased: {| RebasedCommit: CommitHash; TargetHeadSnapshot: CommitHash; PostRebaseReviewBarrierId: ReviewBarrierId |}) =
+        task {
+            let! currentHead = readTargetHead deps job
+
+            match OrchestratorProjection.classifyRebasedCandidate currentHead rebased.RebasedCommit rebased.TargetHeadSnapshot with
+            | RebasedCandidateReality.HeadUnreadable ->
+                return failed job "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+            | RebasedCandidateReality.PublishReady ->
+                return!
+                    attemptPublish
+                        deps
+                        job
+                        {| RebasedCommit = rebased.RebasedCommit
+                           ExpectedHead = rebased.TargetHeadSnapshot |}
+            | RebasedCandidateReality.NeedsRebase -> return! publishEventually deps job 0
+        }
+
+    /// ORCH-007: re-enter from a publish claim. Reads the target head and
+    /// classifies the three CAS branches in fixed order.
+    let private reenterPublishClaim (deps: OrchestratorProgramDeps) (job: ManagerJob) (claim: {| RebasedCommit: CommitHash; ExpectedHead: CommitHash |}) =
+        task {
+            let! currentHead = readTargetHead deps job
+
+            match OrchestratorProjection.classifyPublishClaim currentHead claim.RebasedCommit claim.ExpectedHead with
+            | PublishClaimReality.HeadUnreadable ->
+                return failed job "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+            | PublishClaimReality.AlreadyFastForwarded ->
+                let head = Option.get currentHead
+                return!
+                    backfillPublished
+                        deps
+                        job
+                        {| RebasedCommit = claim.RebasedCommit
+                           ResultingTargetHead = head |}
+            | PublishClaimReality.PublishReady ->
+                return!
+                    attemptPublish
+                        deps
+                        job
+                        {| RebasedCommit = claim.RebasedCommit
+                           ExpectedHead = claim.ExpectedHead |}
+            | PublishClaimReality.ClaimExpired -> return! publishEventually deps job 0
+        }
+
+    /// ORCH-007: one entry for fresh start and restart. The durable projection
+    /// carries physical evidence (commits, head snapshots, conflict files), not
+    /// a program counter. Each `JobProgress` case maps directly to the CE effect
+    /// that advances the job from that evidence.
     ///
-    /// `None` for a job whose last fact is `ManagerJobCreated` — that is not a
-    /// recovery, it is the ordinary path from the top.
-    ///
-    /// The target head is read here and handed to `recoveryAction` as an option:
-    /// ORCH-008 makes a failed read fail closed, and the projection turns that
-    /// `None` into `FailClosed` rather than guessing.
-    let private recoveryFor (deps: OrchestratorProgramDeps) (job: ManagerJob) =
+    /// `None` projection = no durable fact = fresh start. `ManagerStarted` is
+    /// also a fresh start: the Manager fork is durable but has produced nothing
+    /// yet, so the path is `AwaitManager → afterManager`.
+    let private program (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {
             let record =
                 OrchestratorProjection.tryFind job.JobId (deps.Snapshot()).AgentProjections.Orchestrator
 
-            match record with
-            | None -> return None
-            | Some value -> return! recoveryFromProgress deps job value
-        }
+            let progress =
+                record
+                |> Option.map (fun value -> value.Progress)
+                |> Option.defaultValue JobProgress.ManagerStarted
 
-    let private startFresh (deps: OrchestratorProgramDeps) (job: ManagerJob) =
-        taskResult {
-            do!
-                deps.Manager.AwaitManager job.JobId
-                |> mapTaskError (fun error -> failed job (sprintf "Manager run failed: %s" error))
-
-            let! verdict = afterManager deps job |> TaskResultCE.ofTask
-            return verdict
-        }
-        |> mapTask asVerdict
-
-    let private program (deps: OrchestratorProgramDeps) (job: ManagerJob) =
-        task {
-            let! action = recoveryFor deps job
-
-            match action with
-            | Some recoveryAction -> return! resumeFromDurableFacts deps job recoveryAction
-            | None -> return! startFresh deps job
+            match progress with
+            | JobProgress.ManagerStarted -> return! awaitAndPublish deps job
+            | JobProgress.CandidateReady _ -> return! publishEventually deps job 0
+            | JobProgress.ConflictPending conflict ->
+                return!
+                    resolveConflict
+                        deps
+                        job
+                        {| CandidateCommit = conflict.CandidateCommit
+                           ConflictFiles = conflict.ConflictFiles |}
+            | JobProgress.RebasedCandidateReady rebased ->
+                return! reenterRebasedCandidate deps job rebased
+            | JobProgress.PublishClaimed claim ->
+                return! reenterPublishClaim deps job claim
+            | JobProgress.Published _
+            | JobProgress.Failed _
+            | JobProgress.Abandoned -> return! cleanUp deps job
         }
 
     let run (deps: OrchestratorProgramDeps) (job: ManagerJob) =

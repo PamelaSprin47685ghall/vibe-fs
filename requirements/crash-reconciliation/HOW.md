@@ -87,7 +87,7 @@ ExecutorTool：requirePermit → Distillation.asDistillationRuntime runtime requ
 
   exact resume material 的 `chat.message` 只做 physical admission / reconcile binding，不进入 PromptIngress、AuthorityRoot、PromptKey continuation 或 managed business routing。provider messages transform 先检查 trailing user material marker；命中后只做 Host wire sanitization，跳过 Manager narrative、Companion/XTrace、Strength、Pair、Blogger 等普通业务 transform。marker 跟随该 physical material，因此同一 `/continue` 中 tool result 后的下一次 provider step 仍走 disclosure-only；下一条新 ordinary PhysicalUserMessageId 才自然恢复普通路径。`HostTurnObserver` 对同一 exact material 继续 suppress idle/reconcile 自动 effect。真正 reopen handle/发送 charge 只来自 LLM 看见 briefing 后显式选择的正常 tool call，因此 resume discovery 与业务 effect 分离。
 - **各 domain 的恢复规则**（ORCH-007、magic-todo settle、managed-session replacement、publish reconcile）：归各 domain owner，本包只引用为本地应用示例。Attached replacement 的共享恢复纪律是：proven old physical loss 后 create fresh，再由 domain 的 `Close(old)` / `Link(new)` 显式迁移 durable association；不得把 Link 当覆盖赋值。Companion 的动态证明见 managed-session-lifecycle `satellite-runtime.test.mjs`。
-- **recoveryAction 的领域语义**（`requirements/change-integration/tests/job.test.mjs`）：归
+- **ORCH-007 的领域语义**（`requirements/change-integration/tests/job.test.mjs`）：归
   `change-integration`；本包 REUSE 其「从最后事实决定唯一动作」作为 CRASH-002 的域内实例。
 
 ## 依赖

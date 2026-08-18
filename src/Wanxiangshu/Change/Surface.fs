@@ -172,44 +172,29 @@ module ChangeSurface =
     let progressName (job: obj) : string =
         stringField job [ "progress"; "Progress" ]
 
-    let private actionObject =
-        function
-        | ResumeManager -> box {| kind = "ResumeManager" |}
-        | RebaseReviewPublish commit ->
-            box
-                {| kind = "RebaseReviewPublish"
-                   candidateCommit = CommitHash.value commit |}
-        | ResumeConflictResolution payload ->
-            box
-                {| kind = "ResumeConflictResolution"
-                   candidateCommit = CommitHash.value payload.CandidateCommit
-                   conflictFiles = payload.ConflictFiles |> List.toArray |}
-        | AttemptPublish payload ->
-            box
-                {| kind = "AttemptPublish"
-                   rebasedCommit = CommitHash.value payload.RebasedCommit
-                   expectedHead = CommitHash.value payload.ExpectedHead |}
-        | BackfillPublished payload ->
-            box
-                {| kind = "BackfillPublished"
-                   rebasedCommit = CommitHash.value payload.RebasedCommit
-                   resultingTargetHead = CommitHash.value payload.ResultingTargetHead |}
-        | RebaseAndReviewAgain -> box {| kind = "RebaseAndReviewAgain" |}
-        | CleanUp -> box {| kind = "CleanUp" |}
-        | FailClosed reason ->
-            box
-                {| kind = "FailClosed"
-                   reason = reason |}
+    /// ORCH-007 domain classification for a rebased candidate. Returns a
+    /// physical-world classification, not a program counter.
+    let classifyRebasedCandidate (head: obj) (rebasedCommit: string) (targetHeadSnapshot: string) : obj =
+        let currentHead = if isNullish head then None else Some(commit head)
+        let reality = OrchestratorProjection.classifyRebasedCandidate currentHead (commit rebasedCommit) (commit targetHeadSnapshot)
 
-    let recoveryAction (projection: obj) (job: string) (head: obj) : obj =
-        let current = (projection :?> ProjectionHandle).Projection
+        match reality with
+        | RebasedCandidateReality.HeadUnreadable -> box {| kind = "HeadUnreadable" |}
+        | RebasedCandidateReality.PublishReady -> box {| kind = "PublishReady" |}
+        | RebasedCandidateReality.NeedsRebase -> box {| kind = "NeedsRebase" |}
 
-        match OrchestratorProjection.tryFind (jobId job) current with
-        | None -> null
-        | Some value ->
-            let currentHead = if isNullish head then None else Some(commit head)
+    /// ORCH-007 domain classification for a publish claim. Three branches in
+    /// fixed order: already-published first, then unchanged target, then
+    /// everything else.
+    let classifyPublishClaim (head: obj) (rebasedCommit: string) (expectedHead: string) : obj =
+        let currentHead = if isNullish head then None else Some(commit head)
+        let reality = OrchestratorProjection.classifyPublishClaim currentHead (commit rebasedCommit) (commit expectedHead)
 
-            OrchestratorProjection.recoveryAction currentHead value |> actionObject
+        match reality with
+        | PublishClaimReality.HeadUnreadable -> box {| kind = "HeadUnreadable" |}
+        | PublishClaimReality.AlreadyFastForwarded -> box {| kind = "AlreadyFastForwarded" |}
+        | PublishClaimReality.PublishReady -> box {| kind = "PublishReady" |}
+        | PublishClaimReality.ClaimExpired -> box {| kind = "ClaimExpired" |}
 
     let requestWorktree (projection: obj) (identity: string) (path: string) (job: string) : obj =
         let current = (projection :?> ProjectionHandle).Projection

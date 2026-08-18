@@ -55,11 +55,11 @@ test('WHAT[EFFECT-ACCOUNTING-009] publish_claimed_recovery_three_branch_order_is
     rebased,
     claimed,
   ])
-  const make = (head) => change.recoveryAction(projection, JOB, head)
-  assert.equal(make('r1').kind, 'BackfillPublished')
-  assert.equal(make('h1').kind, 'AttemptPublish')
-  assert.equal(make('zzz').kind, 'RebaseAndReviewAgain')
-  assert.equal(make(null).kind, 'FailClosed')
+  assert.equal(change.find(projection, JOB).progress, 'PublishClaimed')
+  assert.equal(change.classifyPublishClaim('r1', 'r1', 'h1').kind, 'AlreadyFastForwarded')
+  assert.equal(change.classifyPublishClaim('h1', 'r1', 'h1').kind, 'PublishReady')
+  assert.equal(change.classifyPublishClaim('zzz', 'r1', 'h1').kind, 'ClaimExpired')
+  assert.equal(change.classifyPublishClaim(null, 'r1', 'h1').kind, 'HeadUnreadable')
 })
 
 test('WHAT[EFFECT-ACCOUNTING-012] publish_claim_without_durable_rebase_witness_is_rejected', () => {

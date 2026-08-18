@@ -85,3 +85,35 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_work
   }
   assert.deepEqual(missing, [], `recovery workflow entrypoints must exist in production source: ${missing.join('; ')}`)
 })
+
+test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_change_seam_has_no_recovery_control_token_dispatcher', () => {
+  // OBL-002: the Change seam must not re-introduce a JobRecoveryAction
+  // control-token type, a recoveryAction producer, a resumeFromDurableFacts
+  // interpreter, or any equivalent NextAction dispatcher. Recovery re-enters
+  // the ordinary CE workflow by matching JobProgress (durable evidence) directly.
+  const forbidden = [
+    'src/Wanxiangshu/Change/Projection.fs',
+    'src/Wanxiangshu/Change/Program.fs',
+    'src/Wanxiangshu/Change/Surface.fs',
+    'src/Wanxiangshu/Mission/Manager/FinalitySurface.fs',
+  ]
+  const symbols = [
+    /\bJobRecoveryAction\b/,
+    /\brecoveryAction\b/,
+    /\bresumeFromDurableFacts\b/,
+    /\brecoveryFromProgress\b/,
+    /\brecoveryFor\b/,
+    /\bactionObject\b/,
+    /\brecoveryActionView\b/,
+  ]
+  const violations = []
+  for (const file of forbidden) {
+    const source = readSrc(file)
+    for (const pattern of symbols) {
+      if (pattern.test(source)) {
+        violations.push(`${file}: ${pattern.source}`)
+      }
+    }
+  }
+  assert.deepEqual(violations, [], `Change seam must not re-introduce recovery control tokens: ${violations.join('; ')}`)
+})

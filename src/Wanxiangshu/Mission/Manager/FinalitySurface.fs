@@ -917,35 +917,6 @@ module FinalitySurface =
         | JobProgress.Failed reason -> box {| kind = "failed"; reason = reason |}
         | JobProgress.Abandoned -> box {| kind = "abandoned" |}
 
-    let private recoveryActionView (action: JobRecoveryAction) : obj =
-        match action with
-        | JobRecoveryAction.ResumeManager -> box {| kind = "resume-manager" |}
-        | JobRecoveryAction.RebaseReviewPublish commit ->
-            box
-                {| kind = "rebase-review-publish"
-                   candidateCommit = CommitHash.value commit |}
-        | JobRecoveryAction.ResumeConflictResolution conflict ->
-            box
-                {| kind = "resume-conflict-resolution"
-                   candidateCommit = CommitHash.value conflict.CandidateCommit
-                   conflictFiles = conflict.ConflictFiles |> List.toArray |}
-        | JobRecoveryAction.AttemptPublish claim ->
-            box
-                {| kind = "attempt-publish"
-                   rebasedCommit = CommitHash.value claim.RebasedCommit
-                   expectedHead = CommitHash.value claim.ExpectedHead |}
-        | JobRecoveryAction.BackfillPublished published ->
-            box
-                {| kind = "backfill-published"
-                   rebasedCommit = CommitHash.value published.RebasedCommit
-                   resultingTargetHead = CommitHash.value published.ResultingTargetHead |}
-        | JobRecoveryAction.RebaseAndReviewAgain -> box {| kind = "rebase-and-review-again" |}
-        | JobRecoveryAction.CleanUp -> box {| kind = "clean-up" |}
-        | JobRecoveryAction.FailClosed reason ->
-            box
-                {| kind = "fail-closed"
-                   reason = reason |}
-
     let private jobView (job: ManagerJobProjection) : obj =
         box
             {| jobId = ManagerJobId.value job.ManagerJobId
@@ -956,11 +927,10 @@ module FinalitySurface =
                worktreePath = WorktreePath.value job.WorktreePath
                targetRef = TargetRef.value job.TargetRef
                targetBranchFrozen = job.TargetBranchFrozen
-               progress = jobProgressView job.Progress
-               recovery = recoveryActionView (OrchestratorProjection.recoveryAction None job) |}
+               progress = jobProgressView job.Progress |}
 
     /// FINALITY-028: fold plain ManagerJob history and return only JS-native
-    /// job records, active records, and recovery decisions.
+    /// job records and active records.
     let jobProjection (events: obj array) : obj =
         match jobProjectionEvents events with
         | Error message -> box {| ok = false; error = message |}

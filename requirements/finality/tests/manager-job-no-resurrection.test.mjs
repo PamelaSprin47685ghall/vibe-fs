@@ -63,7 +63,6 @@ test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume
     const job = onlyJob(projection)
     assert.equal(job.progress.kind, name)
     assert.equal(projection.activeJobs.length, 0, `${name}: not active`)
-    assert.equal(job.recovery.kind, 'clean-up', `${name}: recovery is CleanUp, never ResumeManager`)
   }
 })
 
@@ -104,7 +103,7 @@ test('WHAT[FINALITY-028] an active owned job continues on the same session and w
   const projection = projectionOf([created()])
   const job = onlyJob(projection)
   assert.equal(projection.activeJobs.length, 1)
-  assert.equal(job.recovery.kind, 'resume-manager')
+  assert.equal(job.progress.kind, 'manager-started')
   assert.equal(job.managerSessionId, MANAGER)
   assert.equal(job.worktreeIdentity, 'wt_finality_028')
   assert.equal(job.worktreePath, '/tmp/wt-finality-028')

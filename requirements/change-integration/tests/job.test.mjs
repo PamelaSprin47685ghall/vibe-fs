@@ -47,8 +47,10 @@ const jobAt = (value, projection = created()) => {
   const next = change.recordProgress(projection, JOB, value)
   return { projection: next, job: change.find(next, JOB) }
 }
-const actionAt = (value, head) => change.recoveryAction(value.projection, JOB, head ?? null)
-const actionKind = (value, head) => actionAt(value, head).kind
+const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
+  change.classifyRebasedCandidate(head ?? null, rebasedCommit, snapshot)
+const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
+  change.classifyPublishClaim(head ?? null, rebasedCommit, expectedHead)
 
 // ── one job, one worktree, one Manager ────────────────────────────────────────
 
@@ -134,65 +136,64 @@ test('WHAT[CHGINT-006] ORCH_006_all_three_terminal_cases_end_the_job', () => {
   for (const terminal of [progress.published(), progress.failed(), progress.abandoned()]) {
     const projection = change.recordProgress(created(), JOB, terminal)
     assert.equal(change.activeJobs(projection).length, 0)
-    assert.equal(change.recoveryAction(projection, JOB, 'h1').kind, 'CleanUp')
   }
 })
 
 // ── ORCH-007 recovery action totality ─────────────────────────────────────────
 
-test('WHAT[CHGINT-012] ORCH_007_progress_that_needs_no_head_derives_its_action_from_the_fact_alone', () => {
-  assert.equal(actionKind(jobAt(progress.managerStarted()), undefined), 'ResumeManager')
-  assert.equal(actionKind(jobAt(progress.candidateReady()), undefined), 'RebaseReviewPublish')
-  assert.equal(actionKind(jobAt(progress.conflictPending()), undefined), 'ResumeConflictResolution')
-  assert.equal(actionKind(jobAt(progress.managerStarted()), 'h1'), 'ResumeManager')
-  assert.equal(actionKind(jobAt(progress.candidateReady()), 'h1'), 'RebaseReviewPublish')
+test('WHAT[CHGINT-012] ORCH_007_progress_that_needs_no_head_derives_its_classification_from_the_fact_alone', () => {
+  assert.equal(jobAt(progress.managerStarted()).job.progress, 'ManagerStarted')
+  assert.equal(jobAt(progress.candidateReady()).job.progress, 'CandidateReady')
+  assert.equal(jobAt(progress.conflictPending()).job.progress, 'ConflictPending')
 })
 
 test('WHAT[CHGINT-005] ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_files', () => {
-  const action = actionAt(jobAt(progress.conflictPending(['src/a.fs', 'src/b.fs'])), 'h1')
-  assert.equal(action.kind, 'ResumeConflictResolution')
-  assert.deepEqual({ commit: action.candidateCommit, files: action.conflictFiles }, { commit: 'c1', files: ['src/a.fs', 'src/b.fs'] })
+  const { job } = jobAt(progress.conflictPending(['src/a.fs', 'src/b.fs']))
+  assert.equal(job.progress, 'ConflictPending')
+  const conflict = change.progress('ConflictPending', {
+    candidateCommit: 'c1',
+    targetHeadSnapshot: 'h1',
+    conflictFiles: ['src/a.fs', 'src/b.fs'],
+    diagnosticsDigest: 'digest',
+  })
+  assert.deepEqual(conflict.payload.conflictFiles, ['src/a.fs', 'src/b.fs'])
 })
 
 test('WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved', () => {
-  const action = actionAt(jobAt(progress.rebased('h1')), 'h1')
-  assert.equal(action.kind, 'AttemptPublish')
-  assert.deepEqual({ rebased: action.rebasedCommit, expected: action.expectedHead }, { rebased: 'r1', expected: 'h1' })
+  assert.equal(classifyRebased('h1').kind, 'PublishReady')
+  assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })
 
 test('WHAT[CHGINT-013] REVIEW_008_a_moved_target_discards_the_post_rebase_witness', () => {
-  assert.equal(actionKind(jobAt(progress.rebased('h1')), 'h2'), 'RebaseAndReviewAgain')
+  assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })
 
 test('WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order', () => {
-  const value = jobAt(progress.publishClaimed())
-  assert.equal(actionKind(value, 'r1'), 'BackfillPublished')
-  assert.deepEqual(actionAt(value, 'r1'), { kind: 'BackfillPublished', rebasedCommit: 'r1', resultingTargetHead: 'r1' })
-  assert.equal(actionKind(value, 'h1'), 'AttemptPublish')
-  assert.deepEqual(actionAt(value, 'h1'), { kind: 'AttemptPublish', rebasedCommit: 'r1', expectedHead: 'h1' })
-  assert.equal(actionKind(value, 'h9'), 'RebaseAndReviewAgain')
+  assert.equal(classifyClaim('r1').kind, 'AlreadyFastForwarded')
+  assert.equal(classifyClaim('h1').kind, 'PublishReady')
+  assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
 })
 
 test('WHAT[CHGINT-007] ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case', () => {
-  for (const value of [progress.rebased(), progress.publishClaimed()]) {
-    const action = actionAt(jobAt(value), undefined)
-    assert.equal(action.kind, 'FailClosed')
-    assert.equal(action.reason, 'GetTargetHead failed; ORCH-008 forbids falling back to HEAD')
-  }
+  assert.equal(classifyRebased(undefined).kind, 'HeadUnreadable')
+  assert.equal(classifyClaim(undefined).kind, 'HeadUnreadable')
 })
 
-test('WHAT[CHGINT-003] ORCH_007_every_progress_case_yields_exactly_one_action', () => {
+test('WHAT[CHGINT-003] ORCH_007_every_progress_case_is_exhaustive', () => {
   const table = [
-    ['ManagerStarted', progress.managerStarted(), 'ResumeManager'],
-    ['CandidateReady', progress.candidateReady(), 'RebaseReviewPublish'],
-    ['ConflictPending', progress.conflictPending(), 'ResumeConflictResolution'],
-    ['RebasedCandidateReady', progress.rebased('h1'), 'AttemptPublish'],
-    ['PublishClaimed', progress.publishClaimed(), 'AttemptPublish'],
-    ['Published', progress.published(), 'CleanUp'],
-    ['Failed', progress.failed(), 'CleanUp'],
-    ['Abandoned', progress.abandoned(), 'CleanUp'],
+    ['ManagerStarted', progress.managerStarted()],
+    ['CandidateReady', progress.candidateReady()],
+    ['ConflictPending', progress.conflictPending()],
+    ['RebasedCandidateReady', progress.rebased('h1')],
+    ['PublishClaimed', progress.publishClaimed()],
+    ['Published', progress.published()],
+    ['Failed', progress.failed()],
+    ['Abandoned', progress.abandoned()],
   ]
-  assert.deepEqual(table.map(([name, value]) => [name, actionKind(jobAt(value), 'h1')]), table.map(([name, , expected]) => [name, expected]))
+  assert.deepEqual(
+    table.map(([name, value]) => [name, jobAt(value).job.progress]),
+    table.map(([name]) => [name, name]),
+  )
 })
 
 // ── durable fold and typed worktree effect ───────────────────────────────────
@@ -230,7 +231,6 @@ test('WHAT[CHGINT-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_alre
   const projection = foldProjection([createdEvent, candidateEvent, publishedEvent, createdEvent])
   assert.equal(change.find(projection, JOB).progress, 'Published')
   assert.equal(change.activeJobs(projection).length, 0)
-  assert.equal(change.recoveryAction(projection, JOB, 'r1').kind, 'CleanUp')
 })
 
 test('WHAT[CHGINT-009] ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree', () => {
