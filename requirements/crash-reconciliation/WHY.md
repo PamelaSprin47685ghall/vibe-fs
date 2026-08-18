@@ -27,6 +27,7 @@ durable facts + 可信物理 observation 重新进入普通程序，不能从缓
 - 证据 ambiguous / multiple / missing 时不是 fail closed，而是挑一个最像的继续；
 - 没有 fresh evidence 却自动发出 effect（恢复期间自动 continuation、自动 join）；
 - 用户显式 `/continue` 后，系统声称有 restart briefing，却没有把该 briefing 放进本次真实 provider-visible user material；LLM 因而只能从旧 transcript 猜「上次大概做到哪」，把已经成功的新 tool result 再解释成仍未完成并原地重试。
+- `/continue` 已被 `chat.message` 识别为 disclosure-only physical material，却又因为 Host 后续 `chat.params` 带着一个 managed agent 名字而被重新解释成 managed business execution；这等于让 Host wire label 覆盖已建立的 exact physical 事实，最终制造并不存在的 binding failure。
 
 ## 与相邻包的边界
 

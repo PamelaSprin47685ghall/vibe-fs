@@ -196,6 +196,62 @@ test('WHAT[CRASH-018] CRASH_018_transform_uses_exact_physical_binding_when_host_
   })
 })
 
+test('WHAT[CRASH-018] CRASH_018_chat_params_respects_exact_disclosure_classification', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses_continue_chat_params'
+    const continueID = 'msg-continue-chat-params'
+
+    await acceptAuthorityRoot(runtime, sessionID, 'fast-manager')
+
+    const commandOutput = { parts: [] }
+    await hooks['command.execute.before'](
+      { command: 'continue', sessionID, arguments: '' },
+      commandOutput,
+    )
+
+    const config = {}
+    resume.registerCommand(config)
+    const physicalOutput = {
+      message: { id: continueID, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: config.command.continue.template }],
+    }
+
+    await hooks['chat.message'](
+      { sessionID, messageID: continueID },
+      physicalOutput,
+    )
+
+    const paramsOutput = { options: {} }
+    await hooks['chat.params'](
+      {
+        sessionID,
+        agent: 'fast-manager',
+        model: {
+          id: 'host-default-model',
+          providerID: 'fixture',
+          capabilities: { temperature: true },
+          options: {},
+        },
+        provider: {},
+        message: {
+          id: continueID,
+          sessionID,
+          role: 'user',
+          model: { providerID: 'fixture', modelID: 'host-default-model' },
+        },
+      },
+      paramsOutput,
+    )
+
+    assert.equal(
+      paramsOutput.temperature,
+      undefined,
+      'disclosure-only /continue must not inherit managed execution temperature policy',
+    )
+    assert.equal(paramsOutput.options.temperature, undefined)
+  })
+})
+
 test('WHAT[CRASH-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_ordinary_material', async () => {
   await withExecutablePlugin(async (hooks) => {
     const sessionID = 'ses_continue_handoff_superseded'

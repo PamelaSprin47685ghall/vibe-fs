@@ -111,4 +111,6 @@ Wanxiangshu 可以向 Host managed-agent config 投影必要的 mode/permission/
 
 Host 接收物理 user message 后，`chat.message` 是唯一 required managed model admission owner：它必须同时取得 `PhysicalUserMessageId` 与合法 EffectiveAgent，以 `(SessionId, PhysicalUserMessageId)` 调用/复用 MJS execution lease，并把 `{providerID, modelID, variant}` 写入 Host mutable message。`chat.params` 只验证刚由 chat.message 记录的 current exact binding；随后 messages transform 再以 trailing physical user id + PromptKey（若有）二次核对同一 execution。缺失 physical id 的 managed admission fail closed。发送栈与 `chat.message` 同时 required-acquire 属重复 authority，禁止。
 
+“managed”由 `chat.message` 的 typed admission 决定，不能由后续 Host hook 上出现某个 managed agent 字符串反推。若同一 exact physical material 已由其它规范 owner 明确分类为非业务 provider material（当前唯一实例：CRASH-018 `/continue` disclosure-only），`chat.params` 必须保持该分类，不得凭 agent label 要求一个从未建立、也不应建立的 MJS / `SessionExecutionBinding` lease。
+
 非 managed Host 会话不受本包接管。

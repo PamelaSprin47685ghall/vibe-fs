@@ -55,6 +55,27 @@ module ChatParamsHook =
     let private isManagedName (agent: string) =
         ManagedAgent.requiredNames |> List.contains agent
 
+    let private trySessionId (input: obj) =
+        if isNull input || isNull input?sessionID then
+            None
+        else
+            string input?sessionID
+            |> normalizeText
+            |> Option.map SessionId.create
+
+    let private tryPhysicalUserMessageId (input: obj) =
+        if isNull input || isNull input?message || isNull input?message?id then
+            None
+        else
+            string input?message?id
+            |> normalizeText
+            |> Option.map PhysicalUserMessageId.create
+
+    let private isDisclosureOnlyMaterial input =
+        match trySessionId input, tryPhysicalUserMessageId input with
+        | Some sessionId, Some physicalId -> ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
+        | _ -> false
+
     let private checkObservedProvider sessionId agent model =
         match SessionExecutionBinding.validateObservedProvider sessionId agent model with
         | Ok true -> ()
@@ -131,12 +152,15 @@ module ChatParamsHook =
                 }
             """
 
-    let private handleInput (input: obj) (output: obj) =
+    let private applyManagedPolicy input output =
         match trySessionAndAgent input with
         | Some(sessionId, agent) ->
             validateModel sessionId agent input
             applyManagedTemperature input output
         | None -> ()
+
+    let private handleInput (input: obj) (output: obj) =
+        if isDisclosureOnlyMaterial input then () else applyManagedPolicy input output
 
     let create () : obj =
         box (fun (input: obj) (output: obj) -> handleInput input output)
