@@ -22,12 +22,12 @@ APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignor
 
 `APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只补充声明“这个
 package 还覆盖哪些包外仓库路径”。同一个源码文件可以同时命中多个 package；未提供该文件的
-package 仍天然覆盖自身目录，只是不额外关联包外路径。尚未实现的自动 grounding 语义保留在
-[`proposals/requirement-grounding`](../proposals/requirement-grounding/WHAT.md)，不冒充当前 active package。
+package 仍天然覆盖自身目录，只是不额外关联包外路径。自动路径关联与 read-equivalent provider
+grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 48 包索引
+## 49 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -117,6 +117,7 @@ package 仍天然覆盖自身目录，只是不额外关联包外路径。尚未
 | [repository-investigation](repository-investigation/WHAT.md) | repository claim 由可定位可追溯真实 observation 建立。 |
 | [knowledge-reuse](knowledge-reuse/WHAT.md) | 历史 repository knowledge 是 best-effort cache/hint，不冒充当前证明。 |
 | [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、all-or-nothing surface。 |
+| [requirement-grounding](requirement-grounding/WHAT.md) | 代码路径触碰时自动把相关 requirement 文档与测试按 read 语义投影进当前开发上下文。 |
 
 ### 12. Optimization / epistemics
 | Package | 一句话 WHY |
@@ -131,7 +132,7 @@ package 仍天然覆盖自身目录，只是不额外关联包外路径。尚未
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 109-edge 骨架一致（0 cycle）。
+权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 110-edge 骨架一致（0 cycle）。
 
 ## 运行与验证
 

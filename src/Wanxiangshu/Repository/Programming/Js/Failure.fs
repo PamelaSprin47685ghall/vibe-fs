@@ -62,6 +62,7 @@ type JsFailure =
     | TransactionCommitFailed
     | TransactionRollbackFailed
     | TransactionRecoveryRequired
+    | RequirementGroundingRequired
     | UnknownMember
 
 module JsFailure =
@@ -92,6 +93,7 @@ module JsFailure =
         | JsFailure.TransactionCommitFailed -> "TRANSACTION_COMMIT_FAILED"
         | JsFailure.TransactionRollbackFailed -> "TRANSACTION_ROLLBACK_FAILED"
         | JsFailure.TransactionRecoveryRequired -> "TRANSACTION_RECOVERY_REQUIRED"
+        | JsFailure.RequirementGroundingRequired -> "REQUIREMENT_GROUNDING_REQUIRED"
         | JsFailure.UnknownMember -> "UNKNOWN_MEMBER"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
@@ -126,6 +128,8 @@ module JsFailure =
         | JsFailure.TransactionCommitFailed -> "transaction commit failed"
         | JsFailure.TransactionRollbackFailed -> "transaction rollback failed"
         | JsFailure.TransactionRecoveryRequired -> "durable transaction recovery is required"
+        | JsFailure.RequirementGroundingRequired ->
+            "relevant requirements were grounded; re-evaluate and issue a new mutation intent"
         | JsFailure.UnknownMember -> "member is not part of this generated surface"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
@@ -172,5 +176,6 @@ module JsFailure =
         | "TRANSACTION_COMMIT_FAILED" -> JsFailure.TransactionCommitFailed
         | "TRANSACTION_ROLLBACK_FAILED" -> JsFailure.TransactionRollbackFailed
         | "TRANSACTION_RECOVERY_REQUIRED" -> JsFailure.TransactionRecoveryRequired
+        | "REQUIREMENT_GROUNDING_REQUIRED" -> JsFailure.RequirementGroundingRequired
         | "UNKNOWN_MEMBER" -> JsFailure.UnknownMember
         | _ -> JsFailure.ProgramFailed text

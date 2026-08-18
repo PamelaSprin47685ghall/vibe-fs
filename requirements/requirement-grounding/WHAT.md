@@ -36,7 +36,7 @@ wildmatch 匹配语法：空行与 `#` 注释忽略；普通匹配行把包外�
 ## REQUIREMENT-GROUNDING-005：grounding material = 当前 package 文档 + 测试源码
 
 一个 package 的 grounding material set 由读取时实际存在的 `README.md`、`WHY.md`、`WHAT.md`、
-`HOW.md`、`HOW.md`、`APPLIES-TO`，以及递归 `tests/**/*.test.mjs` 组成；按稳定路径顺序读取。
+`HOW.md`、`APPLIES-TO`，以及递归 `tests/**/*.test.mjs` 组成；按稳定路径顺序读取。
 不存在的可选文件省略，不从 package 外猜补材料。material set 是内部规划概念，不得作为新的
 provider-visible bundle/message/result 形状出现。
 

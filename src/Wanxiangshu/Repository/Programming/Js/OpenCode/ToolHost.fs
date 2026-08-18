@@ -184,8 +184,33 @@ module JsToolSpec =
         (surface: JsSurface)
         (workspaceRoot: string)
         (persistence: IJsTransactionPersistence option)
+        (groundingAdmission: (HostToolContext -> string list -> Task<Result<unit, JsFailure>>) option)
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
+
+        let runProgram ctx programSource =
+            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+
+            match groundingAdmission with
+            | None ->
+                JsToolWorkflow.run
+                    workspaceRoot
+                    surface.BaseClassSource
+                    programSource
+                    10000
+                    deadlineEpochMs
+                    (1 <<< 20)
+                    persistence
+            | Some admit ->
+                JsToolWorkflow.runWithMutationAdmission
+                    workspaceRoot
+                    surface.BaseClassSource
+                    programSource
+                    10000
+                    deadlineEpochMs
+                    (1 <<< 20)
+                    persistence
+                    (admit ctx)
 
         { Name = surface.ToolName
           Description = surface.Description
@@ -195,7 +220,7 @@ module JsToolSpec =
                   (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                   factory ]
           Execute =
-            fun args _ ->
+            fun args ctx ->
                 task {
                     match readProgram args with
                     | None ->
@@ -209,15 +234,7 @@ module JsToolSpec =
                                   ) ]
                     | Some programSource ->
                         // 10 s sandbox deadline; 1 MiB output bound (JS-054).
-                        let! outcome =
-                            JsToolWorkflow.run
-                                workspaceRoot
-                                surface.BaseClassSource
-                                programSource
-                                10000
-                                (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
-                                (1 <<< 20)
-                                persistence
+                        let! outcome = runProgram ctx programSource
 
                         return JsToolsResult.render outcome
                 } }

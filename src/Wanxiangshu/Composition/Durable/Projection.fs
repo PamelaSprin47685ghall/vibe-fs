@@ -15,6 +15,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
@@ -96,6 +97,7 @@ type SessionAgentProjection =
         ManagerLife: ManagerLifeProjection option
         /// HOST-013: permanent auto-injected pairs for this transcript.
         Guidelines: GuidelineProjectionState option
+        RequirementGrounding: RequirementGroundingProjectionState option
         /// Rulebook Main tip Full/Identity delivery (TipGuidanceDelivered fold).
         TipDelivery: TipDeliveryProjectionState option
         SessionStartedAt: SessionStartedAtProjectionState option
@@ -148,6 +150,7 @@ module AgentProjection =
           BloggerCycles = None
           ManagerLife = None
           Guidelines = None
+          RequirementGrounding = None
           TipDelivery = None
           SessionStartedAt = None
           DelegatedToolEstimate = None }

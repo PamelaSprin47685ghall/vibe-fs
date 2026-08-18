@@ -46,7 +46,7 @@ module JsToolHostSurface =
                     Some(JsTransactionSurface.persistenceOf store)
 
             let factory = ToolHostCodec.factory toolModule
-            let spec = JsToolSpec.create factory surface workspaceRoot persistence
+            let spec = JsToolSpec.create factory surface workspaceRoot persistence None
             let registered = ToolHostCodec.register factory spec
             box (JsRegisteredToolHandle(spec, registered))
 

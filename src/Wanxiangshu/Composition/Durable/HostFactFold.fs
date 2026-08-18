@@ -15,6 +15,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
@@ -81,6 +82,43 @@ module HostFactFold =
                     reject
                         "PairProgrammingGuidelineAnchored"
                         (sprintf "placement (%A, %A) already exists in this transcript (HOST-013 §8)" callGap resultGap)
+
+        | HostFactCases.RequirementGroundingRequested payload ->
+            Ok(
+                AgentProjection.update
+                    payload.SessionId
+                    (fun session ->
+                        let prior =
+                            session.RequirementGrounding
+                            |> Option.defaultValue RequirementGroundingProjection.empty
+
+                        { session with
+                            RequirementGrounding =
+                                Some(RequirementGroundingProjection.applyRequested payload.Snapshot prior) })
+                    projection
+            )
+
+        | HostFactCases.RequirementGroundingAnchored payload ->
+            AgentProjection.tryUpdate
+                payload.SessionId
+                (fun session ->
+                    session.RequirementGrounding
+                    |> Option.defaultValue RequirementGroundingProjection.empty
+                    |> RequirementGroundingProjection.applyAnchored payload.Occurrence
+                    |> Result.map (fun updated ->
+                        { session with
+                            RequirementGrounding = Some updated }))
+                projection
+            |> function
+                | Ok updated -> Ok updated
+                | Error(RequirementGroundingFoldRejection.NonSequentialOrdinal(expected, actual)) ->
+                    reject
+                        "RequirementGroundingAnchored"
+                        (sprintf "ordinal %d is not the successor of %d" actual expected)
+                | Error(RequirementGroundingFoldRejection.DuplicateIdentity identity) ->
+                    reject "RequirementGroundingAnchored" ("identity already grounded: " + identity)
+                | Error(RequirementGroundingFoldRejection.MissingRequest identity) ->
+                    reject "RequirementGroundingAnchored" ("missing grounding request: " + identity)
 
         | HostFactCases.TipGuidanceDelivered payload ->
             // Idempotent: Full tips accumulate; IdentityOnly is a no-op on the set.

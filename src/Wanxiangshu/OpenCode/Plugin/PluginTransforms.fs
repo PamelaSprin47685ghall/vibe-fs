@@ -571,6 +571,41 @@ module PluginTransforms =
         else
             injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 
+    let private projectRequirementGrounding
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        (projectionSessionIdOpt: string option)
+        (sessionPort: ISessionHostPort)
+        (outObj: obj)
+        : Task =
+        let applyProjection sessionId projected =
+            match projected with
+            | Ok values ->
+                HostMessageProjection.replaceMessagesInPlace outObj values
+                Task.FromResult()
+            | Error reason ->
+                Diagnostic.emit
+                    "requirement-grounding-projection-fail-closed"
+                    [ "session_id", sessionId; "result", reason ]
+
+                task {
+                    let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                    ()
+                }
+
+        match journal, workspaceDirectory, projectionSessionIdOpt with
+        | Some durable, Some _, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
+            task {
+                let messages = unbox<obj array> outObj?messages |> Array.toList
+                let! projected =
+                    Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingTransform.tryProject
+                        durable
+                        sessionId
+                        messages
+                do! applyProjection sessionId projected
+            }
+        | _ -> Task.FromResult()
+
     let private bloggerChronicleThoughtText (language: ProviderLanguage) =
         match language with
         | ProviderLanguage.SimplifiedChinese -> "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
@@ -713,6 +748,7 @@ module PluginTransforms =
         let scope = boot.Scope
         let journal = boot.Journal
         let clock = boot.Clock
+        let workspaceDirectory = boot.WorkspaceDirectory
         let sessionPort = host.SessionPort
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
@@ -796,6 +832,17 @@ module PluginTransforms =
                 // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
                 do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
+
+                // REQUIREMENT-GROUNDING-007/012: permanent requirement reads use
+                // the same append-only placement discipline, after HOST-013 so
+                // ordinary and Cursor order is always pseudo-skill → read(s).
+                do!
+                    projectRequirementGrounding
+                        journal
+                        workspaceDirectory
+                        projectionSessionIdOpt
+                        sessionPort
+                        outObj
 
                 injectBloggerChronicleThought journal projectionSessionIdOpt outObj
 

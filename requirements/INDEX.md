@@ -101,6 +101,7 @@
 | `repository-investigation` | repository claim 必须由可定位、可追溯的真实观察建立，reasoning 不能冒充 evidence acquisition。 |
 | `knowledge-reuse` | 过去的 repository knowledge 可作为 best-effort cache/hint 复用，但不能冒充当前证明。 |
 | `repository-programming` | repository 变换需要能力投影、可组合、sandboxed、all-or-nothing 的 programming surface，而不是多套漂移 RPC。 |
+| `requirement-grounding` | 代码路径触碰时，适用 requirement package 必须在 effect 前以可重放 read 语义进入当前 participant horizon。 |
 
 ## 12. Optional optimization / epistemics
 
@@ -129,10 +130,11 @@
 - 新增 `capability-enforcement`：office consequence 与 schema/runtime gate 同构是两个不同 WHY。
 - 新增 `external-investigation`：Browser 的 provenance-bearing external evidence 不能塞进 local repository investigation。
 - 新增 `work-record`：canonical bounded work statement 被 delegation、process review、Finality 共用，不能继续藏在 Companion/Review 下。
+- 新增 `requirement-grounding`：路径命中的规范与测试需要自动、去重、可重放地进入开发上下文，且首次 mutation 必须先 grounding。
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（102 edges，0 cycle）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（110 edges，0 cycle）。
 
 ```text
 requirement-system       → 无
@@ -180,6 +182,7 @@ guidance-delivery        → behavior-diagnosis, participant-horizon, durable-ev
 repository-investigation → office-capability, participant-horizon
 knowledge-reuse          → repository-investigation, durable-events, durable-convergence
 repository-programming   → office-capability, capability-enforcement, effect-accounting, durable-events, participant-horizon
+requirement-grounding    → requirement-system, host-boundary, participant-horizon, provider-projection, interaction-authority, semantic-trace, prefix-stability, repository-programming
 speculative-investigation→ repository-investigation, participant-identity, execution-model-routing, participant-horizon, provider-projection, semantic-trace
 epistemic-reasoning      → participant-horizon
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
@@ -194,4 +197,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-其余 102 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。
+其余 110 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。

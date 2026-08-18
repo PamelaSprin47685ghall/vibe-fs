@@ -190,6 +190,8 @@ module JsToolsData =
 /// recovery can undo only what was provably written.
 module JsToolWorkflow =
 
+    type MutationAdmission = string list -> Task<Result<unit, JsFailure>>
+
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure.
     type JsToolOutcome =
@@ -264,7 +266,7 @@ module JsToolWorkflow =
     /// deadlineMs bounds the sandbox; outputBoundBytes bounds the result.
     /// `persistence` enables durable prepare/commit facts (JS-012). Current and
     /// transaction head are owned by the canonical Integrator; no history reader is exposed here.
-    let run
+    let private runCore
         (root: string)
         (baseClassSource: string)
         (modelSource: string)
@@ -272,6 +274,7 @@ module JsToolWorkflow =
         (deadlineEpochMs: int64)
         (outputBoundBytes: int)
         (persistence: IJsTransactionPersistence option)
+        (mutationAdmission: MutationAdmission option)
         : Task<JsToolOutcome> =
         task {
             let! outcome =
@@ -291,6 +294,11 @@ module JsToolWorkflow =
 
                     do! JsTransaction.preflight exists (readCurrentText root) mutations
 
+                    match mutationAdmission with
+                    | Some admit when not (List.isEmpty mutations) ->
+                        do! admit (mutations |> List.map JsStagedMutation.path)
+                    | _ -> ()
+
                     if List.isEmpty mutations then
                         return value, [], []
                     else
@@ -301,6 +309,37 @@ module JsToolWorkflow =
             | Ok(value, rewritten, created) -> return Succeeded(value, rewritten, created)
             | Error failure -> return Failed failure
         }
+
+    let run
+        (root: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (persistence: IJsTransactionPersistence option)
+        : Task<JsToolOutcome> =
+        runCore root baseClassSource modelSource deadlineMs deadlineEpochMs outputBoundBytes persistence None
+
+    let runWithMutationAdmission
+        (root: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (persistence: IJsTransactionPersistence option)
+        (mutationAdmission: MutationAdmission)
+        : Task<JsToolOutcome> =
+        runCore
+            root
+            baseClassSource
+            modelSource
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            (Some mutationAdmission)
 
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;

@@ -119,7 +119,7 @@ module PairProgrammingThoughtTransform =
         | "1" -> true
         | _ -> false
 
-    let private isCursorProvider (providerId: string option) =
+    let isCursorProvider (providerId: string option) =
         providerId
         |> Option.exists (fun value -> value.Equals("cursor", StringComparison.OrdinalIgnoreCase))
 
@@ -420,7 +420,7 @@ module PairProgrammingThoughtTransform =
     /// 消息（CTX-010 `DropLeading`）；被覆盖区里的 pair 属于被替换的前缀，
     /// 不应再注入 rewritten view，更不能因此 AbortSession 杀死 recovery slot。
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
-    let private cursorGuidanceSeparator = "\u0000\uFEFF"
+    let cursorGuidanceSeparator = "\u0000\uFEFF"
 
     let private isString (value: obj) : bool =
         not (isNull value) && emitJsExpr value "typeof $0 === 'string'"
@@ -443,15 +443,15 @@ module PairProgrammingThoughtTransform =
         | Some "error" -> clonedState?output <- box ((unbox<string> originalState?output) + suffix)
         | _ -> ()
 
-    let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
+    let appendCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj option =
         let parts = rawParts rawMsg
 
         match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
         | None -> None
         | Some index ->
             let suffix =
-                markerTexts
-                |> List.map (fun markerText -> cursorGuidanceSeparator + markerText)
+                suffixTexts
+                |> List.map (fun text -> cursorGuidanceSeparator + text)
                 |> String.concat ""
 
             let originalPart = parts.[index]
@@ -465,6 +465,9 @@ module PairProgrammingThoughtTransform =
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
             Some clonedMessage
+
+    let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
+        appendCursorSuffixes markerTexts rawMsg
 
     let private gapPresent (addressSet: Set<string>) (gap: TranscriptGap) =
         match gap with
@@ -652,7 +655,7 @@ module PairProgrammingThoughtTransform =
             gapsAroundAddress TranscriptGap.Before last "trailing user without transcript address (HOST-013)"
         | _ -> gapsAroundAddress TranscriptGap.After last "last message without transcript address (HOST-013)"
 
-    let private decideCurrentPlacement (realMessages: obj list) : Result<TranscriptGap * TranscriptGap, string> =
+    let decideCurrentPlacement (realMessages: obj list) : Result<TranscriptGap * TranscriptGap, string> =
         match List.rev realMessages with
         | [] -> Ok(TranscriptGap.Start, TranscriptGap.Start)
         | last :: rest ->

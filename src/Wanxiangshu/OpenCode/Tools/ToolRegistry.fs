@@ -68,6 +68,7 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -196,6 +197,12 @@ module ToolRegistry =
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
         let jsProse = JsDescriptionAssets.load providerLanguage
 
+        let groundingAdmission (ctx: HostToolContext) paths =
+            match workspaceDirectory with
+            | None -> Task.FromResult(Ok())
+            | Some root when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(Ok())
+            | Some root -> RequirementGroundingGate.programAdmission journal root ctx.SessionId paths
+
         let runtime =
             new ToolRuntimeScope(
                 sessionPort,
@@ -220,7 +227,12 @@ module ToolRegistry =
                   match JsToolGenerator.generate (string role) (Roles.permissions role) jsProse with
                   | Some surface ->
                       yield
-                          JsToolSpec.create factory surface (defaultArg workspaceDirectory "") jsTransactionPersistence
+                          JsToolSpec.create
+                              factory
+                              surface
+                              (defaultArg workspaceDirectory "")
+                              jsTransactionPersistence
+                              (Some groundingAdmission)
                   | None -> () ]
 
         let baseSpecs =

@@ -54,6 +54,8 @@
     <Compile Include="Execution/Session/Ownership.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
     <Compile Include="Foundation/Outcome.fs"/>
+    <Compile Include="Requirement/Grounding/Model.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Model.fs"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fs"/>
     <Compile Include="Mission/Review/Facts.fs"/>
@@ -202,6 +204,7 @@
     <Compile Include="Context/Companion/Blogger/Runtime/CycleSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineProjection.fs"/>
     <Compile Include="OpenCode/Host/PairProgramming/GuidelineSurface.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Projection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliveryProjection.fs"/>
     <Compile Include="Enforcer/Guidance/DeliverySurface.fs"/>
     <Compile Include="Execution/Fission/Projection.fs"/>
@@ -560,6 +563,11 @@
     <Compile Include="Execution/Fission/OpenCode/Tool.fs"/>
     <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>
     <Compile Include="Repository/Programming/Js/GlobFs.fs"/>
+    <Compile Include="Requirement/Grounding/Catalog.fs"/>
+    <Compile Include="Requirement/Grounding/Surface.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Runtime.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Gate.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGrounding/Transform.fs"/>
     <Compile Include="Repository/Programming/Js/AnchorFs.fs"/>
     <Compile Include="Repository/Programming/Js/MutationFs.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Capture.fs"/>
@@ -598,6 +606,8 @@
     <Compile Include="OpenCode/Tools/FileToolsSurface.fs"/>
     <Compile Include="OpenCode/Tools/FileMutationSurface.fs"/>
     <Compile Include="Persistence/Journal/Surface.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
+    <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/HandleSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>

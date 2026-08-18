@@ -180,6 +180,9 @@ module JsGlobFs =
 
             wildmatchRegex body
 
+    let matchesPathPattern (pattern: string) (path: string) : Result<bool, JsFailure> =
+        compilePathPattern pattern |> Result.map (fun regex -> regexTest regex path)
+
     let private compileUserPatterns (pattern: string) : Result<obj array, JsFailure> =
         if System.String.IsNullOrEmpty pattern then
             Error JsFailure.AnchorInvalidPattern

@@ -94,6 +94,20 @@ module PluginHostInterop =
     let fatalHook operation (adaptedHook: obj) : obj =
         guardedHostHook operation adaptedHook fatalHookErrorFor
 
+    [<Emit("(args, context) => { const expectedMessage = $2; const handle = (err) => { const message = err && typeof err === 'object' && 'message' in err ? String(err.message) : String(err); if (message === expectedMessage) throw err; $3($0, err); throw err; }; try { return Promise.resolve($1(args, context)).catch(handle); } catch (err) { return handle(err); } }")>]
+    let private guardedExpectedRejectionHook
+        (operation: string)
+        (fn: obj)
+        (expected: string)
+        (onError: string -> obj -> unit)
+        : obj =
+        jsNative
+
+    /// Expected protocol rejection crosses the Host hook boundary unchanged;
+    /// every other exception still enters the fatal invariant membrane.
+    let expectedRejectionHook operation expected (adaptedHook: obj) : obj =
+        guardedExpectedRejectionHook operation adaptedHook expected fatalHookErrorFor
+
     let projectionSessionIdFromMessages (output: obj) =
         ProviderWireDecode.projectionSessionIdFromMessages output
 

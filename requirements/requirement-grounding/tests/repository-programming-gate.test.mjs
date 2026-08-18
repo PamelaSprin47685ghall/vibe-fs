@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+
+import * as surface from '../../../dist/OpenCode/Host/RequirementGroundingRepositorySurface.js'
+
+const workflowSource = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs', import.meta.url), 'utf8')
+
+const sandbox = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wanxiang-grounding-js-'))
+  for (const name of ['alpha', 'beta']) mkdirSync(join(dir, 'requirements', name), { recursive: true })
+  mkdirSync(join(dir, 'src', 'alpha'), { recursive: true })
+  mkdirSync(join(dir, 'src', 'beta'), { recursive: true })
+  writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'alpha\n', 'utf8')
+  writeFileSync(join(dir, 'requirements', 'alpha', 'APPLIES-TO'), '/src/alpha/**\n', 'utf8')
+  writeFileSync(join(dir, 'requirements', 'beta', 'WHAT.md'), 'beta\n', 'utf8')
+  writeFileSync(join(dir, 'requirements', 'beta', 'APPLIES-TO'), '/src/beta/**\n', 'utf8')
+  writeFileSync(join(dir, 'src', 'alpha', 'a.txt'), 'a0', 'utf8')
+  writeFileSync(join(dir, 'src', 'beta', 'b.txt'), 'b0', 'utf8')
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+const program = `class Js extends JsProgram {
+  async run() {
+    await this.write('src/alpha/new.txt', 'a1');
+    await this.write('src/beta/new.txt', 'b1');
+    return { ok: true };
+  }
+}`
+
+test('WHAT[REQUIREMENT-GROUNDING-009] grounds the union of a staged multi-file effect set before an all-or-nothing commit', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const result = await surface.runFirstAttempt(dir, 'js-union', program)
+    assert.equal(result.caseName, 'Failed')
+    assert.equal(result.failureCode, 'REQUIREMENT_GROUNDING_REQUIRED')
+    assert.deepEqual(result.pendingPackages, ['alpha', 'beta'])
+    assert.equal(result.created.length, 0)
+    assert.equal(readFileSync(join(dir, 'src', 'alpha', 'a.txt'), 'utf8'), 'a0')
+    assert.equal(readFileSync(join(dir, 'src', 'beta', 'b.txt'), 'utf8'), 'b0')
+
+    const runCoreAt = workflowSource.indexOf('let private runCore')
+    const preflightAt = workflowSource.indexOf('JsTransaction.preflight', runCoreAt)
+    const admissionAt = workflowSource.indexOf('mutationAdmission', preflightAt)
+    const commitAt = workflowSource.indexOf('commitMutations', admissionAt)
+    assert.ok(runCoreAt >= 0 && preflightAt > runCoreAt && admissionAt > preflightAt && commitAt > admissionAt)
+    surface.dispose(result.runtime)
+  } finally { cleanup() }
+})
+
+test('WHAT[REQUIREMENT-GROUNDING-010] applies one grounding policy across OpenCode native and repository-programming file tools', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const result = await surface.compareNativeAndProgramDecision(dir, 'equivalence', join(dir, 'src', 'alpha', 'a.txt'))
+    assert.deepEqual(result.nativePackages, ['alpha'])
+    assert.deepEqual(result.programPackages, ['alpha'])
+    assert.equal(result.nativeAllowed, false)
+    assert.equal(result.programAllowed, false)
+    surface.dispose(result.runtime)
+  } finally { cleanup() }
+})

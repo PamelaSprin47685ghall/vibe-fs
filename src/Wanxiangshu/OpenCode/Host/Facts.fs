@@ -2,6 +2,8 @@ namespace Wanxiangshu.OpenCode.Host
 
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Requirement.Grounding
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 /// Rulebook Main tip presentation for auto-injected guidance.
 [<RequireQualifiedAccess>]
@@ -18,6 +20,12 @@ type HostFactCases =
            MarkerText: string
            CallGap: TranscriptGap
            ResultGap: TranscriptGap |}
+    | RequirementGroundingRequested of
+        {| SessionId: SessionId
+           Snapshot: GroundingSnapshot |}
+    | RequirementGroundingAnchored of
+        {| SessionId: SessionId
+           Occurrence: RequirementGroundingOccurrence |}
     | TipGuidanceDelivered of
         {| SessionId: SessionId
            TipName: string
