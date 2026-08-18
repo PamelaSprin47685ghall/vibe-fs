@@ -136,6 +136,66 @@ test('WHAT[CRASH-018] CRASH_018_real_command_material_materializes_briefing_and_
   })
 })
 
+test('WHAT[CRASH-018] CRASH_018_transform_uses_exact_physical_binding_when_host_drops_part_metadata', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const sessionID = 'ses_continue_exact_binding'
+    const continueID = 'msg-continue-exact-binding'
+
+    await acceptAuthorityRoot(runtime, sessionID, 'deep-coder')
+
+    const commandOutput = { parts: [] }
+    await hooks['command.execute.before'](
+      { command: 'continue', sessionID, arguments: '' },
+      commandOutput,
+    )
+
+    const config = {}
+    resume.registerCommand(config)
+    const physicalOutput = {
+      message: { id: continueID, sessionID, role: 'user' },
+      parts: [{ type: 'text', text: config.command.continue.template }],
+    }
+
+    await hooks['chat.message'](
+      { sessionID, messageID: continueID },
+      physicalOutput,
+    )
+
+    assert.equal(
+      physicalOutput.parts.some((part) => part.metadata?.wanxiangshu_explicit_resume === true),
+      true,
+      'chat.message must bind the exact physical material before provider transform',
+    )
+
+    // Some Host projections do not preserve custom part metadata between
+    // chat.message and messages.transform. Keep the exact physical id but strip
+    // the marker to prove the process-local binding, not metadata survival, owns
+    // suppression at this boundary.
+    const providerOutput = {
+      messages: [
+        {
+          info: { id: continueID, sessionID, role: 'user' },
+          parts: [{ type: 'text', text: config.command.continue.template }],
+        },
+      ],
+    }
+
+    await hooks['experimental.chat.messages.transform'](
+      { sessionID },
+      providerOutput,
+    )
+
+    assert.equal(
+      createdIds.length,
+      0,
+      'exact /continue binding must prevent ordinary Companion/Strength child creation when marker metadata is absent',
+    )
+    assert.equal(runtime.prompts.length, 0)
+    assert.equal(providerOutput.messages.length, 1)
+    assert.equal(providerOutput.messages[0].info.id, continueID)
+  })
+})
+
 test('WHAT[CRASH-018] CRASH_018_abandoned_command_handoff_cannot_mark_a_later_ordinary_material', async () => {
   await withExecutablePlugin(async (hooks) => {
     const sessionID = 'ses_continue_handoff_superseded'

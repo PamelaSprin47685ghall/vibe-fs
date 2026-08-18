@@ -741,6 +741,22 @@ module PluginTransforms =
         | Ok() -> ()
         | Error error -> invalidOp error
 
+    let private exactExplicitResumeBinding
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        =
+        projectionSessionIdOpt
+        |> Option.exists (fun sessionText ->
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+
+            ProviderWireCapture.lastUserMessageId rawMessages
+            |> Option.exists (ExplicitResumeSuppression.isPhysicalMaterial (SessionId.create sessionText)))
+
+    let private isExplicitResumeProviderMaterial projectionSessionIdOpt outObj =
+        ExplicitResumeSuppression.isCurrentMaterial outObj
+        || exactExplicitResumeBinding projectionSessionIdOpt outObj
+
     /// Provider-facing transform composition: order only.
     /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
     /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
@@ -881,9 +897,12 @@ module PluginTransforms =
                         else
                             None)
 
-                if ExplicitResumeSuppression.isCurrentMaterial outObj then
+                if isExplicitResumeProviderMaterial projectionSessionIdOpt outObj then
                     // CRASH-018: the exact /continue material stays disclosure-only
                     // for every provider step, including steps after tool results.
+                    // The trailing marker is the direct path; the exact physical
+                    // registry is the authoritative fallback when Host projection
+                    // drops custom part metadata after chat.message.
                     // Do not reinterpret it through ordinary semantic transforms.
                     let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                     let sanitized = HostMessageProjection.sanitizeMessages currentMessages
