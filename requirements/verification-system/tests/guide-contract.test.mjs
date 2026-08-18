@@ -171,8 +171,11 @@ test('WHAT[VERIFICATION-SYSTEM-008] the journal publishes boot append and snapsh
     load('Composition/Durable/ProjectionState'),
   ])
 
+  // AgentJournal constructs from an already-folded projection + writer
+  // (createFromProjection). EventStore boot/resume belongs to
+  // EventStoreJournalWriter (create / resumeOrCreate) and the workspace Host.
+  // The retired EventStore-boot forwarding facade must not return.
   assertCallable(journal, 'Persistence/Journal/AgentJournal', [
-    'AgentJournalModule_createFromEventStore',
     'AgentJournalModule_createFromProjection',
     'AgentJournalModule_appendAgent',
     'AgentJournalModule_appendMagicTodo',

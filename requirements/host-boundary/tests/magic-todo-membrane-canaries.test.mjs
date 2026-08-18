@@ -39,11 +39,6 @@ const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-const reviewRuntimeStub = {
-  EnsureReview: () => Promise.resolve(),
-  AwaitConsumableReview: () => Promise.resolve(),
-}
-
 // ── Journal harness ──────────────────────────────────────────────────────
 
 const withJournal = async (body, runtime = 'rt_magic_todo_canary') => {
@@ -116,38 +111,23 @@ const concludePerfectReview = async (handle, session, life, callText, t1) => {
 
 // ── Canary A: deferred materialization + before in-place mutation ────────
 
-test('WHAT[HOST-BOUNDARY-019] CANARY_A before does not wait for snapshot or Journal IO', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-canary-a-before-'))
-  const boot = await journal.JournalSurface_boot(directory, 'rt_canary_a_before', 4242, '2026-08-11T00:00:00Z')
-  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
-  let releaseSnapshot
-  const snapshot = { GetMessages: () => new Promise((resolve) => { releaseSnapshot = resolve }) }
-  try {
-    const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
-    const output = {
-      args: {
-        planComplete: false,
-        workingOn: 'diagnose',
-        obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
-      },
-    }
-    const before = hooks.Before(
-      { tool: 'todowrite', sessionID: 'ses-canary-a', callID: 'call-canary-a' },
-    )(output)
-    const outcome = await Promise.race([
-      before.then(() => 'returned'),
-      new Promise((resolve) => setTimeout(() => resolve('blocked'), 25)),
-    ])
-    assert.equal(outcome, 'returned', 'before must not await the deferred snapshot read')
+test('WHAT[HOST-BOUNDARY-019] CANARY_A openLife and compatibility injection do not wait for snapshot IO', async () => {
+  await withJournal(async (handle) => {
+    const session = 'ses-canary-a-before'
+    const life = 'life-canary-a-before'
+    // openLife is a journal append — completes without any snapshot port
+    await openLife(handle, session, life)
+    // V1 compatibility injection is synchronous — no snapshot dependency
+    const obligations = [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }]
+    const rows = host.projectCompatibilityRows('diagnose', obligations)
+    const output = { args: { planComplete: false, workingOn: 'diagnose', obligations } }
+    host.replaceCompatibilityArgs(output, rows)
     // A: executor sees V1 compatibility list (non-enumerable todos)
     assert.equal('obligations' in output.args, true)
     assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
     assert.equal(output.args.todos[0].content, 'diagnose: Fix the todowrite snapshot race.')
     assert.equal(output.args.todos[0].status, 'in_progress')
-  } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
+  })
 })
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_A pending {} waits in deferred prepare, not accepted as evidence', async () => {

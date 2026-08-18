@@ -185,6 +185,14 @@ module MagicTodoProjection =
         | None -> Ok()
         | Some cp -> Error(MagicTodoReject.AwaitingConsumableReview(TodoWriteId.value cp.TodoWriteId))
 
+    /// O(1) reverse locator: reviewer-session → owning ManagerLifeId.
+    /// Directly reads ReviewerLifeBySession — no ByLife scan.
+    let tryReviewerLife
+        (reviewerSessionId: SessionId)
+        (state: MagicTodoProjectionState)
+        : ManagerLifeId option =
+        Map.tryFind (SessionId.value reviewerSessionId) state.ReviewerLifeBySession
+
     /// REVIEW-013: typed process-review authority for a dedicated reviewer session.
     /// Presence of Accepted ∧ Assigned ∧ ¬Concluded on this reviewer is RequestKind
     /// TodoProcessReview — not a pendingChallenge guess.

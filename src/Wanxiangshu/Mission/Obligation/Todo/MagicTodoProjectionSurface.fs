@@ -168,6 +168,12 @@ module MagicTodoProjectionSurface =
     let fold (handle: MagicTodoProjectionHandle) (eventId: string) (factJson: string) : obj =
         handle.Fold(eventId, factJson)
 
+    let reviewerLife (handle: MagicTodoProjectionHandle) (reviewerSessionId: string) : obj =
+        MagicTodoProjection.tryReviewerLife (SessionId.create reviewerSessionId) handle.State
+        |> Option.map ManagerLifeId.value
+        |> Option.defaultValue null
+        |> box
+
     let view (handle: MagicTodoProjectionHandle) (lifeId: string) : obj =
         lifeView handle.State (ManagerLifeId.create lifeId)
 

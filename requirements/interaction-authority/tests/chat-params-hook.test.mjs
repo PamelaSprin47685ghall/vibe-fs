@@ -78,7 +78,7 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_mode
     {
       sessionID: 'ses_chat_params_child_4',
       agent: 'deep-coder',
-      model: { id: 'deep-opus', providerID: 'anthropic' },
+      model: { id: 'deep-opus', providerID: 'anthropic', capabilities: { temperature: true } },
       message: {
         model: { providerID: 'anthropic', modelID: 'deep-opus', variant: 'high' },
       },
@@ -88,6 +88,34 @@ test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_accepts_the_real_provider_mode
 
   assert.equal(observed.ok, true, observed.error)
   assert.equal(observed.temperature, 1)
+})
+
+test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_leaves_temperature_untouched_when_model_capability_disables_it', () => {
+  binding.bindChild('ses_chat_params_root_5', 'ses_chat_params_child_5', 'deep-coder')
+  binding.acceptPromptExecution(
+    'ses_chat_params_child_5',
+    'pk-chat-params-reasoning-shape',
+    'physical-chat-params-reasoning-shape',
+    'deep-coder',
+    { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
+  )
+
+  const output = {}
+  const observed = chatParams.apply(
+    {
+      sessionID: 'ses_chat_params_child_5',
+      agent: 'deep-coder',
+      model: { id: 'o3-mini', providerID: 'openai', capabilities: { temperature: false } },
+      message: {
+        model: { providerID: 'openai', modelID: 'o3-mini', variant: 'high' },
+      },
+    },
+    output,
+  )
+
+  assert.equal(observed.ok, true, observed.error)
+  assert.equal(observed.temperature, undefined)
+  assert.equal(output.temperature, undefined)
 })
 
 test('WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_agentless_root_does_not_invent_binding', () => {

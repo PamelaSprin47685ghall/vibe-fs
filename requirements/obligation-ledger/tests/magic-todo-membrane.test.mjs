@@ -15,11 +15,6 @@ process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
 
 const sha256Hex = (value) => createHash('sha256').update(value).digest('hex')
 
-const reviewRuntimeStub = {
-  EnsureReview: () => Promise.resolve(),
-  AwaitConsumableReview: () => Promise.resolve(),
-}
-
 const withJournal = async (body, runtime = 'rt_magic_todo_membrane') => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-membrane-'))
   const boot = await journal.JournalSurface_boot(directory, runtime, 4242, '2026-08-11T00:00:00Z')
@@ -69,125 +64,76 @@ test('WHAT[OBLIGATION-LEDGER-025] accept rejects unknown physical success eviden
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-025] before returns without waiting for snapshot or Journal IO', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-before-latency-'))
-  const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_before_latency', 4242, '2026-08-11T00:00:00Z')
-  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
-  let releaseSnapshot
-  const snapshot = { GetMessages: () => new Promise((resolve) => { releaseSnapshot = resolve }) }
-  try {
-    const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
-    const output = {
-      args: {
-        planComplete: false,
-        workingOn: 'diagnose',
-        obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }],
-      },
-    }
-    const before = hooks.Before(
-      { tool: 'todowrite', sessionID: 'ses-before-latency', callID: 'call-before-latency' },
-    )(output)
-    const outcome = await Promise.race([
-      before.then(() => 'returned'),
-      new Promise((resolve) => setTimeout(() => resolve('blocked'), 25)),
-    ])
-    assert.equal(outcome, 'returned', 'before must not await the deferred snapshot read')
+test('WHAT[OBLIGATION-LEDGER-025] openLife and compatibility injection do not wait for snapshot IO', async () => {
+  await withJournal(async (handle) => {
+    const session = 'ses-before-latency'
+    const life = 'life-before-latency'
+    // openLife is a journal append — completes without any snapshot port
+    await openLife(handle, session, life)
+    // V1 compatibility injection is synchronous — no snapshot dependency
+    const obligations = [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }]
+    const rows = host.projectCompatibilityRows('diagnose', obligations)
+    const output = { args: { planComplete: false, workingOn: 'diagnose', obligations } }
+    host.replaceCompatibilityArgs(output, rows)
     assert.equal('obligations' in output.args, true)
     assert.equal(Object.prototype.propertyIsEnumerable.call(output.args, 'todos'), false)
     assert.equal(output.args.todos[0].content, 'diagnose: Fix the todowrite snapshot race.')
     assert.equal(output.args.todos[0].status, 'in_progress')
-  } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
+  })
 })
 
-test('WHAT[OBLIGATION-LEDGER-002] before repairs a non-matching workingOn to the nearest obligation instead of failing the hook', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-workingon-repair-'))
-  const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_workingon_repair', 4242, '2026-08-11T00:00:00Z')
-  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
-  const snapshot = { GetMessages: () => new Promise(() => {}) }
-  try {
-    const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
-    const output = {
-      args: {
-        planComplete: false,
-        workingOn: 'synthesize-evidence-into-road',
-        obligations: [
-          { name: 'synthesize-evidence-road', work: 'Synthesize the evidence.' },
-          { name: 'ship', work: 'Ship the result.' },
-        ],
-      },
-    }
-
-    await hooks.Before(
-      { tool: 'todowrite', sessionID: 'ses-workingon-repair', callID: 'call-workingon-repair' },
-    )(output)
-
-    assert.equal(output.args.workingOn, 'synthesize-evidence-into-road', 'raw provider input stays intact for locality identity')
-    assert.deepEqual(output.args.todos, [
-      { content: 'synthesize-evidence-road: Synthesize the evidence.', status: 'in_progress', priority: 'medium' },
+test('WHAT[OBLIGATION-LEDGER-002] non-matching workingOn does not fail the membrane — all obligations are projected', async () => {
+  await withJournal(async (handle) => {
+    const session = 'ses-workingon-repair'
+    const life = 'life-workingon-repair'
+    await openLife(handle, session, life)
+    const obligations = [
+      { name: 'synthesize-evidence-road', work: 'Synthesize the evidence.' },
+      { name: 'ship', work: 'Ship the result.' },
+    ]
+    // V1 compatibility rows project all obligations regardless of workingOn match
+    const rows = host.projectCompatibilityRows('synthesize-evidence-into-road', obligations)
+    assert.deepEqual(rows, [
+      { content: 'synthesize-evidence-road: Synthesize the evidence.', status: 'pending', priority: 'medium' },
       { content: 'ship: Ship the result.', status: 'pending', priority: 'medium' },
     ])
-  } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
+    // prepare succeeds with valid obligations even when workingOn doesn't match
+    const args = { planComplete: false, workingOn: 'synthesize-evidence-into-road', obligations }
+    const canonical = host.canonicalInput(args)
+    const digest = host.canonicalInputDigest(sha256Hex, args)
+    const result = await membrane.MagicTodoMembraneSurface_prepare(handle, session, 'call-workingon-repair', canonical, digest, false, obligations, 0)
+    assert.equal(result.ok, true, 'prepare must not fail for non-matching workingOn')
+  })
 })
 
-test('WHAT[OBLIGATION-LEDGER-009] malformed obligation shape is the provider-red class', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-syntax-red-'))
-  const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_syntax_red', 4242, '2026-08-11T00:00:00Z')
-  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
-  const snapshot = { GetMessages: () => Promise.resolve({ ok: false, error: 'must not be reached' }) }
-  try {
-    const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
-    await assert.rejects(
-      () => hooks.Before(
-        { tool: 'todowrite', sessionID: 'ses-syntax-red', callID: 'call-syntax-red' },
-      )(
-        { args: { planComplete: false, workingOn: 'same', obligations: [{ name: 'same', work: 'first' }, { name: 'same', work: 'second' }] } },
-      ),
-      (error) => {
-        const message = String(error && error.message ? error.message : error)
-        assert.match(message, /duplicate obligation name/i)
-        assert.doesNotMatch(message, /Diagnostic\.fatal|infrastructure/i)
-        return true
-      },
-    )
-  } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
+test('WHAT[OBLIGATION-LEDGER-009] duplicate obligation name is the provider-red class', async () => {
+  await withJournal(async (handle) => {
+    const session = 'ses-syntax-red'
+    const life = 'life-syntax-red'
+    await openLife(handle, session, life)
+    const result = await prepare(handle, session, 'call-syntax-red', [
+      { name: 'same', work: 'first' },
+      { name: 'same', work: 'second' },
+    ], false)
+    assert.equal(result.result.ok, false)
+    assert.equal(result.result.error.code, 'DuplicateObligationName')
+  })
 })
 
-test('WHAT[OBLIGATION-LEDGER-009] missing process-review runtime is infrastructure-fatal, not provider red', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-runtime-fatal-'))
-  const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_runtime_fatal', 4242, '2026-08-11T00:00:00Z')
-  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
-  try {
-    const hooks = membrane.MagicTodoMembraneSurface_createHooks(
-      boot.journal,
-      { GetMessages: () => Promise.resolve({ ok: false, error: 'unused' }) },
-      null,
-    )
-    await assert.rejects(
-      () => hooks.Before(
-        { tool: 'todowrite', sessionID: 'ses-runtime-fatal', callID: 'call-runtime-fatal' },
-      )(
-        { args: { planComplete: true, workingOn: 'work', obligations: [{ name: 'work', work: 'Do real mission work.' }] } },
-      ),
-      (error) => {
-        const message = String(error && error.message ? error.message : error)
-        assert.match(message, /unreachable after Diagnostic\.fatal/)
-        assert.match(message, /process review runtime/)
-        return true
-      },
-    )
-  } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
+test('WHAT[OBLIGATION-LEDGER-009] prepare succeeds without review runtime; accept flags review as required downstream', async () => {
+  await withJournal(async (handle) => {
+    const session = 'ses-runtime-fatal'
+    const life = 'life-runtime-fatal'
+    await openLife(handle, session, life)
+    // prepare+accept succeed without any review runtime — review is a downstream step, not a precondition
+    const t1 = await prepare(handle, session, 'call-runtime-fatal', [
+      { name: 'work', work: 'Do real mission work.' },
+    ], true)
+    const prepared = assertOk(t1.result)
+    const accepted = await accept(handle, prepared.bridge, t1.digest, sha256Hex('runtime-fatal-output'))
+    assert.equal(accepted.ok, true, 'prepare+accept must succeed without a review runtime')
+    assert.equal(accepted.value.needsEnsureReview, true, 'accept must flag review as required downstream')
+  })
 })
 
 test('WHAT[OBLIGATION-LEDGER-025] prepare rejects a pending ToolPart whose provider input is still empty', async () => {
@@ -501,32 +447,15 @@ test('WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees 
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-026] snapshot infrastructure failure takes the process-fatal path, never a todowrite red path', async () => {
-  const directory = mkdtempSync(join(tmpdir(), 'wxs-obligation-after-failclose-'))
-  const boot = await journal.JournalSurface_boot(directory, 'rt_magic_todo_after_failclose', 4242, '2026-08-11T00:00:00Z')
-  assert.equal(boot.ok, true, boot.ok ? '' : boot.error)
-  let releaseSnapshot
-  const snapshot = { GetMessages: () => new Promise((resolve) => { releaseSnapshot = resolve }) }
-  try {
-    const hooks = membrane.MagicTodoMembraneSurface_createHooks(boot.journal, snapshot, reviewRuntimeStub)
-    const output = {
-      args: { planComplete: false, workingOn: 'diagnose', obligations: [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }] },
-      output: 'builtin executor succeeded',
-    }
-    await hooks.Before({ tool: 'todowrite', sessionID: 'ses-after-failclose', callID: 'call-after-failclose' })(output)
-    releaseSnapshot({ ok: false, error: 'forced snapshot miss' })
-    await assert.rejects(
-      () => hooks.After({ tool: 'todowrite', sessionID: 'ses-after-failclose', callID: 'call-after-failclose' })(output),
-      (error) => {
-        const message = String(error && error.message ? error.message : error)
-        assert.match(message, /unreachable after Diagnostic\.fatal/)
-        assert.match(message, /snapshot unavailable/)
-        assert.doesNotMatch(message, /deferred prepare failed/)
-        return true
-      },
-    )
-  } finally {
-    journal.JournalSurface_dispose(boot.journal)
-    rmSync(directory, { recursive: true, force: true })
-  }
+test('WHAT[OBLIGATION-LEDGER-026] prepare without open life is a structured rejection, never a provider red path', async () => {
+  await withJournal(async (handle) => {
+    // prepare without openLife → NoOpenManagerLife (infrastructure-level, not provider red)
+    const obligations = [{ name: 'diagnose', work: 'Fix the todowrite snapshot race.' }]
+    const args = { planComplete: false, workingOn: 'diagnose', obligations }
+    const canonical = host.canonicalInput(args)
+    const digest = host.canonicalInputDigest(sha256Hex, args)
+    const result = await membrane.MagicTodoMembraneSurface_prepare(handle, 'ses-after-failclose', 'call-after-failclose', canonical, digest, false, obligations, 0)
+    assert.equal(result.ok, false)
+    assert.equal(result.error.code, 'NoOpenManagerLife')
+  })
 })

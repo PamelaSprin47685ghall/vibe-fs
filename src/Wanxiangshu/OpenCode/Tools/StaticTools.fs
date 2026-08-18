@@ -195,15 +195,24 @@ module StaticTools =
     let private primaryAgent (role: Role) (systemPrompt: string option) : obj =
         match systemPrompt with
         | Some text when not (String.IsNullOrWhiteSpace text) ->
-            createObj [ "mode", box "primary"; "permission", permissionObj role; "prompt", box text ]
-        | _ -> createObj [ "mode", box "primary"; "permission", permissionObj role ]
+            createObj
+                [ "mode", box "primary"
+                  "permission", permissionObj role
+                  "prompt", box text
+                  "temperature", box 1.0 ]
+        | _ ->
+            createObj
+                [ "mode", box "primary"
+                  "permission", permissionObj role
+                  "temperature", box 1.0 ]
 
     let private hiddenAgent (role: Role) (systemPrompt: string) : obj =
         createObj
             [ "mode", box "primary"
               "hidden", box true
               "permission", permissionObj role
-              "prompt", box systemPrompt ]
+              "prompt", box systemPrompt
+              "temperature", box 1.0 ]
 
     /// The only values accepted by the OpenCode judge tool.  Keep this
     /// parser deliberately independent of assistant text: a verdict is a tool
@@ -241,7 +250,8 @@ module StaticTools =
             [ "mode", box "primary"
               "hidden", box true
               "permission", permissionObj Role.Distiller
-              "prompt", box prompt ]
+              "prompt", box prompt
+              "temperature", box 1.0 ]
 
     let browserAgentConfig (prompt: string option) : obj = primaryAgent Role.Browser prompt
 

@@ -114,6 +114,9 @@ module ManagedAgentConfig =
         if not (isNull owned?prompt) then
             entry?prompt <- owned?prompt
 
+        if not (isNull owned?temperature) then
+            entry?temperature <- owned?temperature
+
     let private ownedConfigForRole (role: Role) : obj =
         let prompts = RuntimeResources.current().Prompts
 

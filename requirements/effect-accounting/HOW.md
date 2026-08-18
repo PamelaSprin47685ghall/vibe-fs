@@ -18,11 +18,11 @@ ExecutionFactCases：HandleLinked / HandleCompleted / HandleRetired / HandleAban
   HandleFalseCompletionRejected / HandleFalseTerminalReported / ParentJoinCorrectionRequested
 PromptFactCases：PluginPromptClaimed（send 前持久化）/ PluginPromptSubmitted /
   PluginPromptPhysicalAccepted / PluginPromptAbandoned / AuthorityRootAccepted
-MagicTodoFact（Domain/MagicTodoFacts.fs）：TodoWritePrepared / TodoWriteAccepted
+MagicTodoFact（Mission/Obligation/Todo/Facts.fs）：TodoWritePrepared / TodoWriteAccepted
   （携带 PreparedFactRef + InputDigest/OutputDigest + PhysicalSuccessEvidence）
 ```
 
-## effect 状态投影（`Change/Orchestration/OrchestratorProjection.fs`）
+## effect 状态投影（`Change/Projection.fs`）
 
 ```text
 WorktreeEffectStatus = Requested of {| ManagerJobId; WorktreePath |}
@@ -40,7 +40,7 @@ recoveryAction（ORCH-007，三分支固定顺序）——见 WHAT 009：
       _                                        → RebaseAndReviewAgain（witness 作废）
 ```
 
-## fold 拒绝回归（`Change/Orchestration/OrchestratorFactFold.fs`）
+## fold 拒绝回归（`Change/Fold.fs`）
 
 ```text
 PublishClaimed 分支：job 当前无 RebasedCandidateReady → reject
@@ -62,7 +62,7 @@ Host Reconciler：由 composition 注入 `AgentJournal.isPoisoned` 作为 durabl
 判定手段（哪些 EventId 已 committed）由 durable-events 的 canonical root witness 提供。
 ```
 
-## 先证后重试的实现（`Application/Reconciliation/`）
+## 先证后重试的实现（`Interaction/Dispatch/Recovery.fs` / `Mission/Obligation/Todo/MagicTodoMembrane.fs`）
 
 ```text
 PromptRecovery.reconcileClaim（L71）：先做 snapshot 物理核对，再查 budget；
@@ -77,10 +77,10 @@ TodoProcessReviewProgram（L106）：CurrentObligations 在 TodoWriteAccepted �
 
 ## 实例与边界
 
-- **Worktree 编排**（`Application/Orchestration/Runtime.fs` `forkManagerCore`）：
+- **Worktree 编排**（`Change/Runtime.fs` `forkManagerCore`）：
   `WorktreeCreateRequested`（L99）先于 `WorktreeResource.Create`（L109），
   `WorktreeCreated`（L125）后，`ManagerJobCreated` 最后（L137–140 注释）。
-- **Publish 编排**（`Application/Orchestration/Program.fs` `claimAndFf` L179–209）：
+- **Publish 编排**（`Change/Program.fs` `claimAndFf` L179–209）：
   短 CAS 窗口持有 gate；`current <> expectedHead → TargetMoved`（不写 claim）；
   `current = expectedHead → append PublishClaimed → FfMerge → ok → append Published`；
   `publishUnderGate` 保证 gate release；`publishEventually` 在 TargetMoved 上循环

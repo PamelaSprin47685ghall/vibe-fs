@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import * as workspaceHost from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const POISON = 'LEAVE_UNREAD_POISON_SENTINEL_NEVER_PARSE\n{not-a-journal-envelope\n'
 const fingerprint = (path) => {
@@ -36,20 +37,24 @@ test('WHAT[DURABLE-EVENTS-010] SharedAgentJournal_boots_local_EventStore_and_lea
     writeFileSync(stale, POISON)
     const before = fingerprint(stale)
 
-    const acquired = mustOk(await workspaceHost.WorkspaceEventStoreSurface_acquire(retiredDir, commonDir, process.pid, '2026-04-01T00:00:00Z'))
+    const acquired = mustOk(await journalSurface.JournalSurface_acquireSharedForWorkspace(workspace, process.pid, '2026-04-01T00:00:00Z'))
     assert.deepEqual(fingerprint(stale), before)
     assert.equal(readFileSync(stale, 'utf8'), POISON)
 
-    const closed = mustOk(await workspaceHost.WorkspaceEventStoreSurface_appendClosed(acquired.journal, 'ses_host_es'))
-    assert.equal(closed.session, true)
+    mustOk(await journalSurface.JournalSurface_appendAgent(
+      acquired.journal,
+      { kind: 'Session', session: 'ses_host_es' },
+      null,
+      { family: 'Companion', case: 'CompanionBloggerClosed', payload: { SessionId: 'ses_host_es' } },
+    ))
     assert.deepEqual(fingerprint(stale), before)
 
     const files = readdirSync(join(commonDir, 'wanxiang', 'events'))
     assert.equal(files.length >= 1, true)
     assert.equal(files.every((name) => name.endsWith('.ndjson')), true)
-    assert.equal(workspaceHost.WorkspaceEventStoreSurface_hasCurrent(commonDir), true)
+    assert.equal(journalSurface.JournalSurface_hasSession(acquired.journal, 'ses_host_es'), true)
 
-    workspaceHost.WorkspaceEventStoreSurface_release(acquired.journal)
+    journalSurface.JournalSurface_dispose(acquired.journal)
   })
 })
 

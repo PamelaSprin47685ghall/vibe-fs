@@ -53,14 +53,14 @@ LOOP。
 TOKENIZER = gpt-tokenizer/o200k_base
 HALF_LIFE = 64 token
 LAMBDA = 2^(-1/64)
-NORMAL_WEIGHTED_DISTINCT = 18.385164504723882
+NORMAL_WEIGHTED_DISTINCT = 18.52650592106275
 THEORETICAL_LOOP_WEIGHTED_DISTINCT = 1
-LOOP_WEIGHTED_DISTINCT_THRESHOLD = (18.385164504723882 + 1) / 2
-                                 = 9.692582252361941
+LOOP_WEIGHTED_DISTINCT_THRESHOLD = (18.52650592106275 + 1) / 2
+                                 = 9.763252960531375
 ```
 
 滴定语料 = 仓库中 Git tracked + 非 ignored 且 strict UTF-8 可解码的全部文字。half-life 由这些文字
-所有非空行的 o200k token 长度 p99 向上取二次幂：当前 p99=56 → 64。正常值不是均值，而是把全部
+所有非空行的 o200k token 长度 p99 向上取二次幂：当前 p99=59 → 64。正常值不是均值，而是把全部
 可读文字按确定顺序连接后，从理论最大 distinct prior `1/(1-λ)` 开始扫描时出现的最低 `D_t`；异常
 值不采样垃圾语料，直接取「所有观测都是同一个 token」的理论极限 1。阈值严格取二者中线。滴定由
 `tests/loop-calibration.test.mjs` 永久重放。上述“当前”统计值只是仓库语料的派生基线，不是人工冻结

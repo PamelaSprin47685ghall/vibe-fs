@@ -73,6 +73,7 @@ test('WHAT[ENF-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_m
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must receive owned mode`)
     assert.ok(entry.permission !== undefined, `${name} must receive owned permission`)
+    assert.equal(entry.temperature, 1, `${name} must receive forced temperature 1.0`)
     assert.equal(entry.model, `host/${name}`, 'model stays untouched but is never routing truth')
   }
 })

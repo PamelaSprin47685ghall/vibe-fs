@@ -81,15 +81,21 @@ module ChatParamsHook =
             let agent = (string input?agent).Trim()
             validateSessionAndAgent sessionText agent
 
-    let private applyManagedTemperature (output: obj) =
-        if not (isNull output) then
+    let private supportsTemperature (input: obj) =
+        if isNull input || isNull input?model || isNull input?model?capabilities || isNull input?model?capabilities?temperature then
+            true
+        else
+            input?model?capabilities?temperature <> box false
+
+    let private applyManagedTemperature (input: obj) (output: obj) =
+        if not (isNull output) && supportsTemperature input then
             output?temperature <- 1.0
 
     let private handleInput (input: obj) (output: obj) =
         match trySessionAndAgent input with
         | Some(sessionId, agent) ->
             validateModel sessionId agent input
-            applyManagedTemperature output
+            applyManagedTemperature input output
         | None -> ()
 
     let create () : obj =

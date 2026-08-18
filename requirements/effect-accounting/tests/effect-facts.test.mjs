@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import * as change from '../../../dist/Change/Surface.js'
 
 const FACT_CODEC_SOURCE = readFileSync(new URL('../../../src/Wanxiangshu/Persistence/Journal/FactCodec.fs', import.meta.url), 'utf8')
-const FACT_TYPES_SOURCE = readFileSync(new URL('../../../src/Wanxiangshu/Composition/Durable/Fact.fs', import.meta.url), 'utf8')
+const FACT_TYPES_SOURCE = readFileSync(new URL('../../../src/Wanxiangshu/Change/Facts.fs', import.meta.url), 'utf8')
 
 const JOB = 'job_ea'
 const WT = 'wt_ea'
@@ -75,5 +75,7 @@ test('WHAT[EFFECT-ACCOUNTING-010] typed_effect_facts_replace_the_generic_durable
   assert.match(FACT_TYPES_SOURCE, /RebasedCandidateReady/)
   assert.match(FACT_TYPES_SOURCE, /ManagerJobCreated/)
   assert.doesNotMatch(FACT_TYPES_SOURCE, /DurableEffectRequested|DurableEffectAccepted/)
+  const projection = fold([managerCreated, requested, created, rebased, claimed])
+  assert.equal(change.worktreeEffect(projection, WT), 'Created')
   assert.match(FACT_CODEC_SOURCE, /pre.?050|migration|unsupported/i)
 })
