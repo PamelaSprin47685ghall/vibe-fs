@@ -30,14 +30,27 @@
 ## 阻塞:e2e Long Stroke 红(pre-existing,非本线引入)
 
 - 现象:10 个 mock provider 请求后停滞,watchdog 5s silence;blocked expectation = blogger.0;journal 尾部 BloggerRequestMaterialized ×2 后无 provider dispatch。
-- 证据(dist 插桩):applySessionTransform/applyNonReplicaTransform 进入,planArmedWorkMainRetry 从未进入 → `TryRecoveryArming` 返回 None → armed recovery 从未 arm(HostTurnObserver 的 TurnFailed/TurnAborted 路径未触发或未匹配)。blogger 的 provider 请求在 hook 链上游静默消失。
-- 排除:与依赖升级无关(旧 deps + 新代码同败);与 MessageVisibilityHub 无关(bbecb2c19 轮询版同败);v0.8.2 e2e 绿(99 mock-req)。
-- 结论:回归在 v0.8.2..6195af001 区间,被 delay 加载 bug 掩盖至今。
-- **bisect 定位(隔离 clone /tmp/wxs-clone,8 腿收敛)**:first bad = `c6ecba617` "Fix recovery and execution lease boundaries"(76 文件 +1851/−640:HostSignalBootstrap、SessionExecutionBinding、PluginHooks、PluginTransforms、AgentJournal、新增 FatalProcess.fs / ExplicitResumeSuppression.fs)。其左邻 22ace444c 绿;blogger 修复线 aab402e88 绿。
-- 相关高风险区:Blogger 恢复链(aab402e88 / 2c735e240 / b95d92e46 / a0d65c1d7 一带)。
+- 10 个请求时序实测 trace:
+  1. `strength-canary-title.0` (strength-canary-owner)
+  2. `strength-canary-replica.0` (replica 0)
+  3. `blogger.0` attempt 1 (strength companion blogger, chronicle tool-call)
+  4. `blogger.0` attempt 2 (chronicle tool-call)
+  5. `strength-canary-replica.1` (replica 1)
+  6. `blogger.0` attempt 3 (chronicle tool-call)
+  7. `strength-canary-owner.0` (owner 完成)
+  8. `needhelp-owner-title.0` (needhelp-owner title)
+  9. `needhelp-owner-fast.0` (needhelp fast 启动并被 NeedHelpSensor 命中 sentinel abort)
+  10. `blogger.0` attempt 4 (needhelp companion blogger, chronicle tool-call)
+- 根因排查进展:
+  - `needhelp-owner-fast.0` 命中 sentinel 后触发 `sessionPort.AbortSession`，产生 `AbortWake`（`context.Quiescence = None`）。
+  - `withFreshAssistanceQuiescence` 在 `AbortWake` 时先 mark owner claim 并延迟到 `IdleWake` 执行 `sendEscalationContinuation`。
+  - 同期 `needhelp-owner` 的 transform 触发 `CompanionTransform` 启动了新的 Blogger session，派发了 `blogger.0` attempt 4。
+  - Blogger attempt 4 调用 `chronicle` 成功后由 `EnforcerHost.handleContinuation` 给出 `StopPhysicalRun` 并 abort 该 Blogger session。
+  - 待排查点：`needhelp-owner-fast.0` 的 `SessionIdle` 事件到达后，`AssistanceHost` 的 `sendEscalationContinuation` 派发 `needhelp-owner-deep.0`（或 `ModelRouting.acquireManagedExecution`）与 Blogger 停机之间的交汇状态。
+- bisect 定位:first bad = `c6ecba617` "Fix recovery and execution lease boundaries"。
 
 ## 待办
 
-- [ ] 修 c6ecba617 引入的 blogger armed-recovery 不触发(起点:SessionExecutionBinding / ExplicitResumeSuppression 对 TurnFailed/TurnAborted 的 arm 路径)。
+- [ ] 深入定位 c6ecba617 中 `AssistanceHost.sendEscalationContinuation` / `ModelRouting` / Blogger 停止在 `needhelp` 边界处的调度停滞根因并修复。
 - [ ] `npm run format-build-test` 全绿(e2e 段)后打 tag v0.8.3。
 - [ ] AGENTS.md 义务账:OBL-001 的 11 fail 已随根因修复清零,验收后可勾销对应条目。
