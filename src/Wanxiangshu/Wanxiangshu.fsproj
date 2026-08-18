@@ -82,6 +82,7 @@
     <Compile Include="Context/Prefix/Candidate.fs"/>
     <Compile Include="Enforcer/Catalog.fs"/>
     <Compile Include="Enforcer/Codec.fs"/>
+    <Compile Include="Enforcer/ChronicleExecution.fs"/>
     <Compile Include="Enforcer/Cycle/Model.fs"/>
     <Compile Include="Participant/Provider/Attempt/RecoverySlot.fs"/>
     <Compile Include="Execution/Session/Recovery/Model.fs"/>

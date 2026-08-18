@@ -88,6 +88,11 @@ module EnforcerSurface =
     let fieldNames () : string array =
         EnforcerCatalog.fieldNames (rulebook ()) |> List.toArray
 
+    let chronicleExecutionContract (hasLiveCycle: bool) : obj =
+        match ChronicleExecution.decide hasLiveCycle "provider-result" with
+        | ChronicleExecution.Completed value -> box {| kind = "Completed"; value = value |}
+        | ChronicleExecution.NoLiveCycle -> box {| kind = "NoLiveCycle" |}
+
     /// Exact TipName/FieldName lookup. Missing and blank values are `null`.
     let tryFindByField (field: string) : obj =
         match EnforcerCatalog.tryFindByField field (rulebook ()) with

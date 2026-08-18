@@ -1,6 +1,6 @@
 # Host TodoTable Compatibility Sink & Runtime Migration Audit
 
-Audit date: 2026-08-17
+Audit date: 2026-08-17; machine-census evidence refreshed 2026-08-18.
 Scope: `Surface.CompatibilityTodoRow` / `obligationsToCompatibilityRows` /
 `HostCodec.replaceCompatibilityArgs` sink, and every runtime migration that rewrites
 or refuses historical bad data on the Host boundary (`JoinDrain` false-abort,
@@ -18,16 +18,18 @@ No code edits — report only.
    `requirements/finality/HOW.md` + `tests/work-activated-writer-ratchet.test.mjs`
    (WorkActivated LEGACY-010).
 2. Read every implementation site (see §4 inventory).
-3. Ran a fresh census over `.git/wanxiang/events/` (48 journals) for each bad-data
-   marker, distinguishing **fact envelope lines** from **blob content** inside
-   `JsTransactionPrepared` mutations (the latter are file text, not facts).
+3. Census evidence is now machine-owned: run
+   `node scripts/checks/legacy-horizon-census.mjs --roots-file=cleanup/census/current-worktree-roots.txt`.
+   The dated result is `cleanup/census/current-worktree-result-2026-08-18.json`.
+   That inventory names only this worktree; it is evidence for this audit, not a claim about all supported workspaces.
 
 ---
 
-## 2. Census evidence (2026-08-17, 48 journals)
+## 2. Census evidence
 
-Previous census: 26 journals (2026-08-16, cited in legacy-ledger LEGACY-007 and
-EFFECT-ACCOUNTING-007). Current: **48 journals**.
+The prose counts recorded during the 2026-08-16/17 audits are historical snapshots, not current truth.
+The reproducible 2026-08-18 local snapshot is the tracked JSON above: 59 journals, 18,916 lines,
+all four LEGACY-005 detector counts zero, roots digest `0cfd1c96…ca306`.
 
 | Probe | Fact-line hits | Notes |
 |---|---|---|
@@ -43,9 +45,8 @@ EFFECT-ACCOUNTING-007). Current: **48 journals**.
 | `HandleCompleted` missing `CompletionRef`/`CompletionDigest` | 0 of 142 | EXEC-009 clean break complete |
 | `WorkActivated` fact | 1 | the long-stroke e2e journal only |
 
-**Conclusion**: every runtime migration's bad-data set is observably empty in the
-local census. The only live compat writer (`WorkActivated`) fires exactly once, in
-the e2e scenario it exists to serve.
+**Conclusion**: every LEGACY-005 bad-data detector is zero in the declared local inventory.
+This does not satisfy the external supported-workspace horizon required to remove those detectors.
 
 ---
 
@@ -54,7 +55,7 @@ the e2e scenario it exists to serve.
 | ID | Migration surface | Creditor (who needs it) | Boundary (where it lives) | Writer dead? | Finite bad-data set? | Exit condition | Current verdict |
 |---|---|---|---|---|---|---|---|
 | **M1** | Host V1 TodoTable sink: `CompatibilityTodoRow`, `obligationsToCompatibilityRows`, `HostCodec.replaceCompatibilityArgs`, `MagicTodoHostSurface.projectCompatibilityRows`, MagicTodoMembrane before-hook projection | OpenCode Host V1 TodoTable contract (the built-in executor still consumes `{todos:[{content,status,priority}]}`) | `Mission/Obligation/Todo/Surface.fs` + `OpenCode/HostCodec.fs` + `OpenCode/MagicTodoHostSurface.fs` + `MagicTodoMembrane.fs` before-hook; one-way canonical → V1, non-enumerable `todos` | N/A — not a bad-data migration; it is a **live projection** written every checkpoint | N/A — no stored bad data; optimistic UI state only, never round-trips into canonical | Host V1 TodoTable removed from supported host contract → delete `CompatibilityTodoRow` / `obligationsToCompatibilityRows` / `replaceCompatibilityArgs` / V1 canaries | BOUNDED-COMPAT (live sink, not decode-only) |
-| **M2** | false-abort retired-handle replacement: `migrateRetiredFalseAbort`, `tryMigrateRetiredFalseAbort`, `migrateOutcomeToUnit`, `appendMigrationFacts`, `reconcileFalseAborts`, `FalseTerminalMigration.replacementHandle`; plus `HostForkRestart.migrateRetiredIfFalseAbort` entry | Historical deployment journals with retired false-abort tombstones (zero real samples in 48-journal census) | `Execution/Delegation/Handle/JoinDrain.fs` + `Fork/ChildRecovery.fs` (`FalseTerminalMigration`) + `Fork/Host/Restart.fs`; decode-only detect (`decodeBody` → `LegacyFalseAbort`) is permanent; the **migrate** branch is the bounded-compat part | **Yes** — `encodeOutcome` has no aborted branch; gate `codec-encode-finality-aborted` enforces; `AgentJoinItem` has no aborted case | **Yes** — bad data = historical `SendFailure`/aborted blob on a *retired* handle; writer dead ⇒ finite and non-growing | census/instrumentation proves zero observable retired false-abort tombstones across all deployments → delete `migrateRetiredFalseAbort` / `tryMigrateRetiredFalseAbort` / `migrateOutcomeToUnit` / `appendMigrationFacts` / `reconcileFalseAborts` retire-side branch, **keep** `decodeBody` detect → refuse | BOUNDED-COMPAT (decode + one-shot idempotent migrate) |
+| **M2** | false-abort retired-handle replacement: `migrateRetiredFalseAbort`, `tryMigrateRetiredFalseAbort`, `migrateOutcomeToUnit`, `appendMigrationFacts`, `reconcileFalseAborts`, `FalseTerminalMigration.replacementHandle`; plus `HostForkRestart.migrateRetiredIfFalseAbort` entry | Historical deployment journals with retired false-abort tombstones (zero real samples in the dated 2026-08-17 local census) | `Execution/Delegation/Handle/JoinDrain.fs` + `Fork/ChildRecovery.fs` (`FalseTerminalMigration`) + `Fork/Host/Restart.fs`; decode-only detect (`decodeBody` → `LegacyFalseAbort`) is permanent; the **migrate** branch is the bounded-compat part | **Yes** — `encodeOutcome` has no aborted branch; gate `codec-encode-finality-aborted` enforces; `AgentJoinItem` has no aborted case | **Yes** — bad data = historical `SendFailure`/aborted blob on a *retired* handle; writer dead ⇒ finite and non-growing | census/instrumentation proves zero observable retired false-abort tombstones across all deployments → delete `migrateRetiredFalseAbort` / `tryMigrateRetiredFalseAbort` / `migrateOutcomeToUnit` / `appendMigrationFacts` / `reconcileFalseAborts` retire-side branch, **keep** `decodeBody` detect → refuse | BOUNDED-COMPAT (decode + one-shot idempotent migrate) |
 | **M3** | `WorkActivated` compat writer: `appendLegacyMigrationWorkActivatedCompat` in `Workflow.fs`, called only from `materializeInitialAgentOwnerLife` | e2e long-stroke scenario: `long-stroke.toml:184` (`waitFact WorkActivated eq 1`) + `long-stroke-oracles.mjs:385` (`countFactCase WorkActivated >= 1`) | `Mission/Manager/Life/Workflow.fs` (private function + single call site); the `WorkActivated` **decode** in `Projection.fs` is inert-legacy and permanent | Canonical writer dead (`acceptActivation`/`applyAcceptedActivation` deleted, ratcheted by `work-activated-writer-ratchet.test.mjs`); **compat writer is alive** — fires on every AgentOwnerRoot migration Life | **No** — not bad-data repair; it is a live writer serving a test oracle. The "finite set" is the set of e2e runs, not historical data | long-stroke scenario updated to not require `WorkActivated` → delete compat function + call; decode stays | BOUNDED-COMPAT (live compat writer, test creditor) |
 | **M4a** | `containsLegacyFallbackFields` → `pre050MigrationMessage` | operators who may still hold pre-0.5.0 runtime journals | `Persistence/Journal/FactCodec.fs` + `Envelope.fs` ingress; decode-only **refuse** (no migration) | Yes — current writer emits canonical shapes only | Yes — pre-0.5.0 journals only; 0 in census | retention horizon + external workspace census proves no pre-0.5.0 bytes → delete detection + diagnostic tests | DECODE-ONLY REFUSE (already) |
 | **M4b** | `containsLegacyScoreVectorEntry` → `tipV2CleanBreakMessage` | historical tip-v1 observation/entry bytes | `FactCodec.fs` + `BlogSurface.fs`; decode-only refuse | Yes | Yes — 0 in census (all 38 `BlogObservationCommitted` carry `TipRuleId`) | all supported workspaces complete tip-v2 clean break + no old bytes → delete | DECODE-ONLY REFUSE (already) |
@@ -138,7 +139,7 @@ the e2e scenario it exists to serve.
   `codec-encode-finality-aborted` gate enforces both. No production path can
   produce a new aborted finality blob.
 - **Finite set?** **Yes.** Writer dead ⇒ the bad-data set is closed: historical
-  `SendFailure`/aborted-blob-on-retired-handle combinations only. 48-journal
+  `SendFailure`/aborted-blob-on-retired-handle combinations only. The dated 2026-08-17 local
   census: 0 aborted blobs, 0 migration facts ever fired.
 - **Offline repair or refuse?**
   - The **unretired** path already refuses: `rejectUnretiredFalseAbort` appends
@@ -159,7 +160,7 @@ the e2e scenario it exists to serve.
   `migrateRetiredFalseAbort` / `tryMigrateRetiredFalseAbort` / `migrateOutcomeToUnit`
   / `appendMigrationFacts` / the retire-side branch of `reconcileFalseAborts` /
   `HostForkRestart.migrateRetiredIfFalseAbort` once the refuse cutover is made.
-  The 48-journal census (zero fired) is the evidence that no real child is lost.
+  The dated 2026-08-17 local census (zero fired) is the historical evidence that no real child was lost in that inventory.
 
 ### M3 — WorkActivated compat writer
 - **Which version bad data?** None. This is a **live writer**, not bad-data
@@ -188,7 +189,7 @@ the e2e scenario it exists to serve.
   fields (M4d).
 - **Writer already dead?** **Yes** for all four — current writer produces
   canonical shapes only.
-- **Finite set?** **Yes** for all four — historical journals only; 0 in 48-journal
+- **Finite set?** **Yes** for all four — historical journals only; 0 in the dated 2026-08-17 local
   census (fact-line probes, blob-content false positives excluded).
 - **Offline repair or refuse?** **Already refuse.** Each detector returns an
   actionable archive-or-remove message; none migrate. These are the reference
@@ -205,7 +206,7 @@ the e2e scenario it exists to serve.
 | Migration | Recommendation | Action |
 |---|---|---|
 | **M1** Host V1 TodoTable sink | **KEEP (live compat)** | BOUNDED-COMPAT until Host V1 contract dropped; then DELETE sink + canaries. Not a migration — do not convert to decode-only. |
-| **M2** false-abort retired replacement | **→ decode-only REFUSE** | Collapse retire-side migrate → refuse (fail-closed + actionable message); keep `decodeBody` detect permanently; delete `migrateRetiredFalseAbort` / `tryMigrateRetiredFalseAbort` / `migrateOutcomeToUnit` / `appendMigrationFacts` / retire branch of `reconcileFalseAborts` / `migrateRetiredIfFalseAbort`. 48-journal census = zero fired ⇒ safe. |
+| **M2** false-abort retired replacement | **→ decode-only REFUSE** | Collapse retire-side migrate → refuse (fail-closed + actionable message); keep `decodeBody` detect permanently; delete `migrateRetiredFalseAbort` / `tryMigrateRetiredFalseAbort` / `migrateOutcomeToUnit` / `appendMigrationFacts` / retire branch of `reconcileFalseAborts` / `migrateRetiredIfFalseAbort`. Dated 2026-08-17 local census = zero fired ⇒ safe for that inventory only. |
 | **M3** WorkActivated compat writer | **DELETE (after test edit)** | Update long-stroke oracle to not require `WorkActivated`; then delete `appendLegacyMigrationWorkActivatedCompat` + call. Keep inert decode. |
 | **M4a** pre-0.5.0 fields | **KEEP decode-only REFUSE** | Already refuse; delete after retention-horizon census. |
 | **M4b** tip-v1 ScoreVectorRef | **KEEP decode-only REFUSE** | Already refuse; 0 in census; delete after horizon. |
@@ -229,6 +230,6 @@ until the Host contract changes.
 | M3 | LEGACY-010 | OBLIGATION-LEDGER-017 / finality HOW |
 | M4a–M4d | LEGACY-005 | durable-events HOW §7 |
 
-The 48-journal census (2026-08-17) strengthens every "zero real samples" exit
+The dated 2026-08-17 local census strengthens every "zero real samples" exit
 claim: M2's migration facts and M4's refusal targets remain at zero across a
-near-doubling of the journal population since the 26-journal census.
+relative to the dated 2026-08-16 predecessor census.

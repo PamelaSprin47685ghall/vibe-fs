@@ -165,48 +165,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - OBLIGATION-LEDGER-018 对“事实 + 增量 projection”描述与新 ADT 同步；不得新增 Stage/Phase wording。
 - 完成证据：`rg -n 'Accepted: bool|Assignment: TodoProcessReviewAssigned option|Concluded: TodoReviewConcluded option' src/Wanxiangshu/Mission/Obligation/Todo` = 0；obligation-ledger projection tests green。
 
-## OBL-004 — `Fact.MagicTodo` typed end-to-end；canonical core 禁止 typed→string→typed 隧道
-
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs`
-  - `MagicTodoFact` 成为 canonical typed fact family；删除“Parallel to Fact.AgentFact until wired”过渡态文字。
-  - 去掉为 circular compile order 不必要的 `open Wanxiangshu.Composition.Durable`；该 fact family 不得依赖 outer router。
-- [ ] `src/Wanxiangshu/Composition/Durable/Fact.fs`
-  - `| MagicTodo of payload: string` → `| MagicTodo of MagicTodoFact`；outer router 只组合 owner-owned typed families。
-- [ ] `src/Wanxiangshu/Wanxiangshu.fsproj`
-  - 调整 compile order：Magic Todo fact algebra 必须先于 outer `Composition/Durable/Fact.fs`，但 projection/workflow 仍可在 outer Fact 后；不得靠复制类型解循环。
-- [ ] `src/Wanxiangshu/Persistence/Journal/AgentJournal.fs`
-  - `AppendMagicTodo` 直接 `Fact.MagicTodo fact`；删除 `MagicTodoFactCodec.encode |> Fact.MagicTodo`。
-- [ ] `src/Wanxiangshu/Composition/Durable/Fold.fs`
-  - `foldMagicTodo` 直接匹配 typed `MagicTodoFact`；删除 canonical fold 内 `MagicTodoFactCodec.tryDecode`。
-- [ ] `src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs`
-  - `JournalPayloadClosure.ofFact` 对 typed MagicTodo 直接调用 typed `payloadRefs`；删除为查 payload refs 先 decode string 的分支。
-- [ ] `src/Wanxiangshu/Persistence/Journal/FactCodec.fs`
-- [ ] `src/Wanxiangshu/Persistence/Journal/Envelope.fs`
-  - JSON/string encode/decode 只在持久化 codec ingress/egress 发生一次；decode 成功后立即得到 typed `Fact.MagicTodo`，不能让 string 进入 Fold/Journal domain API。
-- [ ] `src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs`
-- [ ] `src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs`
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs`
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs`
-- [ ] `src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs`
-  - JS/Host surfaces 可以接收/返回 canonical JSON string，但必须在 surface 内立刻 decode/encode typed fact；禁止把 string 当 core representation。
-- [ ] `requirements/obligation-ledger/tests/magic-todo.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-after.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-event-store.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-host-canaries.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-projection.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs`
-- [ ] `requirements/durable-events/tests/fact-codec.test.mjs`
-- [ ] `requirements/durable-events/tests/envelope.test.mjs`
-- [ ] `requirements/durable-events/tests/workspace-event-store-host.test.mjs`
-- [ ] `requirements/verification-system/tests/guide-contract.test.mjs`
-  - 增加/迁移 proof：typed owner fact 能 roundtrip persistence；semantic fold 不依赖 codec；JS codec surface 仍输出 JS-native bytes。
-- 完成证据：
-  - `rg -n 'MagicTodo of payload: string|MagicTodoFactCodec\.tryDecode payload|MagicTodoFactCodec\.encode \|> Fact\.MagicTodo' src/Wanxiangshu` = 0；
-  - `Composition/Durable` 不再 import MagicTodo codec；
-  - obligation-ledger + durable-events + guide-contract focused tests green。
-
 ## OBL-005 — Fallback success 不得靠 AgentJournal 进程内 overlay 篡改 Snapshot
 
 当前 `AgentJournal.Snapshot = canonical projection + derivedFallbackSuccesses overlay` 与“当前状态是 durable facts 积分”冲突。这里选择统一事件模型：**成功也必须形成 owner-owned durable fact**；不得通过收窄宝典文字为现状开例外。
@@ -238,26 +196,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `requirements/context-compression/tests/recovery-slot.test.mjs`
   - 保证 parked odd Offset 行为在 durable success replay 后仍成立；不得依赖 process-local overlay。
 - 完成证据：`rg -n 'derivedFallbackSuccesses|RecordDerivedFallbackSuccess|recordDerivedFallbackSuccess|success_writes_no_fact|成功不写 cursor 事实' src requirements` = 0；provider-attempt-recovery + context-compression focused tests green；fresh process replay 得到与 pre-crash Snapshot 相同 fallback state。
-
-## OBL-006 — dead-code / horizon census 从“本机传说”变成 tracked verifier
-
-- [ ] `.gitignore`
-  - 删除 `scripts/deadcode-scan.mjs` ignore 规则。
-- [ ] `scripts/deadcode-scan.mjs`
-  - 当前文件真实存在但被 Git ignore。审查后要么正式纳入版本控制，要么迁成 `scripts/checks/deadcode.mjs` 并删除旧文件；**禁止继续存在 ignored verifier**。
-  - scanner 的 false-positive/false-negative 边界写进代码与测试；输出必须稳定、非零 exit 表达 gate failure，不能只 dump JSON 让人肉判断。
-- [ ] `requirements/verification-system/tests/deadcode-scan.test.mjs`
-  - 新建 tracked regression：clean fixture green；孤立 binding fixture red；missing/unreadable root fail-closed；新增 production dead binding 能让 gate red。
-- [ ] `scripts/check.mjs`
-  - 把正式 dead-code verifier 接入 cheap gate；若采用 baseline，只能是 tracked、只减不增，并在 baseline=0 的提交删除 baseline 机制。
-- [ ] `scripts/checks/legacy-horizon-census.mjs`
-  - 新建可重放 census：要求显式 `--roots-file <inventory>`，扫描 inventory 中每个 workspace 的 `.git/wanxiang/events/*.ndjson`，分别统计 LEGACY-005 四类 detector 命中；未传 inventory、inventory 为空、声明 root 缺失、读取/解析失败都必须 nonzero，不能“没找到=0/跳过坏文件=0”。
-  - 输出至少含 workspace 数、journal 数、line 数、四 detector counts、输入 roots 的稳定 digest/manifest；不得只输出总“0”。
-- [ ] `requirements/durable-events/tests/legacy-horizon-census.test.mjs`
-  - 新建 fixture proof：四类旧 bytes 各自能被计数；现代 bytes=0；损坏/缺失声明 root fail-closed。
-- [ ] `cleanup/legacy-ledger.md`
-  - LEGACY-005 的 evidence 改为命令 + dated machine result；禁止继续只有“48-journal census”散文。
-- 完成证据：fresh clone 不依赖 ignored/local 文件即可重放 dead-code gate；任一 LEGACY-005 fixture 注入后 census/gate 必红。
 
 ## OBL-007 — LEGACY-005：四个历史 decoder detector 在 horizon 到期时整组删除
 
@@ -311,51 +249,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
   - 删除 LEGACY-006 row。
 - 退出条件：OpenCode Host V1 TodoTable 不再属于 supported Host contract，真实 executor 不再读取 `todos[{content,status,priority}]`。
 - 完成证据：`rg -n 'CompatibilityTodoRow|obligationsToCompatibilityRows|projectCompatibilityRows|replaceCompatibilityArgs' src requirements cleanup` = 0；Host boundary canaries 仍证明 canonical todowrite schema/execute/after 行为。
-
-## OBL-009 — census 数字只允许一个可重放来源；清理 26 vs 48 文档漂移
-
-- [ ] `requirements/durable-events/HOW.md`
-  - 当前仍写 `.git/wanxiang/events/` “26 journals”；删除这种会过期的手抄 current count，改引用 OBL-006 census 命令/证据位置。HOW 只保留永久规则与 detector exit condition。
-- [ ] `cleanup/host-sink-migration-report.md`
-  - “48 journals / 2026-08-17”可以作为 dated historical evidence，但必须附 machine census command/result identity；不得被当成永久 current truth。
-- [ ] `cleanup/legacy-ledger.md`
-  - LEGACY-005 evidence 与 migration report 使用同一 machine-readable census 来源，禁止各写一套数字。
-- 完成证据：`rg -n '26 journals|48 journals|26-journal|48-journal' requirements cleanup` 中每个剩余命中都明确是 dated historical record；没有两个位置同时声称自己是“当前 census”。
-
-## OBL-010 — Chronicle 的可预见 no-live-cycle 先类型化，再在 Host 最后一公里翻译
-
-当前 `ChronicleTool.noLiveCycleResult` 把可预见的 `CHRONICLE_NO_LIVE_CYCLE` 直接实现成 `InvalidOperationException`。Host SDK 若要求 throw，可以在最外层 adapter 翻译；领域判断本身不能以异常作为数据类型。
-
-- [ ] `src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs`
-  - 删除 `noLiveCycleResult : Task<string>` 内直接 `return raise (InvalidOperationException(NoLiveCycleError))` 的业务判断形状。
-  - 新建封闭 outcome（例如 `ChronicleExecution = Completed of string | NoLiveCycle`）或等价强类型 Result；`hasLiveCycle` 只决定 typed outcome。
-  - abort session 是 no-live-cycle outcome 的 effect shell；如果 `ToolSpec.Execute` 的 Host 合同必须 reject Promise/throw，则只允许 `Execute` 最后一公里把 `NoLiveCycle` 翻成 `InvalidOperationException(NoLiveCycleError)`，不得让该异常穿回纯 decision/helper。
-- [ ] `requirements/behavior-diagnosis/WHAT.md`
-  - 在 BD-006/BD-017 所属边界明确 no-live-cycle 是可预见 protocol outcome；Host exception 仅为 physical adapter encoding，不是领域错误模型。
-- [ ] `requirements/behavior-diagnosis/HOW.md`
-  - 记录 typed decision → abort effect → Host error encoding 的单向边界。
-- [ ] `requirements/behavior-diagnosis/tests/chronicle-no-live-cycle.test.mjs`
-  - 新建 regression：有 live cycle 返回正常 provider result；无 live cycle 产生 typed no-live-cycle 路径并 abort；Host adapter 最终仍按 SDK 合同暴露 `CHRONICLE_NO_LIVE_CYCLE`；不得靠 regex 私有函数体证明。
-- 完成证据：Chronicle focused test green；`rg -n 'return raise \(InvalidOperationException\(NoLiveCycleError\)\)' src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs` = 0；若仍存在 `InvalidOperationException(NoLiveCycleError)`，只能位于 `ToolSpec.Execute` 最后一公里 adapter。
-
-## OBL-012 — chat.message pending supersession 不得穿透 fatal membrane
-
-当前 `ModelRoutingRuntime.cancelDemand` 用 `OperationCanceledException()` 表示“同 SessionId 更新 physical message / owner cleanup 取消旧 pending demand”；这是 EMR-004 规定的正常生命周期结果。`HostSignalBootstrap.chatMessageHook` await 该 Task 后，异常穿过 `PluginHostInterop.fatalHook`，被误分类为 `plugin-hook-chat-message-failed`；Fable 默认取消异常 message 为空，因此现场只见 `{"operation":"plugin-hook-chat-message-failed","result":""}`，并触发 process fatal。
-
-- [ ] `src/Wanxiangshu/OpenCode/Host/ModelRouting.fs`
-  - pending acquisition 的 supersede/cancel 改为封闭 typed outcome；不得再用 exception 代表正常 demand 生命周期。
-  - scheduler/invariant 真实异常仍保持 exception/fatal 语义，不得被 cancellation 分支吞掉。
-- [ ] `src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs`
-  - `chat.message` 收到 superseded acquisition 后成功短路；不得继续 model projection、PromptIngress、capability commit，也不得进入 `fatalHook`。
-- [ ] `src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs`
-  - JS proof surface 显式编码 acquisition outcome；不得靠 rejected Promise 区分 superseded。
-- [ ] `requirements/execution-model-routing/WHAT.md`、`HOW.md`
-  - 明确 superseded pending demand 是预期 typed outcome，旧 Host hook 必须无副作用成功收敛；fatal 只保留 invariant/scheduler break。
-- [ ] `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`
-  - 把 superseded/cancel regression 从 `assert.rejects` 改为 typed outcome 断言。
-- [ ] `requirements/execution-model-routing/tests/process-shared-routing.test.mjs`
-  - 增加真实 plugin-hook regression：容量阻塞旧 physical message → 同 SessionId 新 message supersede；旧 `chat.message` Promise 必须 resolve、不得打印 fatal，fresh message 正常取得 lease。
-- 完成证据：focused execution-model-routing tests green；`rg -n 'trySetCanceled demand\.Completion|assert\.rejects\(old\)|assert\.rejects\(blocked\)' src/Wanxiangshu/OpenCode/Host requirements/execution-model-routing/tests` = 0；标准 `check/build/verification-system` 全绿。
 
 ## OBL-011 — 最终验收与义务账自删除
 

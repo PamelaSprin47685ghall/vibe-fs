@@ -216,7 +216,7 @@ Journal 的 `payload_refs` 不再是空数组：`JournalPayloadClosure.ofFact`�
    当前 writer 只产生完整的 canonical facts；已删除缺字段注入与旧 observation-tag
    rewrite。保留的历史路径只在 persistence ingress 对已知旧 bytes 做**拒绝并给出明确处置
    信息**，绝不把旧 bytes 迁移为新 facts，也没有旧 writer。census 2026-08-16：
-   `.git/wanxiang/events/` 的 26 journals 全部现代形状，零缺字段行。
+   retention-horizon 证据不得手抄 journal 数；使用 tracked `scripts/checks/legacy-horizon-census.mjs --roots-file <inventory>` 对显式 inventory 重放。inventory 为空、声明 workspace 缺失、events 目录/NDJSON 读取失败均 fail closed；输出包含 workspace/journal/line 数、四类 detector counts 与 roots digest。历史 dated census 只作为当时 inventory 的证据，不代表“当前所有受支持 workspace”。
 
    | decode-only ingress | 真实债权人 | Exit condition |
    |---|---|---|

@@ -61,6 +61,7 @@ tips 仍独立存活，模型必须自己猜「tip 2 属于 frame 1/2/3 哪个�
   delivery/coverage 问题）。
 - feedback dedupe/coverage —— `guidance-delivery`。
 - `chronicle` 工具名与 Blogger 工具权限（ENFORCER-010/011）—— `capability-enforcement`。
+- `chronicle` 的 Host SDK exception 形状只是物理编码；“当前没有 live Blogger cycle”是本包可预见的 protocol outcome，先在 owner 内类型化，再由最外层 tool adapter 翻译。
 - tip 目录物理格式/文件名 —— 本包只消费目录身份，物理布局是资源实现细节（且
   `guidance-delivery` 的 INDEPENDENT CHANGE 恰好就是「目录格式换成 typed catalog
   而 diagnosis 不动」）。

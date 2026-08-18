@@ -50,4 +50,3 @@ Thumbs.db
 # Local scan artifacts
 /local/
 /local:/
-scripts/deadcode-scan.mjs

@@ -126,11 +126,10 @@ module ChronicleTool =
                 ()
         }
 
-    let private noLiveCycleResult runtime (ctx: HostToolContext) : System.Threading.Tasks.Task<string> =
+    let private applyNoLiveCycleEffect runtime (ctx: HostToolContext) : System.Threading.Tasks.Task =
         task {
             Diagnostic.emit "chronicle-execute" [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
             do! abortSessionIfPresent runtime ctx.SessionId
-            return raise (InvalidOperationException(NoLiveCycleError))
         }
 
     let private resultForTip language tipRaw =
@@ -145,6 +144,27 @@ module ChronicleTool =
         match tryCanonicalText (args.Text "entry") with
         | Error _ -> nothingToRemember language
         | Ok _ -> resultForTip language (args.Text "tip")
+
+    let private executeChronicle
+        (runtime: ToolRuntimeScope)
+        (parkedHost: IParkedTransformHost option)
+        language
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : System.Threading.Tasks.Task<ChronicleExecution> =
+        task {
+            let execution =
+                if hasLiveCycle parkedHost ctx.SessionId then
+                    ChronicleExecution.decide true (executeValidEntry language args)
+                else
+                    ChronicleExecution.decide false ""
+
+            match execution with
+            | ChronicleExecution.Completed _ -> return execution
+            | ChronicleExecution.NoLiveCycle ->
+                do! applyNoLiveCycleEffect runtime ctx
+                return execution
+        }
 
     let spec
         (factory: HostToolFactory)
@@ -169,9 +189,11 @@ module ChronicleTool =
             fun args ctx ->
                 task {
                     let language = lang ctx
+                    let! execution = executeChronicle runtime parkedHost language args ctx
 
-                    if hasLiveCycle parkedHost ctx.SessionId then
-                        return executeValidEntry language args
-                    else
-                        return! noLiveCycleResult runtime ctx
+                    match execution with
+                    | ChronicleExecution.Completed value -> return value
+                    | ChronicleExecution.NoLiveCycle ->
+                        let hostError = InvalidOperationException(NoLiveCycleError)
+                        return raise hostError
                 } }

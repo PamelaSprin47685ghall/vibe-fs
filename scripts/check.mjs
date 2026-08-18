@@ -12,6 +12,7 @@ const checks = [
   join(root, 'checks/architecture.mjs'),
   join(root, 'checks/dsl-ownership.mjs'),
   join(root, 'checks/fsharp-control-pyramid.mjs'),
+  join(root, 'checks/deadcode.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),

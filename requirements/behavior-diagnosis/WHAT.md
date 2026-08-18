@@ -64,10 +64,14 @@ TipName/RuleId/FieldName 恒等。装载按语言定位叶子，无跨语言 fal
 `chronicle` 调用按 codec 解析：`entry`（trim 后非空）与 `tip`（目录 TipName 枚举
 精确命中）为语义必需；缺失 tip / 空 tip / 非 string tip → 失败，错误面稳定
 （`missing required argument: tip`）；`entry` 缺失或空 → 无有效文本。
+若物理 tool call 到达时不存在 live Blogger cycle，owner 必须先得到封闭的
+`NoLiveCycle` protocol outcome，并终止该 stale session；只有 `ToolSpec.Execute` 最后一公里
+可以把该 outcome 编码为 Host SDK 的 `CHRONICLE_NO_LIVE_CYCLE` exception。领域 helper/
+decision 不得用 exception 表示这个可预见分支。
 
 - 含义：诊断必须有「观察了什么 + 选中哪条规则」两个要素，缺一不可成立
   （ENFORCER-022/023/061）。
-- 边界：`chronicle` 工具名与权限归 `capability-enforcement`；这里只锁参数语义。
+- 边界：`chronicle` 工具名与权限归 `capability-enforcement`；这里只锁参数语义与 live-cycle protocol outcome，Host exception 仅是 adapter encoding。
 - 证据：`codec.test.mjs` `ENFORCER_023_*`、`ENFORCER_022_*`；`HOW.md` 行 15–17。
 
 ### BD-007 tip 精确映射，无 fuzzy

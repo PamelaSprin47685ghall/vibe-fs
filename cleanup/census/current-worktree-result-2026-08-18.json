@@ -1,0 +1,19 @@
+{
+  "command": "node scripts/checks/legacy-horizon-census.mjs --roots-file=cleanup/census/current-worktree-roots.txt",
+  "scope": "dated local worktree evidence only; not the authoritative supported-workspace inventory",
+  "result": {
+    "workspaces": 1,
+    "journals": 59,
+    "lines": 18916,
+    "counts": {
+      "pre050": 0,
+      "scoreVector": 0,
+      "unanchoredGuideline": 0,
+      "incompleteHandleCompleted": 0
+    },
+    "rootsDigest": "0cfd1c96cbc0c0e025888750a8b75d7d507ab83eaef58650f1023579f03ca306",
+    "roots": [
+      "../.."
+    ]
+  }
+}
