@@ -124,3 +124,25 @@ post-receive projection、Wanxiang-specific server API。
 **边界**：hook 安装/chain 的安全规则（不覆盖用户 hook）→ `Infrastructure/Git` 实现面
 （proof 见 `durable-events` 的 hook-dispatcher 测试）。
 **证据**：→ HOW.md 009。
+
+## DURABLE-CONVERGENCE-010 —— hook 热路径成本只随变化量增长
+
+**规范陈述**：成功完成一次完整同步后，client 可以保存不具备真相权威的 materialization cache：
+`physical file stat fingerprint → StoreSnapshot.RootOid`。fingerprint 必须覆盖同步 writer/payload 文件集合及
+每个文件足以检测普通写入/替换的 filesystem identity/stat；cache 缺失、损坏或 fingerprint 不同只能退回完整
+读取、canonical validation、materialization，绝不能把 cache 当 durable truth。
+
+当当前 physical fingerprint 命中 cache 且 remote root 与 cached root 相同，`WriterStreamSync` 必须直接复用
+cached snapshot：不得重读历史 body、不得逐 remote blob 解压/解码、不得重做 k-way merge。
+当 fingerprint 未命中但存在上次已验证 materialization manifest 时，近似相同的 local/remote 也必须按文件差异工作：
+同名文件只有在 cached stat identity 或 remote blob OID 与当前物理状态不能证明相同时才读取 body；unchanged payload
+不得因为另一个 writer append 而被重新读取/解压/写 blob。payload closure presence 检查只做 existence probe，不得为了
+回答“是否存在”读取 payload body。
+`reference-transaction` 的 observed root 已由用户 fetch/pull 确认为当前 remote；candidate root 相同则不得再发
+一次空 `git push`。`pre-push` 不得在 common path 先做 `ls-remote + fetch`：应以本地 remote-tracking store ref
+作为 optimistic lease expectation，直接尝试 CAS push；只有 lease rejection 才 discover/fetch remote 并完整重试。
+
+**含义/动机**：无变化 sync 的本地成本应接近 Git index stat scan，而不是 O(total durable bytes)；push/pull
+保留同一双向语义，但额外 work 只在真实 local/remote delta 或 CAS race 时发生。
+**边界**：cache 是 performance hint，删除它不改变结果；CAS/remote ref 才证明跨机器当前性。
+**证据**：→ HOW.md 010。

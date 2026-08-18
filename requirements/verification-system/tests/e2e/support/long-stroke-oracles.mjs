@@ -85,7 +85,11 @@ export function armNeedHelpCausalHolds(scenario) {
         tracedSessions.add(sessionId);
       }
       if (sessionId && tracedSessions.has(sessionId)) {
-        console.error(`[NEEDHELP-EVENT] seq=${event.seq} type=${event.type} session=${sessionId} raw=${event.raw}`);
+        console.error(
+          `[NEEDHELP-EVENT] seq=${event.seq} type=${event.type} session=${sessionId} ` +
+            `status=${event.properties?.status?.type ?? ''} finish=${event.properties?.info?.finish ?? ''} ` +
+            `part=${event.properties?.part?.type ?? ''} delta=${event.properties?.delta ?? ''}`,
+        );
       }
     });
   }

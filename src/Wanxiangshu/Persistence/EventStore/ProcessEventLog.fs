@@ -101,6 +101,9 @@ module ProcessEventLog =
     [<Import("readdirSync", "node:fs")>]
     let private readdirSync (path: string) : string[] = jsNative
 
+    [<Import("statSync", "node:fs")>]
+    let private statSync (path: string) : obj = jsNative
+
     [<Import("openSync", "node:fs")>]
     let private openSync (path: string) (flags: string) : int = jsNative
 
@@ -115,6 +118,12 @@ module ProcessEventLog =
 
     [<Emit("$0.update($1)")>]
     let private hashUpdate (hash: obj) (content: byte[]) : obj = jsNative
+
+    [<Emit("$0.update($1, 'utf8')")>]
+    let private hashUpdateText (hash: obj) (content: string) : obj = jsNative
+
+    [<Emit("[$0.dev, $0.ino, $0.mode, $0.size, $0.mtimeMs, $0.ctimeMs].join(':')")>]
+    let private statIdentity (stat: obj) : string = jsNative
 
     [<Emit("$0.digest('hex')")>]
     let private hashHex (hash: obj) : string = jsNative
@@ -263,6 +272,45 @@ module ProcessEventLog =
             |> Array.sort
             |> Array.toList
 
+    let private payloadFileNames commonDir =
+        let directory = payloadsDirectory commonDir
+
+        if not (existsSync directory) then
+            []
+        else
+            readdirSync directory |> Array.sort |> Array.toList
+
+    let private fingerprintFiles hash label directory names =
+        names
+        |> List.iter (fun name ->
+            let identity = statSync (join2 directory name) |> statIdentity
+            hashUpdateText hash (label + "\u0000" + name + "\u0000" + identity + "\n") |> ignore)
+
+    let private physicalStats directory names =
+        names
+        |> List.map (fun name -> name, statSync (join2 directory name) |> statIdentity)
+
+    /// Git-index-style physical cache key. It never replaces canonical validation:
+    /// a cache miss falls back to reading bytes, while a hit only reuses a snapshot
+    /// that has already been validated/materialized for the exact same file stats.
+    let physicalFingerprint (commonDir: string) : string =
+        let hash = createHash "sha256"
+        fingerprintFiles hash "writers" (eventsDirectory commonDir) (writerFileNames commonDir)
+        fingerprintFiles hash "payloads" (payloadsDirectory commonDir) (payloadFileNames commonDir)
+        hashHex hash
+
+    let writerPhysicalStats (commonDir: string) : (string * string) list =
+        writerFileNames commonDir |> physicalStats (eventsDirectory commonDir)
+
+    let payloadPhysicalStats (commonDir: string) : (string * string) list =
+        payloadFileNames commonDir |> physicalStats (payloadsDirectory commonDir)
+
+    let readWriterFileBytes (commonDir: string) (name: string) : byte[] =
+        readBytesFileSync (join2 (eventsDirectory commonDir) name)
+
+    let readPayloadFileBytes (commonDir: string) (name: string) : byte[] =
+        readBytesFileSync (join2 (payloadsDirectory commonDir) name)
+
     /// Frozen writer files as exact UTF-8 text. Sync owns bytes, not event meaning.
     let readWriterTexts (commonDir: string) : (string * string) list =
         writerFileNames commonDir
@@ -335,15 +383,13 @@ module ProcessEventLog =
             None
 
     let payloadExists commonDir payloadRef =
-        readPayload commonDir payloadRef |> Option.isSome
+        existsSync (join2 (payloadsDirectory commonDir) (PayloadRef.value payloadRef))
 
     let readPayloadFiles (commonDir: string) : (string * byte[]) list =
         let directory = payloadsDirectory commonDir
         ensureDirectory directory
 
-        readdirSync directory
-        |> Array.sort
-        |> Array.toList
+        payloadFileNames commonDir
         |> List.map (fun name -> name, readBytesFileSync (join2 directory name))
 
     let private writeOrReusePayload path name content =

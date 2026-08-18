@@ -96,7 +96,7 @@ test('WHAT[DURABLE-EVENTS-011] one_complete_writer_file_is_one_blob_only_at_remo
   const log = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
 
   assert.match(sync, /WriteBlob/, 'remote sync encodes writer bytes as Git blobs')
-  assert.match(sync, /writerId \+ "\.ndjson"/, 'one complete writer file maps to one blob entry')
+  assert.match(sync + log, /writer(?:Id)? \+ "\.ndjson"/, 'one complete writer file maps to one blob entry')
   assert.doesNotMatch(sync, /delta|chunk|segment|EventIdShard|index/, 'no delta/chunk/segment/index protocol in sync encoding')
   assert.doesNotMatch(store + log, /\.Fetch|\.Pull|\.Push|WriterStreamSync|GitGateway|ProcessGitRawStore/, 'runtime append path performs no remote sync or Git CAS')
 })

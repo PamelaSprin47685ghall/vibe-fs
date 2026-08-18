@@ -16,6 +16,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
