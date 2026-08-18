@@ -118,6 +118,11 @@ module ReviewerEvidence =
         | EnsureVerdictSubmitted
         | CompleteProcessReview
 
+    [<RequireQualifiedAccess>]
+    type ProcessIdleDisposition =
+        | OrdinaryRepair
+        | CompleteToolOnlyProcessReview
+
     let classifyNeed journal reviewerKey =
         let reviewerId = SessionId.create reviewerKey
 
@@ -134,3 +139,14 @@ module ReviewerEvidence =
         | Some _, None -> Need.EnsureVerdictSubmitted
         | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
         | Some _, Some _ -> Need.CompleteProcessReview
+
+    /// Process reviewers are explicitly instructed to answer with one `judge`
+    /// tool call. Once that judgement is durable, a stable Host idle is the
+    /// physical closure boundary for that tool-only turn; asking for an ordinary
+    /// missing-final-report would contradict the process-review protocol and can
+    /// strand ReviewAttemptClosed behind an abandoned synthetic repair.
+    let processIdleDisposition journal reviewerKey =
+        match classifyNeed journal reviewerKey with
+        | Need.CompleteProcessReview -> ProcessIdleDisposition.CompleteToolOnlyProcessReview
+        | Need.NotProcessReview
+        | Need.EnsureVerdictSubmitted -> ProcessIdleDisposition.OrdinaryRepair

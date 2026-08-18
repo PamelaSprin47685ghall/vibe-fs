@@ -56,8 +56,10 @@ type PairProgrammingGuideline =
 
 - `apply ordinal callId markerText callGap resultGap state`：三拒绝——ordinal ≠
   next（`NonSequentialOrdinal`）、CallId 重复（`DuplicateCallId`）、placement 重复
-  （`DuplicatePlacement`，SessionId 隐含 + CallGap + ResultGap 至多一对）。
-- `pairs`：存储 newest-first，返回 oldest-first（replay 顺序）。
+  （`DuplicatePlacement`，SessionId + 当前 horizon 隐含 + CallGap + ResultGap 至多一对）。
+- `pairs`：返回 durable 全历史；`visiblePairs`：只返回当前 provider horizon 的 replay set。
+- `applyReanchor`：保留全部历史 + CallId frontier，推进 visible floor 到 `nextOrdinal`；旧 placement 因 horizon
+  退休可在新 horizon 再出现，新 occurrence 仍必须使用全历史 next ordinal 与新 CallId。
 - `MarkerText` 原样存储 → replay byte-identical（HOST-013「当时实际看到的精确 payload」）。新 occurrence 在 append 前已包成 `<skill_content name="">…</skill_content>`；历史 raw MarkerText 保持旧 wire。substrate 是 Journal fold，不是私有 delivery 文件。
 
 ## 4. marker 注入：`src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs`
@@ -74,7 +76,8 @@ type PairProgrammingGuideline =
 | IdentityOnly 后 reanchor 仍给身份 | GD-005 | `applyReanchor` 是否被接线（ContextReanchored fold） |
 | restart 后第一次判定漂移 | GD-004 | 交付决策是否读进程内存 |
 | main.md 进了 Blogger system | GD-008 | `composeBloggerSystemPromptFor` 是否混入 MainText |
-| 历史 marker 字节被改写 | GD-011 | `GuidelineProjection` 是否按原文存储/重放 |
+| 历史 marker 字节被改写 | GD-011 | `GuidelineProjection` 是否按原文存储；同 horizon replay 是否原字节 |
+| Y 后旧 pair 又出现 | GD-011 / CTX-019 | `ContextFactFold` 是否调用 `GuidelineProjection.applyReanchor`；transform 是否只读 `visiblePairs` |
 
 ## 6. 验证命令
 

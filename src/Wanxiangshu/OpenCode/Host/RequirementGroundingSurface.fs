@@ -3,6 +3,8 @@ namespace Wanxiangshu.OpenCode.Host
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
+open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Persistence.Journal
@@ -98,6 +100,34 @@ module RequirementGroundingSurface =
         RequirementGroundingRuntime.pending (agentJournalOf journal) (SessionId.create sessionId)
         |> List.map _.PackageName
         |> List.toArray
+
+    let appendContextReanchored
+        journal
+        sessionId
+        (previousEpoch: int64)
+        (nextEpoch: int64)
+        observedRun
+        : Task<obj> =
+        task {
+            let session = SessionId.create sessionId
+
+            let fact =
+                ContextFact.ContextReanchored
+                    {| SessionId = session
+                       PreviousEpochId = PrefixEpochId.create previousEpoch
+                       NextEpochId = PrefixEpochId.create nextEpoch
+                       ObservedCompactionRun = ProviderRunIdentity.create observedRun |}
+
+            let! result = AgentJournal.appendAgent (StreamId.Session session) None fact (agentJournalOf journal)
+
+            return
+                match result with
+                | Ok _ -> box {| ok = true; error = null |}
+                | Error failure ->
+                    box
+                        {| ok = false
+                           error = JournalAppendFailure.describe failure |}
+        }
 
     let source = RequirementGroundingTransform.source
     let cursorSeparator = RequirementGroundingTransform.cursorSeparator

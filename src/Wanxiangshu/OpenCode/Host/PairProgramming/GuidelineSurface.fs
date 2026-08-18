@@ -45,7 +45,9 @@ module GuidelineSurface =
                resultGap = gapToJs pair.ResultGap |}
 
     let private stateToJs (state: GuidelineProjectionState) : obj =
-        box {| pairs = GuidelineProjection.pairs state |> List.map pairToJs |> List.toArray |}
+        box
+            {| pairs = GuidelineProjection.pairs state |> List.map pairToJs |> List.toArray
+               visibleFromOrdinal = state.VisibleFromOrdinal |}
 
     let private pairOfJs (value: obj) : PairProgrammingGuideline =
         { Ordinal = int64Value value?ordinal
@@ -61,18 +63,42 @@ module GuidelineSurface =
             else
                 unbox<obj array> value?pairs
 
+        let visibleFromOrdinal =
+            if isNullish value?visibleFromOrdinal then 1L else int64Value value?visibleFromOrdinal
+
         // The JSON state intentionally carries only semantic pairs. Replaying
         // them through the owner rebuilds the private set indexes and keeps
         // collection representation out of the JS contract.
-        ((GuidelineProjection.empty, pairs)
-         ||> Array.fold (fun state value ->
-             let pair = pairOfJs value
+        let rebuilt, crossedVisibilityFloor =
+            ((GuidelineProjection.empty, false), pairs)
+            ||> Array.fold (fun (state, crossed) value ->
+                let pair = pairOfJs value
 
-             match
-                 GuidelineProjection.apply pair.Ordinal pair.CallId pair.MarkerText pair.CallGap pair.ResultGap state
-             with
-             | Ok next -> next
-             | Error rejection -> failwithf "GuidelineSurface: invalid state (%A)" rejection))
+                let current =
+                    if not crossed && visibleFromOrdinal > 1L && pair.Ordinal >= visibleFromOrdinal then
+                        GuidelineProjection.applyReanchor state
+                    else
+                        state
+
+                match
+                    GuidelineProjection.apply
+                        pair.Ordinal
+                        pair.CallId
+                        pair.MarkerText
+                        pair.CallGap
+                        pair.ResultGap
+                        current
+                with
+                | Ok next -> next, crossed || pair.Ordinal >= visibleFromOrdinal
+                | Error rejection -> failwithf "GuidelineSurface: invalid state (%A)" rejection)
+
+        let rebuilt =
+            if visibleFromOrdinal > 1L && not crossedVisibilityFloor then
+                GuidelineProjection.applyReanchor rebuilt
+            else
+                rebuilt
+
+        GuidelineProjection.restoreVisibilityFloor visibleFromOrdinal rebuilt
 
     let private rejectionToJs (rejection: GuidelineFoldRejection) : obj =
         match rejection with
@@ -107,6 +133,12 @@ module GuidelineSurface =
 
     let pairs (state: obj) : obj array =
         GuidelineProjection.pairs (stateOfJs state) |> List.map pairToJs |> List.toArray
+
+    let visiblePairs (state: obj) : obj array =
+        GuidelineProjection.visiblePairs (stateOfJs state) |> List.map pairToJs |> List.toArray
+
+    let applyReanchor (state: obj) : obj =
+        stateOfJs state |> GuidelineProjection.applyReanchor |> stateToJs
 
     /// Apply one semantic pair. Ordinals may be JavaScript numbers or BigInts;
     /// the owner normalizes them to the production int64 identity.

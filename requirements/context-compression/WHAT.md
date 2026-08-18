@@ -338,5 +338,25 @@ F# CE 的等待与继续直接表达（STRUCTURED-WORKFLOW-001/002/003）。
 **证据**：`tests/enforcer-cycle-commit-convergence.test.mjs`
 `ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier`；
 `tests/blogger-convergence-gaps.test.mjs`
+
+---
+
+## CONTEXT-COMPRESSION-019：X→Y 后旧辅助注入不跨 horizon 保留
+
+**规范**：任何 `ContextReanchored` 所代表的 X→Y / Host compaction 冷边界，都必须把旧 provider horizon
+中的**辅助注入可见性**归零。旧 horizon 已投影的 pair-programming synthetic `skill`、该 marker 中的 tip
+guidance、requirement-grounding ordinary `read` observations（包括 `APPLIES-TO`、requirements 文档与 tests），
+以及未来同类 Host-adopted guidance/grounding injection，均不得在 Y replacement 之后仅因 durable history
+存在而继续 replay。
+
+durable occurrence 本身不得删除、改写或重编号；它仍是审计与普通 restart 的历史事实。重锚只终止其
+provider-visible coverage。Y 生效后的新 turn 必须从“这些辅助注入当前不可见”开始，后续只有各自正常触发
+重新成立时才逐步创建新的 occurrence / coverage；禁止在 reanchor 时一次性把旧辅助材料全集重新灌回。
+
+本条不删除同 Life invariant system/tool contract，不删除 Authority/Persona 等 canonical domain facts，也不
+删除由 Y / FrozenRecordPrefix / XTrace 所代表的 canonical semantic work material；这些分别由其 owner 决定。
+
+**证据**：`tests/injected-context-reanchor.test.mjs`；交叉 `guidance-delivery` GD-005/GD-011、
+`requirement-grounding` REQUIREMENT-GROUNDING-006/007/012、`prefix-stability` PREFIX-STABILITY-010/011。
 `C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current`；跨包 restart 边界 REUSE
 `requirements/crash-reconciliation/tests/explicit-continue.test.mjs` 的 CRASH-017/018；HOW.md 第 018 行。

@@ -45,12 +45,14 @@ provider-visible bundle/message/result 形状出现。
 ## REQUIREMENT-GROUNDING-006：grounding identity 按内容版本去重
 
 自动交付身份至少包含 canonical workspace identity、package name 与 grounding material set 的确定性
-content digest。同一 participant provider context 已经完成同一 identity 的自动 read 后，后续路径触碰
+content digest。同一 participant **当前 provider horizon** 已经完成同一 identity 的自动 read 后，后续路径触碰
 不得再次自动读取同一 material set；package 内容改变导致 digest 改变时视为新的 grounding，可再次读取。
+`ContextReanchored` 会清空当前 horizon grounding coverage，所以即使 digest 未变，Y 后第一次再次触碰相关路径
+也必须重新 grounding；这不是新 package version，而是新 horizon 的知识恢复。
 
 **证据**：→ HOW.md `REQUIREMENT-GROUNDING-006`。
 
-## REQUIREMENT-GROUNDING-007：自动 grounding = 永久锚定的普通 read 投影
+## REQUIREMENT-GROUNDING-007：自动 grounding = 当前 horizon 锚定的普通 read 投影
 
 当一次 provider-facing 文件观察将 covered source content 暴露给 participant（例如 read 或返回
 源码片段的 grep）时，所有未 grounding package 的 material 必须按 ordinary provider 与 Cursor 两种既有
@@ -60,8 +62,9 @@ tool-result 语义。禁止 `GroundingBundle`、特殊 system 文本或其它 gr
 需要多次 read，则按普通 read 的分页/range 方式产生多次读取。
 
 这些自动 read 不是每轮重新执行文件系统读取，而是在首次 grounding 时把当次普通 read 的 call/result
-**原始 provider-visible 字节 + transcript gap anchor** 固化成永久历史 occurrence；后续 provider turn 只按
-同一 anchor、同一字节 replay。新 occurrence 只能追加在当前 wire 的追加区，禁止插回已经发送的 prefix。
+**原始 provider-visible 字节 + transcript gap anchor** 固化成 durable occurrence；同一 provider horizon 的
+后续 turn 只按同一 anchor、同一字节 replay。`ContextReanchored` 后旧 occurrence 仍在历史中但退出 provider-visible
+replay set；后续路径再次触发时形成新的 occurrence。新 occurrence 只能追加在当前 wire 的追加区，禁止插回已经发送的 prefix。
 若同一 gap 同时产生现有 pair-programming 伪 `skill({ name: "" })` occurrence 与 requirement grounding，
 固定顺序为 **伪 skill → requirement read(s)**。仅列路径而不暴露源码内容的目录枚举不强制 grounding。
 
@@ -113,14 +116,16 @@ read/edit/write/grep/move/remove 与万象术 repository-programming surface 只
 
 **证据**：→ HOW.md `REQUIREMENT-GROUNDING-011`。
 
-## REQUIREMENT-GROUNDING-012：grounding occurrence 进入语义历史，restart 不重复
+## REQUIREMENT-GROUNDING-012：grounding occurrence 进入语义历史；普通 restart 重放，reanchor 退休 coverage
 
 成功完成 grounding identity 的自动 read 必须成为 participant semantic history 中可重放的 typed occurrence。
 occurrence 至少保存 workspace/package/digest、每个 read 的稳定 call identity、read args、原始 result 字节及
-call/result gap anchor；retry、Host restart、普通 continuation 都从该事实重放相同 read transcript，不重新读取
-当前文件、不重新 renderer、不移动 placement。package 内容变化形成新 digest 时，只在当前追加区新增新的
-grounding reads；旧 occurrence 永不改写。不得仅靠 process-local Set、扫描 prompt 文本或 session 外临时文件
-去重。内部 material loader 自己读取 `requirements/<package>/` 不递归触发新的 provider grounding。
+call/result gap anchor；retry、Host restart、普通 continuation 在同一 horizon 从该事实重放相同 read transcript，
+不重新读取当前文件、不重新 renderer、不移动 placement。`ContextReanchored` 后旧 occurrence 保留审计但不再投影，
+grounded coverage 清空；同 digest 若再次触发，使用全历史递增 ordinal 与新的稳定 call identity 形成新 occurrence。
+package 内容变化形成新 digest 时，同样只在当前追加区新增 grounding reads；旧 occurrence 永不改写。不得仅靠
+process-local Set、扫描 prompt 文本或 session 外临时文件去重。内部 material loader 自己读取
+`requirements/<package>/` 不递归触发新的 provider grounding。
 
 同一 occurrence 必须同时足以确定 ordinary provider 的完整 read pair 与 Cursor 的 result-only suffix。Cursor
 投影使用同一冻结 result bytes，并额外使用该 read 的 canonical workspace-relative path 生成 source-path

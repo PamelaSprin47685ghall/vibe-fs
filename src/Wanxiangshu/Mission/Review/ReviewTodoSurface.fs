@@ -9,6 +9,7 @@ open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection
+open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Persistence.Journal
 
 /// Review-owned process-review membrane. Magic Todo's typed fact codec and
@@ -218,6 +219,12 @@ module ReviewTodoSurface =
         with
         | TodoProcessReviewProgram.ProducerPresence.Present -> box {| status = "Present" |}
         | TodoProcessReviewProgram.ProducerPresence.Absent reason -> box {| status = "Absent"; reason = reason |}
+
+    let processIdleDisposition (handle: JournalHandle) (reviewerSessionId: string) : string =
+        match ReviewerEvidence.processIdleDisposition (Some handle.Journal) reviewerSessionId with
+        | ReviewerEvidence.ProcessIdleDisposition.OrdinaryRepair -> "OrdinaryRepair"
+        | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview ->
+            "CompleteToolOnlyProcessReview"
 
     let requestKindNames () = [| "TodoProcess"; "FinalityTerminal" |]
 

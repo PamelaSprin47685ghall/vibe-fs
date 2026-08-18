@@ -74,6 +74,13 @@
   无法证明关闭 → `HostContractUnsupported` 启动失败。
 - 收容层：任意观察到的 compaction pseudo-run → 原子 `ContextReanchored`（HOST-006）；
   `nextReanchor` 消费 `PrefixEpochProjection.isReanchored`（同 compaction 只重锚一次）。
+- 同一 `ContextReanchored` fold 同时退休旧 auxiliary-injection visibility：
+  `GuidelineProjection.applyReanchor` 清当前 horizon pair replay set；
+  `RequirementGroundingProjection.applyReanchor` 清当前 grounded/visible read set；
+  `TipDeliveryProjection.applyReanchor` 清 tip semantic coverage。三者都保留 durable occurrence 历史，
+  所以普通 restart 仍可审计历史，而 Y 后 provider wire 不会恢复旧辅助注入。
+- post-reanchor 新 pair / tip / requirement read 只能由之后的普通触发重新产生；不得在 reanchor fold 中
+  eager 重注入旧全集。
 - `prune` 特殊：绕过 transform 直接删行，收容层无法修复 → 必须预防关闭。
 
 ### 1.6 诊断边界（`Kernel/Diagnostic`，见 ctx014 测试）
@@ -143,6 +150,7 @@
 | CONTEXT-COMPRESSION-016（Y 只物化 PrefixCoverage 完整 turn） | `tests/blogger-delta.test.mjs`：`CTX_011_a_multi_part_turn_splits_at_part_boundaries_and_holds_the_cutoff`、`CTX_011_a_chunk_ending_on_a_non_final_part_never_advances_the_cutoff`、`CTX_011_the_cutoff_never_decreases_across_chunks`；`tests/probe-selection.test.mjs`：`CTX_011_the_candidate_never_swallows_the_message_being_answered`、`COMPANION_011_the_proof_hashes_exactly_the_clamped_cutoff` | MOVE | `node --test requirements/context-compression/tests/blogger-delta.test.mjs requirements/context-compression/tests/probe-selection.test.mjs` |
 | CONTEXT-COMPRESSION-017（Opening floor / same-session self-memory identity） | `tests/ctx-opening-floor.test.mjs`（NEW）：`CTX_016_pre_t1_floor_is_the_xtrace_head_not_an_activation_cursor`、`CTX_016_work_activated_is_inert_and_does_not_move_the_floor`、`CTX_016_blogger_effective_start_is_max_of_record_coverage_and_floor`；`tests/companion-projection.test.mjs`：`COMPANION_010_same_session_memory_is_work_log_not_a_delegation_record`；跨包：`requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs`（semantic-trace 包）`COMPANION_003_capture_opening_takes_authoritative_requirements` | NEW + MOVE + 跨包 | `node --test requirements/context-compression/tests/ctx-opening-floor.test.mjs requirements/context-compression/tests/companion-projection.test.mjs` |
 | CONTEXT-COMPRESSION-018（连续 catch-up：无 frozen frontier；所有 quiet re-entry 先 park，wake 后读 live Current） | `tests/enforcer-cycle-commit-convergence.test.mjs`：`ENFORCER_same_run_after_squash_rejected_as_known_not_committed`（idempotent receipt quiet 必须实际调用 ParkTransform 后才可因模拟 physical expiry stop）/ `ENFORCER_caught_up_park_absorbs_future_material_beyond_previous_head_without_frozen_frontier`（park 前 head=2，park 期间新增 3..4，同一 continuation 立即派生 2→4 下一块）；`tests/blogger-convergence-gaps.test.mjs`：`C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current`、`C0_commit_drains_via_tryRefresh_before_park`；跨包边界 REUSE `requirements/crash-reconciliation/tests/explicit-continue.test.mjs`：`CRASH_017_new_process_runtime_dispose_does_not_claim_or_abort_old_active_handle`、`CRASH_018_continue_discloses_restart_keeps_broken_tool_visible_and_process_locally_reenlists_survivor` | NEW + REUSE + 跨包 | `node --test requirements/context-compression/tests/enforcer-cycle-commit-convergence.test.mjs requirements/context-compression/tests/blogger-convergence-gaps.test.mjs requirements/crash-reconciliation/tests/explicit-continue.test.mjs` |
+| CONTEXT-COMPRESSION-019（Y 后辅助注入 coverage 归零，历史 occurrence 保留） | `tests/injected-context-reanchor.test.mjs`：pair old synthetic 不 replay + 新 occurrence fresh call id；requirement old reads 不 replay + 同 digest 可重新 request；REUSE `requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs::ENFORCER_TIP_DELIVERY_006_context_reanchor_clears_full_so_next_is_full_again` | NEW + REUSE | `node --test requirements/context-compression/tests/injected-context-reanchor.test.mjs requirements/guidance-delivery/tests/tip-guidance-delivery.test.mjs` |
 
 ### 2. 本包拥有的测试文件（全部单跑绿）
 
@@ -172,6 +180,7 @@ node --test requirements/context-compression/tests/ctx014.test.mjs
 node --test requirements/context-compression/tests/terminal-validity.test.mjs
 node --test requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs
 node --test requirements/context-compression/tests/ctx-opening-floor.test.mjs
+node --test requirements/context-compression/tests/injected-context-reanchor.test.mjs
 ```
 
 ### 4. REUSE 落点（留在原处，SPLIT@cutover）

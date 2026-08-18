@@ -24,6 +24,9 @@ module RequirementGroundingRuntime =
         stateFor journal sessionId |> RequirementGroundingProjection.pending
 
     let occurrences (journal: AgentJournal) sessionId =
+        stateFor journal sessionId |> RequirementGroundingProjection.visibleOccurrences
+
+    let historyOccurrences (journal: AgentJournal) sessionId =
         stateFor journal sessionId |> RequirementGroundingProjection.occurrences
 
     let groundedKeys (journal: AgentJournal) sessionId =

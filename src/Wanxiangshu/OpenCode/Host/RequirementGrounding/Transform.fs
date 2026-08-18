@@ -39,9 +39,9 @@ module RequirementGroundingTransform =
             else
                 Some(string parts.[0]?callID)
 
-    let stableCallId sessionId workspace packageName digest index =
+    let stableCallId sessionId workspace packageName digest ordinal index =
         let input =
-            String.concat "\u0000" [ sessionId; workspace; packageName; digest; string index ]
+            String.concat "\u0000" [ sessionId; workspace; packageName; digest; string ordinal; string index ]
 
         "requirement-grounding-read-" + (HostDigest.sha256Hex input).Substring(0, 24)
 
@@ -171,12 +171,12 @@ module RequirementGroundingTransform =
     let private argsJson path =
         CanonicalJson.canonicalJson (createObj [ "filePath", box path ])
 
-    let private anchoredReads sessionId snapshot =
+    let private anchoredReads sessionId ordinal snapshot =
         snapshot.Materials
         |> List.mapi (fun index material ->
             { CallId =
                 ToolCallId.create (
-                    stableCallId sessionId snapshot.Workspace snapshot.PackageName snapshot.Digest index
+                    stableCallId sessionId snapshot.Workspace snapshot.PackageName snapshot.Digest ordinal index
                 )
               Path = material.Path
               ArgsJson = argsJson material.Path
@@ -188,7 +188,7 @@ module RequirementGroundingTransform =
           PackageName = snapshot.PackageName
           Digest = snapshot.Digest
           Ordinal = ordinal
-          Reads = anchoredReads sessionId snapshot
+          Reads = anchoredReads sessionId ordinal snapshot
           CallGap = callGap
           ResultGap = resultGap }
 
@@ -239,6 +239,19 @@ module RequirementGroundingTransform =
                 + String.Join(", ", orphaned)
             )
 
+    let private stripCursorHistory history rawMessages =
+        let providerId = PairProgrammingThoughtTransform.providerIdFromMessages rawMessages
+
+        if PairProgrammingThoughtTransform.isCursorProvider providerId then
+            let suffixes =
+                history
+                |> List.collect _.Reads
+                |> List.map _.CursorResultBytes
+
+            rawMessages |> List.map (PairProgrammingThoughtTransform.stripCursorSuffixes suffixes)
+        else
+            rawMessages
+
     let private anchorRequested journal sessionId realMessages providerId history pending =
         if List.isEmpty pending then
             Task.FromResult(Ok(replay providerId realMessages history))
@@ -260,9 +273,10 @@ module RequirementGroundingTransform =
         : Task<Result<obj list, string>> =
         taskResult {
             let session = SessionId.create sessionId
-            let history = RequirementGroundingRuntime.occurrences journal session
-            let! realMessages = validateSyntheticHistory history rawMessages
+            let history = RequirementGroundingRuntime.historyOccurrences journal session
+            let visibleHistory = RequirementGroundingRuntime.occurrences journal session
+            let! realMessages = validateSyntheticHistory history (stripCursorHistory history rawMessages)
             let providerId = PairProgrammingThoughtTransform.providerIdFromMessages realMessages
             let pending = RequirementGroundingRuntime.pending journal session
-            return! anchorRequested journal sessionId realMessages providerId history pending
+            return! anchorRequested journal sessionId realMessages providerId visibleHistory pending
         }

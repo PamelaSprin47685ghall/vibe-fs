@@ -140,7 +140,9 @@ MarkerText; CallGap; ResultGap }` 持久化（HOST-013）：`MarkerText` = provi
 当时实际看到的精确 payload（新 occurrence 为 `<skill_content name="">…</skill_content>`；历史 occurrence 保留其
 原 wire 字节）；replay 必须 byte-identical 恢复原文，不随 authored
 `main.md` 版本演进改写。fold 拒绝：ordinal 乱序、重复 CallId、重复 placement
-（SessionId + CallGap + ResultGap 至多一对）。
+（SessionId + 当前 horizon + CallGap + ResultGap 至多一对）。`ContextReanchored` 不删除历史 pair fact，
+但会退休此前 pair 的 provider-visible coverage；post-reanchor 不 replay 旧 marker，下一次正常 pair trigger
+产生新的 ordinal/call-id/MarkerText。冻结意味着“历史事实不改写”，不意味着“跨 Y 永久可见”。
 
 - 含义：历史交付是 EventStore 事实不是文件旁路；restart 后 Main 看到的就是当时
   收到的那一版（Rulebook §17）。
@@ -157,6 +159,8 @@ GD-011 durable pair；以后 replay 只读已存字节，不用当前 elapsed/re
 
 - 含义：dynamic calibration 是“这一刻提供了什么指导”的 occurrence 数据；projection 决定新文案，
   durable MarkerText 决定历史文案。两个时间面不混合。
+- `ContextReanchored` 后若形成新 occurrence，按当时 latest tip / elapsed / remaining / canonical guideline
+  重新 compose；不得把旧 occurrence 原字节作为新 horizon 的默认恢复材料。
 - 边界：elapsed 的起点/采样 → `time-capability` TIME-007；remaining 的 replace/decrement/0 语义 →
   `delegation` DELEG-022；tool-estimate 提示 craft → `cognitive-environment` COGNITIVE-ENVIRONMENT-014；
   prefix placement/stability → `prefix-stability`。

@@ -466,6 +466,38 @@ module PairProgrammingThoughtTransform =
             clonedMessage?parts <- box clonedParts
             Some clonedMessage
 
+    let stripCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
+        let parts = rawParts rawMsg
+
+        match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
+        | None -> rawMsg
+        | Some index ->
+            let stripKnown value =
+                (value, suffixTexts)
+                ||> List.fold (fun current text ->
+                    current.Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal))
+
+            let originalPart = parts.[index]
+            let originalState = originalPart?state
+            let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
+
+            match partStatus originalPart with
+            | Some "completed" when isString originalState?output ->
+                clonedState?output <- box (stripKnown (unbox<string> originalState?output))
+            | Some "error" when isString originalState?error ->
+                clonedState?error <- box (stripKnown (unbox<string> originalState?error))
+            | Some "error" when isString originalState?output ->
+                clonedState?output <- box (stripKnown (unbox<string> originalState?output))
+            | _ -> ()
+
+            let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
+            clonedPart?state <- clonedState
+            let clonedParts = Array.copy parts
+            clonedParts.[index] <- clonedPart
+            let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
+            clonedMessage?parts <- box clonedParts
+            clonedMessage
+
     let private appendCursorGuidanceToTerminalToolResult (markerTexts: string list) (rawMsg: obj) : obj option =
         appendCursorSuffixes markerTexts rawMsg
 
@@ -681,6 +713,23 @@ module PairProgrammingThoughtTransform =
                   CallGap = pair.CallGap
                   ResultGap = pair.ResultGap })
 
+    let private readDurableVisibleHistory
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        : PairProgrammingGuidelineWire list =
+        match AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections with
+        | None -> []
+        | Some session ->
+            session.Guidelines
+            |> Option.map GuidelineProjection.visiblePairs
+            |> Option.defaultValue []
+            |> List.map (fun pair ->
+                { Ordinal = pair.Ordinal
+                  CallId = ToolCallId.value pair.CallId
+                  MarkerText = pair.MarkerText
+                  CallGap = pair.CallGap
+                  ResultGap = pair.ResultGap })
+
     let private readMemoryHistory (key: string) : PairProgrammingGuidelineWire list =
         match memoryLedger.TryGetValue key with
         | true, pairs -> pairs |> Seq.toList
@@ -733,6 +782,7 @@ module PairProgrammingThoughtTransform =
     let private commitPairInjection
         (providerId: string option)
         (history: PairProgrammingGuidelineWire list)
+        (visibleHistory: PairProgrammingGuidelineWire list)
         (append: PairProgrammingGuidelineWire -> Task<Result<unit, string>>)
         (sessionId: string option)
         (markerText: string)
@@ -741,10 +791,10 @@ module PairProgrammingThoughtTransform =
         (resultGap: TranscriptGap)
         : Task<Result<obj list, string>> =
         taskResult {
-            let existing = findPlacement history callGap resultGap
+            let existing = findPlacement visibleHistory callGap resultGap
 
             if Option.isSome existing || skipAutoInjectedRequested providerId then
-                return! replay providerId realMessages history
+                return! replay providerId realMessages visibleHistory
             else
                 let ordinal = nextGuidelineOrdinal history
 
@@ -755,7 +805,7 @@ module PairProgrammingThoughtTransform =
                       CallGap = callGap
                       ResultGap = resultGap }
 
-                let! rendered = replay providerId realMessages (history @ [ candidate ])
+                let! rendered = replay providerId realMessages (visibleHistory @ [ candidate ])
                 do! append candidate
                 return rendered
         }
@@ -782,6 +832,26 @@ module PairProgrammingThoughtTransform =
         taskResult {
             let key = transcriptKey sessionId
 
+            let history, visibleHistory, append =
+                match journal, sessionId with
+                | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
+                    let session = SessionId.create sid
+                    readDurableHistory durable session,
+                    readDurableVisibleHistory durable session,
+                    appendDurable durable session
+                | _ ->
+                    let memory = readMemoryHistory key
+                    memory, memory, (fun pair -> Task.FromResult(appendMemory key pair))
+
+            let rawProviderId = providerIdFromMessages rawMessages
+
+            let rawMessages =
+                if isCursorProvider rawProviderId then
+                    let suffixes = history |> List.map _.MarkerText
+                    rawMessages |> List.map (stripCursorSuffixes suffixes)
+                else
+                    rawMessages
+
             let strippedCallIds =
                 rawMessages
                 |> List.filter isPairProgrammingThought
@@ -800,13 +870,6 @@ module PairProgrammingThoughtTransform =
 
             let providerId = providerIdFromMessages realMessages
 
-            let history, append =
-                match journal, sessionId with
-                | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
-                    let session = SessionId.create sid
-                    readDurableHistory durable session, appendDurable durable session
-                | _ -> readMemoryHistory key, (fun pair -> Task.FromResult(appendMemory key pair))
-
             let knownCallIds = history |> List.map (fun pair -> pair.CallId) |> Set.ofList
 
             let orphaned =
@@ -822,7 +885,17 @@ module PairProgrammingThoughtTransform =
 
             let! callGap, resultGap = decideCurrentPlacement realMessages
 
-            return! commitPairInjection providerId history append sessionId markerText realMessages callGap resultGap
+            return!
+                commitPairInjection
+                    providerId
+                    history
+                    visibleHistory
+                    append
+                    sessionId
+                    markerText
+                    realMessages
+                    callGap
+                    resultGap
         }
 
     let tryInject

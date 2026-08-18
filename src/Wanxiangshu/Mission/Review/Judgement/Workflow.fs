@@ -157,8 +157,9 @@ module ReviewerWorkflow =
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
     /// XTrace terminal segment, close the carried attempt, and report.
-    /// `allowToolOnlyFallback` lets an active Finality CE report a tool-only
-    /// judgement terminal without encoding review stage in this observer.
+    /// `allowToolOnlyFallback` lets a review protocol whose physical contract is
+    /// one typed `judge` call report a tool-only judgement terminal without
+    /// inventing an extra prose round.
     let private completeReviewer
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -174,9 +175,9 @@ module ReviewerWorkflow =
                 if not (String.IsNullOrWhiteSpace sessionWide) then
                     sessionWide
                 elif allowToolOnlyFallback then
-                    // Finality judgement turns may be tool-only. The CE consumes
-                    // the typed judge delivery separately, so terminal reporting
-                    // needs only a non-empty physical completion value.
+                    // The typed judge delivery is already durable review evidence;
+                    // terminal reporting only needs a non-empty physical completion
+                    // value. This does not mint a verdict or a Finality witness.
                     "Review judgement submitted."
                 else
                     sessionWide
@@ -228,7 +229,28 @@ module ReviewerWorkflow =
                 reportContinuationFailure eventPort turn.SessionId outcome
             }
             :> Task
-        | ReviewerEvidence.Need.CompleteProcessReview -> completeReviewer eventPort journal turn false
+        | ReviewerEvidence.Need.CompleteProcessReview -> completeReviewer eventPort journal turn true
+
+    /// REVIEW-ASSURANCE-009: process review is explicitly judge-only. If stable
+    /// idle arrives after its verdict is durable, close that physical turn here
+    /// instead of entering generic missing-final-report repair. `false` leaves
+    /// ordinary routing in ownership of every other idle occasion.
+    let tryCompleteProcessReviewAtIdle
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        (reviewerKey: string)
+        : Task<bool> =
+        if ReviewJudgementInbox.isOwned turn.SessionId then
+            Task.FromResult false
+        else
+            match ReviewerEvidence.processIdleDisposition journal reviewerKey with
+            | ReviewerEvidence.ProcessIdleDisposition.OrdinaryRepair -> Task.FromResult false
+            | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview ->
+                task {
+                    do! completeReviewer eventPort journal turn true
+                    return true
+                }
 
     /// Physical terminal observer. Active Finality reviewers are owned by the
     /// direct ReviewBarrierWorkflow CE, so this function only reports their turn;

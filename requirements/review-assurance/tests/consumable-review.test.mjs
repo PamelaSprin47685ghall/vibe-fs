@@ -180,7 +180,13 @@ test('WHAT[REVIEW-ASSURANCE-009] REVIEW_013_verdict_requires_closed_reviewer_tur
   try {
     await appendReviewFacts(opened, reviewerSession)
     await reviewJournal.appendReview(opened.journal, reviewerSession, null, 'ReviewBarrierStarted', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1' })
+    assert.equal(todo.processIdleDisposition(opened.journal, reviewerSession), 'OrdinaryRepair')
     await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-1', 'ReviewVerdictRecorded', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1', ProviderRun: 'run-1', ToolCallId: 'call-1', Verdict: 'PERFECT' })
+    assert.equal(
+      todo.processIdleDisposition(opened.journal, reviewerSession),
+      'CompleteToolOnlyProcessReview',
+      'a process reviewer that already durably judged must close at stable idle instead of entering missing-final-report repair',
+    )
     const pending = await todo.tryConclude(opened.journal, life, write)
     assert.equal(pending.status, 'Pending')
     assert.match(pending.reason, /not closed/i)

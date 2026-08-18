@@ -103,6 +103,13 @@ module TurnWorkflow =
             let observeIdleOrdinary current =
                 OrdinaryTurnWorkflow.observeIdle quiescence sessionPort eventPort journal current
 
+            let tryCompleteProcessReviewerAtIdle () =
+                ReviewerWorkflow.tryCompleteProcessReviewAtIdle
+                    eventPort
+                    journal
+                    turn
+                    (SessionId.value turn.SessionId)
+
             let observeIdleDelivery () : Task =
                 task {
                     match turn.Role, turn.Observation, turn.Outcome with
@@ -129,6 +136,11 @@ module TurnWorkflow =
                                 journal
                                 turn
                                 (SessionId.value turn.SessionId)
+                    | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ ->
+                        let! handled = tryCompleteProcessReviewerAtIdle ()
+
+                        if not handled then
+                            do! observeIdleOrdinary context
                     | Some Role.Reviewer, _, _ -> do! observeIdleOrdinary context
                     | _ -> do! observeIdleOrdinary context
                 }
@@ -153,8 +165,13 @@ module TurnWorkflow =
                     // once from durable linkage before bounded-context workflows consume the fact.
                     let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
 
-                    match turn.Role, turn.Outcome with
-                    | Some Role.Reviewer, ReconcileProgram.TurnCompleted ->
+                    match turn.Role, turn.Observation, turn.Outcome with
+                    | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ ->
+                        let! handled = tryCompleteProcessReviewerAtIdle ()
+
+                        if not handled then
+                            do! observeOrdinary context
+                    | Some Role.Reviewer, _, ReconcileProgram.TurnCompleted ->
                         do!
                             ReviewerWorkflow.observe
                                 reviewerContinuationPort
@@ -162,8 +179,8 @@ module TurnWorkflow =
                                 journal
                                 turn
                                 (SessionId.value turn.SessionId)
-                    | Some Role.Reviewer, _ -> do! observeOrdinary context
-                    | Some Role.Manager, _ ->
+                    | Some Role.Reviewer, _, _ -> do! observeOrdinary context
+                    | Some Role.Manager, _, _ ->
                         do!
                             ManagerWorkflow.observe
                                 sessionPort

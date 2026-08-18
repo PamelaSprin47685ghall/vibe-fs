@@ -20,7 +20,9 @@ RED = 满足下列任一：
 
 1. 未提交候选污染真实历史（probe 先写事实再回滚、Y squash 失败仍改 frames）；
 2. 压缩覆盖不完整证据（半 turn 冒充完整 prefix 证明、Opening 被吞）；
-3. 系统靠猜模型窗口主动改写用户世界（CTX-001/002 违例）。
+3. 系统靠猜模型窗口主动改写用户世界（CTX-001/002 违例）；
+4. X→Y 冷边界后仍把旧 horizon 的辅助注入重新塞回 provider context，使“已被替换的上下文”
+   实际继续携带 pair guideline、tip、requirement/APPLIES-TO 等非 canonical work material。
 
 ## 4. 历史考古
 
@@ -73,6 +75,18 @@ park waiter、drain window 与 physical flight 是三个正交物理事实。取
 flight 从注册表删除。否则会制造确定的竞态：provider 已生成合法 tool call → 本地先清 flight → tool
 execute 重查 `HasFlight=false` → 把合法在途调用误判成 stale no-live-cycle。flight 只由 cycle terminal
 commit、显式 abandon/fail 或 session disposal 释放；seal 只阻止新 work，并让当前 flight 自然收尾。
+
+### 4.9 Y 是新的 horizon，不是“摘要 + 全部旧辅助注入”
+
+X→Y replacement 的价值之一就是淘汰旧 provider horizon。pair-programming guideline、其中携带的 tip、
+requirement grounding 的普通 read（包括 `APPLIES-TO`、HOW/WHAT/tests）以及未来同类 Host-adopted
+辅助注入若在 `ContextReanchored` 后仍从 durable history 原位 replay，就等于把被压缩掉的上下文又偷偷
+搬回来：Y 只压缩 canonical work，辅助材料却永久累积，最终重新吞掉上下文。
+
+因此 durable occurrence 与 provider-visible coverage 必须分开。旧 occurrence 仍是不可篡改审计事实，
+用于 ordinal / call-id 唯一性与普通 restart；但 `ContextReanchored` 使其退出新 horizon 的 replay set。
+之后只有新的正常触发才能逐步形成新的 occurrence。这里不删除 system/tool contract，也不删除由 Y / frozen
+record prefix 表示的 canonical semantic work；这些不是“辅助注入”。
 
 ## 5. 与相邻包的边界
 

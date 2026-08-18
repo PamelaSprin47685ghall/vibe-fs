@@ -99,6 +99,8 @@
 
 **规范**：record-ready 判定是「能否在**同一 Journal snapshot** 物化有效 canonical LWR」，不是 `coverage >= frontier.Sequence`（frontier 排他 = lastPart+1，真实 coverage 上限只达 lastPart，旧门禁会永远悬挂）。coverage 判定与 LWR materialization 不同 revision 即不成立。等待只经 `AgentJournal.awaitChangeFrom` 事件唤醒；禁止 timer/sleep/wall-clock 轮询。Direct CE 必须先采样 revision，再执行 `tryConclude`/producer 判定，最后 `awaitChangeFrom sampledRevision`，形成 check→subscribe/recheck 等价握手，禁止在判定后才采 revision 造成 lost wakeup。waiter 取消/dispose/崩溃不是 durable abandonment：从 durable assignment / VerdictKnown / 冻结 frontier 重建同名 waiter 继续等。
 
+Process reviewer 的物理协议是单次 typed `judge` tool call：当该 verdict 已 durable 且 Host 到达 stable idle，必须把该 tool-only turn 直接收束为 matching `ReviewAttemptClosed` 并冻结当时 XTrace frontier；不得再要求普通 `missing-final-report` prose continuation。这个收束只承认已经 durable 的 verdict，不得凭 idle 自行推断 PERFECT/REVISE。
+
 **含义/动机**：轮询把 Journal 因果等待退化成运气；用较晚 head 替换冻结 frontier 会改变原 REVISE 的记录目标。同 snapshot 保证「判定时就绪」与「物化同一份」不可分。
 
 **边界**：等待机制的因果可观测性 → `causal-wait`；「process-local waiter 消失即放弃」禁令的本包侧即本命题。

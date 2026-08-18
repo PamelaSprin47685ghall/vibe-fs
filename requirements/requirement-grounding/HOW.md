@@ -44,7 +44,7 @@ tests/**/*.test.mjs  # lexical path order
 workspace 不碰撞；内容不变时即使重复触碰多个文件也只自动读取一次。这个 material set/digest 只用于
 规划与去重，不形成 provider-visible bundle。
 
-## 4. provider observation path：一次读取，永久投影
+## 4. provider observation path：一次读取，horizon 内永久投影
 
 OpenCode native `read`/`grep` 在 `tool.execute.after` 解析实际观察路径并提交 durable Request；mutation
 在 `tool.execute.before` 解析目标路径并先提交 Request。下一次 provider transform 消费 Pending Request。
@@ -55,6 +55,9 @@ ordinary provider 使用 completed synthetic `read` Host tool part，`state.inpu
 
 首次 Request 冻结 `GroundingSnapshot`；首次投影生成 `RequirementGroundingAnchored`，保存稳定 call id、
 args、result bytes、Cursor result bytes、CallGap/ResultGap。后续只 replay occurrence，不重新读取文件。
+这里“后续”只指当前未重锚 horizon；`ContextReanchored` 通过 `RequirementGroundingProjection.applyReanchor`
+清空 `Grounded + visible occurrences`，保留 `OccurrencesRev` 全历史与 ordinal frontier。Y 后若再次触发同 digest，
+会创建新的 occurrence，call id 额外绑定 occurrence ordinal，避免与旧 horizon read call identity 碰撞。
 
 placement 复用 HOST-013 的 append-only 原则：新 grounding 只能落在本轮追加区。如果当前 turn 同时创建
 pair-programming 的 synthetic empty-name `skill`，同一 gap bucket 内 ordinal/order 明确为：
@@ -113,7 +116,7 @@ range/截断事实若已经体现在 ordinary result bytes 中就不得重复编
 provider-projection 定义同样最小的 result-local attributes。原则是不复制可从正文恢复的事实，也不让 Cursor
 丢失 ordinary read 本来通过 call half 明确表达的 provenance。
 
-Cursor 历史 suffix 与 ordinary pair 一样按 occurrence 原字节 replay。首次生成 envelope 后应冻结最终 Cursor
+Cursor 当前-horizon suffix 与 ordinary pair 一样按 occurrence 原字节 replay。首次生成 envelope 后应冻结最终 Cursor
 bytes，而不是每轮由 `CanonicalPath + ResultBytes` 重新 render，以避免 renderer 演进破坏 prefix cache。
 
 纯 `glob`/目录 list 只返回路径名时不触发；grep 一旦返回源码行即触发其实际 match file。
@@ -141,6 +144,8 @@ repository-programming 的 target set 可能由用户程序计算得到。`JsToo
 occurrence 保存 `{ Workspace; Package; Digest; Ordinal; Reads; CallGap; ResultGap }`；每条 read 保存稳定
 `CallId/Path/ArgsJson/ResultBytes/CursorResultBytes`。`CursorResultBytes` 在首次 occurrence 形成时已经完成
 path attribute 包裹并冻结；projection 直接维护 `(Workspace,Package,Digest)` grounded set，不扫描 prompt 文本。
+projection 同时保留 durable occurrence history 与 horizon-relative visible/grounded coverage；
+`ContextReanchored` 只清后者，绝不删除历史 occurrence。
 
 placement 与 Cursor suffix 直接复用 `PairProgrammingThoughtTransform.decideCurrentPlacement`、
 `isCursorProvider`、`appendCursorSuffixes`；pair 与 grounding 的 durable payload 各自独立，位置算法不复制。
@@ -170,7 +175,7 @@ src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
   native before/after gate
 
 src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
-  pair 后的 permanent grounding projection
+  pair 后的 current-horizon grounding projection
 
 src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
   transaction staged-effect admission

@@ -89,3 +89,19 @@ test('WHAT[GD-011] GP_006_replay_restores_pairs_oldest_first', () => {
     'exact marker bytes must survive replay',
   )
 })
+
+test('WHAT[GD-011] GP_007_reanchor_retires_visible_pairs_without_deleting_durable_history', () => {
+  const first = apply(1n, 'call-1', marker, gapBefore('m1'), gapAfter('m1'), empty)
+  assert.equal(resultTag(first), 'Ok')
+  assert.equal(guideline.visiblePairs(first.value).length, 1)
+
+  const reanchored = guideline.applyReanchor(first.value)
+  assert.deepEqual(guideline.visiblePairs(reanchored), [])
+  assert.equal(pairs(reanchored).length, 1, 'durable history remains auditable')
+  assert.equal(nextOrdinal(reanchored), 2n, 'ordinal frontier never rewinds')
+
+  const second = apply(2n, 'call-2', marker, gapBefore('m1'), gapAfter('m1'), reanchored)
+  assert.equal(resultTag(second), 'Ok', 'same gap may be reused only because it is a new horizon')
+  assert.deepEqual(guideline.visiblePairs(second.value).map((pair) => pair.callId), ['call-2'])
+  assert.deepEqual(pairs(second.value).map((pair) => pair.callId), ['call-1', 'call-2'])
+})

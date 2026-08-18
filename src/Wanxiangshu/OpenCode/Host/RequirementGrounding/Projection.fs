@@ -5,7 +5,8 @@ open Wanxiangshu.Requirement.Grounding
 type RequirementGroundingProjectionState =
     { Pending: Map<string, GroundingSnapshot>
       OccurrencesRev: RequirementGroundingOccurrence list
-      Grounded: Set<string> }
+      Grounded: Set<string>
+      VisibleFromOrdinal: int64 }
 
 [<RequireQualifiedAccess>]
 type RequirementGroundingFoldRejection =
@@ -18,7 +19,8 @@ module RequirementGroundingProjection =
     let empty =
         { Pending = Map.empty
           OccurrencesRev = []
-          Grounded = Set.empty }
+          Grounded = Set.empty
+          VisibleFromOrdinal = 1L }
 
     let private occurrenceKey (occurrence: RequirementGroundingOccurrence) =
         GroundingIdentity.key occurrence.Workspace occurrence.PackageName occurrence.Digest
@@ -40,6 +42,9 @@ module RequirementGroundingProjection =
 
     let occurrences state = List.rev state.OccurrencesRev
 
+    let visibleOccurrences state =
+        occurrences state |> List.filter (fun occurrence -> occurrence.Ordinal >= state.VisibleFromOrdinal)
+
     let groundedKeys state =
         state.Grounded |> Set.toList |> List.sort
 
@@ -47,6 +52,11 @@ module RequirementGroundingProjection =
         match state.OccurrencesRev with
         | [] -> 1L
         | newest :: _ -> newest.Ordinal + 1L
+
+    let applyReanchor state =
+        { state with
+            Grounded = Set.empty
+            VisibleFromOrdinal = nextOrdinal state }
 
     let applyRequested snapshot state =
         let key = GroundingIdentity.snapshotKey snapshot
@@ -71,4 +81,5 @@ module RequirementGroundingProjection =
             Ok
                 { Pending = Map.remove key state.Pending
                   OccurrencesRev = occurrence :: state.OccurrencesRev
-                  Grounded = Set.add key state.Grounded }
+                  Grounded = Set.add key state.Grounded
+                  VisibleFromOrdinal = state.VisibleFromOrdinal }

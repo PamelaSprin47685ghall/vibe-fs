@@ -44,6 +44,8 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
+open Wanxiangshu.OpenCode.Host.PairProgramming
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 
 module ContextFactFold =
 
@@ -258,6 +260,10 @@ module ContextFactFold =
                         { session with
                             PrefixEpoch = Some retired
                             Blog = session.Blog |> Option.map BlogProjection.applyReanchor
-                            TipDelivery = session.TipDelivery |> Option.map TipDeliveryProjection.applyReanchor }))
+                            TipDelivery = session.TipDelivery |> Option.map TipDeliveryProjection.applyReanchor
+                            Guidelines = session.Guidelines |> Option.map GuidelineProjection.applyReanchor
+                            RequirementGrounding =
+                                session.RequirementGrounding
+                                |> Option.map RequirementGroundingProjection.applyReanchor }))
                 projection
             |> prefixOutcome "ContextReanchored" projection

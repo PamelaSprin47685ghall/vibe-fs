@@ -164,14 +164,17 @@ snapshot 携带其一必须携带其二。
 
 ---
 
-## PREFIX-STABILITY-010：历史 synthetic pair 原位 replay，anchor 缺失不重定位
+## PREFIX-STABILITY-010：同一 horizon 的 historical synthetic pair 原位 replay；reanchor 退休旧 replay set
 
-**规范**（HOST-013 行为约束 1–3/6，cache.md）：pair 一经加入即不可变永久历史。普通 provider
-每次 transform 必须按 durable gap anchor 原位置、原字节恢复全部既有 synthetic half，再把本次
+**规范**（HOST-013 行为约束 1–3/6，cache.md）：pair 一经加入即不可变 durable 历史。普通 provider
+在**同一未重锚 provider horizon**内每次 transform 必须按 durable gap anchor 原位置、原字节恢复当前 horizon
+既有 synthetic half，再把本次
 pair 按其 gap anchor 渲染。**禁止**删除、过滤、去重、改写历史 pair；禁止复用既有 `callID`。
 durable anchor 引用的真实消息缺失时，该 historical pair 不参与本次渲染（禁止重定位到
 「最接近位置 / trailing user 前 / 末尾」）；durable fact 保留，完整 transcript 回来后按
-anchor 再 replay。legacy 无 anchor journal → fail closed（incompatible），禁止启发式迁移。
+anchor 再 replay。`ContextReanchored` 会退休当前 pair visibility：此前 pair occurrence 继续留在 durable
+history，但不得进入新 Y horizon；之后的新 pair 使用新的 ordinal/call-id 追加。legacy 无 anchor journal →
+fail closed（incompatible），禁止启发式迁移。
 
 **含义/动机**：历史字节只能由 durable append-only 事实恢复，不得由当前 transcript 形态
 重新决定——否则每次 transform 都在重排已呈现的历史。
@@ -184,12 +187,13 @@ Cursor `NUL+BOM` + 同一 skill-content payload）归 provider-projection；本�
 
 ---
 
-## PREFIX-STABILITY-011：冷边界由事实驱动（HOST-013 前缀漂移不得用 epoch 掩盖）
+## PREFIX-STABILITY-011：冷边界由事实驱动（同 horizon 禁漂移；reanchor 后不得复活旧 auxiliary bytes）
 
 **规范**（HOST-013 行为约束 5）：同一 epoch 内前次 provider-visible wire 必须是后次 wire 的
 稳定字节前缀（`ProviderProjection.isAppendOnlyPrefix` 权威判定）。**禁止**用 PrefixEpoch 切换
 掩盖 HOST-013 自己造成的前缀漂移；禁止读 limit、做 token 估算（CTX-002）。历史 marker 永不因
-replay / compaction / reanchor 重算 elapsed——只重放已存字节（`SessionStartedAt` 只采样一次）。
+普通 retry/restart replay 重算 elapsed——同 horizon 只重放已存字节（`SessionStartedAt` 只采样一次）。
+`ContextReanchored` 后旧 marker 不再 replay；若后续触发新 occurrence，动态 calibration 重新采样并冻结新字节。
 
 **含义/动机**：epoch 切换是合法冷边界，不是修补 bug 的橡皮擦。
 

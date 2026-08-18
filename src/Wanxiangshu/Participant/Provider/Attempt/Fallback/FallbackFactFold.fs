@@ -134,7 +134,7 @@ module FallbackFactFold =
                   AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
                   ProviderRun = payload.ProviderRun }
 
-            match AgentProjection.tryFind payload.SessionId projection.AgentProjections with
+            match AgentProjection.tryFind payload.SessionId projection with
             | None ->
                 reject
                     "FallbackSucceeded"

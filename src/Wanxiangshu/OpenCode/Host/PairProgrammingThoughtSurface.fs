@@ -5,6 +5,7 @@ open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Context.Companion
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
@@ -136,6 +137,34 @@ module PairProgrammingThoughtSurface =
         |> Option.bind (fun value -> value.Guidelines)
         |> Option.map (GuidelineProjection.pairs >> List.length)
         |> Option.defaultValue 0
+
+    let appendContextReanchored
+        (journal: obj)
+        (session: string)
+        (previousEpoch: int64)
+        (nextEpoch: int64)
+        (observedRun: string)
+        : Task<obj> =
+        task {
+            let sessionId = SessionId.create session
+
+            let fact =
+                ContextFact.ContextReanchored
+                    {| SessionId = sessionId
+                       PreviousEpochId = PrefixEpochId.create previousEpoch
+                       NextEpochId = PrefixEpochId.create nextEpoch
+                       ObservedCompactionRun = ProviderRunIdentity.create observedRun |}
+
+            let! result = AgentJournal.appendAgent (StreamId.Session sessionId) None fact (agentJournalOf journal)
+
+            return
+                match result with
+                | Ok _ -> box {| ok = true; error = null |}
+                | Error failure ->
+                    box
+                        {| ok = false
+                           error = JournalAppendFailure.describe failure |}
+        }
 
     let projectionFlags (journal: obj) (session: string) : obj = flagsForJournal journal session
 

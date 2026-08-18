@@ -281,10 +281,13 @@ module TodoProcessReviewProgram =
         match lifecycle with
         | HandleLifecycle.Active
         | HandleLifecycle.CompletedAwaitingJoin _ -> ProducerPresence.Present
-        | HandleLifecycle.Retired when verdictKnown ->
+        | HandleLifecycle.Retired when verdictKnown
+        | HandleLifecycle.Abandoned _ when verdictKnown ->
             // The reviewer has durably spoken. The remaining producer
-            // is Journal/XTrace/LWR record-ready convergence, not the
-            // retired Host work-unit.
+            // is Journal/XTrace/LWR record-ready convergence, not the Host
+            // work-unit. Parent cancellation/process teardown must not erase
+            // that durable producer or turn a missing closure into a fake
+            // "before durable verdict" infrastructure failure.
             ProducerPresence.Present
         | HandleLifecycle.Abandoned _
         | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle ended before durable verdict"
@@ -295,7 +298,9 @@ module TodoProcessReviewProgram =
         (reviewer: SessionAgentProjection)
         : ProducerPresence =
         let verdictKnown =
-            reviewer.ReviewGuard |> Option.bind verdictClosure |> Option.isSome
+            reviewer.ReviewGuard
+            |> Option.bind ReviewProjection.latestObservedAttempt
+            |> Option.isSome
 
         match Map.tryFind assignment.ReviewerSessionId snapshot.AgentProjections.HandleByChildSession with
         | Some record -> presenceForHandle record.Lifecycle verdictKnown

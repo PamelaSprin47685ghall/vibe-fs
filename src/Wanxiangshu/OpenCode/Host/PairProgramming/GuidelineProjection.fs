@@ -21,6 +21,9 @@ type GuidelineProjectionState =
         Pairs: PairProgrammingGuideline list
         CallIds: Set<string>
         Placements: Set<string>
+        /// First ordinal still visible in the current provider horizon.
+        /// ContextReanchored advances this floor without deleting durable history.
+        VisibleFromOrdinal: int64
     }
 
 [<RequireQualifiedAccess>]
@@ -37,9 +40,13 @@ module GuidelineProjection =
     let empty: GuidelineProjectionState =
         { Pairs = []
           CallIds = Set.empty
-          Placements = Set.empty }
+          Placements = Set.empty
+          VisibleFromOrdinal = 1L }
 
     let pairs (state: GuidelineProjectionState) : PairProgrammingGuideline list = List.rev state.Pairs
+
+    let visiblePairs (state: GuidelineProjectionState) : PairProgrammingGuideline list =
+        pairs state |> List.filter (fun pair -> pair.Ordinal >= state.VisibleFromOrdinal)
 
     let private gapKey (gap: TranscriptGap) =
         match gap with
@@ -54,6 +61,24 @@ module GuidelineProjection =
         match state.Pairs with
         | [] -> 1L
         | newest :: _ -> newest.Ordinal + 1L
+
+    let applyReanchor (state: GuidelineProjectionState) : GuidelineProjectionState =
+        { state with
+            Placements = Set.empty
+            VisibleFromOrdinal = nextOrdinal state }
+
+    let restoreVisibilityFloor visibleFromOrdinal (state: GuidelineProjectionState) : GuidelineProjectionState =
+        let floor = max 1L visibleFromOrdinal
+
+        let placements =
+            state.Pairs
+            |> List.filter (fun pair -> pair.Ordinal >= floor)
+            |> List.map (fun pair -> placementKey pair.CallGap pair.ResultGap)
+            |> Set.ofList
+
+        { state with
+            Placements = placements
+            VisibleFromOrdinal = floor }
 
     let apply
         (ordinal: int64)
@@ -84,4 +109,5 @@ module GuidelineProjection =
                       ResultGap = resultGap }
                     :: state.Pairs
                   CallIds = Set.add callKey state.CallIds
-                  Placements = Set.add placeKey state.Placements }
+                  Placements = Set.add placeKey state.Placements
+                  VisibleFromOrdinal = state.VisibleFromOrdinal }

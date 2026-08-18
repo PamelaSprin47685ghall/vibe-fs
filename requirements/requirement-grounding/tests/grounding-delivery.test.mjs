@@ -64,6 +64,25 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest iden
   } finally { cleanup() }
 })
 
+test('WHAT[REQUIREMENT-GROUNDING-006] reanchor_resets_horizon_coverage_so_the_same_digest_must_ground_again', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const opened = await host.createJournal(dir)
+    const source = join(dir, 'src', 'main.fs')
+    const session = 's-reanchor-dedupe'
+    await host.requestPaths(opened.journal, dir, session, [source])
+    await host.projectWithJournal(opened.journal, session, terminalRead(source))
+    assert.equal((await host.requestPaths(opened.journal, dir, session, [source])).needsGrounding, false)
+
+    const reanchored = await host.appendContextReanchored(opened.journal, session, 0n, 1n, 'compaction-1')
+    assert.equal(reanchored.ok, true, reanchored.error)
+    const after = await host.requestPaths(opened.journal, dir, session, [source])
+    assert.equal(after.needsGrounding, true)
+    assert.equal(after.requested, 1)
+    host.disposeJournal(opened.journal)
+  } finally { cleanup() }
+})
+
 test('WHAT[REQUIREMENT-GROUNDING-011] ordinary read observations add knowledge without creating authority or expanding capability', async () => {
   const { dir, cleanup } = sandbox()
   try {
