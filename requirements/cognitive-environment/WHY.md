@@ -59,3 +59,6 @@ Prompt/Role Law 只是这些事实的 presentation surface，不获得 semantic 
   细粒度后继；batch 只可能是同一时刻 ready 调用的自然合并，不是同步边界。
 - **把 NEEDHELP 写成稀缺/失败语言（"only when truly blocked"）。** 拒绝：制造求助羞耻、诱导长时
   低价值自我挣扎（increase-strength.md §3.1）；budget 是机器侧护栏，不进 provider 文案。
+- **把 Blogger chronicle-direct nudge 对所有模型默认开启。** 拒绝：该 nudge 是针对特定 provider model
+  行为偏差的局部校准，不是 Blogger 的长期认知事实。未知模型默认不得被改写；只有显式 modelID allowlist
+  命中时才投影。空 allowlist = 功能关闭。

@@ -64,5 +64,4 @@ module JudgeSurface =
     let markVerdictSubmitted (sessionId: string) : unit =
         SharedState.VerdictSessions.Add(sessionId) |> ignore
 
-    let clearVerdictSessions () : unit =
-        SharedState.VerdictSessions.Clear()
+    let clearVerdictSessions () : unit = SharedState.VerdictSessions.Clear()

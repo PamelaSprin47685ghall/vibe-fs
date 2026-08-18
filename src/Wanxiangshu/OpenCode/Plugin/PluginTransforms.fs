@@ -573,10 +573,20 @@ module PluginTransforms =
 
     let private bloggerChronicleThoughtText (language: ProviderLanguage) =
         match language with
-        | ProviderLanguage.SimplifiedChinese ->
-            "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
+        | ProviderLanguage.SimplifiedChinese -> "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
         | ProviderLanguage.English ->
             "For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly."
+
+    let private bloggerChronicleThoughtModelIds: Set<string> = Set.empty
+
+    let private bloggerChronicleThoughtEnabled (projectionSessionIdOpt: string option) =
+        if Set.isEmpty bloggerChronicleThoughtModelIds then
+            false
+        else
+            projectionSessionIdOpt
+            |> Option.map SessionId.create
+            |> Option.bind SessionExecutionBinding.currentProviderModel
+            |> Option.exists (fun model -> Set.contains model.modelID bloggerChronicleThoughtModelIds)
 
     let private rawMessageRole (message: obj) =
         if isNull message then
@@ -589,7 +599,10 @@ module PluginTransforms =
             ""
 
     let private rawMessageParts (message: obj) : obj array =
-        if isNull message || isNull message?parts then [||] else unbox<obj array> message?parts
+        if isNull message || isNull message?parts then
+            [||]
+        else
+            unbox<obj array> message?parts
 
     let private isBloggerChronicleThoughtPart (part: obj) =
         if isNull part || isNull part?``type`` || isNull part?text then
@@ -608,10 +621,7 @@ module PluginTransforms =
         && parts.Length = 1
         && isBloggerChronicleThoughtPart parts.[0]
 
-    let private bloggerChronicleThoughtMessageId
-        (projectionSessionIdOpt: string option)
-        (messages: obj list)
-        =
+    let private bloggerChronicleThoughtMessageId (projectionSessionIdOpt: string option) (messages: obj list) =
         let frontier =
             messages
             |> List.tryLast
@@ -619,23 +629,21 @@ module PluginTransforms =
             |> Option.defaultValue "start"
 
         let digest =
-            HostDigest.sha256Hex(
-                String.concat "\u001f" [ defaultArg projectionSessionIdOpt ""; "blogger-chronicle-reasoning"; frontier ]
+            HostDigest.sha256Hex (
+                String.concat
+                    "\u001f"
+                    [ defaultArg projectionSessionIdOpt ""
+                      "blogger-chronicle-reasoning"
+                      frontier ]
             )
 
         "reasoning-" + digest.Substring(0, 24)
 
     let private bloggerChronicleThoughtMessage (messageId: string) (text: string) =
-        let part =
-            createObj [ "type", box "reasoning"; "text", box text ]
+        let part = createObj [ "type", box "reasoning"; "text", box text ]
 
         createObj
-            [ "info",
-              box (
-                  createObj
-                      [ "id", box messageId
-                        "role", box "assistant" ]
-              )
+            [ "info", box (createObj [ "id", box messageId; "role", box "assistant" ])
               "parts", box [| part |] ]
 
     let private insertBloggerChronicleThoughtAtFrontier (marker: obj) (messages: obj list) =
@@ -649,10 +657,12 @@ module PluginTransforms =
         (outObj: obj)
         =
         match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId
-            when SessionAssociationProjection.isCompanion
+        | Some durable, Some sessionId when
+            bloggerChronicleThoughtEnabled projectionSessionIdOpt
+            && SessionAssociationProjection.isCompanion
                 (SessionId.create sessionId)
-                (AgentJournal.snapshot durable).AgentProjections.Associations ->
+                (AgentJournal.snapshot durable).AgentProjections.Associations
+            ->
             let messages =
                 unbox<obj array> outObj?messages
                 |> Array.toList

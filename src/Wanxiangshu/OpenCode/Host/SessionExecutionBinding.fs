@@ -270,6 +270,12 @@ module SessionExecutionBinding =
         | None -> beginExternalProviderAttempt sessionId physicalUserMessageId
         | Some key -> useAcceptedPromptBinding sessionId physicalUserMessageId key
 
+    let currentProviderModel (sessionId: SessionId) : OpencodeModel option =
+        lock gate (fun () ->
+            match providerAttemptBindings.TryGetValue(SessionId.value sessionId) with
+            | true, binding -> Some binding.Model
+            | false, _ -> None)
+
     let drop (sessionId: SessionId) =
         lock gate (fun () ->
             let key = SessionId.value sessionId

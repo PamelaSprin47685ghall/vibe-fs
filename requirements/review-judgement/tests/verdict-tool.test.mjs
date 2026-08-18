@@ -72,6 +72,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_subsequent_call_returns_already_judged_me
       const result = await hooks.tool.judge.execute({ verdict: 'PERFECT' }, hostContext({ toolCallId: 'call-1', providerRunId: 'run-1' }))
       assert.match(result, /(?:You have already made a judgment, please conclude the conversation|你已经做出过判断了，现在请你结束对话)/i)
       assert.doesNotMatch(result, /(?:judgment was not received|你的判断未被收下)/i)
+      assert.ok(runtime.abortedIds.includes('ses-reviewer'), 'reviewer session must be interrupted/aborted on subsequent judge call')
     })
   } finally {
     judge.clearVerdictSessions()

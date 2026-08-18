@@ -27,6 +27,13 @@ test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_companion_onl
   assert.doesNotMatch(helper, /PairProgrammingThoughtTransform|skillContent|"tool"|"status"|"source"|"synthetic"/)
 })
 
+test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_default_off_and_exact_model_allowlisted', () => {
+  assert.match(source, /let private bloggerChronicleThoughtModelIds\s*:\s*Set<string>\s*=\s*Set\.empty/)
+  assert.match(source, /SessionExecutionBinding\.currentProviderModel/)
+  assert.match(source, /Set\.contains model\.modelID bloggerChronicleThoughtModelIds/)
+  assert.doesNotMatch(source, /StartsWith\([^\n]*bloggerChronicleThoughtModelIds|Contains\([^\n]*bloggerChronicleThoughtModelIds/)
+})
+
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_the_last_semantic_injection_before_sanitize', () => {
   const pairIndex = source.indexOf('do! maybeInjectPairGuideline')
   const bloggerIndex = source.indexOf('injectBloggerChronicleThought journal projectionSessionIdOpt outObj')

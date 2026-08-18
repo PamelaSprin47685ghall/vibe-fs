@@ -15,15 +15,27 @@ module LoopDetector =
         [<Import("vocabularySize", "./GptTokens.js")>]
         let vocabularySize: int = jsNative
 
-    let TokenVocabularySize = TokenEncoding.vocabularySize
-    let HalfLife = 64.0
-    let Lambda = Math.Pow(2.0, -1.0 / HalfLife)
+    let TokenVocabularySize = LoopDetectorConstants.VocabularySize
+    let HalfLife = LoopDetectorConstants.HalfLife
+    let Lambda = LoopDetectorConstants.Lambda
 
-    let NormalWeightedDistinctCount = 18.52650592106275
-    let TheoreticalLoopWeightedDistinctCount = 1.0
+    let MaxSupport = LoopDetectorConstants.MaxSupport
+    let DistributionMean = LoopDetectorConstants.DistributionMean
+    let DistributionVariance = LoopDetectorConstants.DistributionVariance
+    let DistributionStd = LoopDetectorConstants.DistributionStd
+    let BetaAlpha = LoopDetectorConstants.BetaAlpha
+    let BetaBeta = LoopDetectorConstants.BetaBeta
+    let ConfidenceLevel = LoopDetectorConstants.ConfidenceLevel
+    let ConfidenceQuantile = LoopDetectorConstants.ConfidenceQuantile
+    let BetaQuantileU = LoopDetectorConstants.BetaQuantileU
+
+    let NormalWeightedDistinctCount = LoopDetectorConstants.NormalWeightedDistinctCount
+
+    let TheoreticalLoopWeightedDistinctCount =
+        LoopDetectorConstants.TheoreticalLoopWeightedDistinctCount
 
     let LoopWeightedDistinctThreshold =
-        (NormalWeightedDistinctCount + TheoreticalLoopWeightedDistinctCount) / 2.0
+        LoopDetectorConstants.LoopWeightedDistinctThreshold
 
     [<RequireQualifiedAccess>]
     type State =

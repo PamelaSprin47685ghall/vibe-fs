@@ -6,12 +6,44 @@ import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurfa
 
 const trackedTokenCount = (detector) => loopDetector.trackedTokenCount(detector)
 
-const diverse = () =>
-  Array.from(
-    { length: 800 },
-    (_, index) =>
-      `let value_${index} = repository_${index % 31}.load("entity-${index}", ${index * 7919}); // owner-${index % 47}`,
-  ).join('\n')
+const diverse = () => `
+export class OrderProcessor {
+  constructor(private readonly repository: OrderRepository, private readonly paymentGateway: PaymentGateway) {}
+  async processOrder(orderId: string, user: UserContext): Promise<OrderResult> {
+    const order = await this.repository.findById(orderId);
+    if (!order) throw new EntityNotFoundError("Order", orderId);
+    if (order.status !== OrderStatus.Pending) return { success: false, reason: "Order is not in pending state", currentStatus: order.status };
+    const authorization = await this.paymentGateway.authorize({ amount: order.totalAmount, currency: order.currency, customerId: user.paymentCustomerId });
+    if (!authorization.approved) {
+      await this.repository.updateStatus(orderId, OrderStatus.PaymentFailed);
+      return { success: false, reason: authorization.declineReason };
+    }
+    const updated = await this.repository.finalizeOrder(orderId, { transactionId: authorization.transactionId, processedAt: new Date() });
+    await this.notifyCustomer(user.email, updated);
+    return { success: true, order: updated };
+  }
+}
+function calculateTax(income, filingStatus) {
+  const brackets = getTaxBrackets(filingStatus);
+  let tax = 0;
+  for (const bracket of brackets) {
+    if (income > bracket.min) {
+      const taxable = Math.min(income - bracket.min, bracket.max - bracket.min);
+      tax += taxable * bracket.rate;
+    }
+  }
+  return { income, tax, effectiveRate: tax / income };
+}
+async function checkInventoryAvailability(warehouseId, skuList) {
+  const inventory = await db.warehouseInventory.query({ warehouseId, skus: skuList });
+  const missing = [];
+  for (const item of skuList) {
+    const stock = inventory.find(i => i.sku === item.sku);
+    if (!stock || stock.quantity < item.required) missing.push(item.sku);
+  }
+  return { available: missing.length === 0, missingItems: missing };
+}
+`
 
 test('WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length', () => {
   const detector = loopDetector.create()

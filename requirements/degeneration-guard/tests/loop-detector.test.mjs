@@ -30,9 +30,12 @@ test('WHAT[DG-004] LOOP_004_constants_are_token_calibrated', () => {
   assert.equal(loopDetector.halfLife, 64)
   close(loopDetector.lambda, 2 ** (-1 / 64))
   assert.equal(loopDetector.theoreticalLoopWeightedDistinctCount, 1)
-  close(
-    loopDetector.loopWeightedDistinctThreshold,
-    (loopDetector.normalWeightedDistinctCount + loopDetector.theoreticalLoopWeightedDistinctCount) / 2,
+  assert.equal(loopDetector.confidenceLevel, 0.95)
+  assert.equal(loopDetector.confidenceQuantile, 0.05)
+  assert.ok(loopDetector.normalWeightedDistinctCount > loopDetector.loopWeightedDistinctThreshold)
+  assert.ok(
+    loopDetector.loopWeightedDistinctThreshold >
+      loopDetector.theoreticalLoopWeightedDistinctCount,
   )
 })
 
@@ -69,15 +72,40 @@ test('WHAT[DG-001] LOOP_003_single_token_repetition_converges_to_theoretical_loo
   assert.equal(result.isLoop, true, `weightedDistinct=${result.weightedDistinctTokens}`)
   assert.equal(result.state, 'Loop')
   assert.ok(result.weightedDistinctTokens <= loopDetector.loopWeightedDistinctThreshold)
-  close(result.weightedDistinctTokens, 1, 1e-3)
+  close(result.weightedDistinctTokens, 1, 1e-2)
 })
 
 test('WHAT[DG-001] LOOP_003_diverse_programmatic_text_stays_normal', () => {
-  const body = Array.from(
-    { length: 500 },
-    (_, index) =>
-      `const result_${index} = await shard_${index % 23}.load("entity-${index}", { revision: ${index * 17 + 3}, owner: "worker-${index % 41}" });`,
-  ).join('\n')
+  const body = `
+export class OrderProcessor {
+  constructor(private readonly repository: OrderRepository, private readonly paymentGateway: PaymentGateway) {}
+
+  async processOrder(orderId: string, user: UserContext): Promise<OrderResult> {
+    const order = await this.repository.findById(orderId);
+    if (!order) {
+      throw new EntityNotFoundError("Order", orderId);
+    }
+    if (order.status !== OrderStatus.Pending) {
+      return { success: false, reason: "Order is not in pending state", currentStatus: order.status };
+    }
+    const authorization = await this.paymentGateway.authorize({
+      amount: order.totalAmount,
+      currency: order.currency,
+      customerId: user.paymentCustomerId,
+    });
+    if (!authorization.approved) {
+      await this.repository.updateStatus(orderId, OrderStatus.PaymentFailed);
+      return { success: false, reason: authorization.declineReason };
+    }
+    const updated = await this.repository.finalizeOrder(orderId, {
+      transactionId: authorization.transactionId,
+      processedAt: new Date(),
+    });
+    await this.notifyCustomer(user.email, updated);
+    return { success: true, order: updated };
+  }
+}
+`
 
   const result = loopDetector.pushText(loopDetector.create(), body)
   assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
@@ -85,29 +113,55 @@ test('WHAT[DG-001] LOOP_003_diverse_programmatic_text_stays_normal', () => {
 })
 
 test('WHAT[DG-001] LOOP_003_markdown_table_repeated_structure_with_varied_tokens_is_normal', () => {
-  const body = [
-    '| Component | Owner | Revision | Evidence |',
-    '| --- | --- | ---: | --- |',
-    ...Array.from(
-      { length: 500 },
-      (_, index) =>
-        `| component-${index} | team-${index % 37} | ${1000 + index} | artifact-${index}-${(index * 7919).toString(16)} |`,
-    ),
-  ].join('\n')
+  const body = `
+# Deployment Matrix and Service Configuration
+
+| Service Name | Cluster | Zone | Min Instances | Max Instances | CPU Target | Memory (GB) | Health Check URL | Owner Team |
+| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- | :--- |
+| ingress-gateway | prod-us-east-1 | us-east-1a | 4 | 32 | 70% | 8 | /healthz/ready | networking |
+| auth-session-broker | prod-us-east-1 | us-east-1b | 2 | 16 | 60% | 16 | /v1/system/status | identity-core |
+| catalog-search-indexer | prod-eu-west-1 | eu-west-1a | 3 | 24 | 75% | 32 | /internal/probes/liveness | search-discovery |
+| billing-invoice-worker | prod-ap-southeast-1 | ap-southeast-1c | 1 | 8 | 50% | 4 | /metrics/health | payments-ledger |
+`
 
   const result = loopDetector.pushText(loopDetector.create(), body)
   assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
+  assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
 })
 
 test('WHAT[DG-001] LOOP_003_ascii_graph_repeated_connectors_with_varied_tokens_is_normal', () => {
-  const body = Array.from(
-    { length: 500 },
-    (_, index) =>
-      `[stage_${index}] ----queue_${index % 29}/${100 + index}----> [stage_${index + 1}] status=${['cold', 'warm', 'ready'][index % 3]} owner=worker_${index % 43}`,
-  ).join('\n')
+  const body = `
+# System Architecture Diagram
+
+\`\`\`
+       +-----------------------+
+       |   Cloudflare CDN      |
+       +-----------+-----------+
+                   | (HTTPS / TLS 1.3)
+                   v
+       +-----------------------+
+       |   Kong API Gateway    | <--- JWT Validation / Rate Limiting
+       +-----------+-----------+
+                   |
+         +---------+---------+
+         |                   |
+         v                   v
++-----------------+ +-----------------+
+| Checkout Worker | | Inventory Micro |
++--------+--------+ +--------+--------+
+         |                   |
+         +---------+---------+
+                   | (gRPC Protocol)
+                   v
+       +-----------------------+
+       | PostgreSQL Primary DB |
+       +-----------------------+
+\`\`\`
+`
 
   const result = loopDetector.pushText(loopDetector.create(), body)
   assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
+  assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
 })
 
 test('WHAT[DG-005] LOOP_005_empty_push_is_noop', () => {

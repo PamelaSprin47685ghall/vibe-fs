@@ -36,14 +36,15 @@ LOOP iff D <= threshold
 ## 滴定
 
 1. `git ls-files --cached --others --exclude-standard` 得到仓库集合。
-2. `TextDecoder('utf-8', { fatal: true })` 定义「可读文字」；不可 strict UTF-8 解码者排除。
-3. 所有非空行分别用 o200k 计 token；当前 p99=59，向上取二次幂 → `HALF_LIFE=64`。
+2. `TextDecoder('utf-8', { fatal: true })` 定义「可读文字」；不可 strict UTF-8 解码者排除（生成的 `LoopDetectorConstants.fs` 自身排除，保证语料稳定）。
+3. 所有非空行分别用 o200k 计 token；当前 p99=59，向上取二次幂 → `HALF_LIFE=64`，$\lambda = 2^{-1/64}$，$M = 1/(1-\lambda)$。
 4. 所有可读文字按确定的 git path 顺序连接并 token 化。
-5. calibration 从理论最大 distinct steady prior `1/(1-λ)` 扫完整 token 流，取全程最低 `D` 为正常侧：当前 `18.52650592106275`。这些当前统计基线随仓库语料派生；feel free to modify，重跑 calibration 后同步 production 与文档即可。
-6. 异常侧不采样：全为同一 token 时 `D` 的理论极限就是 `1`。
-7. threshold = `(normal + 1) / 2 = 9.763252960531375`。
+5. calibration 从理论最大 distinct prior $M$ 单趟扫描完整 token 流，计算 $\sum D_t$ 与 $\sum D_t^2$，得到均值 $\mu$ 与方差 $\sigma^2$。
+6. 将有界区间 $[1.0, M]$ 线性映射至 $[0, 1]$（$u = (D - 1)/(M - 1)$），通过矩估计拟合贝塔分布 $\text{Beta}(\alpha, \beta)$。
+7. 求解 Beta 分布 95% 置信奇异分位数（下侧 $p = 0.05$ 对应分位数 $u_{0.05}$），映射回 $D$ 空间作为 `threshold = 1.0 + (M - 1) * u_{0.05}`。
+8. 每次 build 之前由 `scripts/generate-loop-constants.mjs` 从仓库语料实际生成 `src/Wanxiangshu/Execution/Session/LoopDetectorConstants.fs`，不硬编码具体数值。
 
-production fresh detector 从正常侧值开始，而不是从 1 开始，避免短输出天然被判 loop。
+production fresh detector 从分布均值 `NORMAL_WEIGHTED_DISTINCT` 开始，作为正常无罪 prior，避免短输出天然被判 loop。
 
 ## 内存
 

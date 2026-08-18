@@ -47,24 +47,24 @@ LOOP。
 
 ## DG-004：固定参数与仓库滴定
 
-参数不得按模型、角色、上下文长度、自然语言 vs 代码动态改写：
+参数不得按模型、角色、上下文长度、自然语言 vs 代码动态改写。在每次 build 之前通过程序
+`scripts/generate-loop-constants.mjs` 扫描仓库语料动态生成常量，不硬编码具体数值：
 
 ```text
 TOKENIZER = gpt-tokenizer/o200k_base
 HALF_LIFE = 64 token
 LAMBDA = 2^(-1/64)
-NORMAL_WEIGHTED_DISTINCT = 18.52650592106275
+MAX_SUPPORT = 1 / (1 - λ) ≈ 92.833385
 THEORETICAL_LOOP_WEIGHTED_DISTINCT = 1
-LOOP_WEIGHTED_DISTINCT_THRESHOLD = (18.52650592106275 + 1) / 2
-                                 = 9.763252960531375
+CONFIDENCE_LEVEL = 0.95
+CONFIDENCE_QUANTILE = 0.05
 ```
 
 滴定语料 = 仓库中 Git tracked + 非 ignored 且 strict UTF-8 可解码的全部文字。half-life 由这些文字
-所有非空行的 o200k token 长度 p99 向上取二次幂：当前 p99=59 → 64。正常值不是均值，而是把全部
-可读文字按确定顺序连接后，从理论最大 distinct prior `1/(1-λ)` 开始扫描时出现的最低 `D_t`；异常
-值不采样垃圾语料，直接取「所有观测都是同一个 token」的理论极限 1。阈值严格取二者中线。滴定由
-`tests/loop-calibration.test.mjs` 永久重放。上述“当前”统计值只是仓库语料的派生基线，不是人工冻结
-的产品语义；仓库可读文本变化时 feel free to modify，重新运行 calibration 并同步 production/WHAT/HOW/PROOF。
+所有非空行的 o200k token 长度 p99 向上取二次幂：当前 p99=59 → 64。加权相异度 $D_t$ 的物理取值区间严格受限在 $[1.0, M]$（$M = 1/(1-\lambda)$）。
+通过矩估计在有界区间 $[1.0, M]$ 上拟合贝塔分布 $\text{Beta}(\alpha, \beta)$（归一化变量 $u = (D-1)/(M-1) \in [0, 1]$），计算 95% 置信度奇异阈值（即 Beta 分布的 0.05 下侧分位数 $I_{0.05}^{-1}(\alpha, \beta)$ 映射回 $D$ 空间）。
+`NORMAL_WEIGHTED_DISTINCT` 取语料分布均值 $\mu$，`LOOP_WEIGHTED_DISTINCT_THRESHOLD` 取 Beta 分布 95% 置信奇异阈值。
+滴定由 `tests/loop-calibration.test.mjs` 永久重放，并在每次 build 时动态生成 `LoopDetectorConstants.fs`。
 
 fresh detector 以 `NORMAL_WEIGHTED_DISTINCT` 为无罪 prior；真实 token 按同一 λ 自动淡出该 prior。
 

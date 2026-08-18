@@ -144,8 +144,7 @@ module JudgeTool =
                 scope.MarkVerdictSubmitted context.SessionId
                 finish (received context)
 
-            let challenge () =
-                finish (challenged context)
+            let challenge () = finish (challenged context)
 
             let reject () =
                 finish (notReceived context Path.JudgmentCouldNotBeRecorded)
@@ -176,13 +175,16 @@ module JudgeTool =
         let hasSession = not (String.IsNullOrWhiteSpace context.SessionId)
         let isSubmitted = hasSession && scope.HasVerdictSubmitted context.SessionId
         let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
+
         let physicalUserMsg =
             if hasSession then
                 scope.CurrentPhysicalUserMessage context.SessionId
             else
                 None
 
-        match isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg with
+        match
+            isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg
+        with
         | false, _, _, _, _, _, _ -> ExecutionDecision.Refused Path.NotFromReviewer
         | _, false, _, _, _, _, _ -> ExecutionDecision.Refused Path.NoActiveIdentity
         | _, _, true, _, _, _, _ -> ExecutionDecision.AlreadyJudged
@@ -198,11 +200,20 @@ module JudgeTool =
                   ToolCallId = toolCallId
                   Verdict = value }
 
+    let private abortSession (scope: ToolRuntimeScope) (sessionId: string) : Task =
+        task {
+            if not (String.IsNullOrWhiteSpace sessionId) then
+                let! _ = scope.Sessions.AbortSession(SessionId.create sessionId)
+                ()
+        }
+
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
             match decideExecution scope args context with
             | ExecutionDecision.Refused reason -> return notReceived context reason
-            | ExecutionDecision.AlreadyJudged -> return alreadyJudged context
+            | ExecutionDecision.AlreadyJudged ->
+                do! abortSession scope context.SessionId
+                return alreadyJudged context
             | ExecutionDecision.Proceed judgement -> return! dispatchJudgement scope context judgement
         }
 
