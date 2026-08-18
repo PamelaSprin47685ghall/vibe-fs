@@ -241,9 +241,7 @@ module ReviewerWorkflow =
         (turn: ReconciledTurn)
         (reviewerKey: string)
         : Task<bool> =
-        if ReviewJudgementInbox.isOwned turn.SessionId then
-            Task.FromResult false
-        else
+        let resolveIdleDisposition () =
             match ReviewerEvidence.processIdleDisposition journal reviewerKey with
             | ReviewerEvidence.ProcessIdleDisposition.OrdinaryRepair -> Task.FromResult false
             | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview ->
@@ -251,6 +249,11 @@ module ReviewerWorkflow =
                     do! completeReviewer eventPort journal turn true
                     return true
                 }
+
+        if ReviewJudgementInbox.isOwned turn.SessionId then
+            Task.FromResult false
+        else
+            resolveIdleDisposition ()
 
     /// Physical terminal observer. Active Finality reviewers are owned by the
     /// direct ReviewBarrierWorkflow CE, so this function only reports their turn;

@@ -110,6 +110,12 @@ module TurnWorkflow =
                     turn
                     (SessionId.value turn.SessionId)
 
+            let completeReviewerOrObserve (observe: unit -> Task) : Task =
+                task {
+                    let! handled = tryCompleteProcessReviewerAtIdle ()
+                    if not handled then do! observe ()
+                }
+
             let observeIdleDelivery () : Task =
                 task {
                     match turn.Role, turn.Observation, turn.Outcome with
@@ -137,10 +143,7 @@ module TurnWorkflow =
                                 turn
                                 (SessionId.value turn.SessionId)
                     | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ ->
-                        let! handled = tryCompleteProcessReviewerAtIdle ()
-
-                        if not handled then
-                            do! observeIdleOrdinary context
+                        return! completeReviewerOrObserve (fun () -> observeIdleOrdinary context)
                     | Some Role.Reviewer, _, _ -> do! observeIdleOrdinary context
                     | _ -> do! observeIdleOrdinary context
                 }
@@ -167,10 +170,7 @@ module TurnWorkflow =
 
                     match turn.Role, turn.Observation, turn.Outcome with
                     | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ ->
-                        let! handled = tryCompleteProcessReviewerAtIdle ()
-
-                        if not handled then
-                            do! observeOrdinary context
+                        return! completeReviewerOrObserve (fun () -> observeOrdinary context)
                     | Some Role.Reviewer, _, ReconcileProgram.TurnCompleted ->
                         do!
                             ReviewerWorkflow.observe

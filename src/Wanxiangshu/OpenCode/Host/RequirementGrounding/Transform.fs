@@ -29,15 +29,20 @@ module RequirementGroundingTransform =
     let isGroundingRead raw = sourceOf raw = Some source
 
     let private callIdOf raw =
-        if isNull raw || isNull raw?parts then
-            None
-        else
+        let resolveParts () =
             let parts = unbox<obj array> raw?parts
 
-            if parts.Length = 0 || isNull parts.[0]?callID then
+            if parts.Length = 0 then
+                None
+            elif isNull parts.[0]?callID then
                 None
             else
                 Some(string parts.[0]?callID)
+
+        if isNull raw || isNull raw?parts then
+            None
+        else
+            resolveParts ()
 
     let stableCallId sessionId workspace packageName digest ordinal index =
         let input =

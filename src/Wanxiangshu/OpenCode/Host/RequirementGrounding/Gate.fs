@@ -56,16 +56,21 @@ module RequirementGroundingGate =
         let fromLine (line: string) =
             let colon = line.IndexOf ':'
 
-            if colon <= 0 then
-                None
-            else
+            let resolveCandidate () =
                 let candidate = line.Substring(0, colon).Trim()
                 let absolute = absoluteCandidate workspace candidate
 
-                if candidate = "" || not (existsSync absolute) then
+                if candidate = "" then
+                    None
+                elif not (existsSync absolute) then
                     None
                 else
                     Some candidate
+
+            if colon <= 0 then
+                None
+            else
+                resolveCandidate ()
 
         let rendered = if isNull output then "" else string output
 

@@ -123,18 +123,25 @@ module ManagerJobHandoff =
             | _ -> return HandoffOutcome.ManagerOwnsTurn
         }
 
+    let private recordFallbackSuccess
+        (journal: AgentJournal option)
+        (turn: ReconciledTurn)
+        : Task<unit> =
+        task {
+            match journal with
+            | Some j ->
+                let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
+                ()
+            | None -> ()
+        }
+
     let private recordFallbackSuccessIfValid
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (terminalValid: bool)
         : Task<unit> =
         task {
-            if terminalValid then
-                match journal with
-                | Some j ->
-                    let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
-                    ()
-                | None -> ()
+            if terminalValid then do! recordFallbackSuccess journal turn
         }
 
     let private completeCompleted

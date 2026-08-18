@@ -92,6 +92,44 @@ module FallbackFactFold =
                 FallbackProjection.applyAdvance identity previous next consecutiveFailureCount current
                 |> Result.map (fun updated -> { session with Fallback = Some updated }))
 
+    let private foldFallbackSucceeded (projection: AgentProjectionSet) (payload: {| SessionId: SessionId; LogicalRunId: LogicalRunId; AuthorityRootUserMessageId: AuthorityRootUserMessageId; ProviderRun: ProviderRunIdentity |}) : Result<AgentProjectionSet, FoldRejection> =
+        let identity =
+            { SessionId = payload.SessionId
+              LogicalRunId = payload.LogicalRunId
+              AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+              ProviderRun = payload.ProviderRun }
+
+        let applySuccess (current: FallbackProjection) =
+            if
+                current.LogicalRunId <> identity.LogicalRunId
+                || current.AuthorityRootUserMessageId <> identity.AuthorityRootUserMessageId
+            then
+                Ok projection
+            else
+                Ok(
+                    updateSession
+                        payload.SessionId
+                        (fun s ->
+                            { s with
+                                Fallback = Some(FallbackProjection.recordSuccess current) })
+                        projection
+                )
+
+        let resolveSession (session: SessionAgentProjection) =
+            match session.Fallback with
+            | None ->
+                reject
+                    "FallbackSucceeded"
+                    "cursor success has no cursor to clear: FALLBACK-001 requires an accepted Authority Root"
+            | Some current -> applySuccess current
+
+        match AgentProjection.tryFind payload.SessionId projection with
+        | None ->
+            reject
+                "FallbackSucceeded"
+                "cursor success has no cursor to clear: FALLBACK-001 requires an accepted Authority Root"
+        | Some session -> resolveSession session
+
     let fold (projection: AgentProjectionSet) (fact: FallbackFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── fallback ────────────────────────────────────────────────────────
         match fact with
@@ -128,35 +166,4 @@ module FallbackFactFold =
             )
 
         | FallbackFactCases.FallbackSucceeded payload ->
-            let identity =
-                { SessionId = payload.SessionId
-                  LogicalRunId = payload.LogicalRunId
-                  AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                  ProviderRun = payload.ProviderRun }
-
-            match AgentProjection.tryFind payload.SessionId projection with
-            | None ->
-                reject
-                    "FallbackSucceeded"
-                    "cursor success has no cursor to clear: FALLBACK-001 requires an accepted Authority Root"
-            | Some session ->
-                match session.Fallback with
-                | None ->
-                    reject
-                        "FallbackSucceeded"
-                        "cursor success has no cursor to clear: FALLBACK-001 requires an accepted Authority Root"
-                | Some current ->
-                    if
-                        current.LogicalRunId <> identity.LogicalRunId
-                        || current.AuthorityRootUserMessageId <> identity.AuthorityRootUserMessageId
-                    then
-                        Ok projection
-                    else
-                        Ok(
-                            updateSession
-                                payload.SessionId
-                                (fun s ->
-                                    { s with
-                                        Fallback = Some(FallbackProjection.recordSuccess current) })
-                                projection
-                        )
+            foldFallbackSucceeded projection payload

@@ -172,12 +172,17 @@ module OrdinaryTurnWorkflow =
                 else
                     completeAgent ()
 
+            let recordSuccessIfValid (journal: AgentJournal option) =
+                task {
+                    match journal with
+                    | Some j ->
+                        let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
+                        ()
+                    | None -> ()
+                }
+
             if terminalValid then
-                match journal with
-                | Some j ->
-                    let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
-                    ()
-                | None -> ()
+                do! recordSuccessIfValid journal
 
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
                 return ()

@@ -169,6 +169,40 @@ module FallbackLedger =
                 | Ok _ -> return! appendAdvanced journal budget sessionId providerRun reason current next
         }
 
+    let private appendSuccessFact
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (current: FallbackProjection)
+        : Task<Result<unit, string>> =
+        task {
+            let succeeded =
+                FallbackFact.FallbackSucceeded
+                    {| SessionId = sessionId
+                       LogicalRunId = current.LogicalRunId
+                       AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
+                       ProviderRun = providerRun |}
+
+            let! appended =
+                AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) succeeded journal
+
+            return
+                appended
+                |> Result.map (fun _ -> ())
+                |> Result.mapError JournalAppendFailure.describe
+        }
+
+    let private recordSuccessForCurrent
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (current: FallbackProjection)
+        : Task<Result<unit, string>> =
+        if current.Cursor.ConsecutiveFailureCount = 0 then
+            Task.FromResult(Ok())
+        else
+            appendSuccessFact journal sessionId providerRun current
+
     let recordConfirmedSuccess
         (journal: AgentJournal)
         (sessionId: SessionId)
@@ -177,24 +211,7 @@ module FallbackLedger =
         task {
             match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
             | None -> return Error "NoActiveRun: no cursor for session"
-            | Some current ->
-                if current.Cursor.ConsecutiveFailureCount = 0 then
-                    return Ok()
-                else
-                    let succeeded =
-                        FallbackFact.FallbackSucceeded
-                            {| SessionId = sessionId
-                               LogicalRunId = current.LogicalRunId
-                               AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
-                               ProviderRun = providerRun |}
-
-                    let! appended =
-                        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) succeeded journal
-
-                    return
-                        appended
-                        |> Result.map (fun _ -> ())
-                        |> Result.mapError JournalAppendFailure.describe
+            | Some current -> return! recordSuccessForCurrent journal sessionId providerRun current
         }
 
     let admitConfirmedFailure journal budget sessionId providerRun reason =
