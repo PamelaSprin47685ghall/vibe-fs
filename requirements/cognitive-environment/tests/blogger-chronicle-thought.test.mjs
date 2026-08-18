@@ -15,17 +15,16 @@ test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_has_exact_biling
   )
 })
 
-test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_companion_only_ephemeral_completed_injection', () => {
+test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_companion_only_ephemeral_reasoning_injection', () => {
   assert.match(source, /let private injectBloggerChronicleThought/)
   assert.match(source, /SessionAssociationProjection\.isCompanion/)
-  assert.match(source, /blogger-chronicle-thought/)
-  assert.match(source, /"status", box "completed"/)
-  assert.match(source, /"tool", box PairProgrammingThoughtTransform\.toolName/)
-  assert.match(source, /"name", box PairProgrammingThoughtTransform\.skillName/)
+  assert.match(source, /"type", box "reasoning"/)
+  assert.match(source, /"text", box text/)
 
-  const helper = source.match(/let private injectBloggerChronicleThought[\s\S]*?\n    let private strengthReplicaRuntime/)?.[0]
+  const helper = source.match(/let private bloggerChronicleThoughtText[\s\S]*?\n    let private strengthReplicaRuntime/)?.[0]
   assert.ok(helper, 'Blogger thought helper must remain local to PluginTransforms')
   assert.doesNotMatch(helper, /AgentJournal\.append|appendDurable|GuidelineProjection|tryInject/)
+  assert.doesNotMatch(helper, /PairProgrammingThoughtTransform|skillContent|"tool"|"status"|"source"|"synthetic"/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_the_last_semantic_injection_before_sanitize', () => {

@@ -92,8 +92,7 @@ strength family KEEP speculative-investigation，本断言 enforcement 侧归本
 
 Blogger 业务工具面恰为 `{chronicle}`、Distiller 为空、Bookkeeper 仅 `js-bookkeeper`；其它角色不得获得
 这些业务面（ENFORCER-010/011、AGENT-006 表）。Host-owned `skill` 工具不属于角色业务 capability，所有角色
-保持可用；injection-only guidance（HOST-013 pair hint 与 Blogger 临时 chronicle-direct nudge）可借用 synthetic
-`skill({ name: "" })` wire。真实 active empty-name skill call 必须改写为
+保持可用；HOST-013 只借用 synthetic `skill({ name: "" })` wire。真实 active empty-name skill call 必须改写为
 DENIED，非空 skill name 不得被 HOST-013 拦截、隐藏或改写。
 
 含义/动机：内部路径（运行时合成）不得被模型当作可选工具（历史 agent 条款「内部 Agent 从 public

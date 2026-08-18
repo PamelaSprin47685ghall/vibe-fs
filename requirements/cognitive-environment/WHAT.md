@@ -148,9 +148,9 @@ Blogger 的每次普通 provider transform 都在当前 request frontier 注入�
 文案跟随该 Blogger session 已绑定的 provider language。
 
 该 nudge 只属于当次 provider-facing transform：不写 Journal、不进入 durable projection、不形成下一次请求必须
-replay 的历史。重复 transform 必须先移除同 source 的旧临时 marker，再按当前 frontier 重建一个；Blogger 之外
-不得注入。wire 可借用 injection-only completed synthetic `skill({ name: "" })` 形状，但 active empty-name skill
-仍然禁止模型主动调用。
+replay 的历史。重复 transform 必须先移除上一轮注入的同文案 reasoning block，再按当前 frontier 重建一个；
+Blogger 之外不得注入。wire 形状就是普通 `reasoning` part，`text` 为上述裸字符串；不得包 `<skill_content>`、
+不得借用 `skill({ name: "" })`、不得携带 `source` / `synthetic` / completed-tool marker。
 
 ## 反向覆盖
 

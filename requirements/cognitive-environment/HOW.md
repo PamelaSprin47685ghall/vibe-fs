@@ -13,7 +13,7 @@
 | 005/011 | `resources/provider/role/*/`（无 fast/deep 字样）；`Session/CompanionPrompt.fs` 等使用 `PromptResources` 组合；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | 自我模型稳定；`prompt-stability` 测试（byte-stability）归 `prefix-stability`/`participant-identity` |
 | 012 | `resources/provider/role/reviewer/*` + `resources/provider/library/reviewer/quality-ledger/*`；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | REVIEW-012：双 PERFECT 不入 prompt |
 | 013 | `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`；HOST-013 transform（`Infrastructure/OpenCode/Host/*`）把同一 canonical 正文投影到 wire；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | craft 单源；并发文案用持续重算的 ready frontier 表达因果调度，不把 wave/DAG 变成 barrier；`cursor-pair-hint.md`/`pair-parallel-tools.md`/`increase-strength.md` 考古 |
-| 015 | `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`；`requirements/cognitive-environment/tests/blogger-chronicle-thought.test.mjs` | Blogger-only ephemeral marker：locale 取 session binding；每次 transform 先 strip 同 source 临时 marker，再按当前 frontier 注入一个 completed synthetic empty-skill wire；不走 Journal/GuidelineProjection |
+| 015 | `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`；`requirements/cognitive-environment/tests/blogger-chronicle-thought.test.mjs` | Blogger-only ephemeral reasoning：locale 取 session binding；每次 transform 先 strip 上轮同文案 reasoning，再按当前 frontier 注入一个裸 `reasoning.text`；不走 Journal/GuidelineProjection，不借 synthetic skill wire |
 
 ## 关键机制：PromptResources 是唯一组合源
 

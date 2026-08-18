@@ -571,20 +571,12 @@ module PluginTransforms =
         else
             injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
 
-    let private bloggerChronicleThoughtSource = "blogger-chronicle-thought"
-
     let private bloggerChronicleThoughtText (language: ProviderLanguage) =
         match language with
         | ProviderLanguage.SimplifiedChinese ->
             "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
         | ProviderLanguage.English ->
             "For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly."
-
-    let private isBloggerChronicleThought (message: obj) =
-        not (isNull message)
-        && not (isNull message?info)
-        && not (isNull message?info?source)
-        && string message?info?source = bloggerChronicleThoughtSource
 
     let private rawMessageRole (message: obj) =
         if isNull message then
@@ -596,7 +588,27 @@ module PluginTransforms =
         else
             ""
 
-    let private bloggerChronicleThoughtCallId
+    let private rawMessageParts (message: obj) : obj array =
+        if isNull message || isNull message?parts then [||] else unbox<obj array> message?parts
+
+    let private isBloggerChronicleThoughtPart (part: obj) =
+        if isNull part || isNull part?``type`` || isNull part?text then
+            false
+        else
+            let text = string part?text
+
+            string part?``type`` = "reasoning"
+            && (text = bloggerChronicleThoughtText ProviderLanguage.SimplifiedChinese
+                || text = bloggerChronicleThoughtText ProviderLanguage.English)
+
+    let private isBloggerChronicleThought (message: obj) =
+        let parts = rawMessageParts message
+
+        rawMessageRole message = "assistant"
+        && parts.Length = 1
+        && isBloggerChronicleThoughtPart parts.[0]
+
+    let private bloggerChronicleThoughtMessageId
         (projectionSessionIdOpt: string option)
         (messages: obj list)
         =
@@ -608,34 +620,21 @@ module PluginTransforms =
 
         let digest =
             HostDigest.sha256Hex(
-                String.concat "\u001f" [ defaultArg projectionSessionIdOpt ""; bloggerChronicleThoughtSource; frontier ]
+                String.concat "\u001f" [ defaultArg projectionSessionIdOpt ""; "blogger-chronicle-reasoning"; frontier ]
             )
 
-        bloggerChronicleThoughtSource + "-" + digest.Substring(0, 24)
+        "reasoning-" + digest.Substring(0, 24)
 
-    let private bloggerChronicleThoughtMessage (callId: string) (text: string) =
+    let private bloggerChronicleThoughtMessage (messageId: string) (text: string) =
         let part =
-            createObj
-                [ "type", box "tool"
-                  "tool", box PairProgrammingThoughtTransform.toolName
-                  "callID", box callId
-                  "state",
-                  box (
-                      createObj
-                          [ "status", box "completed"
-                            "input", box (createObj [ "name", box PairProgrammingThoughtTransform.skillName ])
-                            "output", box (PairProgrammingThoughtTransform.skillContent text)
-                            "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
-                  ) ]
+            createObj [ "type", box "reasoning"; "text", box text ]
 
         createObj
             [ "info",
               box (
                   createObj
-                      [ "id", box callId
-                        "role", box "assistant"
-                        "source", box bloggerChronicleThoughtSource
-                        "synthetic", box true ]
+                      [ "id", box messageId
+                        "role", box "assistant" ]
               )
               "parts", box [| part |] ]
 
@@ -659,13 +658,13 @@ module PluginTransforms =
                 |> Array.toList
                 |> List.filter (isBloggerChronicleThought >> not)
 
-            let callId = bloggerChronicleThoughtCallId projectionSessionIdOpt messages
+            let messageId = bloggerChronicleThoughtMessageId projectionSessionIdOpt messages
             let text = bloggerChronicleThoughtText (languageFor projectionSessionIdOpt)
-            let marker = bloggerChronicleThoughtMessage callId text
+            let reasoning = bloggerChronicleThoughtMessage messageId text
 
             HostMessageProjection.replaceMessagesInPlace
                 outObj
-                (insertBloggerChronicleThoughtAtFrontier marker messages)
+                (insertBloggerChronicleThoughtAtFrontier reasoning messages)
         | _ -> ()
 
     let private strengthReplicaRuntime
