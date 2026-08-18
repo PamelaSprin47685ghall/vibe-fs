@@ -19,7 +19,10 @@ module ProviderRunBindingSurface =
     let private rejectionToJs reads rejection : obj =
         match rejection with
         | ProviderRunBinding.Rejection.NoBindableRun ->
-            box {| ok = false; error = "NoBindableRun"; reads = reads |}
+            box
+                {| ok = false
+                   error = "NoBindableRun"
+                   reads = reads |}
         | ProviderRunBinding.Rejection.AmbiguousRun count ->
             box
                 {| ok = false
@@ -27,7 +30,10 @@ module ProviderRunBindingSurface =
                    count = count
                    reads = reads |}
         | ProviderRunBinding.Rejection.NotLatestRun ->
-            box {| ok = false; error = "NotLatestRun"; reads = reads |}
+            box
+                {| ok = false
+                   error = "NotLatestRun"
+                   reads = reads |}
 
     /// HOST-BOUNDARY-008 causal read: bind the unsealed assistant child of one
     /// physical user message to a provider run identity.
@@ -52,11 +58,15 @@ module ProviderRunBindingSurface =
         | Error rejection ->
             match rejection with
             | ProviderRunBinding.Rejection.NoBindableRun ->
-                box {| ok = false; error = "NoBindableRun" |}
+                box
+                    {| ok = false
+                       error = "NoBindableRun" |}
             | ProviderRunBinding.Rejection.AmbiguousRun count ->
-                box {| ok = false; error = "AmbiguousRun"; count = count |}
-            | ProviderRunBinding.Rejection.NotLatestRun ->
-                box {| ok = false; error = "NotLatestRun" |}
+                box
+                    {| ok = false
+                       error = "AmbiguousRun"
+                       count = count |}
+            | ProviderRunBinding.Rejection.NotLatestRun -> box {| ok = false; error = "NotLatestRun" |}
 
     /// Exercise the same typed observation policy used by the physical wire:
     /// `NoBindableRun` may advance to another public snapshot, while genuine
@@ -66,7 +76,8 @@ module ProviderRunBindingSurface =
         (physicalUserMessage: string)
         (snapshots: SessionSnapshotSurface.ProjectedMessages array)
         : obj =
-        let capped = snapshots |> Array.truncate ProviderRunBinding.projectionCatchupMaxReads
+        let capped =
+            snapshots |> Array.truncate ProviderRunBinding.projectionCatchupMaxReads
 
         let rec loop index =
             if index >= capped.Length then

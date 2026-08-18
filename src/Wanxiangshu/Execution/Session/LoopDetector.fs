@@ -88,7 +88,9 @@ module LoopDetector =
     /// in-place mutation of Step or WeightedDistinctTokenCount.
     let pushText (detector: Detector) (text: string) : Detector * Evaluation =
         let updated =
-            if String.IsNullOrEmpty text then detector
-            else pushTokens detector text
+            if String.IsNullOrEmpty text then
+                detector
+            else
+                pushTokens detector text
 
         updated, evaluate updated

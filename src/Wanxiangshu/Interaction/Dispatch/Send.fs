@@ -432,8 +432,7 @@ module PromptDispatcherSend =
                                 let! persisted = this.PersistDetachedInvocation(key, sessionId)
 
                                 match persisted with
-                                | Error error ->
-                                    return PromptDispatcher.SendAttemptOutcome.Failed error
+                                | Error error -> return PromptDispatcher.SendAttemptOutcome.Failed error
                                 | Ok() ->
                                     this.ObserveDetachedSend key sessionId sendTask None
                                     return PromptDispatcher.SendAttemptOutcome.Sent key

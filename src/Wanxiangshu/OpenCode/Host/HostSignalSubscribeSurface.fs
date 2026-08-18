@@ -33,7 +33,10 @@ module HostSignalSubscribeSurface =
     let private invokeDispose (value: obj) : unit = jsNative
 
     let private onSignalEventOf (value: obj) : obj -> unit =
-        if isFunction value then unbox<obj -> unit> value else fun _ -> ()
+        if isFunction value then
+            unbox<obj -> unit> value
+        else
+            fun _ -> ()
 
     /// Translate the Fable Result into a JS-native object. The subscription
     /// disposer is wrapped so the caller receives a plain `dispose()` function,
@@ -43,20 +46,40 @@ module HostSignalSubscribeSurface =
             let tuple = resultFields result
             let subscription = arrayItem0 tuple
             let source = arrayItem1 tuple :?> string
-            let dispose = if isNullish subscription then null else box (fun () -> invokeDispose subscription)
-            box {| ok = true; source = source; dispose = dispose |}
+
+            let dispose =
+                if isNullish subscription then
+                    null
+                else
+                    box (fun () -> invokeDispose subscription)
+
+            box
+                {| ok = true
+                   source = source
+                   dispose = dispose |}
         else
-            box {| ok = false; error = resultFields result :?> string |}
+            box
+                {| ok = false
+                   error = resultFields result :?> string |}
 
     /// JS-native trySubscribe. Returns a plain object:
     ///   success → { ok: true, source: string, dispose: () => void | null }
     ///   failure → { ok: false, error: string }
     let trySubscribe (input: obj) (onSignalEvent: obj) (timerPort: obj) : Task<obj> =
         if not (isFunction onSignalEvent) then
-            Task.FromResult(box {| ok = false; error = "OPENCODE-SIGNAL-SUBSCRIBE: callback unavailable" |})
+            Task.FromResult(
+                box
+                    {| ok = false
+                       error = "OPENCODE-SIGNAL-SUBSCRIBE: callback unavailable" |}
+            )
         else
             let callback = onSignalEventOf onSignalEvent
-            let port = if isNullish timerPort then None else Some(unbox<ITimerPort> timerPort)
+
+            let port =
+                if isNullish timerPort then
+                    None
+                else
+                    Some(unbox<ITimerPort> timerPort)
 
             task {
                 let! result = HostSignalSubscribe.trySubscribe input callback port

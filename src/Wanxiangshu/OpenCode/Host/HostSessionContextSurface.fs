@@ -9,8 +9,7 @@ module HostSessionContextSurface =
     let private jsUndefined: obj = jsNative
 
     let roleOf (agent: string) : string option =
-        HostSessionContext.roleOf agent
-        |> Option.map AgentRoleIdentity.roleName
+        HostSessionContext.roleOf agent |> Option.map AgentRoleIdentity.roleName
 
     let read (raw: obj) : obj =
         let sessionId, agent = HostSessionContext.read raw

@@ -24,17 +24,25 @@ module StealthBrowserMcpConfigSurface =
     /// `kind` is "disabled" | "fixture" | "uvx".
     let launchDecision (read: string -> string option) : obj =
         let launch = StealthBrowserMcpConfig.launchFrom read
+
         let kind, ref, path, enabled, reason =
             match launch with
             | McpLaunch.Disabled -> "disabled", "", "", false, "disabled"
             | McpLaunch.Fixture p -> "fixture", "", p, true, "fixture"
             | McpLaunch.Uvx r -> "uvx", r, "", true, "enabled"
-        box {| kind = kind; ref = ref; path = path; enabled = enabled; reason = reason |}
+
+        box
+            {| kind = kind
+               ref = ref
+               path = path
+               enabled = enabled
+               reason = reason |}
 
     /// Apply a launch decision to a config, preserving other MCP servers.
     /// Returns the config object (mutated in place).
     let applyToConfig (config: obj) (read: string -> string option) : obj =
-        if isNull config then config
+        if isNull config then
+            config
         else
             StealthBrowserMcpConfig.apply config (StealthBrowserMcpConfig.launchFrom read)
             config
@@ -44,9 +52,14 @@ module StealthBrowserMcpConfigSurface =
     /// `{ type, command, enabled }`.
     let entryFor (read: string -> string option) : obj =
         let launch = StealthBrowserMcpConfig.launchFrom read
+
         let command, enabled =
             match launch with
             | McpLaunch.Disabled -> StealthBrowserMcp.uvxCommand StealthBrowserMcp.defaultRef, false
             | McpLaunch.Fixture p -> StealthBrowserMcp.fixtureCommand p, true
             | McpLaunch.Uvx r -> StealthBrowserMcp.uvxCommand r, true
-        box {| ``type`` = "local"; command = box command; enabled = enabled |}
+
+        box
+            {| ``type`` = "local"
+               command = box command
+               enabled = enabled |}

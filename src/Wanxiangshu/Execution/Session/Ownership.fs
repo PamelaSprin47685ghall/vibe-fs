@@ -53,5 +53,3 @@ module SessionOwnership =
         function
         | SessionOwnership.Root -> None
         | SessionOwnership.Attached(owner, _) -> Some owner
-
-

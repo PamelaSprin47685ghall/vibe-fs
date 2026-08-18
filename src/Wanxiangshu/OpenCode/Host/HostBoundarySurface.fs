@@ -13,10 +13,7 @@ module HostBoundarySurface =
         HostMessageProjection.sanitizeMessage raw
 
     let sanitizeMessages (raw: obj array) : obj array =
-        raw
-        |> Array.toList
-        |> HostMessageProjection.sanitizeMessages
-        |> List.toArray
+        raw |> Array.toList |> HostMessageProjection.sanitizeMessages |> List.toArray
 
     let roleOf (agent: string) : string =
         HostSessionContext.roleOf agent
@@ -37,7 +34,9 @@ module HostBoundarySurface =
         | ProviderRunBinding.Rejection.NotLatestRun -> "NotLatestRun", 0
 
     let bindableRun (physicalUserMessageId: string) (rawMessages: obj array) : obj =
-        match ProviderRunBinding.bindableRun physicalUserMessageId (SessionSnapshotPort.projectMessages rawMessages) with
+        match
+            ProviderRunBinding.bindableRun physicalUserMessageId (SessionSnapshotPort.projectMessages rawMessages)
+        with
         | Ok run ->
             box
                 {| ok = true
@@ -55,12 +54,15 @@ module HostBoundarySurface =
 
     let private toolState =
         function
-        | SnapshotToolPartState.Pending ->
-            box {| kind = "pending"; value = null |}
+        | SnapshotToolPartState.Pending -> box {| kind = "pending"; value = null |}
         | SnapshotToolPartState.Completed outputCanonical ->
-            box {| kind = "completed"; value = outputCanonical |}
+            box
+                {| kind = "completed"
+                   value = outputCanonical |}
         | SnapshotToolPartState.Failed errorCanonical ->
-            box {| kind = "failed"; value = errorCanonical |}
+            box
+                {| kind = "failed"
+                   value = errorCanonical |}
 
     let locateToolCall (toolCallId: string) (rawMessages: obj array) : obj =
         match

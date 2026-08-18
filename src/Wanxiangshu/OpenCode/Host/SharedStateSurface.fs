@@ -20,8 +20,7 @@ module SharedStateSurface =
         | true, v -> v
         | false, _ -> null
 
-    let clearSessionParents () : unit =
-        SharedState.SessionParents.Clear()
+    let clearSessionParents () : unit = SharedState.SessionParents.Clear()
 
     /// ReviewGuardNudges: cross-instance at-most-once reservation. The key
     /// must NOT contain RuntimeId (root + worktree would each send a twin
@@ -38,11 +37,9 @@ module SharedStateSurface =
     /// RootWorkspace: mutable atom set by whichever plugin instance boots
     /// first. Worktree instances pin blogger companions here so the system
     /// prompt survives the manager worktree release at publish.
-    let setRootWorkspace (path: string) : unit =
-        SharedState.RootWorkspace <- Some path
+    let setRootWorkspace (path: string) : unit = SharedState.RootWorkspace <- Some path
 
-    let clearRootWorkspace () : unit =
-        SharedState.RootWorkspace <- None
+    let clearRootWorkspace () : unit = SharedState.RootWorkspace <- None
 
     let tryGetRootWorkspace () : string =
         SharedState.RootWorkspace |> Option.defaultValue null

@@ -20,10 +20,7 @@ module QuiescenceSurface =
         (sessionId: string)
         (physicalUserMessageId: string)
         : unit =
-        gate.ObservePhysicalUserMessage(
-            SessionId.create sessionId,
-            PhysicalUserMessageId.create physicalUserMessageId
-        )
+        gate.ObservePhysicalUserMessage(SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId)
 
     let observeIdle (gate: SessionQuiescenceGate) (sessionId: string) : QuiescencePermit =
         gate.ObserveIdle(SessionId.create sessionId)

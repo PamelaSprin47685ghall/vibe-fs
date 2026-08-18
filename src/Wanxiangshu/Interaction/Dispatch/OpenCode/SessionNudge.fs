@@ -373,7 +373,9 @@ module HostSessionNudge =
         let rt = PromptDispatcher.forJournal durable
 
         if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
-            Task.FromResult(IdleContinuationOutcome.Failed "Manager idle encouragement already claimed for this terminal")
+            Task.FromResult(
+                IdleContinuationOutcome.Failed "Manager idle encouragement already claimed for this terminal"
+            )
         else
             let agent = agentForActiveCursor journal sessionId profile
 

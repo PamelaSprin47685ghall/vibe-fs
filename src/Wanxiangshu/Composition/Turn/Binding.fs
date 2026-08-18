@@ -186,7 +186,9 @@ module TurnBinding =
 
                 match activeBindings.TryGetValue(key) with
                 | true, binding ->
-                    activeBindings.[key] <- { binding with PhysicalUserMessageId = Some physical }
+                    activeBindings.[key] <-
+                        { binding with
+                            PhysicalUserMessageId = Some physical }
                 | false, _ ->
                     activeBindings.[key] <-
                         { SessionId = sessionId

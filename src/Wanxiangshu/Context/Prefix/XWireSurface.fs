@@ -69,7 +69,12 @@ module XWireSurface =
                     | "tool-call" -> Some(SemanticToolCall(text part?name, text part?args))
                     | "tool-result" -> Some(SemanticToolResult(text part?result))
                     | "media" ->
-                        let mt = if isNullish part?mediaType then None else Some(text part?mediaType)
+                        let mt =
+                            if isNullish part?mediaType then
+                                None
+                            else
+                                Some(text part?mediaType)
+
                         Some(SemanticMedia(mt, text part?contentDigest))
                     | _ -> None)
 
@@ -98,10 +103,20 @@ module XWireSurface =
         match part with
         | SemanticText t -> box {| kind = "text"; text = t |}
         | SemanticReasoning t -> box {| kind = "reasoning"; text = t |}
-        | SemanticToolCall(name, args) -> box {| kind = "tool-call"; name = name; args = args |}
-        | SemanticToolResult result -> box {| kind = "tool-result"; result = result |}
+        | SemanticToolCall(name, args) ->
+            box
+                {| kind = "tool-call"
+                   name = name
+                   args = args |}
+        | SemanticToolResult result ->
+            box
+                {| kind = "tool-result"
+                   result = result |}
         | SemanticMedia(mediaType, digest) ->
-            box {| kind = "media"; mediaType = mediaType; contentDigest = digest |}
+            box
+                {| kind = "media"
+                   mediaType = mediaType
+                   contentDigest = digest |}
 
     let private semanticMessageToJs (msg: SemanticMessage) : obj =
         box
@@ -114,8 +129,7 @@ module XWireSurface =
         | NoCandidateReason.CoverageNotAheadOfRequest -> "CoverageNotAheadOfRequest"
         | NoCandidateReason.WouldRetreat _ -> "WouldRetreat"
         | NoCandidateReason.NotNewerThanCommitted -> "NotNewerThanCommitted"
-        | NoCandidateReason.CutoffProofFailed(expected, recomputed) ->
-            $"CutoffProofFailed:{expected}:{recomputed}"
+        | NoCandidateReason.CutoffProofFailed(expected, recomputed) -> $"CutoffProofFailed:{expected}:{recomputed}"
 
     let private probeToJs (probe: PrefixProbe) : obj =
         let c = probe.Candidate
@@ -130,8 +144,7 @@ module XWireSurface =
                        cutoff = c.CutoffExclusive
                        prefixDigest = c.CoveredPrefixDigest
                        sealRoot = c.SealRoot
-                       syntheticId = c.SyntheticMessageId |}
-            |}
+                       syntheticId = c.SyntheticMessageId |} |}
 
     // ── sha256: exact production owner used by XWire.applyTransform ─────────
 
@@ -148,6 +161,7 @@ module XWireSurface =
     /// the same proof input used by `transform` when validating Companion coverage.
     let coveredPrefixDigest (projection: obj) (cutoff: int) : string =
         let typed = semanticProjectionOfJs projection
+
         let truncated =
             { typed with
                 Messages = typed.Messages |> List.truncate cutoff }
@@ -243,8 +257,8 @@ module XWireSurface =
                     else
                         // ── HOST-BOUNDARY-020: armed + missing snapshot port → fail-closed ──
                         let snapshotPort =
-                            not (isNullish input?snapshotPort)
-                            && (input?snapshotPort |> unbox<bool>)
+                            not (isNullish input?snapshotPort) && (input?snapshotPort |> unbox<bool>)
+
                         let prefixEpoch =
                             if isNullish input?prefixEpoch then
                                 None
@@ -278,7 +292,10 @@ module XWireSurface =
                         else
                             // ── Recovery decision: mayRecover (CTX-006) ──
                             let offsetByte =
-                                if isNullish input?offset then 0uy else byte (intValue input?offset)
+                                if isNullish input?offset then
+                                    0uy
+                                else
+                                    byte (intValue input?offset)
 
                             let offset =
                                 match AgentPairCursor.FallbackOffsetCodec.ofByte offsetByte with
@@ -375,8 +392,10 @@ module XWireSurface =
                                 // We have the choice and probe result directly,
                                 // so the promote decision is: Completed + has probe.
                                 let outcome =
-                                    if isNullish input?outcome then None
-                                    else Some(text input?outcome)
+                                    if isNullish input?outcome then
+                                        None
+                                    else
+                                        Some(text input?outcome)
 
                                 let promoted =
                                     match outcome with
@@ -403,9 +422,7 @@ module XWireSurface =
                                                 { Role = "user"
                                                   Parts = [ SemanticText activation.Memory ] }
 
-                                            let tail =
-                                                currentProjection.Messages
-                                                |> List.skip activation.DropLeading
+                                            let tail = currentProjection.Messages |> List.skip activation.DropLeading
 
                                             let transformed =
                                                 { currentProjection with
@@ -413,9 +430,7 @@ module XWireSurface =
 
                                             box
                                                 {| messages =
-                                                    transformed.Messages
-                                                    |> List.map semanticMessageToJs
-                                                    |> List.toArray |}
+                                                    transformed.Messages |> List.map semanticMessageToJs |> List.toArray |}
                                         | _ -> input?currentProjection
                                     else
                                         input?currentProjection
@@ -452,16 +467,26 @@ module XWireSurface =
         let hasPlan = not (isNullish input?hasPlan) && (input?hasPlan |> unbox<bool>)
 
         if not hasPlan then
-            box {| promoted = false; cleared = false; keptPlan = false |}
+            box
+                {| promoted = false
+                   cleared = false
+                   keptPlan = false |}
         else
             let outcome = text input?outcome
             let hasProbe = not (isNullish input?hasProbe) && (input?hasProbe |> unbox<bool>)
+
             let currentEpoch =
-                if isNullish input?currentEpoch then None
-                else Some(PrefixEpochId.create (int64 (text input?currentEpoch)))
+                if isNullish input?currentEpoch then
+                    None
+                else
+                    Some(PrefixEpochId.create (int64 (text input?currentEpoch)))
+
             let probeEpoch =
-                if isNullish input?probeEpoch then None
-                else Some(PrefixEpochId.create (int64 (text input?probeEpoch)))
+                if isNullish input?probeEpoch then
+                    None
+                else
+                    Some(PrefixEpochId.create (int64 (text input?probeEpoch)))
+
             let epochMatches =
                 match currentEpoch, probeEpoch with
                 | Some current, Some probe -> current = probe
@@ -470,11 +495,20 @@ module XWireSurface =
             match outcome with
             | "completed" ->
                 // CTX-012: only a probe based on the current epoch can promote.
-                box {| promoted = hasProbe && epochMatches; cleared = true; keptPlan = false |}
+                box
+                    {| promoted = hasProbe && epochMatches
+                       cleared = true
+                       keptPlan = false |}
             | "failed"
             | "aborted" ->
                 // Terminal failure: clear plan, no promotion.
-                box {| promoted = false; cleared = true; keptPlan = false |}
+                box
+                    {| promoted = false
+                       cleared = true
+                       keptPlan = false |}
             | _ ->
                 // In-progress / unknown: keep the plan (HOST-BOUNDARY-021).
-                box {| promoted = false; cleared = false; keptPlan = true |}
+                box
+                    {| promoted = false
+                       cleared = false
+                       keptPlan = true |}

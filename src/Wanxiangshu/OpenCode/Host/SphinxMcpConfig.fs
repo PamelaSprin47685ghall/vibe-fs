@@ -112,9 +112,8 @@ module SphinxMcpConfig =
     /// Apply a launch decision to a config, preserving other MCP servers.
     /// Returns the config object (mutated in place) for chaining.
     let applyToConfig (config: obj) (launch: Launch) : obj =
-        if isNull config then config
+        if isNull config then
+            config
         else
             applyNonNull config launch
             config
-
-

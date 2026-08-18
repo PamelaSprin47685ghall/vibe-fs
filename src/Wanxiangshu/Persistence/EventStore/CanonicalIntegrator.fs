@@ -608,13 +608,13 @@ module CanonicalIntegrator =
                             { DurableEvents = durableEvents
                               Cuts = cuts
                               Commit =
-                                  fun () ->
-                                      lock gate (fun () ->
-                                          if not (obj.ReferenceEquals(state, expectedState)) then
-                                              failwith
-                                                  "CanonicalIntegrator Current changed between prepare and durable append"
+                                fun () ->
+                                    lock gate (fun () ->
+                                        if not (obj.ReferenceEquals(state, expectedState)) then
+                                            failwith
+                                                "CanonicalIntegrator Current changed between prepare and durable append"
 
-                                          state <- preparedState) }
+                                        state <- preparedState) }
                     })
 
             member _.TryCurrent(key) =

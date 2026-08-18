@@ -45,7 +45,9 @@ type SessionQuiescenceGate() =
     let mutable physicalMessages = Map.empty<string, string>
 
     let nextSerial key =
-        Map.tryFind key serials |> Option.defaultValue 0L |> fun current -> current + 1L
+        Map.tryFind key serials
+        |> Option.defaultValue 0L
+        |> fun current -> current + 1L
 
     /// 每次 provider request 开始构建（`experimental.chat.messages.transform`
     /// 最早同步位置）时调用：旧 idle permit 立即失效，而不是等 request 跑半天
@@ -63,9 +65,7 @@ type SessionQuiescenceGate() =
     /// previous terminal may no longer send, even if messages.transform has not
     /// started yet. Exact message replay is idempotent so it cannot revoke the
     /// provider attempt that this same material already started.
-    member _.ObservePhysicalUserMessage
-        (sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId)
-        : unit =
+    member _.ObservePhysicalUserMessage(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) : unit =
         lock gate (fun () ->
             let key = SessionId.value sessionId
             let physical = PhysicalUserMessageId.value physicalUserMessageId

@@ -97,15 +97,20 @@ module SessionSnapshotSurface =
         let messages = handle.Messages
 
         if messageIndex < 0 || messageIndex >= List.length messages then
-            box {| ok = false; error = "MessageIndexOutOfRange" |}
+            box
+                {| ok = false
+                   error = "MessageIndexOutOfRange" |}
         else
             let message = List.item messageIndex messages
             let toolParts = message.ToolParts
 
             if partIndex < 0 || partIndex >= Array.length toolParts then
-                box {| ok = false; error = "PartIndexOutOfRange" |}
+                box
+                    {| ok = false
+                       error = "PartIndexOutOfRange" |}
             else
                 let part = toolParts[partIndex]
+
                 box
                     {| ok = true
                        state = toolPartStateToJs part.State

@@ -194,5 +194,3 @@ module RoleDefinitions =
         |> List.map (fun role ->
             { Role = role
               Tools = Roles.permissions role })
-
-

@@ -148,10 +148,7 @@ module BloggerCrashRecovery =
         host.SetDrainWindow(key, DrainWindow.Closed)
 
     /// CE clear step: abandon physical flight ownership after durable abandon.
-    let private clearFlight
-        (host: IParkedTransformHost)
-        (bloggerSessionId: SessionId)
-        : unit =
+    let private clearFlight (host: IParkedTransformHost) (bloggerSessionId: SessionId) : unit =
         let key = SessionId.value bloggerSessionId
         host.ClearCurrentRequest key
         host.SetDrainWindow(key, DrainWindow.Closed)

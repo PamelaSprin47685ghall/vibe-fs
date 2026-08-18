@@ -156,8 +156,7 @@ module private SessionInterop =
 
     let statusOfEntry (handle: string) (entry: SessionEntry) : LookupOutcome<SessionStatus> =
         match entry.LastResult with
-        | InquiryResult.Answered answer ->
-            LookupOutcome.Found(handle, SessionStatus.Answered(answer, entry.State))
+        | InquiryResult.Answered answer -> LookupOutcome.Found(handle, SessionStatus.Answered(answer, entry.State))
         | _ -> LookupOutcome.Found(handle, SessionStatus.Active entry.State)
 
 type SessionStore() =
@@ -179,9 +178,7 @@ type SessionStore() =
         | _ ->
             let handle = SessionInterop.randomUUID ()
 
-            sessions[handle] <-
-                { State = state
-                  LastResult = result }
+            sessions[handle] <- { State = state; LastResult = result }
 
             StartOutcome.Started(handle, state, result)
 

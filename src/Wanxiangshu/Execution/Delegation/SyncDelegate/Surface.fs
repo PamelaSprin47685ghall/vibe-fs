@@ -278,7 +278,10 @@ module SyncDelegateSurface =
                 | None -> return false
                 | Some child ->
                     let parts =
-                        if String.IsNullOrWhiteSpace answer then [||] else [| MessagePart.Text answer |]
+                        if String.IsNullOrWhiteSpace answer then
+                            [||]
+                        else
+                            [| MessagePart.Text answer |]
 
                     let turn =
                         { SessionId = child

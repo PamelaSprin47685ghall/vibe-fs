@@ -196,8 +196,7 @@ module LifecycleWorkRecordProjection =
         task {
             match XTraceProjection.latestTerminal xTrace with
             | None -> return trace
-            | Some terminal ->
-                return! appendTerminalFallback durable (XTraceProjection.parts xTrace) trace terminal
+            | Some terminal -> return! appendTerminalFallback durable (XTraceProjection.parts xTrace) trace terminal
         }
 
     /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
@@ -391,8 +390,7 @@ module LifecycleWorkRecordProjection =
             let! trace =
                 match terminalForBoundedRange terminalProviderRun range xTrace with
                 | None -> Task.FromResult boundedTrace
-                | Some terminal ->
-                    appendTerminalFallback durable (partsWithinRange range xTrace) boundedTrace terminal
+                | Some terminal -> appendTerminalFallback durable (partsWithinRange range xTrace) boundedTrace terminal
 
             match xTrace.Opening with
             | None -> return None

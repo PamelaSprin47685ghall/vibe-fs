@@ -133,11 +133,11 @@ module XTraceProjection =
         | part :: _ -> part.Cursor.Sequence + 1L
         | [] -> 0L
 
-    let latestTerminal (state: XTraceProjectionState) : XTraceTerminalRef option =
-        List.tryHead state.Terminals
+    let latestTerminal (state: XTraceProjectionState) : XTraceTerminalRef option = List.tryHead state.Terminals
 
     let terminalForProviderRun (providerRun: ProviderRunIdentity) (state: XTraceProjectionState) =
-        state.Terminals |> List.tryFind (fun terminal -> terminal.ProviderRun = providerRun)
+        state.Terminals
+        |> List.tryFind (fun terminal -> terminal.ProviderRun = providerRun)
 
     let private parseGeneration (token: string) =
         match System.Int32.TryParse token with

@@ -360,8 +360,10 @@ module JoinDrain =
         match HandleCompletionCodec.decodeBody body, retired with
         | LegacyFalseAbort _, false ->
             task {
-                do! rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
+                do!
+                    rejectUnretiredFalseAbort durable parentId record blobRef blobDigest
                     |> TaskValue.map ignore
+
                 return Ok()
             }
         | LegacyFalseAbort _, true ->
@@ -395,7 +397,11 @@ module JoinDrain =
             | _ -> return Ok()
         }
 
-    let private reconcileOne (durable: AgentJournal) (parentId: SessionId) (record: HandleRecord) : Task<Result<unit, ForkError>> =
+    let private reconcileOne
+        (durable: AgentJournal)
+        (parentId: SessionId)
+        (record: HandleRecord)
+        : Task<Result<unit, ForkError>> =
         task {
             match tryFalseAbortCell record with
             | None -> return Ok()

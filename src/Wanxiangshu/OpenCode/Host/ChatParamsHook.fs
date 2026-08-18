@@ -82,7 +82,12 @@ module ChatParamsHook =
             validateSessionAndAgent sessionText agent
 
     let private supportsTemperature (input: obj) =
-        if isNull input || isNull input?model || isNull input?model?capabilities || isNull input?model?capabilities?temperature then
+        if
+            isNull input
+            || isNull input?model
+            || isNull input?model?capabilities
+            || isNull input?model?capabilities?temperature
+        then
             true
         else
             input?model?capabilities?temperature <> box false

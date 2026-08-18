@@ -31,13 +31,17 @@ module McpServer =
     [<Emit("new $0()")>]
     let private constructEmpty (constructor: obj) : obj = jsNative
 
-    let private zString (description: string) : obj = emitJsExpr zod "$0.string().describe($1)"
+    let private zString (description: string) : obj =
+        emitJsExpr zod "$0.string().describe($1)"
 
-    let private zNumberRecord (description: string) : obj = emitJsExpr (zod, description) "$0.record($0.string(), $0.number()).describe($1)"
+    let private zNumberRecord (description: string) : obj =
+        emitJsExpr (zod, description) "$0.record($0.string(), $0.number()).describe($1)"
 
-    let private zRecord (description: string) : obj = emitJsExpr (zod, description) "$0.record($0.string(), $0.any()).describe($1)"
+    let private zRecord (description: string) : obj =
+        emitJsExpr (zod, description) "$0.record($0.string(), $0.any()).describe($1)"
 
-    let private zStringArray (description: string) : obj = emitJsExpr (zod, description) "$0.array($0.string()).describe($1)"
+    let private zStringArray (description: string) : obj =
+        emitJsExpr (zod, description) "$0.array($0.string()).describe($1)"
 
     let private zRecordArray (description: string) : obj =
         emitJsExpr (zod, description) "$0.array($0.record($0.string(), $0.any())).describe($1)"
@@ -103,7 +107,8 @@ module McpServer =
         createObj
             [ "content" ==> [| textContent (McpContract.summarizeError view) |]
               "isError" ==> true
-              "_meta" ==> createObj [ "tool" ==> tool; "error" ==> McpContract.errorObject view ] ]
+              "_meta"
+              ==> createObj [ "tool" ==> tool; "error" ==> McpContract.errorObject view ] ]
 
     let private handlePrefix (handle: string option) =
         match handle with
@@ -156,7 +161,12 @@ module McpServer =
     let private optionalHandle (value: obj) : string option =
         if isNullish value then None else Some(unbox<string> value)
 
-    let private lookupFailure (tool: string) (startedMs: float) (outcome: LookupOutcome<'Value>) (ok: string -> 'Value -> obj) : obj =
+    let private lookupFailure
+        (tool: string)
+        (startedMs: float)
+        (outcome: LookupOutcome<'Value>)
+        (ok: string -> 'Value -> obj)
+        : obj =
         match outcome with
         | LookupOutcome.Found(handle, value) -> ok handle value
         | LookupOutcome.MissingHandle ->
@@ -322,8 +332,8 @@ module McpServer =
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "items"
                   ==> zObjectArray
-                      candidateSchema
-                      "Candidate proposals: method, question, semanticKey; optional dependencyKey, expectedRootGain, gatewayGain, cost, provenance" ])
+                          candidateSchema
+                          "Candidate proposals: method, question, semanticKey; optional dependencyKey, expectedRootGain, gatewayGain, cost, provenance" ])
             (observationHandler McpContract.toolPropose ObservationCodec.decodeCandidates store)
 
         register
@@ -334,10 +344,13 @@ module McpServer =
             (createObj
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "actionKey" ==> zString "Copy exactly from InvestigateRequest.action.id"
-                  "semanticAssessment" ==> zOptional (zRecord "Optional control-only semantic reassessment")
+                  "semanticAssessment"
+                  ==> zOptional (zRecord "Optional control-only semantic reassessment")
                   "findings" ==> zOptional (zRecordArray "Findings with semanticKey and text")
-                  "evidence" ==> zOptional (zRecordArray "Evidence with semanticKey, proposition, source, dependencyKey")
-                  "hypotheses" ==> zOptional (zRecordArray "Hypotheses with semanticKey and label")
+                  "evidence"
+                  ==> zOptional (zRecordArray "Evidence with semanticKey, proposition, source, dependencyKey")
+                  "hypotheses"
+                  ==> zOptional (zRecordArray "Hypotheses with semanticKey and label")
                   "candidates" ==> zOptional (zRecordArray "Follow-up candidate proposals") ])
             (observationHandler McpContract.toolInvestigate ObservationCodec.decodeInvestigation store)
 
@@ -349,7 +362,8 @@ module McpServer =
             (createObj
                 [ "handle" ==> zString "Opaque inquiry handle returned by start"
                   "text" ==> zString "Synthesis text"
-                  "findingKeys" ==> zOptional (zStringArray "Known finding keys organized by this synthesis")
+                  "findingKeys"
+                  ==> zOptional (zStringArray "Known finding keys organized by this synthesis")
                   "uncertainties" ==> zOptional (zStringArray "Explicit uncertainties") ])
             (observationHandler McpContract.toolSynthesize ObservationCodec.decodeSynthesis store)
 

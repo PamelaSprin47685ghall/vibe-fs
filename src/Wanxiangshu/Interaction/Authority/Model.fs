@@ -640,5 +640,3 @@ module PromptAuthority =
                 choice
             else
                 XProjectionChoice.UseCommittedEpoch }
-
-

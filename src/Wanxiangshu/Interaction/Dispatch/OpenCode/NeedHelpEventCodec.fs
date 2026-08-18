@@ -144,5 +144,3 @@ module NeedHelpEventCodec =
         let raw = HostEventCodec.unwrap rawInput
 
         deltaProperties raw |> Option.bind (decodeDelta raw)
-
-

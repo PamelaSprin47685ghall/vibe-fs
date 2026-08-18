@@ -169,7 +169,9 @@ module HandleSurface =
         elif text.StartsWith("manager-job:", StringComparison.Ordinal) then
             Ok(HandleId.ManagerJob(ManagerJobId.create (text.Substring(12))))
         else
-            Error {| kind = "UnknownHandleKind"; value = text |}
+            Error
+                {| kind = "UnknownHandleKind"
+                   value = text |}
 
     let private parseRole (value: obj) : Result<Role, {| kind: string; value: string |}> =
         match string value with
@@ -183,27 +185,39 @@ module HandleSurface =
         | "Orchestrator" -> Ok Role.Orchestrator
         | "Browser" -> Ok Role.Browser
         | "Inquiry" -> Ok Role.Inquiry
-        | other -> Error {| kind = "UnknownRole"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownRole"
+                   value = other |}
 
     let private parseCompletionKind (value: obj) : Result<HandleCompletionKind, {| kind: string; value: string |}> =
         match string value with
         | "Terminal" -> Ok HandleCompletionKind.Terminal
         | "SendFailure" -> Ok HandleCompletionKind.SendFailure
         | "Cancelled" -> Ok HandleCompletionKind.Cancelled
-        | other -> Error {| kind = "UnknownCompletionKind"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownCompletionKind"
+                   value = other |}
 
     let private parseAbandonReason (value: obj) : Result<HandleAbandonReason, {| kind: string; value: string |}> =
         match string value with
         | "ParentCancelled" -> Ok HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> Ok HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> Ok HandleAbandonReason.HostSessionGone
-        | other -> Error {| kind = "UnknownAbandonReason"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownAbandonReason"
+                   value = other |}
 
     let private parseOwnership (value: obj) : Result<HandleOwnership, {| kind: string; value: string |}> =
         match string value with
         | "DurableParentHandle" -> Ok HandleOwnership.DurableParentHandle
         | "HostOwnedHidden" -> Ok HandleOwnership.HostOwnedHidden
-        | other -> Error {| kind = "UnknownOwnership"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownOwnership"
+                   value = other |}
 
     let private rejectionName (rejection: HandleTransitionRejection) : string =
         match rejection with
@@ -234,8 +248,7 @@ module HandleSurface =
                 optStr c.CompletionRef BlobRef.value,
                 optStr c.CompletionDigest BlobDigest.value,
                 jsUndefined
-            | HandleLifecycle.Abandoned reason ->
-                jsUndefined, jsUndefined, jsUndefined, box (reason.ToString())
+            | HandleLifecycle.Abandoned reason -> jsUndefined, jsUndefined, jsUndefined, box (reason.ToString())
             | HandleLifecycle.Retired ->
                 // The tombstone retains the last completion that was consumed
                 // by join — EXEC-005 requires `list` to say WHICH completion
@@ -266,19 +279,21 @@ module HandleSurface =
     type HandleProjectionState internal (projection: AgentLinkageProjection) =
         member _.Internal = projection
 
-    let private okResult (state: HandleProjectionState) : obj =
-        box {| ok = true; state = state |}
+    let private okResult (state: HandleProjectionState) : obj = box {| ok = true; state = state |}
 
-    let private errorResult (error: obj) : obj =
-        box {| ok = false; error = error |}
+    let private errorResult (error: obj) : obj = box {| ok = false; error = error |}
 
-    let private inputError (err: {| kind: string; value: string |}) : obj =
-        errorResult err
+    let private inputError (err: {| kind: string; value: string |}) : obj = errorResult err
 
     let private resultOf (outcome: Result<AgentLinkageProjection, HandleTransitionRejection>) : obj =
         match outcome with
         | Ok projection -> okResult (HandleProjectionState projection)
-        | Error rejection -> errorResult (box {| kind = "TransitionRejected"; reason = rejectionName rejection |})
+        | Error rejection ->
+            errorResult (
+                box
+                    {| kind = "TransitionRejected"
+                       reason = rejectionName rejection |}
+            )
 
     /// The empty projection. JS starts every scenario from this.
     let empty () : HandleProjectionState =
@@ -315,8 +330,7 @@ module HandleSurface =
                     | Ok ownership ->
                         let child = SessionId.create (string (command?child))
                         let agent = string (command?agent)
-                        HandleProjection.link h child agent role ownership projection
-                        |> resultOf
+                        HandleProjection.link h child agent role ownership projection |> resultOf
 
         | "complete" ->
             match parseHandleId (command?handle) with
@@ -330,16 +344,22 @@ module HandleSurface =
                 match kindResult with
                 | Error e -> inputError e
                 | Ok kind ->
-                    let ref = match command?ref with null -> None | value -> Some(BlobRef.create (string value))
-                    let digest = match command?digest with null -> None | value -> Some(BlobDigest.create (string value))
+                    let ref =
+                        match command?ref with
+                        | null -> None
+                        | value -> Some(BlobRef.create (string value))
+
+                    let digest =
+                        match command?digest with
+                        | null -> None
+                        | value -> Some(BlobDigest.create (string value))
 
                     let c: HandleCompletion =
                         { Kind = kind
                           CompletionRef = ref
                           CompletionDigest = digest }
 
-                    HandleProjection.complete h c projection
-                    |> resultOf
+                    HandleProjection.complete h c projection |> resultOf
 
         | "abandon" ->
             match parseHandleId (command?handle) with
@@ -352,18 +372,19 @@ module HandleSurface =
 
                 match reasonResult with
                 | Error e -> inputError e
-                | Ok reason ->
-                    HandleProjection.abandon h reason projection
-                    |> resultOf
+                | Ok reason -> HandleProjection.abandon h reason projection |> resultOf
 
         | "retire" ->
             match parseHandleId (command?handle) with
             | Error e -> inputError e
-            | Ok h ->
-                HandleProjection.retire h projection
-                |> resultOf
+            | Ok h -> HandleProjection.retire h projection |> resultOf
 
-        | _ -> errorResult (box {| kind = "UnknownCommand"; value = op |})
+        | _ ->
+            errorResult (
+                box
+                    {| kind = "UnknownCommand"
+                       value = op |}
+            )
 
     /// Read one handle record from a projection state. Returns `null` if the
     /// handle is not in the map (never linked, or — impossible for retired —
@@ -392,8 +413,7 @@ module HandleSurface =
 
     /// `tryFind(handle, projection)` — returns the record or `null`. JS uses
     /// `isSome(tryFind(...))` to distinguish "retired" from "never existed".
-    let tryFind (state: HandleProjectionState) (handle: obj) : obj =
-        read state handle
+    let tryFind (state: HandleProjectionState) (handle: obj) : obj = read state handle
 
     /// `tryFindByChildSession(child, projection)`.
     let tryFindByChildSession (state: HandleProjectionState) (child: obj) : obj =
@@ -441,6 +461,7 @@ module HandleSurface =
     let handleIdPty (value: string) : string = "pty:" + value
     let handleIdManagerJob (value: string) : string = "manager-job:" + value
     let handleIdDescribe (value: string) : string = value
+
     let handleIdTryAgent (value: string) : obj =
         if value.StartsWith("agent:", StringComparison.Ordinal) then
             box (value.Substring(6))
@@ -455,12 +476,11 @@ module HandleSurface =
     // None). The surface serializes/deserializes the JS fact object directly;
     // the fold's parseFact treats missing fields as None.
 
-    let serializeFact (value: obj) : string =
-        Fable.Core.JS.JSON.stringify(value)
+    let serializeFact (value: obj) : string = Fable.Core.JS.JSON.stringify (value)
 
     let deserializeFact (line: string) : obj =
         try
-            let value = Fable.Core.JS.JSON.parse(line)
+            let value = Fable.Core.JS.JSON.parse (line)
             box {| ok = true; value = value |}
-        with
-        | _ -> box {| ok = false; error = "InvalidJson" |}
+        with _ ->
+            box {| ok = false; error = "InvalidJson" |}

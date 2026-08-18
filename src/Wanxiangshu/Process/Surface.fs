@@ -1052,12 +1052,7 @@ module ProcessSurface =
     /// the terminal handle. The supervisor owns the full exit lifecycle.
     let supervisorAttach (supervisor: obj) (port: obj) (id: obj) (term: obj) : unit =
         let exitTcs = TaskCompletionSource<unit>()
-        PtySupervisor.attach
-            (supervisorOf supervisor)
-            (ptyPortOf port)
-            (ptyIdOf id)
-            term
-            exitTcs
+        PtySupervisor.attach (supervisorOf supervisor) (ptyPortOf port) (ptyIdOf id) term exitTcs
 
     let spoolReadPath (path: string) : Task<obj array> =
         // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator

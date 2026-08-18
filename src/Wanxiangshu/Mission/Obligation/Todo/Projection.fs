@@ -187,10 +187,7 @@ module MagicTodoProjection =
 
     /// O(1) reverse locator: reviewer-session → owning ManagerLifeId.
     /// Directly reads ReviewerLifeBySession — no ByLife scan.
-    let tryReviewerLife
-        (reviewerSessionId: SessionId)
-        (state: MagicTodoProjectionState)
-        : ManagerLifeId option =
+    let tryReviewerLife (reviewerSessionId: SessionId) (state: MagicTodoProjectionState) : ManagerLifeId option =
         Map.tryFind (SessionId.value reviewerSessionId) state.ReviewerLifeBySession
 
     /// REVIEW-013: typed process-review authority for a dedicated reviewer session.

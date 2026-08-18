@@ -24,7 +24,8 @@ module CompactionPolicySurface =
         |> box
 
     /// `experimental.compaction.autocontinue` answer (always false).
-    let autoContinueEnabled () : bool = HostCompactionPolicy.autoContinueEnabled
+    let autoContinueEnabled () : bool =
+        HostCompactionPolicy.autoContinueEnabled
 
     /// HOST-006 containment: is this message a Host compaction pseudo-run.
     let isContainableCompaction (isCompaction: bool) : bool =
@@ -38,8 +39,7 @@ module CompactionPolicySurface =
         let predicate (runId: ProviderRunIdentity) =
             (isReanchored :?> (string -> bool)) (ProviderRunIdentity.value runId)
 
-        let typed =
-            observed |> Array.map ProviderRunIdentity.create |> Array.toList
+        let typed = observed |> Array.map ProviderRunIdentity.create |> Array.toList
 
         match HostCompactionPolicy.nextReanchor typed predicate with
         | Some runId -> box (ProviderRunIdentity.value runId)
@@ -52,8 +52,7 @@ module CompactionPolicySurface =
     let judgeFirstTurn (session: string) (pseudoRunsOnFirstTurn: int) : obj =
         HostCompactionPolicy.judgeFirstTurn None (SessionId.create session) pseudoRunsOnFirstTurn
         |> function
-            | CompactionGateVerdict.Satisfied ->
-                box {| kind = "Satisfied" |}
+            | CompactionGateVerdict.Satisfied -> box {| kind = "Satisfied" |}
             | CompactionGateVerdict.SettingUnavailable setting ->
                 box
                     {| kind = "SettingUnavailable"

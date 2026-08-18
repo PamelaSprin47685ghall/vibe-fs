@@ -167,12 +167,16 @@ type PluginStrengthScope() =
 
         match counterfactualAwait.TryGetValue key with
         | true, AwaitFirst(targetRun, _) when targetRun = providerRun ->
-            let nextAwait, nextState = advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+            let nextAwait, nextState =
+                advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+
             strengthPredictorState <- nextState
             counterfactualAwait.Remove key |> ignore
             nextAwait |> Option.iter (fun p -> counterfactualAwait.[key] <- p)
         | true, AwaitSecond _ ->
-            let nextAwait, nextState = advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+            let nextAwait, nextState =
+                advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+
             strengthPredictorState <- nextState
             counterfactualAwait.Remove key |> ignore
             nextAwait |> Option.iter (fun p -> counterfactualAwait.[key] <- p)

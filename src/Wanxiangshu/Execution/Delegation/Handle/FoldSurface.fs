@@ -36,7 +36,9 @@ module HandleFoldSurface =
         elif text.StartsWith("manager-job:", StringComparison.Ordinal) then
             Ok(HandleId.ManagerJob(ManagerJobId.create (text.Substring(12))))
         else
-            Error {| kind = "UnknownHandleKind"; value = text |}
+            Error
+                {| kind = "UnknownHandleKind"
+                   value = text |}
 
     let private parseRole (value: obj) : Result<Role, {| kind: string; value: string |}> =
         match string value with
@@ -50,30 +52,41 @@ module HandleFoldSurface =
         | "Orchestrator" -> Ok Role.Orchestrator
         | "Browser" -> Ok Role.Browser
         | "Inquiry" -> Ok Role.Inquiry
-        | other -> Error {| kind = "UnknownRole"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownRole"
+                   value = other |}
 
     let private parseCompletionKind (value: obj) : Result<HandleCompletionKind, {| kind: string; value: string |}> =
         match string value with
         | "Terminal" -> Ok HandleCompletionKind.Terminal
         | "SendFailure" -> Ok HandleCompletionKind.SendFailure
         | "Cancelled" -> Ok HandleCompletionKind.Cancelled
-        | other -> Error {| kind = "UnknownCompletionKind"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownCompletionKind"
+                   value = other |}
 
     let private parseAbandonReason (value: obj) : Result<HandleAbandonReason, {| kind: string; value: string |}> =
         match string value with
         | "ParentCancelled" -> Ok HandleAbandonReason.ParentCancelled
         | "DeadlineExceeded" -> Ok HandleAbandonReason.DeadlineExceeded
         | "HostSessionGone" -> Ok HandleAbandonReason.HostSessionGone
-        | other -> Error {| kind = "UnknownAbandonReason"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownAbandonReason"
+                   value = other |}
 
     let private parseOwnership (value: obj) : Result<HandleOwnership, {| kind: string; value: string |}> =
         match string value with
         | "DurableParentHandle" -> Ok HandleOwnership.DurableParentHandle
         | "HostOwnedHidden" -> Ok HandleOwnership.HostOwnedHidden
-        | other -> Error {| kind = "UnknownOwnership"; value = other |}
+        | other ->
+            Error
+                {| kind = "UnknownOwnership"
+                   value = other |}
 
-    let private inputError (err: {| kind: string; value: string |}) : obj =
-        box {| ok = false; error = err |}
+    let private inputError (err: {| kind: string; value: string |}) : obj = box {| ok = false; error = err |}
 
     // ── Fact construction from JS objects ────────────────────────────────────
 
@@ -95,6 +108,7 @@ module HandleFoldSurface =
                     let child = SessionId.create (string (payload?ChildSessionId))
                     let parent = SessionId.create (string (payload?ParentSessionId))
                     let agent = string (payload?TargetAgent)
+
                     let byname =
                         match payload?Byname with
                         | null -> agent
@@ -124,8 +138,16 @@ module HandleFoldSurface =
             | Error e -> Error(inputError e)
             | Ok kind ->
                 let parent = SessionId.create (string (payload?ParentSessionId))
-                let ref = match payload?CompletionRef with null -> None | value -> Some(BlobRef.create (string value))
-                let digest = match payload?CompletionDigest with null -> None | value -> Some(BlobDigest.create (string value))
+
+                let ref =
+                    match payload?CompletionRef with
+                    | null -> None
+                    | value -> Some(BlobRef.create (string value))
+
+                let digest =
+                    match payload?CompletionDigest with
+                    | null -> None
+                    | value -> Some(BlobDigest.create (string value))
 
                 Ok(
                     ExecutionFactCases.HandleCompleted
@@ -179,7 +201,14 @@ module HandleFoldSurface =
         | "HandleCompleted" -> buildHandleCompleted payload
         | "HandleRetired" -> buildHandleRetired payload
         | "HandleAbandoned" -> buildHandleAbandoned payload
-        | other -> Error(box {| ok = false; error = {| kind = "UnknownFactCase"; value = other |} |})
+        | other ->
+            Error(
+                box
+                    {| ok = false
+                       error =
+                        {| kind = "UnknownFactCase"
+                           value = other |} |}
+            )
 
     // ── Fold state ───────────────────────────────────────────────────────────
 
@@ -187,8 +216,7 @@ module HandleFoldSurface =
     type FoldState internal (projection: AgentProjectionSet) =
         member _.Internal = projection
 
-    let foldEmpty () : FoldState =
-        FoldState AgentProjection.empty
+    let foldEmpty () : FoldState = FoldState AgentProjection.empty
 
     /// Fold a list of fact envelopes through the production `ExecutionFactFold`.
     /// Each envelope is `{ seq, stream, fact }` where `fact` is
@@ -211,11 +239,16 @@ module HandleFoldSurface =
                         Error(
                             box
                                 {| ok = false
-                                   error = {| Fact = rejection.Fact; Reason = rejection.Reason |} |}
+                                   error =
+                                    {| Fact = rejection.Fact
+                                       Reason = rejection.Reason |} |}
                         )
 
         match foldAll state.Internal (Array.toList envelopes) with
-        | Ok current -> box {| ok = true; state = FoldState current |}
+        | Ok current ->
+            box
+                {| ok = true
+                   state = FoldState current |}
         | Error errorBox -> errorBox
 
     /// Extract the handle projection for one parent session from a fold state.

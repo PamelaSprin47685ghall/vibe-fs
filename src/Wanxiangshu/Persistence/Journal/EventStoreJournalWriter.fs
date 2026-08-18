@@ -228,8 +228,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
     member _.LastCommittedLocalSeq =
         lock gate (fun () -> if runtimeStartedCommitted then currentSeq - 1L else 0L)
 
-    member _.IsPoisoned =
-        lock gate (fun () -> firstFailure.IsSome)
+    member _.IsPoisoned = lock gate (fun () -> firstFailure.IsSome)
 
     member _.TryCurrent(key: string) = store.TryCurrent key
 
@@ -239,9 +238,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
                 firstFailure <- Some firstFailureReason)
 
     member private _.PriorPoison(eventId: EventId) : CommitResult<Envelope> option =
-        lock gate (fun () ->
-            firstFailure
-            |> Option.map (fun f -> NotAttempted(eventId, WriterPoisoned f)))
+        lock gate (fun () -> firstFailure |> Option.map (fun f -> NotAttempted(eventId, WriterPoisoned f)))
 
     static member private formatAppendError(error: AppendError) : string =
         match error with
@@ -426,8 +423,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
 
                 running)
 
-    member private _.FinishClose() =
-        lock gate (fun () -> closed <- true)
+    member private _.FinishClose() = lock gate (fun () -> closed <- true)
 
     member private this.DrainAcceptedPrefix(acceptedPrefix: Task) : Task =
         task {
