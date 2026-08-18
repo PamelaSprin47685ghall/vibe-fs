@@ -114,8 +114,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 ## OBL-007 — LEGACY-005：四个历史 decoder detector 在 horizon 到期时整组删除
 
-债权人 = 历史 durable bytes；当前 census 曾报告 0，但退出只能由 OBL-006 的 tracked census + 明确 retention horizon 证明。外部条件未满足前本项保持 `[ ]`，不得写“已完成/有界所以完成”。
-
 - [ ] `src/Wanxiangshu/Persistence/Journal/FactCodec.fs`
   - 到期同一提交删除 `containsLegacyFallbackFields`、`containsLegacyScoreVectorEntry`、`containsLegacyUnanchoredGuideline`、`containsHandleCompletedMissingCompletionFields` 及对应 refusal message/branch。
 - [ ] `src/Wanxiangshu/Persistence/Journal/Envelope.fs`
@@ -138,50 +136,6 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - [ ] `requirements/verification-system/HOW.md`
 - [ ] `cleanup/legacy-ledger.md`
   - 删除 LEGACY-005 当前架构描述与 ledger row。
-- 退出条件：所有受支持 workspace 在 retention horizon 之后由 `scripts/checks/legacy-horizon-census.mjs` 得到四 detector 全 0，且无支持中的 deployment 能再制造/提交这些旧 bytes。
-- 关闭本项时必须引用负责人提供的 supported-workspace inventory 与其 digest；仓库内若没有权威 inventory，工程师无权自己挑几个目录定义“所有受支持 workspace”，本项继续保持未完成。
-- 完成证据：`rg -n 'containsLegacyFallbackFields|containsLegacyScoreVectorEntry|containsLegacyUnanchoredGuideline|containsHandleCompletedMissingCompletionFields|pre050MigrationMessage|tipV2CleanBreakMessage|legacyGuidelineCleanBreakMessage' src requirements cleanup` = 0。
-
-## OBL-008 — LEGACY-006：Host V1 TodoTable sink 在 creditor 退役时整组删除
-
-债权人 = 当前 OpenCode Host V1 built-in TodoTable executor；边界必须始终单向 canonical obligations → V1 UI args，绝不反推 canonical。Host V1 仍是支持合同期间可以存在，但本项保持 `[ ]`。
-
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs`
-  - Host V1 退役提交删除 `CompatibilityTodoRow`、`obligationsToCompatibilityRows`。
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs`
-  - 删除 `replaceCompatibilityArgs` 与 `todos` non-enumerable V1 注入逻辑。
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs`
-  - 删除 `projectCompatibilityRows`、surface `replaceCompatibilityArgs` 与 CompatibilityTodoRow 构造。
-- [ ] `src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs`
-  - 删除 before-hook 对 `MagicTodoHostCodec.replaceCompatibilityArgs` / `obligationsToCompatibilityRows` 的调用；canonical prepare/accept workflow 不变。
-- [ ] `requirements/obligation-ledger/tests/magic-todo-host-codec.test.mjs`
-- [ ] `requirements/obligation-ledger/tests/magic-todo-host-canaries.test.mjs`
-- [ ] `requirements/host-boundary/tests/magic-todo-membrane-canaries.test.mjs`
-  - 删除只证明 V1 `todos[{content,status,priority}]` 投影的 canaries；保留 canonical obligations / Host hook semantic tests。
-- [ ] `requirements/obligation-ledger/WHAT.md`、`HOW.md`
-  - OBLIGATION-LEDGER-015 中永久部分只剩“canonical 单真相源、sink 不得反推”；V1 具体字段/Removal 过渡文字在 creditor 退役后删除。
-- [ ] `cleanup/legacy-ledger.md`
-  - 删除 LEGACY-006 row。
-- 退出条件：OpenCode Host V1 TodoTable 不再属于 supported Host contract，真实 executor 不再读取 `todos[{content,status,priority}]`。
-- 完成证据：`rg -n 'CompatibilityTodoRow|obligationsToCompatibilityRows|projectCompatibilityRows|replaceCompatibilityArgs' src requirements cleanup` = 0；Host boundary canaries 仍证明 canonical todowrite schema/execute/after 行为。
-
-## OBL-011 — 最终验收与义务账自删除
-
-只有 OBL-001..010、OBL-012 全部真实闭合后执行。不得提前把本节改成“完成时”。
-
-- [ ] `node scripts/check.mjs` exit 0。
-- [ ] `node scripts/build.mjs` exit 0，仍为 Fable-only；不得用 `dotnet build` 代替。
-- [ ] `node requirements/verification-system/tests/run.mjs` exit 0，authoritative fail count = 0。
-- [ ] `git status --short` 只包含本次预期改动；无 ignored verifier 被当验收依赖。
-- [ ] 对 OBL-003/004/010 的 forbidden symbols 分别执行账内 `rg`，结果 = 0。
-- [ ] 对 OBL-007/008：若外部 exit condition 尚未满足，则**不得执行本项，也不得宣称全仓清零**；义务继续留在这里。
-- [ ] 最后一个义务完成的同一提交删除本“当前义务账”已完成条目；若一个未完成义务都不剩，删除整个本节。Git history 负责记录做过多少轮、删过多少代码、过去有什么数字。
-
-终态验收只接受三句话都有机器证据：
-
-1. 数据结构只保存世界事实，不保存程序执行位置。
-2. canonical core 从 typed input 到 typed fact/fold 不经过 string/obj 隧道；副作用先 durable 后成为 Current。
-3. 标准验证全绿，且没有靠旧 facade、ignored scanner、手工 census、bounded compatibility 冒充“全部完成”。
 
 ## 关于负责人
 
