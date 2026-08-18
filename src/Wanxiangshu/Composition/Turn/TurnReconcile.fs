@@ -69,13 +69,15 @@ module TurnReconcile =
         |> Option.map (List.filter (fun message -> message.Role = "assistant"))
         |> Option.bind List.tryLast
 
-    let private resolveAssistant (messages: SessionMessage list) (root: string) (physical: string) =
+    let private resolveAssistant (messages: SessionMessage list) (physical: string) =
+        // HOST-BOUNDARY-005: once the current physical user is known, only an
+        // assistant after that exact user can reconcile this occasion. Falling
+        // back to an assistant after the authority root turns projection lag
+        // into a stale terminal from an older continuation; AABB then stops
+        // advancing and Manager idle dedupe sees an already-spent ProviderRun.
+        // Absence is therefore `NoTurn` evidence for the event-driven scheduler,
+        // never permission to reuse historical assistant state.
         findAssistantAfter messages physical
-        |> Option.orElseWith (fun () ->
-            if physical = root then
-                None
-            else
-                findAssistantAfter messages root)
 
     /// Reconcile a full snapshot against an active run binding.
     ///
@@ -104,7 +106,7 @@ module TurnReconcile =
 
                 resolvePhysical messages declaredRoot root declaredPhysical declaredPhysicalIsContinuationUser
                 |> Option.bind (fun physical ->
-                    resolveAssistant messages root physical
+                    resolveAssistant messages physical
                     |> Option.map (fun assistant ->
                         CompletedTurnClassifier.buildTurn
                             binding.SessionId

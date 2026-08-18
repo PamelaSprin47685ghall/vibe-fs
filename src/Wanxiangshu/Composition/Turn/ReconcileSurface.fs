@@ -1,8 +1,11 @@
 namespace Wanxiangshu.Composition.Turn
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode
 
 /// JS-native boundary for reconciliation's classifiers, evidence, wakes and
 /// publish seals. Maps remain opaque; turns, decisions and observations cross
@@ -216,3 +219,132 @@ module ReconcileSurface =
 
     let clearProvisional (maps: obj) (session: string) : obj =
         PublishMapsHandle(ReconcileProgram.clearProvisional (mapsOf maps) session) :> obj
+
+    let private schedulerMessage
+        (id: string)
+        (role: string)
+        (parentId: string option)
+        (finish: string option)
+        (errorName: string option)
+        (completed: bool)
+        (parts: MessagePart array)
+        : SessionMessage =
+        { Id = id
+          Role = role
+          Agent = None
+          Finish = finish
+          ErrorName = errorName
+          Model = None
+          ParentId = parentId
+          Completed = completed
+          IsCompaction = false
+          PromptKey = None
+          Parts = parts
+          PartIds = Array.create parts.Length None
+          ToolParts = [||] }
+
+    let private projectionEdgeScenario (failureWake: bool) : Task<obj> =
+        task {
+            let sessionId = SessionId.create "projection-edge-session"
+            let rootPhysical = PhysicalUserMessageId.create "projection-edge-root"
+            let currentPhysical = PhysicalUserMessageId.create "projection-edge-current"
+            let store = TurnBinding.Store()
+            store.BindUserMessage(sessionId, rootPhysical)
+            store.BindContinuationUserMessage(sessionId, currentPhysical)
+
+            // DSL-MUTABLE: algorithm-scratch — fake Host projection visibility.
+            let mutable currentVisible = false
+            // DSL-MUTABLE: algorithm-scratch — proves one read per causal edge.
+            let mutable snapshotReads = 0
+            let firstSnapshotObserved = TaskCompletionSource<unit>()
+            let currentTurnObserved = TaskCompletionSource<ReconciledTurnContext>()
+
+            let user id = schedulerMessage id "user" None None None false [||]
+
+            let oldAssistant =
+                schedulerMessage
+                    "projection-edge-old-run"
+                    "assistant"
+                    (Some "projection-edge-root")
+                    (Some "stop")
+                    None
+                    true
+                    [| MessagePart.Text "old terminal" |]
+
+            let currentAssistant =
+                if failureWake then
+                    schedulerMessage
+                        "projection-edge-current-run"
+                        "assistant"
+                        (Some "projection-edge-current")
+                        None
+                        (Some "APIError")
+                        true
+                        [||]
+                else
+                    schedulerMessage
+                        "projection-edge-current-run"
+                        "assistant"
+                        (Some "projection-edge-current")
+                        (Some "stop")
+                        None
+                        true
+                        [| MessagePart.Text "current terminal" |]
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+
+                        let messages =
+                            [ user "projection-edge-root"
+                              oldAssistant
+                              user "projection-edge-current" ]
+                            |> fun prefix -> if currentVisible then prefix @ [ currentAssistant ] else prefix
+
+                        Task.FromResult(Ok messages) }
+
+            let observeSnapshot (_: SessionId) (_: SessionMessage list) : Task =
+                AsyncSupport.trySetResult firstSnapshotObserved () |> ignore
+                Task.FromResult(()) :> Task
+
+            let onTurn (context: ReconciledTurnContext) : Task =
+                if ProviderRunIdentity.value context.Turn.ProviderRun = "projection-edge-current-run" then
+                    AsyncSupport.trySetResult currentTurnObserved context |> ignore
+
+                Task.FromResult(()) :> Task
+
+            let scheduler =
+                Reconciler.Scheduler(snapshot, store, onTurn, ?onSnapshot = Some observeSnapshot)
+
+            if failureWake then
+                scheduler.Kick(sessionId, ReconcileProgram.ReconcileWake.FailureWake)
+            else
+                scheduler.SignalIdle(sessionId, QuiescencePermit.create sessionId 1L)
+
+            do! firstSnapshotObserved.Task
+            currentVisible <- true
+            scheduler.NotifyProjectionChanged(sessionId, currentPhysical)
+
+            let! observed = currentTurnObserved.Task
+            do! scheduler.StopAndDrain()
+
+            return
+                box
+                    {| snapshotReads = snapshotReads
+                       providerRun = ProviderRunIdentity.value observed.Turn.ProviderRun
+                       outcome =
+                           match observed.Turn.Outcome with
+                           | ReconcileProgram.TurnCompleted -> "TurnCompleted"
+                           | ReconcileProgram.TurnFailed _ -> "TurnFailed"
+                           | ReconcileProgram.TurnAborted _ -> "TurnAborted"
+                           | ReconcileProgram.TurnInProgress -> "TurnInProgress"
+                           | ReconcileProgram.TurnNeedsContinuation _ -> "TurnNeedsContinuation"
+                       hasQuiescence = Option.isSome observed.Quiescence |}
+        }
+
+    let idleProjectionEdgeScenario () : Task<obj> =
+        projectionEdgeScenario false
+
+    let failureProjectionEdgeScenario () : Task<obj> =
+        projectionEdgeScenario true

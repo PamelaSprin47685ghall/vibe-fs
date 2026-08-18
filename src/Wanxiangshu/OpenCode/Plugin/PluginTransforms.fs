@@ -621,9 +621,7 @@ module PluginTransforms =
         |> Option.map SessionId.create
         |> Option.bind SessionExecutionBinding.currentProviderModel
         |> Option.exists (fun model ->
-            List.exists
-                (fun prefix -> model.modelID.StartsWith(prefix, StringComparison.Ordinal))
-                bloggerChronicleThoughtModelPrefixes)
+            List.exists (fun prefix -> model.modelID.StartsWith(prefix, StringComparison.Ordinal)) bloggerChronicleThoughtModelPrefixes)
 
     let private rawMessageRole (message: obj) =
         if isNull message then

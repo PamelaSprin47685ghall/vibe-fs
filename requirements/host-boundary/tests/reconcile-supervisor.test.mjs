@@ -13,8 +13,9 @@ const failed = (error) => ({ kind: 'Failed', error })
 // ── HOST-BOUNDARY-005: reconcile decision surface ────────────────────────
 //
 // The production owner is ReconcileSurface.decideStep. The support
-// hostPolicy.reconcile was a hand-model that reimplemented bounded causal
-// reread with a different shape. The real production logic uses
+// hostPolicy.reconcile was a hand-model that reimplemented counter-driven
+// reread with a different shape. Production no longer authorizes reads from
+// that counter; the real logic uses
 // decideStep(wake, rereadsRemaining, evidence) → { name, rereadsRemaining,
 // clearsContinuationCandidate }.
 //
@@ -22,29 +23,32 @@ const failed = (error) => ({ kind: 'Failed', error })
 //   - snapshots with finish=true → evidenceTerminal
 //   - snapshots with finish=false → evidenceProvisional (incomplete)
 //   - snapshots with error → evidenceSnapshotError
-//   - maxReads=3 → rereadsRemaining starts at 3
 //   - stopped = decision name is StopPass
 //   - terminal = decision name is Publish (evidence was Terminal)
 
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_error_uses_bounded_causal_reread', () => {
-  // SnapshotError goes through bounded causal reread: with budget > 1 it
-  // returns Reread (the snapshot is unstable, retry the read); only when
-  // exhausted (budget = 1) does it StopPass (no evidence to act on, wait
-  // for the next Host signal).
-  const reread = ReconcileSurface.decideStep(idleWake, 4, ReconcileSurface.evidenceSnapshotError('provider unavailable'))
-  assert.equal(ReconcileSurface.decisionName(reread), 'Reread')
-  const exhausted = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceSnapshotError('provider unavailable'))
-  assert.equal(ReconcileSurface.decisionName(exhausted), 'StopPass')
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_error_never_self_polls', () => {
+  for (const remaining of [8, 4, 2, 1]) {
+    const decision = ReconcileSurface.decideStep(
+      idleWake,
+      remaining,
+      ReconcileSurface.evidenceSnapshotError('provider unavailable'),
+    )
+    assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
+  }
 })
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_incomplete_delayed_rekick_finds_terminal', () => {
-  // Provisional (incomplete) with remaining budget → Reread; then Terminal → Publish.
-  const reread = ReconcileSurface.decideStep(idleWake, 4, ReconcileSurface.evidenceProvisional('TurnInProgress'))
-  assert.equal(ReconcileSurface.decisionName(reread), 'Reread')
-  const publish = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceTerminal('TurnCompleted'))
-  assert.equal(ReconcileSurface.decisionName(publish), 'Publish')
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_is_the_only_nonterminal_publish_authority', () => {
+  const idle = ReconcileSurface.decideStep(idleWake, 4, ReconcileSurface.evidenceProvisional('TurnInProgress'))
+  assert.equal(ReconcileSurface.decisionName(idle), 'Publish')
+
+  const failure = ReconcileSurface.decideStep(
+    ReconcileSurface.failureWake(),
+    4,
+    ReconcileSurface.evidenceProvisional('TurnInProgress'),
+  )
+  assert.equal(ReconcileSurface.decisionName(failure), 'StopPass')
 })
 
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_incomplete_rereads_exhausted_stops', () => {
@@ -119,13 +123,10 @@ test('WHAT[HOST-BOUNDARY-003] HOST_signal_subscribe_client_events_listen_support
 // ── Mutation sensitivity ─────────────────────────────────────────────────
 
 test('WHAT[HOST-BOUNDARY-005] mutation_canary_snapshot_error_exhausted_must_stop_pass', () => {
-  // When the causal reread budget is exhausted, SnapshotError must StopPass
-  // — it must never Publish (there is no evidence to hand to business).
-  // With remaining budget it Rereads; this canary guards the exhausted
-  // boundary so a regression to Publish or infinite Reread is caught.
+  // SnapshotError must never Publish or self-authorize another read.
   const decision = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceSnapshotError('e'))
   assert.equal(ReconcileSurface.decisionName(decision), 'StopPass',
-    'mutation guard: exhausted SnapshotError must StopPass, not Publish or Reread')
+    'mutation guard: SnapshotError must StopPass, not Publish or Reread')
 })
 
 test('WHAT[HOST-BOUNDARY-016] mutation_canary_duplicate_completed_is_absorbed', () => {

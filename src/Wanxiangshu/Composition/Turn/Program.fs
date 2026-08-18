@@ -104,11 +104,10 @@ module ReconcileProgram =
         | TurnInProgress
         | TurnNeedsContinuation _ -> false
 
-    let private decideExhaustedRetryable (rereadsRemaining: int) (exhausted: ReconcileDecision) =
-        if rereadsRemaining > 1 then
-            ReconcileDecision.Reread(false, rereadsRemaining - 1)
-        else
-            exhausted
+    let private decideExhaustedRetryable (_rereadsRemaining: int) (exhausted: ReconcileDecision) =
+        // HOST-BOUNDARY-005: no read is authorized by a counter. A later read
+        // needs a new coarse Host signal or exact projection-change edge.
+        exhausted
 
     let private exhaustedUnknownDecision (wake: ReconcileWake) =
         match wake with
@@ -127,41 +126,42 @@ module ReconcileProgram =
             // terminal publishes normally.
             ReconcileDecision.StopPass
 
-    let private decideExhaustedUnknown (wake: ReconcileWake) (rereadsRemaining: int) =
-        if rereadsRemaining > 1 then
-            ReconcileDecision.Reread(true, rereadsRemaining - 1)
-        else
-            exhaustedUnknownDecision wake
+    let private decideExhaustedUnknown (wake: ReconcileWake) (_rereadsRemaining: int) =
+        exhaustedUnknownDecision wake
 
     let private decideExhaustedProvisional (wake: ReconcileWake) =
         match wake with
-        | ReconcileWake.AbortWake ->
-            // HOST-004: under operator abort, stalled provisional must never
-            // publish an observation that business could turn into
-            // InteractionRepair / "#". StopPass and wait for the real
-            // TurnAborted terminal.
-            ReconcileDecision.StopPass
-        | _ ->
-            // F1: exhausted TurnNeedsContinuation / stalled tool-call turn must
-            // publish so the business repair branch runs instead of dying in
-            // StopPass.
+        | ReconcileWake.IdleWake _ ->
+            // Idle is the only wake that proves the exact current physical
+            // execution is quiescent. A provisional/unknown assistant under
+            // that witness belongs to business repair.
             ReconcileDecision.Publish
+        | ReconcileWake.RetryWake
+        | ReconcileWake.FailureWake
+        | ReconcileWake.AbortWake ->
+            // Provider/abort status can race the public session projection.
+            // Never turn a non-idle wake plus provisional snapshot into a
+            // synthetic repair. Scheduler parks the occasion and the exact
+            // terminal message.updated projection edge re-kicks it.
+            ReconcileDecision.StopPass
 
     let private tokenAlreadySealed (maps: Map<string, string>) (key: string) (token: string) =
         match Map.tryFind key maps with
         | Some previous when previous = token -> true
         | _ -> false
 
-    /// 有界因果重读：rereadsRemaining = 还能进行多少次读取判定（初始 = maxCausalRereads + 1）。
+    /// Reconcile decision for one snapshot observation. Production Scheduler
+    /// supplies a single read per causal edge (HOST-BOUNDARY-005); the remaining
+    /// counter stays only as a pure compatibility surface for historical tests.
     ///
     /// 不变量（GLORY-070 / HOST-004 rev.3 / rabbit §7）：SessionIdle 被消费后只允许
     /// 产生一个稳定观测交接或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个带
     /// idle evidence 的稳定 `Unknown`。`Unknown`（finish=None）耗尽后只有在 `IdleWake`
     /// 下 `Publish` 给业务（TurnWorkflow / InteractionRepair 决定是否 repair）；
-    /// `Retry` / `Failure` wake 只证明观测稳定、不证明静止——不交接（StopPass，等
-    /// 下一个 signal）。`Provisional`（finish=stop 无合法正文 / tool-calls 停滞）
-    /// 耗尽后发布；只有 `SnapshotError` / `NoTurn` 保持 StopPass（没有任何可作用的
-    /// 对象，等待下一个 Host signal 重踢）。
+    /// `Retry` / `Failure` wake 只证明“某个 provider lifecycle edge 已发生”，不证明
+    /// 当前 snapshot 已追上，更不授予 idle repair 权；其 Unknown / Provisional 都
+    /// StopPass，等待 exact projection-change edge。只有 IdleWake 下的稳定 Unknown /
+    /// Provisional 可以 Publish 给业务。`SnapshotError` / `NoTurn` 同样 StopPass。
     let decideStep (wake: ReconcileWake) (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
         match evidence with
         | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish

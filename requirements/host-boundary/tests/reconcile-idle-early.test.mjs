@@ -4,55 +4,73 @@ import * as ReconcileSurface from '../../../dist/Composition/Turn/ReconcileSurfa
 
 const idleWake = ReconcileSurface.idleWake('s1', 1n)
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_idle_early_then_second_signal_completes', () => {
-  // First pass: three Provisional (incomplete) snapshots exhaust the budget.
-  // Under IdleWake, Provisional exhausted → Publish (not StopPass).
-  // But with rereadsRemaining=3, the first two are Reread, the third is Publish.
-  const first1 = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceProvisional('TurnInProgress'))
-  assert.equal(ReconcileSurface.decisionName(first1), 'Reread')
-  const first2 = ReconcileSurface.decideStep(idleWake, 2, ReconcileSurface.evidenceProvisional('TurnInProgress'))
-  assert.equal(ReconcileSurface.decisionName(first2), 'Reread')
-  const first3 = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceProvisional('TurnInProgress'))
-  assert.equal(ReconcileSurface.decisionName(first3), 'Publish')
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_drives_exactly_one_additional_idle_read', async () => {
+  const result = await ReconcileSurface.idleProjectionEdgeScenario()
 
-  // Second pass: a new IdleWake with Terminal evidence → Publish immediately.
-  const second = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceTerminal('TurnCompleted'))
-  assert.equal(ReconcileSurface.decisionName(second), 'Publish')
+  assert.deepEqual(result, {
+    snapshotReads: 2,
+    providerRun: 'projection-edge-current-run',
+    outcome: 'TurnCompleted',
+    hasQuiescence: true,
+  })
 })
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_consecutive_errors_retry_until_ok_terminal', () => {
-  // SnapshotError goes through bounded causal reread: with budget > 1 it
-  // returns Reread (the snapshot is unstable, retry the read); only when
-  // exhausted (budget = 1) does it StopPass. The next signal with Terminal
-  // evidence → Publish.
-  const errorReread = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceSnapshotError('e1'))
-  assert.equal(ReconcileSurface.decisionName(errorReread), 'Reread')
-  const errorExhausted = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceSnapshotError('e2'))
-  assert.equal(ReconcileSurface.decisionName(errorExhausted), 'StopPass')
-  // A subsequent signal with Terminal evidence publishes.
-  const terminal = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceTerminal('TurnCompleted'))
-  assert.equal(ReconcileSurface.decisionName(terminal), 'Publish')
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_delivers_the_next_failed_provider_run_to_AABB', async () => {
+  const result = await ReconcileSurface.failureProjectionEdgeScenario()
+
+  assert.deepEqual(result, {
+    snapshotReads: 2,
+    providerRun: 'projection-edge-current-run',
+    outcome: 'TurnFailed',
+    hasQuiescence: false,
+  })
 })
 
-test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_persistent_errors_stop_pass_bounded', () => {
-  // SnapshotError uses bounded causal reread: with budget > 1 it Rereads
-  // (the snapshot is unstable); only when exhausted (budget = 1) does it
-  // StopPass. The pass is bounded: it never loops infinitely.
-  const reread = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceSnapshotError('e1'))
-  assert.equal(ReconcileSurface.decisionName(reread), 'Reread')
-  // Budget decremented: 2 → still Reread.
-  const reread2 = ReconcileSurface.decideStep(idleWake, 2, ReconcileSurface.evidenceSnapshotError('e2'))
-  assert.equal(ReconcileSurface.decisionName(reread2), 'Reread')
-  // Exhausted (budget = 1) → StopPass, not Reread or Publish.
-  const exhausted = ReconcileSurface.decideStep(idleWake, 1, ReconcileSurface.evidenceSnapshotError('e4'))
-  assert.equal(ReconcileSurface.decisionName(exhausted), 'StopPass')
+test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_has_no_counter_driven_snapshot_polling', () => {
+  for (const remaining of [8, 4, 2, 1]) {
+    const error = ReconcileSurface.decideStep(
+      idleWake,
+      remaining,
+      ReconcileSurface.evidenceSnapshotError('projection unavailable'),
+    )
+    assert.equal(ReconcileSurface.decisionName(error), 'StopPass')
+
+    const noTurn = ReconcileSurface.decideStep(
+      ReconcileSurface.failureWake(),
+      remaining,
+      ReconcileSurface.evidenceNoTurn(),
+    )
+    assert.equal(ReconcileSurface.decisionName(noTurn), 'StopPass')
+  }
 })
 
-// ── Mutation sensitivity ─────────────────────────────────────────────────
+test('WHAT[HOST-BOUNDARY-005] EXEC_only_idle_can_publish_a_nonterminal_current_assistant', () => {
+  const idle = ReconcileSurface.decideStep(
+    idleWake,
+    99,
+    ReconcileSurface.evidenceProvisional('TurnInProgress'),
+  )
+  assert.equal(ReconcileSurface.decisionName(idle), 'Publish')
 
-test('WHAT[HOST-BOUNDARY-005] mutation_canary_terminal_evidence_publishes_under_idle_wake', () => {
-  // If someone changes Terminal evidence to StopPass, this canary fails.
-  const decision = ReconcileSurface.decideStep(idleWake, 3, ReconcileSurface.evidenceTerminal('TurnCompleted'))
-  assert.equal(ReconcileSurface.decisionName(decision), 'Publish',
-    'mutation guard: Terminal evidence under IdleWake must Publish')
+  for (const wake of [
+    ReconcileSurface.retryWake(),
+    ReconcileSurface.failureWake(),
+    ReconcileSurface.abortWake(),
+  ]) {
+    const decision = ReconcileSurface.decideStep(
+      wake,
+      99,
+      ReconcileSurface.evidenceProvisional('TurnInProgress'),
+    )
+    assert.equal(ReconcileSurface.decisionName(decision), 'StopPass')
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-005] mutation_canary_terminal_evidence_still_publishes', () => {
+  const decision = ReconcileSurface.decideStep(
+    ReconcileSurface.failureWake(),
+    99,
+    ReconcileSurface.evidenceTerminal('TurnFailed'),
+  )
+  assert.equal(ReconcileSurface.decisionName(decision), 'Publish')
 })

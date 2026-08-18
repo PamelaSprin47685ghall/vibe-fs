@@ -91,7 +91,6 @@
     <Compile Include="Execution/Delegation/Fork/ChildRecovery.fs"/>
     <Compile Include="Execution/Delegation/Fork/ChildRecoverySurface.fs"/>
     <Compile Include="Composition/Turn/Program.fs"/>
-    <Compile Include="Composition/Turn/ReconcileSurface.fs"/>
     <Compile Include="Host/CompactionPolicy.fs"/>
     <Compile Include="Participant/Provider/Projection/Model.fs"/>
     <Compile Include="Context/Trace/Model.fs"/>
@@ -475,6 +474,7 @@
     <Compile Include="Composition/Turn/TurnReconcile.fs"/>
     <Compile Include="Composition/Turn/ReconcilePass.fs"/>
     <Compile Include="Composition/Turn/Scheduler.fs"/>
+    <Compile Include="Composition/Turn/ReconcileSurface.fs"/>
     <Compile Include="Mission/Review/Judgement/Verdict.fs"/>
     <Compile Include="Mission/Review/Barrier/Reverify.fs"/>
     <Compile Include="Mission/Review/Judgement/Evidence.fs"/>

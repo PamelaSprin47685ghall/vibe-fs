@@ -278,19 +278,19 @@ module TodoProcessReviewProgram =
         | Absent of reason: string
 
     let private presenceForHandle (lifecycle: HandleLifecycle) (verdictKnown: bool) : ProducerPresence =
-        match lifecycle with
-        | HandleLifecycle.Active
-        | HandleLifecycle.CompletedAwaitingJoin _ -> ProducerPresence.Present
-        | HandleLifecycle.Retired when verdictKnown
-        | HandleLifecycle.Abandoned _ when verdictKnown ->
+        match lifecycle, verdictKnown with
+        | HandleLifecycle.Active, _
+        | HandleLifecycle.CompletedAwaitingJoin _, _ -> ProducerPresence.Present
+        | HandleLifecycle.Retired, true
+        | HandleLifecycle.Abandoned _, true ->
             // The reviewer has durably spoken. The remaining producer
             // is Journal/XTrace/LWR record-ready convergence, not the Host
             // work-unit. Parent cancellation/process teardown must not erase
             // that durable producer or turn a missing closure into a fake
             // "before durable verdict" infrastructure failure.
             ProducerPresence.Present
-        | HandleLifecycle.Abandoned _
-        | HandleLifecycle.Retired -> ProducerPresence.Absent "reviewer handle ended before durable verdict"
+        | HandleLifecycle.Abandoned _, false
+        | HandleLifecycle.Retired, false -> ProducerPresence.Absent "reviewer handle ended before durable verdict"
 
     let private presenceForReviewer
         (snapshot: ProjectionSet)

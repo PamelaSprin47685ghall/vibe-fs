@@ -75,6 +75,13 @@ module Reconciler =
         | Enqueued
         | Stopped
 
+    [<RequireQualifiedAccess>]
+    type private ProjectionPassDecision =
+        | Settled of edgeEpoch: int64
+        | ConsumeEdgeAndQueue of edgeEpoch: int64
+        | Park of consumedEpoch: int64
+        | Ignore
+
     [<Emit("console.error($0, $1)")>]
     let private logError (prefix: string) (message: string) : unit = jsNative
 
@@ -131,6 +138,19 @@ module Reconciler =
         // to RetryWake (no idle rights — the safe side).
         // DSL-MUTABLE: resource — per-session last-dispatch wake.
         let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
+        // HOST-BOUNDARY-005: exact terminal message.updated is a projection
+        // visibility edge, never a business HostSignal. Keep one monotonic edge
+        // version per session/current physical user so a pass can park without
+        // losing an edge that races the snapshot read.
+        // DSL-MUTABLE: resource — latest projection-change edge per session.
+        let projectionEdges = Dictionary<string, struct (string * int64)>()
+        // Last projection edge already spent to authorize a snapshot read for
+        // this physical user. This makes reads edge-counted rather than
+        // time/budget-counted: one edge can cause at most one extra read.
+        // DSL-MUTABLE: resource — consumed projection edge per session.
+        let projectionConsumed = Dictionary<string, struct (string * int64)>()
+        // DSL-MUTABLE: resource — parked reconcile occasion per session.
+        let projectionWaits = Dictionary<string, struct (string * int64)>()
         let resolveProjection = defaultArg projection (fun _ -> None)
         let onDeleted = defaultArg onDeleted ignore
         let isDurableUnavailable = defaultArg durableUnavailable (fun () -> false)
@@ -138,8 +158,14 @@ module Reconciler =
         let observeSnapshot =
             defaultArg onSnapshot (fun _ _ -> AsyncSupport.completedTask ())
 
-        let maxRereads = defaultArg maxCausalRereads 3
-        let maxErrors = defaultArg maxConsecutiveErrors 5
+        // The public constructor keeps these optional arguments for source
+        // compatibility, but production reconciliation is event-driven: one
+        // causal edge owns one snapshot read. Another read requires another
+        // coarse Host signal or exact projection-change edge, never time/budget.
+        let _ = maxCausalRereads
+        let _ = maxConsecutiveErrors
+        let maxRereads = 0
+        let maxErrors = 1
 
         let isCleared (sessionId: SessionId) =
             lock gate (fun () -> cleared.Contains(SessionId.value sessionId))
@@ -173,9 +199,122 @@ module Reconciler =
                 else
                     let key = SessionId.value sessionId
                     let generation = currentGeneration sessionId
+                    projectionWaits.Remove(key) |> ignore
                     wakes.[key] <- wake
                     queued.[key] <- generation
                     startOrEnqueue key generation)
+
+        let projectionSettledForWake
+            (wake: ReconcileProgram.ReconcileWake)
+            (turn: ReconciledTurn option)
+            =
+            match turn, wake with
+            | None, _ -> false
+            | Some _, ReconcileProgram.ReconcileWake.IdleWake _ -> true
+            | Some observed,
+              (ReconcileProgram.ReconcileWake.RetryWake
+              | ReconcileProgram.ReconcileWake.FailureWake
+              | ReconcileProgram.ReconcileWake.AbortWake) ->
+                Option.isNone observed.Observation && ReconcileProgram.isTerminalOutcome observed.Outcome
+
+        let projectionEpochFor
+            (source: Dictionary<string, struct (string * int64)>)
+            (key: string)
+            (physicalKey: string)
+            =
+            match source.TryGetValue key with
+            | true, struct (storedPhysical, epoch) when storedPhysical = physicalKey -> epoch
+            | _ -> 0L
+
+        let decideProjectionPass settled current edgeEpoch consumedEpoch =
+            if settled then
+                ProjectionPassDecision.Settled edgeEpoch
+            elif not current then
+                ProjectionPassDecision.Ignore
+            elif edgeEpoch > consumedEpoch then
+                ProjectionPassDecision.ConsumeEdgeAndQueue edgeEpoch
+            else
+                ProjectionPassDecision.Park consumedEpoch
+
+        let settleProjectionPass
+            (sessionId: SessionId)
+            (generation: int)
+            (physical: PhysicalUserMessageId)
+            (settled: bool)
+            =
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                let physicalKey = PhysicalUserMessageId.value physical
+                let edgeEpoch = projectionEpochFor projectionEdges key physicalKey
+                let consumedEpoch = projectionEpochFor projectionConsumed key physicalKey
+
+                let decision =
+                    decideProjectionPass settled (isCurrent sessionId generation) edgeEpoch consumedEpoch
+
+                match decision with
+                | ProjectionPassDecision.Settled epoch ->
+                    projectionConsumed.[key] <- struct (physicalKey, epoch)
+                    projectionWaits.Remove(key) |> ignore
+                | ProjectionPassDecision.ConsumeEdgeAndQueue epoch ->
+                    // The pass was driven by a coarse signal while at least
+                    // one exact projection edge remained unconsumed, OR an
+                    // edge raced this read. Spend the newest edge once and
+                    // queue exactly one more read. If that read still cannot
+                    // see the assistant, it parks until a genuinely newer edge.
+                    projectionConsumed.[key] <- struct (physicalKey, epoch)
+                    projectionWaits.Remove(key) |> ignore
+                    queued.[key] <- generation
+                | ProjectionPassDecision.Park epoch ->
+                    projectionWaits.[key] <- struct (physicalKey, epoch)
+                | ProjectionPassDecision.Ignore -> ())
+
+        let projectionWaitMatches key physicalKey =
+            match projectionWaits.TryGetValue key with
+            | true, struct (waitingPhysical, _) when waitingPhysical = physicalKey -> true
+            | _ -> false
+
+        let armProjectionPass (sessionId: SessionId) (generation: int) (physical: PhysicalUserMessageId) =
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                let physicalKey = PhysicalUserMessageId.value physical
+                let edgeEpoch = projectionEpochFor projectionEdges key physicalKey
+                let consumedEpoch = projectionEpochFor projectionConsumed key physicalKey
+                let hasUnconsumedEdge = edgeEpoch > consumedEpoch
+                let nextConsumed = if hasUnconsumedEdge then edgeEpoch else consumedEpoch
+
+                projectionWaits.[key] <- struct (physicalKey, nextConsumed)
+
+                if hasUnconsumedEdge then
+                    projectionConsumed.[key] <- struct (physicalKey, edgeEpoch)
+                    queued.[key] <- generation)
+
+        let recordProjectionEdge (sessionId: SessionId) physicalKey =
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                let admitted = accepting && not (isDurableUnavailable ())
+                let nextEpoch = projectionEpochFor projectionEdges key physicalKey + 1L
+                let waiting = projectionWaitMatches key physicalKey
+
+                match admitted, waiting with
+                | false, _ -> false
+                | true, false ->
+                    projectionEdges.[key] <- struct (physicalKey, nextEpoch)
+                    false
+                | true, true ->
+                    projectionEdges.[key] <- struct (physicalKey, nextEpoch)
+                    // This read is now owned by exactly this edge. Mark it
+                    // consumed before queueing so the pass cannot spin on the
+                    // same event if projection is still not visible.
+                    projectionConsumed.[key] <- struct (physicalKey, nextEpoch)
+                    projectionWaits.Remove(key) |> ignore
+                    true)
+
+        let invalidateProjectionWait (sessionId: SessionId) =
+            lock gate (fun () ->
+                let key = SessionId.value sessionId
+                projectionWaits.Remove(key) |> ignore
+                projectionEdges.Remove(key) |> ignore
+                projectionConsumed.Remove(key) |> ignore)
 
         let finishDrain () =
             lock gate (fun () ->
@@ -276,7 +415,26 @@ module Reconciler =
                     let activeBinding =
                         binding.ActiveRunBinding(sessionId, ?projection = resolveProjection sessionId)
 
-                    return!
+                    let currentPhysical =
+                        activeBinding |> Option.bind (fun bound -> bound.PhysicalUserMessageId)
+
+                    currentPhysical
+                    |> Option.iter (armProjectionPass sessionId generation)
+
+                    let observeProjectionSnapshot observedSession messages =
+                        let settled =
+                            match activeBinding with
+                            | None -> true
+                            | Some bound ->
+                                TurnReconcile.reconcile messages bound
+                                |> projectionSettledForWake wake
+
+                        currentPhysical
+                        |> Option.iter (fun physical -> settleProjectionPass sessionId generation physical settled)
+
+                        observeSnapshot observedSession messages
+
+                    do!
                         ReconcilePass.run
                             snapshot
                             isCurrent
@@ -284,7 +442,7 @@ module Reconciler =
                             mapsFor
                             recordMaps
                             wake
-                            observeSnapshot
+                            observeProjectionSnapshot
                             onTurn
                             maxRereads
                             maxErrors
@@ -359,6 +517,22 @@ module Reconciler =
         member _.SignalIdle(sessionId: SessionId, permit: QuiescencePermit) : unit =
             this.Kick(sessionId, ReconcileProgram.ReconcileWake.IdleWake permit)
 
+        /// HOST-BOUNDARY-001/005: terminal assistant message.updated is an
+        /// infrastructure-only projection edge. It can only wake an already
+        /// parked coarse-signal occasion for the exact current physical user;
+        /// it never creates or changes business terminal semantics.
+        member _.NotifyProjectionChanged(sessionId: SessionId, physical: PhysicalUserMessageId) : unit =
+            let physicalKey = PhysicalUserMessageId.value physical
+
+            let matchesCurrentPhysical =
+                binding.TryPhysicalUserMessage(sessionId)
+                |> Option.exists (fun current -> PhysicalUserMessageId.value current = physicalKey)
+
+            let shouldKick = matchesCurrentPhysical && recordProjectionEdge sessionId physicalKey
+
+            if shouldKick then
+                this.Kick(sessionId, currentWake sessionId)
+
         member this.Signal(signal: HostSignal) : unit =
             match signal with
             | SessionIdle sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
@@ -376,16 +550,20 @@ module Reconciler =
 
         member _.BindUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId, ?agentRole: Role) =
             lock gate (fun () -> cleared.Remove(SessionId.value sessionId) |> ignore)
+            invalidateProjectionWait sessionId
             binding.BindUserMessage(sessionId, physical, ?agentRole = agentRole)
 
         member _.BindContinuationUserMessage(sessionId: SessionId, physical: PhysicalUserMessageId) =
+            invalidateProjectionWait sessionId
             binding.BindContinuationUserMessage(sessionId, physical)
 
         member _.BindPhysicalUserMaterial(sessionId: SessionId, physical: PhysicalUserMessageId) =
+            invalidateProjectionWait sessionId
             binding.BindPhysicalUserMaterial(sessionId, physical)
 
         member _.BindActiveRun(value: ActiveRunBinding) =
             lock gate (fun () -> cleared.Remove(SessionId.value value.SessionId) |> ignore)
+            invalidateProjectionWait value.SessionId
             binding.BindActiveRun(value)
 
         member _.TryPhysicalUserMessage(sessionId: SessionId) =
@@ -407,7 +585,10 @@ module Reconciler =
                 queued.Remove(key) |> ignore
                 active.Remove(key) |> ignore
                 published.Remove(key) |> ignore
-                wakes.Remove(key) |> ignore)
+                wakes.Remove(key) |> ignore
+                projectionWaits.Remove(key) |> ignore
+                projectionEdges.Remove(key) |> ignore
+                projectionConsumed.Remove(key) |> ignore)
 
             binding.ClearSession(sessionId)
             onDeleted sessionId

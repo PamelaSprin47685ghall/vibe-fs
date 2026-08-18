@@ -248,3 +248,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 1. 数据结构只保存世界事实，不保存程序执行位置。
 2. canonical core 从 typed input 到 typed fact/fold 不经过 string/obj 隧道；副作用先 durable 后成为 Current。
 3. 标准验证全绿，且没有靠旧 facade、ignored scanner、手工 census、bounded compatibility 冒充“全部完成”。
+
+## 关于负责人
+
+你就是项目的最终负责人，本文档中说的负责人报批，其实就是你自己的复审。本项目不存在人工干预，全自动维护。

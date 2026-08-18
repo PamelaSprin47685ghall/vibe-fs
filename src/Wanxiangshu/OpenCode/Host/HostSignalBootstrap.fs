@@ -485,7 +485,14 @@ module HostSignalBootstrap =
                             if not (needHelpSensor.IsReasoningDelta raw) then
                                 loopSensor.Observe raw),
                     onNeedHelpEvent = needHelpSensor.Observe,
-                    onPhysicalExecutionEnd = ModelRouting.releasePhysicalExecution
+                    onPhysicalExecutionEnd =
+                        (fun sessionId physicalUserMessageId ->
+                            // EMR-007 owns capacity release. Reconciliation
+                            // observes the same exact terminal assistant edge as
+                            // projection visibility only; it remains outside the
+                            // HostSignal/business vocabulary.
+                            ModelRouting.releasePhysicalExecution sessionId physicalUserMessageId
+                            reconciler.NotifyProjectionChanged(sessionId, physicalUserMessageId))
                 )
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None

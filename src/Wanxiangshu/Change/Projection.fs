@@ -106,27 +106,31 @@ type OrchestratorProjection =
     { Jobs: Map<ManagerJobId, ManagerJobProjection>
       WorktreeEffects: Map<WorktreeIdentity, WorktreeEffectStatus> }
 
-/// ORCH-007 domain classification: what is the reality of the target head
-/// relative to a rebased candidate's snapshot? This is a physical-world
-/// classification, not a program counter — the CE workflow in Program.fs
-/// matches on it to decide which effect to execute.
-[<RequireQualifiedAccess>]
-type RebasedCandidateReality =
-    | HeadUnreadable
-    | PublishReady
-    | NeedsRebase
-
-/// ORCH-007 domain classification: what is the reality of the target head
-/// relative to a publish claim? The three branches are evaluated in fixed
-/// order (already-published first, then unchanged target, then everything
-/// else); order matters — checking "unchanged" first would re-attempt an ff
-/// that already succeeded.
-[<RequireQualifiedAccess>]
-type PublishClaimReality =
-    | HeadUnreadable
-    | AlreadyFastForwarded
-    | PublishReady
-    | ClaimExpired
+/// ORCH-007: exactly one action per job, derived from its last fact.
+type JobRecoveryAction =
+    /// Resume the Manager from the existing worktree.
+    | ResumeManager
+    /// Enter rebaseReviewPublishLoop with this candidate.
+    | RebaseReviewPublish of CommitHash
+    /// Hand the conflict back to the same Manager in the same worktree.
+    | ResumeConflictResolution of
+        {| CandidateCommit: CommitHash
+           ConflictFiles: string list |}
+    /// Acquire the short gate and re-read the head before ff-only.
+    | AttemptPublish of
+        {| RebasedCommit: CommitHash
+           ExpectedHead: CommitHash |}
+    /// ORCH-007 branch 1: the ff already happened, only the fact is missing.
+    | BackfillPublished of
+        {| RebasedCommit: CommitHash
+           ResultingTargetHead: CommitHash |}
+    /// ORCH-007 branch 3: the claim expired. Discard it AND the post-rebase
+    /// witness (REVIEW-008), then rebase and review again.
+    | RebaseAndReviewAgain
+    /// Clean up the worktree; nothing is owed.
+    | CleanUp
+    /// GetTargetHead failed. ORCH-008: fail closed rather than guess.
+    | FailClosed of reason: string
 
 module OrchestratorProjection =
 
@@ -292,31 +296,54 @@ module OrchestratorProjection =
             { projection with
                 Jobs = Map.add jobId { job with Progress = progress } projection.Jobs }
 
-    /// ORCH-007 domain classification for a rebased candidate: the target head
-    /// must still be the snapshot the post-rebase witness was reviewed against.
-    let classifyRebasedCandidate
+    /// ORCH-007 decision for a rebased candidate: the target head must still be
+    /// the snapshot the post-rebase witness was reviewed against.
+    let private rebasedCandidateAction
         (currentHead: CommitHash option)
         (rebasedCommit: CommitHash)
         (targetHeadSnapshot: CommitHash)
-        : RebasedCandidateReality
         =
         match currentHead with
-        | None -> RebasedCandidateReality.HeadUnreadable
-        | Some head when head = targetHeadSnapshot -> RebasedCandidateReality.PublishReady
-        | Some _ -> RebasedCandidateReality.NeedsRebase
+        | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+        | Some head when head = targetHeadSnapshot ->
+            AttemptPublish
+                {| RebasedCommit = rebasedCommit
+                   ExpectedHead = targetHeadSnapshot |}
+        | Some _ -> RebaseAndReviewAgain
 
-    /// ORCH-007 domain classification for a publish claim inside the CAS window.
-    /// The three branches are evaluated in fixed order: already-published first,
-    /// then unchanged target, then everything else. Order matters — checking
-    /// "unchanged" first would re-attempt an ff that already succeeded.
-    let classifyPublishClaim
+    /// ORCH-007 decision for a publish claim inside the CAS window. The three
+    /// branches are evaluated in the clause's fixed order: already-published
+    /// first, then unchanged target, then everything else. Order matters —
+    /// checking "unchanged" first would re-attempt an ff that already succeeded.
+    let private publishClaimAction
         (currentHead: CommitHash option)
         (rebasedCommit: CommitHash)
         (expectedHead: CommitHash)
-        : PublishClaimReality
         =
         match currentHead with
-        | None -> PublishClaimReality.HeadUnreadable
-        | Some head when head = rebasedCommit -> PublishClaimReality.AlreadyFastForwarded
-        | Some head when head = expectedHead -> PublishClaimReality.PublishReady
-        | Some _ -> PublishClaimReality.ClaimExpired
+        | None -> FailClosed "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
+        | Some head when head = rebasedCommit ->
+            BackfillPublished
+                {| RebasedCommit = rebasedCommit
+                   ResultingTargetHead = head |}
+        | Some head when head = expectedHead ->
+            AttemptPublish
+                {| RebasedCommit = rebasedCommit
+                   ExpectedHead = expectedHead |}
+        | Some _ -> RebaseAndReviewAgain
+
+    /// ORCH-007. `currentHead` is None when GetTargetHead failed.
+    let recoveryAction (currentHead: CommitHash option) (job: ManagerJobProjection) : JobRecoveryAction =
+        match job.Progress with
+        | JobProgress.ManagerStarted -> ResumeManager
+        | JobProgress.CandidateReady candidate -> RebaseReviewPublish candidate.CandidateCommit
+        | JobProgress.ConflictPending conflict ->
+            ResumeConflictResolution
+                {| CandidateCommit = conflict.CandidateCommit
+                   ConflictFiles = conflict.ConflictFiles |}
+        | JobProgress.RebasedCandidateReady rebased ->
+            rebasedCandidateAction currentHead rebased.RebasedCommit rebased.TargetHeadSnapshot
+        | JobProgress.PublishClaimed claim -> publishClaimAction currentHead claim.RebasedCommit claim.ExpectedHead
+        | JobProgress.Published _
+        | JobProgress.Failed _
+        | JobProgress.Abandoned -> CleanUp

@@ -15,6 +15,11 @@ wake 的物理编码；两者都不得携带 terminal 事实。禁止处理 `mes
 `session.updated` / `session.diff` 作为业务输入；禁止从 idle payload 推断 terminal/完成/失败；禁止依赖
 两个 idle 编码的先后顺序推导因果。
 
+`message.updated` 可以作为**纯 projection-change edge** 唤醒一个已经由上述 coarse signal 建立、但因
+SDK snapshot 尚未看到当前 physical user 对应 assistant 而处于 pending 的 reconcile occasion。这个 edge
+只能触发重新读取完整 SDK snapshot：不得自身携带/推断 terminal 业务事实，也不得在没有 pending
+occasion 时凭空建立新的业务 wake。
+
 物理基础设施可以在这个边界并行抽取不进入业务层的资源证据：execution-model-routing 只读取
 最终 assistant `message.updated.info.parentID`（error，或 completed 且非 `tool-calls` finish）来得到 exact PhysicalUserMessageId 并释放对应 model
 lease；该 observation 不得被包装成 `HostSignal`、不得携带 terminal 业务语义（具体合同归 EMR-007）。
@@ -63,17 +68,25 @@ retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
 **证据**：`ReconcileProgram.SnapshotObservation` / `TurnOutcome`；→ HOW.md `HOST-BOUNDARY-004`
 （REUSE `domain/reconcile-program.test.mjs` + `codec/signals.test.mjs`）。
 
-## HOST-BOUNDARY-005：Reconciler 快照观测 machinery（single-flight / dirty / 有界因果重读）
+## HOST-BOUNDARY-005：Reconciler 快照观测 machinery（single-flight / pending occasion / 事件驱动收敛）
 
-**规范**：Reconciler 每 session 同时最多一次 reconcile（single-flight）；idle 到达设 dirty；
-每次 idle 至多 3 次因果重读；无新信号时不产生 `setTimeout` / `GetMessages`
-（HOST-004；`reconciler-event-driven-de-polling.md` 有界重读取代无界退避轮询）。
+**规范**：Reconciler 每 session 同时最多一次 reconcile（single-flight）。coarse Host signal 到达时建立/更新
+该 session 的 reconcile occasion，并只读取一次当前完整 SDK snapshot。若当前 physical user 已经明确绑定，
+但 snapshot 尚未出现其对应 assistant，则该 occasion 保持 pending；后续同 session 的 `message.updated`
+projection-change edge 才允许重新 Kick，并必须保留原 occasion 的 wake 权限（尤其 `IdleWake` 的
+`QuiescencePermit`）。没有新的 coarse signal 或 projection-change edge 时，不得通过 retry loop、固定次数
+重读、`setTimeout` 或其它 wall-clock polling 再次 `GetMessages`。
 
-**含义/动机**：轮询把时间推进当业务状态探测（A 类病态）；事件驱动只对真实信号反应。
+projection-change edge 与“登记 pending”之间不得存在 lost-wakeup race：如果 edge 在一次 snapshot read
+与 pending 登记之间到达，scheduler 必须观察到该 edge 的单调版本变化并立即重新排队。新的 physical user
+binding 必须使旧 pending occasion 失效；`ClearSession` 同样清除其 pending/edge 状态。
 
-**证据**：`Composition/Turn/Scheduler.fs`（Scheduler：queued/active/generation/
-wake）；→ HOW.md `HOST-BOUNDARY-005`（REUSE `execution/reconcile-idle-early.test.mjs`、
-`domain/reconcile-program.test.mjs`）。
+**含义/动机**：轮询把时间推进当业务状态探测，而且 Host projection lag 超过任意固定窗口就会把真实
+terminal 永久漏掉。事件驱动只对真实 causal edge 反应，并让 projection lag 的长度不再参与业务正确性。
+
+**证据**：`Composition/Turn/Scheduler.fs`（Scheduler：queued/active/generation/wake + projection edge epoch /
+pending occasion）；`Composition/Turn/TurnReconcile.fs`（当前 physical 已绑定时禁止回退到 authority root 的旧
+assistant）；→ HOW.md `HOST-BOUNDARY-005`。
 
 ## HOST-BOUNDARY-006：同一 raw part 的 Parts/ToolParts 状态投影一致
 
