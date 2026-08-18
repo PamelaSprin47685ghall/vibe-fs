@@ -1,0 +1,11 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/repository-investigation/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Repository/Investigation/**
+/src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs
+/src/Wanxiangshu/OpenCode/Tools/FetchTool.fs
+/resources/provider/role/inspector/**
+/resources/provider/tool/inspect/**
+/resources/provider/lifecycle/warm-start/**
+/scripts/checks/semantic-anchors.mjs

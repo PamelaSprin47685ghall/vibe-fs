@@ -1,0 +1,11 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/verification-system/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Verification/**
+/scripts/check.mjs
+/scripts/build.mjs
+/scripts/checks/**
+/scripts/lib/test-surface-scan.mjs
+/scripts/lib/walk.mjs
+/scripts/warmup-opencode.mjs

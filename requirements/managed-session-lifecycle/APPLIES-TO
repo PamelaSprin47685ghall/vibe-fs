@@ -1,0 +1,17 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/managed-session-lifecycle/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Session/Attachment/**
+/src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+/src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+/src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs
+/src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs
+/src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
+/src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
+/src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+/src/Wanxiangshu/Composition/Turn/Scheduler.fs
+/scripts/checks/session-ownership-ratchet.mjs

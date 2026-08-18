@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/execution-model-routing/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs
+/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
+/src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs
+/src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs
+/src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs
+/src/Wanxiangshu/OpenCode/Host/Sessions.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
+/src/Wanxiangshu/Strength/OpenCode/**
+/src/Wanxiangshu/Strength/Policy.fs

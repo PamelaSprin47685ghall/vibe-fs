@@ -1,0 +1,11 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/intra-participant-parallelism/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Fission/**
+/src/Wanxiangshu/Foundation/Roles.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs
+/src/Wanxiangshu/OpenCode/Host/Sessions.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+/resources/provider/tool/fission/**

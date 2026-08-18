@@ -1,0 +1,14 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/obligation-ledger/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Mission/Obligation/**
+/src/Wanxiangshu/Mission/Manager/Idle.fs
+/src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs
+/src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs
+/src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs
+/src/Wanxiangshu/Mission/Review/TodoProcess.fs
+/src/Wanxiangshu/Context/Companion/Transform.fs
+/src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs
+/resources/provider/lifecycle/magic-todo/**
+/scripts/checks/semantic-anchors.mjs

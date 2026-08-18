@@ -1,0 +1,8 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/epistemic-reasoning/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Sphinx/**
+/src/Wanxiangshu/Resources/PackageMetadata.fs
+/resources/provider/role/inquiry/**
+/scripts/checks/semantic-anchors.mjs

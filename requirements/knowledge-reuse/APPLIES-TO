@@ -1,0 +1,10 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/knowledge-reuse/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Repository/Knowledge/Casebook/**
+/src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs
+/src/Wanxiangshu/OpenCode/Tools/FetchTool.fs
+/resources/provider/tool/fetch/**
+/resources/provider/role/bookkeeper/**
+/scripts/checks/unified-store-gate.mjs

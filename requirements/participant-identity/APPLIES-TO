@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/participant-identity/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Participant/Persona/**
+/src/Wanxiangshu/Foundation/Roles.fs
+/src/Wanxiangshu/Foundation/Identity.fs
+/src/Wanxiangshu/Execution/Session/Association.fs
+/src/Wanxiangshu/Execution/Session/AssociationSurface.fs
+/src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs
+/src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs
+/src/Wanxiangshu/OpenCode/Host/Sessions.fs
+/src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs
+/resources/provider/role/**
+/scripts/checks/semantic-anchors.mjs
+/requirements/prefix-stability/tests/system-prompt-stability.test.mjs

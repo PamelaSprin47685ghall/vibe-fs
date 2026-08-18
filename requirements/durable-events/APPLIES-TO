@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/durable-events/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Composition/Durable/**
+/src/Wanxiangshu/Persistence/EventStore/**
+/src/Wanxiangshu/Persistence/Journal/**
+/src/Wanxiangshu/Git/Hook/**
+/src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs
+/src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs
+/src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs
+/src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs
+/src/Wanxiangshu/Strength/Persistence/**
+/resources/git/wanxiang-hook.mjs
+/scripts/checks/unified-store-gate.mjs
+/scripts/checks/legacy-horizon-census.mjs

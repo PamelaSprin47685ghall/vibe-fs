@@ -1,0 +1,14 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/participant-horizon/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs
+/src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs
+/src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs
+/src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs
+/src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs
+/src/Wanxiangshu/Participant/Provider/Projection/**
+/resources/provider/tool/horizon/**
+/scripts/checks/provider-leak-gate.mjs
+/requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs
+/requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs

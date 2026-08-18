@@ -1,0 +1,10 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/speculative-investigation/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Strength/**
+/src/Wanxiangshu/Participant/Provider/Projection/**
+/src/Wanxiangshu/Context/Trace/**
+/src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+/scripts/checks/semantic-anchors.mjs

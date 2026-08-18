@@ -1,0 +1,11 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/change-integration/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Change/**
+/src/Wanxiangshu/Git/Gateway.fs
+/src/Wanxiangshu/Git/IntegrationGate.fs
+/src/Wanxiangshu/Git/Operations.fs
+/src/Wanxiangshu/Git/Subject.fs
+/src/Wanxiangshu/Git/WorktreeResource.fs
+/requirements/effect-accounting/tests/effect-facts.test.mjs

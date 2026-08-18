@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/host-boundary/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/OpenCode/Host/**
+/src/Wanxiangshu/OpenCode/Codec/**
+/src/Wanxiangshu/OpenCode/Signals/**
+/src/Wanxiangshu/OpenCode/Plugin/**
+/src/Wanxiangshu/Foundation/FatalProcess.fs
+/src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/**
+/src/Wanxiangshu/Execution/Fission/OpenCode/**
+/src/Wanxiangshu/Interaction/Dispatch/OpenCode/**
+/src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs
+/src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs
+/src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
+/scripts/checks/architecture.mjs

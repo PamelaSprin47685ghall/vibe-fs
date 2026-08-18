@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/capability-enforcement/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Foundation/Roles.fs
+/src/Wanxiangshu/Foundation/RolesSurface.fs
+/src/Wanxiangshu/Participant/Persona/**
+/src/Wanxiangshu/OpenCode/Tools/**
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs
+/src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+/src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs
+/src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+/src/Wanxiangshu/Repository/Programming/Js/OpenCode/**
+/scripts/checks/capability-isomorphism-gate.mjs
+/scripts/checks/js-surface-gate.mjs
+/scripts/checks/tool-referential-integrity.mjs

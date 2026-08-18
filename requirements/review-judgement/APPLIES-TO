@@ -1,0 +1,12 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/review-judgement/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Mission/Review/Judgement/**
+/src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs
+/src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs
+/src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs
+/resources/provider/role/reviewer/**
+/resources/provider/tool/judge/**
+/resources/provider/library/reviewer/**
+/scripts/checks/semantic-anchors.mjs

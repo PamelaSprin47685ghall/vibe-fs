@@ -1,0 +1,13 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/provider-attempt-recovery/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Participant/Provider/Attempt/Fallback/**
+/src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs
+/src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
+/src/Wanxiangshu/Mission/Manager/JobHandoff.fs
+/src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs
+/src/Wanxiangshu/OpenCode/Host/ModelRouting.fs
+/requirements/context-compression/tests/recovery-slot.test.mjs

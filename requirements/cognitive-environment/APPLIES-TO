@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/cognitive-environment/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/resources/provider/role/**
+/resources/provider/library/**
+/src/Wanxiangshu/Resources/ProviderResources.fs
+/src/Wanxiangshu/Resources/ProviderProse.fs
+/src/Wanxiangshu/Resources/PromptResources.fs
+/src/Wanxiangshu/Resources/PromptSurface.fs
+/src/Wanxiangshu/Participant/Persona/**
+/src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+/src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs
+/scripts/checks/semantic-anchors.mjs
+/scripts/checks/language-parity-gate.mjs
+/scripts/checks/prompt-depth-ratchet.mjs

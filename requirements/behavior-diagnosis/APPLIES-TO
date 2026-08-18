@@ -1,0 +1,13 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/behavior-diagnosis/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/resources/enforcer/**
+/src/Wanxiangshu/Enforcer/**
+/src/Wanxiangshu/Context/Companion/Blogger/**
+/src/Wanxiangshu/Interaction/Repair/**
+/src/Wanxiangshu/Composition/Durable/Fact.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+/src/Wanxiangshu/Persistence/Journal/FactCodec.fs
+/scripts/checks/semantic-anchors.mjs
+/scripts/checks/language-parity-gate.mjs

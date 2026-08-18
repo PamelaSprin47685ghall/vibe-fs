@@ -1,0 +1,15 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/durable-convergence/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs
+/src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs
+/src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs
+/src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs
+/src/Wanxiangshu/Persistence/EventStore/Store.fs
+/src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs
+/src/Wanxiangshu/Git/Hook/**
+/src/Wanxiangshu/Git/Gateway.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs
+/resources/git/wanxiang-hook.mjs

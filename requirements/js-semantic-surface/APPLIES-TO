@@ -1,0 +1,9 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/js-semantic-surface/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/**/*Surface.fs
+/scripts/checks/js-boundary-gate.mjs
+/scripts/checks/js-surface-manifest.mjs
+/scripts/lib/test-surface-scan.mjs
+/scripts/lib/walk.mjs

@@ -1,0 +1,15 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/degeneration-guard/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Session/LoopDetector.fs
+/src/Wanxiangshu/Execution/Session/LoopDetectorConstants.fs
+/src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs
+/src/Wanxiangshu/Execution/Session/GptTokens.js
+/src/Wanxiangshu/OpenCode/Host/LoopSensor.fs
+/src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs
+/src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs
+/scripts/generate-loop-constants.mjs
+/scripts/lib/calibrate-loop-detector.mjs
+/scripts/checks/p0-recovery-join.mjs

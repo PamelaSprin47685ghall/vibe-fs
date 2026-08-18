@@ -1,0 +1,13 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/dispatch-protocol/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Interaction/Dispatch/**
+/src/Wanxiangshu/Interaction/Repair/Port.fs
+/src/Wanxiangshu/Foundation/Identity.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+/src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs
+/src/Wanxiangshu/Execution/Session/Recovery/Model.fs
+/src/Wanxiangshu/Context/Companion/HostBlogger.fs
+/src/Wanxiangshu/Strength/Replica/Runtime.fs

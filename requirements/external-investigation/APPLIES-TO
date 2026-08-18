@@ -1,0 +1,11 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/external-investigation/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/resources/provider/role/browser/**
+/src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs
+/src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs
+/src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs
+/src/Wanxiangshu/Participant/Persona/**
+/scripts/checks/semantic-anchors.mjs
+/scripts/checks/language-parity-gate.mjs

@@ -1,0 +1,13 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/delegation/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Delegation/**
+/src/Wanxiangshu/Interaction/Authority/Child.fs
+/src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
+/resources/provider/delegation/**
+/resources/provider/tool/fork/**
+/resources/provider/tool/commission/**
+/resources/provider/tool/join/**
+/scripts/checks/dsl-ownership.mjs
+/scripts/checks/tool-referential-integrity.mjs

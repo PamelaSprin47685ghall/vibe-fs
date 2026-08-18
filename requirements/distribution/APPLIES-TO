@@ -1,0 +1,12 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/distribution/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/package.json
+/src/Wanxiangshu/Wanxiangshu.fsproj
+/src/Wanxiangshu/AssemblyInfo.fs
+/src/Wanxiangshu/Resources/**
+/resources/**
+/scripts/build.mjs
+/scripts/check.mjs
+/scripts/warmup-opencode.mjs

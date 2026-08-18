@@ -1,0 +1,22 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/office-capability/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Participant/Persona/**
+/src/Wanxiangshu/Foundation/Roles.fs
+/src/Wanxiangshu/Foundation/RolesSurface.fs
+/resources/provider/role/manager/**
+/resources/provider/role/coder/**
+/resources/provider/role/inspector/**
+/resources/provider/role/devops/**
+/resources/provider/role/browser/**
+/resources/provider/role/inquiry/**
+/resources/provider/role/reviewer/**
+/resources/provider/role/orchestrator/**
+/resources/provider/tool/fork/**
+/resources/provider/tool/inspect/**
+/scripts/checks/semantic-anchors.mjs
+/scripts/checks/language-parity-gate.mjs
+/requirements/capability-enforcement/tests/agent-permission-gate.test.mjs
+/requirements/capability-enforcement/tests/inquiry-permissions.test.mjs
+/requirements/capability-enforcement/tests/integration/plugin/manager-tool-contract.test.mjs

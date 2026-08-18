@@ -1,0 +1,15 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/repository-programming/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Repository/Programming/**
+/src/Wanxiangshu/Process/JsSandbox.fs
+/src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs
+/src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+/resources/provider/tool/js-program/**
+/resources/provider/tool/js-bookkeeper/**
+/resources/provider/tool/mv/**
+/resources/provider/tool/rm/**
+/scripts/checks/js-surface-gate.mjs
+/scripts/checks/semantic-anchors.mjs

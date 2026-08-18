@@ -1,0 +1,17 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/time-capability/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Foundation/Temporal.fs
+/src/Wanxiangshu/Process/Deadline.fs
+/src/Wanxiangshu/Process/DeadlineSurface.fs
+/src/Wanxiangshu/Process/PtyTiming.fs
+/src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs
+/src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs
+/src/Wanxiangshu/Verification/TemporalSurface.fs
+/src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs
+/src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs
+/scripts/checks/g4r-ce-vocabulary.mjs
+/requirements/process-execution/tests/process-wait.test.mjs
+/requirements/process-execution/tests/process-runner.test.mjs
+/requirements/process-execution/tests/handle-process.test.mjs

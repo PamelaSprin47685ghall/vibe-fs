@@ -1,0 +1,11 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/action-affordance/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/resources/provider/tool/**
+/src/Wanxiangshu/OpenCode/Tools/**
+/scripts/checks/semantic-anchors.mjs
+/scripts/checks/language-parity-gate.mjs
+/scripts/checks/tool-referential-integrity.mjs
+/requirements/office-capability/tests/eval/provider-office-boundary/**
+/requirements/obligation-ledger/tests/magic-todo-provider-boundary.test.mjs

@@ -1,0 +1,15 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/session-ontology/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Session/Association.fs
+/src/Wanxiangshu/Execution/Session/AssociationSurface.fs
+/src/Wanxiangshu/Execution/Session/Ownership.fs
+/src/Wanxiangshu/Execution/Session/Attachment/**
+/src/Wanxiangshu/Participant/Persona/RoleIdentity.fs
+/src/Wanxiangshu/Participant/Persona/SessionPersona.fs
+/src/Wanxiangshu/OpenCode/Host/Sessions.fs
+/src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs
+/src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs
+/src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs
+/scripts/checks/session-ownership-ratchet.mjs

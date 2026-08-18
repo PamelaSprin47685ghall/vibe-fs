@@ -1,0 +1,15 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/causal-wait/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Execution/Session/Wait/**
+/src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs
+/src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs
+/src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs
+/src/Wanxiangshu/Change/Job.fs
+/src/Wanxiangshu/Change/Host/Host.fs
+/src/Wanxiangshu/Mission/Finality/Record.fs
+/src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs
+/src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs
+/scripts/checks/causal-wait-boundary.mjs

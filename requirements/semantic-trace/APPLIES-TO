@@ -1,0 +1,10 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/semantic-trace/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Context/Trace/**
+/src/Wanxiangshu/Composition/Durable/Fold.fs
+/src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+/src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs
+/src/Wanxiangshu/Persistence/Journal/FactCodec.fs
+/scripts/checks/semantic-anchors.mjs

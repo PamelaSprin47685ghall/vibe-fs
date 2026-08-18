@@ -1,0 +1,12 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/structured-workflow/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/**/*.fs
+/scripts/check.mjs
+/scripts/checks/architecture.mjs
+/scripts/checks/dsl-ownership.mjs
+/scripts/checks/fsharp-control-pyramid.mjs
+/scripts/checks/g4r-ce-vocabulary.mjs
+/scripts/checks/test-boundary.mjs
+/scripts/lib/walk.mjs

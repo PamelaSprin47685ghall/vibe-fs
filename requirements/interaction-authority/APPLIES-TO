@@ -1,0 +1,12 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/interaction-authority/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Interaction/Authority/**
+/src/Wanxiangshu/Interaction/Dispatch/Ingress.fs
+/src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs
+/src/Wanxiangshu/Interaction/Dispatch/Send.fs
+/src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs
+/src/Wanxiangshu/Mission/Manager/Life/Facts.fs
+/src/Wanxiangshu/Composition/Durable/Fold.fs
+/src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs

@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/provider-language/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/resources/provider/**
+/src/Wanxiangshu/Participant/Provider/Language.fs
+/src/Wanxiangshu/Participant/Provider/LanguageSurface.fs
+/src/Wanxiangshu/Participant/Provider/SessionLanguage.fs
+/src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs
+/src/Wanxiangshu/Resources/ProviderResources.fs
+/src/Wanxiangshu/Resources/ProviderProse.fs
+/src/Wanxiangshu/Resources/RuntimeResources.fs
+/scripts/checks/language-parity-gate.mjs
+/scripts/checks/provider-prose-ownership.mjs
+/scripts/checks/semantic-anchors.mjs
+/requirements/prefix-stability/tests/system-prompt-stability.test.mjs

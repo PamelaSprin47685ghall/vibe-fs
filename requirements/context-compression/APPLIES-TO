@@ -1,0 +1,16 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/context-compression/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Context/Companion/**
+/src/Wanxiangshu/Context/Prefix/**
+/src/Wanxiangshu/Host/CompactionPolicy.fs
+/src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs
+/src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs
+/src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs
+/src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs
+/src/Wanxiangshu/Participant/Provider/Projection/Intent.fs
+/src/Wanxiangshu/Participant/Provider/Projection/Planner.fs
+/requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs
+/requirements/prefix-stability/tests/prefix-epoch.test.mjs
+/requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs

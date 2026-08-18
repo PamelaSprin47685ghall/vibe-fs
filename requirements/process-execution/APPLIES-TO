@@ -1,0 +1,28 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/process-execution/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Process/ProcessRequest.fs
+/src/Wanxiangshu/Process/ProcessRunner.fs
+/src/Wanxiangshu/Process/ProcessOutput.fs
+/src/Wanxiangshu/Process/NodeProcessHost.fs
+/src/Wanxiangshu/Process/NodeProcessWait.fs
+/src/Wanxiangshu/Process/Pty.fs
+/src/Wanxiangshu/Process/PtyApi.fs
+/src/Wanxiangshu/Process/PtyBackend.fs
+/src/Wanxiangshu/Process/PtySession.fs
+/src/Wanxiangshu/Process/PtySupervisor.fs
+/src/Wanxiangshu/Process/PtyTypes.fs
+/src/Wanxiangshu/Process/Spool.fs
+/src/Wanxiangshu/OpenCode/Tools/PtyTool.fs
+/src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs
+/src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs
+/resources/provider/tool/run/**
+/resources/provider/tool/query-shell/**
+/resources/provider/tool/open-terminal/**
+/resources/provider/tool/read-terminal/**
+/resources/provider/tool/send-terminal/**
+/resources/provider/tool/signal-terminal/**
+/scripts/checks/semantic-anchors.mjs
+/requirements/delegation/tests/join-v2-wire.test.mjs
+/requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs
