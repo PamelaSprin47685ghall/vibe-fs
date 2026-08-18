@@ -123,10 +123,7 @@ module ManagerJobHandoff =
             | _ -> return HandoffOutcome.ManagerOwnsTurn
         }
 
-    let private recordFallbackSuccess
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        : Task<unit> =
+    let private recordFallbackSuccess (journal: AgentJournal option) (turn: ReconciledTurn) : Task<unit> =
         task {
             match journal with
             | Some j ->
@@ -141,7 +138,8 @@ module ManagerJobHandoff =
         (terminalValid: bool)
         : Task<unit> =
         task {
-            if terminalValid then do! recordFallbackSuccess journal turn
+            if terminalValid then
+                do! recordFallbackSuccess journal turn
         }
 
     let private completeCompleted

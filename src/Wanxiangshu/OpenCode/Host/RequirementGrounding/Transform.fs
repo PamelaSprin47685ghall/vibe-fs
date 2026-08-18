@@ -32,12 +32,9 @@ module RequirementGroundingTransform =
         let resolveParts () =
             let parts = unbox<obj array> raw?parts
 
-            if parts.Length = 0 then
-                None
-            elif isNull parts.[0]?callID then
-                None
-            else
-                Some(string parts.[0]?callID)
+            if parts.Length = 0 then None
+            elif isNull parts.[0]?callID then None
+            else Some(string parts.[0]?callID)
 
         if isNull raw || isNull raw?parts then
             None
@@ -248,12 +245,10 @@ module RequirementGroundingTransform =
         let providerId = PairProgrammingThoughtTransform.providerIdFromMessages rawMessages
 
         if PairProgrammingThoughtTransform.isCursorProvider providerId then
-            let suffixes =
-                history
-                |> List.collect _.Reads
-                |> List.map _.CursorResultBytes
+            let suffixes = history |> List.collect _.Reads |> List.map _.CursorResultBytes
 
-            rawMessages |> List.map (PairProgrammingThoughtTransform.stripCursorSuffixes suffixes)
+            rawMessages
+            |> List.map (PairProgrammingThoughtTransform.stripCursorSuffixes suffixes)
         else
             rawMessages
 

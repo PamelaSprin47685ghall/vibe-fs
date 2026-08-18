@@ -298,8 +298,7 @@ module OrchestratorProjection =
         (currentHead: CommitHash option)
         (rebasedCommit: CommitHash)
         (targetHeadSnapshot: CommitHash)
-        : RebasedCandidateReality
-        =
+        : RebasedCandidateReality =
         match currentHead with
         | None -> RebasedCandidateReality.HeadUnreadable
         | Some head when head = targetHeadSnapshot -> RebasedCandidateReality.PublishReady
@@ -313,8 +312,7 @@ module OrchestratorProjection =
         (currentHead: CommitHash option)
         (rebasedCommit: CommitHash)
         (expectedHead: CommitHash)
-        : PublishClaimReality
-        =
+        : PublishClaimReality =
         match currentHead with
         | None -> PublishClaimReality.HeadUnreadable
         | Some head when head = rebasedCommit -> PublishClaimReality.AlreadyFastForwarded

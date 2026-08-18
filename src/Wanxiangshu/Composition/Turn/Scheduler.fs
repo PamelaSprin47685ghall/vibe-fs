@@ -204,18 +204,14 @@ module Reconciler =
                     queued.[key] <- generation
                     startOrEnqueue key generation)
 
-        let projectionSettledForWake
-            (wake: ReconcileProgram.ReconcileWake)
-            (turn: ReconciledTurn option)
-            =
+        let projectionSettledForWake (wake: ReconcileProgram.ReconcileWake) (turn: ReconciledTurn option) =
             match turn, wake with
             | None, _ -> false
             | Some _, ReconcileProgram.ReconcileWake.IdleWake _ -> true
             | Some observed,
-              (ReconcileProgram.ReconcileWake.RetryWake
-              | ReconcileProgram.ReconcileWake.FailureWake
-              | ReconcileProgram.ReconcileWake.AbortWake) ->
-                Option.isNone observed.Observation && ReconcileProgram.isTerminalOutcome observed.Outcome
+              (ReconcileProgram.ReconcileWake.RetryWake | ReconcileProgram.ReconcileWake.FailureWake | ReconcileProgram.ReconcileWake.AbortWake) ->
+                Option.isNone observed.Observation
+                && ReconcileProgram.isTerminalOutcome observed.Outcome
 
         let projectionEpochFor
             (source: Dictionary<string, struct (string * int64)>)
@@ -264,8 +260,7 @@ module Reconciler =
                     projectionConsumed.[key] <- struct (physicalKey, epoch)
                     projectionWaits.Remove(key) |> ignore
                     queued.[key] <- generation
-                | ProjectionPassDecision.Park epoch ->
-                    projectionWaits.[key] <- struct (physicalKey, epoch)
+                | ProjectionPassDecision.Park epoch -> projectionWaits.[key] <- struct (physicalKey, epoch)
                 | ProjectionPassDecision.Ignore -> ())
 
         let projectionWaitMatches key physicalKey =
@@ -418,16 +413,13 @@ module Reconciler =
                     let currentPhysical =
                         activeBinding |> Option.bind (fun bound -> bound.PhysicalUserMessageId)
 
-                    currentPhysical
-                    |> Option.iter (armProjectionPass sessionId generation)
+                    currentPhysical |> Option.iter (armProjectionPass sessionId generation)
 
                     let observeProjectionSnapshot observedSession messages =
                         let settled =
                             match activeBinding with
                             | None -> true
-                            | Some bound ->
-                                TurnReconcile.reconcile messages bound
-                                |> projectionSettledForWake wake
+                            | Some bound -> TurnReconcile.reconcile messages bound |> projectionSettledForWake wake
 
                         currentPhysical
                         |> Option.iter (fun physical -> settleProjectionPass sessionId generation physical settled)
@@ -528,7 +520,8 @@ module Reconciler =
                 binding.TryPhysicalUserMessage(sessionId)
                 |> Option.exists (fun current -> PhysicalUserMessageId.value current = physicalKey)
 
-            let shouldKick = matchesCurrentPhysical && recordProjectionEdge sessionId physicalKey
+            let shouldKick =
+                matchesCurrentPhysical && recordProjectionEdge sessionId physicalKey
 
             if shouldKick then
                 this.Kick(sessionId, currentWake sessionId)

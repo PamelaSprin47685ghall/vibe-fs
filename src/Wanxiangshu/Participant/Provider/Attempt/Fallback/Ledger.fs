@@ -183,8 +183,7 @@ module FallbackLedger =
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                        ProviderRun = providerRun |}
 
-            let! appended =
-                AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) succeeded journal
+            let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) succeeded journal
 
             return
                 appended

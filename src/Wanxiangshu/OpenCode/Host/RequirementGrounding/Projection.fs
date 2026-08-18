@@ -43,7 +43,8 @@ module RequirementGroundingProjection =
     let occurrences state = List.rev state.OccurrencesRev
 
     let visibleOccurrences state =
-        occurrences state |> List.filter (fun occurrence -> occurrence.Ordinal >= state.VisibleFromOrdinal)
+        occurrences state
+        |> List.filter (fun occurrence -> occurrence.Ordinal >= state.VisibleFromOrdinal)
 
     let groundedKeys state =
         state.Grounded |> Set.toList |> List.sort

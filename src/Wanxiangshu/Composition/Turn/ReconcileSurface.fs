@@ -259,7 +259,8 @@ module ReconcileSurface =
             let firstSnapshotObserved = TaskCompletionSource<unit>()
             let currentTurnObserved = TaskCompletionSource<ReconciledTurnContext>()
 
-            let user id = schedulerMessage id "user" None None None false [||]
+            let user id =
+                schedulerMessage id "user" None None None false [||]
 
             let oldAssistant =
                 schedulerMessage
@@ -297,10 +298,12 @@ module ReconcileSurface =
                         snapshotReads <- snapshotReads + 1
 
                         let messages =
-                            [ user "projection-edge-root"
-                              oldAssistant
-                              user "projection-edge-current" ]
-                            |> fun prefix -> if currentVisible then prefix @ [ currentAssistant ] else prefix
+                            [ user "projection-edge-root"; oldAssistant; user "projection-edge-current" ]
+                            |> fun prefix ->
+                                if currentVisible then
+                                    prefix @ [ currentAssistant ]
+                                else
+                                    prefix
 
                         Task.FromResult(Ok messages) }
 
@@ -334,17 +337,15 @@ module ReconcileSurface =
                     {| snapshotReads = snapshotReads
                        providerRun = ProviderRunIdentity.value observed.Turn.ProviderRun
                        outcome =
-                           match observed.Turn.Outcome with
-                           | ReconcileProgram.TurnCompleted -> "TurnCompleted"
-                           | ReconcileProgram.TurnFailed _ -> "TurnFailed"
-                           | ReconcileProgram.TurnAborted _ -> "TurnAborted"
-                           | ReconcileProgram.TurnInProgress -> "TurnInProgress"
-                           | ReconcileProgram.TurnNeedsContinuation _ -> "TurnNeedsContinuation"
+                        match observed.Turn.Outcome with
+                        | ReconcileProgram.TurnCompleted -> "TurnCompleted"
+                        | ReconcileProgram.TurnFailed _ -> "TurnFailed"
+                        | ReconcileProgram.TurnAborted _ -> "TurnAborted"
+                        | ReconcileProgram.TurnInProgress -> "TurnInProgress"
+                        | ReconcileProgram.TurnNeedsContinuation _ -> "TurnNeedsContinuation"
                        hasQuiescence = Option.isSome observed.Quiescence |}
         }
 
-    let idleProjectionEdgeScenario () : Task<obj> =
-        projectionEdgeScenario false
+    let idleProjectionEdgeScenario () : Task<obj> = projectionEdgeScenario false
 
-    let failureProjectionEdgeScenario () : Task<obj> =
-        projectionEdgeScenario true
+    let failureProjectionEdgeScenario () : Task<obj> = projectionEdgeScenario true

@@ -104,16 +104,14 @@ module TurnWorkflow =
                 OrdinaryTurnWorkflow.observeIdle quiescence sessionPort eventPort journal current
 
             let tryCompleteProcessReviewerAtIdle () =
-                ReviewerWorkflow.tryCompleteProcessReviewAtIdle
-                    eventPort
-                    journal
-                    turn
-                    (SessionId.value turn.SessionId)
+                ReviewerWorkflow.tryCompleteProcessReviewAtIdle eventPort journal turn (SessionId.value turn.SessionId)
 
             let completeReviewerOrObserve (observe: unit -> Task) : Task =
                 task {
                     let! handled = tryCompleteProcessReviewerAtIdle ()
-                    if not handled then do! observe ()
+
+                    if not handled then
+                        do! observe ()
                 }
 
             let observeIdleDelivery () : Task =

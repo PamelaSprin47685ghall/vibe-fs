@@ -176,7 +176,12 @@ module ChangeSurface =
     /// physical-world classification, not a program counter.
     let classifyRebasedCandidate (head: obj) (rebasedCommit: string) (targetHeadSnapshot: string) : obj =
         let currentHead = if isNullish head then None else Some(commit head)
-        let reality = OrchestratorProjection.classifyRebasedCandidate currentHead (commit rebasedCommit) (commit targetHeadSnapshot)
+
+        let reality =
+            OrchestratorProjection.classifyRebasedCandidate
+                currentHead
+                (commit rebasedCommit)
+                (commit targetHeadSnapshot)
 
         match reality with
         | RebasedCandidateReality.HeadUnreadable -> box {| kind = "HeadUnreadable" |}
@@ -188,7 +193,9 @@ module ChangeSurface =
     /// everything else.
     let classifyPublishClaim (head: obj) (rebasedCommit: string) (expectedHead: string) : obj =
         let currentHead = if isNullish head then None else Some(commit head)
-        let reality = OrchestratorProjection.classifyPublishClaim currentHead (commit rebasedCommit) (commit expectedHead)
+
+        let reality =
+            OrchestratorProjection.classifyPublishClaim currentHead (commit rebasedCommit) (commit expectedHead)
 
         match reality with
         | PublishClaimReality.HeadUnreadable -> box {| kind = "HeadUnreadable" |}

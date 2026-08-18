@@ -46,7 +46,8 @@ module GuidelineProjection =
     let pairs (state: GuidelineProjectionState) : PairProgrammingGuideline list = List.rev state.Pairs
 
     let visiblePairs (state: GuidelineProjectionState) : PairProgrammingGuideline list =
-        pairs state |> List.filter (fun pair -> pair.Ordinal >= state.VisibleFromOrdinal)
+        pairs state
+        |> List.filter (fun pair -> pair.Ordinal >= state.VisibleFromOrdinal)
 
     let private gapKey (gap: TranscriptGap) =
         match gap with

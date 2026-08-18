@@ -64,7 +64,10 @@ module GuidelineSurface =
                 unbox<obj array> value?pairs
 
         let visibleFromOrdinal =
-            if isNullish value?visibleFromOrdinal then 1L else int64Value value?visibleFromOrdinal
+            if isNullish value?visibleFromOrdinal then
+                1L
+            else
+                int64Value value?visibleFromOrdinal
 
         // The JSON state intentionally carries only semantic pairs. Replaying
         // them through the owner rebuilds the private set indexes and keeps
@@ -135,7 +138,9 @@ module GuidelineSurface =
         GuidelineProjection.pairs (stateOfJs state) |> List.map pairToJs |> List.toArray
 
     let visiblePairs (state: obj) : obj array =
-        GuidelineProjection.visiblePairs (stateOfJs state) |> List.map pairToJs |> List.toArray
+        GuidelineProjection.visiblePairs (stateOfJs state)
+        |> List.map pairToJs
+        |> List.toArray
 
     let applyReanchor (state: obj) : obj =
         stateOfJs state |> GuidelineProjection.applyReanchor |> stateToJs

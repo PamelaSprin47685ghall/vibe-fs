@@ -92,7 +92,14 @@ module FallbackFactFold =
                 FallbackProjection.applyAdvance identity previous next consecutiveFailureCount current
                 |> Result.map (fun updated -> { session with Fallback = Some updated }))
 
-    let private foldFallbackSucceeded (projection: AgentProjectionSet) (payload: {| SessionId: SessionId; LogicalRunId: LogicalRunId; AuthorityRootUserMessageId: AuthorityRootUserMessageId; ProviderRun: ProviderRunIdentity |}) : Result<AgentProjectionSet, FoldRejection> =
+    let private foldFallbackSucceeded
+        (projection: AgentProjectionSet)
+        (payload:
+            {| SessionId: SessionId
+               LogicalRunId: LogicalRunId
+               AuthorityRootUserMessageId: AuthorityRootUserMessageId
+               ProviderRun: ProviderRunIdentity |})
+        : Result<AgentProjectionSet, FoldRejection> =
         let identity =
             { SessionId = payload.SessionId
               LogicalRunId = payload.LogicalRunId
@@ -165,5 +172,4 @@ module FallbackFactFold =
                     projection
             )
 
-        | FallbackFactCases.FallbackSucceeded payload ->
-            foldFallbackSucceeded projection payload
+        | FallbackFactCases.FallbackSucceeded payload -> foldFallbackSucceeded projection payload

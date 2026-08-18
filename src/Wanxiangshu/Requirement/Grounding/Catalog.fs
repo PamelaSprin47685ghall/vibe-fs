@@ -170,14 +170,12 @@ module GroundingCatalog =
         || relativePath.StartsWith(selfPrefix, StringComparison.Ordinal)
 
     let private matchKind relativePath package =
-        if selfMatch relativePath package then
-            Some PackageSelf
-        elif externalMatch relativePath package then
-            Some AppliesTo
-        else
-            None
+        if selfMatch relativePath package then Some PackageSelf
+        elif externalMatch relativePath package then Some AppliesTo
+        else None
 
-    let private packageMatches relativePath package = matchKind relativePath package |> Option.isSome
+    let private packageMatches relativePath package =
+        matchKind relativePath package |> Option.isSome
 
     let resolve workspace path =
         let root = canonicalWorkspace workspace
@@ -280,8 +278,7 @@ module GroundingCatalog =
         |> List.choose (workspaceRelative root)
         |> List.collect (fun relativePath ->
             packages
-            |> List.choose (fun package ->
-                matchKind relativePath package |> Option.map (fun kind -> package, kind)))
+            |> List.choose (fun package -> matchKind relativePath package |> Option.map (fun kind -> package, kind)))
         |> List.groupBy (fun (package, _) -> package.Name)
         |> List.sortBy fst
         |> List.map (fun (_, matches) ->

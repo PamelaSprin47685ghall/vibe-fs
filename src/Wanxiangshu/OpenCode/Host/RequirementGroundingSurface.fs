@@ -101,13 +101,7 @@ module RequirementGroundingSurface =
         |> List.map _.PackageName
         |> List.toArray
 
-    let appendContextReanchored
-        journal
-        sessionId
-        (previousEpoch: int64)
-        (nextEpoch: int64)
-        observedRun
-        : Task<obj> =
+    let appendContextReanchored journal sessionId (previousEpoch: int64) (nextEpoch: int64) observedRun : Task<obj> =
         task {
             let session = SessionId.create sessionId
 

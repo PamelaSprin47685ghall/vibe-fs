@@ -223,8 +223,7 @@ module ReviewTodoSurface =
     let processIdleDisposition (handle: JournalHandle) (reviewerSessionId: string) : string =
         match ReviewerEvidence.processIdleDisposition (Some handle.Journal) reviewerSessionId with
         | ReviewerEvidence.ProcessIdleDisposition.OrdinaryRepair -> "OrdinaryRepair"
-        | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview ->
-            "CompleteToolOnlyProcessReview"
+        | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview -> "CompleteToolOnlyProcessReview"
 
     let requestKindNames () = [| "TodoProcess"; "FinalityTerminal" |]
 

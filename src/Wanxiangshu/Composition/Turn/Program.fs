@@ -126,8 +126,7 @@ module ReconcileProgram =
             // terminal publishes normally.
             ReconcileDecision.StopPass
 
-    let private decideExhaustedUnknown (wake: ReconcileWake) (_rereadsRemaining: int) =
-        exhaustedUnknownDecision wake
+    let private decideExhaustedUnknown (wake: ReconcileWake) (_rereadsRemaining: int) = exhaustedUnknownDecision wake
 
     let private decideExhaustedProvisional (wake: ReconcileWake) =
         match wake with

@@ -423,11 +423,23 @@ module OrchestratorProgram =
 
     /// ORCH-007: re-enter from a rebased candidate. Reads the target head and
     /// classifies the reality to decide the CE effect.
-    let private reenterRebasedCandidate (deps: OrchestratorProgramDeps) (job: ManagerJob) (rebased: {| RebasedCommit: CommitHash; TargetHeadSnapshot: CommitHash; PostRebaseReviewBarrierId: ReviewBarrierId |}) =
+    let private reenterRebasedCandidate
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (rebased:
+            {| RebasedCommit: CommitHash
+               TargetHeadSnapshot: CommitHash
+               PostRebaseReviewBarrierId: ReviewBarrierId |})
+        =
         task {
             let! currentHead = readTargetHead deps job
 
-            match OrchestratorProjection.classifyRebasedCandidate currentHead rebased.RebasedCommit rebased.TargetHeadSnapshot with
+            match
+                OrchestratorProjection.classifyRebasedCandidate
+                    currentHead
+                    rebased.RebasedCommit
+                    rebased.TargetHeadSnapshot
+            with
             | RebasedCandidateReality.HeadUnreadable ->
                 return failed job "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
             | RebasedCandidateReality.PublishReady ->
@@ -442,7 +454,13 @@ module OrchestratorProgram =
 
     /// ORCH-007: re-enter from a publish claim. Reads the target head and
     /// classifies the three CAS branches in fixed order.
-    let private reenterPublishClaim (deps: OrchestratorProgramDeps) (job: ManagerJob) (claim: {| RebasedCommit: CommitHash; ExpectedHead: CommitHash |}) =
+    let private reenterPublishClaim
+        (deps: OrchestratorProgramDeps)
+        (job: ManagerJob)
+        (claim:
+            {| RebasedCommit: CommitHash
+               ExpectedHead: CommitHash |})
+        =
         task {
             let! currentHead = readTargetHead deps job
 
@@ -451,6 +469,7 @@ module OrchestratorProgram =
                 return failed job "GetTargetHead failed; ORCH-008 forbids falling back to HEAD"
             | PublishClaimReality.AlreadyFastForwarded ->
                 let head = Option.get currentHead
+
                 return!
                     backfillPublished
                         deps
@@ -495,10 +514,8 @@ module OrchestratorProgram =
                         job
                         {| CandidateCommit = conflict.CandidateCommit
                            ConflictFiles = conflict.ConflictFiles |}
-            | JobProgress.RebasedCandidateReady rebased ->
-                return! reenterRebasedCandidate deps job rebased
-            | JobProgress.PublishClaimed claim ->
-                return! reenterPublishClaim deps job claim
+            | JobProgress.RebasedCandidateReady rebased -> return! reenterRebasedCandidate deps job rebased
+            | JobProgress.PublishClaimed claim -> return! reenterPublishClaim deps job claim
             | JobProgress.Published _
             | JobProgress.Failed _
             | JobProgress.Abandoned -> return! cleanUp deps job

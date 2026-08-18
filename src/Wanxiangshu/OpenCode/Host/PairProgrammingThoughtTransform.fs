@@ -838,6 +838,7 @@ module PairProgrammingThoughtTransform =
                 match journal, sessionId with
                 | Some durable, Some sid when not (String.IsNullOrWhiteSpace sid) ->
                     let session = SessionId.create sid
+
                     readDurableHistory durable session,
                     readDurableVisibleHistory durable session,
                     appendDurable durable session
