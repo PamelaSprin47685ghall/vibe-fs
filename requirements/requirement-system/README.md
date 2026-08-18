@@ -12,7 +12,7 @@ journal 怎么存、review 怎么判都不归它），它拥有的是「这些�
 ```text
 README.md   ← 你在这里
 WHY.md      不可替代的存在理由：为什么必须有一个包管「谁拥有什么」
-WHAT.md     唯一 normative 合同：16+1 条编号命题（REQUIREMENT-SYSTEM-001..017）
+WHAT.md     唯一 normative 合同：18 条编号命题（REQUIREMENT-SYSTEM-001..018）
 HOW.md      实现模型：meta-verifier + spec gate + change-lifecycle；历史与弃权
 PROOF.md    每条命题的测试落点
 tests/      本包拥有的可执行 proof
@@ -22,7 +22,7 @@ tests/      本包拥有的可执行 proof
 
 - **所有权元规则**（001–005）：唯一 semantic owner、包身份独立于物理布局、全部包同时为真、
   每个 executable proof 恰一个 owner、无裸规范权威。
-- **树结构合同**（006–007、016）：48 个包 × 5 份文档、无 INDEX 外目录、WHAT 是唯一
+- **树结构合同**（006–007、016）：49 个包 × 5 份文档、无 INDEX 外目录、WHAT 是唯一
   normative 合同、依赖声明 ⊆ INDEX 依赖骨架。
 - **条款治理**（008–009）：Clause ID 唯一且稳定、条款按层归属（行为→what、所有权→shape、
   算法→how、证明→proof、理由→why）。
@@ -41,7 +41,7 @@ tests/      本包拥有的可执行 proof
 2. `scripts/checks/spec.mjs` + `scripts/checks/spec-rules.mjs`：requirements/ 树治理门
    （定义只在 WHAT.md、引用可解析、全仓零归档树引用、废止路径、链接完整性；
    spec-rules 的纯规则回归在 `tests/spec-rules.test.mjs`）。
-3. `requirements/README.md`：48 包树入口导航（2026-08-14 cutover 后承担导航职责）。
+3. `requirements/README.md`：49 包树入口导航（2026-08-14 cutover 后承担导航职责）。
 4. `tests/change-lifecycle.test.mjs`：WHAT-013/014/015 机器面（Completed 不作当前依据 pin +
    blocker 四步 + AGENTS 小修复豁免 + `activeBodyViolations` / `frozenOriginViolations` 纯验证器：
    Active 冻结 origin 边界、跨版本原文不变、段白名单、禁止 progress·commit·code-snapshot 段）。
@@ -54,7 +54,7 @@ node --test requirements/requirement-system/tests/spec-rules.test.mjs
 node --test requirements/requirement-system/tests/change-lifecycle.test.mjs
 ```
 
-- meta-verifier 迁移中途红是预期（当前 48 包若有未落地包）；两个 META 包自身的结构检查必须绿。
+- meta-verifier 迁移中途红是预期（当前 49 包若有未落地包）；两个 META 包自身的结构检查必须绿。
 - 每条 WHAT 命题的精确落点见 `PROOF.md`。
 
 ## 边界（DOES NOT OWN）

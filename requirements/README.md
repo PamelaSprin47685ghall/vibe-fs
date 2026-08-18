@@ -16,18 +16,21 @@ WHAT.md     唯一 normative 合同（编号命题，每条有测试落点）
 HOW.md      实现模型与约束（非 normative；含「历史与弃权」）
 PROOF.md    测试落点表（每条 WHAT 命题 → 测试）
 tests/      本包拥有的可执行 proof（*.test.mjs）
-APPLIES-TO  可选的正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=排除例外
+APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignore wildmatch 语法，普通行=纳入，!行=排除例外
 ```
 
-`APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只声明“哪些仓库路径在
-阅读或修改时应关联这个 package”。同一个源码文件可以同时命中多个 package；未提供该文件的
-package 不参加自动路径关联。这个约定为可复用的 `requirement-grounding` 能力预留：万象术在
+`requirements/<package>/` 下的全部内容天然属于该 package 的覆盖范围，包括文档、tests 与
+`APPLIES-TO` 本身；禁止为了覆盖包自身而把这些路径重复写进 `APPLIES-TO`。
+
+`APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只补充声明“这个
+package 还覆盖哪些包外仓库路径”。同一个源码文件可以同时命中多个 package；未提供该文件的
+package 仍天然覆盖自身目录，只是不额外关联包外路径。这个约定为可复用的 `requirement-grounding` 能力预留：万象术在
 OpenCode 中开发任何采用同类 `requirements/<package>/` 结构的项目时，都可按相同方式发现相关
 规范，而不是把万象术自身源码路径写死进运行时。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 48 包索引
+## 49 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -117,6 +120,7 @@ OpenCode 中开发任何采用同类 `requirements/<package>/` 结构的项目�
 | [repository-investigation](repository-investigation/README.md) | repository claim 由可定位可追溯真实 observation 建立。 |
 | [knowledge-reuse](knowledge-reuse/README.md) | 历史 repository knowledge 是 best-effort cache/hint，不冒充当前证明。 |
 | [repository-programming](repository-programming/README.md) | repository mutation 用 capability-projected、sandboxed、all-or-nothing surface。 |
+| [requirement-grounding](requirement-grounding/README.md) | 读写代码时按项目自己的路径范围自动带入相关 requirement 文档与测试，同一内容版本不重复注入。 |
 
 ### 12. Optimization / epistemics
 | Package | 一句话 WHY |
@@ -131,7 +135,7 @@ OpenCode 中开发任何采用同类 `requirements/<package>/` 结构的项目�
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md / README.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 102-edge 骨架一致（0 cycle）。
+权威依赖清单见各包 HOW.md / README.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 109-edge 骨架一致（0 cycle）。
 
 ## 运行与验证
 

@@ -7,7 +7,7 @@
 |---|---|---|---|
 | REQUIREMENT-SYSTEM-001 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: meta verifier: 全量迁移状态——无 INDEX 外目录；每包唯一目录）；`requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings——ID 唯一检测） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-002 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（结构检查只认包名 + 5 份文档，不要求未裁决的 manifest 格式） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
-| REQUIREMENT-SYSTEM-003 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——INDEX 48 包 × 5 文档同时齐备才绿） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
+| REQUIREMENT-SYSTEM-003 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——INDEX 49 包 × 5 文档同时齐备才绿） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-004 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（每个 WHAT 命题 ID 在 PROOF.md 至少一行）；`requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings——同 ID 二次定义可识别） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-005 | `requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：路由/Change 文件不得定义正式条款） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-006 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——树入口与 INDEX 同一包集 + 无外目录） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |

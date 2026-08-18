@@ -4,7 +4,7 @@
 //
 // 本测试扫描 requirements/ 全树，断言五个结构事实：
 //   1. INDEX（requirements/INDEX.md 表 + requirements/README.md 树入口）
-//      中当前全部 47 个包都有 requirements/<pkg>/{README,WHY,WHAT,HOW,PROOF}.md；
+//      中当前全部 49 个包都有 requirements/<pkg>/{README,WHY,WHAT,HOW,PROOF}.md；
 //   2. 每个 WHAT.md 的每个 `<PACKAGE>-NNN` 命题 ID（标题定义）在 PROOF.md
 //      表格中有行（按包名 + ID 交叉检查）；
 //   3. 每个 PROOF.md 落点引用的测试文件真实存在；
@@ -13,13 +13,13 @@
 //      （允许子集，不允许多出边）。
 //
 // green only after full migration lands；中途缺失包是预期中间状态。
-// 中途红有两种，均为预期：缺包（当前 47 包未全落地）与已落地但尚不完整
+// 中途红有两种，均为预期：缺包（当前 49 包未全落地）与已落地但尚不完整
 // （PROOF 占位、落点缺失、WHAT/PROOF 尚未对齐）的包。
 // 两个 test() 分工：
 //   - `已迁移包结构一致`：只检查 5 份文档齐备的包，失败精确到包与原因。
 //     本包（requirement-system / verification-system）现在必须干净；删一个
 //     已存在包的 PROOF 行立即在失败列表中出现该包（可红性）。
-//   - `全量迁移状态`：当前 47 包 × 5 文档 + 无 INDEX 外目录。迁移中途必然红，
+//   - `全量迁移状态`：当前 49 包 × 5 文档 + 无 INDEX 外目录。迁移中途必然红，
 //     红的内容精确到「哪个包缺哪个文件」，cutover 全量落地后转绿。
 //
 // 依赖骨架源是 requirements/INDEX.md（live manifest，2026-08-14 cutover 迁入）。
@@ -60,7 +60,7 @@ const packageNamesFromIndexTables = () => {
   return [...new Set(names)]
 }
 
-/** INDEX.md「# 依赖骨架」后的第一个 code block：当前 102 edge 邻接清单。 */
+/** INDEX.md「# 依赖骨架」后的第一个 code block：当前 110 edge 邻接清单。 */
 const dependencySkeleton = () => {
   const text = read(INDEX_FILE)
   const heading = text.indexOf('# 依赖骨架')
@@ -299,7 +299,7 @@ test('WHAT[REQUIREMENT-SYSTEM-006] tree entry and INDEX name the same package se
     'requirements/README.md tree entry and requirements-design/INDEX.md must name the same package set',
   )
 
-  assert.equal(fromIndex.length, 48, `expected 48 packages in INDEX, found ${fromIndex.length}`)
+  assert.equal(fromIndex.length, 49, `expected 49 packages in INDEX, found ${fromIndex.length}`)
 })
 
 test('WHAT[REQUIREMENT-SYSTEM-016] declared DEPENDS ON stays within the INDEX skeleton', () => {

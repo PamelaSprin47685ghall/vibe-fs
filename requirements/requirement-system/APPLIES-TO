@@ -1,4 +1,5 @@
-# Positive path set. Patterns are repository-root relative and use gitignore wildmatch syntax.
+# Positive package-external path set. Patterns are repository-root relative and use gitignore wildmatch syntax.
+# requirements/requirement-system/** is covered implicitly and must not be listed here.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /scripts/checks/spec.mjs

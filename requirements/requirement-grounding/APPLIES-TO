@@ -1,0 +1,9 @@
+# Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
+# requirements/requirement-grounding/** is covered implicitly and must not be listed here.
+# Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+
+/src/Wanxiangshu/Requirement/Grounding/**
+/src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+/src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+/src/Wanxiangshu/Repository/Programming/**
+
