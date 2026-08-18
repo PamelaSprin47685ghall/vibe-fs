@@ -54,6 +54,8 @@ occupancy registry 是同一 OpenCode OS 进程内的 module-level shared truth�
 
 pending demand 必须可由 execution cancellation / abort、session delete、plugin shutdown，或**同 SessionId 更晚的 PhysicalUserMessageId**移除；被 supersede 的旧 pending demand 必须取消，不能日后抢到槽并复活旧请求。**业务 retire/completion 本身不是 capacity 证据**。每次 occupancy 变化后，runtime 按 pending 到达顺序各重试一次；某个较早 demand 仍返回 `null` 不得阻止后续不同 role 获得 scheduler 当前允许的 target。
 
+pending demand 被 supersede / owner cleanup 移除是**预期 lifecycle outcome**，不得编码成 exception。routing owner 必须返回封闭 typed outcome（acquired / superseded）；真实 scheduler/invariant break 才允许 exception。若 supersede 发生在真实 `chat.message` hook 正在等待 model slot 时，旧 hook 必须成功短路且不再执行 model projection、PromptIngress 或 execution capability commit；不得让该正常取消穿过 plugin fatal membrane 变成 process fatal。
+
 可丢弃优化若其 owner 明确规定“不等待”（例如 Strength K0），可以在 `null` 后放弃该 optional demand；这不是 required execution 的降级。
 
 ## EMR-005：模型选择策略全部属于 MJS；runtime 不再拥有 lane、容量表或候选算法

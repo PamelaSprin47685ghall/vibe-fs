@@ -48,6 +48,17 @@ module ModelRoutingSurface =
             {| model = target.Model
                reasoning = target.Reasoning |}
 
+    let private acquisitionObject =
+        function
+        | ModelRoutingAcquisition.Acquired target ->
+            box
+                {| kind = "Acquired"
+                   target = targetObject target |}
+        | ModelRoutingAcquisition.Superseded ->
+            box
+                {| kind = "Superseded"
+                   target = null |}
+
     let private targetOf (value: obj) : ModelRoutingTarget =
         if isNullish value then
             invalidArg "running" "execution-model-routing: running target must be non-null"
@@ -132,17 +143,17 @@ module ModelRoutingSurface =
     /// Initialize the process-shared scheduler runtime used by Host admission.
     let initialize () : Task = ModelRouting.initialize ()
 
-    /// Acquire from the process-shared Host runtime and expose only the plain
-    /// model/reasoning target selected by the scheduler.
+    /// Acquire from the process-shared Host runtime and expose the lifecycle
+    /// outcome without translating expected supersession into Promise rejection.
     let acquire (sessionId: string) (physicalUserMessageId: string) (agent: string) : Task<obj> =
         task {
-            let! target =
+            let! acquisition =
                 ModelRouting.acquireManagedExecution
                     (SessionId.create sessionId)
                     (PhysicalUserMessageId.create physicalUserMessageId)
                     agent
 
-            return targetObject target
+            return acquisitionObject acquisition
         }
 
     /// Release the current process-shared execution for a reusable session.
@@ -181,11 +192,11 @@ module ModelRoutingSurface =
 
     let acquireManaged (runtime: obj) (sessionId: string) (physicalUserMessageId: string) (agent: string) : Task<obj> =
         task {
-            let! target =
+            let! acquisition =
                 (runtimeOf runtime)
                     .AcquireManagedExecution(sessionId, physicalUserMessageId, agent)
 
-            return targetObject target
+            return acquisitionObject acquisition
         }
 
     let tryReserveManaged (runtime: obj) (sessionId: string) (agent: string) : obj =

@@ -8,7 +8,9 @@ await routing.initialize()
 
 const model = { providerID: 'openai', modelID: 'gpt-5' }
 const modelFromLease = async (sessionId, physicalUserMessageId, agent) => {
-  const target = await routing.acquire(sessionId, physicalUserMessageId, agent)
+  const outcome = await routing.acquire(sessionId, physicalUserMessageId, agent)
+  assert.equal(outcome.kind, 'Acquired')
+  const target = outcome.target
   const [providerID, ...modelParts] = target.model.split('/')
   return { providerID, modelID: modelParts.join('/'), variant: target.reasoning }
 }

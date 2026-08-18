@@ -86,6 +86,7 @@ module HostSignalBootstrap =
     [<RequireQualifiedAccess>]
     type private RoutedChatExecution =
         | NoRoute
+        | Superseded
         | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
         | PluginManaged of
             PromptDispatcher.Runtime *
@@ -157,6 +158,18 @@ module HostSignalBootstrap =
         | false, Some sid, None -> externalAdmission sid decoded.PhysicalUserMessageId decoded.ExplicitAgent
         | _ -> ChatExecutionAdmission.NoRoute
 
+    let private externalRoutedExecution sessionId physical agent =
+        function
+        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
+        | ModelRoutingAcquisition.Acquired target ->
+            RoutedChatExecution.ExternalManaged(sessionId, physical, agent, ModelRouting.toOpenCodeModel target)
+
+    let private pluginRoutedExecution runtime claim physical agent =
+        function
+        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
+        | ModelRoutingAcquisition.Acquired target ->
+            RoutedChatExecution.PluginManaged(runtime, claim, physical, agent, ModelRouting.toOpenCodeModel target)
+
     let private routeChatExecution (scope: PluginRuntimeScope) admission =
         task {
             match admission with
@@ -166,28 +179,19 @@ module HostSignalBootstrap =
                 let sessionText = SessionId.value sessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
                 SessionExecutionBinding.observeUserFacingAgent sessionId agent
-                let! target = ModelRouting.acquireManagedExecution sessionId physical agent
-
-                return
-                    RoutedChatExecution.ExternalManaged(sessionId, physical, agent, ModelRouting.toOpenCodeModel target)
+                let! acquisition = ModelRouting.acquireManagedExecution sessionId physical agent
+                return externalRoutedExecution sessionId physical agent acquisition
             | ChatExecutionAdmission.PluginManaged(runtime, claim, physical, agent) ->
                 let sessionText = SessionId.value claim.SessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
-                let! target = ModelRouting.acquireManagedExecution claim.SessionId physical agent
-
-                return
-                    RoutedChatExecution.PluginManaged(
-                        runtime,
-                        claim,
-                        physical,
-                        agent,
-                        ModelRouting.toOpenCodeModel target
-                    )
+                let! acquisition = ModelRouting.acquireManagedExecution claim.SessionId physical agent
+                return pluginRoutedExecution runtime claim physical agent acquisition
         }
 
     let private routedModel =
         function
-        | RoutedChatExecution.NoRoute -> None
+        | RoutedChatExecution.NoRoute
+        | RoutedChatExecution.Superseded -> None
         | RoutedChatExecution.ExternalManaged(_, _, _, model)
         | RoutedChatExecution.PluginManaged(_, _, _, _, model) -> Some model
 
@@ -234,7 +238,8 @@ module HostSignalBootstrap =
             acceptPluginExecution runtime claim physical agent model
         | RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model) ->
             SessionExecutionBinding.acceptExternalExecution sessionId physical agent model
-        | RoutedChatExecution.NoRoute -> ()
+        | RoutedChatExecution.NoRoute
+        | RoutedChatExecution.Superseded -> ()
 
     let private eventString (value: obj) =
         if isNull value then
@@ -588,6 +593,23 @@ module HostSignalBootstrap =
                      | None -> Ok()
                      | Some workspace -> HookDispatcher.ensure workspace)
 
+            let requireDurabilityActivation () =
+                match durabilityActivation.Value with
+                | Ok() -> ()
+                | Error error ->
+                    Diagnostic.fatal "durability-activation-failed" [ "result", error ]
+
+            let signalExternalJoinWake (decoded: PromptIngressCodec.DecodedMessage) =
+                match
+                    decoded.SessionId,
+                    decoded.PhysicalUserMessageId,
+                    decoded.PromptKey,
+                    decoded.IsHostCompaction
+                with
+                | Some sessionId, Some _, None, false ->
+                    scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
+                | _ -> ()
+
             let observePhysicalAdmission output sessionId physicalId =
                 scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
 
@@ -596,6 +618,15 @@ module HostSignalBootstrap =
                 | ExplicitResumeSuppression.PhysicalMaterialObservation.ReplacedExplicitResume ->
                     reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
                 | ExplicitResumeSuppression.PhysicalMaterialObservation.Ordinary -> ()
+
+            let continueRoutedChatMessage routedExecution decoded input output =
+                task {
+                    projectRoutedModel output routedExecution
+                    requireDurabilityActivation ()
+                    signalExternalJoinWake decoded
+                    do! promptIngressHook input output
+                    commitExecutionCapability routedExecution
+                }
 
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
@@ -625,36 +656,10 @@ module HostSignalBootstrap =
                         // agent/model fields are never authority for a continuation.
                         let admission = chatExecutionAdmission journal decoded output
                         let! routedExecution = routeChatExecution scope admission
-                        projectRoutedModel output routedExecution
 
-                        match durabilityActivation.Value with
-                        | Ok() -> ()
-                        | Error error ->
-                            // Once a live chat.message needs durability, activation
-                            // failure is Wanxiangshu infrastructure failure, not a
-                            // provider/business consequence. Continuing the Host loop
-                            // would execute without its required durable authority.
-                            Diagnostic.fatal "durability-activation-failed" [ "result", error ]
-
-                        // Signal even when mid-run UnknownOrigin — not only after
-                        // AcceptHumanRoot. physical id + no PromptKey + not compaction
-                        // → join wake.
-                        match
-                            decoded.SessionId,
-                            decoded.PhysicalUserMessageId,
-                            decoded.PromptKey,
-                            decoded.IsHostCompaction
-                        with
-                        // An external user message interrupts ONLY the current active
-                        // join attempts; with none active it is dropped as a join wake
-                        // (the message itself stays in the normal Host queue). No future
-                        // join is latched or woken by this older message (EXEC-017).
-                        | Some sessionId, Some _, None, false ->
-                            scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
-                        | _ -> ()
-
-                        do! promptIngressHook input output
-                        commitExecutionCapability routedExecution
+                        match routedExecution with
+                        | RoutedChatExecution.Superseded -> ()
+                        | _ -> do! continueRoutedChatMessage routedExecution decoded input output
                     }
 
             let cancelSignals (ids: SessionId seq) =

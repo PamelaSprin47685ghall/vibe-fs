@@ -41,7 +41,9 @@ const assertPrepared = (result, agent) => {
 
 const admitPhysicalExecution = async (sessionId, agent) => {
   const physicalId = `msg-binding-${sessionId}`
-  const target = await routing.acquire(sessionId, physicalId, agent)
+  const outcome = await routing.acquire(sessionId, physicalId, agent)
+  assert.equal(outcome.kind, 'Acquired')
+  const target = outcome.target
   assert.equal(target.model, agent.startsWith('deep-') ? 'test/deep' : 'test/fast')
   assert.equal(target.reasoning, agent.startsWith('deep-') ? 'high' : 'none')
   routing.release(sessionId)
@@ -108,7 +110,9 @@ test('WHAT[PID-008] provider_reasoning_variant_must_match_the_exact_lease', asyn
 
   const physicalId = 'msg-variant-exact'
   const expected = modelFor('deep-distiller')
-  const target = await routing.acquire(child, physicalId, 'deep-distiller')
+  const outcome = await routing.acquire(child, physicalId, 'deep-distiller')
+  assert.equal(outcome.kind, 'Acquired')
+  const target = outcome.target
   assert.deepEqual(target, { model: 'test/deep', reasoning: 'high' })
 
   binding.acceptPromptExecution(child, 'prompt-variant-exact', physicalId, 'deep-distiller', expected)

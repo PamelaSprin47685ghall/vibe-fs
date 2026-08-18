@@ -11,6 +11,11 @@ open Wanxiangshu.Resources
 
 type ModelRoutingTarget = { Model: string; Reasoning: string }
 
+[<RequireQualifiedAccess>]
+type ModelRoutingAcquisition =
+    | Acquired of ModelRoutingTarget
+    | Superseded
+
 type private ExecutionLease =
     { PhysicalUserMessageId: string option
       Agent: string
@@ -21,7 +26,7 @@ type private PendingDemand =
       PhysicalUserMessageId: string
       Agent: string
       PreviousTarget: ModelRoutingTarget option
-      Completion: TaskCompletionSource<ModelRoutingTarget> }
+      Completion: TaskCompletionSource<ModelRoutingAcquisition> }
 
 module ModelRouting =
 
@@ -274,7 +279,7 @@ module ModelRouting =
 
         let cancelDemand demand =
             removeDemand demand
-            AsyncSupport.trySetCanceled demand.Completion |> ignore
+            AsyncSupport.trySetResult demand.Completion ModelRoutingAcquisition.Superseded |> ignore
 
         let failDemand (error: exn) (demand: PendingDemand) =
             try
@@ -310,7 +315,7 @@ module ModelRouting =
         let commit demand target =
             rememberExecution demand target
             removeDemand demand
-            AsyncSupport.trySetResult demand.Completion target |> ignore
+            AsyncSupport.trySetResult demand.Completion (ModelRoutingAcquisition.Acquired target) |> ignore
 
         let commitScheduled demand scheduled =
             match scheduled with
@@ -375,7 +380,7 @@ module ModelRouting =
             match lease.PhysicalUserMessageId with
             | Some current when current = physicalUserMessageId ->
                 requireSameAgent sessionId physicalUserMessageId lease.Agent agent
-                Some(Task.FromResult lease.Target)
+                Some(Task.FromResult(ModelRoutingAcquisition.Acquired lease.Target))
             | None ->
                 requireSameAgent sessionId physicalUserMessageId lease.Agent agent
 
@@ -385,7 +390,7 @@ module ModelRouting =
 
                 lastPhysicalTargetBySession.[sessionId] <- lease.Target
 
-                Some(Task.FromResult lease.Target)
+                Some(Task.FromResult(ModelRoutingAcquisition.Acquired lease.Target))
             | Some _ -> None
 
         let reusePendingExecution sessionId physicalUserMessageId agent =
@@ -413,10 +418,10 @@ module ModelRouting =
                 lastPhysicalTargetBySession.[sessionId] <- target
 
                 drainDemands ()
-                Task.FromResult target
+                Task.FromResult(ModelRoutingAcquisition.Acquired target)
             | None ->
                 let completion =
-                    TaskCompletionSource<ModelRoutingTarget>(TaskCreationOptions.RunContinuationsAsynchronously)
+                    TaskCompletionSource<ModelRoutingAcquisition>(TaskCreationOptions.RunContinuationsAsynchronously)
 
                 let demand =
                     { SessionId = sessionId
@@ -447,7 +452,7 @@ module ModelRouting =
             try
                 acquireManagedTask sessionId physicalUserMessageId agent
             with ex ->
-                failedTask<ModelRoutingTarget> ex
+                failedTask<ModelRoutingAcquisition> ex
 
         let tryReserveFresh sessionId agent =
             match scheduleOrPoison agent (previousTarget sessionId) with
@@ -483,9 +488,9 @@ module ModelRouting =
 
         member _.AcquireManagedExecution
             (sessionId: string, physicalUserMessageId: string, agent: string)
-            : Task<ModelRoutingTarget> =
+            : Task<ModelRoutingAcquisition> =
             match normalizeExecutionInput sessionId physicalUserMessageId agent with
-            | Error ex -> failedTask<ModelRoutingTarget> ex
+            | Error ex -> failedTask<ModelRoutingAcquisition> ex
             | Ok(normSessionId, normPhysicalUserMessageId, normAgent) ->
                 acquireManagedSafe normSessionId normPhysicalUserMessageId normAgent
 
