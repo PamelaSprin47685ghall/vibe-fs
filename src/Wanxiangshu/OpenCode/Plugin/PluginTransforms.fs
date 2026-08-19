@@ -612,22 +612,22 @@ module PluginTransforms =
             }
         | _ -> Task.FromResult()
 
-    let private bloggerChronicleThoughtText (language: ProviderLanguage) =
+    let private bloggerChronicleText (language: ProviderLanguage) =
         match language with
         | ProviderLanguage.SimplifiedChinese -> "对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。"
         | ProviderLanguage.English ->
             "For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly."
 
-    let private bloggerChronicleThoughtModelPrefixes: string list = [ "step-3.5-flash" ]
+    let private bloggerChronicleTextModelPrefixes: string list = [ "step-3.5-flash" ]
 
-    let private bloggerChronicleThoughtEnabled (projectionSessionIdOpt: string option) =
+    let private bloggerChronicleTextEnabled (projectionSessionIdOpt: string option) =
         projectionSessionIdOpt
         |> Option.map SessionId.create
         |> Option.bind SessionExecutionBinding.currentProviderModel
         |> Option.exists (fun model ->
             List.exists
                 (fun prefix -> model.modelID.StartsWith(prefix, StringComparison.Ordinal))
-                bloggerChronicleThoughtModelPrefixes)
+                bloggerChronicleTextModelPrefixes)
 
     let private rawMessageRole (message: obj) =
         if isNull message then
@@ -645,24 +645,24 @@ module PluginTransforms =
         else
             unbox<obj array> message?parts
 
-    let private isBloggerChronicleThoughtPart (part: obj) =
+    let private isBloggerChronicleTextPart (part: obj) =
         if isNull part || isNull part?``type`` || isNull part?text then
             false
         else
             let text = string part?text
 
-            string part?``type`` = "reasoning"
-            && (text = bloggerChronicleThoughtText ProviderLanguage.SimplifiedChinese
-                || text = bloggerChronicleThoughtText ProviderLanguage.English)
+            string part?``type`` = "text"
+            && (text = bloggerChronicleText ProviderLanguage.SimplifiedChinese
+                || text = bloggerChronicleText ProviderLanguage.English)
 
-    let private isBloggerChronicleThought (message: obj) =
+    let private isBloggerChronicleTextMessage (message: obj) =
         let parts = rawMessageParts message
 
         rawMessageRole message = "assistant"
         && parts.Length = 1
-        && isBloggerChronicleThoughtPart parts.[0]
+        && isBloggerChronicleTextPart parts.[0]
 
-    let private bloggerChronicleThoughtMessageId (projectionSessionIdOpt: string option) (messages: obj list) =
+    let private bloggerChronicleTextMessageId (projectionSessionIdOpt: string option) (messages: obj list) =
         let frontier =
             messages
             |> List.tryLast
@@ -674,32 +674,32 @@ module PluginTransforms =
                 String.concat
                     "\u001f"
                     [ defaultArg projectionSessionIdOpt ""
-                      "blogger-chronicle-reasoning"
+                      "blogger-chronicle-text"
                       frontier ]
             )
 
-        "reasoning-" + digest.Substring(0, 24)
+        "text-" + digest.Substring(0, 24)
 
-    let private bloggerChronicleThoughtMessage (messageId: string) (text: string) =
-        let part = createObj [ "type", box "reasoning"; "text", box text ]
+    let private bloggerChronicleTextMessage (messageId: string) (text: string) =
+        let part = createObj [ "type", box "text"; "text", box text ]
 
         createObj
             [ "info", box (createObj [ "id", box messageId; "role", box "assistant" ])
               "parts", box [| part |] ]
 
-    let private insertBloggerChronicleThoughtAtFrontier (marker: obj) (messages: obj list) =
+    let private insertBloggerChronicleTextAtFrontier (marker: obj) (messages: obj list) =
         match List.rev messages with
         | last :: rest when rawMessageRole last = "user" -> List.rev rest @ [ marker; last ]
         | _ -> messages @ [ marker ]
 
-    let private injectBloggerChronicleThought
+    let private injectBloggerChronicleText
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
         (outObj: obj)
         =
         match journal, projectionSessionIdOpt with
         | Some durable, Some sessionId when
-            bloggerChronicleThoughtEnabled projectionSessionIdOpt
+            bloggerChronicleTextEnabled projectionSessionIdOpt
             && SessionAssociationProjection.isCompanion
                 (SessionId.create sessionId)
                 (AgentJournal.snapshot durable).AgentProjections.Associations
@@ -707,15 +707,15 @@ module PluginTransforms =
             let messages =
                 unbox<obj array> outObj?messages
                 |> Array.toList
-                |> List.filter (isBloggerChronicleThought >> not)
+                |> List.filter (isBloggerChronicleTextMessage >> not)
 
-            let messageId = bloggerChronicleThoughtMessageId projectionSessionIdOpt messages
-            let text = bloggerChronicleThoughtText (languageFor projectionSessionIdOpt)
-            let reasoning = bloggerChronicleThoughtMessage messageId text
+            let messageId = bloggerChronicleTextMessageId projectionSessionIdOpt messages
+            let text = bloggerChronicleText (languageFor projectionSessionIdOpt)
+            let marker = bloggerChronicleTextMessage messageId text
 
             HostMessageProjection.replaceMessagesInPlace
                 outObj
-                (insertBloggerChronicleThoughtAtFrontier reasoning messages)
+                (insertBloggerChronicleTextAtFrontier marker messages)
         | _ -> ()
 
     let private strengthReplicaRuntime
@@ -870,7 +870,7 @@ module PluginTransforms =
                 // ordinary and Cursor order is always pseudo-skill → read(s).
                 do! projectRequirementGrounding journal workspaceDirectory projectionSessionIdOpt sessionPort outObj
 
-                injectBloggerChronicleThought journal projectionSessionIdOpt outObj
+                injectBloggerChronicleText journal projectionSessionIdOpt outObj
 
                 // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                 // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。

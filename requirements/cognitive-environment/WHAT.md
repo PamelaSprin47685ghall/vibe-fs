@@ -140,10 +140,10 @@ capability 时考虑委派/分裂。提示不得宣称 participant 拥有其实�
 停止工作或停止调用工具。X 的计量与 replace/retain 语义归 `delegation`（DELEG-022）；本包只拥有 provider
 该如何理解这个 measurement 的 craft。
 
-### COGNITIVE-ENVIRONMENT-015：Blogger 可按 provider model 临时获得 chronicle-direct thought nudge
+### COGNITIVE-ENVIRONMENT-015：Blogger 可按 provider model 临时获得 chronicle-direct assistant text nudge
 
 Blogger 的普通 provider transform 仅当当前 physical provider attempt 的 `modelID` 命中 chronicle-direct
-prefix allowlist 时，才在当前 request frontier 注入且只注入一个临时 thought nudge：
+prefix allowlist 时，才在当前 request frontier 注入且只注入一个临时 assistant text nudge：
 简体中文为「对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。」；English 为
 「For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly.」
 文案跟随该 Blogger session 已绑定的 provider language。
@@ -153,8 +153,8 @@ provider attempt 都开启该 nudge。匹配使用 ordinal、大小写敏感的�
 substring 或 fallback tier 推断开启，也不得把其它未列出的 model family 一并放行。
 
 该 nudge 只属于当次 provider-facing transform：不写 Journal、不进入 durable projection、不形成下一次请求必须
-replay 的历史。重复 transform 必须先移除上一轮注入的同文案 reasoning block，再按当前 frontier 重建一个；
-Blogger 之外不得注入。wire 形状就是普通 `reasoning` part，`text` 为上述裸字符串；不得包 `<skill_content>`、
+replay 的历史。重复 transform 必须先移除上一轮注入的同文案 assistant `text` part，再按当前 frontier 重建一个；
+Blogger 之外不得注入。wire 形状就是 `role=assistant` message 内唯一一个普通 `text` part，`text` 为上述裸字符串；不得包 `<skill_content>`、
 不得借用 `skill({ name: "" })`、不得携带 `source` / `synthetic` / completed-tool marker。
 
 ## 反向覆盖
