@@ -14,7 +14,7 @@ const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.
 
 test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_du_await_state_without_proof_is_RED', () => {
   const source = readFixture('cross-callback-pc-illegal.fs')
-  const hits = scanText(source, 'src/Wanxiangshu/Strength/OpenCode/PluginScope.fs')
+  const hits = scanText(source, 'src/Wanxiangshu/New/CounterfactualCollector.fs')
   const { regressions, ok } = evaluateViolations(hits)
   assert.equal(ok, false, 'DU await state without proof annotation must be RED')
   assert.ok(
@@ -59,6 +59,22 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_trytake_not_in_baselin
   assert.ok(regressions.some((v) => v.name === 'newContinuation'))
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_trytake_only_marks_the_registry_it_consumes', () => {
+  const source = [
+    'module Sample',
+    'let continuation = Dictionary<string, string>()',
+    'let unrelatedCache = Dictionary<string, string>()',
+    'type Scope() =',
+    '    member _.TryTakeContinuation(sessionId: string) =',
+    '        match continuation.TryGetValue(sessionId) with',
+    '        | true, value -> continuation.Remove(sessionId) |> ignore; Some value',
+    '        | _ -> None',
+    '    member _.ReadCache(sessionId: string) = unrelatedCache.TryGetValue(sessionId)',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/New/Module.fs')
+  assert.deepEqual(hits.map((v) => v.name), ['continuation'])
+})
+
 // ── Pattern 3: Armed presence probe ─────────────────────────────────────────
 
 test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_armed_probe_without_proof_is_RED', () => {
@@ -88,6 +104,19 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_armed_not_in_baseline_
   const { regressions, ok } = evaluateViolations(hits)
   assert.equal(ok, false, 'new armed probe not in baseline must be RED')
   assert.ok(regressions.some((v) => v.name === 'newArmed'))
+})
+
+test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_armed_probe_only_marks_the_registry_it_reads', () => {
+  const source = [
+    'module Sample',
+    'let armed = HashSet<string>()',
+    'let unrelatedCache = Dictionary<string, string>()',
+    'type Sensor() =',
+    '    member _.IsArmed(sessionId: string) = armed.Contains(sessionId)',
+    '    member _.ReadCache(sessionId: string) = unrelatedCache.TryGetValue(sessionId)',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/New/Sensor.fs')
+  assert.deepEqual(hits.map((v) => v.name), ['armed'])
 })
 
 // ── Green: physical proof annotation whitelists ─────────────────────────────

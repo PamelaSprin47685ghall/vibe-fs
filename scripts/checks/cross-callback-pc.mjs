@@ -9,7 +9,7 @@
  * Three pattern signatures:
  *  1. TryTake continuation consumption: methods named TryTake* returning option
  *  2. Armed presence probe: methods named IsArmed/HasArmed/TryArm returning bool/option
- *  3. DU await state: Dictionary<_, DU> where DU has cases named Await*/Armed/Pending*
+ *  3. DU await state: Dictionary<_, DU> where DU has Await/Armed/Pending-prefixed cases
  *
  * Whitelist: ``` /// DSL-cross-callback-proof: physical ``` annotation on the
  * declaration line's preceding doc block proves the cell is an opaque physical
@@ -60,7 +60,7 @@ const ARMED_PROBE_PATTERN = /\bmember\s+(?:_\.|this\.)\s*(?:IsArmed|HasArmed\w*|
 
 /**
  * Pattern 3: DU await state.
- * Matches type declarations with cases named Await*/Armed/Pending* that
+ * Matches type declarations with Await/Armed/Pending-prefixed cases that
  * are used as Dictionary value types.
  */
 const DU_AWAIT_CASE_PATTERN = /^\s*\|\s*(Await\w+|Armed\w*|Pending\w*)\s+of\b/
@@ -89,6 +89,31 @@ const hasProofAnnotation = (lines, index) => {
   return false
 }
 
+const memberBlocks = (lines) => {
+  const blocks = []
+  for (let i = 0; i < lines.length; i++) {
+    const member = /^(\s*)member\s+/.exec(lines[i])
+    if (!member) continue
+
+    const indent = member[1].length
+    let end = i + 1
+    while (end < lines.length) {
+      const nextMember = /^(\s*)member\s+/.exec(lines[end])
+      if (nextMember && nextMember[1].length <= indent) break
+
+      const nextType = /^(\s*)(?:type|and)\s+/.exec(lines[end])
+      if (nextType && nextType[1].length < indent) break
+      end++
+    }
+
+    blocks.push(lines.slice(i, end).join('\n'))
+  }
+  return blocks
+}
+
+const referencesRegistry = (block, name) =>
+  new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(block)
+
 /**
  * Scan one file body for cross-callback PC patterns.
  * @returns {{ file, line, name, pattern, text }[]}
@@ -96,6 +121,7 @@ const hasProofAnnotation = (lines, index) => {
 export const scanText = (text, file = '<synthetic>') => {
   const lines = text.split('\n')
   const violations = []
+  const members = memberBlocks(lines)
 
   // Collect registry declarations
   const registries = []
@@ -134,10 +160,9 @@ export const scanText = (text, file = '<synthetic>') => {
     // If proof annotation exists, this is whitelisted
     if (reg.hasProof) continue
 
-    // Check for TryTake pattern in the whole file
-    const hasTryTake = TRYTAKE_PATTERN.test(text)
-    // Check for Armed probe pattern
-    const hasArmedProbe = ARMED_PROBE_PATTERN.test(text)
+    // A member pattern only implicates the registry it actually reads/consumes.
+    const hasTryTake = members.some((block) => TRYTAKE_PATTERN.test(block) && referencesRegistry(block, reg.name))
+    const hasArmedProbe = members.some((block) => ARMED_PROBE_PATTERN.test(block) && referencesRegistry(block, reg.name))
     // Check for DU await state: registry value type is an await DU
     const declLine = lines[reg.line]
     const valueMatch = /Dictionary<[^,]+,\s*(\w+)>/.exec(declLine)
