@@ -13,6 +13,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
@@ -47,6 +48,7 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
@@ -900,6 +902,120 @@ module PairProgrammingThoughtTransform =
                     callGap
                     resultGap
         }
+
+    // ── Pair guideline injection (migrated from PluginTransforms composition root) ──
+
+    type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
+
+    let private skipPairGuideline (journal: AgentJournal option) (projectionSessionIdOpt: string option) : bool =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId ->
+            SessionAssociationProjection.isCompanion
+                (SessionId.create sessionId)
+                (AgentJournal.snapshot durable).AgentProjections.Associations
+        | _ -> false
+
+    let private toolEstimateText
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (language: ProviderLanguage)
+        : string option =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId ->
+            DelegatedToolEstimateLedger.tryRemaining durable (SessionId.create sessionId)
+            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
+        | _ -> None
+
+    let private composeMarkerText
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (elapsed: string option)
+        (toolEstimate: string option)
+        (guideline: string)
+        : Task<string> =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId ->
+            task {
+                let! guidance = EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+
+                return PairProgrammingCalibration.composeWithElapsed guidance elapsed toolEstimate guideline
+            }
+        | _ -> Task.FromResult(PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline)
+
+    let private terminateSessionIfPresent
+        (terminateSession: SessionTermination)
+        (projectionSessionIdOpt: string option)
+        (reason: string)
+        : Task =
+        match projectionSessionIdOpt with
+        | Some sessionId ->
+            task {
+                let! _ = terminateSession (SessionId.create sessionId) reason
+                ()
+            }
+        | None -> Task.FromResult()
+
+    let private applyPairInjectResult
+        (terminateSession: SessionTermination)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        (injectResult: Result<obj list, string>)
+        : Task =
+        match injectResult with
+        | Ok newMessages ->
+            HostMessageProjection.replaceMessagesInPlace outObj newMessages
+            Task.FromResult()
+        | Error reason ->
+            Diagnostic.emit
+                "host-013-fail-closed"
+                [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
+
+            terminateSessionIfPresent terminateSession projectionSessionIdOpt reason
+
+    let private injectPairProgrammingGuideline
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (sessionStartedAt: DateTimeOffset option)
+        (clock: IClockPort)
+        (terminateSession: SessionTermination)
+        (language: ProviderLanguage)
+        (outObj: obj)
+        : Task =
+        task {
+            let messages = unbox<obj array> outObj?messages |> Array.toList
+
+            let guideline =
+                ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+
+            let elapsed =
+                sessionStartedAt
+                |> Option.map (fun startedAt ->
+                    let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
+                    PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
+
+            let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
+
+            let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
+
+            let! injectResult =
+                tryInjectCore journal projectionSessionIdOpt markerText messages
+
+            do! applyPairInjectResult terminateSession projectionSessionIdOpt outObj injectResult
+        }
+
+    let maybeInjectGuideline
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (sessionStartedAt: DateTimeOffset option)
+        (clock: IClockPort)
+        (terminateSession: SessionTermination)
+        (language: ProviderLanguage)
+        (outObj: obj)
+        : Task =
+        if skipPairGuideline journal projectionSessionIdOpt then
+            Task.FromResult()
+        else
+            injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock terminateSession language outObj
 
     let tryInject
         (journal: AgentJournal option)

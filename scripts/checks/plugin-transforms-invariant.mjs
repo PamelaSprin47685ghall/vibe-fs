@@ -61,7 +61,7 @@ const orderingSteps = [
   'XWire.applyTransform',
   'applyBloggerEnforcerContinuation',
   'StrengthSpeculate.tryApply',
-  'maybeInjectPairGuideline',
+  'PairProgrammingThoughtTransform.maybeInjectGuideline',
   'projectRequirementGrounding',
   'BloggerChronicleText.maybeInject',
   'sanitizeMessages',

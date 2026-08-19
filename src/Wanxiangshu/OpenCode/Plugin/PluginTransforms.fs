@@ -474,119 +474,10 @@ module PluginTransforms =
             runEnforcerIfMainAssociated scope journal durable terminateSession sid sessionId outObj
         | _ -> Task.FromResult()
 
-    let private skipPairGuideline (journal: AgentJournal option) (projectionSessionIdOpt: string option) : bool =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
-            SessionAssociationProjection.isCompanion
-                (SessionId.create sessionId)
-                (AgentJournal.snapshot durable).AgentProjections.Associations
-        | _ -> false
-
     let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
         match projectionSessionIdOpt with
         | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
         | None -> ProviderLanguage.English
-
-    let private toolEstimateText
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (language: ProviderLanguage)
-        : string option =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
-            DelegatedToolEstimateLedger.tryRemaining durable (SessionId.create sessionId)
-            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
-        | _ -> None
-
-    let private composeMarkerText
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (elapsed: string option)
-        (toolEstimate: string option)
-        (guideline: string)
-        : Task<string> =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
-            task {
-                let! guidance = EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
-
-                return PairProgrammingCalibration.composeWithElapsed guidance elapsed toolEstimate guideline
-            }
-        | _ -> Task.FromResult(PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline)
-
-    let private terminateSessionIfPresent
-        (terminateSession: SessionTermination)
-        (projectionSessionIdOpt: string option)
-        (reason: string)
-        : Task =
-        match projectionSessionIdOpt with
-        | Some sessionId ->
-            task {
-                let! _ = terminateSession (SessionId.create sessionId) reason
-                ()
-            }
-        | None -> Task.FromResult()
-
-    let private applyPairInjectResult
-        (terminateSession: SessionTermination)
-        (projectionSessionIdOpt: string option)
-        (outObj: obj)
-        (injectResult: Result<obj list, string>)
-        : Task =
-        match injectResult with
-        | Ok newMessages ->
-            HostMessageProjection.replaceMessagesInPlace outObj newMessages
-            Task.FromResult()
-        | Error reason ->
-            Diagnostic.emit
-                "host-013-fail-closed"
-                [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
-
-            terminateSessionIfPresent terminateSession projectionSessionIdOpt reason
-
-    let private injectPairProgrammingGuideline
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (sessionStartedAt: DateTimeOffset option)
-        (clock: IClockPort)
-        (terminateSession: SessionTermination)
-        (outObj: obj)
-        : Task =
-        task {
-            let messages = unbox<obj array> outObj?messages |> Array.toList
-            let language = languageFor projectionSessionIdOpt
-
-            let guideline =
-                ProviderProse.render language ProjectionConstants.PairProgrammingGuidelinePath Map.empty
-
-            let elapsed =
-                sessionStartedAt
-                |> Option.map (fun startedAt ->
-                    let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
-                    PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
-
-            let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
-
-            let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
-
-            let! injectResult =
-                PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
-
-            do! applyPairInjectResult terminateSession projectionSessionIdOpt outObj injectResult
-        }
-
-    let private maybeInjectPairGuideline
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (sessionStartedAt: DateTimeOffset option)
-        (clock: IClockPort)
-        (terminateSession: SessionTermination)
-        (outObj: obj)
-        : Task =
-        if skipPairGuideline journal projectionSessionIdOpt then
-            Task.FromResult()
-        else
-            injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock terminateSession outObj
 
     let private projectRequirementGrounding
         (journal: AgentJournal option)
@@ -781,12 +672,13 @@ module PluginTransforms =
                 // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
                 do!
-                    maybeInjectPairGuideline
+                    PairProgrammingThoughtTransform.maybeInjectGuideline
                         journal
                         projectionSessionIdOpt
                         sessionStartedAt
                         clock
                         terminateSession
+                        (languageFor projectionSessionIdOpt)
                         outObj
 
                 // REQUIREMENT-GROUNDING-007/012: permanent requirement reads use
