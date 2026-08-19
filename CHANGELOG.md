@@ -4,6 +4,38 @@
 
 - （空）
 
+## 0.8.4
+
+- Obligation & Magic Todo 强类型化与恢复去令牌化（OBL-002/004）：
+  - MagicTodo checkpoint 生命周期及进度追踪实现全链路强类型化，彻底消除字符串弱类型推导。
+  - 删除 `JobRecoveryAction` 控制令牌调度器；崩溃恢复流程从持久化 facts 重新进入普通 CE workflow。
+  - 清理 AGENTS.md 历史义务账与旧控制流。
+
+- Finality & Review Judgement 裁决去未决态与生命周期收口：
+  - 审阅裁决（`judge`）提交流程引入强类型请求标识与去重；消除未决分支（undecided outcomes）。
+  - Finality 工具支持数组提示词（array prompts），完善审阅者裁决差距（reviewer judgement gaps）。
+
+- Degeneration Guard / Loop Detection 动态校准：
+  - LoopDetector 常量解耦硬编码，转为基于构建产物动态校准分布参数。
+  - LoopSensor 准确捕获并处理 reasoning 与 thinking 增量。
+
+- Session 生命周期与 Abort / 级联中断模型精细化：
+  - 会话级联中断与中止（cascading abort / InterruptAttempt）模型细化，引入 typed assistance outcomes。
+  - 增强会话终止、Daemon 管理与父子会话发现（`bindManagedChild`）。
+  - 内部中断后续生命周期收口。
+
+- Host Boundary & 执行模型路由适配：
+  - 修复连续 user message 之间自动插入 assistant dot message，符合 Host 对话契约。
+  - 插件 Hook 增强柯里化函数与生成适配器的兼容性处理。
+  - 强化物理执行绑定（execution binding）、披露类参数与会话 ID 抽取；显式 `/continue` 命令处理与抑制保持。
+
+- Blogger / Chronicle 与借用容量管理：
+  - 稳定 Blogger 飞行状态与路由默认值；重构 chronicle thought 注入。
+  - 实现借用容量（borrowing capacity）与 credit source 路由管理。
+
+- Requirement Grounding 规范接地系统：
+  - 引入 APPLIES-TO 清单与规范接地上下文压缩、观测闭环。
+
 ## 0.8.3
 
 - 依赖整备：bun-pty `^0.4.10`、gpt-tokenizer `^4.0.0`（`o200k_base` API 不变，滴定常量未漂移）、@opencode-ai/plugin `^1.18.18`、opencode-ai `1.18.18`、smol-toml `1.8.0`；删除零引用的 `eventsource`。Fable 5.13.0 / fable-library-js 2.5.1 已是最新。

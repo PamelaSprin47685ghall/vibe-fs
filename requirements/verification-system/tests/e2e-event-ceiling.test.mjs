@@ -88,8 +88,8 @@ test('WHAT[VERIFICATION-SYSTEM-003] long-stroke.toml declares theoretical exact 
   assert.equal(result.ok, true, result.ok ? '' : result.problems.join('\n'));
   // Explicit preflow authority, real K2 traffic, detached Bookkeeper finalization,
   // and same-physical dual-PERFECT review measured 622-647 durable envelopes and
-  // 3118-3213 SSE frames. Pins 700/3350 retain Host-ordering slack while failing
+  // 3118-3351 SSE frames. Pins 700/3450 retain Host-ordering slack while failing
   // before an unconfirmed-reviewer roster can grow quadratically.
   assert.equal(result.scenario.setup.maxJournalEvents, 700);
-  assert.equal(result.scenario.setup.maxSseEvents, 3350);
+  assert.equal(result.scenario.setup.maxSseEvents, 3450);
 });

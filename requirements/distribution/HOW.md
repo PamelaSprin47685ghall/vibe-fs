@@ -18,7 +18,7 @@
 - `main` == `exports["."]` == 同一 entry（DISTRIBUTION-003）。
 - `files` 是唯一打包 whitelist：`dist/`（编译代码）+ `resources/`（runtime semantic resources）；`package.json`/`README.md`/`LICENSE` 由 npm 自动带进 tarball。**无** `.npmignore`。
 - 私有不公开：`private: true`、`publishConfig.access: restricted`、`license: SEE LICENSE IN LICENSE`；从 tarball 或私有 registry 安装（`README.md` §获取与安装）。
-- 用户可读安装说明见 `README.md`（`npm install ./wanxiangshu-0.8.2.tgz`；OpenCode 配置按包名或 `main` 挂载；启动时资源缺失/非法 → 启动失败，无代码内置副本兜底）。
+- 用户可读安装说明见 `README.md`（`npm install ./wanxiangshu-0.8.4.tgz`；OpenCode 配置按包名或 `main` 挂载；启动时资源缺失/非法 → 启动失败，无代码内置副本兜底）。
 
 ## 2. 构建（scripts/build.mjs）
 
