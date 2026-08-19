@@ -96,4988 +96,4988 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 ---
 
-<div dir="auto">
-    <div dir="auto">思考了 2m 46s</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可以。这次我不再把它写成“架构建议”，而是写成一份可以照着执行、可以逐阶段验收、可以防止重构本身把系统搞坏的迁移手册。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">先给一个总裁决：你们现在其实已经拥有最终体系的大部分“局部定理”，问题不是缺少好思想，而是这些好思想还没有被统一成一套互斥的角色系统，也没有全部升级为 repository-wide
-        mechanically enforced architecture。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">尤其要先避免一个新的误区：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “教科书级”不等于冻结成某个永恒的 49 包、某棵永恒目录树、某套永恒 decorator 分类。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们自己的 requirements/INDEX.md 已经说得非常正确：当前是 49 张 boundary card，但 49 不是目标，也不是稳定 API；后续发现 orphan /
-        overlap / garbage 仍应继续拆并。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正的终态应该是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt;
+
+    思考了 2m 46s
+    
+    可以。这次我不再把它写成“架构建议”，而是写成一份可以照着执行、可以逐阶段验收、可以防止重构本身把系统搞坏的迁移手册。
+    
+    先给一个总裁决：你们现在其实已经拥有最终体系的大部分“局部定理”，问题不是缺少好思想，而是这些好思想还没有被统一成一套互斥的角色系统，也没有全部升级为 repository-wide
+        mechanically enforced architecture。
+    
+    尤其要先避免一个新的误区：
+    
+    &gt; “教科书级”不等于冻结成某个永恒的 49 包、某棵永恒目录树、某套永恒 decorator 分类。
+    
+    
+    
+    你们自己的 requirements/INDEX.md 已经说得非常正确：当前是 49 张 boundary card，但 49 不是目标，也不是稳定 API；后续发现 orphan /
+        overlap / garbage 仍应继续拆并。
+    
+    真正的终态应该是：
+    
+    &gt;
         任何一个语义事实、能力、时序规则、物理资源、持久化事实、跨模块依赖，都能回答“谁拥有它、为什么它存在、谁有资格消费它、如何组合、如何失败、如何恢复、怎样证明”；并且凡是机器可以判断的边界，都由 CI 直接拒绝非法世界。
-    </div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们现有 requirement-system 已经规定每条 normative proposition 恰有一个 package owner，而且明确说文件共址不是 owner
-        判据，ownership 由 WHY + failure meaning + independent change 决定。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以我们不是推倒重来。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我们要做的是完成最后一次 architecture rotation：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">从“Requirement Ownership”升级到“Semantic Capability Architecture”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终我建议把整个系统稳定成下面这张图：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">┌─────────────────────────┐</div>
-    <div dir="auto">                         │      Domain Truth       │</div>
-    <div dir="auto">                         │ ADT / Facts / Evidence  │</div>
-    <div dir="auto">                         │ Pure Decision / Laws    │</div>
-    <div dir="auto">                         └────────────┬────────────┘</div>
-    <div dir="auto">                                      │ establishes</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                         ┌─────────────────────────┐</div>
-    <div dir="auto">                         │         Witness         │</div>
-    <div dir="auto">                         │     “P is now known”    │</div>
-    <div dir="auto">                         └────────────┬────────────┘</div>
-    <div dir="auto">                                      │ admission</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                         ┌─────────────────────────┐</div>
-    <div dir="auto">                         │       Capability        │</div>
-    <div dir="auto">                         │   “effect E is allowed” │</div>
-    <div dir="auto">                         │ scope / epoch / owner   │</div>
-    <div dir="auto">                         └────────────┬────────────┘</div>
-    <div dir="auto">                                      │ consumed by</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">┌──────────────────┐      ┌─────────────────────────┐</div>
-    <div dir="auto">│ Semantic Policy  │─────▶│   Capability-Passing    │</div>
-    <div dir="auto">│ / Vocabulary     │      │         CE              │</div>
-    <div dir="auto">└──────────────────┘      │ sequence / bind / scope │</div>
-    <div dir="auto">                          └────────────┬────────────┘</div>
-    <div dir="auto">                                      │ invokes</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                         ┌─────────────────────────┐</div>
-    <div dir="auto">                         │          Ports          │</div>
-    <div dir="auto">                         └────────────┬────────────┘</div>
-    <div dir="auto">                                      │</div>
-    <div dir="auto">                 ┌────────────────────┼─────────────────────┐</div>
-    <div dir="auto">                 ▼                    ▼                     ▼</div>
-    <div dir="auto">       Port Decorator       Capability Transformer    Physical Adapter</div>
-    <div dir="auto">       invocation law       authority derivation     Host/Git/process</div>
-    <div dir="auto">                 └────────────────────┬─────────────────────┘</div>
-    <div dir="auto">                                      │</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                               Physical Effect</div>
-    <div dir="auto">                                      │</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                             Durable Fact / Receipt</div>
-    <div dir="auto">                                      │</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                         Canonical Event Integrator</div>
-    <div dir="auto">                                      │</div>
-    <div dir="auto">                                      ▼</div>
-    <div dir="auto">                                 Projection</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">横跨所有东西的是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Primary Semantic Owner</div>
-    <div dir="auto">        +</div>
-    <div dir="auto">Published Contract</div>
-    <div dir="auto">        +</div>
-    <div dir="auto">Requirement Law</div>
-    <div dir="auto">        +</div>
-    <div dir="auto">Proof Ladder</div>
-    <div dir="auto">        +</div>
-    <div dir="auto">Architecture Gate</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">下面开始真正的迁移。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第一章：先不要改业务代码——先冻结你现在已经证明正确的世界</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是整个重构最重要的一步。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第一阶段不搬一个文件，不重命名一个大模块，不引入一个新抽象。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">原因很简单：你们现在不是从烂代码开始。相反，仓库中已经有很多非常昂贵、非常精细的因果不变量。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 PluginTransforms.normalTransform 当前实际顺序包含：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">begin physical provider attempt</div>
-    <div dir="auto">→ bind SessionStartedAt</div>
-    <div dir="auto">→ Strength replay</div>
-    <div dir="auto">→ XTrace capture</div>
-    <div dir="auto">→ Companion projection</div>
-    <div dir="auto">→ XWire</div>
-    <div dir="auto">→ Blogger/Enforcer continuation</div>
-    <div dir="auto">→ Strength speculation</div>
-    <div dir="auto">→ Pair guideline</div>
-    <div dir="auto">→ Requirement grounding</div>
-    <div dir="auto">→ Blogger chronicle</div>
-    <div dir="auto">→ Host message sanitization</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而源代码注释已经明确钉住诸如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">XTrace 必须在 Companion rewrite / X-wire 之前；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Strength speculate 必须在 Enforcer 之后、Pair marker 之前；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">requirement grounding 必须在 HOST-013 之后；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">provider-facing sanitation 最后进行。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这意味着：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">PluginTransforms 很泥，但它不是随机泥。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它里面混着很多已经成立的时序定理。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以第一次重构最危险的事情就是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">transforms</div>
-    <div dir="auto">|&gt; List.map apply</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">MiddlewarePipeline.register(...)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">那会把一个显式、可读、有 law 的顺序，改成一个“漂亮但失去主权”的动态解释器。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因此 Phase 0 的任务只有一个：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">给现有行为拍“宪法级快照”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">先确保下面这些入口全部继续成立：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">node scripts/check.mjs</div>
-    <div dir="auto">node requirements/verification-system/tests/run.mjs</div>
-    <div dir="auto">npm run format-build-test</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们现有 verification system 已经定义：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">0 Static</div>
-    <div dir="auto">1 Pure</div>
-    <div dir="auto">2 Temporal</div>
-    <div dir="auto">3 Adapter</div>
-    <div dir="auto">4 Long Stroke</div>
-    <div dir="auto">5 Release</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">并要求顺序被机器 pin。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以迁移过程中严格实行：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">每一次结构重构：</div>
-    <div dir="auto">L0 architecture 必须先绿</div>
-    <div dir="auto">→ build</div>
-    <div dir="auto">→ owner-specific pure/temporal tests</div>
-    <div dir="auto">→ relevant adapter</div>
-    <div dir="auto">→ 最后才跑 Long Stroke</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">绝对不要用：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “E2E 还绿，所以重构没问题。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为你们自己的规范已经正确指出：E2E 是稀缺物理证明，不是 semantic coverage 捷径。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Phase 0 完成条件</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不改行为，只记录：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">A. PluginTransforms 当前 exact semantic order</div>
-    <div dir="auto">B. Assistance abort → idle → successor 当前 exact trace</div>
-    <div dir="auto">C. model routing capacity borrowing 当前 trace</div>
-    <div dir="auto">D. canonical event append/replay 当前 trace</div>
-    <div dir="auto">E. shutdown/drain 当前 trace</div>
-    <div dir="auto">F. recovery re-entry 当前 trace</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这六套 trace 后面就是重构的“不动点”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二章：建立全仓统一的语义词典——从此不再允许 Token 万金油</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是整个重构的语言基础。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">从这一步开始，任何新类型必须属于下面类别之一。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">2.1 Evidence：观察到了什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Evidence 是输入材料，不意味着已经成立某个领域命题。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type ReviewObservation =</div>
-    <div dir="auto">    | ReviewerReportedPerfect of ReviewerId * TreeHash</div>
-    <div dir="auto">    | ReviewerReportedRevision of ReviewerId * Report</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Evidence 可以：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不完整；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">冲突；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">过时；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">被拒绝；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">需要多个来源合并。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “我们观察到了什么？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">2.2 Decision：根据 Evidence 应该判断什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Decision 是纯函数输出。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Evidence -&gt; Decision</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type ReviewDecision =</div>
-    <div dir="auto">    | NeedMoreEvidence</div>
-    <div dir="auto">    | RevisionRequired of Report</div>
-    <div dir="auto">    | CandidateConfirmed of ConfirmedReview</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “根据这些事实，我们应该如何分类？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Decision 本身不授权 effect。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">2.3 Witness：命题已经成立</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness 是已经通过 owner law 建立起来的事实见证。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type ConfirmedReviewWitness = private ConfirmedReviewWitness of ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “P 已被证明。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">P =</div>
-    <div dir="auto">    两位合法 reviewer</div>
-    <div dir="auto">    对同一 tree</div>
-    <div dir="auto">    在同一 review cohort</div>
-    <div dir="auto">    给出满足 finality law 的 PERFECT</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness 应当：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">stable</div>
-    <div dir="auto">auditable</div>
-    <div dir="auto">replayable when the proposition itself is durable</div>
-    <div dir="auto">free of physical resource ownership</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但不要再定义一个绝对规则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “所有 Witness 必须序列化。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更准确的是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 如果它所证明的命题需要跨 crash 存在，那么建立该 Witness 的事实必须可由 durable evidence 重新推导。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">有些 Witness 只是当前函数调用内的纯证明值，没有必要单独写 EventStore。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因此不要为了“Witness 化”疯狂增加：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">FooWitnessCreated</div>
-    <div dir="auto">BarWitnessCreated</div>
-    <div dir="auto">BazWitnessCreated</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">HandleCompleted</div>
-    <div dir="auto">+</div>
-    <div dir="auto">ProviderRun terminal evidence</div>
-    <div dir="auto">+</div>
-    <div dir="auto">AuthorityRoot</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">已经足够纯推导出：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ConsultationCompletedWitness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">就直接 project。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要重复持久化派生真理。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">2.4 Capability：现在有资格做什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability 不证明“世界是真的什么”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “当前 owner 允许你执行某个 effect。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">典型：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">QuiescencePermit</div>
-    <div dir="auto">CapacityLease</div>
-    <div dir="auto">IntegrationPermit</div>
-    <div dir="auto">BlessCapability</div>
-    <div dir="auto">PublishCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">尤其 process-bound effect capability 应具备：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">opaque identity</div>
-    <div dir="auto">owner</div>
-    <div dir="auto">scope</div>
-    <div dir="auto">epoch / serial / generation</div>
-    <div dir="auto">resource binding</div>
-    <div dir="auto">validation rule</div>
-    <div dir="auto">consume/revoke semantics</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">于是以后 code review 中最简单的一问就是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 这是 Witness 还是 Capability？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “嗯……是一个 token……”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">直接 REVISE。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三章：建立 Proof-Carrying Capability 的标准形状</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们已经有了非常好的教科书范例。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AssistanceAbortClaim 当前就是 private typed capability，携带精确 SessionId + ProviderRunIdentity，并被注释为
-        Host-boundary one-shot capability。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">QuiescencePermit 更进一步：它不是 registry presence，而是带 serial 的 process-local permit，由 owner gate 在消费时检查
-        freshness。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以不要再发明一套新 framework。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">把这个模式抽象成审查协议，而不是抽象成基类。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">推荐约定：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type CapabilityId = private CapabilityId of string</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type SomeCapability =</div>
-    <div dir="auto">    private</div>
-    <div dir="auto">        {</div>
-    <div dir="auto">            Id: CapabilityId</div>
-    <div dir="auto">            Scope: ScopeId</div>
-    <div dir="auto">            Epoch: Epoch</div>
-    <div dir="auto">        }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但真正的一次性不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type SomeCapability = ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">保证的。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">gate.TryConsume capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">保证的。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3.1 Owner Gate 的黄金结构</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">推荐统一成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type ConsumeFailure =</div>
-    <div dir="auto">    | AlreadyConsumed</div>
-    <div dir="auto">    | Superseded</div>
-    <div dir="auto">    | WrongScope</div>
-    <div dir="auto">    | StaleEpoch</div>
-    <div dir="auto">    | OwnerDisposed</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type CapabilityGate() =</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    member _.TryConsume(capability)</div>
-    <div dir="auto">        : Result&lt;ConsumedCapability, ConsumeFailure&gt; =</div>
-    <div dir="auto">        ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里我更推荐：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Result&lt;_, ConsumeFailure&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是 bool。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">bool 适合极小的物理 predicate。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一旦 failure meaning 对调试、reconciliation、law 有价值，就应该显式分型。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">注意：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ConsumedCapability 不应该意味着“现在真的执行完 effect 了”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它只意味着：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; admission 已原子完成。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确链条是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability</div>
-    <div dir="auto">→ Consume Gate</div>
-    <div dir="auto">→ Effect Admission</div>
-    <div dir="auto">→ physical operation</div>
-    <div dir="auto">→ physical receipt/evidence</div>
-    <div dir="auto">→ durable fact</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3.2 Capability 消费失败绝大多数不是 exception</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 stale permit：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">新 provider attempt 已开始</div>
-    <div dir="auto">旧 quiescence permit 到达</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是系统允许的 race resolution。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Error Superseded</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是异常。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">异常用于：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">gate internal corruption</div>
-    <div dir="auto">impossible invariant</div>
-    <div dir="auto">disposed resource illegally accessed</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3.3 Capability 不能“半消费回滚”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是非常关键的设计纪律。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要建立这样的模型：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">consume capability</div>
-    <div dir="auto">→ effect 做了一半</div>
-    <div dir="auto">→ 出错</div>
-    <div dir="auto">→ restore capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这会立即陷入分布式事务幻想。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该明确分两层：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Admission Capability</div>
-    <div dir="auto">        ↓ consume</div>
-    <div dir="auto">Effect Attempt</div>
-    <div dir="auto">        ↓</div>
-    <div dir="auto">Succeeded / Failed / Unknown</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果物理 effect 已经可能发生，就进入：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">receipt</div>
-    <div dir="auto">reconciliation</div>
-    <div dir="auto">idempotency</div>
-    <div dir="auto">dedupe</div>
-    <div dir="auto">compensation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是把 capability 复活。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3.4 进程重启后的能力失效</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">process-local capability 最简单可靠的规则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ProcessEpoch = random fresh identity at boot</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability carries ProcessEpoch</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">gate only validates current epoch</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者 capability 只存在于当前 gate 的私有 identity space 中。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这样 restart 后：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">旧 Capability</div>
-    <div dir="auto">≠</div>
-    <div dir="auto">新 Gate 可接受的 Capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不需要显式扫描“把全部 permit 标失效”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3.5 Fable/JS 边界</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要相信 F# private 是 JavaScript 安全边界。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">F# private 是源码/类型层封装。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">跨 Fable semantic surface 时继续采用你们已经在用的规则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">opaque handle</div>
-    <div dir="auto">obtain</div>
-    <div dir="auto">pass back</div>
-    <div dir="auto">dispose</div>
-    <div dir="auto">never inspect</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">durable-events 的 semantic boundary 已经明确把 EventStoreHandle / JournalHandle 暴露为 opaque capability，而
-        JSON-shaped values 才作为普通语义数据跨 JS 边界。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Quiescence semantic test 也已经证明 JS 侧只 obtain/pass-back opaque gate/permit，而不检查 F# representation。
-    </div>
-    <div dir="auto"><br></div>
-    <div dir="auto">推广这个现有模式，不要发明 JS Symbol 安全框架。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除非未来真的存在 adversarial JS plugin security boundary；目前 semantic opacity 足够。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四章：正式把 Decorator 理论改成“观察等价 + Trace Relation”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这一章非常重要。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以后不要说：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; Transparent Decorator 是 f(x)=x。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是错误的。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">定义一个 Port：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">P : Req -&gt; Effect Resp</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">其执行产生 trace：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Trace(P, req)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">再定义业务 owner 认可的观察投影：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">π_business : Trace -&gt; BusinessObservation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">那么 transparent decorator D 应满足：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">π_business(Trace(D(P), x))</div>
-    <div dir="auto">=</div>
-    <div dir="auto">π_business(Trace(P, x))</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">注意：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">π_diagnostic(...)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可以不同。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以 logging / metrics / causal wait observation 才有资格叫“业务透明”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">4.1 Transparent Decorator</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let withCausalObservation observer port =</div>
-    <div dir="auto">    fun request -&gt;</div>
-    <div dir="auto">        task {</div>
-    <div dir="auto">            use lease = observer.Enter(...)</div>
-    <div dir="auto">            try</div>
-    <div dir="auto">                let! response = port request</div>
-    <div dir="auto">                observer.Resolve lease</div>
-    <div dir="auto">                return response</div>
-    <div dir="auto">            with ex -&gt;</div>
-    <div dir="auto">                observer.Fail(lease, ex)</div>
-    <div dir="auto">                return raise ex</div>
-    <div dir="auto">        }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它可以增加：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">diagnostic trace</div>
-    <div dir="auto">timing trace</div>
-    <div dir="auto">causal wait trace</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但不得改变 owner 定义的：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">business facts</div>
-    <div dir="auto">effect multiplicity</div>
-    <div dir="auto">admission authority</div>
-    <div dir="auto">business outcome</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">4.2 Semantic Decorator</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">retry / fallback / deadline / dedupe 等不能套透明定义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该有一个明确 law：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Trace(D(P))</div>
-    <div dir="auto">   R_policy</div>
-    <div dir="auto">Trace(P)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里 R_policy 是 owner 定义的关系。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 fallback 可能规定：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">confirmed failure A</div>
-    <div dir="auto">→ at most one B attempt</div>
-    <div dir="auto">→ B may only begin after A terminal evidence</div>
-    <div dir="auto">→ same logical authority</div>
-    <div dir="auto">→ retry budget monotonic</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这不是“透明”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是新语义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">仓库当前 STRUCTURED-WORKFLOW-013 已经明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">transparent decorator 可叠加；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">retry/fallback/recovery/dedupe/claim/deadline 属于 trace-changing semantic decorator；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">必须拥有正式 law 或 CE 中明确语义名字；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止匿名 MiddlewarePipeline / DecoratorBase / IWorkflowDecorator。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这条不要推翻。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只把数学表达再收紧。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">4.3 Capability Transformer</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">从这一阶段开始，正式停止把 BorrowingCapacity 叫普通 Decorator。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">定义：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">T :</div>
-    <div dir="auto">Resource</div>
-    <div dir="auto">× Context</div>
-    <div dir="auto">× Authority</div>
-    <div dir="auto">→ DerivedCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CapacityLedger</div>
-    <div dir="auto">× SessionLineage</div>
-    <div dir="auto">× CurrentExecution</div>
-    <div dir="auto">→ BorrowedCapacity</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这改变的是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">who may act</div>
-    <div dir="auto">under what authority</div>
-    <div dir="auto">against which resource</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是单纯的调用包装。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以正式词典：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Port Decorator</div>
-    <div dir="auto">    invocation transformation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability Transformer</div>
-    <div dir="auto">    authority derivation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Adapter</div>
-    <div dir="auto">    physical implementation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Semantic Vocabulary</div>
-    <div dir="auto">    law-bearing temporal compression</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五章：绝对禁止建立中央 Decorator Framework</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里请非常坚决。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要建立：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Foundation/</div>
-    <div dir="auto">  Decorators.fs</div>
-    <div dir="auto">  Resilience.fs</div>
-    <div dir="auto">  Middleware.fs</div>
-    <div dir="auto">  Policies.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更不要出现：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type IWorkflowDecorator =</div>
-    <div dir="auto">    abstract Wrap : Workflow -&gt; Workflow</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这会成为下一代大泥球。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确形态：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Time/</div>
-    <div dir="auto">    Deadline.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Execution/Session/Wait/</div>
-    <div dir="auto">    Observation.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Participant/Provider/Attempt/Fallback/</div>
-    <div dir="auto">    Workflow.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">OpenCode/Host/</div>
-    <div dir="auto">    ModelCapacity.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">调用形式可以很函数式：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">raw</div>
-    <div dir="auto">|&gt; CausalWait.observe ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但代码仍属于 capability owner。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">原则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 抽象复用单位不是“设计模式”，而是“同一条 law”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只有发现三个 owner 使用了完全相同的数学 law，才考虑提取一个极小 primitive。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否则宁可有三个五行高阶函数，也不要一个 300 行 ResilienceDecorators.fs。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六章：不要再把 VirtualTimer 叫 Decorator</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是一次重要的词汇清洁。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">VirtualTimer 通常不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Port -&gt; Port</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ITimerPort 的另一实现</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以它属于：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Test Adapter / Deterministic Physical Model</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">生产：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">NodeTimerPort</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">测试：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">VirtualTimerPort</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">二者满足相同 port contract。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">仓库现在已经明确要求 virtual timer/clock 可精确推进，用于确定性 temporal proof。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以以后：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">withVirtualTime</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除非真的是包装现有 timer port，否则不要因为函数式 API 好看就叫 decorator。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是词汇纪律的一部分。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七章：CE 的最终规则——它不是“什么都塞进去”的 workflow 函数</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们当前 structured-workflow 的一句话其实已经非常接近最终定义：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; CE 讲故事；Vocabulary 负责定理；Decorator 负责能力；Port 负责物理。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我会稍作修订：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Pure Algebra          决定事实</div>
-    <div dir="auto">Witness               建立命题</div>
-    <div dir="auto">Capability            授予 effect authority</div>
-    <div dir="auto">CE                    编排因果相继</div>
-    <div dir="auto">Semantic Vocabulary   压缩有证明的时序 law</div>
-    <div dir="auto">Port Decorator        修饰 invocation</div>
-    <div dir="auto">Capability Transformer 派生 authority</div>
-    <div dir="auto">Physical Adapter      接触外部现实</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">7.1 什么应该写成 let!</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">判断方法非常简单：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 它是不是需要等待另一个 capability/effect/evidence 产生？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果是，适合 CE：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">taskResult {</div>
-    <div dir="auto">    let! evidence = reviewer.Await(...)</div>
-    <div dir="auto">    let decision = Review.decide evidence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    match decision with</div>
-    <div dir="auto">    | ...</div>
-    <div dir="auto">}</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">7.2 什么应该是 pure match</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果一个分支只依赖已经取得的数据：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Evidence -&gt; Decision</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">放纯函数。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要写：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">task {</div>
-    <div dir="auto">    if ...</div>
-    <div dir="auto">    elif ...</div>
-    <div dir="auto">    else ...</div>
-    <div dir="auto">}</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后里面根本没有 effect。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let decide evidence =</div>
-    <div dir="auto">    match evidence with</div>
-    <div dir="auto">    | ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更正确。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">7.3 Evidence -&gt; Decision -&gt; match -&gt; Effect 是核心姿态</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要追求整个 workflow：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">A</div>
-    <div dir="auto">→ B</div>
-    <div dir="auto">→ C</div>
-    <div dir="auto">→ D</div>
-    <div dir="auto">→ E</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">完全没有 match。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">业务分支是真实世界的代数。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">好的 CE 往往就是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">taskResult {</div>
-    <div dir="auto">    let! evidence = observe ports</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    match decide evidence with</div>
-    <div dir="auto">    | Stop outcome -&gt;</div>
-    <div dir="auto">        return outcome</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    | Continue instruction -&gt;</div>
-    <div dir="auto">        let! receipt = execute instruction</div>
-    <div dir="auto">        return finish receipt</div>
-    <div dir="auto">}</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这比强迫所有东西 monadic-linear 更清晰。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">7.4 CE 中禁止存在什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CurrentStage</div>
-    <div dir="auto">NextStep</div>
-    <div dir="auto">ResumeAt</div>
-    <div dir="auto">Phase</div>
-    <div dir="auto">StepIndex</div>
-    <div dir="auto">ContinueToken</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果这些只是“程序走到哪里”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ReviewOutcome</div>
-    <div dir="auto">HandleLifecycle</div>
-    <div dir="auto">PhysicalAttempt</div>
-    <div dir="auto">QuiescencePermit</div>
-    <div dir="auto">ProviderFailure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果它们描述真实领域/物理世界。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们当前 STRUCTURED-WORKFLOW-017 已经非常准确地禁止：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">child Stage -&gt; parent match -&gt; effect</div>
-    <div dir="auto">registry presence -&gt; infer lifecycle -&gt; effect</div>
-    <div dir="auto">Advance/Tick/Resume/Step repeatedly drives child</div>
-    <div dir="auto">recovery jumps into child internal continuation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">并要求 parent 只能观察 typed input/capability、领域结果、evidence、capability outcome。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这条就是最终宪法之一。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八章：Semantic Vocabulary 的准入制度</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是每个 helper 都配叫 Vocabulary。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个函数只有在下面五问全部有答案时，才能成为 public semantic vocabulary。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们当前 HOW 已经有几乎一样的审查表：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">1. 名字声明什么业务承诺？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">2. 隐藏哪些时序？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3. 哪个 temporal / behavioral proof 证明？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">4. 改变 trace 还是 transparent？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">5. crash 后从什么 durable evidence 重入？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议再加两问：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">6. 它的 Primary Owner 是谁？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">7. 如果删除/替换实现，哪些消费者应该完全不受影响？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">于是禁用：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">executeSafe</div>
-    <div dir="auto">process</div>
-    <div dir="auto">handle</div>
-    <div dir="auto">runThing</div>
-    <div dir="auto">manage</div>
-    <div dir="auto">perform</div>
-    <div dir="auto">doWorkflow</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除非 domain vocabulary 真的就叫那个。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">鼓励：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">continueAfterConfirmedFailure</div>
-    <div dir="auto">ensurePerfectConfirmed</div>
-    <div dir="auto">publishEventually</div>
-    <div dir="auto">recoverFamilyDirect</div>
-    <div dir="auto">reviewUntilFirstRevisionOrAllConfirmed</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">事实上 structured-workflow 当前已经登记了这些高阶 Vocabulary，并要求生产定义真实存在。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是很好的基础。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九章：现在开始建立缺失的那一层——Production Semantic Ownership Graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是我认为本仓下一次最大 architecture upgrade。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们已经有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Requirement proposition owner</div>
-    <div dir="auto">Requirement dependency graph</div>
-    <div dir="auto">APPLIES-TO</div>
-    <div dir="auto">JS semantic surface owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但还没有一张足够强的：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">production artifact</div>
-    <div dir="auto">→ primary semantic owner</div>
-    <div dir="auto">→ public contracts</div>
-    <div dir="auto">→ allowed owner dependencies</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">9.1 不要滥用 APPLIES-TO</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">现在 structured-workflow/APPLIES-TO 覆盖整个：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">/src/Wanxiangshu/**/*.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以及大量 gate scripts。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这本身不一定错。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为 structured-workflow 是全仓结构规则，当然可以“观察”全仓。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">错误在于把：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">APPLIES-TO</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">误解成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">OWNS</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以我现在不会建议简单把 APPLIES-TO 缩掉。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议语义上明确三种关系：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">OWNS</div>
-    <div dir="auto">GOVERNS</div>
-    <div dir="auto">OBSERVES</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最低成本实现可以不改文件格式：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">WHAT owner</div>
-    <div dir="auto">APPLIES-TO = governance/observation scope</div>
-    <div dir="auto">architecture ownership manifest = production primary owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这样：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">structured-workflow</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可以合法治理 646 个 F# 文件而一个业务功能都不拥有。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是正确的 Meta Package。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">9.2 增加 architecture/semantic-owners.*</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">名字可自行定。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">[[owner]]</div>
-    <div dir="auto">path = &quot;src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs&quot;</div>
-    <div dir="auto">primary = &quot;execution-model-routing&quot;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">[[owner]]</div>
-    <div dir="auto">path = &quot;src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs&quot;</div>
-    <div dir="auto">primary = &quot;interaction-authority&quot;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">[[owner]]</div>
-    <div dir="auto">path = &quot;src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs&quot;</div>
-    <div dir="auto">primary = &quot;host-boundary&quot;</div>
-    <div dir="auto">kind = &quot;composition-root&quot;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">重点不是 TOML。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">重点是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 任何 production module 必须有恰一个 primary semantic owner。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个文件实现其它 package law 的消费</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但不允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">两个 package 都说“这段行为是我定义的”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们 js-semantic-surface 已经出现类似成熟模式：surface entry 带明确 owner、laws、representation、kind，并在跨 owner law 时使用
-        lawOwners。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">把这个思想推广到 production architecture。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">9.3 Primary Owner 不等于目录</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这点千万别退化回 Layer Architecture。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">OpenCode/Host/ModelCapacity.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">物理上在 OpenCode/Host。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">语义 owner 可以是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">execution-model-routing</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">没问题。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Requirement system 自己已经说：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 文件/模块共址不是 owner 判据。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以不要重新建立：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Domain/</div>
-    <div dir="auto">Application/</div>
-    <div dir="auto">Infrastructure/</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后以为目录就是语义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十章：建立 Owner Dependency Gate</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">有了：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">file → owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">才能开始真正消灭大泥球。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">目标是生成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">production import graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后投影为：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">owner A -&gt; owner B</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">10.1 不要求 source graph = requirement graph 一模一样</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是非常重要的。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Requirement dependency 表示：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; law A 的成立以 law B 为前提。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Source dependency 表示：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; implementation A 编译时引用 implementation B。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">两者不是同一张图。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以不要写一个幼稚 gate：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">F# import edge 必须与 requirements/INDEX.md 一一对应</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确规则是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 一个跨 owner 的 production dependency 必须拥有合法的 architectural justification。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一般是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">A requirement depends on B</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">A consumes B&#39;s published physical/semantic contract</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">composition root wiring</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">10.2 禁止 cross-owner internal import</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是未来最重要的 L0 gate 之一。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">规则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">foreign owner</div>
-    <div dir="auto">    ↓</div>
-    <div dir="auto">只能依赖</div>
-    <div dir="auto">    ↓</div>
-    <div dir="auto">published contract / port / semantic surface</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Owner A</div>
-    <div dir="auto">→ Owner B/private/internal/helper/implementation DU</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">仓库现有 enforcer 已经把这个问题说得非常精确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 语言层面的 public/internal 不是 architecture authorization；真正的问题是 owner 是否承诺它为跨层 contract。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以最好建立显式 published contract manifest，而不是仅靠：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">文件名叫 Surface.fs 就算 public</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十一章：不要立即拆 PluginTransforms——先重新定义它是什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">现在开始第一个大手术。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">首先需要改变目标：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; PluginTransforms 不需要“少依赖”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Composition Root 本来就应该知道很多 capability。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正的问题是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 它能不能只知道 public capability，而不知道那些 capability 的内部语义实现？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以目标不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">95 opens -&gt; 5 opens</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">目标是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">wide fan-out</div>
-    <div dir="auto">but shallow knowledge</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是根本区别。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十二章：PluginTransforms 最终结构</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议最终把它定义为：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Provider Transform Composition Root</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它只做四件事：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">1. 确定本次 transform 属于哪种 composition mode</div>
-    <div dir="auto">2. 按固定语义顺序调用 owner-published operations</div>
-    <div dir="auto">3. 显式传递必要 capability/context</div>
-    <div dir="auto">4. 返回 Host 所需结果</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它不能：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">自己重新判断 XTrace law</div>
-    <div dir="auto">自己解析 Strength policy</div>
-    <div dir="auto">自己实现 Enforcer continuation</div>
-    <div dir="auto">自己决定 requirement-grounding 规则</div>
-    <div dir="auto">自己读业务 persistence</div>
-    <div dir="auto">自己维护跨 callback state</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十三章：不要建立 ITransformMiddleware</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">绝对不要：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type ITransform =</div>
-    <div dir="auto">    abstract Apply : TransformContext -&gt; Task&lt;TransformContext&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let pipeline =</div>
-    <div dir="auto">    [</div>
-    <div dir="auto">        xtrace</div>
-    <div dir="auto">        companion</div>
-    <div dir="auto">        enforcer</div>
-    <div dir="auto">        strength</div>
-    <div dir="auto">    ]</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为这会把语义顺序变成数据。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以后一定会出现：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">if condition then pipeline.Insert(...)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后恭喜，第二运行时回来了。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十四章：PluginTransforms 使用“静态乐谱”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终应该看起来像：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let normalTransform</div>
-    <div dir="auto">    (cap: NormalTransformCapabilities)</div>
-    <div dir="auto">    (input: TransformInput)</div>
-    <div dir="auto">    : Task&lt;unit&gt; =</div>
-    <div dir="auto">    task {</div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.ProviderAttempt.beginPhysicalAttempt</div>
-    <div dir="auto">                input.Session</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        let! startedAt =</div>
-    <div dir="auto">            cap.SessionTime.bindStartedAt</div>
-    <div dir="auto">                input.Session</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        let! replay =</div>
-    <div dir="auto">            cap.Strength.prepareReplay</div>
-    <div dir="auto">                input.Session</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.SemanticTrace.captureBeforeProjection</div>
-    <div dir="auto">                input.Session</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto">                replay</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.Companion.projectOrdinaryMaterial</div>
-    <div dir="auto">                input.Input</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.ProviderProjection.applyXWire</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.BloggerContinuation.continueAfterProjection</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.Strength.completeEligibleSpeculation</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.PairGuidance.projectAfterStrength</div>
-    <div dir="auto">                startedAt</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        do!</div>
-    <div dir="auto">            cap.RequirementGrounding.project</div>
-    <div dir="auto">                input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        cap.BloggerChronicle.project input.Output</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        cap.HostBoundary.ensureProviderMessageShape input.Output</div>
-    <div dir="auto">    }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">注意：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">NormalTransformCapabilities 不是一个全仓 service locator。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">private/local to PluginTransforms composition</div>
-    <div dir="auto">named fields</div>
-    <div dir="auto">fixed topology</div>
-    <div dir="auto">no List&lt;Middleware&gt;</div>
-    <div dir="auto">no dynamic registration</div>
-    <div dir="auto">no generic decorator interface</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这样测试很好写，而生产顺序仍然显式。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十五章：PluginTransforms 的顺序怎么永久锁死</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要只做 source-regex test。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">需要三层 proof。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">L0：composition shape</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">静态检查：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">no middleware list</div>
-    <div dir="auto">no dynamic registration</div>
-    <div dir="auto">no private semantic helper proliferation</div>
-    <div dir="auto">no foreign internal imports</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">L1/L2：semantic trace</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">把 NormalTransformCapabilities 替换为 recording fakes：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">BeginAttempt</div>
-    <div dir="auto">BindSessionStart</div>
-    <div dir="auto">PrepareStrength</div>
-    <div dir="auto">CaptureXTrace</div>
-    <div dir="auto">ProjectCompanion</div>
-    <div dir="auto">ApplyXWire</div>
-    <div dir="auto">ContinueBlogger</div>
-    <div dir="auto">SpeculateStrength</div>
-    <div dir="auto">InjectPair</div>
-    <div dir="auto">GroundRequirements</div>
-    <div dir="auto">InjectChronicle</div>
-    <div dir="auto">Sanitize</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">断言：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">actualTrace = expectedTrace</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而且各 operation 自己仍由 owner package 证明。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">L3：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真实 Host adapter 只证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">OpenCode transform mutation semantics</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">L4：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">One World 只证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 整套 composition 在真实 OpenCode 环境可工作。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就符合你们现有 proof ladder。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十六章：如何防止以后又往 PluginTransforms 塞 helper</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">新增 L0：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">PluginTransforms composition-root invariant</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">create</div>
-    <div dir="auto">wire</div>
-    <div dir="auto">compose</div>
-    <div dir="auto">dispatch mode</div>
-    <div dir="auto">call owner surface</div>
-    <div dir="auto">small Host shape extraction</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let private decideXXX</div>
-    <div dir="auto">let private recoverXXX</div>
-    <div dir="auto">let private classifyXXX</div>
-    <div dir="auto">let private calculateXXX</div>
-    <div dir="auto">let private maintainXXX</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是靠函数名黑名单完全判断，而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">1. composition root 的 pure helper 只能是 representation-level；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">2. semantic branch 必须调用 owner function；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">3. 新增超过一定复杂度的 private helper触发人工 owner review。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要使用 LOC 限制。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">行数不是架构。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十七章：PluginTransforms 的 Strength Replica branch 不要强行消灭</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前源码明确存在：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Replica:</div>
-    <div dir="auto">XWire</div>
-    <div dir="auto">→ runtime.HandleTransform</div>
-    <div dir="auto">→ sanitize</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而普通路径经过完整 normalTransform。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这个分支看起来“不统一”，但可能恰恰是领域差异。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以不要为了：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “所有 transform 都应该走统一 pipeline”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强行合并。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确做法是定义：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type TransformMode =</div>
-    <div dir="auto">    | Ordinary</div>
-    <div dir="auto">    | StrengthReplica of StrengthReplicaCapability</div>
-    <div dir="auto">    | ExplicitResumeDisclosure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果这些确实是真实 semantic alternatives。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">match mode with</div>
-    <div dir="auto">| Ordinary -&gt; ...</div>
-    <div dir="auto">| StrengthReplica cap -&gt; ...</div>
-    <div dir="auto">| ExplicitResumeDisclosure -&gt; ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是合法领域分支。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 program counter。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十八章：第二个手术点 AssistanceHost——先承认它已经有一半是正确答案</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这一点很重要。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要把 AssistanceHost 当作“全坏”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">现在 NeedHelpSensor 已经：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">exact sentinel</div>
-    <div dir="auto">exact SessionId</div>
-    <div dir="auto">exact ProviderRunIdentity</div>
-    <div dir="auto">private AssistanceAbortClaim</div>
-    <div dir="auto">one-shot consumption</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而且当前源码明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AbortWake 只 claim</div>
-    <div dir="auto">fresh SessionIdle 才是 transport fence</div>
-    <div dir="auto">permit 后才 TryConsumeAssistanceClaim</div>
-    <div dir="auto">成功后才能发送 escalation / 创建 consultation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这其实已经是一个非常漂亮的：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability-Passing causal handoff</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以 AssistanceHost 的重构不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “把旧隐式状态机变成 capability。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它已经做了一部分。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正任务是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 把这个正确的 capability seam 从巨大跨领域 host 中解放出来。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第十九章：Assistance 的最终业务所有权应该是什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议把它的核心责任写成一句话：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 当一个受 Wanxiangshu 管理的 provider attempt 产生合法 NEEDHELP authority 时，在不破坏当前 physical
+    
+    
+    
+    
+    你们现有 requirement-system 已经规定每条 normative proposition 恰有一个 package owner，而且明确说文件共址不是 owner
+        判据，ownership 由 WHY + failure meaning + independent change 决定。
+    
+    所以我们不是推倒重来。
+    
+    我们要做的是完成最后一次 architecture rotation：
+    
+    从“Requirement Ownership”升级到“Semantic Capability Architecture”
+    
+    最终我建议把整个系统稳定成下面这张图：
+    
+    ┌─────────────────────────┐
+                             │      Domain Truth       │
+                             │ ADT / Facts / Evidence  │
+                             │ Pure Decision / Laws    │
+                             └────────────┬────────────┘
+                                          │ establishes
+                                          ▼
+                             ┌─────────────────────────┐
+                             │         Witness         │
+                             │     “P is now known”    │
+                             └────────────┬────────────┘
+                                          │ admission
+                                          ▼
+                             ┌─────────────────────────┐
+                             │       Capability        │
+                             │   “effect E is allowed” │
+                             │ scope / epoch / owner   │
+                             └────────────┬────────────┘
+                                          │ consumed by
+                                          ▼
+    ┌──────────────────┐      ┌─────────────────────────┐
+    │ Semantic Policy  │─────▶│   Capability-Passing    │
+    │ / Vocabulary     │      │         CE              │
+    └──────────────────┘      │ sequence / bind / scope │
+                              └────────────┬────────────┘
+                                          │ invokes
+                                          ▼
+                             ┌─────────────────────────┐
+                             │          Ports          │
+                             └────────────┬────────────┘
+                                          │
+                     ┌────────────────────┼─────────────────────┐
+                     ▼                    ▼                     ▼
+           Port Decorator       Capability Transformer    Physical Adapter
+           invocation law       authority derivation     Host/Git/process
+                     └────────────────────┬─────────────────────┘
+                                          │
+                                          ▼
+                                   Physical Effect
+                                          │
+                                          ▼
+                                 Durable Fact / Receipt
+                                          │
+                                          ▼
+                             Canonical Event Integrator
+                                          │
+                                          ▼
+                                     Projection
+    
+    横跨所有东西的是：
+    
+    Primary Semantic Owner
+            +
+    Published Contract
+            +
+    Requirement Law
+            +
+    Proof Ladder
+            +
+    Architecture Gate
+    
+    下面开始真正的迁移。
+    
+    
+    ---
+    
+    第一章：先不要改业务代码——先冻结你现在已经证明正确的世界
+    
+    这是整个重构最重要的一步。
+    
+    第一阶段不搬一个文件，不重命名一个大模块，不引入一个新抽象。
+    
+    原因很简单：你们现在不是从烂代码开始。相反，仓库中已经有很多非常昂贵、非常精细的因果不变量。
+    
+    例如 PluginTransforms.normalTransform 当前实际顺序包含：
+    
+    begin physical provider attempt
+    → bind SessionStartedAt
+    → Strength replay
+    → XTrace capture
+    → Companion projection
+    → XWire
+    → Blogger/Enforcer continuation
+    → Strength speculation
+    → Pair guideline
+    → Requirement grounding
+    → Blogger chronicle
+    → Host message sanitization
+    
+    而源代码注释已经明确钉住诸如：
+    
+    XTrace 必须在 Companion rewrite / X-wire 之前；
+    
+    Strength speculate 必须在 Enforcer 之后、Pair marker 之前；
+    
+    requirement grounding 必须在 HOST-013 之后；
+    
+    provider-facing sanitation 最后进行。
+    
+    
+    这意味着：
+    
+    PluginTransforms 很泥，但它不是随机泥。
+    
+    它里面混着很多已经成立的时序定理。
+    
+    所以第一次重构最危险的事情就是：
+    
+    transforms
+    |&gt; List.map apply
+    
+    或者：
+    
+    MiddlewarePipeline.register(...)
+    
+    那会把一个显式、可读、有 law 的顺序，改成一个“漂亮但失去主权”的动态解释器。
+    
+    因此 Phase 0 的任务只有一个：
+    
+    给现有行为拍“宪法级快照”
+    
+    先确保下面这些入口全部继续成立：
+    
+    node scripts/check.mjs
+    node requirements/verification-system/tests/run.mjs
+    npm run format-build-test
+    
+    你们现有 verification system 已经定义：
+    
+    0 Static
+    1 Pure
+    2 Temporal
+    3 Adapter
+    4 Long Stroke
+    5 Release
+    
+    并要求顺序被机器 pin。
+    
+    所以迁移过程中严格实行：
+    
+    每一次结构重构：
+    L0 architecture 必须先绿
+    → build
+    → owner-specific pure/temporal tests
+    → relevant adapter
+    → 最后才跑 Long Stroke
+    
+    绝对不要用：
+    
+    &gt; “E2E 还绿，所以重构没问题。”
+    
+    
+    
+    因为你们自己的规范已经正确指出：E2E 是稀缺物理证明，不是 semantic coverage 捷径。
+    
+    Phase 0 完成条件
+    
+    不改行为，只记录：
+    
+    A. PluginTransforms 当前 exact semantic order
+    B. Assistance abort → idle → successor 当前 exact trace
+    C. model routing capacity borrowing 当前 trace
+    D. canonical event append/replay 当前 trace
+    E. shutdown/drain 当前 trace
+    F. recovery re-entry 当前 trace
+    
+    这六套 trace 后面就是重构的“不动点”。
+    
+    
+    ---
+    
+    第二章：建立全仓统一的语义词典——从此不再允许 Token 万金油
+    
+    这是整个重构的语言基础。
+    
+    从这一步开始，任何新类型必须属于下面类别之一。
+    
+    
+    ---
+    
+    2.1 Evidence：观察到了什么
+    
+    Evidence 是输入材料，不意味着已经成立某个领域命题。
+    
+    例如：
+    
+    type ReviewObservation =
+        | ReviewerReportedPerfect of ReviewerId * TreeHash
+        | ReviewerReportedRevision of ReviewerId * Report
+    
+    Evidence 可以：
+    
+    不完整；
+    
+    冲突；
+    
+    过时；
+    
+    被拒绝；
+    
+    需要多个来源合并。
+    
+    
+    它回答：
+    
+    &gt; “我们观察到了什么？”
+    
+    
+    
+    
+    ---
+    
+    2.2 Decision：根据 Evidence 应该判断什么
+    
+    Decision 是纯函数输出。
+    
+    Evidence -&gt; Decision
+    
+    例如：
+    
+    type ReviewDecision =
+        | NeedMoreEvidence
+        | RevisionRequired of Report
+        | CandidateConfirmed of ConfirmedReview
+    
+    它回答：
+    
+    &gt; “根据这些事实，我们应该如何分类？”
+    
+    
+    
+    Decision 本身不授权 effect。
+    
+    
+    ---
+    
+    2.3 Witness：命题已经成立
+    
+    Witness 是已经通过 owner law 建立起来的事实见证。
+    
+    type ConfirmedReviewWitness = private ConfirmedReviewWitness of ...
+    
+    它回答：
+    
+    &gt; “P 已被证明。”
+    
+    
+    
+    例如：
+    
+    P =
+        两位合法 reviewer
+        对同一 tree
+        在同一 review cohort
+        给出满足 finality law 的 PERFECT
+    
+    Witness 应当：
+    
+    stable
+    auditable
+    replayable when the proposition itself is durable
+    free of physical resource ownership
+    
+    但不要再定义一个绝对规则：
+    
+    &gt; “所有 Witness 必须序列化。”
+    
+    
+    
+    更准确的是：
+    
+    &gt; 如果它所证明的命题需要跨 crash 存在，那么建立该 Witness 的事实必须可由 durable evidence 重新推导。
+    
+    
+    
+    有些 Witness 只是当前函数调用内的纯证明值，没有必要单独写 EventStore。
+    
+    因此不要为了“Witness 化”疯狂增加：
+    
+    FooWitnessCreated
+    BarWitnessCreated
+    BazWitnessCreated
+    
+    如果：
+    
+    HandleCompleted
+    +
+    ProviderRun terminal evidence
+    +
+    AuthorityRoot
+    
+    已经足够纯推导出：
+    
+    ConsultationCompletedWitness
+    
+    就直接 project。
+    
+    不要重复持久化派生真理。
+    
+    
+    ---
+    
+    2.4 Capability：现在有资格做什么
+    
+    Capability 不证明“世界是真的什么”。
+    
+    它证明：
+    
+    &gt; “当前 owner 允许你执行某个 effect。”
+    
+    
+    
+    典型：
+    
+    QuiescencePermit
+    CapacityLease
+    IntegrationPermit
+    BlessCapability
+    PublishCapability
+    
+    尤其 process-bound effect capability 应具备：
+    
+    opaque identity
+    owner
+    scope
+    epoch / serial / generation
+    resource binding
+    validation rule
+    consume/revoke semantics
+    
+    于是以后 code review 中最简单的一问就是：
+    
+    &gt; 这是 Witness 还是 Capability？
+    
+    
+    
+    如果回答：
+    
+    &gt; “嗯……是一个 token……”
+    
+    
+    
+    直接 REVISE。
+    
+    
+    ---
+    
+    第三章：建立 Proof-Carrying Capability 的标准形状
+    
+    你们已经有了非常好的教科书范例。
+    
+    AssistanceAbortClaim 当前就是 private typed capability，携带精确 SessionId + ProviderRunIdentity，并被注释为
+        Host-boundary one-shot capability。
+    
+    QuiescencePermit 更进一步：它不是 registry presence，而是带 serial 的 process-local permit，由 owner gate 在消费时检查
+        freshness。
+    
+    所以不要再发明一套新 framework。
+    
+    把这个模式抽象成审查协议，而不是抽象成基类。
+    
+    推荐约定：
+    
+    type CapabilityId = private CapabilityId of string
+    
+    type SomeCapability =
+        private
+            {
+                Id: CapabilityId
+                Scope: ScopeId
+                Epoch: Epoch
+            }
+    
+    但真正的一次性不是：
+    
+    type SomeCapability = ...
+    
+    保证的。
+    
+    而是：
+    
+    gate.TryConsume capability
+    
+    保证的。
+    
+    
+    ---
+    
+    3.1 Owner Gate 的黄金结构
+    
+    推荐统一成：
+    
+    type ConsumeFailure =
+        | AlreadyConsumed
+        | Superseded
+        | WrongScope
+        | StaleEpoch
+        | OwnerDisposed
+    
+    type CapabilityGate() =
+    
+        member _.TryConsume(capability)
+            : Result&lt;ConsumedCapability, ConsumeFailure&gt; =
+            ...
+    
+    这里我更推荐：
+    
+    Result&lt;_, ConsumeFailure&gt;
+    
+    而不是 bool。
+    
+    bool 适合极小的物理 predicate。
+    
+    一旦 failure meaning 对调试、reconciliation、law 有价值，就应该显式分型。
+    
+    注意：
+    
+    ConsumedCapability 不应该意味着“现在真的执行完 effect 了”。
+    
+    它只意味着：
+    
+    &gt; admission 已原子完成。
+    
+    
+    
+    正确链条是：
+    
+    Capability
+    → Consume Gate
+    → Effect Admission
+    → physical operation
+    → physical receipt/evidence
+    → durable fact
+    
+    
+    ---
+    
+    3.2 Capability 消费失败绝大多数不是 exception
+    
+    例如 stale permit：
+    
+    新 provider attempt 已开始
+    旧 quiescence permit 到达
+    
+    这是系统允许的 race resolution。
+    
+    应该是：
+    
+    Error Superseded
+    
+    而不是异常。
+    
+    异常用于：
+    
+    gate internal corruption
+    impossible invariant
+    disposed resource illegally accessed
+    
+    
+    ---
+    
+    3.3 Capability 不能“半消费回滚”
+    
+    这是非常关键的设计纪律。
+    
+    不要建立这样的模型：
+    
+    consume capability
+    → effect 做了一半
+    → 出错
+    → restore capability
+    
+    这会立即陷入分布式事务幻想。
+    
+    应该明确分两层：
+    
+    Admission Capability
+            ↓ consume
+    Effect Attempt
+            ↓
+    Succeeded / Failed / Unknown
+    
+    如果物理 effect 已经可能发生，就进入：
+    
+    receipt
+    reconciliation
+    idempotency
+    dedupe
+    compensation
+    
+    而不是把 capability 复活。
+    
+    
+    ---
+    
+    3.4 进程重启后的能力失效
+    
+    process-local capability 最简单可靠的规则：
+    
+    ProcessEpoch = random fresh identity at boot
+    
+    Capability carries ProcessEpoch
+    
+    gate only validates current epoch
+    
+    或者 capability 只存在于当前 gate 的私有 identity space 中。
+    
+    这样 restart 后：
+    
+    旧 Capability
+    ≠
+    新 Gate 可接受的 Capability
+    
+    而不需要显式扫描“把全部 permit 标失效”。
+    
+    
+    ---
+    
+    3.5 Fable/JS 边界
+    
+    不要相信 F# private 是 JavaScript 安全边界。
+    
+    F# private 是源码/类型层封装。
+    
+    跨 Fable semantic surface 时继续采用你们已经在用的规则：
+    
+    opaque handle
+    obtain
+    pass back
+    dispose
+    never inspect
+    
+    durable-events 的 semantic boundary 已经明确把 EventStoreHandle / JournalHandle 暴露为 opaque capability，而
+        JSON-shaped values 才作为普通语义数据跨 JS 边界。
+    
+    Quiescence semantic test 也已经证明 JS 侧只 obtain/pass-back opaque gate/permit，而不检查 F# representation。
+    
+    
+    推广这个现有模式，不要发明 JS Symbol 安全框架。
+    
+    除非未来真的存在 adversarial JS plugin security boundary；目前 semantic opacity 足够。
+    
+    
+    ---
+    
+    第四章：正式把 Decorator 理论改成“观察等价 + Trace Relation”
+    
+    这一章非常重要。
+    
+    以后不要说：
+    
+    &gt; Transparent Decorator 是 f(x)=x。
+    
+    
+    
+    这是错误的。
+    
+    定义一个 Port：
+    
+    P : Req -&gt; Effect Resp
+    
+    其执行产生 trace：
+    
+    Trace(P, req)
+    
+    再定义业务 owner 认可的观察投影：
+    
+    π_business : Trace -&gt; BusinessObservation
+    
+    那么 transparent decorator D 应满足：
+    
+    π_business(Trace(D(P), x))
+    =
+    π_business(Trace(P, x))
+    
+    注意：
+    
+    π_diagnostic(...)
+    
+    可以不同。
+    
+    所以 logging / metrics / causal wait observation 才有资格叫“业务透明”。
+    
+    
+    ---
+    
+    4.1 Transparent Decorator
+    
+    例：
+    
+    let withCausalObservation observer port =
+        fun request -&gt;
+            task {
+                use lease = observer.Enter(...)
+                try
+                    let! response = port request
+                    observer.Resolve lease
+                    return response
+                with ex -&gt;
+                    observer.Fail(lease, ex)
+                    return raise ex
+            }
+    
+    它可以增加：
+    
+    diagnostic trace
+    timing trace
+    causal wait trace
+    
+    但不得改变 owner 定义的：
+    
+    business facts
+    effect multiplicity
+    admission authority
+    business outcome
+    
+    
+    ---
+    
+    4.2 Semantic Decorator
+    
+    retry / fallback / deadline / dedupe 等不能套透明定义。
+    
+    应该有一个明确 law：
+    
+    Trace(D(P))
+       R_policy
+    Trace(P)
+    
+    这里 R_policy 是 owner 定义的关系。
+    
+    例如 fallback 可能规定：
+    
+    confirmed failure A
+    → at most one B attempt
+    → B may only begin after A terminal evidence
+    → same logical authority
+    → retry budget monotonic
+    
+    这不是“透明”。
+    
+    这是新语义。
+    
+    仓库当前 STRUCTURED-WORKFLOW-013 已经明确：
+    
+    transparent decorator 可叠加；
+    
+    retry/fallback/recovery/dedupe/claim/deadline 属于 trace-changing semantic decorator；
+    
+    必须拥有正式 law 或 CE 中明确语义名字；
+    
+    禁止匿名 MiddlewarePipeline / DecoratorBase / IWorkflowDecorator。
+    
+    
+    这条不要推翻。
+    
+    只把数学表达再收紧。
+    
+    
+    ---
+    
+    4.3 Capability Transformer
+    
+    从这一阶段开始，正式停止把 BorrowingCapacity 叫普通 Decorator。
+    
+    定义：
+    
+    T :
+    Resource
+    × Context
+    × Authority
+    → DerivedCapability
+    
+    例如：
+    
+    CapacityLedger
+    × SessionLineage
+    × CurrentExecution
+    → BorrowedCapacity
+    
+    这改变的是：
+    
+    who may act
+    under what authority
+    against which resource
+    
+    不是单纯的调用包装。
+    
+    所以正式词典：
+    
+    Port Decorator
+        invocation transformation
+    
+    Capability Transformer
+        authority derivation
+    
+    Adapter
+        physical implementation
+    
+    Semantic Vocabulary
+        law-bearing temporal compression
+    
+    
+    ---
+    
+    第五章：绝对禁止建立中央 Decorator Framework
+    
+    这里请非常坚决。
+    
+    不要建立：
+    
+    Foundation/
+      Decorators.fs
+      Resilience.fs
+      Middleware.fs
+      Policies.fs
+    
+    更不要出现：
+    
+    type IWorkflowDecorator =
+        abstract Wrap : Workflow -&gt; Workflow
+    
+    这会成为下一代大泥球。
+    
+    正确形态：
+    
+    Time/
+        Deadline.fs
+    
+    Execution/Session/Wait/
+        Observation.fs
+    
+    Participant/Provider/Attempt/Fallback/
+        Workflow.fs
+    
+    OpenCode/Host/
+        ModelCapacity.fs
+    
+    调用形式可以很函数式：
+    
+    raw
+    |&gt; CausalWait.observe ...
+    
+    但代码仍属于 capability owner。
+    
+    原则：
+    
+    &gt; 抽象复用单位不是“设计模式”，而是“同一条 law”。
+    
+    
+    
+    只有发现三个 owner 使用了完全相同的数学 law，才考虑提取一个极小 primitive。
+    
+    否则宁可有三个五行高阶函数，也不要一个 300 行 ResilienceDecorators.fs。
+    
+    
+    ---
+    
+    第六章：不要再把 VirtualTimer 叫 Decorator
+    
+    这是一次重要的词汇清洁。
+    
+    VirtualTimer 通常不是：
+    
+    Port -&gt; Port
+    
+    它是：
+    
+    ITimerPort 的另一实现
+    
+    所以它属于：
+    
+    Test Adapter / Deterministic Physical Model
+    
+    生产：
+    
+    NodeTimerPort
+    
+    测试：
+    
+    VirtualTimerPort
+    
+    二者满足相同 port contract。
+    
+    仓库现在已经明确要求 virtual timer/clock 可精确推进，用于确定性 temporal proof。
+    
+    所以以后：
+    
+    withVirtualTime
+    
+    除非真的是包装现有 timer port，否则不要因为函数式 API 好看就叫 decorator。
+    
+    这是词汇纪律的一部分。
+    
+    
+    ---
+    
+    第七章：CE 的最终规则——它不是“什么都塞进去”的 workflow 函数
+    
+    你们当前 structured-workflow 的一句话其实已经非常接近最终定义：
+    
+    &gt; CE 讲故事；Vocabulary 负责定理；Decorator 负责能力；Port 负责物理。
+    
+    
+    
+    我会稍作修订：
+    
+    Pure Algebra          决定事实
+    Witness               建立命题
+    Capability            授予 effect authority
+    CE                    编排因果相继
+    Semantic Vocabulary   压缩有证明的时序 law
+    Port Decorator        修饰 invocation
+    Capability Transformer 派生 authority
+    Physical Adapter      接触外部现实
+    
+    
+    ---
+    
+    7.1 什么应该写成 let!
+    
+    判断方法非常简单：
+    
+    &gt; 它是不是需要等待另一个 capability/effect/evidence 产生？
+    
+    
+    
+    如果是，适合 CE：
+    
+    taskResult {
+        let! evidence = reviewer.Await(...)
+        let decision = Review.decide evidence
+    
+        match decision with
+        | ...
+    }
+    
+    
+    ---
+    
+    7.2 什么应该是 pure match
+    
+    如果一个分支只依赖已经取得的数据：
+    
+    Evidence -&gt; Decision
+    
+    放纯函数。
+    
+    不要写：
+    
+    task {
+        if ...
+        elif ...
+        else ...
+    }
+    
+    然后里面根本没有 effect。
+    
+    例如：
+    
+    let decide evidence =
+        match evidence with
+        | ...
+    
+    更正确。
+    
+    
+    ---
+    
+    7.3 Evidence -&gt; Decision -&gt; match -&gt; Effect 是核心姿态
+    
+    不要追求整个 workflow：
+    
+    A
+    → B
+    → C
+    → D
+    → E
+    
+    完全没有 match。
+    
+    业务分支是真实世界的代数。
+    
+    好的 CE 往往就是：
+    
+    taskResult {
+        let! evidence = observe ports
+    
+        match decide evidence with
+        | Stop outcome -&gt;
+            return outcome
+    
+        | Continue instruction -&gt;
+            let! receipt = execute instruction
+            return finish receipt
+    }
+    
+    这比强迫所有东西 monadic-linear 更清晰。
+    
+    
+    ---
+    
+    7.4 CE 中禁止存在什么
+    
+    禁止：
+    
+    CurrentStage
+    NextStep
+    ResumeAt
+    Phase
+    StepIndex
+    ContinueToken
+    
+    如果这些只是“程序走到哪里”。
+    
+    允许：
+    
+    ReviewOutcome
+    HandleLifecycle
+    PhysicalAttempt
+    QuiescencePermit
+    ProviderFailure
+    
+    如果它们描述真实领域/物理世界。
+    
+    你们当前 STRUCTURED-WORKFLOW-017 已经非常准确地禁止：
+    
+    child Stage -&gt; parent match -&gt; effect
+    registry presence -&gt; infer lifecycle -&gt; effect
+    Advance/Tick/Resume/Step repeatedly drives child
+    recovery jumps into child internal continuation
+    
+    并要求 parent 只能观察 typed input/capability、领域结果、evidence、capability outcome。
+    
+    这条就是最终宪法之一。
+    
+    
+    ---
+    
+    第八章：Semantic Vocabulary 的准入制度
+    
+    不是每个 helper 都配叫 Vocabulary。
+    
+    一个函数只有在下面五问全部有答案时，才能成为 public semantic vocabulary。
+    
+    你们当前 HOW 已经有几乎一样的审查表：
+    
+    1. 名字声明什么业务承诺？
+    
+    
+    2. 隐藏哪些时序？
+    
+    
+    3. 哪个 temporal / behavioral proof 证明？
+    
+    
+    4. 改变 trace 还是 transparent？
+    
+    
+    5. crash 后从什么 durable evidence 重入？
+    
+    
+    
+    我建议再加两问：
+    
+    6. 它的 Primary Owner 是谁？
+    
+    
+    7. 如果删除/替换实现，哪些消费者应该完全不受影响？
+    
+    
+    
+    于是禁用：
+    
+    executeSafe
+    process
+    handle
+    runThing
+    manage
+    perform
+    doWorkflow
+    
+    除非 domain vocabulary 真的就叫那个。
+    
+    鼓励：
+    
+    continueAfterConfirmedFailure
+    ensurePerfectConfirmed
+    publishEventually
+    recoverFamilyDirect
+    reviewUntilFirstRevisionOrAllConfirmed
+    
+    事实上 structured-workflow 当前已经登记了这些高阶 Vocabulary，并要求生产定义真实存在。
+    
+    这是很好的基础。
+    
+    
+    ---
+    
+    第九章：现在开始建立缺失的那一层——Production Semantic Ownership Graph
+    
+    这是我认为本仓下一次最大 architecture upgrade。
+    
+    你们已经有：
+    
+    Requirement proposition owner
+    Requirement dependency graph
+    APPLIES-TO
+    JS semantic surface owner
+    
+    但还没有一张足够强的：
+    
+    production artifact
+    → primary semantic owner
+    → public contracts
+    → allowed owner dependencies
+    
+    
+    ---
+    
+    9.1 不要滥用 APPLIES-TO
+    
+    现在 structured-workflow/APPLIES-TO 覆盖整个：
+    
+    /src/Wanxiangshu/**/*.fs
+    
+    以及大量 gate scripts。
+    
+    这本身不一定错。
+    
+    因为 structured-workflow 是全仓结构规则，当然可以“观察”全仓。
+    
+    错误在于把：
+    
+    APPLIES-TO
+    
+    误解成：
+    
+    OWNS
+    
+    所以我现在不会建议简单把 APPLIES-TO 缩掉。
+    
+    我建议语义上明确三种关系：
+    
+    OWNS
+    GOVERNS
+    OBSERVES
+    
+    最低成本实现可以不改文件格式：
+    
+    WHAT owner
+    APPLIES-TO = governance/observation scope
+    architecture ownership manifest = production primary owner
+    
+    这样：
+    
+    structured-workflow
+    
+    可以合法治理 646 个 F# 文件而一个业务功能都不拥有。
+    
+    这是正确的 Meta Package。
+    
+    
+    ---
+    
+    9.2 增加 architecture/semantic-owners.*
+    
+    名字可自行定。
+    
+    例如：
+    
+    [[owner]]
+    path = &quot;src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs&quot;
+    primary = &quot;execution-model-routing&quot;
+    
+    [[owner]]
+    path = &quot;src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs&quot;
+    primary = &quot;interaction-authority&quot;
+    
+    [[owner]]
+    path = &quot;src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs&quot;
+    primary = &quot;host-boundary&quot;
+    kind = &quot;composition-root&quot;
+    
+    重点不是 TOML。
+    
+    重点是：
+    
+    &gt; 任何 production module 必须有恰一个 primary semantic owner。
+    
+    
+    
+    允许：
+    
+    一个文件实现其它 package law 的消费
+    
+    但不允许：
+    
+    两个 package 都说“这段行为是我定义的”
+    
+    你们 js-semantic-surface 已经出现类似成熟模式：surface entry 带明确 owner、laws、representation、kind，并在跨 owner law 时使用
+        lawOwners。
+    
+    把这个思想推广到 production architecture。
+    
+    
+    ---
+    
+    9.3 Primary Owner 不等于目录
+    
+    这点千万别退化回 Layer Architecture。
+    
+    例如：
+    
+    OpenCode/Host/ModelCapacity.fs
+    
+    物理上在 OpenCode/Host。
+    
+    语义 owner 可以是：
+    
+    execution-model-routing
+    
+    没问题。
+    
+    Requirement system 自己已经说：
+    
+    &gt; 文件/模块共址不是 owner 判据。
+    
+    
+    
+    所以不要重新建立：
+    
+    Domain/
+    Application/
+    Infrastructure/
+    
+    然后以为目录就是语义。
+    
+    
+    ---
+    
+    第十章：建立 Owner Dependency Gate
+    
+    有了：
+    
+    file → owner
+    
+    才能开始真正消灭大泥球。
+    
+    目标是生成：
+    
+    production import graph
+    
+    然后投影为：
+    
+    owner A -&gt; owner B
+    
+    
+    ---
+    
+    10.1 不要求 source graph = requirement graph 一模一样
+    
+    这是非常重要的。
+    
+    Requirement dependency 表示：
+    
+    &gt; law A 的成立以 law B 为前提。
+    
+    
+    
+    Source dependency 表示：
+    
+    &gt; implementation A 编译时引用 implementation B。
+    
+    
+    
+    两者不是同一张图。
+    
+    所以不要写一个幼稚 gate：
+    
+    F# import edge 必须与 requirements/INDEX.md 一一对应
+    
+    正确规则是：
+    
+    &gt; 一个跨 owner 的 production dependency 必须拥有合法的 architectural justification。
+    
+    
+    
+    一般是：
+    
+    A requirement depends on B
+    
+    或者：
+    
+    A consumes B&#39;s published physical/semantic contract
+    
+    或者：
+    
+    composition root wiring
+    
+    
+    ---
+    
+    10.2 禁止 cross-owner internal import
+    
+    这是未来最重要的 L0 gate 之一。
+    
+    规则：
+    
+    foreign owner
+        ↓
+    只能依赖
+        ↓
+    published contract / port / semantic surface
+    
+    不能：
+    
+    Owner A
+    → Owner B/private/internal/helper/implementation DU
+    
+    仓库现有 enforcer 已经把这个问题说得非常精确：
+    
+    &gt; 语言层面的 public/internal 不是 architecture authorization；真正的问题是 owner 是否承诺它为跨层 contract。
+    
+    
+    
+    所以最好建立显式 published contract manifest，而不是仅靠：
+    
+    文件名叫 Surface.fs 就算 public
+    
+    
+    ---
+    
+    第十一章：不要立即拆 PluginTransforms——先重新定义它是什么
+    
+    现在开始第一个大手术。
+    
+    首先需要改变目标：
+    
+    &gt; PluginTransforms 不需要“少依赖”。
+    
+    
+    
+    Composition Root 本来就应该知道很多 capability。
+    
+    真正的问题是：
+    
+    &gt; 它能不能只知道 public capability，而不知道那些 capability 的内部语义实现？
+    
+    
+    
+    所以目标不是：
+    
+    95 opens -&gt; 5 opens
+    
+    目标是：
+    
+    wide fan-out
+    but shallow knowledge
+    
+    这是根本区别。
+    
+    
+    ---
+    
+    第十二章：PluginTransforms 最终结构
+    
+    我建议最终把它定义为：
+    
+    Provider Transform Composition Root
+    
+    它只做四件事：
+    
+    1. 确定本次 transform 属于哪种 composition mode
+    2. 按固定语义顺序调用 owner-published operations
+    3. 显式传递必要 capability/context
+    4. 返回 Host 所需结果
+    
+    它不能：
+    
+    自己重新判断 XTrace law
+    自己解析 Strength policy
+    自己实现 Enforcer continuation
+    自己决定 requirement-grounding 规则
+    自己读业务 persistence
+    自己维护跨 callback state
+    
+    
+    ---
+    
+    第十三章：不要建立 ITransformMiddleware
+    
+    绝对不要：
+    
+    type ITransform =
+        abstract Apply : TransformContext -&gt; Task&lt;TransformContext&gt;
+    
+    let pipeline =
+        [
+            xtrace
+            companion
+            enforcer
+            strength
+        ]
+    
+    因为这会把语义顺序变成数据。
+    
+    以后一定会出现：
+    
+    if condition then pipeline.Insert(...)
+    
+    然后恭喜，第二运行时回来了。
+    
+    
+    ---
+    
+    第十四章：PluginTransforms 使用“静态乐谱”
+    
+    最终应该看起来像：
+    
+    let normalTransform
+        (cap: NormalTransformCapabilities)
+        (input: TransformInput)
+        : Task&lt;unit&gt; =
+        task {
+            do!
+                cap.ProviderAttempt.beginPhysicalAttempt
+                    input.Session
+                    input.Output
+    
+            let! startedAt =
+                cap.SessionTime.bindStartedAt
+                    input.Session
+                    input.Output
+    
+            let! replay =
+                cap.Strength.prepareReplay
+                    input.Session
+                    input.Output
+    
+            do!
+                cap.SemanticTrace.captureBeforeProjection
+                    input.Session
+                    input.Output
+                    replay
+    
+            do!
+                cap.Companion.projectOrdinaryMaterial
+                    input.Input
+                    input.Output
+    
+            do!
+                cap.ProviderProjection.applyXWire
+                    input.Output
+    
+            do!
+                cap.BloggerContinuation.continueAfterProjection
+                    input.Output
+    
+            do!
+                cap.Strength.completeEligibleSpeculation
+                    input.Output
+    
+            do!
+                cap.PairGuidance.projectAfterStrength
+                    startedAt
+                    input.Output
+    
+            do!
+                cap.RequirementGrounding.project
+                    input.Output
+    
+            cap.BloggerChronicle.project input.Output
+    
+            cap.HostBoundary.ensureProviderMessageShape input.Output
+        }
+    
+    注意：
+    
+    NormalTransformCapabilities 不是一个全仓 service locator。
+    
+    它：
+    
+    private/local to PluginTransforms composition
+    named fields
+    fixed topology
+    no List&lt;Middleware&gt;
+    no dynamic registration
+    no generic decorator interface
+    
+    这样测试很好写，而生产顺序仍然显式。
+    
+    
+    ---
+    
+    第十五章：PluginTransforms 的顺序怎么永久锁死
+    
+    不要只做 source-regex test。
+    
+    需要三层 proof。
+    
+    L0：composition shape
+    
+    静态检查：
+    
+    no middleware list
+    no dynamic registration
+    no private semantic helper proliferation
+    no foreign internal imports
+    
+    L1/L2：semantic trace
+    
+    把 NormalTransformCapabilities 替换为 recording fakes：
+    
+    BeginAttempt
+    BindSessionStart
+    PrepareStrength
+    CaptureXTrace
+    ProjectCompanion
+    ApplyXWire
+    ContinueBlogger
+    SpeculateStrength
+    InjectPair
+    GroundRequirements
+    InjectChronicle
+    Sanitize
+    
+    断言：
+    
+    actualTrace = expectedTrace
+    
+    而且各 operation 自己仍由 owner package 证明。
+    
+    L3：
+    
+    真实 Host adapter 只证明：
+    
+    OpenCode transform mutation semantics
+    
+    L4：
+    
+    One World 只证明：
+    
+    &gt; 整套 composition 在真实 OpenCode 环境可工作。
+    
+    
+    
+    这就符合你们现有 proof ladder。
+    
+    
+    ---
+    
+    第十六章：如何防止以后又往 PluginTransforms 塞 helper
+    
+    新增 L0：
+    
+    PluginTransforms composition-root invariant
+    
+    允许：
+    
+    create
+    wire
+    compose
+    dispatch mode
+    call owner surface
+    small Host shape extraction
+    
+    禁止：
+    
+    let private decideXXX
+    let private recoverXXX
+    let private classifyXXX
+    let private calculateXXX
+    let private maintainXXX
+    
+    不是靠函数名黑名单完全判断，而是：
+    
+    1. composition root 的 pure helper 只能是 representation-level；
+    
+    
+    2. semantic branch 必须调用 owner function；
+    
+    
+    3. 新增超过一定复杂度的 private helper触发人工 owner review。
+    
+    
+    
+    不要使用 LOC 限制。
+    
+    行数不是架构。
+    
+    
+    ---
+    
+    第十七章：PluginTransforms 的 Strength Replica branch 不要强行消灭
+    
+    当前源码明确存在：
+    
+    Replica:
+    XWire
+    → runtime.HandleTransform
+    → sanitize
+    
+    而普通路径经过完整 normalTransform。
+    
+    这个分支看起来“不统一”，但可能恰恰是领域差异。
+    
+    所以不要为了：
+    
+    &gt; “所有 transform 都应该走统一 pipeline”
+    
+    
+    
+    强行合并。
+    
+    正确做法是定义：
+    
+    type TransformMode =
+        | Ordinary
+        | StrengthReplica of StrengthReplicaCapability
+        | ExplicitResumeDisclosure
+    
+    如果这些确实是真实 semantic alternatives。
+    
+    然后：
+    
+    match mode with
+    | Ordinary -&gt; ...
+    | StrengthReplica cap -&gt; ...
+    | ExplicitResumeDisclosure -&gt; ...
+    
+    这是合法领域分支。
+    
+    不是 program counter。
+    
+    
+    ---
+    
+    第十八章：第二个手术点 AssistanceHost——先承认它已经有一半是正确答案
+    
+    这一点很重要。
+    
+    不要把 AssistanceHost 当作“全坏”。
+    
+    现在 NeedHelpSensor 已经：
+    
+    exact sentinel
+    exact SessionId
+    exact ProviderRunIdentity
+    private AssistanceAbortClaim
+    one-shot consumption
+    
+    而且当前源码明确：
+    
+    AbortWake 只 claim
+    fresh SessionIdle 才是 transport fence
+    permit 后才 TryConsumeAssistanceClaim
+    成功后才能发送 escalation / 创建 consultation
+    
+    
+    
+    这其实已经是一个非常漂亮的：
+    
+    Capability-Passing causal handoff
+    
+    所以 AssistanceHost 的重构不是：
+    
+    &gt; “把旧隐式状态机变成 capability。”
+    
+    
+    
+    它已经做了一部分。
+    
+    真正任务是：
+    
+    &gt; 把这个正确的 capability seam 从巨大跨领域 host 中解放出来。
+    
+    
+    
+    
+    ---
+    
+    第十九章：Assistance 的最终业务所有权应该是什么
+    
+    我建议把它的核心责任写成一句话：
+    
+    &gt; 当一个受 Wanxiangshu 管理的 provider attempt 产生合法 NEEDHELP authority 时，在不破坏当前 physical
         attempt、Authority Root 与 parent-child ownership 的条件下，将该 authority 转换成一次 bounded assistance successor，并把结果重新交还原
-        owner。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果一句话再长，就说明 owner 还没切好。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里实际上有四个概念：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">NeedHelp Detection</div>
-    <div dir="auto">Assistance Admission</div>
-    <div dir="auto">Consultation Delegation</div>
-    <div dir="auto">Advice Delivery</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它们不一定属于同一模块。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十章：Assistance 推荐物理拆法</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Interaction/</div>
-    <div dir="auto">  Authority/</div>
-    <div dir="auto">    Assistance.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">  Dispatch/</div>
-    <div dir="auto">    Assistance/</div>
-    <div dir="auto">      Workflow.fs</div>
-    <div dir="auto">      Decision.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    OpenCode/</div>
-    <div dir="auto">      NeedHelpSensor.fs</div>
-    <div dir="auto">      AssistanceAdapter.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">名字可以调整。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">角色应类似：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">NeedHelpSensor.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只拥有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">reasoning delta stream</div>
-    <div dir="auto">fragment suffix</div>
-    <div dir="auto">exact sentinel</div>
-    <div dir="auto">exact provider attempt identity</div>
-    <div dir="auto">abort reservation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不拥有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">deep inquiry</div>
-    <div dir="auto">review</div>
-    <div dir="auto">git</div>
-    <div dir="auto">strength</div>
-    <div dir="auto">todo</div>
-    <div dir="auto">finality</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Interaction/Authority/Assistance.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">拥有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AssistanceAbortClaim</div>
-    <div dir="auto">AssistanceCause</div>
-    <div dir="auto">AssistanceDisposition</div>
-    <div dir="auto">admission law</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里的类型尽量是纯的。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Assistance/Workflow.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只有 CE：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let handle</div>
-    <div dir="auto">    (ports: AssistancePorts)</div>
-    <div dir="auto">    (context: AssistanceContext)</div>
-    <div dir="auto">    (claim: AssistanceAbortClaim)</div>
-    <div dir="auto">    =</div>
-    <div dir="auto">    taskResult {</div>
-    <div dir="auto">        let! admission =</div>
-    <div dir="auto">            ports.Admission.consumeAfterFreshIdle context claim</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        let! profile =</div>
-    <div dir="auto">            ports.Authority.requireCurrentOwner admission</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        match Assistance.decide profile with</div>
-    <div dir="auto">        | EscalateFast request -&gt;</div>
-    <div dir="auto">            return! ports.Escalation.continueOwner request</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        | ConsultDeep request -&gt;</div>
-    <div dir="auto">            let! consultation =</div>
-    <div dir="auto">                ports.Consultation.start request</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">            let! evidence =</div>
-    <div dir="auto">                ports.Consultation.awaitOutcome consultation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">            return!</div>
-    <div dir="auto">                ports.Advice.deliver</div>
-    <div dir="auto">                    (AssistanceAdvice.fromEvidence evidence)</div>
-    <div dir="auto">    }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">关键是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CE 看 Assistance 世界</div>
-    <div dir="auto">而不是 Git/Strength/Review/Todo 世界</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十一章：不要设计巨型 AssistancePorts</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">危险形状：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type AssistancePorts =</div>
-    <div dir="auto">    {</div>
-    <div dir="auto">        Git: IGitPort</div>
-    <div dir="auto">        Session: ISessionPort</div>
-    <div dir="auto">        Journal: IJournal</div>
-    <div dir="auto">        Strength: IStrength</div>
-    <div dir="auto">        Todo: ITodo</div>
-    <div dir="auto">        Review: IReview</div>
-    <div dir="auto">        ...</div>
-    <div dir="auto">    }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这只是把大泥球从 imports 搬进 record。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确形态应该是业务 capability：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type AssistancePorts =</div>
-    <div dir="auto">    {</div>
-    <div dir="auto">        CurrentAuthority :</div>
-    <div dir="auto">            AssistanceOwner -&gt; CurrentAuthority option</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        StartConsultation :</div>
-    <div dir="auto">            ConsultationRequest -&gt; Task&lt;Result&lt;ConsultationHandle, AssistanceError&gt;&gt;
-    </div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        AwaitConsultation :</div>
-    <div dir="auto">            ConsultationHandle -&gt; Task&lt;Result&lt;ConsultationEvidence, AssistanceError&gt;&gt;
-    </div>
-    <div dir="auto"><br></div>
-    <div dir="auto">        DeliverAdvice :</div>
-    <div dir="auto">            AdviceDelivery -&gt; Task&lt;Result&lt;AdviceReceipt, AssistanceError&gt;&gt;</div>
-    <div dir="auto">    }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">注意没有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Git</div>
-    <div dir="auto">Strength</div>
-    <div dir="auto">Todo</div>
-    <div dir="auto">Review</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这些细节由 adapter 负责把真实系统组装成上面四种 capability。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十二章：不要凭空发明 ConsultationCompletedWitness 持久化事件</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">先检查现有 durable facts 是否已经足够证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">consultation child belongs to owner</div>
-    <div dir="auto">child terminal</div>
-    <div dir="auto">terminal belongs exact logical run</div>
-    <div dir="auto">output available</div>
-    <div dir="auto">owner still current</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果已经有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">HandleLinked</div>
-    <div dir="auto">HandleCompleted</div>
-    <div dir="auto">AuthorityRoot</div>
-    <div dir="auto">ProviderRun terminal</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">那么：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ConsultationEvidence</div>
-    <div dir="auto">    -&gt; Result&lt;ConsultationCompletedWitness, InvalidConsultation&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该是 pure projection。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只有如果存在一个现有事实集合无法表达但必须跨 crash 保存的新领域区别，才新增 event。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是防止 EventStore 变成“所有中间变量的垃圾桶”的关键。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十三章：Assistance abort 权限一定要继续保持现在的分型</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前文档已经有一个非常重要的边界：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">InterruptAttempt</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只允许 physical managed sub-session 的当前 attempt interruption；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AbortSession</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">才拥有 detach + descendant cascade。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这个边界不要因为“统一 capability”被合并。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终应该甚至更明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type InterruptCurrentAttempt =</div>
-    <div dir="auto">    private ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type TerminateManagedSession =</div>
-    <div dir="auto">    private ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">两种不同 capability。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ISessionControl.Abort(...)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个万能入口。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十四章：Assistance 重构的 proof ladder</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Pure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Fast → escalation</div>
-    <div dir="auto">Deep → consultation</div>
-    <div dir="auto">wrong authority root → reject</div>
-    <div dir="auto">recursive NEEDHELP → bounded failure</div>
-    <div dir="auto">late child result → cannot resurrect superseded owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Temporal</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">精确枚举：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">NEEDHELP</div>
-    <div dir="auto">→ abort accepted</div>
-    <div dir="auto">→ TurnAborted</div>
-    <div dir="auto">→ no fresh idle</div>
-    <div dir="auto">→ must not send</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">fresh idle</div>
-    <div dir="auto">→ claim consume</div>
-    <div dir="auto">→ exactly one successor</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以及：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">abort fail</div>
-    <div dir="auto">→ claim rollback</div>
-    <div dir="auto">→ ordinary failure remains possible</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Adapter</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">证明 OpenCode：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">InterruptAttempt affects current attempt only</div>
-    <div dir="auto">reasoning deltas fragment correctly</div>
-    <div dir="auto">SessionIdle produces fresh quiescence evidence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Long Stroke</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只证明真实 Host 的：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">sentinel</div>
-    <div dir="auto">→ abort</div>
-    <div dir="auto">→ idle</div>
-    <div dir="auto">→ consultation/escalation</div>
-    <div dir="auto">→ owner receives advice</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">组合成立。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十五章：第三个手术点 HostSignalBootstrap</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">完成前两个以后再动。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">目标：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; Bootstrap 是 wiring，不是 semantics。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它应该只：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">construct</div>
-    <div dir="auto">subscribe</div>
-    <div dir="auto">attach</div>
-    <div dir="auto">route physical signals</div>
-    <div dir="auto">dispose/drain</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它不应该：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">决定 model policy</div>
-    <div dir="auto">决定 recovery semantics</div>
-    <div dir="auto">决定 fission policy</div>
-    <div dir="auto">决定 finality</div>
-    <div dir="auto">决定 assistance successor</div>
-    <div dir="auto">决定 strength meaning</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们目前其实已经有 plugin load purity tests，明确拒绝在 plugin load 恢复 session/tool durable state。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因此继续沿这个方向推进。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十六章：Composition Root 允许宽，不允许深</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是整个系统以后非常重要的一句话：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; Wide knowledge is legal at composition roots; deep knowledge is not.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">PluginBoot</div>
-    <div dir="auto">HostSignalBootstrap</div>
-    <div dir="auto">PluginTransforms</div>
-    <div dir="auto">ToolRegistry</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可能依赖很多 owners。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这并不自动是泥球。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">判断标准不是 imports 数量。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 它是否 match 了 foreign owner 的内部领域类型，并据此做业务决定？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如合法：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let reviewer = Review.createCapability ...</div>
-    <div dir="auto">let routing = ModelRouting.create ...</div>
-    <div dir="auto">let assistance = Assistance.create ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">非法：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">match Review.InternalCohortState with</div>
-    <div dir="auto">| ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十七章：Model Routing 作为全仓“教材样板”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所有其它模块都应该学习它，不是复制实现，而是复制ownership discipline。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前 architecture test 已经明确要求：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CapacityLedger</div>
-    <div dir="auto">BorrowingCapacity</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">存在于 ModelCapacity；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">routing 可以使用 BorrowingCapacity&lt;ModelRoutingTarget&gt;；</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Sessions</div>
-    <div dir="auto">SessionExecutionBinding</div>
-    <div dir="auto">PluginTransforms</div>
-    <div dir="auto">HostSignalBootstrap</div>
-    <div dir="auto">MJS scheduler</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">都不得重新出现：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ancestorDistance</div>
-    <div dir="auto">CapacityTokenState</div>
-    <div dir="auto">CapacityStepDemand</div>
-    <div dir="auto">ownedTokenByExecution</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是教科书级 ownership gate。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">未来每个复杂 capability 都应该能写出类似测试：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">this knowledge exists here</div>
-    <div dir="auto">and nowhere else</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十八章：建立“Knowledge Exclusivity Gate”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是下一代 architecture gate 的核心。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 Assistance：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AssistanceAbortClaim</div>
-    <div dir="auto">exact NEEDHELP claim consume</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只允许 interaction-authority/host adapter owner。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Finality：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ConfirmedReview admission</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只允许 finality owner。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capacity：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ancestor borrowing</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只允许 EMR capacity transformer。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">规则不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">字符串全仓只能出现一次</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">关键算法/状态机/authority vocabulary</div>
-    <div dir="auto">有一个 positive owner zone</div>
-    <div dir="auto">+</div>
-    <div dir="auto">若干 explicit consumer zones</div>
-    <div dir="auto">+</div>
-    <div dir="auto">其余 zone negative</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是 model routing 现有测试的普遍化。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第二十九章：structured-workflow 不要“退场”，要完成 Meta 化</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议不用“降级”这个词。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它不是不重要。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">恰恰相反：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 它应该从“拥有很多 workflow 细节的超包”升级为“只拥有宿主语言工作流结构律的 Meta Constitution”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终只保留真正 universal 的法律。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十章：structured-workflow 最终应保留什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议保留类似：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-001</div>
-    <div dir="auto">Business flow is expressed directly by host-language CE.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-002</div>
-    <div dir="auto">No second business runtime / AST interpreter.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-003</div>
-    <div dir="auto">Stored state describes reality, not execution position.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-004</div>
-    <div dir="auto">Pure decision and physical effect have an explicit seam.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-005</div>
-    <div dir="auto">Mutable state is physical resource / projection cache / algorithm scratch,</div>
-    <div dir="auto">not business program counter.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-006</div>
-    <div dir="auto">Workflow composition is structurally closed.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-007</div>
-    <div dir="auto">Semantic compression requires owner law + proof.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-008</div>
-    <div dir="auto">Trace-altering higher-order composition must be named and owned.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-009</div>
-    <div dir="auto">Cancellation is control plane unless domain explicitly models a cancellation fact.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">SW-META-010</div>
-    <div dir="auto">Business recursion/fan-out must be bounded or guarded by explicit physical capability.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">差不多就够了。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十一章：从 structured-workflow 移出去什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Provider fallback 怎么 retry</div>
-    <div dir="auto">Manager 如何 rebase</div>
-    <div dir="auto">Blogger 如何 catch up</div>
-    <div dir="auto">Review 怎么 confirm</div>
-    <div dir="auto">Recovery 怎么恢复 family</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这些都不是 structured-workflow 的 law。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它只规定：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 这些东西必须长成什么结构。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正行为 law 回：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">provider-attempt-recovery</div>
-    <div dir="auto">change-integration</div>
-    <div dir="auto">context-compression</div>
-    <div dir="auto">review-assurance</div>
-    <div dir="auto">crash-reconciliation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十二章：structured-workflow 不应该拥有 taskResult 实现</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是一个很容易犯的错误。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Meta package 可以规定：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Task&lt;Result&lt;_,_&gt;&gt; plumbing 应有唯一 CE vocabulary</div>
-    <div dir="auto">禁止私建 builder</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但实际：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">TaskResultCE</div>
-    <div dir="auto">TaskValue</div>
-    <div dir="auto">TaskResult</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这些机械实现可以继续归：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Foundation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Meta law 和 implementation owner 不需要是同一个。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否则 structured-workflow 又会成为：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“所有与 CE 有关的代码归我”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后重新膨胀。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十三章：APPLIES-TO 可以继续很宽，但 ownership 必须很窄</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因此针对你第 78 题，我现在给一个更精确裁决：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要机械缩 APPLIES-TO。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果 Meta law：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“全仓不能出现第二 workflow runtime”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">那当然要扫描：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">/src/Wanxiangshu/**/*.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确修复是明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">APPLIES-TO = governance scope</div>
-    <div dir="auto">≠ primary ownership</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">于是 structured-workflow 可以扫描全仓，但不能宣称：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “所有 task/async 代码都属于 structured-workflow。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十四章：现有 architecture.mjs 还不够——但不要把所有 gate 塞进去</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前 architecture checker 明确只有一个 production root，并定义 PURE_DIRS 等基础结构检查。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">下一阶段不要把它扩成 5000 行 God Gate。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">建议：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">scripts/checks/</div>
-    <div dir="auto">    architecture.mjs</div>
-    <div dir="auto">    semantic-ownership.mjs</div>
-    <div dir="auto">    owner-dependencies.mjs</div>
-    <div dir="auto">    cross-owner-contract.mjs</div>
-    <div dir="auto">    capability-boundary.mjs</div>
-    <div dir="auto">    composition-root.mjs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后统一由：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">scripts/check.mjs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">接线。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们已有 enforcer 原则也明确指出：如果 ownership/dependency invariant 可以机械判断却只靠 review，就是 missing architecture
-        gate。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十五章：Capability/Witness 静态门应该查什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要只按名称。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">名称 gate 只能做“报警器”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">*Token</div>
-    <div dir="auto">*Permit</div>
-    <div dir="auto">*Lease</div>
-    <div dir="auto">*Claim</div>
-    <div dir="auto">*Witness</div>
-    <div dir="auto">*Proof</div>
-    <div dir="auto">*Receipt</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">触发分类检查。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后要求 annotation 或 manifest：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">kind = witness</div>
-    <div dir="auto">kind = capability</div>
-    <div dir="auto">kind = receipt</div>
-    <div dir="auto">kind = physical-handle</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但最终判据是用途：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">serialize when durable</div>
-    <div dir="auto">project</div>
-    <div dir="auto">compare</div>
-    <div dir="auto">fold</div>
-    <div dir="auto">derive decision</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">直接调用 physical effect，仅凭旧 witness 绕过 admission</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">owner-gate consume</div>
-    <div dir="auto">invoke corresponding effect</div>
-    <div dir="auto">revoke</div>
-    <div dir="auto">dispose</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">默认不允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">FactCodec</div>
-    <div dir="auto">EventEnvelope</div>
-    <div dir="auto">JSON persistent state</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十六章：不要追求“所有 Capability 构造器 private”作为唯一保障</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">推荐 private，但真正规则是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 只有 owner 的 issuance function 能建立有效 capability。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可以有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">private record</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但如果同一个 module 到处随便：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">{ Id = ...; Epoch = ... }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">private 没意义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以更好的 API：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">module BlessCapability =</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    type T = private BlessCapability of ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    let internal grant ...</div>
-    <div dir="auto">    let internal validate ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">foreign owner 只能：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">receive</div>
-    <div dir="auto">pass</div>
-    <div dir="auto">consume through published port</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十七章：Capability hierarchy 怎么做</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要做 OO 权限继承：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">IAdminCapability</div>
-    <div dir="auto">    : IUserCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更适合 F# 的是显式 attenuation：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AdminCapability</div>
-    <div dir="auto">    -&gt; ReadCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">AdminCapability</div>
-    <div dir="auto">    -&gt; PublishCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">函数：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let attenuateToRead admin =</div>
-    <div dir="auto">    ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是 capability transformer。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">父 capability revoke 后子 capability 是否失效，由 law 明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">shared epoch</div>
-    <div dir="auto">parent lease</div>
-    <div dir="auto">revocation generation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是靠对象引用层级猜。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十八章：有限 N 次 Capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要发 N 个 bool。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">建：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">QuotaCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">owner gate 维护：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Remaining</div>
-    <div dir="auto">Epoch</div>
-    <div dir="auto">Scope</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">消费：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">tryConsume</div>
-    <div dir="auto">    : QuotaCapability</div>
-    <div dir="auto">    -&gt; Result&lt;QuotaReceipt * QuotaCapability option, QuotaFailure&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但如果 capability 是 opaque handle，也可以让 caller 永远持同一 handle：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">gate.TryUse(handle)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">由 gate 内部计数。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">哪种更好取决于你是否希望 quota 的剩余量成为 caller-visible semantic data。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">通常不要。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第三十九章：Decorator 允许持可变状态吗？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可以。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">rate limiter</div>
-    <div dir="auto">single-flight</div>
-    <div dir="auto">circuit health</div>
-    <div dir="auto">causal observation registry</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但必须分类。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">algorithm scratch</div>
-    <div dir="auto">physical resource</div>
-    <div dir="auto">projection cache</div>
-    <div dir="auto">policy state</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“为了 decorator 工作方便”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">就出现：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CurrentStage</div>
-    <div dir="auto">PendingSecondRetry</div>
-    <div dir="auto">FallbackPhase</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后变隐式 workflow runtime。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十章：Decorator Error 应该如何传播</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Transparent decorator：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">原则上保持 owner contract</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果它自身失败：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">diagnostic failure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">需要明确是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">fail open</div>
-    <div dir="auto">fail closed</div>
-    <div dir="auto">process fatal</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能随便吞。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Semantic decorator 可以把底层物理错误映射成领域 policy outcome，但必须由 owner law 决定。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ProviderError</div>
-    <div dir="auto">    -&gt; ConfirmedProviderFailure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是“error mapping utility”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它是 provider recovery 的业务语义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十一章：不要设置 Decorator 最大嵌套深度</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最多 5 层 decorator</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这种指标毫无理论意义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该控制：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">semantic nesting depth</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">即：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 一次调用要理解多少个 trace-altering policy？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">透明 observation 十层可能都没问题。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">三个互相影响的 retry/fallback/deadline/claim 已经可能无法理解。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以 review 看：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">有多少独立 policy owner 改变本次 trace？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是看调用栈层数。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十二章：Composition Root 里的业务 if 是否全部禁止？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这又是一个容易走极端的地方。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">match TransformMode with</div>
-    <div dir="auto">| Ordinary -&gt; ...</div>
-    <div dir="auto">| StrengthReplica replica -&gt; ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为这是 composition alternative。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">if review.IsPerfect &amp;&amp; strength.Pending &amp;&amp; ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为 root 开始决定 foreign domain semantics。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">原则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; Composition Root 可以选择 wiring topology，不能重新实现 domain decision。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十三章：事件溯源部分——这一块其实已经很接近最终形态</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我不会建议你们大改 durable-events。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前它已经有非常强的几条 law。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如本地 append：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; durable witness 是 writer 文件末尾完整 canonical JSON+LF；runtime append 不得创建 Git
-        blob/tree/ref/CAS，也不得随历史长度重写旧 bytes。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">每个 process 一个唯一 WriterId 和永久增长的 NDJSON writer file。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Git blob 只出现在 remote sync hook 边界，而且完整 writer file 对应一个 blob。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这已经非常清晰。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十四章：CanonicalIntegrator 是另一个“教材样板”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前 normative law 已经规定：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 生产只有一个 canonical F# CE Integrator 可以把 writer streams 积分成 Current；业务模块只注册 single-event
+        owner。
+    
+    
+    
+    如果一句话再长，就说明 owner 还没切好。
+    
+    这里实际上有四个概念：
+    
+    NeedHelp Detection
+    Assistance Admission
+    Consultation Delegation
+    Advice Delivery
+    
+    它们不一定属于同一模块。
+    
+    
+    ---
+    
+    第二十章：Assistance 推荐物理拆法
+    
+    例如：
+    
+    Interaction/
+      Authority/
+        Assistance.fs
+    
+      Dispatch/
+        Assistance/
+          Workflow.fs
+          Decision.fs
+    
+        OpenCode/
+          NeedHelpSensor.fs
+          AssistanceAdapter.fs
+    
+    名字可以调整。
+    
+    角色应类似：
+    
+    
+    ---
+    
+    NeedHelpSensor.fs
+    
+    只拥有：
+    
+    reasoning delta stream
+    fragment suffix
+    exact sentinel
+    exact provider attempt identity
+    abort reservation
+    
+    不拥有：
+    
+    deep inquiry
+    review
+    git
+    strength
+    todo
+    finality
+    
+    
+    ---
+    
+    Interaction/Authority/Assistance.fs
+    
+    拥有：
+    
+    AssistanceAbortClaim
+    AssistanceCause
+    AssistanceDisposition
+    admission law
+    
+    这里的类型尽量是纯的。
+    
+    
+    ---
+    
+    Assistance/Workflow.fs
+    
+    只有 CE：
+    
+    let handle
+        (ports: AssistancePorts)
+        (context: AssistanceContext)
+        (claim: AssistanceAbortClaim)
+        =
+        taskResult {
+            let! admission =
+                ports.Admission.consumeAfterFreshIdle context claim
+    
+            let! profile =
+                ports.Authority.requireCurrentOwner admission
+    
+            match Assistance.decide profile with
+            | EscalateFast request -&gt;
+                return! ports.Escalation.continueOwner request
+    
+            | ConsultDeep request -&gt;
+                let! consultation =
+                    ports.Consultation.start request
+    
+                let! evidence =
+                    ports.Consultation.awaitOutcome consultation
+    
+                return!
+                    ports.Advice.deliver
+                        (AssistanceAdvice.fromEvidence evidence)
+        }
+    
+    关键是：
+    
+    CE 看 Assistance 世界
+    而不是 Git/Strength/Review/Todo 世界
+    
+    
+    ---
+    
+    第二十一章：不要设计巨型 AssistancePorts
+    
+    危险形状：
+    
+    type AssistancePorts =
+        {
+            Git: IGitPort
+            Session: ISessionPort
+            Journal: IJournal
+            Strength: IStrength
+            Todo: ITodo
+            Review: IReview
+            ...
+        }
+    
+    这只是把大泥球从 imports 搬进 record。
+    
+    正确形态应该是业务 capability：
+    
+    type AssistancePorts =
+        {
+            CurrentAuthority :
+                AssistanceOwner -&gt; CurrentAuthority option
+    
+            StartConsultation :
+                ConsultationRequest -&gt; Task&lt;Result&lt;ConsultationHandle, AssistanceError&gt;&gt;
+    
+    
+            AwaitConsultation :
+                ConsultationHandle -&gt; Task&lt;Result&lt;ConsultationEvidence, AssistanceError&gt;&gt;
+    
+    
+            DeliverAdvice :
+                AdviceDelivery -&gt; Task&lt;Result&lt;AdviceReceipt, AssistanceError&gt;&gt;
+        }
+    
+    注意没有：
+    
+    Git
+    Strength
+    Todo
+    Review
+    
+    这些细节由 adapter 负责把真实系统组装成上面四种 capability。
+    
+    
+    ---
+    
+    第二十二章：不要凭空发明 ConsultationCompletedWitness 持久化事件
+    
+    先检查现有 durable facts 是否已经足够证明：
+    
+    consultation child belongs to owner
+    child terminal
+    terminal belongs exact logical run
+    output available
+    owner still current
+    
+    如果已经有：
+    
+    HandleLinked
+    HandleCompleted
+    AuthorityRoot
+    ProviderRun terminal
+    
+    那么：
+    
+    ConsultationEvidence
+        -&gt; Result&lt;ConsultationCompletedWitness, InvalidConsultation&gt;
+    
+    应该是 pure projection。
+    
+    只有如果存在一个现有事实集合无法表达但必须跨 crash 保存的新领域区别，才新增 event。
+    
+    这是防止 EventStore 变成“所有中间变量的垃圾桶”的关键。
+    
+    
+    ---
+    
+    第二十三章：Assistance abort 权限一定要继续保持现在的分型
+    
+    当前文档已经有一个非常重要的边界：
+    
+    InterruptAttempt
+    
+    只允许 physical managed sub-session 的当前 attempt interruption；
+    
+    而：
+    
+    AbortSession
+    
+    才拥有 detach + descendant cascade。
+    
+    这个边界不要因为“统一 capability”被合并。
+    
+    最终应该甚至更明确：
+    
+    type InterruptCurrentAttempt =
+        private ...
+    
+    type TerminateManagedSession =
+        private ...
+    
+    两种不同 capability。
+    
+    不能：
+    
+    ISessionControl.Abort(...)
+    
+    一个万能入口。
+    
+    
+    ---
+    
+    第二十四章：Assistance 重构的 proof ladder
+    
+    Pure
+    
+    证明：
+    
+    Fast → escalation
+    Deep → consultation
+    wrong authority root → reject
+    recursive NEEDHELP → bounded failure
+    late child result → cannot resurrect superseded owner
+    
+    Temporal
+    
+    精确枚举：
+    
+    NEEDHELP
+    → abort accepted
+    → TurnAborted
+    → no fresh idle
+    → must not send
+    
+    fresh idle
+    → claim consume
+    → exactly one successor
+    
+    以及：
+    
+    abort fail
+    → claim rollback
+    → ordinary failure remains possible
+    
+    Adapter
+    
+    证明 OpenCode：
+    
+    InterruptAttempt affects current attempt only
+    reasoning deltas fragment correctly
+    SessionIdle produces fresh quiescence evidence
+    
+    Long Stroke
+    
+    只证明真实 Host 的：
+    
+    sentinel
+    → abort
+    → idle
+    → consultation/escalation
+    → owner receives advice
+    
+    组合成立。
+    
+    
+    ---
+    
+    第二十五章：第三个手术点 HostSignalBootstrap
+    
+    完成前两个以后再动。
+    
+    目标：
+    
+    &gt; Bootstrap 是 wiring，不是 semantics。
+    
+    
+    
+    它应该只：
+    
+    construct
+    subscribe
+    attach
+    route physical signals
+    dispose/drain
+    
+    它不应该：
+    
+    决定 model policy
+    决定 recovery semantics
+    决定 fission policy
+    决定 finality
+    决定 assistance successor
+    决定 strength meaning
+    
+    你们目前其实已经有 plugin load purity tests，明确拒绝在 plugin load 恢复 session/tool durable state。
+    
+    因此继续沿这个方向推进。
+    
+    
+    ---
+    
+    第二十六章：Composition Root 允许宽，不允许深
+    
+    这是整个系统以后非常重要的一句话：
+    
+    &gt; Wide knowledge is legal at composition roots; deep knowledge is not.
+    
+    
+    
+    所以：
+    
+    PluginBoot
+    HostSignalBootstrap
+    PluginTransforms
+    ToolRegistry
+    
+    可能依赖很多 owners。
+    
+    这并不自动是泥球。
+    
+    判断标准不是 imports 数量。
+    
+    而是：
+    
+    &gt; 它是否 match 了 foreign owner 的内部领域类型，并据此做业务决定？
+    
+    
+    
+    例如合法：
+    
+    let reviewer = Review.createCapability ...
+    let routing = ModelRouting.create ...
+    let assistance = Assistance.create ...
+    
+    非法：
+    
+    match Review.InternalCohortState with
+    | ...
+    
+    
+    ---
+    
+    第二十七章：Model Routing 作为全仓“教材样板”
+    
+    所有其它模块都应该学习它，不是复制实现，而是复制ownership discipline。
+    
+    当前 architecture test 已经明确要求：
+    
+    CapacityLedger
+    BorrowingCapacity
+    
+    存在于 ModelCapacity；
+    
+    routing 可以使用 BorrowingCapacity&lt;ModelRoutingTarget&gt;；
+    
+    但：
+    
+    Sessions
+    SessionExecutionBinding
+    PluginTransforms
+    HostSignalBootstrap
+    MJS scheduler
+    
+    都不得重新出现：
+    
+    ancestorDistance
+    CapacityTokenState
+    CapacityStepDemand
+    ownedTokenByExecution
+    
+    
+    
+    这就是教科书级 ownership gate。
+    
+    未来每个复杂 capability 都应该能写出类似测试：
+    
+    this knowledge exists here
+    and nowhere else
+    
+    
+    ---
+    
+    第二十八章：建立“Knowledge Exclusivity Gate”
+    
+    这是下一代 architecture gate 的核心。
+    
+    例如 Assistance：
+    
+    AssistanceAbortClaim
+    exact NEEDHELP claim consume
+    
+    只允许 interaction-authority/host adapter owner。
+    
+    Finality：
+    
+    ConfirmedReview admission
+    
+    只允许 finality owner。
+    
+    Capacity：
+    
+    ancestor borrowing
+    
+    只允许 EMR capacity transformer。
+    
+    规则不是：
+    
+    字符串全仓只能出现一次
+    
+    而是：
+    
+    关键算法/状态机/authority vocabulary
+    有一个 positive owner zone
+    +
+    若干 explicit consumer zones
+    +
+    其余 zone negative
+    
+    这就是 model routing 现有测试的普遍化。
+    
+    
+    ---
+    
+    第二十九章：structured-workflow 不要“退场”，要完成 Meta 化
+    
+    我建议不用“降级”这个词。
+    
+    它不是不重要。
+    
+    恰恰相反：
+    
+    &gt; 它应该从“拥有很多 workflow 细节的超包”升级为“只拥有宿主语言工作流结构律的 Meta Constitution”。
+    
+    
+    
+    最终只保留真正 universal 的法律。
+    
+    
+    ---
+    
+    第三十章：structured-workflow 最终应保留什么
+    
+    我建议保留类似：
+    
+    SW-META-001
+    Business flow is expressed directly by host-language CE.
+    
+    SW-META-002
+    No second business runtime / AST interpreter.
+    
+    SW-META-003
+    Stored state describes reality, not execution position.
+    
+    SW-META-004
+    Pure decision and physical effect have an explicit seam.
+    
+    SW-META-005
+    Mutable state is physical resource / projection cache / algorithm scratch,
+    not business program counter.
+    
+    SW-META-006
+    Workflow composition is structurally closed.
+    
+    SW-META-007
+    Semantic compression requires owner law + proof.
+    
+    SW-META-008
+    Trace-altering higher-order composition must be named and owned.
+    
+    SW-META-009
+    Cancellation is control plane unless domain explicitly models a cancellation fact.
+    
+    SW-META-010
+    Business recursion/fan-out must be bounded or guarded by explicit physical capability.
+    
+    差不多就够了。
+    
+    
+    ---
+    
+    第三十一章：从 structured-workflow 移出去什么
+    
+    例如：
+    
+    Provider fallback 怎么 retry
+    Manager 如何 rebase
+    Blogger 如何 catch up
+    Review 怎么 confirm
+    Recovery 怎么恢复 family
+    
+    这些都不是 structured-workflow 的 law。
+    
+    它只规定：
+    
+    &gt; 这些东西必须长成什么结构。
+    
+    
+    
+    真正行为 law 回：
+    
+    provider-attempt-recovery
+    change-integration
+    context-compression
+    review-assurance
+    crash-reconciliation
+    
+    
+    ---
+    
+    第三十二章：structured-workflow 不应该拥有 taskResult 实现
+    
+    这是一个很容易犯的错误。
+    
+    Meta package 可以规定：
+    
+    Task&lt;Result&lt;_,_&gt;&gt; plumbing 应有唯一 CE vocabulary
+    禁止私建 builder
+    
+    但实际：
+    
+    TaskResultCE
+    TaskValue
+    TaskResult
+    
+    这些机械实现可以继续归：
+    
+    Foundation
+    
+    Meta law 和 implementation owner 不需要是同一个。
+    
+    否则 structured-workflow 又会成为：
+    
+    “所有与 CE 有关的代码归我”
+    
+    然后重新膨胀。
+    
+    
+    ---
+    
+    第三十三章：APPLIES-TO 可以继续很宽，但 ownership 必须很窄
+    
+    因此针对你第 78 题，我现在给一个更精确裁决：
+    
+    不要机械缩 APPLIES-TO。
+    
+    如果 Meta law：
+    
+    “全仓不能出现第二 workflow runtime”
+    
+    那当然要扫描：
+    
+    /src/Wanxiangshu/**/*.fs
+    
+    正确修复是明确：
+    
+    APPLIES-TO = governance scope
+    ≠ primary ownership
+    
+    于是 structured-workflow 可以扫描全仓，但不能宣称：
+    
+    &gt; “所有 task/async 代码都属于 structured-workflow。”
+    
+    
+    
+    
+    ---
+    
+    第三十四章：现有 architecture.mjs 还不够——但不要把所有 gate 塞进去
+    
+    当前 architecture checker 明确只有一个 production root，并定义 PURE_DIRS 等基础结构检查。
+    
+    下一阶段不要把它扩成 5000 行 God Gate。
+    
+    建议：
+    
+    scripts/checks/
+        architecture.mjs
+        semantic-ownership.mjs
+        owner-dependencies.mjs
+        cross-owner-contract.mjs
+        capability-boundary.mjs
+        composition-root.mjs
+    
+    然后统一由：
+    
+    scripts/check.mjs
+    
+    接线。
+    
+    你们已有 enforcer 原则也明确指出：如果 ownership/dependency invariant 可以机械判断却只靠 review，就是 missing architecture
+        gate。
+    
+    
+    ---
+    
+    第三十五章：Capability/Witness 静态门应该查什么
+    
+    不要只按名称。
+    
+    名称 gate 只能做“报警器”。
+    
+    例如：
+    
+    *Token
+    *Permit
+    *Lease
+    *Claim
+    *Witness
+    *Proof
+    *Receipt
+    
+    触发分类检查。
+    
+    然后要求 annotation 或 manifest：
+    
+    kind = witness
+    kind = capability
+    kind = receipt
+    kind = physical-handle
+    
+    但最终判据是用途：
+    
+    Witness
+    
+    允许：
+    
+    serialize when durable
+    project
+    compare
+    fold
+    derive decision
+    
+    不允许：
+    
+    直接调用 physical effect，仅凭旧 witness 绕过 admission
+    
+    Capability
+    
+    允许：
+    
+    owner-gate consume
+    invoke corresponding effect
+    revoke
+    dispose
+    
+    默认不允许：
+    
+    FactCodec
+    EventEnvelope
+    JSON persistent state
+    
+    
+    ---
+    
+    第三十六章：不要追求“所有 Capability 构造器 private”作为唯一保障
+    
+    推荐 private，但真正规则是：
+    
+    &gt; 只有 owner 的 issuance function 能建立有效 capability。
+    
+    
+    
+    可以有：
+    
+    private record
+    
+    但如果同一个 module 到处随便：
+    
+    { Id = ...; Epoch = ... }
+    
+    private 没意义。
+    
+    所以更好的 API：
+    
+    module BlessCapability =
+    
+        type T = private BlessCapability of ...
+    
+        let internal grant ...
+        let internal validate ...
+    
+    foreign owner 只能：
+    
+    receive
+    pass
+    consume through published port
+    
+    
+    ---
+    
+    第三十七章：Capability hierarchy 怎么做
+    
+    不要做 OO 权限继承：
+    
+    IAdminCapability
+        : IUserCapability
+    
+    更适合 F# 的是显式 attenuation：
+    
+    AdminCapability
+        -&gt; ReadCapability
+    
+    AdminCapability
+        -&gt; PublishCapability
+    
+    函数：
+    
+    let attenuateToRead admin =
+        ...
+    
+    这就是 capability transformer。
+    
+    父 capability revoke 后子 capability 是否失效，由 law 明确：
+    
+    shared epoch
+    parent lease
+    revocation generation
+    
+    而不是靠对象引用层级猜。
+    
+    
+    ---
+    
+    第三十八章：有限 N 次 Capability
+    
+    不要发 N 个 bool。
+    
+    建：
+    
+    QuotaCapability
+    
+    owner gate 维护：
+    
+    Remaining
+    Epoch
+    Scope
+    
+    消费：
+    
+    tryConsume
+        : QuotaCapability
+        -&gt; Result&lt;QuotaReceipt * QuotaCapability option, QuotaFailure&gt;
+    
+    但如果 capability 是 opaque handle，也可以让 caller 永远持同一 handle：
+    
+    gate.TryUse(handle)
+    
+    由 gate 内部计数。
+    
+    哪种更好取决于你是否希望 quota 的剩余量成为 caller-visible semantic data。
+    
+    通常不要。
+    
+    
+    ---
+    
+    第三十九章：Decorator 允许持可变状态吗？
+    
+    可以。
+    
+    例如：
+    
+    rate limiter
+    single-flight
+    circuit health
+    causal observation registry
+    
+    但必须分类。
+    
+    algorithm scratch
+    physical resource
+    projection cache
+    policy state
+    
+    不能：
+    
+    “为了 decorator 工作方便”
+    
+    就出现：
+    
+    CurrentStage
+    PendingSecondRetry
+    FallbackPhase
+    
+    然后变隐式 workflow runtime。
+    
+    
+    ---
+    
+    第四十章：Decorator Error 应该如何传播
+    
+    Transparent decorator：
+    
+    原则上保持 owner contract
+    
+    如果它自身失败：
+    
+    diagnostic failure
+    
+    需要明确是：
+    
+    fail open
+    fail closed
+    process fatal
+    
+    不能随便吞。
+    
+    Semantic decorator 可以把底层物理错误映射成领域 policy outcome，但必须由 owner law 决定。
+    
+    例如：
+    
+    ProviderError
+        -&gt; ConfirmedProviderFailure
+    
+    不是“error mapping utility”。
+    
+    它是 provider recovery 的业务语义。
+    
+    
+    ---
+    
+    第四十一章：不要设置 Decorator 最大嵌套深度
+    
+    不要：
+    
+    最多 5 层 decorator
+    
+    这种指标毫无理论意义。
+    
+    应该控制：
+    
+    semantic nesting depth
+    
+    即：
+    
+    &gt; 一次调用要理解多少个 trace-altering policy？
+    
+    
+    
+    透明 observation 十层可能都没问题。
+    
+    三个互相影响的 retry/fallback/deadline/claim 已经可能无法理解。
+    
+    所以 review 看：
+    
+    有多少独立 policy owner 改变本次 trace？
+    
+    不是看调用栈层数。
+    
+    
+    ---
+    
+    第四十二章：Composition Root 里的业务 if 是否全部禁止？
+    
+    不。
+    
+    这又是一个容易走极端的地方。
+    
+    允许：
+    
+    match TransformMode with
+    | Ordinary -&gt; ...
+    | StrengthReplica replica -&gt; ...
+    
+    因为这是 composition alternative。
+    
+    禁止：
+    
+    if review.IsPerfect &amp;&amp; strength.Pending &amp;&amp; ...
+    
+    因为 root 开始决定 foreign domain semantics。
+    
+    原则：
+    
+    &gt; Composition Root 可以选择 wiring topology，不能重新实现 domain decision。
+    
+    
+    
+    
+    ---
+    
+    第四十三章：事件溯源部分——这一块其实已经很接近最终形态
+    
+    我不会建议你们大改 durable-events。
+    
+    当前它已经有非常强的几条 law。
+    
+    例如本地 append：
+    
+    &gt; durable witness 是 writer 文件末尾完整 canonical JSON+LF；runtime append 不得创建 Git
+        blob/tree/ref/CAS，也不得随历史长度重写旧 bytes。
+    
+    
+    
+    每个 process 一个唯一 WriterId 和永久增长的 NDJSON writer file。
+    
+    Git blob 只出现在 remote sync hook 边界，而且完整 writer file 对应一个 blob。
+    
+    这已经非常清晰。
+    
+    
+    ---
+    
+    第四十四章：CanonicalIntegrator 是另一个“教材样板”
+    
+    当前 normative law 已经规定：
+    
+    &gt; 生产只有一个 canonical F# CE Integrator 可以把 writer streams 积分成 Current；业务模块只注册 single-event
         integration oracle，不能自己获得 history-reader capability，也不能自行 scan/load/fold history；boot replay 与 live append 使用同一个
-        CE program 和同一套 rules。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这比很多 event-sourcing 系统都干净。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里的下一步不是重构成更抽象。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是继续封死旁路。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十五章：业务模块永远不能有 HistoryReader</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">建议把这条升成极强 architecture gate：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止 feature owner 出现：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">loadEvents</div>
-    <div dir="auto">readAllEvents</div>
-    <div dir="auto">scanHistory</div>
-    <div dir="auto">replayHistory</div>
-    <div dir="auto">foldHistory</div>
-    <div dir="auto">EventStoreMerge</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CanonicalIntegrator</div>
-    <div dir="auto">remote physical convergence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以外。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">已有 durable-events test 本身已经在检查业务模块不能拥有历史读取/重放循环。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">继续扩大覆盖即可。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十六章：Projection 不是数据库 Entity</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终认知：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">History = durable truth</div>
-    <div dir="auto">Projection = cached integral</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但“所有状态都必须 fold events”也不要宗教化。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">分类：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Durable domain truth</div>
-    <div dir="auto">    → EventStore</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Derived durable view</div>
-    <div dir="auto">    → Projection</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Process-local capability authority</div>
-    <div dir="auto">    → Gate</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Physical resource</div>
-    <div dir="auto">    → runtime registry</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Algorithm scratch</div>
-    <div dir="auto">    → local mutable</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Diagnostic observation</div>
-    <div dir="auto">    → diagnostic store</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">千万别把：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">PTY handle</div>
-    <div dir="auto">timer</div>
-    <div dir="auto">quiescence permit</div>
-    <div dir="auto">socket</div>
-    <div dir="auto">in-flight Task</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">写 EventStore。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十七章：Projection 查询不需要全部 O(1)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第 91 题需要特别纠正。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是所有 incremental query 都必须 O(1)。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确规则：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 被明确证明为热路径且历史规模增长会破坏系统目标的查询，才必须拥有复杂度 contract。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">latest committed checkpoint</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果每个 provider turn 都查，就应该：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">projection.LatestCommitted</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">O(1)。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但一次 rare recovery 可以 O(log n)，甚至 O(n)，如果有明确 budget。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要把算法 Big-O 变成无差别 architecture dogma。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十八章：ProjectionCutTail 的正确理解</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前设计非常精细：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">bad semantic fact：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">仍 durable 保留</div>
-    <div dir="auto">→ rule Current 保持 last-good</div>
-    <div dir="auto">→ 同次 append 写 ProjectionCutTail</div>
-    <div dir="auto">→ replay 先看到 bad fact</div>
-    <div dir="auto">→ 再看到 reset</div>
-    <div dir="auto">→ 再继续</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而且当前进程一旦得到自己 EventId 被 cut 的 typed rejection receipt，就必须 process fatal，因为 durable projection
-        能恢复，并不意味着已经发生的 process-local/physical side effect 可以回滚。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这条要保留。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它正确地区分了：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">durable recoverability</div>
-    <div dir="auto">≠</div>
-    <div dir="auto">current process trustworthiness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是非常重要的分布式系统原则。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第四十九章：不要试图证明“任意 SIGKILL 后 100% 无歧义恢复”这种绝对命题</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是你 100 个问题里最后一个，也是最需要降维的一个。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">绝对命题：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “任何一行代码执行期间 SIGKILL，重启后 100% 无歧义恢复。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">对存在外部 Host / LLM / Git / process effect 的系统，一般不能凭软件内部 EventStore 绝对证明。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">典型窗口：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">发出外部 effect</div>
-    <div dir="auto">外部已执行</div>
-    <div dir="auto">SIGKILL</div>
-    <div dir="auto">本地 success receipt 尚未 durable</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">重启时，你不知道：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">effect never happened</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">还是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">effect happened but receipt was lost</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除非外部系统提供：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">idempotency key</div>
-    <div dir="auto">transactional receipt</div>
-    <div dir="auto">queryable effect identity</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以真正教科书级命题应该是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 对于每一个 crash cut，系统要么从 durable facts 唯一恢复，要么通过外部 physical observation/reconciliation
-        收敛到一个显式、有限、fail-closed 的合法状态；绝不通过猜测补写事实。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这才可证明。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十章：所有外部 effect 都应该逐渐拥有四段式模型</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">对于高价值 effect：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Intent</div>
-    <div dir="auto">Admission</div>
-    <div dir="auto">Physical Receipt</div>
-    <div dir="auto">Durable Outcome</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">PublishRequested</div>
-    <div dir="auto">PublishCapability</div>
-    <div dir="auto">Git fast-forward receipt</div>
-    <div dir="auto">Published</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ProviderExecutionAdmitted</div>
-    <div dir="auto">CapacityLease</div>
-    <div dir="auto">provider attempt</div>
-    <div dir="auto">ProviderAttemptTerminal</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是每个 effect 都必须四个 event。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是因果概念模型。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">有时 Intent 是 CE 内瞬态； 有时 Admission 是 process capability； Receipt 是 Host observation； Durable Outcome
-        才写事件。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十一章：Crash recovery 永远从事实重入普通 CE</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ResumeAtReviewStep3</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">taskResult {</div>
-    <div dir="auto">    let facts = projection.Current</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    match ReviewRecovery.decide facts with</div>
-    <div dir="auto">    | AlreadyDone witness -&gt;</div>
-    <div dir="auto">        return witness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    | NeedsReview input -&gt;</div>
-    <div dir="auto">        return! reviewWorkflow input</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    | NeedsReconcile input -&gt;</div>
-    <div dir="auto">        return! reconcile input</div>
-    <div dir="auto">}</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们 structured-workflow 当前已经明确禁止 durable ResumeAt... 这类 recovery control token，并要求恢复重入普通 workflow。
-    </div>
-    <div dir="auto"><br></div>
-    <div dir="auto">继续贯彻。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十二章：生产与测试的最终关系不是 1:1，而是 Proposition → Proof Portfolio</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">从此不要讨论：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Foo.fs</div>
-    <div dir="auto">应该有</div>
-    <div dir="auto">Foo.test.mjs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这种弱映射。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">正确图：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Normative Proposition</div>
-    <div dir="auto">      │</div>
-    <div dir="auto">      ├── Static proof</div>
-    <div dir="auto">      ├── Pure proof</div>
-    <div dir="auto">      ├── Temporal proof</div>
-    <div dir="auto">      ├── Adapter proof</div>
-    <div dir="auto">      └── Long Stroke evidence if necessary</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个 test 可以覆盖多个相关 invariants。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个 proposition 可以有多个 proof。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">proof ownership</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">仍必须唯一。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这和你们 requirement system 的设计完全兼容。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十三章：属性测试应该测 Law，不测随机代码</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">推荐大量增加 deterministic generative tests。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 Capability：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">生成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">issue</div>
-    <div dir="auto">consume</div>
-    <div dir="auto">consume again</div>
-    <div dir="auto">supersede</div>
-    <div dir="auto">consume old</div>
-    <div dir="auto">issue new</div>
-    <div dir="auto">revoke</div>
-    <div dir="auto">consume</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">验证：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">at most one admitted effect per capability epoch</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Event Fold：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">生成合法 event sequence：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">append online</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">得到：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Current_online</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">replay from zero</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">得到：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Current_replay</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Current_online = Current_replay</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是“逐字节”所有内存对象。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该比较 canonical semantic projection。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为缓存、dictionary enumeration、debug metadata 不一定属于 contract。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十四章：Event Fold 的顺序性质不要默认交换律</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">很多事件 fold：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">fold [A; B]</div>
-    <div dir="auto">≠</div>
-    <div dir="auto">fold [B; A]</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以 property-based test 不应该无脑测试 permutation invariance。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该先声明代数：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">commutative events</div>
-    <div dir="auto">causally ordered events</div>
-    <div dir="auto">idempotent duplicate</div>
-    <div dir="auto">independent branches</div>
-    <div dir="auto">conflicting heads</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后分别证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">independent events commute</div>
-    <div dir="auto">causally related events preserve order</div>
-    <div dir="auto">duplicates are idempotent</div>
-    <div dir="auto">conflicts remain conflicts</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这才是数学化 event sourcing。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十五章：Concurrent Heads 应该是事实，不是异常</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">两个离线合法分支：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">A</div>
-    <div dir="auto"> / \</div>
-    <div dir="auto">B   C</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果没有 causal order：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">B || C</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Structural Projection 应表达：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type HeadState =</div>
-    <div dir="auto">    | Single of EventId</div>
-    <div dir="auto">    | Concurrent of NonEmptySet&lt;EventId&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者已有对应 domain shape。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">last timestamp wins</div>
-    <div dir="auto">last file wins</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后把冲突抹掉。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">冲突本身就是事实。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十六章：禁止 feature.db / private ref</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这个可以直接 L0。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">扫描：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">*.db</div>
-    <div dir="auto">*.sqlite</div>
-    <div dir="auto">refs/*</div>
-    <div dir="auto">.git/wanxiang/*</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">在允许的 infrastructure zones 之外出现即红。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但要允许正常静态 repository content。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们现有 durable-events 已明确要求所有动态 durable event truth 统一进入 writer files，不允许 feature-owned backend。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以直接把 normative law 机械化即可。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十七章：交付型全仓重构路线图——执行完即交付</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">旧 wave 的根本缺陷：把 inventory、gate、baseline、census 当成重构成果。它们只能证明“知道问题在哪里”，不能证明生产所有权已经迁移。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">从本章开始，只有 production cutover 算进度。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个 owner slice 的固定施工单元：</div>
-    <div dir="auto">1. 读对应 WHY / WHAT / HOW + 当前 proof。</div>
-    <div dir="auto">2. 先补会因旧实现而失败、因目标边界而通过的最低层 proof。</div>
-    <div dir="auto">3. 把 decision / vocabulary / capability / effect ownership 搬到唯一 owner。</div>
-    <div dir="auto">4. 建最窄 published contract；foreign owner 只见 outcome / evidence / capability / port。</div>
-    <div dir="auto">5. 一次迁完全部 production callers；禁止“先 facade，未来再迁”。</div>
-    <div dir="auto">6. 同一 slice 删除旧 implementation、旧 alias、旧 adapter、旧 compatibility path；Git 负责历史。</div>
-    <div dir="auto">7. 跑 owner proof + architecture gate + build；绿后提交，再进入下一个 slice。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">四条完成铁律：</div>
-    <div dir="auto">A. report-only / baseline-only / gate-only commit 永远不能关闭一个 migration wave。</div>
-    <div dir="auto">B. KEEP 不是默认值。KEEP 必须证明：单一 owner、边界凝聚、foreign callers 只经 published contract、无重复知识。</div>
-    <div dir="auto">C. 每个 wave 结束时不得留下“新旧并存待后续删除”。迁移与删除属于同一 wave。</div>
-    <div dir="auto">D. baseline 只能是施工期临时护栏；最终交付时必须归零或删除。不存在“baseline 持续下降即完成”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">全仓覆盖矩阵，任何一级 production 区域都不能漏：</div>
-    <div dir="auto">Wave 0 — 全文件 target ledger；只建立施工闭环，不算重构进度。</div>
-    <div dir="auto">Wave 1 — OpenCode composition shell：Plugin / Host / Tools / Signals / Codec。</div>
-    <div dir="auto">Wave 2 — Interaction：Authority / Dispatch / Assistance / Repair。</div>
-    <div dir="auto">Wave 3 — Mission：Manager / Finality / Review / Obligation / WorkRecord。</div>
-    <div dir="auto">Wave 4 — Execution + Composition：Session / Delegation / Fission / Agent / Turn。</div>
-    <div dir="auto">Wave 5 — Context + Strength + Enforcer + Participant。</div>
-    <div dir="auto">Wave 6 — Persistence + Change + Git。</div>
-    <div dir="auto">Wave 7 — Process + Repository + Sphinx + Foundation + Resources + Host + Requirement + Verification + 其余 production。</div>
-    <div dir="auto">Wave 8 — 全仓 primary-owner / published-contract / dependency hard cut。</div>
-    <div dir="auto">Wave 9 — 物理目录与模块 rotation；删除旧树、空壳 Surface、过渡 facade。</div>
-    <div dir="auto">Wave 10 — requirements / structured-workflow / proof graph 与最终代码同步。</div>
-    <div dir="auto">Wave 11 — release closure：零迁移债 + 全梯度验证 + 可打包交付。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 1–7 必须共同关闭 Wave 0 ledger 的全部 production rows；Wave 8–11 只做全仓收口，不再接受新的“以后再搬”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 0：建立唯一施工账本，不把账本当成果</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">创建临时 architecture migration ledger，逐一覆盖 src/Wanxiangshu 下全部 production .fs。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">每行必须有：</div>
-    <div dir="auto">current path</div>
-    <div dir="auto">primary semantic owner</div>
-    <div dir="auto">classification = KEEP / MOVE / SPLIT / DELETE / COMPOSITION-ROOT / ADAPTER</div>
-    <div dir="auto">target path / target modules</div>
-    <div dir="auto">published contracts consumed / published</div>
-    <div dir="auto">foreign owner dependencies</div>
-    <div dir="auto">proofs that pin current law</div>
-    <div dir="auto">assigned wave</div>
-    <div dir="auto">status = PENDING / CUTOVER / DELETED / PROVEN-KEEP</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">semantic-owners.json 只能作为候选 owner inventory。文件被填了一个 owner ≠ ownership 已正确；必须由源码职责、WHAT owner、foreign imports 三者共同裁决。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ownership-adjudication.json 里的多 owner 列表视为 governance/APPLIES-TO evidence，不得冒充 primary ownership。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">热点 proof freeze 至少覆盖：</div>
-    <div dir="auto">PluginTransforms exact trace</div>
-    <div dir="auto">Assistance abort → fresh idle → successor trace</div>
-    <div dir="auto">ModelRouting capacity trace</div>
-    <div dir="auto">CanonicalIntegrator boot/live equivalence</div>
-    <div dir="auto">shutdown/drain</div>
-    <div dir="auto">recovery re-entry</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">完成标准：</div>
-    <div dir="auto">100% production files 有 row；0 UNKNOWN；所有 row 已分配到 Wave 1–7；KEEP 都有可验证理由。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">注意：Wave 0 完成只表示“可以施工”，不得被称为“重构完成”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 1：OpenCode composition shell 真正瘦身</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制起点：</div>
-    <div dir="auto">OpenCode/Plugin/PluginTransforms.fs</div>
-    <div dir="auto">OpenCode/Host/HostSignalBootstrap.fs</div>
-    <div dir="auto">OpenCode/Tools/ToolRegistry.fs</div>
-    <div dir="auto">OpenCode/Host/PairProgrammingThoughtTransform.fs</div>
-    <div dir="auto">OpenCode/Host/ModelRouting.fs</div>
-    <div dir="auto">OpenCode/Host/ModelCapacity.fs</div>
-    <div dir="auto">以及 PluginBoot / PluginHostWiring / PluginRecoveryWiring / PluginSessionWiring 与其直接 Host/Codec/Signals collaborators。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. PluginTransforms：逐项把 XTrace / Companion / Enforcer / Strength / Pair guidance / Requirement grounding 语义实现迁回 owner；root 只保留 typed mode + 固定顺序 + owner-published calls + Host shape。</div>
-    <div dir="auto">2. HostSignalBootstrap：把 model/recovery/fission/finality/assistance policy 搬出；只保留 construct / subscribe / route typed signal / drain / dispose。</div>
-    <div dir="auto">3. ToolRegistry：每个 tool owner 发布 ToolSpec + admission；registry 只 aggregate + Host projection，删除 registry 内业务 availability 判断。</div>
-    <div dir="auto">4. PairProgrammingThoughtTransform：把 context/guidance/prefix/grounding decision 迁回各 owner，保留 transform composition。</div>
-    <div dir="auto">5. ModelRouting / ModelCapacity：只保留 execution-model-routing owner 知识；provider recovery / host representation 通过 published boundary 接入。</div>
-    <div dir="auto">6. 扫完 OpenCode/Plugin、Host、Tools、Signals、Codec 的 Wave 0 rows；逐个 CUTOVER / DELETE / PROVEN-KEEP。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止：</div>
-    <div dir="auto">ITransformMiddleware / dynamic pipeline / service locator / giant capability bag。</div>
-    <div dir="auto">抽一个新 facade 包住旧泥球然后宣布完成。</div>
-    <div dir="auto">只减少 LOC 而保留 foreign policy。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 1 完成标准：</div>
-    <div dir="auto">OpenCode 对应 ledger rows 0 PENDING。</div>
-    <div dir="auto">PluginTransforms 与 HostSignalBootstrap 可宽 fan-out，但只依赖 published contracts，不 match foreign internals。</div>
-    <div dir="auto">ToolRegistry 不拥有工具业务可用性。</div>
-    <div dir="auto">迁出的旧 helper / alias / internal path 全删。</div>
-    <div dir="auto">ordered transform proof + affected owner tests + node scripts/check.mjs + node scripts/build.mjs 全绿。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 2：Interaction ownership cut——Assistance 不再是 Host 泥球</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制起点：</div>
-    <div dir="auto">Interaction/Dispatch/OpenCode/AssistanceHost.fs</div>
-    <div dir="auto">Interaction/Dispatch/OpenCode/NeedHelpSensor.fs</div>
-    <div dir="auto">Interaction/Dispatch/Send.fs</div>
-    <div dir="auto">Interaction/Dispatch/Dispatcher.fs</div>
-    <div dir="auto">Interaction/Dispatch/Recovery.fs</div>
-    <div dir="auto">Interaction/Dispatch/PhysicalAcceptance.fs</div>
-    <div dir="auto">Interaction/Authority/*</div>
-    <div dir="auto">Interaction/Repair/*</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. 固化 AssistanceAbortClaim exact identity、abort 不消费、fresh idle 后 consume once、late child 不复活 owner 的 temporal proof。</div>
-    <div dir="auto">2. 把 fast/deep selection、current-run validation、consultation classification、recursive assistance policy 搬到 dispatch/assistance owner。</div>
-    <div dir="auto">3. Git / Review / Todo / Strength / Fork 只通过 assistance-specific ports / witness / capability 接入；Assistance workflow 不直接引用这些 owner 的 internal namespace。</div>
-    <div dir="auto">4. NeedHelpSensor 只检测 typed observation，不决定 assistance policy；PhysicalAcceptance 只拥有物理接受事实。</div>
-    <div dir="auto">5. Send / Dispatcher 只拥有 dispatch protocol 与 transport ordering；authority issuance/validation/consume 迁回 Interaction/Authority。</div>
-    <div dir="auto">6. Repair 只处理 completed-turn repair contract，不偷取 normal dispatch ownership。</div>
-    <div dir="auto">7. 迁完全部 Interaction callers 后删除 AssistanceHost 内旧业务分支与跨域 helper。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 2 完成标准：</div>
-    <div dir="auto">Interaction ledger rows 0 PENDING。</div>
-    <div dir="auto">Assistance workflow 输入只含自己的 evidence / witness / capability / ports。</div>
-    <div dir="auto">无 Git/Review/Todo/Strength/Fork internal import。</div>
-    <div dir="auto">abort → fresh idle → successor trace 与 recovery trace 全绿。</div>
-    <div dir="auto">旧 Assistance policy path 0 references。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 3：Mission vertical cuts——Manager / Finality / Review / Obligation / WorkRecord 各归其主</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制热点：</div>
-    <div dir="auto">Mission/Manager/FinalitySurface.fs</div>
-    <div dir="auto">Mission/Manager/Workflow.fs</div>
-    <div dir="auto">Mission/Finality/*</div>
-    <div dir="auto">Mission/Review/DedicatedTodoRuntime.fs</div>
-    <div dir="auto">Mission/Review/Judgement/*</div>
-    <div dir="auto">Mission/Obligation/Todo/MagicTodoMembrane.fs</div>
-    <div dir="auto">Mission/Obligation/Todo/Projection.fs</div>
-    <div dir="auto">Mission/WorkRecord/*</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. Finality owner 只消费 typed facts / projections / review witness / cohort outcomes；foreign code 不得知道 Finality private algebra。</div>
-    <div dir="auto">2. Review 拆清 judgement、assurance、barrier、host adapter；Review witness 由 review owner 生产，Finality 只消费。</div>
-    <div dir="auto">3. Obligation/Todo 把 canonical obligation、projection、Host V1 compatibility sink 分层；compat sink 只能单向 canonical → host，不可反向成为 truth。</div>
-    <div dir="auto">4. Manager 只做 mission lifecycle/orchestration，不重新实现 Finality、Review、Todo policy。</div>
-    <div dir="auto">5. WorkRecord 只拥有工作记录 materialization 与 opening semantics，不变成通用 mission state bag。</div>
-    <div dir="auto">6. 对 FinalitySurface / MagicTodoMembrane / DedicatedTodoRuntime 做 semantic slice：凝聚的 owner 私有大模块可 KEEP；跨 owner 的部分必须 MOVE/SPLIT。</div>
-    <div dir="auto">7. 每个 cutover 同步删掉旧 membrane/facade 中对应分支，禁止保留双实现。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 3 完成标准：</div>
-    <div dir="auto">Mission ledger rows 0 PENDING。</div>
-    <div dir="auto">Finality/Review/Todo/Manager/WorkRecord 之间的依赖只经 published contracts。</div>
-    <div dir="auto">没有“Manager knows everything”或“Membrane owns both sides”路径。</div>
-    <div dir="auto">Finality、review witness、obligation durability 与 Host compatibility owner tests 全绿。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 4：Execution + Composition——把 child/session/fission lifecycle 从 Host 条件树变成 owner workflows</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制热点：</div>
-    <div dir="auto">Execution/Fission/OpenCode/Host.fs</div>
-    <div dir="auto">Execution/Fission/OpenCode/Tool.fs</div>
-    <div dir="auto">Execution/Delegation/Fork/OpenCode/Tool.fs</div>
-    <div dir="auto">Execution/Delegation/Fork/Host/Agent.fs</div>
-    <div dir="auto">Execution/Delegation/Fork/Host/Restart.fs</div>
-    <div dir="auto">Execution/Delegation/Fork/Host/Join.fs</div>
-    <div dir="auto">Execution/Session/Recovery/*</div>
-    <div dir="auto">Execution/Session/Wait/*</div>
-    <div dir="auto">Composition/Turn/ReconcilePass.fs</div>
-    <div dir="auto">Composition/Turn/Scheduler.fs</div>
-    <div dir="auto">Composition/Turn/Workflow.fs</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. Session owner 固定 association、attachment、wait、recovery 的 published lifecycle surface。</div>
-    <div dir="auto">2. Delegation owner 固定 child run / handle / join / recovery 的 durable facts 与 completion outcomes；Host adapter 不重造 child state。</div>
-    <div dir="auto">3. Fission owner 固定 admission、lane materialization、takeover、delivery claim；OpenCode Host/Tool 只做物理投影与 tool boundary。</div>
-    <div dir="auto">4. Composition/Turn 只 orchestration：宽 fan-out 合法，但不得读 foreign internal Stage/Step/Dictionary 来决定语义。</div>
-    <div dir="auto">5. recovery 从 durable facts + physical observation 重建，不恢复隐藏 program counter。</div>
-    <div dir="auto">6. 合并/删除重复的 join、restart、reconcile、completion path；同一个 lifecycle transition 只能有一个 semantic owner。</div>
-    <div dir="auto">7. 对 legitimate physical registries 保留 mutable，但必须局限在 resource boundary，不把 registry presence 当业务事实。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 4 完成标准：</div>
-    <div dir="auto">Execution + Composition ledger rows 0 PENDING。</div>
-    <div dir="auto">父流程只能消费 child outcome/evidence/capability，不能消费 child execution position。</div>
-    <div dir="auto">abort/retry/crash/join/drain 均有 temporal proof。</div>
-    <div dir="auto">旧 lifecycle 分支与重复 recovery path 0 references。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 5：Context + Strength + Enforcer + Participant——把横向大 Surface 切回真正 owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制热点：</div>
-    <div dir="auto">Strength/Surface.fs</div>
-    <div dir="auto">Strength/OpenCode/Speculate.fs</div>
-    <div dir="auto">Strength/Replica/Runtime.fs</div>
-    <div dir="auto">Enforcer/Continuation.fs</div>
-    <div dir="auto">Context/Trace/XTraceSurface.fs</div>
-    <div dir="auto">Context/Trace/Capture.fs</div>
-    <div dir="auto">Context/Companion/CompressionSurface.fs</div>
-    <div dir="auto">Context/Companion/Blogger/Runtime/Coordinator.fs</div>
-    <div dir="auto">Context/Prefix/Wire.fs</div>
-    <div dir="auto">Participant/Provider/*</div>
-    <div dir="auto">Participant/Persona/*</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. Context：Trace / Prefix / Companion 各自拥有 canonical model/projection/workflow；OpenCode transform 只能调用其 published operations。</div>
-    <div dir="auto">2. Strength：Budget / Prediction / Replica / Persistence 分清；Surface 只发布稳定业务 contract，不承载跨层 orchestration。</div>
-    <div dir="auto">3. Enforcer：Rulebook / observation / continuation / guidance 分清；Continuation 只组合 owned decisions，不重做 Context 或 Host policy。</div>
-    <div dir="auto">4. Participant：Persona、Provider Language、Provider Attempt、Provider Projection 的知识边界分离；Session binding 只持 identity/capability，不泄漏 provider internals。</div>
-    <div dir="auto">5. 对每个超过一屏的 Surface 逐段标 owner；owner-private cohesive code 可 KEEP，foreign policy 必须迁出。</div>
-    <div dir="auto">6. 删除为旧跨域调用保留的 helper/facade，更新全部 callers。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 5 完成标准：</div>
-    <div dir="auto">Context / Strength / Enforcer / Participant ledger rows 0 PENDING。</div>
-    <div dir="auto">不存在“Surface 因为方便所以拥有多个 owner 规则”。</div>
-    <div dir="auto">cross-owner callers 只依赖 Surface/contract，不依赖 private runtime/projection internals。</div>
-    <div dir="auto">Strength counterfactual、Enforcer continuation、Context trace/prefix、participant binding proofs 全绿。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 6：Persistence + Change + Git——耐久真相只走一条 canonical spine</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制热点：</div>
-    <div dir="auto">Persistence/EventStore/CanonicalIntegrator.fs</div>
-    <div dir="auto">Persistence/EventStore/ProcessEventLog.fs</div>
-    <div dir="auto">Persistence/EventStore/GitObjectDatabase.fs</div>
-    <div dir="auto">Persistence/EventStore/Store.fs</div>
-    <div dir="auto">Persistence/Journal/EventStoreJournalWriter.fs</div>
-    <div dir="auto">Persistence/Journal/AgentJournal.fs</div>
-    <div dir="auto">Change/*</div>
-    <div dir="auto">Git/*</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. CanonicalIntegrator 保持全局 replay / merge / boot convergence 唯一 owner；feature 不得自己扫描历史重建第二套真相。</div>
-    <div dir="auto">2. 每个 feature fold 只成为 single-event transition oracle；full-history traversal、merge ordering、common-dir integration 只在 persistence owner。</div>
-    <div dir="auto">3. Journal writer 只拥有 append/flush/close/poison 等物理 durability；业务 workflow 不观察 writer lifecycle 推导业务状态。</div>
-    <div dir="auto">4. Change owner 通过 ports 使用 Git/Review/Session 物理能力；Change Host 不复制 Git semantics 或 Review judgement。</div>
-    <div dir="auto">5. Git 只拥有 repository physical operations / integration gate / worktree resource，不成为 mission/change policy owner。</div>
-    <div dir="auto">6. 清理所有 feature-owned durable backend、history reader、duplicate replay loop、legacy migration writer；历史兼容只允许 decode/refuse 或明确 named creditor 的 bounded projection。</div>
-    <div dir="auto">7. 对 cleanup/legacy-ledger.md 每个 survivor 再确认 creditor、writer、exit condition；UNKNOWN/“以后再说”直接删除或迁移。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">禁止：</div>
-    <div dir="auto">因为 EventStore 大就 wholesale rewrite。</div>
-    <div dir="auto">为迁移方便新增双写、影子 store、feature 私有 replay。</div>
-    <div dir="auto">用 snapshot/state cell 代替 canonical durable fact。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 6 完成标准：</div>
-    <div dir="auto">Persistence / Change / Git ledger rows 0 PENDING。</div>
-    <div dir="auto">canonical replay path 唯一；feature full-history reader = 0。</div>
-    <div dir="auto">所有 acknowledged durable effect 在 restart 后可从 writer facts 重建。</div>
-    <div dir="auto">boot/live equivalence、crash cut、merge、writer failure proofs 全绿。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 7：Platform + Repository + remaining production——关闭全仓最后一批 production rows</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">覆盖：</div>
-    <div dir="auto">Process/*</div>
-    <div dir="auto">Repository/Investigation/*</div>
-    <div dir="auto">Repository/Knowledge/*</div>
-    <div dir="auto">Repository/Programming/*</div>
-    <div dir="auto">Sphinx/*</div>
-    <div dir="auto">Foundation/*</div>
-    <div dir="auto">Resources/*</div>
-    <div dir="auto">Host/*</div>
-    <div dir="auto">Requirement/Grounding/*</div>
-    <div dir="auto">Verification/*</div>
-    <div dir="auto">以及 Wave 0 ledger 中尚未被 Wave 1–6 覆盖的任何 production file。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">强制热点至少包括 Process/Surface.fs、Repository/Programming/Js/*、Sphinx/Session.fs、Resources/ProviderProse.fs、Foundation 中被业务层大量引用的 primitives。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. Process 把 PTY / node process / deadline / large gate / spool 分成物理 primitives；Surface 只发布进程能力，不拥有调用方业务 policy。</div>
-    <div dir="auto">2. Repository 分清 investigation、knowledge reuse、programming；工具 host 只适配，不把 workflow 和 filesystem 实现揉成一层。</div>
-    <div dir="auto">3. Sphinx 把 epistemic domain state 与 MCP/codec/physical session adapter 分层；process-local store 不冒充 durable business truth。</div>
-    <div dir="auto">4. Foundation 只留下真正通用、无业务 owner 的 algebra/primitives；任何 owner-specific helper 移回 owner。</div>
-    <div dir="auto">5. Resources 只 materialize package/provider/prompt resources；禁止通过资源层重新拥有 routing/provider semantics。</div>
-    <div dir="auto">6. Host 顶层只保留 host contract/projection，不承载 OpenCode 或 mission policy。</div>
-    <div dir="auto">7. Requirement/Grounding production surface 只实现 requirement-grounding owner；meta constitution 留到 Wave 10。</div>
-    <div dir="auto">8. Verification production surface 只提供 proof primitive/temporal harness，不拥有被验证业务。</div>
-    <div dir="auto">9. 最后遍历 Wave 0 ledger；任何 PENDING row 必须在本 wave 内 MOVE/SPLIT/DELETE/PROVEN-KEEP，不准顺延。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 7 完成标准：</div>
-    <div dir="auto">Wave 0 ledger 全部 production rows 0 PENDING。</div>
-    <div dir="auto">所有一级 src/Wanxiangshu 区域都完成 production cutover。</div>
-    <div dir="auto">Foundation/Resources/Host/Verification 不拥有 foreign business policy。</div>
-    <div dir="auto">此时才允许进入全仓 dependency hard cut。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 8：全仓 owner dependency hard cut——gate 只验收，不再替代施工</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当前 semantic-owners manifest 的“每文件一个 owner”只是必要条件，不是完成条件。这个 wave 要让 manifest 与真实代码依赖相符。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">逐文件、逐 edge 做：</div>
-    <div dir="auto">1. 每个 production file 恰有一个 primary semantic owner；owner 必须与 WHAT ownership 和源码职责一致。</div>
-    <div dir="auto">2. 每个 cross-owner dependency 必须落到对方 published contract；private Model/Runtime/Projection/Host internals 不得被 foreign owner import。</div>
-    <div dir="auto">3. Composition roots 可宽 fan-out，但只做 wiring/order/lifetime，不 match foreign domain cases，不持 foreign workflow position。</div>
-    <div dir="auto">4. Meta packages 的 APPLIES-TO 只表示 governance scope，不能因此获得 production ownership。</div>
-    <div dir="auto">5. Foreign owner 可消费 outcome / evidence / witness / capability / port，不能消费 Stage / Step / cursor / mutable registry presence 等 execution position。</div>
-    <div dir="auto">6. 对 owner graph 每个 cycle 裁决：若是同一语义主权则合并 owner/locality；若是物理组合则建立窄 bridge；禁止靠 baseline 永久豁免。</div>
-    <div dir="auto">7. architecture gate 必须检查实际 imports/compile edges，而不只是 manifest 是否覆盖；若现有 gate 不够，先补 gate，再立即修掉所有红边。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 8 完成标准：</div>
-    <div dir="auto">UNOWNED = 0。</div>
-    <div dir="auto">wrong-primary-owner = 0。</div>
-    <div dir="auto">cross-owner internal imports = 0。</div>
-    <div dir="auto">unjustified owner cycles = 0。</div>
-    <div dir="auto">composition-root foreign policy = 0。</div>
-    <div dir="auto">任何 architecture baseline / allowlist 中的迁移债 = 0；不能以“只下降”为完成。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 9：Physical Tree Rotation——让目录树终于投影最终语义拓扑</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只有 Wave 8 真实 owner graph 稳定后才搬目录。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. 按 primary owner + runtime locality 生成 target tree；目录名表达 owner/physical adapter/composition role，而不是历史事故。</div>
-    <div dir="auto">2. MOVE 已裁决文件到 target locality；更新 Wanxiangshu.fsproj compile order 与 namespace/module references。</div>
-    <div dir="auto">3. SPLIT 文件按 owner operation 切开；每个新文件必须有单一 owner，禁止按“凑 500 行”机械切。</div>
-    <div dir="auto">4. DELETE 旧目录、空壳 Surface、只转发的过渡 facade、旧 alias、旧 namespace compatibility wrapper。</div>
-    <div dir="auto">5. 合并只有历史原因才分离的同 owner 微模块；减少无语义价值的 translator layers。</div>
-    <div dir="auto">6. 全仓 grep 旧 path / namespace / symbol，必须 0 production references。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 9 完成标准：</div>
-    <div dir="auto">不存在 old-tree/new-tree 双骨架。</div>
-    <div dir="auto">不存在空目录、stale fsproj entry、transition alias、facade-hides-mess。</div>
-    <div dir="auto">project tree 能从物理布局直接看出 semantic owner 与 adapter/composition locality。</div>
-    <div dir="auto">全 build + architecture gates 在真实新路径上通过。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 10：Requirement / structured-workflow / proof graph 同步最终代码</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">现在才改“宪法”，因为 production topology 已经稳定。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">施工顺序：</div>
-    <div dir="auto">1. 遍历全部 requirement package 的 WHAT：分类为 Universal Structural Law / Owner-specific Law / Historical-Garbage。</div>
-    <div dir="auto">2. structured-workflow 只保留 universal meta law；owner-specific law 迁到真实 owner package。</div>
-    <div dir="auto">3. APPLIES-TO 明确等于 governance scope，不等于 production ownership；semantic owner 以最终 source topology + manifest 为准。</div>
-    <div dir="auto">4. 每条保留 WHAT 都必须有最低足够层 proof；测试引用最终 module/path，删除旧 topology 的测试入口。</div>
-    <div dir="auto">5. 删除已经完成使命的 migration baseline、census snapshot、temporary allowlist；仍有长期价值的 cleanup 文档改成事实性 architecture record，而不是施工状态。</div>
-    <div dir="auto">6. requirements/INDEX、GAP、WHY/HOW、proof ownership 与最终代码逐 owner 对账。</div>
-    <div dir="auto">7. 故意破坏关键边界，确认对应 gate/test 会红；恢复后再提交。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 10 完成标准：</div>
-    <div dir="auto">owner-specific law 在 meta package = 0。</div>
-    <div dir="auto">stale path / stale module / deleted behavior 的 normative prose = 0。</div>
-    <div dir="auto">每条 critical WHAT 有 owned proof；每个 critical gate 可 demonstrably red。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wave 11：Release Closure——只有这里通过才允许说“全仓大重构完成”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">先做零债扫描：</div>
-    <div dir="auto">Wave 0 ledger PENDING = 0。</div>
-    <div dir="auto">migration baseline / temporary allowlist = 0。</div>
-    <div dir="auto">old namespace / old path / deleted symbol production refs = 0。</div>
-    <div dir="auto">TODO/FIXME/compatibility shim 中属于本次迁移债的项目 = 0。</div>
-    <div dir="auto">bounded compatibility 只允许 named external/durable creditor + evidence + writer policy + exit condition；无 creditor 即删除。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">再做完整交付验证：</div>
-    <div dir="auto">1. node scripts/check.mjs</div>
-    <div dir="auto">2. node scripts/build.mjs</div>
-    <div dir="auto">3. node requirements/verification-system/tests/run.mjs</div>
-    <div dir="auto">4. npm run format-build-test</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">npm run format-build-test 是最终 release gate：format + checks + build + verification integration + package integration + warmup + e2e + npm pack --dry-run 必须整条通过。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最后人工审查：</div>
-    <div dir="auto">git diff 无临时调试/迁移脚手架。</div>
-    <div dir="auto">git status 只含本次应交付变化。</div>
-    <div dir="auto">Chapter 92 Definition of Done 每一项逐条成立。</div>
-    <div dir="auto">删除临时 architecture migration ledger；它的任务已经结束，最终 architecture truth 在代码、requirements 和机械 gate 中。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终完成标准只有一句：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; Wave 1–7 已实际迁完全部 production code，Wave 8–10 已把拓扑/目录/规范收敛到同一个事实，Wave 11 全梯度通过；此时执行完即可交付，不存在下一轮“真正的重构还没开始”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十八章：最终代码审查模板</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以后每个重要 PR 必须能回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">1. 这条变化属于哪个 Primary Owner？</div>
-    <div dir="auto">2. 它建立/改变哪条 WHAT proposition？</div>
-    <div dir="auto">3. 输入是什么：</div>
-    <div dir="auto">   Evidence / Witness / Capability / ordinary data？</div>
-    <div dir="auto">4. 输出是什么？</div>
-    <div dir="auto">5. 是否改变 business trace？</div>
-    <div dir="auto">6. 如果改变，law 是什么？</div>
-    <div dir="auto">7. 是否产生/派生 authority？</div>
-    <div dir="auto">8. 如果是，谁负责 issue / validate / consume / revoke？</div>
-    <div dir="auto">9. crash 发生在每个 effect 边界时怎样重入？</div>
-    <div dir="auto">10. 是否新增 durable fact？为什么现有 facts 不能推导？</div>
-    <div dir="auto">11. 是否新增 cross-owner dependency？</div>
-    <div dir="auto">12. dependency 是否只经 published contract？</div>
-    <div dir="auto">13. 是否暴露 child execution position？</div>
-    <div dir="auto">14. 是否出现 mutable state？</div>
-    <div dir="auto">15. mutable 属于：</div>
-    <div dir="auto">    physical resource / projection cache / algorithm scratch / 什么？</div>
-    <div dir="auto">16. 如何证明：</div>
-    <div dir="auto">    Static / Pure / Temporal / Adapter / Long Stroke？</div>
-    <div dir="auto">17. 最低 proof level 是哪层？</div>
-    <div dir="auto">18. 为什么不应该在更低层证明？</div>
-    <div dir="auto">19. 哪个 test/gate 必须因故意破坏而变红？</div>
-    <div dir="auto">20. 如果把 implementation 全部替换，consumer 哪些东西不应该知道？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">答不出来：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">REVISE</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第五十九章：Decorator Review 模板</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">每个 decorator 回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Owner:</div>
-    <div dir="auto">Published name:</div>
-    <div dir="auto">Underlying port:</div>
-    <div dir="auto">State held:</div>
-    <div dir="auto">Observation projection:</div>
-    <div dir="auto">Business observation:</div>
-    <div dir="auto">Trace relation:</div>
-    <div dir="auto">Failure policy:</div>
-    <div dir="auto">Cancellation law:</div>
-    <div dir="auto">Deadline law:</div>
-    <div dir="auto">Crash lifetime:</div>
-    <div dir="auto">Proof:</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Transparent：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">必须明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">π_business(D(P)) = π_business(P)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Semantic：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">必须明确：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">allowed trace relation R</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能写：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “只是 wrapper。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十章：Capability Review 模板</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability:</div>
-    <div dir="auto">Owner:</div>
-    <div dir="auto">Authority granted:</div>
-    <div dir="auto">Resource:</div>
-    <div dir="auto">Scope:</div>
-    <div dir="auto">Provenance:</div>
-    <div dir="auto">Epoch/freshness:</div>
-    <div dir="auto">Who can issue:</div>
-    <div dir="auto">Who can consume:</div>
-    <div dir="auto">Can be observed without consuming:</div>
-    <div dir="auto">Can be delegated:</div>
-    <div dir="auto">Can be attenuated:</div>
-    <div dir="auto">Can be revoked:</div>
-    <div dir="auto">Can be serialized:</div>
-    <div dir="auto">Restart semantics:</div>
-    <div dir="auto">Consume failure algebra:</div>
-    <div dir="auto">Physical effect after admission:</div>
-    <div dir="auto">Receipt/evidence after effect:</div>
-    <div dir="auto">Proof:</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这会极大减少“token archaeology”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十一章：Witness Review 模板</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness:</div>
-    <div dir="auto">Proposition P:</div>
-    <div dir="auto">Evidence required:</div>
-    <div dir="auto">Pure establishment rule:</div>
-    <div dir="auto">Validity scope:</div>
-    <div dir="auto">Subject identity:</div>
-    <div dir="auto">Digest/epoch if required:</div>
-    <div dir="auto">Durable across restart?</div>
-    <div dir="auto">If yes: which facts reconstruct it?</div>
-    <div dir="auto">Can it directly authorize effect?</div>
-    <div dir="auto">    NO, unless a named admission rule grants capability.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最后一条非常关键。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十二章：什么时候 Witness 需要 digest</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是所有 Witness 都带 digest。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">判据：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; P 是否只对某个精确版本的 subject 成立？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Review PERFECT</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">显然应该绑定：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">TreeHash</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否则它会被错误应用到未来 tree。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">UserRole = Manager</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可能不需要 tree digest。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以 digest 是 proposition identity 的一部分，不是 Witness 模板字段。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十三章：旧 Witness 在现实变化后不是“变成非法值”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如旧：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ConfirmedReview(Tree=A)</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Git Tree 变为 B 后。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">旧 Witness 仍然是真的：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “Tree A 曾经被确认。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它没有魔法变质。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正发生的是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">FinalityAdmission.grantBlessing</div>
-    <div dir="auto">    currentTree = B</div>
-    <div dir="auto">    witnessTree = A</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">于是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Error StaleWitness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这再次说明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness = knowledge</div>
-    <div dir="auto">Capability = current authority</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">必须分开。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十四章：Negative Witness 与 Capability Failure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Negative Witness：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type ReviewDefectWitness =</div>
-    <div dir="auto">    | ConfirmedDefect of ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它说明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 某个负命题成立。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability failure：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Error StalePermit</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">说明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 当前没有 effect authority。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">二者绝对不能共用：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">FailureToken</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十五章：Compensation 应该放哪里</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">分三类。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">纯 admission 前失败</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不需要 compensation。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">物理资源 acquire 后失败</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">由 resource scope：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">use</div>
-    <div dir="auto">try/finally</div>
-    <div dir="auto">dispose</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">处理。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">已提交外部业务 effect 后需要反向业务 action</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是真正 saga compensation。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">必须是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">owner-owned workflow</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要藏进 generic decorator。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CreateChild succeeded</div>
-    <div dir="auto">Link durable failed</div>
-    <div dir="auto">→ abort fresh child</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是 delegation owner 的 rollback law。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 withCompensation 工具箱。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十六章：CE 资源清理</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">F#：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">use</div>
-    <div dir="auto">use!</div>
-    <div dir="auto">try/finally</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">用于 lexical resource lifetime。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但 Node/Fable 环境下需要注意：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 不要把同步锁持有跨 let!。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所有 process-local gate：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">lock</div>
-    <div dir="auto">→ inspect/update minimal synchronous state</div>
-    <div dir="auto">→ release lock</div>
-    <div dir="auto">→ await external operation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果 mutation 本身必须跨 async operation 串行，就使用：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">serial queue / actor</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是长时间 lock。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">model routing 当前设计已经明确采用 process-wide serial queue 来顺序处理 resource mutation，避免并发 scheduler 基于同一旧
-        snapshot 同时提交。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是正确模板。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十七章：如何避免 CE 闭包变量变隐式 PC</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">任何跨 await mutable：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let mutable stage = ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">都触发 review。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但不是全禁。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">允许：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">local accumulator</div>
-    <div dir="auto">bounded algorithm</div>
-    <div dir="auto">resource handle</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">危险：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let mutable firstDone</div>
-    <div dir="auto">let mutable waitingSecond</div>
-    <div dir="auto">let mutable phase</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果后续 let! 根据它决定业务 effect。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">优先改成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let! first = ...</div>
-    <div dir="auto">match first with</div>
-    <div dir="auto">| ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者有界递归参数：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let rec loop budget evidence =</div>
-    <div dir="auto">    taskResult {</div>
-    <div dir="auto">        ...</div>
-    <div dir="auto">        return! loop (budget - 1) nextEvidence</div>
-    <div dir="auto">    }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十八章：如何证明递归有界</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">三种合法方式。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">结构递归</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">List tail</div>
-    <div dir="auto">tree child</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">显式预算</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">RetryBudget</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">每次递减。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">物理 deadline / cancellation capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但要小心：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; deadline 只证明时间有界，不一定证明 attempt 数有界。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果每个 attempt 可以零耗时，理论上仍可能无限循环。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以 retry/fallback 最好同时有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">budget</div>
-    <div dir="auto">+</div>
-    <div dir="auto">deadline</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果需要。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第六十九章：Semantic Vocabulary 的 Trace Refinement 怎么证明</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要试图 theorem prover 全自动。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">对于绝大多数 workflow，采用：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">reference algebra</div>
-    <div dir="auto">+</div>
-    <div dir="auto">generated finite trace families</div>
-    <div dir="auto">+</div>
-    <div dir="auto">temporal deterministic tests</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 fallback：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">生成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">A success</div>
-    <div dir="auto">A fail then B success</div>
-    <div dir="auto">A fail then B fail</div>
-    <div dir="auto">deadline before A</div>
-    <div dir="auto">deadline between A/B</div>
-    <div dir="auto">cancel during A</div>
-    <div dir="auto">stale terminal</div>
-    <div dir="auto">duplicate terminal</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后证明每个 trace 满足 owner law。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所谓“形式化”不等于必须 Coq。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">把 law 写清楚并对状态空间进行可重复穷举，已经比模糊 unit test 强几个数量级。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十章：最终不要建立 Free Monad / Workflow AST</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这个应该永久禁掉。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们当前 structured-workflow 已明确拒绝：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">WorkflowCommand</div>
-    <div dir="auto">WorkflowReply</div>
-    <div dir="auto">Step</div>
-    <div dir="auto">Suspend</div>
-    <div dir="auto">WorkflowInterpreter</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这类第二 runtime pattern。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">保持。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">F# CE 最大的价值就是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 使用语言已有控制流和类型系统。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要为了“更形式化”再制造另一门语言。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十一章：49 Package 怎么办</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要减少到：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">10</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">也不要追求：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">60</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">数字没有意义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">INDEX 已经明确说 49 只是当前 independent WHY/failure meaning/change test 的结果，不是目标。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Package 合并条件：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">same WHY</div>
-    <div dir="auto">same failure meaning</div>
-    <div dir="auto">cannot change independently</div>
-    <div dir="auto">same semantic owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">拆分条件：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">independent major change</div>
-    <div dir="auto">different authority</div>
-    <div dir="auto">different failure meaning</div>
-    <div dir="auto">different proof obligation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十二章：110 条 dependency edge 也不是债务数量</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要想着：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “边越少越干净。”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">有些 semantic dependencies 就是真实复杂性。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">目标不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">minimize edge count</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">every edge is truthful</div>
-    <div dir="auto">every edge has direction</div>
-    <div dir="auto">no hidden edge</div>
-    <div dir="auto">no cycle without real mutual domain</div>
-    <div dir="auto">no source internal dependency bypasses graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">本质复杂度应该在图里可见，而不是被 Utils 隐藏。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十三章：教科书级不是“低耦合”，而是“诚实耦合”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这是我认为你前面说“本质复杂性在耦合里面”的真正答案。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">复杂系统不可能没有 coupling。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Finality</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真的依赖：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Review</div>
-    <div dir="auto">Git candidate</div>
-    <div dir="auto">Handle drain</div>
-    <div dir="auto">Authority</div>
-    <div dir="auto">Durability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">硬拆掉只是撒谎。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">好的 architecture 不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">0 coupling</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">coupling has explicit semantic direction</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">即：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Finality consumes ReviewWitness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Finality reads ReviewerRuntime.internalState</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是区别。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十四章：所谓 Functional DDD 最终只保留 DDD 的这一层</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不用 Entity/Repository/Aggregate 模板。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">保留：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Ubiquitous Language</div>
-    <div dir="auto">Semantic Ownership</div>
-    <div dir="auto">Bounded Context</div>
-    <div dir="auto">Independent Change</div>
-    <div dir="auto">Anti-Corruption Boundary</div>
-    <div dir="auto">Explicit Dependencies</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后具体实现使用：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ADT</div>
-    <div dir="auto">pure functions</div>
-    <div dir="auto">CE</div>
-    <div dir="auto">capability</div>
-    <div dir="auto">events</div>
-    <div dir="auto">ports</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以以后不必再争：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “这是 DDD 吗？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它只是 architecture ownership theory。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十五章：最终项目目录不要强行镜像 Requirement Packages</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要变成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">src/</div>
-    <div dir="auto">  finality/</div>
-    <div dir="auto">  time-capability/</div>
-    <div dir="auto">  causal-wait/</div>
-    <div dir="auto">  execution-model-routing/</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除非代码自然如此。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Requirement tree：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">semantic law graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Production tree：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">code locality / technology / runtime locality</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它们应该相互映射，但不是 1:1。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这个原则和 production-test 非 1:1 是同一种思想：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 不同投影服务不同目的。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十六章：最终 architecture 的三个图</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以后架构师不再只看目录树。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">要同时看：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">图 A：Semantic Ownership Graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Requirement Owner → Requirement Owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">图 B：Production Dependency Graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Module Owner → Module Owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">图 C：Runtime Capability Graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Authority</div>
-    <div dir="auto">→ Derived Capability</div>
-    <div dir="auto">→ Port</div>
-    <div dir="auto">→ Physical Resource</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果这三张图互相矛盾，架构就有问题。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十七章：再加第四张图——Proof Graph</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">WHAT law</div>
-    <div dir="auto">→ static proof</div>
-    <div dir="auto">→ pure proof</div>
-    <div dir="auto">→ temporal proof</div>
-    <div dir="auto">→ adapter proof</div>
-    <div dir="auto">→ long stroke</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是生产与测试之间真正的连接。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是文件镜像。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十八章：最终“完美模块”的定义</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">打开任何一个 production module，我希望读者能在十分钟内回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">为什么存在？</div>
-    <div dir="auto">谁拥有？</div>
-    <div dir="auto">输入是什么？</div>
-    <div dir="auto">输出是什么？</div>
-    <div dir="auto">它知道哪些 foreign concepts？</div>
-    <div dir="auto">这些 concepts 是否是 public contracts？</div>
-    <div dir="auto">它建立哪些 facts？</div>
-    <div dir="auto">它颁发哪些 capabilities？</div>
-    <div dir="auto">它消费哪些 capabilities？</div>
-    <div dir="auto">它产生哪些 effects？</div>
-    <div dir="auto">它写哪些 durable facts？</div>
-    <div dir="auto">它失败意味着什么？</div>
-    <div dir="auto">crash 后怎样恢复？</div>
-    <div dir="auto">它的 law 在哪里？</div>
-    <div dir="auto">proof 在哪里？</div>
-    <div dir="auto">谁阻止别人复制它的知识？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">全部能回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">教科书级。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第七十九章：最终“完美 CE”的定义</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一眼看起来应该像：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">taskResult {</div>
-    <div dir="auto">    let! evidence = observe ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    let decision = Domain.decide evidence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    match decision with</div>
-    <div dir="auto">    | Done witness -&gt;</div>
-    <div dir="auto">        return witness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    | Need capabilityRequest -&gt;</div>
-    <div dir="auto">        let! capability = Admission.grant ... capabilityRequest</div>
-    <div dir="auto">        let! receipt = Effect.execute capability</div>
-    <div dir="auto">        return! continueFrom receipt</div>
-    <div dir="auto">}</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">task {</div>
-    <div dir="auto">    let! state = getEverything()</div>
-    <div dir="auto">    if state.Flag1 then</div>
-    <div dir="auto">       if state.Stage = ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十章：最终“完美 Decorator”的定义</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一眼可回答：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">what port?</div>
-    <div dir="auto">what owner?</div>
-    <div dir="auto">what trace relation?</div>
-    <div dir="auto">what state?</div>
-    <div dir="auto">what failure?</div>
-    <div dir="auto">what proof?</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而且：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">没有 global registry</div>
-    <div dir="auto">没有 dynamic middleware</div>
-    <div dir="auto">没有 magic ordering</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十一章：最终“完美 Capability Transformer”的定义</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如 BorrowingCapacity。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">应该可以写：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Base resource truth:</div>
-    <div dir="auto">    CapacityLedger</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Context:</div>
-    <div dir="auto">    session lineage</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Derived authority:</div>
-    <div dir="auto">    borrower may temporarily use exact lender occurrence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Invalidation:</div>
-    <div dir="auto">    owner recall</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Fence:</div>
-    <div dir="auto">    provider step boundary</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Isolation:</div>
-    <div dir="auto">    no cross-provider credit</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Knowledge owner:</div>
-    <div dir="auto">    BorrowingCapacity only</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后 architecture gate 证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 这些知识不在任何其它模块重复出现。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是教材。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十二章：最终“完美 Event Owner”的定义</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">业务 owner：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">EventEnvelope -&gt; Current -&gt; Result&lt;Current, SemanticError&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">或者等价 single-event oracle。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能拥有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">history</div>
-    <div dir="auto">iteration</div>
-    <div dir="auto">replay cursor</div>
-    <div dir="auto">file</div>
-    <div dir="auto">Git blob</div>
-    <div dir="auto">remote</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CanonicalIntegrator 拥有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">ordered history</div>
-    <div dir="auto">integration frontier</div>
-    <div dir="auto">replay</div>
-    <div dir="auto">live integration</div>
-    <div dir="auto">rule registry</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这和你们现有 DURABLE-EVENTS-019 已经完全一致。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所以这部分不要过度设计。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十三章：最终“完美 Physical Adapter”的定义</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它可以非常脏：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Fable obj</div>
-    <div dir="auto">JsInterop</div>
-    <div dir="auto">OpenCode field names</div>
-    <div dir="auto">Node APIs</div>
-    <div dir="auto">Git plumbing</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">没关系。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">要求：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">脏知识向内不泄漏</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">并通过：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">typed observation</div>
-    <div dir="auto">receipt</div>
-    <div dir="auto">port outcome</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">收敛。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Host-boundary 当前也已经把目标描述成：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 换一个 Host，只要 adapter 提供同等 snapshot/coarse wake/transform/tool/session API/identity observation
-        capability，其它 participant/mission/durability WHAT 不变。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是 anti-corruption boundary 的正确姿态。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十四章：不要追求 100% Pure</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">物理系统里：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">mutable</div>
-    <div dir="auto">Dictionary</div>
-    <div dir="auto">HashSet</div>
-    <div dir="auto">locks</div>
-    <div dir="auto">TaskCompletionSource</div>
-    <div dir="auto">ports</div>
-    <div dir="auto">registries</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">本来就应该存在。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们自己的 cross-callback gate 已经识别：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">pty</div>
-    <div dir="auto">timer</div>
-    <div dir="auto">waiter</div>
-    <div dir="auto">single-flight</div>
-    <div dir="auto">quiescence permit</div>
-    <div dir="auto">process handle</div>
-    <div dir="auto">socket</div>
-    <div dir="auto">cancellation</div>
-    <div dir="auto">resource</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这些合法 physical capability 类别。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正目标是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; mutable 只表达现实中确实存在的可变资源，而不是程序员脑中的 workflow position。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这才是 Functional Architecture，不是 Pure FP 宗教。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十五章：不要把所有 Result 都领域化</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最终 error taxonomy 至少三种：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Domain Rejection</div>
-    <div dir="auto">Physical Failure</div>
-    <div dir="auto">Invariant Violation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Domain：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Result&lt;&#39;T, DomainError&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Physical：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">通常由 port contract 映射。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Invariant：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">fatal / poison / process termination</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能为了“函数式”全部：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Result&lt;_, string&gt;</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">然后继续运行。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">尤其 durable semantic invariant break，当前设计已经正确规定 current process fatal。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十六章：推荐最终命名规范</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是硬 gate 全扫，但作为 review vocabulary：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Evidence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Observation</div>
-    <div dir="auto">Evidence</div>
-    <div dir="auto">Snapshot</div>
-    <div dir="auto">Receipt</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness</div>
-    <div dir="auto">Proof</div>
-    <div dir="auto">Confirmed...</div>
-    <div dir="auto">Accepted...</div>
-    <div dir="auto">Established...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Permit</div>
-    <div dir="auto">Lease</div>
-    <div dir="auto">Claim</div>
-    <div dir="auto">Capability</div>
-    <div dir="auto">Handle</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Decision</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Decision</div>
-    <div dir="auto">Disposition</div>
-    <div dir="auto">Outcome</div>
-    <div dir="auto">Classification</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Physical resource</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Port</div>
-    <div dir="auto">Host</div>
-    <div dir="auto">Adapter</div>
-    <div dir="auto">Runtime</div>
-    <div dir="auto">Gate</div>
-    <div dir="auto">Registry</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Semantic operation</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">用业务动词：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">publishEventually</div>
-    <div dir="auto">continueAfterConfirmedFailure</div>
-    <div dir="auto">ensurePerfectConfirmed</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">避免：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Manager</div>
-    <div dir="auto">Helper</div>
-    <div dir="auto">Processor</div>
-    <div dir="auto">Handler</div>
-    <div dir="auto">Utils</div>
-    <div dir="auto">Common</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">除非其业务语言确实如此。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十七章：100 个问题中的几条需要明确“拒绝题设”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">为了防止这套重构再次教条化，有几题的前提不能直接接受。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“Witness 必须序列化？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">跨 crash 必须存在的 proposition，其 durable evidence 必须足够重建 witness。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“Capability 必须永远不可序列化？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">对当前 process authority 默认是。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但这是 architecture choice，不是 capability theory 的数学定义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Wanxiangshu 当前这类 physical authority 应 process-local。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“所有 Projection query 必须 O(1)？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">按 performance law 决定。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“Transparent Decorator 可以随便加？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它仍需证明：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">business observational equivalence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而且 diagnostics 失败策略必须定义。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“所有 retry 都应该藏在 decorator？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只有 mechanical retry。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Semantic retry 需要 owner law。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“Composition Root 不能出现业务分支？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能重新决定业务事实。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">可以 match owner 已经输出的 topology/domain alternative。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“AssistanceHost 应该完全没有状态？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">physical single-flight、subscription、attempt claim gate 可以有状态。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不能有隐式 workflow PC。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“所有状态必须 Events -&gt; Fold？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">physical resource / capability authority 不属于 durable history。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">“SIGKILL 后绝对无歧义？”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">只有在外部 effect contract 足够强时才能做到。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">否则目标是 deterministic reconciliation + fail-closed ambiguity。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十八章：整个迁移过程最重要的禁令</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这几个事情一定不要做：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">❌ 新建 Workflow framework</div>
-    <div dir="auto">❌ 新建 global Decorator library</div>
-    <div dir="auto">❌ 新建 generic Capability manager</div>
-    <div dir="auto">❌ 新建 giant Ports bag</div>
-    <div dir="auto">❌ 把所有 Capability 存 EventStore</div>
-    <div dir="auto">❌ 把所有 Witness 单独写 event</div>
-    <div dir="auto">❌ 把所有业务 workflow 变成 Event-sourced aggregate</div>
-    <div dir="auto">❌ 按 LOC 拆模块</div>
-    <div dir="auto">❌ 追求 production/test 文件镜像</div>
-    <div dir="auto">❌ 追求 requirement/source 目录镜像</div>
-    <div dir="auto">❌ 追求 dependency edge 数最少</div>
-    <div dir="auto">❌ 用 E2E 证明纯 semantic law</div>
-    <div dir="auto">❌ 为了统一而隐藏真实业务分支</div>
-    <div dir="auto">❌ 把顺序明确的 composition 改成动态 middleware list</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果这十四件事避免了，重构成功概率会高很多。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第八十九章：我建议你把 Model Routing、Quiescence、CanonicalIntegrator 设成“三大正样本”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以后 architecture documentation 不要只写反模式。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">固定三个 Reference Architecture：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Reference A — Model Routing</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">教：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">single authority</div>
-    <div dir="auto">base resource</div>
-    <div dir="auto">capability transformer</div>
-    <div dir="auto">knowledge exclusivity</div>
-    <div dir="auto">architecture-negative tests</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Reference B — Quiescence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">教：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">physical observation</div>
-    <div dir="auto">opaque capability</div>
-    <div dir="auto">freshness</div>
-    <div dir="auto">consume-time validation</div>
-    <div dir="auto">one-shot authority</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Reference C — Canonical Integrator</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">教：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">single interpreter</div>
-    <div dir="auto">feature-owned oracle</div>
-    <div dir="auto">no feature history reader</div>
-    <div dir="auto">replay/live same program</div>
-    <div dir="auto">durable fact vs process safety</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">新 feature 设计时先问：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 我更像 A、B、C 中哪个？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这样全仓 architecture 会逐渐自相似。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这才是真正值得保留的“Fractal”概念。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 所有东西都是 CE。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 同一种 ownership/capability/proof 结构在不同尺度重复出现。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十章：重新定义“Fractal CE”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">我建议以后不要把“Fractal CE”当 package taxonomy。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">把它定义为一个定理：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; 如果一个业务 workflow 被缩成一个具名 operation，那么这个 operation 展开以后仍由 typed
+        CE program 和同一套 rules。
+    
+    
+    
+    这比很多 event-sourcing 系统都干净。
+    
+    这里的下一步不是重构成更抽象。
+    
+    而是继续封死旁路。
+    
+    
+    ---
+    
+    第四十五章：业务模块永远不能有 HistoryReader
+    
+    建议把这条升成极强 architecture gate：
+    
+    禁止 feature owner 出现：
+    
+    loadEvents
+    readAllEvents
+    scanHistory
+    replayHistory
+    foldHistory
+    EventStoreMerge
+    
+    除：
+    
+    CanonicalIntegrator
+    remote physical convergence
+    
+    以外。
+    
+    已有 durable-events test 本身已经在检查业务模块不能拥有历史读取/重放循环。
+    
+    继续扩大覆盖即可。
+    
+    
+    ---
+    
+    第四十六章：Projection 不是数据库 Entity
+    
+    最终认知：
+    
+    History = durable truth
+    Projection = cached integral
+    
+    但“所有状态都必须 fold events”也不要宗教化。
+    
+    分类：
+    
+    Durable domain truth
+        → EventStore
+    
+    Derived durable view
+        → Projection
+    
+    Process-local capability authority
+        → Gate
+    
+    Physical resource
+        → runtime registry
+    
+    Algorithm scratch
+        → local mutable
+    
+    Diagnostic observation
+        → diagnostic store
+    
+    千万别把：
+    
+    PTY handle
+    timer
+    quiescence permit
+    socket
+    in-flight Task
+    
+    写 EventStore。
+    
+    
+    ---
+    
+    第四十七章：Projection 查询不需要全部 O(1)
+    
+    第 91 题需要特别纠正。
+    
+    不是所有 incremental query 都必须 O(1)。
+    
+    正确规则：
+    
+    &gt; 被明确证明为热路径且历史规模增长会破坏系统目标的查询，才必须拥有复杂度 contract。
+    
+    
+    
+    例如：
+    
+    latest committed checkpoint
+    
+    如果每个 provider turn 都查，就应该：
+    
+    projection.LatestCommitted
+    
+    O(1)。
+    
+    但一次 rare recovery 可以 O(log n)，甚至 O(n)，如果有明确 budget。
+    
+    不要把算法 Big-O 变成无差别 architecture dogma。
+    
+    
+    ---
+    
+    第四十八章：ProjectionCutTail 的正确理解
+    
+    当前设计非常精细：
+    
+    bad semantic fact：
+    
+    仍 durable 保留
+    → rule Current 保持 last-good
+    → 同次 append 写 ProjectionCutTail
+    → replay 先看到 bad fact
+    → 再看到 reset
+    → 再继续
+    
+    而且当前进程一旦得到自己 EventId 被 cut 的 typed rejection receipt，就必须 process fatal，因为 durable projection
+        能恢复，并不意味着已经发生的 process-local/physical side effect 可以回滚。
+    
+    这条要保留。
+    
+    它正确地区分了：
+    
+    durable recoverability
+    ≠
+    current process trustworthiness
+    
+    这是非常重要的分布式系统原则。
+    
+    
+    ---
+    
+    第四十九章：不要试图证明“任意 SIGKILL 后 100% 无歧义恢复”这种绝对命题
+    
+    这是你 100 个问题里最后一个，也是最需要降维的一个。
+    
+    绝对命题：
+    
+    &gt; “任何一行代码执行期间 SIGKILL，重启后 100% 无歧义恢复。”
+    
+    
+    
+    对存在外部 Host / LLM / Git / process effect 的系统，一般不能凭软件内部 EventStore 绝对证明。
+    
+    典型窗口：
+    
+    发出外部 effect
+    外部已执行
+    SIGKILL
+    本地 success receipt 尚未 durable
+    
+    重启时，你不知道：
+    
+    effect never happened
+    
+    还是：
+    
+    effect happened but receipt was lost
+    
+    除非外部系统提供：
+    
+    idempotency key
+    transactional receipt
+    queryable effect identity
+    
+    所以真正教科书级命题应该是：
+    
+    &gt; 对于每一个 crash cut，系统要么从 durable facts 唯一恢复，要么通过外部 physical observation/reconciliation
+        收敛到一个显式、有限、fail-closed 的合法状态；绝不通过猜测补写事实。
+    
+    
+    
+    这才可证明。
+    
+    
+    ---
+    
+    第五十章：所有外部 effect 都应该逐渐拥有四段式模型
+    
+    对于高价值 effect：
+    
+    Intent
+    Admission
+    Physical Receipt
+    Durable Outcome
+    
+    例如：
+    
+    PublishRequested
+    PublishCapability
+    Git fast-forward receipt
+    Published
+    
+    或者：
+    
+    ProviderExecutionAdmitted
+    CapacityLease
+    provider attempt
+    ProviderAttemptTerminal
+    
+    不是每个 effect 都必须四个 event。
+    
+    这是因果概念模型。
+    
+    有时 Intent 是 CE 内瞬态； 有时 Admission 是 process capability； Receipt 是 Host observation； Durable Outcome
+        才写事件。
+    
+    
+    ---
+    
+    第五十一章：Crash recovery 永远从事实重入普通 CE
+    
+    不要：
+    
+    ResumeAtReviewStep3
+    
+    而是：
+    
+    taskResult {
+        let facts = projection.Current
+    
+        match ReviewRecovery.decide facts with
+        | AlreadyDone witness -&gt;
+            return witness
+    
+        | NeedsReview input -&gt;
+            return! reviewWorkflow input
+    
+        | NeedsReconcile input -&gt;
+            return! reconcile input
+    }
+    
+    你们 structured-workflow 当前已经明确禁止 durable ResumeAt... 这类 recovery control token，并要求恢复重入普通 workflow。
+    
+    
+    继续贯彻。
+    
+    
+    ---
+    
+    第五十二章：生产与测试的最终关系不是 1:1，而是 Proposition → Proof Portfolio
+    
+    从此不要讨论：
+    
+    Foo.fs
+    应该有
+    Foo.test.mjs
+    
+    这种弱映射。
+    
+    正确图：
+    
+    Normative Proposition
+          │
+          ├── Static proof
+          ├── Pure proof
+          ├── Temporal proof
+          ├── Adapter proof
+          └── Long Stroke evidence if necessary
+    
+    一个 test 可以覆盖多个相关 invariants。
+    
+    一个 proposition 可以有多个 proof。
+    
+    但：
+    
+    proof ownership
+    
+    仍必须唯一。
+    
+    这和你们 requirement system 的设计完全兼容。
+    
+    
+    ---
+    
+    第五十三章：属性测试应该测 Law，不测随机代码
+    
+    推荐大量增加 deterministic generative tests。
+    
+    例如 Capability：
+    
+    生成：
+    
+    issue
+    consume
+    consume again
+    supersede
+    consume old
+    issue new
+    revoke
+    consume
+    
+    验证：
+    
+    at most one admitted effect per capability epoch
+    
+    Event Fold：
+    
+    生成合法 event sequence：
+    
+    append online
+    
+    得到：
+    
+    Current_online
+    
+    然后：
+    
+    replay from zero
+    
+    得到：
+    
+    Current_replay
+    
+    证明：
+    
+    Current_online = Current_replay
+    
+    不是“逐字节”所有内存对象。
+    
+    应该比较 canonical semantic projection。
+    
+    因为缓存、dictionary enumeration、debug metadata 不一定属于 contract。
+    
+    
+    ---
+    
+    第五十四章：Event Fold 的顺序性质不要默认交换律
+    
+    很多事件 fold：
+    
+    fold [A; B]
+    ≠
+    fold [B; A]
+    
+    所以 property-based test 不应该无脑测试 permutation invariance。
+    
+    应该先声明代数：
+    
+    commutative events
+    causally ordered events
+    idempotent duplicate
+    independent branches
+    conflicting heads
+    
+    然后分别证明：
+    
+    independent events commute
+    causally related events preserve order
+    duplicates are idempotent
+    conflicts remain conflicts
+    
+    这才是数学化 event sourcing。
+    
+    
+    ---
+    
+    第五十五章：Concurrent Heads 应该是事实，不是异常
+    
+    两个离线合法分支：
+    
+    A
+     / \
+    B   C
+    
+    如果没有 causal order：
+    
+    B || C
+    
+    Structural Projection 应表达：
+    
+    type HeadState =
+        | Single of EventId
+        | Concurrent of NonEmptySet&lt;EventId&gt;
+    
+    或者已有对应 domain shape。
+    
+    不要：
+    
+    last timestamp wins
+    last file wins
+    
+    然后把冲突抹掉。
+    
+    冲突本身就是事实。
+    
+    
+    ---
+    
+    第五十六章：禁止 feature.db / private ref
+    
+    这个可以直接 L0。
+    
+    扫描：
+    
+    *.db
+    *.sqlite
+    refs/*
+    .git/wanxiang/*
+    
+    在允许的 infrastructure zones 之外出现即红。
+    
+    但要允许正常静态 repository content。
+    
+    你们现有 durable-events 已明确要求所有动态 durable event truth 统一进入 writer files，不允许 feature-owned backend。
+    
+    所以直接把 normative law 机械化即可。
+    
+    
+    ---
+    
+    第五十七章：交付型全仓重构路线图——执行完即交付
+    
+    旧 wave 的根本缺陷：把 inventory、gate、baseline、census 当成重构成果。它们只能证明“知道问题在哪里”，不能证明生产所有权已经迁移。
+    
+    从本章开始，只有 production cutover 算进度。
+    
+    一个 owner slice 的固定施工单元：
+    1. 读对应 WHY / WHAT / HOW + 当前 proof。
+    2. 先补会因旧实现而失败、因目标边界而通过的最低层 proof。
+    3. 把 decision / vocabulary / capability / effect ownership 搬到唯一 owner。
+    4. 建最窄 published contract；foreign owner 只见 outcome / evidence / capability / port。
+    5. 一次迁完全部 production callers；禁止“先 facade，未来再迁”。
+    6. 同一 slice 删除旧 implementation、旧 alias、旧 adapter、旧 compatibility path；Git 负责历史。
+    7. 跑 owner proof + architecture gate + build；绿后提交，再进入下一个 slice。
+    
+    四条完成铁律：
+    A. report-only / baseline-only / gate-only commit 永远不能关闭一个 migration wave。
+    B. KEEP 不是默认值。KEEP 必须证明：单一 owner、边界凝聚、foreign callers 只经 published contract、无重复知识。
+    C. 每个 wave 结束时不得留下“新旧并存待后续删除”。迁移与删除属于同一 wave。
+    D. baseline 只能是施工期临时护栏；最终交付时必须归零或删除。不存在“baseline 持续下降即完成”。
+    
+    全仓覆盖矩阵，任何一级 production 区域都不能漏：
+    Wave 0 — 全文件 target ledger；只建立施工闭环，不算重构进度。
+    Wave 1 — OpenCode composition shell：Plugin / Host / Tools / Signals / Codec。
+    Wave 2 — Interaction：Authority / Dispatch / Assistance / Repair。
+    Wave 3 — Mission：Manager / Finality / Review / Obligation / WorkRecord。
+    Wave 4 — Execution + Composition：Session / Delegation / Fission / Agent / Turn。
+    Wave 5 — Context + Strength + Enforcer + Participant。
+    Wave 6 — Persistence + Change + Git。
+    Wave 7 — Process + Repository + Sphinx + Foundation + Resources + Host + Requirement + Verification + 其余 production。
+    Wave 8 — 全仓 primary-owner / published-contract / dependency hard cut。
+    Wave 9 — 物理目录与模块 rotation；删除旧树、空壳 Surface、过渡 facade。
+    Wave 10 — requirements / structured-workflow / proof graph 与最终代码同步。
+    Wave 11 — release closure：零迁移债 + 全梯度验证 + 可打包交付。
+    
+    Wave 1–7 必须共同关闭 Wave 0 ledger 的全部 production rows；Wave 8–11 只做全仓收口，不再接受新的“以后再搬”。
+    
+    
+    ---
+    
+    Wave 0：建立唯一施工账本，不把账本当成果
+    
+    创建临时 architecture migration ledger，逐一覆盖 src/Wanxiangshu 下全部 production .fs。
+    
+    每行必须有：
+    current path
+    primary semantic owner
+    classification = KEEP / MOVE / SPLIT / DELETE / COMPOSITION-ROOT / ADAPTER
+    target path / target modules
+    published contracts consumed / published
+    foreign owner dependencies
+    proofs that pin current law
+    assigned wave
+    status = PENDING / CUTOVER / DELETED / PROVEN-KEEP
+    
+    semantic-owners.json 只能作为候选 owner inventory。文件被填了一个 owner ≠ ownership 已正确；必须由源码职责、WHAT owner、foreign imports 三者共同裁决。
+    
+    ownership-adjudication.json 里的多 owner 列表视为 governance/APPLIES-TO evidence，不得冒充 primary ownership。
+    
+    热点 proof freeze 至少覆盖：
+    PluginTransforms exact trace
+    Assistance abort → fresh idle → successor trace
+    ModelRouting capacity trace
+    CanonicalIntegrator boot/live equivalence
+    shutdown/drain
+    recovery re-entry
+    
+    完成标准：
+    100% production files 有 row；0 UNKNOWN；所有 row 已分配到 Wave 1–7；KEEP 都有可验证理由。
+    
+    注意：Wave 0 完成只表示“可以施工”，不得被称为“重构完成”。
+    
+    
+    ---
+    
+    Wave 1：OpenCode composition shell 真正瘦身
+    
+    强制起点：
+    OpenCode/Plugin/PluginTransforms.fs
+    OpenCode/Host/HostSignalBootstrap.fs
+    OpenCode/Tools/ToolRegistry.fs
+    OpenCode/Host/PairProgrammingThoughtTransform.fs
+    OpenCode/Host/ModelRouting.fs
+    OpenCode/Host/ModelCapacity.fs
+    以及 PluginBoot / PluginHostWiring / PluginRecoveryWiring / PluginSessionWiring 与其直接 Host/Codec/Signals collaborators。
+    
+    施工顺序：
+    1. PluginTransforms：逐项把 XTrace / Companion / Enforcer / Strength / Pair guidance / Requirement grounding 语义实现迁回 owner；root 只保留 typed mode + 固定顺序 + owner-published calls + Host shape。
+    2. HostSignalBootstrap：把 model/recovery/fission/finality/assistance policy 搬出；只保留 construct / subscribe / route typed signal / drain / dispose。
+    3. ToolRegistry：每个 tool owner 发布 ToolSpec + admission；registry 只 aggregate + Host projection，删除 registry 内业务 availability 判断。
+    4. PairProgrammingThoughtTransform：把 context/guidance/prefix/grounding decision 迁回各 owner，保留 transform composition。
+    5. ModelRouting / ModelCapacity：只保留 execution-model-routing owner 知识；provider recovery / host representation 通过 published boundary 接入。
+    6. 扫完 OpenCode/Plugin、Host、Tools、Signals、Codec 的 Wave 0 rows；逐个 CUTOVER / DELETE / PROVEN-KEEP。
+    
+    禁止：
+    ITransformMiddleware / dynamic pipeline / service locator / giant capability bag。
+    抽一个新 facade 包住旧泥球然后宣布完成。
+    只减少 LOC 而保留 foreign policy。
+    
+    Wave 1 完成标准：
+    OpenCode 对应 ledger rows 0 PENDING。
+    PluginTransforms 与 HostSignalBootstrap 可宽 fan-out，但只依赖 published contracts，不 match foreign internals。
+    ToolRegistry 不拥有工具业务可用性。
+    迁出的旧 helper / alias / internal path 全删。
+    ordered transform proof + affected owner tests + node scripts/check.mjs + node scripts/build.mjs 全绿。
+    
+    
+    
+    
+    ---
+    
+    Wave 2：Interaction ownership cut——Assistance 不再是 Host 泥球
+    
+    强制起点：
+    Interaction/Dispatch/OpenCode/AssistanceHost.fs
+    Interaction/Dispatch/OpenCode/NeedHelpSensor.fs
+    Interaction/Dispatch/Send.fs
+    Interaction/Dispatch/Dispatcher.fs
+    Interaction/Dispatch/Recovery.fs
+    Interaction/Dispatch/PhysicalAcceptance.fs
+    Interaction/Authority/*
+    Interaction/Repair/*
+    
+    施工顺序：
+    1. 固化 AssistanceAbortClaim exact identity、abort 不消费、fresh idle 后 consume once、late child 不复活 owner 的 temporal proof。
+    2. 把 fast/deep selection、current-run validation、consultation classification、recursive assistance policy 搬到 dispatch/assistance owner。
+    3. Git / Review / Todo / Strength / Fork 只通过 assistance-specific ports / witness / capability 接入；Assistance workflow 不直接引用这些 owner 的 internal namespace。
+    4. NeedHelpSensor 只检测 typed observation，不决定 assistance policy；PhysicalAcceptance 只拥有物理接受事实。
+    5. Send / Dispatcher 只拥有 dispatch protocol 与 transport ordering；authority issuance/validation/consume 迁回 Interaction/Authority。
+    6. Repair 只处理 completed-turn repair contract，不偷取 normal dispatch ownership。
+    7. 迁完全部 Interaction callers 后删除 AssistanceHost 内旧业务分支与跨域 helper。
+    
+    Wave 2 完成标准：
+    Interaction ledger rows 0 PENDING。
+    Assistance workflow 输入只含自己的 evidence / witness / capability / ports。
+    无 Git/Review/Todo/Strength/Fork internal import。
+    abort → fresh idle → successor trace 与 recovery trace 全绿。
+    旧 Assistance policy path 0 references。
+    
+    
+    ---
+    
+    Wave 3：Mission vertical cuts——Manager / Finality / Review / Obligation / WorkRecord 各归其主
+    
+    强制热点：
+    Mission/Manager/FinalitySurface.fs
+    Mission/Manager/Workflow.fs
+    Mission/Finality/*
+    Mission/Review/DedicatedTodoRuntime.fs
+    Mission/Review/Judgement/*
+    Mission/Obligation/Todo/MagicTodoMembrane.fs
+    Mission/Obligation/Todo/Projection.fs
+    Mission/WorkRecord/*
+    
+    施工顺序：
+    1. Finality owner 只消费 typed facts / projections / review witness / cohort outcomes；foreign code 不得知道 Finality private algebra。
+    2. Review 拆清 judgement、assurance、barrier、host adapter；Review witness 由 review owner 生产，Finality 只消费。
+    3. Obligation/Todo 把 canonical obligation、projection、Host V1 compatibility sink 分层；compat sink 只能单向 canonical → host，不可反向成为 truth。
+    4. Manager 只做 mission lifecycle/orchestration，不重新实现 Finality、Review、Todo policy。
+    5. WorkRecord 只拥有工作记录 materialization 与 opening semantics，不变成通用 mission state bag。
+    6. 对 FinalitySurface / MagicTodoMembrane / DedicatedTodoRuntime 做 semantic slice：凝聚的 owner 私有大模块可 KEEP；跨 owner 的部分必须 MOVE/SPLIT。
+    7. 每个 cutover 同步删掉旧 membrane/facade 中对应分支，禁止保留双实现。
+    
+    Wave 3 完成标准：
+    Mission ledger rows 0 PENDING。
+    Finality/Review/Todo/Manager/WorkRecord 之间的依赖只经 published contracts。
+    没有“Manager knows everything”或“Membrane owns both sides”路径。
+    Finality、review witness、obligation durability 与 Host compatibility owner tests 全绿。
+    
+    
+    
+    
+    ---
+    
+    Wave 4：Execution + Composition——把 child/session/fission lifecycle 从 Host 条件树变成 owner workflows
+    
+    强制热点：
+    Execution/Fission/OpenCode/Host.fs
+    Execution/Fission/OpenCode/Tool.fs
+    Execution/Delegation/Fork/OpenCode/Tool.fs
+    Execution/Delegation/Fork/Host/Agent.fs
+    Execution/Delegation/Fork/Host/Restart.fs
+    Execution/Delegation/Fork/Host/Join.fs
+    Execution/Session/Recovery/*
+    Execution/Session/Wait/*
+    Composition/Turn/ReconcilePass.fs
+    Composition/Turn/Scheduler.fs
+    Composition/Turn/Workflow.fs
+    
+    施工顺序：
+    1. Session owner 固定 association、attachment、wait、recovery 的 published lifecycle surface。
+    2. Delegation owner 固定 child run / handle / join / recovery 的 durable facts 与 completion outcomes；Host adapter 不重造 child state。
+    3. Fission owner 固定 admission、lane materialization、takeover、delivery claim；OpenCode Host/Tool 只做物理投影与 tool boundary。
+    4. Composition/Turn 只 orchestration：宽 fan-out 合法，但不得读 foreign internal Stage/Step/Dictionary 来决定语义。
+    5. recovery 从 durable facts + physical observation 重建，不恢复隐藏 program counter。
+    6. 合并/删除重复的 join、restart、reconcile、completion path；同一个 lifecycle transition 只能有一个 semantic owner。
+    7. 对 legitimate physical registries 保留 mutable，但必须局限在 resource boundary，不把 registry presence 当业务事实。
+    
+    Wave 4 完成标准：
+    Execution + Composition ledger rows 0 PENDING。
+    父流程只能消费 child outcome/evidence/capability，不能消费 child execution position。
+    abort/retry/crash/join/drain 均有 temporal proof。
+    旧 lifecycle 分支与重复 recovery path 0 references。
+    
+    
+    ---
+    
+    Wave 5：Context + Strength + Enforcer + Participant——把横向大 Surface 切回真正 owner
+    
+    强制热点：
+    Strength/Surface.fs
+    Strength/OpenCode/Speculate.fs
+    Strength/Replica/Runtime.fs
+    Enforcer/Continuation.fs
+    Context/Trace/XTraceSurface.fs
+    Context/Trace/Capture.fs
+    Context/Companion/CompressionSurface.fs
+    Context/Companion/Blogger/Runtime/Coordinator.fs
+    Context/Prefix/Wire.fs
+    Participant/Provider/*
+    Participant/Persona/*
+    
+    施工顺序：
+    1. Context：Trace / Prefix / Companion 各自拥有 canonical model/projection/workflow；OpenCode transform 只能调用其 published operations。
+    2. Strength：Budget / Prediction / Replica / Persistence 分清；Surface 只发布稳定业务 contract，不承载跨层 orchestration。
+    3. Enforcer：Rulebook / observation / continuation / guidance 分清；Continuation 只组合 owned decisions，不重做 Context 或 Host policy。
+    4. Participant：Persona、Provider Language、Provider Attempt、Provider Projection 的知识边界分离；Session binding 只持 identity/capability，不泄漏 provider internals。
+    5. 对每个超过一屏的 Surface 逐段标 owner；owner-private cohesive code 可 KEEP，foreign policy 必须迁出。
+    6. 删除为旧跨域调用保留的 helper/facade，更新全部 callers。
+    
+    Wave 5 完成标准：
+    Context / Strength / Enforcer / Participant ledger rows 0 PENDING。
+    不存在“Surface 因为方便所以拥有多个 owner 规则”。
+    cross-owner callers 只依赖 Surface/contract，不依赖 private runtime/projection internals。
+    Strength counterfactual、Enforcer continuation、Context trace/prefix、participant binding proofs 全绿。
+    
+    
+    ---
+    
+    Wave 6：Persistence + Change + Git——耐久真相只走一条 canonical spine
+    
+    强制热点：
+    Persistence/EventStore/CanonicalIntegrator.fs
+    Persistence/EventStore/ProcessEventLog.fs
+    Persistence/EventStore/GitObjectDatabase.fs
+    Persistence/EventStore/Store.fs
+    Persistence/Journal/EventStoreJournalWriter.fs
+    Persistence/Journal/AgentJournal.fs
+    Change/*
+    Git/*
+    
+    施工顺序：
+    1. CanonicalIntegrator 保持全局 replay / merge / boot convergence 唯一 owner；feature 不得自己扫描历史重建第二套真相。
+    2. 每个 feature fold 只成为 single-event transition oracle；full-history traversal、merge ordering、common-dir integration 只在 persistence owner。
+    3. Journal writer 只拥有 append/flush/close/poison 等物理 durability；业务 workflow 不观察 writer lifecycle 推导业务状态。
+    4. Change owner 通过 ports 使用 Git/Review/Session 物理能力；Change Host 不复制 Git semantics 或 Review judgement。
+    5. Git 只拥有 repository physical operations / integration gate / worktree resource，不成为 mission/change policy owner。
+    6. 清理所有 feature-owned durable backend、history reader、duplicate replay loop、legacy migration writer；历史兼容只允许 decode/refuse 或明确 named creditor 的 bounded projection。
+    7. 对 cleanup/legacy-ledger.md 每个 survivor 再确认 creditor、writer、exit condition；UNKNOWN/“以后再说”直接删除或迁移。
+    
+    禁止：
+    因为 EventStore 大就 wholesale rewrite。
+    为迁移方便新增双写、影子 store、feature 私有 replay。
+    用 snapshot/state cell 代替 canonical durable fact。
+    
+    Wave 6 完成标准：
+    Persistence / Change / Git ledger rows 0 PENDING。
+    canonical replay path 唯一；feature full-history reader = 0。
+    所有 acknowledged durable effect 在 restart 后可从 writer facts 重建。
+    boot/live equivalence、crash cut、merge、writer failure proofs 全绿。
+    
+    
+    ---
+    
+    Wave 7：Platform + Repository + remaining production——关闭全仓最后一批 production rows
+    
+    覆盖：
+    Process/*
+    Repository/Investigation/*
+    Repository/Knowledge/*
+    Repository/Programming/*
+    Sphinx/*
+    Foundation/*
+    Resources/*
+    Host/*
+    Requirement/Grounding/*
+    Verification/*
+    以及 Wave 0 ledger 中尚未被 Wave 1–6 覆盖的任何 production file。
+    
+    强制热点至少包括 Process/Surface.fs、Repository/Programming/Js/*、Sphinx/Session.fs、Resources/ProviderProse.fs、Foundation 中被业务层大量引用的 primitives。
+    
+    施工顺序：
+    1. Process 把 PTY / node process / deadline / large gate / spool 分成物理 primitives；Surface 只发布进程能力，不拥有调用方业务 policy。
+    2. Repository 分清 investigation、knowledge reuse、programming；工具 host 只适配，不把 workflow 和 filesystem 实现揉成一层。
+    3. Sphinx 把 epistemic domain state 与 MCP/codec/physical session adapter 分层；process-local store 不冒充 durable business truth。
+    4. Foundation 只留下真正通用、无业务 owner 的 algebra/primitives；任何 owner-specific helper 移回 owner。
+    5. Resources 只 materialize package/provider/prompt resources；禁止通过资源层重新拥有 routing/provider semantics。
+    6. Host 顶层只保留 host contract/projection，不承载 OpenCode 或 mission policy。
+    7. Requirement/Grounding production surface 只实现 requirement-grounding owner；meta constitution 留到 Wave 10。
+    8. Verification production surface 只提供 proof primitive/temporal harness，不拥有被验证业务。
+    9. 最后遍历 Wave 0 ledger；任何 PENDING row 必须在本 wave 内 MOVE/SPLIT/DELETE/PROVEN-KEEP，不准顺延。
+    
+    Wave 7 完成标准：
+    Wave 0 ledger 全部 production rows 0 PENDING。
+    所有一级 src/Wanxiangshu 区域都完成 production cutover。
+    Foundation/Resources/Host/Verification 不拥有 foreign business policy。
+    此时才允许进入全仓 dependency hard cut。
+    
+    
+    ---
+    
+    Wave 8：全仓 owner dependency hard cut——gate 只验收，不再替代施工
+    
+    当前 semantic-owners manifest 的“每文件一个 owner”只是必要条件，不是完成条件。这个 wave 要让 manifest 与真实代码依赖相符。
+    
+    逐文件、逐 edge 做：
+    1. 每个 production file 恰有一个 primary semantic owner；owner 必须与 WHAT ownership 和源码职责一致。
+    2. 每个 cross-owner dependency 必须落到对方 published contract；private Model/Runtime/Projection/Host internals 不得被 foreign owner import。
+    3. Composition roots 可宽 fan-out，但只做 wiring/order/lifetime，不 match foreign domain cases，不持 foreign workflow position。
+    4. Meta packages 的 APPLIES-TO 只表示 governance scope，不能因此获得 production ownership。
+    5. Foreign owner 可消费 outcome / evidence / witness / capability / port，不能消费 Stage / Step / cursor / mutable registry presence 等 execution position。
+    6. 对 owner graph 每个 cycle 裁决：若是同一语义主权则合并 owner/locality；若是物理组合则建立窄 bridge；禁止靠 baseline 永久豁免。
+    7. architecture gate 必须检查实际 imports/compile edges，而不只是 manifest 是否覆盖；若现有 gate 不够，先补 gate，再立即修掉所有红边。
+    
+    Wave 8 完成标准：
+    UNOWNED = 0。
+    wrong-primary-owner = 0。
+    cross-owner internal imports = 0。
+    unjustified owner cycles = 0。
+    composition-root foreign policy = 0。
+    任何 architecture baseline / allowlist 中的迁移债 = 0；不能以“只下降”为完成。
+    
+    
+    ---
+    
+    Wave 9：Physical Tree Rotation——让目录树终于投影最终语义拓扑
+    
+    只有 Wave 8 真实 owner graph 稳定后才搬目录。
+    
+    施工顺序：
+    1. 按 primary owner + runtime locality 生成 target tree；目录名表达 owner/physical adapter/composition role，而不是历史事故。
+    2. MOVE 已裁决文件到 target locality；更新 Wanxiangshu.fsproj compile order 与 namespace/module references。
+    3. SPLIT 文件按 owner operation 切开；每个新文件必须有单一 owner，禁止按“凑 500 行”机械切。
+    4. DELETE 旧目录、空壳 Surface、只转发的过渡 facade、旧 alias、旧 namespace compatibility wrapper。
+    5. 合并只有历史原因才分离的同 owner 微模块；减少无语义价值的 translator layers。
+    6. 全仓 grep 旧 path / namespace / symbol，必须 0 production references。
+    
+    Wave 9 完成标准：
+    不存在 old-tree/new-tree 双骨架。
+    不存在空目录、stale fsproj entry、transition alias、facade-hides-mess。
+    project tree 能从物理布局直接看出 semantic owner 与 adapter/composition locality。
+    全 build + architecture gates 在真实新路径上通过。
+    
+    
+    ---
+    
+    Wave 10：Requirement / structured-workflow / proof graph 同步最终代码
+    
+    现在才改“宪法”，因为 production topology 已经稳定。
+    
+    施工顺序：
+    1. 遍历全部 requirement package 的 WHAT：分类为 Universal Structural Law / Owner-specific Law / Historical-Garbage。
+    2. structured-workflow 只保留 universal meta law；owner-specific law 迁到真实 owner package。
+    3. APPLIES-TO 明确等于 governance scope，不等于 production ownership；semantic owner 以最终 source topology + manifest 为准。
+    4. 每条保留 WHAT 都必须有最低足够层 proof；测试引用最终 module/path，删除旧 topology 的测试入口。
+    5. 删除已经完成使命的 migration baseline、census snapshot、temporary allowlist；仍有长期价值的 cleanup 文档改成事实性 architecture record，而不是施工状态。
+    6. requirements/INDEX、GAP、WHY/HOW、proof ownership 与最终代码逐 owner 对账。
+    7. 故意破坏关键边界，确认对应 gate/test 会红；恢复后再提交。
+    
+    Wave 10 完成标准：
+    owner-specific law 在 meta package = 0。
+    stale path / stale module / deleted behavior 的 normative prose = 0。
+    每条 critical WHAT 有 owned proof；每个 critical gate 可 demonstrably red。
+    
+    
+    ---
+    
+    Wave 11：Release Closure——只有这里通过才允许说“全仓大重构完成”
+    
+    先做零债扫描：
+    Wave 0 ledger PENDING = 0。
+    migration baseline / temporary allowlist = 0。
+    old namespace / old path / deleted symbol production refs = 0。
+    TODO/FIXME/compatibility shim 中属于本次迁移债的项目 = 0。
+    bounded compatibility 只允许 named external/durable creditor + evidence + writer policy + exit condition；无 creditor 即删除。
+    
+    再做完整交付验证：
+    1. node scripts/check.mjs
+    2. node scripts/build.mjs
+    3. node requirements/verification-system/tests/run.mjs
+    4. npm run format-build-test
+    
+    npm run format-build-test 是最终 release gate：format + checks + build + verification integration + package integration + warmup + e2e + npm pack --dry-run 必须整条通过。
+    
+    最后人工审查：
+    git diff 无临时调试/迁移脚手架。
+    git status 只含本次应交付变化。
+    Chapter 92 Definition of Done 每一项逐条成立。
+    删除临时 architecture migration ledger；它的任务已经结束，最终 architecture truth 在代码、requirements 和机械 gate 中。
+    
+    最终完成标准只有一句：
+    
+    &gt; Wave 1–7 已实际迁完全部 production code，Wave 8–10 已把拓扑/目录/规范收敛到同一个事实，Wave 11 全梯度通过；此时执行完即可交付，不存在下一轮“真正的重构还没开始”。
+    
+    
+    ---
+    
+    第五十八章：最终代码审查模板
+    
+    以后每个重要 PR 必须能回答：
+    
+    1. 这条变化属于哪个 Primary Owner？
+    2. 它建立/改变哪条 WHAT proposition？
+    3. 输入是什么：
+       Evidence / Witness / Capability / ordinary data？
+    4. 输出是什么？
+    5. 是否改变 business trace？
+    6. 如果改变，law 是什么？
+    7. 是否产生/派生 authority？
+    8. 如果是，谁负责 issue / validate / consume / revoke？
+    9. crash 发生在每个 effect 边界时怎样重入？
+    10. 是否新增 durable fact？为什么现有 facts 不能推导？
+    11. 是否新增 cross-owner dependency？
+    12. dependency 是否只经 published contract？
+    13. 是否暴露 child execution position？
+    14. 是否出现 mutable state？
+    15. mutable 属于：
+        physical resource / projection cache / algorithm scratch / 什么？
+    16. 如何证明：
+        Static / Pure / Temporal / Adapter / Long Stroke？
+    17. 最低 proof level 是哪层？
+    18. 为什么不应该在更低层证明？
+    19. 哪个 test/gate 必须因故意破坏而变红？
+    20. 如果把 implementation 全部替换，consumer 哪些东西不应该知道？
+    
+    答不出来：
+    
+    REVISE
+    
+    
+    ---
+    
+    第五十九章：Decorator Review 模板
+    
+    每个 decorator 回答：
+    
+    Owner:
+    Published name:
+    Underlying port:
+    State held:
+    Observation projection:
+    Business observation:
+    Trace relation:
+    Failure policy:
+    Cancellation law:
+    Deadline law:
+    Crash lifetime:
+    Proof:
+    
+    Transparent：
+    
+    必须明确：
+    
+    π_business(D(P)) = π_business(P)
+    
+    Semantic：
+    
+    必须明确：
+    
+    allowed trace relation R
+    
+    不能写：
+    
+    &gt; “只是 wrapper。”
+    
+    
+    
+    
+    ---
+    
+    第六十章：Capability Review 模板
+    
+    Capability:
+    Owner:
+    Authority granted:
+    Resource:
+    Scope:
+    Provenance:
+    Epoch/freshness:
+    Who can issue:
+    Who can consume:
+    Can be observed without consuming:
+    Can be delegated:
+    Can be attenuated:
+    Can be revoked:
+    Can be serialized:
+    Restart semantics:
+    Consume failure algebra:
+    Physical effect after admission:
+    Receipt/evidence after effect:
+    Proof:
+    
+    这会极大减少“token archaeology”。
+    
+    
+    ---
+    
+    第六十一章：Witness Review 模板
+    
+    Witness:
+    Proposition P:
+    Evidence required:
+    Pure establishment rule:
+    Validity scope:
+    Subject identity:
+    Digest/epoch if required:
+    Durable across restart?
+    If yes: which facts reconstruct it?
+    Can it directly authorize effect?
+        NO, unless a named admission rule grants capability.
+    
+    最后一条非常关键。
+    
+    
+    ---
+    
+    第六十二章：什么时候 Witness 需要 digest
+    
+    不是所有 Witness 都带 digest。
+    
+    判据：
+    
+    &gt; P 是否只对某个精确版本的 subject 成立？
+    
+    
+    
+    例如：
+    
+    Review PERFECT
+    
+    显然应该绑定：
+    
+    TreeHash
+    
+    否则它会被错误应用到未来 tree。
+    
+    但：
+    
+    UserRole = Manager
+    
+    可能不需要 tree digest。
+    
+    所以 digest 是 proposition identity 的一部分，不是 Witness 模板字段。
+    
+    
+    ---
+    
+    第六十三章：旧 Witness 在现实变化后不是“变成非法值”
+    
+    例如旧：
+    
+    ConfirmedReview(Tree=A)
+    
+    Git Tree 变为 B 后。
+    
+    旧 Witness 仍然是真的：
+    
+    &gt; “Tree A 曾经被确认。”
+    
+    
+    
+    它没有魔法变质。
+    
+    真正发生的是：
+    
+    FinalityAdmission.grantBlessing
+        currentTree = B
+        witnessTree = A
+    
+    于是：
+    
+    Error StaleWitness
+    
+    这再次说明：
+    
+    Witness = knowledge
+    Capability = current authority
+    
+    必须分开。
+    
+    
+    ---
+    
+    第六十四章：Negative Witness 与 Capability Failure
+    
+    Negative Witness：
+    
+    type ReviewDefectWitness =
+        | ConfirmedDefect of ...
+    
+    它说明：
+    
+    &gt; 某个负命题成立。
+    
+    
+    
+    Capability failure：
+    
+    Error StalePermit
+    
+    说明：
+    
+    &gt; 当前没有 effect authority。
+    
+    
+    
+    二者绝对不能共用：
+    
+    FailureToken
+    
+    
+    ---
+    
+    第六十五章：Compensation 应该放哪里
+    
+    分三类。
+    
+    纯 admission 前失败
+    
+    不需要 compensation。
+    
+    物理资源 acquire 后失败
+    
+    由 resource scope：
+    
+    use
+    try/finally
+    dispose
+    
+    处理。
+    
+    已提交外部业务 effect 后需要反向业务 action
+    
+    这是真正 saga compensation。
+    
+    必须是：
+    
+    owner-owned workflow
+    
+    不要藏进 generic decorator。
+    
+    例如：
+    
+    CreateChild succeeded
+    Link durable failed
+    → abort fresh child
+    
+    这是 delegation owner 的 rollback law。
+    
+    不是 withCompensation 工具箱。
+    
+    
+    ---
+    
+    第六十六章：CE 资源清理
+    
+    F#：
+    
+    use
+    use!
+    try/finally
+    
+    用于 lexical resource lifetime。
+    
+    但 Node/Fable 环境下需要注意：
+    
+    &gt; 不要把同步锁持有跨 let!。
+    
+    
+    
+    所有 process-local gate：
+    
+    lock
+    → inspect/update minimal synchronous state
+    → release lock
+    → await external operation
+    
+    如果 mutation 本身必须跨 async operation 串行，就使用：
+    
+    serial queue / actor
+    
+    而不是长时间 lock。
+    
+    model routing 当前设计已经明确采用 process-wide serial queue 来顺序处理 resource mutation，避免并发 scheduler 基于同一旧
+        snapshot 同时提交。
+    
+    这是正确模板。
+    
+    
+    ---
+    
+    第六十七章：如何避免 CE 闭包变量变隐式 PC
+    
+    任何跨 await mutable：
+    
+    let mutable stage = ...
+    
+    都触发 review。
+    
+    但不是全禁。
+    
+    允许：
+    
+    local accumulator
+    bounded algorithm
+    resource handle
+    
+    危险：
+    
+    let mutable firstDone
+    let mutable waitingSecond
+    let mutable phase
+    
+    如果后续 let! 根据它决定业务 effect。
+    
+    优先改成：
+    
+    let! first = ...
+    match first with
+    | ...
+    
+    或者有界递归参数：
+    
+    let rec loop budget evidence =
+        taskResult {
+            ...
+            return! loop (budget - 1) nextEvidence
+        }
+    
+    
+    ---
+    
+    第六十八章：如何证明递归有界
+    
+    三种合法方式。
+    
+    结构递归
+    
+    List tail
+    tree child
+    
+    显式预算
+    
+    RetryBudget
+    
+    每次递减。
+    
+    物理 deadline / cancellation capability
+    
+    但要小心：
+    
+    &gt; deadline 只证明时间有界，不一定证明 attempt 数有界。
+    
+    
+    
+    如果每个 attempt 可以零耗时，理论上仍可能无限循环。
+    
+    所以 retry/fallback 最好同时有：
+    
+    budget
+    +
+    deadline
+    
+    如果需要。
+    
+    
+    ---
+    
+    第六十九章：Semantic Vocabulary 的 Trace Refinement 怎么证明
+    
+    不要试图 theorem prover 全自动。
+    
+    对于绝大多数 workflow，采用：
+    
+    reference algebra
+    +
+    generated finite trace families
+    +
+    temporal deterministic tests
+    
+    例如 fallback：
+    
+    生成：
+    
+    A success
+    A fail then B success
+    A fail then B fail
+    deadline before A
+    deadline between A/B
+    cancel during A
+    stale terminal
+    duplicate terminal
+    
+    然后证明每个 trace 满足 owner law。
+    
+    所谓“形式化”不等于必须 Coq。
+    
+    把 law 写清楚并对状态空间进行可重复穷举，已经比模糊 unit test 强几个数量级。
+    
+    
+    ---
+    
+    第七十章：最终不要建立 Free Monad / Workflow AST
+    
+    这个应该永久禁掉。
+    
+    你们当前 structured-workflow 已明确拒绝：
+    
+    WorkflowCommand
+    WorkflowReply
+    Step
+    Suspend
+    WorkflowInterpreter
+    
+    这类第二 runtime pattern。
+    
+    保持。
+    
+    F# CE 最大的价值就是：
+    
+    &gt; 使用语言已有控制流和类型系统。
+    
+    
+    
+    不要为了“更形式化”再制造另一门语言。
+    
+    
+    ---
+    
+    第七十一章：49 Package 怎么办
+    
+    不要减少到：
+    
+    10
+    
+    也不要追求：
+    
+    60
+    
+    数字没有意义。
+    
+    INDEX 已经明确说 49 只是当前 independent WHY/failure meaning/change test 的结果，不是目标。
+    
+    Package 合并条件：
+    
+    same WHY
+    same failure meaning
+    cannot change independently
+    same semantic owner
+    
+    拆分条件：
+    
+    independent major change
+    different authority
+    different failure meaning
+    different proof obligation
+    
+    
+    ---
+    
+    第七十二章：110 条 dependency edge 也不是债务数量
+    
+    不要想着：
+    
+    &gt; “边越少越干净。”
+    
+    
+    
+    有些 semantic dependencies 就是真实复杂性。
+    
+    目标不是：
+    
+    minimize edge count
+    
+    而是：
+    
+    every edge is truthful
+    every edge has direction
+    no hidden edge
+    no cycle without real mutual domain
+    no source internal dependency bypasses graph
+    
+    本质复杂度应该在图里可见，而不是被 Utils 隐藏。
+    
+    
+    ---
+    
+    第七十三章：教科书级不是“低耦合”，而是“诚实耦合”
+    
+    这是我认为你前面说“本质复杂性在耦合里面”的真正答案。
+    
+    复杂系统不可能没有 coupling。
+    
+    例如：
+    
+    Finality
+    
+    真的依赖：
+    
+    Review
+    Git candidate
+    Handle drain
+    Authority
+    Durability
+    
+    硬拆掉只是撒谎。
+    
+    好的 architecture 不是：
+    
+    0 coupling
+    
+    而是：
+    
+    coupling has explicit semantic direction
+    
+    即：
+    
+    Finality consumes ReviewWitness
+    
+    而不是：
+    
+    Finality reads ReviewerRuntime.internalState
+    
+    这就是区别。
+    
+    
+    ---
+    
+    第七十四章：所谓 Functional DDD 最终只保留 DDD 的这一层
+    
+    不用 Entity/Repository/Aggregate 模板。
+    
+    保留：
+    
+    Ubiquitous Language
+    Semantic Ownership
+    Bounded Context
+    Independent Change
+    Anti-Corruption Boundary
+    Explicit Dependencies
+    
+    然后具体实现使用：
+    
+    ADT
+    pure functions
+    CE
+    capability
+    events
+    ports
+    
+    所以以后不必再争：
+    
+    &gt; “这是 DDD 吗？”
+    
+    
+    
+    它只是 architecture ownership theory。
+    
+    
+    ---
+    
+    第七十五章：最终项目目录不要强行镜像 Requirement Packages
+    
+    不要变成：
+    
+    src/
+      finality/
+      time-capability/
+      causal-wait/
+      execution-model-routing/
+    
+    除非代码自然如此。
+    
+    Requirement tree：
+    
+    semantic law graph
+    
+    Production tree：
+    
+    code locality / technology / runtime locality
+    
+    它们应该相互映射，但不是 1:1。
+    
+    这个原则和 production-test 非 1:1 是同一种思想：
+    
+    &gt; 不同投影服务不同目的。
+    
+    
+    
+    
+    ---
+    
+    第七十六章：最终 architecture 的三个图
+    
+    以后架构师不再只看目录树。
+    
+    要同时看：
+    
+    图 A：Semantic Ownership Graph
+    
+    Requirement Owner → Requirement Owner
+    
+    图 B：Production Dependency Graph
+    
+    Module Owner → Module Owner
+    
+    图 C：Runtime Capability Graph
+    
+    Authority
+    → Derived Capability
+    → Port
+    → Physical Resource
+    
+    如果这三张图互相矛盾，架构就有问题。
+    
+    
+    ---
+    
+    第七十七章：再加第四张图——Proof Graph
+    
+    WHAT law
+    → static proof
+    → pure proof
+    → temporal proof
+    → adapter proof
+    → long stroke
+    
+    这就是生产与测试之间真正的连接。
+    
+    不是文件镜像。
+    
+    
+    ---
+    
+    第七十八章：最终“完美模块”的定义
+    
+    打开任何一个 production module，我希望读者能在十分钟内回答：
+    
+    为什么存在？
+    谁拥有？
+    输入是什么？
+    输出是什么？
+    它知道哪些 foreign concepts？
+    这些 concepts 是否是 public contracts？
+    它建立哪些 facts？
+    它颁发哪些 capabilities？
+    它消费哪些 capabilities？
+    它产生哪些 effects？
+    它写哪些 durable facts？
+    它失败意味着什么？
+    crash 后怎样恢复？
+    它的 law 在哪里？
+    proof 在哪里？
+    谁阻止别人复制它的知识？
+    
+    全部能回答：
+    
+    教科书级。
+    
+    
+    ---
+    
+    第七十九章：最终“完美 CE”的定义
+    
+    一眼看起来应该像：
+    
+    taskResult {
+        let! evidence = observe ...
+    
+        let decision = Domain.decide evidence
+    
+        match decision with
+        | Done witness -&gt;
+            return witness
+    
+        | Need capabilityRequest -&gt;
+            let! capability = Admission.grant ... capabilityRequest
+            let! receipt = Effect.execute capability
+            return! continueFrom receipt
+    }
+    
+    而不是：
+    
+    task {
+        let! state = getEverything()
+        if state.Flag1 then
+           if state.Stage = ...
+    
+    
+    ---
+    
+    第八十章：最终“完美 Decorator”的定义
+    
+    一眼可回答：
+    
+    what port?
+    what owner?
+    what trace relation?
+    what state?
+    what failure?
+    what proof?
+    
+    而且：
+    
+    没有 global registry
+    没有 dynamic middleware
+    没有 magic ordering
+    
+    
+    ---
+    
+    第八十一章：最终“完美 Capability Transformer”的定义
+    
+    例如 BorrowingCapacity。
+    
+    应该可以写：
+    
+    Base resource truth:
+        CapacityLedger
+    
+    Context:
+        session lineage
+    
+    Derived authority:
+        borrower may temporarily use exact lender occurrence
+    
+    Invalidation:
+        owner recall
+    
+    Fence:
+        provider step boundary
+    
+    Isolation:
+        no cross-provider credit
+    
+    Knowledge owner:
+        BorrowingCapacity only
+    
+    然后 architecture gate 证明：
+    
+    &gt; 这些知识不在任何其它模块重复出现。
+    
+    
+    
+    这就是教材。
+    
+    
+    ---
+    
+    第八十二章：最终“完美 Event Owner”的定义
+    
+    业务 owner：
+    
+    EventEnvelope -&gt; Current -&gt; Result&lt;Current, SemanticError&gt;
+    
+    或者等价 single-event oracle。
+    
+    不能拥有：
+    
+    history
+    iteration
+    replay cursor
+    file
+    Git blob
+    remote
+    
+    CanonicalIntegrator 拥有：
+    
+    ordered history
+    integration frontier
+    replay
+    live integration
+    rule registry
+    
+    这和你们现有 DURABLE-EVENTS-019 已经完全一致。
+    
+    所以这部分不要过度设计。
+    
+    
+    ---
+    
+    第八十三章：最终“完美 Physical Adapter”的定义
+    
+    它可以非常脏：
+    
+    Fable obj
+    JsInterop
+    OpenCode field names
+    Node APIs
+    Git plumbing
+    
+    没关系。
+    
+    要求：
+    
+    脏知识向内不泄漏
+    
+    并通过：
+    
+    typed observation
+    receipt
+    port outcome
+    
+    收敛。
+    
+    Host-boundary 当前也已经把目标描述成：
+    
+    &gt; 换一个 Host，只要 adapter 提供同等 snapshot/coarse wake/transform/tool/session API/identity observation
+        capability，其它 participant/mission/durability WHAT 不变。
+    
+    
+    
+    这就是 anti-corruption boundary 的正确姿态。
+    
+    
+    ---
+    
+    第八十四章：不要追求 100% Pure
+    
+    物理系统里：
+    
+    mutable
+    Dictionary
+    HashSet
+    locks
+    TaskCompletionSource
+    ports
+    registries
+    
+    本来就应该存在。
+    
+    你们自己的 cross-callback gate 已经识别：
+    
+    pty
+    timer
+    waiter
+    single-flight
+    quiescence permit
+    process handle
+    socket
+    cancellation
+    resource
+    
+    这些合法 physical capability 类别。
+    
+    真正目标是：
+    
+    &gt; mutable 只表达现实中确实存在的可变资源，而不是程序员脑中的 workflow position。
+    
+    
+    
+    这才是 Functional Architecture，不是 Pure FP 宗教。
+    
+    
+    ---
+    
+    第八十五章：不要把所有 Result 都领域化
+    
+    最终 error taxonomy 至少三种：
+    
+    Domain Rejection
+    Physical Failure
+    Invariant Violation
+    
+    Domain：
+    
+    Result&lt;&#39;T, DomainError&gt;
+    
+    Physical：
+    
+    通常由 port contract 映射。
+    
+    Invariant：
+    
+    fatal / poison / process termination
+    
+    不能为了“函数式”全部：
+    
+    Result&lt;_, string&gt;
+    
+    然后继续运行。
+    
+    尤其 durable semantic invariant break，当前设计已经正确规定 current process fatal。
+    
+    
+    ---
+    
+    第八十六章：推荐最终命名规范
+    
+    不是硬 gate 全扫，但作为 review vocabulary：
+    
+    Evidence
+    
+    Observation
+    Evidence
+    Snapshot
+    Receipt
+    
+    Witness
+    
+    Witness
+    Proof
+    Confirmed...
+    Accepted...
+    Established...
+    
+    Capability
+    
+    Permit
+    Lease
+    Claim
+    Capability
+    Handle
+    
+    Decision
+    
+    Decision
+    Disposition
+    Outcome
+    Classification
+    
+    Physical resource
+    
+    Port
+    Host
+    Adapter
+    Runtime
+    Gate
+    Registry
+    
+    Semantic operation
+    
+    用业务动词：
+    
+    publishEventually
+    continueAfterConfirmedFailure
+    ensurePerfectConfirmed
+    
+    避免：
+    
+    Manager
+    Helper
+    Processor
+    Handler
+    Utils
+    Common
+    
+    除非其业务语言确实如此。
+    
+    
+    ---
+    
+    第八十七章：100 个问题中的几条需要明确“拒绝题设”
+    
+    为了防止这套重构再次教条化，有几题的前提不能直接接受。
+    
+    “Witness 必须序列化？”
+    
+    否。
+    
+    跨 crash 必须存在的 proposition，其 durable evidence 必须足够重建 witness。
+    
+    
+    ---
+    
+    “Capability 必须永远不可序列化？”
+    
+    对当前 process authority 默认是。
+    
+    但这是 architecture choice，不是 capability theory 的数学定义。
+    
+    Wanxiangshu 当前这类 physical authority 应 process-local。
+    
+    
+    ---
+    
+    “所有 Projection query 必须 O(1)？”
+    
+    否。
+    
+    按 performance law 决定。
+    
+    
+    ---
+    
+    “Transparent Decorator 可以随便加？”
+    
+    否。
+    
+    它仍需证明：
+    
+    business observational equivalence
+    
+    而且 diagnostics 失败策略必须定义。
+    
+    
+    ---
+    
+    “所有 retry 都应该藏在 decorator？”
+    
+    否。
+    
+    只有 mechanical retry。
+    
+    Semantic retry 需要 owner law。
+    
+    
+    ---
+    
+    “Composition Root 不能出现业务分支？”
+    
+    不能重新决定业务事实。
+    
+    可以 match owner 已经输出的 topology/domain alternative。
+    
+    
+    ---
+    
+    “AssistanceHost 应该完全没有状态？”
+    
+    否。
+    
+    physical single-flight、subscription、attempt claim gate 可以有状态。
+    
+    不能有隐式 workflow PC。
+    
+    
+    ---
+    
+    “所有状态必须 Events -&gt; Fold？”
+    
+    否。
+    
+    physical resource / capability authority 不属于 durable history。
+    
+    
+    ---
+    
+    “SIGKILL 后绝对无歧义？”
+    
+    只有在外部 effect contract 足够强时才能做到。
+    
+    否则目标是 deterministic reconciliation + fail-closed ambiguity。
+    
+    
+    ---
+    
+    第八十八章：整个迁移过程最重要的禁令
+    
+    这几个事情一定不要做：
+    
+    ❌ 新建 Workflow framework
+    ❌ 新建 global Decorator library
+    ❌ 新建 generic Capability manager
+    ❌ 新建 giant Ports bag
+    ❌ 把所有 Capability 存 EventStore
+    ❌ 把所有 Witness 单独写 event
+    ❌ 把所有业务 workflow 变成 Event-sourced aggregate
+    ❌ 按 LOC 拆模块
+    ❌ 追求 production/test 文件镜像
+    ❌ 追求 requirement/source 目录镜像
+    ❌ 追求 dependency edge 数最少
+    ❌ 用 E2E 证明纯 semantic law
+    ❌ 为了统一而隐藏真实业务分支
+    ❌ 把顺序明确的 composition 改成动态 middleware list
+    
+    如果这十四件事避免了，重构成功概率会高很多。
+    
+    
+    ---
+    
+    第八十九章：我建议你把 Model Routing、Quiescence、CanonicalIntegrator 设成“三大正样本”
+    
+    以后 architecture documentation 不要只写反模式。
+    
+    固定三个 Reference Architecture：
+    
+    Reference A — Model Routing
+    
+    教：
+    
+    single authority
+    base resource
+    capability transformer
+    knowledge exclusivity
+    architecture-negative tests
+    
+    Reference B — Quiescence
+    
+    教：
+    
+    physical observation
+    opaque capability
+    freshness
+    consume-time validation
+    one-shot authority
+    
+    Reference C — Canonical Integrator
+    
+    教：
+    
+    single interpreter
+    feature-owned oracle
+    no feature history reader
+    replay/live same program
+    durable fact vs process safety
+    
+    新 feature 设计时先问：
+    
+    &gt; 我更像 A、B、C 中哪个？
+    
+    
+    
+    这样全仓 architecture 会逐渐自相似。
+    
+    这才是真正值得保留的“Fractal”概念。
+    
+    不是：
+    
+    &gt; 所有东西都是 CE。
+    
+    
+    
+    而是：
+    
+    &gt; 同一种 ownership/capability/proof 结构在不同尺度重复出现。
+    
+    
+    
+    
+    ---
+    
+    第九十章：重新定义“Fractal CE”
+    
+    我建议以后不要把“Fractal CE”当 package taxonomy。
+    
+    把它定义为一个定理：
+    
+    &gt; 如果一个业务 workflow 被缩成一个具名 operation，那么这个 operation 展开以后仍由 typed
         evidence/results/capabilities、宿主语言 CE、高阶组合和 owner-owned semantic vocabulary 组成；它不会暴露新的 program counter 或要求另一个
-        interpreter。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们当前 STRUCTURED-WORKFLOW-017 实际上已经是这个定理。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因此：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Fractal CE = composition closure theorem</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Fractal CE = 整个仓库的 owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这个裁决应该永久钉住。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十一章：最终 Architecture Constitution</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果要我把整个重构压缩成十条不可破坏的宪法，我会写：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">I.   Every accepted semantic proposition has exactly one owner.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">II.  Every production capability has exactly one authority owner.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">III. Witness proves; Capability authorizes.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">IV.  Business control flow is host-language CE, never a second runtime.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">V.   Cross-workflow seams expose outcomes/evidence/capabilities,</div>
-    <div dir="auto">     never execution position.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">VI.  Higher-order composition is local and owner-named.</div>
-    <div dir="auto">     No anonymous semantic middleware.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">VII. Durable history stores facts.</div>
-    <div dir="auto">    Process-local gates store temporary authority.</div>
-    <div dir="auto">    Never confuse the two.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">VIII. Feature owners integrate one event.</div>
-    <div dir="auto">      Canonical Integrator alone interprets history.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">IX.  Physical reality enters only through explicit ports/adapters</div>
-    <div dir="auto">     and leaves as typed observation/receipt.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">X.   Every mechanically decidable architectural invariant</div>
-    <div dir="auto">     must eventually become a failing gate.</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这十条比“DDD / Clean Architecture / Hexagonal / Onion”任何标签都更适合你这个系统。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十二章：最终 Definition of Done——什么叫“教科书级”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所有文件 &lt; 300 行</div>
-    <div dir="auto">所有函数 &lt; 20 行</div>
-    <div dir="auto">所有 package 零循环</div>
-    <div dir="auto">所有 class 消失</div>
-    <div dir="auto">所有 mutable 消失</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是下面这些全部成立。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Semantic Ownership</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">0 unowned normative propositions</div>
-    <div dir="auto">0 multi-owner normative propositions</div>
-    <div dir="auto">0 unowned production semantic modules</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Dependency Integrity</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">0 unauthorized cross-owner internal imports</div>
-    <div dir="auto">0 hidden semantic dependency edges</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">CE</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">0 business workflow runtimes</div>
-    <div dir="auto">0 stored program-counter state</div>
-    <div dir="auto">0 cross-module Stage/NextAction seams</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">all high-risk effect authority typed</div>
-    <div dir="auto">all one-shot process capabilities owner-validated</div>
-    <div dir="auto">no process capability persisted as durable fact</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">subject/version identity explicit where required</div>
-    <div dir="auto">no stale witness directly authorizes current effect</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Decorator</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">0 anonymous semantic middleware</div>
-    <div dir="auto">every trace-altering wrapper has owner + law + proof</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Composition</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">wide roots are explicit</div>
-    <div dir="auto">roots contain wiring/order, not foreign policy</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Durability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">one event substrate</div>
-    <div dir="auto">one canonical integrator</div>
-    <div dir="auto">zero feature-owned history loops</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Verification</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">every WHAT law has owned proof</div>
-    <div dir="auto">every proof is at the lowest adequate ladder level</div>
-    <div dir="auto">every critical gate is demonstrably red</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Crash</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">every acknowledged durable effect survives restart</div>
-    <div dir="auto">every ambiguous external cut has an explicit reconciliation law</div>
-    <div dir="auto">no recovery path guesses hidden workflow position</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">达到这个状态，我会很愿意称它：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">教科书级 Algebraic Capability Architecture</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而且不是“代码看起来函数式”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">是整个仓库具有可证明的语义拓扑。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十三章：实施顺序只有一个来源</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">旧的 14 步“明天开始”清单删除。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">原因不是它的局部建议全错，而是它允许只做 inventory、几个热点、gate、baseline、最后目录 rotation，就形成“清单完成”的错觉；它没有保证 src/Wanxiangshu 每一个 production file 都被真实裁决和迁移。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">从现在起，第五十七章《交付型全仓重构路线图——执行完即交付》是唯一施工顺序。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">任何后续 issue / todo / agent instruction 可以把第五十七章拆成更小 commit，但不得：</div>
-    <div dir="auto">跳过某个一级 production 区域。</div>
-    <div dir="auto">把 report/gate/baseline 当成 migration completion。</div>
-    <div dir="auto">把旧实现删除推给未来 wave。</div>
-    <div dir="auto">提前宣布 Debt Zero，而 physical tree / requirements / production callers 仍指向旧拓扑。</div>
-    <div dir="auto">创建第二套更短、但弱化 exit criteria 的“实际施工顺序”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果第五十七章与其他章节的旧计划性文字冲突，以第五十七章的 coverage matrix、per-slice cutover protocol 和 Wave 11 release gate 为准。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十四章：为什么这一次“最后才转目录”很重要</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">你们之前通过 balanced-tree rotations 已经把 production tree 处理得比过去好很多。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但如果现在再次从：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; “这个目录看起来不平衡”</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">开始搬文件，会重复原来的循环。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这一次流程应该反过来：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">laws</div>
-    <div dir="auto">→ owners</div>
-    <div dir="auto">→ capabilities</div>
-    <div dir="auto">→ dependency edges</div>
-    <div dir="auto">→ composition roots</div>
-    <div dir="auto">→ proof graph</div>
-    <div dir="auto">→ 最后 physical tree</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">目录树只是结果。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 architecture truth。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十五章：你最初问“答案在哪里”，现在其实可以更精确回答</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 DDD。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 Decorator。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 CE。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 Event Sourcing。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不是 Capability。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这些都只是不同层的工具。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正答案是：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">把“知识、权力、因果、事实、物理现实、证明”六种关系分开建模，然后只允许它们通过有 owner 的边界组合。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">对应：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">知识     → Evidence / Witness</div>
-    <div dir="auto">权力     → Capability</div>
-    <div dir="auto">因果     → CE</div>
-    <div dir="auto">事实     → ADT / Event</div>
-    <div dir="auto">物理现实 → Port / Adapter / Gate</div>
-    <div dir="auto">证明     → Proof Ladder</div>
-    <div dir="auto">主权     → Requirement/Capability Owner</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一旦这六种东西不再互相冒充，代码自然会开始变简单。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十六章：最关键的一个未来 code smell</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">以后看到任何类型同时承担两个以上问题，就停下来。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type Context =</div>
-    <div dir="auto">    {</div>
-    <div dir="auto">        State: ...</div>
-    <div dir="auto">        Stage: ...</div>
-    <div dir="auto">        Permit: ...</div>
-    <div dir="auto">        Evidence: ...</div>
-    <div dir="auto">        Retry: ...</div>
-    <div dir="auto">        Host: ...</div>
-    <div dir="auto">    }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">问：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这里是不是把：</div>
-    <div dir="auto">knowledge</div>
-    <div dir="auto">authority</div>
-    <div dir="auto">execution position</div>
-    <div dir="auto">physical handle</div>
-    <div dir="auto">揉成了一个包？</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这会成为新的 God Object，只是披着 record 的皮。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Functional programming 并不会自动避免 God Object。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">一个 25-field immutable record 也完全可以是 God Object。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十七章：最关键的一个未来 positive smell</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">理想调用经常会长这样：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let! evidence =</div>
-    <div dir="auto">    capability.Observe ...</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">let decision =</div>
-    <div dir="auto">    Owner.decide evidence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">match decision with</div>
-    <div dir="auto">| Rejected reason -&gt;</div>
-    <div dir="auto">    return Rejected reason</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">| Admitted witness -&gt;</div>
-    <div dir="auto">    let! permit =</div>
-    <div dir="auto">        OwnerAdmission.grant current witness</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    let! receipt =</div>
-    <div dir="auto">        port.Execute permit</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">    return Owner.confirm receipt</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">每一行都能说清：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">谁知道什么</div>
-    <div dir="auto">谁决定什么</div>
-    <div dir="auto">谁允许什么</div>
-    <div dir="auto">谁真的做了什么</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这就是你追求的“明显正确性”。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十八章：关于“数学美感”的最后一个提醒</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要追求：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">所有接口都有漂亮的同构</div>
-    <div dir="auto">所有 decorator 都结合</div>
-    <div dir="auto">所有 workflow 都满足 Monad 教科书</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真实分布式系统有：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">partiality</div>
-    <div dir="auto">timeout</div>
-    <div dir="auto">cancellation</div>
-    <div dir="auto">unknown</div>
-    <div dir="auto">crash</div>
-    <div dir="auto">external nondeterminism</div>
-    <div dir="auto">non-idempotent effects</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">真正数学化的方式不是把这些隐藏掉。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而是把它们放进代数里。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">例如：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">type PhysicalEffectOutcome&lt;&#39;T&gt; =</div>
-    <div dir="auto">    | Confirmed of &#39;T</div>
-    <div dir="auto">    | ConfirmedFailed of PhysicalFailure</div>
-    <div dir="auto">    | Superseded</div>
-    <div dir="auto">    | Cancelled</div>
-    <div dir="auto">    | OutcomeUnknown</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">如果 OutcomeUnknown 真实存在，就让类型说出来。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">不要因为它不漂亮而假装不存在。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第九十九章：这套路线最值得珍惜的地方</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它不会要求你放弃：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">F#</div>
-    <div dir="auto">CE</div>
-    <div dir="auto">Decorator</div>
-    <div dir="auto">Higher-order functions</div>
-    <div dir="auto">Event sourcing</div>
-    <div dir="auto">Strong types</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">恰恰相反。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它会让它们变得更多，但更局部、更有主权、更可证明。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">未来你应该看到更多：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">taskResult { ... }</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更多：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Port -&gt; Port</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更多：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Evidence -&gt; Decision</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更多：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Witness -&gt; Admission -&gt; Capability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">更多：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Resource * Context -&gt; DerivedCapability</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">但更少：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Manager</div>
-    <div dir="auto">Runtime</div>
-    <div dir="auto">Common</div>
-    <div dir="auto">State</div>
-    <div dir="auto">Context</div>
-    <div dir="auto">Processor</div>
-    <div dir="auto">Middleware</div>
-    <div dir="auto">Controller</div>
-    <div dir="auto">Token</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这种无法拒绝新职责的词。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">---</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">第一百章：最终目标图</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">最后，我认为万象术真正成熟后，从架构上应该呈现成这样：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">WANXIANGSHU</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">             ┌───────────┴────────────┐</div>
-    <div dir="auto">             │                        │</div>
-    <div dir="auto">      Semantic Constitution      Proof Constitution</div>
-    <div dir="auto">      requirement-system         verification-system</div>
-    <div dir="auto">      structured-workflow             │</div>
-    <div dir="auto">             │                        │</div>
-    <div dir="auto">             └───────────┬────────────┘</div>
-    <div dir="auto">                         │ governs</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">          ┌──────────────────────────────┐</div>
-    <div dir="auto">          │      Semantic Owners          │</div>
-    <div dir="auto">          │                              │</div>
-    <div dir="auto">          │ finality                     │</div>
-    <div dir="auto">          │ review-assurance             │</div>
-    <div dir="auto">          │ execution-model-routing      │</div>
-    <div dir="auto">          │ interaction-authority        │</div>
-    <div dir="auto">          │ durable-events               │</div>
-    <div dir="auto">          │ causal-wait                  │</div>
-    <div dir="auto">          │ time-capability              │</div>
-    <div dir="auto">          │ ...                          │</div>
-    <div dir="auto">          └──────────────┬───────────────┘</div>
-    <div dir="auto">                         │ publish</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">             Evidence / Witness / Ports</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">               Capability Admission</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">              Capability-Passing CE</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">             ┌───────────┼───────────┐</div>
-    <div dir="auto">             ▼           ▼           ▼</div>
-    <div dir="auto">       Port Decorator  Transformer  Adapter</div>
-    <div dir="auto">             │           │           │</div>
-    <div dir="auto">             └───────────┼───────────┘</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">                   Physical World</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                   Receipt / Fact</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">                 Universal EventStore</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">                 CanonicalIntegrator</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                         ▼</div>
-    <div dir="auto">                    Projection</div>
-    <div dir="auto">                         │</div>
-    <div dir="auto">                    Evidence again</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">形成一个闭环：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">Reality</div>
-    <div dir="auto">→ Evidence</div>
-    <div dir="auto">→ Knowledge</div>
-    <div dir="auto">→ Decision</div>
-    <div dir="auto">→ Authority</div>
-    <div dir="auto">→ Effect</div>
-    <div dir="auto">→ Fact</div>
-    <div dir="auto">→ Projection</div>
-    <div dir="auto">→ Evidence</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">而 CE 只是把这条因果链写成可读程序。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">这句话我认为可以作为整个重构的最终核心：</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">&gt; CE 不拥有世界；CE 只编排世界。</div>
-    <div dir="auto">ADT 描述世界；Witness 证明世界；Capability 授权改变世界；Port 接触世界；Event 记住世界；Projection 重新认识世界；Owner
-        决定谁有资格定义这一切；Proof 决定我们凭什么相信它。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto"><br></div>
-    <div dir="auto">当 PluginTransforms 只剩一首显式的组合乐谱，AssistanceHost 缩成 Assistance-owned 的 capability
+        interpreter。
+    
+    
+    
+    你们当前 STRUCTURED-WORKFLOW-017 实际上已经是这个定理。
+    
+    因此：
+    
+    Fractal CE = composition closure theorem
+    
+    不是：
+    
+    Fractal CE = 整个仓库的 owner
+    
+    这个裁决应该永久钉住。
+    
+    
+    ---
+    
+    第九十一章：最终 Architecture Constitution
+    
+    如果要我把整个重构压缩成十条不可破坏的宪法，我会写：
+    
+    I.   Every accepted semantic proposition has exactly one owner.
+    
+    II.  Every production capability has exactly one authority owner.
+    
+    III. Witness proves; Capability authorizes.
+    
+    IV.  Business control flow is host-language CE, never a second runtime.
+    
+    V.   Cross-workflow seams expose outcomes/evidence/capabilities,
+         never execution position.
+    
+    VI.  Higher-order composition is local and owner-named.
+         No anonymous semantic middleware.
+    
+    VII. Durable history stores facts.
+        Process-local gates store temporary authority.
+        Never confuse the two.
+    
+    VIII. Feature owners integrate one event.
+          Canonical Integrator alone interprets history.
+    
+    IX.  Physical reality enters only through explicit ports/adapters
+         and leaves as typed observation/receipt.
+    
+    X.   Every mechanically decidable architectural invariant
+         must eventually become a failing gate.
+    
+    这十条比“DDD / Clean Architecture / Hexagonal / Onion”任何标签都更适合你这个系统。
+    
+    
+    ---
+    
+    第九十二章：最终 Definition of Done——什么叫“教科书级”
+    
+    不是：
+    
+    所有文件 &lt; 300 行
+    所有函数 &lt; 20 行
+    所有 package 零循环
+    所有 class 消失
+    所有 mutable 消失
+    
+    而是下面这些全部成立。
+    
+    Semantic Ownership
+    
+    0 unowned normative propositions
+    0 multi-owner normative propositions
+    0 unowned production semantic modules
+    
+    Dependency Integrity
+    
+    0 unauthorized cross-owner internal imports
+    0 hidden semantic dependency edges
+    
+    CE
+    
+    0 business workflow runtimes
+    0 stored program-counter state
+    0 cross-module Stage/NextAction seams
+    
+    Capability
+    
+    all high-risk effect authority typed
+    all one-shot process capabilities owner-validated
+    no process capability persisted as durable fact
+    
+    Witness
+    
+    subject/version identity explicit where required
+    no stale witness directly authorizes current effect
+    
+    Decorator
+    
+    0 anonymous semantic middleware
+    every trace-altering wrapper has owner + law + proof
+    
+    Composition
+    
+    wide roots are explicit
+    roots contain wiring/order, not foreign policy
+    
+    Durability
+    
+    one event substrate
+    one canonical integrator
+    zero feature-owned history loops
+    
+    Verification
+    
+    every WHAT law has owned proof
+    every proof is at the lowest adequate ladder level
+    every critical gate is demonstrably red
+    
+    Crash
+    
+    every acknowledged durable effect survives restart
+    every ambiguous external cut has an explicit reconciliation law
+    no recovery path guesses hidden workflow position
+    
+    达到这个状态，我会很愿意称它：
+    
+    教科书级 Algebraic Capability Architecture
+    
+    而且不是“代码看起来函数式”。
+    
+    是整个仓库具有可证明的语义拓扑。
+    
+    
+    ---
+    
+    第九十三章：实施顺序只有一个来源
+    
+    旧的 14 步“明天开始”清单删除。
+    
+    原因不是它的局部建议全错，而是它允许只做 inventory、几个热点、gate、baseline、最后目录 rotation，就形成“清单完成”的错觉；它没有保证 src/Wanxiangshu 每一个 production file 都被真实裁决和迁移。
+    
+    从现在起，第五十七章《交付型全仓重构路线图——执行完即交付》是唯一施工顺序。
+    
+    任何后续 issue / todo / agent instruction 可以把第五十七章拆成更小 commit，但不得：
+    跳过某个一级 production 区域。
+    把 report/gate/baseline 当成 migration completion。
+    把旧实现删除推给未来 wave。
+    提前宣布 Debt Zero，而 physical tree / requirements / production callers 仍指向旧拓扑。
+    创建第二套更短、但弱化 exit criteria 的“实际施工顺序”。
+    
+    如果第五十七章与其他章节的旧计划性文字冲突，以第五十七章的 coverage matrix、per-slice cutover protocol 和 Wave 11 release gate 为准。
+    
+    
+    ---
+    
+    第九十四章：为什么这一次“最后才转目录”很重要
+    
+    你们之前通过 balanced-tree rotations 已经把 production tree 处理得比过去好很多。
+    
+    但如果现在再次从：
+    
+    &gt; “这个目录看起来不平衡”
+    
+    
+    
+    开始搬文件，会重复原来的循环。
+    
+    这一次流程应该反过来：
+    
+    laws
+    → owners
+    → capabilities
+    → dependency edges
+    → composition roots
+    → proof graph
+    → 最后 physical tree
+    
+    目录树只是结果。
+    
+    不是 architecture truth。
+    
+    
+    ---
+    
+    第九十五章：你最初问“答案在哪里”，现在其实可以更精确回答
+    
+    不是 DDD。
+    
+    不是 Decorator。
+    
+    不是 CE。
+    
+    不是 Event Sourcing。
+    
+    不是 Capability。
+    
+    这些都只是不同层的工具。
+    
+    真正答案是：
+    
+    把“知识、权力、因果、事实、物理现实、证明”六种关系分开建模，然后只允许它们通过有 owner 的边界组合。
+    
+    对应：
+    
+    知识     → Evidence / Witness
+    权力     → Capability
+    因果     → CE
+    事实     → ADT / Event
+    物理现实 → Port / Adapter / Gate
+    证明     → Proof Ladder
+    主权     → Requirement/Capability Owner
+    
+    一旦这六种东西不再互相冒充，代码自然会开始变简单。
+    
+    
+    ---
+    
+    第九十六章：最关键的一个未来 code smell
+    
+    以后看到任何类型同时承担两个以上问题，就停下来。
+    
+    例如：
+    
+    type Context =
+        {
+            State: ...
+            Stage: ...
+            Permit: ...
+            Evidence: ...
+            Retry: ...
+            Host: ...
+        }
+    
+    问：
+    
+    这里是不是把：
+    knowledge
+    authority
+    execution position
+    physical handle
+    揉成了一个包？
+    
+    这会成为新的 God Object，只是披着 record 的皮。
+    
+    Functional programming 并不会自动避免 God Object。
+    
+    一个 25-field immutable record 也完全可以是 God Object。
+    
+    
+    ---
+    
+    第九十七章：最关键的一个未来 positive smell
+    
+    理想调用经常会长这样：
+    
+    let! evidence =
+        capability.Observe ...
+    
+    let decision =
+        Owner.decide evidence
+    
+    match decision with
+    | Rejected reason -&gt;
+        return Rejected reason
+    
+    | Admitted witness -&gt;
+        let! permit =
+            OwnerAdmission.grant current witness
+    
+        let! receipt =
+            port.Execute permit
+    
+        return Owner.confirm receipt
+    
+    每一行都能说清：
+    
+    谁知道什么
+    谁决定什么
+    谁允许什么
+    谁真的做了什么
+    
+    这就是你追求的“明显正确性”。
+    
+    
+    ---
+    
+    第九十八章：关于“数学美感”的最后一个提醒
+    
+    不要追求：
+    
+    所有接口都有漂亮的同构
+    所有 decorator 都结合
+    所有 workflow 都满足 Monad 教科书
+    
+    真实分布式系统有：
+    
+    partiality
+    timeout
+    cancellation
+    unknown
+    crash
+    external nondeterminism
+    non-idempotent effects
+    
+    真正数学化的方式不是把这些隐藏掉。
+    
+    而是把它们放进代数里。
+    
+    例如：
+    
+    type PhysicalEffectOutcome&lt;&#39;T&gt; =
+        | Confirmed of &#39;T
+        | ConfirmedFailed of PhysicalFailure
+        | Superseded
+        | Cancelled
+        | OutcomeUnknown
+    
+    如果 OutcomeUnknown 真实存在，就让类型说出来。
+    
+    不要因为它不漂亮而假装不存在。
+    
+    
+    ---
+    
+    第九十九章：这套路线最值得珍惜的地方
+    
+    它不会要求你放弃：
+    
+    F#
+    CE
+    Decorator
+    Higher-order functions
+    Event sourcing
+    Strong types
+    
+    恰恰相反。
+    
+    它会让它们变得更多，但更局部、更有主权、更可证明。
+    
+    未来你应该看到更多：
+    
+    taskResult { ... }
+    
+    更多：
+    
+    Port -&gt; Port
+    
+    更多：
+    
+    Evidence -&gt; Decision
+    
+    更多：
+    
+    Witness -&gt; Admission -&gt; Capability
+    
+    更多：
+    
+    Resource * Context -&gt; DerivedCapability
+    
+    但更少：
+    
+    Manager
+    Runtime
+    Common
+    State
+    Context
+    Processor
+    Middleware
+    Controller
+    Token
+    
+    这种无法拒绝新职责的词。
+    
+    
+    ---
+    
+    第一百章：最终目标图
+    
+    最后，我认为万象术真正成熟后，从架构上应该呈现成这样：
+    
+    WANXIANGSHU
+                             │
+                 ┌───────────┴────────────┐
+                 │                        │
+          Semantic Constitution      Proof Constitution
+          requirement-system         verification-system
+          structured-workflow             │
+                 │                        │
+                 └───────────┬────────────┘
+                             │ governs
+                             ▼
+              ┌──────────────────────────────┐
+              │      Semantic Owners          │
+              │                              │
+              │ finality                     │
+              │ review-assurance             │
+              │ execution-model-routing      │
+              │ interaction-authority        │
+              │ durable-events               │
+              │ causal-wait                  │
+              │ time-capability              │
+              │ ...                          │
+              └──────────────┬───────────────┘
+                             │ publish
+                             ▼
+                 Evidence / Witness / Ports
+                             │
+                             ▼
+                   Capability Admission
+                             │
+                             ▼
+                  Capability-Passing CE
+                             │
+                 ┌───────────┼───────────┐
+                 ▼           ▼           ▼
+           Port Decorator  Transformer  Adapter
+                 │           │           │
+                 └───────────┼───────────┘
+                             ▼
+                       Physical World
+                             │
+                       Receipt / Fact
+                             │
+                             ▼
+                     Universal EventStore
+                             │
+                             ▼
+                     CanonicalIntegrator
+                             │
+                             ▼
+                        Projection
+                             │
+                        Evidence again
+    
+    形成一个闭环：
+    
+    Reality
+    → Evidence
+    → Knowledge
+    → Decision
+    → Authority
+    → Effect
+    → Fact
+    → Projection
+    → Evidence
+    
+    而 CE 只是把这条因果链写成可读程序。
+    
+    这句话我认为可以作为整个重构的最终核心：
+    
+    &gt; CE 不拥有世界；CE 只编排世界。
+    ADT 描述世界；Witness 证明世界；Capability 授权改变世界；Port 接触世界；Event 记住世界；Projection 重新认识世界；Owner
+        决定谁有资格定义这一切；Proof 决定我们凭什么相信它。
+    
+    
+    
+    当 PluginTransforms 只剩一首显式的组合乐谱，AssistanceHost 缩成 Assistance-owned 的 capability
         workflow，HostSignalBootstrap 只剩物理接线，structured-workflow 只剩组合宪法，而 model routing / quiescence / canonical
-        integrator 这种“一个知识一个 owner”的形态遍布全仓时——那时目录树长什么样已经不再重要了。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">因为真正的 architecture 已经不再住在文件夹里。</div>
-    <div dir="auto"><br></div>
-    <div dir="auto">它住在语义所有权图、能力图、因果图和证明图里。</div>
-</div>
+        integrator 这种“一个知识一个 owner”的形态遍布全仓时——那时目录树长什么样已经不再重要了。
+    
+    因为真正的 architecture 已经不再住在文件夹里。
+    
+    它住在语义所有权图、能力图、因果图和证明图里。
+
