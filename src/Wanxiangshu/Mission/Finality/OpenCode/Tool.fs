@@ -142,10 +142,10 @@ module FinalityTool =
 
     let private fatalInfrastructure (sid: SessionId) (ex: exn) : 'T =
         Diagnostic.fatal "finality-infrastructure-failed" [ "session_id", SessionId.value sid; "result", ex.ToString() ]
-        failwith ("unreachable after Diagnostic.fatal: " + ex.Message)
+        failwith ("finality-fatal-unreachable:" + ex.Message)
 
     let private infrastructureError operation error : 'T =
-        raise (InvalidOperationException(sprintf "Finality %s failed: %s" operation error))
+        raise (InvalidOperationException(operation + ":" + error))
 
     let private describeFinalityRequest
         (sid: SessionId)
@@ -189,17 +189,23 @@ module FinalityTool =
         else
             Some(GitTreeHash.create hash)
 
-    let private tryTreeHash (port: GitTreePort) =
+    let private readTreeHash (port: GitTreePort) =
         try
-            match treeHashOf (port.GetTreeHash().Trim()) with
-            | Some tree -> Ok tree
-            | None -> Error "tree adapter returned an empty hash"
+            Ok(port.GetTreeHash().Trim())
         with ex ->
             Error ex.Message
 
+    let private requireTreeHash =
+        function
+        | Some tree -> Ok tree
+        | None -> Error "tree-adapter-empty-hash"
+
+    let private tryTreeHash (port: GitTreePort) =
+        readTreeHash port |> Result.bind (treeHashOf >> requireTreeHash)
+
     let private treeOf (scope: ToolRuntimeScope) (sessionId: string) =
         match scope.TreePortFor sessionId with
-        | None -> Error "tree adapter is unavailable"
+        | None -> Error "tree-adapter-unavailable"
         | Some port -> tryTreeHash port
 
     /// GLORY-037.11-13: any outstanding child work blocks the ending.
@@ -212,7 +218,7 @@ module FinalityTool =
         let runtimeOutstanding =
             match scope.RuntimeFor context with
             | Ok runtime -> runtime.PendingRunCount > 0
-            | Error error -> infrastructureError "runtime lookup" error
+            | Error error -> infrastructureError "runtime-lookup" error
 
         durableOutstanding || runtimeOutstanding
 
@@ -253,7 +259,7 @@ module FinalityTool =
             let providerRun = context.ProviderRunId.Value
 
             match! ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
-            | Error error -> return infrastructureError "blessed Life completion" (sprintf "%A" error)
+            | Error error -> return infrastructureError "blessed-life-completion" (sprintf "%A" error)
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
                 return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
             | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
@@ -335,7 +341,7 @@ module FinalityTool =
                 task {
                     match! journal.WriteBlob lastWords with
                     | Ok blob -> return blob
-                    | Error error -> return infrastructureError "last_words blob write" error
+                    | Error error -> return infrastructureError "last-words-blob-write" error
                 }
 
             let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
@@ -374,7 +380,7 @@ module FinalityTool =
         =
         match endingPrerequisiteRefusal scope context lastWords, treeOf scope sessionId with
         | Some refusal, _ -> Task.FromResult refusal
-        | None, Error error -> task { return invalidOp ("Finality tree read failed: " + error) }
+        | None, Error error -> task { return invalidOp ("finality-tree-read-failed:" + error) }
         | None, Ok tree -> startFinalityFromBlob scope journal context sid life tree lastWords
 
     let private completeBlessedEnding
@@ -434,11 +440,26 @@ module FinalityTool =
         =
         task {
             match! ManagerLifeWorkflow.ensureEndingLife journal sid with
-            | Error error -> return infrastructureError "ending Life admission" (sprintf "%A" error)
+            | Error error -> return infrastructureError "ending-life-admission" (sprintf "%A" error)
             | Ok None -> return refuse context Path.ContinueWorking
             | Ok(Some life) ->
                 let snapshot = AgentJournal.snapshot journal
                 return! acceptSuicide scope journal context sid sessionId life lastWords snapshot
+        }
+
+    let private executeManagerEndingFatal
+        (scope: ToolRuntimeScope)
+        (journal: AgentJournal)
+        (context: HostToolContext)
+        (sid: SessionId)
+        (sessionId: string)
+        (lastWords: string)
+        =
+        task {
+            try
+                return! executeManagerEnding scope journal context sid sessionId lastWords
+            with ex ->
+                return fatalInfrastructure sid ex
         }
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
@@ -449,14 +470,11 @@ module FinalityTool =
             | Some Role.Manager, true, _ -> return refuse context Path.TryAgainLater
             | Some Role.Manager, false, None ->
                 let sid = SessionId.create context.SessionId
-                return fatalInfrastructure sid (InvalidOperationException "Finality requires an AgentJournal")
+                return fatalInfrastructure sid (InvalidOperationException "finality-journal-required")
             | Some Role.Manager, false, Some journal ->
                 let sessionId = context.SessionId
                 let sid = SessionId.create sessionId
-                try
-                    return! executeManagerEnding scope journal context sid sessionId lastWords
-                with ex ->
-                    return fatalInfrastructure sid ex
+                return! executeManagerEndingFatal scope journal context sid sessionId lastWords
             | Some _, _, _ -> return refuse context Path.WrongRole
             | None, _, _ -> return refuse context Path.TryAgainLater
         }

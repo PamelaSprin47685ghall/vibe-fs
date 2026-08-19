@@ -131,11 +131,12 @@ module ReviewBarrierWorkflow =
         (terminal: Task<Result<unit, string>>)
         (expectedPhysical: PhysicalUserMessageId option)
         : Task<
-            Result<
-                ReviewJudgementDelivery * PhysicalUserMessageId option * Task<Result<unit, string>>,
-                ReviewBarrierFailure
-             >
-         > =
+              Result<
+                  ReviewJudgementDelivery * PhysicalUserMessageId option * Task<Result<unit, string>>,
+                  ReviewBarrierFailure
+               >
+           >
+        =
         task {
             let taggedJudgement: Task<obj> =
                 task {
@@ -155,12 +156,19 @@ module ReviewBarrierWorkflow =
             | Choice1Of2(Ok delivery) -> return Ok(delivery, expectedPhysical, terminal)
             | Choice1Of2(Error error) -> return Error(ReviewBarrierFailure.CannotAwaitJudgement error)
             | Choice2Of2(Error error) -> return Error(ReviewBarrierFailure.CannotAwaitReviewer error)
-            | Choice2Of2(Ok()) ->
-                let nextTerminal = host.AwaitReviewer()
+            | Choice2Of2(Ok()) -> return! continueAfterCleanTerminal host judgement
+        }
 
-                match! host.NudgeMissingJudgement() with
-                | Error error -> return Error(ReviewBarrierFailure.CannotNudgeReviewer error)
-                | Ok physical -> return! awaitRequiredJudgement host judgement nextTerminal (Some physical)
+    and private continueAfterCleanTerminal
+        (host: ReviewHostPort)
+        (judgement: Task<Result<ReviewJudgementDelivery, string>>)
+        =
+        task {
+            let nextTerminal = host.AwaitReviewer()
+
+            match! host.NudgeMissingJudgement() with
+            | Error error -> return Error(ReviewBarrierFailure.CannotNudgeReviewer error)
+            | Ok physical -> return! awaitRequiredJudgement host judgement nextTerminal (Some physical)
         }
 
     let private finishAfterTerminal
@@ -259,14 +267,7 @@ module ReviewBarrierWorkflow =
             let! secondDelivery, expectedPhysical, activeTerminal =
                 awaitRequiredJudgement host secondAwait finalTerminal (Some first.PhysicalUserMessageId)
 
-            return!
-                concludeSecond
-                    journal
-                    request
-                    activeTerminal
-                    (Option.get expectedPhysical)
-                    first
-                    secondDelivery
+            return! concludeSecond journal request activeTerminal (Option.get expectedPhysical) first secondDelivery
         }
 
     let private continueAfterFirst

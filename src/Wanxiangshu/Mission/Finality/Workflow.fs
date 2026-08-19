@@ -91,10 +91,7 @@ module FinalityWorkflow =
                     |> Option.defaultWith (fun () ->
                         invalidOp "FinalityRequested was durable but its projection is missing")
             }
-        | None, None ->
-            task {
-                return invalidOp "Finality cannot start without the requested active Life"
-            }
+        | None, None -> task { return invalidOp "Finality cannot start without the requested active Life" }
 
     let private revisionSiblings
         (snapshot: ProjectionSet)
@@ -130,10 +127,7 @@ module FinalityWorkflow =
                     requestTree
             with
             | Error failure ->
-                return
-                    raise (
-                        InvalidOperationException(sprintf "Finality reviewer infrastructure failed: %A" failure)
-                    )
+                return raise (InvalidOperationException(sprintf "Finality reviewer infrastructure failed: %A" failure))
             | Ok(CohortJudgement.RevisionRequired(reviewerId, barrierId, fromRace)) ->
                 let before = AgentJournal.snapshot durable
 
@@ -177,8 +171,7 @@ module FinalityWorkflow =
         =
         task {
             match! CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId lifeId request with
-            | Error error ->
-                return raise (InvalidOperationException("Finality reviewer enlistment failed: " + error))
+            | Error error -> return raise (InvalidOperationException("Finality reviewer enlistment failed: " + error))
             | Ok members ->
                 return!
                     reviewMembers
@@ -238,16 +231,7 @@ module FinalityWorkflow =
                     existingRequest
 
             return!
-                enlistAndReview
-                    reviewerPort
-                    treePort
-                    durable
-                    managerSessionId
-                    life
-                    request
-                    lifeId
-                    requestId
-                    requestTree
+                enlistAndReview reviewerPort treePort durable managerSessionId life request lifeId requestId requestTree
         }
 
     let start

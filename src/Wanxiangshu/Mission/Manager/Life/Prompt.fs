@@ -37,4 +37,3 @@ module ManagerLifecyclePrompt =
         /// GLORY-029 / §7.4.6: Post-T1 idle encouragement.
         [<Literal>]
         let IdleEncouragementPostT1 = ManagerNarrative.Path.IdlePostT1
-

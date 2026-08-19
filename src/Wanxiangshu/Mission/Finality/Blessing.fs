@@ -113,8 +113,7 @@ module BlessingWorkflow =
         : Task<FinalityOutcome> =
         task {
             match! prepareBlessingIfTreeStable treePort journal managerSessionId members requestTree with
-            | Error error ->
-                return raise (InvalidOperationException("Finality blessing preparation failed: " + error))
+            | Error error -> return raise (InvalidOperationException("Finality blessing preparation failed: " + error))
             | Ok(logs, blob) ->
                 do!
                     FinalityJournal.appendLifecycle

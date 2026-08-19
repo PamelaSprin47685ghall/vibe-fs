@@ -378,8 +378,7 @@ module CohortWorkflow =
                 return Ok CohortJudgement.AllConfirmed
             | Choice1Of2(Error failure, _)
             | Choice2Of2(Error failure :: _) -> return Error failure
-            | Choice1Of2(Ok _, _) ->
-                return invalidOp "Finality cohort short-circuited on a non-revision judgement"
+            | Choice1Of2(Ok _, _) -> return invalidOp "Finality cohort short-circuited on a non-revision judgement"
             | Choice2Of2 results ->
                 return
                     results

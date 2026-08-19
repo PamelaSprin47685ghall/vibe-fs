@@ -273,10 +273,14 @@ module RevisionWorkflow =
         (prepared: (SessionId * string) list)
         : Task =
         task {
-            for _, workRecord in prepared do
-                match! reviewerPort.SendRevisionSteer managerSessionId (steerPrompt managerSessionId workRecord) with
-                | Ok() -> ()
-                | Error error -> infrastructureFailed "revision sibling steer delivery" error
+            let! sent =
+                prepared
+                |> TaskResultList.traverseM (fun (_, workRecord) ->
+                    reviewerPort.SendRevisionSteer managerSessionId (steerPrompt managerSessionId workRecord))
+
+            match sent with
+            | Ok _ -> ()
+            | Error error -> infrastructureFailed "revision sibling steer delivery" error
         }
         :> Task
 
@@ -418,6 +422,7 @@ module RevisionWorkflow =
             | Some evidence ->
                 let! workRecordOpt = readSteerWorkRecord journal snapshot reviewerSessionId evidence
                 let prompt = steerPromptOrUnavailable managerSessionId workRecordOpt
+
                 match! reviewerPort.SendRevisionSteer managerSessionId prompt with
                 | Ok() -> ()
                 | Error error -> infrastructureFailed "revision sibling steer replay" error

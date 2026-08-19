@@ -82,6 +82,7 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength
 
 /// Physical OpenCode adapter for Application Finality workflows.
@@ -213,29 +214,32 @@ module FinalityHostPort =
                 return! (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
             }
 
-        let nudgeMissingJudgement reviewerSessionId =
+        let sendMissingJudgementNudge (durable: AgentJournal) reviewerSessionId =
             task {
-                match scope.Journal with
-                | None -> return Error "No journal: a Finality reviewer nudge cannot be claimed"
-                | Some durable ->
-                    let acceptedPhysical = ref None
-                    let dispatcher = PromptDispatcher.forJournal durable
+                let acceptedPhysical = ref None
+                let dispatcher = PromptDispatcher.forJournal durable
 
-                    let! sent =
-                        dispatcher.SendAgentOwnerRoot
-                            scope.Sessions
-                            reviewerSessionId
-                            (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-                            reviewerAgentName
-                            (scope.DirectoryFor(SessionId.value reviewerSessionId))
-                            PromptDispatcher.AwaitMode.Await
-                            (Some(fun physical -> acceptedPhysical.Value <- Some physical))
+                let! sent =
+                    dispatcher.SendAgentOwnerRoot
+                        scope.Sessions
+                        reviewerSessionId
+                        (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
+                        reviewerAgentName
+                        (scope.DirectoryFor(SessionId.value reviewerSessionId))
+                        PromptDispatcher.AwaitMode.Await
+                        (Some(fun physical -> acceptedPhysical.Value <- Some physical))
 
+                return
                     match sent, acceptedPhysical.Value with
-                    | Error error, _ -> return Error error
-                    | Ok _, Some physical -> return Ok physical
-                    | Ok _, None -> return Error "Finality reviewer nudge was admitted without a PhysicalUserMessageId"
+                    | Error error, _ -> Error error
+                    | Ok _, Some physical -> Ok physical
+                    | Ok _, None -> Error "Finality reviewer nudge was admitted without a PhysicalUserMessageId"
             }
+
+        let nudgeMissingJudgement reviewerSessionId =
+            match scope.Journal with
+            | None -> Task.FromResult(Error "No journal: a Finality reviewer nudge cannot be claimed")
+            | Some durable -> sendMissingJudgementNudge durable reviewerSessionId
 
         let sendRevisionSteer targetSessionId prompt =
             task {
