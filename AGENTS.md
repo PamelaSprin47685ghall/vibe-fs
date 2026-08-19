@@ -98,45 +98,183 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 # 当前义务账 — 2026-08-18 验收后
 
-本节只保留**尚未完成**的仓库义务。完成项不在这里留 `[x]`、轮次、战绩、commit 墓碑；完成它的同一提交必须删除对应条目，历史交给 Git。任何新增发现必须先补成新的文件级义务，再修改代码。禁止把本节改成“继续全仓扫描”“相关文件一起改”“视情况处理”之类不可验收描述。
+我按这份 Repomix 中的生产源码做了全仓复核；它本身是整个仓库的合并表示，适合做这种 repository-level review。 结论是：**现有 `0 GHOST remains` 不能作为“状态机债务已经归零”的语义结论。**它主要证明旧的词法形状消失了；真正剩余的问题恰好集中在你说的“分形 CE 跨边界”上。
 
-## 义务账执行纪律
+仓库自己的规范其实已经把判据写得很准确：F# 调用栈应该就是 workflow stack，不应长期保存“下一步去哪”；跨模块审查还明确要求检查 control token、registry presence、`Advance/Tick/Resume/Step` 以及 recovery 跳入内部 continuation。  按这个判据，我认为当前剩余债务如下。
 
-- 每项义务必须同时闭合：normative WHAT/HOW → production owner → public/physical boundary → proof/test → architecture gate。只改其中一层不得勾销。
-- 下列“文件”是当前已知最小影响集，不是允许忽略的新发现。施工中发现额外 caller/codec/surface/test，先把精确路径和 symbol 追加到本义务，再继续改。
-- 禁止为使旧测试变绿而恢复已经消失的 test-only facade、旧 export、旧 control token、旧 representation。测试若钉旧内部布局，改测试；规范若确实要求公开能力，再在真实 owner 上发布语义 API。
-- 禁止把 `State/Stage/Resume/NextAction` 改名后保留；判断标准只有一个：它是否回答“下一段代码跑什么”。是 → 删除，用 F# CE 调用栈表达。
-- 禁止用 `bool + option + option` 继续表示有限生命周期，再靠运行时 guard 修补非法组合；能由 ADT 消灭的非法世界必须在类型层消失。
-- 禁止 typed domain fact 在 canonical durable core 中降成 `string/obj` 再解析回来。字符串/JS shape 只能存在于 codec/Host/JS physical boundary。
-- 禁止用一次性 shell、ignored script、人工抄数字作为完成证据。凡义务依赖 census/scan，scanner 与回归必须 tracked、可重放、能返回非零。
-- 每项完成前至少运行该项列出的 focused tests；最终删除本节前必须同时通过：
-  `node scripts/check.mjs`、`node scripts/build.mjs`、`node requirements/verification-system/tests/run.mjs`。authoritative verification 必须 0 fail；不得把失败标成“已知问题”后宣称完成。
+| 优先级         | 剩余债务                                                | 判定                                                                      |
+| ----------- | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| **P0**      | Provider recovery 的 `RecoveryArming + AttemptPlans` | **确定的跨 callback 状态机/continuation 存储**                                   |
+| **P0**      | Strength `CounterfactualAwait`                      | **旧状态机只是换形，没有真正 CE collapse**                                           |
+| **P1**      | `LoopSensor.armed` 跨 Host→Application 驱动 recovery   | **physical state 越界成为业务 PC/cause token**                                |
+| **P1**      | `NeedHelpSensor.armed` 跨 abort→idle 驱动 assistance   | **同上，而且跨两个 Host callback**                                              |
+| **P1/争议**   | Change `JobProgress` recovery dispatch              | **很接近 durable resume-address；目前靠“这是 evidence”自证合法**                     |
+| **P1/边界决策** | Sphinx `PendingRequest → nextTool`                  | **如果 Sphinx 属普通 workflow，就是明确的分布式解释器；若它是领域 protocol automaton，则必须正式豁免** |
+| **P2**      | `ManagerFinality.EndingDisposition`                 | **非持久状态机，但仍是 child action-opcode → caller effect 的 CE seam 债务**         |
+| **P0 防线**   | 现有 structured-workflow scanner                      | **无法发现上述跨文件/跨 callback 等价状态机，因此制造“0 GHOST”假阴性**                         |
 
-## OBL-007 — LEGACY-005：四个历史 decoder detector 在 horizon 到期时整组删除
+### 1. 最严重的是 Provider recovery：现在仍然在保存 continuation
 
-- [ ] `src/Wanxiangshu/Persistence/Journal/FactCodec.fs`
-  - 到期同一提交删除 `containsLegacyFallbackFields`、`containsLegacyScoreVectorEntry`、`containsLegacyUnanchoredGuideline`、`containsHandleCompletedMissingCompletionFields` 及对应 refusal message/branch。
-- [ ] `src/Wanxiangshu/Persistence/Journal/Envelope.fs`
-  - 删除对 `containsLegacyFallbackFields` / `containsLegacyScoreVectorEntry` 的历史 preflight；现代 decode 只认识当前 typed envelope。
-- [ ] `src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs`
-  - 删除 legacy detector JS exports。
-- [ ] `src/Wanxiangshu/Enforcer/BlogSurface.fs`
-  - 删除 `containsLegacyScoreVectorEntry` forwarding surface。
-- [ ] `requirements/durable-events/tests/envelope.test.mjs`
-- [ ] `requirements/durable-events/tests/fact-codec.test.mjs`
-- [ ] `requirements/verification-system/tests/domain.meta.test.mjs`
-- [ ] `requirements/effect-accounting/tests/pre050-effect-marker.test.mjs`
-- [ ] `requirements/behavior-diagnosis/tests/envelope-tip-v2-clean-break.test.mjs`
-- [ ] `requirements/behavior-diagnosis/tests/fact-codec-tip-v2-clean-break.test.mjs`
-- [ ] `requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs`
-  - 删除只为四个历史 detector 存在的 diagnostic/absence tests；保留当前 format 的正向 codec laws。
-- [ ] `requirements/durable-events/HOW.md`
-- [ ] `requirements/behavior-diagnosis/HOW.md`
-- [ ] `requirements/effect-accounting/HOW.md`
-- [ ] `requirements/verification-system/HOW.md`
-- [ ] `cleanup/legacy-ledger.md`
-  - 删除 LEGACY-005 当前架构描述与 ledger row。
+`PluginRecoveryScope.RecoveryArming` 自己的注释已经把本质说出来了：它连接两个没有共同调用栈的 async entry point——失败后的 `HostTurnObserver.observe` 与下一次 `XWire.applyTransform`；并且直接称它为“一次自动 recovery sequence 的 local control-flow fact”。
 
-## 关于负责人
+这恰恰不是“physical resource”的充分证明，反而是在描述一个**被 heap 化的 continuation**：
 
-你就是项目的最终负责人，本文档中说的负责人报批，其实就是你自己的复审。本项目不存在人工干预，全自动维护。
+`observe failure → [RecoveryArming] → 下一次 transform → plan retry`
+
+`AttemptPlans` 更明显。transform 阶段生成 `AttemptPlan`，存进 Dictionary，等以后完全独立的 reconciliation callback 再取出来；源码解释说不能重算，因为 projection 可能已经变了。 也就是说，它保存的不是 socket、waiter、lease，而是**“当时 workflow 已执行到这里时冻结下来的决策上下文”**。
+
+而且这已经不是理论洁癖，源码记载了两个真实事故：
+
+一处是 Blog frame 稍晚到达，`hasMaterial=false`，导致 probe 被跳过并且 **`ClearRecovery burned the armed slot`**。
+
+另一处是 provisional/unknown turn 时过早清 `AttemptPlan`，后来的 `TurnCompleted` 读到 `TryAttemptPlan=None`，实测结果是 **`FallbackCursorAdvanced without PrefixRebaseCommitted`**。
+
+这两类 bug 本质完全一致：**你把调用栈该保持的局部变量拆到了两个 callback 之间的共享状态里，于是“什么时候清除”变成了新的 transition law。**
+
+正确方向不是把 `RecoveryArming`、`AttemptPlan` 再塞进 Journal。那只是把 process-local PC 升级成 durable PC。应该让一个 owning recovery CE 持有这些值，Host callbacks 只作为 rendezvous/observation adapter；确实需要跨 callback 保存的物理身份，则上升为 opaque typed capability，而不是 `TryGet/Clear` 型共享 workflow cell。
+
+### 2. `CounterfactualAwait` 是典型“改数据结构而没有消状态机”
+
+旧 census 曾明确把 Strength 的两个 pending dictionary 判为 ghost，并给出的修复就是：
+
+`let! first = observeFirst …`
+`let! second = observeSecond …`
+
+也就是把两阶段重新变回调用栈。
+
+现在只是变成了单个：
+
+`CounterfactualAwait = AwaitFirst ... | AwaitSecond ...`
+
+再放进一个 Dictionary。自查因此把它标为 “EXORCISED / PhysicalResource”。
+
+但从控制语义看：
+
+`AwaitFirst → 收到 first callback → AwaitSecond → 收到 second callback → remove`
+
+一点没变。**两个 Dictionary 合并成一个 DU Dictionary，只减少非法组合，没有消除 program counter。**“transition 是 pure fold”也不改变这一点；纯函数可以实现状态机，关键在于这个 DU 是否长期保存“程序现在等第几个 observation”。
+
+这里应该真正变成两次 observation 的 CE，或者让一个低层 collector/waiter 对外只返回完整的 `CounterfactualPair`；`AwaitFirst/AwaitSecond` 若必须存在，也只能封死在 physical adapter 内部。
+
+### 3. `LoopSensor.armed` 的 storage 可以是 physical，但它已经泄漏成业务控制权
+
+`LoopSensor` 明说：abort 是 fire-and-forget，真正的 AABB bridge 要等**以后**的 `TurnAborted`，条件就是 armed mark 仍存在。
+
+随后 Application workflow：
+
+`IsArmed → ClearArmed → bool`
+
+再以这个 bool 决定：
+
+`true → continueAfterLoopKill`
+`false → 普通 Aborted`
+
+代码就在这里。
+
+这精确命中 SW-017 的“parent 读取 child registry/mutable-cell presence 推导下一业务 effect”。
+
+修复不要求删掉 Host sensor 内部的 one-shot latch；应该删的是 **Application 对 `IsArmed/ClearArmed` 的观察权**。Host boundary 应直接产生例如 `AbortCause.LoopKill permit` / `AbortCause.External` 这样的 typed outcome，CE 消费一次 outcome 即可。
+
+### 4. `NeedHelpSensor.armed` 是同一问题，而且更“分形”
+
+NeedHelp sensor 内部保存 armed provider attempt；之后 Assistance workflow 在 `TurnAborted` 上读取 `sensor.IsArmed`，决定是否转入 assistance handling。
+
+但还没结束。它又要等下一次 fresh `SessionIdle` 作为 transport fence，随后 `sensor.TryTake(...)` 成功才真正发 escalation continuation 或创建 consultation child。
+
+所以实际结构是：
+
+`stream sentinel`
+→ `arm`
+→ `abort callback`
+→ `IsArmed`
+→ `claim`
+→ `idle callback`
+→ `TryTake`
+→ `send escalation/create child`
+
+这就是典型的**一个本应连续的 CE 被 Host callback 边界切成三段，再靠 HashSet presence 拼回去**。
+
+它需要一个真正的 `AssistanceAbortClaim`/one-shot capability，把 abort cause 与后续 idle fence 放进一个 owning CE；而不是让业务层反复询问 sensor 当前还记不记得上一阶段。
+
+### 5. `JobProgress` 是我认为最需要重新裁决的 durable 状态债
+
+这一项没有前四项那么绝对，因为作者确实做了大量努力，把每个 case 都附上真实 evidence，并明确写着 “NOT a program counter”。
+
+问题在消费端：
+
+`ManagerStarted → awaitAndPublish`
+`CandidateReady → publishEventually`
+`ConflictPending → resolveConflict`
+`RebasedCandidateReady → reenterRebasedCandidate`
+`PublishClaimed → reenterPublishClaim`
+`Published/Failed/Abandoned → cleanUp`
+
+源码甚至直接写着：**“Each JobProgress case maps directly to the CE effect that advances the job.”** 
+
+这已经非常接近：
+
+> durable projection 中保存 resume address，然后 restart 时 switch resume address。
+
+尤其 `ManagerStarted` 本身几乎就是 phase；`ConflictPending` 也同时承担“事实”和“现在该执行 resolveConflict”的含义。
+
+这里我不建议粗暴删除那些 Journal facts。`CandidateReady`、`ConflictDetected`、`PublishClaimed`、`Published` 都可能是正当 durable facts/effect claims。应清掉的是**把它们 fold 成一个唯一“当前 Progress case”，然后 case→下一程序地址一一映射**的权威性。
+
+更稳的形式是：semantic entry 从一组 durable facts + 当前外部 reality **重新证明 outstanding obligation**，然后进入普通 CE；而不是恢复一个 latest-stage enum。也正因此，不应该为了“去状态机”再多积分几条 `ResumeAtXxx` 日志。
+
+### 6. Sphinx 仍然有一个非常标准的外部 program-counter seam
+
+Sphinx 当前把 kernel 的 `PendingRequest` 翻译成：
+
+`SemanticAssessmentRequest → assess`
+`GenerateCandidatesRequest → propose`
+`InvestigateRequest → investigate`
+`SynthesizeRequest → synthesize`
+
+并把结果作为 `nextTool` 暴露给外部 caller。
+
+连错误恢复也告诉 caller “call the tool named by nextTool”，并从 `PendingRequest` 计算 `ExpectedTool`。
+
+从 distributed-interpreter 的判据看，这是非常标准的：
+
+`child internal PC → seam nextTool token → external caller executes next instruction → resume child`
+
+这里唯一的问题是**scope**。如果 Sphinx inquiry 本来就是一个有意建模的 epistemic protocol automaton，那么它可以合法存在，但应该明确写成 structured-workflow 的 protocol-boundary exemption；不能一边把它作为协议状态机，一边用 “SessionLifecycle 已删” 证明状态机已经归零。
+
+如果它也属于普通 CE workflow，则应该收成一个 `resume/observe` 入口，caller 只提供 observation，不获得“下一 phase 应调用哪个内部 operation”的解释权。
+
+### 7. `ManagerFinality.EndingDisposition` 不是持久状态机，但仍然暴露了 child action opcode
+
+`EndingDisposition` 包含 `ResumeRequest`、`RecoverRequestWithoutReviewers`、`CompleteBlessedLife`、`BeginFinality` 等。
+
+Tool 层随后逐 case 调不同业务效果：
+
+`ResumeRequest → resumeFinalityRequest`
+`Recover... → recoverEmptyMembers`
+`CompleteBlessedLife → completeBlessedEnding`
+`BeginFinality → beginFinalityEnding`。
+
+它没有长期存储 PC，所以严重程度低很多；但从 CE fractal closure 来看，Finality 模块返回的是“caller 下一步做什么”的 opcode，而不是完成后的领域 outcome。
+
+更干净的切法是让 Finality-owned CE 把 resume/recover/begin/complete 本身执行完，只向 Tool adapter 返回诸如 `Accepted / Refused reason / AlreadyCompleted` 这种边界结果。
+
+---
+
+### 为什么现有门禁会漏掉这些
+
+这是此次最重要的一层债务。Round-3 census 的“0 GHOST”依据仍主要是：没有新的 `State/Stage/Phase/Step/Armed/Pending/InFlight` 可疑声明、所有 mutable 都有分类注释，然后把 RecoveryArming、AttemptPlans、NeedHelp/Loop armed 和 `CounterfactualAwait` 判成 PhysicalResource。
+
+但 HOW 自己承认，`registry-joint-branch` 只识别**同一位置 direct/try probe 两个 registry**的语法；分散在不同函数/模块里的 presence 联合必须人工证明。
+
+因此现在的核心漏洞是：
+
+**`DSL-MUTABLE: resource` 是声明，不是证明。**
+
+把“两张表 + implicit phase”改成“一张表 + DU phase”，或者把 `IsArmed` 的 producer 和 consumer 拆到不同文件，现有 gate 很容易自动变绿，但 transition graph 根本没变。
+
+下一轮门禁不应该再主要 grep 名字，而应该守这条结构不变量：
+
+> **任何 mutable/registry value，只要在 callback A 写入，在 callback B 读取，并且 B 的 presence/value 决定下一个业务 effect，它就必须被证明为 opaque physical capability/outcome；否则按 cross-boundary program counter 处理。**
+
+这能同时抓住 `RecoveryArming`、`AttemptPlans`、`CounterfactualAwait`、Loop/NeedHelp，而不会误杀 PTY、timer、waiter、single-flight。像 `SessionQuiescenceGate` 就是很好的合法对照：它明确只是 process-local side-effect admission gate，重启清空，并通过 `QuiescencePermit` 控制物理发送资格，不声称业务 lifecycle。
+
+所以我会把当前真实状态概括成：**文件内的大型手写状态机基本清干净了；剩下的主要不是“State 类型”，而是被拆散在 callback、registry、durable projection 和 module seam 之间的 continuation。**其中最优先应清的是 `RecoveryArming/AttemptPlans → CounterfactualAwait → Loop/NeedHelp armed seam`；同时升级门禁，否则下一次仍会出现“数据结构改名后 census 归零，实际 transition graph 未变”的情况。
