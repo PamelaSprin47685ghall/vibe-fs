@@ -5,6 +5,7 @@ import * as HostSignalSurface from '../../../dist/OpenCode/Host/HostSignalSurfac
 const SESSION = 'ses_frag'
 const decode = (raw) => HostSignalSurface.tryDecode(raw) ?? undefined
 const decodeExecutionEnd = (raw) => HostSignalSurface.tryDecodePhysicalExecutionEnd(raw) ?? undefined
+const decodeStepEnd = (raw) => HostSignalSurface.tryDecodeProviderStepEnd(raw) ?? undefined
 
 test('WHAT[HOST-BOUNDARY-001] HOST_001_fragment_events_die_at_earliest_boundary', () => {
   const fragments = [
@@ -46,6 +47,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_cap
       // properties.sessionID shape.
       info: {
         sessionID: SESSION,
+        id: 'run-tool-call',
         role: 'assistant',
         parentID: 'msg-current',
         time: { created: 1, completed: 2 },
@@ -58,6 +60,7 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_cap
     properties: {
       info: {
         sessionID: SESSION,
+        id: 'run-final',
         role: 'assistant',
         parentID: 'msg-current',
         time: { created: 1, completed: 3 },
@@ -70,6 +73,11 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_cap
   assert.equal(decode(toolCallStep), undefined)
   assert.equal(decode(completed), undefined, 'message.updated still never becomes a business HostSignal')
   assert.equal(decodeExecutionEnd(running), undefined)
+  assert.deepEqual(decodeStepEnd(toolCallStep), {
+    sessionId: SESSION,
+    physicalUserMessageId: 'msg-current',
+    providerRun: 'run-tool-call',
+  }, 'tool-calls ends the provider step even though the physical execution continues')
   assert.equal(
     decodeExecutionEnd(toolCallStep),
     undefined,
@@ -78,6 +86,11 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_cap
   assert.deepEqual(decodeExecutionEnd(completed), {
     sessionId: SESSION,
     physicalUserMessageId: 'msg-current',
+  })
+  assert.deepEqual(decodeStepEnd(completed), {
+    sessionId: SESSION,
+    physicalUserMessageId: 'msg-current',
+    providerRun: 'run-final',
   })
   assert.equal(
     decodeExecutionEnd({ type: 'session.idle', properties: { sessionID: SESSION } }),

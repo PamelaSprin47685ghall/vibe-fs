@@ -22,7 +22,7 @@ export default function route(role, running, previous) {
 ```
 
 - `role` 是当前需要物理模型的 managed `EffectiveAgent` 精确名（如 `fast-coder`、`deep-browser`）。
-- `running` 是当前进程全部已取得且尚未释放的 ModelTarget multiset，元素形状固定为 `{ model: string, reasoning: string }`；重复元素必须保留，数组顺序无语义。
+- `running` 是当前进程全部真实 provider capacity token 的 ModelTarget multiset，元素形状固定为 `{ model: string, reasoning: string }`；重复元素必须保留，数组顺序无语义。idle token 显示 owner target；token 被 descendant 正在使用时显示该 step 的 target；borrow 不增删 occurrence。
 - `previous` 是同一未删除 Session 最近一次**成功物理 execution admission** 使用的 `{ model, reasoning }`，或 `null`。它只是接续对话的选择提示：exact terminal 释放 active lease 后仍保留，新的 Session / 已 drop 的 Session 必须传 `null`；它自身不贡献 `running` occurrence，也不恢复上一 execution 的 lease。
 - 非 `null` 返回值必须同时包含完整非空 `provider/model` 与非空 `reasoning`；裸 `modelID` 非法，因为 provider 也必须由同一个 MJS authority 明确决定。非推理模型用显式字符串（推荐 `none`），不得靠缺字段猜测。
 - `null` 的唯一含义是“按当前 occupancy 暂时不能安排”。
@@ -30,11 +30,11 @@ export default function route(role, running, previous) {
 
 Wanxiangshu 不向 scheduler 暴露 SessionId、transcript、prompt、Host client 或业务状态。模型策略只以当前角色、occupancy 与上一成功 target 为输入。
 
-## EMR-003：`running` 是**当前物理 provider execution** 的 lease multiset；不是 live-session 计数
+## EMR-003：`running` 是真实 provider capacity token multiset；不是 live-session / active-execution 计数
 
-managed provider execution 在 `chat.message` admission 以 **`(SessionId, PhysicalUserMessageId)`** 取得一个 model lease 后，向 `running` 贡献一个 `{model, reasoning}` 元素。`SessionId` 只是可复用容器，不是 occupancy 生命周期；同一 session 同时最多有一个 current physical execution。该 execution 在 idle/abort/delete 时释放，**或在同一 SessionId 出现新的 PhysicalUserMessageId 时被新 execution 原子 supersede**。因此正确性不得依赖 Host 一定先发 idle：新物理 user material 本身就是旧 execution 不再拥有 capacity 的证据。
+`chat.message` 取得的是稳定 execution binding，不保证新建 capacity token。普通 admission 会为该 execution 建一枚 own token；EMR-010 lineage borrow admission 只取得 target binding，沿祖先已有 token 在 provider-step 时使用，因此 active execution 可以没有 own token。基础 token 总数才是 `running.Length` 的唯一真相。
 
-同一 `PhysicalUserMessageId` 的 Host/provider retry 必须复用同一 target；同一 physical id 若观察到不同 EffectiveAgent，fail closed。不同 session 的并发 physical execution 即使取得完全相同 target，仍各贡献一个重复元素；runtime 不按 target 去重。
+同一 `PhysicalUserMessageId` 的 Host/provider retry 必须复用同一 target；同一 physical id 若观察到不同 EffectiveAgent，fail closed。不同 unrelated ordinary executions 若各自拥有 token，即使 target 完全相同也贡献重复 occurrence；borrower 与 lender 共享同一 token，不得双计数。一个 execution 同时最多拥有一枚基础 token。
 
 occupancy registry 是同一 OpenCode OS 进程内的 module-level shared truth：root workspace 与 worktree 虽产生不同 plugin instance，必须观察同一 multiset。不同 OS/OpenCode 进程不共享本地 occupancy。
 
@@ -42,7 +42,7 @@ occupancy registry 是同一 OpenCode OS 进程内的 module-level shared truth�
 
 **发送/排队不是 execution admission。** `fork`、repair、continuation 等 synthetic user message 的 dispatch 必须先完成 PromptKey/claim 并异步 enqueue；不得在 `SendPrompt`、tool 调用栈或 `promptAsync` settle 前抢 model slot。唯一 required managed demand owner 是 Host 已经接收该物理 user message 后的 `chat.message` 路由边界。
 
-该边界第一次需要新 execution lease 时，runtime 以当下 `running` 快照调用 scheduler。若返回 target，必须先原子记录该 lease/occupancy，再允许下一次调度决策观察状态；并发调用不得让两个决策看见同一旧快照后同时提交。
+该边界第一次需要新 execution binding 时，runtime 以 capacity decorator 给出的定向 scheduling view 调 scheduler。若返回 target，必须先原子记录 binding；普通 admission 同时建立 own token，borrow admission 不新建 token。并发调用不得让两个普通 token acquisition 基于同一旧 snapshot 超额提交。
 
 若 required execution 返回 `null`：
 
@@ -60,7 +60,7 @@ pending demand 被 supersede / owner cleanup 移除是**预期 lifecycle outcome
 
 ## EMR-005：模型选择策略全部属于 MJS；runtime 不再拥有 lane、容量表或候选算法
 
-Wanxiangshu runtime 只拥有：scheduler 加载、ABI 校验、process-shared occupancy、串行 acquire/release、pending demand 与 Host model 投影。下列策略全部只能写在 `wanxiangshu.mjs` 内：
+Wanxiangshu runtime 只拥有：scheduler 加载、ABI 校验、process-shared capacity token ledger + lineage borrowing mechanism、串行 arbitration、pending demand 与 Host model 投影。provider 限额数值与 target 选择策略仍只在 `wanxiangshu.mjs`：
 
 - 哪些 role 共享一组模型；
 - fast/deep/Browser 是否分池；
@@ -82,11 +82,11 @@ Strength/assistance/fallback 改档仍通过既有 EffectiveAgent authority；sc
 
 ## EMR-007：physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
-active lease 的普通完成释放必须携带 **exact physical identity**：Host terminal `message.updated` 的 assistant `parentID` 指向触发该 provider execution 的 `PhysicalUserMessageId`，只有 `(SessionId, parentID)` 与 current lease 完全匹配时才能删除该 occurrence。`finish="tool-calls"` 只结束一个 provider step，同一 physical execution 仍会经工具继续，因此不得释放；只接受 assistant error，或已 completed 且 finish 不是 `tool-calls` 的最终 assistant。迟到的旧 terminal 对已经 reuse 到新 PhysicalUserMessageId 的同一 SessionId 必须是 no-op。
+execution 的普通完成释放必须携带 **exact physical identity**：Host terminal `message.updated` 的 assistant `parentID` 指向触发该 provider execution 的 `PhysicalUserMessageId`，只有 `(SessionId, parentID)` 与 current binding 完全匹配时才能 retire 该 execution 自己拥有的 token。borrower 没有 own token 时只删 binding。`finish="tool-calls"` 只结束一个 provider step：它把正在使用的 token 变回 owner-family 可仲裁的 idle token，但不结束 execution binding、也不删除基础 token occurrence。迟到旧 terminal 由 EMR-010 fence 拒绝。
 
 physical adapter 若在 provider dispatch 前决定 suppress 当前 execution（例如 Enforcer `StopPhysicalRun`），必须从当前 wire transcript 取得 exact trailing `PhysicalUserMessageId`。adapter 先发起 Host abort、立即退出正在被 abort 的 transform callback；不得在该 callback 内 await 同一 abort，否则形成 self-deadlock。Host 接受 abort 后才以 `(SessionId, PhysicalUserMessageId)` 精确释放 lease；abort 失败则保留 lease，等待真实 terminal/supersede/delete 证据。
 
-`SessionIdle` 与 typed `AttemptAborted` 只带 SessionId，因此只能作为 wake / quiescence / abort observation，**不得直接删除 active model lease**；否则 A 的迟到 coarse signal 可以误删刚由 B 的 `chat.message` 建立的 lease。`SessionDeleted`、scope cleanup 与 plugin shutdown 因为销毁整个 owner，可按 SessionId 强制清理 current lease/pending。除此之外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution 被 supersede 的直接物理证据，必须在新 admission 内原子释放旧 lease，即使 Host 没有先发 exact terminal。每个实际 lease 删除一个 `running` occurrence，重复 cleanup 幂等，并触发 EMR-004 pending-demand 重算。
+`SessionIdle` 与 typed `AttemptAborted` 只带 SessionId，因此只能作为 wake / quiescence / abort observation，**不得直接删除 execution binding / own token**。`SessionDeleted`、scope cleanup 与 plugin shutdown 因为销毁整个 owner，可按 SessionId 强制 retire current binding、own token 与等待。除此之外，同一 SessionId 的**新 PhysicalUserMessageId**是旧 execution supersession 的直接证据：同 provider own token 可原子移交给新 binding；不能复用时则 retire，若旧 provider step 尚 in-flight，真实 ledger 必须保留该 retiring token 直到 step terminal，绝不提前制造假空槽。
 
 同一 admission 还必须先使上一 terminal 的 idle-derived continuation permit 失效：`chat.message`
 已经证明新 physical material 存在，不能把旧 idle authority 保留到后续
@@ -115,18 +115,20 @@ Host 接收物理 user message 后，`chat.message` 是唯一 required managed m
 
 非 managed Host 会话不受本包接管。
 
-## EMR-010：provider capacity = 独立可抢占 token；只沿 session lineage 借用
+## EMR-010：provider capacity 独立成可抢占 token；只沿 session lineage 借用
 
-ModelTarget execution binding 与 provider capacity token 必须分离。`chat.message` 仍唯一决定当前 physical execution 的稳定 target；真正开始每个 provider step 前，`experimental.chat.messages.transform` 必须先取得该 target provider 的 capacity token。
+ModelTarget execution binding 与 provider capacity token 必须分离。`chat.message` 仍唯一决定当前 physical execution 的稳定 target；每个 provider request 真正形成前，`experimental.chat.messages.transform` 必须先取得该 target provider 的 capacity token。
 
-capacity owner 必须是独立 F# 模块；基础 ledger 只保存真实 token multiset，borrowing decorator 在其上维护 session lineage、借用与等待。`wanxiangshu.mjs` 不保存借贷状态、不接收 parent/child/session id，也不实现 recall。其它 Host/Tool 主流程不得复制借贷判断，只调用 capacity owner 的小边界。
+capacity arbitration 必须由独立 F# owner 实现。基础 ledger 只保存真实 token multiset；borrowing decorator 在其上维护 session lineage、借用、祖先 recall、provider-step fence 与等待。`wanxiangshu.mjs` 不接收 parent/child/session id，不保存借贷状态；其它 Host/Tool 主流程不得复制借贷判断。
 
-一个 execution 若按普通 `running` 可取得 target，则建立自己的 token；若只有在“对该 session 隐去一枚同 provider 的可借祖先 token”后 MJS 才允许 target，则 execution 只取得稳定 target，不新建 token。无关 session 始终看到祖先 token 仍在 `running`，因此借位绝不能把空槽暴露给全局竞争者。不同 provider 不共享 token。
+descendant 可把一枚同 provider 的祖先 token 当作定向 credit，但该 token 在真实 ledger 中始终存在，无关 session 继续把它视为 occupied。若多个 provider credit 同时可见，一个 borrowed scheduler 决策必须能由**恰好一枚**同 provider token 单独解释；否则退回完整 `running` 普通调度，禁止把多枚 credit 合成虚假全局空闲。
 
-token 只在 provider-step 边界转移。descendant 当前 provider request 已发出时，任何 ancestor recall 都必须等待该 step 的 assistant terminal/error observation；不得 abort request、不得先让 ancestor 发出第二个同 token request。step 结束后 token 回到 owner-family arbitration，等待者按 token owner → 近祖先 → 远后代的 ancestry 优先级取得；同一 ancestry depth 保持到达顺序。于是 parent 可随时要求召回，但硬 provider 并发上限从不瞬时突破。
+token 只在 provider-step 边界转移。descendant 当前 provider request 已发出时，ancestor recall 必须等该 step 的 assistant completed/error observation；不得 abort 正在飞的 request，也不得先让 ancestor 发出第二个同 token request。step 结束后，token owner 本人优先，其次近 descendant，再次远 descendant，同 ancestry depth 按请求顺序。
 
-borrower 每次新 transform 都重新取得 step token。若祖先已召回，borrower 可以用当前固定 target 再向 MJS 做**普通容量证明**：只有 MJS 在完整 `running` 上仍返回 exact same target 时，才可建立自己的新 token；返回其它 target 或 `null` 都不得改变本 physical execution 的 target，只能等待。借来的 token 可以继续向 descendant 转借；多层链始终只对应一枚基础 token。
+borrower 每次新 transform 都重新申请 step token。若祖先已召回，它只有两条合法路：MJS 在完整 `running` 上仍返回当前 execution 的 exact target → 建立自己的普通 token；否则等待祖先再次闲置并重借。借来的 token 可沿 child→grandchild 继续转借，但基础 token 数不因层数或子数增加。
 
-Fission fresh lane 虽不是 delegation child，capacity lineage 必须绑定到它替代的 logical owner；因此多条 lane 只能竞争 owner 已有 token，不能因 lane 数量复制免费 capacity。Strength/其它非 lineage session 不因名字或 Host parentID 自动获得借位。
+Fission fresh lane 虽不是 delegation child，capacity lineage 必须绑定到被替代 logical owner；多 lane 竞争同一 owner credit，不复制免费 capacity。不同 provider 永不互借。
 
-provider-step terminal 必须有 anti-stale fence。当前 step 开始时记录 provider wire 已可见的 assistant run identities；只接受该 fence 之后出现的 assistant terminal/error 结束当前 step。迟到的旧 terminal 不得释放已经开始的新 step。若 terminal event 丢失，下一次 transform 观察到 fence 之后的新 assistant run 本身可证明上一 step 已结束。
+provider-step terminal 必须有 anti-stale fence：step 开始时记录 wire 已可见 assistant ProviderRunIdentity；只接受 fence 之外的新 assistant terminal 结束当前 step。若 terminal event 丢失，下一次 transform 观察到新增 assistant run 本身即可补证上一 step 已结束。
+
+若 transform 后段在 provider dispatch 前决定 suppress 当前 run，不能等待不存在的 assistant terminal，也不能先释放再赌 abort 成功。只有 Host abort 已明确返回成功后，physical adapter 才可调用 capacity owner 的 pre-dispatch suppression 边界归还当前 step token，再 retire exact execution；abort 失败必须保留 token。

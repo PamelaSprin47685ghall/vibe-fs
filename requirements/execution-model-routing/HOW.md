@@ -174,7 +174,7 @@ physicalOccupants:Set<SessionId>
 
 所有这些若有需要，都只是 MJS 内部实现。
 
-`ModelRoutingRuntime` 不再自己实现容量表。它组合一个基础 `CapacityLedger<ModelRoutingTarget>` 与一个 `BorrowingCapacity<ModelRoutingTarget>` decorator：前者只做 token acquire/retarget/release/snapshot；后者拥有 lineage、借位候选、祖先优先 recall、step fence、等待队列。routing owner 只向 decorator 提供同步 MJS callback。
+`ModelRoutingRuntime` 组合 `CapacityLedger<ModelRoutingTarget>` 与 `BorrowingCapacity<ModelRoutingTarget>`。前者只有 acquire/retarget/release/snapshot；后者独占 lineage、定向 credit、单-token attribution、ancestor-first recall、step fence 与等待队列。routing 只把 MJS callback 与 exact target 交给 decorator。
 
 ## 4. process-shared occupancy owner
 
@@ -188,7 +188,7 @@ lastPhysicalTarget: SessionId → ModelTarget
 pending: SessionId → latest arrival-ordered physical-execution demand
 ```
 
-`running` 每次调用由 capacity ledger 的 token values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。borrower scheduling view 最多按 provider 隐去一枚对 requester 可借的 lineage token；真实 ledger 不删除它，因此 unrelated scheduler 永远看不到假空槽。`lastPhysicalTarget` 不计 occupancy。
+`running` 每次由 capacity ledger 的 token values 生成新数组。borrow scheduling view 只为 requester 定向隐藏可借 token；真实 ledger 不删除，unrelated demand 永远看不到假空槽。多 provider credit 的 tentative 选择必须再由单 token view 证明；证明不了则回完整 `running`。
 
 同一 SessionId 同时至多一个 current physical execution；不同 SessionId 的并发 execution 若指向同一 target，values 中自然出现重复元素。`PhysicalUserMessageId=None` 只用于 Strength 在 Host 物理 message 创建前的 optional reservation，chat.message 必须把它原位 rebind 成 exact physical id，而不是再占一个 occurrence。
 
@@ -224,9 +224,7 @@ pending acquisition 的结果是封闭 `Acquired target | Superseded`。步骤 3
 
 一轮结束后若仍有 pending，不自行再次循环；等待下一次真实 occupancy event。没有 timer/poll。
 
-每个 provider request 前，messages transform 先进入 capacity decorator。若 own/ordinary/borrowed token 均暂不可得，transform await；token grant 后才继续形成 provider request。assistant error 或任意 completed assistant（包括 `finish="tool-calls"`）结束**provider step**并归还当前 step token；只有 `finish != "tool-calls"` 的 final assistant 仍结束整个 physical execution binding。两层 terminal 不得混同。
-
-step start 同时把当前 wire 已可见 assistant ProviderRunIdentity 集合作为 fence 交给 capacity decorator。terminal event 的 assistant id 已在 fence 中则是迟到旧事件，只做 no-op；新 id 才能结束当前 in-flight step。下一次 transform 若看到 fence 新增 assistant id，会先补证上一 step 已结束，再申请下一 step，避免订阅丢事件造成永久占槽。
+每个 provider request 前，messages transform 先进入 capacity decorator；无 token 就在 transform 前 await。assistant error 或任意 completed assistant（包括 `finish="tool-calls"`）结束 provider step 并归还 step token；只有非 `tool-calls` final assistant 仍结束整个 physical execution binding。step start 同时提交当前 wire 已可见 assistant run 集合作 fence；旧 terminal 不得释放新 step，下一 transform 的新增 run 可补证漏掉的 terminal。
 
 `PluginTransforms.applyContinuationOutcome` 的 `StopPhysicalRun` 从 wire transcript 取 exact trailing `PhysicalUserMessageId`，启动 Host abort 后立即返回，避免 transform callback await 自己的 abort；abort `Ok` 才调用 `ModelRouting.releasePhysicalExecution` 精确清 lease。`SessionIdle` / typed attempt abort 只有 SessionId，继续服务 Reconciler、quiescence、loop/abort 语义，但不直接操作 active model occupancy。session delete / scope cleanup / plugin shutdown 因为整个 owner 已被销毁，可以按 SessionId 强制释放 current lease 并取消 pending。新 PhysicalUserMessageId admission 仍在同一个串行临界区 supersede 旧 lease/pending。业务 completed/retired/join/finality 不直接操作 occupancy；ProviderRetry/ProviderFailure 若仍引用同一 physical user material 则继续复用。
 

@@ -24,9 +24,9 @@
 
 Wanxiangshu 只维护真实 lease multiset、最近一次物理执行 target、串行 acquire/release 与 Host 投影；用户的 `wanxiangshu.mjs` 自己决定角色分组、模型优先级、容量、是否优先延续上一 LLM、视觉模型、fast/deep 差异等。`previous` 只是选择提示，不占容量，也不把上一 lease 复活成 session 级永久绑定。这样产品内不再存在第二份“调度知识”。
 
-这里的“真实 lease”还要再分成两层：**execution binding** 决定这个 physical material 稳定使用哪个 target；**provider capacity token** 决定此刻谁有资格开始下一次 provider step。二者若混在同一张表里，父 agent 一旦在 tool/join 上停工，槽只能继续僵死到整个 physical execution 结束；若粗暴释放，又会把容量送给无关 session，甚至在父恢复时瞬时突破 provider 硬限制。
+这里的 lease 还必须拆成 execution binding 与 provider capacity token。前者回答“这条 physical material 固定跑哪个 target”，后者回答“谁此刻有资格开始下一 provider step”。parent 在 tool/join 上等待时，binding 仍成立，但 capacity 可以定向借给 lineage descendant；ancestor 恢复时只在 step 边界召回，因此不会把硬 provider 限额变成瞬时软限制。
 
-因此 capacity arbitration 是独立 F# 资源层。基础 ledger 保留旧的 running multiset 语义；其上的 borrowing decorator 只允许同一 session lineage 借用祖先 token。token 在 provider step 期间不可抢占；祖先下一次 transform 到来后拥有优先召回权，但必须等当前 descendant step 结束才接管。被召回的 descendant 下一次 transform 要么按 MJS 证明同 provider 出现了普通新额度并取得自己的 token，要么等待祖先再次空闲后继续借。多层借用始终是同一枚 token 沿 lineage 转移，不因层数增加 capacity。
+capacity arbitration 放在独立 F# 对象中：旧式真实 token ledger 是内核，borrow/recall 是 decorator。MJS 仍只是同步纯选择函数，Host/Tool 业务流也只碰极小边界。复杂度被压在唯一 owner 内，而不是散进 join、fission、sync delegate、transform 各处。
 
 ## 3. 为什么 `running` 用 multiset，而不是容量字段
 

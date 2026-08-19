@@ -441,6 +441,16 @@ module ModelRouting =
             | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent lease
             | false, _ -> reusePendingExecution sessionId physicalUserMessageId agent
 
+        let currentPhysicalUserMessageId sessionId =
+            match activeBySession.TryGetValue sessionId with
+            | true, lease -> lease.PhysicalUserMessageId
+            | false, _ -> None
+
+        let cancelCurrentDemand sessionId =
+            match pendingBySession.TryGetValue sessionId with
+            | true, demand -> cancelDemand demand
+            | false, _ -> ()
+
         let acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent =
             let previous = previousTarget sessionId
 
@@ -477,17 +487,9 @@ module ModelRouting =
                 match currentExecutionTask sessionId physicalUserMessageId agent with
                 | Some current -> current
                 | None ->
-                    let oldPhysicalUserMessageId =
-                        match activeBySession.TryGetValue sessionId with
-                        | true, lease -> lease.PhysicalUserMessageId
-                        | false, _ -> None
-
+                    let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
                     activeBySession.Remove sessionId |> ignore
-
-                    match pendingBySession.TryGetValue sessionId with
-                    | true, demand -> cancelDemand demand
-                    | false, _ -> ()
-
+                    cancelCurrentDemand sessionId
                     acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent)
 
         let acquireManagedSafe sessionId physicalUserMessageId agent =
@@ -556,6 +558,10 @@ module ModelRouting =
                 )
                 :> Task
 
+        let drainIfHealthy () =
+            if fatalError.IsNone then
+                drainDemands ()
+
         member _.AcquireManagedExecution
             (sessionId: string, physicalUserMessageId: string, agent: string)
             : Task<ModelRoutingAcquisition> =
@@ -613,27 +619,32 @@ module ModelRouting =
             match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
             | None -> failedTask<unit> (ArgumentException("provider step identity must be non-empty")) :> Task
             | Some(normSessionId, normPhysicalUserMessageId) ->
-                let admission = lock gate (fun () -> enterProviderStepLocked normSessionId normPhysicalUserMessageId visibleProviderRuns)
+                let admission =
+                    lock gate (fun () ->
+                        enterProviderStepLocked normSessionId normPhysicalUserMessageId visibleProviderRuns)
 
                 task {
                     do! admission
-
-                    lock gate (fun () ->
-                        if fatalError.IsNone then
-                            drainDemands ())
+                    lock gate drainIfHealthy
                 }
                 :> Task
 
         member _.EndProviderStep(sessionId: string, physicalUserMessageId: string, providerRun: string) =
             match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
             | None -> ()
-            | Some(normSessionId, normPhysicalUserMessageId) when String.IsNullOrWhiteSpace providerRun -> ()
+            | Some _ when String.IsNullOrWhiteSpace providerRun -> ()
             | Some(normSessionId, normPhysicalUserMessageId) ->
                 lock gate (fun () ->
                     capacity.EndStep(normSessionId, normPhysicalUserMessageId, providerRun.Trim())
+                    drainIfHealthy ())
 
-                    if fatalError.IsNone then
-                        drainDemands ())
+        member _.SuppressProviderStep(sessionId: string, physicalUserMessageId: string) =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> ()
+            | Some(normSessionId, normPhysicalUserMessageId) ->
+                lock gate (fun () ->
+                    capacity.SuppressStep(normSessionId, normPhysicalUserMessageId)
+                    drainIfHealthy ())
 
         member _.SnapshotOccupied() = lock gate (fun () -> running ())
         member _.PendingCount = lock gate (fun () -> pending.Count)
@@ -748,4 +759,10 @@ module ModelRouting =
                 PhysicalUserMessageId.value physicalUserMessageId,
                 ProviderRunIdentity.value providerRun
             )
+        | None -> ()
+
+    let suppressProviderStep (sessionId: SessionId) (physicalUserMessageId: PhysicalUserMessageId) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.SuppressProviderStep(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId)
         | None -> ()

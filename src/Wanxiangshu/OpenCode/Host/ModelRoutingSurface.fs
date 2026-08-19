@@ -234,6 +234,9 @@ module ModelRoutingSurface =
         : unit =
         (runtimeOf runtime).EndProviderStep(sessionId, physicalUserMessageId, providerRun)
 
+    let suppressProviderStep (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : unit =
+        (runtimeOf runtime).SuppressProviderStep(sessionId, physicalUserMessageId)
+
     let snapshotOccupied (runtime: obj) : obj array =
         (runtimeOf runtime).SnapshotOccupied() |> Array.map targetObject
 

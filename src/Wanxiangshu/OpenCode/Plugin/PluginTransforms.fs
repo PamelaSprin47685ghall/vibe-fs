@@ -322,7 +322,11 @@ module PluginTransforms =
         result
         =
         match result with
-        | Ok() -> physicalUserMessageId |> Option.iter (ModelRouting.releasePhysicalExecution sid)
+        | Ok() ->
+            physicalUserMessageId
+            |> Option.iter (fun physical ->
+                ModelRouting.suppressProviderStep sid physical
+                ModelRouting.releasePhysicalExecution sid physical)
         | Error error ->
             Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
 

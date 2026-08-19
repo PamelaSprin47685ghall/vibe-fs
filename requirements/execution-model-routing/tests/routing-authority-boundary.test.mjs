@@ -9,6 +9,28 @@ test('WHAT[EMR-005] EMR_005_runtime_contains_no_product_lane_or_max_sessions_pol
   assert.doesNotMatch(routing, /ExecutionLane|ModelLaneConfig|max_sessions|firstFree|first-free/)
 })
 
+test('WHAT[EMR-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_decorator', async () => {
+  const capacity = await source('src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs')
+  const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
+  const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
+  const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
+  const transform = await source('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
+  const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const scheduler = await source('resources/wanxiangshu.mjs')
+
+  assert.match(capacity, /type CapacityLedger<'target>/)
+  assert.match(capacity, /type BorrowingCapacity<'target>/)
+  assert.match(capacity, /ancestorDistance/)
+  assert.match(capacity, /CapacityTokenState/)
+  assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
+  assert.doesNotMatch(routing, /let ancestorDistance|type private CapacityTokenState|type private CapacityStepDemand/)
+
+  for (const main of [sessions, binding, transform, host]) {
+    assert.doesNotMatch(main, /ancestorDistance|CapacityTokenState|CapacityStepDemand|ownedTokenByExecution/)
+  }
+  assert.doesNotMatch(scheduler, /borrow|recall|lineage|parentSession|childSession/i)
+})
+
 test('WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_authority', async () => {
   const managed = await source('src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs')
   const port = await source('src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs')

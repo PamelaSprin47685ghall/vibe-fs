@@ -45,6 +45,15 @@ module HostSignalSurface =
                    physicalUserMessageId = PhysicalUserMessageId.value physicalUserMessageId |})
         |> Option.defaultValue null
 
+    let tryDecodeProviderStepEnd (raw: obj) : obj =
+        HostEventCodec.tryDecodeProviderStepEnd raw
+        |> Option.map (fun (sessionId, physicalUserMessageId, providerRun) ->
+            box
+                {| sessionId = SessionId.value sessionId
+                   physicalUserMessageId = PhysicalUserMessageId.value physicalUserMessageId
+                   providerRun = ProviderRunIdentity.value providerRun |})
+        |> Option.defaultValue null
+
     let tryAdapt (owned: string array) (raw: obj) : obj =
         // DSL-MUTABLE: resource — owned signal registry for host signal adaptation
         let registry = HashSet<string>(owned)
