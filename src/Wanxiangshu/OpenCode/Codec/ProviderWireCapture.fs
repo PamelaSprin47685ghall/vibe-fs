@@ -148,12 +148,6 @@ module ProviderWireCapture =
                 { Role = message.Role
                   Parts = message.Parts |> List.map (fun part -> part.WirePart) }) }
 
-    let visibleProviderRuns (rawMessages: obj list) =
-        rawMessages
-        |> List.choose decodeCapturedMessage
-        |> List.choose (fun message -> message.ProviderRun)
-        |> Set.ofList
-
     /// The last `role=user` message's wire address in a transform output.
     ///
     /// REVIEW-010's seal binds to the physical user message this request answers

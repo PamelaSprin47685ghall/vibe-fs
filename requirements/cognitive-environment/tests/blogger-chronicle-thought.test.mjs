@@ -28,13 +28,15 @@ test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_companion_onl
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_THOUGHT_is_enabled_for_step_3_5_flash_model_prefix', () => {
+  const enabledHelper = source.match(/let private bloggerChronicleThoughtEnabled[\s\S]*?\n    let private rawMessageRole/)?.[0]
+  assert.ok(enabledHelper, 'Blogger thought model gate must remain a named local decision')
   assert.match(
     source,
     /let private bloggerChronicleThoughtModelPrefixes\s*:\s*string list\s*=\s*\[\s*"step-3\.5-flash"\s*\]/,
   )
-  assert.match(source, /SessionExecutionBinding\.currentProviderModel/)
-  assert.match(source, /model\.modelID\.StartsWith\(prefix, StringComparison\.Ordinal\)/)
-  assert.match(source, /List\.exists[^\n]*bloggerChronicleThoughtModelPrefixes/)
+  assert.match(enabledHelper, /SessionExecutionBinding\.currentProviderModel/)
+  assert.match(enabledHelper, /model\.modelID\.StartsWith\(prefix, StringComparison\.Ordinal\)/)
+  assert.match(enabledHelper, /List\.exists[\s\S]*bloggerChronicleThoughtModelPrefixes/)
   assert.doesNotMatch(source, /providerID[^\n]*step-3\.5-flash|Contains\([^\n]*step-3\.5-flash/)
 })
 
