@@ -175,7 +175,7 @@ Gate / Clean Gate / target head / `job_id` / worktree / CAS 属墙内机械；�
 
 含义/动机：扫描磁盘状态反推进度 = 磁盘可伪造；跳步恢复 = 未过 review 的 candidate 进入共享 ref。
 
-证据：MOVE `tests/job.test.mjs`（`ORCH_007_progress_that_needs_no_head_derives_its_action_from_the_fact_alone`）；
+证据：MOVE `tests/job.test.mjs`（`ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage`）；
 REUSE `requirements/change-integration/tests/runtime.test.mjs`（`ORCH_007_NeedsReview_preserves_the_active_worktree`）。
 
 ## CHGINT-013：target 变化后旧 post-rebase witness 作废

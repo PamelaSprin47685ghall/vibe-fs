@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const change = await import('../../../dist/Change/Surface.js')
 
-test('WHAT[CHGINT-002] ORCH_007_NeedsReview_preserves_the_active_worktree', () => {
+test('WHAT[CHGINT-012] ORCH_007_NeedsReview_preserves_the_active_worktree', () => {
   let removeCalls = 0
   let projection = change.createJob(change.empty(), {
     jobId: 'job-1',
