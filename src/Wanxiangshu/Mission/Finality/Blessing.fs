@@ -51,9 +51,6 @@ open Wanxiangshu.Foundation.Identity
 /// All-confirmed convergence: canonical records + stable tree → blessing.
 module BlessingWorkflow =
 
-    let private undecidedPrompt (managerSessionId: SessionId) =
-        ProviderProse.documentFor managerSessionId ManagerLifecyclePrompt.Path.FinalityUndecidable Map.empty
-
     let private blessedPrompt (managerSessionId: SessionId) (logs: (int * string) list) =
         FinalityPrompt.blessedFromLogs
             (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Blessed Map.empty)
@@ -61,8 +58,9 @@ module BlessingWorkflow =
 
     let private treeUnchanged (treePort: FinalityTreePort) (managerSessionId: SessionId) (expected: GitTreeHash) =
         match treePort.ReadManagerTree managerSessionId with
-        | Ok current -> current = expected
-        | Error _ -> false
+        | Error error -> Error("Manager tree read failed: " + error)
+        | Ok current when current = expected -> Ok()
+        | Ok _ -> Error "Manager tree changed during Finality blessing"
 
     let private prepareBlessing
         (treePort: FinalityTreePort)
@@ -80,11 +78,7 @@ module BlessingWorkflow =
                 else
                     Error "Finality cohort record count changed"
 
-            do!
-                if treeUnchanged treePort managerSessionId requestTree then
-                    Ok()
-                else
-                    Error "Manager tree changed during Finality blessing"
+            do! treeUnchanged treePort managerSessionId requestTree
 
             let logs =
                 orderedRecords
@@ -95,19 +89,6 @@ module BlessingWorkflow =
             return logs, blob
         }
 
-    let private prepareBlessingAfterTreeCheck
-        (treePort: FinalityTreePort)
-        (journal: AgentJournal)
-        (managerSessionId: SessionId)
-        (members: EnlistedMember list)
-        (requestTree: GitTreeHash)
-        =
-        task {
-            match! prepareBlessing treePort journal managerSessionId members requestTree with
-            | Error _ -> return Error false
-            | Ok prepared -> return Ok prepared
-        }
-
     let private prepareBlessingIfTreeStable
         (treePort: FinalityTreePort)
         (journal: AgentJournal)
@@ -115,10 +96,10 @@ module BlessingWorkflow =
         (members: EnlistedMember list)
         (requestTree: GitTreeHash)
         =
-        if not (treeUnchanged treePort managerSessionId requestTree) then
-            Task.FromResult(Error true)
-        else
-            prepareBlessingAfterTreeCheck treePort journal managerSessionId members requestTree
+        taskResult {
+            do! treeUnchanged treePort managerSessionId requestTree
+            return! prepareBlessing treePort journal managerSessionId members requestTree
+        }
 
     let blessIfTreeUnchanged
         (reviewerPort: FinalityReviewerPort)
@@ -131,24 +112,9 @@ module BlessingWorkflow =
         (requestTree: GitTreeHash)
         : Task<FinalityOutcome> =
         task {
-            let undecided () =
-                let reviewer, barrier =
-                    match members with
-                    | first :: _ -> first.ReviewerSessionId, first.BarrierId
-                    | [] -> managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N"))
-
-                RevisionWorkflow.concludeUndecided
-                    journal
-                    managerSessionId
-                    lifeId
-                    requestId
-                    requestTree
-                    reviewer
-                    barrier
-
             match! prepareBlessingIfTreeStable treePort journal managerSessionId members requestTree with
-            | Error true -> return! undecided ()
-            | Error false -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
+            | Error error ->
+                return raise (InvalidOperationException("Finality blessing preparation failed: " + error))
             | Ok(logs, blob) ->
                 do!
                     FinalityJournal.appendLifecycle

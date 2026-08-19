@@ -1,10 +1,12 @@
 // REVIEW-JUDGEMENT-001 (REVIEW-001): the public judgement tool contract.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as provider from '../../../dist/Participant/Provider/LanguageSurface.js'
 import * as judge from '../../../dist/Mission/Review/OpenCode/JudgeSurface.js'
 
 const parse = (value) => judge.parse(value)
+const judgeToolSource = () => readFileSync(new URL('../../../src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs', import.meta.url), 'utf8')
 
 test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_verdict_schema_allows_only_the_verdict_argument', () => {
   const schema = JSON.parse(judge.schemaJson)
@@ -59,4 +61,18 @@ test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_already_judged_receipt_prompts_to_co
   assert.equal(en, 'You have already made a judgment, please conclude the conversation.')
   assert.equal(/PERFECT|REVISE/.test(zh), false)
   assert.equal(/PERFECT|REVISE/.test(en), false)
+})
+
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_receipt_and_finality_challenge_have_disjoint_terminal_semantics', () => {
+  assert.equal(judge.receipt('SimplifiedChinese'), '你的判断已被收下，请你结束对话。')
+
+  const source = judgeToolSource()
+  const challenged = source.match(/let private challenged ctx =([\s\S]*?)\n\s*let private notReceived/)
+  assert.ok(challenged, 'JudgeTool must keep an explicit Finality challenge reply')
+  assert.match(challenged[1], /ReviewChallenge\.Path/)
+  assert.doesNotMatch(
+    challenged[1],
+    /Path\.Received/,
+    'Finality first-PERFECT challenge must never also tell the Reviewer to conclude',
+  )
 })

@@ -164,13 +164,15 @@ test('WHAT[VERIFICATION-SYSTEM-007] poisoned durable substrate rejects new recon
   })
 })
 
-test('WHAT[VERIFICATION-SYSTEM-007] plugin scope drains reconcile and admitted background work before disposal', async () => {
+test('WHAT[VERIFICATION-SYSTEM-007] plugin scope drains reconcile and admitted Host work before disposal', async () => {
   const result = await temporal.pluginScopeStopDrainScenario()
   assert.deepEqual(result, {
     blockedBeforeRelease: true,
     disposed: true,
     lateBackgroundRejected: true,
+    lateOwnedRejected: true,
     stillWaitingForReconcile: true,
+    stillWaitingForOwnedWork: true,
   })
 })
 

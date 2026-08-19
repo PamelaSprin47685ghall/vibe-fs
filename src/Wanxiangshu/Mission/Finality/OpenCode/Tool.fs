@@ -140,6 +140,13 @@ module FinalityTool =
 
     let private tString = ToolHostCodec.TString
 
+    let private fatalInfrastructure (sid: SessionId) (ex: exn) : 'T =
+        Diagnostic.fatal "finality-infrastructure-failed" [ "session_id", SessionId.value sid; "result", ex.ToString() ]
+        failwith ("unreachable after Diagnostic.fatal: " + ex.Message)
+
+    let private infrastructureError operation error : 'T =
+        raise (InvalidOperationException(sprintf "Finality %s failed: %s" operation error))
+
     let private describeFinalityRequest
         (sid: SessionId)
         (lifeId: ManagerLifeId)
@@ -184,13 +191,15 @@ module FinalityTool =
 
     let private tryTreeHash (port: GitTreePort) =
         try
-            treeHashOf (port.GetTreeHash().Trim())
-        with _ ->
-            None
+            match treeHashOf (port.GetTreeHash().Trim()) with
+            | Some tree -> Ok tree
+            | None -> Error "tree adapter returned an empty hash"
+        with ex ->
+            Error ex.Message
 
     let private treeOf (scope: ToolRuntimeScope) (sessionId: string) =
         match scope.TreePortFor sessionId with
-        | None -> None
+        | None -> Error "tree adapter is unavailable"
         | Some port -> tryTreeHash port
 
     /// GLORY-037.11-13: any outstanding child work blocks the ending.
@@ -203,7 +212,7 @@ module FinalityTool =
         let runtimeOutstanding =
             match scope.RuntimeFor context with
             | Ok runtime -> runtime.PendingRunCount > 0
-            | Error _ -> false
+            | Error error -> infrastructureError "runtime lookup" error
 
         durableOutstanding || runtimeOutstanding
 
@@ -244,7 +253,7 @@ module FinalityTool =
             let providerRun = context.ProviderRunId.Value
 
             match! ManagerLifeWorkflow.completeBlessedLife journal sid life blessing lastWords providerRun with
-            | Error _ -> return refuse context Path.TryAgainLater
+            | Error error -> return infrastructureError "blessed Life completion" (sprintf "%A" error)
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
                 return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
             | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
@@ -255,8 +264,7 @@ module FinalityTool =
     let private renderOutcome (outcome: FinalityOutcome) =
         match outcome with
         | FinalityOutcome.Rejected prompt
-        | FinalityOutcome.Blessed prompt
-        | FinalityOutcome.Undecided prompt -> prompt
+        | FinalityOutcome.Blessed prompt -> prompt
 
     let private endingPrerequisiteRefusal (scope: ToolRuntimeScope) (context: HostToolContext) (lastWords: string) =
         if String.IsNullOrWhiteSpace lastWords then
@@ -322,10 +330,13 @@ module FinalityTool =
         (tree: GitTreeHash)
         (lastWords: string)
         =
-        taskResult {
+        task {
             let! blob =
-                journal.WriteBlob lastWords
-                |> TaskValue.map (Result.mapError (fun _ -> refuse context Path.SeekEndWhenReady))
+                task {
+                    match! journal.WriteBlob lastWords with
+                    | Ok blob -> return blob
+                    | Error error -> return infrastructureError "last_words blob write" error
+                }
 
             let requestId = FinalityRequestId.create (Guid.NewGuid().ToString("N"))
             let reviewerPort, treePort = finalityPorts scope sid
@@ -348,13 +359,9 @@ module FinalityTool =
                         blob.BlobDigest
                         context.ProviderRunId.Value
                         context.ToolCallId.Value)
-                |> TaskResultCE.ofTask
 
             return renderOutcome outcome
         }
-        |> TaskValue.map (function
-            | Ok text
-            | Error text -> text)
 
     let private beginFinalityEnding
         (scope: ToolRuntimeScope)
@@ -367,8 +374,8 @@ module FinalityTool =
         =
         match endingPrerequisiteRefusal scope context lastWords, treeOf scope sessionId with
         | Some refusal, _ -> Task.FromResult refusal
-        | None, None -> Task.FromResult(refuse context Path.SeekEndWhenReady)
-        | None, Some tree -> startFinalityFromBlob scope journal context sid life tree lastWords
+        | None, Error error -> task { return invalidOp ("Finality tree read failed: " + error) }
+        | None, Ok tree -> startFinalityFromBlob scope journal context sid life tree lastWords
 
     let private completeBlessedEnding
         (scope: ToolRuntimeScope)
@@ -427,7 +434,7 @@ module FinalityTool =
         =
         task {
             match! ManagerLifeWorkflow.ensureEndingLife journal sid with
-            | Error _ -> return refuse context Path.TryAgainLater
+            | Error error -> return infrastructureError "ending Life admission" (sprintf "%A" error)
             | Ok None -> return refuse context Path.ContinueWorking
             | Ok(Some life) ->
                 let snapshot = AgentJournal.snapshot journal
@@ -440,11 +447,16 @@ module FinalityTool =
 
             match scope.RoleFor context, String.IsNullOrWhiteSpace context.SessionId, scope.Journal with
             | Some Role.Manager, true, _ -> return refuse context Path.TryAgainLater
-            | Some Role.Manager, false, None -> return refuse context Path.TryAgainLater
+            | Some Role.Manager, false, None ->
+                let sid = SessionId.create context.SessionId
+                return fatalInfrastructure sid (InvalidOperationException "Finality requires an AgentJournal")
             | Some Role.Manager, false, Some journal ->
                 let sessionId = context.SessionId
                 let sid = SessionId.create sessionId
-                return! executeManagerEnding scope journal context sid sessionId lastWords
+                try
+                    return! executeManagerEnding scope journal context sid sessionId lastWords
+                with ex ->
+                    return fatalInfrastructure sid ex
             | Some _, _, _ -> return refuse context Path.WrongRole
             | None, _, _ -> return refuse context Path.TryAgainLater
         }

@@ -38,6 +38,3 @@ module ManagerLifecyclePrompt =
         [<Literal>]
         let IdleEncouragementPostT1 = ManagerNarrative.Path.IdlePostT1
 
-        /// GLORY-057 / A.5.4: infrastructure-failure notice.
-        [<Literal>]
-        let FinalityUndecidable = "lifecycle/manager/finality-undecidable"

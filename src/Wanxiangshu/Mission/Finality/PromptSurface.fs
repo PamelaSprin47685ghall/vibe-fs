@@ -74,9 +74,6 @@ module PromptSurface =
     let idleEncouragementPostT1 () : string =
         document ManagerLifecyclePrompt.Path.IdleEncouragementPostT1
 
-    let finalityUndecidable () : string =
-        document ManagerLifecyclePrompt.Path.FinalityUndecidable
-
     let rejected (reviewerWorkRecord: string) : string =
         FinalityPrompt.rejected (document FinalityPrompt.Path.Rejected) reviewerWorkRecord
 

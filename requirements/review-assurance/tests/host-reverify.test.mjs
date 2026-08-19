@@ -153,10 +153,56 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_accepts_second_PERFECT_after_type
   }
 })
 
-test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_terminal_before_first_judgement_fails_closed_without_hanging', { timeout: 2000 }, async () => {
-  const live = await liveOrchestrator({
+test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_first_judgement_nudges_without_a_waiter_gap', { timeout: 3000 }, async () => {
+  let live
+  let reviewerDriver
+  let sends = 0
+  live = await liveOrchestrator({
     sessionBehaviour: {
-      terminalAfterSend: 'reviewer-terminal-before-judge',
+      onSendPrompt: (reviewerId, prompt, _options, meta) => {
+        sends += 1
+
+        if (sends === 1) {
+          queueMicrotask(() =>
+            live.sessions.notifyTerminal(reviewerId, {
+              kind: 'Completed',
+              sessionId: reviewerId,
+              authorityRoot: 'root-before-first',
+              providerRun: 'run-before-first-terminal',
+              role: 'Reviewer',
+              terminalText: 'ended without judge',
+              turnFormalText: 'ended without judge',
+            }),
+          )
+          return
+        }
+
+        assert.equal(sends, 2, 'one clean terminal must produce exactly one immediate nudge')
+        assert.match(prompt, /judge/i)
+        assert.match(prompt, /上一轮回复没有调用 judge|previous.*judge/i)
+
+        const response = reviewHost.deliverJudgement(
+          reviewerId,
+          meta.physical,
+          'run-after-first-nudge',
+          'call-after-first-nudge',
+          'REVISE',
+        )
+        assert.ok(response, 'the original Finality CE judgement waiter must survive the clean terminal')
+
+        reviewerDriver = (async () => {
+          assert.deepEqual(await response, { ok: true, effect: 'Accepted' })
+          live.sessions.notifyTerminal(reviewerId, {
+            kind: 'Completed',
+            sessionId: reviewerId,
+            authorityRoot: 'root-before-first',
+            providerRun: 'run-after-first-nudge',
+            role: 'Reviewer',
+            terminalText: 'revision requested',
+            turnFormalText: 'revision requested',
+          })
+        })()
+      },
     },
   })
   const worktree = gitDir('rv-terminal-before-judge')
@@ -169,32 +215,78 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_terminal_before_first_judgement_f
       'bar_terminal_before_judge',
     )
 
+    await reviewerDriver
     assert.equal(result.ok, false)
-    assert.match(result.error, /Cannot await reviewer: reviewer-terminal-before-judge/)
+    assert.match(result.error, /Reviewer requested revision/)
+    assert.equal(sends, 2)
   } finally {
     live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })
 
-test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_terminal_before_second_judgement_fails_closed_without_hanging', { timeout: 2000 }, async () => {
+test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_second_judgement_nudges_and_confirms', { timeout: 3000 }, async () => {
   let live
   let reviewerDriver
+  let sends = 0
+  let firstPhysical
+  let secondPhysical
   live = await liveOrchestrator({
     sessionBehaviour: {
-      onSendPrompt: (reviewerId, _prompt, _options, meta) => {
-        const firstResponse = reviewHost.deliverJudgement(
+      onSendPrompt: (reviewerId, prompt, _options, meta) => {
+        sends += 1
+
+        if (sends === 1) {
+          firstPhysical = meta.physical
+          const firstResponse = reviewHost.deliverJudgement(
+            reviewerId,
+            firstPhysical,
+            'run-terminal-before-second-1',
+            'call-terminal-before-second-1',
+            'PERFECT',
+          )
+          assert.ok(firstResponse, 'first PERFECT must enter the direct-CE judgement slot')
+
+          reviewerDriver = (async () => {
+            assert.deepEqual(await firstResponse, { ok: true, effect: 'Challenge' })
+            live.sessions.notifyTerminal(reviewerId, {
+              kind: 'Completed',
+              sessionId: reviewerId,
+              authorityRoot: 'root-before-second',
+              providerRun: 'run-terminal-before-second-1',
+              role: 'Reviewer',
+              terminalText: 'ended after challenge',
+              turnFormalText: 'ended after challenge',
+            })
+          })()
+          return
+        }
+
+        assert.equal(sends, 2, 'clean terminal after first PERFECT must immediately nudge')
+        assert.match(prompt, /judge/i)
+        secondPhysical = meta.physical
+        assert.notEqual(secondPhysical, firstPhysical, 'nudge is a fresh physical continuation')
+
+        const secondResponse = reviewHost.deliverJudgement(
           reviewerId,
-          meta.physical,
-          'run-terminal-before-second-1',
-          'call-terminal-before-second-1',
+          secondPhysical,
+          'run-terminal-before-second-2',
+          'call-terminal-before-second-2',
           'PERFECT',
         )
-        assert.ok(firstResponse, 'first PERFECT must enter the direct-CE judgement slot')
+        assert.ok(secondResponse, 'the second judgement waiter must already exist before the nudge is sent')
 
         reviewerDriver = (async () => {
-          assert.deepEqual(await firstResponse, { ok: true, effect: 'Challenge' })
-          live.sessions.notifyTerminal(reviewerId, { kind: 'Failed', error: 'reviewer-terminal-before-second-judge' })
+          assert.deepEqual(await secondResponse, { ok: true, effect: 'Accepted' })
+          live.sessions.notifyTerminal(reviewerId, {
+            kind: 'Completed',
+            sessionId: reviewerId,
+            authorityRoot: 'root-before-second',
+            providerRun: 'run-terminal-before-second-2',
+            role: 'Reviewer',
+            terminalText: 'review confirmed after nudge',
+            turnFormalText: 'review confirmed after nudge',
+          })
         })()
       },
     },
@@ -210,8 +302,9 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_terminal_before_second_judgement_
     )
 
     await reviewerDriver
-    assert.equal(result.ok, false)
-    assert.match(result.error, /Cannot await reviewer: reviewer-terminal-before-second-judge/)
+    assert.equal(result.ok, true, result.ok ? '' : result.error)
+    assert.equal(sends, 2)
+    assert.notEqual(firstPhysical, secondPhysical)
   } finally {
     live.cleanup()
     rmSync(worktree, { recursive: true, force: true })

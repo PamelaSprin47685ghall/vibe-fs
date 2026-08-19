@@ -550,8 +550,8 @@ module TemporalSurface =
                        snapshotReads = snapshotReads |}
         }
 
-    /// Plugin owner proof: disposal closes detached-work admission and awaits
-    /// both reconcile and already-admitted Host background work before returning.
+    /// Plugin owner proof: disposal closes Host-work admission and awaits
+    /// reconcile plus already-admitted foreground/background work before returning.
     let pluginScopeStopDrainScenario () : Task<obj> =
         task {
             let reconcileEntered =
@@ -565,10 +565,18 @@ module TemporalSurface =
 
             let releaseBackground =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let ownedEntered =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let releaseOwned =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — scenario scope-disposal observation.
             let mutable disposed = false
             // DSL-MUTABLE: algorithm-scratch — scenario rejected-background observation.
             let mutable lateBackgroundStarted = false
+            // DSL-MUTABLE: algorithm-scratch — scenario rejected-owned-work observation.
+            let mutable lateOwnedStarted = false
             let scope = new PluginRuntimeScope(None)
 
             scope.TrackReconcileShutdown(fun () ->
@@ -585,7 +593,16 @@ module TemporalSurface =
                 }
                 :> Task)
 
+            let owned =
+                scope.RunOwnedWork(fun () ->
+                    task {
+                        AsyncSupport.trySetResult ownedEntered () |> ignore
+                        do! releaseOwned.Task
+                    }
+                    :> Task)
+
             do! backgroundEntered.Task
+            do! ownedEntered.Task
 
             let disposing =
                 task {
@@ -599,17 +616,27 @@ module TemporalSurface =
                 lateBackgroundStarted <- true
                 Task.FromResult(()) :> Task)
 
+            do!
+                scope.RunOwnedWork(fun () ->
+                    lateOwnedStarted <- true
+                    Task.FromResult(()) :> Task)
+
             let blockedBeforeRelease = not disposed
             AsyncSupport.trySetResult releaseBackground () |> ignore
             let stillWaitingForReconcile = not disposed
             AsyncSupport.trySetResult releaseReconcile () |> ignore
+            let stillWaitingForOwnedWork = not disposed
+            AsyncSupport.trySetResult releaseOwned () |> ignore
+            do! owned
             do! disposing
 
             return
                 box
                     {| blockedBeforeRelease = blockedBeforeRelease
                        stillWaitingForReconcile = stillWaitingForReconcile
+                       stillWaitingForOwnedWork = stillWaitingForOwnedWork
                        lateBackgroundRejected = not lateBackgroundStarted
+                       lateOwnedRejected = not lateOwnedStarted
                        disposed = disposed |}
         }
 
@@ -691,6 +718,7 @@ module TemporalSurface =
                   StartReview = fun _ -> Task.FromResult(Error "unused")
                   OpenJudgementChannel = fun _ -> Error "unused"
                   AwaitTerminal = fun _ -> Task.FromResult(Error "unused")
+                  NudgeMissingJudgement = fun _ -> Task.FromResult(Error "unused")
                   SendRevisionSteer = fun _ _ -> Task.FromResult(Error "unused")
                   AbortReviewer = abort }
 

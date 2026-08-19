@@ -56,12 +56,17 @@ module VerdictWorkflow =
         (managerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (tree: GitTreeHash)
+        (expectedSecondPhysicalUserMessageId: PhysicalUserMessageId)
         (first: ReviewJudgement)
         (second: ReviewJudgement)
         : Task<Result<unit, string>> =
         taskResult {
             let firstWitness = verdictWitness tree first
             let secondWitness = verdictWitness tree second
+
+            do!
+                (second.PhysicalUserMessageId = expectedSecondPhysicalUserMessageId)
+                |> Result.requireTrue "second PERFECT did not come from the expected physical review prompt"
 
             let! _ =
                 ReviewWitness.confirm

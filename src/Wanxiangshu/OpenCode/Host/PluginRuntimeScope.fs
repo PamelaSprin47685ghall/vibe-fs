@@ -100,19 +100,19 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: resource — shared terminal bus port handle
     let mutable sharedTerminalPort: Events.HostEventPort option = None
     let disposeGate = obj ()
-    let backgroundGate = obj ()
+    let ownedWorkGate = obj ()
     // DSL-MUTABLE: resource — scope dispose latch
     let mutable disposed = false
     // DSL-MUTABLE: resource — one shutdown Task owns the Journal/store release sequence.
     let mutable disposeTask: Task option = None
     // DSL-MUTABLE: resource — scheduler shutdown hook owned by this scope.
     let mutable reconcileShutdown: (unit -> Task) option = None
-    // DSL-MUTABLE: resource — detached Host-work admission latch.
-    let mutable acceptingBackgroundWork = true
-    // DSL-MUTABLE: resource — in-flight detached Host-work count.
-    let mutable backgroundWorkCount = 0
-    // DSL-MUTABLE: single-flight — shared waiter for detached Host-work drain.
-    let mutable backgroundDrainWaiter: TaskCompletionSource<unit> option = None
+    // DSL-MUTABLE: resource — Host-work admission latch shared by foreground hooks and detached work.
+    let mutable acceptingOwnedWork = true
+    // DSL-MUTABLE: resource — in-flight Host-work count.
+    let mutable ownedWorkCount = 0
+    // DSL-MUTABLE: single-flight — shared waiter for Host-work drain.
+    let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first detached Host-work failure for shutdown propagation.
     let mutable backgroundFailure: exn option = None
 
@@ -321,23 +321,23 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.TrackReconcileShutdown(stopAndDrain: unit -> Task) = reconcileShutdown <- Some stopAndDrain
 
-    member private _.AdmitBackgroundWork() : bool =
-        lock backgroundGate (fun () ->
-            if not acceptingBackgroundWork then
+    member private _.AdmitOwnedWork() : bool =
+        lock ownedWorkGate (fun () ->
+            if not acceptingOwnedWork then
                 false
             else
-                backgroundWorkCount <- backgroundWorkCount + 1
+                ownedWorkCount <- ownedWorkCount + 1
                 true)
 
     member private _.RecordBackgroundFailure(failure: exn) =
-        lock backgroundGate (fun () -> backgroundFailure <- Option.orElse backgroundFailure (Some failure))
+        lock ownedWorkGate (fun () -> backgroundFailure <- Option.orElse backgroundFailure (Some failure))
 
-    member private _.FinishBackgroundWork() =
-        lock backgroundGate (fun () ->
-            backgroundWorkCount <- backgroundWorkCount - 1
+    member private _.FinishOwnedWork() =
+        lock ownedWorkGate (fun () ->
+            ownedWorkCount <- ownedWorkCount - 1
 
-            if not acceptingBackgroundWork && backgroundWorkCount = 0 then
-                backgroundDrainWaiter
+            if not acceptingOwnedWork && ownedWorkCount = 0 then
+                ownedWorkDrainWaiter
                 |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
 
     member private _.CaptureBackgroundFailure(start: unit -> Task) : Task<exn option> =
@@ -353,37 +353,52 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         task {
             let! failure = this.CaptureBackgroundFailure start
             failure |> Option.iter this.RecordBackgroundFailure
-            this.FinishBackgroundWork()
+            this.FinishOwnedWork()
         }
         :> Task
 
     member this.RunBackground(start: unit -> Task) : unit =
-        if this.AdmitBackgroundWork() then
+        if this.AdmitOwnedWork() then
             this.ObserveBackgroundWork(start) |> ignore
 
-    member private _.BackgroundDrainTask() : Task =
-        match backgroundDrainWaiter with
+    member private this.RunAdmittedOwnedWork(start: unit -> Task) : Task =
+        task {
+            try
+                do! start ()
+            finally
+                this.FinishOwnedWork()
+        }
+        :> Task
+
+    member this.RunOwnedWork(start: unit -> Task) : Task =
+        if this.AdmitOwnedWork() then
+            this.RunAdmittedOwnedWork start
+        else
+            Task.FromResult(()) :> Task
+
+    member private _.OwnedWorkDrainTask() : Task =
+        match ownedWorkDrainWaiter with
         | Some waiter -> waiter.Task :> Task
         | None ->
             let waiter =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            backgroundDrainWaiter <- Some waiter
+            ownedWorkDrainWaiter <- Some waiter
             waiter.Task :> Task
 
-    member private this.StopBackgroundAndDrain() : Task<exn option> =
+    member private this.StopOwnedWorkAndDrain() : Task<exn option> =
         let waiting =
-            lock backgroundGate (fun () ->
-                acceptingBackgroundWork <- false
+            lock ownedWorkGate (fun () ->
+                acceptingOwnedWork <- false
 
-                if backgroundWorkCount = 0 then
+                if ownedWorkCount = 0 then
                     Task.FromResult(()) :> Task
                 else
-                    this.BackgroundDrainTask())
+                    this.OwnedWorkDrainTask())
 
         task {
             do! waiting
-            return lock backgroundGate (fun () -> backgroundFailure)
+            return lock ownedWorkGate (fun () -> backgroundFailure)
         }
 
     member _.AttachSharedTerminal(key: string option, port: Events.HostEventPort option) =
@@ -485,12 +500,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             subscription <- None
 
             let reconcileDrain = this.TakeReconcileDrain()
-            let backgroundDrain = this.StopBackgroundAndDrain()
+            let ownedWorkDrain = this.StopOwnedWorkAndDrain()
 
             let! reconcileFailure = captureTaskFailure reconcileDrain
             remember reconcileFailure
 
-            let! backgroundFailure = backgroundDrain
+            let! backgroundFailure = ownedWorkDrain
             remember backgroundFailure
 
             remember (captureSyncFailure (fun () -> blogger.Dispose()))

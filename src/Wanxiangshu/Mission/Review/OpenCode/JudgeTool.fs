@@ -66,8 +66,7 @@ module JudgeTool =
 
     let private challenged ctx =
         ToolHostCodec.tomlObjectWithInstructions
-            [ line ctx Path.Received
-              ProviderProse.render (lang ctx) ReviewChallenge.Path Map.empty ]
+            [ ProviderProse.render (lang ctx) ReviewChallenge.Path Map.empty ]
             []
 
     let private notReceived ctx reasonPath =

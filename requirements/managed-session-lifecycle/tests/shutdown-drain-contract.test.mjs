@@ -45,6 +45,19 @@ test('WHAT[MANAGED-SESSION-009] shutdown ownership drains session runtimes befor
   assert.doesNotMatch(finalityHostPort, /AbortReviewer[\s\S]{0,160}InterruptAttempt reviewerSessionId \|> ignore/)
 })
 
+test('WHAT[MANAGED-SESSION-009] provider transform is admitted into plugin shutdown ownership', () => {
+  const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
+  const hooks = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
+
+  assert.match(scope, /member this\.RunOwnedWork\(start: unit -> Task\) : Task/)
+  assert.match(scope, /let ownedWorkDrain = this\.StopOwnedWorkAndDrain\(\)/)
+  assert.match(hooks, /let ownedTransform[\s\S]{0,220}scope\.RunOwnedWork\(fun \(\) -> transform inObj outObj\)/)
+  assert.match(
+    hooks,
+    /"experimental\.chat\.messages\.transform",\s*box \(fatalHook "plugin-hook-messages-transform-failed" \(curriedHook \(box ownedTransform\)\)\)/,
+  )
+})
+
 test('WHAT[MANAGED-SESSION-009] fork terminal callbacks are runtime-owned and drained before parent cancel', () => {
   const runtime = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs')
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')

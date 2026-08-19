@@ -76,9 +76,12 @@ test('WHAT[REVIEW-ASSURANCE-003] REVIEW_004_duplicate_attempt_is_refused', () =>
   assert.equal(duplicate.error, 'DuplicateAttempt')
 })
 
-test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_confirmation_requires_both_judgements_on_the_same_physical_prompt', () => {
+test('WHAT[REVIEW-ASSURANCE-002] REVIEW_003_completed_witness_carries_same_prompt_or_typed_nudge_physical_identity', () => {
   assert.notEqual(confirmed(), null)
-  assert.equal(confirmed({ secondPhysical: 'msg_other' }), null)
+  const nudged = confirmed({ secondPhysical: 'msg_nudge' })
+  assert.notEqual(nudged, null)
+  assert.equal(review.readWitness(nudged).firstPhysical, REVIEW_PHYSICAL)
+  assert.equal(review.readWitness(nudged).secondPhysical, 'msg_nudge')
 })
 
 test('WHAT[REVIEW-ASSURANCE-001] REVIEW_003_confirmation_still_requires_distinct_attempts', () => {

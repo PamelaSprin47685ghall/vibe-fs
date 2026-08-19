@@ -22,6 +22,11 @@ Manager 说「我做完了」只是 participant 的**自宣**。world 允许不�
   Acceptance 失去保护。
 - **隐藏评审泄漏**：Manager 看到 Reviewer、barrier、witness、2N，把终局质量门重新变成
   「显式最后一步」，在工作未收敛时机械执行。
+- **基础设施故障伪装成第三种裁定**：Reviewer transport、Journal、record materialization、tree
+  读取或内部 invariant 失败被压成 `Undecided`，Manager 收到「无法裁定」并继续工作。真实世界里
+  Reviewer 可能早已给出 PERFECT/REVISE；系统只是把自己的故障冒充成业务结果，既抹掉根因又污染
+  durable history。现代 Finality 只允许业务 judgement 决定 rejection/blessing；基础设施失败必须
+  fail-fast，并打印足以定位 session/request/reviewer/barrier 的诊断。
 
 **finality 保证：不可逆 mission end 的资格建立在 obligations + current tree + qualified review
 evidence 上；rejection / blessed / rest 是三种不同经验；Acceptance 与 rest 是不同阈。**
@@ -47,6 +52,9 @@ RED = 满足下列任一：
 3. Manager 面出现隐藏 Reviewer / barrier / witness / 2N / cohort 编排（hidden mechanism 变成
    Manager checklist）；
 4. 状态来自故事文本反解而非 typed facts（`suicide`/`glory`/`distant future` 文本推导状态）。
+5. 现代 Finality 把任何基础设施/协议失败映射成 `FinalityUndecided` 或 Manager-facing
+   「ending could not be decided」，而不是让故障直接 fatal；或在已有 PERFECT/REVISE 后因后处理
+   失败改写成「未裁定」。
 
 ## 4. 历史考古（为什么曾经 RED）
 
@@ -58,4 +66,7 @@ RED = 满足下列任一：
 历史上还有：`verdict`/`judge` 工具名之争（`judge` 属 Reviewer、`suicide` 属 Manager，因果身份不同）；
 单一结束文案把未接受当安息（why「Finality：单一结束文案 vs rejection/blessed/rest」裁决）；
 结构化 `FinalityFinding` schema 被拒（第二事实源、摘要漂移，GLORY-004/049/050）。
+历史 `FinalityUndecided` 只保留为旧 journal 的 decode/replay 事实；它曾被误用成现代失败汇合点，
+把 reviewer terminal、record-ready、blob、tree、journal 甚至 catch-all exception 全部洗成一种温和
+Manager 文案。这条路现已封死：历史可以被忠实重放，当前代码不得再产生它。
 完整推导见历史 why/glory 与历史 why/review 条款；被拒方案记录在 HOW.md「历史与弃权」。

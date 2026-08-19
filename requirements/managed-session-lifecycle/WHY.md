@@ -36,6 +36,10 @@
    `Failed` terminal，使 fork handle 完成并唤醒 parent join。禁止“abort 成功 → 无 recovery、无 terminal、
    无 parent wake”的 orphan attempt。若 Host abort 请求失败，任何预先 arm 的 cause/claim 必须立即撤销，
    不得污染下一 attempt。
+9. **plugin dispose 必须晚于全部已准入 Host hook**。provider-facing transform 会同步 XTrace、Strength、
+   grounding 等 durable facts；若 dispose 只 drain detached background/reconcile，却允许已进入的 transform
+   越过 `AgentJournal` release，退出时就会得到 `writer is disposed`。关闭准入后，已进入 hook 必须仍可完成；
+   关闭后的迟到 hook 必须不再触碰 durable substrate。
 
 ## RED 是什么样
 
@@ -54,6 +58,7 @@ RED = 同一 logical owner 可得到两个活跃 replacement，或 restart/cance
 - 内部 attempt interrupt 后既没有 AABB/assistance/replacement successor，也没有 `Failed` terminal + parent wake → RED。
 - abort transport 失败后 Loop/NeedHelp cause 仍 armed，下一次无关 abort 被误分类 → RED。
 - child 已被 parent abort 物理停止，但 durable handle 仍 `Active`，导致 horizon 报 “still away” → RED。
+- plugin dispose 已释放 journal，但先前已进入或随后迟到的 provider transform 仍尝试 append → RED。
 - Hidden（HostOwnedHidden）handle 泄漏进父的 list/join/guard/恢复 → RED（EXEC-014 回归：
   Distiller child 泄漏会阻塞 caller 的 suicide）。
 

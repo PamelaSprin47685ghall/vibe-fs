@@ -135,7 +135,7 @@ one typed judge → ReviewVerdictRecorded
 | 命题 | 可执行 proof |
 |---|---|
 | REVIEW-ASSURANCE-001 | `tests/witness.test.mjs` → `REVIEW_003_two_attempts_require_distinct_run_and_call`、`REVIEW_003_confirmation_still_requires_distinct_attempts`；`tests/finality-direct-ce-contract.test.mjs` → `REVIEW_CE_003_reverify_is_the_direct_ce_temporal_owner` |
-| REVIEW-ASSURANCE-002 | `tests/finality-direct-ce-contract.test.mjs` → `REVIEW_CE_001_finality_dual_perfect_has_no_persisted_program_position`；`tests/host-reverify.test.mjs` → `HOST_reverify_terminal_before_first_judgement_fails_closed_without_hanging`、`HOST_reverify_terminal_before_second_judgement_fails_closed_without_hanging`、typed challenge dual-PERFECT Host case；`tests/witness.test.mjs` → `REVIEW_005_single_PERFECT_is_not_a_durable_pending_witness`、`REVIEW_003_confirmation_requires_exact_challenge_physical_identity`、`REVIEW_003_challenge_text_is_presentation_only_and_localized`；`tests/shared-state.test.mjs` → `SHARED_judgement_rendezvous_is_physical_not_a_business_stage` |
+| REVIEW-ASSURANCE-002 | `tests/finality-direct-ce-contract.test.mjs` → `REVIEW_CE_001_finality_dual_perfect_has_no_persisted_program_position`；`tests/host-reverify.test.mjs` → typed challenge dual-PERFECT、`HOST_reverify_normal_terminal_before_first_judgement_nudges_without_a_waiter_gap`、`HOST_reverify_normal_terminal_before_second_judgement_nudges_and_confirms`（judgement waiter + next terminal observer 先于 nudge；nudge PhysicalAccepted 绑定 next judgement）；`tests/witness.test.mjs` → single-PERFECT 不成 witness + typed physical causality；`tests/shared-state.test.mjs` → `SHARED_judgement_rendezvous_is_physical_not_a_business_stage` |
 | REVIEW-ASSURANCE-003 | `tests/witness.test.mjs` → `REVIEW_004_attempt_identity_names_all_five_components`、`REVIEW_004_duplicate_attempt_is_refused` |
 | REVIEW-ASSURANCE-004 | `tests/witness.test.mjs` → `REVIEW_005_confirmedReviewer_is_derived_from_witness` |
 | REVIEW-ASSURANCE-005 | `tests/witness.test.mjs` → `REVIEW_006_confirmed_witness_is_self_contained_typed_evidence` |
@@ -150,14 +150,14 @@ one typed judge → ReviewVerdictRecorded
 
 ### 行为级 canary
 
-`requirements/verification-system/tests/e2e/scenarios/long-stroke.toml` 的 Finality reviewer 段包含两个独立 provider requests：第一次 `judge(PERFECT)`，随后 skeptical challenge continuation，再次 `judge(PERFECT)`。权威 e2e 必须证明第二次直接形成 completed witness；不存在第三次“再尝试让状态机认账”的路径。
+`requirements/verification-system/tests/e2e/scenarios/long-stroke.toml` 的 Finality reviewer happy path 在同一 physical review prompt 内完成 first PERFECT → challenge tool result → second PERFECT。Host contract 另覆盖 Reviewer 在 required judgement 前正常 terminal：CE 保留同一个 judgement waiter，先订阅下一 terminal，再发 typed missing-judgement nudge；下一 judgement 绑定该 nudge PhysicalAccepted identity。无 durable pending stage。
 
 ### 可红性
 
 - 把 first PERFECT 恢复成 durable pending state → `REVIEW_CE_001` 红。
 - Finality control path重新引用 provider wire/text/digest → `REVIEW_CE_002` 红。
 - `Reverify.fs` 重新读 Journal projection 决定下一步 → `REVIEW_CE_003` 红。
-- challenge physical id 与 second judgement physical id 不同仍确认 → witness physical-causality case 红。
+- 未发生 nudge却允许 second judgement 换 physical id，或发生 nudge后 next judgement 不匹配 nudge PhysicalAccepted → physical-causality case 红。
 - 同 run / 同 call 仍确认 → distinct-attempt cases 红。
 - 新 barrier/tree 复用旧 witness → REVIEW-008 cases 红。
 - process verdict 直接变 ConsumableReview 或伪 Finality confirmation → consumable-review cases 红。

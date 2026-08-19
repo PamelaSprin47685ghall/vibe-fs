@@ -42,7 +42,6 @@ import {
   bloggerText,
   bloggerToolResult,
   field,
-  finalityUndecidable,
   forkBaseInstructions,
   forkPayload,
   idleEncouragement,
@@ -120,7 +119,6 @@ const productionPayloads = () => ({
   // GLORY lifecycle prompts — instruction-only SyntheticToml (all # comments).
   'glory: work activation': workActivation(),
   'glory: idle encouragement': idleEncouragement(),
-  'glory: finality undecidable': finalityUndecidable(),
 });
 
 /** Assert a fixture is refused, and that the refusal names the rule rather than something adjacent. */
@@ -201,10 +199,6 @@ export const arch010Cases = [
       assertTrue(
         payloads['glory: idle encouragement'].startsWith('# You have done useful work'),
         'idle encouragement must start with the idle golden as a comment',
-      );
-      assertTrue(
-        payloads['glory: finality undecidable'].startsWith('#'),
-        'finality undecidable must be instruction-only comments',
       );
 
       // And the four fork shapes must be four distinct documents. Identical output would mean the

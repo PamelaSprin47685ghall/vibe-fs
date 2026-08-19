@@ -27,9 +27,11 @@
 
 ## REVIEW-ASSURANCE-002：单次 PERFECT 不足；challenge 因果只能由 typed physical identity 建立
 
-**规范**：第一次 PERFECT 只是 CE 的局部值，不产生 `PerfectPending` / `PendingChallenge` / `PerfectChallengeIssued` 之类“执行到一半”业务状态，也不另发 `ReviewConfirmation` user continuation。CE 必须在第一次 judgement durable 后预注册第二 judgement waiter，再调用 first delivery 的 `Challenge()` capability；`JudgeTool` 由该 capability 完成 skeptical tool result。第二 judgement 必须来自同一 `PhysicalUserMessageId`、不同 ProviderRunIdentity / ToolCallId。challenge 文本只负责给 Reviewer 看，任何控制判断都不得解析、hash、扫描或比较该文本。**每一次 judgement waiter 都必须与同一个、在 reviewer start 前已订阅的 terminal task 竞争；Reviewer 提前 terminal 或 timeout 均直接 fail closed，不得残留挂起 waiter 或假绿**。
+**规范**：第一次 PERFECT 只是 CE 的局部值，不产生 `PerfectPending` / `PendingChallenge` / `PerfectChallengeIssued` 之类“执行到一半”业务状态，也不另发 `ReviewConfirmation` user continuation。CE 必须在第一次 judgement durable 后预注册第二 judgement waiter，再调用 first delivery 的 `Challenge()` capability；`JudgeTool` 由该 capability 完成 **仅含 skeptical challenge、绝不含「judgement received / conclude」** 的 tool result。若 Reviewer 在同一 provider conversation 内继续，第二 judgement 必须沿用 first 的 `PhysicalUserMessageId`；若 Reviewer 在 required second judgement 前正常 terminal，CE 必须发 typed nudge，并取得该 nudge **PhysicalAccepted 返回的精确 `PhysicalUserMessageId`**，之后第二 judgement 必须绑定这个 nudge physical id。两条路径都要求不同 ProviderRunIdentity / ToolCallId。challenge/nudge 文本只负责给 Reviewer 看，任何控制判断都不得解析、hash、扫描或比较文本。
 
-**含义/动机**：单 PERFECT 可被模型随口同意；第二次独立 judgement 的价值来自真实的 tool-call completion 因果边，而不是“某段文字恰好出现在 canonical input”这种可被 Host render 细节破坏的启发式。
+Finality 的每个 required judgement waiter 都必须先与 terminal observation 一同就位，再允许 prompt/challenge/nudge 触发 provider execution。Reviewer 若在 required judgement 前以**正常 Completed** 结束当前 run，CE 必须保留已注册 judgement waiter，**先注册下一次 terminal observation，再 nudge 同一 Reviewer**，取得 nudge 的 PhysicalAccepted identity 后继续等待；不得因一次正常 terminal 产生 `Undecided`、关闭 barrier 或留下 waiter 缺口。若再次正常 terminal 仍缺 judgement，同一 CE 重复上述动作；每次都用最新 nudge physical id 验证下一 judgement。Reviewer transport failure / timeout / judgement channel failure 属基础设施失败，必须向 Finality 上抛并由 Host fatal，不得伪装成 judgement。该 retry 仍由同一个 F# CE 调用栈拥有，不得持久化 `PendingSecondJudge` 或另造状态机。
+
+**含义/动机**：单 PERFECT 可被模型随口同意；第二次独立 judgement 的价值来自真实的 tool-call completion 因果边，而不是“某段文字恰好出现在 canonical input”这种可被 Host render 细节破坏的启发式。正常 terminal 只是模型结束了一次 run，不是系统获准放弃 evidence obligation 的事实；nudge 必须把这条 obligation 接回同一个 CE。
 
 **边界**：challenge 文案与本地化只归 provider prose；tool result 的 Host delivery 归 Host/tool protocol，本包只拥有 direct CE 调用 judgement delivery capabilities 的顺序。
 

@@ -52,8 +52,8 @@ open Wanxiangshu.Foundation.Identity
 /// Finality rejection, sibling accounting/steering, and durable resume.
 module RevisionWorkflow =
 
-    let private undecidedPrompt (managerSessionId: SessionId) =
-        ProviderProse.documentFor managerSessionId ManagerLifecyclePrompt.Path.FinalityUndecidable Map.empty
+    let private infrastructureFailed operation (error: string) : 'T =
+        invalidOp (sprintf "Finality %s failed: %s" operation error)
 
     let private rejectedPrompt (managerSessionId: SessionId) (workRecord: string) =
         FinalityPrompt.rejected
@@ -65,30 +65,6 @@ module RevisionWorkflow =
 
     let private steerUnavailablePrompt (managerSessionId: SessionId) =
         ProviderProse.documentFor managerSessionId FinalityPrompt.Path.SteerUnavailable Map.empty
-
-    let concludeUndecided
-        (journal: AgentJournal)
-        (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (requestId: FinalityRequestId)
-        (requestTree: GitTreeHash)
-        (reviewerSessionId: SessionId)
-        (barrierId: ReviewBarrierId)
-        : Task<FinalityOutcome> =
-        task {
-            do!
-                FinalityJournal.appendLifecycle
-                    journal
-                    (ManagerLifecycleFact.FinalityUndecided
-                        {| SessionId = managerSessionId
-                           LifeId = lifeId
-                           RequestId = requestId
-                           ReviewerSessionId = reviewerSessionId
-                           BarrierId = barrierId
-                           GitTreeHash = requestTree |})
-
-            return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
-        }
 
     let private stagePrimaryRejectionRecord
         (journal: AgentJournal)
@@ -298,8 +274,9 @@ module RevisionWorkflow =
         : Task =
         task {
             for _, workRecord in prepared do
-                let! _ = reviewerPort.SendRevisionSteer managerSessionId (steerPrompt managerSessionId workRecord)
-                ()
+                match! reviewerPort.SendRevisionSteer managerSessionId (steerPrompt managerSessionId workRecord) with
+                | Ok() -> ()
+                | Error error -> infrastructureFailed "revision sibling steer delivery" error
         }
         :> Task
 
@@ -318,9 +295,7 @@ module RevisionWorkflow =
         : Task<FinalityOutcome> =
         task {
             match! commitSiblingSteerFacts journal managerSessionId lifeId requestId requestTree records with
-            | Error _ ->
-                return!
-                    concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
+            | Error error -> return infrastructureFailed "revision sibling accounting" error
             | Ok prepared ->
                 let! outcome =
                     sealRejected
@@ -351,9 +326,7 @@ module RevisionWorkflow =
         : Task<FinalityOutcome> =
         task {
             match! stagePrimaryRejectionRecord journal rejectingReviewer barrierId with
-            | Error _ ->
-                return!
-                    concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
+            | Error error -> return infrastructureFailed "primary rejection record materialization" error
             | Ok(workRecord, primaryBlob) ->
                 return!
                     rejectAfterPrimary
@@ -383,9 +356,7 @@ module RevisionWorkflow =
         : Task<FinalityOutcome> =
         task {
             match! awaitDurableSiblingRecords journal siblings with
-            | Error _ ->
-                return!
-                    concludeUndecided journal managerSessionId lifeId requestId requestTree rejectingReviewer barrierId
+            | Error error -> return infrastructureFailed "revision sibling record readiness" error
             | Ok records ->
                 return!
                     rejectAfterRecords
@@ -447,8 +418,9 @@ module RevisionWorkflow =
             | Some evidence ->
                 let! workRecordOpt = readSteerWorkRecord journal snapshot reviewerSessionId evidence
                 let prompt = steerPromptOrUnavailable managerSessionId workRecordOpt
-                let! _ = reviewerPort.SendRevisionSteer managerSessionId prompt
-                ()
+                match! reviewerPort.SendRevisionSteer managerSessionId prompt with
+                | Ok() -> ()
+                | Error error -> infrastructureFailed "revision sibling steer replay" error
         }
         :> Task
 
@@ -594,9 +566,4 @@ module RevisionWorkflow =
         (lifeId: ManagerLifeId)
         (requestId: FinalityRequestId)
         : Task<FinalityOutcome option> =
-        task {
-            try
-                return! resumeRejectedRequestBody reviewerPort journal managerSessionId lifeId requestId
-            with _ ->
-                return Some(FinalityOutcome.Undecided(undecidedPrompt managerSessionId))
-        }
+        resumeRejectedRequestBody reviewerPort journal managerSessionId lifeId requestId

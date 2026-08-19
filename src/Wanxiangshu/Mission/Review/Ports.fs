@@ -50,7 +50,8 @@ type ReviewJudgementChannel =
 type ReviewHostPort =
     { StartReview: unit -> Task<Result<unit, string>>
       AwaitJudgement: unit -> Task<Result<ReviewJudgementDelivery, string>>
-      AwaitReviewer: unit -> Task<Result<unit, string>> }
+      AwaitReviewer: unit -> Task<Result<unit, string>>
+      NudgeMissingJudgement: unit -> Task<Result<PhysicalUserMessageId, string>> }
 
 /// Physical continuation capability retained for process-review missing-judge
 /// repair. Finality challenge sequencing belongs exclusively to ReviewBarrierWorkflow.

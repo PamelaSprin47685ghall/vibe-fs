@@ -14,6 +14,14 @@
 - **「只有 verdict、没有 report」被当作可消费**：VerdictKnown 立即放行下一 TodoWrite——Manager 拿不到 canonical 报告，或 Host 用 terminal 摘要顶替 LWR。
 - **基础设施失败伪装成业务 REVISE**：create/resume/assignment/LWR 物化失败被写成 REVISE——Manager 被派去「修复」系统故障，Journal 里留下伪造 settlement。
 - **过程 PERFECT 冒充终末 witness**：process 一次判断被计入 terminal dual-PERFECT——终末 2N 代数被稀释，mission 在证据不足时结束。
+- **把过程评审与结果评审 DRY 成同一 continuation**：过程评审一次 durable `judge` 已经完成本轮，
+  回执应明确收下并结束；结果评审第一次 PERFECT 恰恰尚未完成，必须只返回 skeptical challenge，
+  再取得第二次独立 judgement。若两者共享同一「received + challenge」回执，模型会同时收到
+  「结束对话」与「继续评估」两个冲突命令，dual-PERFECT 必然出现缺口。
+- **结果 Reviewer 正常结束就放弃确认链**：第一次 PERFECT 后模型可能在 challenge 后结束当前 run。
+  这不是第三种 judgement，也不是可接受的 fail-closed 终点；Finality CE 必须在 waiter/terminal
+  observation 已经就位的前提下 nudge 同一 Reviewer，继续取得缺失 judgement。真正的 transport /
+  Journal / record / tree 失败则属于 fatal infrastructure failure，绝不能伪装成业务 outcome。
 
 `review-assurance` 存在的意义：**judgement 的消费资格必须由 bounded evidence（request-range 记录）、fresh witness（当前 tree/barrier）与因果确认（challenge 出现在 seal 里）建立**。
 
@@ -28,6 +36,10 @@
 5. record-ready 判定用较晚 XTrace head 替换冻结 frontier、分两次读取 coverage 与 LWR、或用 timer/sleep/wall-clock 轮询；
 6. 基础设施失败（create/resume/assignment/LWR 物化）被写成业务 PERFECT/REVISE；
 7. process PERFECT 计入 terminal dual-PERFECT，或 process REVISE 被当成 `FinalityRejected` 事实。
+8. Finality 第一次 PERFECT 的 tool result 同时包含「judgement received / conclude」与 challenge，
+   或 Reviewer 在 required second judgement 前正常 terminal 后没有被 nudge。
+9. Finality 的 typed infrastructure failure 被折叠成 `Undecided`、REVISE、PERFECT 或任何 Manager-facing
+   业务经验，而不是 fail-fast diagnostic。
 
 ## 为什么必须独立存在（Independent Change Test）
 

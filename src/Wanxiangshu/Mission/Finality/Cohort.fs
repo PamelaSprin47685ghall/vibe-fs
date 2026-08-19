@@ -60,7 +60,6 @@ type CohortJudgement =
         barrierId: ReviewBarrierId *
         siblings: (SessionId * ReviewBarrierId) list
     | AllConfirmed
-    | Undecided
 
 /// Finality cohort enlistment and temporal short-circuit vocabulary.
 module CohortWorkflow =
@@ -129,7 +128,8 @@ module CohortWorkflow =
             let host =
                 { StartReview = fun () -> reviewerPort.StartReview memberInfo
                   AwaitJudgement = channel.AwaitJudgement
-                  AwaitReviewer = awaitOrCancel }
+                  AwaitReviewer = awaitOrCancel
+                  NudgeMissingJudgement = fun () -> reviewerPort.NudgeMissingJudgement memberInfo.ReviewerSessionId }
 
             let request =
                 { ManagerSessionId = managerSessionId
@@ -338,7 +338,7 @@ module CohortWorkflow =
         (managerSessionId: SessionId)
         (members: EnlistedMember list)
         (requestTree: GitTreeHash)
-        : Task<CohortJudgement> =
+        : Task<Result<CohortJudgement, ReviewBarrierFailure>> =
         task {
             let cancel = CancelToken()
 
@@ -367,7 +367,7 @@ module CohortWorkflow =
                         | _ -> None)
                     |> List.distinctBy fst
 
-                return CohortJudgement.RevisionRequired(reviewerId, barrierId, siblings)
+                return Ok(CohortJudgement.RevisionRequired(reviewerId, barrierId, siblings))
             | Choice2Of2 results when
                 List.forall
                     (function
@@ -375,6 +375,16 @@ module CohortWorkflow =
                     | _ -> false)
                     results
                 ->
-                return CohortJudgement.AllConfirmed
-            | _ -> return CohortJudgement.Undecided
+                return Ok CohortJudgement.AllConfirmed
+            | Choice1Of2(Error failure, _)
+            | Choice2Of2(Error failure :: _) -> return Error failure
+            | Choice1Of2(Ok _, _) ->
+                return invalidOp "Finality cohort short-circuited on a non-revision judgement"
+            | Choice2Of2 results ->
+                return
+                    results
+                    |> List.tryPick (function
+                        | Error failure -> Some(Error failure)
+                        | Ok _ -> None)
+                    |> Option.defaultWith (fun () -> invalidOp "Finality cohort produced neither judgement nor failure")
         }

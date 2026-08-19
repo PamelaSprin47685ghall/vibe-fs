@@ -52,16 +52,6 @@ open Wanxiangshu.Foundation.Identity
 /// Manager Finality story: enlist cohort → review → reject+steer OR bless.
 module FinalityWorkflow =
 
-    let private undecidedPrompt (managerSessionId: SessionId) =
-        ProviderProse.documentFor managerSessionId ManagerLifecyclePrompt.Path.FinalityUndecidable Map.empty
-
-    let private undecidedMember (managerSessionId: SessionId) (request: FinalityRequestProjection) =
-        request.Members
-        |> Map.toList
-        |> List.tryHead
-        |> Option.map (fun (reviewerSessionId, memberRef) -> reviewerSessionId, memberRef.BarrierId)
-        |> Option.defaultValue (managerSessionId, ReviewBarrierId.create (Guid.NewGuid().ToString("N")))
-
     let private requestForLife
         (durable: AgentJournal)
         (managerSessionId: SessionId)
@@ -76,7 +66,7 @@ module FinalityWorkflow =
         (existingRequest: FinalityRequestProjection option)
         =
         match lifeOpt, existingRequest with
-        | _, Some request -> Task.FromResult(Some request)
+        | _, Some request -> Task.FromResult request
         | Some _, None ->
             task {
                 do!
@@ -98,8 +88,13 @@ module FinalityWorkflow =
                     |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
                     |> Option.bind (fun life -> life.ActiveFinality)
                     |> Option.filter (fun request -> request.RequestId = requestId)
+                    |> Option.defaultWith (fun () ->
+                        invalidOp "FinalityRequested was durable but its projection is missing")
             }
-        | None, None -> Task.FromResult None
+        | None, None ->
+            task {
+                return invalidOp "Finality cannot start without the requested active Life"
+            }
 
     let private revisionSiblings
         (snapshot: ProjectionSet)
@@ -124,7 +119,6 @@ module FinalityWorkflow =
         (requestId: FinalityRequestId)
         (requestTree: GitTreeHash)
         (members: EnlistedMember list)
-        (request: FinalityRequestProjection)
         =
         task {
             match!
@@ -135,7 +129,12 @@ module FinalityWorkflow =
                     members
                     requestTree
             with
-            | CohortJudgement.RevisionRequired(reviewerId, barrierId, fromRace) ->
+            | Error failure ->
+                return
+                    raise (
+                        InvalidOperationException(sprintf "Finality reviewer infrastructure failed: %A" failure)
+                    )
+            | Ok(CohortJudgement.RevisionRequired(reviewerId, barrierId, fromRace)) ->
                 let before = AgentJournal.snapshot durable
 
                 let siblings =
@@ -152,7 +151,7 @@ module FinalityWorkflow =
                         barrierId
                         requestTree
                         siblings
-            | CohortJudgement.AllConfirmed ->
+            | Ok CohortJudgement.AllConfirmed ->
                 return!
                     BlessingWorkflow.blessIfTreeUnchanged
                         reviewerPort
@@ -163,18 +162,6 @@ module FinalityWorkflow =
                         requestId
                         members
                         requestTree
-            | CohortJudgement.Undecided ->
-                let reviewer, barrier = undecidedMember managerSessionId request
-
-                return!
-                    RevisionWorkflow.concludeUndecided
-                        durable
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        reviewer
-                        barrier
         }
 
     let private enlistAndReview
@@ -190,18 +177,8 @@ module FinalityWorkflow =
         =
         task {
             match! CohortWorkflow.enlistRequiredReviewers reviewerPort durable managerSessionId lifeId request with
-            | Error _ ->
-                let reviewer, barrier = undecidedMember managerSessionId request
-
-                return!
-                    RevisionWorkflow.concludeUndecided
-                        durable
-                        managerSessionId
-                        lifeIdValue
-                        requestId
-                        requestTree
-                        reviewer
-                        barrier
+            | Error error ->
+                return raise (InvalidOperationException("Finality reviewer enlistment failed: " + error))
             | Ok members ->
                 return!
                     reviewMembers
@@ -213,7 +190,6 @@ module FinalityWorkflow =
                         requestId
                         requestTree
                         members
-                        request
         }
 
     let private executeDurable
@@ -243,7 +219,11 @@ module FinalityWorkflow =
                 |> Option.bind (fun life -> life.ActiveFinality)
                 |> Option.filter (fun request -> request.RequestId = requestId)
 
-            let! requestOpt =
+            let life =
+                lifeOpt
+                |> Option.defaultWith (fun () -> invalidOp "Finality active Life disappeared before request admission")
+
+            let! request =
                 requestForLife
                     durable
                     managerSessionId
@@ -257,52 +237,17 @@ module FinalityWorkflow =
                     lifeOpt
                     existingRequest
 
-            match lifeOpt, requestOpt with
-            | Some life, Some request ->
-                return!
-                    enlistAndReview
-                        reviewerPort
-                        treePort
-                        durable
-                        managerSessionId
-                        life
-                        request
-                        lifeId
-                        requestId
-                        requestTree
-            | _ -> return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
-        }
-
-    let private startDurable
-        (reviewerPort: FinalityReviewerPort)
-        (treePort: FinalityTreePort)
-        (durable: AgentJournal)
-        (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (requestId: FinalityRequestId)
-        (requestTree: GitTreeHash)
-        (lastWordsRef: BlobRef)
-        (lastWordsDigest: BlobDigest)
-        (providerRun: ProviderRunIdentity)
-        (toolCallId: ToolCallId)
-        =
-        task {
-            try
-                return!
-                    executeDurable
-                        reviewerPort
-                        treePort
-                        durable
-                        managerSessionId
-                        lifeId
-                        requestId
-                        requestTree
-                        lastWordsRef
-                        lastWordsDigest
-                        providerRun
-                        toolCallId
-            with _ ->
-                return FinalityOutcome.Undecided(undecidedPrompt managerSessionId)
+            return!
+                enlistAndReview
+                    reviewerPort
+                    treePort
+                    durable
+                    managerSessionId
+                    life
+                    request
+                    lifeId
+                    requestId
+                    requestTree
         }
 
     let start
@@ -319,9 +264,9 @@ module FinalityWorkflow =
         (toolCallId: ToolCallId)
         : Task<FinalityOutcome> =
         match journal with
-        | None -> Task.FromResult(FinalityOutcome.Undecided(undecidedPrompt managerSessionId))
+        | None -> task { return invalidOp "Finality requires an AgentJournal" }
         | Some durable ->
-            startDurable
+            executeDurable
                 reviewerPort
                 treePort
                 durable
@@ -342,5 +287,5 @@ module FinalityWorkflow =
         (requestId: FinalityRequestId)
         : Task<FinalityOutcome option> =
         match journal with
-        | None -> Task.FromResult None
+        | None -> task { return invalidOp "Finality resume requires an AgentJournal" }
         | Some durable -> RevisionWorkflow.resumeRejectedRequest reviewerPort durable managerSessionId lifeId requestId

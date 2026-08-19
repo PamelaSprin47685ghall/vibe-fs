@@ -5,6 +5,8 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
@@ -362,12 +364,37 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         let reviewerAgentId =
             sprintf "%s-%s" (OrchestratorManagerJob.reviewerAgentId jobId) (ReviewBarrierId.value barrierId)
 
+        let nudgeReviewer reviewerSessionId =
+            task {
+                match deps.Journal with
+                | None -> return Error "No journal: a result-review nudge cannot be claimed"
+                | Some durable ->
+                    let acceptedPhysical = ref None
+                    let dispatcher = PromptDispatcher.forJournal durable
+
+                    let! sent =
+                        dispatcher.SendAgentOwnerRoot
+                            deps.Sessions
+                            reviewerSessionId
+                            (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
+                            OrchestratorHostReview.DeepReviewerAgent
+                            (Some(WorktreePath.value worktree))
+                            PromptDispatcher.AwaitMode.Await
+                            (Some(fun physical -> acceptedPhysical.Value <- Some physical))
+
+                    match sent, acceptedPhysical.Value with
+                    | Error error, _ -> return Error error
+                    | Ok _, Some physical -> return Ok physical
+                    | Ok _, None -> return Error "result-review nudge was admitted without a PhysicalUserMessageId"
+            }
+
         OrchestratorHostReview.reverify
             deps.Journal
             (fun _ path prompt ->
                 forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true None)
             (fun _ -> runtime.SendDeferredFirstPrompt reviewerAgentId)
             (fun _ -> awaitChild reviewerAgentId)
+            nudgeReviewer
             jobId
             managerSessionId
             worktree

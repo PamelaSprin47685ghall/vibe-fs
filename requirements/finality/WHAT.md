@@ -403,7 +403,9 @@ Post-T1：规划与执行是同一活动；Planning、Delegation、child 或命�
 cohort/graduate，关闭为 undecidable；后续新 request 进入本协议。旧 `WorkActivated` /
 Activation 事实仅 inert decode；open Life 的 Opening floor 迁移为 `WorkRecordStart`
 （obligation-ledger OBLIGATION-LEDGER-017）；Magic Todo 升级瞬间 seed 见
-OBLIGATION-LEDGER-019（GLORY-069）。
+OBLIGATION-LEDGER-019（GLORY-069）。`FinalityUndecided` 仅是历史 decode/replay 事实：现代
+`FinalityWorkflow`、Reviewer CE 与 `suicide` surface **不得 append、返回或渲染它**，也不得再有
+`finality-undecidable` provider prose 入口。
 
 **含义 / 动机**：迁移不破坏历史事实；历史证据不足的一对一 finality 诚实关闭为 undecidable。
 
@@ -411,19 +413,25 @@ OBLIGATION-LEDGER-019（GLORY-069）。
 
 **证据** → HOW.md 行 F-25。
 
-## FINALITY-026：undecidable 是合法结局经验；绝不伪造
+## FINALITY-026：现代 Finality 必有业务裁定；基础设施失败直接 fatal
 
-**规范**：无法证明时 append / 映射 `FinalityUndecided`，**绝不** bless / reject 或伪造 record。
-基础设施失败永远不是 PERFECT / REVISE（GLORY-056/057）；`ReviewerOutcome = Revision of
-WorkRecord | Confirmed of ConfirmedWitness` 与 typed infrastructure failure 是合法领域结果，
-不是全局 dispatcher 或 durable stage（GLORY-043）。undecided 对 Manager 呈现为
-「Your ending could not be decided. You still have time. Continue, and seek your end again.」。
+**规范**：现代 Finality 的业务 judgement 空间只有 Reviewer 的 `PERFECT | REVISE`；一次
+FinalityRequest 最终只能走 rejection 或 qualified confirmation→blessing。不存在第三种
+`Undecided` 业务 outcome。Reviewer/session transport、judgement channel、Journal append、blob、
+record-ready、tree read/check、projection invariant 或未知 exception 失败时，系统必须打印
+`finality-infrastructure-failed` 调试信息并 process-fatal；**不得** append `FinalityUndecided`，不得
+向 Manager 返回「未能被裁定」，也不得把已存在的 PERFECT/REVISE 因后处理失败抹成未裁定。
 
-**含义 / 动机**：证据不足时宁可不结束，不猜 blessing/rejection；把系统故障伪装成工作缺陷会让
-Manager 去「修复」系统（why「REVISE 是正常业务结果」「失败反馈是完整 LWR」裁决）。
+Reviewer 在 required judgement 前**正常结束一个 provider run**不是 infra verdict：Finality review CE
+必须继续追索缺失 judgement（具体 challenge/nudge 因果归 review-assurance），直到取得合法 REVISE 或
+dual-PERFECT。只有真正基础设施失败才 fatal。
 
-**边界**：record-ready / 恢复机制属 review-assurance + crash-reconciliation；本包拥有
-outcome 分型与 Life 继续语义。
+**含义 / 动机**：业务判断与系统健康是正交维度。把 infra failure 压成 `Undecided` 会让 Manager
+错误继续劳动，同时把真正故障从日志和 durable provenance 中抹掉；在已有 PERFECT/REVISE 后这么做
+甚至是在改写 Reviewer 已经发生的事实。系统不能继续相信自己的 finality machinery 时应立即熔断。
+
+**边界**：dual-PERFECT / terminal→nudge 的 CE 因果属 review-assurance；fatal 的物理 process kill /
+diagnostic adapter 属 Host/OpenCode；本包拥有「现代 outcome 无 Undecided」与 failure 分类。
 
 **证据** → HOW.md 行 F-26。
 

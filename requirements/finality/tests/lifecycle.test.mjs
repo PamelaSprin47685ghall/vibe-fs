@@ -9,7 +9,6 @@ import {
   blessed,
   firstBirth,
   firstBirthText,
-  finalityUndecidable,
   idleEncouragementPostT1,
   idleEncouragementPreT1,
   managerSystemPrompt,
@@ -188,7 +187,7 @@ test('WHAT[FINALITY-017] isLifeArchived true only after life completed', () => {
   assert.equal(finality.isLifeArchived(archived), true)
 })
 
-test('WHAT[FINALITY-026] FinalityUndecided closes the request without a wound record', () => {
+test('WHAT[FINALITY-025] legacy FinalityUndecided closes the historical request without a wound record', () => {
   const life = finality.lifeView(worldOf(base([finalityRequested(), finalityUndecided()])))
   assert.equal(life.activeFinality.resolution.kind, 'undecided')
   assert.equal(life.lastRejectedWorkRecord, null)
@@ -263,13 +262,6 @@ test('WHAT[FINALITY-019] idle encouragement golden bytes', async () => {
   assert.ok(idleEncouragementPostT1().includes('# You have done useful work'))
 })
 
-test('WHAT[FINALITY-026] host undecidable golden bytes', async () => {
-  assert.equal(
-    finalityUndecidable(),
-    '# Your ending could not be decided.\n# You still have time. Continue, and seek your end again when you are ready.\n',
-  )
-})
-
 test('WHAT[FINALITY-012] finality rejection renders work record as guidance comments', async () => {
   const record = 'Chronicle\n- defect A at src/a.ts\n- missing test for B'
   const rendered = rejected(record)
@@ -340,7 +332,6 @@ test('WHAT[PROVIDER-LANGUAGE-005] frozen texts use lf only', async () => {
     workActivation(),
     idleEncouragementPreT1(),
     idleEncouragementPostT1(),
-    finalityUndecidable(),
     rejected('record'),
   ]) {
     assert.equal(text.includes('\r'), false, 'frozen text must not contain CR')

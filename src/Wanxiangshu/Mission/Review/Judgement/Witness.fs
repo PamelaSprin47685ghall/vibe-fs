@@ -123,10 +123,7 @@ module ReviewWitness =
         (first: VerdictWitness)
         (second: VerdictWitness)
         : ReviewWitness option =
-        if
-            firstPhysicalUserMessageId <> secondPhysicalUserMessageId
-            || not (isDistinctAttempt barrierId first second)
-        then
+        if not (isDistinctAttempt barrierId first second) then
             None
         else
             Some(

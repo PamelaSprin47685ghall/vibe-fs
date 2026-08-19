@@ -213,6 +213,30 @@ module FinalityHostPort =
                 return! (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
             }
 
+        let nudgeMissingJudgement reviewerSessionId =
+            task {
+                match scope.Journal with
+                | None -> return Error "No journal: a Finality reviewer nudge cannot be claimed"
+                | Some durable ->
+                    let acceptedPhysical = ref None
+                    let dispatcher = PromptDispatcher.forJournal durable
+
+                    let! sent =
+                        dispatcher.SendAgentOwnerRoot
+                            scope.Sessions
+                            reviewerSessionId
+                            (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
+                            reviewerAgentName
+                            (scope.DirectoryFor(SessionId.value reviewerSessionId))
+                            PromptDispatcher.AwaitMode.Await
+                            (Some(fun physical -> acceptedPhysical.Value <- Some physical))
+
+                    match sent, acceptedPhysical.Value with
+                    | Error error, _ -> return Error error
+                    | Ok _, Some physical -> return Ok physical
+                    | Ok _, None -> return Error "Finality reviewer nudge was admitted without a PhysicalUserMessageId"
+            }
+
         let sendRevisionSteer targetSessionId prompt =
             task {
                 match!
@@ -233,6 +257,7 @@ module FinalityHostPort =
               StartReview = startReview
               OpenJudgementChannel = ReviewJudgementInbox.acquire
               AwaitTerminal = awaitTerminal
+              NudgeMissingJudgement = nudgeMissingJudgement
               SendRevisionSteer = sendRevisionSteer
               AbortReviewer =
                 fun reviewerSessionId ->

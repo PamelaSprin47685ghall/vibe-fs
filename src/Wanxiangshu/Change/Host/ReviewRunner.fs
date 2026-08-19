@@ -81,6 +81,7 @@ module OrchestratorHostReview =
         | ReviewBarrierFailure.CannotStartReviewer reason -> sprintf "Cannot start reviewer: %s" reason
         | ReviewBarrierFailure.CannotAwaitReviewer reason -> sprintf "Cannot await reviewer: %s" reason
         | ReviewBarrierFailure.CannotAwaitJudgement reason -> sprintf "Cannot await reviewer judgement: %s" reason
+        | ReviewBarrierFailure.CannotNudgeReviewer reason -> sprintf "Cannot nudge reviewer: %s" reason
         | ReviewBarrierFailure.CannotRecordJudgement reason -> sprintf "Cannot record reviewer judgement: %s" reason
         | ReviewBarrierFailure.InvalidJudgement reason -> sprintf "Invalid reviewer judgement: %s" reason
 
@@ -104,6 +105,7 @@ module OrchestratorHostReview =
         (forkReviewer: ManagerJobId -> WorktreePath -> string -> Task<Result<SessionId, string>>)
         (startReviewer: ManagerJobId -> Task<Result<unit, string>>)
         (awaitReviewer: ManagerJobId -> Task<Result<unit, string>>)
+        (nudgeReviewer: SessionId -> Task<Result<PhysicalUserMessageId, string>>)
         (jobId: ManagerJobId)
         (managerSessionId: SessionId)
         (worktree: WorktreePath)
@@ -126,7 +128,8 @@ module OrchestratorHostReview =
             let host: ReviewHostPort =
                 { StartReview = fun () -> startReviewer jobId
                   AwaitJudgement = channel.AwaitJudgement
-                  AwaitReviewer = fun () -> awaitReviewer jobId }
+                  AwaitReviewer = fun () -> awaitReviewer jobId
+                  NudgeMissingJudgement = fun () -> nudgeReviewer reviewerSessionId }
 
             let request =
                 { ManagerSessionId = managerSessionId

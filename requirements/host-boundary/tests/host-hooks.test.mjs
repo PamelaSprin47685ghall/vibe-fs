@@ -186,8 +186,13 @@ test('WHAT[HOST-BOUNDARY-019] CHAT_MESSAGE_new_physical_material_supersedes_old_
 test('WHAT[HOST-BOUNDARY-019] PROMPT_004_human_root_survives_host_synthetic_file_parts', () => {
   // The transform hook receives the full message array including host-synthetic
   // parts. The human root message identity (role=user, id=root) is preserved
-  // through the transform — the transform does not strip or rewrite user roots.
-  assert.match(pluginHooksSource, /experimental\.chat\.messages\.transform[\s\S]*?curriedHook.*transform/)
+  // through the transform — the lifecycle wrapper only admits/drains the same
+  // transform and does not strip or rewrite user roots.
+  assert.match(pluginHooksSource, /let ownedTransform[\s\S]*?scope\.RunOwnedWork\(fun \(\) -> transform inObj outObj\)/)
+  assert.match(
+    pluginHooksSource,
+    /experimental\.chat\.messages\.transform[\s\S]*?curriedHook.*ownedTransform/,
+  )
   // The transform is a pure function over the message array; it does not
   // consume host-synthetic file parts as business input.
   const transformsSource = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')

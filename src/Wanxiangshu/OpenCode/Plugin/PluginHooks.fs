@@ -220,6 +220,9 @@ module PluginHooks =
                         collectCasebookObservation toolInput toolOutput
                 }
 
+            let ownedTransform (inObj: obj) (outObj: obj) : Task =
+                scope.RunOwnedWork(fun () -> transform inObj outObj)
+
             // HOST-009: the object handed to the Host carries Host hooks and
             // nothing else.
             //
@@ -250,7 +253,7 @@ module PluginHooks =
                       // Companion rewrite and the REVIEW-010 seal twice over the
                       // same message array.
                       "experimental.chat.messages.transform",
-                      box (fatalHook "plugin-hook-messages-transform-failed" (curriedHook (box transform)))
+                      box (fatalHook "plugin-hook-messages-transform-failed" (curriedHook (box ownedTransform)))
                       // HOST-026 / PROMPT-017: session-bound ProviderLanguage
                       // replaces only the Wanxiangshu-owned agent system segment.
                       // Host/AGENTS/system additions remain byte-identical.

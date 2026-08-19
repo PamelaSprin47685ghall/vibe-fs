@@ -13,6 +13,9 @@
 - **无证据偏好冒充缺陷**：reviewer 把「我会写得不同」说成缺陷。REVISE 不购买任何实质改进，只表达口味。
 - **PERFECT 被误读为全知/字面无瑕**：reviewer 不敢在 PERFECT 时说真话（怕「不完美」与「接受」冲突），于是压制真实但 non-blocking 的观察；或者反过来，任何 tiny typo 都自动 REVISE。
 - **判断对象漂移**：判断变成对 reviewer mood 的投射，而不是对 root requirement + 当前被审对象的评估。
+- **过程/结果回执语义混淆**：过程评审的一次 judgement 已经完成本 request，应明确「已收下，请结束」；
+  Finality 的第一次 PERFECT 只是确认协议的第一半，应只要求再次评估。若为了复用一个 tool reply
+  把两段 prose 拼在一起，就会同时命令 Reviewer 结束和继续，判断语义本身被 transport 文案破坏。
 
 `review-judgement` 存在的意义：**PERFECT/REVISE 必须由 discrimination 挣得**——acceptance 要挣，rejection 也要挣；material defect 才能 withhold；non-blocking workmanship 可以与 acceptance 共存；PERFECT ≠ 全知；REVISE 必须购买实质更好/更真的结果。
 
@@ -27,6 +30,8 @@
 5. REVISE 不购买任何实质更好/更真的结果（例如 tiny typo 自动 REVISE、「测试必须总跑过」万能律）；
 6. Examiner's Ledger 八维被烙成必填 report 字段 / Pass 表 / 固定八段标题。
 7. reusable dedicated Reviewer 在上一轮成功 `judge` 后，被 session 级“already judged”标记永久静音；下一条独立 review request 到来时仍被当作上一轮重复提交并被 abort。
+8. process `judge` 成功不返回明确 terminal receipt，或 Finality first-PERFECT challenge 复用该
+   terminal receipt，导致同一 tool result 同时要求结束与继续。
 
 ## 为什么必须独立存在（Independent Change Test）
 

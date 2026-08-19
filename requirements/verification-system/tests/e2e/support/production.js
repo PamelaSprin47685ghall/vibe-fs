@@ -116,11 +116,10 @@ export const bloggerDocument = (items) => BloggerModule.render(items);
 
 export const bloggerDocumentWith = (instructions, items) => BloggerModule.renderWith(instructions, items);
 
-// ── ManagerLifecyclePrompt: GLORY activation / idle / undecidable ─────────────
+// ── ManagerLifecyclePrompt: GLORY activation / idle ───────────────────────────
 // Instruction-only SyntheticToml documents (already comment-prefixed).
 
 export const workActivation = () => readProviderDocument('lifecycle/manager/work-activation');
 export const idleEncouragement = () => readProviderDocument('lifecycle/manager/idle-post-t1');
 export const idleEncouragementPreT1 = () => readProviderDocument('lifecycle/manager/idle-pre-t1');
 export const idleEncouragementPostT1 = () => readProviderDocument('lifecycle/manager/idle-post-t1');
-export const finalityUndecidable = () => readProviderDocument('lifecycle/manager/finality-undecidable');

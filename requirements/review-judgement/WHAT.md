@@ -85,7 +85,9 @@
 
 ## REVIEW-JUDGEMENT-008：过程评审的 verdict 是一次真实判断：一次 durable judge 即 terminal
 
-**规范**：TodoProcessReview（过程评审）是 checkpoint 工作的**真实判断**：一次 durable `judge`（PERFECT 或 REVISE）即 terminal。这里的“一次”绑定到当前 physical review request，而不是整个 reusable Reviewer Session：同一 request 内再次 `judge` 必须被识别为重复提交并收束当前 turn；下一条不同 `PhysicalUserMessageId` 的 process-review assignment 到达同一 dedicated Reviewer Session 时，必须重新具备一次 `judge` 资格。成功 judgement 后为阻止模型在本轮继续空跑而触发的 Host abort 只结束当前 turn，不退休 logical/physical Reviewer session，也不得污染下一轮 assignment。它**不走** challenge / 二次 PERFECT / dual-PERFECT witness 代数——那是 FinalityReview 的确认协议。过程判断必须于本 request 内产生具体 prose 工作记录（缺陷/应改项，或 PERFECT 时已检查且未发现实质问题）；**无 prose 的过程 PERFECT 无效**，不得形成可消费报告。
+**规范**：TodoProcessReview（过程评审）是 checkpoint 工作的**真实判断**：一次 durable `judge`（PERFECT 或 REVISE）即 terminal。这里的“一次”绑定到当前 physical review request，而不是整个 reusable Reviewer Session：同一 request 内再次 `judge` 必须被识别为重复提交并收束当前 turn；下一条不同 `PhysicalUserMessageId` 的 process-review assignment 到达同一 dedicated Reviewer Session 时，必须重新具备一次 `judge` 资格。过程 `judge` 成功的 tool result 明确使用 `tool/judge/received`（「你的判断已被收下，请你结束对话」）；成功 judgement 后为阻止模型在本轮继续空跑而触发的 Host abort 只结束当前 turn，不退休 logical/physical Reviewer session，也不得污染下一轮 assignment。
+
+过程评审**不走** challenge / 二次 PERFECT / dual-PERFECT witness 代数——那是 FinalityReview 的确认协议。Finality 第一次 PERFECT **不得复用**过程评审的 terminal received receipt；它的 tool result 只能是 skeptical challenge，要求 Reviewer 再评估一次。Finality 第二次 judgement 或 REVISE 才可以完成该 judgement delivery。两个流程必须由各自的 F# CE/调用栈表达；只允许复用 typed `ReviewJudgement` 数据与物理 inbox，不允许为了 DRY 合并 lifecycle/terminal 语义。过程判断必须于本 request 内产生具体 prose 工作记录（缺陷/应改项，或 PERFECT 时已检查且未发现实质问题）；**无 prose 的过程 PERFECT 无效**，不得形成可消费报告。
 
 **含义/动机**：过程评审是 lag-1 节拍义务（每次 `TodoWriteAccepted` 恰好一次 Rk，节拍规则归 `obligation-ledger`）。若过程也强制 challenge + 二次 PERFECT，会把并行工作压成串行，并与终末 2N 代数混淆（历史 why/review「过程一次判断 vs 终末双 PERFECT」）。过程 verdict 仍是判断——它决定该 checkpoint 的业务 outcome（PERFECT/REVISE → settle），只是不需要第二次因果确认。
 

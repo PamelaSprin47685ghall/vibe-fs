@@ -24,7 +24,6 @@ open Wanxiangshu.Foundation.Identity
 type FinalityOutcome =
     | Rejected of prompt: string
     | Blessed of prompt: string
-    | Undecided of prompt: string
 
 /// One enlisted cohort member with the durable identities the driver needs.
 type EnlistedMember =
