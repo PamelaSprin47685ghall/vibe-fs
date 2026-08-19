@@ -6,6 +6,7 @@
 //   - use static explicit ordering (no dynamic middleware list)
 //   - not contain foreign domain decision helpers (decide/recover/classify/calculate/maintain)
 //   - not introduce ITransformMiddleware or pipeline registration patterns
+//   - preserve the fixed semantic ordering of normalTransform's 12 named steps
 //
 // This gate is a structural regression guard, not a semantic proof.
 
@@ -50,10 +51,66 @@ for (const pattern of forbiddenHelpers) {
   }
 }
 
+// 3. normalTransform semantic ordering lock
+const orderingSteps = [
+  'beginPhysicalProviderAttempt',
+  'tryBindSessionStartedAt',
+  'strengthReplayPlansFor',
+  'applySessionXTracePipeline',
+  'applyCompanionForOrdinaryMaterial',
+  'XWire.applyTransform',
+  'applyBloggerEnforcerContinuation',
+  'StrengthSpeculate.tryApply',
+  'maybeInjectPairGuideline',
+  'projectRequirementGrounding',
+  'injectBloggerChronicleText',
+  'sanitizeMessages',
+]
+
+const allLines = text.split('\n')
+const normalTransformStart = allLines.findIndex(l => /^\s*let\s+normalTransform\b/.test(l))
+if (normalTransformStart < 0) {
+  violations.push('ordering: normalTransform function not found')
+} else {
+  const startIndent = allLines[normalTransformStart].length - allLines[normalTransformStart].trimStart().length
+  let normalTransformEnd = allLines.length
+  for (let i = normalTransformStart + 1; i < allLines.length; i++) {
+    const line = allLines[i]
+    if (line.trim() === '') continue
+    const indent = line.length - line.trimStart().length
+    if (indent <= startIndent && /^\s*let\s/.test(line)) {
+      normalTransformEnd = i
+      break
+    }
+  }
+
+  const bodyLines = allLines.slice(normalTransformStart, normalTransformEnd)
+  const stepLines = []
+  for (let i = 0; i < orderingSteps.length; i++) {
+    const step = orderingSteps[i]
+    const foundIdx = bodyLines.findIndex(l => l.includes(step))
+    if (foundIdx < 0) {
+      violations.push(`ordering step ${i + 1} not found: ${step}`)
+      stepLines.push(-1)
+    } else {
+      stepLines.push(normalTransformStart + foundIdx + 1)
+    }
+  }
+
+  for (let i = 0; i < stepLines.length - 1; i++) {
+    if (stepLines[i] < 0 || stepLines[i + 1] < 0) continue
+    if (stepLines[i] >= stepLines[i + 1]) {
+      violations.push(
+        `ordering violation: step ${i + 1} (${orderingSteps[i]} at line ${stepLines[i]}) must precede step ${i + 2} (${orderingSteps[i + 1]} at line ${stepLines[i + 1]})`
+      )
+    }
+  }
+}
+
 if (violations.length > 0) {
   console.error('plugin-transforms-invariant: VIOLATIONS')
   for (const v of violations) console.error(`  ${v}`)
   process.exit(1)
 }
 
-console.log('plugin-transforms-invariant: OK — static composition, no dynamic pipeline, no foreign decisions')
+console.log('plugin-transforms-invariant: OK — static composition, no dynamic pipeline, no foreign decisions, ordering locked')
