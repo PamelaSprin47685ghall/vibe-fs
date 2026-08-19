@@ -1,4 +1,4 @@
 namespace Wanxiangshu
 
 module FableBarrier =
-    let token = "test-token-1787120815000154812"
+    let token = "barrier-1787120966322-z7oa5m79"

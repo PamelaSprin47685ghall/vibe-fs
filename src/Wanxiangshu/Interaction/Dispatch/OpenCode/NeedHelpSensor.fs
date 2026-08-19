@@ -214,6 +214,7 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
                 this.ApplyAbortOutcome(sessionId, providerRun, outcome)
             with ex ->
                 this.RollbackArm(sessionId, providerRun)
+
                 Diagnostic.emit
                     "needhelp"
                     [ "session_id", SessionId.value sessionId

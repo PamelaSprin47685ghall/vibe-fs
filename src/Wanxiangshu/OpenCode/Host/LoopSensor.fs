@@ -77,6 +77,7 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                 applyAbortOutcome rollback sessionId outcome
             with ex ->
                 rollback ()
+
                 Diagnostic.emit
                     "loop-kill"
                     [ "session_id", SessionId.value sessionId
@@ -134,7 +135,9 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                    | None -> [])
 
             Diagnostic.emit "loop-kill" fields
-            abortAndReport abortSession (fun () -> this.RollbackArm sessionId) sessionId |> ignore
+
+            abortAndReport abortSession (fun () -> this.RollbackArm sessionId) sessionId
+            |> ignore
         else
             Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "ignored-duplicate" ]
 

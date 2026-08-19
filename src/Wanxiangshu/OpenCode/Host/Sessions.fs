@@ -93,8 +93,7 @@ module ManagedSessionTermination =
                 let! cancelOutcome = captureUnit (fun () -> cancelSessionChildren sessionId)
                 let! abortOutcome = captureResult (fun () -> sessionPort.AbortSession sessionId)
 
-                eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason)
-                |> ignore
+                eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason) |> ignore
 
                 return combineEffects cancelOutcome abortOutcome
             }

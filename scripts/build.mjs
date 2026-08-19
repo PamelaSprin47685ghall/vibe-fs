@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { execFileSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
 import {
@@ -11,57 +11,185 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
+const daemonDir = path.join(root, '.fable-daemon')
+const pidFile = path.join(daemonDir, 'pid')
+const logFile = path.join(daemonDir, 'log')
+const ackJson = path.join(daemonDir, 'ack.json')
+const barrierFs = path.join(root, 'src/Wanxiangshu/FableBarrier.fs')
 
 function fail(message) {
   console.error(message)
   process.exit(1)
 }
 
-function removeGitignores(dir) {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) removeGitignores(full)
-    else if (entry.name === '.gitignore') fs.unlinkSync(full)
+function isPidRunning(pid) {
+  if (!pid || isNaN(pid)) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
   }
 }
 
-function removeSources(dir) {
-  if (!fs.existsSync(dir)) return
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) removeSources(full)
-    else if (entry.name.endsWith('.fs') || entry.name.endsWith('.fsproj')) fs.unlinkSync(full)
+function getDaemonPid() {
+  if (!fs.existsSync(pidFile)) return null
+  try {
+    const raw = fs.readFileSync(pidFile, 'utf8').trim()
+    const pid = parseInt(raw, 10)
+    if (isPidRunning(pid)) return pid
+    try {
+      fs.unlinkSync(pidFile)
+    } catch {}
+    return null
+  } catch {
+    return null
   }
+}
+
+function stopDaemon() {
+  const pid = getDaemonPid()
+  if (pid) {
+    try {
+      process.kill(pid, 'SIGTERM')
+    } catch {}
+    const deadline = Date.now() + 2000
+    while (Date.now() < deadline && isPidRunning(pid)) {
+      const waitEnd = Date.now() + 50
+      while (Date.now() < waitEnd) {}
+    }
+    if (isPidRunning(pid)) {
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {}
+    }
+  }
+  try {
+    if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile)
+  } catch {}
+}
+
+function startDaemon() {
+  fs.mkdirSync(daemonDir, { recursive: true })
+  fs.mkdirSync(dist, { recursive: true })
+
+  const logFd = fs.openSync(logFile, 'a')
+  const child = spawn(
+    'dotnet',
+    [
+      'tool',
+      'run',
+      'fable',
+      'watch',
+      'src/Wanxiangshu/Wanxiangshu.fsproj',
+      '-o',
+      'dist',
+      '--noGitignore',
+      '--runWatch',
+      'node',
+      'scripts/fable-ack.mjs',
+    ],
+    {
+      cwd: root,
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+    },
+  )
+
+  child.unref()
+  fs.closeSync(logFd)
+  fs.writeFileSync(pidFile, String(child.pid), 'utf8')
+  return child.pid
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function readNewLogs(fromOffset) {
+  if (!fs.existsSync(logFile)) return ''
+  try {
+    const fd = fs.openSync(logFile, 'r')
+    const stat = fs.fstatSync(fd)
+    const length = stat.size - fromOffset
+    if (length <= 0) {
+      fs.closeSync(fd)
+      return ''
+    }
+    const buffer = Buffer.alloc(length)
+    fs.readSync(fd, buffer, 0, length, fromOffset)
+    fs.closeSync(fd)
+    return buffer.toString('utf8')
+  } catch {
+    return ''
+  }
+}
+
+async function barrierSync() {
+  let pid = getDaemonPid()
+  const isCold = !pid
+  if (!pid) {
+    pid = startDaemon()
+  }
+
+  const token = `barrier-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const initialLogOffset = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0
+
+  const barrierContent = `namespace Wanxiangshu\n\nmodule FableBarrier =\n    let token = "${token}"\n`
+  fs.writeFileSync(barrierFs, barrierContent, 'utf8')
+
+  const timeoutMs = isCold ? 120_000 : 45_000
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    if (!isPidRunning(pid)) {
+      const logs = readNewLogs(initialLogOffset)
+      fail(`fable watch daemon died unexpectedly.\n${logs}`)
+    }
+
+    if (fs.existsSync(ackJson)) {
+      try {
+        const raw = fs.readFileSync(ackJson, 'utf8')
+        const ack = JSON.parse(raw)
+        if (ack.token === token && ack.status === 'ok') {
+          return
+        }
+      } catch {}
+    }
+
+    const newLogs = readNewLogs(initialLogOffset)
+    if (
+      newLogs.includes('Compilation failed') ||
+      (newLogs.includes('error FSHARP:') && !newLogs.includes('Watching src/Wanxiangshu'))
+    ) {
+      await sleep(100)
+      const fullLogs = readNewLogs(initialLogOffset)
+      fail(`fable compilation failed:\n${fullLogs}`)
+    }
+
+    await sleep(50)
+  }
+
+  const logs = readNewLogs(initialLogOffset)
+  fail(`fable barrier timed out after ${timeoutMs}ms.\nLogs:\n${logs}`)
+}
+
+if (process.argv.includes('--stop')) {
+  stopDaemon()
+  console.log('fable daemon stopped')
+  process.exit(0)
+}
+
+if (process.argv.includes('--restart')) {
+  stopDaemon()
 }
 
 // DG-004: calibration is build input, never tracked source. Compute once from
 // the current repository corpus; materialize values only as generated dist JS.
 const loopDetectorCalibration = calibrateFromRepository(root)
 
-fs.rmSync(dist, { recursive: true, force: true })
-fs.mkdirSync(dist, { recursive: true })
+await barrierSync()
 
-try {
-  execFileSync(
-    'dotnet',
-    [
-      'tool',
-      'run',
-      'fable',
-      'precompile',
-      'src/Wanxiangshu/Wanxiangshu.fsproj',
-      '-o',
-      'dist',
-    ],
-    { cwd: root, stdio: 'inherit' },
-  )
-} catch {
-  fail('fable precompile failed')
-}
-
-removeGitignores(dist)
-removeSources(dist)
 writeLoopDetectorCalibrationArtifact(root, loopDetectorCalibration)
 
 const entry = path.join(root, 'dist/OpenCode/Plugin/Plugin.js')

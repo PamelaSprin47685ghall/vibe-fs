@@ -1362,8 +1362,10 @@ module StrengthSurface =
                 Task.FromResult(Ok())
 
             member _.InterruptAttempt(_) = Task.FromResult(Ok())
+
             member _.TerminateAttempt(_sessionId: SessionId, _reason: string) : Task<Result<unit, string>> =
                 Task.FromResult(Ok())
+
             member _.TryTakeAttemptTermination(_sessionId: SessionId) : string option = None
             member _.AbortChildren(_) = AsyncSupport.completedTask ()
             member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")

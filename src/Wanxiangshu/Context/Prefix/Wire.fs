@@ -564,7 +564,10 @@ module XWire =
     /// armed attempt CE; provisional/unknown turns keep the plan alive (SW-009,
     /// SW-017②, PAR-011).
     let private reconcileTerminalAttempt
-        (durable: AgentJournal) (scope: PluginRuntimeScope) (turn: ReconciledTurn) (plan: AttemptPlan)
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        (plan: AttemptPlan)
         : Task =
         match turn.Outcome with
         | ReconcileProgram.TurnCompleted

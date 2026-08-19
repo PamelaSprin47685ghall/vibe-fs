@@ -880,12 +880,25 @@ module PluginTransforms =
                 // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                 // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
-                do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock terminateSession outObj
+                do!
+                    maybeInjectPairGuideline
+                        journal
+                        projectionSessionIdOpt
+                        sessionStartedAt
+                        clock
+                        terminateSession
+                        outObj
 
                 // REQUIREMENT-GROUNDING-007/012: permanent requirement reads use
                 // the same append-only placement discipline, after HOST-013 so
                 // ordinary and Cursor order is always pseudo-skill → read(s).
-                do! projectRequirementGrounding journal workspaceDirectory projectionSessionIdOpt terminateSession outObj
+                do!
+                    projectRequirementGrounding
+                        journal
+                        workspaceDirectory
+                        projectionSessionIdOpt
+                        terminateSession
+                        outObj
 
                 injectBloggerChronicleText journal projectionSessionIdOpt outObj
 
