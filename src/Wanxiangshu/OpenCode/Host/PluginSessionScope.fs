@@ -143,7 +143,12 @@ type PluginSessionScope() =
         this.SessionParents.Remove sessionId |> ignore
         SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
-        this.VerdictSubmissions.Remove sessionId |> ignore
+        let sid = SessionId.create sessionId
+
+        this.VerdictSubmissions
+        |> Seq.filter (JudgementRequestIdentity.belongsTo sid)
+        |> Seq.toArray
+        |> Array.iter (fun request -> this.VerdictSubmissions.Remove request |> ignore)
         this.AbortedSessions.Remove sessionId |> ignore
 
         if preserveIdentity then
@@ -151,7 +156,6 @@ type PluginSessionScope() =
         else
             this.DropSessionIdentity sessionId
 
-        let sid = SessionId.create sessionId
         // HOST-004 Q-10: a deleted session's idle permits die forever.
         this.Quiescence.DropSession sid
         // SessionDeleted: drop join-interrupt waiters + one-shot user-message latch.

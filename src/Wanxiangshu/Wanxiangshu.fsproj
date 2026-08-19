@@ -139,6 +139,7 @@
     <Compile Include="Context/Prefix/Projection.fs"/>
     <Compile Include="Mission/Review/Judgement/Witness.fs"/>
     <Compile Include="Mission/Review/Judgement/Challenge.fs"/>
+    <Compile Include="Mission/Review/Judgement/RequestIdentity.fs"/>
     <Compile Include="Participant/Persona/ManagedCatalog.fs"/>
     <Compile Include="Participant/Persona/OfficeCapabilitySurface.fs"/>
     <Compile Include="Participant/Persona/Surface.fs"/>

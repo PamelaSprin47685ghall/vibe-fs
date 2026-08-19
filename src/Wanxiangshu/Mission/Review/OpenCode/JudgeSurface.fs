@@ -1,9 +1,11 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
 
 open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
+open Wanxiangshu.Foundation.Identity
 
 /// Public judgement-tool owner boundary. It exposes the exact parser/schema and
 /// contract view; ToolRuntimeScope and HostToolCodec remain implementation-only.
@@ -62,11 +64,21 @@ module JudgeSurface =
         ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/already-judged"
 
     let markVerdictSubmitted (sessionId: string) (physicalUserMessageId: string) : unit =
-        SharedState.VerdictSubmissions.[sessionId] <- PhysicalUserMessageId.create physicalUserMessageId
+        let reviewer = SessionId.create sessionId
+
+        SharedState.VerdictSubmissions
+        |> Seq.filter (JudgementRequestIdentity.belongsTo reviewer)
+        |> Seq.toArray
+        |> Array.iter (fun request -> SharedState.VerdictSubmissions.Remove request |> ignore)
+
+        JudgementRequestIdentity.key reviewer (PhysicalUserMessageId.create physicalUserMessageId)
+        |> SharedState.VerdictSubmissions.Add
+        |> ignore
 
     let hasVerdictSubmitted (sessionId: string) (physicalUserMessageId: string) : bool =
-        match SharedState.VerdictSubmissions.TryGetValue sessionId with
-        | true, submitted -> submitted = PhysicalUserMessageId.create physicalUserMessageId
-        | false, _ -> false
+        JudgementRequestIdentity.key
+            (SessionId.create sessionId)
+            (PhysicalUserMessageId.create physicalUserMessageId)
+        |> SharedState.VerdictSubmissions.Contains
 
-    let clearVerdictSessions () : unit = SharedState.VerdictSubmissions.Clear()
+    let clearVerdictSubmissions () : unit = SharedState.VerdictSubmissions.Clear()

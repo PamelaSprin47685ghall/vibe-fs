@@ -58,8 +58,8 @@ module SharedState =
 
     // DSL-MUTABLE: resource — cross-instance session parent map
     let SessionParents = Dictionary<string, string>()
-    // DSL-MUTABLE: resource — latest judged physical review request by reusable reviewer session
-    let VerdictSubmissions = Dictionary<string, PhysicalUserMessageId>()
+    // DSL-MUTABLE: resource — judged physical review request identities across plugin instances
+    let VerdictSubmissions = HashSet<string>()
     // DSL-MUTABLE: resource — cross-instance session directory map
     let SessionDirectories = Dictionary<string, string>()
 

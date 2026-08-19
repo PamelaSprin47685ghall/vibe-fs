@@ -178,7 +178,7 @@ module ToolRegistry =
         (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (currentPhysicalUserMessage: string -> string option)
-        (verdictSubmissions: Dictionary<string, PhysicalUserMessageId>)
+        (verdictSubmissions: HashSet<string>)
         (sessionDirectories: Dictionary<string, string>)
         (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> Task<string option>) option)

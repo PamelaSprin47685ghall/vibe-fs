@@ -15,6 +15,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Execution.Delegation
@@ -55,7 +56,7 @@ type ToolRuntimeScope
         workspaceDirectory: string option,
         sessionParents: Dictionary<string, string>,
         currentPhysicalUserMessage: string -> string option,
-        verdictSubmissions: Dictionary<string, PhysicalUserMessageId>,
+        verdictSubmissions: HashSet<string>,
         sessionDirectories: Dictionary<string, string>,
         onRunStarted: (SessionId -> Role -> string option -> unit) option,
         parentWorkRecordFor: (string -> Task<string option>) option,
@@ -497,13 +498,20 @@ type ToolRuntimeScope
         | false, _ -> gitTreePort
 
     member _.MarkVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
-        lock gate (fun () -> verdictSubmissions.[reviewerId] <- physicalUserMessageId)
+        lock gate (fun () ->
+            let sessionId = SessionId.create reviewerId
+
+            verdictSubmissions
+            |> Seq.filter (JudgementRequestIdentity.belongsTo sessionId)
+            |> Seq.toArray
+            |> Array.iter (fun existing -> verdictSubmissions.Remove existing |> ignore)
+
+            JudgementRequestIdentity.key sessionId physicalUserMessageId |> verdictSubmissions.Add |> ignore)
 
     member _.HasVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
         lock gate (fun () ->
-            match verdictSubmissions.TryGetValue reviewerId with
-            | true, submitted -> submitted = physicalUserMessageId
-            | false, _ -> false)
+            JudgementRequestIdentity.key (SessionId.create reviewerId) physicalUserMessageId
+            |> verdictSubmissions.Contains)
 
     member _.RunOwnedWork(start: unit -> Task) : bool =
         let admitted =

@@ -89,17 +89,21 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_subsequent_call_returns_already_judged_me
       assert.ok(runtime.abortedIds.includes('ses-reviewer'), 'reviewer session must be interrupted/aborted on subsequent judge call')
     })
   } finally {
-    judge.clearVerdictSessions()
+    judge.clearVerdictSubmissions()
   }
 })
 
 test('WHAT[REVIEW-JUDGEMENT-008] JUDGE_submission_dedupe_is_scoped_to_one_physical_review_request', () => {
   try {
-    judge.clearVerdictSessions()
+    judge.clearVerdictSubmissions()
     judge.markVerdictSubmitted('ses-reviewer', 'review-request-1')
     assert.equal(judge.hasVerdictSubmitted('ses-reviewer', 'review-request-1'), true)
     assert.equal(judge.hasVerdictSubmitted('ses-reviewer', 'review-request-2'), false)
+    judge.markVerdictSubmitted('ses-reviewer', 'review-request-2')
+    assert.equal(judge.hasVerdictSubmitted('ses-reviewer', 'review-request-1'), false)
+    assert.equal(judge.hasVerdictSubmitted('ses-reviewer', 'review-request-2'), true)
   } finally {
-    judge.clearVerdictSessions()
+    judge.clearVerdictSubmissions()
   }
 })
+
