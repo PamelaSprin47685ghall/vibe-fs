@@ -100,14 +100,8 @@ module OrdinaryTurnWorkflow =
             AsyncSupport.completedTask ()
 
     /// Own the reconciled ordinary-turn outcome match.
-    /// `timerPort` and `abortParent` are injected by Host composition (Process is not Application).
-    let private clearArmedLoopKill (loopSensor: LoopSensor option) (sessionId: SessionId) =
-        match loopSensor with
-        | Some sensor when sensor.IsArmed sessionId ->
-            sensor.ClearArmed sessionId
-            true
-        | _ -> false
-
+    /// `abortCause` is the Host boundary typed outcome consumed exactly once (SW-017 ①).
+    /// LoopKillArmed presence is not exposed; CE branches on typed outcome.
     let private handleAborted
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
@@ -116,16 +110,17 @@ module OrdinaryTurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (abortedSessions: HashSet<string>)
-        (loopSensor: LoopSensor option)
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         (sessionKey: string)
         (reason: string)
         =
         // LOOP-006: our own kill is bridged into the provider-failure AABB path.
         // User / cleanup aborts still report Aborted and do not advance the cursor.
-        if clearArmedLoopKill loopSensor turn.SessionId then
+        match abortCause with
+        | AbortCause.LoopKill ->
             ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
-        else
+        | AbortCause.External ->
             task {
                 abortedSessions.Add sessionKey |> ignore
                 abortParent sessionKey
@@ -208,7 +203,7 @@ module OrdinaryTurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
-        (loopSensor: LoopSensor option)
+        (abortCause: AbortCause)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (completeAgent: unit -> Task<bool * bool>)
@@ -233,7 +228,7 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 abortedSessions
-                loopSensor
+                abortCause
                 turn
                 sessionKey
                 reason
@@ -268,7 +263,7 @@ module OrdinaryTurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
-        (loopSensor: LoopSensor option)
+        (abortCause: AbortCause)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         : Task =
@@ -301,7 +296,7 @@ module OrdinaryTurnWorkflow =
                 joinGuardNudges
                 hasLivePty
                 abortedSessions
-                loopSensor
+                abortCause
                 quiescence
                 context
                 completeAgent

@@ -69,17 +69,8 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
-/// Sealed inside physical adapter — not cross-callback workflow PC (SW-003, SW-017②).
-/// Represents one in-flight counterfactual observation inside the collector.
-/// Only the collector module may construct/match it; business workflow above
-/// only observes the completed CounterfactualPair via TryTakeCounterfactualPair.
-type private CounterfactualAwait =
-    | AwaitFirst of targetRun: ProviderRunIdentity * feature: StrengthFeatureKey
-    | AwaitSecond of feature: StrengthFeatureKey
-
-/// Collector that turns two observations into one CounterfactualPair.
-/// Physics-only: first observation target-bound, second observation completes.
-/// Business layer does not branch on AwaitFirst/AwaitSecond.
+/// Completed counterfactual pair — typed outcome consumed once by the owning CE.
+/// Business layer observes only this type, never the collector's internal registries.
 type CounterfactualPair =
     { Feature: StrengthFeatureKey
       FirstSymbol: StrengthPrimarySymbol
@@ -89,47 +80,45 @@ type private CounterfactualFirst =
     { Feature: StrengthFeatureKey
       Symbol: StrengthPrimarySymbol }
 
-/// Collector internals — physical adapter owns the waiting.
+/// Physical adapter — collects two primary observations into one CounterfactualPair.
+/// No cross-callback program counter: armed targets and buffered firsts are
+/// independent physical resource registries, not a phased await state machine.
+/// Observe returns the completed pair directly; no separate TryTake/consume API.
+/// DSL-cross-callback-proof: physical — armed target registry and buffered
+/// first-observation registry are physical resources consumed once by Observe.
 type private CounterfactualCollector() =
-    let counterfactualAwait = Dictionary<string, CounterfactualAwait>()
-    let counterfactualFirsts = Dictionary<string, CounterfactualFirst>()
-    /// DSL-cross-callback-proof: physical — completed typed collector outcome consumed once by the owning CE
-    let counterfactualPairs = Dictionary<string, CounterfactualPair>()
-
-    // DSL-MUTABLE: resource — counterfactual await registry by session (physical adapter, sealed)
-    // DSL-MUTABLE: resource — completed counterfactual pairs (typed outcome, one-shot)
+    // DSL-MUTABLE: resource — armed counterfactual target by session (physical adapter)
+    let armedTargets = Dictionary<string, ProviderRunIdentity * StrengthFeatureKey>()
+    // DSL-MUTABLE: resource — buffered first observation by session (physical adapter)
+    let observedFirsts = Dictionary<string, CounterfactualFirst>()
 
     member _.Arm(sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey) =
         let key = SessionId.value sessionId
 
-        if not (counterfactualAwait.ContainsKey key) then
-            counterfactualAwait.[key] <- AwaitFirst(targetRun, feature)
+        if not (armedTargets.ContainsKey key) then
+            armedTargets.[key] <- (targetRun, feature)
 
     member private _.ObserveFirst
         (key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
         : StrengthPredictorState * CounterfactualPair option =
         let next, firstReadonly = StrengthPredictor.observeFirst feature symbol state
-        counterfactualAwait.Remove key |> ignore
+        armedTargets.Remove key |> ignore
 
         if firstReadonly then
-            counterfactualAwait.[key] <- AwaitSecond feature
-            counterfactualFirsts.[key] <- { Feature = feature; Symbol = symbol }
-        else
-            counterfactualFirsts.Remove key |> ignore
+            observedFirsts.[key] <- { Feature = feature; Symbol = symbol }
 
         next, None
 
     member private _.CompletePair(key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol) =
-        match counterfactualFirsts.TryGetValue key with
+        match observedFirsts.TryGetValue key with
         | true, first ->
-            counterfactualFirsts.Remove key |> ignore
+            observedFirsts.Remove key |> ignore
 
             let pair =
                 { Feature = feature
                   FirstSymbol = first.Symbol
                   SecondSymbol = symbol }
 
-            counterfactualPairs.[key] <- pair
             Some pair
         | false, _ -> None
 
@@ -137,8 +126,14 @@ type private CounterfactualCollector() =
         (key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
         : StrengthPredictorState * CounterfactualPair option =
         let next = StrengthPredictor.observeSecond feature symbol state
-        counterfactualAwait.Remove key |> ignore
         next, this.CompletePair(key, feature, symbol)
+
+    member private this.ObserveFromFirstSeen
+        (key: string, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
+        : StrengthPredictorState * CounterfactualPair option =
+        match observedFirsts.TryGetValue key with
+        | true, first -> this.ObserveSecond(key, first.Feature, symbol, state)
+        | false, _ -> state, None
 
     member this.Observe
         (
@@ -149,26 +144,13 @@ type private CounterfactualCollector() =
         ) : StrengthPredictorState * CounterfactualPair option =
         let key = SessionId.value sessionId
 
-        match counterfactualAwait.TryGetValue key with
-        | true, AwaitFirst(targetRun, feature) when targetRun = providerRun ->
-            this.ObserveFirst(key, feature, symbol, state)
-        | true, AwaitSecond feature -> this.ObserveSecond(key, feature, symbol, state)
-        | _ -> state, None
-
-    /// One-shot typed outcome: owning CE consumes the completed pair exactly once.
-    member _.TryTakePair(sessionId: SessionId) : CounterfactualPair option =
-        let key = SessionId.value sessionId
-
-        match counterfactualPairs.TryGetValue key with
-        | true, pair ->
-            counterfactualPairs.Remove key |> ignore
-            Some pair
-        | false, _ -> None
+        match armedTargets.TryGetValue key with
+        | true, (targetRun, feature) when targetRun = providerRun -> this.ObserveFirst(key, feature, symbol, state)
+        | _ -> this.ObserveFromFirstSeen(key, symbol, state)
 
     member _.ClearSession(sessionId: string) =
-        counterfactualAwait.Remove sessionId |> ignore
-        counterfactualFirsts.Remove sessionId |> ignore
-        counterfactualPairs.Remove sessionId |> ignore
+        armedTargets.Remove sessionId |> ignore
+        observedFirsts.Remove sessionId |> ignore
 
 /// STRENGTH-*: decision-local replica ownership/capability registry plus bounded
 /// predictor evidence for one plugin instance. Durable causality stays in
@@ -186,7 +168,7 @@ type PluginStrengthScope() =
     // DSL-MUTABLE: resource — restart-discardable predictor evidence cache
     let mutable strengthPredictorState = StrengthPredictor.empty
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
-    // Physical adapter collector — DU sealed inside, business observes only CounterfactualPair
+    // Physical adapter collector — no DU state machine, business observes only CounterfactualPair
     // DSL-MUTABLE: resource — counterfactual collector (physical adapter, typed outcome)
     let collector = CounterfactualCollector()
 
@@ -234,10 +216,10 @@ type PluginStrengthScope() =
 
     member _.ObserveStrengthPrimary
         (sessionId: SessionId, providerRun: ProviderRunIdentity, symbol: StrengthPrimarySymbol)
-        =
+        : CounterfactualPair option =
         let key = SessionId.value sessionId
 
-        let nextState, _pair =
+        let nextState, pair =
             collector.Observe(sessionId, providerRun, symbol, strengthPredictorState)
 
         strengthPredictorState <- nextState
@@ -249,9 +231,7 @@ type PluginStrengthScope() =
 
         strengthRecentPrimary.[key] <- recent
 
-    /// Typed one-shot outcome for owning CE — consumes the completed CounterfactualPair exactly once.
-    member _.TryTakeCounterfactualPair(sessionId: SessionId) : CounterfactualPair option =
-        collector.TryTakePair sessionId
+        pair
 
     /// Session deletion drops the decision-local Strength evidence for that session
     /// (mirror of DisposeSession's per-session cleanup in PluginRuntimeScope).

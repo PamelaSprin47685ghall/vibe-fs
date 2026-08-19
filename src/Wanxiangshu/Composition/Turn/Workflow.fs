@@ -84,7 +84,7 @@ module TurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
-        (loopSensor: LoopSensor option)
+        (abortCause: AbortCause)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         : Task =
@@ -158,7 +158,7 @@ module TurnWorkflow =
                     joinGuardNudges
                     hasLivePty
                     abortedSessions
-                    loopSensor
+                    abortCause
                     quiescence
                     current
 

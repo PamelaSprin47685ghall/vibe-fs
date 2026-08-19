@@ -6,17 +6,36 @@
  * where B's presence/value determines the next business effect — without proof
  * that the cell is an opaque physical capability/outcome.
  *
- * Three pattern signatures:
+ * Four pattern signatures:
  *  1. TryTake continuation consumption: methods named TryTake* returning option
  *  2. Armed presence probe: methods named IsArmed/HasArmed/TryArm returning bool/option
  *  3. DU await state: Dictionary<_, DU> where DU has Await/Armed/Pending-prefixed cases
+ *  4. Clear/Drop presence-clearing: methods named Clear* / Drop* that clear registry
+ *     presence and whose return value or side-effect drives the next business effect
  *
- * Whitelist: ``` /// DSL-cross-callback-proof: physical ``` annotation on the
- * declaration line's preceding doc block proves the cell is an opaque physical
- * capability/outcome (PTY/timer/waiter/single-flight permit).
+ * Structural invariant:
+ *   ∀ mutable/registry value, if written in callback A, read in callback B,
+ *   and B's presence/value determines the next business effect, then it must
+ *   be proven as an opaque physical capability/outcome, otherwise it is a
+ *   cross-boundary program counter.
+ *
+ * Whitelist: ``` /// DSL-cross-callback-proof: physical <category> ``` annotation
+ * on the declaration line's preceding doc block proves the cell is an opaque
+ * physical capability/outcome. <category> should be one of EXEMPTION_CATEGORIES.
+ * Backward compat: bare `physical` without category is still accepted.
+ *
+ * Exemption categories (physical capabilities that are NOT program counters):
+ *  pty, timer, waiter, single-flight, quiescence-permit, process-handle,
+ *  socket, cancellation-token, resource (backward compat)
+ *
+ * Legal reference: SessionQuiescenceGate.fs — process-local side-effect
+ * admission gate. ObserveIdle returns opaque QuiescencePermit; TryConsume(permit)
+ * checks state == Idle(permit.AttemptSerial). The permit is an unforgeable
+ * typed capability, not a presence probe. Restart clears the gate (HOST-007).
  *
  * Baseline: known debt entries (file::name) are allowed but reported; new debt
- * not in baseline and without proof annotation is RED.
+ * not in baseline and without proof annotation is RED. BASELINE_MAX_SIZE is a
+ * ratchet — it only decreases as debt items are fixed, never increases.
  */
 
 import { readFileSync } from 'node:fs'
@@ -34,16 +53,37 @@ const norm = (p) => p.replace(/\\/g, '/')
  * until fixed; any NEW pattern not listed here is RED.
  */
 export const KNOWN_DEBT_BASELINE = new Set([
-  // PluginRecoveryScope — RecoveryArming + AttemptPlans
-  'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs::recoveryArming',
-  'src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs::attemptPlans',
-  // PluginScope — CounterfactualAwait
-  'src/Wanxiangshu/Strength/OpenCode/PluginScope.fs::counterfactualAwait',
   // LoopSensor — armed
   'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed',
   // NeedHelpSensor — armed
   'src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs::armed',
 ])
+
+/**
+ * Physical capability exemption categories.
+ * A proof annotation should reference one of these categories to whitelist
+ * a mutable/registry value as an opaque physical capability/outcome.
+ * Backward compat: bare 'physical' without category is still accepted.
+ */
+export const EXEMPTION_CATEGORIES = new Set([
+  'pty',
+  'timer',
+  'waiter',
+  'single-flight',
+  'quiescence-permit',
+  'process-handle',
+  'socket',
+  'cancellation-token',
+  'resource',
+])
+
+/**
+ * Baseline ratchet ceiling: KNOWN_DEBT_BASELINE.size must never exceed this.
+ * When a debt item is fixed, remove it from KNOWN_DEBT_BASELINE and decrease
+ * BASELINE_MAX_SIZE by 1. Increasing BASELINE_MAX_SIZE is a ratchet violation
+ * (VERIFICATION-SYSTEM-010: acceptance criteria only tighten).
+ */
+export const BASELINE_MAX_SIZE = 2
 
 /**
  * Pattern 1: TryTake continuation consumption.
@@ -64,6 +104,14 @@ const ARMED_PROBE_PATTERN = /\bmember\s+(?:_\.|this\.)\s*(?:IsArmed|HasArmed\w*|
  * are used as Dictionary value types.
  */
 const DU_AWAIT_CASE_PATTERN = /^\s*\|\s*(Await\w+|Armed\w*|Pending\w*)\s+of\b/
+
+/**
+ * Pattern 4: Clear/Drop presence-clearing probe.
+ * Matches method names like ClearArmed, ClearRecovery, DropAttempt, DropSession
+ * that clear registry presence and whose return value or side-effect drives
+ * the next business effect decision (e.g. IsArmed → ClearArmed → bool → branch).
+ */
+const CLEAR_PRESENCE_PATTERN = /\bmember\s+(?:_\.|this\.)\s*(Clear\w*|Drop\w*)\s*[<(]/
 
 /**
  * Registry declaration: Dictionary or HashSet with DSL-MUTABLE annotation.
@@ -163,6 +211,7 @@ export const scanText = (text, file = '<synthetic>') => {
     // A member pattern only implicates the registry it actually reads/consumes.
     const hasTryTake = members.some((block) => TRYTAKE_PATTERN.test(block) && referencesRegistry(block, reg.name))
     const hasArmedProbe = members.some((block) => ARMED_PROBE_PATTERN.test(block) && referencesRegistry(block, reg.name))
+    const hasClearPresence = members.some((block) => CLEAR_PRESENCE_PATTERN.test(block) && referencesRegistry(block, reg.name))
     // Check for DU await state: registry value type is an await DU
     const declLine = lines[reg.line]
     const valueMatch = /Dictionary<[^,]+,\s*(\w+)>/.exec(declLine)
@@ -172,6 +221,7 @@ export const scanText = (text, file = '<synthetic>') => {
     let pattern = null
     if (hasTryTake) pattern = 'trytake-continuation'
     else if (hasArmedProbe) pattern = 'armed-presence-probe'
+    else if (hasClearPresence) pattern = 'clear-presence-probe'
     else if (hasDuAwait) pattern = 'du-await-state'
 
     if (!pattern) continue

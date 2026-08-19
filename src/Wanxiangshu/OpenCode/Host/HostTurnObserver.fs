@@ -183,6 +183,14 @@ module HostTurnObserver =
            | ReconcileProgram.TurnInProgress
            | ReconcileProgram.TurnNeedsContinuation _ -> true
 
+    /// SW-017 ①: Host boundary consumes the one-shot LoopKillArmed mark,
+    /// producing a typed AbortCause. Application CE branches on the typed outcome,
+    /// never probing sensor presence.
+    let private abortCauseOfTurn (scope: PluginRuntimeScope) (context: ReconciledTurnContext) : AbortCause =
+        match context.Turn.Outcome with
+        | ReconcileProgram.TurnAborted _ -> scope.LoopSensor.ConsumeAbortCause context.Turn.SessionId
+        | _ -> AbortCause.External
+
     let private observeApplicationTurn
         (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
@@ -192,36 +200,42 @@ module HostTurnObserver =
         (reviewerContinuationPort: ReviewerContinuationPort)
         (context: ReconciledTurnContext)
         : Task =
-        if needsBloggerIdleProtocolRepair context then
-            // A prose-only Blogger terminal has no tool-loop request after it,
-            // so provider transform cannot own recovery. The idle wake is the
-            // causal boundary that can still send exact-one nudge / AABB.
-            InteractionRepairWorkflow.repairBloggerProtocol
-                scope.ParkedTransformHost
-                scope.Sessions.Quiescence
-                context
-                sessionPort
-                eventPort
-                journal
-        else
-            // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
-            // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
-            TurnWorkflow.observe
-                recoveryTimerPort
-                Pty.abortParent
-                (fun sessionId -> scope.CancelSessionChildren(SessionId.value sessionId))
-                sessionPort
-                eventPort
-                journal
-                scope.SyncDelegateRuntime
-                reviewerContinuationPort
-                scope.Sessions.NudgeSent
-                scope.Sessions.JoinGuardNudges
-                scope.HasLivePty
-                scope.Sessions.AbortedSessions
-                (Some scope.LoopSensor)
-                scope.Sessions.Quiescence
-                context
+        task {
+            if needsBloggerIdleProtocolRepair context then
+                // A prose-only Blogger terminal has no tool-loop request after it,
+                // so provider transform cannot own recovery. The idle wake is the
+                // causal boundary that can still send exact-one nudge / AABB.
+                return!
+                    InteractionRepairWorkflow.repairBloggerProtocol
+                        scope.ParkedTransformHost
+                        scope.Sessions.Quiescence
+                        context
+                        sessionPort
+                        eventPort
+                        journal
+            else
+                // Sole Application turn entry (rabbit §6.5 / §18): Host no longer
+                // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
+                let abortCause = abortCauseOfTurn scope context
+
+                do!
+                    TurnWorkflow.observe
+                        recoveryTimerPort
+                        Pty.abortParent
+                        (fun sessionId -> scope.CancelSessionChildren(SessionId.value sessionId))
+                        sessionPort
+                        eventPort
+                        journal
+                        scope.SyncDelegateRuntime
+                        reviewerContinuationPort
+                        scope.Sessions.NudgeSent
+                        scope.Sessions.JoinGuardNudges
+                        scope.HasLivePty
+                        scope.Sessions.AbortedSessions
+                        abortCause
+                        scope.Sessions.Quiescence
+                        context
+        }
 
     let private observeFamilyReady
         (recoveryTimerPort: ITimerPort)
@@ -307,13 +321,14 @@ module HostTurnObserver =
             | AssistanceTurnDisposition.Handled ->
                 // HOST-027: if LoopSensor also armed before the physical abort
                 // settled, the explicit collaboration request owns this abort.
-                // Clear the competing process-local cause so it cannot leak into
-                // the next attempt as a phantom loop-kill.
-                scope.LoopSensor.ClearArmed turn.SessionId
+                // Discard the competing typed cause so it cannot leak into
+                // the next attempt as a phantom loop-kill. ConsumeAbortCause
+                // is one-shot (SW-017 ①); return value ignored — discarding.
+                scope.LoopSensor.ConsumeAbortCause turn.SessionId |> ignore
                 do! XWire.reconcileAttempt journal scope turn
                 return ()
             | AssistanceTurnDisposition.ClaimedButUnresolved ->
-                scope.LoopSensor.ClearArmed turn.SessionId
+                scope.LoopSensor.ConsumeAbortCause turn.SessionId |> ignore
                 do! XWire.reconcileAttempt journal scope turn
 
                 eventPort.NotifyTerminal
@@ -339,11 +354,12 @@ module HostTurnObserver =
                 // STRENGTH-010: only primary (non-Replica) turns feed the
                 // counterfactual predictor. Pending shadow/control labels
                 // are target-bound inside the scope.
-                scope.Strength.ObserveStrengthPrimary(
-                    turn.SessionId,
-                    turn.ProviderRun,
-                    StrengthTurnEvidence.primarySymbol turn.Parts
-                )
+                let _ =
+                    scope.Strength.ObserveStrengthPrimary(
+                        turn.SessionId,
+                        turn.ProviderRun,
+                        StrengthTurnEvidence.primarySymbol turn.Parts
+                    )
 
                 // STRENGTH-007: consumption proof closes before any later
                 // continuation can be admitted. This writer is independent

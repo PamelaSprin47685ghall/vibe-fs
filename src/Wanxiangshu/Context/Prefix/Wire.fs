@@ -560,9 +560,26 @@ module XWire =
         | ReconcileProgram.TurnNeedsContinuation _
         | ReconcileProgram.TurnInProgress -> Task.FromResult(())
 
-    /// Owning recovery CE consumes the frozen attempt plan exactly once (typed handle).
-    /// Reconciliation is the only consumer; no second read after provisional.
+    /// Terminal outcome dispatch: consume the typed handle and delegate to the
+    /// armed attempt CE; provisional/unknown turns keep the plan alive (SW-009,
+    /// SW-017②, PAR-011).
+    let private reconcileTerminalAttempt
+        (durable: AgentJournal) (scope: PluginRuntimeScope) (turn: ReconciledTurn) (plan: AttemptPlan)
+        : Task =
+        match turn.Outcome with
+        | ReconcileProgram.TurnCompleted
+        | ReconcileProgram.TurnFailed _
+        | ReconcileProgram.TurnAborted _ ->
+            scope.ConsumeAttemptPlan turn.SessionId turn.ProviderRun |> ignore
+            reconcileArmedAttempt durable scope turn plan
+        | ReconcileProgram.TurnNeedsContinuation _
+        | ReconcileProgram.TurnInProgress -> Task.FromResult(())
+
+    /// Owning recovery CE peeks the frozen attempt plan first; consumes only on terminal
+    /// outcomes. Provisional/unknown turns keep the plan alive for the terminal reread,
+    /// eliminating the premature-clear bug where FallbackCursorAdvanced had no matching
+    /// PrefixRebaseCommitted (SW-009, SW-017②, PAR-011).
     let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
-        match journal, scope.TryTakeAttemptPlan turn.SessionId turn.ProviderRun with
-        | Some durable, Some plan -> reconcileArmedAttempt durable scope turn plan
+        match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
+        | Some durable, Some plan -> reconcileTerminalAttempt durable scope turn plan
         | _ -> Task.FromResult(())

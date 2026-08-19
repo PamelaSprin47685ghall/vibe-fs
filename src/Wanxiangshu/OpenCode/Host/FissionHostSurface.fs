@@ -113,7 +113,7 @@ module FissionHostSurface =
                     (HashSet<string>())
                     (fun _ -> false)
                     (HashSet<string>())
-                    None
+                    AbortCause.External
                     (SessionQuiescenceGate())
                     context
 

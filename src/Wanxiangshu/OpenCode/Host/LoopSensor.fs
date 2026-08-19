@@ -25,16 +25,24 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
+/// Host boundary typed outcome: LoopKill vs External abort cause.
+/// Produced only by LoopSensor.ConsumeAbortCause, consumed exactly once by Application CE (SW-017 ①).
+[<RequireQualifiedAccess>]
+type AbortCause =
+    | LoopKill
+    | External
+
 /// LOOP-002 / LOOP-006: edge sensor over Host streaming deltas.
 ///
 /// Owns per-session detectors and the process-local LoopKillArmed set.
 /// Abort is fire-and-forget; the AABB bridge happens later on TurnAborted
-/// when the armed mark is still present (OrdinaryTurnWorkflow).
+/// when the typed AbortCause is consumed (Host → Application one-shot).
 type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Result<unit, string>>) =
 
     let gate = obj ()
     // DSL-MUTABLE: resource — per-session loop detector registry
     let detectors = Dictionary<string, LoopDetector.Detector>()
+    /// DSL-cross-callback-proof: physical single-flight — one-shot LoopKillArmed, consumed as typed AbortCause
     // DSL-MUTABLE: single-flight — one-shot loop-kill armed mark per session
     let armed = HashSet<string>()
 
@@ -63,16 +71,19 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                       "provider_error", ex.Message ]
         }
 
-    member _.IsArmed(sessionId: SessionId) =
-        lock gate (fun () -> armed.Contains(keyOf sessionId))
+    /// Host boundary: consume the one-shot LoopKillArmed mark, producing a typed outcome.
+    /// Application CE consumes this outcome once; internal latch presence is not exposed (SW-017 ①).
+    member _.ConsumeAbortCause(sessionId: SessionId) : AbortCause =
+        lock gate (fun () ->
+            let key = keyOf sessionId
 
-    /// LOOP-006: claim the armed mark. True exactly once per session until
-    /// ClearArmed / DropSession.
-    member _.TryArm(sessionId: SessionId) =
+            if armed.Remove key then
+                AbortCause.LoopKill
+            else
+                AbortCause.External)
+
+    member private _.TryArm(sessionId: SessionId) =
         lock gate (fun () -> armed.Add(keyOf sessionId))
-
-    member _.ClearArmed(sessionId: SessionId) =
-        lock gate (fun () -> armed.Remove(keyOf sessionId) |> ignore)
 
     member _.DropSession(sessionId: SessionId) =
         lock gate (fun () ->
@@ -124,7 +135,9 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
             this.Kill delta.SessionId (Some evaluation.WeightedDistinctTokenCount) evaluation.Step
 
     member private this.ObserveOwned(delta: LoopEventCodec.TextDelta) =
-        match isOwned delta.SessionId, this.IsArmed delta.SessionId with
+        let alreadyArmed = lock gate (fun () -> armed.Contains(keyOf delta.SessionId))
+
+        match isOwned delta.SessionId, alreadyArmed with
         | false, _
         | true, true -> ()
         | true, false -> this.KillIfLoop delta (this.Evaluate delta)

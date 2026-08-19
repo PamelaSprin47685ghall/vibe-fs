@@ -268,8 +268,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member this.ArmRecovery(sessionId: SessionId) = recovery.ArmRecovery sessionId
 
-    member this.TryRecoveryArming(sessionId: SessionId) = recovery.TryRecoveryArming sessionId
-
     member this.TryTakeRecoveryPermit(sessionId: SessionId) =
         recovery.TryTakeRecoveryPermit sessionId
 
@@ -281,14 +279,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member this.TryAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
         recovery.TryAttemptPlan sessionId providerRun
 
-    member this.TryTakeAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        recovery.TryTakeAttemptPlan sessionId providerRun
-
-    member this.ClearRecovery(sessionId: SessionId) =
-        recovery.ClearRecovery(SessionId.value sessionId)
-
-    member this.ClearAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
-        recovery.TryTakeAttemptPlan sessionId providerRun |> ignore
+    member this.ConsumeAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) =
+        recovery.ConsumeAttemptPlan sessionId providerRun
 
     /// HOST-006 prevention layer: the config hook's finding.
     ///

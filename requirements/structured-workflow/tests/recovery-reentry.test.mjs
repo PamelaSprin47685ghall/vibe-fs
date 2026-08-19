@@ -90,7 +90,7 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_change_seam_has_no_recovery_control_t
   // OBL-002: the Change seam must not re-introduce a JobRecoveryAction
   // control-token type, a recoveryAction producer, a resumeFromDurableFacts
   // interpreter, or any equivalent NextAction dispatcher. Recovery re-enters
-  // the ordinary CE workflow by matching JobProgress (durable evidence) directly.
+  // the ordinary CE workflow by matching independent durable facts directly.
   const forbidden = [
     'src/Wanxiangshu/Change/Projection.fs',
     'src/Wanxiangshu/Change/Program.fs',

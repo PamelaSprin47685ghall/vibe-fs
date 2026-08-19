@@ -92,9 +92,17 @@ type private AttemptPlanHandle =
 type PluginRecoveryScope(journal: AgentJournal option) =
 
     // Owning CE internal single-flight channels — process-local, crash-zero.
+    /// DSL-cross-callback-proof: physical single-flight — opaque one-shot recovery arming permit channel.
+    /// Owning recovery CE (XWire.applyNonReplicaTransform) consumes via TryTakeRecoveryPermit;
+    /// Host callback (HostTurnObserver.armRecoveryIfEligible) only arms via ArmRecovery.
+    /// No stringly-typed TryGet/Clear drives business branching (SW-017②, SW-009, PAR-011).
     // DSL-MUTABLE: single-flight — per-session one-shot recovery arming permit channel (typed capability)
     let recoveryArming = Dictionary<string, SlotArming>()
 
+    /// DSL-cross-callback-proof: physical single-flight — opaque frozen attempt plan channel.
+    /// Owning recovery CE (XWire.reconcileAttempt) consumes via ConsumeAttemptPlan on terminal;
+    /// transform adapter records via RecordAttemptPlan; Strength peeks via TryAttemptPlan.
+    /// No stringly-typed TryGet/Clear drives business branching (SW-017②, SW-009, PAR-011).
     // DSL-MUTABLE: single-flight — per-provider-run attempt plan channel (frozen decision, typed handle)
     let attemptPlans = Dictionary<string, AttemptPlan>()
 
@@ -126,19 +134,14 @@ type PluginRecoveryScope(journal: AgentJournal option) =
             Some arming
         | false, _ -> None
 
-    /// Legacy peek — retained for compatibility but must not drive business branching.
-    /// New code must use TryTakeRecoveryPermit.
-    member this.TryRecoveryArming(sessionId: SessionId) =
-        match recoveryArming.TryGetValue(SessionId.value sessionId) with
-        | true, arming -> Some arming
-        | false, _ -> None
-
     member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
         attemptPlans.[SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun] <- plan
 
     /// Owning CE consumes the frozen plan exactly once on terminal reconciliation.
+    /// Provisional/unknown turns must use TryAttemptPlan (peek) to keep the plan alive;
+    /// only terminal outcomes (TurnCompleted/TurnFailed/TurnAborted) call ConsumeAttemptPlan.
     /// Returns None if already consumed or never recorded.
-    member this.TryTakeAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) : AttemptPlan option =
+    member this.ConsumeAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) : AttemptPlan option =
         let key =
             SessionId.value sessionId + "\u001f" + ProviderRunIdentity.value providerRun
 
@@ -165,17 +168,12 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         recoveryArming.Remove sessionId |> ignore
         this.ClearAttemptPlansFor sessionId
 
-    /// One-shot arming consumption (FALLBACK-012): drops arming only; attempt
-    /// plans stay until the turn resolves them. Prefer TryTakeRecoveryPermit.
-    member this.ClearRecovery(sessionId: string) =
-        recoveryArming.Remove sessionId |> ignore
-
     /// Re-arm for the durable NoCoverage case — blog frames catching up (PAR-011, SW-009).
     member this.ReArmRecovery(sessionId: SessionId) =
         recoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
 
     /// Drops attempt plans whose key prefix matches (used for a session and
-    /// for its linked Blogger keys during session deletion). Prefer TryTakeAttemptPlan.
+    /// for its linked Blogger keys during session deletion). Prefer ConsumeAttemptPlan.
     member this.ClearAttemptPlansFor(key: string) =
         attemptPlans.Keys
         |> Seq.filter (fun planKey -> planKey.StartsWith(key + "\u001f", StringComparison.Ordinal))

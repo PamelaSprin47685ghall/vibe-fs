@@ -86,14 +86,12 @@ module LoopSensorSurface =
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw
 
-    let isArmed (sensor: obj) (session: string) : bool =
-        (sensor :?> SensorHandle).Sensor.IsArmed(SessionId.create session)
-
-    let tryArm (sensor: obj) (session: string) : bool =
-        (sensor :?> SensorHandle).Sensor.TryArm(SessionId.create session)
-
-    let clearArmed (sensor: obj) (session: string) : unit =
-        (sensor :?> SensorHandle).Sensor.ClearArmed(SessionId.create session)
+    /// Consume the one-shot LoopKillArmed mark, producing typed AbortCause (SW-017 ①).
+    /// Application CE branches on typed outcome, never probing presence.
+    let consumeAbortCause (sensor: obj) (session: string) : string =
+        match (sensor :?> SensorHandle).Sensor.ConsumeAbortCause(SessionId.create session) with
+        | AbortCause.LoopKill -> "LoopKill"
+        | AbortCause.External -> "External"
 
     let dropSession (sensor: obj) (session: string) : unit =
         (sensor :?> SensorHandle).Sensor.DropSession(SessionId.create session)

@@ -30,8 +30,14 @@ WorktreeEffectStatus = Requested of {| ManagerJobId; WorktreePath |}
 WorktreeEffects：Map<WorktreeIdentity, WorktreeEffectStatus>
   requestWorktree：无状态 → Requested；已有 Created → 保持 Created（不回归）
   acceptWorktree：Requested → Created；重复 Created 幂等
-JobProgress：ManagerStarted | CandidateReady | ConflictPending | RebasedCandidateReady
-  | PublishClaimed {| RebasedCommit; ExpectedHead |} | Published | Failed | Abandoned
+ManagerJobProjection 独立 durable facts（不 fold 成唯一 latest-case enum）：
+  CandidateReady: {| CandidateCommit; PreRebaseReviewBarrierId |} option
+  ConflictDetected: {| CandidateCommit; TargetHeadSnapshot; ConflictFiles; DiagnosticsDigest |} option
+  RebasedCandidateReady: {| RebasedCommit; TargetHeadSnapshot; PostRebaseReviewBarrierId |} option
+  PublishClaimed: {| RebasedCommit; ExpectedHead |} option
+  Terminal: TerminalOutcome option（Published | Failed | Abandoned）
+semantic entry 从 facts + 当前外部现实（target head）重证 outstanding obligation（SW-003 vs SW-009 消歧）；
+不恢复 latest-stage enum，不新增 ResumeAtXxx 补偿日志。
 classifyPublishClaim（ORCH-007，三分支固定顺序）——见 WHAT 009：
   currentHead = None                       → HeadUnreadable（ORCH-008 fail closed）
   head = claim.RebasedCommit               → AlreadyFastForwarded（ff 已发生，只缺事实）
@@ -44,7 +50,7 @@ classifyPublishClaim（ORCH-007，三分支固定顺序）——见 WHAT 009：
 ```text
 PublishClaimed 分支：job 当前无 RebasedCandidateReady → reject
   "publish claimed for a job with no rebased candidate (ORCH-004)"（claim 必须有 durable witness）
-Published → JobProgress.Published；terminal job 不再接受任何 progress（重放幂等）
+Published → Terminal.Published；terminal job 不再接受任何 progress（重放幂等）
 WorktreeCreateRequested → requestWorktree；WorktreeCreated → acceptWorktree
 ```
 

@@ -48,6 +48,19 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation.Identity
 
+/// Host boundary typed one-shot capability: an assistance abort claim.
+/// Produced only by NeedHelpSensor.TryConsumeAssistanceClaim, consumed exactly once by the owning CE (SW-017 ②).
+/// Carries the exact attempt identity so the claim cannot be confused across provider runs.
+[<RequireQualifiedAccess>]
+type AssistanceAbortClaim =
+    private
+        { SessionId: SessionId
+          ProviderRun: ProviderRunIdentity }
+
+    static member Create(sessionId: SessionId, providerRun: ProviderRunIdentity) =
+        { SessionId = sessionId
+          ProviderRun = providerRun }
+
 /// HOST-027: process-local exact-sentinel sensor over reasoning deltas.
 /// It owns only stream part identity, rolling suffixes, and armed attempt
 /// identities; business escalation begins after the physical abort reconciles.
@@ -61,6 +74,7 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     let suffixes = Dictionary<string, string>()
     // DSL-MUTABLE: resource — reasoning part identity set
     let reasoningParts = HashSet<string>()
+    /// DSL-cross-callback-proof: physical single-flight — one-shot armed attempt mark, consumed as typed AssistanceAbortClaim
     // DSL-MUTABLE: single-flight — one-shot armed attempt mark
     let armed = HashSet<string>()
 
@@ -91,32 +105,42 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
 
     member _.Sentinel = sentinelText
 
-    member _.IsArmed(sessionId: SessionId, providerRun: ProviderRunIdentity) =
-        lock gate (fun () -> armed.Contains(attemptKey sessionId providerRun))
-
-    /// HOST-027: coarse abort ownership is decided by the exact typed armed
-    /// attempt, not by the generic MessageAborted transport signal. This query
-    /// exists only so HostSignalBootstrap can avoid revoking the idle right of
-    /// an abort that this sensor itself requested.
-    member _.HasArmedSession(sessionId: SessionId) =
-        let prefix = sessionPrefix sessionId
-
-        lock gate (fun () ->
-            armed
-            |> Seq.exists (fun key -> key.StartsWith(prefix, StringComparison.Ordinal)))
-
-    member _.TryArm(sessionId: SessionId, providerRun: ProviderRunIdentity) =
-        lock gate (fun () -> armed.Add(attemptKey sessionId providerRun))
-
-    /// Claim an assistance abort exactly once for the reconciled provider run.
-    /// Stream state dies with the attempt so detector memory is bounded by
-    /// currently live provider runs rather than session lifetime.
-    member _.TryTake(sessionId: SessionId, providerRun: ProviderRunIdentity) =
+    /// Host boundary: consume the one-shot assistance abort claim for the exact attempt.
+    /// Returns Some typed claim exactly once; subsequent calls return None (SW-017 ② one-shot).
+    member _.TryConsumeAssistanceClaim
+        (sessionId: SessionId, providerRun: ProviderRunIdentity)
+        : AssistanceAbortClaim option =
         lock gate (fun () ->
             let key = attemptKey sessionId providerRun
-            suffixes.Remove key |> ignore
-            removePartsByPrefix (partPrefix sessionId providerRun)
-            armed.Remove key)
+
+            if not (armed.Remove key) then
+                None
+            else
+                suffixes.Remove key |> ignore
+                removePartsByPrefix (partPrefix sessionId providerRun)
+                Some(AssistanceAbortClaim.Create(sessionId, providerRun)))
+
+    /// Consume and discard any armed claims for the session (used when assistance defers to another typed cause).
+    member _.DiscardArmedForSession(sessionId: SessionId) =
+        lock gate (fun () ->
+            let prefix = sessionPrefix sessionId
+
+            let suffixKeys =
+                suffixes.Keys
+                |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
+                |> Seq.toArray
+
+            let armedKeys =
+                armed
+                |> Seq.filter (fun key -> key.StartsWith(prefix, StringComparison.Ordinal))
+                |> Seq.toArray
+
+            suffixKeys |> Array.iter (fun key -> suffixes.Remove key |> ignore)
+            removePartsByPrefix prefix
+            armedKeys |> Array.iter (fun key -> armed.Remove key |> ignore))
+
+    member private _.TryArm(sessionId: SessionId, providerRun: ProviderRunIdentity) =
+        lock gate (fun () -> armed.Add(attemptKey sessionId providerRun))
 
     member _.DropAttempt(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () ->
@@ -178,29 +202,32 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
             NeedHelpEventCodec.isNeedHelpDelta raw
             || lock gate (fun () -> reasoningParts.Contains(partKey delta.SessionId delta.ProviderRun delta.PartId))
 
+    member private this.ProbeReasoningDelta(delta: NeedHelpEventCodec.StreamDelta) =
+        let hit =
+            lock gate (fun () ->
+                let key = attemptKey delta.SessionId delta.ProviderRun
+
+                let previous =
+                    match suffixes.TryGetValue key with
+                    | true, value -> value
+                    | false, _ -> ""
+
+                let combined = previous + delta.Delta
+                let found = combined.Contains(sentinelText, StringComparison.Ordinal)
+                suffixes.[key] <- keepSuffix combined
+                found)
+
+        if hit then
+            this.RequestAbort(delta.SessionId, delta.ProviderRun)
+
     member private this.ObserveDelta(raw: obj, delta: NeedHelpEventCodec.StreamDelta) =
-        if
-            not (isOwned delta.SessionId)
-            || this.IsArmed(delta.SessionId, delta.ProviderRun)
-        then
+        let alreadyArmed =
+            lock gate (fun () -> armed.Contains(attemptKey delta.SessionId delta.ProviderRun))
+
+        if not (isOwned delta.SessionId) || alreadyArmed then
             ()
         elif this.IsReasoningDelta raw then
-            let hit =
-                lock gate (fun () ->
-                    let key = attemptKey delta.SessionId delta.ProviderRun
-
-                    let previous =
-                        match suffixes.TryGetValue key with
-                        | true, value -> value
-                        | false, _ -> ""
-
-                    let combined = previous + delta.Delta
-                    let found = combined.Contains(sentinelText, StringComparison.Ordinal)
-                    suffixes.[key] <- keepSuffix combined
-                    found)
-
-            if hit then
-                this.RequestAbort(delta.SessionId, delta.ProviderRun)
+            this.ProbeReasoningDelta delta
 
     member private _.ObserveUpdatedPart(part: NeedHelpEventCodec.PartIdentity) =
         lock gate (fun () ->

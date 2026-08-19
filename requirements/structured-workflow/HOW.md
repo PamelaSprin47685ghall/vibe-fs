@@ -269,6 +269,78 @@ materialize one bounded WorkRecord。provider 顺序第一项是 canonical invoc
 命中 1–5 默认 REVISE。合法 physical presence 必须停留在 adapter/physical owner，向上
 收敛成 typed capability/outcome/evidence；合法 domain result 可以由 parent 穷尽 `match`。
 
+#### 3.6.1 结构不变量（cross-callback PC gate）
+
+> **`DSL-MUTABLE: resource` 是声明，不是证明。** 把两张表 + implicit phase 改成一张表 +
+> DU phase，或把 `IsArmed` 的 producer 和 consumer 拆到不同文件，现有 `dsl-ownership`
+> 的 `registry-joint-branch` 门禁很容易自动变绿，但 transition graph 根本没变。
+
+`scripts/checks/cross-callback-pc.mjs` 守住以下结构不变量：
+
+> ∀ mutable/registry value，若在 callback A 写入、在 callback B 读取且 B 的
+> presence/value 决定下一业务 effect，则必须证明为 opaque physical capability/outcome，
+> 否则判 cross-boundary program counter。
+
+四种 pattern signature：
+
+| Pattern | 形态 | 判定 |
+|---|---|---|
+| `trytake-continuation` | `TryTake*` 方法返回 option（one-shot 消费） | 跨 callback continuation |
+| `armed-presence-probe` | `IsArmed`/`HasArmed`/`TryArm` 返回 bool/option | presence 驱动业务分支 |
+| `du-await-state` | `Dictionary<_, DU>` 且 DU 有 `Await`/`Armed`/`Pending` case | DU 状态机跨 callback |
+| `clear-presence-probe` | `Clear*`/`Drop*` 方法清除 registry 且返回值驱动业务分支 | presence 清除驱动下一 effect |
+
+Proof annotation: `/// DSL-cross-callback-proof: physical <category>`，`<category>` 应属于
+`EXEMPTION_CATEGORIES`。向后兼容：不带 category 的 bare `physical` 仍被接受。
+
+Baseline ratchet: `KNOWN_DEBT_BASELINE.size ≤ BASELINE_MAX_SIZE`，修复一项债务后从 baseline
+移除并下调 `BASELINE_MAX_SIZE`（只降不升，VERIFICATION-SYSTEM-010）。
+
+#### 3.6.2 豁免清单（physical capability vs 真 PC）
+
+| 类别 | 说明 | 合法对照 |
+|---|---|---|
+| `pty` | PTY process handle registry | 物理进程句柄，重启后失效 |
+| `timer` | timer/deadline handle registry | 物理定时器句柄 |
+| `waiter` | TaskCompletionSource / async waiter registry | 物理等待句柄 |
+| `single-flight` | single-flight admission permit | 物理并发控制 |
+| `quiescence-permit` | idle-derived side-effect admission gate | **`SessionQuiescenceGate.fs`** |
+| `process-handle` | native process handle lease | 物理进程租约 |
+| `socket` | network socket / connection handle | 物理连接句柄 |
+| `cancellation-token` | CancellationTokenRegistration handle | 物理取消句柄 |
+| `resource` | 通用物理资源（向后兼容） | 已有 annotation 无 category 时使用 |
+
+**合法对照：`SessionQuiescenceGate.fs`（`quiescence-permit`）**
+
+`SessionQuiescenceGate` 是 process-local side-effect admission gate（HOST-004）。它回答唯一
+问题：一个以 idle 为前提的副作用，现在是否仍有资格发送？
+
+- `ObserveIdle(session)` → 返回 opaque `QuiescencePermit(session, serial)`
+- `TryConsume(permit)` → `state == Idle(permit.AttemptSerial)` → `IdleConsumed` → `true`；否则 `false`
+- 重启后 gate 清空：没有 fresh idle → 没有 permit → fail-closed（HOST-007）
+- permit 是不可伪造的 typed capability，不是 presence probe
+- 不写 Journal、不参与 crash recovery、不表达业务 stage
+
+与真 PC 的关键区别：`SessionQuiescenceGate` 的 `TryConsume` 接收一个 **typed permit**
+（`QuiescencePermit`），不是 session key 的 `TryGetValue`。permit 携带 attemptSerial，
+gate 验证 `state == Idle(permit.AttemptSerial)` 才消费——这是 capability 验证，不是
+registry presence 查询。
+
+**非法对照（真 PC，在 baseline 中）**
+
+| 债务 | 形态 | 为什么是 PC |
+|---|---|---|
+| `recoveryArming` | `Dictionary<string, SlotArming>` + `TryTakeRecoveryPermit(key)` | key presence 驱动 recovery 分支 |
+| `attemptPlans` | `Dictionary<string, AttemptPlan>` + `TryTakeAttemptPlan(key)` | key presence 驱动 reconciliation |
+| `LoopSensor.armed` | `HashSet<string>` + `IsArmed(key)` → `ClearArmed(key)` → bool | presence → bool → 业务分支 |
+| `NeedHelpSensor.armed` | `HashSet<string>` + `IsArmed` → `TryTake` → escalation | 三段 CE 跨 callback 拼接 |
+
+**已修复（从 baseline 移除）**
+
+| 债务 | 原形态 | 修复方式 |
+|---|---|---|
+| `counterfactualAwait` | `Dictionary<string, DU(AwaitFirst\|AwaitSecond)>` — DU 状态机跨 callback | 已坍缩为 owning CE；源文件 `PluginScope.fs` 中 `counterfactualAwait` Dictionary 声明已不存在 |
+
 ### 3.7 其它机制（非本包 owner）
 
 - `scripts/checks/architecture.mjs`（ARCH-001 分层、fsproj、资源读取位置）→

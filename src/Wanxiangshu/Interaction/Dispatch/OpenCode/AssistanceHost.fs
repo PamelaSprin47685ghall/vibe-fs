@@ -644,44 +644,46 @@ type AssistanceHost
     /// aborted attempt. A fresh SessionIdle revisit is the transport fence. The
     /// NEEDHELP arm is consumed only behind that fence, so ordinary fallback can
     /// never race a half-landed assistance continuation.
+    /// HOST-027: owning CE holds the one-shot AssistanceAbortClaim.
+    /// The typed claim is consumed exactly once behind the idle fence (SW-017 ②).
+    /// No separate IsArmed presence probe; the claim itself is the capability.
     let withFreshAssistanceQuiescence
         (context: ReconciledTurnContext)
-        (turn: ReconciledTurn)
+        (assistanceClaim: AssistanceAbortClaim)
         (continueAfterIdle: unit -> Task<AssistanceTurnDisposition>)
         =
-        markOwnerClaim turn
-
-        let execute () =
-            task {
-                if not (sensor.TryTake(turn.SessionId, turn.ProviderRun)) then
-                    return AssistanceTurnDisposition.Handled
-                else
-                    return! continueAfterIdle ()
-            }
+        markOwnerClaim context.Turn
 
         match context.Quiescence with
         | None -> Task.FromResult AssistanceTurnDisposition.Handled
-        | Some _ -> execute ()
+        | Some _ ->
+            task {
+                // Claim already consumed to produce the typed value; fence decides escalation
+                return! continueAfterIdle ()
+            }
 
     let escalateFastOwnerRequest
         (context: ReconciledTurnContext)
+        (assistanceClaim: AssistanceAbortClaim)
         (turn: ReconciledTurn)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         role
         =
-        withFreshAssistanceQuiescence context turn (fun () -> sendEscalationContinuation turn profile role)
+        withFreshAssistanceQuiescence context assistanceClaim (fun () -> sendEscalationContinuation turn profile role)
 
     let beginDeepOwnerConsultation
         (context: ReconciledTurnContext)
+        (assistanceClaim: AssistanceAbortClaim)
         (turn: ReconciledTurn)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         requester
         =
-        withFreshAssistanceQuiescence context turn (fun () ->
+        withFreshAssistanceQuiescence context assistanceClaim (fun () ->
             beginConsultation turn.SessionId profile.LogicalRunId requester turn.Directory)
 
     let handleParsedOwnerRequest
         (context: ReconciledTurnContext)
+        (assistanceClaim: AssistanceAbortClaim)
         (turn: ReconciledTurn)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         requestingAgent
@@ -690,21 +692,24 @@ type AssistanceHost
         | Error _ -> Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
         | Ok(_, role, _, _) when role <> profile.CanonicalRole ->
             Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
-        | Ok(_, role, AgentTier.Fast, _) -> escalateFastOwnerRequest context turn profile role
-        | Ok(requester, _, AgentTier.Deep, _) -> beginDeepOwnerConsultation context turn profile requester
+        | Ok(_, role, AgentTier.Fast, _) -> escalateFastOwnerRequest context assistanceClaim turn profile role
+        | Ok(requester, _, AgentTier.Deep, _) ->
+            beginDeepOwnerConsultation context assistanceClaim turn profile requester
 
     let handleOwnerRequestForProfile
         (context: ReconciledTurnContext)
+        (assistanceClaim: AssistanceAbortClaim)
         (turn: ReconciledTurn)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         =
         task {
             match! requestingAgentFor turn with
             | Error _ -> return AssistanceTurnDisposition.ClaimedButUnresolved
-            | Ok requestingAgent -> return! handleParsedOwnerRequest context turn profile requestingAgent
+            | Ok requestingAgent ->
+                return! handleParsedOwnerRequest context assistanceClaim turn profile requestingAgent
         }
 
-    let handleOwnerRequest (context: ReconciledTurnContext) =
+    let handleOwnerRequest (context: ReconciledTurnContext) (assistanceClaim: AssistanceAbortClaim) =
         let turn = context.Turn
 
         task {
@@ -712,7 +717,7 @@ type AssistanceHost
             | None -> return AssistanceTurnDisposition.ClaimedButUnresolved
             | Some profile when profile.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId ->
                 return AssistanceTurnDisposition.ClaimedButUnresolved
-            | Some profile -> return! handleOwnerRequestForProfile context turn profile
+            | Some profile -> return! handleOwnerRequestForProfile context assistanceClaim turn profile
         }
 
     let finalizeConsultationAdvice owner logicalRun requester childId (record: HandleRecord) providerPrompt directory =
@@ -813,7 +818,10 @@ type AssistanceHost
         // cause proves this consultation attempt is unusable; ordinary
         // external abort remains a bounded failure advice without being
         // written as provider-failure evidence.
-        let recursive = sensor.TryTake(turn.SessionId, turn.ProviderRun)
+        let recursiveClaim =
+            sensor.TryConsumeAssistanceClaim(turn.SessionId, turn.ProviderRun)
+
+        let recursive = recursiveClaim.IsSome
 
         let failureReason =
             if recursive then
@@ -867,13 +875,14 @@ type AssistanceHost
         }
 
     let handleOwnerSideTurn (context: ReconciledTurnContext) (turn: ReconciledTurn) =
-        let isArmed = sensor.IsArmed(turn.SessionId, turn.ProviderRun)
         let isClaimed = isClaimedOwnerAttempt turn
 
-        match turn.Outcome with
-        | ReconcileProgram.TurnAborted _ when isArmed -> handleOwnerRequest context
-        | ReconcileProgram.TurnAborted _
-        | ReconcileProgram.TurnFailed _ when isClaimed ->
+        let assistanceClaim =
+            sensor.TryConsumeAssistanceClaim(turn.SessionId, turn.ProviderRun)
+
+        match turn.Outcome, assistanceClaim with
+        | ReconcileProgram.TurnAborted _, Some claim -> handleOwnerRequest context claim
+        | (ReconcileProgram.TurnAborted _, None | ReconcileProgram.TurnFailed _, None) when isClaimed ->
             // HOST-027: once exact NEEDHELP has claimed this physical owner
             // ProviderRun, later Host terminal views of that SAME run cannot
             // reclassify it as provider failure. OpenCode may surface Abort and
