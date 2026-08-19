@@ -173,6 +173,8 @@ module JournalPayloadClosure =
                 pair p.WorkRecordRef p.WorkRecordDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionCompletionCaptured p)) ->
                 pair p.PayloadRef p.PayloadDigest
+            | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionTakeoverClaimed p)) ->
+                pair p.AggregateWorkRecordRef p.AggregateWorkRecordDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionTakeoverStarted p)) ->
                 pair p.AggregateWorkRecordRef p.AggregateWorkRecordDigest
             | Fact.Agent(AgentFact.Fission(FissionFactCases.FissionConverged p)) ->

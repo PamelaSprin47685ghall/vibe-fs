@@ -41,6 +41,17 @@ type FissionFactCases =
            OwnerSessionId: SessionId
            ExternalId: string
            LaneIndex: int |}
+    | FissionTakeoverClaimed of
+        {| GroupId: string
+           OwnerSessionId: SessionId
+           LaneIndex: int
+           LaneSessionId: SessionId
+           PromptKey: PromptKey
+           AggregateWorkRecordRef: BlobRef
+           AggregateWorkRecordDigest: BlobDigest |}
+    /// Legacy accepted-physical takeover fact. New writes use
+    /// FissionTakeoverClaimed so lane-terminal observation never waits for a
+    /// future chat.message just to learn its PhysicalUserMessageId.
     | FissionTakeoverStarted of
         {| GroupId: string
            OwnerSessionId: SessionId

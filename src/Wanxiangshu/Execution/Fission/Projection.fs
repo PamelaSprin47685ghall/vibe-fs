@@ -19,7 +19,8 @@ type FissionGroupTerminal =
 type FissionTakeoverProjection =
     { LaneIndex: int
       LaneSessionId: SessionId
-      PhysicalUserMessageId: PhysicalUserMessageId
+      PromptKey: PromptKey option
+      PhysicalUserMessageId: PhysicalUserMessageId option
       AggregateWorkRecordRef: BlobRef
       AggregateWorkRecordDigest: BlobDigest }
 
@@ -112,6 +113,15 @@ module FissionProjection =
            LaneIndex: int
            LaneSessionId: SessionId
            PhysicalUserMessageId: PhysicalUserMessageId
+           AggregateWorkRecordRef: BlobRef
+           AggregateWorkRecordDigest: BlobDigest |}
+
+    type private TakeoverClaimedPayload =
+        {| GroupId: string
+           OwnerSessionId: SessionId
+           LaneIndex: int
+           LaneSessionId: SessionId
+           PromptKey: PromptKey
            AggregateWorkRecordRef: BlobRef
            AggregateWorkRecordDigest: BlobDigest |}
 
@@ -343,32 +353,83 @@ module FissionProjection =
             Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
         | Some group -> decideExternalAffinity state payload group
 
-    let private takeoverMatches (existing: FissionTakeoverProjection) (payload: TakeoverStartedPayload) =
-        existing.LaneIndex = payload.LaneIndex
-        && existing.LaneSessionId = payload.LaneSessionId
-        && existing.PhysicalUserMessageId = payload.PhysicalUserMessageId
-        && existing.AggregateWorkRecordRef = payload.AggregateWorkRecordRef
-        && existing.AggregateWorkRecordDigest = payload.AggregateWorkRecordDigest
+    let private takeoverMatches
+        (existing: FissionTakeoverProjection)
+        laneIndex
+        laneSessionId
+        promptKey
+        physicalUserMessageId
+        aggregateWorkRecordRef
+        aggregateWorkRecordDigest
+        =
+        existing.LaneIndex = laneIndex
+        && existing.LaneSessionId = laneSessionId
+        && existing.PromptKey = promptKey
+        && existing.PhysicalUserMessageId = physicalUserMessageId
+        && existing.AggregateWorkRecordRef = aggregateWorkRecordRef
+        && existing.AggregateWorkRecordDigest = aggregateWorkRecordDigest
+
+    let private foldTakeover
+        (state: FissionProjectionState)
+        groupId
+        laneIndex
+        laneSessionId
+        promptKey
+        physicalUserMessageId
+        aggregateWorkRecordRef
+        aggregateWorkRecordDigest
+        =
+        let takeover: FissionTakeoverProjection =
+            { LaneIndex = laneIndex
+              LaneSessionId = laneSessionId
+              PromptKey = promptKey
+              PhysicalUserMessageId = physicalUserMessageId
+              AggregateWorkRecordRef = aggregateWorkRecordRef
+              AggregateWorkRecordDigest = aggregateWorkRecordDigest }
+
+        match Map.tryFind groupId state.Groups with
+        | None -> Error(FissionProjectionRejection.UnknownGroup groupId)
+        | Some group when laneIndex < 0 || laneIndex >= group.LaneCount ->
+            Error(FissionProjectionRejection.InvalidLane laneIndex)
+        | Some group when Map.tryFind laneIndex group.LaneSessions <> Some laneSessionId ->
+            Error(FissionProjectionRejection.LaneSessionMismatch laneIndex)
+        | Some group when not (convergenceReady group) ->
+            Error(FissionProjectionRejection.ConvergenceIncomplete groupId)
+        | Some { Takeover = Some existing } when
+            takeoverMatches
+                existing
+                laneIndex
+                laneSessionId
+                promptKey
+                physicalUserMessageId
+                aggregateWorkRecordRef
+                aggregateWorkRecordDigest
+            ->
+            Ok state
+        | Some { Takeover = Some _ } -> Error(FissionProjectionRejection.ConflictingTakeover groupId)
+        | Some group -> Ok(replaceGroup state groupId { group with Takeover = Some takeover })
+
+    let private foldTakeoverClaimed (state: FissionProjectionState) (payload: TakeoverClaimedPayload) =
+        foldTakeover
+            state
+            payload.GroupId
+            payload.LaneIndex
+            payload.LaneSessionId
+            (Some payload.PromptKey)
+            None
+            payload.AggregateWorkRecordRef
+            payload.AggregateWorkRecordDigest
 
     let private foldTakeoverStarted (state: FissionProjectionState) (payload: TakeoverStartedPayload) =
-        let takeover: FissionTakeoverProjection =
-            { LaneIndex = payload.LaneIndex
-              LaneSessionId = payload.LaneSessionId
-              PhysicalUserMessageId = payload.PhysicalUserMessageId
-              AggregateWorkRecordRef = payload.AggregateWorkRecordRef
-              AggregateWorkRecordDigest = payload.AggregateWorkRecordDigest }
-
-        match Map.tryFind payload.GroupId state.Groups with
-        | None -> Error(FissionProjectionRejection.UnknownGroup payload.GroupId)
-        | Some group when payload.LaneIndex < 0 || payload.LaneIndex >= group.LaneCount ->
-            Error(FissionProjectionRejection.InvalidLane payload.LaneIndex)
-        | Some group when Map.tryFind payload.LaneIndex group.LaneSessions <> Some payload.LaneSessionId ->
-            Error(FissionProjectionRejection.LaneSessionMismatch payload.LaneIndex)
-        | Some group when not (convergenceReady group) ->
-            Error(FissionProjectionRejection.ConvergenceIncomplete payload.GroupId)
-        | Some { Takeover = Some existing } when takeoverMatches existing payload -> Ok state
-        | Some { Takeover = Some _ } -> Error(FissionProjectionRejection.ConflictingTakeover payload.GroupId)
-        | Some group -> Ok(replaceGroup state payload.GroupId { group with Takeover = Some takeover })
+        foldTakeover
+            state
+            payload.GroupId
+            payload.LaneIndex
+            payload.LaneSessionId
+            None
+            (Some payload.PhysicalUserMessageId)
+            payload.AggregateWorkRecordRef
+            payload.AggregateWorkRecordDigest
 
     let private decideConverged
         (state: FissionProjectionState)
@@ -436,6 +497,7 @@ module FissionProjection =
         | FissionFactCases.FissionCompletionCaptured payload -> foldCompletionCaptured state payload
         | FissionFactCases.FissionCompletionDelivered payload -> foldCompletionDelivered state payload
         | FissionFactCases.FissionExternalAffinityBound payload -> foldExternalAffinityBound state payload
+        | FissionFactCases.FissionTakeoverClaimed payload -> foldTakeoverClaimed state payload
         | FissionFactCases.FissionTakeoverStarted payload -> foldTakeoverStarted state payload
         | FissionFactCases.FissionConverged payload -> foldConverged state payload
         | FissionFactCases.FissionFailed payload -> foldFailed state payload

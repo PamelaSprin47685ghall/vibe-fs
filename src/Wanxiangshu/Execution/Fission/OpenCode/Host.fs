@@ -293,24 +293,24 @@ module FissionHost =
               "[fission_ring_handoff]"
               aggregate ]
 
-    let private appendTakeoverStarted
+    let private appendTakeoverClaimed
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (aggregateBlob: BlobWriteReceipt)
         laneIndex
         laneSessionId
-        physicalUserMessageId
+        promptKey
         =
         appendFission
             durable
             group.OwnerSessionId
             None
-            (FissionFact.FissionTakeoverStarted
+            (FissionFact.FissionTakeoverClaimed
                 {| GroupId = group.GroupId
                    OwnerSessionId = group.OwnerSessionId
                    LaneIndex = laneIndex
                    LaneSessionId = laneSessionId
-                   PhysicalUserMessageId = physicalUserMessageId
+                   PromptKey = promptKey
                    AggregateWorkRecordRef = aggregateBlob.BlobRef
                    AggregateWorkRecordDigest = aggregateBlob.BlobDigest |})
 
@@ -326,7 +326,6 @@ module FissionHost =
         laneSessionId
         =
         task {
-            let acceptedPhysicalId = TaskCompletionSource<PhysicalUserMessageId>()
             let dispatcher = PromptDispatcher.forJournal durable
 
             match!
@@ -339,13 +338,11 @@ module FissionHost =
                     authority.SelectedAgent
                     (directoryFor laneSessionId)
                     PromptDispatcher.AwaitMode.Await
-                    (Some(fun physicalId -> acceptedPhysicalId.TrySetResult physicalId |> ignore))
+                    None
             with
             | Error _ -> return false
-            | Ok _ ->
-                let! physicalId = acceptedPhysicalId.Task
-
-                match! appendTakeoverStarted durable group aggregateBlob laneIndex laneSessionId physicalId with
+            | Ok promptKey ->
+                match! appendTakeoverClaimed durable group aggregateBlob laneIndex laneSessionId promptKey with
                 | Error _ -> return false
                 | Ok() -> return true
         }
@@ -920,13 +917,38 @@ module FissionHost =
         | Stale
         | Current
 
-    let private classifyTakeoverTurn (takeover: FissionTakeoverProjection) (turn: ReconciledTurn) =
-        if turn.SessionId <> takeover.LaneSessionId then
-            TakeoverTurnDisposition.Stale
-        elif turn.PhysicalUserMessageId <> takeover.PhysicalUserMessageId then
-            TakeoverTurnDisposition.Stale
-        else
+    let private acceptedDispatchForPromptKey
+        (durable: AgentJournal)
+        laneSessionId
+        promptKey
+        =
+        AgentProjection.tryFind laneSessionId (AgentJournal.snapshot durable).AgentProjections
+        |> Option.bind (fun session -> session.PromptAuthority)
+        |> Option.bind (fun authority ->
+            authority.AcceptedDispatches
+            |> Map.tryPick (fun _ acceptedDispatch ->
+                if acceptedDispatch.PromptKey = promptKey then
+                    Some acceptedDispatch
+                else
+                    None))
+
+    let private takeoverPhysicalMessage (durable: AgentJournal) (takeover: FissionTakeoverProjection) =
+        match takeover.PhysicalUserMessageId, takeover.PromptKey with
+        | Some physicalUserMessageId, _ -> Some physicalUserMessageId
+        | None, Some promptKey ->
+            acceptedDispatchForPromptKey durable takeover.LaneSessionId promptKey
+            |> Option.map (fun acceptedDispatch -> acceptedDispatch.PhysicalUserMessageId)
+        | None, None -> None
+
+    let private classifyTakeoverTurn
+        (durable: AgentJournal)
+        (takeover: FissionTakeoverProjection)
+        (turn: ReconciledTurn)
+        =
+        match turn.SessionId = takeover.LaneSessionId, takeoverPhysicalMessage durable takeover with
+        | true, Some physicalUserMessageId when turn.PhysicalUserMessageId = physicalUserMessageId ->
             TakeoverTurnDisposition.Current
+        | _ -> TakeoverTurnDisposition.Stale
 
     let private observeCurrentTakeoverOutcome
         (sessionPort: ISessionHostPort)
@@ -955,7 +977,7 @@ module FissionHost =
         (takeover: FissionTakeoverProjection)
         (turn: ReconciledTurn)
         =
-        match classifyTakeoverTurn takeover turn with
+        match classifyTakeoverTurn durable takeover turn with
         | TakeoverTurnDisposition.Stale ->
             // The handoff is already admitted. Any replay of an earlier slice
             // terminal is stale and cannot rematerialize or complete the owner.

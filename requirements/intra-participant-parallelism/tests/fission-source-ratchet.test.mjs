@@ -33,19 +33,30 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session
   assert.match(facts, /FissionAdmitted/)
   assert.match(facts, /FissionLaneMaterialized/)
   assert.match(facts, /FissionCompletionDelivered/)
+  assert.match(facts, /FissionTakeoverClaimed/)
   assert.match(facts, /FissionTakeoverStarted/)
   assert.match(facts, /FissionConverged/)
   assert.match(fold, /FissionAdmitted/)
+  assert.match(fold, /FissionTakeoverClaimed/)
   assert.match(fold, /FissionTakeoverStarted/)
   assert.match(fold, /FissionConverged/)
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring takeover before reporting the old logical owner', () => {
   const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+  const facts = read('src/Wanxiangshu/Execution/Fission/Facts.fs')
 
-  assert.match(host, /FissionFact\.FissionTakeoverStarted/)
+  assert.match(host, /FissionFact\.FissionTakeoverClaimed/)
   assert.match(host, /SendContinuation[\s\S]{0,1200}?ContinuationKind\.FissionHandoff[\s\S]{0,600}?AwaitMode\.Await/)
-  assert.match(host, /turn\.PhysicalUserMessageId <> takeover\.PhysicalUserMessageId/)
+  assert.doesNotMatch(
+    host,
+    /TaskCompletionSource<PhysicalUserMessageId>|acceptedPhysicalId\.Task/,
+    'lane-terminal observation must not block waiting for a future chat.message physical id',
+  )
+  assert.match(facts, /FissionTakeoverClaimed[\s\S]{0,500}?PromptKey:\s*PromptKey/)
+  assert.match(host, /acceptedDispatch\.PromptKey\s*=\s*promptKey/)
+  assert.match(host, /takeover\.PromptKey[\s\S]{0,500}?acceptedDispatchForPromptKey/)
+  assert.match(host, /turn\.PhysicalUserMessageId\s*=\s*physicalUserMessageId/)
   assert.match(host, /CompletedTurnClassifier\.partsSessionText turn\.Parts/)
   assert.match(host, /NotifyTerminal group\.OwnerSessionId \(TerminalOutcome\.Completed result\)/)
   assert.doesNotMatch(host, /TerminalText\s*=\s*aggregate/)
