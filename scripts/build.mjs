@@ -73,6 +73,14 @@ function startDaemon() {
   fs.mkdirSync(daemonDir, { recursive: true })
   fs.mkdirSync(dist, { recursive: true })
 
+  if (!fs.existsSync(barrierFs)) {
+    fs.writeFileSync(
+      barrierFs,
+      `namespace Wanxiangshu\n\nmodule FableBarrier =\n    let token = "init"\n`,
+      'utf8',
+    )
+  }
+
   const logFd = fs.openSync(logFile, 'a')
   const child = spawn(
     'dotnet',
@@ -160,7 +168,7 @@ async function barrierSync() {
     const newLogs = readNewLogs(initialLogOffset)
     if (
       newLogs.includes('Compilation failed') ||
-      (newLogs.includes('error FSHARP:') && !newLogs.includes('Watching src/Wanxiangshu'))
+      (newLogs.includes('error FSHARP:') && !/Watching\s+src\/Wanxiangshu/.test(newLogs))
     ) {
       await sleep(100)
       const fullLogs = readNewLogs(initialLogOffset)
@@ -184,11 +192,11 @@ if (process.argv.includes('--restart')) {
   stopDaemon()
 }
 
+await barrierSync()
+
 // DG-004: calibration is build input, never tracked source. Compute once from
 // the current repository corpus; materialize values only as generated dist JS.
 const loopDetectorCalibration = calibrateFromRepository(root)
-
-await barrierSync()
 
 writeLoopDetectorCalibrationArtifact(root, loopDetectorCalibration)
 

@@ -130,6 +130,7 @@ export const readableRepositoryTexts = (root = defaultRoot) => {
   const readable = []
 
   for (const relPath of paths) {
+    if (relPath === 'src/Wanxiangshu/FableBarrier.fs' || relPath.endsWith('/FableBarrier.fs')) continue
     try {
       readable.push([relPath, decoder.decode(readFileSync(path.join(root, relPath)))])
     } catch {

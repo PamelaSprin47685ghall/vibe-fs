@@ -172,11 +172,11 @@ flow = [
   # receives the sole provider-error fault; the Host fallback continuation then
   # completes, and delivery #2 of the same step performs the first legal suicide.
   # No external Manager prompt races the Host continuation.
-  { wait = "manager-idle.0" },
+  { wait = "manager-idle.0", timeoutMs = 30000 },
   { awaitTerminal = true, requireAssistantTerminal = true, requireIdleAfterActivity = true, session = "child" },
   { wait = "continue" },
   { waitFact = { name = "FallbackCursorAdvanced", eq = 1 } },
-  { wait = "manager-idle.0" },
+  { wait = "manager-idle.0", timeoutMs = 30000 },
   { waitFact = { name = "FinalityRejected", gte = 1, renewOn = ["ReviewVerdictRecorded", "ReviewAttemptClosed", "BlogObservationCommitted"] }, timeoutMs = 60000 },
 
   # Same physical ManagerIdle turn repairs, then seeks dual-PERFECT blessing.

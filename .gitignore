@@ -27,6 +27,7 @@
 /.delivery-logs/
 /.fable-daemon/
 /.fable-ack
+src/Wanxiangshu/FableBarrier.fs
 
 # Logs
 *.log

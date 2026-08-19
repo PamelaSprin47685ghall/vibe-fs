@@ -886,9 +886,10 @@ type AssistanceHost
         let assistanceClaim =
             sensor.TryObserveAssistanceClaim(turn.SessionId, turn.ProviderRun)
 
-        match turn.Outcome, assistanceClaim with
-        | ReconcileProgram.TurnAborted _, Some claim -> handleOwnerRequest context claim
-        | (ReconcileProgram.TurnAborted _, None | ReconcileProgram.TurnFailed _, None) when isClaimed ->
+        match turn.Outcome, assistanceClaim, context.Quiescence with
+        | ReconcileProgram.TurnAborted _, Some claim, _
+        | _, Some claim, Some _ -> handleOwnerRequest context claim
+        | (ReconcileProgram.TurnAborted _, None, _ | ReconcileProgram.TurnFailed _, None, _) when isClaimed ->
             // HOST-027: once exact NEEDHELP has claimed this physical owner
             // ProviderRun, later Host terminal views of that SAME run cannot
             // reclassify it as provider failure. OpenCode may surface Abort and
