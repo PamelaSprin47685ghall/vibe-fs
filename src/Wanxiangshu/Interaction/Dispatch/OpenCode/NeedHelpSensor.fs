@@ -49,7 +49,7 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation.Identity
 
 /// Host boundary typed one-shot capability: an assistance abort claim.
-/// Produced only by NeedHelpSensor.TryConsumeAssistanceClaim, consumed exactly once by the owning CE (SW-017 ②).
+/// Observed after abort, consumed exactly once by the owning CE behind fresh idle (SW-017 ②).
 /// Carries the exact attempt identity so the claim cannot be confused across provider runs.
 [<RequireQualifiedAccess>]
 type AssistanceAbortClaim =
@@ -60,6 +60,10 @@ type AssistanceAbortClaim =
     static member Create(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         { SessionId = sessionId
           ProviderRun = providerRun }
+
+module AssistanceAbortClaim =
+    let sessionId (claim: AssistanceAbortClaim) = claim.SessionId
+    let providerRun (claim: AssistanceAbortClaim) = claim.ProviderRun
 
 /// HOST-027: process-local exact-sentinel sensor over reasoning deltas.
 /// It owns only stream part identity, rolling suffixes, and armed attempt
@@ -105,6 +109,16 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
 
     member _.Sentinel = sentinelText
 
+    /// Observe the typed claim without consuming its idle successor authority.
+    member _.TryObserveAssistanceClaim
+        (sessionId: SessionId, providerRun: ProviderRunIdentity)
+        : AssistanceAbortClaim option =
+        lock gate (fun () ->
+            if armed.Contains(attemptKey sessionId providerRun) then
+                Some(AssistanceAbortClaim.Create(sessionId, providerRun))
+            else
+                None)
+
     /// Host boundary: consume the one-shot assistance abort claim for the exact attempt.
     /// Returns Some typed claim exactly once; subsequent calls return None (SW-017 ② one-shot).
     member _.TryConsumeAssistanceClaim
@@ -142,6 +156,13 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     member private _.TryArm(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () -> armed.Add(attemptKey sessionId providerRun))
 
+    member private _.RollbackArm(sessionId: SessionId, providerRun: ProviderRunIdentity) =
+        lock gate (fun () ->
+            let key = attemptKey sessionId providerRun
+            suffixes.Remove key |> ignore
+            removePartsByPrefix (partPrefix sessionId providerRun)
+            armed.Remove key |> ignore)
+
     member _.DropAttempt(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         lock gate (fun () ->
             let key = attemptKey sessionId providerRun
@@ -177,12 +198,22 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
                   "result", "abort-failed"
                   "provider_error", reason ]
 
-    member private this.AbortAndReport(sessionId: SessionId) =
+    member private this.ApplyAbortOutcome
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, outcome: Result<unit, string>)
+        =
+        match outcome with
+        | Ok() -> this.ReportAbortOutcome(sessionId, outcome)
+        | Error reason ->
+            this.RollbackArm(sessionId, providerRun)
+            this.ReportAbortOutcome(sessionId, Error reason)
+
+    member private this.AbortAndReport(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         task {
             try
                 let! outcome = abortSession sessionId
-                this.ReportAbortOutcome(sessionId, outcome)
+                this.ApplyAbortOutcome(sessionId, providerRun, outcome)
             with ex ->
+                this.RollbackArm(sessionId, providerRun)
                 Diagnostic.emit
                     "needhelp"
                     [ "session_id", SessionId.value sessionId
@@ -193,7 +224,7 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     member private this.RequestAbort(sessionId: SessionId, providerRun: ProviderRunIdentity) =
         if this.TryArm(sessionId, providerRun) then
             Diagnostic.emit "needhelp" [ "session_id", SessionId.value sessionId; "result", "armed" ]
-            this.AbortAndReport(sessionId) |> ignore
+            this.AbortAndReport(sessionId, providerRun) |> ignore
 
     member _.IsReasoningDelta(raw: obj) =
         match NeedHelpEventCodec.tryDecodeDelta raw with

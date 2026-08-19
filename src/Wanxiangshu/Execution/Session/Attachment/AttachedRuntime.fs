@@ -28,6 +28,7 @@ open Wanxiangshu.Foundation.Identity
 /// Does not use SatelliteRuntime / SatelliteKind (those remain Companion only).
 type AttachedSessionRuntime(?registerParent: SessionId -> SessionId -> unit, ?isUsable: SessionId -> bool) =
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical resource — reusable dedicated child identity binding
     // DSL-MUTABLE: resource — attached session binding registry by scope+role
     let bindings = Dictionary<string, SessionId * string>()
     let register = defaultArg registerParent (fun _ _ -> ())

@@ -169,8 +169,9 @@ system prompt 与 ToolCapabilitySet；不得建立 HumanRoot、不得 reset Fall
 - 含义：`[NEEDHELP]` abort 的 owner 是 assistance：不得进入 ProviderFailure/LoopKill、不得推进
   FallbackCursor、不得增加 consecutive failure 或 retry budget（`increase-strength.md` §6/§14）。
   AbortWake 只 claim 当前 ProviderRun，**不得**在 abort stack 内发送 Fast→Deep continuation 或创建
-  consultation child；Fast escalation 与 Deep consultation 共用同一物理 admission：必须等该 session
-  的 fresh `SessionIdle` revisit 后才消费 NEEDHELP arm 并执行下一动作。这样 continuation 不会在
+  consultation child，也不得提前消费唯一的 NEEDHELP claim；Fast escalation 与 Deep consultation 共用
+  同一物理 admission：必须等该 session 的 fresh `SessionIdle` revisit 后才消费 NEEDHELP arm 并执行下一动作。
+  `TurnAborted` observation 与 `SessionIdle` 之间 claim 必须仍可被 exact ProviderRun 重新观察。这样 continuation 不会在
   OpenCode 的 abort descendant sweep 尚未结束时“消息已落地但 provider 未启动”，再被 fallback 误判失败。
 - 边界：sentinel 检测/arm/abort 机制 → `host-boundary`；deep 命中后的 consultation child →
   `delegation`；Pair Hint wire → `provider-projection` + `prefix-stability`；craft 正文 →

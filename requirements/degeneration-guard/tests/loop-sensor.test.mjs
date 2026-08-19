@@ -46,21 +46,21 @@ const rawDelta = (session, field, text) => ({
   },
 })
 
-test('WHAT[DG-008] LOOP_001_kill_arm_is_process_local_not_persisted', () => {
+test('WHAT[DG-008] LOOP_001_kill_arm_is_process_local_not_persisted', async () => {
   // Owner construct takes only {owned, abort} — no journal / store / path.
-  // Two independent sensors share nothing; TryArm is local HashSet state.
+  // Two independent sensors share nothing; the one-shot typed cause is local state.
   const first = loopSensor.create({ owned: ['ses_a'], abort: () => {} })
   const second = loopSensor.create({ owned: ['ses_a'], abort: () => {} })
 
-  assert.equal(loopSensor.tryArm(first, 'ses_a'), true)
-  assert.equal(loopSensor.isArmed(first, 'ses_a'), true)
-  assert.equal(loopSensor.isArmed(second, 'ses_a'), false)
-  assert.equal(loopSensor.tryArm(second, 'ses_a'), true)
-  assert.equal(loopSensor.isArmed(second, 'ses_a'), true)
+  loopSensor.observe(first, loopSensor.textDelta('ses_a', loopText('p')))
+  await wait(15)
+  assert.equal(loopSensor.consumeAbortCause(first, 'ses_a'), 'LoopKill')
+  assert.equal(loopSensor.consumeAbortCause(second, 'ses_a'), 'External')
 
-  loopSensor.clearArmed(first, 'ses_a')
-  assert.equal(loopSensor.isArmed(first, 'ses_a'), false)
-  assert.equal(loopSensor.isArmed(second, 'ses_a'), true)
+  loopSensor.observe(second, loopSensor.textDelta('ses_a', loopText('p')))
+  await wait(15)
+  assert.equal(loopSensor.consumeAbortCause(second, 'ses_a'), 'LoopKill')
+  assert.equal(loopSensor.consumeAbortCause(first, 'ses_a'), 'External')
 })
 
 test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
@@ -79,7 +79,7 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
   }
   await wait(8)
   assert.deepEqual(aborts, [])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_text'), false)
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_text'), 'External')
 
   // field=text is accepted; low diversity arms + aborts.
   assert.deepEqual(loopDetector.tryDecodeTextDelta(rawDelta('ses_text', 'text', 'abcd')), {
@@ -92,7 +92,7 @@ test('WHAT[DG-002] LOOP_002_sensor_observes_text_delta_only', async () => {
   loopSensor.observe(sensor, loopSensor.textDelta('ses_text', loopText('t')))
   await wait(15)
   assert.deepEqual(aborts, ['ses_text'])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_text'), true)
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_text'), 'LoopKill')
   // Sensor construct has no journal port; arm mark is the only side effect.
 })
 
@@ -109,18 +109,18 @@ test('WHAT[DG-010] LOOP_007_unowned_and_armed_deltas_are_ignored', async () => {
   loopSensor.observe(sensor, loopSensor.textDelta('ses_stranger', loopText('u')))
   await wait(8)
   assert.deepEqual(aborts, [])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
-  assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), false)
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_stranger'), 'External')
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_owned'), 'External')
 
   // Owned text loop arms once; subsequent deltas on the same attempt are ignored.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_owned', loopText('v')))
   await wait(15)
   assert.deepEqual(aborts, ['ses_owned'])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), true)
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_owned', loopText('v')))
   await wait(10)
   assert.deepEqual(aborts, ['ses_owned'])
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_owned'), 'LoopKill')
 })
 
 test('WHAT[DG-002] LOOP_007_reasoning_deltas_trigger_loop_kill', async () => {
@@ -146,7 +146,7 @@ test('WHAT[DG-002] LOOP_007_reasoning_deltas_trigger_loop_kill', async () => {
   loopSensor.observe(sensor, rawDelta('ses_owned', 'reasoning', loopText('q')))
   await wait(15)
   assert.deepEqual(aborts, ['ses_owned'])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_owned'), true)
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_owned'), 'LoopKill')
 })
 
 test('WHAT[DG-007] LOOP_006_owned_low_diversity_stream_aborts_exactly_once', async () => {
@@ -162,12 +162,12 @@ test('WHAT[DG-007] LOOP_006_owned_low_diversity_stream_aborts_exactly_once', asy
   await wait(15)
 
   assert.deepEqual(aborts, ['ses_loop'])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_loop'), true)
 
   // Same attempt: more loop text must not re-abort (LOOP-006 idempotent).
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('a')))
   await wait(10)
   assert.deepEqual(aborts, ['ses_loop'])
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_loop'), 'LoopKill')
 })
 
 test('WHAT[DG-007] LOOP_006_unowned_session_never_aborts', async () => {
@@ -183,7 +183,7 @@ test('WHAT[DG-007] LOOP_006_unowned_session_never_aborts', async () => {
   await wait(8)
 
   assert.deepEqual(aborts, [])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_stranger'), false)
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_stranger'), 'External')
 })
 
 test('WHAT[DG-006] LOOP_006_reset_detector_preserves_loop_kill_armed', async () => {
@@ -200,15 +200,14 @@ test('WHAT[DG-006] LOOP_006_reset_detector_preserves_loop_kill_armed', async () 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_idle', loopText('i')))
   await wait(15)
   assert.deepEqual(aborts, ['ses_idle'])
-  assert.equal(loopSensor.isArmed(sensor, 'ses_idle'), true)
 
   loopSensor.resetDetector(sensor, 'ses_idle')
-  assert.equal(loopSensor.isArmed(sensor, 'ses_idle'), true, 'armed must survive idle reset')
 
   // Still armed → further deltas must not re-abort.
   loopSensor.observe(sensor, loopSensor.textDelta('ses_idle', loopText('i')))
   await wait(10)
   assert.deepEqual(aborts, ['ses_idle'])
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_idle'), 'LoopKill', 'typed cause must survive idle reset')
 })
 
 test('WHAT[DG-007] LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async () => {
@@ -224,14 +223,14 @@ test('WHAT[DG-007] LOOP_006_clear_armed_allows_next_attempt_to_arm_again', async
   await wait(15)
   assert.equal(aborts.length, 1)
 
-  // LOOP-006: completion path clears the mark before the next attempt streams.
-  loopSensor.clearArmed(sensor, 'ses_loop')
+  // LOOP-006: reconcile consumes the one-shot cause before the next attempt streams.
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_loop'), 'LoopKill')
   loopSensor.resetDetector(sensor, 'ses_loop')
-  assert.equal(loopSensor.isArmed(sensor, 'ses_loop'), false)
 
   loopSensor.observe(sensor, loopSensor.textDelta('ses_loop', loopText('c')))
   await wait(15)
   assert.deepEqual(aborts, ['ses_loop', 'ses_loop'])
+  assert.equal(loopSensor.consumeAbortCause(sensor, 'ses_loop'), 'LoopKill')
 })
 
 test('WHAT[DG-011] LOOP_006_continuation_text_is_the_english_loop_nudge', () => {
@@ -271,14 +270,10 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
     const accepted = await dispatch.acceptHumanRoot(handle, SESSION, 'msg_u1', 'fast-coder')
     assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
-    // Arm as the sensor would after detecting LOOP.
-    assert.equal(loopSensor.tryArm(sensor, SESSION), true)
-    assert.equal(loopSensor.isArmed(sensor, SESSION), true)
-
-    // Bridge: completion path clears the mark, then records the failure.
-    assert.equal(loopSensor.isArmed(sensor, SESSION), true)
-    loopSensor.clearArmed(sensor, SESSION)
-    assert.equal(loopSensor.isArmed(sensor, SESSION), false)
+    // Arm through the real streaming path, then consume the typed Host outcome.
+    loopSensor.observe(sensor, loopSensor.textDelta(SESSION, loopText('g')))
+    await wait(15)
+    assert.equal(loopSensor.consumeAbortCause(sensor, SESSION), 'LoopKill')
 
     const first = await fallback.recordConfirmedFailure(
       handle,
@@ -311,10 +306,8 @@ test('WHAT[DG-009] LOOP_006_armed_abort_bridges_to_fallback_advance_once', async
       { offset: 1, failures: 1 },
     )
 
-    // Without LoopKillArmed, a plain user abort would not reach recordConfirmedFailure
-    // (TurnCompletionProgram keeps TerminalOutcome.Aborted). That branch is structural
-    // in production; the sensor's clear above is what makes a later unarmed abort inert.
-    assert.equal(loopSensor.isArmed(sensor, SESSION), false)
+    // The cause is one-shot; a later unarmed abort is External and cannot advance fallback.
+    assert.equal(loopSensor.consumeAbortCause(sensor, SESSION), 'External')
   } finally {
     journal.JournalSurface_dispose(created.journal)
     rmSync(directory, { recursive: true, force: true })
@@ -344,8 +337,9 @@ test('WHAT[DG-012] LOOP_008_loop_kill_advances_cursor_only_via_fallback_controll
     const accepted = await dispatch.acceptHumanRoot(handle, SESSION, 'msg_u008', 'fast-coder')
     assert.equal(accepted.ok, true, accepted.ok ? '' : accepted.error)
 
-    assert.equal(loopSensor.tryArm(sensor, SESSION), true)
-    loopSensor.clearArmed(sensor, SESSION)
+    loopSensor.observe(sensor, loopSensor.textDelta(SESSION, loopText('h')))
+    await wait(15)
+    assert.equal(loopSensor.consumeAbortCause(sensor, SESSION), 'LoopKill')
 
     const before = fallback.snapshot(handle, SESSION)
     assert.equal(before.offset, 0)

@@ -103,15 +103,18 @@ module Reconciler =
         // here; releaseAfterPass checks it to re-drain after the current pass.
         // Same single-flight model as runningDrains (global task count) but
         // scoped per session.
+        /// DSL-cross-callback-proof: physical single-flight — pending drain signal count, not semantic continuation
         // DSL-MUTABLE: resource — per-session single-flight admission queue.
         let queued = Dictionary<string, int>()
         // (HasFlight guard). startOrEnqueue checks active.ContainsKey to decide
         // whether to start a new drain task or enqueue. Only one drain task per
         // session at a time — the per-session equivalent of runningDrains.
+        /// DSL-cross-callback-proof: physical single-flight — live drain ownership by session
         // DSL-MUTABLE: resource — per-session single-flight admission latch.
         let active = Dictionary<string, int>()
         // Set by ClearSession, cleared by BindUserMessage/BindActiveRun.
         // RunPass polls isCleared to skip drains for cleared sessions.
+        /// DSL-cross-callback-proof: physical cancellation-token — deletion invalidates in-flight drain work
         // DSL-MUTABLE: resource — per-session cleared-session flag.
         let cleared = HashSet<string>()
         // store. ClearSession bumps the generation to invalidate in-flight
@@ -122,8 +125,10 @@ module Reconciler =
         // Dictionary is the external invalidation authority that ClearSession
         // mutates, not a drain-pass program counter. Without it, ClearSession
         // would have no mechanism to cancel running drains.
+        /// DSL-cross-callback-proof: physical cancellation-token — generation invalidates stale snapshot work
         // DSL-MUTABLE: resource — per-session cooperative cancellation token store.
         let generations = Dictionary<string, int>()
+        /// DSL-cross-callback-proof: physical resource — last published Host projection cache for re-drain
         // DSL-MUTABLE: resource — per-session published reconcile maps cache.
         // recordMaps stores publish output; mapsFor retrieves it for re-drain.
         let published = Dictionary<string, ReconcileProgram.PublishMaps>()
@@ -136,19 +141,23 @@ module Reconciler =
         // Never consumed: a drain-resume re-run needs the same wake, and a newer
         // signal simply overwrites it. A session with no recorded wake defaults
         // to RetryWake (no idle rights — the safe side).
+        /// DSL-cross-callback-proof: physical resource — last Host wake observation replayed to a drain
         // DSL-MUTABLE: resource — per-session last-dispatch wake.
         let wakes = Dictionary<string, ReconcileProgram.ReconcileWake>()
         // HOST-BOUNDARY-005: exact terminal message.updated is a projection
         // visibility edge, never a business HostSignal. Keep one monotonic edge
         // version per session/current physical user so a pass can park without
         // losing an edge that races the snapshot read.
+        /// DSL-cross-callback-proof: physical resource — monotonic Host projection visibility edge
         // DSL-MUTABLE: resource — latest projection-change edge per session.
         let projectionEdges = Dictionary<string, struct (string * int64)>()
         // Last projection edge already spent to authorize a snapshot read for
         // this physical user. This makes reads edge-counted rather than
         // time/budget-counted: one edge can cause at most one extra read.
+        /// DSL-cross-callback-proof: physical resource — edge-consumption watermark, not workflow position
         // DSL-MUTABLE: resource — consumed projection edge per session.
         let projectionConsumed = Dictionary<string, struct (string * int64)>()
+        /// DSL-cross-callback-proof: physical waiter — snapshot read parked on an exact projection edge
         // DSL-MUTABLE: resource — parked reconcile occasion per session.
         let projectionWaits = Dictionary<string, struct (string * int64)>()
         let resolveProjection = defaultArg projection (fun _ -> None)

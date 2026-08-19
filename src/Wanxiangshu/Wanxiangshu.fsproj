@@ -659,5 +659,6 @@
     <Compile Include="Verification/EventStoreWriterSurface.fs"/>
     <Compile Include="Verification/TemporalSurface.fs"/>
     <Compile Include="OpenCode/Plugin/Plugin.fs"/>
+    <Compile Include="FableBarrier.fs"/>
   </ItemGroup>
 </Project>

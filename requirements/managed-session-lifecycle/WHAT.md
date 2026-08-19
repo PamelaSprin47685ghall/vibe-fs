@@ -211,6 +211,31 @@ port 边界分型就会把局部控制动作放大成 family cancellation，并�
 `ToolRuntimeScope.CancelSessionChildren`、`OrdinaryTurnWorkflow.handleAborted`；→ HOW.md
 `MANAGED-SESSION-016`。
 
+## MANAGED-SESSION-017：内部 interrupt 必须闭合 successor / terminal / parent wake
+
+**规范**：任何插件内部 current-attempt interrupt 在请求 Host abort 前必须已经有且仅有一个后继 owner：
+
+- LoopKill → provider AABB；
+- NeedHelp → exact `(SessionId, ProviderRunIdentity)` assistance claim，`TurnAborted` 只占有该 claim，
+  fresh `SessionIdle` 到达前不得消费；idle 后恰一次 escalation/consultation；
+- Fission / Reviewer / Finality control stop → 各自已存在的 replacement / judgement / finality owner；
+- 无合法后继的 invariant / fail-closed stop → `ManagedSessionTermination.terminate`；调用者在同一个
+  causal CE 内证明 managed child、durable-cancel descendants、执行 logical/physical `AbortSession`，随后
+  发布 `TerminalOutcome.Failed reason`。Fork runtime 由该 Failed terminal 写 `HandleCompleted(Failed)` 并
+  pulse agent mailbox，解除 parent `join`。不得把 reason 存进 registry 等未来 `TurnAborted` callback 再消费。
+
+`InterruptAttempt` 只允许上述有显式 successor owner 的调用点；普通 tool/invariant fail-closed 禁止使用。
+Host abort 返回 Error/throw 时，LoopKill arm、NeedHelp claim 必须同步 rollback；失败的 transport 不得留下
+能被未来 turn 消费的 cause。同步 logical termination 即使 teardown effect 报错，也必须完成 Failed delivery，
+避免 parent 因 transport 局部失败永久等待。
+
+**含义/动机**：physical abort 只是 transport effect，不携带“接下来谁负责”。如果先 abort、后碰运气等
+另一个 callback 猜 cause，就会出现 child 已停但 durable handle 仍 Active、parent 永久等待的三不管。
+
+**证据**：`NeedHelpSensor` claim observe/consume split、`AssistanceHost.withFreshAssistanceQuiescence`、
+`ManagedSessionTermination.terminate`、`ToolRuntimeScope.TerminateSession`、
+`HostForkRunLifecycle.complete(Failed)`；→ HOW.md `MANAGED-SESSION-017`。
+
 ## GARBAGE / 弃权（不进入 WHAT）
 
 - `EXEC-021/022` 假 completion 补偿的 outcome 分型本体 → `effect-accounting`；本包只拥有 handle

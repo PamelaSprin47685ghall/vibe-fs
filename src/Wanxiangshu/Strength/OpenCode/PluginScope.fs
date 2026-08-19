@@ -87,8 +87,10 @@ type private CounterfactualFirst =
 /// DSL-cross-callback-proof: physical — armed target registry and buffered
 /// first-observation registry are physical resources consumed once by Observe.
 type private CounterfactualCollector() =
+    /// DSL-cross-callback-proof: physical single-flight — target identity for one two-observation collector
     // DSL-MUTABLE: resource — armed counterfactual target by session (physical adapter)
     let armedTargets = Dictionary<string, ProviderRunIdentity * StrengthFeatureKey>()
+    /// DSL-cross-callback-proof: physical resource — first observation buffer; business receives only completed pair
     // DSL-MUTABLE: resource — buffered first observation by session (physical adapter)
     let observedFirsts = Dictionary<string, CounterfactualFirst>()
 
@@ -167,6 +169,7 @@ type PluginStrengthScope() =
     // only lowers evidence back toward K0; it is never lifecycle authority.
     // DSL-MUTABLE: resource — restart-discardable predictor evidence cache
     let mutable strengthPredictorState = StrengthPredictor.empty
+    /// DSL-cross-callback-proof: physical resource — bounded restart-discardable predictor evidence cache
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
     // Physical adapter collector — no DU state machine, business observes only CounterfactualPair
     // DSL-MUTABLE: resource — counterfactual collector (physical adapter, typed outcome)

@@ -587,6 +587,21 @@ type ToolRuntimeScope
         }
         :> Task
 
+    /// MANAGED-SESSION-017: a successor-less internal stop is a synchronous
+    /// logical termination CE. Failed delivery is what completes the durable
+    /// fork handle and wakes the parent; no future TurnAborted callback carries
+    /// workflow continuation state.
+    member this.TerminateSession(sessionId: string, reason: string) : Task<Result<unit, string>> =
+        match terminalPort with
+        | None -> Task.FromResult(Error "MANAGED-SESSION-017: terminal event port unavailable")
+        | Some eventPort ->
+            ManagedSessionTermination.terminate
+                (fun sid -> this.CancelSessionChildren(SessionId.value sid))
+                sessions
+                eventPort
+                (SessionId.create sessionId)
+                reason
+
     member _.DisposeSession(sessionId: string) : Task =
         let forkRuntimes, orchestrator =
             lock gate (fun () ->

@@ -30,6 +30,12 @@
    user-facing/root 没有内部 interrupt 权限：除 Host 已观测到外部用户主动中断外，插件不得主动
    interrupt root。否则一次局部控制动作会同时杀掉 Manager 与全部 coder，随后 durable handle 仍是
    `Active`，horizon 又会把已经死亡的 child 报成仍在工作。
+8. **每个内部 attempt interrupt 必须同时拥有 successor**。物理 abort 本身不是业务终态：Loop 必须
+   进入 AABB，NeedHelp 必须在 fresh idle 后进入 assistance，Fission/Reviewer cleanup 必须由各自已存在
+   的 replacement/finality owner 接管；没有 successor 的 invariant/fail-closed stop 必须转成明确
+   `Failed` terminal，使 fork handle 完成并唤醒 parent join。禁止“abort 成功 → 无 recovery、无 terminal、
+   无 parent wake”的 orphan attempt。若 Host abort 请求失败，任何预先 arm 的 cause/claim 必须立即撤销，
+   不得污染下一 attempt。
 
 ## RED 是什么样
 
@@ -45,6 +51,8 @@ RED = 同一 logical owner 可得到两个活跃 replacement，或 restart/cance
 - 父取消后子仍在运行 / 已 Abandoned 的 handle 被 join 消费 → RED。
 - 父 `TurnAborted` 已对外完成，但 Blogger/其它 running child 的 `AbortSession` 仍未完成 → RED。
 - 内部 loop/needhelp/tool 收束 interrupt user-facing/root，或 attempt-only stop 级联 abort descendants → RED。
+- 内部 attempt interrupt 后既没有 AABB/assistance/replacement successor，也没有 `Failed` terminal + parent wake → RED。
+- abort transport 失败后 Loop/NeedHelp cause 仍 armed，下一次无关 abort 被误分类 → RED。
 - child 已被 parent abort 物理停止，但 durable handle 仍 `Active`，导致 horizon 报 “still away” → RED。
 - Hidden（HostOwnedHidden）handle 泄漏进父的 list/join/guard/恢复 → RED（EXEC-014 回归：
   Distiller child 泄漏会阻塞 caller 的 suicide）。

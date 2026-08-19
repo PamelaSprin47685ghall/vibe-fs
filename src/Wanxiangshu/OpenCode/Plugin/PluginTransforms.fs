@@ -105,6 +105,8 @@ open PluginHostInterop
 
 module PluginTransforms =
 
+    type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
+
     let private raiseStrengthFailClosed (fuse: string -> unit) (reason: string) : 'a =
         fuse reason
         raise (InvalidOperationException reason)
@@ -114,7 +116,7 @@ module PluginTransforms =
         (durable: AgentJournal)
         (sessionId: string)
         (candidate: DateTimeOffset)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         : Task<DateTimeOffset option> =
         task {
             match! SessionStartedAtLedger.bind durable (SessionId.create sessionId) candidate with
@@ -122,20 +124,21 @@ module PluginTransforms =
             | Error reason ->
                 Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
 
-                let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
+                let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
+                let! _ = terminateSession (SessionId.create sessionId) terminalReason
 
-                return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
+                return raise (InvalidOperationException terminalReason)
         }
 
     let private tryBindSessionStartedAt
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
         (sessionStartCandidate: DateTimeOffset option)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         : Task<DateTimeOffset option> =
         match journal, projectionSessionIdOpt, sessionStartCandidate with
         | Some durable, Some sessionId, Some candidate ->
-            bindSessionStartedAtOrAbort durable sessionId candidate sessionPort
+            bindSessionStartedAtOrAbort durable sessionId candidate terminateSession
         | _ -> Task.FromResult None
 
     let private strengthReplayPlansFor
@@ -331,14 +334,15 @@ module PluginTransforms =
             Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", "abort-error: " + error ]
 
     let private requestPhysicalStop
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
         (physicalUserMessageId: PhysicalUserMessageId option)
+        (reason: string)
         =
         task {
             try
-                let! result = sessionPort.InterruptAttempt sid
+                let! result = terminateSession sid reason
                 handlePhysicalStopResult sid sessionId physicalUserMessageId result
             with ex ->
                 Diagnostic.emit
@@ -348,7 +352,7 @@ module PluginTransforms =
         |> ignore
 
     let private applyContinuationOutcome
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
         (bloggerMessages: obj list)
@@ -366,14 +370,19 @@ module PluginTransforms =
 
                 Diagnostic.emit "enforcer-stop-physical-run" [ "session_id", sessionId; "result", reason ]
 
-                requestPhysicalStop sessionPort sid sessionId (ProviderWireCapture.lastUserMessageId bloggerMessages)
+                requestPhysicalStop
+                    terminateSession
+                    sid
+                    sessionId
+                    (ProviderWireCapture.lastUserMessageId bloggerMessages)
+                    reason
         }
 
     let private runEnforcerWhenFamilyReady
         (scope: PluginRuntimeScope)
         (journal: AgentJournal option)
         (durable: AgentJournal)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
         (outObj: obj)
@@ -404,14 +413,14 @@ module PluginTransforms =
                     sid
                     bloggerMessages
 
-            do! applyContinuationOutcome sessionPort sid sessionId bloggerMessages outObj outcome
+            do! applyContinuationOutcome terminateSession sid sessionId bloggerMessages outObj outcome
         }
 
     let private runEnforcerAfterRecovery
         (scope: PluginRuntimeScope)
         (journal: AgentJournal option)
         (durable: AgentJournal)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
         (outObj: obj)
@@ -421,27 +430,27 @@ module PluginTransforms =
         | FamilyRecovery.FamilyBlocked _ -> Task.FromResult()
         | FamilyRecovery.FamilyWaiting _
         | FamilyRecovery.FamilyReady _ ->
-            runEnforcerWhenFamilyReady scope journal durable sessionPort sid sessionId outObj
+            runEnforcerWhenFamilyReady scope journal durable terminateSession sid sessionId outObj
 
     let private runEnforcerForMainSession
         (scope: PluginRuntimeScope)
         (journal: AgentJournal option)
         (durable: AgentJournal)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
         (outObj: obj)
         : Task =
         task {
             let! recovery = scope.EnsureRecoveryDone sid
-            do! runEnforcerAfterRecovery scope journal durable sessionPort sid sessionId outObj recovery
+            do! runEnforcerAfterRecovery scope journal durable terminateSession sid sessionId outObj recovery
         }
 
     let private runEnforcerIfMainAssociated
         (scope: PluginRuntimeScope)
         (journal: AgentJournal option)
         (durable: AgentJournal)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (sid: SessionId)
         (sessionId: string)
         (outObj: obj)
@@ -449,20 +458,20 @@ module PluginTransforms =
         let associations = (AgentJournal.snapshot durable).AgentProjections.Associations
 
         match SessionAssociationProjection.tryMainSessionOf sid associations with
-        | Some _ -> runEnforcerForMainSession scope journal durable sessionPort sid sessionId outObj
+        | Some _ -> runEnforcerForMainSession scope journal durable terminateSession sid sessionId outObj
         | None -> Task.FromResult()
 
     let private applyBloggerEnforcerContinuation
         (scope: PluginRuntimeScope)
         (journal: AgentJournal option)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (projectionSessionIdOpt: string option)
         (outObj: obj)
         : Task =
         match projectionSessionIdOpt, journal with
         | Some sessionId, Some durable ->
             let sid = SessionId.create sessionId
-            runEnforcerIfMainAssociated scope journal durable sessionPort sid sessionId outObj
+            runEnforcerIfMainAssociated scope journal durable terminateSession sid sessionId outObj
         | _ -> Task.FromResult()
 
     let private skipPairGuideline (journal: AgentJournal option) (projectionSessionIdOpt: string option) : bool =
@@ -505,17 +514,21 @@ module PluginTransforms =
             }
         | _ -> Task.FromResult(PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline)
 
-    let private abortSessionIfPresent (sessionPort: ISessionHostPort) (projectionSessionIdOpt: string option) : Task =
+    let private terminateSessionIfPresent
+        (terminateSession: SessionTermination)
+        (projectionSessionIdOpt: string option)
+        (reason: string)
+        : Task =
         match projectionSessionIdOpt with
         | Some sessionId ->
             task {
-                let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
+                let! _ = terminateSession (SessionId.create sessionId) reason
                 ()
             }
         | None -> Task.FromResult()
 
     let private applyPairInjectResult
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (projectionSessionIdOpt: string option)
         (outObj: obj)
         (injectResult: Result<obj list, string>)
@@ -529,14 +542,14 @@ module PluginTransforms =
                 "host-013-fail-closed"
                 [ "session_id", (defaultArg projectionSessionIdOpt ""); "result", reason ]
 
-            abortSessionIfPresent sessionPort projectionSessionIdOpt
+            terminateSessionIfPresent terminateSession projectionSessionIdOpt reason
 
     let private injectPairProgrammingGuideline
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
         (sessionStartedAt: DateTimeOffset option)
         (clock: IClockPort)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (outObj: obj)
         : Task =
         task {
@@ -559,7 +572,7 @@ module PluginTransforms =
             let! injectResult =
                 PairProgrammingThoughtTransform.tryInject journal projectionSessionIdOpt markerText messages
 
-            do! applyPairInjectResult sessionPort projectionSessionIdOpt outObj injectResult
+            do! applyPairInjectResult terminateSession projectionSessionIdOpt outObj injectResult
         }
 
     let private maybeInjectPairGuideline
@@ -567,19 +580,19 @@ module PluginTransforms =
         (projectionSessionIdOpt: string option)
         (sessionStartedAt: DateTimeOffset option)
         (clock: IClockPort)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (outObj: obj)
         : Task =
         if skipPairGuideline journal projectionSessionIdOpt then
             Task.FromResult()
         else
-            injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
+            injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock terminateSession outObj
 
     let private projectRequirementGrounding
         (journal: AgentJournal option)
         (workspaceDirectory: string option)
         (projectionSessionIdOpt: string option)
-        (sessionPort: ISessionHostPort)
+        (terminateSession: SessionTermination)
         (outObj: obj)
         : Task =
         let applyProjection sessionId projected =
@@ -593,7 +606,7 @@ module PluginTransforms =
                     [ "session_id", sessionId; "result", reason ]
 
                 task {
-                    let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
+                    let! _ = terminateSession (SessionId.create sessionId) reason
                     ()
                 }
 
@@ -775,10 +788,20 @@ module PluginTransforms =
         let clock = boot.Clock
         let workspaceDirectory = boot.WorkspaceDirectory
         let sessionPort = host.SessionPort
+        let eventPort = host.EventPort
         let snapshotOpt = host.SnapshotOpt
         let strengthDurability = host.StrengthDurability
         let wired = host.Wired
         let strengthFailFuse = boot.StrengthFailClosed
+
+        let terminateSession: SessionTermination =
+            fun sessionId reason ->
+                ManagedSessionTermination.terminate
+                    (fun ownerId -> scope.CancelSessionChildren(SessionId.value ownerId))
+                    sessionPort
+                    eventPort
+                    sessionId
+                    reason
 
         let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj =
             if ExplicitResumeSuppression.isCurrentMaterial outObj then
@@ -815,7 +838,7 @@ module PluginTransforms =
                     projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
 
                 let! sessionStartedAt =
-                    tryBindSessionStartedAt journal projectionSessionIdOpt sessionStartCandidate sessionPort
+                    tryBindSessionStartedAt journal projectionSessionIdOpt sessionStartCandidate terminateSession
 
                 let! strengthReplayPlans =
                     strengthReplayPlansFor journal strengthDurability strengthFailFuse projectionSessionIdOpt outObj
@@ -846,7 +869,7 @@ module PluginTransforms =
                 // docs/what/enforcer.md ENFORCER-044/047/050: Blogger continuation only.
                 // Main-session material is decided once in
                 // CompanionTransform → BloggerCoordinator.onMainMaterial.
-                do! applyBloggerEnforcerContinuation scope journal sessionPort projectionSessionIdOpt outObj
+                do! applyBloggerEnforcerContinuation scope journal terminateSession projectionSessionIdOpt outObj
 
                 // STRENGTH-009: freeze the post-Enforcer semantic view and
                 // complete any eligible speculation before the Pair marker.
@@ -857,12 +880,12 @@ module PluginTransforms =
                 // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
                 // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
                 // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
-                do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock sessionPort outObj
+                do! maybeInjectPairGuideline journal projectionSessionIdOpt sessionStartedAt clock terminateSession outObj
 
                 // REQUIREMENT-GROUNDING-007/012: permanent requirement reads use
                 // the same append-only placement discipline, after HOST-013 so
                 // ordinary and Cursor order is always pseudo-skill → read(s).
-                do! projectRequirementGrounding journal workspaceDirectory projectionSessionIdOpt sessionPort outObj
+                do! projectRequirementGrounding journal workspaceDirectory projectionSessionIdOpt terminateSession outObj
 
                 injectBloggerChronicleText journal projectionSessionIdOpt outObj
 

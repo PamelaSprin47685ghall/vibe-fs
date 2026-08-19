@@ -80,6 +80,7 @@ type PluginBloggerScope() =
     /// serial, so two parks for one session cannot race in practice — the
     /// dictionary entry is the guard that makes the invariant structural).
     let parkedGate = obj ()
+    /// DSL-cross-callback-proof: physical waiter — ParkedTransform owns a TaskCompletionSource transport fence
     // DSL-MUTABLE: resource — parked continuation transform registry by session id
     let parked = Dictionary<string, ParkedTransform>()
     // ENFORCER-047/050: dual slots without dual storage for PendingOffer.
@@ -89,6 +90,7 @@ type PluginBloggerScope() =
     // DSL-MUTABLE: resource — pending offer registry by session id
     let pendingOffer = Dictionary<string, BloggerRequestContext>()
     // Physical Blogger flight ownership lives in SharedState (cross worktree/root).
+    /// DSL-cross-callback-proof: physical quiescence-permit — DrainWindow.Open carries an unforgeable DrainPermit
     // DSL-MUTABLE: single-flight — physical drain-window slot
     let drainWindows = Dictionary<string, DrainWindow>()
 

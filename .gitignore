@@ -25,6 +25,8 @@
 
 # Local delivery verification logs (not product)
 /.delivery-logs/
+/.fable-daemon/
+/.fable-ack
 
 # Logs
 *.log

@@ -60,6 +60,7 @@ type IJoinAttemptRegistry =
 /// Thread-safe process-local attempt registry (Dictionary + lock).
 type JoinAttemptRegistry() =
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical waiter — live JoinAttemptLease wait handles only
     // DSL-MUTABLE: resource — active join attempt registry by session key
     let active = Dictionary<string, ResizeArray<JoinAttemptLease>>()
 

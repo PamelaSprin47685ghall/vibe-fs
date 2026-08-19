@@ -119,17 +119,17 @@ module ChronicleTool =
     let private missingTip language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.MissingTip ] []
 
-    let private abortSessionIfPresent (runtime: ToolRuntimeScope) sessionId : System.Threading.Tasks.Task =
+    let private terminateSessionIfPresent (runtime: ToolRuntimeScope) sessionId : System.Threading.Tasks.Task =
         task {
             if not (String.IsNullOrWhiteSpace sessionId) then
-                let! _ = runtime.Sessions.InterruptAttempt(SessionId.create sessionId)
+                let! _ = runtime.TerminateSession(sessionId, NoLiveCycleError)
                 ()
         }
 
     let private applyNoLiveCycleEffect runtime (ctx: HostToolContext) : System.Threading.Tasks.Task =
         task {
             Diagnostic.emit "chronicle-execute" [ "session_id", ctx.SessionId; "result", NoLiveCycleError ]
-            do! abortSessionIfPresent runtime ctx.SessionId
+            do! terminateSessionIfPresent runtime ctx.SessionId
         }
 
     let private resultForTip language tipRaw =

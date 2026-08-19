@@ -28,6 +28,8 @@ type ISessionHostPort =
     /// Unlike AbortSession, this does not detach/cancel logical children and is
     /// unavailable to user-facing/root sessions.
     abstract InterruptAttempt: sessionId: SessionId -> Task<Result<unit, string>>
+    abstract TerminateAttempt: sessionId: SessionId * reason: string -> Task<Result<unit, string>>
+    abstract TryTakeAttemptTermination: sessionId: SessionId -> string option
     abstract AbortChildren: parentId: SessionId -> Task
 
     /// Fission-only physical sibling creation. `physicalParentId` is the old
@@ -43,6 +45,59 @@ type ISessionHostPort =
     /// HOST-015: the family root every managed child is physically parented to.
     /// Ownership is proven by durable journal links, never by Host parentID.
     abstract FamilyRootOf: sessionId: SessionId -> SessionId
+
+[<RequireQualifiedAccess>]
+module ManagedSessionTermination =
+
+    let private captureResult (operation: unit -> Task<Result<unit, string>>) =
+        task {
+            try
+                return! operation ()
+            with ex ->
+                return Error ex.Message
+        }
+
+    let private captureUnit (operation: unit -> Task) =
+        task {
+            try
+                do! operation ()
+                return Ok()
+            with ex ->
+                return Error ex.Message
+        }
+
+    let private combineEffects cancelOutcome abortOutcome =
+        match cancelOutcome, abortOutcome with
+        | Error error, _ -> Error("descendant cancellation failed: " + error)
+        | Ok(), Error error -> Error("Host abort failed: " + error)
+        | Ok(), Ok() -> Ok()
+
+    /// MANAGED-SESSION-017: fail-closed termination is one causal CE, not an
+    /// attempt-only interrupt followed by a future callback guessing the cause.
+    /// Descendant durable cancellation precedes physical teardown; Failed is
+    /// published after teardown so the existing fork terminal listener commits
+    /// HandleCompleted and pulses the parent join mailbox.
+    let terminate
+        (cancelSessionChildren: SessionId -> Task)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (sessionId: SessionId)
+        (reason: string)
+        : Task<Result<unit, string>> =
+        if sessionPort.FamilyRootOf sessionId = sessionId then
+            Task.FromResult(
+                Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
+            )
+        else
+            task {
+                let! cancelOutcome = captureUnit (fun () -> cancelSessionChildren sessionId)
+                let! abortOutcome = captureResult (fun () -> sessionPort.AbortSession sessionId)
+
+                eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason)
+                |> ignore
+
+                return combineEffects cancelOutcome abortOutcome
+            }
 
 type InjectedSessionPort
     (
@@ -64,6 +119,9 @@ type InjectedSessionPort
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     // DSL-MUTABLE: resource — child-to-parent session map
     let childParents = Dictionary<SessionId, SessionId>()
+    /// DSL-cross-callback-proof: physical single-flight
+    // DSL-MUTABLE: single-flight — attempt-scoped termination reason consumed on abort
+    let attemptTerminations = Dictionary<SessionId, string>()
     let lockObj = obj ()
     let restoredParent = defaultArg familyParent (fun _ -> None)
 
@@ -313,6 +371,23 @@ type InjectedSessionPort
                 )
             else
                 interruptManagedAttempt sessionId
+
+        member _.TerminateAttempt(sessionId, reason) =
+            if not (managedChild sessionId) then
+                Task.FromResult(
+                    Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
+                )
+            else
+                lock lockObj (fun () -> attemptTerminations.[sessionId] <- reason)
+                interruptManagedAttempt sessionId
+
+        member _.TryTakeAttemptTermination(sessionId) =
+            lock lockObj (fun () ->
+                match attemptTerminations.TryGetValue sessionId with
+                | true, reason ->
+                    attemptTerminations.Remove sessionId |> ignore
+                    Some reason
+                | false, _ -> None)
 
         member me.AbortSession(sessionId) =
             if not (managedChild sessionId) then

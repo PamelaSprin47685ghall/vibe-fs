@@ -658,8 +658,14 @@ type AssistanceHost
         | None -> Task.FromResult AssistanceTurnDisposition.Handled
         | Some _ ->
             task {
-                // Claim already consumed to produce the typed value; fence decides escalation
-                return! continueAfterIdle ()
+                match
+                    sensor.TryConsumeAssistanceClaim(
+                        AssistanceAbortClaim.sessionId assistanceClaim,
+                        AssistanceAbortClaim.providerRun assistanceClaim
+                    )
+                with
+                | None -> return AssistanceTurnDisposition.Handled
+                | Some _ -> return! continueAfterIdle ()
             }
 
     let escalateFastOwnerRequest
@@ -878,7 +884,7 @@ type AssistanceHost
         let isClaimed = isClaimedOwnerAttempt turn
 
         let assistanceClaim =
-            sensor.TryConsumeAssistanceClaim(turn.SessionId, turn.ProviderRun)
+            sensor.TryObserveAssistanceClaim(turn.SessionId, turn.ProviderRun)
 
         match turn.Outcome, assistanceClaim with
         | ReconcileProgram.TurnAborted _, Some claim -> handleOwnerRequest context claim

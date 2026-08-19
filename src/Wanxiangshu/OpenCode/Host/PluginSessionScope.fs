@@ -64,6 +64,7 @@ open Wanxiangshu.Strength
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope() =
+    /// DSL-cross-callback-proof: physical resource — retained child identity for cleanup/finality only
     // DSL-MUTABLE: resource — identities retained through staged Inspector finalization.
     let retainedSessionIdentities = HashSet<string>()
 

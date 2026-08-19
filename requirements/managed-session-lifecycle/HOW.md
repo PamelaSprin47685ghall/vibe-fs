@@ -44,8 +44,17 @@ CompletedAwaitingJoin 且 ref+digest 精确匹配才回 Active）、视图（`li
   reuse 不 spawn、沿用已绑 agent；`ForkRuntime` 维护 in-process ChildRun 注册 + 双通道 mailbox。
 - **interrupt 权限分型**：`ISessionHostPort.InterruptAttempt` 只允许有 physical parent 的 managed
   sub-session，且只调用 Host physical abort；`AbortSession` 才拥有 detach + descendant cascade。
-  Loop/NeedHelp/Fission/Reviewer/tool-invariant 的内部收束一律走 `InterruptAttempt`。root/user-facing
-  自动 interrupt 在 port 前与 port 内双重拒绝。
+  `InterruptAttempt` 仅供已经拥有 successor 的 Loop/NeedHelp/Fission/Reviewer/Finality control stop；
+  tool/invariant fail-closed 走 `ManagedSessionTermination.terminate`：调用栈内证明 managed child，先 durable
+  cancel descendants，再 logical/physical `AbortSession`，随后同步发布 `Failed` terminal。root/user-facing
+  因 `FamilyRootOf sessionId = sessionId` fail-closed，任何 child cancel / abort effect 之前即被拒绝。
+- **NeedHelp abort→idle handoff**：`TryObserveAssistanceClaim` 只把 exact attempt 翻译成 typed claim，
+  不删除 sensor arm；`TurnAborted` 无 fresh idle 时只 claim ownership。`IdleRevisit` 再次取得同一 typed
+  claim，`withFreshAssistanceQuiescence` 在 permit 后调用 `TryConsumeAssistanceClaim`，成功才发送 escalation /
+  创建 consultation。这样 abort observation 不会提前吃掉唯一 successor capability。
+- **abort rollback**：Loop/NeedHelp 遵守 reserve→Host abort→commit；Host abort Error/throw 立即撤销本次
+  sensor reserve。fatal/invariant termination 不 reserve 跨 callback cause，而是在当前调用栈内完成终态，
+  因而没有 stale reason 可以泄漏到下一 provider attempt。
 - **TurnAborted cancel**：`OrdinaryTurnWorkflow.handleAborted` 先调用
   `PluginRuntimeScope.CancelSessionChildren` → `ToolRuntimeScope.CancelSessionChildren` →
   `HostForkRuntime.CancelAndDrain`，使 active durable handles 先写 `HandleAbandoned(ParentCancelled)`；
@@ -112,6 +121,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 | MANAGED-SESSION-014 | `tests/sync-delegate-lifecycle.test.mjs` `G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_scope_close`（deleted child retire live binding 但为 owner scope close 保留） | MOVE | `node --test requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs` |
 | MANAGED-SESSION-015 | `tests/handle.test.mjs` `EXEC_009_a_linked_handle_records_the_child_session_it_drives` / `EXEC_009_only_an_agent_handle_answers_the_agent_question` + `EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating` / `EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay`；`tests/terminal-policy.test.mjs` `TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent` / `TPOL_tryLinkedChild_without_journal_returns_none`；`tests/host-fork-agent.test.mjs` `HFA_reuse_unknown_agent_id_is_error`；`tests/join-v2-abandoned-order-lifecycle.test.mjs` `EXEC_018_creation_order_follows_HandleLinked_fold_sequence`（handle id → child session 记录） | MOVE + MOVE + MOVE + MOVE | `node --test requirements/managed-session-lifecycle/tests/handle.test.mjs` / `.../terminal-policy.test.mjs` / `.../host-fork-agent.test.mjs` / `.../join-v2-abandoned-order-lifecycle.test.mjs` |
 | MANAGED-SESSION-016 | `tests/interrupt-boundary.test.mjs`（attempt-only port root fail-closed + 无 child cascade；Loop/NeedHelp root gate；TurnAborted durable cancel → physical cascade → terminal 顺序）；`tests/handle-abandoned.test.mjs` `EXEC_009_Active_to_Abandoned_fold_and_projection`（Abandoned 立即退出 listable/horizon） | NEW + MOVE | `node --test requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` / `.../handle-abandoned.test.mjs` |
+| MANAGED-SESSION-017 | `tests/interrupt-successor.test.mjs`（NeedHelp claim survives abort→idle；fatal stop uses synchronous `ManagedSessionTermination`；internal InterruptAttempt caller allowlist；sensor abort failure rollback；no cross-callback termination registry）；`requirements/interaction-authority/tests/assistance-abort-fence.test.mjs`（INTERACTION-AUTHORITY-012 fresh-idle consumption shape） | NEW + CROSS | `node --test requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs requirements/interaction-authority/tests/assistance-abort-fence.test.mjs` |
 
 ### 反向覆盖（OWNED / NEEDS-SPLIT clause → 本包命题）
 
@@ -122,6 +132,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 - `EXEC-014`（hidden handle 部分）→ MANAGED-SESSION-010。
 - `EXEC-017`（cascade cancel 部分）→ MANAGED-SESSION-009。
 - `EXEC-017`（attempt interrupt 与 logical cancel 权限分型）→ MANAGED-SESSION-016。
+- `EXEC-017`（internal interrupt successor / parent wake closure）→ MANAGED-SESSION-017。
 - `EXEC-026`（runtime ownership 部分）→ MANAGED-SESSION-001/005/014。
 - `EXEC-028`（lifecycle 部分）→ MANAGED-SESSION-004/005。
 - `REVIEW-010/019`（fail-closed 消费）→ MANAGED-SESSION-003/011（交叉引用，不复制）。

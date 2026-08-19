@@ -44,6 +44,10 @@ module ReviewHostSurface =
 
             member _.AbortSession(sessionId) = typed.AbortSession sessionId
             member _.InterruptAttempt(sessionId) = typed.InterruptAttempt sessionId
+            member _.TerminateAttempt(sessionId: SessionId, reason: string) : Task<Result<unit, string>> =
+                typed.TerminateAttempt(sessionId, reason)
+            member _.TryTakeAttemptTermination(sessionId: SessionId) : string option =
+                typed.TryTakeAttemptTermination sessionId
             member _.AbortChildren(sessionId) = typed.AbortChildren sessionId
 
             member _.CreateSiblingSession(owner, parent, options) =

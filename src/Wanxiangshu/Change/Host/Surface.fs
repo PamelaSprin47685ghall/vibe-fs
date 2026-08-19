@@ -157,6 +157,14 @@ module OrchestratorHostSurface =
                     return plainUnitResult value
                 }
 
+            member _.TerminateAttempt(sessionId: SessionId, reason: string) : Task<Result<unit, string>> =
+                task {
+                    let! value = invokeRawTask raw "TerminateAttempt" [| box (SessionId.value sessionId); box reason |]
+                    return plainUnitResult value
+                }
+
+            member _.TryTakeAttemptTermination(_sessionId: SessionId) : string option = None
+
             member _.AbortChildren(sessionId) =
                 invokeRawUnit raw "AbortChildren" [| box (SessionId.value sessionId) |]
 

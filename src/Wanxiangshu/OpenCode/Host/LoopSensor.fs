@@ -40,6 +40,7 @@ type AbortCause =
 type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Result<unit, string>>) =
 
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical resource — streaming detector algorithm state only; outcome is typed AbortCause
     // DSL-MUTABLE: resource — per-session loop detector registry
     let detectors = Dictionary<string, LoopDetector.Detector>()
     /// DSL-cross-callback-proof: physical single-flight — one-shot LoopKillArmed, consumed as typed AbortCause
@@ -58,12 +59,24 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                   "result", "abort-failed"
                   "provider_error", reason ]
 
-    let abortAndReport (abortSession: SessionId -> Task<Result<unit, string>>) (sessionId: SessionId) : Task =
+    let applyAbortOutcome (rollback: unit -> unit) (sessionId: SessionId) (outcome: Result<unit, string>) =
+        match outcome with
+        | Ok() -> reportAbortOutcome sessionId outcome
+        | Error reason ->
+            rollback ()
+            reportAbortOutcome sessionId (Error reason)
+
+    let abortAndReport
+        (abortSession: SessionId -> Task<Result<unit, string>>)
+        (rollback: unit -> unit)
+        (sessionId: SessionId)
+        : Task =
         task {
             try
                 let! outcome = abortSession sessionId
-                reportAbortOutcome sessionId outcome
+                applyAbortOutcome rollback sessionId outcome
             with ex ->
+                rollback ()
                 Diagnostic.emit
                     "loop-kill"
                     [ "session_id", SessionId.value sessionId
@@ -84,6 +97,9 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
 
     member private _.TryArm(sessionId: SessionId) =
         lock gate (fun () -> armed.Add(keyOf sessionId))
+
+    member private _.RollbackArm(sessionId: SessionId) =
+        lock gate (fun () -> armed.Remove(keyOf sessionId) |> ignore)
 
     member _.DropSession(sessionId: SessionId) =
         lock gate (fun () ->
@@ -118,7 +134,7 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
                    | None -> [])
 
             Diagnostic.emit "loop-kill" fields
-            abortAndReport abortSession sessionId |> ignore
+            abortAndReport abortSession (fun () -> this.RollbackArm sessionId) sessionId |> ignore
         else
             Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "ignored-duplicate" ]
 

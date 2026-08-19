@@ -284,7 +284,8 @@ module ToolRegistry =
                         [ "session_id", ctx.SessionId; "result", ChronicleTool.NoLiveCycleError ]
 
                     if not (String.IsNullOrWhiteSpace ctx.SessionId) then
-                        let! _ = runtime.Sessions.InterruptAttempt(SessionId.create ctx.SessionId)
+                        let! _ = runtime.TerminateSession(ctx.SessionId, ChronicleTool.NoLiveCycleError)
+
                         ()
 
                     return raise (InvalidOperationException(ChronicleTool.NoLiveCycleError))

@@ -93,8 +93,10 @@ module StrengthReplicaTools =
 /// removes both indexes atomically.
 type StrengthRuntime() =
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical single-flight — live replica ownership index by owner
     // DSL-MUTABLE: resource — owner-to-replica binding map
     let byOwner = Dictionary<string, StrengthReplicaBinding>()
+    /// DSL-cross-callback-proof: physical single-flight — reverse index for the same live replica capability
     // DSL-MUTABLE: resource — replica-to-binding map
     let byReplica = Dictionary<string, StrengthReplicaBinding>()
 

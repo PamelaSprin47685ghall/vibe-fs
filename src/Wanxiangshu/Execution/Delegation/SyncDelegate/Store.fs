@@ -300,17 +300,21 @@ open SyncDelegateStoreOps
 /// defined by ProviderRun + provider tool-call order, never scheduler timing.
 type internal SyncDelegateCallStore() as this =
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical resource — live call/rendezvous ownership by caller scope
     // DSL-MUTABLE: resource — live calls by owner scope key
     let callsByOwnerScope = Dictionary<string, ResizeArray<SyncDelegateCall>>()
+    /// DSL-cross-callback-proof: physical single-flight — dedicated delegate session owns at most one live call
     // DSL-MUTABLE: resource — at most one live call per dedicated delegate session
     let callsByDelegate = Dictionary<string, SyncDelegateCall>()
     /// DSL-cross-callback-proof: physical — retired child identity retained only for draft/session cleanup
     // DSL-MUTABLE: resource — retired Inspector ids staged between child and owner SessionDeleted
     let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
+    /// DSL-cross-callback-proof: physical waiter — rendezvous buffer until the Host-declared ProviderRun call set is complete
     // DSL-MUTABLE: resource — incomplete semantic batches by (scope, role)
     let pendingBatches = Dictionary<string * SyncDelegateRole, PendingBatch>()
     // Host event projection: provider tool parts accumulate in Host order and
     // complement the independently lagging session snapshot view.
+    /// DSL-cross-callback-proof: physical resource — accumulated Host tool-call observation for one ProviderRun
     // DSL-MUTABLE: resource — host event projection by (owner, providerRun).
     let observedProviderRuns = Dictionary<string * string, ObservedProviderRun>()
     // DSL-MUTABLE: single-flight — complete/admitted batch through ordinary completion

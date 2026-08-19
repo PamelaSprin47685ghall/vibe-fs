@@ -73,12 +73,14 @@ type private CapacityCreditSource =
 type BorrowingCapacity<'target>
     (ledger: CapacityLedger<'target>, providerOf: 'target -> string, sameTarget: 'target -> 'target -> bool) =
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical resource — capacity lineage used only to route token borrowing/recall
     // DSL-MUTABLE: resource — capacity-only session lineage
     let parents = Dictionary<string, string>()
     // DSL-MUTABLE: resource — capacity-only Main → Blogger companion association
     let companionSessionByOwner = Dictionary<string, string>()
     // DSL-MUTABLE: resource — capacity-only Blogger → Main companion association
     let companionOwnerBySession = Dictionary<string, string>()
+    /// DSL-cross-callback-proof: physical resource — exact execution-to-lender token ownership
     // DSL-MUTABLE: resource — exact borrowed execution → actual lender token
     let creditSourceByExecution = Dictionary<string, CapacityCreditSource>()
     // DSL-MUTABLE: resource — at most one owned capacity token per execution

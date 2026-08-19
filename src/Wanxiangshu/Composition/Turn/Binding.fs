@@ -110,10 +110,13 @@ module TurnBinding =
     /// Mutable store for in-memory bindings. Durable recovery uses the journal.
     type Store() =
         let gate = obj ()
+        /// DSL-cross-callback-proof: physical resource — immutable message identity binding, never workflow stage
         // DSL-MUTABLE: resource — user message binding map by session.
         let userMessageBindings = Dictionary<string, PhysicalUserMessageId>()
+        /// DSL-cross-callback-proof: physical resource — current Host run identity/authority binding
         // DSL-MUTABLE: resource — active run binding map by session.
         let activeBindings = Dictionary<string, ActiveRunBinding>()
+        /// DSL-cross-callback-proof: physical resource — accepted continuation message identities
         // DSL-MUTABLE: resource — continuation message id set by session.
         let continuationMessageIds = Dictionary<string, Set<string>>()
 
