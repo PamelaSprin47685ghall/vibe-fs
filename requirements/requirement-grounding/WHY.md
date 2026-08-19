@@ -41,6 +41,17 @@ context 压力，也让“路径相关规范”退化成“自动导入整个测
 首次 mutation 必须被**延期而不是执行**：先补做普通 read，下一次新的明确调用才有资格触碰
 真实文件。不能自动重放旧调用，因为新上下文本应允许模型改变主意。
 
+## 为什么 grep 不触发 APPLIES-TO
+
+`grep`/search 是候选发现，不是对某个文件建立稳定语义上下文。一次宽泛 pattern 可以命中大量实现文件；
+若把每个 match file 都送进 `APPLIES-TO` resolver，搜索结果的高 fan-out 会把许多仅偶然命中的 package
+一起 grounding，既制造噪声，也让 participant 在真正决定阅读哪个文件之前承担无关规范上下文。
+
+因此自动 observation grounding 只认**直接 `read` 的明确文件观察**。`grep` 即使返回源码行，也不据其
+match file 触发 `APPLIES-TO`；participant 从搜索结果选择具体文件并 `read` 后，才建立路径 grounding。
+mutation 不受此豁免影响：真实 effect path 在执行前仍必须经过完整 resolver，因为那已经不是候选发现，
+而是即将发生的文件后果。
+
 ## 为什么不能每次都重复读取
 
 把完整 requirement material 每次读文件都自动 read 一遍，会迅速淹没上下文，也破坏稳定前缀。

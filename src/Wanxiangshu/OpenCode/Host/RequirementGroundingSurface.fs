@@ -75,6 +75,29 @@ module RequirementGroundingSurface =
                            packages = unbox<obj array> requested?packages |}
         }
 
+    let observationDecision journal workspace sessionId toolName args output : Task<obj> =
+        task {
+            let! result =
+                RequirementGroundingGate.after
+                    (Some(agentJournalOf journal))
+                    (Some workspace)
+                    (box
+                        {| tool = toolName
+                           sessionID = sessionId
+                           args = args |})
+                    (box {| output = output |})
+
+            return
+                match result with
+                | Ok decision ->
+                    box
+                        {| ok = true
+                           needsGrounding = decision.NeedsGrounding
+                           requested = decision.Requested
+                           packages = decision.Packages |> List.toArray |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
     let projectWithJournal journal sessionId (rawMessages: obj array) : Task<obj> =
         task {
             let! result =

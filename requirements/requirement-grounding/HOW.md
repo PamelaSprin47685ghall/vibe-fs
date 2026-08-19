@@ -45,8 +45,10 @@ profile 胜出，避免同 package 生成两份互相竞争的 snapshot。
 
 ## 4. provider observation path：一次读取，horizon 内永久投影
 
-OpenCode native `read`/`grep` 在 `tool.execute.after` 解析实际观察路径并提交 durable Request；mutation
+OpenCode native `read` 在 `tool.execute.after` 解析明确观察路径并提交 durable Request；mutation
 在 `tool.execute.before` 解析目标路径并先提交 Request。下一次 provider transform 消费 Pending Request。
+`grep`/search/list/glob 都是 discovery，不把 match path 送进 APPLIES-TO resolver；搜索后只有后续明确 `read`
+才形成 observation grounding。mutation effect path 仍照常在 effect 前 resolve。
 
 ordinary provider 使用 completed synthetic `read` Host tool part，`state.input.filePath` 与 `state.output`
 分别承载 call provenance 与冻结 result bytes；Host 按其普通 tool projection 处理。grounding cause/digest
@@ -118,7 +120,7 @@ provider-projection 定义同样最小的 result-local attributes。原则是不
 Cursor 当前-horizon suffix 与 ordinary pair 一样按 occurrence 原字节 replay。首次生成 envelope 后应冻结最终 Cursor
 bytes，而不是每轮由 `CanonicalPath + ResultBytes` 重新 render，以避免 renderer 演进破坏 prefix cache。
 
-纯 `glob`/目录 list 只返回路径名时不触发；grep 一旦返回源码行即触发其实际 match file。
+`grep`/search/list/glob 均不触发 observation grounding；direct `read` 才触发明确文件观察。
 
 ## 5. mutation gate
 
@@ -207,7 +209,7 @@ grounding state。
 | REQUIREMENT-GROUNDING-004 | `tests/scope-resolution.test.mjs::WHAT[REQUIREMENT-GROUNDING-004] returns every overlapping package in deterministic package-name order` | NEW / GAP-018 CLOSED | overlap union |
 | REQUIREMENT-GROUNDING-005 | `tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest` | NEW / GAP-019 CLOSED | external material profile/order/digest |
 | REQUIREMENT-GROUNDING-006 | `tests/grounding-delivery.test.mjs::WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest identity while allowing changed package content to ground again` | NEW / GAP-019 CLOSED | digest dedupe + invalidation |
-| REQUIREMENT-GROUNDING-007 | `tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes` | NEW / GAP-020 CLOSED | ordinary/Cursor projection + production order |
+| REQUIREMENT-GROUNDING-007 | `tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read call-result pairs while Cursor appends NUL-BOM result-only bytes after the pseudo-skill with stable source-path attributes`; `tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-007] grep match files do not trigger APPLIES-TO before an explicit read` | NEW / GAP-020 CLOSED | direct-read trigger + grep negative boundary + ordinary/Cursor projection |
 | REQUIREMENT-GROUNDING-008 | `tests/opencode-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-008] defers the first ungrounded mutation with zero file effect and never auto-replays the old call` | NEW / GAP-020 CLOSED | zero-effect defer + expected nonfatal hook rejection |
 | REQUIREMENT-GROUNDING-009 | `tests/repository-programming-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-009] grounds the union of a staged multi-file effect set before an all-or-nothing commit` | NEW / GAP-021 CLOSED | staged union before commit |
 | REQUIREMENT-GROUNDING-010 | `tests/repository-programming-gate.test.mjs::WHAT[REQUIREMENT-GROUNDING-010] applies one grounding policy across OpenCode native and repository-programming file tools` | NEW / GAP-021 CLOSED | shared policy |

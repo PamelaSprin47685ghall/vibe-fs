@@ -13,15 +13,6 @@ module RequirementGroundingGate =
     [<Literal>]
     let RequiredError = "REQUIREMENT_GROUNDING_REQUIRED"
 
-    [<Import("existsSync", "node:fs")>]
-    let private existsSync (path: string) : bool = jsNative
-
-    [<Import("join", "node:path")>]
-    let private pathJoin (a: string, b: string) : string = jsNative
-
-    [<Import("isAbsolute", "node:path")>]
-    let private pathIsAbsolute (path: string) : bool = jsNative
-
     let private textField (value: obj) name =
         if isNull value || isNull value?(name) then
             None
@@ -42,39 +33,9 @@ module RequirementGroundingGate =
         | "rm" -> distinct [ textField args "path"; textField args "filePath" ]
         | _ -> []
 
-    let private absoluteCandidate workspace candidate =
-        if pathIsAbsolute candidate then
-            candidate
-        else
-            pathJoin (workspace, candidate)
-
-    let private grepPaths workspace args output =
-        let direct =
-            distinct [ textField args "filePath"; textField args "path" ]
-            |> List.filter (absoluteCandidate workspace >> existsSync)
-
-        let fromLine (line: string) =
-            let colon = line.IndexOf ':'
-
-            let resolveCandidate () =
-                let candidate = line.Substring(0, colon).Trim()
-                let absolute = absoluteCandidate workspace candidate
-
-                if candidate = "" then None
-                elif not (existsSync absolute) then None
-                else Some candidate
-
-            if colon <= 0 then None else resolveCandidate ()
-
-        let rendered = if isNull output then "" else string output
-
-        direct @ (rendered.Split('\n') |> Array.toList |> List.choose fromLine)
-        |> List.distinct
-
-    let private observationPaths (workspace: string) (toolName: string) (args: obj) (output: obj) =
+    let private observationPaths (toolName: string) (args: obj) =
         match toolName.ToLowerInvariant() with
         | "read" -> distinct [ textField args "filePath"; textField args "path" ]
-        | "grep" -> grepPaths workspace args output
         | _ -> []
 
     let private emptyDecision =
@@ -152,16 +113,10 @@ module RequirementGroundingGate =
             else
                 toolInput?args
 
-        let output =
-            if isNull toolOutput || isNull toolOutput?output then
-                null
-            else
-                toolOutput?output
-
         match workspace with
         | None -> Task.FromResult(Ok emptyDecision)
         | Some root when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(Ok emptyDecision)
-        | Some root -> request journal root sessionId (observationPaths root toolName args output)
+        | Some root -> request journal root sessionId (observationPaths toolName args)
 
     let programAdmission
         journal

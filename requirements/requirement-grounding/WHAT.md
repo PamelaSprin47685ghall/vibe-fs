@@ -58,8 +58,8 @@ content digest。同一 participant **当前 provider horizon** 已经完成同�
 
 ## REQUIREMENT-GROUNDING-007：自动 grounding = 当前 horizon 锚定的普通 read 投影
 
-当一次 provider-facing 文件观察将 covered source content 暴露给 participant（例如 read 或返回
-源码片段的 grep）时，所有未 grounding package 的 material 必须按 ordinary provider 与 Cursor 两种既有
+当一次 provider-facing **直接 `read`** 将 covered source content 暴露给 participant 时，所有未 grounding
+package 的 material 必须按 ordinary provider 与 Cursor 两种既有
 Host 投影分别进入 horizon。ordinary provider 与 participant 主动调用 `read` **完全相同**：同一 read
 capability、同一路径与 range 规则、同一输出裁剪/错误语义、同一 source attribution、同一 tool-call/
 tool-result 语义。禁止 `GroundingBundle`、特殊 system 文本或其它 grounding 专用协议。若完整 material
@@ -71,6 +71,8 @@ tool-result 语义。禁止 `GroundingBundle`、特殊 system 文本或其它 gr
 replay set；后续路径再次触发时形成新的 occurrence。新 occurrence 只能追加在当前 wire 的追加区，禁止插回已经发送的 prefix。
 若同一 gap 同时产生现有 pair-programming 伪 `skill({ name: "" })` occurrence 与 requirement grounding，
 固定顺序为 **伪 skill → requirement read(s)**。仅列路径而不暴露源码内容的目录枚举不强制 grounding。
+`grep`/search 即使返回源码片段，也属于候选发现：其 match file **不得触发 APPLIES-TO grounding**；只有
+participant 随后对明确文件执行直接 `read`，或 mutation effect set 真正指向该路径时，resolver 才参与。
 
 Cursor 是唯一 provider-visible 形状例外，走与现有 pair-programming Cursor 特判相同的末端 suffix 机制：不伪造不存在的
 `read` tool-call half，而是在真实 terminal tool result 后按 `NUL+BOM` 分隔依次追加 requirement read
@@ -106,9 +108,11 @@ set；若发现新 grounding，丢弃未提交 stage，并按 REQUIREMENT-GROUND
 
 ## REQUIREMENT-GROUNDING-010：OpenCode 工具来源不能绕过 grounding
 
-grounding policy 作用于 semantic file observation/mutation，不作用于某个工具名。OpenCode native
-read/edit/write/grep/move/remove 与万象术 repository-programming surface 只要产生同类文件后果，
-就必须经过同一 resolver、dedupe 与 mutation gate；新增同义文件工具不得天然获得豁免。
+grounding policy 作用于明确文件观察与真实 mutation effect，不按工具名粗略扩张。OpenCode native `read`
+与同义的明确文件读取必须经过 observation resolver；edit/write/move/remove 与万象术
+repository-programming surface 只要产生同类文件后果，就必须经过同一 resolver、dedupe 与 mutation gate。
+`grep`/search/list/glob 等候选发现工具不因返回路径或源码片段而触发 APPLIES-TO；新增 mutation 或 direct-read
+同义工具也不得借换名绕过 grounding。
 
 **证据**：→ HOW.md `REQUIREMENT-GROUNDING-010`。
 

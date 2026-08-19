@@ -57,6 +57,42 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
   } finally { cleanup() }
 })
 
+test('WHAT[REQUIREMENT-GROUNDING-007] grep match files do not trigger APPLIES-TO before an explicit read', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const sourcePath = join(dir, 'src', 'main.fs')
+    const opened = await grounding.createJournal(dir)
+
+    const grep = await grounding.observationDecision(
+      opened.journal,
+      dir,
+      'grep-does-not-ground',
+      'grep',
+      { path: join(dir, 'src') },
+      `${sourcePath}:1:before\n`,
+    )
+    assert.equal(grep.ok, true)
+    assert.equal(grep.needsGrounding, false)
+    assert.equal(grep.requested, 0)
+    assert.deepEqual(grep.packages, [])
+
+    const read = await grounding.observationDecision(
+      opened.journal,
+      dir,
+      'grep-does-not-ground',
+      'read',
+      { filePath: sourcePath },
+      'before\n',
+    )
+    assert.equal(read.ok, true)
+    assert.equal(read.needsGrounding, true)
+    assert.equal(read.requested, 1)
+    assert.deepEqual(read.packages, ['alpha'])
+
+    grounding.disposeJournal(opened.journal)
+  } finally { cleanup() }
+})
+
 test('WHAT[REQUIREMENT-GROUNDING-008] defers the first ungrounded mutation with zero file effect and never auto-replays the old call', async () => {
   const { dir, cleanup } = sandbox()
   try {
