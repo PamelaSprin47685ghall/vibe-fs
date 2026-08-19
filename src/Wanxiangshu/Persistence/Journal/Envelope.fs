@@ -43,7 +43,12 @@ type Envelope =
 
 module Envelope =
 
-    let private extra = Extra.empty |> Extra.withInt64
+    let private extra =
+        { Extra.empty with
+            Hash = "system-int64"
+            Coders =
+                Extra.empty.Coders
+                |> Map.add "System.Int64" (Encode.boxEncoder Encode.int64, Decode.boxDecoder Decode.int64) }
 
     let private compareAcrossRuntimes (a: Envelope) (b: Envelope) : int =
         let byObservation = compare a.ObservedAt b.ObservedAt

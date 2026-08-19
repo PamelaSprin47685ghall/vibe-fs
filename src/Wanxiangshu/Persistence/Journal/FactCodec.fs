@@ -14,7 +14,12 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 /// Fact serialization (PERSIST-005).
 module FactCodec =
 
-    let private extra = Extra.empty |> Extra.withCustom Encode.int64 Decode.int64
+    let private extra =
+        { Extra.empty with
+            Hash = "system-int64"
+            Coders =
+                Extra.empty.Coders
+                |> Map.add "System.Int64" (Encode.boxEncoder Encode.int64, Decode.boxDecoder Decode.int64) }
 
     let pre050MigrationMessage =
         "Wanxiangshu 0.5.0 does not support pre-0.5.0 runtime journals.\nArchive or remove the old Wanxiangshu runtime journal before starting."
