@@ -85,6 +85,7 @@ type PluginBloggerScope() =
     // ENFORCER-047/050: dual slots without dual storage for PendingOffer.
     // CurrentRequest ownership = physical flight registry (entry = in-flight).
     // PendingOffer = separate dictionary for the next Main material while Parked.
+    /// DSL-cross-callback-proof: physical — one-shot inbound material buffer owned by Blogger convergence
     // DSL-MUTABLE: resource — pending offer registry by session id
     let pendingOffer = Dictionary<string, BloggerRequestContext>()
     // Physical Blogger flight ownership lives in SharedState (cross worktree/root).

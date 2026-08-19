@@ -304,6 +304,7 @@ type internal SyncDelegateCallStore() as this =
     let callsByOwnerScope = Dictionary<string, ResizeArray<SyncDelegateCall>>()
     // DSL-MUTABLE: resource — at most one live call per dedicated delegate session
     let callsByDelegate = Dictionary<string, SyncDelegateCall>()
+    /// DSL-cross-callback-proof: physical — retired child identity retained only for draft/session cleanup
     // DSL-MUTABLE: resource — retired Inspector ids staged between child and owner SessionDeleted
     let deletedInspectorsByOwnerScope = Dictionary<string, SessionId>()
     // DSL-MUTABLE: resource — incomplete semantic batches by (scope, role)

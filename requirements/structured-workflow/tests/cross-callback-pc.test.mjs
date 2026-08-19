@@ -23,6 +23,18 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_du_await_state_without_pro
   )
 })
 
+test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_private_du_await_state_is_detected', () => {
+  const source = [
+    'module Sample',
+    'type private AwaitState =',
+    '    | AwaitFirst of string',
+    '    | AwaitSecond of string',
+    'let awaits = Dictionary<string, AwaitState>()',
+  ].join('\n')
+  const hits = scanText(source, 'src/Wanxiangshu/New/PrivateAwait.fs')
+  assert.ok(hits.some((v) => v.name === 'awaits' && v.pattern === 'du-await-state'))
+})
+
 // ── Pattern 2: TryTake continuation consumption ─────────────────────────────
 
 test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_trytake_without_proof_is_RED', () => {

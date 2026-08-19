@@ -47,7 +47,7 @@ const foldEvents = (events) => {
   assert.equal(result.ok, true, result.ok ? '' : result.error)
   return result.value
 }
-const progressOf = (projection, jobId) => change.find(projection, jobId).progress
+const factsOf = (projection, jobId) => change.find(projection, jobId).facts
 const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
   change.classifyRebasedCandidate(head ?? null, rebasedCommit, snapshot)
 const classifyClaim = (head, rebasedCommit = 'r1', expectedHead = 'h1') =>
@@ -61,10 +61,10 @@ test('WHAT[CHGINT-004] THEOREM_orchestrator_independent_jobs_confluent_across_in
   const foldAB = foldEvents([...seqA, ...seqB])
   const foldBA = foldEvents([...seqB, ...seqA])
 
-  assert.equal(progressOf(foldAB, JOB_A), 'CandidateReady')
-  assert.equal(progressOf(foldAB, JOB_B), 'CandidateReady')
-  assert.equal(progressOf(foldBA, JOB_A), 'CandidateReady')
-  assert.equal(progressOf(foldBA, JOB_B), 'CandidateReady')
+  assert.deepEqual(factsOf(foldAB, JOB_A), ['CandidateReady'])
+  assert.deepEqual(factsOf(foldAB, JOB_B), ['CandidateReady'])
+  assert.deepEqual(factsOf(foldBA, JOB_A), ['CandidateReady'])
+  assert.deepEqual(factsOf(foldBA, JOB_B), ['CandidateReady'])
 
   for (const interleaving of [
     [...seqA, ...seqB],
@@ -73,18 +73,18 @@ test('WHAT[CHGINT-004] THEOREM_orchestrator_independent_jobs_confluent_across_in
     [...seqB, ...seqA],
   ]) {
     const folded = foldEvents(interleaving)
-    assert.equal(progressOf(folded, JOB_A), progressOf(foldAB, JOB_A))
-    assert.equal(progressOf(folded, JOB_B), progressOf(foldAB, JOB_B))
+    assert.deepEqual(factsOf(folded, JOB_A), factsOf(foldAB, JOB_A))
+    assert.deepEqual(factsOf(folded, JOB_B), factsOf(foldAB, JOB_B))
   }
 })
 
-test('WHAT[CHGINT-005] THEOREM_conflict_detected_folds_to_conflict_pending', () => {
+test('WHAT[CHGINT-005] THEOREM_conflict_detected_remains_independent_durable_evidence', () => {
   const folded = foldEvents([
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
     conflictEvent(JOB_A, { conflictFiles: ['publish_proof.txt', 'src/a.fs'] }),
   ])
-  assert.equal(progressOf(folded, JOB_A), 'ConflictPending')
+  assert.deepEqual(factsOf(folded, JOB_A), ['CandidateReady', 'ConflictDetected'])
 })
 
 test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () => {
@@ -94,7 +94,7 @@ test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () 
     rebasedEvent(JOB_A),
     publishClaimedEvent(JOB_A),
   ])
-  assert.equal(progressOf(folded, JOB_A), 'PublishClaimed')
+  assert.deepEqual(factsOf(folded, JOB_A), ['CandidateReady', 'RebasedCandidateReady', 'PublishClaimed'])
   assert.equal(classifyClaim('r1').kind, 'AlreadyFastForwarded')
   assert.equal(classifyClaim('h1').kind, 'PublishReady')
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
@@ -102,7 +102,7 @@ test('WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed', () 
 
 test('WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness', () => {
   const folded = foldEvents([createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), rebasedEvent(JOB_A)])
-  assert.equal(progressOf(folded, JOB_A), 'RebasedCandidateReady')
+  assert.deepEqual(factsOf(folded, JOB_A), ['CandidateReady', 'RebasedCandidateReady'])
   assert.equal(classifyRebased('h1').kind, 'PublishReady')
   assert.equal(classifyRebased('h2').kind, 'NeedsRebase')
 })
@@ -112,7 +112,7 @@ test('WHAT[CHGINT-008] THEOREM_unreadable_target_head_fails_closed', () => {
   assert.equal(classifyClaim(undefined).kind, 'HeadUnreadable')
 })
 
-test('WHAT[CHGINT-006] THEOREM_latest_progress_wins_and_published_is_terminal', () => {
+test('WHAT[CHGINT-006] THEOREM_independent_facts_survive_and_published_is_terminal', () => {
   const events = [
     createEvent(JOB_A, 'ses_orch_a'),
     candidateEvent(JOB_A),
@@ -122,11 +122,17 @@ test('WHAT[CHGINT-006] THEOREM_latest_progress_wins_and_published_is_terminal', 
     publishedEvent(JOB_A),
   ]
   const folded = foldEvents(events)
-  assert.equal(progressOf(folded, JOB_A), 'Published')
+  assert.deepEqual(factsOf(folded, JOB_A), [
+    'CandidateReady',
+    'ConflictDetected',
+    'RebasedCandidateReady',
+    'PublishClaimed',
+    'Published',
+  ])
   assert.equal(change.activeJobs(folded).length, 0)
 
   const replayCreate = foldEvents([...events, createEvent(JOB_A, 'ses_orch_a')])
-  assert.equal(progressOf(replayCreate, JOB_A), 'Published')
+  assert.deepEqual(factsOf(replayCreate, JOB_A), factsOf(folded, JOB_A))
   assert.equal(change.activeJobs(replayCreate).length, 0)
 })
 
@@ -136,25 +142,25 @@ test('WHAT[CHGINT-003] THEOREM_publish_claimed_without_rebased_candidate_is_reje
   assert.match(result.error, /no rebased candidate/)
 })
 
-test('WHAT[CHGINT-005] THEOREM_drop_ephemeral_preserves_conflict_pending', () => {
+test('WHAT[CHGINT-005] THEOREM_drop_ephemeral_preserves_conflict_evidence', () => {
   const durable = [createEvent(JOB_A, 'ses_orch_a'), conflictEvent(JOB_A)]
   const before = foldEvents(durable)
-  assert.equal(progressOf(before, JOB_A), 'ConflictPending')
+  assert.deepEqual(factsOf(before, JOB_A), ['ConflictDetected'])
 
   const after = foldEvents(durable)
-  assert.equal(progressOf(after, JOB_A), 'ConflictPending')
+  assert.deepEqual(factsOf(after, JOB_A), ['ConflictDetected'])
 })
 
 test('WHAT[CHGINT-007] THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra', () => {
   const durable = [createEvent(JOB_A, 'ses_orch_a'), candidateEvent(JOB_A), rebasedEvent(JOB_A), publishClaimedEvent(JOB_A)]
   const before = foldEvents(durable)
-  assert.equal(progressOf(before, JOB_A), 'PublishClaimed')
+  assert.deepEqual(factsOf(before, JOB_A), ['CandidateReady', 'RebasedCandidateReady', 'PublishClaimed'])
   assert.equal(classifyClaim('r1').kind, 'AlreadyFastForwarded')
   assert.equal(classifyClaim('h1').kind, 'PublishReady')
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')
 
   const after = foldEvents(durable)
-  assert.equal(progressOf(after, JOB_A), 'PublishClaimed')
+  assert.deepEqual(factsOf(after, JOB_A), ['CandidateReady', 'RebasedCandidateReady', 'PublishClaimed'])
   assert.equal(classifyClaim('r1').kind, 'AlreadyFastForwarded')
   assert.equal(classifyClaim('h1').kind, 'PublishReady')
   assert.equal(classifyClaim('h9').kind, 'ClaimExpired')

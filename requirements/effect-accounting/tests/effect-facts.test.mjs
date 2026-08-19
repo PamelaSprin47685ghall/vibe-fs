@@ -55,7 +55,7 @@ test('WHAT[EFFECT-ACCOUNTING-009] publish_claimed_recovery_three_branch_order_is
     rebased,
     claimed,
   ])
-  assert.equal(change.find(projection, JOB).progress, 'PublishClaimed')
+  assert.deepEqual(change.find(projection, JOB).facts, ['RebasedCandidateReady', 'PublishClaimed'])
   assert.equal(change.classifyPublishClaim('r1', 'r1', 'h1').kind, 'AlreadyFastForwarded')
   assert.equal(change.classifyPublishClaim('h1', 'r1', 'h1').kind, 'PublishReady')
   assert.equal(change.classifyPublishClaim('zzz', 'r1', 'h1').kind, 'ClaimExpired')

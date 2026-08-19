@@ -93,6 +93,7 @@ type private CounterfactualFirst =
 type private CounterfactualCollector() =
     let counterfactualAwait = Dictionary<string, CounterfactualAwait>()
     let counterfactualFirsts = Dictionary<string, CounterfactualFirst>()
+    /// DSL-cross-callback-proof: physical — completed typed collector outcome consumed once by the owning CE
     let counterfactualPairs = Dictionary<string, CounterfactualPair>()
 
     // DSL-MUTABLE: resource — counterfactual await registry by session (physical adapter, sealed)

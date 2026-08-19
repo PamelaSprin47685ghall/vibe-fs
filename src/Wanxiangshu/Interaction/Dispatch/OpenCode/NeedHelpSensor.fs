@@ -56,6 +56,7 @@ type NeedHelpSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<
     let sentinelText = AssistancePrompt.Sentinel
 
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical — bounded rolling stream text used only by exact-sentinel detection/cleanup
     // DSL-MUTABLE: resource — rolling suffix registry by attempt key
     let suffixes = Dictionary<string, string>()
     // DSL-MUTABLE: resource — reasoning part identity set

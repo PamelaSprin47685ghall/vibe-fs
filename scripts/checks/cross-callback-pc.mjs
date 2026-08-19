@@ -138,7 +138,7 @@ export const scanText = (text, file = '<synthetic>') => {
   const awaitDuNames = new Set()
   let currentType = null
   for (let i = 0; i < lines.length; i++) {
-    const typeDecl = /^\s*(?:type|and)\s+(\w+)\s*=/.exec(lines[i])
+    const typeDecl = /^\s*(?:type|and)\s+(?:private\s+)?(\w+)\s*=/.exec(lines[i])
     if (typeDecl) {
       if (currentType && awaitDuNames.size > 0) {
         // currentType had await cases
