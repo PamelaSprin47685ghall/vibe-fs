@@ -96,11 +96,7 @@ module SyncDelegateSurface =
 
             member _.AbortSession _ = Task.FromResult(Ok())
             member _.InterruptAttempt _ = Task.FromResult(Ok())
-
-            member _.TerminateAttempt(_sessionId: SessionId, _reason: string) : Task<Result<unit, string>> =
-                Task.FromResult(Ok())
-
-            member _.TryTakeAttemptTermination(_sessionId: SessionId) : string option = None
+            member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
 
             member _.CreateSiblingSession(_, _, _) =

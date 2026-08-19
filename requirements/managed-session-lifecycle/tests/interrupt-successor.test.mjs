@@ -23,7 +23,9 @@ test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so
 
   const termination = sessions.match(/module ManagedSessionTermination =([\s\S]*?)type InjectedSessionPort/)
   assert.ok(termination, 'managed termination CE must be inspectable')
-  assert.match(termination[1], /sessionPort\.FamilyRootOf sessionId = sessionId/)
+  assert.match(termination[1], /not \(sessionPort\.IsManagedChild sessionId\)/)
+  assert.match(sessions, /abstract IsManagedChild: sessionId: SessionId -> bool/)
+  assert.match(sessions, /member _\.IsManagedChild\(sessionId\) = managedChild sessionId/)
   assert.match(
     termination[1],
     /cancelSessionChildren sessionId[\s\S]*?sessionPort\.AbortSession sessionId[\s\S]*?NotifyTerminal sessionId \(TerminalOutcome\.Failed reason\)/,
@@ -98,4 +100,3 @@ test('WHAT[MANAGED-SESSION-017] fatal termination never stores cross-callback ca
     assert.doesNotMatch(source, /attemptTerminations|TryTakeAttemptTermination|AbortCause\.InternalTermination/, path)
   }
 })
-

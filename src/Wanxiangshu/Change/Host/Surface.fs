@@ -38,6 +38,9 @@ module OrchestratorHostSurface =
     [<Emit("$0[$1](...$2)")>]
     let private invokeRawValue (value: obj) (name: string) (args: obj array) : obj = jsNative
 
+    [<Emit("typeof $0[$1] === 'function' ? Boolean($0[$1](...$2)) : false")>]
+    let private invokeRawBoolOrFalse (value: obj) (name: string) (args: obj array) : bool = jsNative
+
     [<Emit("$0.managerPort")>]
     let private managerPortOf (host: OrchestratorHost) : obj = jsNative
 
@@ -157,13 +160,8 @@ module OrchestratorHostSurface =
                     return plainUnitResult value
                 }
 
-            member _.TerminateAttempt(sessionId: SessionId, reason: string) : Task<Result<unit, string>> =
-                task {
-                    let! value = invokeRawTask raw "TerminateAttempt" [| box (SessionId.value sessionId); box reason |]
-                    return plainUnitResult value
-                }
-
-            member _.TryTakeAttemptTermination(_sessionId: SessionId) : string option = None
+            member _.IsManagedChild(sessionId) =
+                invokeRawBoolOrFalse raw "IsManagedChild" [| box (SessionId.value sessionId) |]
 
             member _.AbortChildren(sessionId) =
                 invokeRawUnit raw "AbortChildren" [| box (SessionId.value sessionId) |]

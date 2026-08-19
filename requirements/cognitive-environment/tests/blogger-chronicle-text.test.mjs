@@ -41,8 +41,8 @@ test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_enabled_for_step
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_the_last_semantic_injection_before_sanitize', () => {
-  const pairIndex = source.indexOf('do! maybeInjectPairGuideline')
-  const bloggerIndex = source.indexOf('injectBloggerChronicleText journal projectionSessionIdOpt outObj')
+  const pairIndex = source.search(/do!\s+maybeInjectPairGuideline\b/)
+  const bloggerIndex = source.search(/injectBloggerChronicleText\s+journal\s+projectionSessionIdOpt\s+outObj/)
   const sanitizeIndex = source.indexOf('let currentMessages = unbox<obj array> outObj?messages |> Array.toList', bloggerIndex)
 
   assert.ok(pairIndex >= 0)

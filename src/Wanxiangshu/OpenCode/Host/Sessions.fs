@@ -28,8 +28,8 @@ type ISessionHostPort =
     /// Unlike AbortSession, this does not detach/cancel logical children and is
     /// unavailable to user-facing/root sessions.
     abstract InterruptAttempt: sessionId: SessionId -> Task<Result<unit, string>>
-    abstract TerminateAttempt: sessionId: SessionId * reason: string -> Task<Result<unit, string>>
-    abstract TryTakeAttemptTermination: sessionId: SessionId -> string option
+    /// One authority predicate shared by every internal stop/termination path.
+    abstract IsManagedChild: sessionId: SessionId -> bool
     abstract AbortChildren: parentId: SessionId -> Task
 
     /// Fission-only physical sibling creation. `physicalParentId` is the old
@@ -84,7 +84,7 @@ module ManagedSessionTermination =
         (sessionId: SessionId)
         (reason: string)
         : Task<Result<unit, string>> =
-        if sessionPort.FamilyRootOf sessionId = sessionId then
+        if not (sessionPort.IsManagedChild sessionId) then
             Task.FromResult(
                 Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
             )
@@ -118,9 +118,6 @@ type InjectedSessionPort
     let parentChildMap = Dictionary<SessionId, HashSet<SessionId>>()
     // DSL-MUTABLE: resource — child-to-parent session map
     let childParents = Dictionary<SessionId, SessionId>()
-    /// DSL-cross-callback-proof: physical single-flight
-    // DSL-MUTABLE: single-flight — attempt-scoped termination reason consumed on abort
-    let attemptTerminations = Dictionary<SessionId, string>()
     let lockObj = obj ()
     let restoredParent = defaultArg familyParent (fun _ -> None)
 
@@ -371,22 +368,7 @@ type InjectedSessionPort
             else
                 interruptManagedAttempt sessionId
 
-        member _.TerminateAttempt(sessionId, reason) =
-            if not (managedChild sessionId) then
-                Task.FromResult(
-                    Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
-                )
-            else
-                lock lockObj (fun () -> attemptTerminations.[sessionId] <- reason)
-                interruptManagedAttempt sessionId
-
-        member _.TryTakeAttemptTermination(sessionId) =
-            lock lockObj (fun () ->
-                match attemptTerminations.TryGetValue sessionId with
-                | true, reason ->
-                    attemptTerminations.Remove sessionId |> ignore
-                    Some reason
-                | false, _ -> None)
+        member _.IsManagedChild(sessionId) = managedChild sessionId
 
         member me.AbortSession(sessionId) =
             if not (managedChild sessionId) then

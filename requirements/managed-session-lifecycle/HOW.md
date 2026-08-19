@@ -47,7 +47,9 @@ CompletedAwaitingJoin 且 ref+digest 精确匹配才回 Active）、视图（`li
   `InterruptAttempt` 仅供已经拥有 successor 的 Loop/NeedHelp/Fission/Reviewer/Finality control stop；
   tool/invariant fail-closed 走 `ManagedSessionTermination.terminate`：调用栈内证明 managed child，先 durable
   cancel descendants，再 logical/physical `AbortSession`，随后同步发布 `Failed` terminal。root/user-facing
-  因 `FamilyRootOf sessionId = sessionId` fail-closed，任何 child cancel / abort effect 之前即被拒绝。
+  通过 `ISessionHostPort.IsManagedChild` fail-closed，任何 child cancel / abort effect 之前即被拒绝；该 predicate
+  与 `InterruptAttempt` / `AbortSession` 共享同一 parent proof（live child map、restored parent、
+  `SessionExecutionBinding.tryParent`），禁止不同 stop path 各自猜 root。
 - **NeedHelp abort→idle handoff**：`TryObserveAssistanceClaim` 只把 exact attempt 翻译成 typed claim，
   不删除 sensor arm；`TurnAborted` 无 fresh idle 时只 claim ownership。`IdleRevisit` 再次取得同一 typed
   claim，`withFreshAssistanceQuiescence` 在 permit 后调用 `TryConsumeAssistanceClaim`，成功才发送 escalation /

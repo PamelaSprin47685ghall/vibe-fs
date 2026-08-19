@@ -26,4 +26,3 @@ test('WHAT[INTERACTION-AUTHORITY-012] NEEDHELP claim survives TurnAborted until 
   assert.match(fence[1], /\| None -> Task\.FromResult AssistanceTurnDisposition\.Handled/)
   assert.match(fence[1], /\| Some _ ->[\s\S]*?TryConsumeAssistanceClaim[\s\S]*?continueAfterIdle/)
 })
-

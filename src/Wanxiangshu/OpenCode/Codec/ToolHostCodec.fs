@@ -237,7 +237,7 @@ module ToolHostCodec =
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
 
-    [<Emit("(args, context) => $0(args, context)")>]
+    [<Emit("(args, context) => $0(args)(context)")>]
     let private uncurriedExecute (fn: obj) : obj = jsNative
 
     [<Emit("Object.defineProperty($0, $1, { value: $2, enumerable: false })")>]
