@@ -106,7 +106,10 @@ completion 不可再返回。
 
 **规范**：`Abandoned`（含 `ParentCancelled` 等 reason）不可 join、不可回退；parent cancel 对每个
 owned agent 逐个写 `HandleAbandoned`，无批量 fact（EXEC-009）；operator abort → `TurnAborted`
-cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel）。任何随后会释放
+cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel）。该 cascade 是有序的异步
+效果：`TurnAborted` owner 必须 await `AbortChildren(parent)` 完成后，才可发布父 `Aborted` terminal 或
+返回该 cleanup；禁止 fire-and-forget / ignored Task。Companion Blogger 属于该 running sub-session
+集合，主会话停止后其物理 provider attempt 必须在父 abort 完成前收到并完成 interrupt。任何随后会释放
 `AgentJournal` / EventStore / workspace 的 owner teardown，必须先关闭新的异步工作准入，再等待
 **全部已准入的 durable 尾巴**结束：reconcile drain、Host `SessionDeleted` cleanup、fork terminal /
 `FailRun` callback、one-shot terminal 的 XTrace/WorkRecord 补写、per-session / executor / orchestrator `CancelAndDrain`，以及 parent cancel 的 durable

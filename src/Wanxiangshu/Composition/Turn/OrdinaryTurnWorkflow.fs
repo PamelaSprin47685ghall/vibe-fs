@@ -125,14 +125,17 @@ module OrdinaryTurnWorkflow =
         if clearArmedLoopKill loopSensor turn.SessionId then
             ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
         else
-            abortedSessions.Add sessionKey |> ignore
-            abortParent sessionKey
-            sessionPort.AbortChildren turn.SessionId |> ignore
+            task {
+                abortedSessions.Add sessionKey |> ignore
+                abortParent sessionKey
+                do! sessionPort.AbortChildren turn.SessionId
 
-            eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
-            |> ignore
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+                |> ignore
 
-            AsyncSupport.completedTask ()
+                return ()
+            }
+            :> Task
 
     let private applyJoinGuardNudge
         (sessionPort: ISessionHostPort)

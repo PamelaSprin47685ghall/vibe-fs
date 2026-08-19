@@ -26,6 +26,8 @@ Wanxiangshu 只维护真实 lease multiset、最近一次物理执行 target、�
 
 这里的 lease 还必须拆成 execution binding 与 provider capacity token。前者回答“这条 physical material 固定跑哪个 target”，后者回答“谁此刻有资格开始下一 provider step”。parent 在 tool/join 上等待时，binding 仍成立，但 capacity 可以定向借给 lineage descendant；ancestor 恢复时只在 step 边界召回，因此不会把硬 provider 限额变成瞬时软限制。
 
+Blogger 是 Main 的 companion，不是 Main 自己的第二个 provider step。若 Child Main 借了 Parent Main 的 capacity，而 Child Blogger 仍只能看 Main lineage，它要么错误复用 Main token、把 Main/Blogger 串成一条 provider lane，要么让 Parent Blogger 对应的可借 capacity 留在原 family 上空转。正确关系是平行借用：Main 的实际 lender 决定本次 Blogger execution 可见的 companion lender；Main 没借，Blogger 也没有 companion credit。这样 Main/Blogger 两条 capacity 既一起下放，又能分别在各自 step 边界 recall。
+
 capacity arbitration 放在独立 F# 对象中：旧式真实 token ledger 是内核，borrow/recall 是 decorator。MJS 仍只是同步纯选择函数，Host/Tool 业务流也只碰极小边界。复杂度被压在唯一 owner 内，而不是散进 join、fission、sync delegate、transform 各处。
 
 ## 3. 为什么 `running` 用 multiset，而不是容量字段

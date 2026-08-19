@@ -63,3 +63,13 @@ test('WHAT[MANAGED-SESSION-009] fork terminal callbacks are runtime-owned and dr
   assert.match(oneShot, /scope\.RunOwnedWork\(fun \(\) ->/)
   assert.doesNotMatch(oneShot, /settleCompletedTerminal scope childId terminal succeed latch completion\s*\|> ignore/)
 })
+
+test('WHAT[MANAGED-SESSION-009] TurnAborted awaits child cascade before publishing parent terminal', () => {
+  const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
+
+  assert.doesNotMatch(ordinary, /sessionPort\.AbortChildren turn\.SessionId\s*\|> ignore/)
+  assert.match(
+    ordinary,
+    /let private handleAborted[\s\S]*?else\s*task\s*\{[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal turn\.SessionId \(TerminalOutcome\.Aborted reason\)/,
+  )
+})

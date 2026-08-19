@@ -22,6 +22,9 @@
 5. **单一 writer**。`HandleLinked / HandleCompleted / HandleAbandoned / HandleRetired` 只有一个
    writer（`HandleController`），否则 fork 路径、completion 路径、cancel 路径各知一部分顺序，
    谁也看不见别人是否同意（EXEC-009 注释）。
+6. **级联取消必须完成后才宣告父 abort**。`AbortChildren` 是异步物理效果；调用后丢弃 Task 会让
+   父 `TurnAborted` terminal / teardown 抢先完成。Companion Blogger 于是可能仍在 provider flight 中，
+   是否被真正 interrupt 取决于调度时序，形成同一输入时好时坏的竞态。
 
 ## RED 是什么样
 
@@ -35,6 +38,7 @@ RED = 同一 logical owner 可得到两个活跃 replacement，或 restart/cance
 - restart 后同一 handle id 绑定到不同 child session，或同一 child 恢复成两种 lifecycle → RED。
 - `consume` 后 restart 又把同一条 completion 投递一次 → RED（retire tombstone 缺失）。
 - 父取消后子仍在运行 / 已 Abandoned 的 handle 被 join 消费 → RED。
+- 父 `TurnAborted` 已对外完成，但 Blogger/其它 running child 的 `AbortSession` 仍未完成 → RED。
 - Hidden（HostOwnedHidden）handle 泄漏进父的 list/join/guard/恢复 → RED（EXEC-014 回归：
   Distiller child 泄漏会阻塞 caller 的 suicide）。
 

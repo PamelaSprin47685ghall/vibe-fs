@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Manager
 
+open System.Threading.Tasks
 open Wanxiangshu.Change
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
@@ -43,19 +44,17 @@ module ManagerFinality =
     [<RequireQualifiedAccess>]
     type FinalityEndingOutcome =
         | Refused of path: string
-        | Result of toolResult: obj
+        | Result of toolResult: string
 
     /// Execution capabilities the Tool adapter provides to the Finality-owned
     /// ending handler. The handler dispatches internally; the adapter only
     /// renders the boundary outcome.
     type FinalityEndingExecution =
-        { Refuse: string -> obj
-          AlreadyCompleted: unit -> obj
-          ResumeRequest: FinalityRequestProjection -> Task<obj>
-          RecoverEmptyMembers: FinalityRequestProjection -> Task<obj>
-          WaitForCurrentRequest: unit -> obj
-          CompleteBlessedLife: BlessingEvidence -> Task<obj>
-          BeginFinality: unit -> Task<obj> }
+        { AlreadyCompleted: unit -> string
+          ResumeRequest: FinalityRequestProjection -> Task<string>
+          RecoverEmptyMembers: FinalityRequestProjection -> Task<string>
+          CompleteBlessedLife: BlessingEvidence -> Task<string>
+          BeginFinality: unit -> Task<string> }
 
     /// Execute the ending action inside the Finality domain. The Tool adapter
     /// provides execution capabilities but never matches EndingDisposition cases.

@@ -129,6 +129,10 @@ borrower 每次新 transform 都重新申请 step token。若祖先已召回，�
 
 Fission fresh lane 虽不是 delegation child，capacity lineage 必须绑定到被替代 logical owner；多 lane 竞争同一 owner credit，不复制免费 capacity。不同 provider 永不互借。
 
+Blogger companion 必须使用与 Main borrowing 同源的平行 credit，而不是把 Blogger 当作普通 Main descendant 直接借 Main token。runtime 必须知道 `MainSession ↔ BloggerSession` 的 capacity-only companion association。某个 Main physical execution 实际借用祖先 Main token 后，它的 Blogger 新 execution 才可把该 lender Main 对应 Blogger 的真实 token当作 credit；Main execution 未借用时，不得仅凭 companion/parent 关系获得该 Blogger credit。Blogger execution 一旦以该 companion credit admission，后续 provider-step retry 继续以这条 exact companion lender 为借用来源，直到它自己的 execution retire；Parent Blogger owner recall 仍高于 descendant Blogger waiter，并只在 Blogger step 边界发生。
+
+companion credit 不增加 token occurrence，也不得跨 provider。若 lender Main 没有已关联 Blogger、对应 Blogger 当前没有真实 token、或 token provider 与 Child Blogger target 不同，则退回普通完整 `running` 调度；不得凭空制造“一对 Main+Blogger”容量。Main/Blogger 两条借用关系的唯一联动事实只是“本次 Main execution 的实际 lender 身份”，所有仲裁仍由 capacity decorator 单独拥有。
+
 provider-step terminal 必须有 anti-stale fence：step 开始时记录 wire 已可见 assistant ProviderRunIdentity；只接受 fence 之外的新 assistant terminal 结束当前 step。若 terminal event 丢失，下一次 transform 观察到新增 assistant run 本身即可补证上一 step 已结束。
 
 若 transform 后段在 provider dispatch 前决定 suppress 当前 run，不能等待不存在的 assistant terminal，也不能先释放再赌 abort 成功。只有 Host abort 已明确返回成功后，physical adapter 才可调用 capacity owner 的 pre-dispatch suppression 边界归还当前 step token，再 retire exact execution；abort 失败必须保留 token。

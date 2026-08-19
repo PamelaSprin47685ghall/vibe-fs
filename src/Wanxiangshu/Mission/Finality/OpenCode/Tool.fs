@@ -401,11 +401,9 @@ module FinalityTool =
             ManagerFinality.classifyEnding context.ToolCallId life hasPlanCommitment
 
         let exec: ManagerFinality.FinalityEndingExecution =
-            { Refuse = fun path -> refuse context path
-              AlreadyCompleted = fun () -> ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
+            { AlreadyCompleted = fun () -> ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
               ResumeRequest = fun request -> resumeFinalityRequest scope sid life request
               RecoverEmptyMembers = fun request -> recoverEmptyMembers scope sid life request
-              WaitForCurrentRequest = fun () -> refuse context Path.WaitForCurrentEnding
               CompleteBlessedLife =
                 fun blessing -> completeBlessedEnding scope journal context sid life blessing lastWords
               BeginFinality = fun () -> beginFinalityEnding scope journal context sid sessionId life lastWords }

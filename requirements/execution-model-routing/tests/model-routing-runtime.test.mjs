@@ -12,6 +12,7 @@ const {
   releasePhysicalExecution,
   cancelPendingExecution,
   bindCapacityChild,
+  bindCapacityCompanion,
   enterProviderStep,
   endProviderStep,
   suppressProviderStep,
@@ -439,4 +440,78 @@ test('WHAT[EMR-010] EMR_010_multi_provider_credit_requires_one_token_attribution
   assert.equal(snapshotOccupied(runtime).length, 2)
   cancelPendingExecution(runtime, 'leaf')
   assert.equal((await leaf).kind, 'Superseded')
+})
+
+test('WHAT[EMR-010] EMR_010_blogger_borrows_the_lender_blogger_when_main_is_borrowed', async () => {
+  const main = target('provider-main/model')
+  const blogger = target('provider-blog/model')
+  const runtime = createRuntime(providerLimited(
+    { 'provider-main': 1, 'provider-blog': 1 },
+    {
+      parentMain: [main],
+      childMain: [main],
+      parentBlogger: [blogger],
+      childBlogger: [blogger],
+    },
+  ))
+
+  await acquireTarget(runtime, 'parent-main', 'msg-parent-main', 'parentMain')
+  await acquireTarget(runtime, 'parent-blogger', 'msg-parent-blogger', 'parentBlogger')
+  bindCapacityCompanion(runtime, 'parent-main', 'parent-blogger')
+
+  bindCapacityChild(runtime, 'parent-main', 'child-main')
+  await acquireTarget(runtime, 'child-main', 'msg-child-main', 'childMain')
+  bindCapacityCompanion(runtime, 'child-main', 'child-blogger')
+
+  assert.equal(
+    key(await acquireTarget(runtime, 'child-blogger', 'msg-child-blogger', 'childBlogger')),
+    key(blogger),
+  )
+  assert.equal(snapshotOccupied(runtime).length, 2, 'main + blogger borrowing preserves the two real lender tokens')
+
+  await enterProviderStep(runtime, 'child-blogger', 'msg-child-blogger', [])
+  let parentRecalled = false
+  const recall = enterProviderStep(runtime, 'parent-blogger', 'msg-parent-blogger', []).then(() => {
+    parentRecalled = true
+  })
+  await Promise.resolve()
+  assert.equal(parentRecalled, false, 'parent blogger recall waits for the borrowed blogger step boundary')
+
+  endProviderStep(runtime, 'child-blogger', 'msg-child-blogger', 'run-child-blogger-1')
+  await recall
+  assert.equal(parentRecalled, true)
+})
+
+test('WHAT[EMR-010] EMR_010_blogger_gets_no_companion_credit_when_main_did_not_borrow', async () => {
+  const parentMain = target('provider-parent-main/model')
+  const childMain = target('provider-child-main/model')
+  const blogger = target('provider-blog/model')
+  const runtime = createRuntime(providerLimited(
+    { 'provider-parent-main': 1, 'provider-child-main': 1, 'provider-blog': 1 },
+    {
+      parentMain: [parentMain],
+      childMain: [childMain],
+      parentBlogger: [blogger],
+      childBlogger: [blogger],
+    },
+  ))
+
+  await acquireTarget(runtime, 'parent-main', 'msg-parent-main', 'parentMain')
+  await acquireTarget(runtime, 'parent-blogger', 'msg-parent-blogger', 'parentBlogger')
+  bindCapacityCompanion(runtime, 'parent-main', 'parent-blogger')
+
+  bindCapacityChild(runtime, 'parent-main', 'child-main')
+  await acquireTarget(runtime, 'child-main', 'msg-child-main', 'childMain')
+  bindCapacityCompanion(runtime, 'child-main', 'child-blogger')
+
+  let settled = false
+  const childBlogger = acquireManaged(runtime, 'child-blogger', 'msg-child-blogger', 'childBlogger').then((value) => {
+    settled = true
+    return value
+  })
+  await Promise.resolve()
+  assert.equal(settled, false, 'a Main that acquired ordinary capacity does not activate companion borrowing')
+
+  cancelPendingExecution(runtime, 'child-blogger')
+  assert.equal((await childBlogger).kind, 'Superseded')
 })
