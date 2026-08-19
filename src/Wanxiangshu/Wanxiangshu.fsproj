@@ -560,6 +560,7 @@
     <Compile Include="Mission/Finality/OpenCode/Tool.fs"/>
     <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fs"/>
+    <Compile Include="OpenCode/Tools/AssumeTool.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Tool.fs"/>
     <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>

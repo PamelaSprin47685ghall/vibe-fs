@@ -6,7 +6,8 @@
 
 | WHAT 命题 | 实现载体 | 说明 |
 |---|---|---|
-| 001/002 | `resources/provider/tool/<name>/description/{en,zh-CN}.md`（fork/commission/inspect/run/query-shell/establish-behavior/repair-behavior/fetch/join/horizon/judge/suicide/fission/chronicle/js-program/js-bookkeeper/...） | 每个高风险 verb 的合同正文；success/failure/arg 分文件（如 `tool/run/arg-command`、`tool/run/timeout`、`tool/fork/description`） |
+| 001 | `resources/provider/tool/<name>/description/{en,zh-CN}.md`（含 `assume`）；success/failure/arg 分文件（如 `tool/run/arg-command`、`tool/assume/committed`、`tool/fork/description`） | 每个非平凡 verb 的合同正文。`assume` 的底层“无新信息不重开判断”认知事实归 `cognitive-environment`，本包拥有调用边界上的 act/negative affordance/return consequence 镜像。 |
+| 002 | `resources/provider/tool/{fork,commission,inspect,run,query-shell,establish-behavior,repair-behavior,...}/description/{en,zh-CN}.md` | 现行高风险 minimum set 与 Gate C anchor catalog 保持原有约束；`assume` 由 001 的非平凡 verb 合同约束覆盖，不人为扩大 Gate C minimum set。 |
 | 003/004/005/006 | `resources/provider/tool/{inspect,repair-behavior,establish-behavior,run,query-shell}/description/*.md` | 具体负边界/后果/参数语义 |
 | 007/008 | `scripts/checks/tool-referential-integrity.mjs`（Gate A：`scanRepo` / `extractToolSpecNames` / `LEGACY_FORBIDDEN_NAMES`）；`src/Wanxiangshu/Infrastructure/OpenCode/Tools/*Tool.fs` | 同 name 唯一 owner；semantic contract 面归本包，schema 执行面归 `capability-enforcement` |
 | 009/010 | `resources/provider/tool/{fork,commission}/description/*.md`（五 Office 后果 + `calling` 语义）；`OFFICE_CAPABILITY_ANCHORS`（Gate F，canonical 归 `office-capability`） | mirror 完整性 |
@@ -61,7 +62,7 @@ INDEX.md 依赖骨架：`action-affordance → office-capability, participant-ho
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
-| 001 | `tests/action-affordance.test.mjs::AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales`（五问经 anchor 全覆盖）；`tests/prompt-semantic-depth.test.mjs::PROMPT_depth_EN_tool_descriptions_carry_cognition_anchors` / `PROMPT_depth_ZH_tool_descriptions_carry_matching_cognition_anchors`（双语文档逐 id 命中） | NEW | `node --test requirements/action-affordance/tests/action-affordance.test.mjs` |
+| 001 | `tests/action-affordance.test.mjs::AA_prompt_020_tool_descriptions_carry_contract_anchors_in_both_locales`（高风险 minimum set 五问经 anchor 全覆盖）+ `AA_assume_contract_answers_act_fit_boundary_return_and_argument`（`assume` 的 act/fit/negative affordance/return/argument 五问）；`tests/prompt-semantic-depth.test.mjs::PROMPT_depth_EN_tool_descriptions_carry_cognition_anchors` / `PROMPT_depth_ZH_tool_descriptions_carry_matching_cognition_anchors`（双语文档逐 id 命中） | NEW | `node --test requirements/action-affordance/tests/action-affordance.test.mjs` |
 | 002 | `tests/action-affordance.test.mjs::AA_prompt_020_high_risk_verbs_have_semantic_anchor_catalog`；`tests/prompt-semantic-depth.test.mjs::PROMPT_depth_tool_anchor_catalog_covers_high_risk_verbs`；`tests/tool-description-anchors.test.mjs::gate_c_tool_description_anchor_catalog_requires_high_risk_verbs`（anchor-parity 机制面归 `provider-language`） | NEW | 同上 |
 | 003 | `tests/action-affordance.test.mjs::AA_prompt_020_inspect_contract_names_the_not_performed_act` | NEW | 同上 |
 | 004 | `tests/action-affordance.test.mjs::AA_prompt_020_repair_behavior_contract_defines_mechanical` | NEW | 同上 |

@@ -32,6 +32,11 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_needhe
 test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_teaches_abstract_then_commit', () => {
   assert.match(text, /abstract|抽象/i)
   assert.match(text, /commit|笃定/i)
-  assert.match(text, /waver|犹豫/i)
-  assert.match(text, /domino|多米诺/i)
+  assert.match(text, /`assume`/)
+  assert.match(text, /no new knowledge|不产生新知识/i)
+  assert.doesNotMatch(
+    text,
+    /domino|多米诺/i,
+    'the repeated Pair Hint should leave the long psychological reinforcement to assume',
+  )
 })

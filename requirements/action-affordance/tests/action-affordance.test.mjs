@@ -61,6 +61,19 @@ test('WHAT[ACTION-AFFORDANCE-001] AA_prompt_020_tool_descriptions_carry_contract
   }
 })
 
+test('WHAT[ACTION-AFFORDANCE-001] AA_assume_contract_answers_act_fit_boundary_return_and_argument', () => {
+  for (const locale of LOCALES) {
+    const description = readTool('assume', locale)
+    const argument = read(`resources/provider/tool/assume/arg-assumption/${locale}.md`)
+
+    assert.match(description, /钉成当前工作假设|Pin a judgment/i, 'act must be explicit')
+    assert.match(description, /先抽象|Abstract first/i, 'fit must be explicit')
+    assert.match(description, /不是求证|not verification/i, 'nearby act not performed must be explicit')
+    assert.match(description, /不是.*证明|does not establish.*proven/is, 'successful return must stay bounded')
+    assert.match(argument, /当前判断|current judgment/i, 'argument semantics must be explicit')
+  }
+})
+
 test('WHAT[ACTION-AFFORDANCE-003] AA_prompt_020_inspect_contract_names_the_not_performed_act', () => {
   for (const locale of LOCALES) {
     const text = readTool('inspect', locale)

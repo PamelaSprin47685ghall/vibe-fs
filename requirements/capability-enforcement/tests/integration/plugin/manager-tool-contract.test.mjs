@@ -20,7 +20,7 @@ import {
 const TOOL_NAMES = [
   'fork', 'commission', 'join', 'horizon', 'todowrite', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'inspect', 'establish-behavior', 'repair-behavior',
+  'bash-honeypot', 'assume', 'inspect', 'establish-behavior', 'repair-behavior',
   'run', 'query-shell', 'stealth-browser-mcp', 'sphinx', 'judge',
   'chronicle', 'fetch',
 ]
@@ -28,7 +28,7 @@ const TOOL_NAMES = [
 const PLUGIN_TOOL_NAMES = [
   'fork', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'join', 'horizon', 'fission', 'judge', 'suicide', 'run', 'query-shell', 'inspect',
-  'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'chronicle',
+  'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'js-browser', 'js-coder', 'js-devops', 'js-inspector', 'js-reviewer',
 ]
 
@@ -38,14 +38,14 @@ const HOST_OWNED_TOOL_NAMES = [
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller']
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon'],
-  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission'],
-  coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot'],
-  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch'],
-  devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior'],
-  browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp'],
-  inquiry: ['fission', 'inspect', 'sphinx'],
-  reviewer: ['read', 'glob', 'grep', 'judge'],
+  orchestrator: ['commission', 'join', 'horizon', 'assume'],
+  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'assume'],
+  coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume'],
+  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume'],
+  devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume'],
+  browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp', 'assume'],
+  inquiry: ['fission', 'inspect', 'sphinx', 'assume'],
+  reviewer: ['read', 'glob', 'grep', 'judge', 'assume'],
   blogger: ['chronicle'],
   distiller: [],
 }
@@ -102,6 +102,7 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
       chronicle: ['entry', 'tip'],
       'bash-honeypot': [],
+      assume: ['assumption'],
     }
     for (const toolName in expected) {
       for (const argument of expected[toolName]) {
@@ -109,6 +110,21 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
       }
     }
     assert.equal(hooks.tool.commission.args.keywords, undefined)
+  })
+})
+
+test('WHAT[ENF-010] ASSUME_commits_an_abstracted_judgment_without_granting_new_authority', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    await acceptAuthorityRoot(runtime, 'manager-assume', 'fast-manager')
+
+    const result = await hooks.tool.assume.execute(
+      { assumption: 'A and B are independent; execute them concurrently.' },
+      { sessionID: 'manager-assume', agent: 'fast-manager' },
+    )
+
+    assert.match(result, /Committed: A and B are independent; execute them concurrently\./)
+    assert.match(result, /Without new evidence/i)
+    assert.match(result, /Abstract → commit → execute → verify/)
   })
 })
 

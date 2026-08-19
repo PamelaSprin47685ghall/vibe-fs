@@ -1792,6 +1792,10 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs",
+      "owner": "action-affordance"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs",
       "owner": "action-affordance"
     },

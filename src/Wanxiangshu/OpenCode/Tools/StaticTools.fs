@@ -109,6 +109,7 @@ module StaticTools =
           "glob"
           "grep"
           "skill"
+          "assume"
           "mv"
           "rm"
           "bash-honeypot"
@@ -143,7 +144,7 @@ module StaticTools =
         let allowedNames = namesForPermissions allowed
 
         knownToolNames
-        |> List.map (fun name -> name, name = "skill" || Set.contains name allowedNames)
+        |> List.map (fun name -> name, name = "skill" || name = "assume" || Set.contains name allowedNames)
         |> Map.ofList
 
     let private defaultPermission allowed name =
@@ -172,6 +173,9 @@ module StaticTools =
         | "write", Role.DevOps
         | "edit", Role.DevOps -> "deny"
         | "skill", _ -> "allow"
+        | "assume", Role.Blogger
+        | "assume", Role.Distiller -> "deny"
+        | "assume", _ -> "allow"
         | "js-bookkeeper", _ -> "deny"
         | name, _ when name.StartsWith "js-" -> jsPermission role name
         | _ -> defaultPermission allowed name

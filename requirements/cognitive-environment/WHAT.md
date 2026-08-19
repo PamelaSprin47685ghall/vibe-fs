@@ -119,10 +119,12 @@ Pair Programming Hint（HOST-013 occurrence 的正文）是一个 canonical sema
   默认独立；空并发槽或让 ready 工作等待无关任务都视为主动增加 wall-clock。仅真实数据依赖/共享可变
   owner/协议顺序/破坏性干扰/明确有限容量可阻塞；动作应细到单个结果能立刻解锁后继，又完整到单独执行
   有明确价值；不猜未知参数、不制造无用调用、不写死全局并发数字（pair-parallel-tools §3-§14）。
-- 先抽象再笃定：面对工作先在思考中抽象本质结构（独立/依赖/领域判断/机械执行），抽象完成后立刻笃定
-  选择并执行，不犹豫横跳。犹豫不产生新知识只产生新错误；抽象时掌握的信息在犹豫期间没有增加——动摇
-  等于说自己的抽象不可信，但没有新信息支撑。第一个经过充分抽象的决策几乎总是正确的；犹豫横跳的终点
-  是更差的答案和更少的时间。排除犹豫：没有新信息，犹豫不产生新知识，只产生新错误。
+- 先抽象再笃定：面对工作先在思考中抽象本质结构（独立/依赖/领域判断/机械执行）。当前 tool surface 暴露
+  `assume` 时，抽象形成行动结论后调用一次 `assume` 把当前工作假设钉住，再执行、验证；没有新信息不得
+  重开同一判断，也不得为同一未变化判断重复调用。`assume` 是 commitment point，不是 proof，不扩大
+  authority；只有执行/验证/外部输入带来足以改变原结构的新证据才修正。Pair Hint 只保留这个短触发规则，
+  “犹豫不产生新知识只产生新错误”、无依据动摇、domino chain 等完整心理约束由 `assume` 的局部 tool
+  contract 与单次 return 承载，避免在每次 HOST-013 注入中重复长篇正文。
 - 该 hint 是 injection-only skill content；模型不得主动调用 `skill({ name: "" })` / `skill("")`
   尝试读取它。空 skill name 只作为 HOST-013 synthetic wire identity；真实 skill 工具及所有非空 skill name
   保持正常可用。

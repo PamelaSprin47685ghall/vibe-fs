@@ -199,13 +199,28 @@ test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_encourages_filling_concurrenc
 
 test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_pair_hint_teaches_abstract_then_commit_without_wavering', () => {
   for (const locale of ['en', 'zh-CN']) {
-    const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
-    assert.match(text, /抽象|abstract/i)
-    assert.match(text, /笃定|commit/i)
-    assert.match(text, /犹豫|waver/i)
-    assert.match(text, /不产生新知识|produces no new knowledge/i)
-    assert.match(text, /新错误|new error/i)
-    assert.match(text, /多米诺|domino/i)
+    const hint = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
+    const description = read(`resources/provider/tool/assume/description/${locale}.md`)
+    const committed = read(`resources/provider/tool/assume/committed/${locale}.md`)
+
+    assert.match(hint, /抽象|abstract/i)
+    assert.match(hint, /笃定|commit/i)
+    assert.match(hint, /`assume`/)
+    assert.match(hint, /不产生新知识|produces no new knowledge/i)
+    assert.match(hint, /新证据|new (?:evidence|information)/i)
+    assert.doesNotMatch(hint, /多米诺|domino/i, 'the repeated hint should offload the long psychological argument')
+
+    assert.match(description, /独立|independent/i)
+    assert.match(description, /依赖|dependenc/i)
+    assert.match(description, /领域判断|domain decisions/i)
+    assert.match(description, /机械执行|mechanical execution/i)
+    assert.match(description, /犹豫不产生新知识|hesitation produces no new knowledge/i)
+    assert.match(description, /多米诺|domino/i)
+    assert.match(description, /抽象.*笃定.*执行.*验证|abstract.*commit.*execute.*verify/is)
+
+    assert.match(committed, /新证据|new evidence/i)
+    assert.match(committed, /犹豫.*不.*新知识|hesitation produces no new knowledge/is)
+    assert.match(committed, /抽象.*笃定.*执行.*验证|abstract.*commit.*execute.*verify/is)
   }
 })
 
