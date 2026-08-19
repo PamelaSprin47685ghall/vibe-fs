@@ -11,6 +11,7 @@
 
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -27,18 +28,35 @@ const bin = resolveBin()
 const started = Date.now()
 console.error(`[warmup-opencode] bin=${bin}`)
 
-const version = spawnSync(bin, ['--version'], {
-  cwd: root,
-  encoding: 'utf8',
-  env: process.env,
-  timeout: 120_000,
-})
+const warmupHome = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-warmup-'))
+const warmupConfig = path.join(warmupHome, '.config')
+fs.mkdirSync(warmupConfig, { recursive: true })
+const warmupEnv = {
+  ...process.env,
+  HOME: warmupHome,
+  USERPROFILE: warmupHome,
+  XDG_CONFIG_HOME: warmupConfig,
+}
+
+let version
+try {
+  version = spawnSync(bin, ['--version'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: warmupEnv,
+    timeout: 120_000,
+  })
+} catch (error) {
+  try { fs.rmSync(warmupHome, { recursive: true, force: true }) } catch {}
+  throw error
+}
 
 if (version.error || version.status !== 0) {
   console.error(
     `[warmup-opencode] --version failed status=${version.status} ` +
       `error=${version.error?.message || ''} stderr=${(version.stderr || '').slice(0, 500)}`,
   )
+  try { fs.rmSync(warmupHome, { recursive: true, force: true }) } catch {}
   process.exit(version.status === null ? 1 : version.status)
 }
 
@@ -49,9 +67,12 @@ console.error(`[warmup-opencode] version=${ver} in ${Date.now() - started}ms`)
 const help = spawnSync(bin, ['--help'], {
   cwd: root,
   encoding: 'utf8',
-  env: process.env,
+  env: warmupEnv,
   timeout: 60_000,
 })
+
+try { fs.rmSync(warmupHome, { recursive: true, force: true }) } catch {}
+
 if (help.error || (help.status !== 0 && help.status !== null)) {
   // Some builds exit non-zero on --help; ignore if stdout/stderr non-empty.
   if (!help.stdout && !help.stderr) {

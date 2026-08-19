@@ -1,10 +1,40 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test, { after } from 'node:test'
+
+const originalHome = process.env.HOME
+const originalUserProfile = process.env.USERPROFILE
+const home = await mkdtemp(join(tmpdir(), 'wanxiangshu-host-binding-home-'))
+process.env.HOME = home
+process.env.USERPROFILE = home
+await mkdir(join(home, '.config', 'opencode'), { recursive: true })
+await writeFile(
+  join(home, '.config', 'opencode', 'wanxiangshu.mjs'),
+  `
+export default function route(role) {
+  if (role.startsWith('deep-')) return { model: 'test/deep', reasoning: 'high' }
+  if (role.startsWith('fast-')) return { model: 'test/fast', reasoning: 'none' }
+  return { model: 'test/system', reasoning: 'none' }
+}
+`,
+  'utf8',
+)
+
 import * as binding from '../../../dist/OpenCode/Host/SessionBindingSurface.js'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import { runListenerRefcountScenario } from './support/listener-refcount.mjs'
 
 await routing.initialize()
+
+after(async () => {
+  if (originalHome === undefined) delete process.env.HOME
+  else process.env.HOME = originalHome
+  if (originalUserProfile === undefined) delete process.env.USERPROFILE
+  else process.env.USERPROFILE = originalUserProfile
+  await rm(home, { recursive: true, force: true })
+})
 
 const model = { providerID: 'openai', modelID: 'gpt-5' }
 const modelFromLease = async (sessionId, physicalUserMessageId, agent) => {

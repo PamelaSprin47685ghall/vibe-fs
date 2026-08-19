@@ -19,8 +19,9 @@
 // Per-test / suite budgets arrive as env overrides on the shared time-budget constants so package
 // and integration can use wider windows without forking this file.
 
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { pathToFileURL } from 'node:url'
 
 import { run } from 'node:test'
@@ -40,6 +41,27 @@ import {
 // without killing the whole test tier. Production code never infers this from
 // NODE_TEST_CONTEXT or any other Host-owned environment variable.
 process.env.WANXIANGSHU_NO_FATAL_EXIT = '1'
+
+// Isolate HOME / USERPROFILE for the node:test inner runner so any test or
+// pre-import that touches ~/.config/opencode defaults to a throwaway temporary
+// directory rather than the developer's real user configuration directory.
+const runnerTestHome = mkdtempSync(join(tmpdir(), 'wxs-runner-home-'))
+const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
+mkdirSync(runnerRoutingDir, { recursive: true })
+writeFileSync(
+  join(runnerRoutingDir, 'wanxiangshu.mjs'),
+  `export default function route(role, running) {
+  if (!/^(fast|deep)-/.test(role)) throw new Error('unexpected managed role: ' + role)
+  return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}\n`,
+  'utf8',
+)
+process.env.HOME = runnerTestHome
+process.env.USERPROFILE = runnerTestHome
+
+process.on('exit', () => {
+  try { rmSync(runnerTestHome, { recursive: true, force: true }) } catch {}
+})
 
 const files = process.argv.slice(2).filter((argument) => argument.endsWith('.mjs'))
 

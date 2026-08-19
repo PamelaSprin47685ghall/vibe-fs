@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,11 +12,27 @@ const production = path.join(repo, 'dist/OpenCode/Plugin/Plugin.js');
 const opencode = process.env.OPENCODE_BIN ?? 'opencode';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-cursor-hint-canary-'));
+const home = path.join(scenarioDir, 'home');
+const xdgConfig = path.join(scenarioDir, 'xdg', 'config');
+fs.mkdirSync(home, { recursive: true });
+fs.mkdirSync(xdgConfig, { recursive: true });
+const routingDir = path.join(home, '.config', 'opencode');
+fs.mkdirSync(routingDir, { recursive: true });
+fs.writeFileSync(
+  path.join(routingDir, 'wanxiangshu.mjs'),
+  "export default function route() { return { model: 'cursor/default', reasoning: 'none' } }\n",
+  'utf8',
+);
+
 const startHost = () => {
   const child = spawn(opencode, ['serve', '--port', '0', '--hostname', '127.0.0.1'], {
     cwd: repo,
     env: {
       ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      XDG_CONFIG_HOME: xdgConfig,
       OPENCODE_CONFIG_CONTENT: JSON.stringify({ plugin: [wrapper] }),
       WANXIANGSHU_CURSOR_CANARY_PLUGIN: production,
     },
@@ -131,4 +149,5 @@ try {
     new Promise((resolve) => host.child.once('exit', resolve)),
     sleep(3000).then(() => host.child.kill('SIGKILL')),
   ]);
+  try { fs.rmSync(scenarioDir, { recursive: true, force: true }); } catch {}
 }

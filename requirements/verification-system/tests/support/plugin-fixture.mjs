@@ -25,6 +25,24 @@ const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/Disp
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
 const sessionBindingSurface = await import('../../../../dist/OpenCode/Host/SessionBindingSurface.js')
 
+const setupRoutingHome = (directory) => {
+  const routingHome = join(directory, 'routing-home')
+  const routingDir = join(routingHome, '.config', 'opencode')
+  mkdirSync(routingDir, { recursive: true })
+  writeFileSync(
+    join(routingDir, 'wanxiangshu.mjs'),
+    `export default function route(role, running) {
+  if (!/^(fast|deep)-/.test(role)) throw new Error('unexpected managed role: ' + role)
+  if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
+    globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
+  }
+  return { model: 'provider/' + role + '-model', reasoning: 'none' }
+}\n`,
+    'utf8',
+  )
+  return routingHome
+}
+
 /**
  * The smallest SDK client double: mint child ids, accept prompts. The id list is
  * handed back so tests can address the child a fork actually created.
@@ -144,6 +162,11 @@ export const awaitPrompted = (sessionId) => {
  */
 export const withExecutablePlugin = async (body, options = {}) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-exec-'))
+  const previousHome = process.env.HOME
+  const previousUserProfile = process.env.USERPROFILE
+  const routingHome = setupRoutingHome(directory)
+  process.env.HOME = routingHome
+  process.env.USERPROFILE = routingHome
   try {
     execFileSync('git', ['init', '--quiet', directory])
     const createdIds = []
@@ -204,6 +227,10 @@ export const withExecutablePlugin = async (body, options = {}) => {
       }
     }
   } finally {
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    if (previousUserProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = previousUserProfile
     rmSync(directory, { recursive: true, force: true })
   }
 }
@@ -215,6 +242,11 @@ export const withExecutablePlugin = async (body, options = {}) => {
  */
 export const withRestartablePlugin = async (body) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-restart-'))
+  const previousHome = process.env.HOME
+  const previousUserProfile = process.env.USERPROFILE
+  const routingHome = setupRoutingHome(directory)
+  process.env.HOME = routingHome
+  process.env.USERPROFILE = routingHome
   const liveHooks = []
   try {
     execFileSync('git', ['init', '--quiet', directory])
@@ -242,6 +274,10 @@ export const withRestartablePlugin = async (body) => {
     })
   } finally {
     for (const hooks of liveHooks.reverse()) await hooks.dispose()
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    if (previousUserProfile === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = previousUserProfile
     rmSync(directory, { recursive: true, force: true })
   }
 }
@@ -398,20 +434,7 @@ export const withPluginClient = async (client, body) => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-plugin-'))
   const previousHome = process.env.HOME
   const previousUserProfile = process.env.USERPROFILE
-  const routingHome = join(directory, 'routing-home')
-  const routingDir = join(routingHome, '.config', 'opencode')
-  mkdirSync(routingDir, { recursive: true })
-  writeFileSync(
-    join(routingDir, 'wanxiangshu.mjs'),
-    `export default function route(role, running) {
-  if (!/^(fast|deep)-/.test(role)) throw new Error('unexpected managed role: ' + role)
-  if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
-    globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
-  }
-  return { model: 'provider/' + role + '-model', reasoning: 'none' }
-}\n`,
-    'utf8',
-  )
+  const routingHome = setupRoutingHome(directory)
   process.env.HOME = routingHome
   process.env.USERPROFILE = routingHome
 
