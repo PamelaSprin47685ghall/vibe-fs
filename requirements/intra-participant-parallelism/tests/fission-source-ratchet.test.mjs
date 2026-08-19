@@ -44,6 +44,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring takeover before reporting the old logical owner', () => {
   const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+  const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const facts = read('src/Wanxiangshu/Execution/Fission/Facts.fs')
 
   assert.match(host, /FissionFact\.FissionTakeoverClaimed/)
@@ -60,6 +61,18 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
   assert.match(host, /CompletedTurnClassifier\.partsSessionText turn\.Parts/)
   assert.match(host, /NotifyTerminal group\.OwnerSessionId \(TerminalOutcome\.Completed result\)/)
   assert.doesNotMatch(host, /TerminalText\s*=\s*aggregate/)
+
+  const physicalEndAt = bootstrap.indexOf('onPhysicalExecutionEnd =')
+  assert.ok(physicalEndAt >= 0, 'physical execution terminal callback must exist')
+  const physicalEndBlock = bootstrap.slice(physicalEndAt, bootstrap.indexOf('let! subscriptionResult', physicalEndAt))
+  assert.match(physicalEndBlock, /reconciler\.NotifyProjectionChanged\(sessionId, physicalUserMessageId\)/)
+  assert.match(physicalEndBlock, /reconciler\.TryPhysicalUserMessage\(sessionId\)/)
+  assert.match(physicalEndBlock, /FissionProjection\.tryMembershipOfLane/)
+  assert.match(
+    physicalEndBlock,
+    /reconciler\.Kick\(sessionId, ReconcileProgram\.ReconcileWake\.RetryWake\)/,
+    'a successful exact Fission lane terminal must open a snapshot reconcile occasion even when OpenCode drops session.idle',
+  )
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {

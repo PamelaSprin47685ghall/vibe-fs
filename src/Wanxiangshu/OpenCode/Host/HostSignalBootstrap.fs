@@ -504,7 +504,38 @@ module HostSignalBootstrap =
                             // projection visibility only; it remains outside the
                             // HostSignal/business vocabulary.
                             ModelRouting.releasePhysicalExecution sessionId physicalUserMessageId
-                            reconciler.NotifyProjectionChanged(sessionId, physicalUserMessageId))
+                            reconciler.NotifyProjectionChanged(sessionId, physicalUserMessageId)
+
+                            // INTRA-PARTICIPANT-PARALLELISM-009: OpenCode can
+                            // complete a prompt_async physical execution without
+                            // delivering the later session.status/session.idle
+                            // event to the plugin transport. A Fission lane cannot
+                            // rely on that lossy coarse wake because its ordinary
+                            // terminal is the only route into lane materialization
+                            // and eventual takeover of the old logical owner.
+                            //
+                            // This exact physical-terminal edge still carries no
+                            // business outcome. It only opens one snapshot
+                            // reconciliation occasion for a durable Fission lane;
+                            // Completed/Failed/Aborted remains classified from the
+                            // full SDK message snapshot in ReconcilePass. Recording
+                            // the projection edge above before Kick also preserves
+                            // Scheduler's edge-epoch lost-wakeup protection if the
+                            // SDK snapshot is briefly behind the event stream.
+                            let isCurrentPhysical =
+                                reconciler.TryPhysicalUserMessage(sessionId)
+                                |> Option.exists ((=) physicalUserMessageId)
+
+                            let isFissionLane =
+                                journal
+                                |> Option.exists (fun durable ->
+                                    FissionProjection.tryMembershipOfLane
+                                        sessionId
+                                        (AgentJournal.snapshot durable).AgentProjections.Fission
+                                    |> Option.isSome)
+
+                            if isCurrentPhysical && isFissionLane then
+                                reconciler.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake))
                 )
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None

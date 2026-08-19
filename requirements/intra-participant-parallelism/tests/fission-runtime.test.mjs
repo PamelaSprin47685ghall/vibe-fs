@@ -179,3 +179,12 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] observeLaneTurn and OrdinaryTurnWo
     fission.clearOwner(owner)
   }
 })
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] exact Fission terminal bridge reconciles a completed lane even when session idle is missing', async () => {
+  const observed = await fissionHost.missingIdleTerminalBridgeScenario()
+  assertJsData(observed, 'Fission missing-idle terminal bridge observation')
+  assert.equal(observed.outcome, 'TurnCompleted')
+  assert.equal(observed.physicalUserMessageId, 'fission-missing-idle-user')
+  assert.equal(observed.providerRun, 'fission-missing-idle-run')
+  assert.ok(observed.snapshotReads >= 1)
+})

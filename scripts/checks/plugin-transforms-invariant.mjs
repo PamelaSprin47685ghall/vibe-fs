@@ -63,7 +63,7 @@ const orderingSteps = [
   'StrengthSpeculate.tryApply',
   'maybeInjectPairGuideline',
   'projectRequirementGrounding',
-  'injectBloggerChronicleText',
+  'BloggerChronicleText.maybeInject',
   'sanitizeMessages',
 ]
 

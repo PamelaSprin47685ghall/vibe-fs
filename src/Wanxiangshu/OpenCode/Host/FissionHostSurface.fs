@@ -87,6 +87,95 @@ module FissionHostSurface =
           Outcome = ReconcileProgram.TurnInProgress
           Observation = None }
 
+    let private terminalBridgeMessage
+        (id: string)
+        (role: string)
+        (parentId: string option)
+        (finish: string option)
+        (completed: bool)
+        (parts: MessagePart array)
+        : SessionMessage =
+        { Id = id
+          Role = role
+          Agent = None
+          Finish = finish
+          ErrorName = None
+          Model = None
+          ParentId = parentId
+          Completed = completed
+          IsCompaction = false
+          PromptKey = None
+          Parts = parts
+          PartIds = Array.create parts.Length None
+          ToolParts = [||] }
+
+    /// Executable canary for the production Fission terminal bridge. OpenCode
+    /// transports may deliver the exact final assistant message while dropping
+    /// the later session.status/session.idle event. The bridge records that
+    /// projection edge and opens a RetryWake snapshot occasion; the snapshot,
+    /// not the edge, remains the authority for TurnCompleted.
+    let missingIdleTerminalBridgeScenario () : Task<obj> =
+        task {
+            let sessionId = SessionId.create "fission-missing-idle-lane"
+            let physical = PhysicalUserMessageId.create "fission-missing-idle-user"
+            let store = TurnBinding.Store()
+            store.BindUserMessage(sessionId, physical)
+
+            // DSL-MUTABLE: algorithm-scratch — executable surface observation.
+            let mutable snapshotReads = 0
+            let observed = TaskCompletionSource<ReconciledTurnContext>()
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+
+                        Task.FromResult(
+                            Ok
+                                [ terminalBridgeMessage
+                                      (PhysicalUserMessageId.value physical)
+                                      "user"
+                                      None
+                                      None
+                                      false
+                                      [||]
+                                  terminalBridgeMessage
+                                      "fission-missing-idle-run"
+                                      "assistant"
+                                      (Some(PhysicalUserMessageId.value physical))
+                                      (Some "stop")
+                                      true
+                                      [| MessagePart.Text "lane terminal" |] ]
+                        ) }
+
+            let onTurn (context: ReconciledTurnContext) : Task =
+                AsyncSupport.trySetResult observed context |> ignore
+                Task.FromResult(()) :> Task
+
+            let scheduler = Reconciler.Scheduler(snapshot, store, onTurn)
+
+            // Production order: the exact physical terminal first advances the
+            // projection edge epoch, then Fission opens one snapshot occasion.
+            scheduler.NotifyProjectionChanged(sessionId, physical)
+            scheduler.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
+
+            let! context = observed.Task
+            do! scheduler.StopAndDrain()
+
+            return
+                box
+                    {| snapshotReads = snapshotReads
+                       physicalUserMessageId = PhysicalUserMessageId.value context.Turn.PhysicalUserMessageId
+                       providerRun = ProviderRunIdentity.value context.Turn.ProviderRun
+                       outcome =
+                        match context.Turn.Outcome with
+                        | ReconcileProgram.TurnCompleted -> "TurnCompleted"
+                        | ReconcileProgram.TurnFailed _ -> "TurnFailed"
+                        | ReconcileProgram.TurnAborted _ -> "TurnAborted"
+                        | ReconcileProgram.TurnInProgress -> "TurnInProgress"
+                        | ReconcileProgram.TurnNeedsContinuation _ -> "TurnNeedsContinuation" |}
+        }
+
     /// Absorb a Fission-replaced owner turn through Host + ordinary-turn observe.
     /// Caller must have already `markSilentInterrupt`'d the owner.
     let observeReplacedOwner (ownerSessionId: string) : Task<obj> =

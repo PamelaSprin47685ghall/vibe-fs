@@ -38,6 +38,8 @@ Fission admission 后由 lane `k` 新发起的 subagent run/PTY completion 绑�
 
 只有全部 lane own records、required pre-fission broadcasts 与 lane-affined completion obligations 均 accounted for 后，group 才能收敛。一个 Fission group 对 logical parent 最多产生一次 ordinary terminal completion；final completion 必须填回 old logical participant 的原 completion cell，而不是以任一 fresh lane session 建立新 handle。
 
+Fission lane 的 terminal liveness 不得依赖 OpenCode 必然投递 `session.status=idle` / `session.idle`。当 Host 已给出**当前 physical user 精确匹配**的 successful physical-execution terminal edge，且 durable Fission projection 证明该 SessionId 属于当前 Fission group 时，Host boundary 必须打开一次 snapshot reconcile occasion；该 edge 只提供“现在值得重读完整 snapshot”的 liveness witness，不携带 `Completed/Failed/Aborted` 业务结论，也不成为 `HostSignal`。lane terminal 的最终分类仍只能来自完整 SDK message snapshot。后续 coarse idle 若也到达，single-flight/idempotence 必须吸收重复 wake。由此即使 transport 漏掉 idle，正常 `finish=stop` lane 仍必须进入 `FissionLaneMaterialized`，并继续完成 group takeover / old-owner completion。
+
 ## INTRA-PARTICIPANT-PARALLELISM-010：durable replay，不猜 lane
 
 一旦 Fission 已造成真实 lane/effect，active group identity、lane membership、replacement relation、work/broadcast delivery 与 convergence terminal 必须有足以审计 crash 前因果的 durable facts；不得扫描相似 sessions 猜“哪些可能是 twins”。**Fission tool crash 后不自动恢复**：plugin init 与普通后续 tool/hook 都不得重建 lane runtime、重新 abort old owner、补 convergence 或替旧 tool 收尾。旧 Open group 表示上一 Fission 执行中断；未来仅显式 session `/continue` 可把该事实公开给 LLM，由新意图决定是否复用 surviving lane sessions。

@@ -18,7 +18,14 @@ wake 的物理编码；两者都不得携带 terminal 事实。禁止处理 `mes
 `message.updated` 可以作为**纯 projection-change edge** 唤醒一个已经由上述 coarse signal 建立、但因
 SDK snapshot 尚未看到当前 physical user 对应 assistant 而处于 pending 的 reconcile occasion。这个 edge
 只能触发重新读取完整 SDK snapshot：不得自身携带/推断 terminal 业务事实，也不得在没有 pending
-occasion 时凭空建立新的业务 wake。
+occasion 时凭空建立新的**普通业务** wake。
+
+唯一窄例外是 same-participant Fission 的 physical-lane liveness bridge：Host 已经按 EMR-007 规则确认
+no-error、completed、non-`tool-calls` 的 exact physical-execution terminal 后，若该 `SessionId` 有 durable
+Fission lane membership，且 edge 的 physical user 与 Scheduler 当前 binding 精确一致，则允许打开一次
+不携带 quiescence/terminal 事实的 snapshot reconcile occasion，以容忍 OpenCode transport 漏掉后续
+`session.status=idle` / `session.idle`。该 edge 仍不得编码为 `HostSignal`，不得直接声明 Completed/Failed/
+Aborted；完整 SDK snapshot 仍是唯一业务 terminal authority。普通 session 不获得这个例外。
 
 物理基础设施可以在这个边界并行抽取不进入业务层的资源证据：execution-model-routing 只读取
 最终 assistant `message.updated.info.parentID` 来得到 exact PhysicalUserMessageId。assistant error 只证明当前
@@ -85,6 +92,11 @@ projection-change edge 才允许重新 Kick，并必须保留原 occasion 的 wa
 projection-change edge 与“登记 pending”之间不得存在 lost-wakeup race：如果 edge 在一次 snapshot read
 与 pending 登记之间到达，scheduler 必须观察到该 edge 的单调版本变化并立即重新排队。新的 physical user
 binding 必须使旧 pending occasion 失效；`ClearSession` 同样清除其 pending/edge 状态。
+
+Fission physical-lane liveness bridge 必须先记录同一 exact physical 的 projection edge epoch，再打开一次
+`RetryWake` snapshot occasion；这样即使 terminal event 已到而 SDK snapshot 暂时仍落后，既有 edge-epoch
+机制仍可额外消费一次真实 causal edge，而不是退化成 wall-clock polling。迟到的 coarse idle 允许重复
+Kick，但 single-flight + Fission keyed materialization 必须使其幂等。
 
 `ProviderFailure` 与 exact current assistant 已同时可见时，不得再等待 assistant 的 terminal
 `message.updated` 或后续 `SessionIdle`。Host 可以先发布 `session.error`，而 assistant 的

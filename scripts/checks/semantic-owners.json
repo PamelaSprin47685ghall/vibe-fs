@@ -1,5 +1,5 @@
 {
-  "total": 647,
+  "total": 648,
   "owners": [
     "action-affordance",
     "behavior-diagnosis",
@@ -1774,6 +1774,10 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
       "owner": "host-boundary"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
+      "owner": "cognitive-environment"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
