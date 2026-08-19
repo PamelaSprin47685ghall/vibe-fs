@@ -63,6 +63,11 @@ type private CapacityStepDemand<'target> =
       TryOrdinary: 'target array -> bool
       Completion: TaskCompletionSource<unit> }
 
+type private CapacityCreditSource =
+    { Token: int64
+      LenderSessionId: string
+      Distance: int }
+
 /// Decorates the old ledger with lineage-local borrowing and preemptive recall.
 /// Borrowing changes who may use a token, never how many real tokens exist.
 type BorrowingCapacity<'target>
@@ -70,6 +75,12 @@ type BorrowingCapacity<'target>
     let gate = obj ()
     // DSL-MUTABLE: resource — capacity-only session lineage
     let parents = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — capacity-only Main → Blogger companion association
+    let companionSessionByOwner = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — capacity-only Blogger → Main companion association
+    let companionOwnerBySession = Dictionary<string, string>()
+    // DSL-MUTABLE: resource — exact borrowed execution → actual lender token
+    let creditSourceByExecution = Dictionary<string, CapacityCreditSource>()
     // DSL-MUTABLE: resource — at most one owned capacity token per execution
     let ownedTokenByExecution = Dictionary<string, int64>()
     // DSL-MUTABLE: resource — decorator metadata for ledger tokens
@@ -80,6 +91,55 @@ type BorrowingCapacity<'target>
 
     let executionKey sessionId physicalUserMessageId =
         sessionId + "\u001f" + (physicalUserMessageId |> Option.defaultValue "")
+
+    let executionPrefix sessionId = sessionId + "\u001f"
+
+    let currentCreditSource sessionId =
+        let sources =
+            creditSourceByExecution
+            |> Seq.choose (fun (KeyValue(key, source)) ->
+                if key.StartsWith(executionPrefix sessionId, StringComparison.Ordinal) then
+                    Some source
+                else
+                    None)
+            |> Seq.distinct
+            |> Seq.toList
+
+        match sources with
+        | [] -> None
+        | [ source ] -> Some source
+        | _ -> invalidOp (sprintf "execution-model-routing: session %s has multiple borrowed capacity sources" sessionId)
+
+    let clearCreditSource key =
+        creditSourceByExecution.Remove key |> ignore
+
+    let clearCreditSourcesForToken tokenId =
+        creditSourceByExecution
+        |> Seq.choose (fun (KeyValue(key, source)) -> if source.Token = tokenId then Some key else None)
+        |> Seq.toArray
+        |> Array.iter clearCreditSource
+
+    let clearCreditSourcesForSession sessionId =
+        creditSourceByExecution.Keys
+        |> Seq.filter (fun key -> key.StartsWith(executionPrefix sessionId, StringComparison.Ordinal))
+        |> Seq.toArray
+        |> Array.iter clearCreditSource
+
+    let rememberCreditSource key borrowerSessionId (token: CapacityToken<'target>) distance =
+        if distance <= 0 || token.OwnerSessionId = borrowerSessionId then
+            clearCreditSource key
+        else
+            creditSourceByExecution.[key] <-
+                { Token = token.Token
+                  LenderSessionId = token.OwnerSessionId
+                  Distance = distance }
+
+    let moveCreditSource oldKey newKey =
+        match creditSourceByExecution.TryGetValue oldKey with
+        | true, source ->
+            clearCreditSource oldKey
+            creditSourceByExecution.[newKey] <- source
+        | false, _ -> ()
 
     let normalizeProvider (target: 'target) =
         let provider = providerOf target
@@ -109,6 +169,29 @@ type BorrowingCapacity<'target>
     let isAncestor ancestor descendant =
         ancestorDistance ancestor descendant |> Option.isSome
 
+    let companionLender requester =
+        match currentCreditSource requester with
+        | Some source -> Some(source.LenderSessionId, source.Distance)
+        | None ->
+            match companionOwnerBySession.TryGetValue requester with
+            | false, _ -> None
+            | true, ownerMain ->
+                currentCreditSource ownerMain
+                |> Option.bind (fun mainSource ->
+                    match companionSessionByOwner.TryGetValue mainSource.LenderSessionId with
+                    | true, lenderBlogger -> Some(lenderBlogger, mainSource.Distance)
+                    | false, _ -> None)
+
+    let creditDistance lenderSessionId requester =
+        if lenderSessionId = requester then
+            Some 0
+        elif companionOwnerBySession.ContainsKey requester then
+            companionLender requester
+            |> Option.bind (fun (lenderBlogger, distance) ->
+                if lenderBlogger = lenderSessionId then Some distance else None)
+        else
+            ancestorDistance lenderSessionId requester
+
     let isRetiring token =
         match token.State with
         | CapacityTokenState.Retiring _ -> true
@@ -116,6 +199,7 @@ type BorrowingCapacity<'target>
         | CapacityTokenState.InFlight _ -> false
 
     let releaseToken (token: CapacityToken<'target>) =
+        clearCreditSourcesForToken token.Token
         ledger.Release token.Token |> ignore
         tokens.Remove token.Token |> ignore
 
@@ -135,6 +219,8 @@ type BorrowingCapacity<'target>
         | false, _ -> ()
 
     let retireExecution key =
+        clearCreditSource key
+
         match ownedTokenByExecution.TryGetValue key with
         | true, tokenId ->
             ownedTokenByExecution.Remove key |> ignore
@@ -144,10 +230,10 @@ type BorrowingCapacity<'target>
     let creditTokens requester =
         tokens.Values
         |> Seq.choose (fun token ->
-            if isRetiring token || not (isAncestor token.OwnerSessionId requester) then
+            if isRetiring token then
                 None
             else
-                ancestorDistance token.OwnerSessionId requester
+                creditDistance token.OwnerSessionId requester
                 |> Option.map (fun distance -> token, distance))
         |> Seq.groupBy (fun (token, _) -> token.Provider)
         |> Seq.map (fun (provider, candidates) ->
@@ -257,6 +343,16 @@ type BorrowingCapacity<'target>
         | CapacityTokenState.Idle ->
             ledger.Retarget(token.Token, demand.Target)
 
+            match creditDistance token.OwnerSessionId demand.SessionId with
+            | Some distance ->
+                rememberCreditSource
+                    (executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
+                    demand.SessionId
+                    token
+                    distance
+            | None ->
+                invalidOp "execution-model-routing: granted capacity token is not a legal credit source"
+
             token.State <-
                 CapacityTokenState.InFlight
                     { SessionId = demand.SessionId
@@ -278,7 +374,7 @@ type BorrowingCapacity<'target>
     let borrowPair (demand: CapacityStepDemand<'target>) (token: CapacityToken<'target>) =
         let provider = normalizeProvider demand.Target
 
-        match token.State, ancestorDistance token.OwnerSessionId demand.SessionId with
+        match token.State, creditDistance token.OwnerSessionId demand.SessionId with
         | CapacityTokenState.Idle, Some distance when token.Provider = provider ->
             Some(distance, demand.Sequence, token.Token, demand, token)
         | _ -> None
@@ -329,6 +425,15 @@ type BorrowingCapacity<'target>
             acquireForRoute sessionId (Some newPhysicalUserMessageId) target credit
             oldKey |> Option.iter retireExecution
 
+        oldKey |> Option.iter clearCreditSource
+
+        match credit with
+        | Some token ->
+            match creditDistance token.OwnerSessionId sessionId with
+            | Some distance -> rememberCreditSource newKey sessionId token distance
+            | None -> invalidOp "execution-model-routing: routed credit is not legal for requester"
+        | None -> clearCreditSource newKey
+
         target
 
     let ensureReservationToken sessionId target =
@@ -360,6 +465,29 @@ type BorrowingCapacity<'target>
                 invalidOp (sprintf "execution-model-routing: capacity child %s changed parent" child)
             | _ -> parents.[child] <- parent)
 
+    member _.BindCompanion(ownerSessionId: string, bloggerSessionId: string) =
+        lock gate (fun () ->
+            if String.IsNullOrWhiteSpace ownerSessionId || String.IsNullOrWhiteSpace bloggerSessionId then
+                invalidArg "sessionId" "execution-model-routing: capacity companion requires non-empty session ids"
+
+            let owner = ownerSessionId.Trim()
+            let blogger = bloggerSessionId.Trim()
+
+            if owner = blogger then
+                invalidOp "execution-model-routing: capacity companion cannot own itself"
+
+            match companionOwnerBySession.TryGetValue blogger with
+            | true, existing when existing <> owner ->
+                invalidOp (sprintf "execution-model-routing: blogger %s changed companion owner" blogger)
+            | _ -> ()
+
+            match companionSessionByOwner.TryGetValue owner with
+            | true, existing when existing <> blogger -> companionOwnerBySession.Remove existing |> ignore
+            | _ -> ()
+
+            companionSessionByOwner.[owner] <- blogger
+            companionOwnerBySession.[blogger] <- owner)
+
     member _.DropLineage(sessionId: string) =
         lock gate (fun () ->
             parents.Remove sessionId |> ignore
@@ -367,7 +495,28 @@ type BorrowingCapacity<'target>
             parents.Keys
             |> Seq.filter (fun child -> parents.[child] = sessionId)
             |> Seq.toArray
-            |> Array.iter (fun child -> parents.Remove child |> ignore))
+            |> Array.iter (fun child -> parents.Remove child |> ignore)
+
+            match companionSessionByOwner.TryGetValue sessionId with
+            | true, blogger ->
+                companionSessionByOwner.Remove sessionId |> ignore
+                companionOwnerBySession.Remove blogger |> ignore
+            | false, _ -> ()
+
+            match companionOwnerBySession.TryGetValue sessionId with
+            | true, owner ->
+                companionOwnerBySession.Remove sessionId |> ignore
+
+                match companionSessionByOwner.TryGetValue owner with
+                | true, blogger when blogger = sessionId -> companionSessionByOwner.Remove owner |> ignore
+                | _ -> ()
+            | false, _ -> ()
+
+            creditSourceByExecution
+            |> Seq.choose (fun (KeyValue(key, source)) ->
+                if source.LenderSessionId = sessionId then Some key else None)
+            |> Seq.toArray
+            |> Array.iter clearCreditSource)
 
     member _.RouteFresh
         (
@@ -397,6 +546,16 @@ type BorrowingCapacity<'target>
             | None -> None
             | Some(target, credit) ->
                 ensureReservationToken sessionId target credit
+
+                let key = executionKey sessionId None
+
+                match credit with
+                | Some token ->
+                    match creditDistance token.OwnerSessionId sessionId with
+                    | Some distance -> rememberCreditSource key sessionId token distance
+                    | None -> invalidOp "execution-model-routing: reserved credit is not legal for requester"
+                | None -> clearCreditSource key
+
                 Some target)
 
     member _.AdoptReservation(sessionId: string, physicalUserMessageId: string, target: 'target) =
@@ -406,11 +565,14 @@ type BorrowingCapacity<'target>
 
             match ownedTokenByExecution.TryGetValue oldKey with
             | true, tokenId -> adoptOwnedToken oldKey newKey target tokenId
-            | false, _ -> ())
+            | false, _ -> ()
+
+            moveCreditSource oldKey newKey)
 
     member _.ReleaseSession(sessionId: string) =
         lock gate (fun () ->
             cancelWaiters (fun demand -> demand.SessionId = sessionId)
+            clearCreditSourcesForSession sessionId
 
             ownedTokenByExecution.Keys
             |> Seq.filter (fun key -> key.StartsWith(sessionId + "\u001f", StringComparison.Ordinal))

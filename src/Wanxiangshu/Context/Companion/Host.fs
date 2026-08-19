@@ -368,6 +368,7 @@ type CompanionHost
                         (fun sid ->
                             bloggerId <- Some sid
                             bloggerCreateFailed <- false
+                            ModelRouting.bindCapacityCompanion primaryId sid
                             bloggerCreated sid)
                         (fun () -> restoredBloggerIdOpt <- None)
                         (fun () ->

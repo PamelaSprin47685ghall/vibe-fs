@@ -605,6 +605,9 @@ module ModelRouting =
         member _.BindCapacityChild(parentSessionId: string, childSessionId: string) =
             lock gate (fun () -> capacity.BindChild(parentSessionId, childSessionId))
 
+        member _.BindCapacityCompanion(ownerSessionId: string, bloggerSessionId: string) =
+            lock gate (fun () -> capacity.BindCompanion(ownerSessionId, bloggerSessionId))
+
         member _.DropCapacityLineage(sessionId: string) =
             normalizeSessionId sessionId
             |> Option.iter (fun normSessionId -> lock gate (fun () -> capacity.DropLineage normSessionId))
@@ -724,6 +727,11 @@ module ModelRouting =
     let bindCapacityChild (parentSessionId: SessionId) (childSessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime -> runtime.BindCapacityChild(SessionId.value parentSessionId, SessionId.value childSessionId)
+        | None -> ()
+
+    let bindCapacityCompanion (ownerSessionId: SessionId) (bloggerSessionId: SessionId) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.BindCapacityCompanion(SessionId.value ownerSessionId, SessionId.value bloggerSessionId)
         | None -> ()
 
     let dropCapacityLineage (sessionId: SessionId) =

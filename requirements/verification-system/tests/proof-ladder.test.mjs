@@ -115,9 +115,9 @@ test('WHAT[VERIFICATION-SYSTEM-010] wired gate count has a non-shrinking floor',
   const checkSource = read('scripts/check.mjs')
   const wired = wiredGates(checkSource)
   // 2026-08-15：kolmogorov-size 与 enforcer-cross-family-collision 两门按用户要求
-  // 删除，18 = 当前 wired 数；再删任何 gate 必须显式下调本下限（ratchet 语义，
-  // 验收判据只收紧不放宽）。
-  assert.ok(wired.length >= 18, `expected a substantial wired gate list, found ${wired.length}`)
+  // 删除，18 = 当前 wired 数。2026-08-19：cross-callback-pc 门新增，22 = 当前 wired 数。
+  // 再删任何 gate 必须显式下调本下限（ratchet 语义，验收判据只收紧不放宽）。
+  assert.ok(wired.length >= 22, `expected a substantial wired gate list, found ${wired.length}`)
 })
 
 test('WHAT[VERIFICATION-SYSTEM-004] checks directory is wired plus allowlist only', () => {

@@ -15,6 +15,7 @@ const checks = [
   join(root, 'checks/deadcode.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),
   join(root, 'checks/causal-wait-boundary.mjs'),
+  join(root, 'checks/cross-callback-pc.mjs'),
   join(root, 'checks/session-ownership-ratchet.mjs'),
   join(root, 'checks/js-surface-gate.mjs'),
   // js-surface-manifest moved to build.mjs post-compile validation: it requires

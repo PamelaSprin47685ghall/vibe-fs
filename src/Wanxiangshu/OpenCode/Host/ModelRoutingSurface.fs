@@ -218,6 +218,9 @@ module ModelRoutingSurface =
     let bindCapacityChild (runtime: obj) (parentSessionId: string) (childSessionId: string) : unit =
         (runtimeOf runtime).BindCapacityChild(parentSessionId, childSessionId)
 
+    let bindCapacityCompanion (runtime: obj) (ownerSessionId: string) (bloggerSessionId: string) : unit =
+        (runtimeOf runtime).BindCapacityCompanion(ownerSessionId, bloggerSessionId)
+
     let enterProviderStep
         (runtime: obj)
         (sessionId: string)
