@@ -23,6 +23,7 @@ const journalSurface = await import('../../../../dist/Persistence/Journal/Surfac
 const eventsSurface = await import('../../../../dist/OpenCode/Host/EventsSurface.js')
 const dispatchSurface = await import('../../../../dist/Interaction/Dispatch/DispatchSurface.js')
 const obligationJournalSurface = await import('../../../../dist/Persistence/Journal/ObligationJournalSurface.js')
+const sessionBindingSurface = await import('../../../../dist/OpenCode/Host/SessionBindingSurface.js')
 
 /**
  * The smallest SDK client double: mint child ids, accept prompts. The id list is
@@ -251,6 +252,11 @@ export const acceptAuthorityRoot = async (runtime, sessionId, agent) => {
   if (!result?.ok) {
     throw new Error(`AcceptHumanRoot(${sessionId}, ${agent}) rejected: ${result?.error ?? 'unknown error'}`)
   }
+}
+
+/** Bind a managed child session to a parent session in local execution binding. */
+export const bindManagedChild = (parentId, childId, agent) => {
+  return sessionBindingSurface.bindChild(parentId, childId, agent)
 }
 
 /**

@@ -417,8 +417,7 @@ runtime。结构闭包要求业务调用树具有缩放不变性：缩小是有�
   不是 SW-017① 管辖的 business program counter。protocol automaton 拥有独立的 continuation
   ownership（如 EPI-002），其 yield/observe 循环是协议语义而非业务流程位置。豁免条件：
   (1) kernel 唯一拥有 continuation/closure/停止；(2) external caller 只提供 observation，
-  不获"下一 phase 应调用哪个内部 operation"的解释权以外的控制权；(3) 豁免必须以书面
-  protocol-boundary exemption 形式记录在对应 owner 的 WHAT 中。满足条件的 protocol
+  不获"下一 phase 应调用哪个内部 operation"的解释权以外的控制权；(3) 豁免必须以书面 protocol-boundary exemption 形式记录在对应 owner 的 WHAT 中。满足条件的 protocol
   automaton 的 `nextTool`/`ExpectedTool` 是 protocol-level wire translation，不是
   SW-017① 的 child action opcode。
 
