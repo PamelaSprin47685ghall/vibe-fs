@@ -178,7 +178,7 @@ module ToolRegistry =
         (workspaceDirectory: string option)
         (sessionParents: Dictionary<string, string>)
         (currentPhysicalUserMessage: string -> string option)
-        (verdictSessions: HashSet<string>)
+        (verdictSubmissions: Dictionary<string, PhysicalUserMessageId>)
         (sessionDirectories: Dictionary<string, string>)
         (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> Task<string option>) option)
@@ -211,7 +211,7 @@ module ToolRegistry =
                 workspaceDirectory,
                 sessionParents,
                 currentPhysicalUserMessage,
-                verdictSessions,
+                verdictSubmissions,
                 sessionDirectories,
                 onRunStarted,
                 parentWorkRecordFor,

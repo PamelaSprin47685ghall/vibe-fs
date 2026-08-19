@@ -26,7 +26,7 @@ test('WHAT[HOST-BOUNDARY-007] HOST_006_containment_folds_observation_and_reancho
   assert.equal(CompactionPolicySurface.nextReanchor(['run_8'], () => true), null)
 })
 
-test('WHAT[HOST-BOUNDARY-003] HOST_003_host_signal_is_a_typed_wake_never_a_fact_carrier', () => {
+test('WHAT[HOST-BOUNDARY-003] HOST_003_retry_signal_is_a_typed_wake_never_a_run_identity_carrier', () => {
   const retry = HostSignalSurface.tryDecode({ type: 'session.status', sessionID: 'ses_retry', properties: { status: { type: 'retry', attempt: 3, reason: 'again' } } })
   assert.equal(retry.kind, 'ProviderRetry')
   assert.equal(retry.sessionId, 'ses_retry')

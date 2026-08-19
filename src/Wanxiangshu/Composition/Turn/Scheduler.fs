@@ -208,8 +208,12 @@ module Reconciler =
             match turn, wake with
             | None, _ -> false
             | Some _, ReconcileProgram.ReconcileWake.IdleWake _ -> true
+            | Some observed, ReconcileProgram.ReconcileWake.FailureWake(Some physical, _) when
+                observed.PhysicalUserMessageId = physical
+                ->
+                true
             | Some observed,
-              (ReconcileProgram.ReconcileWake.RetryWake | ReconcileProgram.ReconcileWake.FailureWake | ReconcileProgram.ReconcileWake.AbortWake) ->
+              (ReconcileProgram.ReconcileWake.RetryWake | ReconcileProgram.ReconcileWake.FailureWake _ | ReconcileProgram.ReconcileWake.AbortWake) ->
                 Option.isNone observed.Observation
                 && ReconcileProgram.isTerminalOutcome observed.Outcome
 
@@ -529,7 +533,11 @@ module Reconciler =
         member this.Signal(signal: HostSignal) : unit =
             match signal with
             | SessionIdle sessionId -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake)
-            | ProviderFailure(sessionId, _) -> this.Kick(sessionId, ReconcileProgram.ReconcileWake.FailureWake)
+            | ProviderFailure(sessionId, reason) ->
+                this.Kick(
+                    sessionId,
+                    ReconcileProgram.ReconcileWake.FailureWake(binding.TryPhysicalUserMessage sessionId, reason)
+                )
             | ProviderRetry retry -> this.Kick(retry.SessionId, ReconcileProgram.ReconcileWake.RetryWake)
             | SessionDeleted(sessionId, _) -> this.ClearSession(sessionId)
             // HOST-002/004: an operator abort is a typed wake, not a failure.

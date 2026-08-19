@@ -52,14 +52,15 @@ module ReconcileProgram =
     ///
     /// Only an `IdleWake` carries quiescence evidence — a fresh `SessionIdle`
     /// observation. Retry / failure wakes never grant idle-derived continuation
-    /// rights, and the scheduler generation (single-flight fencing) is a
-    /// different physical concept and must never be reused as the attempt
-    /// serial.
+    /// rights. FailureWake freezes the physical user identity observed when the
+    /// session.error arrived; this is failure finality, not ProviderRun identity.
+    /// The scheduler generation (single-flight fencing) is a different physical
+    /// concept and must never be reused as the attempt serial.
     [<RequireQualifiedAccess>]
     type ReconcileWake =
         | IdleWake of QuiescencePermit
         | RetryWake
-        | FailureWake
+        | FailureWake of physicalUserMessageId: PhysicalUserMessageId option * reason: string
         /// HOST-004: operator abort is a typed wake category, not a failure.
         /// It never carries idle/repair rights: under it, Unknown / Provisional
         /// must never Publish a stable observation that business could turn into
@@ -104,6 +105,17 @@ module ReconcileProgram =
         | TurnInProgress
         | TurnNeedsContinuation _ -> false
 
+    let tryFailureWitnessReason (wake: ReconcileWake) (turn: PublishTurn) : string option =
+        match wake with
+        | ReconcileWake.FailureWake(Some physical, reason) when
+            physical = turn.PhysicalUserMessageId && not (isTerminalOutcome turn.Outcome)
+            ->
+            Some reason
+        | ReconcileWake.IdleWake _
+        | ReconcileWake.RetryWake
+        | ReconcileWake.FailureWake _
+        | ReconcileWake.AbortWake -> None
+
     let private decideExhaustedRetryable (_rereadsRemaining: int) (exhausted: ReconcileDecision) =
         // HOST-BOUNDARY-005: no read is authorized by a counter. A later read
         // needs a new coarse Host signal or exact projection-change edge.
@@ -118,7 +130,7 @@ module ReconcileProgram =
             // send missing-final-report is TurnWorkflow / InteractionRepair.
             ReconcileDecision.Publish
         | ReconcileWake.RetryWake
-        | ReconcileWake.FailureWake
+        | ReconcileWake.FailureWake _
         | ReconcileWake.AbortWake ->
             // No idle rights. Observation stability only, or an abort that
             // must not resurrect an idle-derived continuation; the next
@@ -136,12 +148,12 @@ module ReconcileProgram =
             // that witness belongs to business repair.
             ReconcileDecision.Publish
         | ReconcileWake.RetryWake
-        | ReconcileWake.FailureWake
+        | ReconcileWake.FailureWake _
         | ReconcileWake.AbortWake ->
-            // Provider/abort status can race the public session projection.
-            // Never turn a non-idle wake plus provisional snapshot into a
-            // synthetic repair. Scheduler parks the occasion and the exact
-            // terminal message.updated projection edge re-kicks it.
+            // Retry/abort status can race the public session projection. A
+            // FailureWake is handled earlier only when its frozen physical id
+            // matches this exact snapshot assistant. All remaining non-idle
+            // provisional observations stay parked for a causal edge.
             ReconcileDecision.StopPass
 
     let private tokenAlreadySealed (maps: Map<string, string>) (key: string) (token: string) =
@@ -157,18 +169,33 @@ module ReconcileProgram =
     /// 产生一个稳定观测交接或明确 fail closed；因果重读耗尽绝不静默 StopPass 一个带
     /// idle evidence 的稳定 `Unknown`。`Unknown`（finish=None）耗尽后只有在 `IdleWake`
     /// 下 `Publish` 给业务（TurnWorkflow / InteractionRepair 决定是否 repair）；
-    /// `Retry` / `Failure` wake 只证明“某个 provider lifecycle edge 已发生”，不证明
-    /// 当前 snapshot 已追上，更不授予 idle repair 权；其 Unknown / Provisional 都
-    /// StopPass，等待 exact projection-change edge。只有 IdleWake 下的稳定 Unknown /
-    /// Provisional 可以 Publish 给业务。`SnapshotError` / `NoTurn` 同样 StopPass。
+    /// `Retry` wake 只证明 provider lifecycle edge；`FailureWake` 还携带 signal 到达时冻结的
+    /// physical user identity。只有该 physical 与 snapshot exact current assistant 一致时，
+    /// Unknown / Provisional 才被收敛成 TurnFailed；否则仍 StopPass 等待 causal edge。
+    /// 两者都不授予 idle repair 权。普通 Unknown / Provisional 只有 IdleWake 可 Publish；
+    /// `SnapshotError` / `NoTurn` 同样 StopPass。
     let decideStep (wake: ReconcileWake) (rereadsRemaining: int) (evidence: ReconcileEvidence) : ReconcileDecision =
-        match evidence with
-        | ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
-        | ReconcileEvidence.SnapshotError _
-        | ReconcileEvidence.NoTurn -> decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass
-        | ReconcileEvidence.Provisional _ -> decideExhaustedRetryable rereadsRemaining (decideExhaustedProvisional wake)
-        | ReconcileEvidence.Unknown _ -> decideExhaustedUnknown wake rereadsRemaining
-        | ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
+        let hasFailureWitness =
+            match evidence with
+            | ReconcileEvidence.Provisional observed
+            | ReconcileEvidence.Unknown(Some observed) ->
+                observed.PublishTurn |> Option.bind (tryFailureWitnessReason wake) |> Option.isSome
+            | ReconcileEvidence.SnapshotError _
+            | ReconcileEvidence.NoTurn
+            | ReconcileEvidence.Unknown None
+            | ReconcileEvidence.Terminal _
+            | ReconcileEvidence.SessionCleared -> false
+
+        match hasFailureWitness, evidence with
+        | true, (ReconcileEvidence.Provisional _ | ReconcileEvidence.Unknown _) -> ReconcileDecision.Publish
+        | false, ReconcileEvidence.Terminal _ -> ReconcileDecision.Publish
+        | false, (ReconcileEvidence.SnapshotError _ | ReconcileEvidence.NoTurn) ->
+            decideExhaustedRetryable rereadsRemaining ReconcileDecision.StopPass
+        | false, ReconcileEvidence.Provisional _ ->
+            decideExhaustedRetryable rereadsRemaining (decideExhaustedProvisional wake)
+        | false, ReconcileEvidence.Unknown _ -> decideExhaustedUnknown wake rereadsRemaining
+        | false, ReconcileEvidence.SessionCleared -> ReconcileDecision.StopPass
+        | true, _ -> ReconcileDecision.StopPass
 
     let decisionName (decision: ReconcileDecision) : string =
         match decision with

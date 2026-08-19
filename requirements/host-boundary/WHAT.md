@@ -49,7 +49,10 @@ REUSE `codec/signals.test.mjs`）。
 **规范**：Domain 合同永远是 typed `HostSignal`（`SessionIdle | ProviderRetry | ProviderFailure |
 SessionDeleted | AttemptAborted`）；业务层不得观察 raw payload。HostSignal 任何 case 不携带
 message id（FALLBACK-003）；`ProviderRetry.Attempt` 只用于诊断与唤醒，不是 Fallback 领域计数
-（FALLBACK-010）。业务事实只从完整 snapshot 读取（ARCH-002）。
+（FALLBACK-010）。普通业务事实只从完整 snapshot 读取（ARCH-002）。`ProviderFailure` 是 typed
+physical failure witness：它本身不能命名/推进 provider run；只有当同一次 reconcile 的完整 snapshot
+已经给出 exact current physical user 之后的唯一 assistant（ProviderRunIdentity 仍由 snapshot 确定）时，
+二者合取才可把该 exact run 收敛为 `TurnFailed`。snapshot 尚无 current assistant 时仍不得猜 run。
 
 **含义/动机**：从事件字段推导领域事实 = 把传输层偶然参数当权威（`HostSignal.fs` 头注释：
 retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
@@ -80,6 +83,12 @@ projection-change edge 才允许重新 Kick，并必须保留原 occasion 的 wa
 projection-change edge 与“登记 pending”之间不得存在 lost-wakeup race：如果 edge 在一次 snapshot read
 与 pending 登记之间到达，scheduler 必须观察到该 edge 的单调版本变化并立即重新排队。新的 physical user
 binding 必须使旧 pending occasion 失效；`ClearSession` 同样清除其 pending/edge 状态。
+
+`ProviderFailure` 与 exact current assistant 已同时可见时，不得再等待 assistant 的 terminal
+`message.updated` 或后续 `SessionIdle`。Host 可以先发布 `session.error`，而 assistant 的
+`error/finish/time.completed` projection 稍后才赶上；current assistant 已提供 run identity，typed failure
+witness 提供 failure finality，同一次 snapshot read 必须立即发布 `TurnFailed`。若 snapshot 连 current
+assistant 都没有，则仍保持 pending，禁止从 session 级 error 猜测 ProviderRunIdentity。
 
 **含义/动机**：轮询把时间推进当业务状态探测，而且 Host projection lag 超过任意固定窗口就会把真实
 terminal 永久漏掉。事件驱动只对真实 causal edge 反应，并让 projection lag 的长度不再参与业务正确性。

@@ -19,7 +19,8 @@
 
 ```text
 Host 粗粒度信号（idle / retry）            // 只唤醒，不裁决（HOST-004 归 host-boundary）
-→ Reconciler 从完整 Host snapshot 识别失败的 provider attempt
+→ Reconciler 从完整 Host snapshot 识别 exact current ProviderRunIdentity；failure finality 来自
+  terminal snapshot，或 typed ProviderFailure + 同一 snapshot exact current assistant 的合取
 → ProviderRecoveryWorkflow.continueAfterConfirmedFailure(turn, error, continuationPrompt)
 → FallbackLedger.recordConfirmedFailure(journal, DefaultAutoRecoveryBudget, session, providerRun, reason)
      → FallbackEvidence.tryCurrentState：无 cursor → NoActiveRun（无事实）

@@ -142,7 +142,7 @@ module PluginHostInterop =
                 workspaceDirectory
                 scope.Sessions.SessionParents
                 currentPhysicalUserMessage
-                scope.Sessions.VerdictSessions
+                scope.Sessions.VerdictSubmissions
                 scope.Sessions.SessionDirectories
                 onRunStarted
                 parentWorkRecordFor

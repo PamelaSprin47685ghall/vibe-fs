@@ -55,7 +55,7 @@ type ToolRuntimeScope
         workspaceDirectory: string option,
         sessionParents: Dictionary<string, string>,
         currentPhysicalUserMessage: string -> string option,
-        verdictSessions: HashSet<string>,
+        verdictSubmissions: Dictionary<string, PhysicalUserMessageId>,
         sessionDirectories: Dictionary<string, string>,
         onRunStarted: (SessionId -> Role -> string option -> unit) option,
         parentWorkRecordFor: (string -> Task<string option>) option,
@@ -496,11 +496,14 @@ type ToolRuntimeScope
         | true, port -> Some port
         | false, _ -> gitTreePort
 
-    member _.MarkVerdictSubmitted(reviewerId: string) =
-        lock gate (fun () -> verdictSessions.Add reviewerId |> ignore)
+    member _.MarkVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
+        lock gate (fun () -> verdictSubmissions.[reviewerId] <- physicalUserMessageId)
 
-    member _.HasVerdictSubmitted(reviewerId: string) =
-        lock gate (fun () -> verdictSessions.Contains reviewerId)
+    member _.HasVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
+        lock gate (fun () ->
+            match verdictSubmissions.TryGetValue reviewerId with
+            | true, submitted -> submitted = physicalUserMessageId
+            | false, _ -> false)
 
     member _.RunOwnedWork(start: unit -> Task) : bool =
         let admitted =

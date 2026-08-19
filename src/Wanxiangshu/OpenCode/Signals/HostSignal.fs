@@ -11,12 +11,14 @@ type RetrySignal =
       Attempt: string
       Reason: string }
 
-/// FALLBACK-003: Host signals wake, they do not carry facts.
+/// FALLBACK-003: Host signals never carry provider-run identity.
 ///
 /// No message id on any case. A retry event's `messageID` was previously read as
 /// the failed assistant message and written into the cursor, which is deriving a
 /// domain fact from an event field. The failed provider run comes from the
-/// reconciled snapshot instead (HOST-004).
+/// reconciled snapshot instead (HOST-004). ProviderFailure contributes only a
+/// typed physical failure witness; it becomes TurnFailed only when reconciliation
+/// independently sees the exact current assistant for the physical material.
 ///
 /// `AttemptAborted` is only a typed physical wake that revokes continuation
 /// capability. The business `TurnAborted` outcome still comes from the full

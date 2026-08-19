@@ -26,6 +26,19 @@ test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_projection_edge_delivers_the_next_f
   })
 })
 
+test('WHAT[HOST-BOUNDARY-005] EXEC_provider_failure_with_exact_current_assistant_does_not_wait_for_terminal_projection', async () => {
+  const result = await ReconcileSurface.failureWitnessCurrentAssistantScenario()
+
+  assert.deepEqual(result, {
+    snapshotReads: 1,
+    observed: true,
+    providerRun: 'failure-witness-current-run',
+    outcome: 'TurnFailed',
+    reason: 'Bad Request: input_invalid',
+    hasQuiescence: false,
+  })
+})
+
 test('WHAT[HOST-BOUNDARY-005] EXEC_reconcile_has_no_counter_driven_snapshot_polling', () => {
   for (const remaining of [8, 4, 2, 1]) {
     const error = ReconcileSurface.decideStep(

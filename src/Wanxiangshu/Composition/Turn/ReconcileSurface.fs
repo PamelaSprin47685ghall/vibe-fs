@@ -43,7 +43,17 @@ module ReconcileSurface =
                     (int64Of (property value "attemptSerial"))
             )
         | "RetryWake" -> ReconcileProgram.ReconcileWake.RetryWake
-        | "FailureWake" -> ReconcileProgram.ReconcileWake.FailureWake
+        | "FailureWake" ->
+            let physical = stringOf (property value "physical")
+            let reason = stringOf (property value "reason")
+
+            ReconcileProgram.ReconcileWake.FailureWake(
+                (if System.String.IsNullOrWhiteSpace physical then
+                     None
+                 else
+                     Some(PhysicalUserMessageId.create physical)),
+                (if System.String.IsNullOrWhiteSpace reason then "provider failure" else reason)
+            )
         | "AbortWake" -> ReconcileProgram.ReconcileWake.AbortWake
         | other -> invalidArg "wake" (sprintf "unknown reconcile wake: %s" other)
 
@@ -165,6 +175,8 @@ module ReconcileSurface =
     let failureWake () : obj =
         box
             {| kind = "FailureWake"
+               physical = ""
+               reason = "provider failure"
                hasQuiescence = false |}
 
     let abortWake () : obj =
@@ -321,7 +333,7 @@ module ReconcileSurface =
                 Reconciler.Scheduler(snapshot, store, onTurn, ?onSnapshot = Some observeSnapshot)
 
             if failureWake then
-                scheduler.Kick(sessionId, ReconcileProgram.ReconcileWake.FailureWake)
+                scheduler.Signal(ProviderFailure(sessionId, "APIError"))
             else
                 scheduler.SignalIdle(sessionId, QuiescencePermit.create sessionId 1L)
 
@@ -349,3 +361,78 @@ module ReconcileSurface =
     let idleProjectionEdgeScenario () : Task<obj> = projectionEdgeScenario false
 
     let failureProjectionEdgeScenario () : Task<obj> = projectionEdgeScenario true
+
+    let failureWitnessCurrentAssistantScenario () : Task<obj> =
+        task {
+            let sessionId = SessionId.create "failure-witness-session"
+            let rootPhysical = PhysicalUserMessageId.create "failure-witness-root"
+            let currentPhysical = PhysicalUserMessageId.create "failure-witness-current"
+            let store = TurnBinding.Store()
+            store.BindUserMessage(sessionId, rootPhysical)
+            store.BindContinuationUserMessage(sessionId, currentPhysical)
+
+            // DSL-MUTABLE: algorithm-scratch — test observation capture.
+            let mutable snapshotReads = 0
+            let mutable observed: ReconciledTurnContext option = None
+
+            let snapshot =
+                { new ISessionSnapshotPort with
+                    member _.GetMessages _ =
+                        snapshotReads <- snapshotReads + 1
+
+                        Task.FromResult(
+                            Ok
+                                [ schedulerMessage "failure-witness-root" "user" None None None false [||]
+                                  schedulerMessage
+                                      "failure-witness-current"
+                                      "user"
+                                      None
+                                      None
+                                      None
+                                      false
+                                      [||]
+                                  schedulerMessage
+                                      "failure-witness-current-run"
+                                      "assistant"
+                                      (Some "failure-witness-current")
+                                      None
+                                      None
+                                      false
+                                      [||] ]
+                        ) }
+
+            let onTurn (context: ReconciledTurnContext) : Task =
+                observed <- Some context
+                Task.FromResult(()) :> Task
+
+            let scheduler = Reconciler.Scheduler(snapshot, store, onTurn)
+            scheduler.Signal(ProviderFailure(sessionId, "Bad Request: input_invalid"))
+            do! scheduler.StopAndDrain()
+
+            return
+                match observed with
+                | None ->
+                    box
+                        {| snapshotReads = snapshotReads
+                           observed = false
+                           providerRun = ""
+                           outcome = ""
+                           reason = ""
+                           hasQuiescence = false |}
+                | Some context ->
+                    let outcome, reason =
+                        match context.Turn.Outcome with
+                        | ReconcileProgram.TurnFailed reason -> "TurnFailed", reason
+                        | ReconcileProgram.TurnCompleted -> "TurnCompleted", ""
+                        | ReconcileProgram.TurnAborted reason -> "TurnAborted", reason
+                        | ReconcileProgram.TurnInProgress -> "TurnInProgress", ""
+                        | ReconcileProgram.TurnNeedsContinuation reason -> "TurnNeedsContinuation", reason
+
+                    box
+                        {| snapshotReads = snapshotReads
+                           observed = true
+                           providerRun = ProviderRunIdentity.value context.Turn.ProviderRun
+                           outcome = outcome
+                           reason = reason
+                           hasQuiescence = Option.isSome context.Quiescence |}
+        }

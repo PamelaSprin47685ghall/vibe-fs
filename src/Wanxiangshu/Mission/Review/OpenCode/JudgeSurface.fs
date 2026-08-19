@@ -61,7 +61,12 @@ module JudgeSurface =
     let alreadyJudged (language: string) =
         ProviderResources.readText (ProviderLanguage.parse language) "tool/judge/already-judged"
 
-    let markVerdictSubmitted (sessionId: string) : unit =
-        SharedState.VerdictSessions.Add(sessionId) |> ignore
+    let markVerdictSubmitted (sessionId: string) (physicalUserMessageId: string) : unit =
+        SharedState.VerdictSubmissions.[sessionId] <- PhysicalUserMessageId.create physicalUserMessageId
 
-    let clearVerdictSessions () : unit = SharedState.VerdictSessions.Clear()
+    let hasVerdictSubmitted (sessionId: string) (physicalUserMessageId: string) : bool =
+        match SharedState.VerdictSubmissions.TryGetValue sessionId with
+        | true, submitted -> submitted = PhysicalUserMessageId.create physicalUserMessageId
+        | false, _ -> false
+
+    let clearVerdictSessions () : unit = SharedState.VerdictSubmissions.Clear()

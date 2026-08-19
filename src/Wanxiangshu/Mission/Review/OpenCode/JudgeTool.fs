@@ -99,13 +99,14 @@ module JudgeTool =
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
         (journal: AgentJournal)
+        (physicalUserMessageId: PhysicalUserMessageId)
         (submission: VerdictSubmission)
         =
         task {
             match! VerdictWorkflow.recordJudgement journal submission with
             | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
             | Ok() ->
-                scope.MarkVerdictSubmitted context.SessionId
+                scope.MarkVerdictSubmitted(context.SessionId, physicalUserMessageId)
                 return received context
         }
 
@@ -117,7 +118,8 @@ module JudgeTool =
         =
         match processSubmission journal judgement with
         | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
-        | Some submission -> recordSubmittedJudgement scope context journal submission
+        | Some submission ->
+            recordSubmittedJudgement scope context journal judgement.PhysicalUserMessageId submission
 
     let private recordProcessJudgement
         (scope: ToolRuntimeScope)
@@ -141,7 +143,7 @@ module JudgeTool =
                 AsyncSupport.trySetResult completed value |> ignore
 
             let accept () =
-                scope.MarkVerdictSubmitted context.SessionId
+                scope.MarkVerdictSubmitted(context.SessionId, judgement.PhysicalUserMessageId)
                 finish (received context)
 
             let challenge () = finish (challenged context)
@@ -173,7 +175,6 @@ module JudgeTool =
         : ExecutionDecision =
         let isReviewer = scope.RoleFor context = Some Role.Reviewer
         let hasSession = not (String.IsNullOrWhiteSpace context.SessionId)
-        let isSubmitted = hasSession && scope.HasVerdictSubmitted context.SessionId
         let verdict = StaticTools.reviewerVerdictOfString (args.Text "verdict")
 
         let physicalUserMsg =
@@ -181,6 +182,12 @@ module JudgeTool =
                 scope.CurrentPhysicalUserMessage context.SessionId
             else
                 None
+
+        let isSubmitted =
+            hasSession
+            && (physicalUserMsg
+                |> Option.exists (fun messageId ->
+                    scope.HasVerdictSubmitted(context.SessionId, PhysicalUserMessageId.create messageId)))
 
         match
             isReviewer, hasSession, isSubmitted, verdict, context.ToolCallId, context.ProviderRunId, physicalUserMsg

@@ -381,12 +381,15 @@ module HostSignalBootstrap =
                 else
                     handleOrdinaryAbort sessionId signal
 
-            /// FALLBACK-003: every Host signal is a wake and nothing else.
+            /// FALLBACK-003: no Host signal may name the failed ProviderRun.
             ///
             /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
             /// — a second and third writer of the durable cursor, each deciding from
             /// event fields whether an attempt had failed. Both are gone: the
-            /// reconciled snapshot decides, and FallbackController performs the advance.
+            /// reconciled snapshot supplies exact run identity, and FallbackController
+            /// performs the advance. ProviderFailure contributes only failure finality;
+            /// Scheduler freezes the current physical identity at signal admission and
+            /// reconciliation must match it to the snapshot assistant before publishing.
             let onSignal (signal: HostSignal) =
                 match signal with
                 | SessionIdle sessionId ->

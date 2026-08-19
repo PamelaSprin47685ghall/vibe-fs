@@ -10,6 +10,20 @@ const hostContext = ({ sessionId = 'ses-reviewer', toolCallId, providerRunId } =
   ...(providerRunId === undefined ? {} : { messageID: providerRunId }),
 })
 
+const admitReviewerMaterial = async (hooks, messageId) => {
+  const output = {
+    message: {
+      id: messageId,
+      role: 'user',
+      sessionID: 'ses-reviewer',
+      agent: 'fast-reviewer',
+      model: { providerID: 'host', modelID: 'placeholder' },
+    },
+    parts: [],
+  }
+  await hooks['chat.message']({ sessionID: 'ses-reviewer', agent: 'fast-reviewer' }, output)
+}
+
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_spec_exposes_the_verdict_input_and_public_tool_identity', () => {
   const contract = judge.contract('English')
   assert.equal(contract.name, 'judge')
@@ -67,13 +81,24 @@ test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_reviewer_requires_a_tool_call_id_before_r
 test('WHAT[REVIEW-JUDGEMENT-001] JUDGE_subsequent_call_returns_already_judged_message', async () => {
   try {
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-      await acceptAuthorityRoot(runtime, 'ses-reviewer', 'fast-reviewer')
-      judge.markVerdictSubmitted('ses-reviewer')
+      await admitReviewerMaterial(hooks, 'review-request-1')
+      judge.markVerdictSubmitted('ses-reviewer', 'review-request-1')
       const result = await hooks.tool.judge.execute({ verdict: 'PERFECT' }, hostContext({ toolCallId: 'call-1', providerRunId: 'run-1' }))
       assert.match(result, /(?:You have already made a judgment, please conclude the conversation|你已经做出过判断了，现在请你结束对话)/i)
       assert.doesNotMatch(result, /(?:judgment was not received|你的判断未被收下)/i)
       assert.ok(runtime.abortedIds.includes('ses-reviewer'), 'reviewer session must be interrupted/aborted on subsequent judge call')
     })
+  } finally {
+    judge.clearVerdictSessions()
+  }
+})
+
+test('WHAT[REVIEW-JUDGEMENT-008] JUDGE_submission_dedupe_is_scoped_to_one_physical_review_request', () => {
+  try {
+    judge.clearVerdictSessions()
+    judge.markVerdictSubmitted('ses-reviewer', 'review-request-1')
+    assert.equal(judge.hasVerdictSubmitted('ses-reviewer', 'review-request-1'), true)
+    assert.equal(judge.hasVerdictSubmitted('ses-reviewer', 'review-request-2'), false)
   } finally {
     judge.clearVerdictSessions()
   }

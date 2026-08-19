@@ -88,7 +88,7 @@ type PluginSessionScope() =
     // DSL-MUTABLE: resource — lock gate object for companion operations.
     member val CompanionGate = obj ()
     // DSL-MUTABLE: resource — alias to SharedState verdict session set.
-    member val VerdictSessions = SharedState.VerdictSessions
+    member val VerdictSubmissions = SharedState.VerdictSubmissions
     // DSL-MUTABLE: single-flight — per-instance nudge sent set.
     member val NudgeSent = HashSet<string>()
     // DSL-MUTABLE: single-flight — per-instance join guard nudge set.
@@ -143,7 +143,7 @@ type PluginSessionScope() =
         this.SessionParents.Remove sessionId |> ignore
         SessionExecutionBinding.drop (SessionId.create sessionId)
         this.SessionDirectories.Remove sessionId |> ignore
-        this.VerdictSessions.Remove sessionId |> ignore
+        this.VerdictSubmissions.Remove sessionId |> ignore
         this.AbortedSessions.Remove sessionId |> ignore
 
         if preserveIdentity then

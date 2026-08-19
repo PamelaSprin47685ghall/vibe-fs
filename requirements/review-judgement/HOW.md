@@ -12,6 +12,7 @@
   - 成功回执走 `tool/judge/received` 文案（`Your judgment has been received, please conclude the conversation.` / `你的判断已被收下，请你结束对话。`），**不 echo verdict**；再次调用走 `tool/judge/already-judged` 文案（`You have already made a judgment, please conclude the conversation.` / `你已经做出过判断了，现在请你结束对话。`）；`description` 文案明言「It does not echo the verdict」。
   - `execute` 把 `verdict` 文本交给 `StaticTools.reviewerVerdictOfString` 解析，任何非 `PERFECT/REVISE` 值 → `Path.VerdictMustBePerfectOrRevise`。
   - fail-closed 分支（非 Reviewer、无 barrier、无 tree、binding 失败）→ `notReceived`，不落 verdict 事实。这些分支的因果侧（seal binding）归 `review-assurance`。
+  - “already judged”只对当前 `(Reviewer SessionId, PhysicalUserMessageId)` 生效。成功 judgement 后仍可 abort 当前 Reviewer turn 来阻止同一 request 继续空跑；dedicated session 被下一条 process-review continuation 复用时，新的 physical user message 自动形成新的 judgement request identity，不继承上一轮防重标记。
 - `src/Wanxiangshu/Tools/StaticTools.fs`：
   - `reviewerVerdictOfString`：唯一解析器，`"PERFECT" → Ok Perfect`、`"REVISE" → Ok Revise`、其它 → `Error`。刻意独立于 assistant 文本：verdict 是工具参数，绝不从 transcript 推断。
   - `reviewerVerdictSchemaJson`：`additionalProperties: false` + `required: ["verdict"]`——从 schema 层杜绝描述字段（REVIEW-JUDGEMENT-001 的可执行证据）。
@@ -162,3 +163,7 @@ acceptance-not-omniscience
 ### 未覆盖与理由
 
 - 真实模型行为 canary（模型真的按 discrimination 判断）：judgement 最终由 LLM 执行，行为级 canary 属 `verification-system` 的 e2e 阶梯（Long Stroke / finality-cohort-law canary），不在本包单元证明范围（PROOF-MAP 注明的「不能只靠 prompt anchors」已由 discrimination-fixtures 的可失败文本契约 + 工具面行为测试补齐，剩余缺口在 e2e）。
+
+### GAP
+
+- `GAP-023` —— **OPEN**：reusable dedicated Reviewer 的 `judge` 防重当前按整个 `SessionId` 保存，上一轮成功 judgement 会使下一条独立 process-review assignment 误入 `AlreadyJudged → AbortSession`。需把防重 identity 收窄到 physical review request，并以 `verdict-tool.test.mjs` 证明同 request 重复仍被收束、不同 `PhysicalUserMessageId` 可重新 judge。

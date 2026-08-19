@@ -26,6 +26,7 @@
 4. PERFECT 被当作「字面无瑕 / 全知」的承诺，或 non-blocking 观察被 PERFECT 噤声；
 5. REVISE 不购买任何实质更好/更真的结果（例如 tiny typo 自动 REVISE、「测试必须总跑过」万能律）；
 6. Examiner's Ledger 八维被烙成必填 report 字段 / Pass 表 / 固定八段标题。
+7. reusable dedicated Reviewer 在上一轮成功 `judge` 后，被 session 级“already judged”标记永久静音；下一条独立 review request 到来时仍被当作上一轮重复提交并被 abort。
 
 ## 为什么必须独立存在（Independent Change Test）
 

@@ -33,6 +33,11 @@ codec 边界（`FallbackOffsetCodec.ofByte/toByte`）。反序列化遇到非法
 `FallbackAttemptIdentity = { SessionId; LogicalRunId; AuthorityRootUserMessageId; ProviderRun }`
 去重）**最多推进一次**；第二次 observe 得到 `AlreadyRecorded`，不写事实、不推进、不通知 terminal。
 
+“已确认失败”允许两种等价证据：①完整 snapshot 自身给出 exact current assistant 的 terminal failure；
+②typed Host `ProviderFailure` 与同一次完整 snapshot 中 exact current assistant 合取。②只补足 failure
+finality，ProviderRunIdentity 仍必须来自 snapshot；current assistant 尚不可见时，不得用 session error、
+Host retry attempt、message 猜测或 synthetic id 推进 cursor。
+
 含义：`ProviderRecoveryWorkflow.continueAfterConfirmedFailure` 中 `AlreadyRecorded` /
 `NoActiveRun` 分支不产生第二个 continuation、不重复 `NotifyTerminal Failed`——第一个 observe
 保持 owner。

@@ -106,15 +106,30 @@ module ReconcilePass =
         | true, _ -> Some ReconciledTurnDelivery.Observation
         | false, ReconcileProgram.ReconcileWake.IdleWake _ -> Some ReconciledTurnDelivery.IdleRevisit
         | false, ReconcileProgram.ReconcileWake.RetryWake
-        | false, ReconcileProgram.ReconcileWake.FailureWake
+        | false, ReconcileProgram.ReconcileWake.FailureWake _
         | false, ReconcileProgram.ReconcileWake.AbortWake -> None
 
     let private quiescenceOf (wake: ReconcileProgram.ReconcileWake) =
         match wake with
         | ReconcileProgram.ReconcileWake.IdleWake permit -> Some permit
         | ReconcileProgram.ReconcileWake.RetryWake
-        | ReconcileProgram.ReconcileWake.FailureWake
+        | ReconcileProgram.ReconcileWake.FailureWake _
         | ReconcileProgram.ReconcileWake.AbortWake -> None
+
+    let private materializeFailureWitness
+        (wake: ReconcileProgram.ReconcileWake)
+        (turn: ReconciledTurn option)
+        : ReconciledTurn option =
+        turn
+        |> Option.map (fun observed ->
+            let publish = publishTurnOf observed
+
+            match ReconcileProgram.tryFailureWitnessReason wake publish with
+            | Some reason ->
+                { observed with
+                    Outcome = ReconcileProgram.TurnFailed reason
+                    Observation = None }
+            | None -> observed)
 
     let private observeIfPresent
         (isCurrent: SessionId -> int -> bool)
@@ -390,7 +405,7 @@ module ReconcilePass =
         (turns: Map<string, ReconciledTurn>)
         (messages: SessionMessage list)
         : Task =
-        let turn = TurnReconcile.reconcile messages activeBinding
+        let turn = TurnReconcile.reconcile messages activeBinding |> materializeFailureWitness wake
         let evidence = evidenceOf turn
         let observedTurns = observedTurnsOf turn turns
         let decision = ReconcileProgram.decideStep wake rereadsRemaining evidence
