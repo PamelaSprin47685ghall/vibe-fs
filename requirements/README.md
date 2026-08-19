@@ -27,7 +27,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
-## 49 包索引
+## 52 包索引
 
 ### 1. Requirement system
 | Package | 一句话 WHY |
@@ -59,6 +59,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [capability-enforcement](capability-enforcement/WHAT.md) | provider 看见的与 runtime 真能执行的 capability 同源且不扩大 office entitlement。 |
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
+| [attention-regulation](attention-regulation/WHAT.md) | 显式结束 evidence churn、解除自创心理债、延后非阻塞旁支；defer 不冒充 obligation。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
@@ -67,6 +68,7 @@ grounding 由 `requirement-grounding` package 拥有。
 ### 5. Interaction / effect / durability
 | Package | 一句话 WHY |
 |---|---|
+| [concern-routing](concern-routing/WHAT.md) | concern-addressed mailbox 让发送者不依赖身份拓扑，消息只在下一次 Pair Hint 自然边界交付。 |
 | [interaction-authority](interaction-authority/WHAT.md) | PhysicalUserMessage ≠ AuthorityTurn；typed provenance 才能创建/继续 logical interaction。 |
 | [dispatch-protocol](dispatch-protocol/WHAT.md) | 已获授权 interaction 穿过 unreliable Host 时避免 unknown outcome 复制逻辑效果。 |
 | [durable-events](durable-events/WHAT.md) | immutable facts + atomic commit + deterministic fold = 单一可重放 substrate。 |
@@ -110,6 +112,7 @@ grounding 由 `requirement-grounding` package 拥有。
 |---|---|
 | [behavior-diagnosis](behavior-diagnosis/WHAT.md) | pathology 只有满足 trigger/negative/distinction 的 evidence 才成立。 |
 | [guidance-delivery](guidance-delivery/WHAT.md) | diagnosis 与何时/如何再次告知分离。 |
+| [institutional-learning](institutional-learning/WHAT.md) | celebrate/regret 经 Enhancer 压成 ABSORB/BIRTH/DISCARD，让经验进入 canonical Enforcer 而不制造 scar tissue。 |
 
 ### 11. Repository knowledge / programming
 | Package | 一句话 WHY |
@@ -132,7 +135,7 @@ grounding 由 `requirement-grounding` package 拥有。
 
 ## 依赖骨架
 
-权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 110-edge 骨架一致（0 cycle）。
+权威依赖清单见各包 HOW.md 的 DEPENDS ON 节，与 `requirements/INDEX.md` 的 130-edge 骨架一致（0 cycle）。
 
 ## 运行与验证
 

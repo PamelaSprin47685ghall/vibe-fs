@@ -14,6 +14,7 @@
 | 012 | `resources/provider/role/reviewer/*` + `resources/provider/library/reviewer/quality-ledger/*`；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | REVIEW-012：双 PERFECT 不入 prompt |
 | 013 | `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`；`resources/provider/tool/assume/{description,committed,arg-assumption}/{en,zh-CN}.md`；HOST-013 transform（`Infrastructure/OpenCode/Host/*`）把 canonical hint 投影到 wire；`OpenCode/Tools/AssumeTool.fs` 把一次性 commitment reinforcement 投影到 tool return；`requirements/cognitive-environment/tests/cognitive-environment.test.mjs` | Pair Hint 保留高频短触发，`assume` contract/return 承载低频完整心理约束；并发文案仍用持续重算的 ready frontier 表达因果调度，不把 wave/DAG 变成 barrier；`cursor-pair-hint.md`/`pair-parallel-tools.md`/`increase-strength.md` 考古 |
 | 015 | `src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs` + `src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs`；`requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs` | Blogger-only optional ephemeral assistant text：从当前 exact provider-attempt binding 读取 `modelID`，按 ordinal、大小写敏感 prefix allowlist 判定；当前仅 `step-3.5-flash`。启用时 locale 取 session binding，每次 transform 先 strip 上轮同文案 assistant text，再按当前 frontier 注入一个 `role=assistant` + 单一 `text` part 的临时 message；不走 Journal/GuidelineProjection，不借 synthetic skill wire |
+| 016 | `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`（目标）；各 action 的完整 contract/return 分别由 `attention-regulation` / `concern-routing` / `institutional-learning` 与 `action-affordance` 承载 | Pair Hint 只保留微原语短触发；动态 subscription/message fragment 不在 authored craft 内。当前实现尚未覆盖，待 requirements review 后写 GAP。 |
 
 ## 关键机制：PromptResources 是唯一组合源
 
@@ -54,10 +55,11 @@ systemForRole(lang, role)
 
 ## 依赖说明
 
-INDEX.md 依赖骨架：`cognitive-environment → participant-identity, office-capability`。
+INDEX.md 依赖骨架：`cognitive-environment → participant-identity, office-capability, attention-regulation, concern-routing, institutional-learning`。
 - `participant-identity`：Role/Persona 稳定是「自我模型不漂移」的前提；
 - `office-capability`：本包只**引用** authority facts（005/007 说「authority 不随知识流动」，不定义
   authority 本身）。
+- `attention-regulation` / `concern-routing` / `institutional-learning`：016 只拥有何时提醒，必须先消费三个 owner 对 action 含义与边界的定义；不能从 Pair Hint 散文反向创造运行语义。
 
 ## 验证与测试落点
 
@@ -84,6 +86,7 @@ INDEX.md 依赖骨架：`cognitive-environment → participant-identity, office-
 | 013 | `tests/cognitive-environment.test.mjs::CE_agent_031_pair_hint_teaches_needhelp_as_normal_collaboration` + `CE_pair_hint_teaches_continuous_ready_frontier_without_batch_barriers` + `CE_pair_hint_encourages_filling_concurrency_slots` + `CE_pair_hint_teaches_abstract_then_commit_without_wavering`（同时证明 Pair Hint 短触发 + `assume` description/return 完整心理约束）+ `CE_pair_hint_reserves_empty_skill_name_without_disabling_real_skills`；REUSE：`requirements/cognitive-environment/tests/pair-thought-transform.test.mjs::PAIR_HINT_canonical_text_encourages_needhelp_and_continuous_ready_frontier_without_global_N`（SPLIT@cutover：正文 craft → 本包；anchor/replay 机制 → `prefix-stability`/`provider-projection`） | NEW + REUSE | `node --test requirements/cognitive-environment/tests/cognitive-environment.test.mjs requirements/cognitive-environment/tests/pair-thought-transform.test.mjs` |
 | 014 | `requirements/guidance-delivery/tests/pair-calibration.test.mjs` `CE_014_tool_estimate_is_explicitly_advisory_in_both_provider_languages` | REUSE（FROZEN 2026-08-14） | **按用户要求冻结后未执行**；实现后不改 oracle |
 | 015 | `tests/blogger-chronicle-text.test.mjs` `BLOGGER_CHRONICLE_TEXT_*` | NEW | `node --test requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs` |
+| 016 | 待 GAP：Pair Hint 双语正文需出现七件套的最小 trigger，同时不得复制各 owner 的完整合同；动态 mailbox fragment 另由 concern-routing temporal proof 覆盖 | GAP | review 后建立 |
 
 | COGNITIVE-ENVIRONMENT-001 | `tests/cognitive-environment.test.mjs::CE_prompt_015_one_system_prompt_per_role` | NEW | `node --test requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
 | COGNITIVE-ENVIRONMENT-003 | `tests/cognitive-environment.test.mjs::CE_prompt_015_canonical_composition_common_law_role_law_office_library` | NEW | 同上 |
@@ -91,7 +94,7 @@ INDEX.md 依赖骨架：`cognitive-environment → participant-identity, office-
 | COGNITIVE-ENVIRONMENT-005 | `tests/cognitive-environment.test.mjs::CE_prompt_015_no_tier_split_duplicates` | NEW | 同上 |
 
 
-- 命题数：15
+- 命题数：16
 - NEW：2 个文件（`cognitive-environment.test.mjs`、`blogger-chronicle-text.test.mjs`）
 - MOVE：0（本包无单-owner 现有测试文件；prompt-semantic-depth 是 SPLIT，留在原处）
 - REUSE：6 处（prompt-semantic-depth、language-parity-gate、session-persona、pair-thought-transform、session-flattening、provider-prose-ownership）

@@ -6,7 +6,7 @@
 
 | WHAT 命题 | 实现载体 | 说明 |
 |---|---|---|
-| 001 | `resources/provider/tool/<name>/description/{en,zh-CN}.md`（含 `assume`）；success/failure/arg 分文件（如 `tool/run/arg-command`、`tool/assume/committed`、`tool/fork/description`） | 每个非平凡 verb 的合同正文。`assume` 的底层“无新信息不重开判断”认知事实归 `cognitive-environment`，本包拥有调用边界上的 act/negative affordance/return consequence 镜像。 |
+| 001 | `resources/provider/tool/<name>/description/{en,zh-CN}.md`（现有含 `assume`；目标新增 `enough/abandon/defer/celebrate/regret/subscribe/publish`）；success/failure/arg 分文件（如 `tool/run/arg-command`、`tool/assume/committed`、`tool/fork/description`） | 每个非平凡 verb 的合同正文。`assume` 的底层 commitment craft 归 `cognitive-environment`；七个新增 verb 的底层语义分别归 `attention-regulation` / `concern-routing` / `institutional-learning`。本包只拥有调用边界上的 act/fit/negative affordance/return/argument 镜像；新增资源与 proof 待 requirements review 后进入 GAP。 |
 | 002 | `resources/provider/tool/{fork,commission,inspect,run,query-shell,establish-behavior,repair-behavior,...}/description/{en,zh-CN}.md` | 现行高风险 minimum set 与 Gate C anchor catalog 保持原有约束；`assume` 由 001 的非平凡 verb 合同约束覆盖，不人为扩大 Gate C minimum set。 |
 | 003/004/005/006 | `resources/provider/tool/{inspect,repair-behavior,establish-behavior,run,query-shell}/description/*.md` | 具体负边界/后果/参数语义 |
 | 007/008 | `scripts/checks/tool-referential-integrity.mjs`（Gate A：`scanRepo` / `extractToolSpecNames` / `LEGACY_FORBIDDEN_NAMES`）；`src/Wanxiangshu/Infrastructure/OpenCode/Tools/*Tool.fs` | 同 name 唯一 owner；semantic contract 面归本包，schema 执行面归 `capability-enforcement` |

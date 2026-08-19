@@ -14,7 +14,7 @@
 扫描 `requirements/` 全树，五个断言：
 
 ```text
-1. INDEX 49 包 × 3 文档（WHY/WHAT/HOW）与 tests/ 齐备
+1. INDEX 52 包 × 3 文档（WHY/WHAT/HOW）与 tests/ 齐备
 2. 每个 WHAT.md 标题定义的 <PACKAGE>-NNN 命题 ID 在 HOW.md 表格中有行
 3. 每个 HOW.md 落点引用的测试文件真实存在
 4. requirements/ 下无 INDEX 外包目录
@@ -26,7 +26,7 @@
 - 包清单来源 = `requirements/README.md` 树入口链接 ∪ `requirements/INDEX.md` 表格
   （2026-08-14 cutover 迁入）；
   两源必须一致。
-- 依赖骨架解析 `INDEX.md`「# 依赖骨架」后第一个 code block（当前 110 edge）；cutover 后骨架迁入
+- 依赖骨架解析 `INDEX.md`「# 依赖骨架」后第一个 code block（当前 130 edge；旧正文 110 与旧表实际 112 已在本轮纠正）；cutover 后骨架迁入
   requirements/ 树时把解析源指向新位置（SPLIT@cutover）。
 - DEPENDS ON 解析只认声明行（行首 `DEPENDS ON` / 标题 `## DEPENDS ON`）及其延续行，
   散文里的跨包引用不算声明；包自身名字不算自环。
@@ -73,7 +73,7 @@ active state 与 WHAT ID 相同；不存在、歧义、skip/todo、WHAT mismatch
 
 ### 4. 树入口导航
 
-`requirements/README.md` 是 49 包树入口（2026-08-14 cutover 后承担导航）；导航文件
+`requirements/README.md` 是 52 包树入口（2026-08-14 cutover 后承担导航）；导航文件
 只路由不定义条款（REQUIREMENT-SYSTEM-005/007）。
 
 ### 5. change-lifecycle（`tests/change-lifecycle.test.mjs`）
@@ -148,7 +148,7 @@ meta-verifier 迁移中途红是预期（见测试头注释）；结束时三条
 |---|---|---|---|
 | REQUIREMENT-SYSTEM-001 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: meta verifier: 全量迁移状态——无 INDEX 外目录；每包唯一目录）；`requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings——ID 唯一检测） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-002 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（结构检查只认包名 + 5 份文档，不要求未裁决的 manifest 格式） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
-| REQUIREMENT-SYSTEM-003 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——INDEX 49 包 × WHY/WHAT/HOW + tests 同时齐备才绿） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
+| REQUIREMENT-SYSTEM-003 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——INDEX 52 包 × WHY/WHAT/HOW + tests 同时齐备才绿；当前 executable oracle 仍锁 49，待本轮 requirements review 后在 GAP 中迁移） | NEW + GAP | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-004 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（每个 WHAT 命题 ID 在 HOW.md 至少一行）；`requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings——同 ID 二次定义可识别） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |
 | REQUIREMENT-SYSTEM-005 | `requirements/requirement-system/tests/spec-rules.test.mjs`（formalClauseDefinitionHeadings：路由/Change 文件不得定义正式条款） | MOVE | node --test requirements/requirement-system/tests/spec-rules.test.mjs |
 | REQUIREMENT-SYSTEM-006 | `requirements/requirement-system/tests/meta-verifier.test.mjs`（test: 全量迁移状态——树入口与 INDEX 同一包集 + 无外目录） | NEW | node --test requirements/requirement-system/tests/meta-verifier.test.mjs |

@@ -9,12 +9,12 @@
 
 ```fsharp
 type EnforcerRule =
-    { Name: string          // 目录 basename = TipIdentity
-      EnforcerText: string  // resources/enforcer/<name>/enforcer.md 全文
-      MainText: string      // resources/enforcer/<name>/main.md 全文
+    { Name: string          // TipIdentity；built-in 时同时等于目录 basename
+      EnforcerText: string  // 当前 provider language 的 detection 正文
+      MainText: string      // 当前 provider language 的 remediation 正文
       RuleId: string        // durable id; clean break = Name
       FieldName: string     // provider enum 值; = Name
-      LexicalOrder: int }   // 目录顺序 1..N（只描述装载/enum 顺序）
+      LexicalOrder: int }   // live Rulebook union 的确定性派生顺序 1..N
 ```
 
 - `EnforcerCatalog.validate`（BD-003）：schemaVersion=1、非空、三身份唯一且相等、
@@ -58,7 +58,7 @@ repair 入口由 `SessionIdle → ReconcilePass → HostTurnObserver` 驱动，�
 - `ofTipsAndFrames`：zip tip 身份 × frame digest；剩余 tips 保留（digest=None），
   剩余 frames 丢弃（不发明 tip）。
 
-## 2. 资源装载与 Blogger system 合成（BD-002/004/005）
+## 2. Rulebook 装载、institutional extension 与 Blogger system 合成（BD-001..005）
 
 `src/Wanxiangshu/Infrastructure/Resources/EnforcerCatalogResource.fs`：
 
@@ -70,6 +70,27 @@ repair 入口由 `SessionIdle → ReconcilePass → HostTurnObserver` 驱动，�
   按 LexicalOrder 的 `## <Name>` + enforcer.md 全文，`"\n\n"` 拼接。derived only，
   不写回仓库。`main.md` **从不**进入 Blogger system（audience 分离，见
   `guidance-delivery`）。
+
+当前实现到这里仍是 **built-in-only**。本轮 WHAT 新增的 institutional extension 待 GAP：目标是在本包增加
+一个窄 admission + projection surface，把 `InstitutionalRuleBorn` 存入统一 EventStore；event 保存稳定 TipName
+及 English/zh-CN 两套 EnforcerText/MainText。每次需要 rulebook 时按 provider language 物化 institutional rules，
+与 shipped built-in 做 TipName-disjoint union，再统一派生 LexicalOrder 并过 `EnforcerCatalog.validate`。不存在第二
+个 provider catalog，也不写回 npm/package 的 `resources/enforcer` 安装目录。
+
+`institutional-learning` 只能提交 candidate；是否 durable admission 成功由本包裁决。ABSORB 不写 event，BIRTH
+只有在 candidate 通过 structural/localization/identity validation 后才 append。这样 runtime learning 不依赖可写
+安装目录，同时保持“一个 live Rulebook、一个 tip namespace”。
+
+admission 应返回携带 `ExpectedRulebookRevision` 的 staged token/fact；真正与 learning receipt 同批 commit 前再对
+当前 projection 做一次 compare。revision mismatch → `KnownNotCommitted`，不 append candidate，也不让上层写
+LearningDispositionCommitted/DeferredWorkResurfaced。低频 learning 因此允许用严格 revision gate 换取简单、可证明
+的并发语义，而不引入 rule-level lock manager。
+
+目标还需要一个 `RulebookSnapshot` / `RulebookRevision` 绑定面（BD-018）：Blogger life 创建时一次性 materialize
+同一 revision 的 locale rule list，并把同一个 snapshot 同时供 effective system、ChronicleTool schema enum 与
+decode 使用。`InstitutionalRuleBorn` 只使 latest revision 前进；若现有 Blogger life stale，不抢当前 in-flight cycle，
+而是在下一 cycle admission 前经 `managed-session-lifecycle` 的 retire/replacement 建 fresh life。禁止 system 用 old
+snapshot、tool registry 却每次调用读 latest global catalog。
 
 ## 3. Cycle 提交与恢复（BD-010/011/012/013/017）
 
@@ -157,6 +178,9 @@ node requirements/verification-system/tests/run.mjs                             
 
 - `semantic-trace`：诊断建立在 XTrace 覆盖推进的事实上（BD-013 出生门读
   XTraceProjection）。
+- `durable-events`：institutional rule birth 必须进入统一可重放 substrate；invalid candidate 先拒绝再 append。
+- `prefix-stability`：同一 Blogger life 的 system bytes 不可因 rule birth 改写；RulebookRevision 必须按 life freeze。
+- `managed-session-lifecycle`：stale Blogger life 只在自然/quiescent boundary retire/replacement，不 interrupt in-flight cycle。
 - 消费方：`guidance-delivery`（把本包产生的 occurrence 变成 Main 可恢复交付）。
 
 ## 7. 历史与弃权
@@ -164,7 +188,7 @@ node requirements/verification-system/tests/run.mjs                             
 | 源 | 裁决 | 记录 |
 |---|---|---|
 | 旧 `SSOT/15` score-vector / throttle / NudgeAnchored / Main overlay | GARBAGE（clean break，ENFORCER-072/073） | 历史 why/enforcer；历史 change（enforcer）§10 |
-| `catalog.json` 与 `enforcement-a01` 旧 id | GARBAGE（目录即身份取代） | 历史 change（rulebook）§0/§23 |
+| `catalog.json` 与 `enforcement-a01` 旧 id | GARBAGE（TipName 单身份取代；本轮 institutional extension 仍不复活 manifest/catalog） | 历史 change（rulebook）§0/§23 |
 | 历史 what/enforcer 声称「无 evidence 字段」 | HOW 漂移：当前 codec 仍保留 optional evidence（merge 去重 + 128 KiB 界）；occurrence 身份不因 evidence 改变 | 本文件 §1.2；cutover 时需与文档统一 |
 | `scripts/checks/enforcer-rulebook-gate.mjs` | 已退休空壳（2026-08-12）；tip-SSOT proof 由 `tests/unit/enforcer/**` catalog 测试承担，不再有 prose 形状机器门 | 历史 HANDOFF §24 |
 | enforcer.md 写作宪法 A4–A30（mandatory headings / token budget / sibling 校准） | HOW（authoring 规范，非 runtime 合同）；不再有机械门 | 历史 change（rulebook）Appendix A |
@@ -179,11 +203,11 @@ node requirements/verification-system/tests/run.mjs                             
 
 | 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
 |---|---|---|---|
-| BD-001 目录即唯一规则真相（TipName=enum=RuleId） | `tests/catalog.test.mjs` `ENFORCER_170_catalog_has_exactly_120_rules` / `ENFORCER_170_tip_name_equals_rule_id_and_field` / `ENFORCER_172_field_names_match_the_rfc_spelling`；REUSE `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_01/02_and_16` | MOVE + REUSE | `node --test tests/catalog.test.mjs` |
-| BD-002 装载 fail-fast、零 fallback | `tests/catalog-validation.test.mjs`（validate 拒绝族）；`tests/catalog.test.mjs`（120 规则/非空正文）；REUSE `requirements/behavior-diagnosis/tests/integration/resources/enforcer-rulebook.test.mjs`（打包资源路径） | MOVE + REUSE | `node --test tests/catalog.test.mjs` |
-| BD-003 Domain 校验合同（schemaVersion/唯一/1..N/非空） | `tests/catalog-validation.test.mjs` `ENFORCER_170_validate_accepts_one_rule` … `ENFORCER_170_validate_rejects_identity_mismatch`（11 条全族） | MOVE | `node --test tests/catalog-validation.test.mjs` |
-| BD-004 检测语料全量、确定性进 Blogger system | `tests/rulebook-system-composition.test.mjs` `BEHAVIOR_DIAGNOSIS_SYSTEM_001_composed_prompt_contains_every_tip_exactly_once` / `SYSTEM_002_composition_is_deterministic` / `SYSTEM_004_english_load_matches_packaged_rule_count` | NEW | `node --test tests/rulebook-system-composition.test.mjs` |
-| BD-005 本地化叶子同样完整 | `tests/rulebook-system-composition.test.mjs` `SYSTEM_003_zh_cn_leaf_load_is_complete_and_nonempty` | NEW | `node --test tests/rulebook-system-composition.test.mjs` |
+| BD-001 live Rulebook 单身份空间（built-in + institutional） | 现有 built-in：`tests/catalog.test.mjs` `ENFORCER_170_catalog_has_exactly_120_rules` / `ENFORCER_170_tip_name_equals_rule_id_and_field` / `ENFORCER_172_field_names_match_the_rfc_spelling`；REUSE `tip-v2-contract.test.mjs`。待 GAP：institutional admission、跨来源 TipName conflict、restart union。 | MOVE + REUSE + GAP | 现有 `node --test tests/catalog.test.mjs`；新增 proof 待 GAP |
+| BD-002 装载/admission fail-fast、零 fallback | 现有：`tests/catalog-validation.test.mjs` + `tests/catalog.test.mjs` + packaged-resource integration。待 GAP：invalid institutional candidate zero-append；ExpectedRulebookRevision stale → KnownNotCommitted / whole learning transaction zero-commit。 | MOVE + REUSE + GAP | 现有测试 + 新 admission proof |
+| BD-003 live union Domain 校验（schemaVersion/唯一/1..N/非空） | 现有 `tests/catalog-validation.test.mjs` 11 条；待 GAP：built-in + institutional union deterministic order / collision。 | MOVE + GAP | 现有测试 + 新 union proof |
+| BD-004 live 检测语料全量、确定性进 Blogger system | 现有 `tests/rulebook-system-composition.test.mjs`；待 GAP：institutional rule 同样进入 system 且 restart 后字节确定。 | NEW + GAP | 现有测试 + 新 composition proof |
+| BD-005 built-in/institutional 双语正文同样完整 | 现有 `SYSTEM_003_zh_cn_leaf_load_is_complete_and_nonempty`；待 GAP：institutional BIRTH 缺任一语言 admission 失败、两语言 projection 同 TipName。 | NEW + GAP | 现有测试 + 新 localization proof |
 | BD-006 chronicle 参数合同（entry+tip 必需；no-live-cycle typed outcome → abort → Host SDK encoding） | `tests/codec.test.mjs` `ENFORCER_023_missing_tip_fails` / `ENFORCER_023_empty_tip_fails` / `ENFORCER_022_text_and_evidence_are_reserved_not_tips` / `ENFORCER_022_has_valid_text_requires_nonempty_text`；NEW `tests/chronicle-no-live-cycle.test.mjs`（typed Completed/NoLiveCycle + real plugin abort/error boundary） | MOVE+NEW | `node --test requirements/behavior-diagnosis/tests/codec.test.mjs requirements/behavior-diagnosis/tests/chronicle-no-live-cycle.test.mjs` |
 | BD-007 tip 精确映射，无 fuzzy | `tests/codec.test.mjs` `ENFORCER_023_unknown_tip_fails` / `ENFORCER_021_valid_field_maps_exact_rule_id` / `ENFORCER_021_tip_trims_whitespace_before_lookup` / `ENFORCER_024_fuzzy_or_misspelled_tip_is_not_mapped` | MOVE | `node --test tests/codec.test.mjs` |
 | BD-008 无 score path | `tests/codec.test.mjs` `ENFORCER_024_extra_numeric_properties_are_ignored`；`tests/catalog.test.mjs` `ENFORCER_170_no_bridge_fields_on_rule`；REUSE `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_03_04_facade_surface_has_tip_not_numeric_scores` | MOVE + REUSE | `node --test tests/codec.test.mjs` |
@@ -196,6 +220,7 @@ node requirements/verification-system/tests/run.mjs                             
 | BD-015 tip↔frame 配对，禁平行流 | `tests/observation-pair.test.mjs` `RULEBOOK_OBS_001_zip_equal_length_pairs_tip_then_frame` … `RULEBOOK_OBS_008_workLogFromUnits_uses_unit_digests`；`tests/observation-projection.test.mjs` `OBS_PROJ_001/004` | MOVE | `node --test tests/observation-pair.test.mjs` |
 | BD-016 历史压缩不创造新 occurrence | `tests/observation-projection.test.mjs` `OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation`；REUSE `requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs` `ENFORCER_TIP_12_squash_co_truncates_recent_tips`（squash 调度语义归 context-compression，本包锁 co-move 不造事件）；REUSE `requirements/behavior-diagnosis/tests/paired-history-eval.test.mjs` `A42_PAIRED_HISTORY_001..004` | MOVE + REUSE | `node --test tests/observation-projection.test.mjs` |
 | BD-017 无效 cycle 有界协议修复（idle-only 首发 nudge、tool-error 先 Host 自纠、request+terminal scoped AABB、generic fallback 不抢 AABB、abandoned claim 不冒充 issued） | REUSE `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs` `ENFORCER_066_first_pure_terminal_issues_interaction_nudge` / `ENFORCER_067_second_different_pure_terminal_issues_aabb` / `ENFORCER_068_new_invalid_terminal_after_aabb_*`；`requirements/behavior-diagnosis/tests/enforcer-153-rejudge.test.mjs` `ENFORCER_065_chronicle_tool_error_defers_to_the_host_tool_loop_instead_of_repairing` / `ENFORCER_066_first_protocol_nudge_is_idle_owned_never_sent_from_transform` / `ENFORCER_153_snapshot_rejudge_recognizes_exactly_one_completed_chronicle` / `ENFORCER_153_hot_path_aabb_preserves_target_terminal_identity`；`requirements/behavior-diagnosis/tests/integration/blogger-nudge-plugin-repro.test.mjs` `REPRO_blogger_pure_prose_terminal_idle_should_nudge_without_another_transform` / `REPRO_blogger_aabb_is_sent_even_when_generic_fallback_reaches_exhaustion_on_that_failure`（通用 cursor 11→12 仍先真实发送 AABB，AABB 后新的 invalid terminal 才 fatal）/ `REPRO_blogger_second_prose_terminal_idle_spends_aabb_not_second_nudge` | REUSE + ADD | `node --test requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs requirements/behavior-diagnosis/tests/enforcer-153-rejudge.test.mjs requirements/behavior-diagnosis/tests/integration/blogger-nudge-plugin-repro.test.mjs` |
+| BD-018 RulebookRevision 按 Blogger life 冻结；system/enum/decode 同 snapshot；BIRTH 仅在 next fresh life 生效 | 待 GAP：old-life system + old enum/decode 同 revision；in-flight cycle 不被 BIRTH interrupt；next cycle 前 stale life replacement；restart/replay 保持 old occurrence revision | GAP | review 后建立 |
 
 ### semantic anchor id
 

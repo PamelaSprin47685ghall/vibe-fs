@@ -5,6 +5,9 @@
 > 边界：diagnosis 是否成立归 `behavior-diagnosis`；provider projection mechanics
 > 归 `provider-projection`；horizon admission general law 归 `participant-horizon`；
 > interaction authority 创建/继续权归 `interaction-authority`。
+> 本包历史正文用 `main.md` 指 remediation text：对 shipped built-in 它物理来自 `main.md` / `main.zh-CN.md`；
+> 对 institutional rule 它来自 `behavior-diagnosis` canonical live Rulebook 中同 TipName 的 MainText。两者在本包
+> 统一称 canonical MainText；文件名不是 normative identity。
 
 ## A. 两轴分离
 
@@ -152,10 +155,15 @@ MarkerText; CallGap; ResultGap }` 持久化（HOST-013）：`MarkerText` = provi
 ### GD-012 新 occurrence 只消费当前 calibration projection，随后冻结最终 MarkerText
 
 HOST-013 每个**新** pair occurrence 在物化时可组合：latest tip guidance、TIME-007 的 session elapsed、
-delegation 的 `remaining expected tool calls` 动态 calibration、canonical pair-programming guideline。动态值
-只从各 owner 提供的 O(1) projection 读取一次；不得扫描 transcript/XTrace/log。无 estimate 时完全省略
-tool-estimate fragment；elapsed 在 `SessionStartedAt` 已绑定后始终存在。组装后的最终 `MarkerText` 立即进入
-GD-011 durable pair；以后 replay 只读已存字节，不用当前 elapsed/remaining 重写历史 occurrence。
+delegation 的 `remaining expected tool calls` 动态 calibration、`concern-routing` 当前应交付的 subscription
+announcement / mailbox message、canonical pair-programming guideline。动态值只从各 owner 提供的 O(1)
+projection 读取一次；不得扫描 transcript/XTrace/log。无 estimate 时完全省略 tool-estimate fragment；没有
+新的 concern fragment 时同样完全省略对应区块；elapsed 在 `SessionStartedAt` 已绑定后始终存在。组装后的最终
+`MarkerText` 立即进入 GD-011 durable pair；以后 replay 只读已存字节，不用当前 elapsed/remaining/mailbox
+frontier 重写历史 occurrence。concern fragment 的消费与该 frozen pair occurrence 绑定：同一 occurrence replay
+不得重新 drain，下一 occurrence 只取得尚未交付的新 fragment。pair placement 与 `concern-routing` 为该 occurrence
+staging 的 `SubscriptionAnnounced` / `MessageDelivered` coverage facts 必须同一 atomic durable commit；pair 未成功
+冻结则 concern coverage 也不得前进。
 
 - 含义：dynamic calibration 是“这一刻提供了什么指导”的 occurrence 数据；projection 决定新文案，
   durable MarkerText 决定历史文案。两个时间面不混合。
@@ -163,5 +171,6 @@ GD-011 durable pair；以后 replay 只读已存字节，不用当前 elapsed/re
   重新 compose；不得把旧 occurrence 原字节作为新 horizon 的默认恢复材料。
 - 边界：elapsed 的起点/采样 → `time-capability` TIME-007；remaining 的 replace/decrement/0 语义 →
   `delegation` DELEG-022；tool-estimate 提示 craft → `cognitive-environment` COGNITIVE-ENVIRONMENT-014；
+  subscription/message 的地址、mailbox、coverage 与低 authority 语义 → `concern-routing`；
   prefix placement/stability → `prefix-stability`。
 - 证据：GAP-012；`tests/pair-calibration.test.mjs`。

@@ -159,6 +159,23 @@ replay 的历史。重复 transform 必须先移除上一轮注入的同文案 a
 Blogger 之外不得注入。wire 形状就是 `role=assistant` message 内唯一一个普通 `text` part，`text` 为上述裸字符串；不得包 `<skill_content>`、
 不得借用 `skill({ name: "" })`、不得携带 `source` / `synthetic` / completed-tool marker。
 
+### COGNITIVE-ENVIRONMENT-016：Pair Hint 只保留微原语的高频触发，不重复完整心理合同
+
+当当前 tool surface 暴露相应 action 时，Pair Hint 必须以极短 craft 触发 participant 在正确时机主动使用：
+
+- `assume`：抽象完成后 commit，没新信息不反复摇摆（013 已定义完整边界）；
+- `enough`：decision-relevant 信息已足够时停止 evidence churn，不用“为了保险”继续搜；
+- `abandon`：允许自己解除自创方向/承诺的心理重量，但不把它误解成取消真实 obligation；
+- `defer`：看见真实但非 blocking 的旁支时先存后返主线，`not now ≠ never ≠ owed now`；
+- `celebrate` / `regret`：一次经历揭示可复用成功机制或不必要代价时，才把它交给制度学习；不得把每个普通步骤机械 ritualize；
+- `subscribe` / `publish`：按 concern 建语义地址、只在有相关信息时发送；发送者不需要知道收件人，publish 不应即时打断 owner。
+
+完整 act contract、return reinforcement、durable queue/mailbox、Enhancer 与 rule mutation 都不归本包。Pair Hint 只承担
+“此刻存在这个离散动作”的高显著性提醒；把完整心理建设每轮重复注入会变成 prompt tax。
+
+`concern-routing` 动态产生的 subscription announcement / mailbox message 不是 authored craft，也不在本条定义内容；
+它们只在新的 Pair Hint occurrence 形成时由各自 owner 提供，再由现有 provider projection/freeze 机制组合。
+
 ## 反向覆盖
 
 本包吸收的 OWNED clause（COVERAGE.md 归属）：PROMPT-015、PROMPT-016、AGENT-031（NEEDHELP 正常协作
@@ -166,4 +183,5 @@ craft）、HOST-013（Pair Hint 正文 craft 部分）、COMPANION-004（Blogger
 ENFORCER-030（Blogger 统一 system）、REVIEW-012（Reviewer 提示词组合）。跨边界：NEEDHELP 的
 consultation（delegation）、authority continuity（interaction-authority）、wire 注入
 （provider-projection/prefix-stability）、same-run authority（interaction-authority）**不**归本包
-（HANDOFF §10.2 WATCH 如实标注：craft 归本包，其余归各自 owner）。
+（HANDOFF §10.2 WATCH 如实标注：craft 归本包，其余归各自 owner）。微原语的运行语义分别归
+`attention-regulation`、`concern-routing`、`institutional-learning`；既有 `assume` 仍归本包的认知 commitment craft。

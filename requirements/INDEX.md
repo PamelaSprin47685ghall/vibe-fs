@@ -1,6 +1,6 @@
 # Package index
 
-当前设计得到 **49 张 boundary card**。49 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
+当前设计得到 **52 张 boundary card**。52 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 
 ## 1. Requirement system
 
@@ -36,6 +36,7 @@
 | `capability-enforcement` | provider 看见的 capability 与 runtime 真能执行的 capability 必须同源且不扩大 office entitlement。 |
 | `participant-horizon` | machine knowledge 大于 participant experience；只有会改变合法行动的最小事实应穿过 horizon。 |
 | `cognitive-environment` | 世界观、身份、自我职责与继承知识必须按稳定认知层组织，瞬时 runtime/mission 不能伪装成长期身份。 |
+| `attention-regulation` | participant 必须能显式结束 evidence churn、解除自创心理债、延后非阻塞旁支，而不把这些 speech act 冒充事实或 obligation。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 一个 participant life 必须生活在单一、稳定的自然语言世界中，而 protocol identity 保持语言不变。 |
 | `provider-projection` | 已决定可见的 typed semantic intent 必须经唯一确定性投影变成 provider representation，表示不能反向创造 authority。 |
@@ -45,6 +46,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
+| `concern-routing` | participant 之间按 concern-addressed mailbox 通信；发送者不依赖身份拓扑，消息只在自然 Pair Hint 边界打断注意力。 |
 | `interaction-authority` | 物理 user-shaped message 不等于 authority；只有 typed provenance 能创建或继续 logical interaction。 |
 | `dispatch-protocol` | 已获授权的 interaction 穿过不可靠 Host 时必须避免 uncertain outcome 复制逻辑效果。 |
 | `durable-events` | durable truth 必须以不可变事实、原子提交与确定性 fold 形成单一可重放 substrate。 |
@@ -93,6 +95,7 @@
 |---|---|
 | `behavior-diagnosis` | 工程病理只能在满足明确 trigger / negative / distinction 的证据上成立。 |
 | `guidance-delivery` | diagnosis 成立不等于必须立刻重复告知；反馈需要独立的 occurrence、coverage、dedupe 与 horizon-relative delivery 语义。 |
+| `institutional-learning` | celebrate/regret 必须把一次经历压成 ABSORB/BIRTH/DISCARD，使成功与教训能改变 canonical Enforcer 而不让规则库只增不减。 |
 
 ## 11. Repository knowledge / programming
 
@@ -131,10 +134,11 @@
 - 新增 `external-investigation`：Browser 的 provenance-bearing external evidence 不能塞进 local repository investigation。
 - 新增 `work-record`：canonical bounded work statement 被 delegation、process review、Finality 共用，不能继续藏在 Companion/Review 下。
 - 新增 `requirement-grounding`：路径命中的规范与测试需要自动、去重、可重放地进入开发上下文，且首次 mutation 必须先 grounding。
+- 新增 `attention-regulation` / `concern-routing` / `institutional-learning`：最终微原语不是一个“大认知工具包”。`enough/abandon/defer`、`subscribe/publish`、`celebrate/regret → Enhancer` 分属注意力、通信、制度学习三个独立 failure domain；既有 `assume` 保持在 `cognitive-environment`，不重复设计。
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（110 edges，0 cycle）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（130 edges，0 cycle，按本 code block 逐项机器计数）。
 
 ```text
 requirement-system       → 无
@@ -149,13 +153,15 @@ host-boundary            → 无
 participant-identity     → session-ontology
 execution-model-routing  → participant-identity, managed-session-lifecycle, host-boundary
 office-capability        → participant-identity
-capability-enforcement   → office-capability, participant-identity
+capability-enforcement   → office-capability, participant-identity, attention-regulation, concern-routing, institutional-learning
 participant-horizon      → 无
-cognitive-environment    → participant-identity, office-capability
+cognitive-environment    → participant-identity, office-capability, attention-regulation, concern-routing, institutional-learning
+attention-regulation     → participant-identity, durable-events
 action-affordance        → office-capability, participant-horizon
 provider-language        → session-ontology
 provider-projection      → participant-horizon, provider-language
 external-investigation   → office-capability, participant-horizon, host-boundary
+concern-routing          → participant-identity, participant-horizon, durable-events
 interaction-authority    → participant-identity, session-ontology
 dispatch-protocol        → interaction-authority, effect-accounting, host-boundary, durable-events
 effect-accounting        → durable-events
@@ -177,8 +183,9 @@ obligation-ledger        → durable-events, effect-accounting, semantic-trace
 review-judgement         → cognitive-environment, participant-horizon
 review-assurance         → review-judgement, semantic-trace, durable-events, causal-wait
 finality                 → obligation-ledger, review-assurance, participant-horizon
-behavior-diagnosis       → semantic-trace
-guidance-delivery        → behavior-diagnosis, participant-horizon, durable-events
+behavior-diagnosis       → semantic-trace, durable-events, prefix-stability, managed-session-lifecycle
+guidance-delivery        → behavior-diagnosis, participant-horizon, durable-events, concern-routing
+institutional-learning   → attention-regulation, behavior-diagnosis, durable-events
 repository-investigation → office-capability, participant-horizon
 knowledge-reuse          → repository-investigation, durable-events, durable-convergence
 repository-programming   → office-capability, capability-enforcement, effect-accounting, durable-events, participant-horizon
@@ -197,4 +204,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-其余 110 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。
+当前 130 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；本轮以邻接表本身为准纠正计数漂移，并新增 18 edges。

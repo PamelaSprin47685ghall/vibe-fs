@@ -13,7 +13,7 @@ boolean-blindness，看到 `catch` 就说 catch-all，把分数加起来再凭�
 
 本包的存在理由：**diagnosis 成立必须由满足 trigger / negative / distinction 的
 evidence 支撑，且每次成立的 diagnosis 是一次有独立 semantic identity 的语义事件，
-不是评分、不是重复计数、不是历史改写**。规则是数据（目录 Markdown），Host 只证明
+不是评分、不是重复计数、不是历史改写**。规则是数据（shipped 目录 Markdown + 经 admission 的 durable institutional rule），Host 只证明
 cycle 身份与原子提交，不重新解释严重度、不对工程判断做数值积分。
 
 ## 2. 历史上为什么 RED（归档 changes 考古）
@@ -37,10 +37,11 @@ NudgeConsumed → Main fake-user overlay」。它把「给出一个工程意见�
 - `EnforcementReport` 评分向量、`EnforcementObservationOrdinal`、leaky integrator
   / tau / pressure threshold（诊断退化成数值积分）。
 
-### 2.2 修复方向：tip 取代 score，目录即身份
+### 2.2 修复方向：tip 取代 score，TipName 成为单一身份
 
 rebase 裁决（已落地）：删除全部 score/throttle/Main-overlay 机制，不给他们找同名
-新壳。每个 tip 目录只保留单一 `tip` 字段；Host 只证明 tip 来自 catalog、cycle 身份
+新壳。shipped rule 由 tip 目录提供唯一 TipName；本轮新增的 institutional rule 也进入同一 TipName namespace，
+不建立 learned catalog。Host 只证明 tip 来自 live catalog、cycle 身份
 成立、text 非空、commit 与 coverage 原子、replay/recovery 不重复产生业务事实。
 provider 偶发拼写偏差不应制造第二个协议失败：非空 tip 先精确解析，失败后按编辑
 距离选择最近目录名；并列按目录 LexicalOrder 决定，保持同输入同结果。
@@ -49,7 +50,7 @@ provider 偶发拼写偏差不应制造第二个协议失败：非空 tip 先精
 
 - **拒生成代码**：规范生成 F# 让变更绑编译、多份清单漂移；规则是数据、按 tip
   目录打包、运行期扫描校验。
-- **拒 `catalog.json` 第二真相**：目录扫描已给出 TipName 与正文，JSON 只会变成
+- **拒 `catalog.json` 第二真相**：built-in 目录与 durable institutional facts 已给出 TipName 与正文，JSON 只会变成
   第二个会漂的 ordinal/field 表。
 - **拒代码内 fallback catalog / dist 双副本**：掩盖打包错误，让坏包静默成功。
 
@@ -64,9 +65,10 @@ tips 仍独立存活，模型必须自己猜「tip 2 属于 frame 1/2/3 哪个�
 - 诊断如何/何时展示给 Main —— `guidance-delivery`（何时/如何再次告知是独立的
   delivery/coverage 问题）。
 - feedback dedupe/coverage —— `guidance-delivery`。
+- `celebrate/regret` 如何把 experience 压成 ABSORB/BIRTH/DISCARD、何时改变 canonical Rulebook —— `institutional-learning`；本包只消费已经存在且通过 validation 的规则。
 - `chronicle` 工具名与 Blogger 工具权限（ENFORCER-010/011）—— `capability-enforcement`。
 - `chronicle` 的 Host SDK exception 形状只是物理编码；“当前没有 live Blogger cycle”是本包可预见的 protocol outcome，先在 owner 内类型化，再由最外层 tool adapter 翻译。
-- tip 目录物理格式/文件名 —— 本包只消费目录身份，物理布局是资源实现细节（且
+- built-in tip 目录物理格式/文件名 —— 本包只消费 TipName 身份，物理布局是资源实现细节（且
   `guidance-delivery` 的 INDEPENDENT CHANGE 恰好就是「目录格式换成 typed catalog
   而 diagnosis 不动」）。
 - score vector / ordinal —— 已 clean break（GARBAGE，见 `HOW.md` 弃权）。

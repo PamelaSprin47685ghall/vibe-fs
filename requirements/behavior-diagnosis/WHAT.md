@@ -4,25 +4,38 @@
 > `BD-NNN`）。每条末尾的证据指针 → `HOW.md` 行号。
 > 边界：诊断如何/何时展示给 Main、feedback dedupe/coverage 归 `guidance-delivery`；
 > `chronicle` 工具名/权限归 `capability-enforcement`；score vector 是已弃权历史。
+> 运行中 experience 是否值得创建 canonical rule 归 `institutional-learning`；本包只拥有规则一旦存在后的
+> canonical identity、装载、validation 与 diagnosis semantics。
 
 ## A. 检测边界：规则实例 SSOT
 
-### BD-001 目录即唯一规则真相
+### BD-001 live Rulebook 是唯一规则真相；built-in 与 institutional rule 共享同一身份空间
 
-规则实例的唯一真相是 `resources/enforcer/<TipName>/` 目录：目录 basename =
-TipName = provider tip enum 值 = durable RuleId = FieldName，四者恒等。不存在
-`catalog.json`、manifest 或任何并行元数据清单作为装载输入或第二身份。
+每条规则唯一身份恒为 `TipName = RuleId = FieldName`。live Rulebook 只由两种 canonical source 合成：
 
-- 含义：一个名字一套真相（Rulebook §11）。目录集合同时决定 Blogger system 的规则
-  集合、`tip` 枚举、Main guide 查找命名空间与校验清单。
-- 边界：目录的物理格式/命名规则本身不归本包（是资源实现细节）；本包消费「目录 =
-  身份」这个不变量。
-- 证据：`catalog.test.mjs` `ENFORCER_170_*`；`HOW.md` 行 10。
+1. shipped built-in：`resources/enforcer/<TipName>/`，目录 basename = TipName；
+2. workspace institutional：经本包 admission 后进入统一 durable event substrate 的 `InstitutionalRuleBorn`，
+   同样携带唯一 TipName 与完整双语正文。
+
+两种来源进入同一个 `EnforcerCatalog`、同一个 provider tip namespace、同一 Blogger system 与 Main guide lookup；
+跨来源 TipName 冲突必须 fail closed。不存在 `catalog.json`、shadow learned catalog、runtime-only rule DB 或任何
+并行身份清单。
+
+- 含义：一个名字一套真相；制度学习增加的是同一 Rulebook 的 rule instance，不是第二套记忆产品。
+- 边界：experience 是否配出生新 rule 归 `institutional-learning`；本包拥有 candidate admission、durable rule identity、
+  logical catalog union 与后续 diagnosis。built-in 目录物理格式仍只是 HOW。
+- 证据：现有 built-in 面 `catalog.test.mjs` `ENFORCER_170_*`；institutional union/admission 待 GAP；`HOW.md` 行 10。
 
 ### BD-002 装载 fail-fast，零 fallback
 
-启动装载失败（目录缺失、叶子缺失、文本为空、Domain 校验失败）→ 进程 fail fast，
-不 skip、不 warn-and-continue、无代码内 fallback catalog、无 dist 双副本。
+启动装载 built-in 失败（目录缺失、叶子缺失、文本为空、Domain 校验失败）→ 进程 fail fast，
+不 skip、不 warn-and-continue、无代码内 fallback catalog、无 dist 双副本。institutional candidate 在 durable
+append **之前**必须通过同一结构/身份/双语正文校验；非法 candidate 不得先写 event 再等待 fold 忽略。
+
+institutional admission precheck 必须绑定 exact expected `RulebookRevision`。最终 atomic commit 前若 live revision
+已变化，则该 admission 失效并返回 `KnownNotCommitted`，整笔上层 learning transaction 零提交；调用方必须在
+新 live Rulebook 上重新 generalize/precheck。禁止两个基于同一旧 snapshot 的并发 BIRTH 都先返回成功、再让 fold
+事后发现重复/矛盾。
 
 - 含义：坏包必须当场暴露，不能静默成功（历史 why/enforcer 三连拒之一）。
 - 证据：`catalog.test.mjs`、`catalog-validation.test.mjs`；打包路径由
@@ -30,18 +43,19 @@ TipName = provider tip enum 值 = durable RuleId = FieldName，四者恒等。�
 
 ### BD-003 Domain 校验合同
 
-`EnforcerCatalog.validate` 要求：`schemaVersion = 1`；至少一条规则；Name /
+`EnforcerCatalog.validate` 对 built-in + institutional 的 live union 要求：`schemaVersion = 1`；至少一条规则；Name /
 RuleId / FieldName 各自唯一且三者两两相等；LexicalOrder 连续 `1..N`；
-EnforcerText / MainText（及装载派生字段）trim 后非空。N 不硬编码（当前仓库恰为
-120，由测试锁定，不写进 Domain）。
+EnforcerText / MainText（及双语对应正文）trim 后非空。LexicalOrder 是 live union 的确定性派生顺序，不是
+institutional event 自带的可竞争 ordinal。N 不硬编码；shipped built-in 当前恰为 120，由现有测试锁定但不写进 Domain，
+institutional rules 可使 live N 增长。
 
 - 含义：身份唯一 + 顺序连续 + 正文非空是检测语料可用的最低门槛。
 - 证据：`catalog-validation.test.mjs` `ENFORCER_170_validate_*`（11 条）；`HOW.md` 行 12。
 
 ### BD-004 检测语料全量、确定性进入 Blogger system
 
-有效 effective system = base Blogger prompt + `# Enforcer Rulebook` 头 + 全部
-`## <TipName>` + 对应 enforcer.md 全文（按 LexicalOrder 拼接）。同一输入合成同一
+有效 effective system = base Blogger prompt + `# Enforcer Rulebook` 头 + live Rulebook 全部
+`## <TipName>` + 对应当前语言 EnforcerText 全文（按 LexicalOrder 拼接）。同一 live union 输入合成同一
 字节；合成产物是 derived artifact，不写回仓库、不是第三份规则数据。
 
 - 含义：Blogger 在开始判断前已看到全部检测规则，不需要 lookup/search 工具
@@ -50,8 +64,10 @@ EnforcerText / MainText（及装载派生字段）trim 后非空。N 不硬编�
 
 ### BD-005 本地化叶子同样完整
 
-zh-CN 叶子（`enforcer.zh-CN.md` + `main.zh-CN.md`）按同一合同装载：120 条、非空、
-TipName/RuleId/FieldName 恒等。装载按语言定位叶子，无跨语言 fallback。
+built-in 的 zh-CN 叶子（`enforcer.zh-CN.md` + `main.zh-CN.md`）与 institutional rule 的 zh-CN 正文按同一合同
+进入 live Rulebook：非空、TipName/RuleId/FieldName 恒等。每条 institutional BIRTH 必须同时提供 English 与
+zh-CN 的 EnforcerText/MainText；任一语言缺失则 admission 失败。provider projection 按语言选择对应正文，无
+跨语言 fallback。
 
 - 含义：检测边界不因语言而塌缩；语言绑定是 `provider-language` 的领地，本包只
   保证每个语言世界都有完整检测语料。
@@ -228,3 +244,32 @@ terminal 再次 idle，则该 idle 机会记录一次通用 Fallback confirmed f
 - 证据：REUSE `requirements/behavior-diagnosis/tests/enforcer-cycle-protocol.test.mjs`
   `ENFORCER_060_*`、`ENFORCER_061_*`、`ENFORCER_068_*`、`LOOP_006_*`；
   `HOW.md` 行 26。
+
+## G. live Rulebook revision 与 Blogger life
+
+### BD-018 system prompt 与 `chronicle` 必须冻结在同一 RulebookRevision；新 rule 只在 fresh life 生效
+
+每个 Blogger participant life 在创建时绑定一个 exact `RulebookRevision`。该 revision 同时决定：
+
+- Blogger effective system 中完整 Enforcer Rulebook 的字节；
+- `chronicle.tip` provider enum；
+- `chronicle` decode/nearest-resolution 所使用的 rule set；
+- Main 后续按 TipName 查找 remediation 时可解析的 rule identity。
+
+同一 Blogger life 内四者不得分别读取“当前最新 rulebook”，也不得因 `InstitutionalRuleBorn` 在 provider attempt
+之间偷偷改变。这样 old system prompt 不会配 new enum/new decoder。
+
+successful institutional admission 只推进 live RulebookRevision，不即时 interrupt 正在运行的 Blogger cycle。
+如果现有 Blogger life 已绑定旧 revision，则当前 in-flight cycle 继续在旧 snapshot 完成；在**下一次新 Blogger
+cycle 出生之前**，旧 life 必须在 quiescent/natural boundary retire/replacement，fresh life 绑定最新 revision。
+若当前没有 Blogger life，则下一次创建直接绑定 latest。retry/replay 同一个旧 cycle 仍使用其 frozen revision，
+不得借 rule birth 改写历史 provider world。
+
+`RulebookRevision` 是 live catalog 内容的 deterministic identity/projection，不是 wall-clock version、LWW winner 或
+第二份规则数据库。life replacement 不创建 user interaction authority，也不改变 Main participant identity。
+
+- 含义：制度学习可以很快进入未来观察，同时不破坏 PREFIX-STABILITY-007 的 same-Life system bytes，也不让
+  tool schema 与 prompt 分叉。
+- 边界：same-life byte stability → `prefix-stability`；attached/internal life retire/replacement 的物理语义 →
+  `managed-session-lifecycle`；本包拥有“rulebook snapshot 四面同 revision + 新 rule 生效边界”。
+- 证据：待 requirements review 后由 GAP 建立。

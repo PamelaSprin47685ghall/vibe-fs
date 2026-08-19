@@ -97,17 +97,18 @@ strength family KEEP speculative-investigation，本断言 enforcement 侧归本
 
 Blogger 业务工具面恰为 `{chronicle}`、Distiller 为空、Bookkeeper 仅 `js-bookkeeper`；其它角色不得获得
 这些业务面（ENFORCER-010/011、AGENT-006 表）。Host-owned `skill` 工具不属于角色业务 capability，所有角色
-保持可用；`assume` 同样不是 office domain authority，而是 WorkMain 交互角色可见的认知 commitment utility，
-因此不进入 `Roles.permissions`，且不得借此扩大任何角色 authority。Blogger / Distiller / Bookkeeper 的内部窄
-工具面不因 `assume` 扩张。HOST-013 只借用 synthetic `skill({ name: "" })` wire。真实 active empty-name skill
-call 必须改写为 DENIED，非空 skill name 不得被 HOST-013 拦截、隐藏或改写。
+保持可用。`assume` 以及 `enough / abandon / defer / celebrate / regret / subscribe / publish` 都不是 office
+domain authority；它们是有 Pair Hint 的 WorkMain 交互角色可见的认知/注意力/通信/学习 utility，因此不进入
+`Roles.permissions`，不得借此扩大任何角色的 domain entitlement。Blogger / Distiller / Bookkeeper 的内部窄工具面
+不因这组 utility 扩张。HOST-013 只借用 synthetic `skill({ name: "" })` wire。真实 active empty-name skill call
+必须改写为 DENIED，非空 skill name 不得被 HOST-013 拦截、隐藏或改写。
 
 含义/动机：内部路径（运行时合成）不得被模型当作可选工具（历史 agent 条款「内部 Agent 从 public
 enum 消失」）；admission（不进 choice surface）归 `participant-horizon`，本包拥有 schema/gate 拒绝。
 
 边界：可见性过滤的认知面 → `participant-horizon`（AGENT-008）；本包拥有工具面拒绝的执行面。
 
-证据：`tests/agent-permission-gate.test.mjs` `ROLE_ALLOW`（Distiller: []、Blogger: [chronicle]）+ `HOST_skill_remains_allowed_for_every_managed_role` + `ASSUME_is_a_non_authority_utility_for_interactive_roles_only`；`tests/integration/plugin/manager-tool-contract.test.mjs` `ASSUME_commits_an_abstracted_judgment_without_granting_new_authority`；`tests/auto-injected-tool.test.mjs` 的 empty-name DENIED / non-empty pass-through。
+证据：现有 `assume` 面由 `tests/agent-permission-gate.test.mjs` `ROLE_ALLOW`（Distiller: []、Blogger: [chronicle]）+ `HOST_skill_remains_allowed_for_every_managed_role` + `ASSUME_is_a_non_authority_utility_for_interactive_roles_only` 与 `tests/integration/plugin/manager-tool-contract.test.mjs` `ASSUME_commits_an_abstracted_judgment_without_granting_new_authority` 证明；七个新增 utility 的等价可见性/不扩权 proof 待 requirements review 后进入 GAP。`tests/auto-injected-tool.test.mjs` 继续证明 empty-name DENIED / non-empty pass-through。
 
 ## ENF-007：Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 
