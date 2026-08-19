@@ -20,6 +20,7 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
 const pluginHooksSource = read('src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs')
 const interopSource = read('src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs')
+const generatedPluginHooks = read('dist/OpenCode/Plugin/PluginHooks.js')
 
 // The complete set of hook keys the production PluginHooks.create builds.
 // Extracted from the source so a silent addition/removal is caught.
@@ -115,9 +116,22 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_every_registered_hook_has_a_fixture_here'
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_positionally', async () => {
   // The production fatalHook wraps a two-argument callable: (args, context).
-  // curriedHook and pairedHook both emit (args, context) arrow functions.
+  // curriedHook and pairedHook both emit (args, context) arrow functions. The
+  // paired adapter must also complete the second stage when Fable boxes an
+  // already-paired function as curry2(fn); otherwise the Host sees a fulfilled
+  // hook whose body never ran.
   assert.match(interopSource, /\(args,\s*context\)\s*=>\s*\$0\(args\)\(context\)/)
-  assert.match(interopSource, /\(args,\s*context\)\s*=>\s*\$0\(args,\s*context\)/)
+  assert.match(interopSource, /typeof result === 'function' \? result\(context\) : result/)
+  assert.doesNotMatch(
+    generatedPluginHooks,
+    /"tool\.execute\.before"[^\n]*=>\s*curry2\(toolBefore\)\(args, context\)\)/,
+    'generated tool.execute.before adapter must not return an uninvoked curry2 second stage',
+  )
+  assert.match(
+    generatedPluginHooks,
+    /"tool\.execute\.before"[^\n]*typeof result === 'function' \? result\(context\) : result/,
+    'generated tool.execute.before adapter must finish Fable curry2 boxing when present',
+  )
   // The fatal membrane itself is a two-argument callable. It wraps the return
   // in Promise.resolve, so the positional args arrive but the result is async.
   const wrapped = PluginHooksSurface.fatalHook('positional-test', (args, context) => ({ args, context }))

@@ -80,7 +80,13 @@ module PluginHostInterop =
     let curriedHook (fn: obj) : obj = jsNative
 
     /// Host hook that Fable emitted as a two-arity arrow.
-    [<Emit("(args, context) => $0(args, context)")>]
+    ///
+    /// Passing that arrow through an `obj` boundary can make Fable substitute a
+    /// `curry2(fn)` adapter for `$0`. Calling that adapter with two JS arguments
+    /// returns its second-stage function without executing the hook body. Accept
+    /// both runtime shapes here: invoke the supplied callable positionally, then
+    /// finish the curried second stage when Fable inserted one.
+    [<Emit("(args, context) => { const result = $0(args, context); return typeof result === 'function' ? result(context) : result; }")>]
     let pairedHook (fn: obj) : obj = jsNative
 
     /// Fatal membrane applied AFTER arity adaptation. At this point `fn` is always
