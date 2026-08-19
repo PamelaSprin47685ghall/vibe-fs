@@ -671,11 +671,7 @@ module PluginTransforms =
 
         let digest =
             HostDigest.sha256Hex (
-                String.concat
-                    "\u001f"
-                    [ defaultArg projectionSessionIdOpt ""
-                      "blogger-chronicle-text"
-                      frontier ]
+                String.concat "\u001f" [ defaultArg projectionSessionIdOpt ""; "blogger-chronicle-text"; frontier ]
             )
 
         "text-" + digest.Substring(0, 24)
@@ -713,9 +709,7 @@ module PluginTransforms =
             let text = bloggerChronicleText (languageFor projectionSessionIdOpt)
             let marker = bloggerChronicleTextMessage messageId text
 
-            HostMessageProjection.replaceMessagesInPlace
-                outObj
-                (insertBloggerChronicleTextAtFrontier marker messages)
+            HostMessageProjection.replaceMessagesInPlace outObj (insertBloggerChronicleTextAtFrontier marker messages)
         | _ -> ()
 
     let private strengthReplicaRuntime

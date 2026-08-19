@@ -308,13 +308,17 @@ type InjectedSessionPort
 
         member _.InterruptAttempt(sessionId) =
             if not (managedChild sessionId) then
-                Task.FromResult(Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user")
+                Task.FromResult(
+                    Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
+                )
             else
                 interruptManagedAttempt sessionId
 
         member me.AbortSession(sessionId) =
             if not (managedChild sessionId) then
-                Task.FromResult(Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user")
+                Task.FromResult(
+                    Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
+                )
             else
                 abortManagedSession sessionId
 
