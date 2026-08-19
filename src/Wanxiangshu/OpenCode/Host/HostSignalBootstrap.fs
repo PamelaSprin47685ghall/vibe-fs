@@ -626,6 +626,19 @@ module HostSignalBootstrap =
                     reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
                 | ExplicitResumeSuppression.PhysicalMaterialObservation.Ordinary -> ()
 
+            let ensurePhysicalParentDiscovered (sessionId: SessionId) =
+                task {
+                    let key = SessionId.value sessionId
+
+                    if
+                        not (scope.Sessions.SessionParents.ContainsKey key)
+                        && (SessionExecutionBinding.tryParent sessionId).IsNone
+                    then
+                        match! sessionPort.TryGetParentSession sessionId with
+                        | Ok(Some parentId) -> scope.Sessions.SessionParents.[key] <- SessionId.value parentId
+                        | _ -> ()
+                }
+
             let projectExternalManagedFissionVisibility (decoded: PromptIngressCodec.DecodedMessage) output =
                 match decoded.SessionId, decoded.PromptKey, managedAgent decoded.ExplicitAgent with
                 | Some sessionId, None, Some _ ->
@@ -672,6 +685,10 @@ module HostSignalBootstrap =
                         // execution-model-routing. The authority path re-decodes inside
                         // createHook; this local value only gates routing + join wake.
                         let decoded = PromptIngressCodec.decode input output
+
+                        match decoded.SessionId with
+                        | Some sessionId -> do! ensurePhysicalParentDiscovered sessionId
+                        | None -> ()
 
                         // INTRA-PARTICIPANT-PARALLELISM-013: request-local origin
                         // narrowing is independent of business-root admission. In

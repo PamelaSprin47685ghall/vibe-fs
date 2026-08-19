@@ -73,7 +73,11 @@ module OpenCodePort =
                |> Option.defaultValue [])
 
     let private responseBody (res: obj) =
-        if not (isNull res) && not (isNull res?data) then
+        if isNull res then
+            null
+        elif not (isNull res?data) && not (isNull res?data?data) then
+            res?data?data
+        elif not (isNull res?data) then
             res?data
         else
             res

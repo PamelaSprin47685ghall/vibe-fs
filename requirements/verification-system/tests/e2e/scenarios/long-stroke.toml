@@ -257,15 +257,6 @@ user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica 
   respond = { type = "text", text = "Strength dry-run canary owner completed." }
 
 [[turn]]
-id = "needhelp-owner-title"
-lane = "needhelp-owner"
-kind = "title"
-user = "NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finish after advice."
-
-  [[turn.step]]
-  respond = { type = "title", text = "NEEDHELP Long Stroke Canary" }
-
-[[turn]]
 id = "needhelp-owner-fast"
 lane = "needhelp-owner"
 user = "NEEDHELP_LONG_STROKE_CANARY: ask for help as fast, then deep, then finish after advice."
@@ -299,7 +290,7 @@ user = "# How should this agent resolve its current difficulty?"
 id = "needhelp-consult"
 internal = true
 user = "# How should this agent resolve its current difficulty?"
-tools = ["fission", "inspect", "skill"]
+tools = ["inspect", "skill"]
 
   [[turn.step]]
   respond = { type = "text", text = "Independent NEEDHELP perspective: preserve the original charge, verify the strongest assumption, then continue." }

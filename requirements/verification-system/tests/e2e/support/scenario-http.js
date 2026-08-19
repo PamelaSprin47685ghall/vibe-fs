@@ -73,11 +73,14 @@ export class HttpClient {
   async createSession(opts = { model: { id: 'test-model', providerID: 'test' } }) {
     const model = opts.model || { id: 'test-model', providerID: 'test' };
     const agent = opts.agent;
+    const parentID = opts.parentID || opts.parentId;
     const body = { model };
     if (agent) body.agent = agent;
-    const res = await this.request('POST', '/api/session', { body });
+    if (parentID) body.parentID = parentID;
+    if (opts.title) body.title = opts.title;
+    const res = await this.request('POST', '/session', { body });
     if (res.ok && this.onSessionCreated) {
-      const sid = res.data?.data?.data?.id || res.data?.data?.id;
+      const sid = res.data?.id || res.data?.data?.data?.id || res.data?.data?.id;
       if (sid) this.onSessionCreated(sid);
     }
     return res;
@@ -119,5 +122,5 @@ export class HttpClient {
 }
 
 export function getSessionId(sess) {
-  return sess?.data?.data?.data?.id || sess?.data?.data?.id;
+  return sess?.data?.id || sess?.data?.data?.data?.id || sess?.data?.data?.id;
 }

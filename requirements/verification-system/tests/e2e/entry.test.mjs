@@ -111,7 +111,12 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
 
 const runNeedHelpPreFlow = async (scenario) => {
   const holds = armNeedHelpCausalHolds(scenario);
-  const created = await scenario.client.createSession({ agent: 'fast-coder' });
+  const root = await scenario.client.createSession({ agent: 'fast-orchestrator' });
+  const rootId = getSessionId(root);
+  assert.ok(rootId, `needhelp root session creation failed: ${JSON.stringify(root)}`);
+  if (!scenario.sessionIds.includes(rootId)) scenario.sessionIds.push(rootId);
+
+  const created = await scenario.client.createSession({ parentID: rootId, agent: 'fast-coder' });
   const sessionID = getSessionId(created);
   assert.ok(sessionID, `needhelp-owner session creation failed: ${JSON.stringify(created)}`);
   if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
