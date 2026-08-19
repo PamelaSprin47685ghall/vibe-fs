@@ -33,10 +33,8 @@ open Wanxiangshu.Foundation.Identity
 /// ORCH-004/005/006/007: worktree → review → rebase → fresh review → short-CAS
 /// ff-only publish.
 ///
-/// Every branch point reads the durable `JobProgress` (ORCH-006) instead of
-/// inspecting which of several optional fields happens to be set. The old shape
-/// held five independent options and had to rank them, which is exactly the
-/// ambiguous recovery ORCH-006 forbids.
+/// Restart re-proves the outstanding obligation from independent durable facts
+/// plus current Git reality. No durable latest-stage enum survives the callback.
 module OrchestratorProgram =
 
     /// What one publish attempt resolved to.
@@ -486,39 +484,36 @@ module OrchestratorProgram =
             | PublishClaimReality.ClaimExpired -> return! publishEventually deps job 0
         }
 
-    /// ORCH-007: one entry for fresh start and restart. The durable projection
-    /// carries physical evidence (commits, head snapshots, conflict files), not
-    /// a program counter. Each `JobProgress` case maps directly to the CE effect
-    /// that advances the job from that evidence.
-    ///
-    /// `None` projection = no durable fact = fresh start. `ManagerStarted` is
-    /// also a fresh start: the Manager fork is durable but has produced nothing
-    /// yet, so the path is `AwaitManager → afterManager`.
+    /// ORCH-007: one entry for fresh start and restart. Later durable evidence
+    /// proves that earlier obligations were discharged; head-dependent evidence
+    /// is then checked against current Git reality by the re-entry functions.
     let private program (deps: OrchestratorProgramDeps) (job: ManagerJob) =
         task {
             let record =
                 OrchestratorProjection.tryFind job.JobId (deps.Snapshot()).AgentProjections.Orchestrator
 
-            let progress =
-                record
-                |> Option.map (fun value -> value.Progress)
-                |> Option.defaultValue JobProgress.ManagerStarted
+            let terminal = record |> Option.bind (fun value -> value.Terminal)
+            let publishClaim = record |> Option.bind (fun value -> value.PublishClaimed)
 
-            match progress with
-            | JobProgress.ManagerStarted -> return! awaitAndPublish deps job
-            | JobProgress.CandidateReady _ -> return! publishEventually deps job 0
-            | JobProgress.ConflictPending conflict ->
+            let rebasedCandidate =
+                record |> Option.bind (fun value -> value.RebasedCandidateReady)
+
+            let conflict = record |> Option.bind (fun value -> value.ConflictDetected)
+            let candidate = record |> Option.bind (fun value -> value.CandidateReady)
+
+            match terminal, publishClaim, rebasedCandidate, conflict, candidate with
+            | Some _, _, _, _, _ -> return! cleanUp deps job
+            | None, Some claim, _, _, _ -> return! reenterPublishClaim deps job claim
+            | None, None, Some rebased, _, _ -> return! reenterRebasedCandidate deps job rebased
+            | None, None, None, Some conflict, _ ->
                 return!
                     resolveConflict
                         deps
                         job
                         {| CandidateCommit = conflict.CandidateCommit
                            ConflictFiles = conflict.ConflictFiles |}
-            | JobProgress.RebasedCandidateReady rebased -> return! reenterRebasedCandidate deps job rebased
-            | JobProgress.PublishClaimed claim -> return! reenterPublishClaim deps job claim
-            | JobProgress.Published _
-            | JobProgress.Failed _
-            | JobProgress.Abandoned -> return! cleanUp deps job
+            | None, None, None, None, Some _ -> return! publishEventually deps job 0
+            | None, None, None, None, None -> return! awaitAndPublish deps job
         }
 
     let run (deps: OrchestratorProgramDeps) (job: ManagerJob) =

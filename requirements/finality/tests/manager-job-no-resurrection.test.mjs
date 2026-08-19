@@ -25,25 +25,25 @@ const created = (overrides = {}) => ({
   ...overrides,
 })
 
-const progress = (kind, attributes = {}) => ({
-  kind: 'job-progress',
+const fact = (kind, attributes = {}) => ({
+  kind: 'job-fact',
   jobId: JOB,
-  progress: kind,
+  fact: kind,
   ...attributes,
 })
 
 const terminal = {
-  published: () => progress('published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
-  failed: () => progress('failed', { reason: 'boom' }),
-  abandoned: () => progress('abandoned'),
+  Published: () => fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
+  JobFailed: () => fact('JobFailed', { reason: 'boom' }),
+  JobAbandoned: () => fact('JobAbandoned'),
 }
 
-const terminalNames = ['published', 'failed', 'abandoned']
+const terminalNames = ['Published', 'JobFailed', 'JobAbandoned']
 
-const laterProgress = [
-  progress('candidate-ready', { candidateCommit: 'c9', preRebaseReviewBarrierId: 'bar_late' }),
-  progress('failed', { reason: 'late' }),
-  progress('abandoned'),
+const laterFacts = [
+  fact('CandidateReady', { candidateCommit: 'c9', preRebaseReviewBarrierId: 'bar_late' }),
+  fact('JobFailed', { reason: 'late' }),
+  fact('JobAbandoned'),
 ]
 
 const projectionOf = (events) => {
@@ -61,18 +61,18 @@ test('WHAT[FINALITY-028] a terminal ManagerJob is not active and does not resume
   for (const name of terminalNames) {
     const projection = projectionOf([created(), terminal[name]()])
     const job = onlyJob(projection)
-    assert.equal(job.progress.kind, name)
+    assert.deepEqual(job.facts, [name])
     assert.equal(projection.activeJobs.length, 0, `${name}: not active`)
   }
 })
 
-test('WHAT[FINALITY-028] later progress cannot reopen a terminal ManagerJob', () => {
+test('WHAT[FINALITY-028] later facts cannot reopen a terminal ManagerJob', () => {
   for (const name of terminalNames) {
     const sealed = projectionOf([created(), terminal[name]()])
-    const sealedName = onlyJob(sealed).progress.kind
-    for (const later of laterProgress) {
+    const sealedFacts = onlyJob(sealed).facts
+    for (const later of laterFacts) {
       const after = projectionOf([created(), terminal[name](), later])
-      assert.equal(onlyJob(after).progress.kind, sealedName)
+      assert.deepEqual(onlyJob(after).facts, sealedFacts)
       assert.equal(after.activeJobs.length, 0)
     }
   }
@@ -81,7 +81,7 @@ test('WHAT[FINALITY-028] later progress cannot reopen a terminal ManagerJob', ()
 test('WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal job', () => {
   const replayed = projectionOf([
     created(),
-    terminal.published(),
+    terminal.Published(),
     created({
       managerSessionId: 'ses_other',
       managerAgent: 'deep-manager',
@@ -93,7 +93,7 @@ test('WHAT[FINALITY-028] replaying ManagerJobCreated cannot re-enlist a terminal
     }),
   ])
   const job = onlyJob(replayed)
-  assert.equal(job.progress.kind, 'published')
+  assert.deepEqual(job.facts, ['Published'])
   assert.equal(job.managerSessionId, MANAGER)
   assert.equal(job.worktreeIdentity, 'wt_finality_028')
   assert.equal(replayed.activeJobs.length, 0)
@@ -103,7 +103,7 @@ test('WHAT[FINALITY-028] an active owned job continues on the same session and w
   const projection = projectionOf([created()])
   const job = onlyJob(projection)
   assert.equal(projection.activeJobs.length, 1)
-  assert.equal(job.progress.kind, 'manager-started')
+  assert.deepEqual(job.facts, [])
   assert.equal(job.managerSessionId, MANAGER)
   assert.equal(job.worktreeIdentity, 'wt_finality_028')
   assert.equal(job.worktreePath, '/tmp/wt-finality-028')

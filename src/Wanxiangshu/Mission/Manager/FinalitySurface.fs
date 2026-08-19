@@ -815,45 +815,79 @@ module FinalitySurface =
 
     // ── ManagerJob history projection (FINALITY-028) ─────────────────────────
 
-    let private jobProgressOf (event: obj) : Result<JobProgress, string> =
-        match str (event?progress) with
-        | "manager-started" -> Ok JobProgress.ManagerStarted
-        | "candidate-ready" ->
+    let private recordPublishClaimFact
+        (projection: OrchestratorProjection)
+        (jobId: ManagerJobId)
+        (event: obj)
+        : Result<OrchestratorProjection, string> =
+        match
+            OrchestratorProjection.tryFind jobId projection
+            |> Option.bind (fun job -> job.RebasedCandidateReady)
+        with
+        | Some rebased ->
             Ok(
-                JobProgress.CandidateReady
+                OrchestratorProjection.recordPublishClaimed
+                    jobId
+                    {| RebasedCommit = rebased.RebasedCommit
+                       ExpectedHead = CommitHash.create (str (event?expectedHead)) |}
+                    projection
+            )
+        | None -> Error "publish claimed for a job with no rebased candidate (ORCH-004)"
+
+    let private recordJobFact
+        (projection: OrchestratorProjection)
+        (event: obj)
+        : Result<OrchestratorProjection, string> =
+        let jobId = ManagerJobId.create (str (event?jobId))
+
+        match str (event?fact) with
+        | "CandidateReady" ->
+            Ok(
+                OrchestratorProjection.recordCandidateReady
+                    jobId
                     {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
                        PreRebaseReviewBarrierId = ReviewBarrierId.create (str (event?preRebaseReviewBarrierId)) |}
+                    projection
             )
-        | "conflict-pending" ->
+        | "ConflictDetected" ->
             Ok(
-                JobProgress.ConflictPending
+                OrchestratorProjection.recordConflictDetected
+                    jobId
                     {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
                        TargetHeadSnapshot = CommitHash.create (str (event?targetHeadSnapshot))
                        ConflictFiles = stringArrayOf (event?conflictFiles)
                        DiagnosticsDigest = str (event?diagnosticsDigest) |}
+                    projection
             )
-        | "rebased-candidate-ready" ->
+        | "RebasedCandidateReady" ->
             Ok(
-                JobProgress.RebasedCandidateReady
+                OrchestratorProjection.recordRebasedCandidateReady
+                    jobId
                     {| RebasedCommit = CommitHash.create (str (event?rebasedCommit))
                        TargetHeadSnapshot = CommitHash.create (str (event?targetHeadSnapshot))
                        PostRebaseReviewBarrierId = ReviewBarrierId.create (str (event?postRebaseReviewBarrierId)) |}
+                    projection
             )
-        | "publish-claimed" ->
+        | "PublishClaimed" -> recordPublishClaimFact projection jobId event
+        | "Published" ->
             Ok(
-                JobProgress.PublishClaimed
-                    {| RebasedCommit = CommitHash.create (str (event?rebasedCommit))
-                       ExpectedHead = CommitHash.create (str (event?expectedHead)) |}
+                OrchestratorProjection.recordTerminal
+                    jobId
+                    (Wanxiangshu.Change.TerminalOutcome.Published
+                        {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
+                           ResultingTargetHead = CommitHash.create (str (event?resultingTargetHead)) |})
+                    projection
             )
-        | "published" ->
+        | "JobFailed" ->
             Ok(
-                JobProgress.Published
-                    {| CandidateCommit = CommitHash.create (str (event?candidateCommit))
-                       ResultingTargetHead = CommitHash.create (str (event?resultingTargetHead)) |}
+                OrchestratorProjection.recordTerminal
+                    jobId
+                    (Wanxiangshu.Change.TerminalOutcome.Failed(str (event?reason)))
+                    projection
             )
-        | "failed" -> Ok(JobProgress.Failed(str (event?reason)))
-        | "abandoned" -> Ok JobProgress.Abandoned
-        | other -> Error $"unknown ManagerJob progress kind: {other}"
+        | "JobAbandoned" ->
+            Ok(OrchestratorProjection.recordTerminal jobId Wanxiangshu.Change.TerminalOutcome.Abandoned projection)
+        | other -> Error $"unknown ManagerJob fact: {other}"
 
     let private jobProjectionEvents (events: obj array) : Result<OrchestratorProjection, string> =
         let rec loop (projection: OrchestratorProjection) (remaining: obj list) =
@@ -873,49 +907,30 @@ module FinalitySurface =
                            TargetBranchFrozen = str (event?targetBranchFrozen) |}
 
                     loop (OrchestratorProjection.createJob job projection) rest
-                | "job-progress" ->
-                    let jobId = ManagerJobId.create (str (event?jobId))
-
-                    jobProgressOf event
-                    |> Result.map (fun progress -> OrchestratorProjection.recordProgress jobId progress projection)
-                    |> Result.bind (fun next -> loop next rest)
+                | "job-fact" -> recordJobFact projection event |> Result.bind (fun next -> loop next rest)
                 | other -> Error $"unknown ManagerJob event kind: {other}"
 
         loop OrchestratorProjection.empty (List.ofArray events)
 
-    let private jobProgressView (progress: JobProgress) : obj =
-        match progress with
-        | JobProgress.ManagerStarted -> box {| kind = "manager-started" |}
-        | JobProgress.CandidateReady candidate ->
-            box
-                {| kind = "candidate-ready"
-                   candidateCommit = CommitHash.value candidate.CandidateCommit
-                   preRebaseReviewBarrierId = ReviewBarrierId.value candidate.PreRebaseReviewBarrierId |}
-        | JobProgress.ConflictPending conflict ->
-            box
-                {| kind = "conflict-pending"
-                   candidateCommit = CommitHash.value conflict.CandidateCommit
-                   targetHeadSnapshot = CommitHash.value conflict.TargetHeadSnapshot
-                   conflictFiles = conflict.ConflictFiles |> List.toArray
-                   diagnosticsDigest = conflict.DiagnosticsDigest |}
-        | JobProgress.RebasedCandidateReady rebased ->
-            box
-                {| kind = "rebased-candidate-ready"
-                   rebasedCommit = CommitHash.value rebased.RebasedCommit
-                   targetHeadSnapshot = CommitHash.value rebased.TargetHeadSnapshot
-                   postRebaseReviewBarrierId = ReviewBarrierId.value rebased.PostRebaseReviewBarrierId |}
-        | JobProgress.PublishClaimed claim ->
-            box
-                {| kind = "publish-claimed"
-                   rebasedCommit = CommitHash.value claim.RebasedCommit
-                   expectedHead = CommitHash.value claim.ExpectedHead |}
-        | JobProgress.Published published ->
-            box
-                {| kind = "published"
-                   candidateCommit = CommitHash.value published.CandidateCommit
-                   resultingTargetHead = CommitHash.value published.ResultingTargetHead |}
-        | JobProgress.Failed reason -> box {| kind = "failed"; reason = reason |}
-        | JobProgress.Abandoned -> box {| kind = "abandoned" |}
+    let private jobFactsView (job: ManagerJobProjection) =
+        [ if job.CandidateReady.IsSome then
+              yield "CandidateReady"
+
+          if job.ConflictDetected.IsSome then
+              yield "ConflictDetected"
+
+          if job.RebasedCandidateReady.IsSome then
+              yield "RebasedCandidateReady"
+
+          if job.PublishClaimed.IsSome then
+              yield "PublishClaimed"
+
+          match job.Terminal with
+          | Some(Wanxiangshu.Change.TerminalOutcome.Published _) -> yield "Published"
+          | Some(Wanxiangshu.Change.TerminalOutcome.Failed _) -> yield "JobFailed"
+          | Some Wanxiangshu.Change.TerminalOutcome.Abandoned -> yield "JobAbandoned"
+          | None -> () ]
+        |> List.toArray
 
     let private jobView (job: ManagerJobProjection) : obj =
         box
@@ -927,7 +942,7 @@ module FinalitySurface =
                worktreePath = WorktreePath.value job.WorktreePath
                targetRef = TargetRef.value job.TargetRef
                targetBranchFrozen = job.TargetBranchFrozen
-               progress = jobProgressView job.Progress |}
+               facts = jobFactsView job |}
 
     /// FINALITY-028: fold plain ManagerJob history and return only JS-native
     /// job records and active records.

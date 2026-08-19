@@ -305,7 +305,7 @@ module OneShotAgentTool =
         (latch: CompletionLatch)
         (completion: TaskCompletionSource<Result<string * string option, string>>)
         (_sessionId: SessionId)
-        (outcome: TerminalOutcome)
+        (outcome: Wanxiangshu.OpenCode.TerminalOutcome)
         =
         match outcome with
         // COMPANION-005 / HOST-005: a tool result is this turn's formal report, not
@@ -313,10 +313,12 @@ module OneShotAgentTool =
         // host-visible reasoning, so the calling model received the child's
         // reasoning stream as if it were the answer.
         // EXEC-028: Completed requires child LWR (includeOpening=false); missing → Error.
-        | TerminalOutcome.Completed terminal ->
+        | Wanxiangshu.OpenCode.TerminalOutcome.Completed terminal ->
             admitCompletedTerminal scope childId terminal succeed fail latch completion
-        | TerminalOutcome.Aborted reason -> fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
-        | TerminalOutcome.Failed error -> fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
+        | Wanxiangshu.OpenCode.TerminalOutcome.Aborted reason ->
+            fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
+        | Wanxiangshu.OpenCode.TerminalOutcome.Failed error ->
+            fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
 
     let private raceCompletionDeadline
         (outputTask: Task<Result<string * string option, string>>)

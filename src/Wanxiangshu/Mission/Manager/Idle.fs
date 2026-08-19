@@ -164,7 +164,8 @@ module ManagerIdle =
             | HostSessionNudge.IdleContinuationOutcome.Sent _
             | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
             | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+                eventPort.NotifyTerminal turn.SessionId (Wanxiangshu.OpenCode.TerminalOutcome.Failed error)
+                |> ignore
         }
 
     let private processQuiescent

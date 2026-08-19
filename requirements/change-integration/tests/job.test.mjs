@@ -20,31 +20,30 @@ const payload = (overrides = {}) => ({
 })
 
 const created = (overrides) => change.createJob(change.empty(), payload(overrides))
-const progress = {
-  managerStarted: () => change.progress('ManagerStarted', null),
+const fact = {
   candidateReady: (candidateCommit = 'c1', barrier = 'bar_1') =>
-    change.progress('CandidateReady', { candidateCommit, preRebaseReviewBarrierId: barrier }),
-  conflictPending: (conflictFiles = ['a.fs', 'b.fs']) =>
-    change.progress('ConflictPending', {
+    change.fact('CandidateReady', { candidateCommit, preRebaseReviewBarrierId: barrier }),
+  conflictDetected: (conflictFiles = ['a.fs', 'b.fs']) =>
+    change.fact('ConflictDetected', {
       candidateCommit: 'c1',
       targetHeadSnapshot: 'h1',
       conflictFiles,
       diagnosticsDigest: 'digest',
     }),
   rebased: (snapshot = 'h1') =>
-    change.progress('RebasedCandidateReady', {
+    change.fact('RebasedCandidateReady', {
       rebasedCommit: 'r1',
       targetHeadSnapshot: snapshot,
       postRebaseReviewBarrierId: 'bar_2',
     }),
-  publishClaimed: () => change.progress('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' }),
-  published: () => change.progress('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
-  failed: (reason = 'boom') => change.progress('Failed', reason),
-  abandoned: () => change.progress('Abandoned', null),
+  publishClaimed: () => change.fact('PublishClaimed', { rebasedCommit: 'r1', expectedHead: 'h1' }),
+  published: () => change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
+  failed: (reason = 'boom') => change.fact('JobFailed', { reason }),
+  abandoned: () => change.fact('JobAbandoned', null),
 }
 
 const jobAt = (value, projection = created()) => {
-  const next = change.recordProgress(projection, JOB, value)
+  const next = change.recordFact(projection, JOB, value)
   return { projection: next, job: change.find(next, JOB) }
 }
 const classifyRebased = (head, rebasedCommit = 'r1', snapshot = 'h1') =>
@@ -65,7 +64,7 @@ test('WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the
     worktreePath: '/tmp/wt1',
     targetRef: 'refs/heads/main',
     targetBranchFrozen: 'refs/heads/main',
-    progress: 'ManagerStarted',
+    facts: [],
   })
 })
 
@@ -75,9 +74,9 @@ test('WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path
   assert.equal(job.worktreeIdentity, 'wt_1')
 })
 
-test('WHAT[CHGINT-009] ORCH_003_only_progress_ever_changes_after_creation', () => {
+test('WHAT[CHGINT-009] ORCH_003_durable_facts_do_not_change_job_identity', () => {
   const before = change.find(created(), JOB)
-  const after = jobAt(progress.candidateReady())
+  const after = jobAt(fact.candidateReady())
   const identity = (job) => ({
     jobId: job.jobId,
     managerSessionId: job.managerSessionId,
@@ -88,11 +87,11 @@ test('WHAT[CHGINT-009] ORCH_003_only_progress_ever_changes_after_creation', () =
     targetBranchFrozen: job.targetBranchFrozen,
   })
   assert.deepEqual(identity(after.job), identity(before))
-  assert.notEqual(after.job.progress, before.progress)
+  assert.deepEqual(after.job.facts, ['CandidateReady'])
 })
 
-test('WHAT[CHGINT-006] ORCH_003_progress_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
-  const projection = change.recordProgress(created(), 'never', progress.candidateReady())
+test('WHAT[CHGINT-006] ORCH_003_fact_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry', () => {
+  const projection = change.recordFact(created(), 'never', fact.candidateReady())
   assert.equal(change.activeJobs(projection).length, 1)
   assert.equal(change.find(projection, 'never'), null)
 })
@@ -104,7 +103,7 @@ test('WHAT[CHGINT-009] ORCH_003_a_manager_session_resolves_to_its_one_job', () =
   assert.equal(change.find(second, 'ses_zz'), null)
 })
 
-// ── independent jobs and terminal progress ──────────────────────────────────
+// ── independent jobs and terminal facts ─────────────────────────────────────
 
 test('WHAT[CHGINT-004] ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out', () => {
   let projection = created()
@@ -112,45 +111,45 @@ test('WHAT[CHGINT-004] ORCH_004_multiple_jobs_are_active_at_once_and_terminal_on
   projection = change.createJob(projection, payload({ jobId: 'job_3', managerSessionId: 'ses_m3' }))
   assert.equal(change.activeJobs(projection).length, 3)
 
-  const finished = change.recordProgress(projection, 'job_2', progress.published())
+  const finished = change.recordFact(projection, 'job_2', fact.published())
   assert.deepEqual(change.activeJobs(finished).map((job) => job.jobId).sort(), ['job_1', 'job_3'])
 })
 
 test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised', () => {
-  const published = change.recordProgress(created(), JOB, progress.published())
+  const published = change.recordFact(created(), JOB, fact.published())
   assert.notEqual(change.find(published, JOB), null)
   assert.equal(change.activeJobs(published).length, 0)
-  const replayed = change.recordProgress(published, JOB, progress.published())
-  assert.equal(change.find(replayed, JOB).progress, 'Published')
+  const replayed = change.recordFact(published, JOB, fact.published())
+  assert.deepEqual(change.find(replayed, JOB).facts, ['Published'])
 })
 
-test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_accepts_no_further_progress', () => {
-  const published = change.recordProgress(created(), JOB, progress.published())
-  for (const later of [progress.candidateReady('c9'), progress.rebased(), progress.failed('late')]) {
-    const after = change.recordProgress(published, JOB, later)
-    assert.equal(change.find(after, JOB).progress, 'Published')
+test('WHAT[CHGINT-006] ORCH_006_a_terminal_job_accepts_no_further_facts', () => {
+  const published = change.recordFact(created(), JOB, fact.published())
+  for (const later of [fact.candidateReady('c9'), fact.rebased(), fact.failed('late')]) {
+    const after = change.recordFact(published, JOB, later)
+    assert.deepEqual(change.find(after, JOB).facts, ['Published'])
   }
 })
 
 test('WHAT[CHGINT-006] ORCH_006_all_three_terminal_cases_end_the_job', () => {
-  for (const terminal of [progress.published(), progress.failed(), progress.abandoned()]) {
-    const projection = change.recordProgress(created(), JOB, terminal)
+  for (const terminal of [fact.published(), fact.failed(), fact.abandoned()]) {
+    const projection = change.recordFact(created(), JOB, terminal)
     assert.equal(change.activeJobs(projection).length, 0)
   }
 })
 
-// ── ORCH-007 recovery action totality ─────────────────────────────────────────
+// ── ORCH-007 independent durable evidence ───────────────────────────────────
 
-test('WHAT[CHGINT-012] ORCH_007_progress_that_needs_no_head_derives_its_classification_from_the_fact_alone', () => {
-  assert.equal(jobAt(progress.managerStarted()).job.progress, 'ManagerStarted')
-  assert.equal(jobAt(progress.candidateReady()).job.progress, 'CandidateReady')
-  assert.equal(jobAt(progress.conflictPending()).job.progress, 'ConflictPending')
+test('WHAT[CHGINT-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage', () => {
+  const candidate = jobAt(fact.candidateReady())
+  const conflicted = jobAt(fact.conflictDetected(), candidate.projection)
+  assert.deepEqual(conflicted.job.facts, ['CandidateReady', 'ConflictDetected'])
 })
 
 test('WHAT[CHGINT-005] ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_files', () => {
-  const { job } = jobAt(progress.conflictPending(['src/a.fs', 'src/b.fs']))
-  assert.equal(job.progress, 'ConflictPending')
-  const conflict = change.progress('ConflictPending', {
+  const { job } = jobAt(fact.conflictDetected(['src/a.fs', 'src/b.fs']))
+  assert.deepEqual(job.facts, ['ConflictDetected'])
+  const conflict = change.fact('ConflictDetected', {
     candidateCommit: 'c1',
     targetHeadSnapshot: 'h1',
     conflictFiles: ['src/a.fs', 'src/b.fs'],
@@ -179,21 +178,17 @@ test('WHAT[CHGINT-007] ORCH_008_an_unreadable_target_head_fails_closed_for_every
   assert.equal(classifyClaim(undefined).kind, 'HeadUnreadable')
 })
 
-test('WHAT[CHGINT-003] ORCH_007_every_progress_case_is_exhaustive', () => {
-  const table = [
-    ['ManagerStarted', progress.managerStarted()],
-    ['CandidateReady', progress.candidateReady()],
-    ['ConflictPending', progress.conflictPending()],
-    ['RebasedCandidateReady', progress.rebased('h1')],
-    ['PublishClaimed', progress.publishClaimed()],
-    ['Published', progress.published()],
-    ['Failed', progress.failed()],
-    ['Abandoned', progress.abandoned()],
-  ]
-  assert.deepEqual(
-    table.map(([name, value]) => [name, jobAt(value).job.progress]),
-    table.map(([name]) => [name, name]),
-  )
+test('WHAT[CHGINT-003] ORCH_007_each_durable_fact_has_one_projection_slot', () => {
+  let projection = created()
+  for (const value of [fact.candidateReady(), fact.conflictDetected(), fact.rebased(), fact.publishClaimed()]) {
+    projection = change.recordFact(projection, JOB, value)
+  }
+  assert.deepEqual(change.find(projection, JOB).facts, [
+    'CandidateReady',
+    'ConflictDetected',
+    'RebasedCandidateReady',
+    'PublishClaimed',
+  ])
 })
 
 // ── durable fold and typed worktree effect ───────────────────────────────────
@@ -216,20 +211,20 @@ const foldProjection = (events) => {
   return result.value
 }
 
-test('WHAT[CHGINT-006] ORCH_006_the_journal_replays_into_the_latest_progress_only', () => {
+test('WHAT[CHGINT-006] ORCH_006_the_journal_replays_independent_facts_and_terminal', () => {
   const projection = foldProjection([createdEvent, candidateEvent, publishedEvent])
-  assert.equal(change.find(projection, JOB).progress, 'Published')
+  assert.deepEqual(change.find(projection, JOB).facts, ['CandidateReady', 'Published'])
   assert.equal(change.activeJobs(projection).length, 0)
 })
 
-test('WHAT[CHGINT-006] ORCH_006_a_progress_fact_before_its_create_is_dropped_not_promoted', () => {
+test('WHAT[CHGINT-006] ORCH_006_a_fact_before_its_create_is_dropped_not_promoted', () => {
   const projection = foldProjection([candidateEvent])
   assert.equal(change.find(projection, JOB), null)
 })
 
 test('WHAT[CHGINT-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress', () => {
   const projection = foldProjection([createdEvent, candidateEvent, publishedEvent, createdEvent])
-  assert.equal(change.find(projection, JOB).progress, 'Published')
+  assert.deepEqual(change.find(projection, JOB).facts, ['CandidateReady', 'Published'])
   assert.equal(change.activeJobs(projection).length, 0)
 })
 

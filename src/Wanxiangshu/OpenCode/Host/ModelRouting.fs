@@ -731,7 +731,8 @@ module ModelRouting =
 
     let bindCapacityCompanion (ownerSessionId: SessionId) (bloggerSessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
-        | Some runtime -> runtime.BindCapacityCompanion(SessionId.value ownerSessionId, SessionId.value bloggerSessionId)
+        | Some runtime ->
+            runtime.BindCapacityCompanion(SessionId.value ownerSessionId, SessionId.value bloggerSessionId)
         | None -> ()
 
     let dropCapacityLineage (sessionId: SessionId) =

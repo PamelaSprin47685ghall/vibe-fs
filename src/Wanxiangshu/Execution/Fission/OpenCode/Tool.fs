@@ -480,11 +480,11 @@ module FissionTool =
         (lanes: FissionStartedLane list)
         (childId: SessionId)
         (completionId: string)
-        (outcome: TerminalOutcome)
+        (outcome: Wanxiangshu.OpenCode.TerminalOutcome)
         =
         match outcome with
-        | TerminalOutcome.Aborted _ -> ()
-        | TerminalOutcome.Failed error ->
+        | Wanxiangshu.OpenCode.TerminalOutcome.Aborted _ -> ()
+        | Wanxiangshu.OpenCode.TerminalOutcome.Failed error ->
             captureAndBroadcast
                 scope
                 durable
@@ -496,7 +496,7 @@ module FissionTool =
                 completionId
                 (String.concat "\n" [ "status=failed"; "error=" + error ])
             |> ignore
-        | TerminalOutcome.Completed terminal ->
+        | Wanxiangshu.OpenCode.TerminalOutcome.Completed terminal ->
             captureCompletedTerminal
                 scope
                 durable
@@ -521,7 +521,7 @@ module FissionTool =
         (childId: SessionId)
         (completionId: string)
         (sessionId: SessionId)
-        (outcome: TerminalOutcome)
+        (outcome: Wanxiangshu.OpenCode.TerminalOutcome)
         =
         if sessionId <> childId then
             ()

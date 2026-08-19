@@ -73,58 +73,84 @@ module ChangeSurface =
     let private worktreePathValue value = WorktreePath.create (stringOf value)
     let private target value = TargetRef.create (stringOf value)
 
-    let private progressOf (value: obj) : JobProgress =
-        let kind = stringField value [ "kind"; "case"; "name" ]
-        let payload = field value [ "payload"; "value"; "data" ]
+    let private factKindAndPayload (value: obj) =
+        stringField value [ "kind"; "case"; "name" ], field value [ "payload"; "value"; "data" ]
+
+    let fact (kind: string) (payload: obj) : obj =
+        box {| kind = kind; payload = payload |}
+
+    let private recordFactValue
+        (projection: OrchestratorProjection)
+        (managerJobId: ManagerJobId)
+        (value: obj)
+        : OrchestratorProjection =
+        let kind, payload = factKindAndPayload value
 
         match kind with
-        | "ManagerStarted" -> JobProgress.ManagerStarted
         | "CandidateReady" ->
-            JobProgress.CandidateReady
+            OrchestratorProjection.recordCandidateReady
+                managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
                    PreRebaseReviewBarrierId =
                     barrier (field payload [ "preRebaseReviewBarrierId"; "PreRebaseReviewBarrierId" ]) |}
-        | "ConflictPending"
+                projection
         | "ConflictDetected" ->
-            JobProgress.ConflictPending
+            OrchestratorProjection.recordConflictDetected
+                managerJobId
                 {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
                    ConflictFiles = stringArray (field payload [ "conflictFiles"; "ConflictFiles" ]) |> Array.toList
                    DiagnosticsDigest = stringField payload [ "diagnosticsDigest"; "DiagnosticsDigest" ] |}
+                projection
         | "RebasedCandidateReady" ->
-            JobProgress.RebasedCandidateReady
+            OrchestratorProjection.recordRebasedCandidateReady
+                managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
                    TargetHeadSnapshot = commit (field payload [ "targetHeadSnapshot"; "TargetHeadSnapshot" ])
                    PostRebaseReviewBarrierId =
                     barrier (field payload [ "postRebaseReviewBarrierId"; "PostRebaseReviewBarrierId" ]) |}
+                projection
         | "PublishClaimed" ->
-            JobProgress.PublishClaimed
+            OrchestratorProjection.recordPublishClaimed
+                managerJobId
                 {| RebasedCommit = commit (field payload [ "rebasedCommit"; "RebasedCommit" ])
                    ExpectedHead = commit (field payload [ "expectedHead"; "ExpectedHead" ]) |}
+                projection
         | "Published" ->
-            JobProgress.Published
-                {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
-                   ResultingTargetHead = commit (field payload [ "resultingTargetHead"; "ResultingTargetHead" ]) |}
-        | "Failed"
-        | "JobFailed" -> JobProgress.Failed(stringOf payload)
-        | "Abandoned"
-        | "JobAbandoned" -> JobProgress.Abandoned
-        | unknown -> invalidArg "progress" ("unknown job progress: " + unknown)
-
-    let progress (kind: string) (payload: obj) : obj =
-        box {| kind = kind; payload = payload |}
+            OrchestratorProjection.recordTerminal
+                managerJobId
+                (TerminalOutcome.Published
+                    {| CandidateCommit = commit (field payload [ "candidateCommit"; "CandidateCommit" ])
+                       ResultingTargetHead = commit (field payload [ "resultingTargetHead"; "ResultingTargetHead" ]) |})
+                projection
+        | "JobFailed" ->
+            OrchestratorProjection.recordTerminal
+                managerJobId
+                (TerminalOutcome.Failed(stringField payload [ "reason"; "Reason" ]))
+                projection
+        | "JobAbandoned" -> OrchestratorProjection.recordTerminal managerJobId TerminalOutcome.Abandoned projection
+        | unknown -> invalidArg "fact" ("unknown ManagerJob fact: " + unknown)
 
     let private jobObject (job: ManagerJobProjection) : obj =
-        let progressName =
-            match job.Progress with
-            | JobProgress.ManagerStarted -> "ManagerStarted"
-            | JobProgress.CandidateReady _ -> "CandidateReady"
-            | JobProgress.ConflictPending _ -> "ConflictPending"
-            | JobProgress.RebasedCandidateReady _ -> "RebasedCandidateReady"
-            | JobProgress.PublishClaimed _ -> "PublishClaimed"
-            | JobProgress.Published _ -> "Published"
-            | JobProgress.Failed _ -> "Failed"
-            | JobProgress.Abandoned -> "Abandoned"
+        let facts =
+            [ if job.CandidateReady.IsSome then
+                  yield "CandidateReady"
+
+              if job.ConflictDetected.IsSome then
+                  yield "ConflictDetected"
+
+              if job.RebasedCandidateReady.IsSome then
+                  yield "RebasedCandidateReady"
+
+              if job.PublishClaimed.IsSome then
+                  yield "PublishClaimed"
+
+              match job.Terminal with
+              | Some(TerminalOutcome.Published _) -> yield "Published"
+              | Some(TerminalOutcome.Failed _) -> yield "JobFailed"
+              | Some TerminalOutcome.Abandoned -> yield "JobAbandoned"
+              | None -> () ]
+            |> List.toArray
 
         box
             {| jobId = ManagerJobId.value job.ManagerJobId
@@ -135,7 +161,7 @@ module ChangeSurface =
                worktreePath = WorktreePath.value job.WorktreePath
                targetRef = TargetRef.value job.TargetRef
                targetBranchFrozen = job.TargetBranchFrozen
-               progress = progressName |}
+               facts = facts |}
 
     let private createPayload (value: obj) =
         {| ManagerJobId = jobId (field value [ "jobId"; "ManagerJobId" ])
@@ -154,9 +180,9 @@ module ChangeSurface =
         let current = (projection :?> ProjectionHandle).Projection
         ProjectionHandle(OrchestratorProjection.createJob (createPayload payload) current) :> obj
 
-    let recordProgress (projection: obj) (job: string) (value: obj) : obj =
+    let recordFact (projection: obj) (job: string) (value: obj) : obj =
         let current = (projection :?> ProjectionHandle).Projection
-        ProjectionHandle(OrchestratorProjection.recordProgress (jobId job) (progressOf value) current) :> obj
+        ProjectionHandle(recordFactValue current (jobId job) value) :> obj
 
     let find (projection: obj) (job: string) : obj =
         let current = (projection :?> ProjectionHandle).Projection
@@ -168,9 +194,6 @@ module ChangeSurface =
     let activeJobs (projection: obj) : obj array =
         let current = (projection :?> ProjectionHandle).Projection
         OrchestratorProjection.activeJobs current |> List.map jobObject |> List.toArray
-
-    let progressName (job: obj) : string =
-        stringField job [ "progress"; "Progress" ]
 
     /// ORCH-007 domain classification for a rebased candidate. Returns a
     /// physical-world classification, not a program counter.
@@ -237,46 +260,35 @@ module ChangeSurface =
             | WorktreeEffectStatus.Requested _ -> box "Requested"
             | WorktreeEffectStatus.Created _ -> box "Created"
 
+    let private foldPublishClaimed (projection: OrchestratorProjection) (managerJobId: ManagerJobId) (payload: obj) =
+        match
+            OrchestratorProjection.tryFind managerJobId projection
+            |> Option.bind (fun job -> job.RebasedCandidateReady)
+        with
+        | Some rebased ->
+            Ok(
+                OrchestratorProjection.recordPublishClaimed
+                    managerJobId
+                    {| RebasedCommit = rebased.RebasedCommit
+                       ExpectedHead = commit (field payload [ "expectedHead"; "ExpectedHead" ]) |}
+                    projection
+            )
+        | None -> Error "publish claimed for a job with no rebased candidate (ORCH-004)"
+
     let private applyEvent (projection: OrchestratorProjection) (event: obj) : Result<OrchestratorProjection, string> =
         let kind = stringField event [ "kind"; "case"; "type" ]
         let payload = field event [ "payload"; "value"; "data" ]
 
         match kind with
         | "ManagerJobCreated" -> Ok(OrchestratorProjection.createJob (createPayload payload) projection)
+        | "PublishClaimed" -> foldPublishClaimed projection (jobId (field payload [ "jobId"; "ManagerJobId" ])) payload
         | "CandidateReady"
         | "ConflictDetected"
         | "RebasedCandidateReady"
-        | "PublishClaimed"
         | "Published"
         | "JobFailed"
         | "JobAbandoned" ->
-            let job = stringField payload [ "jobId"; "ManagerJobId" ]
-
-            let value =
-                match kind with
-                | "JobFailed" -> progress "Failed" (box (stringField payload [ "reason"; "Reason" ]))
-                | "JobAbandoned" -> progress "Abandoned" null
-                | _ -> progress kind payload
-
-            if kind = "PublishClaimed" then
-                match OrchestratorProjection.tryFind (jobId job) projection with
-                | Some current ->
-                    match current.Progress with
-                    | JobProgress.RebasedCandidateReady rebased ->
-                        let expected = commit (field payload [ "expectedHead"; "ExpectedHead" ])
-
-                        Ok(
-                            OrchestratorProjection.recordProgress
-                                (jobId job)
-                                (JobProgress.PublishClaimed
-                                    {| RebasedCommit = rebased.RebasedCommit
-                                       ExpectedHead = expected |})
-                                projection
-                        )
-                    | _ -> Error "publish claimed for a job with no rebased candidate (ORCH-004)"
-                | None -> Ok projection
-            else
-                Ok(OrchestratorProjection.recordProgress (jobId job) (progressOf value) projection)
+            Ok(recordFactValue projection (jobId (field payload [ "jobId"; "ManagerJobId" ])) (fact kind payload))
         | "WorktreeCreateRequested" ->
             Ok(
                 OrchestratorProjection.requestWorktree

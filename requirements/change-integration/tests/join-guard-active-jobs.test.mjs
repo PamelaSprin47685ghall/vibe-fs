@@ -1,4 +1,4 @@
-// CHGINT-006 — active manager jobs remain outstanding until terminal progress.
+// CHGINT-006 — active manager jobs remain outstanding until a terminal fact.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -18,10 +18,10 @@ test('WHAT[CHGINT-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestr
   })
   assert.equal(change.activeJobs(jobs).length, 1)
 
-  jobs = change.recordProgress(
+  jobs = change.recordFact(
     jobs,
     'job_1',
-    change.progress('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
+    change.fact('Published', { candidateCommit: 'c1', resultingTargetHead: 'r1' }),
   )
   assert.equal(change.activeJobs(jobs).length, 0)
 })

@@ -59,13 +59,13 @@ test('WHAT[CHGINT-009] HOST_ContinueManagerJob_has_no_detached_pending_waiter', 
 
 test('WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree', () => {
   let projection = change.createJob(change.empty(), job('hostfw8', '/tmp/wt-hostfw8'))
-  projection = change.recordProgress(projection, 'hostfw8', change.progress('CandidateReady', {
+  projection = change.recordFact(projection, 'hostfw8', change.fact('CandidateReady', {
     candidateCommit: 'c1',
     preRebaseReviewBarrierId: 'bar1',
   }))
   const continued = change.find(projection, 'hostfw8')
   assert.equal(continued.worktreePath, '/tmp/wt-hostfw8')
-  assert.equal(continued.progress, 'CandidateReady')
+  assert.deepEqual(continued.facts, ['CandidateReady'])
 })
 
 test('WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result', async () => {

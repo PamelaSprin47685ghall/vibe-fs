@@ -68,45 +68,34 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
-/// Vocabulary: Orchestrator progress owns the turn → Manager completes and exits.
-///
-/// rabbit §8.4 — ManagerWorkflow must not know the Orchestrator JobProgress case
-/// set. All CandidateReady / RebasedCandidateReady / PublishClaimed / Published /
-/// Failed / Abandoned (and TurnCompleted ConflictPending) handoff lives here.
+/// Vocabulary: durable Orchestrator evidence owns the turn → Manager completes and exits.
 module ManagerJobHandoff =
 
     /// Result of checking whether Manager business ownership has transferred.
     [<RequireQualifiedAccess>]
     type HandoffOutcome =
-        /// Orchestrator progress consumed the observation; Manager must stop.
+        /// Orchestrator durable evidence consumed the observation; Manager must stop.
         | Transferred
         /// Manager still owns the turn; caller continues Manager sequencing.
         | ManagerOwnsTurn
 
-    let private tryJobProgress (journal: AgentJournal option) (sessionId: SessionId) =
+    let private tryJob (journal: AgentJournal option) (sessionId: SessionId) =
         journal
         |> Option.bind (fun durable ->
             OrchestratorProjection.tryFindByManagerSession
                 sessionId
                 (AgentJournal.snapshot durable).AgentProjections.Orchestrator)
-        |> Option.map (fun job -> job.Progress)
 
-    /// Progress cases that mean the Orchestrator has taken the job from the Manager.
-    let private isTransferred (outcome: ReconcileProgram.TurnOutcome) (progress: JobProgress) =
-        match outcome, progress with
-        | ReconcileProgram.TurnInProgress, JobProgress.CandidateReady _
-        | ReconcileProgram.TurnCompleted, JobProgress.CandidateReady _
-        | ReconcileProgram.TurnInProgress, JobProgress.RebasedCandidateReady _
-        | ReconcileProgram.TurnCompleted, JobProgress.RebasedCandidateReady _
-        | ReconcileProgram.TurnInProgress, JobProgress.PublishClaimed _
-        | ReconcileProgram.TurnCompleted, JobProgress.PublishClaimed _
-        | ReconcileProgram.TurnInProgress, JobProgress.Published _
-        | ReconcileProgram.TurnCompleted, JobProgress.Published _
-        | ReconcileProgram.TurnInProgress, JobProgress.Failed _
-        | ReconcileProgram.TurnCompleted, JobProgress.Failed _
-        | ReconcileProgram.TurnInProgress, JobProgress.Abandoned
-        | ReconcileProgram.TurnCompleted, JobProgress.Abandoned
-        | ReconcileProgram.TurnCompleted, JobProgress.ConflictPending _ -> true
+    let private orchestrationOwnsTurn (job: ManagerJobProjection) =
+        job.CandidateReady.IsSome
+        || job.RebasedCandidateReady.IsSome
+        || job.PublishClaimed.IsSome
+        || job.Terminal.IsSome
+
+    let private isTransferred (outcome: ReconcileProgram.TurnOutcome) (job: ManagerJobProjection) =
+        match outcome with
+        | ReconcileProgram.TurnInProgress -> orchestrationOwnsTurn job
+        | ReconcileProgram.TurnCompleted -> orchestrationOwnsTurn job || job.ConflictDetected.IsSome
         | _ -> false
 
     let private completeInProgress
@@ -116,8 +105,8 @@ module ManagerJobHandoff =
         (turn: ReconciledTurn)
         =
         task {
-            match tryJobProgress journal turn.SessionId with
-            | Some progress when isTransferred turn.Outcome progress ->
+            match tryJob journal turn.SessionId with
+            | Some job when isTransferred turn.Outcome job ->
                 let! _ = TerminalReporter.complete eventPort journal abortedSessions turn
                 return HandoffOutcome.Transferred
             | _ -> return HandoffOutcome.ManagerOwnsTurn
@@ -149,15 +138,15 @@ module ManagerJobHandoff =
         (turn: ReconciledTurn)
         =
         task {
-            match tryJobProgress journal turn.SessionId with
-            | Some progress when isTransferred turn.Outcome progress ->
+            match tryJob journal turn.SessionId with
+            | Some job when isTransferred turn.Outcome job ->
                 let! _, terminalValid = TerminalReporter.complete eventPort journal abortedSessions turn
                 do! recordFallbackSuccessIfValid journal turn terminalValid
                 return HandoffOutcome.Transferred
             | _ -> return HandoffOutcome.ManagerOwnsTurn
         }
 
-    /// If Orchestrator progress already owns this Manager turn, complete the agent
+    /// If durable Orchestrator evidence already owns this Manager turn, complete the agent
     /// and report Transferred; otherwise leave ownership with the Manager.
     let completeIfTransferred
         (eventPort: IEventObservationPort)

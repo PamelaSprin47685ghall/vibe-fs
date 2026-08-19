@@ -42,18 +42,11 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
 module private OrchestratorRuntimeDecisions =
-    /// Job progress evidence → continue eligibility (GLORY-068: terminal never revives).
+    /// Durable terminal fact closes the job permanently (GLORY-068).
     let requireActiveJob (record: ManagerJobProjection) : Result<ManagerJobProjection, string> =
-        match record.Progress with
-        | JobProgress.Published _
-        | JobProgress.Failed _
-        | JobProgress.Abandoned ->
-            Error(sprintf "Manager job is no longer active: %s" (ManagerJobId.value record.ManagerJobId))
-        | JobProgress.ManagerStarted
-        | JobProgress.CandidateReady _
-        | JobProgress.ConflictPending _
-        | JobProgress.RebasedCandidateReady _
-        | JobProgress.PublishClaimed _ -> Ok record
+        match record.Terminal with
+        | Some _ -> Error(sprintf "Manager job is no longer active: %s" (ManagerJobId.value record.ManagerJobId))
+        | None -> Ok record
 
     let mapTaskError (mapper: 'error -> 'mapped) (operation: Task<Result<'value, 'error>>) =
         task {

@@ -18,14 +18,14 @@ test('WHAT[CHGINT-002] ORCH_007_NeedsReview_preserves_the_active_worktree', () =
     targetBranchFrozen: 'refs/heads/main',
   })
 
-  projection = change.recordProgress(
+  projection = change.recordFact(
     projection,
     'job-1',
-    change.progress('CandidateReady', { candidateCommit: 'candidate-head', preRebaseReviewBarrierId: 'bar-1' }),
+    change.fact('CandidateReady', { candidateCommit: 'candidate-head', preRebaseReviewBarrierId: 'bar-1' }),
   )
   const job = change.find(projection, 'job-1')
   assert.equal(job.worktreePath, '/tmp/wt-job-1')
   assert.equal(job.worktreeIdentity, 'manager/job-1')
-  assert.equal(job.progress, 'CandidateReady')
+  assert.deepEqual(job.facts, ['CandidateReady'])
   assert.equal(removeCalls, 0, 'a NeedsReview verdict must keep the active worktree')
 })
