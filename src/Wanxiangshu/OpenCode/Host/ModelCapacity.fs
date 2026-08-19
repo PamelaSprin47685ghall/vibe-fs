@@ -94,7 +94,7 @@ type BorrowingCapacity<'target>
 
     let executionPrefix sessionId = sessionId + "\u001f"
 
-    let currentCreditSource sessionId =
+    let currentCreditSource (sessionId: string) : CapacityCreditSource option =
         let sources =
             creditSourceByExecution
             |> Seq.choose (fun (KeyValue(key, source)) ->
@@ -108,12 +108,13 @@ type BorrowingCapacity<'target>
         match sources with
         | [] -> None
         | [ source ] -> Some source
-        | _ -> invalidOp (sprintf "execution-model-routing: session %s has multiple borrowed capacity sources" sessionId)
+        | _ ->
+            invalidOp (sprintf "execution-model-routing: session %s has multiple borrowed capacity sources" sessionId)
 
     let clearCreditSource key =
         creditSourceByExecution.Remove key |> ignore
 
-    let clearCreditSourcesForToken tokenId =
+    let clearCreditSourcesForToken (tokenId: int64) =
         creditSourceByExecution
         |> Seq.choose (fun (KeyValue(key, source)) -> if source.Token = tokenId then Some key else None)
         |> Seq.toArray
@@ -169,26 +170,38 @@ type BorrowingCapacity<'target>
     let isAncestor ancestor descendant =
         ancestorDistance ancestor descendant |> Option.isSome
 
-    let companionLender requester =
-        match currentCreditSource requester with
-        | Some source -> Some(source.LenderSessionId, source.Distance)
-        | None ->
-            match companionOwnerBySession.TryGetValue requester with
-            | false, _ -> None
-            | true, ownerMain ->
-                currentCreditSource ownerMain
-                |> Option.bind (fun mainSource ->
-                    match companionSessionByOwner.TryGetValue mainSource.LenderSessionId with
-                    | true, lenderBlogger -> Some(lenderBlogger, mainSource.Distance)
-                    | false, _ -> None)
+    let tryCompanionOwner sessionId =
+        match companionOwnerBySession.TryGetValue sessionId with
+        | true, owner -> Some owner
+        | false, _ -> None
+
+    let tryCompanionSession ownerSessionId =
+        match companionSessionByOwner.TryGetValue ownerSessionId with
+        | true, companion -> Some companion
+        | false, _ -> None
+
+    let companionLender (requester: string) : (string * int) option =
+        currentCreditSource requester
+        |> Option.map (fun source -> source.LenderSessionId, source.Distance)
+        |> Option.orElseWith (fun () ->
+            tryCompanionOwner requester
+            |> Option.bind currentCreditSource
+            |> Option.bind (fun source ->
+                tryCompanionSession source.LenderSessionId
+                |> Option.map (fun lenderCompanion -> lenderCompanion, source.Distance)))
+
+    let matchingLenderDistance lenderSessionId (candidateLender, distance) =
+        if candidateLender = lenderSessionId then
+            Some distance
+        else
+            None
 
     let creditDistance lenderSessionId requester =
         if lenderSessionId = requester then
             Some 0
         elif companionOwnerBySession.ContainsKey requester then
             companionLender requester
-            |> Option.bind (fun (lenderBlogger, distance) ->
-                if lenderBlogger = lenderSessionId then Some distance else None)
+            |> Option.bind (matchingLenderDistance lenderSessionId)
         else
             ancestorDistance lenderSessionId requester
 
@@ -257,15 +270,15 @@ type BorrowingCapacity<'target>
 
         withoutTokens hidden, credits
 
-    let ordinaryDecision route =
+    let ordinaryDecision (route: 'target array -> 'target option) : ('target * CapacityToken<'target> option) option =
         route (ledger.Snapshot()) |> Option.map (fun target -> target, None)
 
-    let attributedDecision target credit route =
+    let attributedDecision target (credit: CapacityToken<'target>) route =
         match route (withoutTokens (Set.singleton credit.Token)) with
         | Some attributable when sameTarget attributable target -> Some(target, Some credit)
         | _ -> ordinaryDecision route
 
-    let matchingCreditDecision target credits route =
+    let matchingCreditDecision target (credits: Map<string, CapacityToken<'target>>) route =
         match Map.tryFind (normalizeProvider target) credits with
         | None -> ordinaryDecision route
         | Some credit when credits.Count = 1 -> Some(target, Some credit)
@@ -275,7 +288,7 @@ type BorrowingCapacity<'target>
     /// provider credits were hidden, the chosen target must still be reproducible
     /// with exactly its own provider token hidden; otherwise no single token can
     /// legally pay for that decision.
-    let routeDecision requester route =
+    let routeDecision requester route : ('target * CapacityToken<'target> option) option =
         let borrowedView, credits = schedulingView requester
         let borrowed = route borrowedView
 
@@ -338,20 +351,21 @@ type BorrowingCapacity<'target>
                 finishStep token
             | _ -> ())
 
+    let rememberGrantedCredit (token: CapacityToken<'target>) (demand: CapacityStepDemand<'target>) =
+        match creditDistance token.OwnerSessionId demand.SessionId with
+        | Some distance ->
+            rememberCreditSource
+                (executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
+                demand.SessionId
+                token
+                distance
+        | None -> invalidOp "execution-model-routing: granted capacity token is not a legal credit source"
+
     let grant (token: CapacityToken<'target>) (demand: CapacityStepDemand<'target>) =
         match token.State with
         | CapacityTokenState.Idle ->
             ledger.Retarget(token.Token, demand.Target)
-
-            match creditDistance token.OwnerSessionId demand.SessionId with
-            | Some distance ->
-                rememberCreditSource
-                    (executionKey demand.SessionId (Some demand.PhysicalUserMessageId))
-                    demand.SessionId
-                    token
-                    distance
-            | None ->
-                invalidOp "execution-model-routing: granted capacity token is not a legal credit source"
+            rememberGrantedCredit token demand
 
             token.State <-
                 CapacityTokenState.InFlight
@@ -412,12 +426,34 @@ type BorrowingCapacity<'target>
         if tryGrantBorrowed () || tryGrantOrdinary () then
             drain ()
 
-    let acquireForRoute sessionId physicalUserMessageId target credit =
+    let acquireForRoute sessionId physicalUserMessageId target (credit: CapacityToken<'target> option) =
         match credit with
         | Some _ -> ()
         | None -> acquireOwnedToken sessionId physicalUserMessageId target |> ignore
 
-    let commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target credit =
+    let requiredCreditDistance failure lenderSessionId requester =
+        match creditDistance lenderSessionId requester with
+        | Some distance -> distance
+        | None -> invalidOp failure
+
+    let recordRoutedCredit sessionId key (credit: CapacityToken<'target> option) =
+        match credit with
+        | Some token ->
+            requiredCreditDistance
+                "execution-model-routing: routed credit is not legal for requester"
+                token.OwnerSessionId
+                sessionId
+            |> rememberCreditSource key sessionId token
+        | None -> clearCreditSource key
+
+    let applyRoutedToken
+        sessionId
+        oldKey
+        newKey
+        newPhysicalUserMessageId
+        target
+        (credit: CapacityToken<'target> option)
+        =
         match oldKey, credit with
         | Some previousKey, Some token when token.OwnerKey = previousKey ->
             moveOwnedToken previousKey newKey target token
@@ -425,26 +461,50 @@ type BorrowingCapacity<'target>
             acquireForRoute sessionId (Some newPhysicalUserMessageId) target credit
             oldKey |> Option.iter retireExecution
 
+    let commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target credit =
+        applyRoutedToken sessionId oldKey newKey newPhysicalUserMessageId target credit
         oldKey |> Option.iter clearCreditSource
-
-        match credit with
-        | Some token ->
-            match creditDistance token.OwnerSessionId sessionId with
-            | Some distance -> rememberCreditSource newKey sessionId token distance
-            | None -> invalidOp "execution-model-routing: routed credit is not legal for requester"
-        | None -> clearCreditSource newKey
-
+        recordRoutedCredit sessionId newKey credit
         target
 
-    let ensureReservationToken sessionId target =
-        function
+    let ensureReservationToken sessionId target (credit: CapacityToken<'target> option) =
+        match credit with
         | Some _ -> ()
         | None -> acquireOwnedToken sessionId None target |> ignore
+
+    let recordReservationCredit sessionId key (credit: CapacityToken<'target> option) =
+        match credit with
+        | Some token ->
+            requiredCreditDistance
+                "execution-model-routing: reserved credit is not legal for requester"
+                token.OwnerSessionId
+                sessionId
+            |> rememberCreditSource key sessionId token
+        | None -> clearCreditSource key
 
     let adoptOwnedToken oldKey newKey target tokenId =
         match tokens.TryGetValue tokenId with
         | true, token -> moveOwnedToken oldKey newKey target token
         | false, _ -> ownedTokenByExecution.Remove oldKey |> ignore
+
+    let dropOwnedCompanion sessionId =
+        match companionSessionByOwner.TryGetValue sessionId with
+        | true, blogger ->
+            companionSessionByOwner.Remove sessionId |> ignore
+            companionOwnerBySession.Remove blogger |> ignore
+        | false, _ -> ()
+
+    let clearOwnedCompanionIfMatches owner sessionId =
+        match companionSessionByOwner.TryGetValue owner with
+        | true, blogger when blogger = sessionId -> companionSessionByOwner.Remove owner |> ignore
+        | _ -> ()
+
+    let dropCompanionOwner sessionId =
+        match companionOwnerBySession.TryGetValue sessionId with
+        | true, owner ->
+            companionOwnerBySession.Remove sessionId |> ignore
+            clearOwnedCompanionIfMatches owner sessionId
+        | false, _ -> ()
 
     member _.BindChild(parentSessionId: string, childSessionId: string) =
         lock gate (fun () ->
@@ -467,7 +527,10 @@ type BorrowingCapacity<'target>
 
     member _.BindCompanion(ownerSessionId: string, bloggerSessionId: string) =
         lock gate (fun () ->
-            if String.IsNullOrWhiteSpace ownerSessionId || String.IsNullOrWhiteSpace bloggerSessionId then
+            if
+                String.IsNullOrWhiteSpace ownerSessionId
+                || String.IsNullOrWhiteSpace bloggerSessionId
+            then
                 invalidArg "sessionId" "execution-model-routing: capacity companion requires non-empty session ids"
 
             let owner = ownerSessionId.Trim()
@@ -497,24 +560,15 @@ type BorrowingCapacity<'target>
             |> Seq.toArray
             |> Array.iter (fun child -> parents.Remove child |> ignore)
 
-            match companionSessionByOwner.TryGetValue sessionId with
-            | true, blogger ->
-                companionSessionByOwner.Remove sessionId |> ignore
-                companionOwnerBySession.Remove blogger |> ignore
-            | false, _ -> ()
-
-            match companionOwnerBySession.TryGetValue sessionId with
-            | true, owner ->
-                companionOwnerBySession.Remove sessionId |> ignore
-
-                match companionSessionByOwner.TryGetValue owner with
-                | true, blogger when blogger = sessionId -> companionSessionByOwner.Remove owner |> ignore
-                | _ -> ()
-            | false, _ -> ()
+            dropOwnedCompanion sessionId
+            dropCompanionOwner sessionId
 
             creditSourceByExecution
             |> Seq.choose (fun (KeyValue(key, source)) ->
-                if source.LenderSessionId = sessionId then Some key else None)
+                if source.LenderSessionId = sessionId then
+                    Some key
+                else
+                    None)
             |> Seq.toArray
             |> Array.iter clearCreditSource)
 
@@ -548,14 +602,7 @@ type BorrowingCapacity<'target>
                 ensureReservationToken sessionId target credit
 
                 let key = executionKey sessionId None
-
-                match credit with
-                | Some token ->
-                    match creditDistance token.OwnerSessionId sessionId with
-                    | Some distance -> rememberCreditSource key sessionId token distance
-                    | None -> invalidOp "execution-model-routing: reserved credit is not legal for requester"
-                | None -> clearCreditSource key
-
+                recordReservationCredit sessionId key credit
                 Some target)
 
     member _.AdoptReservation(sessionId: string, physicalUserMessageId: string, target: 'target) =
