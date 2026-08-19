@@ -80,16 +80,16 @@ module BlogSurface =
                 if String.IsNullOrWhiteSpace tip then
                     box
                         {| ok = true
-                           text = "unknown-tip"
+                           text = "missing-tip"
                            error = "missing required argument: tip" |}
                 elif
-                    EnforcerCatalog.tryFindByField tip (EnforcerCatalogResource.load ())
+                    EnforcerCatalog.resolveByField tip (EnforcerCatalogResource.load ())
                     |> Option.isNone
                 then
                     box
                         {| ok = true
-                           text = "unknown-tip"
-                           error = sprintf "UnknownTip %s" tip |}
+                           text = "missing-tip"
+                           error = "missing required argument: tip" |}
                 else
                     box
                         {| ok = true

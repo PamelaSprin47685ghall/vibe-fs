@@ -52,7 +52,10 @@ module ReconcileSurface =
                      None
                  else
                      Some(PhysicalUserMessageId.create physical)),
-                (if System.String.IsNullOrWhiteSpace reason then "provider failure" else reason)
+                (if System.String.IsNullOrWhiteSpace reason then
+                     "provider failure"
+                 else
+                     reason)
             )
         | "AbortWake" -> ReconcileProgram.ReconcileWake.AbortWake
         | other -> invalidArg "wake" (sprintf "unknown reconcile wake: %s" other)
@@ -383,14 +386,7 @@ module ReconcileSurface =
                         Task.FromResult(
                             Ok
                                 [ schedulerMessage "failure-witness-root" "user" None None None false [||]
-                                  schedulerMessage
-                                      "failure-witness-current"
-                                      "user"
-                                      None
-                                      None
-                                      None
-                                      false
-                                      [||]
+                                  schedulerMessage "failure-witness-current" "user" None None None false [||]
                                   schedulerMessage
                                       "failure-witness-current-run"
                                       "assistant"

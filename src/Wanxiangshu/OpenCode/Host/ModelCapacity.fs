@@ -24,10 +24,14 @@ type CapacityLedger<'target>() =
             if entries.ContainsKey token then
                 entries.[token] <- target)
 
-    member _.Release(token: int64) = lock gate (fun () -> entries.Remove token)
+    member _.Release(token: int64) =
+        lock gate (fun () -> entries.Remove token)
 
     member _.Entries() =
-        lock gate (fun () -> entries |> Seq.map (fun (KeyValue(token, target)) -> token, target) |> Seq.toArray)
+        lock gate (fun () ->
+            entries
+            |> Seq.map (fun (KeyValue(token, target)) -> token, target)
+            |> Seq.toArray)
 
     member this.Snapshot() = this.Entries() |> Array.map snd
 
@@ -62,11 +66,7 @@ type private CapacityStepDemand<'target> =
 /// Decorates the old ledger with lineage-local borrowing and preemptive recall.
 /// Borrowing changes who may use a token, never how many real tokens exist.
 type BorrowingCapacity<'target>
-    (
-        ledger: CapacityLedger<'target>,
-        providerOf: 'target -> string,
-        sameTarget: 'target -> 'target -> bool
-    ) =
+    (ledger: CapacityLedger<'target>, providerOf: 'target -> string, sameTarget: 'target -> 'target -> bool) =
     let gate = obj ()
     // DSL-MUTABLE: resource — capacity-only session lineage
     let parents = Dictionary<string, string>()
@@ -106,7 +106,8 @@ type BorrowingCapacity<'target>
 
         loop descendant 0 Set.empty
 
-    let isAncestor ancestor descendant = ancestorDistance ancestor descendant |> Option.isSome
+    let isAncestor ancestor descendant =
+        ancestorDistance ancestor descendant |> Option.isSome
 
     let isRetiring token =
         match token.State with
@@ -150,7 +151,11 @@ type BorrowingCapacity<'target>
                 |> Option.map (fun distance -> token, distance))
         |> Seq.groupBy (fun (token, _) -> token.Provider)
         |> Seq.map (fun (provider, candidates) ->
-            let token, _ = candidates |> Seq.sortBy (fun (token, distance) -> distance, token.Token) |> Seq.head
+            let token, _ =
+                candidates
+                |> Seq.sortBy (fun (token, distance) -> distance, token.Token)
+                |> Seq.head
+
             provider, token)
         |> Map.ofSeq
 
@@ -160,7 +165,10 @@ type BorrowingCapacity<'target>
 
     let schedulingView requester =
         let credits = creditTokens requester
-        let hidden = credits |> Seq.map (fun (KeyValue(_, token)) -> token.Token) |> Set.ofSeq
+
+        let hidden =
+            credits |> Seq.map (fun (KeyValue(_, token)) -> token.Token) |> Set.ofSeq
+
         withoutTokens hidden, credits
 
     let ordinaryDecision route =
@@ -197,6 +205,7 @@ type BorrowingCapacity<'target>
             invalidOp "execution-model-routing: one execution cannot own two capacity tokens"
 
         let tokenId = ledger.Acquire target
+
         let token =
             { Token = tokenId
               OwnerKey = key
@@ -247,6 +256,7 @@ type BorrowingCapacity<'target>
         match token.State with
         | CapacityTokenState.Idle ->
             ledger.Retarget(token.Token, demand.Target)
+
             token.State <-
                 CapacityTokenState.InFlight
                     { SessionId = demand.SessionId
@@ -279,7 +289,10 @@ type BorrowingCapacity<'target>
         |> Seq.toList
 
     let tryGrantBorrowed () =
-        match idleBorrowPairs () |> List.sortBy (fun (distance, sequence, token, _, _) -> distance, sequence, token) with
+        match
+            idleBorrowPairs ()
+            |> List.sortBy (fun (distance, sequence, token, _, _) -> distance, sequence, token)
+        with
         | [] -> false
         | (_, _, _, demand, token) :: _ ->
             grant token demand
@@ -318,6 +331,11 @@ type BorrowingCapacity<'target>
 
         target
 
+    let ensureReservationToken sessionId target =
+        function
+        | Some _ -> ()
+        | None -> acquireOwnedToken sessionId None target |> ignore
+
     let adoptOwnedToken oldKey newKey target tokenId =
         match tokens.TryGetValue tokenId with
         | true, token -> moveOwnedToken oldKey newKey target token
@@ -325,7 +343,10 @@ type BorrowingCapacity<'target>
 
     member _.BindChild(parentSessionId: string, childSessionId: string) =
         lock gate (fun () ->
-            if String.IsNullOrWhiteSpace parentSessionId || String.IsNullOrWhiteSpace childSessionId then
+            if
+                String.IsNullOrWhiteSpace parentSessionId
+                || String.IsNullOrWhiteSpace childSessionId
+            then
                 invalidArg "sessionId" "execution-model-routing: capacity lineage requires non-empty session ids"
 
             let parent = parentSessionId.Trim()
@@ -356,7 +377,10 @@ type BorrowingCapacity<'target>
             route: 'target array -> 'target option
         ) =
         lock gate (fun () ->
-            let oldKey = oldPhysicalUserMessageId |> Option.map (fun physical -> executionKey sessionId (Some physical))
+            let oldKey =
+                oldPhysicalUserMessageId
+                |> Option.map (fun physical -> executionKey sessionId (Some physical))
+
             let newKey = executionKey sessionId (Some newPhysicalUserMessageId)
 
             match routeDecision sessionId route with
@@ -364,14 +388,15 @@ type BorrowingCapacity<'target>
                 oldKey |> Option.iter retireExecution
                 None
             | Some(target, credit) ->
-                commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target credit |> Some)
+                commitRoutedTarget sessionId oldKey newKey newPhysicalUserMessageId target credit
+                |> Some)
 
     member _.ReserveFresh(sessionId: string, route: 'target array -> 'target option) =
         lock gate (fun () ->
             match routeDecision sessionId route with
             | None -> None
             | Some(target, credit) ->
-                if credit.IsNone then acquireOwnedToken sessionId None target |> ignore
+                ensureReservationToken sessionId target credit
                 Some target)
 
     member _.AdoptReservation(sessionId: string, physicalUserMessageId: string, target: 'target) =
@@ -397,7 +422,8 @@ type BorrowingCapacity<'target>
     member _.ReleasePhysical(sessionId: string, physicalUserMessageId: string) =
         lock gate (fun () ->
             cancelWaiters (fun demand ->
-                demand.SessionId = sessionId && demand.PhysicalUserMessageId = physicalUserMessageId)
+                demand.SessionId = sessionId
+                && demand.PhysicalUserMessageId = physicalUserMessageId)
 
             retireExecution (executionKey sessionId (Some physicalUserMessageId))
             drain ())
@@ -414,7 +440,9 @@ type BorrowingCapacity<'target>
             reconcileFence sessionId physicalUserMessageId fence
             nextDemand <- nextDemand + 1L
 
-            let completion = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+            let completion =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
             let demand =
                 { Sequence = nextDemand
                   SessionId = sessionId

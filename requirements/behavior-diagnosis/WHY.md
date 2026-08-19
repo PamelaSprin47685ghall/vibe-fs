@@ -29,8 +29,10 @@ NudgeConsumed → Main fake-user overlay」。它把「给出一个工程意见�
 
 - 缺失 score 默认 0（缺失被伪装成「没问题」）；
 - 数字字符串 / clamp / score parser（wire 层引入数值语义）；
-- Damerau–Levenshtein typo repair（未知字段被强行解释成某条规则 → 诊断在模糊
-  匹配上成立）；
+- Damerau–Levenshtein typo repair 当时作用于 120 个独立 score 字段：一个拼错的
+  数值 key 会凭空制造「哪条规则被评分」这一事实。现在 `chronicle` 只有一个必填
+  `tip`，非空字符串本身已经表达「模型选择了一条 lesson」；编辑距离只负责把这个
+  已存在的选择归一到最近的目录身份，不再制造 score / severity / occurrence。
 - 同规则 score 取 max（多调用时「最严重」赢，而不是确定性选择）；
 - `EnforcementReport` 评分向量、`EnforcementObservationOrdinal`、leaky integrator
   / tau / pressure threshold（诊断退化成数值积分）。
@@ -40,6 +42,8 @@ NudgeConsumed → Main fake-user overlay」。它把「给出一个工程意见�
 rebase 裁决（已落地）：删除全部 score/throttle/Main-overlay 机制，不给他们找同名
 新壳。每个 tip 目录只保留单一 `tip` 字段；Host 只证明 tip 来自 catalog、cycle 身份
 成立、text 非空、commit 与 coverage 原子、replay/recovery 不重复产生业务事实。
+provider 偶发拼写偏差不应制造第二个协议失败：非空 tip 先精确解析，失败后按编辑
+距离选择最近目录名；并列按目录 LexicalOrder 决定，保持同输入同结果。
 
 ### 2.3 规则载体三连拒（历史 why/enforcer 条款）
 

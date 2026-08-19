@@ -1,7 +1,7 @@
 // tests/unit/Enforcer/codec.test.mjs — docs/what/enforcer.md ENFORCER-020…026 tip v2.
 //
-// Blog-argument codec: required tip (catalog field exact match), text, optional evidence.
-// No score map, no fuzzy field mapping, no default tip.
+// Blog-argument codec: required non-empty tip, text, optional evidence.
+// Non-exact tip strings resolve to the nearest catalog field by edit distance.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -10,7 +10,7 @@ import * as enforcer from '../../../dist/Enforcer/Surface.js'
 const firstField = () => enforcer.fieldNames()[0]
 const firstRule = () => enforcer.tryFindByField(firstField())
 
-// ── missing / unknown tip (ENFORCER-023) ────────────────────────────────────
+// ── missing / nearest tip (ENFORCER-023/024) ────────────────────────────────
 
 test('WHAT[BD-006] ENFORCER_023_missing_tip_fails', () => {
   const result = enforcer.decodeCall({ text: 'work log entry' })
@@ -27,18 +27,16 @@ test('WHAT[BD-006] ENFORCER_023_empty_tip_fails', () => {
   }
 })
 
-test('WHAT[BD-007] ENFORCER_023_unknown_tip_fails', () => {
+test('WHAT[BD-007] ENFORCER_023_nonempty_unknown_tip_resolves', () => {
   const result = enforcer.decodeCall({ text: 'entry', tip: 'not-a-catalog-field' })
-  assert.equal(result.ok, false)
-  assert.equal(result.error, enforcer.unknownTipError('not-a-catalog-field'))
-  assert.match(result.error, /^UnknownTip /)
+  assert.equal(result.ok, true)
+  assert.ok(enforcer.fieldNames().includes(result.value.tip.fieldName))
 })
 
-test('WHAT[BD-007] ENFORCER_024_fuzzy_or_misspelled_tip_is_not_mapped', () => {
-  // Old ENFORCER-024 fuzzy mapping is deleted; exact field only.
-  const result = enforcer.decodeCall({ text: 'entry', tip: 'enf-primitive-obsessin' })
-  assert.equal(result.ok, false)
-  assert.match(result.error, /UnknownTip/)
+test('WHAT[BD-007] ENFORCER_024_misspelled_tip_maps_to_nearest_rule', () => {
+  const result = enforcer.decodeCall({ text: 'entry', tip: 'primitive-obsessin' })
+  assert.equal(result.ok, true)
+  assert.equal(result.value.tip.fieldName, 'primitive-obsession')
 })
 
 // ── valid tip maps RuleId (ENFORCER-021/025) ────────────────────────────────

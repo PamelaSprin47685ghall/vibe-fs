@@ -941,7 +941,7 @@ module FissionTool =
         (language: ProviderLanguage)
         =
         task {
-            let prompts = args.Text "prompts"
+            let prompts = args.Texts "prompts"
 
             match FissionPrompt.parse prompts with
             | Error FissionRejectReason.TooFewLanes
@@ -978,5 +978,5 @@ module FissionTool =
         { Name = "fission"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
-          Arguments = [ "prompts", ToolHostCodec.stringSchema factory ]
+          Arguments = [ "prompts", ToolHostCodec.stringArraySchema factory ]
           Execute = execute scope }

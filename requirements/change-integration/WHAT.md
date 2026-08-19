@@ -65,9 +65,11 @@ MOVE `tests/job.test.mjs`（`ORCH_004_multiple_jobs_are_active_at_once_and_termi
 `tests/worktree-resource.test.mjs`（`WORKTREE_create_returns_owned_resource_and_marks_path_identity`、
 `WORKTREE_release_removes_worktree_and_branch_once`）。
 
-## CHGINT-006：restart 后从 Journal 最后事实 fold 出唯一恢复动作
+## CHGINT-006：restart 后从 durable facts + 外部现实重证 outstanding obligation
 
-崩溃恢复完全依赖 Journal 最后一条事实折叠，决定**唯一**恢复动作（ORCH-007）：
+崩溃恢复完全依赖 Journal durable facts（`CandidateReady` / `ConflictDetected` /
+`RebasedCandidateReady` / `PublishClaimed` / `Published` / `JobFailed` / `JobAbandoned`）
+加上当前外部现实（如 target head），重新证明 outstanding obligation，再进入普通 CE（ORCH-007）：
 
 ```text
 Published / JobAbandoned → 清理 worktree，移出活跃 Map
@@ -79,7 +81,13 @@ CandidateReady           → 进 rebaseReviewPublishLoop
 ManagerJobCreated        → 从 worktree 恢复同一 Manager 继续
 ```
 
-含义/动机：事实链不可跳步；磁盘状态可伪造、可停写，故恢复只信最后事实（PERSIST-009 边界）。
+projection 存储独立 durable facts（不 fold 成唯一"最新 case"）；semantic entry 从
+facts + 外部现实重证 obligation，不恢复一个 latest-stage enum，不新增 `ResumeAtXxx`
+补偿日志（SW-003 vs SW-009 消歧）。
+
+含义/动机：事实链不可跳步；磁盘状态可伪造、可停写，故恢复只信 durable facts（PERSIST-009 边界）。
+fold 成唯一 latest case 并 case→下一程序地址一一映射是 durable resume-address（SW-009 禁止）；
+正确形态是从 facts + 外部现实重证。
 
 边界：durable facts 的存储与 fold → `durable-events`；崩溃后重入普通程序 → `crash-reconciliation`。
 

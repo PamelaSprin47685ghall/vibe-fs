@@ -42,10 +42,12 @@ Witness ID 必须指向已持久化 `ConfirmedReviewWitness`；`ConflictDetected
 
 ### 恢复（ORCH-007）
 
-`program` 读取 durable projection 的 `JobProgress`，直接 match 每个 case 调用对应 CE effect。
-fresh start（无 projection 或 `ManagerStarted`）与 restart 共用同一 `awaitAndPublish` entry。
-`JobProgress` 只保存物理证据（commit、head snapshot、conflict files），不保存程序位置。
-`classifyRebasedCandidate` / `classifyPublishClaim` 返回领域分类（`RebasedCandidateReality` /
+`program` 从 durable projection 读取独立 durable facts（`CandidateReady` /
+`ConflictDetected` / `RebasedCandidateReady` / `PublishClaimed` / `Terminal`），
+加上当前外部现实（target head），重新证明 outstanding obligation，进入对应 CE effect。
+fresh start（无 projection 或全部 facts 为 None）与 restart 共用同一 `awaitAndPublish` entry。
+projection 不 fold 成唯一"最新 case"——每个 fact 独立存储，semantic entry 从 facts + reality
+重证 obligation（SW-003 vs SW-009 消歧）。`classifyRebasedCandidate` / `classifyPublishClaim` 返回领域分类（`RebasedCandidateReality` /
 `PublishClaimReality`），Program.fs match 分类决定 CE effect——不存在 control-token dispatcher。
 
 PublishClaimed 三分支固定顺序不可换：

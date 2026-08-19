@@ -224,7 +224,8 @@ module ModelRoutingSurface =
         (physicalUserMessageId: string)
         (visibleProviderRuns: string array)
         : Task =
-        (runtimeOf runtime).EnterProviderStep(sessionId, physicalUserMessageId, visibleProviderRuns |> Set.ofArray)
+        (runtimeOf runtime)
+            .EnterProviderStep(sessionId, physicalUserMessageId, visibleProviderRuns |> Set.ofArray)
 
     let endProviderStep
         (runtime: obj)
@@ -232,7 +233,8 @@ module ModelRoutingSurface =
         (physicalUserMessageId: string)
         (providerRun: string)
         : unit =
-        (runtimeOf runtime).EndProviderStep(sessionId, physicalUserMessageId, providerRun)
+        (runtimeOf runtime)
+            .EndProviderStep(sessionId, physicalUserMessageId, providerRun)
 
     let suppressProviderStep (runtime: obj) (sessionId: string) (physicalUserMessageId: string) : unit =
         (runtimeOf runtime).SuppressProviderStep(sessionId, physicalUserMessageId)

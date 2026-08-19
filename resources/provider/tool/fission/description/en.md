@@ -2,7 +2,7 @@ Temporarily divide this same logical participant into several coequal execution 
 
 Use fission only when this agent is running in a subsession and its own assigned work contains multiple genuinely separable slices whose parallel execution will reduce latency. A user-facing/root session must not fission. Fission separable work, not merely plentiful work.
 
-prompts is one string: one non-empty line per lane, at least two lanes. Each line becomes that lane's exact local charge.
+prompts is a string array with at least two elements. Each non-blank element is one lane's exact local charge; a lane prompt may contain its own newlines.
 
 Fission does not delegate to new agents. Every lane keeps the same logical identity, office, authority, parent relation, child ownership and shared worktree. Existing external work from before the split is shared; work newly initiated by a lane remains completion-affined to that lane.
 

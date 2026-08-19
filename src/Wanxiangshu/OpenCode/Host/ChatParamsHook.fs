@@ -59,9 +59,7 @@ module ChatParamsHook =
         if isNull input || isNull input?sessionID then
             None
         else
-            string input?sessionID
-            |> normalizeText
-            |> Option.map SessionId.create
+            string input?sessionID |> normalizeText |> Option.map SessionId.create
 
     let private tryPhysicalUserMessageId (input: obj) =
         if isNull input || isNull input?message || isNull input?message?id then
@@ -160,7 +158,10 @@ module ChatParamsHook =
         | None -> ()
 
     let private handleInput (input: obj) (output: obj) =
-        if isDisclosureOnlyMaterial input then () else applyManagedPolicy input output
+        if isDisclosureOnlyMaterial input then
+            ()
+        else
+            applyManagedPolicy input output
 
     let create () : obj =
         box (fun (input: obj) (output: obj) -> handleInput input output)

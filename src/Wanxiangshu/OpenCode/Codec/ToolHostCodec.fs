@@ -68,6 +68,18 @@ module private HostArgDecode =
         with _ ->
             None
 
+    let stringsFromArrayValue (value: obj) =
+        if emitJsExpr value "Array.isArray($0) && $0.every(item => typeof item === 'string')" then
+            unbox<string array> value |> Array.toList |> Some
+        else
+            None
+
+    let tryStringsFromArrayValue (value: obj) =
+        try
+            stringsFromArrayValue value
+        with _ ->
+            None
+
     // Fable erases unbox<float> to identity, so a string would pass through where
     // .NET would throw. Type-test instead: a non-number is absent, never a wrong-typed Some.
     let numberFromValue (value: obj) =
@@ -118,6 +130,12 @@ type HostToolArguments internal (raw: obj) =
             None
         else
             HostArgDecode.tryTextsFromArrayValue (raw?(name))
+
+    member _.Texts(name: string) =
+        if isNull raw || isNull raw?(name) then
+            []
+        else
+            HostArgDecode.tryStringsFromArrayValue (raw?(name)) |> Option.defaultValue []
 
     member _.OptionalNumber(name: string) =
         if isNull raw || isNull raw?(name) then
@@ -212,6 +230,9 @@ module ToolHostCodec =
 
     [<Emit("$0.schema.array($0.schema.string()).optional()")>]
     let private rawOptionalStringArraySchema (tool: obj) : obj = jsNative
+
+    [<Emit("$0.schema.array($0.schema.string())")>]
+    let private rawStringArraySchema (tool: obj) : obj = jsNative
 
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
@@ -358,6 +379,9 @@ module ToolHostCodec =
 
     let optionalStringArraySchema (HostToolFactory factory) =
         HostSchema(rawOptionalStringArraySchema factory)
+
+    let stringArraySchema (HostToolFactory factory) =
+        HostSchema(rawStringArraySchema factory)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

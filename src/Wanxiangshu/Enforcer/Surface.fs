@@ -108,13 +108,11 @@ module EnforcerSurface =
         |> EnforcerCatalog.validate schemaVersion
         |> resultToJs (fun (rules: EnforcerRule list) -> ruleArray rules)
 
-    /// Decode chronicle arguments against the packaged exact-tip catalog.
+    /// Decode chronicle arguments against the packaged tip catalog.
     let decodeCall (value: obj) : obj =
         EnforcerCodec.decodeCall (rulebook ()) (rawArgs value) |> resultToJs callToJs
 
     let missingTipError = EnforcerCodec.MissingTipError
-
-    let unknownTipError (value: string) = EnforcerCodec.unknownTipError value
 
     let hasValidText (value: obj) : bool =
         let rawTip = value?tip

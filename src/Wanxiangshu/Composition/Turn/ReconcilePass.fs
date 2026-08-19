@@ -405,7 +405,9 @@ module ReconcilePass =
         (turns: Map<string, ReconciledTurn>)
         (messages: SessionMessage list)
         : Task =
-        let turn = TurnReconcile.reconcile messages activeBinding |> materializeFailureWitness wake
+        let turn =
+            TurnReconcile.reconcile messages activeBinding |> materializeFailureWitness wake
+
         let evidence = evidenceOf turn
         let observedTurns = observedTurnsOf turn turns
         let decision = ReconcileProgram.decideStep wake rereadsRemaining evidence

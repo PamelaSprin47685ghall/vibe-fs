@@ -51,36 +51,19 @@ type ParsedFissionPrompts =
 
 module FissionPrompt =
 
-    let private normalizeNewlines (value: string) =
-        let normalized =
-            if isNull value then
-                ""
-            else
-                value.Replace("\r\n", "\n").Replace("\r", "\n")
-
-        if normalized.EndsWith("\n", StringComparison.Ordinal) then
-            normalized.Substring(0, normalized.Length - 1)
-        else
-            normalized
-
-    /// INTRA-PARTICIPANT-PARALLELISM-002: a line is a lane. Preserve every byte
-    /// except newline normalization and one ergonomic trailing LF.
-    let private validateLanePrompts lines =
-        match lines |> List.tryFindIndex String.IsNullOrWhiteSpace with
+    let private validateLanePrompts prompts =
+        match prompts |> List.tryFindIndex String.IsNullOrWhiteSpace with
         | Some index -> Error(FissionRejectReason.EmptyLanePrompt index)
         | None -> Ok()
 
-    let parse (value: string) : Result<ParsedFissionPrompts, FissionRejectReason> =
-        let normalized = normalizeNewlines value
-        let lines = normalized.Split('\n') |> Array.toList
-
-        if List.length lines < 2 then
+    let parse (prompts: string list) : Result<ParsedFissionPrompts, FissionRejectReason> =
+        if List.length prompts < 2 then
             Error FissionRejectReason.TooFewLanes
         else
-            validateLanePrompts lines
+            validateLanePrompts prompts
             |> Result.map (fun () ->
-                { Count = List.length lines
-                  Lanes = lines |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) })
+                { Count = List.length prompts
+                  Lanes = prompts |> List.mapi (fun index prompt -> { Index = index; Prompt = prompt }) })
 
 [<RequireQualifiedAccess>]
 type FissionCompletionAffinity =

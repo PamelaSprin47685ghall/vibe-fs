@@ -252,6 +252,7 @@ module ModelRouting =
 
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
+
         let capacity =
             BorrowingCapacity<ModelRoutingTarget>(CapacityLedger<ModelRoutingTarget>(), targetProvider, (=))
         // DSL-MUTABLE: resource — active execution lease map per session
@@ -322,7 +323,7 @@ module ModelRouting =
 
         let reserveFreshOrPoison sessionId agent previous =
             try
-                capacity.ReserveFresh(sessionId, fun running -> scheduleOrPoison running agent previous)
+                capacity.ReserveFresh(sessionId, (fun running -> scheduleOrPoison running agent previous))
             with ex ->
                 poison ex
                 raise ex
@@ -351,12 +352,7 @@ module ModelRouting =
 
         let schedulePendingDemand demand =
             if pending.Contains demand then
-                routeFreshOrPoison
-                    demand.SessionId
-                    None
-                    demand.PhysicalUserMessageId
-                    demand.Agent
-                    demand.PreviousTarget
+                routeFreshOrPoison demand.SessionId None demand.PhysicalUserMessageId demand.Agent demand.PreviousTarget
                 |> commitScheduled demand
             else
                 false

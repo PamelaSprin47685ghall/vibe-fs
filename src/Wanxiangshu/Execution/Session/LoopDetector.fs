@@ -73,7 +73,10 @@ module LoopDetector =
     let BetaQuantileU = Calibration.betaQuantileU
 
     let NormalWeightedDistinctCount = Calibration.normalWeightedDistinctCount
-    let TheoreticalLoopWeightedDistinctCount = Calibration.theoreticalLoopWeightedDistinctCount
+
+    let TheoreticalLoopWeightedDistinctCount =
+        Calibration.theoreticalLoopWeightedDistinctCount
+
     let LoopWeightedDistinctThreshold = Calibration.loopWeightedDistinctThreshold
 
     [<RequireQualifiedAccess>]

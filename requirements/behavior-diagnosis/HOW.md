@@ -19,8 +19,11 @@ type EnforcerRule =
 
 - `EnforcerCatalog.validate`（BD-003）：schemaVersion=1、非空、三身份唯一且相等、
   序连续、正文非空。失败返回 `Error string`，装载层转抛 → fail fast。
-- `EnforcerCatalog.tryFindByField`（BD-007）：trim 后精确 `FieldName`/`Name` 命中；
-  无 fuzzy、无近似、无默认。
+- `EnforcerCatalog.tryFindByField`：trim 后精确 `FieldName`/`Name` 命中，供 durable
+  identity / 查询路径使用。
+- `EnforcerCatalog.resolveByField`（BD-007）：先精确命中；否则按 Levenshtein
+  编辑距离选最近 `FieldName`，并列按 LexicalOrder。非空 rulebook + 非空 string
+  永远得到一条规则；没有 `UnknownTip` 分支。
 - `EnforcerCatalog.fieldNames`：按 LexicalOrder 输出 provider enum 清单。
 
 ### 1.2 `src/Wanxiangshu/Domain/EnforcerCodec.fs`（BD-006/007/008）
@@ -31,7 +34,7 @@ type CanonicalBlogCall = { Text: string option; Evidence: string option; Tip: En
 
 - `decodeCall rules rawArgs`：只认 `entry`（兼容旧 `text`）、`tip`、`evidence`；
   其余 property 忽略（ENFORCER-024）。缺/空/非 string `tip` → `MissingTipError`；
-  未知 tip → `UnknownTip <value>`。
+  非空 string tip → `resolveByField`，拼写偏差直接归一到最近规则。
 - `hasValidText`：entry trim 后非空才算有效文本。
 
 > 注意（诚实性）：历史 what/enforcer 条款 ENFORCER-004/020 声称「无 `evidence`

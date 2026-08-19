@@ -10,23 +10,23 @@ const mustOk = (result) => {
   return result
 }
 
-test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical parser normalizes only newline shape and preserves lane text', () => {
-  const parsed = mustOk(fission.parsePrompt('  A  \r\nB\r\n'))
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical lane array preserves each prompt including embedded newlines', () => {
+  const parsed = mustOk(fission.parsePrompt(['  A  \r\nstill A', 'B\r\n']))
   assert.deepEqual(
     parsed.lanes.map((lane) => [lane.index, lane.prompt]),
     [
-      [0, '  A  '],
-      [1, 'B'],
+      [0, '  A  \r\nstill A'],
+      [1, 'B\r\n'],
     ],
   )
   assert.equal(parsed.count, 2)
 
-  const internalBlank = fission.parsePrompt('A\n   \nC')
+  const internalBlank = fission.parsePrompt(['A', '   ', 'C'])
   assert.equal(internalBlank.ok, false)
   assert.equal(internalBlank.reason, 'EmptyLanePrompt')
   assert.equal(internalBlank.laneIndex, 1)
 
-  const tooFew = fission.parsePrompt('A')
+  const tooFew = fission.parsePrompt(['A'])
   assert.equal(tooFew.ok, false)
   assert.equal(tooFew.reason, 'TooFewLanes')
 })

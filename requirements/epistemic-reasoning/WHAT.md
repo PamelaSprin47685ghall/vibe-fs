@@ -270,6 +270,14 @@ UNKNOWN_HANDLE 是当前明确接受的边界（persistence 是独立的未来�
 **边界**：wire 形状细节与 tool description 文案是 HOW；legacy `resume` 保留为兼容工具但不在
 推荐面。
 
+**Protocol-boundary exemption（STRUCTURED-WORKFLOW-017）**：Sphinx inquiry 是领域 protocol automaton
+（epistemic inquiry protocol），不是普通 CE workflow。`nextTool` 是 protocol-level affordance
+translation——将 kernel-decided pending Request 翻译为外部 caller 可调用的 tool name。这不是
+SW-017① 管辖的 child action opcode，因为：(1) Kernel 唯一拥有 continuation/closure/停止（EPI-002）；
+(2) external caller 只提供 typed observation，不获得"下一 phase 应调用哪个内部 operation"之外
+的控制权；(3) yield/observe 循环是协议语义（co-yield coroutine with controller），不是业务流程
+位置。豁免条件已满足并以本条书面记录。
+
 **证据**：HOW.md EPI-013 行（mcp-handle `mcp_server_surface_exposes_phase_tools_and_legacy_resume`、
 mcp-contract、mcp-stdio）。
 

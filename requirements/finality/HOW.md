@@ -58,6 +58,14 @@ LastBlessing 存在               → CompleteBlessedLife     // rest 路径（G
 `admitLabor`：open request 拥有 Life（Manager 普通劳动停放，GLORY-041）；
 resolved 历史 request（Rejected/Blessed/Undecided）不阻塞劳动。
 
+### handleEnding（FINALITY-003，SW-017① 对齐）
+
+`ManagerFinality.handleEnding(disposition, exec)` 在 Finality 域内 dispatch ending action。
+Tool adapter 构造 `FinalityEndingExecution` record（封装执行能力）并调用 `handleEnding`，
+后者内部 match disposition 并返回 `FinalityEndingOutcome`（`Refused path | Result toolResult`）。
+Tool adapter 只渲染边界结果，不 match `EndingDisposition` case。`EndingDisposition` 仍是纯领域分类，
+但不再是 child action opcode → caller effect 的 CE seam。
+
 ### FinalityTool.execute（GLORY-034/035/037-041）
 
 前置条件按序检查（先要求 durable plan commitment，再含 TODO-010 drain：`awaitConsumableReview(latest Accepted)`）；

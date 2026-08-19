@@ -38,6 +38,48 @@ module ManagerFinality =
         | CompleteBlessedLife of BlessingEvidence
         | BeginFinality
 
+    /// Boundary result from Finality-owned ending execution. The Tool adapter
+    /// only receives this — never the internal EndingDisposition to dispatch on.
+    [<RequireQualifiedAccess>]
+    type FinalityEndingOutcome =
+        | Refused of path: string
+        | Result of toolResult: obj
+
+    /// Execution capabilities the Tool adapter provides to the Finality-owned
+    /// ending handler. The handler dispatches internally; the adapter only
+    /// renders the boundary outcome.
+    type FinalityEndingExecution =
+        { Refuse: string -> obj
+          AlreadyCompleted: unit -> obj
+          ResumeRequest: FinalityRequestProjection -> Task<obj>
+          RecoverEmptyMembers: FinalityRequestProjection -> Task<obj>
+          WaitForCurrentRequest: unit -> obj
+          CompleteBlessedLife: BlessingEvidence -> Task<obj>
+          BeginFinality: unit -> Task<obj> }
+
+    /// Execute the ending action inside the Finality domain. The Tool adapter
+    /// provides execution capabilities but never matches EndingDisposition cases.
+    let handleEnding (disposition: EndingDisposition) (exec: FinalityEndingExecution) : Task<FinalityEndingOutcome> =
+        task {
+            match disposition with
+            | EndingDisposition.ContinuePlanning -> return FinalityEndingOutcome.Refused "tool/suicide/continue-working"
+            | EndingDisposition.AlreadyCompleted -> return FinalityEndingOutcome.Result(exec.AlreadyCompleted())
+            | EndingDisposition.ResumeRequest request ->
+                let! result = exec.ResumeRequest request
+                return FinalityEndingOutcome.Result result
+            | EndingDisposition.RecoverRequestWithoutReviewers request ->
+                let! result = exec.RecoverEmptyMembers request
+                return FinalityEndingOutcome.Result result
+            | EndingDisposition.WaitForCurrentRequest ->
+                return FinalityEndingOutcome.Refused "tool/suicide/wait-for-current-ending"
+            | EndingDisposition.CompleteBlessedLife blessing ->
+                let! result = exec.CompleteBlessedLife blessing
+                return FinalityEndingOutcome.Result result
+            | EndingDisposition.BeginFinality ->
+                let! result = exec.BeginFinality()
+                return FinalityEndingOutcome.Result result
+        }
+
     /// Admit ordinary Manager labor only when no open Finality request owns the
     /// current Life. Resolved historical requests do not block labor.
     let admitLabor (life: LifeProjection) : LaborAdmission =

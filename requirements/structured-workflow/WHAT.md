@@ -76,6 +76,12 @@ Step continuation AST
 - 领域证据 DUs / 纯查询以 `Pending|Spent|Phase` 结尾、物理算法名（
   `EstimatedRunningSeconds`、`RecoveryStageProbe`）、fold 拒绝 token（`Already*`）是
   真实事物或拒绝事实，不是行为 bool（dsl-ownership allowlist 语义）。
+- **SW-003 vs SW-009 消歧（durable fact 同时编码 obligation 时）**：当 durable fact
+  同时编码 obligation（如 `CandidateReady` 既是有形证据又暗示"需要 publish"），消歧判据
+  如下：fact 本身是合法持久证据（SW-003 允许）；但把多个 facts fold 成唯一"最新 case"
+  并据此一一映射下一程序地址，是 durable resume-address（SW-009 禁止）。正确形态：
+  semantic entry 从一组 durable facts + 当前外部现实重新证明 outstanding obligation，
+  然后进入普通 CE；不恢复一个 latest-stage enum，不新增 `ResumeAtXxx` 补偿日志。
 
 **证据**：HOW.md §1 第 3 行。
 
@@ -406,6 +412,15 @@ runtime。结构闭包要求业务调用树具有缩放不变性：缩小是有�
   运行到哪里”，不是禁止正常业务分支。
 - recovery 仍遵守 STRUCTURED-WORKFLOW-009：fold durable facts 后从 semantic entry
   重入，不能以“组合”名义恢复内部 continuation。
+- **领域 protocol automaton 的 protocol-boundary exemption**：领域 protocol automaton
+  （如 epistemic inquiry protocol）的 protocol-level affordance translation（如 `nextTool`）
+  不是 SW-017① 管辖的 business program counter。protocol automaton 拥有独立的 continuation
+  ownership（如 EPI-002），其 yield/observe 循环是协议语义而非业务流程位置。豁免条件：
+  (1) kernel 唯一拥有 continuation/closure/停止；(2) external caller 只提供 observation，
+  不获"下一 phase 应调用哪个内部 operation"的解释权以外的控制权；(3) 豁免必须以书面
+  protocol-boundary exemption 形式记录在对应 owner 的 WHAT 中。满足条件的 protocol
+  automaton 的 `nextTool`/`ExpectedTool` 是 protocol-level wire translation，不是
+  SW-017① 的 child action opcode。
 
 **证据**：HOW.md §1 第 17 行。
 

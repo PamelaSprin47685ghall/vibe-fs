@@ -6,9 +6,9 @@
 
 Fission 只增加同一 logical participant 的并发 execution presents。所有 lanes 共享同一 logical identity、CanonicalRole、authority/responsibility owner、logical parent relation 与 logical child set；不得因 physical lane session 数量增加 provider-visible AgentId、handle 或 parent join obligation。
 
-## INTRA-PARTICIPANT-PARALLELISM-002：canonical lane parser
+## INTRA-PARTICIPANT-PARALLELISM-002：canonical lane array
 
-`fission(prompts: String)` 先把 CRLF/CR 规范化为 LF，最多移除一个最终 LF，再按 LF 分行；必须 N≥2，且每行至少含一个非空白字符。除 newline normalization 外，每行文字 byte-for-byte 保留；不得 trim、猜 markdown/list/JSON 或 silently drop empty lane。
+`fission(prompts: String Array)` 中每个 array element 恰好是一条 lane；必须 N≥2，且每个 element 至少含一个非空白字符。每个 lane string 必须 byte-for-byte 保留，包括其内部 CR/LF；不得 trim、按 newline 再分割、normalize、猜 markdown/list/JSON 或 silently drop empty lane。
 
 ## INTRA-PARTICIPANT-PARALLELISM-003：fresh sibling replacement transport
 

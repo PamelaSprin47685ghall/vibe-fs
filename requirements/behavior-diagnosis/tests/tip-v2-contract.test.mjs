@@ -30,10 +30,10 @@ test('WHAT[BD-006] ENFORCER_TIP_05_missing_tip_fails', () => {
   assert.equal(r.error, enforcer.missingTipError)
 })
 
-test('WHAT[BD-007] ENFORCER_TIP_06_unknown_tip_fails', () => {
+test('WHAT[BD-007] ENFORCER_TIP_06_unknown_tip_resolves_to_catalog', () => {
   const r = enforcer.decodeCall({ text: 'entry', tip: 'totally-unknown-field' })
-  assert.equal(r.ok, false)
-  assert.match(r.error, /UnknownTip totally-unknown-field/)
+  assert.equal(r.ok, true)
+  assert.ok(enforcer.fieldNames().includes(r.value.tip.fieldName))
 })
 
 test('WHAT[BD-007] ENFORCER_TIP_07_valid_field_maps_rule_id_exactly', () => {

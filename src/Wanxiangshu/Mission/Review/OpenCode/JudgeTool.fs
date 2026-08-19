@@ -118,8 +118,7 @@ module JudgeTool =
         =
         match processSubmission journal judgement with
         | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
-        | Some submission ->
-            recordSubmittedJudgement scope context journal judgement.PhysicalUserMessageId submission
+        | Some submission -> recordSubmittedJudgement scope context journal judgement.PhysicalUserMessageId submission
 
     let private recordProcessJudgement
         (scope: ToolRuntimeScope)

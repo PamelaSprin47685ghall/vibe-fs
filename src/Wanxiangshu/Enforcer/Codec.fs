@@ -13,7 +13,7 @@ open System
 /// docs/what/enforcer.md ENFORCER-020…026：`blog` tip v2 codec.
 ///
 /// raw JSON object → Result<CanonicalBlogCall, string>.
-/// tip = catalog field exact match only; no score map, no fuzzy field mapping.
+/// tip = exact catalog field or deterministic nearest edit-distance match; no score map.
 module EnforcerCodec =
 
     /// ENFORCER-004 / 026：领域闭合类型。Tip 必填。
@@ -25,8 +25,6 @@ module EnforcerCodec =
     /// ENFORCER-023 错误面。
     [<Literal>]
     let MissingTipError = "missing required argument: tip"
-
-    let unknownTipError (tipValue: string) = sprintf "UnknownTip %s" tipValue
 
     /// ENFORCER-022：text / tip / evidence 的字符串抽取（trim；空 → None）。
     let private tryStringArg (rawArgs: Map<string, obj>) (key: string) : string option =
@@ -49,13 +47,13 @@ module EnforcerCodec =
         if tipValue.Length = 0 then
             Error MissingTipError
         else
-            EnforcerCatalog.tryFindByField tipValue rules
+            EnforcerCatalog.resolveByField tipValue rules
             |> Option.map (fun rule ->
                 Ok
                     { Text = text
                       Evidence = evidence
                       Tip = EnforcerTip.ofRule rule })
-            |> Option.defaultValue (Error(unknownTipError tipValue))
+            |> Option.defaultValue (Error MissingTipError)
 
     let private decodeTip
         (rules: EnforcerRule list)

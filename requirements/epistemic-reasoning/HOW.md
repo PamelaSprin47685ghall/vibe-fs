@@ -190,6 +190,11 @@ Answer 不复制 transcript，也不把 candidate/value estimate/method score �
   认识内核是否 durable 是独立实现选择，不由本包命题强制（边界卡片 DOES NOT OWN 末条）。
 - **SPHINX-005（F# 单一实现）→ HOW**：编译边界/模块依赖方向是当前实现约束，不是认识论合同；
   其「内核不依赖 Host/Agent/Journal」的信息已吸收进 HOW §1。
+- **SW-017 protocol-boundary exemption 裁决（2026-08-19）**：Sphinx `PendingRequest → nextTool`
+  经裁决为领域 protocol automaton 的 protocol-level affordance translation，不是普通 CE workflow
+  的 child action opcode。豁免以 EPI-013 书面记录。裁决依据：EPI-002（Kernel 拥有 continuation）、
+  EPI-004（Pending Request 契约）、EPI-013（MCP affordance 面忠实翻译）。豁免不改变 `nextTool`
+  的实现形态，只正式记录其语义边界。
 
 ## 验证与测试落点
 

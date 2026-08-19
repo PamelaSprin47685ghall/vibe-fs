@@ -76,9 +76,7 @@ module JudgeSurface =
         |> ignore
 
     let hasVerdictSubmitted (sessionId: string) (physicalUserMessageId: string) : bool =
-        JudgementRequestIdentity.key
-            (SessionId.create sessionId)
-            (PhysicalUserMessageId.create physicalUserMessageId)
+        JudgementRequestIdentity.key (SessionId.create sessionId) (PhysicalUserMessageId.create physicalUserMessageId)
         |> SharedState.VerdictSubmissions.Contains
 
     let clearVerdictSubmissions () : unit = SharedState.VerdictSubmissions.Clear()

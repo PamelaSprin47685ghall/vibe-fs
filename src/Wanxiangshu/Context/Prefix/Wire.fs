@@ -310,9 +310,9 @@ module XWire =
     // BlogEntry burns the armed slot and PrefixRebase never lands.
     let private consumeRecoveryArming (scope: PluginRuntimeScope) (sessionId: SessionId) (plan: AttemptPlan) =
         match AttemptPlanner.probeOf plan, plan.NoProbeReason with
-        | Some _, _ -> scope.ClearRecovery sessionId
-        | None, Some NoCandidateReason.NoCoverage -> ()
-        | None, _ -> scope.ClearRecovery sessionId
+        | Some _, _ -> ()
+        | None, Some NoCandidateReason.NoCoverage -> scope.ReArmRecovery sessionId
+        | None, _ -> ()
 
     let private awaitProjectionSignal
         (messageVisibility: MessageVisibilityHub option)
@@ -460,7 +460,10 @@ module XWire =
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
             let physical = ProviderWireCapture.lastUserMessageId rawMessages
 
-            match scope.TryRecoveryArming sessionId, physical, snapshot with
+            // Owning recovery CE consumes the typed arming permit exactly once (SW-017②, PAR-011).
+            // Host callback is only rendezvous/observation; presence no longer drives business branching
+            // outside the owning CE.
+            match scope.TryTakeRecoveryPermit sessionId, physical, snapshot with
             | None, _, _ -> return ()
             | Some _, None, _ ->
                 raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
@@ -540,26 +543,26 @@ module XWire =
         (turn: ReconciledTurn)
         (plan: AttemptPlan)
         : Task =
+        // Typed handle already consumed by reconcileAttempt via TryTakeAttemptPlan.
         // Keep the plan across provisional / unknown rereads of the SAME
-        // provider run. A first idle wake often sees finish=None (Unknown) or
-        // a needs-continuation race before the terminal finish lands; clearing
-        // here made the subsequent TurnCompleted promote with TryAttemptPlan=None
-        // (measured: FallbackCursorAdvanced without PrefixRebaseCommitted).
+        // provider run only inside the owning CE: TurnCompleted commits the
+        // promotable prefix rebase; terminal outcomes release the handle
+        // (already consumed); provisional keeps nothing (no second read).
         match turn.Outcome with
         | ReconcileProgram.TurnCompleted ->
             task {
                 do! commitPromotablePrefixRebase durable turn plan
-                scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
+                ()
             }
             :> Task
         | ReconcileProgram.TurnFailed _
-        | ReconcileProgram.TurnAborted _ ->
-            scope.ClearAttemptPlan turn.SessionId turn.ProviderRun
-            Task.FromResult(())
+        | ReconcileProgram.TurnAborted _ -> Task.FromResult(())
         | ReconcileProgram.TurnNeedsContinuation _
         | ReconcileProgram.TurnInProgress -> Task.FromResult(())
 
+    /// Owning recovery CE consumes the frozen attempt plan exactly once (typed handle).
+    /// Reconciliation is the only consumer; no second read after provisional.
     let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
-        match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
+        match journal, scope.TryTakeAttemptPlan turn.SessionId turn.ProviderRun with
         | Some durable, Some plan -> reconcileArmedAttempt durable scope turn plan
         | _ -> Task.FromResult(())

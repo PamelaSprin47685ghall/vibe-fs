@@ -61,8 +61,8 @@ TipName/RuleId/FieldName 恒等。装载按语言定位叶子，无跨语言 fal
 
 ### BD-006 chronicle 参数合同
 
-`chronicle` 调用按 codec 解析：`entry`（trim 后非空）与 `tip`（目录 TipName 枚举
-精确命中）为语义必需；缺失 tip / 空 tip / 非 string tip → 失败，错误面稳定
+`chronicle` 调用按 codec 解析：`entry`（trim 后非空）与 `tip`（可归一到目录 TipName）
+为语义必需；缺失 tip / 空 tip / 非 string tip → 失败，错误面稳定
 （`missing required argument: tip`）；`entry` 缺失或空 → 无有效文本。
 若物理 tool call 到达时不存在 live Blogger cycle，owner 必须先得到封闭的
 `NoLiveCycle` protocol outcome，并终止该 stale session；只有 `ToolSpec.Execute` 最后一公里
@@ -74,15 +74,17 @@ decision 不得用 exception 表示这个可预见分支。
 - 边界：`chronicle` 工具名与权限归 `capability-enforcement`；这里只锁参数语义与 live-cycle protocol outcome，Host exception 仅是 adapter encoding。
 - 证据：`codec.test.mjs` `ENFORCER_023_*`、`ENFORCER_022_*`；`HOW.md` 行 15–17。
 
-### BD-007 tip 精确映射，无 fuzzy
+### BD-007 tip 确定性最近映射
 
-`tip` 必须精确命中已装载 rulebook 的 TipName 枚举，映射到 RuleId 且
-RuleId = FieldName = TipName；未知 tip / 拼写近似 / 词形变体一律失败，不做
-fuzzy / Damerau–Levenshtein / 默认 tip 修复。查找前 trim。
+`tip` 查找前 trim。精确命中已装载 rulebook 的 TipName 时直接映射；否则对全部
+TipName 计算 Levenshtein 编辑距离并选择距离最小者。最小距离并列时选择
+LexicalOrder 最小者。任何非空 string tip 都必须解析成一条规则，不存在
+`UnknownTip` / “lesson 不在 Rulebook”分支；RuleId = FieldName = TipName 恒成立。
 
-- 含义：诊断不能在「最接近的规则」上成立（历史 why/enforcer 1.4）；
-  未知输入不得被强行解释成某条工程规则。
-- 证据：`codec.test.mjs` `ENFORCER_021_*`、`ENFORCER_024_fuzzy_or_misspelled_*`；
+- 含义：模型已经通过必填 `tip` 表达了「选择某条 lesson」的意图；拼写偏差只做
+  身份归一，不应把 Host 推入额外 tool-error/retry cycle。缺失/空/非 string 仍由
+  BD-006 拒绝，不存在默认 tip。
+- 证据：`codec.test.mjs` `ENFORCER_021_*`、`ENFORCER_024_misspelled_*`；
   `HOW.md` 行 15–17。
 
 ### BD-008 无 score path
@@ -206,8 +208,8 @@ squash（`BlogObservationsSquashed`）把最老 K 个 frame 折叠为一个 Squa
 无有效 cycle（`chronicle` 0 次 / 2+ 次、纯散文、缺 tip、空 entry）最终可进入
 InteractionRepair/nudge 路径，但**第一次物理 Nudge 只能由真正 quiescent 的 idle terminal 拥有，transform
 不得发送 session nudge**。transform 正处在 Host provider/tool-loop 内，在那里发送 nudge 会与 Host 的自然
-continuation 竞争并形成 queued user message。尤其“恰好一次 chronicle，但参数/schema/tool execution 因错误
-tip/hint 失败”仍属于 Host tool-loop：先把 tool error 原样交回 Blogger，让它在下一 provider step 自己改正；
+continuation 竞争并形成 queued user message。尤其“恰好一次 chronicle，但参数/schema/tool execution 因缺失、空值或类型错误
+失败”仍属于 Host tool-loop：先把 tool error 原样交回 Blogger，让它在下一 provider step 自己改正；
 这一失败本身不 claim repair、不记 confirmed failure、不消费 AABB。只有后续真正无 tool-loop 可继续的
 invalid terminal 才由 idle 立即发送 repair nudge。每个 exact `BloggerRequestId` 至多一次 Nudge；同一 terminal run 重放幂等（同一观察
 重放，不发送、不推进）；新 terminal 再次无效才证明 nudge repair 失败 → 统一 Fallback/AABB；abort 清理

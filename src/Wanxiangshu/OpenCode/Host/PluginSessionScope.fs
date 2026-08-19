@@ -149,6 +149,7 @@ type PluginSessionScope() =
         |> Seq.filter (JudgementRequestIdentity.belongsTo sid)
         |> Seq.toArray
         |> Array.iter (fun request -> this.VerdictSubmissions.Remove request |> ignore)
+
         this.AbortedSessions.Remove sessionId |> ignore
 
         if preserveIdentity then

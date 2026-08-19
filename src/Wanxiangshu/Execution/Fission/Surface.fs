@@ -83,8 +83,8 @@ module FissionSurface =
             {| index = lane.Index
                prompt = lane.Prompt |}
 
-    let parsePrompt (text: string) : obj =
-        match FissionPrompt.parse text with
+    let parsePrompt (prompts: string array) : obj =
+        match FissionPrompt.parse (Array.toList prompts) with
         | Ok parsed ->
             box
                 {| ok = true

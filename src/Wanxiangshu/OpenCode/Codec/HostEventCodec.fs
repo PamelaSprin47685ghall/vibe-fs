@@ -235,9 +235,7 @@ module HostEventCodec =
     let private providerRunId (info: obj) =
         nonEmptyFieldText info "id" |> Option.map ProviderRunIdentity.create
 
-    let tryDecodeProviderStepEnd
-        (rawInput: obj)
-        : (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option =
+    let tryDecodeProviderStepEnd (rawInput: obj) : (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option =
         let raw = unwrap rawInput
         let info = messageInfo raw
         let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"

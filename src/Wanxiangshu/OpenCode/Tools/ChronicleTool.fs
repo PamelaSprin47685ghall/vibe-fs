@@ -76,7 +76,7 @@ module ChronicleTool =
         let NothingToRemember = "tool/chronicle/nothing-to-remember"
 
         [<Literal>]
-        let UnknownTip = "tool/chronicle/unknown-tip"
+        let MissingTip = "tool/chronicle/missing-tip"
 
     let EmptyTextError = "CHRONICLE_EMPTY_ENFORCER_061"
 
@@ -116,8 +116,8 @@ module ChronicleTool =
     let private nothingToRemember language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.NothingToRemember ] []
 
-    let private unknownTip language =
-        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.UnknownTip ] []
+    let private missingTip language =
+        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.MissingTip ] []
 
     let private abortSessionIfPresent (runtime: ToolRuntimeScope) sessionId : System.Threading.Tasks.Task =
         task {
@@ -134,11 +134,11 @@ module ChronicleTool =
 
     let private resultForTip language tipRaw =
         if String.IsNullOrWhiteSpace tipRaw then
-            unknownTip language
+            missingTip language
         else
-            EnforcerCatalog.tryFindByField tipRaw (enforcerRules ())
+            EnforcerCatalog.resolveByField tipRaw (enforcerRules ())
             |> Option.map (fun _ -> remembered language)
-            |> Option.defaultValue (unknownTip language)
+            |> Option.defaultValue (missingTip language)
 
     let private executeValidEntry language (args: HostToolArguments) : string =
         match tryCanonicalText (args.Text "entry") with

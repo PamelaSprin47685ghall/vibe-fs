@@ -179,7 +179,9 @@ module ReconcileProgram =
             match evidence with
             | ReconcileEvidence.Provisional observed
             | ReconcileEvidence.Unknown(Some observed) ->
-                observed.PublishTurn |> Option.bind (tryFailureWitnessReason wake) |> Option.isSome
+                observed.PublishTurn
+                |> Option.bind (tryFailureWitnessReason wake)
+                |> Option.isSome
             | ReconcileEvidence.SnapshotError _
             | ReconcileEvidence.NoTurn
             | ReconcileEvidence.Unknown None

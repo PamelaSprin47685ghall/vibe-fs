@@ -397,20 +397,27 @@ module FinalityTool =
             MagicTodoProjection.tryLife life.LifeId snapshot.AgentProjections.MagicTodo
             |> Option.exists MagicTodoProjection.isPlanCommitted
 
-        // Split arms (no `(A|B) as disposition`) — Fable FS0038 double-bind.
-        match ManagerFinality.classifyEnding context.ToolCallId life hasPlanCommitment with
-        | ManagerFinality.EndingDisposition.ContinuePlanning -> Task.FromResult(refuse context Path.ContinueWorking)
-        | ManagerFinality.EndingDisposition.AlreadyCompleted ->
-            Task.FromResult(ToolHostCodec.tomlObject [ "status", tString "already_completed" ])
-        | ManagerFinality.EndingDisposition.ResumeRequest request -> resumeFinalityRequest scope sid life request
-        | ManagerFinality.EndingDisposition.RecoverRequestWithoutReviewers request ->
-            recoverEmptyMembers scope sid life request
-        | ManagerFinality.EndingDisposition.WaitForCurrentRequest ->
-            Task.FromResult(refuse context Path.WaitForCurrentEnding)
-        | ManagerFinality.EndingDisposition.CompleteBlessedLife blessing ->
-            completeBlessedEnding scope journal context sid life blessing lastWords
-        | ManagerFinality.EndingDisposition.BeginFinality ->
-            beginFinalityEnding scope journal context sid sessionId life lastWords
+        let disposition =
+            ManagerFinality.classifyEnding context.ToolCallId life hasPlanCommitment
+
+        let exec: ManagerFinality.FinalityEndingExecution =
+            { Refuse = fun path -> refuse context path
+              AlreadyCompleted = fun () -> ToolHostCodec.tomlObject [ "status", tString "already_completed" ]
+              ResumeRequest = fun request -> resumeFinalityRequest scope sid life request
+              RecoverEmptyMembers = fun request -> recoverEmptyMembers scope sid life request
+              WaitForCurrentRequest = fun () -> refuse context Path.WaitForCurrentEnding
+              CompleteBlessedLife =
+                fun blessing -> completeBlessedEnding scope journal context sid life blessing lastWords
+              BeginFinality = fun () -> beginFinalityEnding scope journal context sid sessionId life lastWords }
+
+        task {
+            let! outcome = ManagerFinality.handleEnding disposition exec
+
+            return
+                match outcome with
+                | ManagerFinality.FinalityEndingOutcome.Refused path -> refuse context path
+                | ManagerFinality.FinalityEndingOutcome.Result result -> result
+        }
 
     let private executeManagerEnding
         (scope: ToolRuntimeScope)

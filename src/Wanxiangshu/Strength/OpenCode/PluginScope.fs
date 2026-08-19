@@ -69,14 +69,105 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
-/// Two-step counterfactual observation — replaces the former
-/// strengthPendingFirst/strengthPendingSecond dictionary pair. One
-/// dictionary holds a single DU value; the transition is a pure fold
-/// (advanceCounterfactual), not two separate mutable dictionaries with
-/// implicit step logic encoded by lookup order.
-type CounterfactualAwait =
+/// Sealed inside physical adapter — not cross-callback workflow PC (SW-003, SW-017②).
+/// Represents one in-flight counterfactual observation inside the collector.
+/// Only the collector module may construct/match it; business workflow above
+/// only observes the completed CounterfactualPair via TryTakeCounterfactualPair.
+type private CounterfactualAwait =
     | AwaitFirst of targetRun: ProviderRunIdentity * feature: StrengthFeatureKey
     | AwaitSecond of feature: StrengthFeatureKey
+
+/// Collector that turns two observations into one CounterfactualPair.
+/// Physics-only: first observation target-bound, second observation completes.
+/// Business layer does not branch on AwaitFirst/AwaitSecond.
+type CounterfactualPair =
+    { Feature: StrengthFeatureKey
+      FirstSymbol: StrengthPrimarySymbol
+      SecondSymbol: StrengthPrimarySymbol }
+
+type private CounterfactualFirst =
+    { Feature: StrengthFeatureKey
+      Symbol: StrengthPrimarySymbol }
+
+/// Collector internals — physical adapter owns the waiting.
+type private CounterfactualCollector() =
+    let counterfactualAwait = Dictionary<string, CounterfactualAwait>()
+    let counterfactualFirsts = Dictionary<string, CounterfactualFirst>()
+    let counterfactualPairs = Dictionary<string, CounterfactualPair>()
+
+    // DSL-MUTABLE: resource — counterfactual await registry by session (physical adapter, sealed)
+    // DSL-MUTABLE: resource — completed counterfactual pairs (typed outcome, one-shot)
+
+    member _.Arm(sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey) =
+        let key = SessionId.value sessionId
+
+        if not (counterfactualAwait.ContainsKey key) then
+            counterfactualAwait.[key] <- AwaitFirst(targetRun, feature)
+
+    member private _.ObserveFirst
+        (key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
+        : StrengthPredictorState * CounterfactualPair option =
+        let next, firstReadonly = StrengthPredictor.observeFirst feature symbol state
+        counterfactualAwait.Remove key |> ignore
+
+        if firstReadonly then
+            counterfactualAwait.[key] <- AwaitSecond feature
+            counterfactualFirsts.[key] <- { Feature = feature; Symbol = symbol }
+        else
+            counterfactualFirsts.Remove key |> ignore
+
+        next, None
+
+    member private _.CompletePair(key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol) =
+        match counterfactualFirsts.TryGetValue key with
+        | true, first ->
+            counterfactualFirsts.Remove key |> ignore
+
+            let pair =
+                { Feature = feature
+                  FirstSymbol = first.Symbol
+                  SecondSymbol = symbol }
+
+            counterfactualPairs.[key] <- pair
+            Some pair
+        | false, _ -> None
+
+    member private this.ObserveSecond
+        (key: string, feature: StrengthFeatureKey, symbol: StrengthPrimarySymbol, state: StrengthPredictorState)
+        : StrengthPredictorState * CounterfactualPair option =
+        let next = StrengthPredictor.observeSecond feature symbol state
+        counterfactualAwait.Remove key |> ignore
+        next, this.CompletePair(key, feature, symbol)
+
+    member this.Observe
+        (
+            sessionId: SessionId,
+            providerRun: ProviderRunIdentity,
+            symbol: StrengthPrimarySymbol,
+            state: StrengthPredictorState
+        ) : StrengthPredictorState * CounterfactualPair option =
+        let key = SessionId.value sessionId
+
+        match counterfactualAwait.TryGetValue key with
+        | true, AwaitFirst(targetRun, feature) when targetRun = providerRun ->
+            this.ObserveFirst(key, feature, symbol, state)
+        | true, AwaitSecond feature -> this.ObserveSecond(key, feature, symbol, state)
+        | _ -> state, None
+
+    /// One-shot typed outcome: owning CE consumes the completed pair exactly once.
+    member _.TryTakePair(sessionId: SessionId) : CounterfactualPair option =
+        let key = SessionId.value sessionId
+
+        match counterfactualPairs.TryGetValue key with
+        | true, pair ->
+            counterfactualPairs.Remove key |> ignore
+            Some pair
+        | false, _ -> None
+
+    member _.ClearSession(sessionId: string) =
+        counterfactualAwait.Remove sessionId |> ignore
+        counterfactualFirsts.Remove sessionId |> ignore
+        counterfactualPairs.Remove sessionId |> ignore
 
 /// STRENGTH-*: decision-local replica ownership/capability registry plus bounded
 /// predictor evidence for one plugin instance. Durable causality stays in
@@ -94,8 +185,9 @@ type PluginStrengthScope() =
     // DSL-MUTABLE: resource — restart-discardable predictor evidence cache
     let mutable strengthPredictorState = StrengthPredictor.empty
     let strengthRecentPrimary = Dictionary<string, StrengthPrimarySymbol list>()
-    // DSL-MUTABLE: resource — counterfactual await registry by session.
-    let counterfactualAwait = Dictionary<string, CounterfactualAwait>()
+    // Physical adapter collector — DU sealed inside, business observes only CounterfactualPair
+    // DSL-MUTABLE: resource — counterfactual collector (physical adapter, typed outcome)
+    let collector = CounterfactualCollector()
 
     /// Fuse is a Result error latch, not a string option. Ok = operational,
     /// Error reason = tripped. TripStrengthFuse is one-shot idempotent: the
@@ -103,24 +195,6 @@ type PluginStrengthScope() =
     /// lets callers participate in Result.bind / CE short-circuit flows.
     // DSL-MUTABLE: resource — strength fuse latch (Ok=operational, Error=tripped)
     let mutable strengthFuse: Result<unit, string> = Ok()
-
-    /// Pure step transition: (await, symbol, predictorState) → (nextAwait, nextPredictorState).
-    /// No dictionary mutation — the caller owns the dictionary update.
-    let nextAwaitAfterFirst feature firstReadonly =
-        if firstReadonly then Some(AwaitSecond feature) else None
-
-    let advanceCounterfactual
-        (await: CounterfactualAwait)
-        (symbol: StrengthPrimarySymbol)
-        (state: StrengthPredictorState)
-        : CounterfactualAwait option * StrengthPredictorState =
-        match await with
-        | AwaitFirst(_, feature) ->
-            let next, firstReadonly = StrengthPredictor.observeFirst feature symbol state
-            nextAwaitAfterFirst feature firstReadonly, next
-        | AwaitSecond feature ->
-            let next = StrengthPredictor.observeSecond feature symbol state
-            None, next
 
     member _.StrengthRuntime = strengthRuntime
 
@@ -155,32 +229,17 @@ type PluginStrengthScope() =
     member _.ArmStrengthCounterfactual
         (sessionId: SessionId, targetRun: ProviderRunIdentity, feature: StrengthFeatureKey)
         =
-        let key = SessionId.value sessionId
-
-        if not (counterfactualAwait.ContainsKey key) then
-            counterfactualAwait.[key] <- AwaitFirst(targetRun, feature)
+        collector.Arm(sessionId, targetRun, feature)
 
     member _.ObserveStrengthPrimary
         (sessionId: SessionId, providerRun: ProviderRunIdentity, symbol: StrengthPrimarySymbol)
         =
         let key = SessionId.value sessionId
 
-        match counterfactualAwait.TryGetValue key with
-        | true, AwaitFirst(targetRun, _) when targetRun = providerRun ->
-            let nextAwait, nextState =
-                advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
+        let nextState, _pair =
+            collector.Observe(sessionId, providerRun, symbol, strengthPredictorState)
 
-            strengthPredictorState <- nextState
-            counterfactualAwait.Remove key |> ignore
-            nextAwait |> Option.iter (fun p -> counterfactualAwait.[key] <- p)
-        | true, AwaitSecond _ ->
-            let nextAwait, nextState =
-                advanceCounterfactual (counterfactualAwait[key]) symbol strengthPredictorState
-
-            strengthPredictorState <- nextState
-            counterfactualAwait.Remove key |> ignore
-            nextAwait |> Option.iter (fun p -> counterfactualAwait.[key] <- p)
-        | _ -> ()
+        strengthPredictorState <- nextState
 
         let recent =
             match strengthRecentPrimary.TryGetValue key with
@@ -189,11 +248,15 @@ type PluginStrengthScope() =
 
         strengthRecentPrimary.[key] <- recent
 
+    /// Typed one-shot outcome for owning CE — consumes the completed CounterfactualPair exactly once.
+    member _.TryTakeCounterfactualPair(sessionId: SessionId) : CounterfactualPair option =
+        collector.TryTakePair sessionId
+
     /// Session deletion drops the decision-local Strength evidence for that session
     /// (mirror of DisposeSession's per-session cleanup in PluginRuntimeScope).
     member _.ClearSession(sessionId: string) =
         strengthRecentPrimary.Remove sessionId |> ignore
-        counterfactualAwait.Remove sessionId |> ignore
+        collector.ClearSession sessionId
 
     member _.Dispose() =
         strengthReplicaRuntime |> Option.iter (fun runtime -> runtime.Dispose())

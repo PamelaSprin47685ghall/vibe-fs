@@ -57,15 +57,15 @@ test('WHAT[BD-017] CHRONICLE_empty_canonical_text_returns_public_consequence', (
 test('WHAT[BD-006] CHRONICLE_missing_tip_returns_rulebook_consequence', () => {
   const result = blog.execute({ hasFlight: true, sessionId: 'ses-blog', entry: 'entry' })
   assert.equal(result.ok, true)
-  assert.equal(result.text, 'unknown-tip')
+  assert.equal(result.text, 'missing-tip')
   assert.equal(result.error, enforcer.missingTipError)
 })
 
-test('WHAT[BD-007] CHRONICLE_unknown_tip_is_rejected_at_runtime', () => {
+test('WHAT[BD-007] CHRONICLE_unknown_tip_is_repaired_at_runtime', () => {
   const result = blog.execute({ hasFlight: true, sessionId: 'ses-blog', entry: 'entry', tip: 'not-a-field' })
   assert.equal(result.ok, true)
-  assert.equal(result.text, 'unknown-tip')
-  assert.match(result.error, /UnknownTip/)
+  assert.equal(result.text, 'remembered')
+  assert.equal(result.error, null)
 })
 
 test('WHAT[BD-009] CHRONICLE_valid_entry_with_identity_returns_fixed_ok', () => {

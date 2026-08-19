@@ -2,14 +2,14 @@
 
 ## 1. Domain spine
 
-建议 production 只持有少量不可非法组合的类型：canonical prompt parser；`FissionGroupId`；lane index/count；`FissionWorkBundle` keyed union；`CompletionAffinity = PreFissionBroadcast | Lane k`；active-group projection。禁止用一组 `isFissioned/isLastLane/hasHandoff` bool 模拟状态机。
+建议 production 只持有少量不可非法组合的类型：canonical prompt-array validator；`FissionGroupId`；lane index/count；`FissionWorkBundle` keyed union；`CompletionAffinity = PreFissionBroadcast | Lane k`；active-group projection。禁止用一组 `isFissioned/isLastLane/hasHandoff` bool 模拟状态机。
 
 ## 2. V1 physical replacement
 
 Fission tool 在 old caller tool context 中：
 
 1. 读取 old caller physical parent。`None` = user-facing/root，立即返回明确的 root-origin consequence；不得读取/解析 prompts，更不得 reserve、读 LWR、写 durable fact、create lane 或 interrupt。
-2. 只有 parent 存在时才解析 prompts；解析失败立即返回，无副作用。Domain admission 随后再次读取 parent，作为 authoritative TOCTOU/fail-closed gate。
+2. 只有 parent 存在时才读取并校验 prompts array；校验失败立即返回，无副作用。每个 array element 已是 lane 边界，lane 内 CR/LF 原样保留。Domain admission 随后再次读取 parent，作为 authoritative TOCTOU/fail-closed gate。
 3. 从 Authority/Profile 取 current managed agent/role；从 canonical LWR port 取 old caller record。
 4. 预留一个 process-local admission slot，防同 owner 两次并发 fission。
 5. 对每 lane 创建 fresh Host session，创建参数里的 `parentID` 使用 **old caller 的 parentID**，而不是 old caller id。
@@ -74,7 +74,7 @@ Role/Persona/Binding 本体（`participant-identity`）；role consequence catal
 | WHAT | 落点 | 证明内容 |
 |---|---|---|
 | INTRA-PARTICIPANT-PARALLELISM-001 | `tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant` | lane/group 不产生 public participant identity；owner id 独立于 physical lane ids；`Surface` 输出为 JS-native plain data，不含 lane session id |
-| INTRA-PARTICIPANT-PARALLELISM-002 | `tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical parser normalizes only newline shape and preserves lane text` | newline normalization、N≥2、empty-line refusal、space preservation |
+| INTRA-PARTICIPANT-PARALLELISM-002 | `tests/fission-domain.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-002] canonical lane array preserves each prompt including embedded newlines` + `tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-002] fission tool exposes prompts as a string array without newline splitting` | String Array schema、N≥2、empty-element refusal、embedded newline/space byte preservation、生产代码无 newline splitting |
 | INTRA-PARTICIPANT-PARALLELISM-003 | `tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-003] admission creates fresh sibling sessions with old parent and starts from LWR + exact lane input`；`tests/fission-source-ratchet.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-003] sibling creation is a distinct Host capability from managed-child creation` | fresh sessions；每 lane parent == old caller parent；prompt 含 canonical LWR + exact lane input；不用 Host fork |
 | INTRA-PARTICIPANT-PARALLELISM-004 | `tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-004] partial create or start failure rolls back every created lane and never interrupts old caller` | 任一 create/send fail → rollback created lanes、old caller不 abort |
 | INTRA-PARTICIPANT-PARALLELISM-005 | `tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-005] old caller silent-interrupts only after every lane started`；`tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-005] failed silent interrupt rolls back lanes and old caller stays out of active set`；`tests/fission-runtime.test.mjs::WHAT[INTRA-PARTICIPANT-PARALLELISM-005] FissionRuntime preserves silent interrupt across multiple checks and is cleared only by clearOwner/clearSilentInterrupt` | 全 lane admitted 后才 silent interrupt；silent abort 不 terminal/cascade |

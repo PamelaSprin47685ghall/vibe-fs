@@ -55,9 +55,16 @@ last_words、ToolCallId、ProviderRun、无 outstanding/completed-awaiting-join 
 正确 worktree ownership、active ManagerJob；并满足 FINALITY-004/005/006（TODO-010）。
 任何失败不得创建 Finality Reviewer/barrier/request（GLORY-037）。
 
+`EndingDisposition` 是纯领域分类，不是 program counter（SW-017①）。Tool adapter 不 match
+disposition case 并分发不同业务效果；Finality-owned `handleEnding` 函数接收分类 + 执行能力，
+内部 dispatch 并返回边界结果（`Refused path | Result toolResult`）。Tool adapter 只调用
+`handleEnding` 并渲染边界结果。
+
 **含义 / 动机**：终结是资源安全 + 协议纪律的交点；半建 cohort 会留下不可恢复的悬挂评审。
+ending dispatch 由 Finality 域拥有，Tool 层不暴露 child action opcode。
 
 **边界**：资源检查的 Host 侧实现（child/PTY/worktree）属 host-boundary；本包拥有「失败即零创建」。
+`EndingDisposition` 作为纯分类保留；改变的是 dispatch 所有权从 Tool 层移到 Finality 层。
 
 **证据** → HOW.md 行 F-3。
 

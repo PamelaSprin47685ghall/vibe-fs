@@ -13,6 +13,17 @@ const fissionProduction = () => [
   'src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs',
 ].map(read).join('\n')
 
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-002] fission tool exposes prompts as a string array without newline splitting', () => {
+  const model = read('src/Wanxiangshu/Execution/Fission/Model.fs')
+  const tool = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
+
+  assert.match(model, /let parse \(prompts: string list\)/)
+  assert.doesNotMatch(model, /normalizeNewlines|\.Split\('\n'\)/)
+  assert.match(tool, /args\.Texts "prompts"/)
+  assert.match(tool, /ToolHostCodec\.stringArraySchema factory/)
+  assert.doesNotMatch(tool, /args\.Text "prompts"/)
+})
+
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-010] V1 Fission has no OpenCode session-fork path and owns durable replay anchors', () => {
   const code = fissionProduction()
   assert.doesNotMatch(code, /session\s*\.\s*fork|\/session\/[^"']*\/fork|CreateForkedSession|ForkSession/i)

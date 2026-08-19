@@ -506,7 +506,9 @@ type ToolRuntimeScope
             |> Seq.toArray
             |> Array.iter (fun existing -> verdictSubmissions.Remove existing |> ignore)
 
-            JudgementRequestIdentity.key sessionId physicalUserMessageId |> verdictSubmissions.Add |> ignore)
+            JudgementRequestIdentity.key sessionId physicalUserMessageId
+            |> verdictSubmissions.Add
+            |> ignore)
 
     member _.HasVerdictSubmitted(reviewerId: string, physicalUserMessageId: PhysicalUserMessageId) =
         lock gate (fun () ->

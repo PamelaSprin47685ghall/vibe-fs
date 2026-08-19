@@ -5,7 +5,7 @@ import { assertJsData, assertOpaque } from '../../verification-system/tests/supp
 const fission = await import('../../../dist/Execution/Fission/Surface.js')
 const fissionHost = await import('../../../dist/OpenCode/Host/FissionHostSurface.js')
 
-const parsed = () => fission.parsePrompt(' lane A  \nlane B')
+const parsed = () => fission.parsePrompt([' lane A  ', 'lane B'])
 
 const harness = ({ failCreateAt, failStartAt, failInterrupt = false, parent = 'old-parent' } = {}) => {
   const events = []
