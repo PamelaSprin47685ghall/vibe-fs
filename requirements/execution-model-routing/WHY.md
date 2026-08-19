@@ -24,6 +24,10 @@
 
 Wanxiangshu 只维护真实 lease multiset、最近一次物理执行 target、串行 acquire/release 与 Host 投影；用户的 `wanxiangshu.mjs` 自己决定角色分组、模型优先级、容量、是否优先延续上一 LLM、视觉模型、fast/deep 差异等。`previous` 只是选择提示，不占容量，也不把上一 lease 复活成 session 级永久绑定。这样产品内不再存在第二份“调度知识”。
 
+这里的“真实 lease”还要再分成两层：**execution binding** 决定这个 physical material 稳定使用哪个 target；**provider capacity token** 决定此刻谁有资格开始下一次 provider step。二者若混在同一张表里，父 agent 一旦在 tool/join 上停工，槽只能继续僵死到整个 physical execution 结束；若粗暴释放，又会把容量送给无关 session，甚至在父恢复时瞬时突破 provider 硬限制。
+
+因此 capacity arbitration 是独立 F# 资源层。基础 ledger 保留旧的 running multiset 语义；其上的 borrowing decorator 只允许同一 session lineage 借用祖先 token。token 在 provider step 期间不可抢占；祖先下一次 transform 到来后拥有优先召回权，但必须等当前 descendant step 结束才接管。被召回的 descendant 下一次 transform 要么按 MJS 证明同 provider 出现了普通新额度并取得自己的 token，要么等待祖先再次空闲后继续借。多层借用始终是同一枚 token 沿 lineage 转移，不因层数增加 capacity。
+
 ## 3. 为什么 `running` 用 multiset，而不是容量字段
 
 容量不是 runtime 应理解的 schema。`running` 保留完整 target occurrence，因此 scheduler 可以按 exact target、model family 或 provider 自己聚合。推荐模板按 `provider`（完整 `provider/model` 中 `/` 前的部分）计数：同一 provider 下不同 model/reasoning 的 active lease 合并占用同一 provider 并发预算。

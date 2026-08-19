@@ -41,6 +41,7 @@ type HostSignalRouter
         // Drop-session cleanup is the composition root's job.
         ?onLoopEvent: obj -> unit,
         ?onNeedHelpEvent: obj -> unit,
+        ?onProviderStepEnd: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> unit,
         ?onPhysicalExecutionEnd: SessionId -> PhysicalUserMessageId -> unit
     ) =
 
@@ -58,6 +59,12 @@ type HostSignalRouter
         | Some observe, Some(sessionId, physicalUserMessageId) -> observe sessionId physicalUserMessageId
         | _ -> ()
 
+    let observeProviderStepEnd raw =
+        match onProviderStepEnd, HostEventCodec.tryDecodeProviderStepEnd raw with
+        | Some observe, Some(sessionId, physicalUserMessageId, providerRun) ->
+            observe sessionId physicalUserMessageId providerRun
+        | _ -> ()
+
     member _.RegisterOwned(sessionId: SessionId) =
         ownedSessions.Add(SessionId.value sessionId) |> ignore
 
@@ -71,6 +78,7 @@ type HostSignalRouter
     /// routing also observes exact terminal assistant identity; none of these
     /// callbacks turns a fragment into a business HostSignal.
     member _.Observe(raw: obj) =
+        observeProviderStepEnd raw
         observePhysicalExecutionEnd raw
 
         match onNeedHelpEvent with

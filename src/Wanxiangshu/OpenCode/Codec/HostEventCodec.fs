@@ -211,6 +211,13 @@ module HostEventCodec =
 
         assistant && (failed || finalFinish)
 
+    let private providerStepTerminalInfo (info: obj) =
+        let assistant = fieldText info "role" = "assistant"
+        let time = if isNull info then null else info?time
+        let completed = not (isNull time) && not (isNull time?completed)
+        let failed = not (isNull info) && not (isNull info?error)
+        assistant && (failed || completed)
+
     let private messageInfoSessionId (info: obj) =
         nonEmptyFieldText info "sessionID" |> Option.map SessionId.create
 
@@ -224,6 +231,23 @@ module HostEventCodec =
 
     let private physicalParentId (info: obj) =
         nonEmptyFieldText info "parentID" |> Option.map PhysicalUserMessageId.create
+
+    let private providerRunId (info: obj) =
+        nonEmptyFieldText info "id" |> Option.map ProviderRunIdentity.create
+
+    let tryDecodeProviderStepEnd
+        (rawInput: obj)
+        : (SessionId * PhysicalUserMessageId * ProviderRunIdentity) option =
+        let raw = unwrap rawInput
+        let info = messageInfo raw
+        let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"
+
+        let sessionId =
+            tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)
+
+        match isMessageUpdated, providerStepTerminalInfo info, sessionId, physicalParentId info, providerRunId info with
+        | true, true, Some sessionId, Some physical, Some providerRun -> Some(sessionId, physical, providerRun)
+        | _ -> None
 
     /// EMR-007: physical capacity release needs exact execution identity. The
     /// coarse SessionIdle signal has only SessionId and can arrive after a newer

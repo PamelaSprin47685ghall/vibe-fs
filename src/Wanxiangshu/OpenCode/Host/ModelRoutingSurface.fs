@@ -215,6 +215,25 @@ module ModelRoutingSurface =
     let cancelPendingExecution (runtime: obj) (sessionId: string) : unit =
         (runtimeOf runtime).CancelPendingExecution(sessionId)
 
+    let bindCapacityChild (runtime: obj) (parentSessionId: string) (childSessionId: string) : unit =
+        (runtimeOf runtime).BindCapacityChild(parentSessionId, childSessionId)
+
+    let enterProviderStep
+        (runtime: obj)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (visibleProviderRuns: string array)
+        : Task =
+        (runtimeOf runtime).EnterProviderStep(sessionId, physicalUserMessageId, visibleProviderRuns |> Set.ofArray)
+
+    let endProviderStep
+        (runtime: obj)
+        (sessionId: string)
+        (physicalUserMessageId: string)
+        (providerRun: string)
+        : unit =
+        (runtimeOf runtime).EndProviderStep(sessionId, physicalUserMessageId, providerRun)
+
     let snapshotOccupied (runtime: obj) : obj array =
         (runtimeOf runtime).SnapshotOccupied() |> Array.map targetObject
 

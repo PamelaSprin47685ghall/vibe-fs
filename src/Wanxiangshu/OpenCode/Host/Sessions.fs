@@ -183,6 +183,7 @@ type InjectedSessionPort
         taskResult {
             try
                 SessionExecutionBinding.bindInternalRoot laneId agent
+                ModelRouting.bindCapacityChild ownerSessionId laneId
                 PersonaBinding.ensureInherited ownerSessionId laneId |> ignore
                 ProviderLanguageBinding.ensureInherited ownerSessionId laneId |> ignore
                 return laneId

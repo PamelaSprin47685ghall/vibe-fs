@@ -101,6 +101,8 @@ module SessionExecutionBinding =
             | Some proposed -> rememberAgent childKey proposed
             | None -> ())
 
+        ModelRouting.bindCapacityChild parentId childId
+
     let restore (parentId: SessionId) (childId: SessionId) (agent: string option) = bind parentId childId agent
 
     /// Fission physical lane: preserve a managed execution identity without declaring
@@ -287,6 +289,7 @@ module SessionExecutionBinding =
             clearAcceptedPromptBindingsForSession key)
 
         ModelRouting.releaseExecution sessionId
+        ModelRouting.dropCapacityLineage sessionId
 
     let cancelUnacquired (sessionId: SessionId) =
         ModelRouting.cancelUnacquiredExecution sessionId

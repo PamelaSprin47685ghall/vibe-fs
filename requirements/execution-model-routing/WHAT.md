@@ -114,3 +114,19 @@ Host 接收物理 user message 后，`chat.message` 是唯一 required managed m
 “managed”由 `chat.message` 的 typed admission 决定，不能由后续 Host hook 上出现某个 managed agent 字符串反推。若同一 exact physical material 已由其它规范 owner 明确分类为非业务 provider material（当前唯一实例：CRASH-018 `/continue` disclosure-only），`chat.params` 必须保持该分类，不得凭 agent label 要求一个从未建立、也不应建立的 MJS / `SessionExecutionBinding` lease。
 
 非 managed Host 会话不受本包接管。
+
+## EMR-010：provider capacity = 独立可抢占 token；只沿 session lineage 借用
+
+ModelTarget execution binding 与 provider capacity token 必须分离。`chat.message` 仍唯一决定当前 physical execution 的稳定 target；真正开始每个 provider step 前，`experimental.chat.messages.transform` 必须先取得该 target provider 的 capacity token。
+
+capacity owner 必须是独立 F# 模块；基础 ledger 只保存真实 token multiset，borrowing decorator 在其上维护 session lineage、借用与等待。`wanxiangshu.mjs` 不保存借贷状态、不接收 parent/child/session id，也不实现 recall。其它 Host/Tool 主流程不得复制借贷判断，只调用 capacity owner 的小边界。
+
+一个 execution 若按普通 `running` 可取得 target，则建立自己的 token；若只有在“对该 session 隐去一枚同 provider 的可借祖先 token”后 MJS 才允许 target，则 execution 只取得稳定 target，不新建 token。无关 session 始终看到祖先 token 仍在 `running`，因此借位绝不能把空槽暴露给全局竞争者。不同 provider 不共享 token。
+
+token 只在 provider-step 边界转移。descendant 当前 provider request 已发出时，任何 ancestor recall 都必须等待该 step 的 assistant terminal/error observation；不得 abort request、不得先让 ancestor 发出第二个同 token request。step 结束后 token 回到 owner-family arbitration，等待者按 token owner → 近祖先 → 远后代的 ancestry 优先级取得；同一 ancestry depth 保持到达顺序。于是 parent 可随时要求召回，但硬 provider 并发上限从不瞬时突破。
+
+borrower 每次新 transform 都重新取得 step token。若祖先已召回，borrower 可以用当前固定 target 再向 MJS 做**普通容量证明**：只有 MJS 在完整 `running` 上仍返回 exact same target 时，才可建立自己的新 token；返回其它 target 或 `null` 都不得改变本 physical execution 的 target，只能等待。借来的 token 可以继续向 descendant 转借；多层链始终只对应一枚基础 token。
+
+Fission fresh lane 虽不是 delegation child，capacity lineage 必须绑定到它替代的 logical owner；因此多条 lane 只能竞争 owner 已有 token，不能因 lane 数量复制免费 capacity。Strength/其它非 lineage session 不因名字或 Host parentID 自动获得借位。
+
+provider-step terminal 必须有 anti-stale fence。当前 step 开始时记录 provider wire 已可见的 assistant run identities；只接受该 fence 之后出现的 assistant terminal/error 结束当前 step。迟到的旧 terminal 不得释放已经开始的新 step。若 terminal event 丢失，下一次 transform 观察到 fence 之后的新 assistant run 本身可证明上一 step 已结束。

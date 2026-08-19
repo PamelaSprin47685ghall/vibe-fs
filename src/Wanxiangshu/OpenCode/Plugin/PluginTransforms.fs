@@ -727,21 +727,33 @@ module PluginTransforms =
             raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
 
     let private beginPhysicalProviderAttempt (scope: PluginRuntimeScope) (sessionText: string) (outObj: obj) =
-        let sessionId = SessionId.create sessionText
+        task {
+            let sessionId = SessionId.create sessionText
 
-        let rawMessages =
-            ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
 
-        scope.Sessions.Quiescence.BeginProviderAttempt sessionId
+            let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
+            scope.Sessions.Quiescence.BeginProviderAttempt sessionId
 
-        match
-            SessionExecutionBinding.beginProviderAttempt
-                sessionId
-                (ProviderWireCapture.lastUserMessageId rawMessages)
-                (ProviderWireCapture.lastUserPromptKey rawMessages)
-        with
-        | Ok() -> ()
-        | Error error -> invalidOp error
+            match
+                SessionExecutionBinding.beginProviderAttempt
+                    sessionId
+                    physicalUserMessageId
+                    (ProviderWireCapture.lastUserPromptKey rawMessages)
+            with
+            | Error error -> invalidOp error
+            | Ok() ->
+                match SessionExecutionBinding.currentProviderModel sessionId, physicalUserMessageId with
+                | Some _, Some physical ->
+                    do!
+                        ModelRouting.enterProviderStep
+                            sessionId
+                            physical
+                            (ProviderWireCapture.visibleProviderRuns rawMessages)
+                | Some _, None -> invalidOp "EMR-010: managed provider step has no physical user message id"
+                | None, _ -> ()
+        }
 
     let private exactExplicitResumeBinding (projectionSessionIdOpt: string option) (outObj: obj) =
         projectionSessionIdOpt
@@ -794,8 +806,9 @@ module PluginTransforms =
                 // HOST-004：新 provider request 开始构建 → 旧 idle permit
                 // 立即失效。必须在该 transform 的最早同步位置（任何 let!
                 // 之前）调用，不得等 request 已运行才标 Running。
-                projectionSessionIdOpt
-                |> Option.iter (fun sessionId -> beginPhysicalProviderAttempt scope sessionId outObj)
+                match projectionSessionIdOpt with
+                | Some sessionId -> do! beginPhysicalProviderAttempt scope sessionId outObj
+                | None -> ()
 
                 // TIME-007: the first provider-facing prompt is the session's
                 // creation boundary. Sample synchronously before any await, then

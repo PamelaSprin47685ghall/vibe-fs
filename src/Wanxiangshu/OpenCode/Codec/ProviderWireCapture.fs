@@ -87,6 +87,12 @@ module ProviderWireCapture =
             { Role = captured.Role
               Parts = captured.Parts |> List.map (fun part -> part.WirePart) })
 
+    let visibleProviderRuns (rawMessages: obj list) =
+        rawMessages
+        |> List.choose decodeCapturedMessage
+        |> List.choose (fun message -> message.ProviderRun)
+        |> Set.ofList
+
     /// Decode a whole provider request.
     ///
     /// `System` stays a separate list rather than becoming a `role = "system"`

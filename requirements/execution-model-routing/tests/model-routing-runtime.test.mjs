@@ -11,6 +11,9 @@ const {
   releaseExecution,
   releasePhysicalExecution,
   cancelPendingExecution,
+  bindCapacityChild,
+  enterProviderStep,
+  endProviderStep,
   snapshotOccupied,
   pendingCount,
 } = routing
@@ -239,4 +242,147 @@ test('WHAT[EMR-002] EMR_002_scheduler_program_error_poisons_pending_and_future_d
   await waitingRejected
   await assert.rejects(acquireTarget(runtime, 'later', 'msg-later', 'waiting'), /bad scheduler program/)
   assert.equal(pendingCount(runtime), 0)
+})
+
+const provider = (model) => model.slice(0, model.indexOf('/'))
+const providerLimited = (limits, routes) => (role, running, previous) => {
+  const candidates = routes[role] ?? []
+  const count = (name) => running.filter((item) => provider(item.model) === name).length
+  const available = (candidate) => count(provider(candidate.model)) < (limits[provider(candidate.model)] ?? 0)
+  if (previous && candidates.some((candidate) => key(candidate) === key(previous)) && available(previous)) return previous
+  return candidates.find(available) ?? null
+}
+
+test('WHAT[EMR-010] EMR_010_lineage_credit_is_free_only_to_descendants_not_global_waiters', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only], stranger: [only] }))
+
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
+  bindCapacityChild(runtime, 'parent', 'child')
+
+  const child = await acquireTarget(runtime, 'child', 'msg-child', 'child')
+  assert.equal(key(child), key(only), 'the child can route through its ancestor credit')
+  assert.equal(snapshotOccupied(runtime).length, 1, 'borrowing never creates a second provider token')
+
+  let strangerSettled = false
+  const stranger = acquireManaged(runtime, 'stranger', 'msg-stranger', 'stranger').then((value) => {
+    strangerSettled = true
+    return value
+  })
+  await Promise.resolve()
+  assert.equal(strangerSettled, false, 'unrelated sessions still see the ancestor token as occupied')
+  assert.equal(pendingCount(runtime), 1)
+  cancelPendingExecution(runtime, 'stranger')
+  assert.equal((await stranger).kind, 'Superseded')
+})
+
+test('WHAT[EMR-010] EMR_010_ancestor_recall_waits_for_descendant_step_end_without_overbooking', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))
+
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
+  bindCapacityChild(runtime, 'parent', 'child')
+  await acquireTarget(runtime, 'child', 'msg-child', 'child')
+
+  await enterProviderStep(runtime, 'child', 'msg-child', [])
+  assert.equal(snapshotOccupied(runtime).length, 1)
+
+  let parentEntered = false
+  const parentStep = enterProviderStep(runtime, 'parent', 'msg-parent', []).then(() => { parentEntered = true })
+  await Promise.resolve()
+  assert.equal(parentEntered, false, 'recall never interrupts a request already in flight')
+  assert.equal(snapshotOccupied(runtime).length, 1, 'the hard provider limit is never exceeded during recall')
+
+  endProviderStep(runtime, 'child', 'msg-child', 'run-child-1')
+  await parentStep
+  assert.equal(parentEntered, true)
+  assert.equal(snapshotOccupied(runtime).length, 1)
+
+  let childReentered = false
+  const childAgain = enterProviderStep(runtime, 'child', 'msg-child', ['run-child-1']).then(() => { childReentered = true })
+  await Promise.resolve()
+  assert.equal(childReentered, false, 'a recalled child blocks at its next transform')
+
+  endProviderStep(runtime, 'parent', 'msg-parent', 'run-parent-1')
+  await childAgain
+  assert.equal(childReentered, true)
+})
+
+test('WHAT[EMR-010] EMR_010_recalled_child_may_take_new_ordinary_capacity_for_the_same_target', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 2 }, { parent: [only], child: [only] }))
+
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
+  bindCapacityChild(runtime, 'parent', 'child')
+  await acquireTarget(runtime, 'child', 'msg-child', 'child')
+
+  await enterProviderStep(runtime, 'child', 'msg-child', [])
+  const parentStep = enterProviderStep(runtime, 'parent', 'msg-parent', [])
+  endProviderStep(runtime, 'child', 'msg-child', 'run-child-1')
+  await parentStep
+
+  await enterProviderStep(runtime, 'child', 'msg-child', ['run-child-1'])
+  assert.equal(
+    snapshotOccupied(runtime).length,
+    2,
+    'with real spare provider quota the child owns a new token instead of stealing the recalled token',
+  )
+})
+
+test('WHAT[EMR-010] EMR_010_owner_priority_beats_multiple_children_and_nested_borrowers', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited(
+    { provider: 1 },
+    { root: [only], childA: [only], childB: [only], grandchild: [only] },
+  ))
+
+  await acquireTarget(runtime, 'root', 'msg-root', 'root')
+  bindCapacityChild(runtime, 'root', 'child-a')
+  bindCapacityChild(runtime, 'root', 'child-b')
+  bindCapacityChild(runtime, 'child-a', 'grandchild')
+  await acquireTarget(runtime, 'child-a', 'msg-a', 'childA')
+  await acquireTarget(runtime, 'child-b', 'msg-b', 'childB')
+  await acquireTarget(runtime, 'grandchild', 'msg-g', 'grandchild')
+
+  await enterProviderStep(runtime, 'grandchild', 'msg-g', [])
+  const order = []
+  const childA = enterProviderStep(runtime, 'child-a', 'msg-a', []).then(() => order.push('child-a'))
+  const childB = enterProviderStep(runtime, 'child-b', 'msg-b', []).then(() => order.push('child-b'))
+  const root = enterProviderStep(runtime, 'root', 'msg-root', []).then(() => order.push('root'))
+  await Promise.resolve()
+
+  endProviderStep(runtime, 'grandchild', 'msg-g', 'run-g-1')
+  await root
+  assert.deepEqual(order, ['root'], 'token owner recall outranks every descendant regardless of arrival order')
+
+  endProviderStep(runtime, 'root', 'msg-root', 'run-root-1')
+  await childA
+  assert.deepEqual(order.slice(0, 2), ['root', 'child-a'], 'nearer ancestry outranks sibling-depth descendants')
+
+  endProviderStep(runtime, 'child-a', 'msg-a', 'run-a-1')
+  await childB
+  assert.deepEqual(order, ['root', 'child-a', 'child-b'])
+})
+
+test('WHAT[EMR-010] EMR_010_credit_never_crosses_provider_boundary', async () => {
+  const a = target('provider-a/model')
+  const b = target('provider-b/model')
+  const runtime = createRuntime(providerLimited(
+    { 'provider-a': 1, 'provider-b': 1 },
+    { parent: [a], blocker: [b], child: [b] },
+  ))
+
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
+  await acquireTarget(runtime, 'blocker', 'msg-blocker', 'blocker')
+  bindCapacityChild(runtime, 'parent', 'child')
+
+  let settled = false
+  const child = acquireManaged(runtime, 'child', 'msg-child', 'child').then((value) => {
+    settled = true
+    return value
+  })
+  await Promise.resolve()
+  assert.equal(settled, false, 'provider-a lineage credit cannot make provider-b appear free')
+  cancelPendingExecution(runtime, 'child')
+  assert.equal((await child).kind, 'Superseded')
 })

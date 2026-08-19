@@ -156,6 +156,8 @@ Running = ModelTarget list                        // active execution multiset�
 Previous = ModelTarget option                     // same-session last successful physical target; no capacity
 Scheduler = role:string × Running × Previous -> ModelTarget option
 PendingDemand = { ExecutionLeaseKey; EffectiveAgent; Previous; cancellation }
+CapacityLedger = opaque provider-token multiset
+BorrowingCapacity = CapacityLedger decorator + lineage + provider-step waiters
 ```
 
 不再有：
@@ -172,6 +174,8 @@ physicalOccupants:Set<SessionId>
 
 所有这些若有需要，都只是 MJS 内部实现。
 
+`ModelRoutingRuntime` 不再自己实现容量表。它组合一个基础 `CapacityLedger<ModelRoutingTarget>` 与一个 `BorrowingCapacity<ModelRoutingTarget>` decorator：前者只做 token acquire/retarget/release/snapshot；后者拥有 lineage、借位候选、祖先优先 recall、step fence、等待队列。routing owner 只向 decorator 提供同步 MJS callback。
+
 ## 4. process-shared occupancy owner
 
 推荐 Fable 模块级 process singleton，而不是 `PluginRuntimeScope` 字段。现有 Host 会按 directory/worktree 产生多个 plugin instance，`OpenCode.Host.SharedState` 已证明 module-level singleton 是 root/worktree 跨实例共享边界。
@@ -184,7 +188,7 @@ lastPhysicalTarget: SessionId → ModelTarget
 pending: SessionId → latest arrival-ordered physical-execution demand
 ```
 
-`running` 每次调用临时由 active execution lease 表的 values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。`lastPhysicalTarget` 不计 occupancy，只在成功 physical admission/adopt 时更新；exact terminal 释放 active lease 时保留，session drop/scope cleanup 时删除。session 是否还可 reuse、handle 是否 retired、业务是否 completed 均不进入 active occupancy 的生命周期判断。
+`running` 每次调用由 capacity ledger 的 token values 生成新数组。不要缓存第二份计数 truth；MJS 自己从 multiset 计数。borrower scheduling view 最多按 provider 隐去一枚对 requester 可借的 lineage token；真实 ledger 不删除它，因此 unrelated scheduler 永远看不到假空槽。`lastPhysicalTarget` 不计 occupancy。
 
 同一 SessionId 同时至多一个 current physical execution；不同 SessionId 的并发 execution 若指向同一 target，values 中自然出现重复元素。`PhysicalUserMessageId=None` 只用于 Strength 在 Host 物理 message 创建前的 optional reservation，chat.message 必须把它原位 rebind 成 exact physical id，而不是再占一个 occurrence。
 
@@ -220,7 +224,9 @@ pending acquisition 的结果是封闭 `Acquired target | Superseded`。步骤 3
 
 一轮结束后若仍有 pending，不自行再次循环；等待下一次真实 occupancy event。没有 timer/poll。
 
-普通 provider 完成由 raw Host `message.updated` 的最终 assistant observation 释放：读取 `properties.info.parentID` 作为 exact `PhysicalUserMessageId`，只有它仍与该 SessionId 的 current lease 匹配时才删除 occurrence。assistant error 直接 terminal；正常路径要求 `time.completed` 且 `finish != "tool-calls"`，因为 `tool-calls` 只是同一 physical execution 的中间 provider step。该 observation 是 model-routing 的物理资源边界，不会转成业务 `HostSignal`。这样 A 的 terminal 即使在 B 已经 admission 后才到，也只能尝试释放 A，不能误删 B。
+每个 provider request 前，messages transform 先进入 capacity decorator。若 own/ordinary/borrowed token 均暂不可得，transform await；token grant 后才继续形成 provider request。assistant error 或任意 completed assistant（包括 `finish="tool-calls"`）结束**provider step**并归还当前 step token；只有 `finish != "tool-calls"` 的 final assistant 仍结束整个 physical execution binding。两层 terminal 不得混同。
+
+step start 同时把当前 wire 已可见 assistant ProviderRunIdentity 集合作为 fence 交给 capacity decorator。terminal event 的 assistant id 已在 fence 中则是迟到旧事件，只做 no-op；新 id 才能结束当前 in-flight step。下一次 transform 若看到 fence 新增 assistant id，会先补证上一 step 已结束，再申请下一 step，避免订阅丢事件造成永久占槽。
 
 `PluginTransforms.applyContinuationOutcome` 的 `StopPhysicalRun` 从 wire transcript 取 exact trailing `PhysicalUserMessageId`，启动 Host abort 后立即返回，避免 transform callback await 自己的 abort；abort `Ok` 才调用 `ModelRouting.releasePhysicalExecution` 精确清 lease。`SessionIdle` / typed attempt abort 只有 SessionId，继续服务 Reconciler、quiescence、loop/abort 语义，但不直接操作 active model occupancy。session delete / scope cleanup / plugin shutdown 因为整个 owner 已被销毁，可以按 SessionId 强制释放 current lease 并取消 pending。新 PhysicalUserMessageId admission 仍在同一个串行临界区 supersede 旧 lease/pending。业务 completed/retired/join/finality 不直接操作 occupancy；ProviderRetry/ProviderFailure 若仍引用同一 physical user material 则继续复用。
 

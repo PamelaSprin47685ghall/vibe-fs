@@ -247,8 +247,13 @@ module ModelRouting =
         | Some _ when String.IsNullOrWhiteSpace physicalUserMessageId -> None
         | Some normSessionId -> Some(normSessionId, physicalUserMessageId.Trim())
 
+    let private targetProvider (target: ModelRoutingTarget) =
+        target.Model.Substring(0, target.Model.IndexOf '/')
+
     type ModelRoutingRuntime(scheduler: obj) =
         let gate = obj ()
+        let capacity =
+            BorrowingCapacity<ModelRoutingTarget>(CapacityLedger<ModelRoutingTarget>(), targetProvider, (=))
         // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
         // DSL-MUTABLE: resource — last physical target map per session
@@ -259,8 +264,7 @@ module ModelRouting =
         // DSL-MUTABLE: resource — process-local scheduler poison
         let mutable fatalError: exn option = None
 
-        let running () =
-            activeBySession.Values |> Seq.map _.Target |> Seq.toArray
+        let running () = capacity.Snapshot()
 
         let previousTarget sessionId =
             match lastPhysicalTargetBySession.TryGetValue sessionId with
@@ -291,17 +295,34 @@ module ModelRouting =
 
         let poison (error: exn) =
             fatalError <- Some error
+            capacity.Fail error
             let waiting = pending |> Seq.toArray
             pending.Clear()
             pendingBySession.Clear()
             waiting |> Array.iter (failDemand error)
 
-        let trySchedule agent previous =
-            invokeScheduler scheduler agent (running ()) previous
-
-        let scheduleOrPoison agent previous =
+        let scheduleOrPoison running agent previous =
             try
-                trySchedule agent previous
+                invokeScheduler scheduler agent running previous
+            with ex ->
+                poison ex
+                raise ex
+
+        let routeFreshOrPoison sessionId oldPhysicalUserMessageId physicalUserMessageId agent previous =
+            try
+                capacity.RouteFresh(
+                    sessionId,
+                    oldPhysicalUserMessageId,
+                    physicalUserMessageId,
+                    fun running -> scheduleOrPoison running agent previous
+                )
+            with ex ->
+                poison ex
+                raise ex
+
+        let reserveFreshOrPoison sessionId agent previous =
+            try
+                capacity.ReserveFresh(sessionId, fun running -> scheduleOrPoison running agent previous)
             with ex ->
                 poison ex
                 raise ex
@@ -330,7 +351,13 @@ module ModelRouting =
 
         let schedulePendingDemand demand =
             if pending.Contains demand then
-                scheduleOrPoison demand.Agent demand.PreviousTarget |> commitScheduled demand
+                routeFreshOrPoison
+                    demand.SessionId
+                    None
+                    demand.PhysicalUserMessageId
+                    demand.Agent
+                    demand.PreviousTarget
+                |> commitScheduled demand
             else
                 false
 
@@ -349,6 +376,7 @@ module ModelRouting =
 
         let retireCurrentExecution sessionId =
             let changed = activeBySession.Remove sessionId
+            capacity.ReleaseSession sessionId
 
             match pendingBySession.TryGetValue sessionId with
             | true, demand -> cancelDemand demand
@@ -361,7 +389,9 @@ module ModelRouting =
             let changed =
                 match activeBySession.TryGetValue sessionId with
                 | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
-                    activeBySession.Remove sessionId
+                    let removed = activeBySession.Remove sessionId
+                    capacity.ReleasePhysical(sessionId, physicalUserMessageId)
+                    removed
                 | _ -> false
 
             // Exact terminal evidence for an older physical execution must never
@@ -388,6 +418,8 @@ module ModelRouting =
             | None ->
                 requireSameAgent sessionId physicalUserMessageId lease.Agent agent
 
+                capacity.AdoptReservation(sessionId, physicalUserMessageId, lease.Target)
+
                 activeBySession.[sessionId] <-
                     { lease with
                         PhysicalUserMessageId = Some physicalUserMessageId }
@@ -409,10 +441,10 @@ module ModelRouting =
             | true, lease -> reuseOrAdoptActiveExecution sessionId physicalUserMessageId agent lease
             | false, _ -> reusePendingExecution sessionId physicalUserMessageId agent
 
-        let acquireFreshDemand sessionId physicalUserMessageId agent =
+        let acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent =
             let previous = previousTarget sessionId
 
-            match scheduleOrPoison agent previous with
+            match routeFreshOrPoison sessionId oldPhysicalUserMessageId physicalUserMessageId agent previous with
             | Some target ->
                 activeBySession.[sessionId] <-
                     { PhysicalUserMessageId = Some physicalUserMessageId
@@ -445,12 +477,18 @@ module ModelRouting =
                 match currentExecutionTask sessionId physicalUserMessageId agent with
                 | Some current -> current
                 | None ->
-                    // A newer physical user message is itself authoritative proof
-                    // that an older execution in this reusable session no longer
-                    // owns capacity. Do not wait for an idle/abort/delete signal
-                    // that Host may legitimately omit or reorder.
-                    retireCurrentExecution sessionId
-                    acquireFreshDemand sessionId physicalUserMessageId agent)
+                    let oldPhysicalUserMessageId =
+                        match activeBySession.TryGetValue sessionId with
+                        | true, lease -> lease.PhysicalUserMessageId
+                        | false, _ -> None
+
+                    activeBySession.Remove sessionId |> ignore
+
+                    match pendingBySession.TryGetValue sessionId with
+                    | true, demand -> cancelDemand demand
+                    | false, _ -> ()
+
+                    acquireFreshDemand sessionId oldPhysicalUserMessageId physicalUserMessageId agent)
 
         let acquireManagedSafe sessionId physicalUserMessageId agent =
             try
@@ -459,7 +497,7 @@ module ModelRouting =
                 failedTask<ModelRoutingAcquisition> ex
 
         let tryReserveFresh sessionId agent =
-            match scheduleOrPoison agent (previousTarget sessionId) with
+            match reserveFreshOrPoison sessionId agent (previousTarget sessionId) with
             | None -> None
             | Some target ->
                 activeBySession.[sessionId] <-
@@ -489,6 +527,34 @@ module ModelRouting =
             match pendingBySession.TryGetValue sessionId with
             | true, demand -> cancelDemand demand
             | false, _ -> ()
+
+        let exactTargetAvailable agent target running =
+            match scheduleOrPoison running agent (Some target) with
+            | Some candidate -> candidate = target
+            | None -> false
+
+        let enterProviderStepLocked sessionId physicalUserMessageId fence =
+            ensureHealthy ()
+
+            match activeBySession.TryGetValue sessionId with
+            | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
+                capacity.EnterStep(
+                    sessionId,
+                    physicalUserMessageId,
+                    lease.Target,
+                    fence,
+                    fun running -> exactTargetAvailable lease.Agent lease.Target running
+                )
+            | _ ->
+                failedTask<unit> (
+                    InvalidOperationException(
+                        sprintf
+                            "execution-model-routing: provider step %s/%s has no active execution binding"
+                            sessionId
+                            physicalUserMessageId
+                    )
+                )
+                :> Task
 
         member _.AcquireManagedExecution
             (sessionId: string, physicalUserMessageId: string, agent: string)
@@ -533,6 +599,41 @@ module ModelRouting =
         member _.CancelPendingExecution(sessionId: string) =
             normalizeSessionId sessionId
             |> Option.iter (fun normSessionId -> lock gate (fun () -> cancelPendingLocked normSessionId))
+
+        member _.BindCapacityChild(parentSessionId: string, childSessionId: string) =
+            lock gate (fun () -> capacity.BindChild(parentSessionId, childSessionId))
+
+        member _.DropCapacityLineage(sessionId: string) =
+            normalizeSessionId sessionId
+            |> Option.iter (fun normSessionId -> lock gate (fun () -> capacity.DropLineage normSessionId))
+
+        member _.EnterProviderStep
+            (sessionId: string, physicalUserMessageId: string, visibleProviderRuns: Set<string>)
+            : Task =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> failedTask<unit> (ArgumentException("provider step identity must be non-empty")) :> Task
+            | Some(normSessionId, normPhysicalUserMessageId) ->
+                let admission = lock gate (fun () -> enterProviderStepLocked normSessionId normPhysicalUserMessageId visibleProviderRuns)
+
+                task {
+                    do! admission
+
+                    lock gate (fun () ->
+                        if fatalError.IsNone then
+                            drainDemands ())
+                }
+                :> Task
+
+        member _.EndProviderStep(sessionId: string, physicalUserMessageId: string, providerRun: string) =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> ()
+            | Some(normSessionId, normPhysicalUserMessageId) when String.IsNullOrWhiteSpace providerRun -> ()
+            | Some(normSessionId, normPhysicalUserMessageId) ->
+                lock gate (fun () ->
+                    capacity.EndStep(normSessionId, normPhysicalUserMessageId, providerRun.Trim())
+
+                    if fatalError.IsNone then
+                        drainDemands ())
 
         member _.SnapshotOccupied() = lock gate (fun () -> running ())
         member _.PendingCount = lock gate (fun () -> pending.Count)
@@ -611,4 +712,40 @@ module ModelRouting =
     let cancelUnacquiredExecution (sessionId: SessionId) =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime -> runtime.CancelPendingExecution(SessionId.value sessionId)
+        | None -> ()
+
+    let bindCapacityChild (parentSessionId: SessionId) (childSessionId: SessionId) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.BindCapacityChild(SessionId.value parentSessionId, SessionId.value childSessionId)
+        | None -> ()
+
+    let dropCapacityLineage (sessionId: SessionId) =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime -> runtime.DropCapacityLineage(SessionId.value sessionId)
+        | None -> ()
+
+    let enterProviderStep
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (visibleProviderRuns: Set<ProviderRunIdentity>)
+        =
+        current()
+            .EnterProviderStep(
+                SessionId.value sessionId,
+                PhysicalUserMessageId.value physicalUserMessageId,
+                visibleProviderRuns |> Set.map ProviderRunIdentity.value
+            )
+
+    let endProviderStep
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (providerRun: ProviderRunIdentity)
+        =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.EndProviderStep(
+                SessionId.value sessionId,
+                PhysicalUserMessageId.value physicalUserMessageId,
+                ProviderRunIdentity.value providerRun
+            )
         | None -> ()

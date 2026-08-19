@@ -485,6 +485,9 @@ module HostSignalBootstrap =
                     onSignal,
                     onLoopEvent = loopSensor.Observe,
                     onNeedHelpEvent = needHelpSensor.Observe,
+                    onProviderStepEnd =
+                        (fun sessionId physicalUserMessageId providerRun ->
+                            ModelRouting.endProviderStep sessionId physicalUserMessageId providerRun),
                     onPhysicalExecutionEnd =
                         (fun sessionId physicalUserMessageId ->
                             // EMR-007 owns capacity release. Reconciliation
