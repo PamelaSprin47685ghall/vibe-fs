@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
-import { generateLoopConstantsFile } from './lib/calibrate-loop-detector.mjs'
+import {
+  calibrateFromRepository,
+  writeLoopDetectorCalibrationArtifact,
+} from './lib/calibrate-loop-detector.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -32,8 +35,9 @@ function removeSources(dir) {
   }
 }
 
-// Dynamically generate loop detector constants from repository corpus before compilation.
-generateLoopConstantsFile(root)
+// DG-004: calibration is build input, never tracked source. Compute once from
+// the current repository corpus; materialize values only as generated dist JS.
+const loopDetectorCalibration = calibrateFromRepository(root)
 
 fs.rmSync(dist, { recursive: true, force: true })
 fs.mkdirSync(dist, { recursive: true })
@@ -58,6 +62,7 @@ try {
 
 removeGitignores(dist)
 removeSources(dist)
+writeLoopDetectorCalibrationArtifact(root, loopDetectorCalibration)
 
 const entry = path.join(root, 'dist/OpenCode/Plugin/Plugin.js')
 if (!fs.existsSync(entry)) fail(`missing entry: ${entry}`)

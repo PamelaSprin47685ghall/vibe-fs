@@ -36,13 +36,16 @@ LOOP iff D <= threshold
 ## 滴定
 
 1. `git ls-files --cached --others --exclude-standard` 得到仓库集合。
-2. `TextDecoder('utf-8', { fatal: true })` 定义「可读文字」；不可 strict UTF-8 解码者排除（生成的 `LoopDetectorConstants.fs` 自身排除，保证语料稳定）。
-3. 所有非空行分别用 o200k 计 token；当前 p99=59，向上取二次幂 → `HALF_LIFE=64`，$\lambda = 2^{-1/64}$，$M = 1/(1-\lambda)$。
+2. `TextDecoder('utf-8', { fatal: true })` 定义「可读文字」；不可 strict UTF-8 解码者排除。生成产物位于 ignored `dist/`，天然不进入语料集合。
+3. 所有非空行分别用 o200k 计 token；p99 向上取二次幂得到 `HALF_LIFE`，再派生 $\lambda = 2^{-1/HALF\_LIFE}$ 与 $M = 1/(1-\lambda)$。
 4. 所有可读文字按确定的 git path 顺序连接并 token 化。
 5. calibration 从理论最大 distinct prior $M$ 单趟扫描完整 token 流，计算 $\sum D_t$ 与 $\sum D_t^2$，得到均值 $\mu$ 与方差 $\sigma^2$。
 6. 将有界区间 $[1.0, M]$ 线性映射至 $[0, 1]$（$u = (D - 1)/(M - 1)$），通过矩估计拟合贝塔分布 $\text{Beta}(\alpha, \beta)$。
 7. 求解 Beta 分布 95% 置信奇异分位数（下侧 $p = 0.05$ 对应分位数 $u_{0.05}$），映射回 $D$ 空间作为 `threshold = 1.0 + (M - 1) * u_{0.05}`。
-8. 每次 build 之前由 `scripts/generate-loop-constants.mjs` 从仓库语料实际生成 `src/Wanxiangshu/Execution/Session/LoopDetectorConstants.fs`，不硬编码具体数值。
+8. `scripts/build.mjs` 从当前仓库语料计算一次 calibration。`LoopDetector.fs` 只通过 Fable `Import`
+   引用 `#wanxiangshu-loop-detector-calibration`，`package.json#imports` 将其稳定解析到 dist 内部 JS。
+   Fable 编译完成后 build 只写 `dist/Execution/Session/LoopDetectorCalibration.js`。不生成 F#/obj/intermediate
+   source；最终数值只存在于 JS 生成产物，build 对 `src/` 零写入。
 
 production fresh detector 从分布均值 `NORMAL_WEIGHTED_DISTINCT` 开始，作为正常无罪 prior，避免短输出天然被判 loop。
 
@@ -91,7 +94,7 @@ DEPENDS ON：`provider-attempt-recovery`（桥接目标：命中后由标准 rec
 | DG-001 低多样性 loop vs 正常多样输出 | `tests/loop-detector.test.mjs`：`LOOP_003_single_token_repetition_converges_to_theoretical_loop`、`LOOP_003_diverse_programmatic_text_stays_normal`、Markdown table / ASCII graph 两个 normal fixture | MOVE+NEW | `node --test requirements/degeneration-guard/tests/loop-detector.test.mjs` |
 | DG-002 传感器只吃 text / reasoning delta、不写业务事实 | `tests/loop-sensor.test.mjs`：`LOOP_002_sensor_observes_text_delta_only`、`LOOP_007_reasoning_deltas_trigger_loop_kill`；`tests/loop-detector.test.mjs`：`LOOP_009_text_delta_decodes_fail_closed` | MOVE | 各文件 `node --test` |
 | DG-003 token weighted-distinct 指标 | `tests/loop-detector.test.mjs`：fresh prior、o200k exact step/reference score、whitespace/punctuation 也是 token、single-token loop、diverse programmatic、Markdown table、ASCII graph；`tests/loop-detector-memory.test.mjs`：单次越阈无 latch / 无 consecutive-hit 要求 | MOVE+NEW | 各文件 `node --test` |
-| DG-004 固定参数 + 全仓滴定 | `tests/loop-calibration.test.mjs`：Git tracked+unignored strict UTF-8 全文；当前非空行 token p99=59 → half-life=64；正常端=全文最低 weighted-distinct；异常端=理论 1；threshold=中线。当前统计基线随语料派生，feel free to modify；`tests/loop-detector.test.mjs` 校验 production 常量关系 | NEW | `node --test requirements/degeneration-guard/tests/loop-calibration.test.mjs requirements/degeneration-guard/tests/loop-detector.test.mjs` |
+| DG-004 artifact-local 固定参数 + 全仓滴定 | `tests/loop-calibration.test.mjs`：Git tracked+unignored strict UTF-8 全文；p99/half-life/均值/方差/Beta threshold 全部与当前语料重算一致；源码树无 calibration 数值文件，`LoopDetector.fs` 只 import 生成 artifact；`tests/loop-detector.test.mjs` 校验 production 参数关系 | NEW | `node --test requirements/degeneration-guard/tests/loop-calibration.test.mjs requirements/degeneration-guard/tests/loop-detector.test.mjs` |
 | DG-005 O(1) 更新与 vocabulary-bounded 内存 | `tests/loop-detector-memory.test.mjs`：`LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_not_stream_length`；`tests/loop-detector.test.mjs`：reference recurrence exactness | NEW | 各文件 `node --test` |
 | DG-006 生命周期绑定单次 ProviderRun | `tests/loop-sensor.test.mjs`：`LOOP_006_reset_detector_preserves_loop_kill_armed`；`tests/loop-detector-memory.test.mjs`：`LOOP_005_two_detectors_are_independent_attempts` | MOVE+NEW | 各文件 `node --test` |
 | DG-007 命中只停止当前物理 attempt、恰好一次 | `tests/loop-sensor.test.mjs`：`LOOP_006_owned_low_diversity_stream_aborts_exactly_once`、`LOOP_006_unowned_session_never_aborts`、`LOOP_006_clear_armed_allows_next_attempt_to_arm_again` | MOVE | `node --test requirements/degeneration-guard/tests/loop-sensor.test.mjs` |

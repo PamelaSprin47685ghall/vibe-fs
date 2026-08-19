@@ -45,10 +45,11 @@ D_t = λ·D_(t-1) + 1             （x 首次出现）
 `D_t <= LOOP_WEIGHTED_DISTINCT_THRESHOLD` → LOOP，否则 NORMAL。无连续命中、无迟滞：单次越阈即
 LOOP。
 
-## DG-004：固定参数与仓库滴定
+## DG-004：artifact-local 固定参数与仓库滴定
 
-参数不得按模型、角色、上下文长度、自然语言 vs 代码动态改写。在每次 build 之前通过程序
-`scripts/generate-loop-constants.mjs` 扫描仓库语料动态生成常量，不硬编码具体数值：
+参数不得按模型、角色、上下文长度、自然语言 vs 代码动态改写；同一个 build artifact 内参数固定。
+每次 build 必须从当前仓库语料重新滴定，并且 calibration 数值只能进入生成产物，禁止进入 tracked
+production source。build 不得改写 `src/` 来传递 calibration，也不得要求开发者提交某次滴定快照：
 
 ```text
 TOKENIZER = gpt-tokenizer/o200k_base
@@ -61,10 +62,13 @@ CONFIDENCE_QUANTILE = 0.05
 ```
 
 滴定语料 = 仓库中 Git tracked + 非 ignored 且 strict UTF-8 可解码的全部文字。half-life 由这些文字
-所有非空行的 o200k token 长度 p99 向上取二次幂：当前 p99=59 → 64。加权相异度 $D_t$ 的物理取值区间严格受限在 $[1.0, M]$（$M = 1/(1-\lambda)$）。
+所有非空行的 o200k token 长度 p99 向上取二次幂。加权相异度 $D_t$ 的物理取值区间严格受限在 $[1.0, M]$（$M = 1/(1-\lambda)$）。
 通过矩估计在有界区间 $[1.0, M]$ 上拟合贝塔分布 $\text{Beta}(\alpha, \beta)$（归一化变量 $u = (D-1)/(M-1) \in [0, 1]$），计算 95% 置信度奇异阈值（即 Beta 分布的 0.05 下侧分位数 $I_{0.05}^{-1}(\alpha, \beta)$ 映射回 $D$ 空间）。
 `NORMAL_WEIGHTED_DISTINCT` 取语料分布均值 $\mu$，`LOOP_WEIGHTED_DISTINCT_THRESHOLD` 取 Beta 分布 95% 置信奇异阈值。
-滴定由 `tests/loop-calibration.test.mjs` 永久重放，并在每次 build 时动态生成 `LoopDetectorConstants.fs`。
+滴定由 `tests/loop-calibration.test.mjs` 永久重放。F# production source 只 import 稳定的 package-internal
+specifier `#wanxiangshu-loop-detector-calibration`；`package.json#imports` 把它映射到
+`dist/Execution/Session/LoopDetectorCalibration.js`。`scripts/build.mjs` 在 Fable 编译后只生成这个 JS artifact。
+calibration 数值只存在于最终生成产物；tracked 源码树不存在 `LoopDetectorConstants.fs` 或等价数值快照。
 
 fresh detector 以 `NORMAL_WEIGHTED_DISTINCT` 为无罪 prior；真实 token 按同一 λ 自动淡出该 prior。
 

@@ -20,6 +20,8 @@ transcript 尾部并推迟进入正常 recovery。本包在污染扩大前把该
 - detector 自己成为新的业务 truth / retry controller（绕过 FallbackController 直接改 Offset、
   直接发 probe/squash）；
 - detector 按角色/自然语言动态放宽阈值（不可测，特例森林）；
+- calibration 把派生数值写回 tracked source，导致 build 改工作树、源码 mtime 与语料集合互相污染；
+- production source 持有某次仓库快照的 calibration 数值，而不是由当前构建输入生成唯一运行产物；
 - detector 的内存随流长度增长（不是 bounded）；
 - detector 状态跨 attempt 复用或泄漏（生命周期没有绑定单次 ProviderRun）；
 - LoopKillArmed 写进 Journal 或日志当恢复协议（它不是 durable 状态）。
