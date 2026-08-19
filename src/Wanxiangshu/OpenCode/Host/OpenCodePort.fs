@@ -88,12 +88,6 @@ module OpenCodePort =
         else
             None
 
-    let private tryMessageId (data: obj) =
-        if not (isNull data) && not (isNull data?id) then
-            Some(PhysicalUserMessageId.create (unbox<string> data?id))
-        else
-            None
-
     let private optionalParentId (item: obj) =
         if isNull item?parentID then
             None

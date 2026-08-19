@@ -246,21 +246,6 @@ module ForkTool =
     let private successInstruction (text: string) =
         ToolHostCodec.tomlObjectWithInstructions [ text ] []
 
-    let private managedForRecord (record: AgentRecord) =
-        if String.IsNullOrWhiteSpace record.Agent then
-            None
-        else
-            ManagedAgent.tryParse record.Agent
-
-    let private forbiddenManagerRole (managed: ManagedAgent) =
-        match managed.Role with
-        | Role.Distiller
-        | Role.Blogger
-        | Role.Orchestrator
-        | Role.Manager
-        | Role.Reviewer -> true
-        | _ -> false
-
     let private personaBinding (role: Role) (tier: AgentTier) =
         PersonaCatalog.persona role tier
         |> fun value -> value.ToLowerInvariant(), ManagedAgent.make tier role
@@ -353,12 +338,6 @@ module ForkTool =
 
                 return workRecord
             }
-
-    let private bynameOf (request: Request) (fallback: string) =
-        if String.IsNullOrWhiteSpace request.Name then
-            fallback
-        else
-            request.Name.Trim()
 
     let private appendFissionAffinity durable (context: HostToolContext) (lane: FissionLaneBinding) handleId =
         taskResult {

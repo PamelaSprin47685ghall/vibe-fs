@@ -87,7 +87,6 @@ const WIRED_ALLOWLIST = new Set([
   'fsharp-control-pyramid-guide.mjs', // guide lib：被 fsharp-control-pyramid.mjs import
   'js-surface-manifest.mjs', // post-build gate：由 build.mjs 在 fable precompile 后调用（依赖 dist 产物，不能 pre-build）
   'legacy-horizon-census.mjs', // census tool：由 OBL-007 历史 detector 退出验证调用
-  'ownership-graph.mjs', // report tool：用于生成生产语义所有权图
 ])
 
 /** 解析 check.mjs 的 checks 数组，返回 wired basename 清单（保持声明顺序）。 */

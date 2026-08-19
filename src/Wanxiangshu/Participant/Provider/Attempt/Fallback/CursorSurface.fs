@@ -215,8 +215,6 @@ module CursorSurface =
                mayContinue = (fun budget current -> FallbackProjection.mayContinue budget (projectionOf current))
                read = (fun current -> projectionOf current |> projectionView) |}
 
-    let private factField (value: obj) (name: string) : obj = field (field value "payload") name
-
     let authorityRootAccepted (value: obj) : obj =
         box
             {| kind = "AuthorityRootAccepted"

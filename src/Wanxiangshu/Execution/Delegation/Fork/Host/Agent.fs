@@ -124,13 +124,6 @@ module HostForkAgent =
         |> String.concat "\n"
         |> fun text -> if String.IsNullOrWhiteSpace text then None else Some text
 
-    let private missingReviewRequirement (input: ReviewRequirementInput) : Result<string list, string> =
-        Error(
-            sprintf
-                "Cannot load original user requirement message %s for reviewer"
-                (AuthorityRootUserMessageId.value input.AuthorityRootUserMessageId)
-        )
-
     let private consumeRequirementText (input: ReviewRequirementInput) (messages: SessionMessage list) =
         // The Authority Root was promoted from a physical message, so its
         // value is that message's wire address. Compared as an address

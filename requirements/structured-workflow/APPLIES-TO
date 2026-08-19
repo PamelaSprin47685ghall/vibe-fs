@@ -1,6 +1,11 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
 # requirements/structured-workflow/** is covered implicitly and must not be listed here.
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
+#
+# APPLIES-TO = governance scope (Meta Constitution). structured-workflow governs
+# source-wide structural rules (CE, no second runtime, no durable PC, etc.) but
+# does not own any production file. Primary file ownership is in
+# scripts/checks/semantic-owners.json.
 
 /src/Wanxiangshu/**/*.fs
 /scripts/check.mjs

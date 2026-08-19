@@ -1,13 +1,4 @@
 {
   "version": 1,
-  "bindings": [
-    "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs::missingReviewRequirement",
-    "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs::bynameOf",
-    "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs::forbiddenManagerRole",
-    "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs::managedForRecord",
-    "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs::capturePayload",
-    "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs::deliverCaptured",
-    "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs::tryMessageId",
-    "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs::factField"
-  ]
+  "bindings": []
 }
