@@ -166,4 +166,4 @@ acceptance-not-omniscience
 
 ### GAP
 
-- `GAP-023` —— **CLOSED**：`judge` 防重 identity 已从整个 reusable Reviewer `SessionId` 收窄为 `(SessionId, PhysicalUserMessageId)`。同 request 的第二次 `judge` 仍走 `AlreadyJudged → AbortSession` 收束当前 turn；下一条 physical review request 会替换旧 request key，重新获得一次 judgement 资格；`session.deleted` 同时清理该 request identity。证据：`requirements/review-judgement/tests/verdict-tool.test.mjs` 8/8，review-judgement + review-assurance + obligation-ledger 196/196，`node scripts/build.mjs` green，`node scripts/check.mjs` green。
+- `GAP-023` —— **CLOSED**：`judge` 防重 identity 已从整个 reusable Reviewer `SessionId` 收窄为 `(SessionId, PhysicalUserMessageId)`。同 request 的第二次 `judge` 仍走 `AlreadyJudged → InterruptAttempt` 只收束当前 turn；下一条 physical review request 会替换旧 request key，重新获得一次 judgement 资格；`session.deleted` 同时清理该 request identity。证据：`requirements/review-judgement/tests/verdict-tool.test.mjs` 8/8，review-judgement + review-assurance + obligation-ledger 196/196，`node scripts/build.mjs` green，`node scripts/check.mjs` green。

@@ -551,6 +551,42 @@ type ToolRuntimeScope
                 not (List.isEmpty ptys)
             | _ -> false)
 
+    member _.CancelSessionChildren(sessionId: string) : Task =
+        let forkRuntimes, orchestrator =
+            lock gate (fun () ->
+                let owned = ResizeArray<HostForkRuntime>()
+
+                match runtimes.TryGetValue sessionId with
+                | true, runtime ->
+                    runtimes.Remove sessionId |> ignore
+                    owned.Add runtime
+                | false, _ -> ()
+
+                match executorRuntimes.TryGetValue sessionId with
+                | true, runtime ->
+                    executorRuntimes.Remove sessionId |> ignore
+                    addUniqueForkRuntime owned runtime
+                | false, _ -> ()
+
+                let host =
+                    match orchestratorHosts.TryGetValue sessionId with
+                    | true, current ->
+                        orchestratorHosts.Remove sessionId |> ignore
+                        Some current
+                    | false, _ -> None
+
+                owned |> Seq.toList, host)
+
+        task {
+            for runtime in forkRuntimes do
+                do! runtime.CancelAndDrain()
+
+            match orchestrator with
+            | Some host -> do! host.CancelAndDrain()
+            | None -> ()
+        }
+        :> Task
+
     member _.DisposeSession(sessionId: string) : Task =
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
@@ -627,6 +663,7 @@ type ToolRuntimeScope
     member this.Dispose() = this.DisposeAsync() |> ignore
 
     interface ISessionRuntimeOwner with
+        member this.CancelSessionChildren sessionId = this.CancelSessionChildren sessionId
         member this.DisposeSession sessionId = this.DisposeSession sessionId
         member this.DisposeExecutorRuntime sessionId = this.DisposeExecutorRuntime sessionId
         member this.DisposeAsync() = this.DisposeAsync()

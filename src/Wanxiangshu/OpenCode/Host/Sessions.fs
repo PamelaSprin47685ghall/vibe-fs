@@ -24,10 +24,10 @@ type ISessionHostPort =
     abstract SendPrompt: sessionId: SessionId * text: string * opts: SessionPromptOptions -> Task<SendOutcome>
 
     abstract AbortSession: sessionId: SessionId -> Task<Result<unit, string>>
-    /// Fission replacement interrupt: abort only this physical Host session.
-    /// Unlike AbortSession, this does not detach/cancel the logical owner's
-    /// managed children. The later TurnAborted is classified by FissionRuntime.
-    abstract InterruptSessionOnly: sessionId: SessionId -> Task<Result<unit, string>>
+    /// Internal attempt stop: abort only this physical Host attempt.
+    /// Unlike AbortSession, this does not detach/cancel logical children and is
+    /// unavailable to user-facing/root sessions.
+    abstract InterruptAttempt: sessionId: SessionId -> Task<Result<unit, string>>
     abstract AbortChildren: parentId: SessionId -> Task
 
     /// Fission-only physical sibling creation. `physicalParentId` is the old
@@ -234,6 +234,32 @@ type InjectedSessionPort
             return childId
         }
 
+    let interruptManagedAttempt (sessionId: SessionId) =
+        task {
+            Diagnostic.emit "session-attempt-interrupt" [ "session_id", SessionId.value sessionId ]
+            SessionExecutionBinding.cancelUnacquired sessionId
+
+            match underlyingPort with
+            | Some port -> return! port.AbortSession sessionId
+            | None -> return Error "No Host transport: cannot interrupt attempt"
+        }
+
+    let abortManagedSession (sessionId: SessionId) =
+        task {
+            Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
+            SessionExecutionBinding.cancelUnacquired sessionId
+            detachChild sessionId
+            do! abortChildren sessionId
+
+            match underlyingPort with
+            | Some port ->
+                let! _ = port.AbortSession(sessionId)
+                ()
+            | None -> ()
+
+            return Ok()
+        }
+
     interface ISessionHostPort with
         member _.AbortChildren(parentId) = abortChildren parentId
 
@@ -280,35 +306,17 @@ type InjectedSessionPort
             else
                 sendRoutedPrompt sessionId text opts
 
-        member _.InterruptSessionOnly(sessionId) =
-            task {
-                Diagnostic.emit "session-fission-interrupt" [ "session_id", SessionId.value sessionId ]
-                SessionExecutionBinding.cancelUnacquired sessionId
-
-                match underlyingPort with
-                | Some port -> return! port.AbortSession sessionId
-                | None -> return Error "No Host transport: cannot interrupt session"
-            }
+        member _.InterruptAttempt(sessionId) =
+            if not (managedChild sessionId) then
+                Task.FromResult(Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user")
+            else
+                interruptManagedAttempt sessionId
 
         member me.AbortSession(sessionId) =
-            task {
-                // Who killed a turn is the first question a stalled run raises, and the answer used
-                // to be nowhere: every abort path was silent, so an interrupted tool call looked
-                // identical to a model that simply stopped. One record per abort, visible under
-                // WANXIANGSHU_DIAG=1.
-                Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
-                SessionExecutionBinding.cancelUnacquired sessionId
-                detachChild sessionId
-                do! abortChildren sessionId
-
-                match underlyingPort with
-                | Some port ->
-                    let! _ = port.AbortSession(sessionId)
-                    ()
-                | None -> ()
-
-                return Ok()
-            }
+            if not (managedChild sessionId) then
+                Task.FromResult(Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user")
+            else
+                abortManagedSession sessionId
 
         member _.CreateSiblingSession(ownerSessionId, physicalParentId, options) =
             createSiblingSession ownerSessionId physicalParentId options

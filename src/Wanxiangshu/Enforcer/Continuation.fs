@@ -94,7 +94,7 @@ module EnforcerContinuation =
 
     /// Continuation transform result. Empty message lists are forbidden: Host
     /// forwards them as provider `messages` and rejects with 400.
-    /// StopPhysicalRun asks the plugin to AbortSession after projecting messages.
+    /// StopPhysicalRun asks the plugin to interrupt only the current physical attempt after projecting messages.
     [<RequireQualifiedAccess>]
     type ContinuationOutcome =
         | ProjectMessages of obj list

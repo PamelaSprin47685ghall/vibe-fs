@@ -111,6 +111,7 @@ module OrdinaryTurnWorkflow =
     let private handleAborted
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
+        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -128,6 +129,7 @@ module OrdinaryTurnWorkflow =
             task {
                 abortedSessions.Add sessionKey |> ignore
                 abortParent sessionKey
+                do! cancelSessionChildren turn.SessionId
                 do! sessionPort.AbortChildren turn.SessionId
 
                 eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
@@ -199,6 +201,7 @@ module OrdinaryTurnWorkflow =
     let private handleOutcome
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
+        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -225,6 +228,7 @@ module OrdinaryTurnWorkflow =
             handleAborted
                 timerPort
                 abortParent
+                cancelSessionChildren
                 sessionPort
                 eventPort
                 journal
@@ -257,6 +261,7 @@ module OrdinaryTurnWorkflow =
     let observe
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
+        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -289,6 +294,7 @@ module OrdinaryTurnWorkflow =
             handleOutcome
                 timerPort
                 abortParent
+                cancelSessionChildren
                 sessionPort
                 eventPort
                 journal

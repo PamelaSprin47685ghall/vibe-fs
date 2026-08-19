@@ -1361,7 +1361,7 @@ module StrengthSurface =
                 aborted.Add(SessionId.value sessionId)
                 Task.FromResult(Ok())
 
-            member _.InterruptSessionOnly(_) = Task.FromResult(Ok())
+            member _.InterruptAttempt(_) = Task.FromResult(Ok())
             member _.AbortChildren(_) = AsyncSupport.completedTask ()
             member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
             member _.TryGetParentSession(_) = Task.FromResult(Ok None)

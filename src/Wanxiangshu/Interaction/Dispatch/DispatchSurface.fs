@@ -49,7 +49,7 @@ module DispatchSurface =
                 emitJsExpr (sendPrompt, SessionId.value sessionId, text, options) "$0($1,$2,$3)"
 
             member _.AbortSession(sessionId) = typed.AbortSession sessionId
-            member _.InterruptSessionOnly(sessionId) = typed.InterruptSessionOnly sessionId
+            member _.InterruptAttempt(sessionId) = typed.InterruptAttempt sessionId
             member _.AbortChildren(sessionId) = typed.AbortChildren sessionId
 
             member _.CreateSiblingSession(owner, parent, options) =

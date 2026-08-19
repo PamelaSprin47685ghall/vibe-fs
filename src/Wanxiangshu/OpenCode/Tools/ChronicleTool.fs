@@ -122,7 +122,7 @@ module ChronicleTool =
     let private abortSessionIfPresent (runtime: ToolRuntimeScope) sessionId : System.Threading.Tasks.Task =
         task {
             if not (String.IsNullOrWhiteSpace sessionId) then
-                let! _ = runtime.Sessions.AbortSession(SessionId.create sessionId)
+                let! _ = runtime.Sessions.InterruptAttempt(SessionId.create sessionId)
                 ()
         }
 

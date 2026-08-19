@@ -73,6 +73,7 @@ open Wanxiangshu.Host
 /// exposing its concrete dictionaries to the plugin composition root.
 type ISessionRuntimeOwner =
     inherit IDisposable
+    abstract CancelSessionChildren: string -> Task
     abstract DisposeSession: string -> Task
     abstract DisposeExecutorRuntime: string -> Task
     /// MANAGED-SESSION-009: plugin shutdown must await durable parent-cancel drain
@@ -410,6 +411,13 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             match toolRuntime with
             | Some owner -> owner.HasLivePty sessionId
             | None -> false)
+
+    member _.CancelSessionChildren(sessionId: string) : Task =
+        let owner = lock toolRuntimeGate (fun () -> toolRuntime)
+
+        match owner with
+        | Some active -> active.CancelSessionChildren sessionId
+        | None -> Task.FromResult(()) :> Task
 
     member private this.DisposeSessionCore(sessionId: string, preserveIdentity: bool) : Task =
         task {

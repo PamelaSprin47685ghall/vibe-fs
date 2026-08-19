@@ -76,7 +76,8 @@ subscriber sticky replay、listener disposal。
 - `HostDigest.sha256Hex`：全仓唯一 sha256（durable digest 单点定义）。
 - `NeedHelpSensor`（`Host/NeedHelpSensor.fs`）：rolling suffix + reasoning PartId 集 + armed
   identity（SessionId × ProviderRun）；`NeedHelpEventCodec` 先登记 `part.type=reasoning` 再适配
-  `field=text` delta；legacy direct reasoning-field 仅 codec 兼容。
+  `field=text` delta；legacy direct reasoning-field 仅 codec 兼容。HostSignalBootstrap 只把有 physical
+  parent 的 managed sub-session 纳入自动 assistance interrupt，并通过 `InterruptAttempt` 收束当前 attempt。
 - `Tools/ToolContext.fs`：`{ SessionId; Workspace; Cancellation }`（execute 双半边身份经
   `ToolHostCodec` 组装；before/after 只见 sessionID+callID）。
 

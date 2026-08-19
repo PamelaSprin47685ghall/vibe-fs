@@ -7,7 +7,7 @@
 | 模块 | 角色 | 对应命题 |
 |---|---|---|
 | `src/Wanxiangshu/Execution/Session/LoopDetector.fs` | `gpt-tokenizer/o200k_base` + 指数衰减 weighted-distinct token detector | DG-003/004/005 |
-| `src/Wanxiangshu/OpenCode/Host/LoopSensor.fs` | transport 边沿观测器：持有 per-session detectors 与进程内 `LoopKillArmed` 集合；Observe 吃 text 与 reasoning delta；命中 → TryArm → AbortSession | DG-002/006/007/008 |
+| `src/Wanxiangshu/OpenCode/Host/LoopSensor.fs` | transport 边沿观测器：持有 per-session detectors 与进程内 `LoopKillArmed` 集合；Observe 吃 text 与 reasoning delta；仅 physical sub-session 命中 → TryArm → InterruptAttempt | DG-002/006/007/008 |
 | `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs` | loop-kill armed abort 桥接到 `recordConfirmedFailure("loop-kill")` | DG-009 |
 | `src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs` | TurnAborted 消费边界：命中 LoopKillArmed → 清标记 → 标准 recovery；未命中 → 普通 abort | DG-007/009 |
 | `requirements/degeneration-guard/tests/loop-calibration*.mjs` | 扫仓库全部 strict UTF-8 文字，重放 half-life / normal / midpoint 滴定 | DG-004 |
@@ -80,7 +80,7 @@ Step 4  verdict.MayContinue → 发 ProviderRetryAttempt continuation（loop-con
 ## 依赖
 
 DEPENDS ON：`provider-attempt-recovery`（桥接目标：命中后由标准 recovery 决定 cursor/budget）、
-`host-boundary`（AbortSession 是 Host 物理能力、snapshot 观察由 Host 提供）。理由：DG-009 消费
+`host-boundary`（InterruptAttempt 是 Host 当前-attempt 物理能力、snapshot 观察由 Host 提供）。理由：DG-009 消费
 前者的唯一写入口，DG-002/007 消费后者的 transport 观察边界。
 
 ## 验证与测试落点

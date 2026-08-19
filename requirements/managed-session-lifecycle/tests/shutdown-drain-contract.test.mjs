@@ -41,8 +41,8 @@ test('WHAT[MANAGED-SESSION-009] shutdown ownership drains session runtimes befor
   assert.match(bootstrap, /durableUnavailable = Some\(fun \(\) -> journal \|> Option\.exists AgentJournal\.isPoisoned\)/)
   assert.match(finalityPorts, /AbortReviewer: SessionId -> Task/)
   assert.match(finalityBlessing, /do! FinalityReviewerPort\.abortAll reviewerPort members/)
-  assert.match(finalityHostPort, /let! _ = scope\.Sessions\.AbortSession reviewerSessionId/)
-  assert.doesNotMatch(finalityHostPort, /AbortReviewer[\s\S]{0,160}AbortSession reviewerSessionId \|> ignore/)
+  assert.match(finalityHostPort, /let! _ = scope\.Sessions\.InterruptAttempt reviewerSessionId/)
+  assert.doesNotMatch(finalityHostPort, /AbortReviewer[\s\S]{0,160}InterruptAttempt reviewerSessionId \|> ignore/)
 })
 
 test('WHAT[MANAGED-SESSION-009] fork terminal callbacks are runtime-owned and drained before parent cancel', () => {

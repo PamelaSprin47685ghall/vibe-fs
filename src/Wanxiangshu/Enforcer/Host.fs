@@ -354,7 +354,7 @@ module EnforcerHost =
         : Task<EnforcerContinuation.ContinuationOutcome> =
         task {
             // Never blank the Host transcript. Project = continue provider view;
-            // Stop = project non-empty messages then plugin AbortSession.
+            // Stop = project non-empty messages then plugin current-attempt interrupt.
             let project (msgs: obj list) = projectMessages msgs rawMessages
 
             let stop (reason: string) =

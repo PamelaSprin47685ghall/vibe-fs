@@ -86,8 +86,10 @@ token 的 `token_id -> last_step`，因此内存上界由固定 vocabulary 决�
 
 ## DG-007：命中只停止当前物理 attempt
 
-detector 判定 LOOP → 若该 session 当前 attempt 尚未武装 LoopKill：记录 `LoopKillArmed` →
-`AbortSession(sessionId)`（物理强杀请求）；若已武装：忽略后续 delta（幂等，不二次 abort）。禁止
+detector 判定 LOOP → 仅当该 session 是有 physical parent 的 managed sub-session，且当前 attempt 尚未
+武装 LoopKill：记录 `LoopKillArmed` → `InterruptAttempt(sessionId)`（只停止当前物理 attempt，不级联
+logical children）；若已武装：忽略后续 delta（幂等，不二次 abort）。user-facing/root 不具备自动
+LoopKill interrupt 权限。禁止
 在 abort 返回前发送 continuation；禁止根据 delta 内容裁剪 transcript 或改写已发出的客户端可见文本。
 
 ## DG-008：LoopKillArmed 是进程内局部事实
@@ -106,9 +108,9 @@ mayContinue 则发 `ProviderRetryAttempt` continuation，否则 `FallbackExhaust
 
 ## DG-010：作用域与豁免
 
-必须检测：插件 Owned 的 managed WorkSession / CompanionSession / BloggerSession 中正在进行的
+必须检测：插件 Owned 且有 physical parent 的 managed WorkSession / CompanionSession / BloggerSession 中正在进行的
 assistant 文本流（包含 field=text 正文与 reasoning / thinking 思考流）。必须忽略：非 Owned session、
-compaction pseudo-run（HOST-006）、title / 非 managed 的 Host 内部 run、已 LoopKillArmed 的同一 attempt 的
+user-facing/root、compaction pseudo-run（HOST-006）、title / 非 managed 的 Host 内部 run、已 LoopKillArmed 的同一 attempt 的
 后续 delta。
 
 ## DG-011：continuation 是独立叶子

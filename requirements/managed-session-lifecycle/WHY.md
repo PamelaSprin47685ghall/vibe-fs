@@ -25,6 +25,11 @@
 6. **级联取消必须完成后才宣告父 abort**。`AbortChildren` 是异步物理效果；调用后丢弃 Task 会让
    父 `TurnAborted` terminal / teardown 抢先完成。Companion Blogger 于是可能仍在 provider flight 中，
    是否被真正 interrupt 取决于调度时序，形成同一输入时好时坏的竞态。
+7. **停止当前 attempt ≠ 取消 logical session**。Loop/NeedHelp/Finality/Fission 等内部控制只可能收束
+   managed sub-session 的当前 physical attempt；它们不能借 `AbortSession` 获得 parent-cancel 权限。
+   user-facing/root 没有内部 interrupt 权限：除 Host 已观测到外部用户主动中断外，插件不得主动
+   interrupt root。否则一次局部控制动作会同时杀掉 Manager 与全部 coder，随后 durable handle 仍是
+   `Active`，horizon 又会把已经死亡的 child 报成仍在工作。
 
 ## RED 是什么样
 
@@ -39,6 +44,8 @@ RED = 同一 logical owner 可得到两个活跃 replacement，或 restart/cance
 - `consume` 后 restart 又把同一条 completion 投递一次 → RED（retire tombstone 缺失）。
 - 父取消后子仍在运行 / 已 Abandoned 的 handle 被 join 消费 → RED。
 - 父 `TurnAborted` 已对外完成，但 Blogger/其它 running child 的 `AbortSession` 仍未完成 → RED。
+- 内部 loop/needhelp/tool 收束 interrupt user-facing/root，或 attempt-only stop 级联 abort descendants → RED。
+- child 已被 parent abort 物理停止，但 durable handle 仍 `Active`，导致 horizon 报 “still away” → RED。
 - Hidden（HostOwnedHidden）handle 泄漏进父的 list/join/guard/恢复 → RED（EXEC-014 回归：
   Distiller child 泄漏会阻塞 caller 的 suicide）。
 

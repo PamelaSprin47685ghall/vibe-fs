@@ -720,7 +720,7 @@ module FissionTool =
         task {
             FissionRuntime.markSilentInterrupt sessionId
 
-            match! scope.Sessions.InterruptSessionOnly sessionId with
+            match! scope.Sessions.InterruptAttempt sessionId with
             | Ok() -> return Ok()
             | Error error ->
                 FissionRuntime.clearSilentInterrupt sessionId

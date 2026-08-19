@@ -61,8 +61,8 @@ export const fakeSessions = (behaviour = {}) => {
       calls.push(['AbortSession', id])
       return { ok: true }
     },
-    InterruptSessionOnly: async (id) => {
-      calls.push(['InterruptSessionOnly', id])
+    InterruptAttempt: async (id) => {
+      calls.push(['InterruptAttempt', id])
       return { ok: true }
     },
     AbortChildren: async (id) => {

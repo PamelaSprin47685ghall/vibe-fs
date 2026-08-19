@@ -42,6 +42,14 @@ CompletedAwaitingJoin 且 ref+digest 精确匹配才回 Active）、视图（`li
 - **HostForkRuntime / ForkRuntime**（`Session/{HostForkRuntime,ForkRuntime}.fs`）：fork child 的
   install → HandleLinked（失败则 abort 新 child）→ SendPrompt（失败则 fail pending run）；
   reuse 不 spawn、沿用已绑 agent；`ForkRuntime` 维护 in-process ChildRun 注册 + 双通道 mailbox。
+- **interrupt 权限分型**：`ISessionHostPort.InterruptAttempt` 只允许有 physical parent 的 managed
+  sub-session，且只调用 Host physical abort；`AbortSession` 才拥有 detach + descendant cascade。
+  Loop/NeedHelp/Fission/Reviewer/tool-invariant 的内部收束一律走 `InterruptAttempt`。root/user-facing
+  自动 interrupt 在 port 前与 port 内双重拒绝。
+- **TurnAborted cancel**：`OrdinaryTurnWorkflow.handleAborted` 先调用
+  `PluginRuntimeScope.CancelSessionChildren` → `ToolRuntimeScope.CancelSessionChildren` →
+  `HostForkRuntime.CancelAndDrain`，使 active durable handles 先写 `HandleAbandoned(ParentCancelled)`；
+  再 `AbortChildren` 收束 Companion 等非 fork attachment，最后发布 parent terminal。
 - **HostForkRestart**（`Session/HostForkRestart.fs`）：`restoreLinkedChildren` 按 durable handle
   投影 re-enlist；`restoreLinkedChildrenWithoutRuntime` 是 journal-only walk。
 
@@ -103,6 +111,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 | MANAGED-SESSION-013 | `tests/host-fork-restart-lifecycle.test.mjs` `HFR_restart_abandoned_handle_recovered_abandoned` / `HFR_restart_retired_handle_recovered_retired` / `HFR_restart_host_owned_hidden_handle_is_filtered_out` / `HFR_restart_active_handle_recovers_active` / `HFR_restart_recovery_commit_failure_blocks`（handle 投影恢复；恢复工作流/legacy false abort 归 crash-reconciliation） | MOVE | `node --test requirements/managed-session-lifecycle/tests/host-fork-restart-lifecycle.test.mjs` |
 | MANAGED-SESSION-014 | `tests/sync-delegate-lifecycle.test.mjs` `G6_deleted_inspector_child_retires_live_binding_but_survives_for_owner_scope_close`（deleted child retire live binding 但为 owner scope close 保留） | MOVE | `node --test requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs` |
 | MANAGED-SESSION-015 | `tests/handle.test.mjs` `EXEC_009_a_linked_handle_records_the_child_session_it_drives` / `EXEC_009_only_an_agent_handle_answers_the_agent_question` + `EXEC_009_relinking_a_live_handle_rebinds_it_rather_than_duplicating` / `EXEC_009_a_completion_for_a_handle_that_was_never_linked_stops_the_replay`；`tests/terminal-policy.test.mjs` `TPOL_tryLinkedChild_finds_child_handle_and_keeps_target_agent` / `TPOL_tryLinkedChild_without_journal_returns_none`；`tests/host-fork-agent.test.mjs` `HFA_reuse_unknown_agent_id_is_error`；`tests/join-v2-abandoned-order-lifecycle.test.mjs` `EXEC_018_creation_order_follows_HandleLinked_fold_sequence`（handle id → child session 记录） | MOVE + MOVE + MOVE + MOVE | `node --test requirements/managed-session-lifecycle/tests/handle.test.mjs` / `.../terminal-policy.test.mjs` / `.../host-fork-agent.test.mjs` / `.../join-v2-abandoned-order-lifecycle.test.mjs` |
+| MANAGED-SESSION-016 | `tests/interrupt-boundary.test.mjs`（attempt-only port root fail-closed + 无 child cascade；Loop/NeedHelp root gate；TurnAborted durable cancel → physical cascade → terminal 顺序）；`tests/handle-abandoned.test.mjs` `EXEC_009_Active_to_Abandoned_fold_and_projection`（Abandoned 立即退出 listable/horizon） | NEW + MOVE | `node --test requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` / `.../handle-abandoned.test.mjs` |
 
 ### 反向覆盖（OWNED / NEEDS-SPLIT clause → 本包命题）
 
@@ -112,6 +121,7 @@ cutover 计划）/ `NEW`（本包新写）。运行命令均为 `node --test <fi
 - `EXEC-009`（OWNED）→ MANAGED-SESSION-006/007/008/009/015。
 - `EXEC-014`（hidden handle 部分）→ MANAGED-SESSION-010。
 - `EXEC-017`（cascade cancel 部分）→ MANAGED-SESSION-009。
+- `EXEC-017`（attempt interrupt 与 logical cancel 权限分型）→ MANAGED-SESSION-016。
 - `EXEC-026`（runtime ownership 部分）→ MANAGED-SESSION-001/005/014。
 - `EXEC-028`（lifecycle 部分）→ MANAGED-SESSION-004/005。
 - `REVIEW-010/019`（fail-closed 消费）→ MANAGED-SESSION-003/011（交叉引用，不复制）。

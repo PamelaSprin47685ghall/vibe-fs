@@ -237,7 +237,7 @@ module FinalityHostPort =
               AbortReviewer =
                 fun reviewerSessionId ->
                     task {
-                        let! _ = scope.Sessions.AbortSession reviewerSessionId
+                        let! _ = scope.Sessions.InterruptAttempt reviewerSessionId
                         return ()
                     }
                     :> Task }

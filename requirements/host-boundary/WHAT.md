@@ -208,6 +208,8 @@ messageID。
 `[NEEDHELP]`；检测器能跨 delta 边界拼出 sentinel，但只保留有限 rolling suffix；visible text、
 tool output、synthetic Pair Hint 与历史 transcript 中的同字节**不得**触发；每个
 `(SessionId, ProviderRunIdentity)` 至多触发一次（HOST-027）。
+自动 assistance interrupt 只允许有 physical parent 的 managed sub-session；user-facing/root 不得被
+sensor 主动 interrupt。命中时只能请求 current physical attempt interrupt，不能触发 descendant cascade。
 
 **含义/动机**：sensor 是 assistance 的物理入口；把 visible text 扫描伪装成等价实现 =
 把用户正文当求助信号。

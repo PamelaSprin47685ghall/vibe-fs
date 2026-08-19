@@ -116,8 +116,8 @@ cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel�
 `HandleAbandoned` 与 physical child teardown。runtime 从 owner registry 移除时也必须先取得并 await
 其 drain Task，禁止「remove → `Cancel() |> ignore`」使资源从最终 shutdown 的可达集合逃逸；不得用
 任何 detached `Async.StartImmediate` / ignored Task 把 Journal append 留到 store/repository 已释放后继续执行。若 durable writer 因首个 physical append failure 进入 poisoned，则 Host Reconciler 必须同步关闭新的 wake admission，并丢弃尚未开始的 queued reconcile；不得继续在 poisoned writer 上消费 durable effect。
-Finality blessing 对 hidden reviewer 只取消当前 physical attempt、保留 process-review session；这些 abort
-同样属于 owner 已准入工作，Blessing 返回前必须全部 settle，禁止用同步 `unit` port 丢弃 `AbortSession` Task。
+Finality blessing 对 hidden reviewer 只取消当前 physical attempt、保留 process-review session；这些 interrupt
+同样属于 owner 已准入工作，Blessing 返回前必须全部 settle，禁止用同步 `unit` port 丢弃 `InterruptAttempt` Task。
 
 **含义/动机**：父取消 = 子全部止损；逐 child 使恢复与审计逐条可定位。
 
@@ -190,6 +190,26 @@ id 派生虚构 session（`HandleController.linkNamed` 注释）。
 
 **证据**：`HandleController.agentHandle/linkNamed`；→ HOW.md `MANAGED-SESSION-015`
 （REUSE `execution/handle.test.mjs` `EXEC_009_a_linked_handle_records_the_child_session_it_drives`）。
+
+## MANAGED-SESSION-016：attempt interrupt 与 logical cancel 权限分离
+
+**规范**：插件内部的 loop-kill、NeedHelp、Finality reviewer 收束、Fission replacement、tool/invariant
+收束只能请求 **current physical attempt interrupt**；该操作不得 detach session、不得调用
+`AbortChildren`、不得写 parent-cancel lifecycle。它只允许作用于有 physical parent 的 managed
+sub-session。`parent=None` 的 user-facing/root session 没有插件内部 interrupt 权限；除 Host 已经因
+外部用户主动中断产生 `TurnAborted` 外，插件不得主动 interrupt root。
+
+真正的 logical session cancel 仍由 `TurnAborted` cleanup / session teardown 拥有。它必须先让
+session-owned runtime 执行 durable parent cancel（每个 active handle → `HandleAbandoned`），再完成
+剩余 physical child cascade，最后才发布 parent `Aborted` terminal。这样 child 物理停止与 horizon
+读取的 durable lifecycle 同步收敛；禁止出现“child 已 interrupt，但 handle 仍 Active”。
+
+**含义/动机**：attempt stop 与 session cancel 共享 Host `abort` transport，但权限完全不同；不在
+port 边界分型就会把局部控制动作放大成 family cancellation，并让 durable/physical truth 分叉。
+
+**证据**：`OpenCode/Host/Sessions.fs`（`InterruptAttempt` vs `AbortSession`）、
+`ToolRuntimeScope.CancelSessionChildren`、`OrdinaryTurnWorkflow.handleAborted`；→ HOW.md
+`MANAGED-SESSION-016`。
 
 ## GARBAGE / 弃权（不进入 WHAT）
 

@@ -151,9 +151,9 @@ module OrchestratorHostSurface =
                     return plainUnitResult value
                 }
 
-            member _.InterruptSessionOnly(sessionId) =
+            member _.InterruptAttempt(sessionId) =
                 task {
-                    let! value = invokeRawTask raw "InterruptSessionOnly" [| box (SessionId.value sessionId) |]
+                    let! value = invokeRawTask raw "InterruptAttempt" [| box (SessionId.value sessionId) |]
                     return plainUnitResult value
                 }
 

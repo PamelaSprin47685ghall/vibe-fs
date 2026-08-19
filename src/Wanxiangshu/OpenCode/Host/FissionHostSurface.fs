@@ -54,7 +54,7 @@ module FissionHostSurface =
                 Task.FromResult(SendOutcome.AdmittedWithReceipt(TransportReceipt.create "receipt"))
 
             member _.AbortSession _ = Task.FromResult(Ok())
-            member _.InterruptSessionOnly _ = Task.FromResult(Ok())
+            member _.InterruptAttempt _ = Task.FromResult(Ok())
             member _.AbortChildren _ = AsyncSupport.completedTask ()
             member _.CreateSiblingSession(_, _, _) = Task.FromResult(Error "unused")
             member _.TryGetParentSession _ = Task.FromResult(Ok None)
@@ -106,6 +106,7 @@ module FissionHostSurface =
                 OrdinaryTurnWorkflow.observe
                     (DummyTimer() :> ITimerPort)
                     (fun _ -> ())
+                    (fun _ -> Task.FromResult(()) :> Task)
                     sessionPort
                     eventPort
                     None

@@ -74,6 +74,7 @@ module TurnWorkflow =
     let observe
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
+        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -150,6 +151,7 @@ module TurnWorkflow =
                 OrdinaryTurnWorkflow.observe
                     timerPort
                     abortParent
+                    cancelSessionChildren
                     sessionPort
                     eventPort
                     journal

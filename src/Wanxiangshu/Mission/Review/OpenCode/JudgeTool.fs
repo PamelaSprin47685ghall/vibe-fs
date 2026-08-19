@@ -209,7 +209,7 @@ module JudgeTool =
     let private abortSession (scope: ToolRuntimeScope) (sessionId: string) : Task =
         task {
             if not (String.IsNullOrWhiteSpace sessionId) then
-                let! _ = scope.Sessions.AbortSession(SessionId.create sessionId)
+                let! _ = scope.Sessions.InterruptAttempt(SessionId.create sessionId)
                 ()
         }
 

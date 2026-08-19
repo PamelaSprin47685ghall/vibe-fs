@@ -122,7 +122,7 @@ module PluginTransforms =
             | Error reason ->
                 Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
 
-                let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
 
                 return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
         }
@@ -338,7 +338,7 @@ module PluginTransforms =
         =
         task {
             try
-                let! result = sessionPort.AbortSession sid
+                let! result = sessionPort.InterruptAttempt sid
                 handlePhysicalStopResult sid sessionId physicalUserMessageId result
             with ex ->
                 Diagnostic.emit
@@ -509,7 +509,7 @@ module PluginTransforms =
         match projectionSessionIdOpt with
         | Some sessionId ->
             task {
-                let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
                 ()
             }
         | None -> Task.FromResult()
@@ -593,7 +593,7 @@ module PluginTransforms =
                     [ "session_id", sessionId; "result", reason ]
 
                 task {
-                    let! _ = sessionPort.AbortSession(SessionId.create sessionId)
+                    let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
                     ()
                 }
 

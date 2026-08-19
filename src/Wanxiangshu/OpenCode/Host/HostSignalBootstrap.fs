@@ -431,6 +431,12 @@ module HostSignalBootstrap =
             let isOwned sessionId =
                 scope.Sessions.OwnedSessions.Contains(SessionId.value sessionId)
 
+            let hasPhysicalParent sessionId =
+                scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
+
+            let isInternalAttemptInterruptible sessionId =
+                isOwned sessionId && hasPhysicalParent sessionId
+
             let isEligibleRole (profile: PromptAuthority.AuthorityExecutionProfile) =
                 match profile.CanonicalRole with
                 | Role.Blogger
@@ -450,7 +456,7 @@ module HostSignalBootstrap =
                 | None -> false
 
             let isNeedHelpEligible sessionId =
-                if not (isOwned sessionId) then
+                if not (isInternalAttemptInterruptible sessionId) then
                     false
                 elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then
                     false
@@ -460,10 +466,10 @@ module HostSignalBootstrap =
                     profileIsEligible sessionId
 
             let loopSensor =
-                LoopSensor(isOwned, (fun sessionId -> sessionPort.AbortSession sessionId))
+                LoopSensor(isInternalAttemptInterruptible, (fun sessionId -> sessionPort.InterruptAttempt sessionId))
 
             let needHelpSensor =
-                NeedHelpSensor(isNeedHelpEligible, (fun sessionId -> sessionPort.AbortSession sessionId))
+                NeedHelpSensor(isNeedHelpEligible, (fun sessionId -> sessionPort.InterruptAttempt sessionId))
 
             do scope.AttachLoopSensor loopSensor
             do scope.AttachNeedHelpSensor needHelpSensor

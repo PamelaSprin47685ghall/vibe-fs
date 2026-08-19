@@ -95,7 +95,7 @@ module SyncDelegateSurface =
                 Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create "msg-physical"))
 
             member _.AbortSession _ = Task.FromResult(Ok())
-            member _.InterruptSessionOnly _ = Task.FromResult(Ok())
+            member _.InterruptAttempt _ = Task.FromResult(Ok())
             member _.AbortChildren _ = Task.FromResult()
 
             member _.CreateSiblingSession(_, _, _) =
