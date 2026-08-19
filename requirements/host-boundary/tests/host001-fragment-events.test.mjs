@@ -68,6 +68,19 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_cap
       },
     },
   }
+  const failed = {
+    type: 'message.updated',
+    properties: {
+      info: {
+        sessionID: SESSION,
+        id: 'run-failed',
+        role: 'assistant',
+        parentID: 'msg-current',
+        time: { created: 1, completed: 2 },
+        error: { name: 'ProviderError' },
+      },
+    },
+  }
 
   assert.equal(decode(running), undefined)
   assert.equal(decode(toolCallStep), undefined)
@@ -92,6 +105,12 @@ test('WHAT[HOST-BOUNDARY-001] HOST_001_terminal_message_identity_is_physical_cap
     physicalUserMessageId: 'msg-current',
     providerRun: 'run-final',
   })
+  assert.deepEqual(decodeStepEnd(failed), {
+    sessionId: SESSION,
+    physicalUserMessageId: 'msg-current',
+    providerRun: 'run-failed',
+  })
+  assert.equal(decodeExecutionEnd(failed), undefined)
   assert.equal(
     decodeExecutionEnd({ type: 'session.idle', properties: { sessionID: SESSION } }),
     undefined,

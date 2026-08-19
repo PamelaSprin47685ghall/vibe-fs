@@ -60,6 +60,8 @@ Session 是可复用容器：业务 completed、handle retired、甚至 Host clo
 
 因此 managed lease 以 `(SessionId, PhysicalUserMessageId)` 为 identity，EffectiveAgent 是该 execution 的稳定属性。同一 physical id 的 provider retry 复用 target；同一 SessionId 出现新 physical id 时，新 material 自身就足以 supersede 旧 lease，不依赖 idle 必达。AABB 切到 peer 只影响**下一条 physical execution**的 EffectiveAgent，不保留一份 session 级 B 槽。
 
+provider assistant error 只证明**当前 provider step 结束**，不证明这条 physical user execution 结束。Host 可以在同一个 `PhysicalUserMessageId` 上继续 retry；若 error event 同时删除 execution binding，下一次 transform 会在已经 durable `PhysicalAccepted` 的 material 上读到“no active execution binding”。这类竞态不能靠 transform 重新 acquire 修补：重新 acquire 会把同一 execution 错当成新 occupancy，并把 release/admission authority 撕成两份。故 physical execution 的普通 terminal witness 必须比 provider-step failure 更强；证据不足时宁可保留 exact lease，直到成功 final assistant、新 physical supersession 或 owner cleanup。
+
 新的 physical execution 仍然必须重新调用 scheduler；只是同一未删除 Session 的上一成功 target 会作为 `previous` 一并传入。这样 MJS 可以在角色策略仍允许、provider 仍有容量时优先保持原 LLM，减少接续对话的模型漂移；一旦原 target 不再属于当前 role 的候选或 provider 已满，仍可立即选择其它 target。exact terminal 释放容量但不删除这份无容量语义的 previous hint；session delete/scope cleanup 才清除它，所以真正新对话得到 `null`。
 
 ## 6. 为什么事件驱动状态必须 process-shared

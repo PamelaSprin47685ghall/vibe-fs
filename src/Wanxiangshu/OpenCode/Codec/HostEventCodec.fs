@@ -193,23 +193,20 @@ module HostEventCodec =
         let properties = if isNull raw then null else raw?properties
         if isNull properties then null else properties?info
 
-    let private terminalAssistantInfo (info: obj) =
+    let private physicalExecutionTerminalInfo (info: obj) =
         let assistant = fieldText info "role" = "assistant"
         let time = if isNull info then null else info?time
         let completed = not (isNull time) && not (isNull time?completed)
         let failed = not (isNull info) && not (isNull info?error)
         let finish = nonEmptyFieldText info "finish"
 
-        // `tool-calls` completes one provider step but the same physical user
-        // execution continues through tool execution and the next provider
-        // step. Releasing there would recreate the exact missing-lease bug on
-        // the next chat.params call for the same physical material.
         let finalFinish =
-            completed
+            not failed
+            && completed
             && (finish
                 |> Option.exists (fun reason -> not (String.Equals(reason, "tool-calls", StringComparison.Ordinal))))
 
-        assistant && (failed || finalFinish)
+        assistant && finalFinish
 
     let private providerStepTerminalInfo (info: obj) =
         let assistant = fieldText info "role" = "assistant"
@@ -256,7 +253,7 @@ module HostEventCodec =
         let raw = unwrap rawInput
         let info = messageInfo raw
         let isMessageUpdated = not (isNull raw) && eventTypeOf raw = "message.updated"
-        let isTerminal = terminalAssistantInfo info
+        let isTerminal = physicalExecutionTerminalInfo info
 
         let sessionId =
             tryReadSessionId raw |> Option.orElseWith (fun () -> messageInfoSessionId info)

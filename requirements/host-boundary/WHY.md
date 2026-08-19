@@ -8,7 +8,9 @@
 
 1. **碎片事件拼真相 = 把因果绑在传输噪声上**（ARCH-002 被拒方案：流式碎片积分）。碎片事件的
    顺序/形状随 Host 版本漂移；从 `message.updated` / `part.delta` 推导完成/失败，上游一改事件
-   shape，业务就悄悄读错。真相源必须固定为「唤醒后读完整 SDK snapshot」。
+   shape，业务就悄悄读错。真相源必须固定为「唤醒后读完整 SDK snapshot」。即使物理资源层读取
+   `message.updated` 的 exact identity，也必须区分“provider step 已失败”和“整个 physical execution
+   已结束”：assistant error 可能马上进入同一 `PhysicalUserMessageId` 的 Host retry，不能据此删 lease。
 2. **Transport 状态机不得搬进 Domain**。把 busy/running 加进业务 HostSignal 并在几十处维护
    if/else（cache.md §16 被拒方案）——transport 状态机不是领域事实。业务只见 typed `HostSignal`
    （idle/retry/aborted/deleted），且信号只唤醒、不携带事实（`HostSignal.fs` 头注释：

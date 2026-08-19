@@ -21,8 +21,10 @@ SDK snapshot 尚未看到当前 physical user 对应 assistant 而处于 pending
 occasion 时凭空建立新的业务 wake。
 
 物理基础设施可以在这个边界并行抽取不进入业务层的资源证据：execution-model-routing 只读取
-最终 assistant `message.updated.info.parentID`（error，或 completed 且非 `tool-calls` finish）来得到 exact PhysicalUserMessageId 并释放对应 model
-lease；该 observation 不得被包装成 `HostSignal`、不得携带 terminal 业务语义（具体合同归 EMR-007）。
+最终 assistant `message.updated.info.parentID` 来得到 exact PhysicalUserMessageId。assistant error 只证明当前
+provider step 结束，不得释放 physical execution lease；只有**无 error、completed、且明确非
+`tool-calls` finish** 的 assistant 才是普通 physical execution terminal。该 observation 不得被包装成
+`HostSignal`、不得携带 terminal 业务语义（具体合同归 EMR-007）。
 
 **含义/动机**：碎片顺序/形状随 Host 版本漂移；把因果绑在传输噪声上（why/host.md §4）。
 
