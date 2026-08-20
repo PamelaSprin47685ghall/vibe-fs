@@ -521,6 +521,7 @@
     <Compile Include="OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fs"/>
     <Compile Include="OpenCode/Host/HostSessionDeletion.fs"/>
+    <Compile Include="Execution/Delegation/SyncDelegate/OpenCode/Observation.fs"/>
     <Compile Include="OpenCode/Host/HostSignalBootstrap.fs"/>
     <Compile Include="OpenCode/Tools/DistillationRuntime.fs"/>
     <Compile Include="OpenCode/Tools/Distillation.fs"/>
