@@ -59,7 +59,7 @@ test('WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-005] package materialization strictly extracts direct Markdown and excludes tests plus the manifest for both self and external access', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-005/006] direct Markdown read counts as visible grounding material and only unread siblings are injected', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const snapshot = grounding.materializePackage(dir, 'alpha')
@@ -71,10 +71,18 @@ test('WHAT[REQUIREMENT-GROUNDING-005] package materialization strictly extracts 
     assert.equal(snapshot.materials.some((m) => m.path.includes('/tests/')), false)
     assert.equal(snapshot.materials.some((m) => m.path.endsWith('/APPLIES-TO')), false)
 
-    // Direct self-access (reading a file within requirements/<package>/) also strictly injects only direct *.md
+    // Reading WHAT.md is itself grounding. Auto-grounding must not echo WHAT.md
+    // back at the model; only the unread sibling materials remain.
     const opened = await host.createJournal(dir)
     const selfPath = join(dir, 'requirements', 'alpha', 'WHAT.md')
-    const requested = await host.requestPaths(opened.journal, dir, 's-self-material', [selfPath])
+    const requested = await host.observationDecision(
+      opened.journal,
+      dir,
+      's-self-material',
+      'read',
+      { filePath: selfPath },
+      'what-v1\n',
+    )
     assert.equal(requested.needsGrounding, true)
     const projected = await host.projectWithJournal(opened.journal, 's-self-material', terminalRead(selfPath))
     assert.equal(projected.ok, true)
@@ -87,16 +95,18 @@ test('WHAT[REQUIREMENT-GROUNDING-005] package materialization strictly extracts 
 
     assert.deepEqual(injectedPaths, [
       'requirements/alpha/HOW.md',
-      'requirements/alpha/WHAT.md',
       'requirements/alpha/WHY.md',
     ])
     assert.equal(injectedPaths.some((path) => path.includes('/tests/')), false)
     assert.equal(injectedPaths.some((path) => path.endsWith('/APPLIES-TO')), false)
+
+    const later = await host.requestPaths(opened.journal, dir, 's-self-material', [join(dir, 'src', 'main.fs')])
+    assert.equal(later.needsGrounding, false, 'manual + automatic reads share one horizon dedupe fact')
     host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest identity while allowing changed package content to ground again', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates material content versions and re-grounds only the changed Markdown sibling', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const opened = await host.createJournal(dir)
@@ -116,6 +126,13 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest iden
     const changed = await host.requestPaths(journal, dir, 's-dedupe', [source])
     assert.equal(changed.needsGrounding, true)
     assert.equal(changed.requested, 1)
+    const changedProjection = await host.projectWithJournal(journal, 's-dedupe', terminalRead(source))
+    const changedReads = changedProjection.value
+      .filter((message) => message.info?.source === host.source)
+      .slice(-1)
+      .map((message) => message.parts[0].state.input.filePath.replaceAll('\\', '/'))
+    assert.equal(changedReads.length, 1)
+    assert.ok(changedReads[0].endsWith('/requirements/alpha/WHAT.md'))
     host.disposeJournal(journal)
   } finally { cleanup() }
 })

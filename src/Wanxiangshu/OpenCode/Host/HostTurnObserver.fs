@@ -183,12 +183,12 @@ module HostTurnObserver =
            | ReconcileProgram.TurnInProgress
            | ReconcileProgram.TurnNeedsContinuation _ -> true
 
-    /// SW-017 ①: Host boundary consumes the one-shot LoopKillArmed mark,
-    /// producing a typed AbortCause. Application CE branches on the typed outcome,
-    /// never probing sensor presence.
+    /// Host boundary consumes the guard's one-shot armed anomaly. Consumption
+    /// also schedules the guard-owned continuation at this existing reconcile point.
     let private abortCauseOfTurn (scope: PluginRuntimeScope) (context: ReconciledTurnContext) : AbortCause =
         match context.Turn.Outcome with
-        | ReconcileProgram.TurnAborted _ -> scope.LoopSensor.ConsumeAbortCause context.Turn.SessionId
+        | ReconcileProgram.TurnAborted _ ->
+            scope.LoopSensor.ConsumeAbortCause(context.Turn.SessionId, context.Turn.Directory)
         | _ -> AbortCause.External
 
     let private observeApplicationTurn

@@ -44,6 +44,15 @@ module RequirementGroundingRuntime =
                    Snapshot = snapshot |})
             journal
 
+    let private appendMaterialObserved (journal: AgentJournal) sessionId observation =
+        AgentJournal.appendAgent
+            (StreamId.Session sessionId)
+            None
+            (HostFact.RequirementGroundingMaterialObserved
+                {| SessionId = sessionId
+                   Observation = observation |})
+            journal
+
     let private requestOne journal sessionId snapshot =
         let current = stateFor journal sessionId
 
@@ -95,6 +104,51 @@ module RequirementGroundingRuntime =
                         { NeedsGrounding = needsGrounding
                           Requested = requested
                           Packages = snapshots |> List.map _.PackageName }
+        }
+
+    let private observeOneMaterial journal sessionId snapshot material =
+        let current = stateFor journal sessionId
+        let key = GroundingIdentity.snapshotMaterialKey snapshot material
+
+        if Set.contains key current.VisibleMaterials then
+            Task.FromResult(Ok())
+        else
+            let observation =
+                { Workspace = snapshot.Workspace
+                  PackageName = snapshot.PackageName
+                  Path = material.Path
+                  Digest = material.Digest }
+
+            taskResult {
+                let! _ =
+                    appendMaterialObserved journal sessionId observation
+                    |> TaskResult.mapError JournalAppendFailure.describe
+
+                return ()
+            }
+
+    let private observeMaterials journal sessionId materials =
+        let rec loop remaining =
+            match remaining with
+            | [] -> Task.FromResult(Ok())
+            | (snapshot, material) :: tail ->
+                taskResult {
+                    do! observeOneMaterial journal sessionId snapshot material
+                    return! loop tail
+                }
+
+        loop materials
+
+    let observeReadPaths
+        (journal: AgentJournal)
+        workspace
+        sessionId
+        paths
+        : Task<Result<RequirementGroundingDecision, string>> =
+        taskResult {
+            let materials = GroundingCatalog.materialsForExactPaths workspace paths
+            do! observeMaterials journal sessionId materials
+            return! requestPaths journal workspace sessionId paths
         }
 
     let appendAnchored (journal: AgentJournal) sessionId occurrence =

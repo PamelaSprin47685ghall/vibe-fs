@@ -1,15 +1,12 @@
 namespace Wanxiangshu.OpenCode
 
 open System
-open System.Collections.Generic
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
-/// JS-native boundary for the Host loop sensor. The detector registry and
-/// LoopKillArmed marks stay process-local and opaque; only raw observations,
-/// session ids, and the abort callback cross this edge.
+/// JS boundary for the process-local degeneration guard.
 module LoopSensorSurface =
 
     type private SensorHandle(sensor: LoopSensor) =
@@ -29,6 +26,9 @@ module LoopSensorSurface =
 
     [<Emit("$0($1)")>]
     let private apply1 (fn: obj) (value: obj) : obj = jsNative
+
+    [<Emit("$0($1,$2)")>]
+    let private apply2 (fn: obj) (first: obj) (second: obj) : obj = jsNative
 
     [<Emit("$0.has($1)")>]
     let private has (set: obj) (value: obj) : bool = jsNative
@@ -57,6 +57,18 @@ module LoopSensorSurface =
         else
             fun _ -> false
 
+    let private resultOf (value: obj) : Result<unit, string> =
+        if isNullish value then
+            Ok()
+        else
+            let ok = property value "ok"
+
+            if isNullish ok || boolOf ok then
+                Ok()
+            else
+                let reason = property value "error"
+                Error(if isNullish reason then "operation failed" else stringOf reason)
+
     let private abortOf (value: obj) : SessionId -> Task<Result<unit, string>> =
         if not (isFunction value) then
             invalidArg "options" "LoopSensorSurface.create requires an abort callback"
@@ -64,34 +76,38 @@ module LoopSensorSurface =
         fun sessionId ->
             task {
                 let! result = unbox<Task<obj>> (asPromise (apply1 value (box (SessionId.value sessionId))))
-
-                if isNullish result then
-                    return Ok()
-                else
-                    let ok = property result "ok"
-
-                    if isNullish ok || boolOf ok then
-                        return Ok()
-                    else
-                        let reason = property result "error"
-                        return Error(if isNullish reason then "abort failed" else stringOf reason)
+                return resultOf result
             }
 
-    /// Create one opaque process-local sensor.
+    let private continueOf (value: obj) : SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>> =
+        if not (isFunction value) then
+            invalidArg "options" "LoopSensorSurface.create requires a continue callback"
+
+        fun sessionId kind _directory ->
+            task {
+                let! result =
+                    unbox<Task<obj>>
+                        (asPromise (apply2 value (box (SessionId.value sessionId)) (box (LoopSensor.kindName kind))))
+
+                return resultOf result
+            }
+
     let create (options: obj) : obj =
         let owned = property options "owned"
         let abort = property options "abort"
-        SensorHandle(LoopSensor(ownedOf owned, abortOf abort)) :> obj
+        let continueCallback = property options "continue"
+        SensorHandle(LoopSensor(ownedOf owned, abortOf abort, continueOf continueCallback)) :> obj
 
     let observe (sensor: obj) (raw: obj) : unit =
         (sensor :?> SensorHandle).Sensor.Observe raw
 
-    /// Consume the one-shot LoopKillArmed mark, producing typed AbortCause (SW-017 ①).
-    /// Application CE branches on typed outcome, never probing presence.
-    let consumeAbortCause (sensor: obj) (session: string) : string =
-        match (sensor :?> SensorHandle).Sensor.ConsumeAbortCause(SessionId.create session) with
-        | AbortCause.LoopKill -> "LoopKill"
-        | AbortCause.External -> "External"
+    let consumeAbortCause (sensor: obj) (session: string) : obj =
+        match (sensor :?> SensorHandle).Sensor.ConsumeAbortCause(SessionId.create session, None) with
+        | AbortCause.External -> box {| cause = "External" |}
+        | AbortCause.DegenerationGuard kind ->
+            box
+                {| cause = "DegenerationGuard"
+                   anomaly = LoopSensor.kindName kind |}
 
     let dropSession (sensor: obj) (session: string) : unit =
         (sensor :?> SensorHandle).Sensor.DropSession(SessionId.create session)

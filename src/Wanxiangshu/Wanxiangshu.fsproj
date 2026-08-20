@@ -104,6 +104,7 @@
     <Compile Include="Mission/Obligation/Todo/Lwr.fs"/>
     <Compile Include="Mission/Obligation/Todo/FinalityCohort.fs"/>
     <Compile Include="Foundation/SyntheticToml.fs"/>
+    <Compile Include="Execution/Delegation/Handoff.fs"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
     <Compile Include="Interaction/Dispatch/AssistancePrompt.fs"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fs"/>
@@ -300,6 +301,7 @@
     <Compile Include="Context/Prefix/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
+    <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
     <Compile Include="Resources/PromptResources.fs"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
     <Compile Include="Enforcer/Surface.fs"/>
@@ -499,6 +501,7 @@
     <Compile Include="Mission/Finality/Types.fs"/>
     <Compile Include="Mission/Finality/Ports.fs"/>
     <Compile Include="Mission/WorkRecord/Materialize.fs"/>
+    <Compile Include="Execution/Delegation/HandoffLedger.fs"/>
     <Compile Include="Mission/WorkRecord/OpeningSemanticSurface.fs"/>
     <Compile Include="Mission/Review/TodoProcess.fs"/>
     <Compile Include="Mission/Review/DedicatedTodoRuntime.fs"/>

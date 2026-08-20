@@ -1,118 +1,110 @@
 namespace Wanxiangshu.OpenCode
 
-open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-/// Host boundary typed outcome: LoopKill vs External abort cause.
-/// Produced only by LoopSensor.ConsumeAbortCause, consumed exactly once by Application CE (SW-017 ①).
+[<RequireQualifiedAccess>]
+type DegenerationKind =
+    | TooRepetitive
+    | TooRandom
+
+/// Host boundary outcome for an abort observed by reconciliation. A guarded
+/// abort has already transferred recovery ownership to LoopSensor.
 [<RequireQualifiedAccess>]
 type AbortCause =
-    | LoopKill
+    | DegenerationGuard of DegenerationKind
     | External
 
-/// LOOP-002 / LOOP-006: edge sensor over Host streaming deltas.
-///
-/// Owns per-session detectors and the process-local LoopKillArmed set.
-/// Abort is fire-and-forget; the AABB bridge happens later on TurnAborted
-/// when the typed AbortCause is consumed (Host → Application one-shot).
-type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Result<unit, string>>) =
+/// Streaming degeneration owner. It owns the whole process-local protocol:
+/// detect -> arm typed anomaly -> interrupt -> consume reconciled abort -> continue.
+type LoopSensor
+    (
+        isOwned: SessionId -> bool,
+        abortSession: SessionId -> Task<Result<unit, string>>,
+        continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>
+    ) =
 
     let gate = obj ()
-    /// DSL-cross-callback-proof: physical resource — streaming detector algorithm state only; outcome is typed AbortCause
-    // DSL-MUTABLE: resource — per-session loop detector registry
+    // DSL-MUTABLE: resource — bounded detector state per physical attempt.
     let detectors = Dictionary<string, LoopDetector.Detector>()
-    /// DSL-cross-callback-proof: physical single-flight — one-shot LoopKillArmed, consumed as typed AbortCause
-    // DSL-MUTABLE: single-flight — one-shot loop-kill armed mark per session
-    let armed = HashSet<string>()
+    // DSL-MUTABLE: single-flight — process-local anomaly ownership until reconcile.
+    let armed = Dictionary<string, DegenerationKind>()
 
     let keyOf (sessionId: SessionId) = SessionId.value sessionId
 
-    let reportAbortOutcome (sessionId: SessionId) (outcome: Result<unit, string>) =
+    let kindName kind =
+        match kind with
+        | DegenerationKind.TooRepetitive -> "too-repetitive"
+        | DegenerationKind.TooRandom -> "too-random"
+
+    let reportPhysicalOutcome operation sessionId kind outcome =
+        let baseFields =
+            [ "session_id", SessionId.value sessionId
+              "side", kindName kind
+              "operation", operation ]
+
         match outcome with
-        | Ok() -> Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "aborted" ]
+        | Ok() -> Diagnostic.emit "degeneration-guard" (baseFields @ [ "result", "ok" ])
         | Error reason ->
             Diagnostic.emit
-                "loop-kill"
-                [ "session_id", SessionId.value sessionId
-                  "result", "abort-failed"
-                  "provider_error", reason ]
+                "degeneration-guard"
+                (baseFields @ [ "result", "failed"; "provider_error", reason ])
 
-    let applyAbortOutcome (rollback: unit -> unit) (sessionId: SessionId) (outcome: Result<unit, string>) =
-        match outcome with
-        | Ok() -> reportAbortOutcome sessionId outcome
-        | Error reason ->
-            rollback ()
-            reportAbortOutcome sessionId (Error reason)
-
-    let abortAndReport
-        (abortSession: SessionId -> Task<Result<unit, string>>)
-        (rollback: unit -> unit)
-        (sessionId: SessionId)
-        : Task =
+    let runAndReport operation physicalCall sessionId kind directory : Task =
         task {
             try
-                let! outcome = abortSession sessionId
-                applyAbortOutcome rollback sessionId outcome
+                let! outcome = physicalCall sessionId kind directory
+                reportPhysicalOutcome operation sessionId kind outcome
             with ex ->
-                rollback ()
-
-                Diagnostic.emit
-                    "loop-kill"
-                    [ "session_id", SessionId.value sessionId
-                      "result", "abort-failed"
-                      "provider_error", ex.Message ]
+                reportPhysicalOutcome operation sessionId kind (Error ex.Message)
         }
 
-    /// Host boundary: consume the one-shot LoopKillArmed mark, producing a typed outcome.
-    /// Application CE consumes this outcome once; internal latch presence is not exposed (SW-017 ①).
-    member _.ConsumeAbortCause(sessionId: SessionId) : AbortCause =
+    member private _.TryArm(sessionId: SessionId, kind: DegenerationKind) =
         lock gate (fun () ->
             let key = keyOf sessionId
 
-            if armed.Remove key then
-                AbortCause.LoopKill
+            if armed.ContainsKey key then
+                false
             else
-                AbortCause.External)
-
-    member private _.TryArm(sessionId: SessionId) =
-        lock gate (fun () -> armed.Add(keyOf sessionId))
+                armed.[key] <- kind
+                true)
 
     member private _.RollbackArm(sessionId: SessionId) =
         lock gate (fun () -> armed.Remove(keyOf sessionId) |> ignore)
 
-    member _.DropSession(sessionId: SessionId) =
-        lock gate (fun () ->
-            let key = keyOf sessionId
-            detectors.Remove key |> ignore
-            armed.Remove key |> ignore)
+    member private this.ApplyInterruptOutcome
+        (sessionId: SessionId, kind: DegenerationKind, outcome: Result<unit, string>) =
+        match outcome with
+        | Ok() -> reportPhysicalOutcome "interrupt" sessionId kind outcome
+        | Error _ ->
+            this.RollbackArm sessionId
+            reportPhysicalOutcome "interrupt" sessionId kind outcome
 
-    /// LOOP-005: discard detector state for the next attempt.
-    /// Does NOT clear LoopKillArmed — LOOP-006 needs the mark to survive until
-    /// TurnAborted is classified (SessionIdle resets the detector before reconcile).
-    member _.ResetDetector(sessionId: SessionId) =
-        lock gate (fun () -> detectors.[keyOf sessionId] <- LoopDetector.create ())
+    member private this.RunInterrupt(sessionId: SessionId, kind: DegenerationKind) =
+        task {
+            try
+                let! outcome = abortSession sessionId
+                this.ApplyInterruptOutcome(sessionId, kind, outcome)
+            with ex ->
+                this.RollbackArm sessionId
+                reportPhysicalOutcome "interrupt" sessionId kind (Error ex.Message)
+        }
+
+    member private this.Interrupt(sessionId: SessionId, kind: DegenerationKind, evaluation: LoopDetector.Evaluation) =
+        if this.TryArm(sessionId, kind) then
+            Diagnostic.emit
+                "degeneration-guard"
+                [ "session_id", SessionId.value sessionId
+                  "side", kindName kind
+                  "operation", "interrupt"
+                  "result", "armed"
+                  "detector_step", string evaluation.Step
+                  "weighted_distinct_token_count", sprintf "%.4f" evaluation.WeightedDistinctTokenCount ]
+
+            this.RunInterrupt(sessionId, kind) |> ignore
 
     member private this.DetectorFor(sessionId: SessionId) =
         let key = keyOf sessionId
@@ -124,23 +116,6 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
             detectors.[key] <- created
             created
 
-    member private this.Kill (sessionId: SessionId) (weightedDistinctTokens: float option) (step: int) =
-        if this.TryArm sessionId then
-            let fields =
-                [ "session_id", SessionId.value sessionId
-                  "result", "armed"
-                  "detector_step", string step ]
-                @ (match weightedDistinctTokens with
-                   | Some value -> [ "weighted_distinct_token_count", sprintf "%.4f" value ]
-                   | None -> [])
-
-            Diagnostic.emit "loop-kill" fields
-
-            abortAndReport abortSession (fun () -> this.RollbackArm sessionId) sessionId
-            |> ignore
-        else
-            Diagnostic.emit "loop-kill" [ "session_id", SessionId.value sessionId; "result", "ignored-duplicate" ]
-
     member private this.Evaluate(delta: LoopEventCodec.TextDelta) : LoopDetector.Evaluation =
         lock gate (fun () ->
             let key = keyOf delta.SessionId
@@ -149,25 +124,72 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
             detectors.[key] <- updated
             evaluation)
 
-    member private this.KillIfLoop (delta: LoopEventCodec.TextDelta) (evaluation: LoopDetector.Evaluation) =
-        if evaluation.IsLoop then
-            this.Kill delta.SessionId (Some evaluation.WeightedDistinctTokenCount) evaluation.Step
+    member private this.InterruptForEvaluation
+        (delta: LoopEventCodec.TextDelta, evaluation: LoopDetector.Evaluation) =
+        match evaluation.State with
+        | LoopDetector.State.Normal -> ()
+        | LoopDetector.State.TooRepetitive ->
+            this.Interrupt(delta.SessionId, DegenerationKind.TooRepetitive, evaluation)
+        | LoopDetector.State.TooRandom ->
+            this.Interrupt(delta.SessionId, DegenerationKind.TooRandom, evaluation)
+
+    member private this.ObserveEligible(delta: LoopEventCodec.TextDelta) =
+        let evaluation = this.Evaluate delta
+        this.InterruptForEvaluation(delta, evaluation)
 
     member private this.ObserveOwned(delta: LoopEventCodec.TextDelta) =
-        let alreadyArmed = lock gate (fun () -> armed.Contains(keyOf delta.SessionId))
+        let alreadyArmed = lock gate (fun () -> armed.ContainsKey(keyOf delta.SessionId))
 
-        match isOwned delta.SessionId, alreadyArmed with
-        | false, _
-        | true, true -> ()
-        | true, false -> this.KillIfLoop delta (this.Evaluate delta)
+        if isOwned delta.SessionId && not alreadyArmed then
+            this.ObserveEligible delta
 
-    /// Feed one Host raw event. Non-text-delta events are no-ops.
+    /// Raw stream edge. Non-text/reasoning events fail closed in LoopEventCodec.
     member this.Observe(raw: obj) =
         match LoopEventCodec.tryDecodeTextDelta raw with
         | None -> ()
         | Some delta -> this.ObserveOwned delta
 
+    /// Reconciliation boundary: atomically transfer one armed anomaly into its
+    /// exactly-once continuation and return a typed cause so downstream yields.
+    member _.ConsumeAbortCause(sessionId: SessionId, directory: string option) : AbortCause =
+        let consumed =
+            lock gate (fun () ->
+                let key = keyOf sessionId
+
+                match armed.TryGetValue key with
+                | true, kind ->
+                    armed.Remove key |> ignore
+                    Some kind
+                | false, _ -> None)
+
+        match consumed with
+        | None -> AbortCause.External
+        | Some kind ->
+            runAndReport "continue" continueSession sessionId kind directory |> ignore
+            AbortCause.DegenerationGuard kind
+
+    member _.DropSession(sessionId: SessionId) =
+        lock gate (fun () ->
+            let key = keyOf sessionId
+            detectors.Remove key |> ignore
+            armed.Remove key |> ignore)
+
+    /// Attempt boundary resets detector scratch but deliberately preserves an
+    /// armed anomaly until TurnAborted reconciliation consumes its ownership.
+    member _.ResetDetector(sessionId: SessionId) =
+        lock gate (fun () -> detectors.[keyOf sessionId] <- LoopDetector.create ())
+
 module LoopSensor =
+
+    let kindName kind =
+        match kind with
+        | DegenerationKind.TooRepetitive -> "TooRepetitive"
+        | DegenerationKind.TooRandom -> "TooRandom"
+
+    let continuationPath kind =
+        match kind with
+        | DegenerationKind.TooRepetitive -> "runtime/degeneration-too-repetitive"
+        | DegenerationKind.TooRandom -> "runtime/degeneration-too-random"
 
     let private interruptiblePredicate
         (ownedSessions: HashSet<string>)
@@ -177,12 +199,10 @@ module LoopSensor =
             let key = SessionId.value sessionId
             ownedSessions.Contains key && sessionParents.ContainsKey key
 
-    /// LOOP-002/006 Host construction. Physical child ownership is the only
-    /// eligibility fact LoopSensor needs; assistance policy must not be borrowed
-    /// merely because it happened to expose the same predicate shape.
     let create
         (ownedSessions: HashSet<string>)
         (sessionParents: Dictionary<string, string>)
         (abortSession: SessionId -> Task<Result<unit, string>>)
+        (continueSession: SessionId -> DegenerationKind -> string option -> Task<Result<unit, string>>)
         =
-        LoopSensor(interruptiblePredicate ownedSessions sessionParents, abortSession)
+        LoopSensor(interruptiblePredicate ownedSessions sessionParents, abortSession, continueSession)

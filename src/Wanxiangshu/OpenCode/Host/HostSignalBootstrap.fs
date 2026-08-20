@@ -36,6 +36,7 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Resources
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
@@ -191,8 +192,8 @@ module HostSignalBootstrap =
                 match signal with
                 | SessionIdle sessionId ->
                     // LOOP-005: idle ends the attempt → fresh detector for the next stream.
-                    // LoopKillArmed must stay until OrdinaryTurnWorkflow bridges TurnAborted
-                    // (ResetDetector deliberately does not clear it; LOOP-006).
+                    // Armed anomaly must survive until TurnAborted reconciliation consumes
+                    // guard ownership (ResetDetector deliberately does not clear it; DG-008).
                     scope.LoopSensor.ResetDetector sessionId
 
                     // HOST-004: the idle observation mints the quiescence permit that
@@ -231,8 +232,28 @@ module HostSignalBootstrap =
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
             let loopSensor =
-                LoopSensor.create scope.Sessions.OwnedSessions scope.Sessions.SessionParents (fun sessionId ->
-                    sessionPort.InterruptAttempt sessionId)
+                LoopSensor.create
+                    scope.Sessions.OwnedSessions
+                    scope.Sessions.SessionParents
+                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+                    (fun sessionId kind directory ->
+                        task {
+                            let prompt =
+                                ProviderProse.documentFor sessionId (LoopSensor.continuationPath kind) Map.empty
+
+                            let! outcome =
+                                HostSessionNudge.sendContinuationResult
+                                    sessionPort
+                                    sessionId
+                                    prompt
+                                    PromptAuthority.DegenerationGuard
+                                    directory
+                                    journal
+                                    PromptDispatcher.AwaitMode.Detached
+                                    None
+
+                            return outcome |> Result.map ignore
+                        })
 
             do scope.AttachLoopSensor loopSensor
 

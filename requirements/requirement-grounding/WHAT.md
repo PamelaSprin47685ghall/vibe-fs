@@ -20,27 +20,28 @@ Grounding 仅从当前工作区根目录下的 `requirements/` 目录发现 pack
 
 无论触发路径属于包外 `APPLIES-TO` 匹配还是包内自身目录（self coverage），规范接地自动载入的材料集合**严格限制**为 `requirements/<package>/` 根目录下直接存在的 `*.md` 普通文件，按文件名升序排列。任何时候**严禁**注入 `tests/**`（测试代码为可执行证明，非规范文本）以及 `APPLIES-TO`（元数据清单）或任何子目录文件。
 
-## REQUIREMENT-GROUNDING-006: Grounding identity 按内容版本去重
+## REQUIREMENT-GROUNDING-006: 可见材料按内容版本统一去重
 
-自动接入的身份由工作区标识、package 名称与材料集合的确定性 content digest 共同构成。同一执行者在当前 provider horizon 内已完成某 identity 的自动读取后，后续触碰相同路径不得重复读取；package 内容变更导致 digest 改变时产生新 identity，允许重新接入。发生上下文重锚 (`ContextReanchored`) 时，当前 horizon 的覆盖记录被清空，后续再次触碰需重新执行接入流程。
+Grounding 去重必须以当前 provider horizon 内执行者已经实际看见的规范材料为事实来源，而不是只记录“自动注入过哪些 package”。原生 `read` 与 `repository-programming` 的 `js-*` 文件读取只要返回了文件内容，都必须登记对应工作区路径与 content digest。若主动读取命中某 package 的根目录 grounding Markdown，该材料视为已经 grounding，当前轮与后续轮自动接入不得再次注入同一内容版本；未读材料仍可按需补齐。材料内容变更导致 digest 改变时允许读取新版本。发生上下文重锚 (`ContextReanchored`) 时，当前 horizon 的可见材料记录被清空，后续再次触碰需重新接入。
 
-## REQUIREMENT-GROUNDING-007: 自动 Grounding 为普通 Read 投影与 Cursor 补充
+## REQUIREMENT-GROUNDING-007: 自动 Grounding 为普通 Read 的弱投影与 Cursor 补充
 
 当直接 `read` 操作将代码暴露给执行者时，未 grounding package 的材料以完全等同于执行者主动调用 `read` 的普通 tool call/result 形式进入当前视界（同一能力权限、路径与范围规则、输出格式）。禁止引入私有的 bundle 格式或特殊 system 文本。
+`repository-programming` 中任何 `js-*` 操作只要实际读取并返回文件内容，与原生 `read` 具有完全相同的 grounding 触发语义；工具名、宿主实现或是否通过 JavaScript 编程面不得造成旁路。
 在同一轮次中若同时存在 pair-programming 伪技能与规范读取，固定顺序为：伪技能 → requirement reads。`grep`、`glob`、`list` 等候选发现工具不触发 `APPLIES-TO` 规范注入。
 在 Cursor 环境下，规范读取结果以 `NUL+BOM` 分隔符追加于终端工具结果之后，并在外层携带工作区相对路径属性作为来源证明，正文内容保持原始读取字节不变。
 
-## REQUIREMENT-GROUNDING-008: 首次 Mutation 先 Grounding 后新意图
+## REQUIREMENT-GROUNDING-008: Mutation 不受 Grounding 阻断
 
-当编辑、写入、移动或删除操作准备触碰受保护路径，而当前上下文尚未接入对应的 package identity 时，本次修改**严禁产生任何文件副作用**。系统必须拒绝当前修改并先行注入规范读取；仅在执行者获取规范事实后由其自主发出的下一次新修改调用才允许真正执行，严禁自动重放或静默继续被拦截的旧调用。
+当编辑、写入、移动或删除操作触碰受覆盖路径，而当前上下文尚缺相关 grounding 材料时，系统可以在同轮或紧随其后的 provider projection 中自动补入规范读取，但**不得阻止、延期、回滚、改写或要求重发原 mutation**。Grounding 不拥有 mutation admission，也不得把“尚未读规范”编码成工具失败。
 
-## REQUIREMENT-GROUNDING-009: 批量与动态目标按完整 Effect Set 准入
+## REQUIREMENT-GROUNDING-009: 批量与动态目标只用于 Grounding 发现
 
-对于可能涉及多路径的批量操作或事务性程序，准入集合取全部 source/target 路径命中的 package 并集。动态生成目标的事务必须先在内存完成 staging 并解析完整 effect set；若检测到缺失 grounding，必须废弃未提交的 staging 并触发规范读取，严禁部分提交或自动重跑程序。
+对于可能涉及多路径的批量操作或事务性程序，grounding 发现集合取实际读取或 source/target effect 路径命中的 package 并集。动态生成目标无需为了 grounding 建立 staging barrier；grounding 只观察已经明确的 read/effect set 并补充规范知识，不参与事务提交、回滚或重试决策。
 
 ## REQUIREMENT-GROUNDING-010: 跨工具源统一 Grounding Policy
 
-Grounding 策略统一作用于所有明确的文件读取与修改行为。原生工具与可编程编程面（如 `repository-programming`）只要产生同类文件后果，必须经过完全相同的解析器、去重逻辑与修改拦截门禁，不得因工具名称或实现形态不同而绕过规则。
+Grounding 策略统一作用于所有明确的文件读取与修改行为。原生工具与可编程编程面（如 `repository-programming`）只要产生同类文件读取或文件后果，必须经过完全相同的路径解析、读取事实登记与去重逻辑；不得因工具名称或实现形态不同而漏触发 grounding，也不得在任一工具族上恢复 mutation barrier。
 
 ## REQUIREMENT-GROUNDING-011: Grounding 为认知知识而非 Authority
 

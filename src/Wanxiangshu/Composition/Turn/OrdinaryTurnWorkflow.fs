@@ -101,7 +101,7 @@ module OrdinaryTurnWorkflow =
 
     /// Own the reconciled ordinary-turn outcome match.
     /// `abortCause` is the Host boundary typed outcome consumed exactly once (SW-017 ①).
-    /// LoopKillArmed presence is not exposed; CE branches on typed outcome.
+    /// Guard armed state is not exposed; CE branches on the typed abort outcome.
     let private handleAborted
         (timerPort: ITimerPort)
         (abortParent: string -> unit)
@@ -115,11 +115,10 @@ module OrdinaryTurnWorkflow =
         (sessionKey: string)
         (reason: string)
         =
-        // LOOP-006: our own kill is bridged into the provider-failure AABB path.
-        // User / cleanup aborts still report Aborted and do not advance the cursor.
+        // DG-009: degeneration-guard already owns its successor. Application must
+        // not become a second recovery owner. External aborts retain normal cleanup.
         match abortCause with
-        | AbortCause.LoopKill ->
-            ProviderRecoveryWorkflow.continueAfterLoopKill timerPort sessionPort eventPort journal turn
+        | AbortCause.DegenerationGuard _ -> AsyncSupport.completedTask ()
         | AbortCause.External ->
             task {
                 abortedSessions.Add sessionKey |> ignore

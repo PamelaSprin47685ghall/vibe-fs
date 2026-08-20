@@ -14,6 +14,13 @@ const waitForChild = async (h, owner, role) => {
   }
   throw new Error(`delegate child was not admitted for ${owner}/${role}`)
 }
+const waitForPromptCount = async (h, owner, role, count) => {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    if (sync.promptCount(h, owner, role) >= count) return
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+  throw new Error(`delegate prompt ${count} was not admitted for ${owner}/${role}`)
+}
 
 test('WHAT[DELEG-009] SYNC_SERIALIZATION_second_active_call_is_rejected', async () => {
   const h = await sync.create(await mkdtemp(join(tmpdir(), 'wxs-sync-ce-')))
@@ -41,6 +48,7 @@ test('WHAT[DELEG-010] SYNC_SERIALIZATION_reuses_dedicated_child_after_completion
 
     const second = sync.invoke(h, 'owner-ce', 'Inspector', 'second')
     assert.equal(await waitForChild(h, 'owner-ce', 'Inspector'), child)
+    await waitForPromptCount(h, 'owner-ce', 'Inspector', 2)
     assert.equal(await sync.settle(h, 'owner-ce', 'Inspector', 'second answer', 'run-second'), true)
     assert.equal((await second).ok, true)
     assert.equal(sync.childCount(h), 1)

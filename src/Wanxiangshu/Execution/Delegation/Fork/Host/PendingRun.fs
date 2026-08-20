@@ -30,6 +30,7 @@ type PendingHostRun =
       AgentId: string
       ChildId: SessionId
       Role: Role
+      StartCursor: int64
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Finished: bool }

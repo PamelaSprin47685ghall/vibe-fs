@@ -33,6 +33,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Mission.Obligation.Todo
 
 /// Existing-child dispatch + parent teardown helpers.
 module HostForkChildDispatch =
@@ -156,7 +157,9 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordFor: SessionId -> Task<string option>)
+        (childWorkRecordForRun:
+            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
@@ -185,7 +188,8 @@ module HostForkChildDispatch =
                     journal
                     parentId
                     sessions
-                    childWorkRecordFor
+                    childWorkRecordForRun
+                    xTraceHead
                     trackOwnedWork
                     agentId
                     childId
@@ -243,7 +247,9 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordFor: SessionId -> Task<string option>)
+        (childWorkRecordForRun:
+            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
@@ -276,7 +282,8 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
-                        childWorkRecordFor
+                        childWorkRecordForRun
+                        xTraceHead
                         trackOwnedWork
                         runtime
                         sendChildPrompt

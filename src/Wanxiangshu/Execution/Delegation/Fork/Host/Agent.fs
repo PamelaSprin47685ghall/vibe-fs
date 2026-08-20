@@ -506,7 +506,8 @@ module HostForkAgent =
                     runtime.Journal
                     runtime.ParentId
                     runtime.Sessions
-                    runtime.ChildWorkRecordOf
+                    runtime.ChildWorkRecordOfRun
+                    runtime.XTraceHead
                     runtime.TrackOwnedWork
                     runtime.Runtime
                     runtime.SendChildPrompt
@@ -606,7 +607,8 @@ module HostForkAgent =
                         runtime.Journal
                         runtime.ParentId
                         runtime.Sessions
-                        runtime.ChildWorkRecordOf
+                        runtime.ChildWorkRecordOfRun
+                        runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
                         runtime.SendChildPrompt
@@ -651,7 +653,8 @@ module HostForkAgent =
                         runtime.Journal
                         runtime.ParentId
                         runtime.Sessions
-                        runtime.ChildWorkRecordOf
+                        runtime.ChildWorkRecordOfRun
+                        runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
                         runtime.SendChildPrompt

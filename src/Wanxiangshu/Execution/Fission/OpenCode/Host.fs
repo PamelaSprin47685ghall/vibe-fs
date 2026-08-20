@@ -1016,7 +1016,8 @@ module FissionHost =
         | ReconcileProgram.TurnInProgress, _ -> FissionSettlementObservation.OngoingExecution
         | ReconcileProgram.TurnNeedsContinuation _, _ -> FissionSettlementObservation.NeedsContinuation
         | ReconcileProgram.TurnFailed _, _ -> FissionSettlementObservation.ProviderFailed
-        | ReconcileProgram.TurnAborted _, AbortCause.LoopKill -> FissionSettlementObservation.LoopInterrupted
+        | ReconcileProgram.TurnAborted _, AbortCause.DegenerationGuard _ ->
+            FissionSettlementObservation.DegenerationInterrupted
         | ReconcileProgram.TurnAborted reason, AbortCause.External -> FissionSettlementObservation.ExternalAbort reason
         | ReconcileProgram.TurnCompleted, _ -> FissionSettlementObservation.Completed
 

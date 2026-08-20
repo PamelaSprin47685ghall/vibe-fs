@@ -14,6 +14,7 @@ const sandbox = () => {
   mkdirSync(join(dir, 'src', 'alpha'), { recursive: true })
   mkdirSync(join(dir, 'src', 'beta'), { recursive: true })
   writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'alpha\n', 'utf8')
+  writeFileSync(join(dir, 'requirements', 'alpha', 'WHY.md'), 'alpha why\n', 'utf8')
   writeFileSync(join(dir, 'requirements', 'alpha', 'APPLIES-TO'), '/src/alpha/**\n', 'utf8')
   writeFileSync(join(dir, 'requirements', 'beta', 'WHAT.md'), 'beta\n', 'utf8')
   writeFileSync(join(dir, 'requirements', 'beta', 'APPLIES-TO'), '/src/beta/**\n', 'utf8')
@@ -30,34 +31,42 @@ const program = `class Js extends JsProgram {
   }
 }`
 
-test('WHAT[REQUIREMENT-GROUNDING-009] grounds the union of a staged multi-file effect set before an all-or-nothing commit', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-009] js-* mutations commit normally while grounding observes the full effect set without admission', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const result = await surface.runFirstAttempt(dir, 'js-union', program)
-    assert.equal(result.caseName, 'Failed')
-    assert.equal(result.failureCode, 'REQUIREMENT_GROUNDING_REQUIRED')
+    assert.equal(result.caseName, 'Succeeded')
+    assert.equal(result.failureCode, null)
     assert.deepEqual(result.pendingPackages, ['alpha', 'beta'])
-    assert.equal(result.created.length, 0)
+    assert.deepEqual(result.created.sort(), ['src/alpha/new.txt', 'src/beta/new.txt'])
+    assert.equal(readFileSync(join(dir, 'src', 'alpha', 'new.txt'), 'utf8'), 'a1')
+    assert.equal(readFileSync(join(dir, 'src', 'beta', 'new.txt'), 'utf8'), 'b1')
     assert.equal(readFileSync(join(dir, 'src', 'alpha', 'a.txt'), 'utf8'), 'a0')
     assert.equal(readFileSync(join(dir, 'src', 'beta', 'b.txt'), 'utf8'), 'b0')
 
     const runCoreAt = workflowSource.indexOf('let private runCore')
     const preflightAt = workflowSource.indexOf('JsTransaction.preflight', runCoreAt)
-    const admissionAt = workflowSource.indexOf('mutationAdmission', preflightAt)
-    const commitAt = workflowSource.indexOf('commitMutations', admissionAt)
-    assert.ok(runCoreAt >= 0 && preflightAt > runCoreAt && admissionAt > preflightAt && commitAt > admissionAt)
+    const observationAt = workflowSource.indexOf('fileAccessObservation', preflightAt)
+    const commitAt = workflowSource.indexOf('commitMutations', observationAt)
+    assert.ok(runCoreAt >= 0 && preflightAt > runCoreAt && observationAt > preflightAt && commitAt > observationAt)
     surface.dispose(result.runtime)
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-010] applies one grounding policy across OpenCode native and repository-programming file tools', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-010] js-* read is a real read: covered code triggers grounding and already-read Markdown is deduplicated', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const result = await surface.compareNativeAndProgramDecision(dir, 'equivalence', join(dir, 'src', 'alpha', 'a.txt'))
-    assert.deepEqual(result.nativePackages, ['alpha'])
-    assert.deepEqual(result.programPackages, ['alpha'])
-    assert.equal(result.nativeAllowed, false)
-    assert.equal(result.programAllowed, false)
+    const readProgram = `class Js extends JsProgram {
+      async run() {
+        const spec = await this.file('requirements/alpha/WHAT.md');
+        const code = await this.file('src/alpha/a.txt');
+        return { spec: spec.text(), code: code.text() };
+      }
+    }`
+    const result = await surface.runFirstAttempt(dir, 'js-read', readProgram)
+    assert.equal(result.caseName, 'Succeeded')
+    assert.deepEqual(result.pendingPackages, ['alpha'])
+    assert.deepEqual(result.pendingMaterials, ['requirements/alpha/WHY.md'])
     surface.dispose(result.runtime)
   } finally { cleanup() }
 })

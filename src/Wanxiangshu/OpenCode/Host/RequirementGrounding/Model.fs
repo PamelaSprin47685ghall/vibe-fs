@@ -5,9 +5,16 @@ open Wanxiangshu.Foundation.Identity
 type RequirementGroundingAnchoredRead =
     { CallId: ToolCallId
       Path: string
+      MaterialDigest: string
       ArgsJson: string
       ResultBytes: string
       CursorResultBytes: string }
+
+type RequirementGroundingMaterialObserved =
+    { Workspace: string
+      PackageName: string
+      Path: string
+      Digest: string }
 
 type RequirementGroundingOccurrence =
     { Workspace: string

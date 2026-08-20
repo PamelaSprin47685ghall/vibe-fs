@@ -108,6 +108,32 @@ module PluginTransforms =
 
     type private SessionTermination = SessionId -> string -> Task<Result<unit, string>>
 
+    type NormalTransformCapabilities =
+        {
+            BeginPhysicalProviderAttempt: string option -> obj -> Task<unit>
+            BindSessionStartedAt: string option -> Task<DateTimeOffset option>
+            ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
+            ApplyXTracePipeline: string option -> obj -> StrengthReplayPlan list -> Task<unit>
+            ApplyCompanion: string option -> obj -> obj -> Task<unit>
+            ApplyXWire: obj -> Task<unit>
+            ApplyEnforcerContinuation: string option -> obj -> Task<unit>
+            ApplyStrengthSpeculate: obj -> Task<unit>
+            InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
+            ProjectRequirementGrounding: string option -> obj -> Task<unit>
+            InjectBloggerChronicle: string option -> obj -> unit
+            SanitizeMessages: obj -> unit
+        }
+
+    type TransformBranchCapabilities =
+        {
+            IsExplicitResume: string option -> obj -> bool
+            RegisterOwned: string -> unit
+            ReplicaRuntime: string option -> StrengthReplicaRuntime option
+            ReplicaXWire: obj -> Task<unit>
+            ReplicaSanitize: obj -> unit
+            ExplicitResumeSanitize: obj -> unit
+        }
+
     let private raiseStrengthFailClosed (fuse: string -> unit) (reason: string) : 'a =
         fuse reason
         raise (InvalidOperationException reason)
@@ -133,10 +159,7 @@ module PluginTransforms =
         ExplicitResumeSuppression.isCurrentMaterial outObj
         || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj
 
-    /// Provider-facing transform composition: order only.
-    /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
-    /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
-    let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : obj -> obj -> Task<unit> =
+    let defaultCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : NormalTransformCapabilities =
         let scope = boot.Scope
         let journal = boot.Journal
         let clock = boot.Clock
@@ -157,47 +180,48 @@ module PluginTransforms =
                     sessionId
                     reason
 
-        let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj =
-            if ExplicitResumeSuppression.isCurrentMaterial outObj then
-                AsyncSupport.completedTask ()
-            else
-                CompanionTransform.handleCompanionTransform
-                    scope.Sessions.Companions
-                    scope.Sessions.CompanionGate
-                    scope
-                    sessionPort
-                    journal
-                    (Some(fun bloggerId ->
-                        // Register ownership + ActiveRun so idle→reconcile
-                        // emits TerminalOutcome.Completed for this child.
-                        wired.RegisterOwned(SessionId.value bloggerId)
-                        wired.BindActiveRun bloggerId Role.Blogger None))
-                    SharedState.RootWorkspace
-                    inObj
-                    outObj
-
-        let normalTransform (projectionSessionIdOpt: string option) (inObj: obj) (outObj: obj) : Task<unit> =
+        let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj : Task<unit> =
             task {
-                // HOST-004：新 provider request 开始构建 → 旧 idle permit
-                // 立即失效。必须在该 transform 的最早同步位置（任何 let!
-                // 之前）调用，不得等 request 已运行才标 Running。
-                match projectionSessionIdOpt with
-                | Some sessionId ->
+                if ExplicitResumeSuppression.isCurrentMaterial outObj then
+                    return ()
+                else
                     do!
-                        SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
-                            scope.Sessions.Quiescence.BeginProviderAttempt
-                            (SessionId.create sessionId)
+                        CompanionTransform.handleCompanionTransform
+                            scope.Sessions.Companions
+                            scope.Sessions.CompanionGate
+                            scope
+                            sessionPort
+                            journal
+                            (Some(fun bloggerId ->
+                                // Register ownership + ActiveRun so idle→reconcile
+                                // emits TerminalOutcome.Completed for this child.
+                                wired.RegisterOwned(SessionId.value bloggerId)
+                                wired.BindActiveRun bloggerId Role.Blogger None))
+                            SharedState.RootWorkspace
+                            inObj
                             outObj
-                | None -> ()
+            }
 
-                // TIME-007: the first provider-facing prompt is the session's
-                // creation boundary. Sample synchronously before any await, then
-                // bind once durably; later prompts reuse the projection value.
-                let sessionStartCandidate =
-                    projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
-
-                let! sessionStartedAt =
+        {
+            BeginPhysicalProviderAttempt =
+                fun projectionSessionIdOpt outObj ->
                     task {
+                        match projectionSessionIdOpt with
+                        | Some sessionId ->
+                            do!
+                                SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                                    scope.Sessions.Quiescence.BeginProviderAttempt
+                                    (SessionId.create sessionId)
+                                    outObj
+                        | None -> return ()
+                    }
+
+            BindSessionStartedAt =
+                fun projectionSessionIdOpt ->
+                    task {
+                        let sessionStartCandidate =
+                            projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
+
                         match!
                             SessionStartedAtLedger.tryBindOrAbort journal projectionSessionIdOpt sessionStartCandidate
                         with
@@ -223,109 +247,185 @@ module PluginTransforms =
                                     )
                     }
 
-                let! strengthReplayPlans =
-                    match projectionSessionIdOpt with
-                    | Some sessionId ->
-                        StrengthReplay.applyBeforeXTrace
-                            journal
-                            strengthDurability
-                            (raiseStrengthFailClosed strengthFailFuse)
-                            sessionId
-                            outObj
-                    | None -> Task.FromResult []
+            ApplyStrengthReplay =
+                fun projectionSessionIdOpt outObj ->
+                    task {
+                        match projectionSessionIdOpt with
+                        | Some sessionId ->
+                            return!
+                                StrengthReplay.applyBeforeXTrace
+                                    journal
+                                    strengthDurability
+                                    (raiseStrengthFailClosed strengthFailFuse)
+                                    sessionId
+                                    outObj
+                        | None -> return []
+                    }
 
-                // COMPANION-003/007: keep the XTrace in step with the
-                // provider-visible semantic projection at the transform
-                // boundary — BEFORE the Companion rewrite and X-wire run,
-                // so the ingest cursor maps against the trace that now
-                // exists (not the previous round's mirror) and the XTrace
-                // never absorbs synthetic heads (Companion memory / prefix
-                // replacement) as raw parts.
-                // Idempotent by (turn, part) provenance; a lagging trace
-                // would stall BlogObservationCommitted.
-                do!
-                    XTracePipeline.applyPipeline
+            ApplyXTracePipeline =
+                fun projectionSessionIdOpt outObj strengthReplayPlans ->
+                    task {
+                        do!
+                            XTracePipeline.applyPipeline
+                                journal
+                                strengthDurability
+                                strengthFailFuse
+                                scope.Sessions.Companions
+                                projectionSessionIdOpt
+                                outObj
+                                strengthReplayPlans
+                    }
+
+            ApplyCompanion = applyCompanionForOrdinaryMaterial
+
+            ApplyXWire =
+                fun outObj ->
+                    task {
+                        do! XWire.applyTransform snapshotOpt journal scope outObj
+                    }
+
+            ApplyEnforcerContinuation =
+                fun projectionSessionIdOpt outObj ->
+                    task {
+                        do! EnforcerContinuation.applyContinuation scope journal terminateSession projectionSessionIdOpt outObj
+                    }
+
+            ApplyStrengthSpeculate =
+                fun outObj ->
+                    task {
+                        do! StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope outObj
+                    }
+
+            InjectPairGuideline =
+                fun projectionSessionIdOpt sessionStartedAt outObj ->
+                    task {
+                        do!
+                            PairProgrammingThoughtTransform.maybeInjectGuideline
+                                journal
+                                projectionSessionIdOpt
+                                sessionStartedAt
+                                clock
+                                terminateSession
+                                (languageFor projectionSessionIdOpt)
+                                outObj
+                    }
+
+            ProjectRequirementGrounding =
+                fun projectionSessionIdOpt outObj ->
+                    task {
+                        do!
+                            RequirementGroundingTransform.projectOrTerminate
+                                journal
+                                workspaceDirectory
+                                projectionSessionIdOpt
+                                (fun sessionId reason -> terminateSession (SessionId.create sessionId) reason)
+                                outObj
+                    }
+
+            InjectBloggerChronicle =
+                fun projectionSessionIdOpt outObj ->
+                    BloggerChronicleText.maybeInject
                         journal
-                        strengthDurability
-                        strengthFailFuse
-                        scope.Sessions.Companions
                         projectionSessionIdOpt
-                        outObj
-                        strengthReplayPlans
-
-                do! applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj
-
-                do! XWire.applyTransform snapshotOpt journal scope outObj
-
-                // docs/what/enforcer.md ENFORCER-044/047/050: Blogger continuation only.
-                // Main-session material is decided once in
-                // CompanionTransform → BloggerCoordinator.onMainMaterial.
-                do! EnforcerContinuation.applyContinuation scope journal terminateSession projectionSessionIdOpt outObj
-
-                // STRENGTH-009: freeze the post-Enforcer semantic view and
-                // complete any eligible speculation before the Pair marker.
-                // Prepared publication precedes Candidate visibility.
-                do! StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope outObj
-
-                // HOST-013：永久 pair-programming auto-injected。
-                // XTrace 之后、ReviewSeal 之前。恢复 durable 历史 pair，
-                // 再在 ResultGap 写入本次 completed synthetic skill({name:""}) Host 行。
-                // Companion / Blogger 整段跳过：结对编程约束干扰 blog 工具合同。
-                do!
-                    PairProgrammingThoughtTransform.maybeInjectGuideline
-                        journal
-                        projectionSessionIdOpt
-                        sessionStartedAt
-                        clock
-                        terminateSession
                         (languageFor projectionSessionIdOpt)
                         outObj
 
-                // REQUIREMENT-GROUNDING-007/012: permanent requirement reads use
-                // the same append-only placement discipline, after HOST-013 so
-                // ordinary and Cursor order is always pseudo-skill → read(s).
-                do!
-                    RequirementGroundingTransform.projectOrTerminate
-                        journal
-                        workspaceDirectory
-                        projectionSessionIdOpt
-                        (fun sessionId reason -> terminateSession (SessionId.create sessionId) reason)
-                        outObj
-
-                BloggerChronicleText.maybeInject
-                    journal
-                    projectionSessionIdOpt
-                    (languageFor projectionSessionIdOpt)
-                    outObj
-
-                // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
-                // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。
-                let currentMessages = unbox<obj array> outObj?messages |> Array.toList
-                let sanitized = HostMessageProjection.sanitizeMessages currentMessages
-                HostMessageProjection.replaceMessagesInPlace outObj sanitized
-                ()
-            }
-
-        let ordinaryProviderTransform projectionSessionIdOpt inObj outObj =
-            task {
-                projectionSessionIdOpt |> Option.iter wired.RegisterOwned
-
-                match strengthReplicaRuntime projectionSessionIdOpt scope with
-                | Some runtime ->
-                    // STRENGTH-004/009: Replica uses exactly one request-plan
-                    // writer plus its mirror/K gate. XTrace, Manager narrative,
-                    // Companion, Enforcer, Pair and Review are owner-only.
-                    do! XWire.applyTransform snapshotOpt journal scope outObj
-                    let! handled = runtime.HandleTransform outObj
-                    requireReplicaHandled handled
-
+            SanitizeMessages =
+                fun outObj ->
                     let currentMessages = unbox<obj array> outObj?messages |> Array.toList
                     let sanitized = HostMessageProjection.sanitizeMessages currentMessages
                     HostMessageProjection.replaceMessagesInPlace outObj sanitized
-                | None -> do! normalTransform projectionSessionIdOpt inObj outObj
-            }
+        }
 
-        let transform (inObj: obj) (outObj: obj) : Task<unit> =
+    let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
+        let scope = boot.Scope
+        let journal = boot.Journal
+        let snapshotOpt = host.SnapshotOpt
+        let wired = host.Wired
+
+        let sanitize outObj =
+            let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+            let sanitized = HostMessageProjection.sanitizeMessages currentMessages
+            HostMessageProjection.replaceMessagesInPlace outObj sanitized
+
+        {
+            IsExplicitResume = isExplicitResumeProviderMaterial
+            RegisterOwned = wired.RegisterOwned
+            ReplicaRuntime = fun projectionSessionIdOpt -> strengthReplicaRuntime projectionSessionIdOpt scope
+            ReplicaXWire = fun outObj -> task { do! XWire.applyTransform snapshotOpt journal scope outObj }
+            ReplicaSanitize = sanitize
+            ExplicitResumeSanitize = sanitize
+        }
+
+    let normalTransform (caps: NormalTransformCapabilities) (projectionSessionIdOpt: string option) (inObj: obj) (outObj: obj) : Task<unit> =
+        task {
+            // 1. SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+            do! caps.BeginPhysicalProviderAttempt projectionSessionIdOpt outObj
+
+            // 2. SessionStartedAtLedger.tryBindOrAbort
+            let! sessionStartedAt = caps.BindSessionStartedAt projectionSessionIdOpt
+
+            // 3. StrengthReplay.applyBeforeXTrace
+            let! strengthReplayPlans = caps.ApplyStrengthReplay projectionSessionIdOpt outObj
+
+            // 4. XTracePipeline.applyPipeline
+            do! caps.ApplyXTracePipeline projectionSessionIdOpt outObj strengthReplayPlans
+
+            // 5. applyCompanionForOrdinaryMaterial
+            do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
+
+            // 6. XWire.applyTransform
+            do! caps.ApplyXWire outObj
+
+            // 7. EnforcerContinuation.applyContinuation
+            do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
+
+            // 8. StrengthSpeculate.tryApply
+            do! caps.ApplyStrengthSpeculate outObj
+
+            // 9. PairProgrammingThoughtTransform.maybeInjectGuideline
+            do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
+
+            // 10. RequirementGroundingTransform.projectOrTerminate
+            do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
+
+            // 11. BloggerChronicleText.maybeInject
+            caps.InjectBloggerChronicle projectionSessionIdOpt outObj
+
+            // 12. HostMessageProjection.sanitizeMessages
+            caps.SanitizeMessages outObj
+            ()
+        }
+
+    let private ordinaryProviderTransform
+        (caps: NormalTransformCapabilities)
+        (branches: TransformBranchCapabilities)
+        (projectionSessionIdOpt: string option)
+        (inObj: obj)
+        (outObj: obj)
+        : Task<unit> =
+        task {
+            projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+
+            match branches.ReplicaRuntime projectionSessionIdOpt with
+            | Some runtime ->
+                // STRENGTH-004/009: Replica uses exactly one request-plan
+                // writer plus its mirror/K gate. XTrace, Manager narrative,
+                // Companion, Enforcer, Pair and Review are owner-only.
+                do! branches.ReplicaXWire outObj
+                let! handled = runtime.HandleTransform outObj
+                requireReplicaHandled handled
+
+                branches.ReplicaSanitize outObj
+            | None ->
+                do! normalTransform caps projectionSessionIdOpt inObj outObj
+        }
+
+    let createWithCaps
+        (caps: NormalTransformCapabilities)
+        (branches: TransformBranchCapabilities)
+        : obj -> obj -> Task<unit> =
+        fun (inObj: obj) (outObj: obj) ->
             task {
                 let projectionSessionIdOpt =
                     projectionSessionIdFromMessages outObj
@@ -339,18 +439,22 @@ module PluginTransforms =
                         else
                             None)
 
-                if isExplicitResumeProviderMaterial projectionSessionIdOpt outObj then
+                if branches.IsExplicitResume projectionSessionIdOpt outObj then
                     // CRASH-018: the exact /continue material stays disclosure-only
                     // for every provider step, including steps after tool results.
                     // The trailing marker is the direct path; the exact physical
                     // registry is the authoritative fallback when Host projection
                     // drops custom part metadata after chat.message.
                     // Do not reinterpret it through ordinary semantic transforms.
-                    let currentMessages = unbox<obj array> outObj?messages |> Array.toList
-                    let sanitized = HostMessageProjection.sanitizeMessages currentMessages
-                    HostMessageProjection.replaceMessagesInPlace outObj sanitized
+                    branches.ExplicitResumeSanitize outObj
                 else
-                    do! ordinaryProviderTransform projectionSessionIdOpt inObj outObj
+                    do! ordinaryProviderTransform caps branches projectionSessionIdOpt inObj outObj
             }
 
-        transform
+    /// Provider-facing transform composition: order only.
+    /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
+    /// narrative → ManagerNarrativeTransform; seal → ReviewSeal; replica fast path unchanged.
+    let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : obj -> obj -> Task<unit> =
+        let caps = defaultCapabilities boot host
+        let branches = defaultBranchCapabilities boot host
+        createWithCaps caps branches

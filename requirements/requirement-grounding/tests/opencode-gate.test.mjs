@@ -6,7 +6,6 @@ import test from 'node:test'
 
 import * as grounding from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
-import * as hookSurface from '../../../dist/OpenCode/Host/PluginHooksSurface.js'
 
 const pluginHooksSource = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs', import.meta.url), 'utf8')
 const pluginTransformsSource = readFileSync(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs', import.meta.url), 'utf8')
@@ -95,29 +94,26 @@ test('WHAT[REQUIREMENT-GROUNDING-007] grep match files do not trigger APPLIES-TO
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-008] defers the first ungrounded mutation with zero file effect and never auto-replays the old call', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-008] mutation grounding is weak observation and never becomes tool admission', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const sourcePath = join(dir, 'src', 'main.fs')
     const opened = await grounding.createJournal(dir)
     const first = await grounding.mutationDecision(opened.journal, dir, 'mutation', [sourcePath])
-    assert.equal(first.allowed, false)
-    assert.equal(readFileSync(sourcePath, 'utf8'), 'before\n')
-
-    const expected = hookSurface.expectedRejectionHook('grounding-before', 'REQUIREMENT_GROUNDING_REQUIRED', async () => {
-      throw new Error('REQUIREMENT_GROUNDING_REQUIRED')
-    })
-    await assert.rejects(() => expected({}, {}), /REQUIREMENT_GROUNDING_REQUIRED/)
+    assert.equal(first.allowed, true)
+    assert.equal(first.needsGrounding, true)
+    assert.deepEqual(first.packages, ['alpha'])
 
     const gateAt = pluginHooksSource.indexOf('RequirementGroundingGate.before')
     const ordinaryBeforeWorkAt = pluginHooksSource.indexOf('ToolHostCodec.decodeContext', gateAt)
-    assert.ok(gateAt >= 0 && ordinaryBeforeWorkAt > gateAt, 'grounding admission is the first production before-hook decision')
-    assert.match(pluginHooksSource, /expectedRejectionHook[\s\S]*?RequirementGroundingGate\.RequiredError/)
+    assert.ok(gateAt >= 0 && ordinaryBeforeWorkAt > gateAt, 'grounding may observe before mutation without owning admission')
+    assert.doesNotMatch(pluginHooksSource, /RequirementGroundingGate\.RequiredError/)
+    assert.doesNotMatch(pluginHooksSource, /expectedRejectionHook[\s\S]*?requirement-grounding/i)
 
     await grounding.projectWithJournal(opened.journal, 'mutation', toolBatch('anthropic', sourcePath))
     const second = await grounding.mutationDecision(opened.journal, dir, 'mutation', [sourcePath])
     assert.equal(second.allowed, true)
-    assert.equal(readFileSync(sourcePath, 'utf8'), 'before\n', 'gate never auto-replays the rejected mutation')
+    assert.equal(second.needsGrounding, false)
     grounding.disposeJournal(opened.journal)
   } finally { cleanup() }
 })

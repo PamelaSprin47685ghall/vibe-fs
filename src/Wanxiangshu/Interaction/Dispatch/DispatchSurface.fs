@@ -29,6 +29,9 @@ module DispatchSurface =
             member _.SubscribeTerminal(sessionId, listener) =
                 typed.SubscribeTerminal(sessionId, listener)
 
+            member _.SubscribeFutureTerminal(sessionId, listener) =
+                typed.SubscribeFutureTerminal(sessionId, listener)
+
             member _.SendPrompt(sessionId, text, options) =
                 lastObservation <-
                     box

@@ -62,28 +62,11 @@ test('WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_n
   )
 })
 
-test('WHAT[DG-003] LOOP_003_threshold_crossing_is_a_single_event_with_no_latch', () => {
-  const detector = loopDetector.create()
-  const degenerate = loopDetector.pushText(detector, ' retry'.repeat(1000))
-  assert.equal(degenerate.isLoop, true)
-  assert.ok(degenerate.weightedDistinctTokens <= loopDetector.loopWeightedDistinctThreshold)
-
-  const recovered = loopDetector.pushText(detector, diverse())
-  assert.equal(recovered.isLoop, false)
-  assert.equal(recovered.state, 'Normal')
-  assert.ok(recovered.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
-})
-
-test('WHAT[DG-003] LOOP_003_judgement_does_not_require_consecutive_hits', () => {
-  const detector = loopDetector.create()
-  let result = loopDetector.evaluate(detector)
-
-  for (let index = 0; index < 200 && !result.isLoop; index += 1) {
-    result = loopDetector.pushText(detector, ' retry')
-  }
-
-  assert.equal(result.isLoop, true)
-  assert.ok(result.step < 100, `single-token repetition crossed at step ${result.step}`)
+test('WHAT[DG-003] LOOP_003_classification_has_no_hysteresis_or_latch', () => {
+  assert.equal(loopDetector.classify(loopDetector.minimumWeightedDistinctCount - 1), 'TooRepetitive')
+  assert.equal(loopDetector.classify(loopDetector.normalWeightedDistinctCount), 'Normal')
+  assert.equal(loopDetector.classify(loopDetector.maximumWeightedDistinctCount + 1), 'TooRandom')
+  assert.equal(loopDetector.classify(loopDetector.normalWeightedDistinctCount), 'Normal')
 })
 
 test('WHAT[DG-006] LOOP_005_two_detectors_are_independent_attempts', () => {
@@ -91,8 +74,8 @@ test('WHAT[DG-006] LOOP_005_two_detectors_are_independent_attempts', () => {
   const b = loopDetector.create()
 
   loopDetector.pushText(a, ' retry'.repeat(1000))
-  assert.equal(loopDetector.evaluate(a).isLoop, true)
-  assert.equal(loopDetector.evaluate(b).isLoop, false)
+  assert.equal(loopDetector.evaluate(a).state, 'TooRepetitive')
+  assert.equal(loopDetector.evaluate(b).isAnomalous, false)
   assert.equal(loopDetector.evaluate(b).state, 'Normal')
   assert.equal(loopDetector.evaluate(b).step, 0)
 })

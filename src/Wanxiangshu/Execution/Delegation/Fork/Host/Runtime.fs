@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
@@ -38,6 +39,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Participant.Persona.AgentRoleIdentity
+open Wanxiangshu.Mission.Obligation.Todo
 
 /// Bridges real child sessions to the existing completion mailbox.
 /// Fork / Reuse / Pty operations live in extension files (semantic split).
@@ -53,6 +55,10 @@ type HostForkRuntime
         ?onRunStarted: SessionId -> Role -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> Task<string option>,
         ?childWorkRecordFor: SessionId -> Task<string option>,
+        ?childWorkRecordForRun:
+            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        ?prepareHandoff: SessionId -> SessionId -> Task<PreparedDelegationHandoff>,
+        ?advanceHandoff: SessionId -> SessionId -> XTraceCursor -> Task<Result<unit, string>>,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
         /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
@@ -195,41 +201,29 @@ type HostForkRuntime
     let childWorkRecordOf =
         defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
-    let readConvergedAggregate (durable: AgentJournal) (aggregateRef: BlobRef) (aggregateDigest: BlobDigest) =
-        task {
-            match! durable.Writer.BlobWriter.Read aggregateRef with
-            | Ok text when HostDigest.sha256Hex text = BlobDigest.value aggregateDigest -> return Some text
-            | _ -> return None
-        }
+    let childWorkRecordOfRun =
+        defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
 
-    let readLatestConverged (durable: AgentJournal) (sessionId: SessionId) =
-        match
-            FissionProjection.tryLatestForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
-        with
-        | Some { Terminal = FissionGroupTerminal.Converged(_, _, aggregateRef, aggregateDigest) } ->
-            readConvergedAggregate durable aggregateRef aggregateDigest
-        | _ -> Task.FromResult None
+    let prepareDelegationHandoff =
+        defaultArg prepareHandoff (fun _ _ ->
+            Task.FromResult
+                { ParentRecord = None
+                  ParentEndExclusive = { Sequence = 0L } })
 
-    let convergedFissionWorkRecordOf (sessionId: SessionId) =
-        task {
-            match journal with
-            | None -> return None
-            | Some durable -> return! readLatestConverged durable sessionId
-        }
+    let advanceDelegationHandoff = defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
 
-    let chooseWorkRecord aggregate fallback =
-        match aggregate with
-        | Some value -> Task.FromResult(Some value)
-        | None -> fallback ()
+    let xTraceHead (sessionId: SessionId) : int64 =
+        match journal with
+        | None -> 0L
+        | Some durable ->
+            AgentJournal.snapshot durable
+            |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
+            |> Option.bind (fun session -> session.XTrace)
+            |> Option.map XTraceProjection.head
+            |> Option.defaultValue 0L
 
     let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
-        match outcome with
-        | TerminalOutcome.Completed _ ->
-            task {
-                let! aggregate = convergedFissionWorkRecordOf run.ChildId
-                return! chooseWorkRecord aggregate (fun () -> childWorkRecordOf run.ChildId)
-            }
-        | _ -> Task.FromResult None
+        HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
@@ -396,6 +390,12 @@ type HostForkRuntime
     member internal _.ChildCreatedDir = childCreatedDir
     member internal _.ParentWorkRecordOf = parentWorkRecordOf
     member internal _.ChildWorkRecordOf = childWorkRecordOf
+    member internal _.ChildWorkRecordOfRun = childWorkRecordOfRun
+    member internal _.XTraceHead = xTraceHead
+    member internal _.PrepareHandoff(delegateSession: SessionId) =
+        prepareDelegationHandoff parentId delegateSession
+    member internal _.AdvanceHandoff(delegateSession: SessionId, cursor: XTraceCursor) =
+        advanceDelegationHandoff parentId delegateSession cursor
     member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
@@ -437,7 +437,8 @@ type HostForkRuntime
                 journal
                 parentId
                 sessions
-                childWorkRecordOf
+                childWorkRecordOfRun
+                xTraceHead
                 (fun work -> startOwnedWork work |> ignore)
                 agentId
                 childId
@@ -453,6 +454,19 @@ type HostForkRuntime
     member this.MarkReady(run: PendingHostRun) =
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.
         HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
+
+    member internal _.AwaitCurrentWorkRecord(agentId: string) : Task<Result<string, string>> =
+        task {
+            match! runtime.AwaitAgent agentId with
+            | Error error -> return Error error
+            | Ok completion ->
+                match completion.Outcome with
+                | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) ->
+                    return Ok payload.WorkRecord
+                | AgentCompleted _ -> return Error "reusable fork completed without bounded delta WorkRecord"
+                | AgentFailed payload -> return Error payload.Message
+                | AgentAbandoned(_, reason) -> return Error reason
+        }
 
     member this.CancelAndDrain() : Task =
         lock cancelGate (fun () ->

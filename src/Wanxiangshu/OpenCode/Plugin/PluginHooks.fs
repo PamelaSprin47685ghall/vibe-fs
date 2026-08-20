@@ -161,22 +161,12 @@ module PluginHooks =
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
-                    match!
+                    do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
                             journal
                             workspaceDirectory
                             toolInput
                             toolOutput
-                    with
-                    | Error error -> return raise (InvalidOperationException error)
-                    | Ok decision when decision.NeedsGrounding ->
-                        return
-                            raise (
-                                InvalidOperationException(
-                                    Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.RequiredError
-                                )
-                            )
-                    | Ok _ -> ()
 
                     let context = ToolHostCodec.decodeContext toolInput
 
@@ -206,15 +196,12 @@ module PluginHooks =
                 task {
                     do! magicTodo.After toolInput toolOutput
 
-                    match!
+                    do!
                         Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after
                             journal
                             workspaceDirectory
                             toolInput
                             toolOutput
-                    with
-                    | Error error -> return raise (InvalidOperationException error)
-                    | Ok _ -> ()
 
                     if casebookEnabled then
                         collectCasebookObservation toolInput toolOutput
@@ -305,10 +292,7 @@ module PluginHooks =
                       box (fatalHook "plugin-hook-tool-definition-failed" (pairedHook (box toolDefinition)))
                       "tool.execute.before",
                       box (
-                          PluginHostInterop.expectedRejectionHook
-                              "plugin-hook-tool-before-failed"
-                              Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.RequiredError
-                              (pairedHook (box toolBefore))
+                          fatalHook "plugin-hook-tool-before-failed" (pairedHook (box toolBefore))
                       )
                       // CASE-003 shares the single after hook key with Magic Todo.
                       // The checkpoint result is enriched first; observation then

@@ -39,6 +39,9 @@ module ReviewHostSurface =
             member _.SubscribeTerminal(sessionId, listener) =
                 typed.SubscribeTerminal(sessionId, listener)
 
+            member _.SubscribeFutureTerminal(sessionId, listener) =
+                typed.SubscribeFutureTerminal(sessionId, listener)
+
             member _.SendPrompt(sessionId, text, options) =
                 emitJsExpr (sendPrompt, SessionId.value sessionId, text, options) "$0($1,$2,$3)"
 

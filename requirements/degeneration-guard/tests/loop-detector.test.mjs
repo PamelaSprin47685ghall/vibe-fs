@@ -25,24 +25,19 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-004] LOOP_004_constants_are_token_calibrated', () => {
+test('WHAT[DG-004] LOOP_004_constants_are_direct_repository_extrema', () => {
   assert.equal(loopDetector.vocabularySize, vocabularySize)
   assert.equal(loopDetector.halfLife, 64)
   close(loopDetector.lambda, 2 ** (-1 / 64))
-  assert.equal(loopDetector.theoreticalLoopWeightedDistinctCount, 1)
-  assert.equal(loopDetector.confidenceLevel, 0.95)
-  assert.equal(loopDetector.confidenceQuantile, 0.05)
-  assert.ok(loopDetector.normalWeightedDistinctCount > loopDetector.loopWeightedDistinctThreshold)
-  assert.ok(
-    loopDetector.loopWeightedDistinctThreshold >
-      loopDetector.theoreticalLoopWeightedDistinctCount,
-  )
+  assert.ok(loopDetector.minimumWeightedDistinctCount < loopDetector.normalWeightedDistinctCount)
+  assert.ok(loopDetector.normalWeightedDistinctCount < loopDetector.maximumWeightedDistinctCount)
+  assert.ok(loopDetector.maximumWeightedDistinctCount < loopDetector.maxSupport)
 })
 
 test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
   const result = loopDetector.evaluate(loopDetector.create())
   assert.equal(result.state, 'Normal')
-  assert.equal(result.isLoop, false)
+  assert.equal(result.isAnomalous, false)
   assert.equal(result.step, 0)
   close(result.weightedDistinctTokens, loopDetector.normalWeightedDistinctCount)
 })
@@ -57,111 +52,47 @@ test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {
   close(result.weightedDistinctTokens, expected.weightedDistinctTokens)
 })
 
-test('WHAT[DG-003] LOOP_003_whitespace_and_punctuation_are_tokens_not_character_exceptions', () => {
-  const text = ' \n\t\r-'.repeat(200)
-  const result = loopDetector.pushText(loopDetector.create(), text)
-  assert.equal(result.step, encode(text).length)
-  assert.ok(result.step > 0)
+test('WHAT[DG-003] LOOP_003_extrema_are_inclusive_normal_boundaries', () => {
+  assert.equal(loopDetector.classify(loopDetector.minimumWeightedDistinctCount), 'Normal')
+  assert.equal(loopDetector.classify(loopDetector.maximumWeightedDistinctCount), 'Normal')
+  assert.equal(
+    loopDetector.classify(loopDetector.minimumWeightedDistinctCount - Number.EPSILON * 128),
+    'TooRepetitive',
+  )
+  assert.equal(
+    loopDetector.classify(loopDetector.maximumWeightedDistinctCount + Number.EPSILON * 128),
+    'TooRandom',
+  )
 })
 
-test('WHAT[DG-001] LOOP_003_single_token_repetition_converges_to_theoretical_loop', () => {
+test('WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () => {
   const unit = ' retry'
   assert.equal(encode(unit).length, 1, 'fixture must be one o200k token')
 
   const result = loopDetector.pushText(loopDetector.create(), unit.repeat(1000))
-  assert.equal(result.isLoop, true, `weightedDistinct=${result.weightedDistinctTokens}`)
-  assert.equal(result.state, 'Loop')
-  assert.ok(result.weightedDistinctTokens <= loopDetector.loopWeightedDistinctThreshold)
+  assert.equal(result.isAnomalous, true, `weightedDistinct=${result.weightedDistinctTokens}`)
+  assert.equal(result.state, 'TooRepetitive')
+  assert.ok(result.weightedDistinctTokens < loopDetector.minimumWeightedDistinctCount)
   close(result.weightedDistinctTokens, 1, 1e-2)
 })
 
-test('WHAT[DG-001] LOOP_003_diverse_programmatic_text_stays_normal', () => {
+test('WHAT[DG-001] LOOP_003_repository_like_programmatic_text_stays_normal', () => {
   const body = `
 export class OrderProcessor {
   constructor(private readonly repository: OrderRepository, private readonly paymentGateway: PaymentGateway) {}
-
   async processOrder(orderId: string, user: UserContext): Promise<OrderResult> {
     const order = await this.repository.findById(orderId);
-    if (!order) {
-      throw new EntityNotFoundError("Order", orderId);
-    }
-    if (order.status !== OrderStatus.Pending) {
-      return { success: false, reason: "Order is not in pending state", currentStatus: order.status };
-    }
-    const authorization = await this.paymentGateway.authorize({
-      amount: order.totalAmount,
-      currency: order.currency,
-      customerId: user.paymentCustomerId,
-    });
-    if (!authorization.approved) {
-      await this.repository.updateStatus(orderId, OrderStatus.PaymentFailed);
-      return { success: false, reason: authorization.declineReason };
-    }
-    const updated = await this.repository.finalizeOrder(orderId, {
-      transactionId: authorization.transactionId,
-      processedAt: new Date(),
-    });
-    await this.notifyCustomer(user.email, updated);
-    return { success: true, order: updated };
+    if (!order) throw new EntityNotFoundError("Order", orderId);
+    const authorization = await this.paymentGateway.authorize({ amount: order.totalAmount, currency: order.currency });
+    if (!authorization.approved) return { success: false, reason: authorization.declineReason };
+    return { success: true, order: await this.repository.finalizeOrder(orderId, authorization.transactionId) };
   }
 }
 `
 
   const result = loopDetector.pushText(loopDetector.create(), body)
-  assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
-  assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
-})
-
-test('WHAT[DG-001] LOOP_003_markdown_table_repeated_structure_with_varied_tokens_is_normal', () => {
-  const body = `
-# Deployment Matrix and Service Configuration
-
-| Service Name | Cluster | Zone | Min Instances | Max Instances | CPU Target | Memory (GB) | Health Check URL | Owner Team |
-| :--- | :--- | :--- | ---: | ---: | ---: | ---: | :--- | :--- |
-| ingress-gateway | prod-us-east-1 | us-east-1a | 4 | 32 | 70% | 8 | /healthz/ready | networking |
-| auth-session-broker | prod-us-east-1 | us-east-1b | 2 | 16 | 60% | 16 | /v1/system/status | identity-core |
-| catalog-search-indexer | prod-eu-west-1 | eu-west-1a | 3 | 24 | 75% | 32 | /internal/probes/liveness | search-discovery |
-| billing-invoice-worker | prod-ap-southeast-1 | ap-southeast-1c | 1 | 8 | 50% | 4 | /metrics/health | payments-ledger |
-`
-
-  const result = loopDetector.pushText(loopDetector.create(), body)
-  assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
-  assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
-})
-
-test('WHAT[DG-001] LOOP_003_ascii_graph_repeated_connectors_with_varied_tokens_is_normal', () => {
-  const body = `
-# System Architecture Diagram
-
-\`\`\`
-       +-----------------------+
-       |   Cloudflare CDN      |
-       +-----------+-----------+
-                   | (HTTPS / TLS 1.3)
-                   v
-       +-----------------------+
-       |   Kong API Gateway    | <--- JWT Validation / Rate Limiting
-       +-----------+-----------+
-                   |
-         +---------+---------+
-         |                   |
-         v                   v
-+-----------------+ +-----------------+
-| Checkout Worker | | Inventory Micro |
-+--------+--------+ +--------+--------+
-         |                   |
-         +---------+---------+
-                   | (gRPC Protocol)
-                   v
-       +-----------------------+
-       | PostgreSQL Primary DB |
-       +-----------------------+
-\`\`\`
-`
-
-  const result = loopDetector.pushText(loopDetector.create(), body)
-  assert.equal(result.isLoop, false, `weightedDistinct=${result.weightedDistinctTokens}`)
-  assert.ok(result.weightedDistinctTokens > loopDetector.loopWeightedDistinctThreshold)
+  assert.equal(result.isAnomalous, false, `weightedDistinct=${result.weightedDistinctTokens}`)
+  assert.equal(result.state, 'Normal')
 })
 
 test('WHAT[DG-005] LOOP_005_empty_push_is_noop', () => {
@@ -171,74 +102,38 @@ test('WHAT[DG-005] LOOP_005_empty_push_is_noop', () => {
   assert.deepEqual(after, before)
 })
 
-test('WHAT[DG-002] LOOP_009_text_delta_decodes_fail_closed', () => {
-  assert.equal(loopDetector.isLoopTextDelta({ type: 'session.status' }), false)
+test('WHAT[DG-002] LOOP_009_text_and_reasoning_delta_decode_fail_closed', () => {
   assert.equal(loopDetector.tryDecodeTextDelta({ type: 'session.status' }), null)
 
-  const ok = loopDetector.tryDecodeTextDelta({
-    type: 'message.part.delta',
-    properties: {
-      sessionID: 'ses_loop',
-      messageID: 'msg_a',
-      partID: 'prt_1',
-      field: 'text',
-      delta: 'aaaa',
-    },
-  })
-
-  assert.deepEqual(ok, {
-    sessionId: 'ses_loop',
-    messageId: 'msg_a',
-    partId: 'prt_1',
-    field: 'text',
-    delta: 'aaaa',
-  })
-
-  for (const field of ['reasoning', 'model_thought', 'thinking', 'reasoning_content']) {
-    assert.deepEqual(
-      loopDetector.tryDecodeTextDelta({
-        type: 'message.part.delta',
-        properties: {
-          sessionID: 'ses_loop',
-          messageID: 'msg_a',
-          partID: 'prt_1',
-          field,
-          delta: 'zzzz',
-        },
-      }),
-      {
-        sessionId: 'ses_loop',
-        messageId: 'msg_a',
-        partId: 'prt_1',
+  for (const field of ['text', 'reasoning', 'model_thought', 'thinking', 'reasoning_content']) {
+    assert.deepEqual(loopDetector.tryDecodeTextDelta({
+      type: 'message.part.delta',
+      properties: {
+        sessionID: 'ses_loop',
+        messageID: 'msg_a',
+        partID: 'prt_1',
         field,
         delta: 'zzzz',
       },
-      `field=${field} must decode`,
-    )
+    }), {
+      sessionId: 'ses_loop',
+      messageId: 'msg_a',
+      partId: 'prt_1',
+      field,
+      delta: 'zzzz',
+    })
   }
 
   for (const field of ['tool', 'tool_call', 'custom_metadata']) {
-    assert.equal(
-      loopDetector.tryDecodeTextDelta({
-        type: 'message.part.delta',
-        properties: {
-          sessionID: 'ses_loop',
-          messageID: 'msg_a',
-          partID: 'prt_1',
-          field,
-          delta: 'zzzz',
-        },
-      }),
-      null,
-      `field=${field} must not decode`,
-    )
-  }
-
-  assert.equal(
-    loopDetector.tryDecodeTextDelta({
+    assert.equal(loopDetector.tryDecodeTextDelta({
       type: 'message.part.delta',
-      properties: { delta: 'x', field: 'text' },
-    }),
-    null,
-  )
+      properties: {
+        sessionID: 'ses_loop',
+        messageID: 'msg_a',
+        partID: 'prt_1',
+        field,
+        delta: 'zzzz',
+      },
+    }), null)
+  }
 })

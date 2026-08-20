@@ -175,7 +175,7 @@ module HandleController =
     ///
     /// Call only for irreversible loss (parent cancel, deadline, host session
     /// gone). Never from loop-kill interrupt, provider-retry wake, or any path
-    /// that may continue the same handle (LOOP-006 continueAfterLoopKill).
+    /// that may continue the same handle through an independently owned control path.
     let recordAbandon
         (journal: AgentJournal option)
         (parentId: SessionId)

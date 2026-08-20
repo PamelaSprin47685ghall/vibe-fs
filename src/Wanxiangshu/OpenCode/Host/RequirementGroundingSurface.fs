@@ -61,31 +61,43 @@ module RequirementGroundingSurface =
 
     let mutationDecision journal workspace sessionId paths : Task<obj> =
         task {
-            let! requested = requestPaths journal workspace sessionId paths
+            let! result =
+                RequirementGroundingGate.decideMutation
+                    (Some(agentJournalOf journal))
+                    workspace
+                    sessionId
+                    (if isNull paths then [] else Array.toList paths)
 
-            if isNull requested?ok || not (unbox<bool> requested?ok) then
-                return requested
-            else
-                return
+            return
+                match result with
+                | Ok decision ->
                     box
                         {| ok = true
-                           allowed = not (unbox<bool> requested?needsGrounding)
-                           needsGrounding = unbox<bool> requested?needsGrounding
-                           requested = int requested?requested
-                           packages = unbox<obj array> requested?packages |}
+                           allowed = true
+                           needsGrounding = decision.NeedsGrounding
+                           requested = decision.Requested
+                           packages = decision.Packages |> List.toArray |}
+                | Error error -> box {| ok = false; error = error |}
         }
 
-    let observationDecision journal workspace sessionId toolName args output : Task<obj> =
+    let observationDecision journal workspace sessionId (toolName: string) (args: obj) _output : Task<obj> =
         task {
+            let paths =
+                if toolName.ToLowerInvariant() <> "read" || isNull args then
+                    []
+                elif not (isNull args?filePath) then
+                    [ string args?filePath ]
+                elif not (isNull args?path) then
+                    [ string args?path ]
+                else
+                    []
+
             let! result =
-                RequirementGroundingGate.after
+                RequirementGroundingGate.decideRead
                     (Some(agentJournalOf journal))
-                    (Some workspace)
-                    (box
-                        {| tool = toolName
-                           sessionID = sessionId
-                           args = args |})
-                    (box {| output = output |})
+                    workspace
+                    sessionId
+                    paths
 
             return
                 match result with

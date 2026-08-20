@@ -53,6 +53,8 @@ module PromptAuthority =
         | ReviewerGuard
         | BusyAgentNudge
         | ProviderRetryAttempt
+        /// DG-011: same-run continuation owned by degeneration-guard after its own interrupt.
+        | DegenerationGuard
         /// AGENT-031/PROMPT-018: same-run collaboration, never fallback retry.
         | NeedHelpEscalation
         /// AGENT-031/PROMPT-018: independent consultation returned to requester.
@@ -251,6 +253,7 @@ module PromptAuthority =
         | Continuation ReviewerGuard -> "ReviewerGuard"
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
+        | Continuation DegenerationGuard -> "DegenerationGuard"
         | Continuation NeedHelpEscalation -> "NeedHelpEscalation"
         | Continuation NeedHelpAdvice -> "NeedHelpAdvice"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
@@ -268,6 +271,7 @@ module PromptAuthority =
         | "ReviewerGuard" -> Some ReviewerGuard
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
+        | "DegenerationGuard" -> Some DegenerationGuard
         | "NeedHelpEscalation" -> Some NeedHelpEscalation
         | "NeedHelpAdvice" -> Some NeedHelpAdvice
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement

@@ -194,8 +194,12 @@ module GroundingCatalog =
             |> List.map (fun packageRelative ->
                 let full = pathJoin (package.Root, packageRelative)
 
-                { Path = "requirements/" + package.Name + "/" + slash packageRelative
-                  ResultBytes = readFileSync (full, "utf8") })
+                let resultBytes = readFileSync (full, "utf8")
+                let path = "requirements/" + package.Name + "/" + slash packageRelative
+
+                { Path = path
+                  Digest = HostDigest.sha256Hex (path + "\u0000" + resultBytes)
+                  ResultBytes = resultBytes })
 
         let digestInput =
             materials
@@ -234,3 +238,19 @@ module GroundingCatalog =
         |> List.map (fun (_, matches) ->
             let package = List.head matches
             materializePackageMaterials root package)
+
+    let materialsForExactPaths workspace paths =
+        let root = canonicalWorkspace workspace
+        let relativePaths = paths |> List.choose (workspaceRelative root) |> Set.ofList
+
+        discover root
+        |> List.collect (fun package ->
+            materializePackageMaterials root package
+            |> fun snapshot ->
+                snapshot.Materials
+                |> List.choose (fun material ->
+                    if Set.contains material.Path relativePaths then
+                        Some(snapshot, material)
+                    else
+                        None))
+        |> List.sortBy (fun (snapshot, material) -> snapshot.PackageName, material.Path)

@@ -160,10 +160,6 @@ module ProviderRecoveryWorkflow =
                 return! waitForCoverage timerPort durable sessionId
         }
 
-    let private emitLoopContinuation (turn: ReconciledTurn) (error: string) =
-        if error = "loop-kill" then
-            Diagnostic.emit "loop-kill" [ "session_id", SessionId.value turn.SessionId; "result", "continue-sent" ]
-
     let private handleContinuation
         (eventPort: IEventObservationPort)
         (turn: ReconciledTurn)
@@ -171,7 +167,7 @@ module ProviderRecoveryWorkflow =
         (continuation: Result<PromptKey, string>)
         =
         match continuation with
-        | Ok _ -> emitLoopContinuation turn error
+        | Ok _ -> ()
         | Error _ -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
@@ -235,19 +231,3 @@ module ProviderRecoveryWorkflow =
         }
         :> Task
 
-    /// LOOP-006: an abort we armed is provider failure for AABB purposes.
-    let continueAfterLoopKill
-        (timerPort: ITimerPort)
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        : Task =
-        continueAfterConfirmedFailure
-            timerPort
-            sessionPort
-            eventPort
-            journal
-            turn
-            "loop-kill"
-            (ProviderProse.documentFor turn.SessionId RuntimeNudge.LoopContinue Map.empty)

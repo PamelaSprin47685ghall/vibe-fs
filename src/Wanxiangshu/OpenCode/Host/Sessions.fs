@@ -14,6 +14,7 @@ type SessionPromptOptions = OpenCodePromptOptions
 
 type ISessionHostPort =
     abstract SubscribeTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
+    abstract SubscribeFutureTerminal: sessionId: SessionId * listener: TerminalCompletionListener -> IDisposable
 
     /// PROMPT-005/PROMPT-011: the outcome, not a `Result`.
     ///
@@ -334,6 +335,33 @@ type InjectedSessionPort
 
             let sub =
                 eventPort.SubscribeTerminalListener(fun sId outcome ->
+                    if sId = sessionId then
+                        listener sId outcome)
+
+            { new IDisposable with
+                member _.Dispose() =
+                    sub.Dispose()
+
+                    lock lockObj (fun () ->
+                        if removeActiveListenerToken sessionId token then
+                            activeListeners.Remove(sessionId) |> ignore) }
+
+        member me.SubscribeFutureTerminal(sessionId, listener) =
+            let token = Guid.NewGuid()
+
+            lock lockObj (fun () ->
+                let listeners =
+                    match activeListeners.TryGetValue sessionId with
+                    | true, current -> current
+                    | false, _ ->
+                        let created = HashSet<Guid>()
+                        activeListeners.[sessionId] <- created
+                        created
+
+                listeners.Add token |> ignore)
+
+            let sub =
+                eventPort.SubscribeFutureTerminalListener(fun sId outcome ->
                     if sId = sessionId then
                         listener sId outcome)
 

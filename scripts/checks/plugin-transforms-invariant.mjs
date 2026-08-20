@@ -68,7 +68,7 @@ const orderingSteps = [
 ]
 
 const allLines = text.split('\n')
-const normalTransformStart = allLines.findIndex(l => /^\s*let\s+normalTransform\b/.test(l))
+const normalTransformStart = allLines.findIndex(l => /^\s*let\s+(?:private\s+)?normalTransform\b/.test(l))
 if (normalTransformStart < 0) {
   violations.push('ordering: normalTransform function not found')
 } else {

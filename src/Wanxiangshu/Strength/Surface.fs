@@ -1354,6 +1354,10 @@ module StrengthSurface =
                 { new IDisposable with
                     member _.Dispose() = () }
 
+            member _.SubscribeFutureTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
             member _.SendPrompt(_, _, _) =
                 Task.FromResult(Outcome.Retryable "unused")
 

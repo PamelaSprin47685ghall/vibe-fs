@@ -15,6 +15,13 @@ const waitForChild = async (h, owner, role) => {
   }
   throw new Error(`delegate child was not admitted for ${owner}/${role}`)
 }
+const waitForPromptCount = async (h, owner, role, count) => {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    if (sync.promptCount(h, owner, role) >= count) return
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+  throw new Error(`delegate prompt ${count} was not admitted for ${owner}/${role}`)
+}
 const settle = async (h, owner, role, answer, run = 'run-1') => sync.settle(h, owner, role, answer, run)
 
 for (const role of ['Inspector', 'Coder']) {
@@ -53,6 +60,12 @@ test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion',
 
     const second = sync.invoke(h, 'owner-sync', 'Inspector', 'second')
     assert.equal(await waitForChild(h, 'owner-sync', 'Inspector'), firstChild)
+    const immediate = await Promise.race([
+      second.then((value) => ({ kind: 'resolved', value })),
+      new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
+    ])
+    assert.deepEqual(immediate, { kind: 'pending' }, 'fresh reuse must remain pending until its own completion')
+    await waitForPromptCount(h, 'owner-sync', 'Inspector', 2)
     assert.equal(await settle(h, 'owner-sync', 'Inspector', 'second answer', 'run-second'), true)
     const secondResult = await second
     assert.equal(secondResult.ok, true)

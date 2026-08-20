@@ -82,7 +82,9 @@ type SyncDelegateRuntime
         /// (includeOpening=false). Injected from plugin wiring so Session does
         /// not depend on Finality compile order; range = the invocation's
         /// XTrace [StartInclusive, EndExclusive).
-        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>
+        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        ?prepareHandoff: SessionId -> SessionId -> Task<PreparedDelegationHandoff>,
+        ?advanceHandoff: SessionId -> SessionId -> XTraceCursor -> Task<Result<unit, string>>
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
@@ -90,6 +92,12 @@ type SyncDelegateRuntime
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
     let projectWorkRecord = defaultArg workRecordFor (fun _ _ _ -> Task.FromResult None)
+    let prepareDelegationHandoff =
+        defaultArg prepareHandoff (fun _ _ ->
+            Task.FromResult
+                { ParentRecord = None
+                  ParentEndExclusive = { Sequence = 0L } })
+    let advanceDelegationHandoff = defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -123,6 +131,7 @@ type SyncDelegateRuntime
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
         task {
             let tools = toolMap (canonicalRole call.Role)
+            let! handoff = prepareDelegationHandoff call.Owner call.Delegate
 
             // EXEC-031: capture the Opening from the raw Charge (not the
             // provider envelope), matching OneShotAgentTool. PromptIngress omits
@@ -141,17 +150,26 @@ type SyncDelegateRuntime
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
 
-            return!
+            let providerPrompt = DelegationHandoff.appendParentDelta request.ProviderPrompt handoff.ParentRecord
+
+            let! sent =
                 dispatcher.SendAgentOwnerRootWithTools
                     sessions
                     call.Delegate
-                    request.ProviderPrompt
+                    providerPrompt
                     call.Agent
                     directory
                     PromptDispatcher.AwaitMode.Await
                     None
                     tools
                     None
+
+            match sent with
+            | Error error -> return Error error
+            | Ok key ->
+                match! advanceDelegationHandoff call.Owner call.Delegate handoff.ParentEndExclusive with
+                | Error error -> return Error(sprintf "delegation handoff append failed: %s" error)
+                | Ok() -> return Ok key
         }
 
     let deps: SyncDelegateWorkflow.Dependencies =
@@ -184,7 +202,8 @@ type SyncDelegateRuntime
                 |> Option.map (fun profile -> profile.SelectedAgent)
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
           DescribeWait = SyncDelegateWait.describe
-          SubscribeTerminal = fun sessionId listener -> sessions.SubscribeTerminal(sessionId, listener) }
+          SubscribeFutureTerminal =
+            fun sessionId listener -> sessions.SubscribeFutureTerminal(sessionId, listener) }
 
     let failPoppedCalls delegateSessionId reason =
         let rec popAll () =

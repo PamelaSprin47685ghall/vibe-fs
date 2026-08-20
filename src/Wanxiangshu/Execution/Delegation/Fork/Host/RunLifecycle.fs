@@ -33,9 +33,25 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Mission.Obligation.Todo
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
 module HostForkRunLifecycle =
+
+    let workRecordForOutcome
+        (childWorkRecordForRun:
+            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> int64)
+        (run: PendingHostRun)
+        (outcome: TerminalOutcome)
+        =
+        match outcome with
+        | TerminalOutcome.Completed result ->
+            childWorkRecordForRun
+                run.ChildId
+                (DelegationHandoff.childRange run.StartCursor (xTraceHead run.ChildId))
+                result.ProviderRun
+        | _ -> Task.FromResult None
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.
     ///
@@ -259,7 +275,9 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordFor: SessionId -> Task<string option>)
+        (childWorkRecordForRun:
+            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (agentId: string)
         (childId: SessionId)
@@ -270,24 +288,20 @@ module HostForkRunLifecycle =
               AgentId = agentId
               ChildId = childId
               Role = role
+              StartCursor = xTraceHead childId
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
-        let terminalWorkRecord outcome =
-            match outcome with
-            | Completed _ -> childWorkRecordFor childId
-            | _ -> Task.FromResult None
-
         let subscription =
-            sessions.SubscribeTerminal(
+            sessions.SubscribeFutureTerminal(
                 childId,
                 (fun _ outcome ->
                     trackOwnedWork (fun () ->
                         task {
-                            let! workRecord = terminalWorkRecord outcome
+                            let! workRecord = workRecordForOutcome childWorkRecordForRun xTraceHead run outcome
                             do! complete gate pendingRuns journal parentId sessions run outcome workRecord
                         }
                         :> Task))

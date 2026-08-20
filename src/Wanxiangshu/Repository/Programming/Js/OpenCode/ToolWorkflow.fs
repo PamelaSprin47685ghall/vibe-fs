@@ -190,7 +190,7 @@ module JsToolsData =
 /// recovery can undo only what was provably written.
 module JsToolWorkflow =
 
-    type MutationAdmission = string list -> Task<Result<unit, JsFailure>>
+    type FileAccessObservation = string list -> string list -> Task<unit>
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure.
@@ -261,6 +261,23 @@ module JsToolWorkflow =
         | None -> commitEphemeral root mutations value |> Task.FromResult
         | Some durable -> commitDurable durable root mutations value prepared
 
+    let private observeFileAccess
+        (observer: FileAccessObservation option)
+        readPaths
+        effectPaths
+        : Task<Result<unit, JsFailure>> =
+        task {
+            match observer with
+            | None -> return Ok()
+            | Some observe ->
+                try
+                    do! observe readPaths effectPaths
+                with _ ->
+                    ()
+
+                return Ok()
+        }
+
     /// Run a model program against root. `baseClassSource` is the generated
     /// JsProgram (JS-002); `modelSource` is the model's `class Js ... run()`.
     /// deadlineMs bounds the sandbox; outputBoundBytes bounds the result.
@@ -274,30 +291,30 @@ module JsToolWorkflow =
         (deadlineEpochMs: int64)
         (outputBoundBytes: int)
         (persistence: IJsTransactionPersistence option)
-        (mutationAdmission: MutationAdmission option)
+        (fileAccessObservation: FileAccessObservation option)
         : Task<JsToolOutcome> =
         task {
             let! outcome =
                 taskResult {
                     // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
                     let staging = ResizeArray<JsStagedMutation>()
-                    let api = JsToolsBindings.createApi root staging
+                    let modelReads = ResizeArray<string>()
+                    let api = JsToolsBindings.createApi root staging modelReads
 
                     let! resultJson =
                         JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
 
                     let! value = JsToolsData.parse resultJson
                     let mutations = staging |> Seq.toList
+                    let readPaths = modelReads |> Seq.distinct |> Seq.toList
+                    let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
                     let exists (path: string) : bool =
                         JsMutationFs.existsPath (JsMutationFs.resolveToolPath root path)
 
                     do! JsTransaction.preflight exists (readCurrentText root) mutations
 
-                    match mutationAdmission with
-                    | Some admit when not (List.isEmpty mutations) ->
-                        do! admit (mutations |> List.map JsStagedMutation.path)
-                    | _ -> ()
+                    do! observeFileAccess fileAccessObservation readPaths effectPaths
 
                     if List.isEmpty mutations then
                         return value, [], []
@@ -321,7 +338,7 @@ module JsToolWorkflow =
         : Task<JsToolOutcome> =
         runCore root baseClassSource modelSource deadlineMs deadlineEpochMs outputBoundBytes persistence None
 
-    let runWithMutationAdmission
+    let runWithFileAccessObservation
         (root: string)
         (baseClassSource: string)
         (modelSource: string)
@@ -329,7 +346,7 @@ module JsToolWorkflow =
         (deadlineEpochMs: int64)
         (outputBoundBytes: int)
         (persistence: IJsTransactionPersistence option)
-        (mutationAdmission: MutationAdmission)
+        (fileAccessObservation: FileAccessObservation)
         : Task<JsToolOutcome> =
         runCore
             root
@@ -339,7 +356,7 @@ module JsToolWorkflow =
             deadlineEpochMs
             outputBoundBytes
             persistence
-            (Some mutationAdmission)
+            (Some fileAccessObservation)
 
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;

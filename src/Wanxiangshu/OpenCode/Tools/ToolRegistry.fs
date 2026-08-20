@@ -198,11 +198,12 @@ module ToolRegistry =
         let providerLanguage = ProviderLanguageBinding.readGlobalPreference ()
         let jsProse = JsDescriptionAssets.load providerLanguage
 
-        let groundingAdmission (ctx: HostToolContext) paths =
+        let groundingObservation (ctx: HostToolContext) readPaths effectPaths =
             match workspaceDirectory with
-            | None -> Task.FromResult(Ok())
-            | Some root when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(Ok())
-            | Some root -> RequirementGroundingGate.programAdmission journal root ctx.SessionId paths
+            | None -> Task.FromResult(())
+            | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
+            | Some root ->
+                RequirementGroundingGate.programObservation journal root ctx.SessionId readPaths effectPaths
 
         let runtime =
             new ToolRuntimeScope(
@@ -233,7 +234,7 @@ module ToolRegistry =
                               surface
                               (defaultArg workspaceDirectory "")
                               jsTransactionPersistence
-                              (Some groundingAdmission)
+                              (Some groundingObservation)
                   | None -> () ]
 
         let baseSpecs =

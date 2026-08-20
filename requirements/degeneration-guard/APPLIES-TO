@@ -8,7 +8,11 @@
 /src/Wanxiangshu/OpenCode/Host/LoopSensor.fs
 /src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs
 /src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs
-/src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+/src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
+/src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs
+/src/Wanxiangshu/Interaction/Authority/Model.fs
+/resources/provider/runtime/degeneration-too-repetitive/**
+/resources/provider/runtime/degeneration-too-random/**
 /scripts/build.mjs
 /scripts/lib/calibrate-loop-detector.mjs
-/scripts/checks/p0-recovery-join.mjs

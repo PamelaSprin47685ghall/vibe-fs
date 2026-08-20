@@ -78,7 +78,7 @@
 |---|---|
 | `provider-attempt-recovery` | 单次 provider attempt 已失败后，可在不改变 authority/personhood 的前提下有界换执行绑定继续。 |
 | `crash-reconciliation` | 进程/插件中断后只能从 durable facts 与可信物理观察重新进入普通程序，不能从临时内存或猜测恢复。 |
-| `degeneration-guard` | 尚未结束的 attempt 若已进入病态重复，应在污染更多历史前主动终止并交给正常 recovery。 |
+| `degeneration-guard` | 尚未结束的 attempt 若 token 多样性越出正常语料经验边界，应在污染更多历史前主动终止并由本包自行要求改写。 |
 
 ## 9. Mission / judgement / finality
 
@@ -178,7 +178,7 @@ context-compression      → semantic-trace, provider-projection
 prefix-stability         → provider-projection, context-compression, provider-language, participant-identity
 provider-attempt-recovery→ participant-identity, execution-model-routing, interaction-authority
 crash-reconciliation     → durable-events, effect-accounting, structured-workflow, host-boundary
-degeneration-guard       → provider-attempt-recovery, host-boundary
+degeneration-guard       → interaction-authority, dispatch-protocol, host-boundary
 obligation-ledger        → durable-events, effect-accounting, semantic-trace
 review-judgement         → cognitive-environment, participant-horizon
 review-assurance         → review-judgement, semantic-trace, durable-events, causal-wait

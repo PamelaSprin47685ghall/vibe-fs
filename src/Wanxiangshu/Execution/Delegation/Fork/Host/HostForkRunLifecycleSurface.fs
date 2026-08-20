@@ -29,6 +29,7 @@ type HostForkRunLifecycleHandle
               AgentId = agentId
               ChildId = SessionId.create childId
               Role = Role.Coder
+              StartCursor = 0L
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }

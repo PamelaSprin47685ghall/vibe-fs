@@ -45,6 +45,21 @@ test('WHAT[HOST-BOUNDARY-016] EVT_late_subscriber_replays_the_last_sticky_outcom
   assert.deepEqual(replayed.sort(), [['ses_replay_a', 'Completed'], ['ses_replay_b', 'Failed']])
 })
 
+test('WHAT[DELEG-025] EVT_future_subscriber_does_not_replay_sticky_terminal', () => {
+  const port = EventsSurface.create()
+  EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-old', 'old result')
+
+  const seen = []
+  const subscription = EventsSurface.subscribeFuture(port, (sessionId, outcome) => seen.push({ sessionId, outcome }))
+  assert.deepEqual(seen, [], 'fresh work unit must not inherit the previous terminal')
+
+  EventsSurface.notify(port, 'ses-reused', 'Completed', 'run-new', 'new result')
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].sessionId, 'ses-reused')
+  assert.equal(seen[0].outcome.providerRun, 'run-new')
+  EventsSurface.dispose(subscription)
+})
+
 test('WHAT[HOST-BOUNDARY-016] EVT_disposed_listener_stops_delivery_and_listener_count_reporting', () => {
   const port = EventsSurface.create()
   const received = []

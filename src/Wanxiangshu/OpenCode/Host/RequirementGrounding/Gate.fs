@@ -10,9 +10,6 @@ open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingGate =
 
-    [<Literal>]
-    let RequiredError = "REQUIREMENT_GROUNDING_REQUIRED"
-
     let private textField (value: obj) name =
         if isNull value || isNull value?(name) then
             None
@@ -60,12 +57,33 @@ module RequirementGroundingGate =
         else
             requestMatched journal workspace sessionId paths
 
+    let private observeReads journal workspace sessionId paths =
+        match journal with
+        | None -> Task.FromResult(Error "requirement grounding requires a durable journal")
+        | Some durable ->
+            RequirementGroundingRuntime.observeReadPaths durable workspace (SessionId.create sessionId) paths
+
+    let private ignoreDecision (operation: Task<Result<RequirementGroundingDecision, string>>) : Task<unit> =
+        task {
+            let! _ = operation
+            return ()
+        }
+
+    let decideMutation journal workspace sessionId paths =
+        request journal workspace sessionId paths
+
+    let decideRead journal workspace sessionId paths =
+        if List.isEmpty paths then
+            Task.FromResult(Ok emptyDecision)
+        else
+            observeReads journal workspace sessionId paths
+
     let before
         (journal: AgentJournal option)
         (workspace: string option)
         (toolInput: obj)
         (toolOutput: obj)
-        : Task<Result<RequirementGroundingDecision, string>> =
+        : Task<unit> =
         let toolName =
             if isNull toolInput || isNull toolInput?tool then
                 ""
@@ -85,16 +103,16 @@ module RequirementGroundingGate =
                 toolOutput?args
 
         match workspace with
-        | None -> Task.FromResult(Ok emptyDecision)
-        | Some root when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(Ok emptyDecision)
-        | Some root -> request journal root sessionId (mutationPaths toolName args)
+        | None -> Task.FromResult(())
+        | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
+        | Some root -> request journal root sessionId (mutationPaths toolName args) |> ignoreDecision
 
     let after
         (journal: AgentJournal option)
         (workspace: string option)
         (toolInput: obj)
         (toolOutput: obj)
-        : Task<Result<RequirementGroundingDecision, string>> =
+        : Task<unit> =
         let toolName =
             if isNull toolInput || isNull toolInput?tool then
                 ""
@@ -114,20 +132,23 @@ module RequirementGroundingGate =
                 toolInput?args
 
         match workspace with
-        | None -> Task.FromResult(Ok emptyDecision)
-        | Some root when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(Ok emptyDecision)
-        | Some root -> request journal root sessionId (observationPaths toolName args)
+        | None -> Task.FromResult(())
+        | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
+        | Some root -> decideRead journal root sessionId (observationPaths toolName args) |> ignoreDecision
 
-    let programAdmission
+    let programObservation
         journal
         workspace
         sessionId
-        paths
-        : Task<Result<unit, Wanxiangshu.Repository.Programming.Js.JsFailure>> =
+        readPaths
+        effectPaths
+        : Task<unit> =
         task {
-            match! request journal workspace sessionId paths with
-            | Error _ -> return Error Wanxiangshu.Repository.Programming.Js.JsFailure.RequirementGroundingRequired
-            | Ok decision when decision.NeedsGrounding ->
-                return Error Wanxiangshu.Repository.Programming.Js.JsFailure.RequirementGroundingRequired
-            | Ok _ -> return Ok()
+            if not (List.isEmpty readPaths) then
+                let! _ = decideRead journal workspace sessionId readPaths
+                ()
+
+            if not (List.isEmpty effectPaths) then
+                let! _ = decideMutation journal workspace sessionId effectPaths
+                ()
         }

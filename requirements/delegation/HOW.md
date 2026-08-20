@@ -23,6 +23,13 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 - **单栈执行与结果分发**：串行化键为直接调用方的 `ReuseScope`。仅第一位 canonical 调用方获得完整 WorkRecord，其余 sibling 调用方获得引用句柄。
 - **普通完成收口**：被委托方普通 Assistant 结束即触发返回，无独立 return 协议通道。
 
+### Reusable work-unit handoff
+
+- 每个 `(parent, delegate)` 维护 durable parent-handoff cursor。新 work unit 先冻结 parent 当前 XTrace head；首次发送附当前 parent LWR，后续发送只附 `[previousHandoff, currentHead)` 的 bounded delta LWR。
+- handoff cursor 仅在新 prompt 已被 Host 接受后推进；发送失败不得吞掉尚未交付的 parent delta。
+- reusable work unit 使用 fresh-only terminal subscription。Host 的 sticky terminal replay 仍保留给 recovery/late observer，但不进入新 invocation。
+- callee 在发送前冻结自身 XTrace head；新 terminal 到达后以 `[start, end)` + terminal provider run 物化 bounded LWR。fork continuation 与 SyncDelegate 共用这条窗口语义，不允许任何 full-lifecycle fallback。
+
 ### Join 消费与中断
 
 Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用结果，单次消费上限受 `MaxJoinBatch` 约束。外部打断信号与超时仅产生 `Interrupted` 结果，确保子会话的执行与既有权能不受破坏。
@@ -54,3 +61,5 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-021 | `requirements/delegation/tests/fork-attachment.test.mjs` |
 | DELEG-022 | `requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs` |
 | DELEG-023 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
+| DELEG-024 | `requirements/delegation/tests/reusable-handoff.test.mjs` + `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
+| DELEG-025 | `requirements/host-boundary/tests/events-port.test.mjs` + `requirements/delegation/tests/reusable-handoff.test.mjs` |

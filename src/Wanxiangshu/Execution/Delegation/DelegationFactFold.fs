@@ -6,6 +6,25 @@ open Wanxiangshu.Composition.Durable
 
 module DelegationFactFold =
 
+    let private advanceHandoff
+        (projection: AgentProjectionSet)
+        (payload:
+            {| ParentSessionId: Identity.SessionId
+               DelegateSessionId: Identity.SessionId
+               ParentEndExclusive: int64 |})
+        : Result<AgentProjectionSet, FoldRejection> =
+        let key = DelegationHandoff.key payload.ParentSessionId payload.DelegateSessionId
+        let previous = Map.tryFind key projection.DelegationHandoffs |> Option.defaultValue 0L
+
+        if payload.ParentEndExclusive < previous then
+            FoldRejection.reject "DelegationHandoffAdvanced" "parent handoff cursor cannot retreat"
+        elif payload.ParentEndExclusive < 0L then
+            FoldRejection.reject "DelegationHandoffAdvanced" "parent handoff cursor must be non-negative"
+        else
+            Ok
+                { projection with
+                    DelegationHandoffs = Map.add key payload.ParentEndExclusive projection.DelegationHandoffs }
+
     let private replaceEstimate
         (projection: AgentProjectionSet)
         (payload:
@@ -44,3 +63,4 @@ module DelegationFactFold =
         match fact with
         | DelegationFactCases.DelegatedToolEstimateReplaced payload -> replaceEstimate projection payload
         | DelegationFactCases.DelegatedToolCallObserved payload -> observeEstimate projection payload
+        | DelegationFactCases.DelegationHandoffAdvanced payload -> advanceHandoff projection payload

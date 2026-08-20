@@ -91,3 +91,11 @@ fork 携带的 attachment 仅将指定同伴的历史工作记录作为只读数
 ## DELEG-023: 委托失败仅在所有恢复路径耗尽后向调用方报告
 
 被委托方在执行过程中遇到单次尝试失败时，属于局部瞬态故障，不得立即向父调用方报告失败；必须等待子会话内的所有恢复重试路径完全耗尽或会话确定性终结后，方可向调用方交付最终失败。
+
+## DELEG-024: reusable handoff = parent delta LWR + fresh charge → fresh completion → callee delta LWR
+
+复用既有 participant/session 发起新工作时，每次调用都形成新的 work unit。输入必须由“调用方自上一次成功 handoff 之后的 delta LifecycleWorkRecord”与本次新 charge 组成；首次 handoff 以当前调用方 LifecycleWorkRecord 作为初始背景。调用方必须等待本 work unit 的新完成，返回值只能物化 callee 本 work unit 的 bounded delta LifecycleWorkRecord，严禁返回 callee 全生命周期记录或上一 work unit 的结果。该合同同时适用于 fork 的 same-road continuation 与 `inspect` / `establish-behavior` / `repair-behavior` 等 reusable synchronous delegation。
+
+## DELEG-025: 新 work unit 只能由订阅之后产生的 terminal 完成
+
+复用 session 的新 work unit 在发送新 prompt 之前建立 fresh-only terminal subscription。历史 sticky terminal 只服务 late-observer/recovery，不得 replay 进新 work unit 的 completion cell。旧 provider run、旧 terminal、旧 completion cache 均不能完成或失败新的调用。

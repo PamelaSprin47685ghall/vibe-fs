@@ -140,6 +140,12 @@ module OrchestratorHostSurface =
 
                 invokeRawDisposable raw "SubscribeTerminal" [| box (SessionId.value sessionId); box callback |]
 
+            member _.SubscribeFutureTerminal(sessionId, listener) =
+                let callback =
+                    fun rawSession rawOutcome -> listener (sessionValue rawSession) (terminalOutcome rawOutcome)
+
+                invokeRawDisposable raw "SubscribeFutureTerminal" [| box (SessionId.value sessionId); box callback |]
+
             member _.SendPrompt(sessionId, text, options) =
                 task {
                     let! value =

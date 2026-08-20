@@ -1,24 +1,26 @@
 # degeneration-guard — WHY
 
-Provider attempt 可能在尚未正常结束前陷入高重复、低信息的退化循环生成。若不及时截断，会持续污染 transcript 尾部并推迟进入正常恢复。本包在污染扩大前将该 attempt 主动终止，并将其桥接至标准的 `provider-attempt-recovery`。
+Provider attempt 可能在尚未正常结束前向两个方向退化：重复度过高时陷入单调模式，重复度过低时趋近无结构随机乱码。二者都应在污染 transcript 与浪费推理预算前被截断。
 
-**degeneration-guard 保证：输出退化循环在流式阶段被纯传感器及早发现并截断，且强杀动作仅作为一次已确认失败桥接回标准恢复机制，不成为平行的重试控制器。**
+**degeneration-guard 保证：以本仓正常语料实际出现过的加权相异度极小值/极大值作为唯一正常包络；流式输出越出包络即中断当前物理 attempt，并由 guard 自己在既有 TurnAborted reconcile 时点发送一次针对异常类型的接续。**
 
 ## 核心不变量与张力
 
-- **纯流式传感器 vs 业务控制器**：检测器仅基于 token 序列维护加权相异度指标，不把 delta 文本拼装为业务事实，不自发做业务决策。
-- **固定参数滴定 vs 特例森林**：检测参数在构建期从仓库语料纯粹重放滴定并固化在构建产物中，严禁在运行期按角色、模型或语言动态放宽阈值。
-- **有界内存与严格绑定**：检测器状态内存有界（仅依赖有限词表），生命周期严格绑定单次 `ProviderRunIdentity`，禁止跨 attempt 复用。
+- **语料包络 vs 概率拟合**：正常性来自仓库语料实际极值，不拟合 Beta/正态分布，不引入置信区间、分位数或经验安全系数。
+- **检测 owner = 恢复 owner**：guard 负责 `detect → interrupt → classify → continue` 完整闭环；其它 turn/fallback/nudge 逻辑只看见“该 abort 已由 degeneration-guard 接管”，不得再次恢复。
+- **固定参数 vs 特例森林**：构建期从仓库 strict UTF-8 语料生成极值，运行期不按角色、模型、语言动态放宽边界。
+- **有界内存与严格绑定**：检测器状态仅保存有限 token 词表的最近出现步数，生命周期绑定单次 `ProviderRunIdentity`，禁止跨 attempt 复用。
 
 ## 违反边界的失败意义
 
-- 严重退化的循环输出持续消耗资源并污染历史记录。
-- 检测器绕过 FallbackController 自行修改 Offset 或重试状态。
-- 滴定参数被动态修改或侵入 tracked 生产源码。
-- 检测器内存随长 token 流无界增长。
-- `LoopKillArmed` 被写入持久化 Journal 冒充恢复协议。
+- 高重复模式或近随机乱码持续消耗资源并污染历史记录。
+- Beta/quantile 等统计模型重新成为运行判断的隐藏第二套规则。
+- guard 中断后又落入普通 nudge/AABB，使同一失败出现两个恢复 owner。
+- 极值或检测参数被运行期修改，或被复制进 tracked 生产源码。
+- detector 内存随长 token 流无界增长。
+- 进程内 armed 状态被写入 Journal 冒充 durable 业务事实。
 
 ## DEPENDS ON
 
-- `provider-attempt-recovery`
 - `host-boundary`
+- `interaction-authority`

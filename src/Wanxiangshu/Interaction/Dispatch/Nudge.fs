@@ -41,9 +41,6 @@ module RuntimeNudge =
     /// FALLBACK: continuation after a provider failure inside one Logical Run.
     let ProviderRetry = "runtime/provider-retry"
 
-    /// LOOP-006: continuation after a LOOP kill bridged into the same AABB path.
-    let LoopContinue = "runtime/loop-continue"
-
     /// EXEC-016: join-capable role tried to finish while resources remain unjoined.
     let BackgroundJoin = "runtime/background-join"
 

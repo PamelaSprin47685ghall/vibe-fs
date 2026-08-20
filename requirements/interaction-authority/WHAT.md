@@ -53,7 +53,7 @@
 
 ## INTERACTION-AUTHORITY-012: assistance 是 continuation 而非 fallback 失败
 
-求助与升级消息（`NeedHelpEscalation` 与 `NeedHelpAdvice`）属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得重置 Fallback 游标、亦不得计入模型重试失败次数。
+求助与升级消息（`NeedHelpEscalation` 与 `NeedHelpAdvice`）以及 degeneration-guard 自恢复消息（`DegenerationGuard`）属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得重置 Fallback 游标、亦不得计入模型重试失败次数。`DegenerationGuard` 不得伪装成 `ProviderRetryAttempt`。
 
 ## INTERACTION-AUTHORITY-013: fast→deep escalation 是 authority continuity
 

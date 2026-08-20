@@ -184,14 +184,14 @@ module JsToolSpec =
         (surface: JsSurface)
         (workspaceRoot: string)
         (persistence: IJsTransactionPersistence option)
-        (groundingAdmission: (HostToolContext -> string list -> Task<Result<unit, JsFailure>>) option)
+        (fileAccessObservation: (HostToolContext -> string list -> string list -> Task<unit>) option)
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
         let runProgram ctx programSource =
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
 
-            match groundingAdmission with
+            match fileAccessObservation with
             | None ->
                 JsToolWorkflow.run
                     workspaceRoot
@@ -201,8 +201,8 @@ module JsToolSpec =
                     deadlineEpochMs
                     (1 <<< 20)
                     persistence
-            | Some admit ->
-                JsToolWorkflow.runWithMutationAdmission
+            | Some observe ->
+                JsToolWorkflow.runWithFileAccessObservation
                     workspaceRoot
                     surface.BaseClassSource
                     programSource
@@ -210,7 +210,7 @@ module JsToolSpec =
                     deadlineEpochMs
                     (1 <<< 20)
                     persistence
-                    (admit ctx)
+                    (observe ctx)
 
         { Name = surface.ToolName
           Description = surface.Description

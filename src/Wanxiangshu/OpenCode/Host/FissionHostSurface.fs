@@ -49,6 +49,10 @@ module FissionHostSurface =
                 { new IDisposable with
                     member _.Dispose() = () }
 
+            member _.SubscribeFutureTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
             member _.SendPrompt(_, _, _) =
                 flags.ContinuationSent <- true
                 Task.FromResult(SendOutcome.AdmittedWithReceipt(TransportReceipt.create "receipt"))
@@ -66,6 +70,10 @@ module FissionHostSurface =
     type private DummyEventPort(flags: CallFlags) =
         interface IEventObservationPort with
             member _.SubscribeTerminalListener _ =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SubscribeFutureTerminalListener _ =
                 { new IDisposable with
                     member _.Dispose() = () }
 

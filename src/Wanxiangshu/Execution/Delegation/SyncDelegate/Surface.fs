@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -48,6 +49,8 @@ module SyncDelegateSurface =
             let key = SessionId.value sessionId
             completed[key] <- count completed key + 1
 
+        member _.AdmittedCount(sessionId: SessionId) = count admitted (SessionId.value sessionId)
+
         member _.Wait(sessionId: SessionId) : Task<unit> =
             let key = SessionId.value sessionId
 
@@ -87,6 +90,10 @@ module SyncDelegateSurface =
     type private SessionPort(children: ResizeArray<SessionId>, readiness: PromptReadiness) =
         interface ISessionHostPort with
             member _.SubscribeTerminal(_, _) =
+                { new IDisposable with
+                    member _.Dispose() = () }
+
+            member _.SubscribeFutureTerminal(_, _) =
                 { new IDisposable with
                     member _.Dispose() = () }
 
@@ -229,7 +236,10 @@ module SyncDelegateSurface =
                     (fun _ _ -> ()),
                     gate,
                     directory,
-                    workRecordFor = workRecordFor
+                    workRecordFor = workRecordFor,
+                    prepareHandoff = (fun parent child -> DelegationHandoffLedger.prepare journal parent child),
+                    advanceHandoff =
+                        (fun parent child cursor -> DelegationHandoffLedger.advance journal parent child cursor)
                 )
 
             let scope =
@@ -419,6 +429,16 @@ module SyncDelegateSurface =
     let childCount (value: obj) : int =
         let harness = unbox<Harness> value
         harness.Children.Count
+
+    let promptCount (value: obj) (owner: string) (role: string) : int =
+        let harness = unbox<Harness> value
+
+        match roleOf role with
+        | Error _ -> 0
+        | Ok role ->
+            harness.Runtime.TryFind(harness.OwnerSession owner, role)
+            |> Option.map harness.Readiness.AdmittedCount
+            |> Option.defaultValue 0
 
     let batchOrder (roleName: string) (toolNames: string array) (currentCall: string) : obj =
         match roleOf roleName with

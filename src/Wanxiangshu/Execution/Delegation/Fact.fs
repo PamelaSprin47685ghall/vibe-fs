@@ -37,3 +37,6 @@ module DelegationFact =
 
     let inline DelegatedToolCallObserved payload =
         AgentFact.Delegation(DelegationFactCases.DelegatedToolCallObserved payload)
+
+    let inline DelegationHandoffAdvanced payload =
+        AgentFact.Delegation(DelegationFactCases.DelegationHandoffAdvanced payload)

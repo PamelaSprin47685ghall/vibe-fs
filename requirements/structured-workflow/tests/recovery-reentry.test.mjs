@@ -69,7 +69,6 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_work
   const entrypoints = [
     ['src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs', 'recoverFamilyDirect'],
     ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'continueAfterConfirmedFailure'],
-    ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'continueAfterLoopKill'],
     ['src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs', 'awaitRecoveryMaterial'],
     ['src/Wanxiangshu/Composition/Turn/Workflow.fs', 'observe'],
     ['src/Wanxiangshu/Mission/Manager/Workflow.fs', 'observe'],

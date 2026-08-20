@@ -134,7 +134,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     // DSL-MUTABLE: single-flight — HOST-006 startup probe one-shot latch
     let mutable startupProbeDone = false
 
-    /// LOOP-006: process-local LoopKillArmed lives inside the sensor.
+    /// DG-008: process-local armed anomaly lives inside the sensor.
     /// Optional until HostSignalBootstrap wires abort + ownership.
     // DSL-MUTABLE: resource — loop sensor attachment slot
     let mutable loopSensor: LoopSensor option = None
@@ -255,7 +255,12 @@ type PluginRuntimeScope(journal: AgentJournal option) =
         | None ->
             // Tests / journal-only scopes never stream deltas. A no-op sensor keeps
             // completion paths callable without inventing an abort port.
-            let empty = LoopSensor((fun _ -> false), (fun _ -> Task.FromResult(Ok())))
+            let empty =
+                LoopSensor(
+                    (fun _ -> false),
+                    (fun _ -> Task.FromResult(Ok())),
+                    (fun _ _ _ -> Task.FromResult(Ok()))
+                )
 
             loopSensor <- Some empty
             empty

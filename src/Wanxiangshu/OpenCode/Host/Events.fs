@@ -17,6 +17,7 @@ type TerminalCompletionListener = SessionId -> TerminalOutcome -> unit
 
 type IEventObservationPort =
     abstract SubscribeTerminalListener: listener: TerminalCompletionListener -> IDisposable
+    abstract SubscribeFutureTerminalListener: listener: TerminalCompletionListener -> IDisposable
     abstract NotifyTerminal: sessionId: SessionId -> outcome: TerminalOutcome -> bool
 
 module Events =
@@ -85,6 +86,25 @@ module Events =
             for registration in handlers do
                 notifyRegistration sessionId outcome registration
 
+        let subscribe replaySticky listener =
+            let registration: ListenerRegistration =
+                lock lockObj (fun () ->
+                    let registration: ListenerRegistration = { Listener = listener; Live = true }
+
+                    listeners.Add registration
+                    registration)
+
+            if replaySticky then
+                let stickyReplay =
+                    lock lockObj (fun () -> stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+
+                for sessionKey, outcome in stickyReplay do
+                    listener (SessionId.create sessionKey) outcome
+
+            { new IDisposable with
+                member _.Dispose() =
+                    lock lockObj (fun () -> registration.Live <- false) }
+
         /// One Completed terminal per (session, provider run), across every plugin
         /// instance sharing this port.
         ///
@@ -117,25 +137,9 @@ module Events =
         /// path. Raw host event observation is handled upstream by the signal stack
         /// (HostSignalAdapter / HostSignalSubscribe).
         interface IEventObservationPort with
-            member _.SubscribeTerminalListener(listener) =
-                let registration: ListenerRegistration =
-                    lock lockObj (fun () ->
-                        let registration: ListenerRegistration = { Listener = listener; Live = true }
+            member _.SubscribeTerminalListener(listener) = subscribe true listener
 
-                        listeners.Add registration
-                        registration)
-
-                // Sessions.SubscribeTerminal filters by sessionId; replaying every
-                // sticky entry is correct — non-matching session ids are ignored.
-                let stickyReplay =
-                    lock lockObj (fun () -> stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
-
-                for sessionKey, outcome in stickyReplay do
-                    listener (SessionId.create sessionKey) outcome
-
-                { new IDisposable with
-                    member _.Dispose() =
-                        lock lockObj (fun () -> registration.Live <- false) }
+            member _.SubscribeFutureTerminalListener(listener) = subscribe false listener
 
             member _.NotifyTerminal sessionId outcome =
                 if not (this.IsCompletedDuplicate(sessionId, outcome)) then

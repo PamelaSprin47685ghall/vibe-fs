@@ -1,5 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
+open Wanxiangshu.Execution.Delegation
+
 #nowarn "3511"
 
 open System.Threading.Tasks
@@ -165,7 +167,10 @@ module PluginSessionWiring =
                                 (Some durable)
                                 sessionId
                                 range
-                                providerRun)
+                                providerRun),
+                    ?prepareHandoff = Some(fun parent child -> DelegationHandoffLedger.prepare durable parent child),
+                    ?advanceHandoff =
+                        Some(fun parent child cursor -> DelegationHandoffLedger.advance durable parent child cursor)
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate

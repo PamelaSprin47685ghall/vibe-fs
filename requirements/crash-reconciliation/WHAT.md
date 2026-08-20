@@ -2,7 +2,7 @@
 
 ## CRASH-001: process-local 状态不是恢复权威
 
-进程重启后，所有 process-local 状态（包括 `armedByFailure`、`LoopKillArmed`、`QuiescencePermit` 与 detector 状态）全部清空，绝不得作为恢复权威。没有 fresh evidence 严禁自动产生任何副作用。
+进程重启后，所有 process-local 状态（包括 `armedByFailure`、degeneration-guard armed anomaly、`QuiescencePermit` 与 detector 状态）全部清空，绝不得作为恢复权威。没有 fresh evidence 严禁自动产生任何副作用。
 
 ## CRASH-002: 重启从 durable facts + 可信物理观察重建世界
 

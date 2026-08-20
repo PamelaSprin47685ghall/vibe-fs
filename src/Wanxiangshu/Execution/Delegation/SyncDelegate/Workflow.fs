@@ -25,7 +25,7 @@ module internal SyncDelegateWorkflow =
           SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait
-          SubscribeTerminal: SessionId -> TerminalCompletionListener -> System.IDisposable }
+          SubscribeFutureTerminal: SessionId -> TerminalCompletionListener -> System.IDisposable }
 
     let private completeError (invocations: SyncDelegateInvocation list) error =
         for invocation in invocations do
@@ -137,7 +137,7 @@ module internal SyncDelegateWorkflow =
         : Task<Result<string, string>> =
         taskResult {
             use _terminalSub =
-                deps.SubscribeTerminal delegateSession (onTerminalOutcome store delegateSession)
+                deps.SubscribeFutureTerminal delegateSession (onTerminalOutcome store delegateSession)
 
             do! deps.SendPrompt call request
 

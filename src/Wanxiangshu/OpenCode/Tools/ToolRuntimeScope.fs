@@ -30,6 +30,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
@@ -82,6 +83,22 @@ type ToolRuntimeScope
     // COMPANION-003: parent→child keeps Opening; child→parent omits it (includeOpening=false).
     let parentRecord = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
     let childRecord = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
+
+    let childRecordForRun sessionId range providerRun =
+        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
+
+    let prepareDelegationHandoff parent delegateSession =
+        match journal with
+        | Some durable -> DelegationHandoffLedger.prepare durable parent delegateSession
+        | None ->
+            Task.FromResult
+                { ParentRecord = None
+                  ParentEndExclusive = { Sequence = 0L } }
+
+    let advanceDelegationHandoff parent delegateSession cursor =
+        match journal with
+        | Some durable -> DelegationHandoffLedger.advance durable parent delegateSession cursor
+        | None -> Task.FromResult(Error "delegation handoff requires a durable journal")
     let terminalPort = eventPort
     let finalityTimeoutMs = finalityReviewerTimeoutMs
     // DSL-MUTABLE: resource — tool runtime dispose latch
@@ -189,6 +206,9 @@ type ToolRuntimeScope
             onRunStarted = onStarted,
             parentWorkRecordFor = (fun parentId -> parentRecord (SessionId.value parentId)),
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
+            childWorkRecordForRun = childRecordForRun,
+            prepareHandoff = prepareDelegationHandoff,
+            advanceHandoff = advanceDelegationHandoff,
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
             treeHashFor =

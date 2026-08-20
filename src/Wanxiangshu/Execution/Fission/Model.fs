@@ -150,7 +150,7 @@ type FissionSettlementObservation =
     | OngoingExecution
     | NeedsContinuation
     | ProviderFailed
-    | LoopInterrupted
+    | DegenerationInterrupted
     | ExternalAbort of string
     | Completed
 
@@ -167,7 +167,7 @@ type FissionTakeoverSettlementDecision =
     | FailGroup of string
 
 /// Pure ownership law at the Fission/Turn boundary. Fission does not implement
-/// nudge, assistance, fallback, AABB, or Loop recovery. Those control-plane
+/// nudge, assistance, fallback, or degeneration recovery. Those control-plane
 /// successors must settle first; Fission only consumes the stable completion.
 module FissionSettlement =
 
@@ -176,7 +176,7 @@ module FissionSettlement =
         | FissionSettlementObservation.OngoingExecution
         | FissionSettlementObservation.NeedsContinuation
         | FissionSettlementObservation.ProviderFailed
-        | FissionSettlementObservation.LoopInterrupted -> FissionLaneSettlementDecision.YieldToTurnWorkflow
+        | FissionSettlementObservation.DegenerationInterrupted -> FissionLaneSettlementDecision.YieldToTurnWorkflow
         | FissionSettlementObservation.ExternalAbort reason -> FissionLaneSettlementDecision.FailGroup reason
         | FissionSettlementObservation.Completed -> FissionLaneSettlementDecision.MaterializeLane
 
@@ -185,7 +185,7 @@ module FissionSettlement =
         | FissionSettlementObservation.OngoingExecution
         | FissionSettlementObservation.NeedsContinuation
         | FissionSettlementObservation.ProviderFailed
-        | FissionSettlementObservation.LoopInterrupted -> FissionTakeoverSettlementDecision.YieldToTurnWorkflow
+        | FissionSettlementObservation.DegenerationInterrupted -> FissionTakeoverSettlementDecision.YieldToTurnWorkflow
         | FissionSettlementObservation.ExternalAbort reason -> FissionTakeoverSettlementDecision.FailGroup reason
         | FissionSettlementObservation.Completed -> FissionTakeoverSettlementDecision.CompleteOwner
 

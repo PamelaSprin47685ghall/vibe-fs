@@ -99,7 +99,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-015] ring fold order and final takeover
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] control-plane successors run before lane settlement and final takeover', () => {
   for (const phase of ['lane', 'takeover']) {
-    for (const observation of ['running', 'needs-continuation', 'provider-failed', 'loop-interrupted']) {
+    for (const observation of ['running', 'needs-continuation', 'provider-failed', 'degeneration-interrupted']) {
       assert.equal(
         fission.settlementDecision(phase, observation),
         'yield-to-turn-workflow',

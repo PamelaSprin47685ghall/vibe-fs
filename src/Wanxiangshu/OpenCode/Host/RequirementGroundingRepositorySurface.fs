@@ -58,6 +58,12 @@ module RequirementGroundingRepositorySurface =
                 RequirementGroundingRuntime.pending journal session
                 |> List.map _.PackageName
                 |> List.toArray
+               pendingMaterials =
+                RequirementGroundingRuntime.pending journal session
+                |> List.collect _.Materials
+                |> List.map _.Path
+                |> List.sort
+                |> List.toArray
                created = created |}
 
     let runFirstAttempt workspace sessionId program : Task<obj> =
@@ -68,15 +74,16 @@ module RequirementGroundingRepositorySurface =
                 match JsGeneratorSurface.typedRole "Coder" "en" with
                 | None -> return raise (InvalidOperationException "Coder js surface unavailable")
                 | Some surface ->
-                    let admission paths =
-                        RequirementGroundingGate.programAdmission
+                    let observe readPaths effectPaths =
+                        RequirementGroundingGate.programObservation
                             (Some runtime.Handle.Journal)
                             runtime.Workspace
                             runtime.SessionId
-                            paths
+                            readPaths
+                            effectPaths
 
                     let! outcome =
-                        JsToolWorkflow.runWithMutationAdmission
+                        JsToolWorkflow.runWithFileAccessObservation
                             runtime.Workspace
                             surface.BaseClassSource
                             program
@@ -84,34 +91,7 @@ module RequirementGroundingRepositorySurface =
                             (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 60000L)
                             (1 <<< 20)
                             None
-                            admission
+                            observe
 
                     return summary runtime outcome
-        }
-
-    let compareNativeAndProgramDecision workspace sessionId path : Task<obj> =
-        task {
-            match! boot workspace sessionId with
-            | Error error -> return raise (InvalidOperationException error)
-            | Ok runtime ->
-                let journal = runtime.Handle.Journal
-                let session = SessionId.create sessionId
-                let! nativeResult = RequirementGroundingRuntime.requestPaths journal workspace session [ path ]
-
-                match nativeResult with
-                | Error error -> return raise (InvalidOperationException error)
-                | Ok nativeDecision ->
-                    let programPackages =
-                        GroundingCatalog.snapshotsForPaths workspace [ path ] |> List.map _.PackageName
-
-                    let! programDecision =
-                        RequirementGroundingGate.programAdmission (Some journal) workspace sessionId [ path ]
-
-                    return
-                        box
-                            {| runtime = (runtime :> obj)
-                               nativePackages = nativeDecision.Packages |> List.toArray
-                               programPackages = programPackages |> List.toArray
-                               nativeAllowed = not nativeDecision.NeedsGrounding
-                               programAllowed = Result.isOk programDecision |}
         }

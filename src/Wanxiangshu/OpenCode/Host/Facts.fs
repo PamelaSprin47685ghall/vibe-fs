@@ -23,6 +23,9 @@ type HostFactCases =
     | RequirementGroundingRequested of
         {| SessionId: SessionId
            Snapshot: GroundingSnapshot |}
+    | RequirementGroundingMaterialObserved of
+        {| SessionId: SessionId
+           Observation: RequirementGroundingMaterialObserved |}
     | RequirementGroundingAnchored of
         {| SessionId: SessionId
            Occurrence: RequirementGroundingOccurrence |}

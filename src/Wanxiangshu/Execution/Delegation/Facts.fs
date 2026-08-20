@@ -79,3 +79,7 @@ type DelegationFactCases =
     | DelegatedToolCallObserved of
         {| SessionId: SessionId
            ToolCallId: ToolCallId |}
+    | DelegationHandoffAdvanced of
+        {| ParentSessionId: SessionId
+           DelegateSessionId: SessionId
+           ParentEndExclusive: int64 |}

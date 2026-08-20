@@ -128,6 +128,10 @@ type AgentProjectionSet =
         /// Canonical per-Life Magic Todo checkpoint projection.
         MagicTodo: MagicTodoProjection.MagicTodoProjectionState
 
+        /// DELEG-024: last parent XTrace cursor physically handed to each reusable
+        /// delegate session. Keyed pair lookup; never inferred from prompt text.
+        DelegationHandoffs: Map<string, int64>
+
         /// Historical count of folded `RuntimeStarted` envelopes. Retained for
         /// audit/backward-compatible projections; it no longer drives recovery.
         RuntimeStartCount: int
@@ -162,6 +166,7 @@ module AgentProjection =
           HandleByChildSession = Map.empty
           Fission = FissionProjection.empty
           MagicTodo = MagicTodoProjection.empty
+          DelegationHandoffs = Map.empty
           RuntimeStartCount = 0 }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =

@@ -61,6 +61,12 @@ module EventsSurface =
         typed.SubscribeTerminalListener(fun sessionId outcome ->
             listener (box (SessionId.value sessionId)) (snapshot outcome))
 
+    let subscribeFuture (port: obj) (listener: obj -> obj -> unit) : obj =
+        let typed = port :?> IEventObservationPort
+
+        typed.SubscribeFutureTerminalListener(fun sessionId outcome ->
+            listener (box (SessionId.value sessionId)) (snapshot outcome))
+
     let dispose (subscription: obj) : unit =
         match subscription with
         | :? IDisposable as disposable -> disposable.Dispose()

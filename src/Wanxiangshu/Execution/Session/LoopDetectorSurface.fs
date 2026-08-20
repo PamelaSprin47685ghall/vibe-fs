@@ -2,12 +2,11 @@ namespace Wanxiangshu.Execution.Session
 
 open Wanxiangshu.Foundation.Identity
 
-/// JavaScript boundary for loop-detector and text-delta semantics.
-/// Detector state remains an opaque production capability; observations are plain records.
+/// JavaScript boundary for the degeneration detector and text-delta semantics.
 [<RequireQualifiedAccess>]
 module LoopDetectorSurface =
     type private DetectorHandle(detector: LoopDetector.Detector) =
-        // DSL-MUTABLE: resource — JS boundary state holder for opaque Detector handle
+        // DSL-MUTABLE: resource — JS boundary holder for opaque detector state
         let mutable current = detector
         member _.Detector = current
         member _.Replace(d: LoopDetector.Detector) = current <- d
@@ -15,12 +14,13 @@ module LoopDetectorSurface =
     let private stateName (state: LoopDetector.State) =
         match state with
         | LoopDetector.State.Normal -> "Normal"
-        | LoopDetector.State.Loop -> "Loop"
+        | LoopDetector.State.TooRepetitive -> "TooRepetitive"
+        | LoopDetector.State.TooRandom -> "TooRandom"
 
     let private evaluationView (evaluation: LoopDetector.Evaluation) : obj =
         box
             {| state = stateName evaluation.State
-               isLoop = evaluation.IsLoop
+               isAnomalous = evaluation.IsAnomalous
                weightedDistinctTokens = evaluation.WeightedDistinctTokenCount
                step = evaluation.Step |}
 
@@ -28,20 +28,9 @@ module LoopDetectorSurface =
     let halfLife = LoopDetector.HalfLife
     let lambda = LoopDetector.Lambda
     let maxSupport = LoopDetector.MaxSupport
-    let distributionMean = LoopDetector.DistributionMean
-    let distributionVariance = LoopDetector.DistributionVariance
-    let distributionStd = LoopDetector.DistributionStd
-    let betaAlpha = LoopDetector.BetaAlpha
-    let betaBeta = LoopDetector.BetaBeta
-    let confidenceLevel = LoopDetector.ConfidenceLevel
-    let confidenceQuantile = LoopDetector.ConfidenceQuantile
-    let betaQuantileU = LoopDetector.BetaQuantileU
     let normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount
-
-    let theoreticalLoopWeightedDistinctCount =
-        LoopDetector.TheoreticalLoopWeightedDistinctCount
-
-    let loopWeightedDistinctThreshold = LoopDetector.LoopWeightedDistinctThreshold
+    let minimumWeightedDistinctCount = LoopDetector.MinimumWeightedDistinctCount
+    let maximumWeightedDistinctCount = LoopDetector.MaximumWeightedDistinctCount
 
     let constants () : obj =
         box
@@ -49,17 +38,12 @@ module LoopDetectorSurface =
                halfLife = LoopDetector.HalfLife
                lambda = LoopDetector.Lambda
                maxSupport = LoopDetector.MaxSupport
-               distributionMean = LoopDetector.DistributionMean
-               distributionVariance = LoopDetector.DistributionVariance
-               distributionStd = LoopDetector.DistributionStd
-               betaAlpha = LoopDetector.BetaAlpha
-               betaBeta = LoopDetector.BetaBeta
-               confidenceLevel = LoopDetector.ConfidenceLevel
-               confidenceQuantile = LoopDetector.ConfidenceQuantile
-               betaQuantileU = LoopDetector.BetaQuantileU
                normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount
-               theoreticalLoopWeightedDistinctCount = LoopDetector.TheoreticalLoopWeightedDistinctCount
-               loopWeightedDistinctThreshold = LoopDetector.LoopWeightedDistinctThreshold |}
+               minimumWeightedDistinctCount = LoopDetector.MinimumWeightedDistinctCount
+               maximumWeightedDistinctCount = LoopDetector.MaximumWeightedDistinctCount |}
+
+    let classify (weightedDistinctTokens: float) : string =
+        LoopDetector.classify weightedDistinctTokens |> stateName
 
     let create () : obj =
         box (DetectorHandle(LoopDetector.create ()))
