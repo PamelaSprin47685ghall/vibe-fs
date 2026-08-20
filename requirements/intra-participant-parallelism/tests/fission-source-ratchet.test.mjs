@@ -76,6 +76,11 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
     /if isCurrentPhysical && isFissionLane then[\s\S]{0,120}?kick sessionId/,
     'a successful exact Fission lane terminal must open a snapshot reconcile occasion even when OpenCode drops session.idle',
   )
+
+  assert.match(host, /let routeAttemptAborted/)
+  assert.match(host, /FissionRuntime\.isSilentInterrupt sessionId/)
+  assert.match(bootstrap, /FissionHost\.routeAttemptAborted/)
+  assert.doesNotMatch(bootstrap, /FissionRuntime\.isSilentInterrupt/)
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {

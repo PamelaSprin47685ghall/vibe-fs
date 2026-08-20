@@ -178,13 +178,6 @@ module HostSignalBootstrap =
 
                 reconciler.Signal signal
 
-            let handleAttemptAborted sessionId signal =
-                if FissionRuntime.isSilentInterrupt sessionId then
-                    scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
-                    reconciler.Signal signal
-                else
-                    handleOrdinaryAbort sessionId signal
-
             /// FALLBACK-003: no Host signal may name the failed ProviderRun.
             ///
             /// `ProviderFailure` and `ProviderRetry` used to run their own writers here
@@ -217,7 +210,12 @@ module HostSignalBootstrap =
                     // an owner cancellation: do not revoke owner resources or cancel
                     // speculation/children here. Revoke the physical attempt's idle
                     // continuation capability so the retired conversation never continues.
-                    handleAttemptAborted sessionId signal
+                    FissionHost.routeAttemptAborted
+                        sessionId
+                        (fun () ->
+                            scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
+                            reconciler.Signal signal)
+                        (fun () -> handleOrdinaryAbort sessionId signal)
                 | SessionDeleted(sessionId, parentSessionIdOpt) ->
                     scope.RunBackground(fun () ->
                         HostSessionDeletion.handle
