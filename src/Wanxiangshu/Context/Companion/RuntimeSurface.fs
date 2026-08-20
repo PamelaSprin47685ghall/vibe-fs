@@ -296,9 +296,3 @@ module CompanionRuntimeSurface =
 
     let createCompanion (sessionId: string) : obj =
         box (Companion(?sessionId = Some(SessionId.create sessionId)))
-
-    let startRecoveryOpportunity (value: obj) : Task =
-        companionOf value |> fun companion -> companion.StartRecoveryOpportunity()
-
-    let offerRecoveryMaterial (value: obj) : bool =
-        companionOf value |> fun companion -> companion.OfferRecoveryMaterial()

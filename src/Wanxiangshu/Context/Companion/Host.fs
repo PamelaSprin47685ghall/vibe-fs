@@ -85,12 +85,6 @@ module private CompanionHostDecisions =
             | None -> Task.FromResult(Ok())
             | Some port -> port.CloseBlogger owner
 
-    let bloggerCursorOffset (primaryId: SessionId) (journal: AgentJournal option) : AgentPairCursor.FallbackOffset =
-        journal
-        |> Option.bind (fun j -> FallbackEvidence.tryCurrentState primaryId (AgentJournal.snapshot j))
-        |> Option.map (fun current -> current.Cursor.Offset)
-        |> Option.defaultValue AgentPairCursor.FallbackOffset.Fork0
-
     let decideEnsureSource (restoredOpt: string option) (bloggerIdOpt: SessionId option) : EnsureSource =
         match restoredOpt, bloggerIdOpt with
         | Some id, None -> Restore id
@@ -386,24 +380,7 @@ type CompanionHost
           Gate = gate
           Companion = companion
           Journal = journal
-          EffectiveAgent = bloggerEffectiveAgent
-          RecordSquashPlan = fun bloggerId providerRun -> this.RecordSquashPlan bloggerId providerRun
-          StageBloggerContext = fun bloggerId ctx -> this.StageBloggerContext bloggerId ctx }
-
-    /// CTX-006 step 5: the squash attempt's plan hook on the Y chain.
-    ///
-    /// The default here is a no-op because `Plugin.fs` is the only owner of the
-    /// `PluginRuntimeScope`; the composition root rebinds this when it constructs
-    /// the CompanionHost so the squash attempt lands in `scope.Recovery.AttemptPlans` like
-    /// any X attempt. A no-op is correct for a scope-less CompanionHost (tests,
-    /// tools), which has no reconcile pass that could consult a plan.
-    // DSL-MUTABLE: resource — injectable squash plan callback holder.
-    member val RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit = fun _ _ -> () with get, set
-
-    /// ENFORCER-045: optional stage hook kept for tests; production freezes
-    /// CurrentRequest via BloggerCoordinator before send (not this callback).
-    // DSL-MUTABLE: resource — injectable blogger context stage callback holder.
-    member val StageBloggerContext: SessionId -> BloggerRequestContext -> unit = fun _ _ -> () with get, set
+          EffectiveAgent = bloggerEffectiveAgent }
 
     /// Ensure the Blogger child exists (create or restore). Key for runtime cell.
     member this.EnsureBloggerAsync() : Task<SessionId> = ensureBlogger ()
@@ -422,18 +399,6 @@ type CompanionHost
             bloggerId <- None
             bloggerCreateFailed <- true
             companion.RecordBloggerClosed())
-
-    /// CTX-006 / FALLBACK-012: open a one-shot recovery opportunity (physical waiter).
-    member this.StartRecoveryOpportunity() : Task = companion.StartRecoveryOpportunity()
-
-    /// Material boundary: offer main material to a pending recovery waiter.
-    /// True when a waiter was taken (recovery path may consume this material).
-    member this.OfferRecoveryMaterial() : bool = companion.OfferRecoveryMaterial()
-
-    /// CTX-006: primary session fallback cursor Offset (durable, not cached).
-    /// FALLBACK-002: the offset leaves this boundary as the closed DU.
-    member this.BloggerCursorOffset() : AgentPairCursor.FallbackOffset =
-        CompanionHostDecisions.bloggerCursorOffset primaryId journal
 
     /// Exposes the canonical CompanionFlow calculation for adapters and tests.
     member _.PreviewDelta(projection: ProviderSemanticProjection) =

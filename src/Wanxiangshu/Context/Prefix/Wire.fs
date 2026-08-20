@@ -162,25 +162,28 @@ module XWire =
         task {
             let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
             let blog = state.Blog |> Option.defaultValue BlogProjection.empty
-            let frames = BlogProjection.coverableFrames blog
 
-            let! frozenResult = materializeFrozenRecordPrefix journal state frames
-            let frozenRecordPrefix = requireOk frozenResult
-            let! blobResult = journal.WriteBlob frozenRecordPrefix
-            let blob = requireOk blobResult
+            if not (BlogProjection.hasCoverage blog) then
+                return Error NoCandidateReason.NoCoverage
+            else
+                let frames = BlogProjection.coverableFrames blog
+                let! frozenResult = materializeFrozenRecordPrefix journal state frames
+                let frozenRecordPrefix = requireOk frozenResult
+                let! blobResult = journal.WriteBlob frozenRecordPrefix
+                let blob = requireOk blobResult
 
-            return
-                PrefixProbeSelection.select
-                    HostDigest.sha256Hex
-                    sessionId
-                    prefix.EpochId
-                    snapshot.CommittedPrefix
-                    blog.Coverage.CoverableTurnCutoffExclusive
-                    blog.Coverage.CoveredPrefixDigest
-                    requestCutoff
-                    blob.BlobRef
-                    blob.BlobDigest
-                    (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
+                return
+                    PrefixProbeSelection.select
+                        HostDigest.sha256Hex
+                        sessionId
+                        prefix.EpochId
+                        snapshot.CommittedPrefix
+                        blog.Coverage.CoverableTurnCutoffExclusive
+                        blog.Coverage.CoveredPrefixDigest
+                        requestCutoff
+                        blob.BlobRef
+                        blob.BlobDigest
+                        (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
         }
 
     let private requireStrengthReplicaAuthority
@@ -233,7 +236,7 @@ module XWire =
                     providerRun
                     (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
                     ProviderRequestKind.StrengthReplica
-                    false
+                    RecoveryOpportunity.OrdinaryAttempt
                     (fun () -> Error NoCandidateReason.NoCoverage)
 
             if plan.Profile.ToolCapabilitySet <> binding.ToolCapabilitySet then
@@ -258,18 +261,17 @@ module XWire =
                   ObservedCompactionRunId = "" }
         | _ -> None
 
-    let private selectCandidateWhenRecoverable
-        (mayRecover: bool)
+    let private selectCandidateForOpportunity
+        (opportunity: RecoveryOpportunity)
         (durable: AgentJournal)
         (sessionId: SessionId)
         (snapshot: ProjectionSnapshot)
         (state: SessionAgentProjection)
         (cutoff: int)
         =
-        if mayRecover then
-            candidate durable sessionId snapshot state cutoff
-        else
-            Task.FromResult(Error NoCandidateReason.NoCoverage)
+        match opportunity with
+        | RecoveryOpportunity.RecoveryAttempt -> candidate durable sessionId snapshot state cutoff
+        | RecoveryOpportunity.OrdinaryAttempt -> Task.FromResult(Error NoCandidateReason.NoCoverage)
 
     let private readFrozenRecordPrefixBody
         (durable: AgentJournal)
@@ -302,17 +304,6 @@ module XWire =
             // applyRenderedPrefix（与既有 Host id 字节合同一致）。
             let rendered = ProjectionRenderer.renderPrefix ordered
             ProjectionMessageEdit.applyRenderedPrefix rawMessages rendered
-
-    // FALLBACK-012 / CTX-011: arming is a one-shot recovery opportunity. Consume it
-    // only when a probe was actually selected, OR when recovery was not possible for
-    // a durable reason. Temporary NoCoverage (blog frames still catching up) must keep
-    // arming so a later main can still probe — otherwise a retry that races the first
-    // BlogEntry burns the armed slot and PrefixRebase never lands.
-    let private consumeRecoveryArming (scope: PluginRuntimeScope) (sessionId: SessionId) (plan: AttemptPlan) =
-        match AttemptPlanner.probeOf plan, plan.NoProbeReason with
-        | Some _, _ -> ()
-        | None, Some NoCandidateReason.NoCoverage -> scope.ReArmRecovery sessionId
-        | None, _ -> ()
 
     let private awaitProjectionSignal
         (messageVisibility: MessageVisibilityHub option)
@@ -399,10 +390,10 @@ module XWire =
                       TransportMessages = Set.empty
                       HostReanchor = hostReanchor }
 
-                let mayRecover =
-                    RecoverySlot.mayRecover arming fallback.Cursor.Offset (BlogProjection.hasCoverage blog)
+                let opportunity = RecoverySlot.opportunity arming fallback.Cursor.Offset
 
-                let! candidateResult = selectCandidateWhenRecoverable mayRecover durable sessionId snapshot state cutoff
+                let! candidateResult =
+                    selectCandidateForOpportunity opportunity durable sessionId snapshot state cutoff
 
                 let selectProbe () = candidateResult
 
@@ -414,7 +405,7 @@ module XWire =
                         providerRun
                         (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                         ProviderRequestKind.WorkMain
-                        mayRecover
+                        opportunity
                         selectProbe
 
                 // `requiredBlob` is the single answer to "which blob does this choice
@@ -440,7 +431,6 @@ module XWire =
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
 
                 scope.RecordAttemptPlan sessionId providerRun plan
-                consumeRecoveryArming scope sessionId plan
 
             | _ ->
                 raise (

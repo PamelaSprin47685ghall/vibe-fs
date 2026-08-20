@@ -29,6 +29,11 @@ type SlotArming =
     /// sequence.
     | ArmedByAdvance
 
+[<RequireQualifiedAccess>]
+type RecoveryOpportunity =
+    | OrdinaryAttempt
+    | RecoveryAttempt
+
 /// CTX-007: what one provider attempt produced.
 ///
 /// Terminal validity is already resolved into the case: `Completed` means the
@@ -105,6 +110,12 @@ module RecoverySlot =
         | SlotArming.ArmedByAdvance -> true
         | SlotArming.NotArmed -> false
 
+    let opportunity (arming: SlotArming) (offset: AgentPairCursor.FallbackOffset) =
+        if isArmed arming && AgentPairCursor.isRecoverySlot offset then
+            RecoveryOpportunity.RecoveryAttempt
+        else
+            RecoveryOpportunity.OrdinaryAttempt
+
     /// CTX-006: may this slot attempt a recovery action (X prefix probe or Y frame
     /// squash) before its main request.
     ///
@@ -126,7 +137,22 @@ module RecoverySlot =
     /// send the ordinary main request rather than construct an empty probe. That is
     /// why such a slot is "a slot that MAY recover", not "a slot that compresses".
     let mayRecover (arming: SlotArming) (offset: AgentPairCursor.FallbackOffset) (hasMaterial: bool) =
-        isArmed arming && AgentPairCursor.isRecoverySlot offset && hasMaterial
+        opportunity arming offset = RecoveryOpportunity.RecoveryAttempt && hasMaterial
+
+    /// PAR-010/017: pure Blogger slot dispatch after the failed attempt has already
+    /// been admitted and the cursor has advanced. A failed Squash can never start
+    /// another Squash in the same slot; it always returns to Main on the next slot.
+    let nextBloggerRequest
+        (failedKind: ProviderRequestKind)
+        (nextOpportunity: RecoveryOpportunity)
+        (hasSquashMaterial: bool)
+        : Result<ProviderRequestKind, string> =
+        match failedKind, nextOpportunity, hasSquashMaterial with
+        | ProviderRequestKind.BloggerMain, RecoveryOpportunity.RecoveryAttempt, true ->
+            Ok ProviderRequestKind.BloggerSquash
+        | ProviderRequestKind.BloggerMain, _, _ -> Ok ProviderRequestKind.BloggerMain
+        | ProviderRequestKind.BloggerSquash, _, _ -> Ok ProviderRequestKind.BloggerMain
+        | _ -> Error "Blogger recovery received a non-Blogger request kind"
 
     /// CTX-007 for a `BloggerSquash` sub-request.
     ///

@@ -75,22 +75,6 @@ open Wanxiangshu.Strength
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
 
-    let private notifyBloggerRecovery (sessionId: SessionId) (companion: CompanionHost) =
-        match companion.BloggerSession with
-        | Some bloggerId when bloggerId = sessionId -> companion.StartRecoveryOpportunity() |> ignore
-        | _ -> ()
-
-    let private notifyCompanionsOfRecovery (scope: PluginRuntimeScope) (sessionId: SessionId) =
-        for KeyValue(_, companion) in scope.Sessions.Companions do
-            notifyBloggerRecovery sessionId companion
-
-    let private armRecoveryIfEligible (scope: PluginRuntimeScope) isFissionOwner (turn: ReconciledTurn) =
-        match isFissionOwner, turn.Outcome with
-        | false, (ReconcileProgram.TurnFailed _ | ReconcileProgram.TurnAborted _) ->
-            scope.ArmRecovery turn.SessionId
-            notifyCompanionsOfRecovery scope turn.SessionId
-        | _ -> ()
-
     let private dropNeedHelpIfTerminal (scope: PluginRuntimeScope) (turn: ReconciledTurn) =
         match turn.Outcome with
         | ReconcileProgram.TurnCompleted
@@ -223,6 +207,8 @@ module HostTurnObserver =
                         sessionPort
                         eventPort
                         journal
+                        scope.ParkedTransformHost
+                        scope.ArmRecovery
                         scope.SyncDelegateRuntime
                         reviewerContinuationPort
                         scope.Sessions.NudgeSent
@@ -247,7 +233,6 @@ module HostTurnObserver =
         task {
             let turn = context.Turn
             let isFissionOwner = isFissionOwnerSession journal turn.SessionId
-            armRecoveryIfEligible scope isFissionOwner turn
             do! XWire.reconcileAttempt journal scope turn
             do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 

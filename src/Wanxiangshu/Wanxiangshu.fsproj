@@ -483,6 +483,7 @@
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
     <Compile Include="Enforcer/Host.fs"/>
+    <Compile Include="Context/Companion/Blogger/MainContext.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fs"/>
     <Compile Include="Context/Companion/Transform.fs"/>
     <Compile Include="Mission/Review/OpenCode/HostGuard.fs"/>

@@ -58,14 +58,10 @@ module AttemptPlanner =
 
     /// PROMPT-008: build the profile for one attempt.
     ///
-    /// `armingDecision` is the CTX-006 answer computed by `RecoverySlot.mayRecover` —
-    /// passed in rather than recomputed, because arming is a control-flow fact of the
-    /// caller's recovery sequence (FALLBACK-012) and this module has no way to observe
-    /// it. Handing it a cursor and letting it decide would reintroduce the
-    /// parked-cursor bug.
-    ///
-    /// `selectProbe` is deferred: it only runs when the slot may actually recover, so a
-    /// non-recovery request never pays for a digest recomputation or a blob read.
+    /// `opportunity` says only whether the attempt is the primed slot reached by a
+    /// real failure. Material is not a second boolean. WorkMain proves material by
+    /// running `selectProbe`; `Error NoCoverage` is therefore an explicit ordinary
+    /// no-probe result rather than an unreachable branch.
     let plan
         (authority: PromptAuthority.AuthorityExecutionProfile)
         (cursor: AgentPairCursor.FallbackCursor)
@@ -73,17 +69,17 @@ module AttemptPlanner =
         (providerRun: ProviderRunIdentity)
         (origin: PromptAuthority.PromptOrigin)
         (requestKind: ProviderRequestKind)
-        (mayRecover: bool)
+        (opportunity: RecoveryOpportunity)
         (selectProbe: unit -> Result<PrefixProbe, NoCandidateReason>)
         : AttemptPlan =
         // CTX-010: only a work main request substitutes a prefix. Asking for the probe
         // at all is gated on that here, so a Companion request cannot spend a digest
         // recomputation deciding something it may not do.
         let probe =
-            if mayRecover && ProviderRequestKind.mayCarryProbe requestKind then
-                Some(selectProbe ())
-            else
-                None
+            match opportunity, ProviderRequestKind.mayCarryProbe requestKind with
+            | RecoveryOpportunity.RecoveryAttempt, true -> Some(selectProbe ())
+            | RecoveryOpportunity.OrdinaryAttempt, _
+            | RecoveryOpportunity.RecoveryAttempt, false -> None
 
         let choice, noProbeReason =
             match probe with

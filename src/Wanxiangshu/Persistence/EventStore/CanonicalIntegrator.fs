@@ -96,6 +96,7 @@ module JournalIntegration =
           Integrate =
             fun current envelope ->
                 match EventStoreJournalCodec.tryDecode envelope with
+                | Error error when FactCodec.isIgnoredLegacyDecodeError error -> Ok current
                 | Error error -> Error error
                 | Ok journalEnvelope ->
                     Fold.foldEnvelope (unbox<ProjectionSet> current) journalEnvelope

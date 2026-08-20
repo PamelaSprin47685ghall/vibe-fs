@@ -73,17 +73,25 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Strength
 
-/// Confirmed-failure recovery: wait for blogger coverage material, then continue.
-/// Temporal shape is journal predicate + journal change signal + one IDeadlineHandle
-/// (G4R-CE S2 / CausalAwait.untilSignalOrDeadline). No slice poll, no UtcNow.
+/// Confirmed-failure recovery. The failed session owns the next slot:
+/// WorkMain arms one X prefix opportunity; BloggerMain may insert one BloggerSquash
+/// maintenance request before retrying main. No future unrelated X material is a
+/// recovery trigger.
 module ProviderRecoveryWorkflow =
 
-    /// CTX-006 hasMaterial for X: BlogObservationCommitted coverage on the main session.
-    let private sessionHasCoverage (durable: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+    let private sessionHasFreshCoverage (durable: AgentJournal) (sessionId: SessionId) =
+        let session = AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+
+        let committedCutoff =
+            session
+            |> Option.bind (fun state -> state.PrefixEpoch)
+            |> Option.bind (fun prefix -> prefix.Snapshot)
+            |> Option.map (fun snapshot -> snapshot.CutoffExclusive)
+            |> Option.defaultValue 0
+
+        session
         |> Option.bind (fun state -> state.Blog)
-        |> Option.map BlogProjection.hasCoverage
-        |> Option.defaultValue false
+        |> Option.exists (fun blog -> blog.Coverage.CoverableTurnCutoffExclusive > committedCutoff)
 
     /// True when a Companion Blogger is linked — only then is waiting for coverage
     /// meaningful. Sessions without a blogger never grow coverage; waiting would
@@ -104,7 +112,7 @@ module ProviderRecoveryWorkflow =
     /// fires. Fail open: WaitTimedOut still sends the ordinary main
     /// (CTX-011 no-candidate path).
     let private tryReadCoverage (durable: AgentJournal) (sessionId: SessionId) =
-        if sessionHasCoverage durable sessionId then
+        if sessionHasFreshCoverage durable sessionId then
             Some()
         else
             None
@@ -144,9 +152,9 @@ module ProviderRecoveryWorkflow =
             | Error _ -> return ()
         }
 
-    let private waitForCoverage (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
+    let private waitForFreshCoverage (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
         task {
-            if sessionHasCoverage durable sessionId then
+            if sessionHasFreshCoverage durable sessionId then
                 return ()
             else
                 return! awaitCoverageSignal timerPort durable sessionId
@@ -157,8 +165,61 @@ module ProviderRecoveryWorkflow =
             if not (expectsCoverage durable sessionId) then
                 return ()
             else
-                return! waitForCoverage timerPort durable sessionId
+                return! waitForFreshCoverage timerPort durable sessionId
         }
+
+    let private currentFallback (durable: AgentJournal) (sessionId: SessionId) =
+        FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable)
+
+    let private isRecoveryOffset (durable: AgentJournal) (sessionId: SessionId) =
+        currentFallback durable sessionId
+        |> Option.exists (fun fallback -> AgentPairCursor.isRecoverySlot fallback.Cursor.Offset)
+
+    let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
+        SessionAssociationProjection.tryMainSessionOf
+            bloggerSessionId
+            (AgentJournal.snapshot durable).AgentProjections.Associations
+
+    let private recoverySquashContext
+        (durable: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        =
+        let session = AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
+        let blog = session |> Option.bind (fun value -> value.Blog) |> Option.defaultValue BlogProjection.empty
+        let epoch =
+            session
+            |> Option.bind (fun value -> value.PrefixEpoch)
+            |> Option.map (fun prefix -> prefix.EpochId)
+            |> Option.defaultValue PrefixEpochId.initial
+
+        CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId epoch blog
+
+    let private squashPrompt (mainSessionId: SessionId) =
+        ProviderProse.instructionLines (ProviderProse.languageOf mainSessionId) CompanionPrompt.Squash Map.empty
+        |> CompanionPrompt.asCommentedInstruction
+
+    let private notifyFailure (eventPort: IEventObservationPort) (turn: ReconciledTurn) (reason: string) =
+        eventPort.NotifyTerminal
+            turn.SessionId
+            (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+        |> ignore
+
+    let private sendContinuation
+        (sessionPort: ISessionHostPort)
+        (turn: ReconciledTurn)
+        (journal: AgentJournal option)
+        (prompt: string)
+        =
+        HostSessionNudge.sendContinuationResult
+            sessionPort
+            turn.SessionId
+            prompt
+            PromptAuthority.ProviderRetryAttempt
+            turn.Directory
+            journal
+            PromptDispatcher.AwaitMode.Detached
+            None
 
     let private handleContinuation
         (eventPort: IEventObservationPort)
@@ -168,11 +229,153 @@ module ProviderRecoveryWorkflow =
         =
         match continuation with
         | Ok _ -> ()
-        | Error _ ->
-            eventPort.NotifyTerminal
-                turn.SessionId
-                (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId error))
-            |> ignore
+        | Error _ -> notifyFailure eventPort turn error
+
+    let private sendStagedBloggerContinuation
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IParkedTransformHost)
+        (turn: ReconciledTurn)
+        (ctx: BloggerRequestContext)
+        (prompt: string)
+        (failureReason: string)
+        : Task =
+        task {
+            match! BloggerCoordinator.stageContinuationContext scope durable ctx with
+            | Error reason -> notifyFailure eventPort turn reason
+            | Ok() ->
+                match! sendContinuation sessionPort turn (Some durable) prompt with
+                | Error reason ->
+                    do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
+                    notifyFailure eventPort turn failureReason
+                | Ok promptKey ->
+                    match! BloggerCoordinator.bindContinuationContext durable ctx promptKey with
+                    | Ok() -> ()
+                    | Error reason ->
+                        do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
+                        notifyFailure eventPort turn reason
+        }
+
+    let private replaceFailedBloggerRequest
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IParkedTransformHost)
+        (turn: ReconciledTurn)
+        (failed: BloggerRequestContext)
+        (next: BloggerRequestContext)
+        (prompt: string)
+        (failureReason: string)
+        : Task =
+        task {
+            do!
+                BloggerCoordinator.abandonContinuationContext
+                    scope
+                    durable
+                    failed
+                    "provider-attempt-failed"
+
+            return!
+                sendStagedBloggerContinuation
+                    sessionPort
+                    eventPort
+                    durable
+                    scope
+                    turn
+                    next
+                    prompt
+                    failureReason
+        }
+
+    let private continueBlogger
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IParkedTransformHost)
+        (turn: ReconciledTurn)
+        (mainSessionId: SessionId)
+        (continuationPrompt: string)
+        (error: string)
+        : Task =
+        task {
+            let current = scope.TryPeekCurrentRequest(SessionId.value turn.SessionId)
+
+            match current with
+            | None -> notifyFailure eventPort turn "Blogger recovery has no owned request context"
+            | Some((BloggerRequestContext.Main _) as failed) when isRecoveryOffset durable turn.SessionId ->
+                match recoverySquashContext durable mainSessionId turn.SessionId with
+                | Some squash ->
+                    return!
+                        replaceFailedBloggerRequest
+                            sessionPort
+                            eventPort
+                            durable
+                            scope
+                            turn
+                            failed
+                            squash
+                            (squashPrompt mainSessionId)
+                            error
+                | None ->
+                    return!
+                        replaceFailedBloggerRequest
+                            sessionPort
+                            eventPort
+                            durable
+                            scope
+                            turn
+                            failed
+                            failed
+                            continuationPrompt
+                            error
+            | Some((BloggerRequestContext.Main _) as failed) ->
+                return!
+                    replaceFailedBloggerRequest
+                        sessionPort
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        failed
+                        failed
+                        continuationPrompt
+                        error
+            | Some((BloggerRequestContext.Squash _) as failed) ->
+                match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
+                | None -> notifyFailure eventPort turn "Blogger squash failed and no main material can be rebuilt"
+                | Some main ->
+                    return!
+                        replaceFailedBloggerRequest
+                            sessionPort
+                            eventPort
+                            durable
+                            scope
+                            turn
+                            failed
+                            main
+                            continuationPrompt
+                            error
+        }
+
+    let private continueWorkMain
+        (timerPort: ITimerPort)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (armRecovery: SessionId -> unit)
+        (turn: ReconciledTurn)
+        (continuationPrompt: string)
+        (error: string)
+        : Task =
+        task {
+            if isRecoveryOffset durable turn.SessionId then
+                armRecovery turn.SessionId
+                do! awaitRecoveryMaterial timerPort durable turn.SessionId
+
+            let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
+            handleContinuation eventPort turn error continuation
+        }
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
     ///
@@ -188,16 +391,14 @@ module ProviderRecoveryWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (scope: IParkedTransformHost)
+        (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (error: string)
         (continuationPrompt: string)
         : Task =
         task {
-            let fail reason =
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
-                |> ignore
+            let fail reason = notifyFailure eventPort turn reason
 
             match journal with
             | None -> fail error
@@ -217,22 +418,28 @@ module ProviderRecoveryWorkflow =
                 | Ok ConfirmedFailureOutcome.AlreadyRecorded
                 | Ok ConfirmedFailureOutcome.NoActiveRun -> ()
                 | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
-                    // The cursor advanced and budget permits the A′ continuation.
-                    // CTX-006: give the linked Blogger a chance to commit coverage
-                    // before the armed A′/B′ continue is planned (XWire.applyTransform).
-                    do! awaitRecoveryMaterial timerPort durable turn.SessionId
-
-                    let! continuation =
-                        HostSessionNudge.sendContinuationResult
-                            sessionPort
-                            turn.SessionId
-                            continuationPrompt
-                            PromptAuthority.ProviderRetryAttempt
-                            turn.Directory
-                            journal
-                            PromptDispatcher.AwaitMode.Detached
-                            None
-
-                    handleContinuation eventPort turn error continuation
+                    match mainSessionOfBlogger durable turn.SessionId with
+                    | Some mainSessionId ->
+                        return!
+                            continueBlogger
+                                sessionPort
+                                eventPort
+                                durable
+                                scope
+                                turn
+                                mainSessionId
+                                continuationPrompt
+                                error
+                    | None ->
+                        return!
+                            continueWorkMain
+                                timerPort
+                                sessionPort
+                                eventPort
+                                durable
+                                armRecovery
+                                turn
+                                continuationPrompt
+                                error
         }
         :> Task

@@ -103,44 +103,6 @@ module BloggerCoordinator =
             blog, xTrace, epoch
         | None -> host.Memory.Blog, host.Memory.XTrace, PrefixEpochId.initial
 
-    let private openingFloor (journal: AgentJournal option) (mainSessionId: SessionId) : int64 option =
-        match journal with
-        | None -> None
-        | Some durable ->
-            ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections
-
-    let private nextMainContext
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (observedEpoch: PrefixEpochId)
-        (blog: BlogProjectionState)
-        (xTrace: XTraceProjectionState)
-        (floorSequence: int64 option)
-        (projection: ProviderSemanticProjection)
-        : BloggerRequestContext option =
-        // GLORY-023: the Manager Life's protected prefix never enters Y. The
-        // effective ingest start is max(blog coverage, life floor); a chunk that
-        // would span the floor is cut at it by the cursor itself (GLORY-024).
-        let effectiveIngested =
-            floorSequence
-            |> Option.map (fun floor -> max blog.Coverage.IngestedThroughSequence floor)
-            |> Option.defaultValue blog.Coverage.IngestedThroughSequence
-
-        let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
-
-        match
-            BloggerDelta.nextChunk
-                BloggerDelta.DeltaLimitBytes
-                ingestCursor
-                blog.Coverage.CoverableTurnCutoffExclusive
-                projection.Messages
-        with
-        | None -> None
-        | Some chunk ->
-            // Birth gate: mapping failure / Next≤Prev → None (no Start, no fatal).
-            // Commit-path fatal remains only for contexts that somehow escaped this gate.
-            EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection chunk
-
     let private encodeContextPayload (ctx: BloggerRequestContext) =
         match ctx with
         | BloggerRequestContext.Main main ->
@@ -221,7 +183,7 @@ module BloggerCoordinator =
     /// C5: durable materialization. Context blob is the irrecomputable semantic
     /// input. Pre-send PromptKey=None; after physical send, re-append with the
     /// same ContextDigest + Some PromptKey so commit can prove ownership.
-    let private materializeRequest
+    let materializeRequest
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)
         (promptKey: PromptKey option)
@@ -287,6 +249,33 @@ module BloggerCoordinator =
                 (BloggerRequestContext.bloggerSessionId ctx)
                 (Some ctx)
                 reason
+
+    let stageContinuationContext
+        (scope: IParkedTransformHost)
+        (journal: AgentJournal)
+        (ctx: BloggerRequestContext)
+        : Task<Result<unit, string>> =
+        task {
+            match! materializeRequest journal ctx None with
+            | Error reason -> return Error reason
+            | Ok() ->
+                scope.SetCurrentRequest(SessionId.value (BloggerRequestContext.bloggerSessionId ctx), ctx)
+                return Ok()
+        }
+
+    let bindContinuationContext (journal: AgentJournal) (ctx: BloggerRequestContext) (promptKey: PromptKey) =
+        materializeRequest journal ctx (Some promptKey)
+
+    let abandonContinuationContext
+        (scope: IParkedTransformHost)
+        (journal: AgentJournal)
+        (ctx: BloggerRequestContext)
+        (reason: string)
+        : Task =
+        task {
+            do! abandonRequest (Some journal) ctx reason
+            scope.ClearCurrentRequest(SessionId.value (BloggerRequestContext.bloggerSessionId ctx))
+        }
 
     let private blocksNew = BloggerRuntimeHost.blocksNew
     let private forceSealRuntime = BloggerRuntimeHost.forceSealRuntime
@@ -404,71 +393,6 @@ module BloggerCoordinator =
         | None -> Task.FromResult(DecisionEffect.MaterializeFailed "no journal")
         | Some j -> startWithJournal scope host journal j key ctx
 
-    let private effectFromMaterialDecision
-        (scope: IParkedTransformHost)
-        (host: CompanionHost)
-        (journal: AgentJournal option)
-        (key: string)
-        (decision: BloggerRuntime.Decision)
-        : Task<DecisionEffect option> =
-        match decision with
-        | BloggerRuntime.Decision.Start startCtx
-        | BloggerRuntime.Decision.Offer startCtx ->
-            task {
-                let! effect = startFrozen scope host journal key startCtx
-                return Some effect
-            }
-        | BloggerRuntime.Decision.Skip -> Task.FromResult(Some DecisionEffect.SkippedInFlight)
-
-    let private tryStartBuiltSquash
-        (scope: IParkedTransformHost)
-        (host: CompanionHost)
-        (journal: AgentJournal option)
-        (key: string)
-        (squashCtxOpt: BloggerRequestContext option)
-        : Task<DecisionEffect option> =
-        match squashCtxOpt with
-        | None -> Task.FromResult None
-        | Some squashCtx ->
-            // Physical facts only: parked waiter + flight ownership (decideMaterial).
-            effectFromMaterialDecision
-                scope
-                host
-                journal
-                key
-                (BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) squashCtx)
-
-    let private tryStartSquash
-        (scope: IParkedTransformHost)
-        (host: CompanionHost)
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (observedEpoch: PrefixEpochId)
-        (key: string)
-        (blog: BlogProjectionState)
-        : Task<DecisionEffect option> =
-        // Material wakes the recovery waiter first. Presence of the waiter is the
-        // opportunity (physical possession), not a cross-call Armed flag.
-        if not (host.OfferRecoveryMaterial()) then
-            Task.FromResult None
-        elif
-            not (
-                RecoverySlot.mayRecover
-                    SlotArming.ArmedByAdvance
-                    (host.BloggerCursorOffset())
-                    (List.length blog.Frames > 0)
-            )
-        then
-            Task.FromResult None
-        else
-            tryStartBuiltSquash
-                scope
-                host
-                journal
-                key
-                (CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId observedEpoch blog)
-
     let private applyMainDecision
         (scope: IParkedTransformHost)
         (host: CompanionHost)
@@ -494,56 +418,6 @@ module BloggerCoordinator =
         | None -> Task.FromResult DecisionEffect.NoMaterial
         | Some ctx -> applyMainDecision scope host journal key ctx
 
-    let private continueAfterSquashMiss
-        (scope: IParkedTransformHost)
-        (host: CompanionHost)
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (observedEpoch: PrefixEpochId)
-        (blog: BlogProjectionState)
-        (xTrace: XTraceProjectionState)
-        (floorSequence: int64 option)
-        (projection: ProviderSemanticProjection)
-        (key: string)
-        : Task<DecisionEffect> =
-        startMainOrNone
-            scope
-            host
-            journal
-            key
-            (nextMainContext mainSessionId bloggerSessionId observedEpoch blog xTrace floorSequence projection)
-
-    let private continueAfterSquashAttempt
-        (scope: IParkedTransformHost)
-        (host: CompanionHost)
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (observedEpoch: PrefixEpochId)
-        (blog: BlogProjectionState)
-        (xTrace: XTraceProjectionState)
-        (floorSequence: int64 option)
-        (projection: ProviderSemanticProjection)
-        (key: string)
-        (squashEffect: DecisionEffect option)
-        : Task<DecisionEffect> =
-        match squashEffect with
-        | Some effect -> Task.FromResult effect
-        | None ->
-            continueAfterSquashMiss
-                scope
-                host
-                journal
-                mainSessionId
-                bloggerSessionId
-                observedEpoch
-                blog
-                xTrace
-                floorSequence
-                projection
-                key
-
     /// Unique production entry for main-session material → Blogger lifecycle.
     let onMainMaterial
         (scope: IParkedTransformHost)
@@ -554,11 +428,6 @@ module BloggerCoordinator =
         (projection: ProviderSemanticProjection)
         : Task<DecisionEffect> =
         let key = SessionId.value bloggerSessionId
-
-        // GLORY-023 / TODO-001: Manager Opening floor from effectiveOpeningFloor
-        // (BlindPlan Pre-T1 dynamic head / Post-T1 WorkRecordStart). Never
-        // legacy activation prefix end.
-        let floorSequence = openingFloor journal mainSessionId
 
         if blocksNew journal mainSessionId scope key then
             forceSealRuntime scope key
@@ -572,22 +441,18 @@ module BloggerCoordinator =
             // No cell: decideMaterial routes from HasParked + HasFlight only.
             task {
                 let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
-
-                let! squashEffect =
-                    tryStartSquash scope host journal mainSessionId bloggerSessionId observedEpoch key blog
-
                 return!
-                    continueAfterSquashAttempt
+                    startMainOrNone
                         scope
                         host
                         journal
-                        mainSessionId
-                        bloggerSessionId
-                        observedEpoch
-                        blog
-                        xTrace
-                        floorSequence
-                        projection
                         key
-                        squashEffect
+                        (BloggerMainContext.fromProjection
+                            journal
+                            mainSessionId
+                            bloggerSessionId
+                            observedEpoch
+                            blog
+                            xTrace
+                            projection)
             }

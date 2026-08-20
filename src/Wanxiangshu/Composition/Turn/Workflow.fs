@@ -76,6 +76,8 @@ module TurnWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (recoveryScope: IParkedTransformHost)
+        (armRecovery: SessionId -> unit)
         (syncDelegate: SyncDelegateRuntime option)
         (reviewerContinuationPort: ReviewerContinuationPort)
         (nudgeSent: HashSet<string>)
@@ -151,6 +153,8 @@ module TurnWorkflow =
                     sessionPort
                     eventPort
                     journal
+                    recoveryScope
+                    armRecovery
                     joinGuardNudges
                     hasLivePty
                     abortedSessions

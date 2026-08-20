@@ -168,10 +168,6 @@ type PluginRecoveryScope(journal: AgentJournal option) =
         recoveryArming.Remove sessionId |> ignore
         this.ClearAttemptPlansFor sessionId
 
-    /// Re-arm for the durable NoCoverage case — blog frames catching up (PAR-011, SW-009).
-    member this.ReArmRecovery(sessionId: SessionId) =
-        recoveryArming.[SessionId.value sessionId] <- RecoverySlot.afterFailureAdvance
-
     /// Drops attempt plans whose key prefix matches (used for a session and
     /// for its linked Blogger keys during session deletion). Prefer ConsumeAttemptPlan.
     member this.ClearAttemptPlansFor(key: string) =

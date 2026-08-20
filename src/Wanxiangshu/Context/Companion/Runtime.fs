@@ -56,16 +56,6 @@ open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort, ?sessionId: SessionId) =
     let lockObj = obj ()
 
-    /// CTX-006 / FALLBACK-012: one-shot recovery material waiter.
-    ///
-    /// Physical possession only — presence means a recovery Task is waiting for
-    /// the next main material. Not a business stage: failure registers the waiter
-    /// via `StartRecoveryOpportunity`; material offers complete it once via
-    /// `OfferRecoveryMaterial`. A restart leaves `None` (safe: at most one missed
-    /// compression opportunity, matching `RecoverySlot.afterRestart`).
-    // DSL-MUTABLE: resource — one-shot recovery material waiter
-    let mutable recoveryWaiter: TaskCompletionSource<unit> option = None
-
     let restoredMemory = initialMemory
 
     // DSL-MUTABLE: resource — in-memory blog projection mirror (durable-backed)
@@ -122,40 +112,6 @@ type Companion(?initialMemory: CompanionMemory, ?durable: ICompanionDurablePort,
     /// at first and re-reads the projection head every round.
     member _.RefreshXTrace(state: XTraceProjectionState) : unit =
         lock lockObj (fun () -> xTraceProjection <- state)
-
-    /// FALLBACK-012 / CTX-006: open a one-shot recovery opportunity after a real failure.
-    ///
-    /// Registers a physical waiter Task. Opportunity exists while the Task is unfinished.
-    /// A second call while the first waiter is unconsumed reuses it (one opportunity).
-    member _.StartRecoveryOpportunity() : Task =
-        let waiter =
-            lock lockObj (fun () ->
-                match recoveryWaiter with
-                | Some existing -> existing
-                | None ->
-                    let created =
-                        TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                    recoveryWaiter <- Some created
-                    created)
-
-        waiter.Task :> Task
-
-    /// Material boundary: complete the pending recovery waiter if any.
-    /// Returns true when a waiter was taken (recovery path may consume this material).
-    /// Second offer with no registered waiter is a no-op.
-    member _.OfferRecoveryMaterial() : bool =
-        let waiter =
-            lock lockObj (fun () ->
-                let current = recoveryWaiter
-                recoveryWaiter <- None
-                current)
-
-        match waiter with
-        | Some tcs ->
-            AsyncSupport.trySetResult tcs () |> ignore
-            true
-        | None -> false
 
     member this.Snapshot: CompanionMemory = this.Memory
     member this.GetMemory() : CompanionMemory = this.Memory

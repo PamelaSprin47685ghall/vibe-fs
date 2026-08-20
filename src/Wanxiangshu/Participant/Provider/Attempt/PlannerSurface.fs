@@ -80,7 +80,7 @@ module AttemptPlannerSurface =
             (ProviderRunIdentity.create "surface-provider-run")
             (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
             requestKind
-            false
+            RecoveryOpportunity.OrdinaryAttempt
             (fun () -> Error NoCandidateReason.NoCoverage)
 
     /// Build one derived profile from JSON-shaped input.

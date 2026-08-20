@@ -254,6 +254,25 @@ module CompressionSurface =
     let mayRecover (arming: string) (offset: int) (hasMaterial: bool) : bool =
         RecoverySlot.mayRecover (armingOf arming) (offsetOf offset) hasMaterial
 
+    let recoveryOpportunity (arming: string) (offset: int) : string =
+        match RecoverySlot.opportunity (armingOf arming) (offsetOf offset) with
+        | RecoveryOpportunity.OrdinaryAttempt -> "OrdinaryAttempt"
+        | RecoveryOpportunity.RecoveryAttempt -> "RecoveryAttempt"
+
+    let nextBloggerRequest (failedKind: string) (opportunity: string) (hasSquashMaterial: bool) : string =
+        let nextOpportunity =
+            if opportunity = "RecoveryAttempt" then
+                RecoveryOpportunity.RecoveryAttempt
+            else
+                RecoveryOpportunity.OrdinaryAttempt
+
+        match requestKindOf failedKind with
+        | None -> "Error"
+        | Some kind ->
+            match RecoverySlot.nextBloggerRequest kind nextOpportunity hasSquashMaterial with
+            | Ok next -> ProviderRequestKind.label next
+            | Error _ -> "Error"
+
     let private outcomeResult (value: obj) : Result<AttemptOutcome, string> =
         match text value with
         | "Completed" -> Ok AttemptOutcome.Completed
@@ -383,7 +402,10 @@ module CompressionSurface =
                     (ProviderRunIdentity.create "surface-provider-run")
                     (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
                     requestKind
-                    (not (isNullish value?mayRecover) && unbox<bool> value?mayRecover)
+                    (if not (isNullish value?mayRecover) && unbox<bool> value?mayRecover then
+                         RecoveryOpportunity.RecoveryAttempt
+                     else
+                         RecoveryOpportunity.OrdinaryAttempt)
                     selectProbe
             )
         | Error error, _, _

@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -84,16 +84,50 @@ test('WHAT[DURABLE-EVENTS-020] parsed Journal payload replay does not stringify 
   const { readFile } = await import('node:fs/promises')
   const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
   const factCodec = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/FactCodec.fs', import.meta.url), 'utf8')
+  const integrator = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs', import.meta.url), 'utf8')
 
   assert.doesNotMatch(
     envelope,
     /let\s+deserializeValue[\s\S]{0,700}JS\.JSON\.stringify\s+value/,
     'activation already owns a parsed payload; legacy detection must not serialize it again',
   )
-  assert.match(envelope, /FactCodec\.legacyDecodeErrorForValue\s+value/)
-  assert.match(factCodec, /let\s+legacyDecodeErrorForValue/)
-  assert.doesNotMatch(factCodec, /const stack = \[root\]/,
-    'legacy checks must inspect the Fact DU boundary, not traverse arbitrary large payload material')
+  assert.doesNotMatch(envelope, /legacyDecodeErrorForValue|isIgnoredLegacyValue|isIgnoredLegacyDecodeError/,
+    'Envelope decode must not perform legacy work on the hot path')
+  assert.match(factCodec, /let\s+isIgnoredLegacyDecodeError/)
+  assert.doesNotMatch(factCodec, /legacyDecodeErrorCode|const stack = \[root\]/,
+    'activation must not scan parsed Journal payloads for legacy markers')
+  assert.match(integrator, /Error error when FactCodec\.isIgnoredLegacyDecodeError error -> Ok current/,
+    'legacy classification runs only after decode failure, never for modern events')
+})
+
+test('WHAT[DURABLE-EVENTS-020] replay ignores a legacy Journal fact instead of cutting the stream', async () => {
+  await withRepo(async (commonDir) => {
+    const eventId = 'e'.repeat(40)
+    const legacy = {
+      event_id: eventId,
+      event_type: 'JournalEnvelope',
+      parents: [],
+      payload: {
+        EventId: ['EventId', eventId],
+        Fact: ['Agent', ['Fallback', ['PluginPromptAccepted', {}]]],
+        LocalSeq: ['LocalSeq', '1'],
+        ObservedAt: '2026-01-01T00:00:00.000+00:00',
+        RuntimeId: ['RuntimeId', 'rt_legacy'],
+        Stream: 'Workspace',
+      },
+      payload_refs: [],
+      stream_id: 'journal/workspace',
+    }
+    const eventsDir = join(commonDir, 'wanxiang', 'events')
+    mkdirSync(eventsDir, { recursive: true })
+    writeFileSync(join(eventsDir, 'legacy-writer.ndjson'), `${JSON.stringify(legacy)}\n`)
+
+    const booted = mustOk(
+      await journal.JournalSurface_bootWithWriterId(commonDir, 'modern-writer', 'rt_modern', 7001, '2026-05-02T00:00:00Z'),
+      'boot with ignored legacy fact',
+    )
+    journal.JournalSurface_dispose(booted.journal)
+  })
 })
 
 test('WHAT[DURABLE-EVENTS-020] Journal replay precompiles outer fact-family dispatch instead of reflecting nested unions per event', async () => {

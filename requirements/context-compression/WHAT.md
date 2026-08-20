@@ -20,13 +20,13 @@
 
 控制流仅识别快照的 `Outcome`（`Completed | Failed | Aborted`），严禁根据错误字符串或异常类型细分溢出、网络或限流等原因。
 
-## CONTEXT-COMPRESSION-006: 恢复槽 = armed ∧ primed ∧ hasMaterial
+## CONTEXT-COMPRESSION-006: 恢复机会一次性消费，恢复动作 = opportunity ∧ hasMaterial
 
-仅当同时满足 `armedByFailure`（由真实失败激活）、`primed`（处于奇数 Offset）与 `hasMaterial`（存在可用材料）三项合取条件时，才允许执行恢复动作（X 执行 prefix probe，Y 执行 frame squash）。无材料时正常发送主请求。
+真实失败被 `FallbackLedger` 接受并推进 cursor 后，只有新 Offset 为奇数时才产生一次 `RecoveryOpportunity`；它是 `armedByFailure ∧ primed` 的类型化结果，不得与 `hasMaterial` 折叠成一个布尔值。X 在该机会中必须实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash。若本次物理 attempt 没有可用材料，则发送普通主请求并消费该机会，严禁把 arming 留给未来无关请求，也严禁通过进程内 waiter 等待未来 X material 再补做 recovery。
 
 ## CONTEXT-COMPRESSION-007: 按 RequestKind 分派结局
 
-每个 attempt 的结局按 `ProviderRequestKind` 进行确定性分派。同种 RequestKind 的同种结局必须产生完全一致的后继动作，严禁根据错误文本产生分支。恢复槽内的失败继续累加连续失败计数。
+每个 attempt 的结局按 `ProviderRequestKind` 进行确定性分派；RequestKind 必须来自 attempt 的 typed context / durable receipt / accepted continuation evidence，而非角色猜测或错误文本。同种 RequestKind 的同种结局必须产生完全一致的后继动作。`BloggerSquash` 与 `InteractionRepair` 成功不得清零连续失败计数；只有 `WorkMain | BloggerMain` 的有效成功可以清零。
 
 ## CONTEXT-COMPRESSION-008: X 不发压缩请求
 
@@ -79,3 +79,11 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 ## CONTEXT-COMPRESSION-020: `todowrite` 所在回合永远保留 X 原文
 
 任何包含 `todowrite` tool call 的 Host 消息，以及与该 call id 对应的 tool result 消息，都不得被 Y 前缀替换删除。Prefix cutoff 可以越过这些回合并压缩其余历史，但写回 provider context 时必须从被 drop 的 X 前缀中提取这些消息并原样保留；该规则不依赖 Manager 的 T1/T2 阶段，也适用于 AABB/recovery 后形成的 Y replacement。
+
+## CONTEXT-COMPRESSION-021: Y recovery 由失败会话当场拥有，禁止未来 X material 代触发
+
+`BloggerMain` 的已确认失败在 Fallback advance 后若进入 primed Offset 且当前 X 存在可 squash frames，则该 Blogger 的下一次 continuation 必须先物化 `BloggerRequestContext.Squash` 并发送 `BloggerSquash`；不得先重发失败的 BloggerMain，也不得注册 process-local recovery waiter 等待未来主 X transform。`BloggerSquash` 成功提交后，下一次 provider step 必须从 durable Blog + XTrace 重新派生 BloggerMain；Squash 失败则结束该槽、再次 advance 后才允许进入下一槽。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
+
+## CONTEXT-COMPRESSION-022: BloggerMainContext 是唯一重建公式
+
+正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash/AABB refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest cursor、同一 200 KiB chunk 与同一 coverage digest 规则。严禁在 Coordinator、Enforcer 或 recovery workflow 中复制第二套 next-main 算法。

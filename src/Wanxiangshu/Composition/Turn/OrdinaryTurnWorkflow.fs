@@ -2,6 +2,7 @@ namespace Wanxiangshu.Composition.Turn
 
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
@@ -69,6 +70,29 @@ open Wanxiangshu.Host
 /// Ordinary (non-role-specialized) turn outcome routing: observation / outcome
 /// match that drives repair, recovery, abort, and completed join-guard paths.
 module OrdinaryTurnWorkflow =
+
+    let private bloggerReceiptKind (journal: AgentJournal) (turn: ReconciledTurn) =
+        let projections = AgentJournal.snapshot journal
+
+        SessionAssociationProjection.tryMainSessionOf turn.SessionId projections.AgentProjections.Associations
+        |> Option.bind (fun mainSessionId -> AgentProjection.tryFind mainSessionId projections.AgentProjections)
+        |> Option.bind (fun session -> session.BloggerCycles)
+        |> Option.bind (BloggerCycleProjection.tryReceipt turn.ProviderRun)
+        |> Option.map (fun receipt -> receipt.Kind)
+
+    let private requestKindOfCompleted (journal: AgentJournal) (turn: ReconciledTurn) =
+        match bloggerReceiptKind journal turn with
+        | Some BlogFrameKind.Squash -> ProviderRequestKind.BloggerSquash
+        | Some BlogFrameKind.Entry -> ProviderRequestKind.BloggerMain
+        | None ->
+            let continuationKind =
+                PromptAuthorityLedger.projectionFor turn.SessionId (AgentJournal.snapshot journal).AgentProjections
+                |> Option.bind (fun authority -> Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
+
+            match continuationKind, turn.Role with
+            | Some PromptAuthority.InteractionRepair, _ -> ProviderRequestKind.InteractionRepair
+            | _, Some Role.Blogger -> ProviderRequestKind.BloggerMain
+            | _ -> ProviderRequestKind.WorkMain
 
     /// Revisit a previously delivered turn only for work whose authority comes
     /// from a fresh idle observation. Terminal plumbing remains first-delivery only.
@@ -179,9 +203,10 @@ module OrdinaryTurnWorkflow =
             let recordSuccessIfValid (journal: AgentJournal option) =
                 task {
                     match journal with
-                    | Some j ->
+                    | Some j when ProviderRequestKind.clearsFailureCountOnSuccess (requestKindOfCompleted j turn) ->
                         let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
                         ()
+                    | Some _
                     | None -> ()
                 }
 
@@ -202,6 +227,8 @@ module OrdinaryTurnWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (recoveryScope: IParkedTransformHost)
+        (armRecovery: SessionId -> unit)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
@@ -238,6 +265,8 @@ module OrdinaryTurnWorkflow =
                 sessionPort
                 eventPort
                 journal
+                recoveryScope
+                armRecovery
                 turn
                 error
                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
@@ -258,6 +287,8 @@ module OrdinaryTurnWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
+        (recoveryScope: IParkedTransformHost)
+        (armRecovery: SessionId -> unit)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortedSessions: HashSet<string>)
@@ -289,6 +320,8 @@ module OrdinaryTurnWorkflow =
                 sessionPort
                 eventPort
                 journal
+                recoveryScope
+                armRecovery
                 joinGuardNudges
                 hasLivePty
                 abortedSessions

@@ -71,9 +71,7 @@ module internal CompanionHostBlogger =
           Gate: obj
           Companion: Companion
           Journal: AgentJournal option
-          EffectiveAgent: string
-          RecordSquashPlan: SessionId -> ProviderRunIdentity -> unit
-          StageBloggerContext: SessionId -> BloggerRequestContext -> unit }
+          EffectiveAgent: string }
 
     /// CTX-012: covered frame count = ceil(m / 2).
     let coveredFrameCount (frameCount: int) : int =

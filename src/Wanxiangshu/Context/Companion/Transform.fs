@@ -78,28 +78,6 @@ module CompanionTransform =
             |> Option.bind (fun companion -> companion.BloggerSessionId)
             |> Option.map SessionId.value)
 
-    let private bindSquashPlan (scope: PluginRuntimeScope) (journal: AgentJournal option) (value: CompanionHost) =
-        value.RecordSquashPlan <-
-            fun bloggerId providerRun ->
-                match journal with
-                | None -> ()
-                | Some j ->
-                    PromptAuthorityLedger.activeProfile bloggerId (AgentJournal.snapshot j).AgentProjections
-                    |> Option.iter (fun authority ->
-                        let plan =
-                            AttemptPlanner.plan
-                                authority
-                                AgentPairCursor.initial
-                                (PhysicalUserMessageId.create (SessionId.value bloggerId))
-                                providerRun
-                                (PromptAuthority.PromptOrigin.AuthorityRoot
-                                    PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-                                ProviderRequestKind.BloggerSquash
-                                false
-                                (fun () -> Error NoCandidateReason.NoCoverage)
-
-                        scope.RecordAttemptPlan bloggerId providerRun plan)
-
     let private ensureCompanion
         (companions: Dictionary<string, CompanionHost>)
         (gate: obj)
@@ -132,7 +110,6 @@ module CompanionTransform =
                     )
 
                 companions.[sessionId] <- value
-                bindSquashPlan scope journal value
                 value)
 
     let private tryMessageSessionId message =

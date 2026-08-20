@@ -290,7 +290,7 @@ module XWireSurface =
                                    error = error
                                    output = null |}
                         else
-                            // ── Recovery decision: mayRecover (CTX-006) ──
+                            // ── Recovery decision: failure-local slot opportunity (CTX-006) ──
                             let offsetByte =
                                 if isNullish input?offset then
                                     0uy
@@ -303,10 +303,7 @@ module XWireSurface =
                                 | Error _ -> AgentPairCursor.FallbackOffset.Fork0
 
                             let coverableCutoff = intValue input?coverableCutoff
-                            let hasMaterial = coverableCutoff > 0
-
-                            let mayRecover =
-                                RecoverySlot.mayRecover SlotArming.ArmedByAdvance offset hasMaterial
+                            let opportunity = RecoverySlot.opportunity SlotArming.ArmedByAdvance offset
 
                             // ── Probe selection (CTX-011) ──
                             let committedSnapshot = snapshotOptionOfJs input?committedSnapshot
@@ -327,7 +324,8 @@ module XWireSurface =
                                 HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
 
                             let probeResult =
-                                if mayRecover then
+                                match opportunity with
+                                | RecoveryOpportunity.RecoveryAttempt ->
                                     PrefixProbeSelection.select
                                         sha256Hex
                                         (SessionId.create sessionId)
@@ -339,8 +337,7 @@ module XWireSurface =
                                         frozenRef
                                         frozenDigest
                                         recomputeDigest
-                                else
-                                    Error NoCandidateReason.NoCoverage
+                                | RecoveryOpportunity.OrdinaryAttempt -> Error NoCandidateReason.NoCoverage
 
                             // ── Prefix intent (CTX-010) ──
                             let choice, noProbeReason =
@@ -377,14 +374,9 @@ module XWireSurface =
                                     | RenderedPrefix.SyntheticPrefix _ -> true
                                     | RenderedPrefix.PhysicalPrefix -> false
 
-                                // ── Consume arming (FALLBACK-012) ──
-                                // Probe selected → consume. NoCoverage (temporary) → keep.
-                                // Any other durable reason → consume.
-                                let consumed =
-                                    match probeResult with
-                                    | Ok _ -> true
-                                    | Error NoCandidateReason.NoCoverage -> false
-                                    | Error _ -> true
+                                // The typed permit was consumed before this attempt was built.
+                                // No probe result can leak arming into a later physical request.
+                                let consumed = true
 
                                 // ── Reconcile: promotableProbe (CTX-012) ──
                                 // AttemptPlanner.promotableProbe reads only

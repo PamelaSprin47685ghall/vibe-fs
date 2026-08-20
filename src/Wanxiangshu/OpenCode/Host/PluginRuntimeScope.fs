@@ -305,8 +305,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     member this.TryTakeRecoveryPermit(sessionId: SessionId) =
         recovery.TryTakeRecoveryPermit sessionId
 
-    member this.ReArmRecovery(sessionId: SessionId) = recovery.ReArmRecovery sessionId
-
     member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
         recovery.RecordAttemptPlan sessionId providerRun plan
 

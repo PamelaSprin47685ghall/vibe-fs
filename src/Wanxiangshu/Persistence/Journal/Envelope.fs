@@ -323,6 +323,4 @@ module Envelope =
     /// EventStore already owns a parsed canonical payload. Decode it directly
     /// instead of stringify -> parse on every replayed Journal event.
     let deserializeValue (value: JsonValue) : Result<Envelope, string> =
-        match FactCodec.legacyDecodeErrorForValue value with
-        | Some error -> Error error
-        | None -> deserializeCurrentEnvelopeValue value
+        deserializeCurrentEnvelopeValue value

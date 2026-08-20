@@ -140,29 +140,6 @@ test('WHAT[DURABLE-EVENTS-002] tryDecode_rejects_wrong_EventType', () => {
   assert.match(result.error, /JournalEnvelope/)
 })
 
-test('WHAT[DURABLE-EVENTS-009] parsed EventStore payload rejects legacy fact tags before generic journal decode', () => {
-  const encoded = journalCodec.encode([], [], env())
-  const legacy = structuredClone(encoded)
-  legacy.payload.Fact = ['Agent', ['Fallback', ['PluginPromptAccepted', {}]]]
-
-  const result = journalCodec.decode(legacy)
-  assert.equal(result.ok, false)
-  assert.match(result.error, /pre-0\.5\.0|Archive or remove/)
-})
-
-test('WHAT[DURABLE-EVENTS-009] parsed EventStore payload rejects pre-tip-v2 observation shape', () => {
-  const encoded = journalCodec.encode([], [], env())
-  const legacy = structuredClone(encoded)
-  legacy.payload.Fact = ['Agent', ['Context', ['BlogObservationCommitted', {
-    SessionId: ['SessionId', SESSION],
-    ScoreVectorRef: ['BlobRef', 'blobs/legacy'],
-  }]]]
-
-  const result = journalCodec.decode(legacy)
-  assert.equal(result.ok, false)
-  assert.match(result.error, /tip v2|TipRuleId|ScoreVectorRef/)
-})
-
 test('WHAT[DURABLE-EVENTS-002] workspace_child_process_streams_round_trip', () => {
   const cases = [
     { stream: { kind: 'Workspace' }, seq: 1 },
