@@ -76,56 +76,6 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 module HostSignalBootstrap =
 
-
-    [<RequireQualifiedAccess>]
-    type private RoutedChatExecution =
-        | NoRoute
-        | Superseded
-        | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
-        | PluginManaged of
-            PromptAuthority.PromptClaim *
-            PhysicalUserMessageId *
-            string *
-            OpencodeModel
-
-
-    let private externalRoutedExecution sessionId physical agent =
-        function
-        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
-        | ModelRoutingAcquisition.Acquired target ->
-            RoutedChatExecution.ExternalManaged(sessionId, physical, agent, ModelRouting.toOpenCodeModel target)
-
-    let private pluginRoutedExecution claim physical agent =
-        function
-        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
-        | ModelRoutingAcquisition.Acquired target ->
-            RoutedChatExecution.PluginManaged(claim, physical, agent, ModelRouting.toOpenCodeModel target)
-
-    let private routeChatExecution (scope: PluginRuntimeScope) admission =
-        task {
-            match admission with
-            | ModelRouting.ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
-            | ModelRouting.ChatExecutionAdmission.Rejected error -> return invalidOp error
-            | ModelRouting.ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent) ->
-                let sessionText = SessionId.value sessionId
-                scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
-                SessionExecutionBinding.observeUserFacingAgent sessionId agent
-                let! acquisition = ModelRouting.acquireManagedExecution sessionId physical agent
-                return externalRoutedExecution sessionId physical agent acquisition
-            | ModelRouting.ChatExecutionAdmission.PluginManaged(claim, physical, agent) ->
-                let sessionText = SessionId.value claim.SessionId
-                scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
-                let! acquisition = ModelRouting.acquireManagedExecution claim.SessionId physical agent
-                return pluginRoutedExecution claim physical agent acquisition
-        }
-
-    let private routedModel =
-        function
-        | RoutedChatExecution.NoRoute
-        | RoutedChatExecution.Superseded -> None
-        | RoutedChatExecution.ExternalManaged(_, _, _, model)
-        | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
-
     let private requireOutputMessage output =
         let message = if isNull output then null else output?message
 
@@ -135,7 +85,7 @@ module HostSignalBootstrap =
         message
 
     let private projectRoutedModel output routed =
-        match routedModel routed with
+        match ModelRouting.routedModel routed with
         | None -> ()
         | Some model ->
             let message = requireOutputMessage output
@@ -174,17 +124,16 @@ module HostSignalBootstrap =
             )
 
     let private commitExecutionCapability (journal: AgentJournal option) =
-        function
-        | RoutedChatExecution.PluginManaged(claim, physical, agent, model) ->
-            match journal with
-            | Some j ->
-                let runtime = PromptDispatcher.forJournal j
-                acceptPluginExecution runtime claim physical agent model
-            | None -> ()
-        | RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model) ->
+        fun routed ->
+        match routed, journal with
+        | ModelRouting.RoutedChatExecution.PluginManaged(claim, physical, agent, model), Some j ->
+            let runtime = PromptDispatcher.forJournal j
+            acceptPluginExecution runtime claim physical agent model
+        | ModelRouting.RoutedChatExecution.PluginManaged _, None -> ()
+        | ModelRouting.RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model), _ ->
             SessionExecutionBinding.acceptExternalExecution sessionId physical agent model
-        | RoutedChatExecution.NoRoute
-        | RoutedChatExecution.Superseded -> ()
+        | ModelRouting.RoutedChatExecution.NoRoute, _
+        | ModelRouting.RoutedChatExecution.Superseded, _ -> ()
 
     let private eventString (value: obj) =
         if isNull value then
@@ -609,14 +558,14 @@ module HostSignalBootstrap =
                     projectRoutedModel output routedExecution
 
                     match routedExecution with
-                    | RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
+                    | ModelRouting.RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
                         let hasPhysicalParent =
                             scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
 
                         projectFissionToolVisibility hasPhysicalParent output
-                    | RoutedChatExecution.ExternalManaged _
-                    | RoutedChatExecution.NoRoute
-                    | RoutedChatExecution.Superseded -> ()
+                    | ModelRouting.RoutedChatExecution.ExternalManaged _
+                    | ModelRouting.RoutedChatExecution.NoRoute
+                    | ModelRouting.RoutedChatExecution.Superseded -> ()
 
                     requireDurabilityActivation ()
                     signalExternalJoinWake decoded
@@ -677,10 +626,15 @@ module HostSignalBootstrap =
                             decoded.PhysicalUserMessageId
                             decoded.PromptKey
                             decoded.ExplicitAgent
-                    let! routedExecution = routeChatExecution scope admission
+                    let! routedExecution =
+                        ModelRouting.routeChatExecution
+                            (fun sessionId ->
+                                scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore)
+                            SessionExecutionBinding.observeUserFacingAgent
+                            admission
 
                     match routedExecution with
-                    | RoutedChatExecution.Superseded -> ()
+                    | ModelRouting.RoutedChatExecution.Superseded -> ()
                     | _ -> do! continueRoutedChatMessage routedExecution decoded input output
                 }
 

@@ -45,11 +45,15 @@ test('WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_autho
 
 test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const params = await source('src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs')
 
   assert.match(host, /decoded\.PhysicalUserMessageId/)
-  assert.match(host, /ModelRouting\.acquireManagedExecution/)
+  assert.match(host, /ModelRouting\.routeChatExecution/)
+  assert.doesNotMatch(host, /ModelRoutingAcquisition|ChatExecutionAdmission\.(NoRoute|Rejected|ExternalManaged|PluginManaged)/)
+  assert.match(routing, /let routeChatExecution/)
+  assert.match(routing, /acquireManagedExecution/)
   assert.doesNotMatch(sessions, /ModelRouting\.acquireManagedExecution/, 'fork/send enqueue must never wait for model capacity')
   assert.match(host, /message\?model\s*<-\s*box routed/)
   assert.match(params, /validateObservedProvider/)
@@ -83,7 +87,7 @@ test('WHAT[EMR-007] EMR_007_chat_message_closes_the_old_idle_window_before_model
   const invoke = chatHook.indexOf('observePhysicalAdmission output sessionId physicalId')
   const ordinaryCall = chatHook.indexOf('continueOrdinaryChatMessage decoded input output')
   const classify = ordinaryRouting.indexOf('ModelRouting.chatExecutionAdmission')
-  const acquire = ordinaryRouting.indexOf('let! routedExecution = routeChatExecution')
+  const acquire = ordinaryRouting.indexOf('ModelRouting.routeChatExecution')
 
   assert.notEqual(revoke, -1, 'chat.message must close the preceding idle-send window')
   assert.notEqual(invoke, -1, 'chat.message must invoke the named physical admission barrier')

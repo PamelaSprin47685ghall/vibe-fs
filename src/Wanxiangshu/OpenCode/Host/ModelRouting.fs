@@ -783,6 +783,13 @@ module ModelRouting =
         | PluginManaged of PromptAuthority.PromptClaim * PhysicalUserMessageId * string
         | Rejected of string
 
+    [<RequireQualifiedAccess>]
+    type RoutedChatExecution =
+        | NoRoute
+        | Superseded
+        | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
+        | PluginManaged of PromptAuthority.PromptClaim * PhysicalUserMessageId * string * OpencodeModel
+
     let managedAgentForAdmission (value: string option) =
         value
         |> Option.map (fun agent -> agent.Trim())
@@ -838,3 +845,45 @@ module ModelRouting =
         | false, Some sid, Some key -> pluginAdmission tryPendingClaim journal sid physicalUserMessageId key
         | false, Some sid, None -> externalAdmission sid physicalUserMessageId explicitAgent
         | _ -> ChatExecutionAdmission.NoRoute
+
+    let private externalRoutedExecution sessionId physical agent =
+        function
+        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
+        | ModelRoutingAcquisition.Acquired target ->
+            RoutedChatExecution.ExternalManaged(sessionId, physical, agent, toOpenCodeModel target)
+
+    let private pluginRoutedExecution claim physical agent =
+        function
+        | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
+        | ModelRoutingAcquisition.Acquired target ->
+            RoutedChatExecution.PluginManaged(claim, physical, agent, toOpenCodeModel target)
+
+    /// EMR-009 managed chat.message routing policy. The composition root supplies
+    /// only the two process-local observations that cross into sibling owners;
+    /// admission interpretation and acquisition outcomes stay owned here.
+    let routeChatExecution
+        (observeManagedSession: SessionId -> unit)
+        (observeExternalAgent: SessionId -> string -> unit)
+        (admission: ChatExecutionAdmission)
+        : Task<RoutedChatExecution> =
+        task {
+            match admission with
+            | ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
+            | ChatExecutionAdmission.Rejected error -> return invalidOp error
+            | ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent) ->
+                observeManagedSession sessionId
+                observeExternalAgent sessionId agent
+                let! acquisition = acquireManagedExecution sessionId physical agent
+                return externalRoutedExecution sessionId physical agent acquisition
+            | ChatExecutionAdmission.PluginManaged(claim, physical, agent) ->
+                observeManagedSession claim.SessionId
+                let! acquisition = acquireManagedExecution claim.SessionId physical agent
+                return pluginRoutedExecution claim physical agent acquisition
+        }
+
+    let routedModel =
+        function
+        | RoutedChatExecution.NoRoute
+        | RoutedChatExecution.Superseded -> None
+        | RoutedChatExecution.ExternalManaged(_, _, _, model)
+        | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
