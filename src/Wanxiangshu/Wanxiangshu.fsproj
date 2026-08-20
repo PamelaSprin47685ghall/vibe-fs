@@ -641,6 +641,7 @@
     <Compile Include="OpenCode/Plugin/PluginSessionWiring.fs"/>
     <Compile Include="OpenCode/Plugin/PluginRecoveryWiring.fs"/>
     <Compile Include="OpenCode/Host/BloggerChronicleText.fs"/>
+    <Compile Include="Context/Trace/XTracePipeline.fs"/>
     <Compile Include="OpenCode/Plugin/PluginTransforms.fs"/>
     <Compile Include="OpenCode/Plugin/PluginHooks.fs"/>
     <Compile Include="OpenCode/Plugin/SpikePlugin.fs"/>

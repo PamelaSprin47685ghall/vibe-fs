@@ -1,5 +1,5 @@
 {
-  "total": 648,
+  "total": 650,
   "owners": [
     "action-affordance",
     "behavior-diagnosis",
@@ -385,6 +385,10 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+      "owner": "semantic-trace"
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
       "owner": "semantic-trace"
     },
     {
@@ -1432,6 +1436,10 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
+      "owner": "cognitive-environment"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
       "owner": "execution-model-routing"
     },
@@ -1774,10 +1782,6 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
       "owner": "host-boundary"
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
-      "owner": "cognitive-environment"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",

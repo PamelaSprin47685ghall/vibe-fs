@@ -56,7 +56,7 @@ const orderingSteps = [
   'beginPhysicalProviderAttempt',
   'tryBindSessionStartedAt',
   'strengthReplayPlansFor',
-  'applySessionXTracePipeline',
+  'XTracePipeline.applyPipeline',
   'applyCompanionForOrdinaryMaterial',
   'XWire.applyTransform',
   'applyBloggerEnforcerContinuation',
