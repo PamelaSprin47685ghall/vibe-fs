@@ -31,6 +31,10 @@ type AgentStatus =
 type ForkResult =
     | Created of agentId: string
     | Nudged of agentId: string
+    /// Host may have physically accepted the new AgentOwnerRoot, but the send
+    /// boundary could not prove it synchronously. Recovery owns the durable
+    /// Pending claim; callers must not interpret this as permission to resend.
+    | DispatchUncertain of agentId: string
     | NotFound of agentId: string
 
 type ForkResult with
@@ -38,6 +42,7 @@ type ForkResult with
         match this with
         | ForkResult.Created id
         | ForkResult.Nudged id
+        | ForkResult.DispatchUncertain id
         | ForkResult.NotFound id -> id
 
 [<RequireQualifiedAccess>]

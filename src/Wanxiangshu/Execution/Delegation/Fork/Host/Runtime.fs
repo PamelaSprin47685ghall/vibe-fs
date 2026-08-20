@@ -331,11 +331,16 @@ type HostForkRuntime
                         failPendingRun
 
                 return
-                    match sent with
-                    | Ok _ ->
+                match sent with
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted ->
                         lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
                         Ok()
-                    | Error err -> Error err
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
+                        // Never resend an outcome-unknown first prompt. Durable
+                        // PromptAuthority recovery owns the pending claim now.
+                        lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
+                        Ok()
+                    | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err -> Error err
             }
 
         task {

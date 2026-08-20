@@ -258,6 +258,20 @@ module PromptAuthorityLedger =
         | Pending
         | Dispatchable
 
+    let pendingDispatchClaim
+        (sessionId: SessionId)
+        (payloadDigest: string)
+        (agentProjections: AgentProjectionSet)
+        : PromptAuthority.PromptClaim option =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority ->
+            authority.PendingClaims
+            |> Seq.tryPick (fun (KeyValue(_, claim)) ->
+                if claim.SessionId = sessionId && claim.PayloadDigest = payloadDigest then
+                    Some claim
+                else
+                    None))
+
     let dispatchStatusFor
         (sessionId: SessionId)
         (payloadDigest: string)
@@ -268,10 +282,6 @@ module PromptAuthorityLedger =
         match projectionFor sessionId agentProjections with
         | Some authority when Map.containsKey key authority.AcceptedDispatches ->
             DispatchStatus.Accepted(Map.find key authority.AcceptedDispatches)
-        | Some authority when
-            authority.PendingClaims
-            |> Seq.exists (fun (KeyValue(_, claim)) ->
-                claim.SessionId = sessionId && claim.PayloadDigest = payloadDigest)
-            ->
+        | _ when pendingDispatchClaim sessionId payloadDigest agentProjections |> Option.isSome ->
             DispatchStatus.Pending
         | _ -> DispatchStatus.Dispatchable

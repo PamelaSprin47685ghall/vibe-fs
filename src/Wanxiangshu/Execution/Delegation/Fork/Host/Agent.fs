@@ -295,8 +295,10 @@ module HostForkAgent =
                     (fun error -> runtime.FailRun(run, error))
 
             match sent with
-            | Ok _ -> return Ok result
-            | Error err ->
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted -> return Ok result
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _ ->
+                return Ok(ForkResult.DispatchUncertain result.AgentId)
+            | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err ->
                 do! runtime.FailRun(run, err)
                 return Error err
         }

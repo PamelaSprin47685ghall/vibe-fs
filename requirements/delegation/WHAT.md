@@ -104,7 +104,7 @@ terminal 能完成或失败 work unit，当且仅当它属于该 work unit 实�
 
 ## DELEG-026: effect truth 只能沿 direct CE 单向前进
 
-新 assignment 的业务流程必须直接写成 `prepare → dispatch → await own completion → checkpoint completed handoff` 的 F# CE。物理 dispatch 之前的 durable claim 复用 `PromptAuthority` 已有事实，不另造 delegation program-state。确定未发送的 dispatch failure 可以作为本次调用失败；一旦 dispatch 已发生或 outcome unknown，任何后置 handoff/frontier/affinity bookkeeping 都不得把调用结果改写成“未放置”。route 的 parent frontier 只能由“本次 interaction 已完成”的 durable fact推进。调用方因此永远不会同时得到“无法放置”与“后台其实已经启动”两种互斥现实。
+新 assignment 的业务流程必须直接写成 `prepare → dispatch → await own completion → checkpoint completed handoff` 的 F# CE。物理 dispatch 之前的 durable claim 复用 `PromptAuthority` 已有事实，不另造 delegation program-state。确定未发送的 dispatch failure 可以作为本次调用失败；一旦 dispatch 已发生或 outcome unknown，任何后置 handoff/frontier/affinity bookkeeping 都不得把调用结果改写成“未放置”。Host 对 prompt acceptance 给出 unknown 时，durable Pending claim 继续拥有恢复权：不得伪造 terminal failure、不得释放本次 run 的 terminal observer、不得自动重发；调用方必须得到明确的“可能已接受、不要另起重复委托”后果。route 的 parent frontier 只能由“本次 interaction 已完成”的 durable fact推进。调用方因此永远不会同时得到“无法放置”与“后台其实已经启动”两种互斥现实。
 
 ## DELEG-027: 新 assignment 不得伪装成 busy nudge
 

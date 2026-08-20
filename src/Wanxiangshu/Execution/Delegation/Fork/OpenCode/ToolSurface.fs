@@ -11,6 +11,7 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Execution.Session.OpenCode
 
 /// Opaque JS-native harness for the real Manager fork tool path.
 /// Production semantics stay in ForkTool/HostForkRuntime; this surface only
@@ -22,6 +23,8 @@ module ForkToolSurface =
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
         let physicalRoots = Dictionary<string, ResizeArray<string>>()
+        // DSL-MUTABLE: test-boundary fault injection — exactly one next Host send outcome.
+        let mutable nextSendOutcome: SendOutcome option = None
         // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
         let physicalSequence = ref 0
 
@@ -69,6 +72,8 @@ module ForkToolSurface =
             | true, values when values.Count > 0 -> Some values[values.Count - 1]
             | _ -> None
 
+        member _.SetNextSendOutcome(outcome: SendOutcome) = nextSendOutcome <- Some outcome
+
         member _.Notify(sessionId: SessionId, outcome: TerminalOutcome) =
             match listeners.TryGetValue(SessionId.value sessionId) with
             | true, registrations ->
@@ -83,10 +88,16 @@ module ForkToolSurface =
             member _.SendPrompt(sessionId, text, _) =
                 let key = SessionId.value sessionId
                 historyOf prompts key |> fun values -> values.Add text
-                physicalSequence.Value <- physicalSequence.Value + 1
-                let physical = sprintf "fork-physical-%d" physicalSequence.Value
-                historyOf physicalRoots key |> fun values -> values.Add physical
-                Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
+
+                match nextSendOutcome with
+                | Some outcome ->
+                    nextSendOutcome <- None
+                    Task.FromResult outcome
+                | None ->
+                    physicalSequence.Value <- physicalSequence.Value + 1
+                    let physical = sprintf "fork-physical-%d" physicalSequence.Value
+                    historyOf physicalRoots key |> fun values -> values.Add physical
+                    Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
 
             member _.AbortSession _ = Task.FromResult(Ok())
             member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -276,6 +287,19 @@ module ForkToolSurface =
         |> Option.bind (fun childId -> harness.Sessions.Prompt(childId, index))
         |> Option.map box
         |> Option.defaultValue null
+
+    let nextPromptAcceptanceUnknown (value: obj) (reason: string) =
+        let harness = unbox<ForkHarness> value
+        harness.Sessions.SetNextSendOutcome(SendOutcome.AcceptanceUnknown reason)
+
+    let cancelOwnerChildren (value: obj) (owner: string) : Task =
+        let harness = unbox<ForkHarness> value
+        harness.Scope.CancelSessionChildren(SessionId.value (harness.OwnerSession owner))
+
+    let executeHorizon (value: obj) (owner: string) : Task<string> =
+        let harness = unbox<ForkHarness> value
+        let spec = HorizonTool.spec harness.Scope
+        spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =
         task {

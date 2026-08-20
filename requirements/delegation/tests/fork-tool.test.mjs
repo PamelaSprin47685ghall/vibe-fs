@@ -147,3 +147,54 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_waits_for_own_completion_and_r
   }
 })
 
+test('WHAT[DELEG-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_not_placed', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-unknown-'))
+  const runtime = await forkTool.createRuntime(directory)
+  const owner = 'manager-unknown'
+
+  try {
+    forkTool.nextPromptAcceptanceUnknown(runtime, 'connection closed after request write')
+
+    const result = await forkTool.executeManagerFork(
+      runtime,
+      toolModule,
+      owner,
+      'coder',
+      'Ada',
+      'UNCERTAIN-FORK-CHARGE',
+    )
+
+    assert.doesNotMatch(result, /could not be placed/i)
+    assert.match(result, /may already have been accepted/i)
+    assert.equal(forkTool.childCount(runtime), 1)
+    assert.equal(forkTool.promptCount(runtime), 1, 'physical Host send was attempted exactly once')
+
+    const roster = await forkTool.executeHorizon(runtime, owner)
+    assert.match(roster, /Ada/)
+    assert.match(roster, /still away/i)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+
+test('WHAT[PARTICIPANT-HORIZON-011] FORK_TOOL_abandoned_child_does_not_vanish_from_horizon_before_join', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-abandoned-horizon-'))
+  const runtime = await forkTool.createRuntime(directory)
+  const owner = 'manager-abandoned-horizon'
+
+  try {
+    const placed = await forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'VISIBLE-CHARGE')
+    assert.match(placed, /Ada/)
+    await waitForPromptCount(runtime, 1)
+
+    await forkTool.cancelOwnerChildren(runtime, owner)
+
+    const roster = await forkTool.executeHorizon(runtime, owner)
+    assert.match(roster, /Ada/, 'durable abandoned child must not become indistinguishable from never-created')
+    assert.match(roster, /did not return/i)
+    assert.doesNotMatch(roster, /no one is currently away/i)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+

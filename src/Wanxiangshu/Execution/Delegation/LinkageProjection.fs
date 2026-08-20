@@ -320,6 +320,20 @@ module HandleProjection =
                 | Active
                 | CompletedAwaitingJoin _ -> true))
 
+    /// PARTICIPANT-HORIZON-011: parent-visible roster is not the same question
+    /// as "does this handle still block finality?". An Abandoned child still has
+    /// one undelivered consequence for its parent, so it remains visible until
+    /// Join consumes that consequence and writes Retired.
+    let horizonVisible (current: AgentLinkageProjection) =
+        current
+        |> recordsWhere (fun record ->
+            parentVisible record
+            && (match record.Lifecycle with
+                | Retired -> false
+                | Active
+                | CompletedAwaitingJoin _
+                | Abandoned _ -> true))
+
     /// EXEC-004: what `join` may consume as completion cells. Abandoned is not
     /// a completion cell — see `reportableAbandoned` for EXEC-009 batch items.
     let joinable (current: AgentLinkageProjection) =

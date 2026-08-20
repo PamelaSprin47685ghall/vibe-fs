@@ -105,7 +105,7 @@ module EventStoreJournalCodec =
 
     let private envelopeFromPayload (payload: JsonValue) : Result<Envelope, string> =
         try
-            Envelope.deserialize (JS.JSON.stringify payload)
+            Envelope.deserializeValue payload
         with ex ->
             Error ex.Message
 

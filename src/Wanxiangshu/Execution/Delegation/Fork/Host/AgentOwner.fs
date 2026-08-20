@@ -82,4 +82,4 @@ module HostForkAgentOwner =
         sendFirstPromptCore sessions journal childId agent directory prompt None None
 
     let sendFirstPromptObserved sessions journal childId agent directory prompt onAccepted onDetachedFailure =
-        sendFirstPromptCore sessions journal childId agent directory prompt (Some onAccepted) (Some onDetachedFailure)
+        HostForkRunLifecycle.sendAgentOwnerRootObserved sessions journal childId agent directory prompt onAccepted

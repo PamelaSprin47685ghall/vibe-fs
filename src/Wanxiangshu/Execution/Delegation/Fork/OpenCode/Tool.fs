@@ -151,6 +151,9 @@ module ForkTool =
             let ChargeNotPlaced = "tool/fork/charge-not-placed"
 
             [<Literal>]
+            let ChargePlacementUncertain = "tool/fork/charge-placement-uncertain"
+
+            [<Literal>]
             let PersonUnknown = "tool/fork/person-unknown"
 
             [<Literal>]
@@ -471,9 +474,14 @@ module ForkTool =
             let! placement =
                 taskResult {
                     do! recordFissionAffinity scope context handleId
-                    let! _ = runManagerFork scope runtime role request language attachment handleId managed
+                    let! result = runManagerFork scope runtime role request language attachment handleId managed
                     announceChild runtime context handleId
-                    return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+
+                    return
+                        match result with
+                        | ForkResult.DispatchUncertain _ ->
+                            consequence (namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim()))
+                        | _ -> successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
                 }
 
             match placement with

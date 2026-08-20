@@ -8,12 +8,14 @@ test('WHAT[MANAGED-SESSION-013] HFR_restart_abandoned_handle_recovered_abandoned
   const result = observed('abandon')
   assert.equal(result.ok, true)
   assert.equal(result.record.lifecycle, 'Abandoned')
+  assert.equal(result.horizonVisible, 1, 'unconsumed abandonment remains visible to the parent horizon')
 })
 
 test('WHAT[MANAGED-SESSION-013] HFR_restart_retired_handle_recovered_retired', () => {
   const result = observed('retire')
   assert.equal(result.ok, true)
   assert.equal(result.record.lifecycle, 'Retired')
+  assert.equal(result.horizonVisible, 0, 'join-retired handle may finally leave the parent horizon')
 })
 
 test('WHAT[MANAGED-SESSION-013] HFR_restart_host_owned_hidden_handle_is_filtered_out', () => {

@@ -48,3 +48,12 @@ test('WHAT[PARTICIPANT-HORIZON-011] EXEC_005_horizon_has_no_polling_or_backgroun
   const source = await readFile(sourcePath, 'utf8')
   assert.doesNotMatch(source, /AwaitChangeFrom|Task\.Delay|setInterval|setTimeout|System\.Timers|PeriodicTimer/)
 })
+
+test('WHAT[PARTICIPANT-HORIZON-011] HORIZON_abandoned_child_remains_visible_until_join_retires_it', async () => {
+  const rendered = horizon.render([agent('Ada', 'abandoned')], [])
+  assert.match(rendered, /Ada did not return/i)
+
+  const source = await readFile(sourcePath, 'utf8')
+  assert.match(source, /HandleProjection\.horizonVisible handles/)
+  assert.doesNotMatch(source, /HandleProjection\.listable handles/)
+})

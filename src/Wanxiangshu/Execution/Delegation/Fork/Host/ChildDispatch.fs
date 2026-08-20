@@ -99,11 +99,18 @@ module HostForkChildDispatch =
             children.Clear()
             pendingRuns.Clear())
 
-    let private decideExistingSendAcceptance (sent: Result<unit, string>) (result: ForkResult) =
+    let private decideExistingSendAcceptance
+        (sent: HostForkRunLifecycle.AgentOwnerDispatchOutcome)
+        (result: ForkResult)
+        =
         match sent, result with
-        | Ok(), (ForkResult.Nudged _ | ForkResult.Created _) -> Ok result
-        | Ok(), _ -> Error "Existing agent did not accept a new run"
-        | Error err, _ -> Error err
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted,
+          (ForkResult.Nudged _ | ForkResult.Created _) -> Ok result
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted, _ ->
+            Error "Existing agent did not accept a new run"
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _, _ ->
+            Ok(ForkResult.DispatchUncertain result.AgentId)
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err, _ -> Error err
 
     let private nudgeBusyChild
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
@@ -126,7 +133,13 @@ module HostForkChildDispatch =
         (sessions: ISessionHostPort)
         (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
-            string -> SessionId -> Role -> string -> string -> (PhysicalUserMessageId -> unit) -> Task<Result<unit, string>>)
+            string
+                -> SessionId
+                -> Role
+                -> string
+                -> string
+                -> (PhysicalUserMessageId -> unit)
+                -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -139,10 +152,7 @@ module HostForkChildDispatch =
         taskResult {
             HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
             let payload = Option.defaultValue prompt enrichedPrompt
-            // ofTask keeps Result intact so Error still settles failRun (not bare bind).
-            let! sent =
-                sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
-                |> TaskResultCE.ofTask
+            let! sent = sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
 
             match decideExistingSendAcceptance sent result with
             | Ok accepted -> return accepted
@@ -167,7 +177,13 @@ module HostForkChildDispatch =
         (runtime: ForkRuntime)
         (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
-            string -> SessionId -> Role -> string -> string -> (PhysicalUserMessageId -> unit) -> Task<Result<unit, string>>)
+            string
+                -> SessionId
+                -> Role
+                -> string
+                -> string
+                -> (PhysicalUserMessageId -> unit)
+                -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (onRunStarted: SessionId -> Role -> unit)
         (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
@@ -263,7 +279,13 @@ module HostForkChildDispatch =
         (runtime: ForkRuntime)
         (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
-            string -> SessionId -> Role -> string -> string -> (PhysicalUserMessageId -> unit) -> Task<Result<unit, string>>)
+            string
+                -> SessionId
+                -> Role
+                -> string
+                -> string
+                -> (PhysicalUserMessageId -> unit)
+                -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
         (preparedHandoff: PreparedDelegationHandoff option)

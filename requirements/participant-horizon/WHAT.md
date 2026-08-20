@@ -54,6 +54,8 @@ Blogger、Distiller、Bookkeeper 等内部辅助角色严禁出现在模型可�
 
 `horizon()` 是按需主动拉取的快照接口，禁止轮询、后台推送或 watcher 订阅。其返回当前在场各可见子智能体的最新工作记录；若记录暂不可读则直接说明，不得以陈旧数据伪装最新状态。
 
+父级可见 child 一旦已经 durable 建立，就不得在其最终后果尚未交付给父级前从 horizon 消失。尤其 `Abandoned` 是“该 child 没有回来”的可行动后果：在 Join 将这项后果消费并把 handle 退休之前，`horizon()` 必须继续按 Byname 展示该 child 并明确说明其未返回。只有已 `Retired` 的 handle 才可从 roster 移除；不得把 `listable/outstanding` 等终结门禁视图误用成 horizon roster。
+
 ## PARTICIPANT-HORIZON-012: warm-start hints 只向有 repository 证据 authority 的角色准入
 
 仓库热启动线索（WarmStart hints）仅向有权直接接触仓库证据的角色（Coder、Inspector、DevOps）准入。其余角色仅可沿调用链传递关键词，不得接收仓库代码片段。

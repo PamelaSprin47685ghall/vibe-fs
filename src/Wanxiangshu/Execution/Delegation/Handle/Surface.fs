@@ -78,6 +78,7 @@ module HandleSurface =
                    action = action
                    record = snapshot finalProjection
                    listable = HandleProjection.listable finalProjection |> List.length
+                   horizonVisible = HandleProjection.horizonVisible finalProjection |> List.length
                    joinable = HandleProjection.joinable finalProjection |> List.length |}
 
     /// Crash-reconciliation matrix at the handle owner. Duplicate completion

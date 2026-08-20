@@ -15,6 +15,8 @@ open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -38,6 +40,67 @@ open Wanxiangshu.Mission.Obligation.Todo
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
 module HostForkRunLifecycle =
 
+    [<RequireQualifiedAccess>]
+    type AgentOwnerDispatchOutcome =
+        | Accepted
+        | AcceptanceUncertain of string
+        | Rejected of string
+
+    let private durableDispatchObservation
+        (durable: AgentJournal)
+        (childId: SessionId)
+        (payloadDigest: string)
+        =
+        let projections = (AgentJournal.snapshot durable).AgentProjections
+
+        match PromptAuthorityLedger.dispatchStatusFor childId payloadDigest projections with
+        | PromptAuthorityLedger.DispatchStatus.Accepted evidence -> Choice1Of3 evidence
+        | PromptAuthorityLedger.DispatchStatus.Pending ->
+            match PromptAuthorityLedger.pendingDispatchClaim childId payloadDigest projections with
+            | Some claim -> Choice2Of3 claim
+            | None ->
+                raise (
+                    InvalidOperationException(
+                        "PromptAuthority projection reported Pending without the matching durable claim"
+                    )
+                )
+        | PromptAuthorityLedger.DispatchStatus.Dispatchable -> Choice3Of3()
+
+    let private classifySendError
+        (durable: AgentJournal)
+        (childId: SessionId)
+        (prompt: string)
+        (onAccepted: PhysicalUserMessageId -> unit)
+        (error: string)
+        =
+        let payloadDigest = HostDigest.sha256Hex prompt
+
+        let accepted evidence =
+            // Close the race where PhysicalAccepted landed after the dispatcher
+            // cancelled its synchronous waiter but before we inspected durable
+            // evidence. Binding the same root twice is idempotent assignment.
+            onAccepted evidence.PhysicalUserMessageId
+            AgentOwnerDispatchOutcome.Accepted
+
+        match durableDispatchObservation durable childId payloadDigest with
+        | Choice1Of3 evidence -> accepted evidence
+        | Choice3Of3() -> AgentOwnerDispatchOutcome.Rejected error
+        | Choice2Of3 claim ->
+            // AcceptanceUnknown intentionally leaves the claim Pending. Restore
+            // the process-local callback that PromptDispatcher cancelled when its
+            // synchronous Result was Error, then re-read durable truth to close
+            // the accepted-between-read-and-register race.
+            PromptPhysicalAcceptance.register claim.PromptKey onAccepted
+
+            match durableDispatchObservation durable childId payloadDigest with
+            | Choice1Of3 evidence ->
+                PromptPhysicalAcceptance.cancel claim.PromptKey
+                accepted evidence
+            | Choice2Of3 _ -> AgentOwnerDispatchOutcome.AcceptanceUncertain error
+            | Choice3Of3() ->
+                PromptPhysicalAcceptance.cancel claim.PromptKey
+                AgentOwnerDispatchOutcome.Rejected error
+
     let workRecordForOutcome
         (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> int64)
@@ -57,7 +120,7 @@ module HostForkRunLifecycle =
     /// PROMPT-005: the journal is required. A journal-less dispatcher would report
     /// success for a claim it never wrote, which is the one failure mode the
     /// four-fact protocol exists to prevent.
-    let sendAgentOwnerRoot
+    let sendAgentOwnerRootObserved
         (sessions: ISessionHostPort)
         (journal: AgentJournal option)
         (childId: SessionId)
@@ -65,10 +128,10 @@ module HostForkRunLifecycle =
         (directory: string option)
         (prompt: string)
         (onAccepted: PhysicalUserMessageId -> unit)
-        : Task<Result<unit, string>> =
+        : Task<AgentOwnerDispatchOutcome> =
         task {
             match journal with
-            | None -> return Error "No journal: an AgentOwnerRoot prompt cannot be claimed"
+            | None -> return AgentOwnerDispatchOutcome.Rejected "No journal: an AgentOwnerRoot prompt cannot be claimed"
             | Some durable ->
                 let svc = PromptDispatcher.forJournal durable
                 let! sent =
@@ -81,7 +144,10 @@ module HostForkRunLifecycle =
                         PromptDispatcher.AwaitMode.Await
                         (Some onAccepted)
 
-                return sent |> Result.map ignore
+                return
+                    match sent with
+                    | Ok _ -> AgentOwnerDispatchOutcome.Accepted
+                    | Error error -> classifySendError durable childId prompt onAccepted error
         }
 
     /// PROMPT-006: every child prompt is an AgentOwnerRoot through the Dispatcher.
@@ -100,7 +166,7 @@ module HostForkRunLifecycle =
         (prompt: string)
         (onAccepted: PhysicalUserMessageId -> unit)
         =
-        sendAgentOwnerRoot sessions journal childId agent directory prompt onAccepted
+        sendAgentOwnerRootObserved sessions journal childId agent directory prompt onAccepted
 
     let childPromptSender sessions parentId journal directoryOf =
         fun agentId childId (_role: Role) agent prompt onAccepted ->

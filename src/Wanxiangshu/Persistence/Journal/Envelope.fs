@@ -3,6 +3,8 @@ namespace Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -136,39 +138,66 @@ module Envelope =
     let private providerRunDecoder: Decoder<ProviderRunIdentity option> =
         Decode.option (Decode.string |> Decode.map ProviderRunIdentity.create)
 
+    let private magicTodoEnvelopeDecoder: Decoder<Envelope> =
+        Decode.object (fun get ->
+            let canonical =
+                get.Required.Field
+                    "Fact"
+                    (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
+
+            match MagicTodoFactCodec.tryDecode canonical with
+            | Ok fact ->
+                { RuntimeId = RuntimeId.create (get.Required.Field "RuntimeId" Decode.string)
+                  LocalSeq = LocalSeq.create (get.Required.Field "LocalSeq" Decode.int64)
+                  ObservedAt = get.Required.Field "ObservedAt" Decode.datetimeOffset
+                  EventId = EventId.create (get.Required.Field "EventId" Decode.string)
+                  Stream = get.Required.Field "Stream" streamDecoder
+                  ProviderRun = get.Required.Field "ProviderRun" providerRunDecoder
+                  Fact = Fact.MagicTodo fact }
+            | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
+
+    let private currentEnvelopeDecoder: Decoder<Envelope> =
+        Decode.Auto.generateDecoderCached<Envelope>(extra = extra)
+
     let private decodeMagicTodoEnvelope decoder json =
         match Decode.fromString decoder json with
         | Ok envelope -> Some envelope
         | Error _ -> None
 
     let private tryDecodeMagicTodoEnvelope (json: string) : Envelope option =
-        let decoder: Decoder<Envelope> =
-            Decode.object (fun get ->
-                let canonical =
-                    get.Required.Field
-                        "Fact"
-                        (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
-
-                match MagicTodoFactCodec.tryDecode canonical with
-                | Ok fact ->
-                    { RuntimeId = RuntimeId.create (get.Required.Field "RuntimeId" Decode.string)
-                      LocalSeq = LocalSeq.create (get.Required.Field "LocalSeq" Decode.int64)
-                      ObservedAt = get.Required.Field "ObservedAt" Decode.datetimeOffset
-                      EventId = EventId.create (get.Required.Field "EventId" Decode.string)
-                      Stream = get.Required.Field "Stream" streamDecoder
-                      ProviderRun = get.Required.Field "ProviderRun" providerRunDecoder
-                      Fact = Fact.MagicTodo fact }
-                | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
-
-        try
-            decodeMagicTodoEnvelope decoder json
-        with _ ->
+        if json.IndexOf("\"MagicTodo\"", StringComparison.Ordinal) < 0 then
             None
+        else
+            try
+                decodeMagicTodoEnvelope magicTodoEnvelopeDecoder json
+            with _ ->
+                None
+
+    let private hasMagicTodoFact (value: JsonValue) : bool =
+        emitJsExpr
+            value
+            "!!$0 && typeof $0 === 'object' && !!$0.Fact && typeof $0.Fact === 'object' && Object.prototype.hasOwnProperty.call($0.Fact, 'MagicTodo')"
+
+    let private tryDecodeMagicTodoEnvelopeValue (value: JsonValue) : Envelope option =
+        if not (hasMagicTodoFact value) then
+            None
+        else
+            try
+                match Decode.fromValue "$" magicTodoEnvelopeDecoder value with
+                | Ok envelope -> Some envelope
+                | Error _ -> None
+            with _ ->
+                None
 
     let private deserializeCurrentEnvelope json =
         match tryDecodeMagicTodoEnvelope json with
         | Some envelope -> Ok envelope
-        | None -> Decode.Auto.fromString<Envelope> (json, extra = extra)
+        | None -> Decode.fromString currentEnvelopeDecoder json
+
+    let private deserializeCurrentEnvelopeValue (value: JsonValue) =
+        match tryDecodeMagicTodoEnvelopeValue value with
+        | Some envelope -> Ok envelope
+        | None -> Decode.fromValue "$" currentEnvelopeDecoder value
 
     let deserialize (json: string) : Result<Envelope, string> =
         if FactCodec.containsLegacyFallbackFields json then
@@ -177,3 +206,15 @@ module Envelope =
             Error FactCodec.tipV2CleanBreakMessage
         else
             deserializeCurrentEnvelope json
+
+    /// EventStore already owns a parsed canonical payload. Decode it directly
+    /// instead of stringify -> parse on every replayed Journal event.
+    let deserializeValue (value: JsonValue) : Result<Envelope, string> =
+        let json = JS.JSON.stringify value
+
+        if FactCodec.containsLegacyFallbackFields json then
+            Error FactCodec.pre050MigrationMessage
+        elif FactCodec.containsLegacyScoreVectorEntry json then
+            Error FactCodec.tipV2CleanBreakMessage
+        else
+            deserializeCurrentEnvelopeValue value

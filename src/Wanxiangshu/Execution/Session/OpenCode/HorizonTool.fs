@@ -187,7 +187,7 @@ module HorizonTool =
 
     let private appendHandleLinesForRoster language journal snapshot runtimeByAgentId agentLines handles =
         task {
-            for handle in HandleProjection.listable handles do
+            for handle in HandleProjection.horizonVisible handles do
                 do! appendHandleLines language journal snapshot runtimeByAgentId agentLines handle
         }
 
