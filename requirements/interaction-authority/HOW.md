@@ -33,7 +33,7 @@
 | INTERACTION-AUTHORITY-009 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-010 | `requirements/interaction-authority/tests/join-guard.test.mjs` |
 | INTERACTION-AUTHORITY-011 | `requirements/interaction-authority/tests/chat-params-hook.test.mjs` |
-| INTERACTION-AUTHORITY-012 | `requirements/interaction-authority/tests/assistance-host.test.mjs` |
+| INTERACTION-AUTHORITY-012 | `requirements/interaction-authority/tests/assistance-host.test.mjs`, `requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs` |
 | INTERACTION-AUTHORITY-013 | `requirements/interaction-authority/tests/assistance-host.test.mjs` |
 | INTERACTION-AUTHORITY-014 | `requirements/interaction-authority/tests/join-guard-execution.test.mjs` |
 | INTERACTION-AUTHORITY-015 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` |
