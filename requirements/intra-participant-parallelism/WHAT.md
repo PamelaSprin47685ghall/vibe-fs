@@ -36,6 +36,8 @@ Fission 准入必须原子地建立全部 N 条 lanes。任一 lane 的创建、
 
 仅在所有 lane 的自有工作记录、裂变前广播债权与各 lane 亲和任务均完成结算后，group 方可收敛。一个 Fission group 最终仅向逻辑父级交付一次普通的 terminal completion，并将结果写回原 logical participant 的 completion cell。
 
+收敛后的最终接管属于同一个 logical lane 生命周期，而不是某一条固定的 physical user message。最终接管期间若发生 nudge、assistance、provider recovery/AABB 或 LoopKill→AABB，其后继 continuation 仍由该接管 lane 拥有；只有后继链最终产生普通 `TurnCompleted` 后才允许写入 `FissionConverged` 并发布 logical completion。
+
 ## INTRA-PARTICIPANT-PARALLELISM-010: durable replay，不猜 lane
 
 裂变产生的 group 标识、lane 成员关系、替换关系与收敛终结均依赖不可变的 durable facts 进行审计与重放；严禁通过扫描外部相似会话推测并发实体。进程中断后未完成的裂变作为中断事实记录，不进行自动隐式恢复。
@@ -51,3 +53,11 @@ Fission 的角色权能准入必须从 office consequence 的单一源头投影�
 ## INTRA-PARTICIPANT-PARALLELISM-013: subsession-only origin
 
 裂变的调用源校验与角色权能正交：调用方必须证明自身为物理 subsession。直面用户的根会话在任何资源预留、记录物化或中断前必须直接 fail-closed，且在向模型投影工具集时显式剔除 Fission 工具，防止根会话被错误裂变。
+
+## INTRA-PARTICIPANT-PARALLELISM-014: control-plane successor precedes lane settlement
+
+Fission 不拥有 nudge、`[NEEDHELP]` assistance、provider fallback/AABB 或 LoopDetector 的恢复语义。对 Fission lane 的 reconciled turn：`TurnInProgress`、`TurnNeedsContinuation`、`TurnFailed` 与由 LoopKill 导致的 `TurnAborted` 必须让渡给普通 Turn/Application owner；成功建立的 assistance continuation 同样先于 Fission settlement。上述路径不得 materialize lane、不得失败 group、不得发布 logical completion。仅稳定 `TurnCompleted` 可进入 lane materialization / final takeover completion；真正的外部 abort 才可终止 group。若 Assistance 已认领该 physical abort、但 successor 无法建立，则错误必须交还 Fission owner 对整个 logical group fail-closed，不能只终止物理 lane 而遗留 active group。
+
+## INTRA-PARTICIPANT-PARALLELISM-015: deterministic ring convergence
+
+Ring convergence 的顺序只由 canonical lane index/count 决定。V1 的 ring fold 从 lane `0` 按索引递增环行至 lane `N-1`，以 keyed union 合并记录，并由确定的终点 lane `N-1` 接受最终 takeover。不得持久化或读取“最后到达/最后 materialize 的 lane”来选择接管者；不同完成到达顺序必须得到同一 merge order、同一 takeover lane 与同一 aggregate。

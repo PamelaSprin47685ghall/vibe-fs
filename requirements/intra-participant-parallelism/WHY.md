@@ -10,9 +10,11 @@
 
 1. **一人多 Present**：Fission 仅增加物理执行通路（lanes），不创建新的业务身份或句柄；所有 lanes 共享同一个 logical identity 与 responsibility owner。
 2. **全有或全无准入（All-or-None Admission）**：所有 lanes 的创建与启动必须原子生效；任一失败则全量回滚，旧 caller 继续运行且不受干扰。
-3. **静默中断与单点收口**：旧物理执行者在全量 lanes 建立后静默退休，不产生业务中止；整个 group 最终仅向父级交付一次 terminal completion。
+3. **控制面先行，Fission 后收口**：旧物理执行者在全量 lanes 建立后静默退休，不产生业务中止。任一 lane 或最终接管 present 遭遇 nudge、`[NEEDHELP]` assistance、provider recovery/AABB、LoopKill 时，先由这些能力的 owner 完成同一 logical run 的 successor；Fission 只消费 successor 之后真正稳定的 completion，整个 group 最终仅向父级交付一次 terminal completion。
 4. **既有债权广播与后续债权亲和**：裂变前的未完成子任务向所有 lanes 广播；裂变后各 lane 新发起的子任务归属于该发起 lane。
 5. **Keyed 结果收敛**：各 lane 的工作记录按 lane 索引作为唯一 key 进行合并，以集合并集而非到达时序确定最终产物。
+
+因此 Fission 不能把某一次 physical attempt 当成 lane 生命周期。physical attempt 可被控制面中断并产生后继；lane 生命周期跨越这些 attempts，直到稳定 completion 后才进入 ring convergence。
 
 ## 破坏后果
 

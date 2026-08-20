@@ -275,14 +275,14 @@ module FissionHost =
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (blocks: ResizeArray<string>)
-        laneIndex
+        laneIndexes
         =
         taskResult {
-            if laneIndex >= group.LaneCount then
-                return ()
-            else
+            match laneIndexes with
+            | [] -> return ()
+            | laneIndex :: rest ->
                 do! appendOneLaneWork durable group blocks laneIndex
-                return! appendLaneWorkBlocks durable group blocks (laneIndex + 1)
+                return! appendLaneWorkBlocks durable group blocks rest
         }
 
     let private appendOneSharedCompletion
@@ -326,7 +326,7 @@ module FissionHost =
             blocks.Add ""
             blocks.Add "[owner_before_fission]"
             blocks.Add ownerRecord
-            do! appendLaneWorkBlocks durable group blocks 0
+            do! appendLaneWorkBlocks durable group blocks (FissionRing.mergeOrder group.LaneCount)
 
             do!
                 group.PreFissionCompletionIds
@@ -430,7 +430,7 @@ module FissionHost =
         aggregate
         =
         let target =
-            group.LastMaterializedLaneIndex
+            FissionRing.finalLane group.LaneCount
             |> Option.bind (fun laneIndex ->
                 Map.tryFind laneIndex group.LaneSessions
                 |> Option.map (fun laneSessionId -> laneIndex, laneSessionId))
@@ -769,6 +769,32 @@ module FissionHost =
             | _ -> ()
         }
 
+    /// Assistance may own a physical abort before Fission sees the turn. If the
+    /// assistance successor cannot be established, return that terminal error to
+    /// the Fission owner instead of killing only one physical lane and leaking an
+    /// active logical group.
+    let failLaneIfActive
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (laneSessionId: SessionId)
+        reason
+        : Task<bool> =
+        task {
+            match journal with
+            | None -> return false
+            | Some durable ->
+                match
+                    FissionProjection.tryMembershipOfLane
+                        laneSessionId
+                        (AgentJournal.snapshot durable).AgentProjections.Fission
+                with
+                | None -> return false
+                | Some(group, _) ->
+                    do! failGroup sessionPort eventPort durable group reason
+                    return true
+        }
+
     let private validateOwnerRunResult (result: AgentRunResult) =
         if result.IsValid then
             Ok result
@@ -985,39 +1011,23 @@ module FissionHost =
         | FissionGroupTerminal.Open ->
             observeOpenLaneCompletion sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
-    [<RequireQualifiedAccess>]
-    type private TakeoverTurnDisposition =
-        | Stale
-        | Current
+    let private settlementObservation abortCause outcome =
+        match outcome, abortCause with
+        | ReconcileProgram.TurnInProgress, _ -> FissionSettlementObservation.OngoingExecution
+        | ReconcileProgram.TurnNeedsContinuation _, _ -> FissionSettlementObservation.NeedsContinuation
+        | ReconcileProgram.TurnFailed _, _ -> FissionSettlementObservation.ProviderFailed
+        | ReconcileProgram.TurnAborted _, AbortCause.LoopKill -> FissionSettlementObservation.LoopInterrupted
+        | ReconcileProgram.TurnAborted reason, AbortCause.External -> FissionSettlementObservation.ExternalAbort reason
+        | ReconcileProgram.TurnCompleted, _ -> FissionSettlementObservation.Completed
 
-    let private acceptedDispatchForPromptKey (durable: AgentJournal) laneSessionId promptKey =
-        AgentProjection.tryFind laneSessionId (AgentJournal.snapshot durable).AgentProjections
-        |> Option.bind (fun session -> session.PromptAuthority)
-        |> Option.bind (fun authority ->
-            authority.AcceptedDispatches
-            |> Map.tryPick (fun _ acceptedDispatch ->
-                if acceptedDispatch.PromptKey = promptKey then
-                    Some acceptedDispatch
-                else
-                    None))
+    let private settlementObservationOfTurn abortCause (turn: ReconciledTurn) =
+        settlementObservation abortCause turn.Outcome
 
-    let private takeoverPhysicalMessage (durable: AgentJournal) (takeover: FissionTakeoverProjection) =
-        match takeover.PhysicalUserMessageId, takeover.PromptKey with
-        | Some physicalUserMessageId, _ -> Some physicalUserMessageId
-        | None, Some promptKey ->
-            acceptedDispatchForPromptKey durable takeover.LaneSessionId promptKey
-            |> Option.map (fun acceptedDispatch -> acceptedDispatch.PhysicalUserMessageId)
-        | None, None -> None
-
-    let private classifyTakeoverTurn
-        (durable: AgentJournal)
-        (takeover: FissionTakeoverProjection)
-        (turn: ReconciledTurn)
-        =
-        match turn.SessionId = takeover.LaneSessionId, takeoverPhysicalMessage durable takeover with
-        | true, Some physicalUserMessageId when turn.PhysicalUserMessageId = physicalUserMessageId ->
-            TakeoverTurnDisposition.Current
-        | _ -> TakeoverTurnDisposition.Stale
+    let private failSettlement sessionPort eventPort durable group reason =
+        task {
+            do! failGroup sessionPort eventPort durable group reason
+            return true
+        }
 
     let private observeCurrentTakeoverOutcome
         (sessionPort: ISessionHostPort)
@@ -1025,18 +1035,15 @@ module FissionHost =
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (takeover: FissionTakeoverProjection)
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         =
-        match turn.Outcome with
-        | ReconcileProgram.TurnInProgress
-        | ReconcileProgram.TurnNeedsContinuation _
-        | ReconcileProgram.TurnFailed _ -> task { return false }
-        | ReconcileProgram.TurnAborted reason ->
-            task {
-                do! failGroup sessionPort eventPort durable group reason
-                return true
-            }
-        | ReconcileProgram.TurnCompleted -> completeTakeover sessionPort eventPort durable group takeover turn
+        match FissionSettlement.decideTakeover (settlementObservationOfTurn abortCause turn) with
+        | FissionTakeoverSettlementDecision.YieldToTurnWorkflow -> task { return false }
+        | FissionTakeoverSettlementDecision.FailGroup reason ->
+            failSettlement sessionPort eventPort durable group reason
+        | FissionTakeoverSettlementDecision.CompleteOwner ->
+            completeTakeover sessionPort eventPort durable group takeover turn
 
     let private observeTakeoverOutcome
         (sessionPort: ISessionHostPort)
@@ -1044,15 +1051,19 @@ module FissionHost =
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         (takeover: FissionTakeoverProjection)
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         =
-        match classifyTakeoverTurn durable takeover turn with
-        | TakeoverTurnDisposition.Stale ->
-            // The handoff is already admitted. Any replay of an earlier slice
-            // terminal is stale and cannot rematerialize or complete the owner.
+        if turn.SessionId = takeover.LaneSessionId then
+            // Composition/Turn has already reconciled this observation against
+            // the session's current physical user message. The takeover owns the
+            // lane across every same-run continuation; re-freezing it to the first
+            // FissionHandoff physical id would strand nudge/NEEDHELP/AABB successors.
+            observeCurrentTakeoverOutcome sessionPort eventPort durable group takeover abortCause turn
+        else
+            // Once takeover is claimed, all non-terminal lanes are historical
+            // physical presents and cannot regain settlement ownership.
             task { return true }
-        | TakeoverTurnDisposition.Current ->
-            observeCurrentTakeoverOutcome sessionPort eventPort durable group takeover turn
 
     let private observeOpenLaneOutcome
         (sessionPort: ISessionHostPort)
@@ -1062,22 +1073,13 @@ module FissionHost =
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         =
-        match turn.Outcome with
-        | ReconcileProgram.TurnInProgress
-        | ReconcileProgram.TurnNeedsContinuation _ -> task { return false }
-        | ReconcileProgram.TurnFailed _ ->
-            // Provider-attempt failure remains lane-local and follows the
-            // ordinary A/A/B/B recovery path. Fission does not turn one
-            // failed attempt into group failure.
-            task { return false }
-        | ReconcileProgram.TurnAborted reason ->
-            task {
-                do! failGroup sessionPort eventPort durable group reason
-                return true
-            }
-        | ReconcileProgram.TurnCompleted ->
+        match FissionSettlement.decideLane (settlementObservationOfTurn abortCause turn) with
+        | FissionLaneSettlementDecision.YieldToTurnWorkflow -> task { return false }
+        | FissionLaneSettlementDecision.FailGroup reason -> failSettlement sessionPort eventPort durable group reason
+        | FissionLaneSettlementDecision.MaterializeLane ->
             observeCompletedLane sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
 
     let private observeLaneOutcome
@@ -1088,15 +1090,16 @@ module FissionHost =
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         =
         match group.Terminal, group.Takeover with
         | FissionGroupTerminal.Converged _, _
         | FissionGroupTerminal.Failed _, _ -> task { return true }
         | FissionGroupTerminal.Open, Some takeover ->
-            observeTakeoverOutcome sessionPort eventPort durable group takeover turn
+            observeTakeoverOutcome sessionPort eventPort durable group takeover abortCause turn
         | FissionGroupTerminal.Open, None ->
-            observeOpenLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
+            observeOpenLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex abortCause turn
 
     let private observeDurableLaneTurn
         (sessionPort: ISessionHostPort)
@@ -1104,6 +1107,7 @@ module FissionHost =
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (durable: AgentJournal)
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         =
         match
@@ -1113,7 +1117,7 @@ module FissionHost =
         with
         | None -> task { return false }
         | Some(group, laneIndex) ->
-            observeLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
+            observeLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex abortCause turn
 
     /// Returns true when this turn belongs to Fission and its terminal semantics
     /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
@@ -1123,6 +1127,7 @@ module FissionHost =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (abortCause: AbortCause)
         (turn: ReconciledTurn)
         : Task<bool> =
         task {
@@ -1142,5 +1147,5 @@ module FissionHost =
                 return true
             | false, None -> return false
             | false, Some durable ->
-                return! observeDurableLaneTurn sessionPort eventPort journal joinGuardNudges durable turn
+                return! observeDurableLaneTurn sessionPort eventPort journal joinGuardNudges durable abortCause turn
         }

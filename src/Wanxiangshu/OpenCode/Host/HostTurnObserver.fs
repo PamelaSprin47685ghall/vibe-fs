@@ -254,7 +254,7 @@ module HostTurnObserver =
             do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
             let! fissionHandled =
-                FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges turn
+                FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges abortCause turn
 
             if not isFissionOwner && not fissionHandled then
                 do!
@@ -297,6 +297,25 @@ module HostTurnObserver =
                         abortCause
                         context
         }
+
+    let private closeUnresolvedAssistance
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        : Task =
+        task {
+            do! XWire.reconcileAttempt journal scope turn
+
+            let reason = "assistance escalation could not continue"
+            let! fissionOwned = FissionHost.failLaneIfActive sessionPort eventPort journal turn.SessionId reason
+
+            if not fissionOwned then
+                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                |> ignore
+        }
+        :> Task
 
     let private observeBusinessTurn
         (recoveryTimerPort: ITimerPort)
@@ -365,14 +384,7 @@ module HostTurnObserver =
                 do! XWire.reconcileAttempt journal scope turn
                 return ()
             | AssistanceTurnDisposition.ClaimedButUnresolved ->
-                do! XWire.reconcileAttempt journal scope turn
-
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed "assistance escalation could not continue")
-                |> ignore
-
-                return ()
+                return! closeUnresolvedAssistance sessionPort eventPort journal scope turn
             | AssistanceTurnDisposition.NotAssistance ->
                 dropNeedHelpIfTerminal scope turn
                 return! observeWithoutAssistance ()

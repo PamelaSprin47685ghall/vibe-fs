@@ -88,6 +88,32 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] ring successor wraps and forwards 
   assert.equal(fission.ringSuccessor(4, 3, [1, 2, 3]), 0, 'lane N-1 wraps to lane 0')
 })
 
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-015] ring fold order and final takeover lane are canonical, never arrival ordered', () => {
+  assert.deepEqual(fission.ringMergeOrder(4), [0, 1, 2, 3])
+  assert.equal(fission.ringFinalLane(4), 3)
+  assert.deepEqual(fission.ringMergeOrder(2), [0, 1])
+  assert.equal(fission.ringFinalLane(2), 1)
+  assert.deepEqual(fission.ringMergeOrder(1), [])
+  assert.equal(fission.ringFinalLane(1), null)
+})
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] control-plane successors run before lane settlement and final takeover', () => {
+  for (const phase of ['lane', 'takeover']) {
+    for (const observation of ['running', 'needs-continuation', 'provider-failed', 'loop-interrupted']) {
+      assert.equal(
+        fission.settlementDecision(phase, observation),
+        'yield-to-turn-workflow',
+        `${phase}/${observation} must remain inside the ordinary continuation owner`,
+      )
+    }
+  }
+
+  assert.equal(fission.settlementDecision('lane', 'completed'), 'materialize-lane')
+  assert.equal(fission.settlementDecision('takeover', 'completed'), 'complete-owner')
+  assert.equal(fission.settlementDecision('lane', 'external-abort'), 'fail-group')
+  assert.equal(fission.settlementDecision('takeover', 'external-abort'), 'fail-group')
+})
+
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-001] lanes carry no provider-visible identity or handle and keep the same logical participant', () => {
   const lane = fission.startedLane(1, 'lane-session-1', 'lane input')
   assertJsData(lane, 'started lane')

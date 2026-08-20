@@ -262,6 +262,36 @@ module FissionSurface =
         |> Option.map box
         |> Option.defaultValue null
 
+    let ringMergeOrder (laneCount: int) : int array =
+        FissionRing.mergeOrder laneCount |> List.toArray
+
+    let ringFinalLane (laneCount: int) : obj =
+        FissionRing.finalLane laneCount |> Option.map box |> Option.defaultValue null
+
+    let settlementDecision (phase: string) (observation: string) : string =
+        let parsedObservation =
+            match observation with
+            | "running" -> FissionSettlementObservation.OngoingExecution
+            | "needs-continuation" -> FissionSettlementObservation.NeedsContinuation
+            | "provider-failed" -> FissionSettlementObservation.ProviderFailed
+            | "loop-interrupted" -> FissionSettlementObservation.LoopInterrupted
+            | "external-abort" -> FissionSettlementObservation.ExternalAbort "external abort"
+            | "completed" -> FissionSettlementObservation.Completed
+            | _ -> invalidArg "observation" "unknown Fission settlement observation"
+
+        match phase with
+        | "lane" ->
+            match FissionSettlement.decideLane parsedObservation with
+            | FissionLaneSettlementDecision.YieldToTurnWorkflow -> "yield-to-turn-workflow"
+            | FissionLaneSettlementDecision.MaterializeLane -> "materialize-lane"
+            | FissionLaneSettlementDecision.FailGroup _ -> "fail-group"
+        | "takeover" ->
+            match FissionSettlement.decideTakeover parsedObservation with
+            | FissionTakeoverSettlementDecision.YieldToTurnWorkflow -> "yield-to-turn-workflow"
+            | FissionTakeoverSettlementDecision.CompleteOwner -> "complete-owner"
+            | FissionTakeoverSettlementDecision.FailGroup _ -> "fail-group"
+        | _ -> invalidArg "phase" "unknown Fission settlement phase"
+
     let convergenceReady (laneCount: int) (completionIds: string array) (bundle: obj) (delivery: obj) : bool =
         FissionConvergence.ready laneCount (Array.toList completionIds) (bundleOfJs bundle) (deliveryOfJs delivery)
 

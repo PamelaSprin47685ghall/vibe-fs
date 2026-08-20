@@ -46,6 +46,7 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
   const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const facts = read('src/Wanxiangshu/Execution/Fission/Facts.fs')
+  const projection = read('src/Wanxiangshu/Execution/Fission/Projection.fs')
 
   assert.match(host, /FissionFact\.FissionTakeoverClaimed/)
   assert.match(host, /SendContinuation[\s\S]{0,1200}?ContinuationKind\.FissionHandoff[\s\S]{0,600}?AwaitMode\.Await/)
@@ -55,12 +56,15 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
     'lane-terminal observation must not block waiting for a future chat.message physical id',
   )
   assert.match(facts, /FissionTakeoverClaimed[\s\S]{0,500}?PromptKey:\s*PromptKey/)
-  assert.match(host, /acceptedDispatch\.PromptKey\s*=\s*promptKey/)
-  assert.match(host, /takeover\.PromptKey[\s\S]{0,500}?acceptedDispatchForPromptKey/)
-  assert.match(host, /turn\.PhysicalUserMessageId\s*=\s*physicalUserMessageId/)
+  assert.doesNotMatch(host, /acceptedDispatchForPromptKey|takeoverPhysicalMessage|TakeoverTurnDisposition/)
+  assert.match(host, /turn\.SessionId\s*=\s*takeover\.LaneSessionId/)
   assert.match(host, /CompletedTurnClassifier\.partsSessionText turn\.Parts/)
   assert.match(host, /NotifyTerminal group\.OwnerSessionId \(TerminalOutcome\.Completed result\)/)
   assert.doesNotMatch(host, /TerminalText\s*=\s*aggregate/)
+
+  assert.match(host, /FissionRing\.finalLane group\.LaneCount/)
+  assert.doesNotMatch(host, /LastMaterializedLaneIndex/)
+  assert.doesNotMatch(projection, /LastMaterializedLaneIndex/)
 
   const physicalEndAt = bootstrap.indexOf('onPhysicalExecutionEnd =')
   assert.ok(physicalEndAt >= 0, 'physical execution terminal callback must exist')
@@ -81,6 +85,22 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
   assert.match(host, /FissionRuntime\.isSilentInterrupt sessionId/)
   assert.match(bootstrap, /FissionHost\.routeAttemptAborted/)
   assert.doesNotMatch(bootstrap, /FissionRuntime\.isSilentInterrupt/)
+})
+
+test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Assistance and Loop/AABB remain control-plane owners before Fission settlement', () => {
+  const observer = read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
+  const host = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+
+  const businessTurn = observer.slice(observer.indexOf('let private observeBusinessTurn'))
+  const assistanceAt = businessTurn.indexOf('scope.HandleAssistanceTurn context')
+  const ordinaryPathAt = businessTurn.indexOf('observeWithoutAssistance ()', assistanceAt)
+  assert.ok(assistanceAt >= 0 && ordinaryPathAt > assistanceAt, 'NEEDHELP assistance must establish its successor before entering the Fission/ordinary settlement path')
+  assert.match(observer, /AssistanceTurnDisposition\.ClaimedButUnresolved[\s\S]{0,250}?closeUnresolvedAssistance/)
+  assert.match(observer, /let private closeUnresolvedAssistance[\s\S]{0,700}?FissionHost\.failLaneIfActive/)
+  assert.match(observer, /FissionHost\.observeLaneTurn[\s\S]{0,300}?abortCause/)
+  assert.match(host, /AbortCause\.LoopKill[\s\S]{0,300}?FissionSettlementObservation\.LoopInterrupted/)
+  assert.match(host, /FissionLaneSettlementDecision\.YieldToTurnWorkflow/)
+  assert.match(host, /FissionTakeoverSettlementDecision\.YieldToTurnWorkflow/)
 })
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {

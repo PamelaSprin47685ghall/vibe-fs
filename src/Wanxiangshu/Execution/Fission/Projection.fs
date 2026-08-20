@@ -38,7 +38,6 @@ type FissionGroupProjection =
       PreFissionCompletionIds: Set<string>
       LaneWork: Map<int, BlobRef * BlobDigest>
       LaneProviderRuns: Map<int, ProviderRunIdentity>
-      LastMaterializedLaneIndex: int option
       CapturedCompletions: Map<string, BlobRef * BlobDigest>
       CompletionDeliveries: Map<string, Set<int>>
       ExternalAffinities: Map<string, int>
@@ -220,7 +219,6 @@ module FissionProjection =
               PreFissionCompletionIds = Set.ofList payload.PreFissionCompletionIds
               LaneWork = Map.empty
               LaneProviderRuns = Map.empty
-              LastMaterializedLaneIndex = None
               CapturedCompletions = Map.empty
               CompletionDeliveries = Map.empty
               ExternalAffinities = Map.empty
@@ -273,8 +271,7 @@ module FissionProjection =
                 { group with
                     LaneWork =
                         Map.add payload.LaneIndex (payload.WorkRecordRef, payload.WorkRecordDigest) group.LaneWork
-                    LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns
-                    LastMaterializedLaneIndex = Some payload.LaneIndex }
+                    LaneProviderRuns = Map.add payload.LaneIndex payload.ProviderRun group.LaneProviderRuns }
 
             Ok(replaceGroup state payload.GroupId next)
 

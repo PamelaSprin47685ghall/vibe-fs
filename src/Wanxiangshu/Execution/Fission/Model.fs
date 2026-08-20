@@ -1,35 +1,5 @@
 namespace Wanxiangshu.Execution.Fission
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-
 open System
 
 [<RequireQualifiedAccess>]
@@ -152,6 +122,16 @@ module FissionWorkBundle =
 
 module FissionRing =
 
+    /// Canonical ring fold. The order is a property of the topology, not of
+    /// callback arrival. Keeping this tiny makes arrival-order convergence
+    /// literally unrepresentable in the domain model.
+    let mergeOrder laneCount =
+        if laneCount < 2 then [] else [ 0 .. laneCount - 1 ]
+
+    /// V1 closes the canonical ring at N-1. Every valid group therefore has one
+    /// deterministic physical present that may receive the final takeover.
+    let finalLane laneCount = mergeOrder laneCount |> List.tryLast
+
     /// Ring transport is derived from lane index/count. Closed successors are
     /// skipped mechanically until the next live present; when every lane is
     /// closed the durable group finalizer owns the bundle.
@@ -164,6 +144,50 @@ module FissionRing =
             [ 1..laneCount ]
             |> List.map (fun offset -> (laneIndex + offset) % laneCount)
             |> List.tryFind (fun candidate -> not (Set.contains candidate closed))
+
+[<RequireQualifiedAccess>]
+type FissionSettlementObservation =
+    | OngoingExecution
+    | NeedsContinuation
+    | ProviderFailed
+    | LoopInterrupted
+    | ExternalAbort of string
+    | Completed
+
+[<RequireQualifiedAccess>]
+type FissionLaneSettlementDecision =
+    | YieldToTurnWorkflow
+    | MaterializeLane
+    | FailGroup of string
+
+[<RequireQualifiedAccess>]
+type FissionTakeoverSettlementDecision =
+    | YieldToTurnWorkflow
+    | CompleteOwner
+    | FailGroup of string
+
+/// Pure ownership law at the Fission/Turn boundary. Fission does not implement
+/// nudge, assistance, fallback, AABB, or Loop recovery. Those control-plane
+/// successors must settle first; Fission only consumes the stable completion.
+module FissionSettlement =
+
+    let decideLane observation =
+        match observation with
+        | FissionSettlementObservation.OngoingExecution
+        | FissionSettlementObservation.NeedsContinuation
+        | FissionSettlementObservation.ProviderFailed
+        | FissionSettlementObservation.LoopInterrupted -> FissionLaneSettlementDecision.YieldToTurnWorkflow
+        | FissionSettlementObservation.ExternalAbort reason -> FissionLaneSettlementDecision.FailGroup reason
+        | FissionSettlementObservation.Completed -> FissionLaneSettlementDecision.MaterializeLane
+
+    let decideTakeover observation =
+        match observation with
+        | FissionSettlementObservation.OngoingExecution
+        | FissionSettlementObservation.NeedsContinuation
+        | FissionSettlementObservation.ProviderFailed
+        | FissionSettlementObservation.LoopInterrupted -> FissionTakeoverSettlementDecision.YieldToTurnWorkflow
+        | FissionSettlementObservation.ExternalAbort reason -> FissionTakeoverSettlementDecision.FailGroup reason
+        | FissionSettlementObservation.Completed -> FissionTakeoverSettlementDecision.CompleteOwner
 
 module FissionConvergence =
 
