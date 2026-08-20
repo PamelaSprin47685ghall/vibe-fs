@@ -178,6 +178,9 @@ type PluginBloggerScope() =
                     true
                 | false, _ -> false)
 
+        member this.HasPendingOffer(sessionId: string) : bool =
+            lock parkedGate (fun () -> pendingOffer.ContainsKey sessionId)
+
         member this.TryTakePendingOffer(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () ->
                 match pendingOffer.TryGetValue sessionId with

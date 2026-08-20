@@ -8,15 +8,17 @@
 3. **将并发冲突误杀为存储损坏**：将合法的领域并发分支误判为底层的存储格式损坏，导致数据库整体不可恢复。
 
 `durable-convergence` 确立了确定性事实收敛模型：
-- **存储层永不丢事实**：合并等价于事件集合的有穷并集（Set Union）与标识去重；
+- **活跃 writer 内永不丢事实**：固定 retention 窗口内的 writer 合并等价于事件集合的有穷并集（Set Union）与标识去重；
 - **并发分支显式表达**：合法并发分叉在投影层明确表达为 `DomainConflict`，通过显式的裁决事件（Resolution Event）完成收敛；
 - **确定性 k-way merge**：无论输入流枚举顺序或在何处执行，相同输入必定产生全局一致的规范序列。
+- **有界历史**：进程 writer 超过固定 24 小时无输出后整条退出 canonical writer set，使物理历史规模由“项目总寿命”变为“最近活动窗口”。
 
 ## 2. 核心不变量与破坏后果
 
-- **Merge = Set Union**：两个不同的 EventId 必须全部进入合并后的历史，严禁基于时间戳丢弃任意事实；若破坏，并发协作会发生静默数据丢失。
+- **Retained Merge = Set Union**：同一 retention 截止时刻仍活跃的 writer 内，两个不同 EventId 必须全部进入合并后的历史；只能整体淘汰过期 writer，不能按事件时间挑赢家。
 - **Resolution 必须覆盖全部 Heads**：解决冲突的裁决事件必须显式将所有竞争分支的 Head 作为其父事件；若破坏，重放历史无法证明冲突已真正被解决。
 - **Dumb Remote 原则**：远端仓库仅作为哑对象存储，不包含任何领域逻辑；所有收敛与验证完全在客户端完成。
+- **Activity 不等于 fetch 时间**：远端 snapshot 必须携带 writer blob OID 绑定的 activity manifest；否则一次下载就会错误延长 writer 寿命，导致历史无法按窗口收缩。
 
 ## DEPENDS ON
 

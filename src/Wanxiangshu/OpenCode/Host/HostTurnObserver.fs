@@ -176,7 +176,6 @@ module HostTurnObserver =
         | _ -> AbortCause.External
 
     let private observeApplicationTurn
-        (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -203,7 +202,6 @@ module HostTurnObserver =
                 // multiplexes SyncDelegate / Reviewer / Manager handled-bools.
                 do!
                     TurnWorkflow.observe
-                        recoveryTimerPort
                         sessionPort
                         eventPort
                         journal
@@ -221,7 +219,6 @@ module HostTurnObserver =
         }
 
     let private observeFamilyReady
-        (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -242,7 +239,6 @@ module HostTurnObserver =
             if not isFissionOwner && not fissionHandled then
                 do!
                     observeApplicationTurn
-                        recoveryTimerPort
                         sessionPort
                         eventPort
                         journal
@@ -253,7 +249,6 @@ module HostTurnObserver =
         }
 
     let private observeAfterStrength
-        (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -271,7 +266,6 @@ module HostTurnObserver =
             | FamilyRecovery.FamilyReady _ ->
                 return!
                     observeFamilyReady
-                        recoveryTimerPort
                         sessionPort
                         eventPort
                         journal
@@ -303,7 +297,6 @@ module HostTurnObserver =
         :> Task
 
     let private observeBusinessTurn
-        (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -348,7 +341,6 @@ module HostTurnObserver =
 
                         return!
                             observeAfterStrength
-                                recoveryTimerPort
                                 sessionPort
                                 eventPort
                                 journal
@@ -376,7 +368,6 @@ module HostTurnObserver =
         }
 
     let observe
-        (recoveryTimerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -395,7 +386,6 @@ module HostTurnObserver =
             Task.FromResult(()) :> Task
         else
             observeBusinessTurn
-                recoveryTimerPort
                 sessionPort
                 eventPort
                 journal

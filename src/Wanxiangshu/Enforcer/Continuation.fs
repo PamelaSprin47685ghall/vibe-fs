@@ -461,9 +461,25 @@ module EnforcerContinuation =
         (live: BloggerRequestContext)
         : Task<ContinuationOutcome> =
         task {
-            ensureFlightOrSet ctx.Scope sessionKey live
-            let! rebuilt = resumeWithContext ctx live
-            return ctx.Project rebuilt
+            match ProviderWireCapture.lastUserPromptKey ctx.RawMessages with
+            | None ->
+                return!
+                    fatalProjectRaw
+                        ctx
+                        sessionKey
+                        (Some live)
+                        "next Blogger provider step has no physical PromptKey"
+            | Some promptKey ->
+                match! BloggerCoordinator.stageContinuationContext ctx.Scope ctx.Durable live with
+                | Error reason ->
+                    return! fatalProjectRaw ctx sessionKey (Some live) ("Blogger context materialize failed: " + reason)
+                | Ok() ->
+                    match! BloggerCoordinator.bindContinuationContext ctx.Durable live promptKey with
+                    | Error reason ->
+                        return! fatalProjectRaw ctx sessionKey (Some live) ("Blogger PromptKey bind failed: " + reason)
+                    | Ok() ->
+                        let! rebuilt = resumeWithContext ctx live
+                        return ctx.Project rebuilt
         }
 
     let private refreshGapAfterPark

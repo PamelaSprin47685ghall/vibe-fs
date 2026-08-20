@@ -133,8 +133,9 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_armed_without_material_no_probe', () => {
   const result = XWireSurface.transform(armedInput({ coverableCutoff: 0 }))
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
-  // NoCoverage means the slot is not consumed (temporary — waiting for material).
-  assert.equal(result.consumed, false)
+  // RecoveryOpportunity belongs to this physical attempt. NoCoverage sends the
+  // ordinary projection but must not leak arming into a later parked odd cursor.
+  assert.equal(result.consumed, true)
   assert.equal(result.changed, false)
   assert.ok(result.noProbeReason, 'should have a no-probe reason')
 })

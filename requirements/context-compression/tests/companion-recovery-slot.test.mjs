@@ -1,44 +1,97 @@
-/**
- * CTX-006 / FALLBACK-012: Companion recovery opportunity is a one-shot physical waiter.
- *
- * Failure opens `StartRecoveryOpportunity` (registers a TCS). Material offers via
- * `OfferRecoveryMaterial` consume that waiter once. No Armed/NotArmed program
- * counter — opportunity exists while the waiter Task is unfinished. A fresh
- * Companion has no residual opportunity (restart-safe).
- */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import * as slot from '../../../dist/Context/Companion/CompressionSurface.js'
 
-const make = () => runtime.createCompanion('ses-main')
-const startOpportunity = (c) => runtime.startRecoveryOpportunity(c)
-const offerMaterial = (c) => runtime.offerRecoveryMaterial(c)
+const ROOT = new URL('../../../', import.meta.url).pathname
+const PROD = join(ROOT, 'src/Wanxiangshu')
 
-test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_fresh_companion_has_no_recovery_opportunity', () => {
-  const c = make()
-  assert.equal(offerMaterial(c), false, 'no register → offer is no-op')
+const walk = (dir, acc = []) => {
+  for (const entry of readdirSync(dir)) {
+    const path = join(dir, entry)
+    const stat = statSync(path)
+    if (stat.isDirectory()) walk(path, acc)
+    else if (path.endsWith('.fs')) acc.push(path)
+  }
+  return acc
+}
+
+const production = walk(PROD)
+const source = (rel) => readFileSync(join(ROOT, rel), 'utf8')
+
+test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_opportunity_is_failure_plus_primed_not_material', () => {
+  assert.equal(slot.recoveryOpportunity(slot.afterFailureAdvance, 1), 'RecoveryAttempt')
+  assert.equal(slot.recoveryOpportunity(slot.afterFailureAdvance, 3), 'RecoveryAttempt')
+  assert.equal(slot.recoveryOpportunity(slot.afterFailureAdvance, 0), 'OrdinaryAttempt')
+  assert.equal(slot.recoveryOpportunity(slot.beginSequence, 1), 'OrdinaryAttempt')
+
+  // Material is a later proof. It changes whether recovery can act, not whether
+  // this physical attempt owns the one-shot recovery opportunity.
+  assert.equal(slot.mayRecover(slot.afterFailureAdvance, 1, false), false)
+  assert.equal(slot.recoveryOpportunity(slot.afterFailureAdvance, 1), 'RecoveryAttempt')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_start_then_offer_consumes_waiter_once', async () => {
-  const c = make()
-  const opportunity = startOpportunity(c)
-  assert.equal(offerMaterial(c), true, 'first offer takes the waiter')
-  await opportunity
-  assert.equal(offerMaterial(c), false, 'second offer no longer consumed')
+test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_primed_blogger_main_with_frames_dispatches_squash_first', () => {
+  assert.equal(slot.nextBloggerRequest('blogger-main', 'RecoveryAttempt', true), 'blogger-squash')
+  assert.equal(slot.nextBloggerRequest('blogger-main', 'RecoveryAttempt', false), 'blogger-main')
+  assert.equal(slot.nextBloggerRequest('blogger-main', 'OrdinaryAttempt', true), 'blogger-main')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_second_start_reuses_single_opportunity', async () => {
-  const c = make()
-  const first = startOpportunity(c)
-  const second = startOpportunity(c)
-  // Same one-shot waiter: two starts share one opportunity.
-  assert.equal(offerMaterial(c), true)
-  await Promise.all([first, second])
-  assert.equal(offerMaterial(c), false)
+test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_failed_squash_always_leaves_the_slot_before_main', () => {
+  assert.equal(slot.nextBloggerRequest('blogger-squash', 'OrdinaryAttempt', true), 'blogger-main')
+  assert.equal(slot.nextBloggerRequest('blogger-squash', 'RecoveryAttempt', true), 'blogger-main')
 })
 
-test('WHAT[CONTEXT-COMPRESSION-006] CTX_006_offer_without_register_is_noop', () => {
-  const c = make()
-  assert.equal(offerMaterial(c), false)
-  assert.equal(offerMaterial(c), false)
+test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_future_X_material_waiter_is_deleted_from_production', () => {
+  const forbidden = /StartRecoveryOpportunity|OfferRecoveryMaterial|recoveryWaiter|ReArmRecovery/
+  const hits = production
+    .filter((file) => forbidden.test(readFileSync(file, 'utf8')))
+    .map((file) => file.slice(ROOT.length))
+
+  assert.deepEqual(hits, [], `parallel recovery waiter/re-arm state remains: ${hits.join(', ')}`)
+
+  const coordinator = source('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
+  assert.doesNotMatch(coordinator, /tryStartSquash|OfferRecoveryMaterial/)
+
+  const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
+  assert.match(workflow, /FallbackLedger\.recordConfirmedFailure/)
+  assert.match(workflow, /RecoverySlot\.nextBloggerRequest/)
+  assert.match(workflow, /replaceFailedBloggerRequest/)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_BloggerMainContext', () => {
+  const coordinator = source('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
+  const transform = source('src/Wanxiangshu/Context/Companion/Transform.fs')
+  const enforcer = source('src/Wanxiangshu/Enforcer/Continuation.fs')
+  const recovery = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
+
+  assert.match(coordinator, /BloggerMainContext\.fromProjection/)
+  assert.match(transform, /BloggerMainContext\.hasMaterial/)
+  assert.match(enforcer, /BloggerMainContext\.fromJournal/)
+  assert.match(recovery, /BloggerMainContext\.fromJournal/)
+
+  for (const [name, text] of [
+    ['Coordinator', coordinator],
+    ['Transform', transform],
+    ['Enforcer', enforcer],
+    ['Recovery', recovery],
+  ]) {
+    assert.doesNotMatch(text, /BloggerDelta\.nextChunk/, `${name} must not own a second next-main formula`)
+  }
+})
+
+test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_new_prompt', () => {
+  const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
+  const replace = workflow.slice(
+    workflow.indexOf('let private replaceFailedBloggerRequest'),
+    workflow.indexOf('let private continueBlogger'),
+  )
+  const send = workflow.slice(
+    workflow.indexOf('let private sendStagedBloggerContinuation'),
+    workflow.indexOf('let private replaceFailedBloggerRequest'),
+  )
+
+  assert.match(replace, /abandonContinuationContext[\s\S]*sendStagedBloggerContinuation/)
+  assert.match(send, /stageContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/)
 })

@@ -8,6 +8,7 @@
 /src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs
 /src/Wanxiangshu/Persistence/EventStore/Store.fs
 /src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs
+/src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs
 /src/Wanxiangshu/Git/Hook/**
 /src/Wanxiangshu/Git/Gateway.fs
 /src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs

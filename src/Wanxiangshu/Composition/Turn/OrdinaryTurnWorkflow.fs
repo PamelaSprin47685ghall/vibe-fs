@@ -82,17 +82,20 @@ module OrdinaryTurnWorkflow =
 
     let private requestKindOfCompleted (journal: AgentJournal) (turn: ReconciledTurn) =
         match bloggerReceiptKind journal turn with
-        | Some BlogFrameKind.Squash -> ProviderRequestKind.BloggerSquash
-        | Some BlogFrameKind.Entry -> ProviderRequestKind.BloggerMain
+        | Some BlogFrameKind.Squash -> Some ProviderRequestKind.BloggerSquash
+        | Some BlogFrameKind.Entry -> Some ProviderRequestKind.BloggerMain
         | None ->
             let continuationKind =
                 PromptAuthorityLedger.projectionFor turn.SessionId (AgentJournal.snapshot journal).AgentProjections
                 |> Option.bind (fun authority -> Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
 
             match continuationKind, turn.Role with
-            | Some PromptAuthority.InteractionRepair, _ -> ProviderRequestKind.InteractionRepair
-            | _, Some Role.Blogger -> ProviderRequestKind.BloggerMain
-            | _ -> ProviderRequestKind.WorkMain
+            | Some PromptAuthority.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
+            // A Blogger terminal without a durable cycle receipt did not prove a
+            // business Main or maintenance Squash success. Never clear fallback
+            // from Role alone.
+            | _, Some Role.Blogger -> None
+            | _ -> Some ProviderRequestKind.WorkMain
 
     /// Revisit a previously delivered turn only for work whose authority comes
     /// from a fresh idle observation. Terminal plumbing remains first-delivery only.
@@ -127,7 +130,6 @@ module OrdinaryTurnWorkflow =
     /// `abortCause` is the Host boundary typed outcome consumed exactly once (SW-017 ①).
     /// Guard armed state is not exposed; CE branches on the typed abort outcome.
     let private handleAborted
-        (timerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -203,10 +205,13 @@ module OrdinaryTurnWorkflow =
             let recordSuccessIfValid (journal: AgentJournal option) =
                 task {
                     match journal with
-                    | Some j when ProviderRequestKind.clearsFailureCountOnSuccess (requestKindOfCompleted j turn) ->
-                        let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
-                        ()
-                    | Some _
+                    | Some j ->
+                        match requestKindOfCompleted j turn with
+                        | Some kind when ProviderRequestKind.clearsFailureCountOnSuccess kind ->
+                            let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
+                            ()
+                        | Some _
+                        | None -> ()
                     | None -> ()
                 }
 
@@ -223,7 +228,6 @@ module OrdinaryTurnWorkflow =
         :> Task
 
     let private handleOutcome
-        (timerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -250,7 +254,6 @@ module OrdinaryTurnWorkflow =
             InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
         | ReconcileProgram.TurnAborted reason ->
             handleAborted
-                timerPort
                 sessionPort
                 eventPort
                 journal
@@ -261,7 +264,6 @@ module OrdinaryTurnWorkflow =
                 reason
         | ReconcileProgram.TurnFailed error ->
             ProviderRecoveryWorkflow.continueAfterConfirmedFailure
-                timerPort
                 sessionPort
                 eventPort
                 journal
@@ -283,7 +285,6 @@ module OrdinaryTurnWorkflow =
                 completeAgent
 
     let observe
-        (timerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -316,7 +317,6 @@ module OrdinaryTurnWorkflow =
                 TerminalReporter.complete eventPort journal abortedSessions turn
 
             handleOutcome
-                timerPort
                 sessionPort
                 eventPort
                 journal

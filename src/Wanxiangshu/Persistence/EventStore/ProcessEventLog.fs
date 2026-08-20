@@ -4,6 +4,7 @@ open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Strength.Persistence
 
 open System
+open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -104,6 +105,15 @@ module ProcessEventLog =
     [<Import("statSync", "node:fs")>]
     let private statSync (path: string) : obj = jsNative
 
+    [<Import("readSync", "node:fs")>]
+    let private readSync (fd: int) (buffer: byte[]) (offset: int) (length: int) (position: int) : int = jsNative
+
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
+    [<Import("utimesSync", "node:fs")>]
+    let private utimesSync (path: string) (atime: float) (mtime: float) : unit = jsNative
+
     [<Import("openSync", "node:fs")>]
     let private openSync (path: string) (flags: string) : int = jsNative
 
@@ -125,6 +135,12 @@ module ProcessEventLog =
     [<Emit("[$0.dev, $0.ino, $0.mode, $0.size, $0.mtimeMs, $0.ctimeMs].join(':')")>]
     let private statIdentity (stat: obj) : string = jsNative
 
+    [<Emit("$0.mtimeMs")>]
+    let private statMtimeMs (stat: obj) : float = jsNative
+
+    [<Emit("$0.size")>]
+    let private statSize (stat: obj) : int = jsNative
+
     [<Emit("$0.digest('hex')")>]
     let private hashHex (hash: obj) : string = jsNative
 
@@ -138,6 +154,11 @@ module ProcessEventLog =
 
     let private ensureDirectory path =
         mkdirSync path (createObj [ "recursive" ==> true ])
+
+    type WriterPhysicalMetadata =
+        { Name: string
+          StatIdentity: string
+          LastActivityMs: float }
 
     /// Cross-process physical serialization shared by runtime append and the
     /// standalone Git-hook synchronizer. It protects bytes/snapshot boundaries
@@ -261,6 +282,93 @@ module ProcessEventLog =
     let private decodeFile (path: string) : Result<EventEnvelope list, StorageInvalid> =
         decodeWriterText path (readTextFileSync path "utf8")
 
+    let private lastIndexOfLf (buffer: byte[]) count =
+        // DSL-MUTABLE: algorithm-scratch — reverse byte cursor inside one pread block.
+        let mutable index = count - 1
+        // DSL-MUTABLE: algorithm-scratch — exact delimiter position, -1 when absent.
+        let mutable found = -1
+
+        while index >= 0 && found < 0 do
+            if buffer.[index] = 10uy then
+                found <- index
+            else
+                index <- index - 1
+
+        found
+
+    let private readExactAt fd position length =
+        let bytes = Array.zeroCreate<byte> length
+        // DSL-MUTABLE: algorithm-scratch — bytes already filled by positional reads.
+        let mutable filled = 0
+
+        while filled < length do
+            let count = readSync fd bytes filled (length - filled) (position + filled)
+
+            if count <= 0 then
+                failwith "unexpected EOF while reading writer tail"
+
+            filled <- filled + count
+
+        bytes
+
+    /// Exact O(last-line-bytes) NDJSON tail lookup. The scan searches raw LF bytes
+    /// backwards with positional reads; UTF-8 boundaries do not matter because an
+    /// unescaped LF cannot occur inside a valid JSON string.
+    let readLastCompleteLine (path: string) : Result<string option, string> =
+        if not (existsSync path) then
+            Ok None
+        else
+            let size = statSync path |> statSize
+
+            if size = 0 then
+                Ok None
+            else
+                let fd = openSync path "r"
+
+                try
+                    let trailing = readExactAt fd (size - 1) 1
+
+                    if trailing.[0] <> 10uy then
+                        Error(sprintf "writer file has incomplete trailing line: %s" path)
+                    else
+                        let lineEnd = size - 1
+
+                        if lineEnd = 0 then
+                            Error(sprintf "writer file contains empty final line: %s" path)
+                        else
+                            let blockSize = 4096
+                            // DSL-MUTABLE: algorithm-scratch — exclusive end of next reverse pread.
+                            let mutable cursor = lineEnd
+                            // DSL-MUTABLE: algorithm-scratch — exact line start once previous LF is found.
+                            let mutable lineStart = -1
+
+                            while cursor > 0 && lineStart < 0 do
+                                let start = max 0 (cursor - blockSize)
+                                let length = cursor - start
+                                let buffer = readExactAt fd start length
+                                let delimiter = lastIndexOfLf buffer length
+
+                                if delimiter >= 0 then
+                                    lineStart <- start + delimiter + 1
+                                elif start = 0 then
+                                    lineStart <- 0
+                                else
+                                    cursor <- start
+
+                            let length = lineEnd - lineStart
+
+                            if length <= 0 then
+                                Error(sprintf "writer file contains empty final line: %s" path)
+                            else
+                                readExactAt fd lineStart length
+                                |> Encoding.UTF8.GetString
+                                |> Some
+                                |> Ok
+                with ex ->
+                    Error ex.Message
+                finally
+                    closeSync fd
+
     let private writerFileNames commonDir =
         let directory = eventsDirectory commonDir
 
@@ -292,6 +400,15 @@ module ProcessEventLog =
         names
         |> List.map (fun name -> name, statSync (join2 directory name) |> statIdentity)
 
+    let private writerMetadata directory names =
+        names
+        |> List.map (fun name ->
+            let stat = statSync (join2 directory name)
+
+            { Name = name
+              StatIdentity = statIdentity stat
+              LastActivityMs = statMtimeMs stat })
+
     /// Git-index-style physical cache key. It never replaces canonical validation:
     /// a cache miss falls back to reading bytes, while a hit only reuses a snapshot
     /// that has already been validated/materialized for the exact same file stats.
@@ -303,6 +420,9 @@ module ProcessEventLog =
 
     let writerPhysicalStats (commonDir: string) : (string * string) list =
         writerFileNames commonDir |> physicalStats (eventsDirectory commonDir)
+
+    let writerPhysicalMetadata (commonDir: string) : WriterPhysicalMetadata list =
+        writerFileNames commonDir |> writerMetadata (eventsDirectory commonDir)
 
     let payloadPhysicalStats (commonDir: string) : (string * string) list =
         payloadFileNames commonDir |> physicalStats (payloadsDirectory commonDir)
@@ -325,22 +445,63 @@ module ProcessEventLog =
             writeTextFileSync path incoming "utf8"
             durabilityBarrier path
 
-    /// Replace/import one writer file only when the incoming bytes extend the
-    /// local complete-line prefix. Divergence is fail-closed physical corruption.
-    let mergeWriterText (commonDir: string) (writerId: string) (incoming: string) : Result<unit, string> =
+    let private setWriterActivity path activityMs =
+        let seconds = activityMs / 1000.0
+        utimesSync path seconds seconds
+
+    let private currentWriterActivity path = statSync path |> statMtimeMs
+
+    let private reconcileEqualWriterActivity path incomingActivity =
+        match incomingActivity with
+        | None -> ()
+        | Some remoteActivity ->
+            // Equal bytes describe the same process output. Resolve legacy/fetch
+            // metadata discrepancies monotonically toward the earlier observation;
+            // ordinary snapshots already carry the identical value.
+            setWriterActivity path (min (currentWriterActivity path) remoteActivity)
+
+    /// Merge one whole writer while preserving the producer's activity time from
+    /// the remote snapshot. A fetch/import must never make an old writer look new.
+    let mergeWriterTextWithActivity
+        (commonDir: string)
+        (writerId: string)
+        (incoming: string)
+        (incomingActivityMs: float option)
+        : Result<unit, string> =
         let writer = safeWriterId writerId
         let directory = eventsDirectory commonDir
         ensureDirectory directory
         let path = join2 directory (writer + ".ndjson")
-        let existing = if existsSync path then readTextFileSync path "utf8" else ""
+        let exists = existsSync path
+        let existing = if exists then readTextFileSync path "utf8" else ""
 
-        if existing = incoming || incoming.StartsWith(existing, StringComparison.Ordinal) then
+        if existing = incoming then
+            if exists then
+                reconcileEqualWriterActivity path incomingActivityMs
+
+            Ok()
+        elif incoming.StartsWith(existing, StringComparison.Ordinal) then
             writeExtendedWriter path existing incoming
+            incomingActivityMs |> Option.iter (setWriterActivity path)
             Ok()
         elif existing.StartsWith(incoming, StringComparison.Ordinal) then
             Ok()
         else
             Error(sprintf "writer history diverged: %s" writer)
+
+    /// Replace/import one writer file only when the incoming bytes extend the
+    /// local complete-line prefix. Divergence is fail-closed physical corruption.
+    let mergeWriterText (commonDir: string) (writerId: string) (incoming: string) : Result<unit, string> =
+        mergeWriterTextWithActivity commonDir writerId incoming None
+
+    let removeWriterFile (commonDir: string) (name: string) : unit =
+        if name.EndsWith(".ndjson", StringComparison.Ordinal) then
+            let path = join2 (eventsDirectory commonDir) name
+
+            if existsSync path then
+                unlinkSync path
+        else
+            invalidArg "name" "writer filename must end in .ndjson"
 
     /// Frozen writer streams, sorted only by WriterId for deterministic enumeration.
     /// The canonical Integrator owns cross-stream ordering and interpretation.

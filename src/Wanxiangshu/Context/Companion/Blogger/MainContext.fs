@@ -22,6 +22,33 @@ module BloggerMainContext =
         |> Option.bind (fun durable ->
             ManagerOpeningFloor.floorSequence mainSessionId (AgentJournal.snapshot durable).AgentProjections)
 
+    let private nextChunk
+        (journal: AgentJournal option)
+        (mainSessionId: SessionId)
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (projection: ProviderProjection.ProviderSemanticProjection)
+        =
+        let effectiveIngested =
+            openingFloor journal mainSessionId
+            |> Option.map (max blog.Coverage.IngestedThroughSequence)
+            |> Option.defaultValue blog.Coverage.IngestedThroughSequence
+
+        BloggerDelta.nextChunk
+            BloggerDelta.DeltaLimitBytes
+            (XTraceProjection.semanticCursorFor effectiveIngested xTrace)
+            blog.Coverage.CoverableTurnCutoffExclusive
+            projection.Messages
+
+    let hasMaterial
+        (journal: AgentJournal option)
+        (mainSessionId: SessionId)
+        (blog: BlogProjectionState)
+        (xTrace: XTraceProjectionState)
+        (projection: ProviderProjection.ProviderSemanticProjection)
+        =
+        nextChunk journal mainSessionId blog xTrace projection |> Option.isSome
+
     let fromProjection
         (journal: AgentJournal option)
         (mainSessionId: SessionId)
@@ -31,18 +58,7 @@ module BloggerMainContext =
         (xTrace: XTraceProjectionState)
         (projection: ProviderProjection.ProviderSemanticProjection)
         : BloggerRequestContext option =
-        let effectiveIngested =
-            openingFloor journal mainSessionId
-            |> Option.map (max blog.Coverage.IngestedThroughSequence)
-            |> Option.defaultValue blog.Coverage.IngestedThroughSequence
-
-        let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
-
-        BloggerDelta.nextChunk
-            BloggerDelta.DeltaLimitBytes
-            ingestCursor
-            blog.Coverage.CoverableTurnCutoffExclusive
-            projection.Messages
+        nextChunk journal mainSessionId blog xTrace projection
         |> Option.bind (EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection)
 
     let private semanticPart (part: XTracePartRef) (body: string) =

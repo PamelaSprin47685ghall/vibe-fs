@@ -15,9 +15,11 @@
    - 领域裁决事件（Resolution Event）必须显式在 `parents` 中包含当前全部竞争头部，折叠后将头部集合重新收敛为单个。
 
 3. **双向无损同步（Bidirectional Convergence）**：
-   - 独立 Git Hook 进程在执行同步时，获取远端快照与本地所有 `.git/wanxiang/events/*.ndjson` 文件。
-   - 执行 k-way merge 产生统一事实后，全量替换本地同步快照，并将每个本地写者文件完整编码为一个 Git blob，经由标准 CAS 推送至远端。
-   - 热路径利用文件元数据指纹跳过无变更文件的重复读取与编解码。
+   - 独立 Git Hook 进程在执行同步时，以同一 `now`/24h TTL 对本地与远端 writer 做整流 retention；writer 内部仍保持完整 append-only 流。
+   - snapshot 根包含 `writer-manifest`，逐 writer 原子记录完整 blob OID 与 `lastActivity`。远端导入复用该 activity，不允许 fetch 动作刷新 writer 生命周期。
+   - retention 后执行 k-way merge；过期 writer 文件从本地删除，新的远端 `writers/` tree 也不再包含它，因此旧 snapshot 再参与同步时仍会被相同 retention predicate 过滤而不能稳定复活。
+   - 热路径利用文件元数据指纹与 manifest 跳过无变更文件的重复读取与编解码；materialization cache 同时记录“下一次 expiry”，跨过该时刻即使文件未变化也必须重新 materialize。
+   - NDJSON 尾记录读取使用从 EOF 反向按块 `pread` 查找裸 LF 的确定性算法；不猜测最后一行长度，也不解码整条 writer。
 
 ## 验证与测试落点
 
@@ -33,3 +35,4 @@
 | DURABLE-CONVERGENCE-008 | `requirements/durable-convergence/tests/event-store-converge.test.mjs` |
 | DURABLE-CONVERGENCE-009 | `requirements/durable-convergence/tests/dumb-remote-no-domain.test.mjs` |
 | DURABLE-CONVERGENCE-010 | `requirements/durable-convergence/tests/hook-performance-fast-path.test.mjs` |
+| DURABLE-CONVERGENCE-011 | `requirements/durable-convergence/tests/writer-retention.test.mjs` |

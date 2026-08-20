@@ -68,6 +68,7 @@ type IParkedTransformHost =
     abstract ClearCurrentRequest: string -> unit
     /// Stage PendingOffer. Returns true when a parked waiter was resumed.
     abstract SetPendingOffer: string * BloggerRequestContext -> bool
+    abstract HasPendingOffer: string -> bool
     abstract TryTakePendingOffer: string -> BloggerRequestContext option
     /// Physical drain-window slot.
     abstract GetDrainWindow: string -> DrainWindow

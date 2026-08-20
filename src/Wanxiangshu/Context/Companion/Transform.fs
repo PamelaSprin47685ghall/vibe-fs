@@ -140,28 +140,8 @@ module CompanionTransform =
         (projection: ProviderProjection.ProviderSemanticProjection)
         : Task<unit> =
         task {
-            let floorSequence =
-                match journal with
-                | None -> None
-                | Some durable ->
-                    ManagerOpeningFloor.floorSequence
-                        (SessionId.create sessionId)
-                        (AgentJournal.snapshot durable).AgentProjections
-
-            let effectiveIngested =
-                floorSequence
-                |> Option.map (fun floor -> max blog.Coverage.IngestedThroughSequence floor)
-                |> Option.defaultValue blog.Coverage.IngestedThroughSequence
-
-            let ingestCursor = XTraceProjection.semanticCursorFor effectiveIngested xTrace
-
             let hasMaterial =
-                BloggerDelta.nextChunk
-                    BloggerDelta.DeltaLimitBytes
-                    ingestCursor
-                    blog.Coverage.CoverableTurnCutoffExclusive
-                    projection.Messages
-                |> Option.isSome
+                BloggerMainContext.hasMaterial journal (SessionId.create sessionId) blog xTrace projection
 
             if hasMaterial then
                 let! bloggerId = companion.EnsureBloggerAsync()

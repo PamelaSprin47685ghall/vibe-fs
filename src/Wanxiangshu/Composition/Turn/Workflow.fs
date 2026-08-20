@@ -72,7 +72,6 @@ module TurnWorkflow =
     /// Route one stable observation to SyncDelegate-owned / Reviewer / Manager /
     /// Ordinary. Ordinary falls through when Manager does not claim the turn.
     let observe
-        (timerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -149,7 +148,6 @@ module TurnWorkflow =
 
             let observeOrdinary current =
                 OrdinaryTurnWorkflow.observe
-                    timerPort
                     sessionPort
                     eventPort
                     journal

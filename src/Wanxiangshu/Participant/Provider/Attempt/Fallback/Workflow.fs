@@ -93,87 +93,58 @@ module ProviderRecoveryWorkflow =
         |> Option.bind (fun state -> state.Blog)
         |> Option.exists (fun blog -> blog.Coverage.CoverableTurnCutoffExclusive > committedCutoff)
 
-    /// True when a Companion Blogger is linked — only then is waiting for coverage
-    /// meaningful. Sessions without a blogger never grow coverage; waiting would
-    /// only burn the A′ budget on a clock.
-    let private expectsCoverage (durable: AgentJournal) (sessionId: SessionId) =
+    let private bloggerOfMain (durable: AgentJournal) (sessionId: SessionId) =
         SessionAssociationProjection.tryBloggerOf
             sessionId
             (AgentJournal.snapshot durable).AgentProjections.Associations
-        |> Option.isSome
 
-    /// Bound: after a confirmed failure, the next A′/B′ ProviderRetry is the only
-    /// recovery slot that may probe (CTX-006/010). Blog frames often land a few
-    /// tens of ms after the failed main turn's companion request — racing the
-    /// continue send made hasMaterial=false, so AttemptPlanner skipped the probe
-    /// and ClearRecovery burned the armed slot.
-    ///
-    /// Wait on journal folds until coverage exists or the injectable deadline
-    /// fires. Fail open: WaitTimedOut still sends the ordinary main
-    /// (CTX-011 no-candidate path).
-    let private tryReadCoverage (durable: AgentJournal) (sessionId: SessionId) =
-        if sessionHasFreshCoverage durable sessionId then
-            Some()
-        else
-            None
+    let private bloggerProducerActive (scope: IParkedTransformHost) (bloggerSessionId: SessionId) =
+        let key = SessionId.value bloggerSessionId
+        scope.HasFlight key || scope.HasPendingOffer key
 
-    let private awaitCoverageSignal (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
+    /// CTX-006: causal wait, never a wall-clock guess. We wait only while the
+    /// linked Blogger demonstrably owns a flight or staged offer capable of
+    /// producing newer coverage. Every transition that can end that ownership
+    /// commits/abandons material in the journal, so the revision is the wakeup.
+    let rec private awaitLinkedProducer
+        (scope: IParkedTransformHost)
+        (durable: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        : Task =
         task {
-            let sessionKey = SessionId.value sessionId
+            let fromRevision = AgentJournal.revision durable
 
-            let descriptor =
-                DiagnosticWait.create
-                    "provider-recovery-material"
-                    (CausalOwner.create "ProviderRecoveryWorkflow" [ "session", sessionKey ])
-                    [ "session", sessionKey; "name", "coverage" ]
-                    (ExternalProducer("journal", [ "session", sessionKey ]))
-                    [ WaitEscape.OpenEndedExternal ]
-                    "ProviderRecoveryWorkflow.awaitRecoveryMaterial"
-
-            let deadline = timerPort.Delay 2000
-
-            let awaitSignal () =
-                task {
-                    let fromRev = AgentJournal.revision durable
-                    let! _ = AgentJournal.awaitChangeFrom fromRev durable
-                    return ()
-                }
-
-            match!
-                CausalAwait.untilSignalOrDeadline
-                    CausalWaitHub.observer
-                    descriptor
-                    deadline
-                    (fun () -> tryReadCoverage durable sessionId)
-                    awaitSignal
-            with
-            | Ok() -> return ()
-            | Error DiagnosticWaitExit.WaitTimedOut -> return ()
-            | Error _ -> return ()
-        }
-
-    let private waitForFreshCoverage (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
-        task {
-            if sessionHasFreshCoverage durable sessionId then
+            if
+                sessionHasFreshCoverage durable mainSessionId
+                || not (bloggerProducerActive scope bloggerSessionId)
+            then
                 return ()
             else
-                return! awaitCoverageSignal timerPort durable sessionId
+                let! _ = AgentJournal.awaitChangeFrom fromRevision durable
+                return! awaitLinkedProducer scope durable mainSessionId bloggerSessionId
         }
 
-    let awaitRecoveryMaterial (timerPort: ITimerPort) (durable: AgentJournal) (sessionId: SessionId) : Task =
-        task {
-            if not (expectsCoverage durable sessionId) then
-                return ()
-            else
-                return! waitForFreshCoverage timerPort durable sessionId
-        }
+    let awaitRecoveryMaterial
+        (scope: IParkedTransformHost)
+        (durable: AgentJournal)
+        (mainSessionId: SessionId)
+        : Task =
+        match bloggerOfMain durable mainSessionId with
+        | None -> Task.FromResult(()) :> Task
+        | Some bloggerSessionId -> awaitLinkedProducer scope durable mainSessionId bloggerSessionId
 
     let private currentFallback (durable: AgentJournal) (sessionId: SessionId) =
         FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable)
 
-    let private isRecoveryOffset (durable: AgentJournal) (sessionId: SessionId) =
+    let private opportunityAfterAdvance (durable: AgentJournal) (sessionId: SessionId) =
         currentFallback durable sessionId
-        |> Option.exists (fun fallback -> AgentPairCursor.isRecoverySlot fallback.Cursor.Offset)
+        |> Option.map (fun fallback ->
+            if AgentPairCursor.isRecoverySlot fallback.Cursor.Offset then
+                RecoveryOpportunity.RecoveryAttempt
+            else
+                RecoveryOpportunity.OrdinaryAttempt)
+        |> Option.defaultValue RecoveryOpportunity.OrdinaryAttempt
 
     let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
         SessionAssociationProjection.tryMainSessionOf
@@ -300,12 +271,14 @@ module ProviderRecoveryWorkflow =
         : Task =
         task {
             let current = scope.TryPeekCurrentRequest(SessionId.value turn.SessionId)
+            let opportunity = opportunityAfterAdvance durable turn.SessionId
+            let squash = recoverySquashContext durable mainSessionId turn.SessionId
 
             match current with
             | None -> notifyFailure eventPort turn "Blogger recovery has no owned request context"
-            | Some((BloggerRequestContext.Main _) as failed) when isRecoveryOffset durable turn.SessionId ->
-                match recoverySquashContext durable mainSessionId turn.SessionId with
-                | Some squash ->
+            | Some((BloggerRequestContext.Main _) as failed) ->
+                match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerMain opportunity squash.IsSome, squash with
+                | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
                     return!
                         replaceFailedBloggerRequest
                             sessionPort
@@ -314,10 +287,10 @@ module ProviderRecoveryWorkflow =
                             scope
                             turn
                             failed
-                            squash
+                            squashCtx
                             (squashPrompt mainSessionId)
                             error
-                | None ->
+                | Ok ProviderRequestKind.BloggerMain, _ ->
                     return!
                         replaceFailedBloggerRequest
                             sessionPort
@@ -329,49 +302,43 @@ module ProviderRecoveryWorkflow =
                             failed
                             continuationPrompt
                             error
-            | Some((BloggerRequestContext.Main _) as failed) ->
-                return!
-                    replaceFailedBloggerRequest
-                        sessionPort
-                        eventPort
-                        durable
-                        scope
-                        turn
-                        failed
-                        failed
-                        continuationPrompt
-                        error
+                | Ok _, _
+                | Error _, _ -> notifyFailure eventPort turn "Blogger recovery produced an invalid next request kind"
             | Some((BloggerRequestContext.Squash _) as failed) ->
-                match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
-                | None -> notifyFailure eventPort turn "Blogger squash failed and no main material can be rebuilt"
-                | Some main ->
-                    return!
-                        replaceFailedBloggerRequest
-                            sessionPort
-                            eventPort
-                            durable
-                            scope
-                            turn
-                            failed
-                            main
-                            continuationPrompt
-                            error
+                match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerSquash opportunity squash.IsSome with
+                | Error _ -> notifyFailure eventPort turn "Blogger squash recovery produced an invalid next request kind"
+                | Ok ProviderRequestKind.BloggerMain ->
+                    match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
+                    | None -> notifyFailure eventPort turn "Blogger squash failed and no main material can be rebuilt"
+                    | Some main ->
+                        return!
+                            replaceFailedBloggerRequest
+                                sessionPort
+                                eventPort
+                                durable
+                                scope
+                                turn
+                                failed
+                                main
+                                continuationPrompt
+                                error
+                | Ok _ -> notifyFailure eventPort turn "Blogger squash recovery did not return to main"
         }
 
     let private continueWorkMain
-        (timerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
+        (scope: IParkedTransformHost)
         (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
         : Task =
         task {
-            if isRecoveryOffset durable turn.SessionId then
+            if opportunityAfterAdvance durable turn.SessionId = RecoveryOpportunity.RecoveryAttempt then
                 armRecovery turn.SessionId
-                do! awaitRecoveryMaterial timerPort durable turn.SessionId
+                do! awaitRecoveryMaterial scope durable turn.SessionId
 
             let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
             handleContinuation eventPort turn error continuation
@@ -387,7 +354,6 @@ module ProviderRecoveryWorkflow =
     /// budget still permits one. The continuation itself produces no second
     /// advance, which is why nothing here writes again.
     let continueAfterConfirmedFailure
-        (timerPort: ITimerPort)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -433,10 +399,10 @@ module ProviderRecoveryWorkflow =
                     | None ->
                         return!
                             continueWorkMain
-                                timerPort
                                 sessionPort
                                 eventPort
                                 durable
+                                scope
                                 armRecovery
                                 turn
                                 continuationPrompt
