@@ -3,6 +3,8 @@ namespace Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
@@ -74,6 +76,59 @@ module FactCodec =
            // refuse with the migration message rather than an opaque DU error.
            "\"DurableEffectRequested\""
            "\"DurableEffectAccepted\"" |]
+
+    [<Emit("new Set($0.map(marker => marker.slice(1, -1)))")>]
+    let private markerNames (markers: string array) : obj = jsNative
+
+    let private pre050MarkerNames = markerNames pre050Markers
+
+    [<Emit("""
+    (function (root, pre050) {
+      const stack = [root];
+      while (stack.length !== 0) {
+        const value = stack.pop();
+        if (typeof value === 'string') {
+          if (pre050.has(value)) return 1;
+          continue;
+        }
+        if (value === null || typeof value !== 'object') continue;
+
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i += 1) {
+            const item = value[i];
+            if (typeof item === 'string') {
+              if (pre050.has(item)) return 1;
+              if (item === 'BlogObservationCommitted' || item === 'BlogEntryCommitted') {
+                const payload = value[i + 1];
+                if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+                  if (Object.prototype.hasOwnProperty.call(payload, 'ScoreVectorRef')
+                      || !Object.prototype.hasOwnProperty.call(payload, 'TipRuleId')) return 2;
+                }
+              }
+            }
+            stack.push(item);
+          }
+          continue;
+        }
+
+        for (const key of Object.keys(value)) {
+          if (pre050.has(key)) return 1;
+          stack.push(value[key]);
+        }
+      }
+      return 0;
+    })($0, $1)
+    """)>]
+    let private legacyDecodeErrorCode (value: obj) (markers: obj) : int = jsNative
+
+    /// Parsed EventStore payloads use one bounded tree walk for all legacy
+    /// rejection checks. Replay must not stringify and rescan every Journal
+    /// envelope once per historical marker.
+    let legacyDecodeErrorForValue (value: obj) : string option =
+        match legacyDecodeErrorCode value pre050MarkerNames with
+        | 1 -> Some pre050MigrationMessage
+        | 2 -> Some tipV2CleanBreakMessage
+        | _ -> None
 
     // retention horizon: durable-events HOW §223 (pre-0.5.0 markers) — decode-only, delete when external census proves 0
     let containsLegacyFallbackFields (json: string) =

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 
-test('WHAT[MANAGED-SESSION-009] shutdown ownership drains session runtimes before journal release', () => {
+test('WHAT[MANAGED-SESSION-018] shutdown detaches session runtimes before journal release without logical cancel', () => {
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
   const deletion = read('src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs')
@@ -26,8 +26,10 @@ test('WHAT[MANAGED-SESSION-009] shutdown ownership drains session runtimes befor
 
   assert.match(tools, /member _\.DisposeSession\(sessionId: string\) : Task/)
   assert.match(tools, /member _\.DisposeExecutorRuntime\(sessionId: string\) : Task/)
-  assert.match(tools, /do! runtime\.CancelAndDrain\(\)/)
-  assert.match(tools, /do! host\.CancelAndDrain\(\)/)
+  assert.match(tools, /for runtime in forkRuntimes do\s*do! runtime\.DetachAndDrain\(\)/)
+  assert.match(tools, /for host in orchestrators do\s*do! host\.DetachAndDrain\(\)/)
+  assert.match(tools, /CancelSessionChildren[\s\S]*?runtime\.CancelAndDrain\(\)/)
+  assert.match(tools, /DisposeSession\(sessionId: string\)[\s\S]*?runtime\.CancelAndDrain\(\)/)
   assert.match(tools, /member _\.RunOwnedWork\(start: unit -> Task\) : bool/)
   assert.match(tools, /let! ownedFailure = stopOwnedWorkAndDrain \(\)/)
   assert.doesNotMatch(tools, /runtime\.Cancel\(\)/)
@@ -58,7 +60,7 @@ test('WHAT[MANAGED-SESSION-009] provider transform is admitted into plugin shutd
   )
 })
 
-test('WHAT[MANAGED-SESSION-009] fork terminal callbacks are runtime-owned and drained before parent cancel', () => {
+test('WHAT[MANAGED-SESSION-018] fork terminal callbacks drain before either detach or authorized parent cancel', () => {
   const runtime = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs')
   const lifecycle = read('src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs')
   const oneShot = read('src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs')
@@ -66,6 +68,10 @@ test('WHAT[MANAGED-SESSION-009] fork terminal callbacks are runtime-owned and dr
   assert.match(runtime, /let startOwnedWork \(work: unit -> Task\) : Task/)
   assert.match(runtime, /let stopOwnedWorkAndDrain \(\) : Task/)
   assert.match(runtime, /do! stopOwnedWorkAndDrain \(\)/)
+  assert.match(runtime, /member this\.DetachAndDrain\(\) : Task/)
+  const detachBlock = runtime.match(/member this\.DetachAndDrain\(\) : Task =([\s\S]*?)member this\.Cancel\(\)/)
+  assert.ok(detachBlock, 'process detach implementation must be inspectable')
+  assert.doesNotMatch(detachBlock[1], /HandleController\.cancelChildren|sessions\.AbortSession|teardownChildren/)
   assert.match(runtime, /member internal _\.TrackOwnedWork\(work: unit -> Task\)/)
   assert.match(runtime, /member this\.FailRun\(run: PendingHostRun, error: string\) : Task =\s*startOwnedWork/)
 
@@ -77,12 +83,11 @@ test('WHAT[MANAGED-SESSION-009] fork terminal callbacks are runtime-owned and dr
   assert.doesNotMatch(oneShot, /settleCompletedTerminal scope childId terminal succeed latch completion\s*\|> ignore/)
 })
 
-test('WHAT[MANAGED-SESSION-009] TurnAborted awaits child cascade before publishing parent terminal', () => {
+test('WHAT[MANAGED-SESSION-018] TurnAborted publishes attempt terminal without child cascade', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
 
-  assert.doesNotMatch(ordinary, /sessionPort\.AbortChildren turn\.SessionId\s*\|> ignore/)
-  assert.match(
-    ordinary,
-    /AbortCause\.External ->[\s\S]*?do! cancelSessionChildren turn\.SessionId[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal\s+turn\.SessionId\s+\(TerminalOutcome\.Aborted\(TerminalStop\.forAuthority turn\.AuthorityRootUserMessageId reason\)\)/,
-  )
+  const abortedBlock = ordinary.match(/let private handleAborted([\s\S]*?)let private applyJoinGuardNudge/)
+  assert.ok(abortedBlock)
+  assert.doesNotMatch(abortedBlock[1], /cancelSessionChildren|abortParent|AbortChildren|CancelAndDrain/)
+  assert.match(abortedBlock[1], /TerminalOutcome\.Aborted/)
 })

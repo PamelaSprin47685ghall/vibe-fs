@@ -80,6 +80,20 @@ test('WHAT[DURABLE-EVENTS-020] plugin load defers EventStore replay and durable-
     'the first durable Host admission must activate deferred projection state')
 })
 
+test('WHAT[DURABLE-EVENTS-020] parsed Journal payload replay does not stringify every envelope for legacy detection', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
+  const factCodec = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/FactCodec.fs', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(
+    envelope,
+    /let\s+deserializeValue[\s\S]{0,700}JS\.JSON\.stringify\s+value/,
+    'activation already owns a parsed payload; legacy detection must not serialize it again',
+  )
+  assert.match(envelope, /FactCodec\.legacyDecodeErrorForValue\s+value/)
+  assert.match(factCodec, /let\s+legacyDecodeErrorForValue/)
+})
+
 test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
   const { readFile } = await import('node:fs/promises')
   const integrator = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs', import.meta.url), 'utf8')

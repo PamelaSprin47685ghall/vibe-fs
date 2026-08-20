@@ -47,4 +47,4 @@ provider-leak-gate.mjs
 
 ## GAP
 
-- `GAP-028`（OPEN）：Horizon 误复用 `HandleProjection.listable`，把仍待 Join 交付的 durable `Abandoned` 过滤掉，使已存在 child 在 roster 中表现得像从未创建；同时 fork 首 prompt 的 `AcceptanceUnknown` 被上层当成已证实发送失败并写 `HandleCompleted`，随后工具又返回“未放置”，存在重复委托与真实后台 child 脱钩风险。关闭条件：独立 horizon roster projection 保留未消费 abandonment；acceptance unknown 保留 durable Pending claim、terminal observer 与单次物理发送，不合成 terminal failure；真实 fork+horizon oracle 全绿。
+- `GAP-028`（CLOSED）：Horizon 已改用独立 `HandleProjection.horizonVisible`，父级可见 `Abandoned` 在 Join 消费并 `Retired` 前持续留在 roster；fork 首 prompt 的 `AcceptanceUnknown` 由 durable PromptAuthority `Pending` claim 接管恢复，保留 terminal observer 与单次物理发送，不再合成 `HandleCompleted` 或返回“未放置”。`horizon-surface.test.mjs`、`host-fork-restart-lifecycle.test.mjs` 与真实 `fork-tool.test.mjs` 回归均已绿；核心实现落于 `2953a0978`。

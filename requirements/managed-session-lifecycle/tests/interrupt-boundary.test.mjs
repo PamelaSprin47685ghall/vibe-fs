@@ -47,7 +47,7 @@ test('WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing r
   )
 })
 
-test('WHAT[MANAGED-SESSION-016] logical TurnAborted durably cancels runtime children before physical cascade and terminal', () => {
+test('WHAT[MANAGED-SESSION-018] TurnAborted has no logical child-cancel authority', () => {
   const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
   const tools = read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs')
   const scope = read('src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs')
@@ -57,8 +57,11 @@ test('WHAT[MANAGED-SESSION-016] logical TurnAborted durably cancels runtime chil
   assert.match(tools, /member _\.CancelSessionChildren\(sessionId: string\) : Task/)
   assert.match(tools, /CancelSessionChildren[\s\S]*?runtime\.CancelAndDrain\(\)/)
 
+  const abortedBlock = ordinary.match(/let private handleAborted([\s\S]*?)let private applyJoinGuardNudge/)
+  assert.ok(abortedBlock, 'TurnAborted branch must remain inspectable')
+  assert.doesNotMatch(abortedBlock[1], /cancelSessionChildren|abortParent|AbortChildren|CancelAndDrain/)
   assert.match(
-    ordinary,
-    /let private handleAborted[\s\S]*?do! cancelSessionChildren turn\.SessionId[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal\s+turn\.SessionId\s+\(TerminalOutcome\.Aborted\(TerminalStop\.forAuthority turn\.AuthorityRootUserMessageId reason\)\)/,
+    abortedBlock[1],
+    /eventPort\.NotifyTerminal\s+turn\.SessionId\s+\(TerminalOutcome\.Aborted\(TerminalStop\.forAuthority turn\.AuthorityRootUserMessageId reason\)\)/,
   )
 })

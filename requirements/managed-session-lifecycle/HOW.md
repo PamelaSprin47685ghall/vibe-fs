@@ -49,3 +49,7 @@
 | MANAGED-SESSION-016 | `requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` |
 | MANAGED-SESSION-017 | `requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs` |
 | MANAGED-SESSION-018 | `requirements/managed-session-lifecycle/tests/shutdown-drain-contract.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` |
+
+## GAP
+
+- `GAP-029`（CLOSED）：旧实现把 plugin/process shutdown 与未被内部 successor owner 认领的 `TurnAborted` 都升级成 logical parent cancellation，最终经 `CancelAndDrain → HandleController.cancelChildren` 写入 `HandleAbandoned(ParentCancelled)` 并物理 `AbortSession(child)`。现已拆成 `DetachAndDrain` 与 `CancelAndDrain` 两种互斥权限：process/plugin shutdown 只解绑 observer 与本地资源，保留 durable `Active`；ordinary `TurnAborted` 不再拿到 `abortParent` / `CancelSessionChildren` capability；只有 SessionDeleted、显式 successor-less termination 等明确 logical termination 仍可进入 durable abandon。`shutdown-drain-contract.test.mjs`、`interrupt-boundary.test.mjs` 与真实 fork process-detach oracle 已绿；核心实现落于 `506ab7d36`。

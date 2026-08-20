@@ -96,9 +96,8 @@ type HostForkRuntime
     let ownedWorkGate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
-    // DSL-MUTABLE: resource — one terminal runtime teardown owns either logical
-    // cancel or process-local detach. A process detach must never race a later
-    // durable parent-cancel writer.
+    // One terminal runtime teardown owns either logical cancel or process-local detach.
+    // DSL-MUTABLE: single-flight — detach/cancel teardown owner under cancelGate
     let mutable teardownTask: Task option = None
     // DSL-MUTABLE: resource — terminal/failure callback admission latch.
     let mutable acceptingOwnedWork = true

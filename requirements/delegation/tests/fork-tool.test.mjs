@@ -193,6 +193,32 @@ test('WHAT[PARTICIPANT-HORIZON-011] FORK_TOOL_abandoned_child_does_not_vanish_fr
     assert.match(roster, /Ada/, 'durable abandoned child must not become indistinguishable from never-created')
     assert.match(roster, /did not return/i)
     assert.doesNotMatch(roster, /no one is currently away/i)
+    assert.equal(forkTool.abortCount(runtime), 1, 'authorized logical cancel still physically tears down the child')
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
+})
+
+test('WHAT[MANAGED-SESSION-018] FORK_TOOL_process_detach_preserves_durable_active_child_for_restart', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-process-detach-'))
+  const runtime = await forkTool.createRuntime(directory)
+  const owner = 'manager-process-detach'
+
+  try {
+    const placed = await forkTool.executeManagerFork(runtime, toolModule, owner, 'coder', 'Ada', 'SURVIVE-PLUGIN-RELOAD')
+    assert.match(placed, /Ada/)
+    await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
+
+    await forkTool.detachToolRuntime(runtime)
+
+    assert.equal(
+      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
+      'Active',
+      'process/plugin shutdown has no authority to manufacture ParentCancelled',
+    )
+    assert.equal(forkTool.abortCount(runtime), 0, 'process/plugin detach must not call Host AbortSession for live child agents')
+    assert.equal(forkTool.childCount(runtime), 1)
   } finally {
     forkTool.disposeRuntime(runtime)
   }

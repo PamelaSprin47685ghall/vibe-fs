@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
@@ -23,8 +24,10 @@ module ForkToolSurface =
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
         let physicalRoots = Dictionary<string, ResizeArray<string>>()
-        // DSL-MUTABLE: test-boundary fault injection — exactly one next Host send outcome.
+        // DSL-MUTABLE: algorithm-scratch — exactly one next Host send outcome in the harness
         let mutable nextSendOutcome: SendOutcome option = None
+        // DSL-MUTABLE: algorithm-scratch — Host AbortSession call count in the harness
+        let mutable abortCount = 0
         // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
         let physicalSequence = ref 0
 
@@ -73,6 +76,7 @@ module ForkToolSurface =
             | _ -> None
 
         member _.SetNextSendOutcome(outcome: SendOutcome) = nextSendOutcome <- Some outcome
+        member _.AbortCount = abortCount
 
         member _.Notify(sessionId: SessionId, outcome: TerminalOutcome) =
             match listeners.TryGetValue(SessionId.value sessionId) with
@@ -99,7 +103,9 @@ module ForkToolSurface =
                     historyOf physicalRoots key |> fun values -> values.Add physical
                     Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create physical))
 
-            member _.AbortSession _ = Task.FromResult(Ok())
+            member _.AbortSession _ =
+                abortCount <- abortCount + 1
+                Task.FromResult(Ok())
             member _.InterruptAttempt _ = Task.FromResult(Ok())
             member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
@@ -268,6 +274,9 @@ module ForkToolSurface =
     let childCount (value: obj) =
         (unbox<ForkHarness> value).Sessions.ChildCount
 
+    let abortCount (value: obj) =
+        (unbox<ForkHarness> value).Sessions.AbortCount
+
     let child (value: obj) : obj =
         (unbox<ForkHarness> value).Sessions.LatestChild
         |> Option.map (SessionId.value >> box)
@@ -295,6 +304,24 @@ module ForkToolSurface =
     let cancelOwnerChildren (value: obj) (owner: string) : Task =
         let harness = unbox<ForkHarness> value
         harness.Scope.CancelSessionChildren(SessionId.value (harness.OwnerSession owner))
+
+    let detachToolRuntime (value: obj) : Task =
+        let harness = unbox<ForkHarness> value
+        harness.Scope.DisposeAsync()
+
+    let durableLifecycleByname (value: obj) (owner: string) (byname: string) : obj =
+        let harness = unbox<ForkHarness> value
+
+        AgentJournal.handleProjection harness.Journal (harness.OwnerSession owner)
+        |> HandleProjection.tryFindByByname byname
+        |> Option.map (fun record ->
+            match record.Lifecycle with
+            | HandleLifecycle.Active -> "Active"
+            | HandleLifecycle.CompletedAwaitingJoin _ -> "CompletedAwaitingJoin"
+            | HandleLifecycle.Abandoned _ -> "Abandoned"
+            | HandleLifecycle.Retired -> "Retired")
+        |> Option.map box
+        |> Option.defaultValue null
 
     let executeHorizon (value: obj) (owner: string) : Task<string> =
         let harness = unbox<ForkHarness> value
