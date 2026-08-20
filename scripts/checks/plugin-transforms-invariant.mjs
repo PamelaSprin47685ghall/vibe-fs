@@ -59,7 +59,7 @@ const orderingSteps = [
   'XTracePipeline.applyPipeline',
   'applyCompanionForOrdinaryMaterial',
   'XWire.applyTransform',
-  'applyBloggerEnforcerContinuation',
+  'EnforcerContinuation.applyContinuation',
   'StrengthSpeculate.tryApply',
   'PairProgrammingThoughtTransform.maybeInjectGuideline',
   'projectRequirementGrounding',

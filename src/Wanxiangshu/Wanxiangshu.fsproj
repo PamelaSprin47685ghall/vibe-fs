@@ -445,7 +445,6 @@
     <Compile Include="Enforcer/Cycle/Recovery.fs"/>
     <Compile Include="Enforcer/Repair.fs"/>
     <Compile Include="Enforcer/RepairSurface.fs"/>
-    <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Enforcer/Host.fs"/>
     <Compile Include="Context/Companion/HostBlogger.fs"/>
     <Compile Include="Context/Companion/JournalPort.fs"/>
@@ -484,6 +483,7 @@
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
+    <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Surface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
     <Compile Include="Interaction/Repair/InteractionRepair.fs"/>
