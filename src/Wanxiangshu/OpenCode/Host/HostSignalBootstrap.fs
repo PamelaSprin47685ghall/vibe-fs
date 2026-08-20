@@ -57,6 +57,7 @@ open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
+open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission
@@ -413,11 +414,6 @@ module HostSignalBootstrap =
                 | Ok() -> ()
                 | Error error -> Diagnostic.fatal "durability-activation-failed" [ "result", error ]
 
-            let signalExternalJoinWake (decoded: PromptIngressCodec.DecodedMessage) =
-                match decoded.SessionId, decoded.PhysicalUserMessageId, decoded.PromptKey, decoded.IsHostCompaction with
-                | Some sessionId, Some _, None, false -> scope.Sessions.JoinInterrupts.SignalUserMessage sessionId
-                | _ -> ()
-
             let observePhysicalAdmission output sessionId physicalId =
                 scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
 
@@ -446,7 +442,7 @@ module HostSignalBootstrap =
                     FissionHostRequestProjection.projectRouted hasPhysicalParent routedExecution output
 
                     requireDurabilityActivation ()
-                    signalExternalJoinWake decoded
+                    JoinWake.observeChatMessage scope.Sessions.JoinInterrupts decoded
                     do! promptIngressHook input output
                     let dispatchAccepted =
                         journal
