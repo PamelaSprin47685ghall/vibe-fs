@@ -130,7 +130,11 @@ module PluginSessionWiring =
 
         match journal with
         | Some durable ->
-            seedDurableSessions durable
+            // DURABLE-EVENTS-020: history-derived process bindings are semantic
+            // state, so seeding them belongs to the first durable admission, not
+            // plugin construction. This callback also forces the deferred
+            // WorkspaceEventStore Current exactly at that activation boundary.
+            scope.AttachDurabilityActivation(fun () -> seedDurableSessions durable)
 
             // SyncDelegate attaches whenever the durable journal exists.
             let attached =

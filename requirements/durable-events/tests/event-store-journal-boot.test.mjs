@@ -64,6 +64,22 @@ test('WHAT[DURABLE-EVENTS-020] plugin host does not pre-scan canonical history b
     'PluginHost must not add a second full history scan before CanonicalIntegrator owns replay')
 })
 
+test('WHAT[DURABLE-EVENTS-020] plugin load defers EventStore replay and durable-session seeding until activation', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const workspaceStore = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs', import.meta.url), 'utf8')
+  const writer = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs', import.meta.url), 'utf8')
+  const sessionWiring = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs', import.meta.url), 'utf8')
+  const signals = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs', import.meta.url), 'utf8')
+
+  assert.match(workspaceStore, /lazy\s*\(/, 'workspace store must defer CanonicalIntegrator replay')
+  assert.doesNotMatch(writer, /resumeOrCreate[\s\S]{0,1600}currentJournalProjection/,
+    'resumeOrCreate must not force Current during plugin load')
+  assert.match(sessionWiring, /AttachDurabilityActivation/,
+    'durable projection seeding must attach to the activation boundary')
+  assert.match(signals, /ActivateDurability\(\)/,
+    'the first durable Host admission must activate deferred projection state')
+})
+
 test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
   const { readFile } = await import('node:fs/promises')
   const integrator = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs', import.meta.url), 'utf8')

@@ -45,6 +45,24 @@ module WorkspaceEventStore =
     // DSL-MUTABLE: resource — shared workspace event store refcount registry
     let private shared = Dictionary<string, SharedEntry>()
 
+    let private deferredStore (commonDir: string) : IEventStore =
+        let active =
+            lazy (
+                let writerId = Guid.NewGuid().ToString("N")
+                let integrator = CanonicalIntegrator.create ()
+                EventStore.createLocal commonDir writerId integrator
+            )
+
+        { new IEventStore with
+            member _.Append(events) = active.Value.Append events
+            member _.WritePayload(content) = active.Value.WritePayload content
+            member _.ReadPayload(payloadRef) = active.Value.ReadPayload payloadRef
+            member _.TryCurrent(key) = active.Value.TryCurrent key
+            member _.TryEvent(eventId) = active.Value.TryEvent eventId
+            member _.TryHeads(streamId) = active.Value.TryHeads streamId
+            member _.TryHead(streamId) = active.Value.TryHead streamId
+            member _.AllHeads() = active.Value.AllHeads() }
+
     let acquire (commonDir: string) : IEventStore =
         if String.IsNullOrWhiteSpace commonDir then
             failwith "WorkspaceEventStore.acquire: commonDir is empty"
@@ -55,9 +73,11 @@ module WorkspaceEventStore =
                 entry.RefCount <- entry.RefCount + 1
                 entry.Store
             | false, _ ->
-                let writerId = Guid.NewGuid().ToString("N")
-                let integrator = CanonicalIntegrator.create ()
-                let store = EventStore.createLocal commonDir writerId integrator
+                // DURABLE-EVENTS-020: owning the workspace capability is not the
+                // same thing as consuming durable semantics. Canonical replay is
+                // deliberately behind the IEventStore methods so plugin load can
+                // finish without folding the entire workspace history.
+                let store = deferredStore commonDir
 
                 shared.[commonDir] <- { Store = store; RefCount = 1 }
 

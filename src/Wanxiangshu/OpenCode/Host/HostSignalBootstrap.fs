@@ -417,7 +417,7 @@ module HostSignalBootstrap =
 
             let requireDurabilityActivation () =
                 match durabilityActivation.Value with
-                | Ok() -> ()
+                | Ok() -> scope.ActivateDurability()
                 | Error error -> Diagnostic.fatal "durability-activation-failed" [ "result", error ]
 
             let observePhysicalAdmission output sessionId physicalId =

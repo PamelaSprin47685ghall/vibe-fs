@@ -116,6 +116,11 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first detached Host-work failure for shutdown propagation.
     let mutable backgroundFailure: exn option = None
+    let durabilityActivationGate = obj ()
+    // DSL-MUTABLE: resource — one-shot callbacks that may force deferred durable Current.
+    let mutable durabilityActivators: (unit -> unit) list = []
+    // DSL-MUTABLE: resource — first real durable admission owns activation exactly once.
+    let mutable durabilityActivated = false
 
     /// HOST-006: the first compaction setting the config hook could not establish.
     ///
@@ -181,6 +186,32 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             Some ex
 
     member _.Journal = journal
+
+    member _.AttachDurabilityActivation(activate: unit -> unit) =
+        let runNow =
+            lock durabilityActivationGate (fun () ->
+                if durabilityActivated then
+                    true
+                else
+                    durabilityActivators <- activate :: durabilityActivators
+                    false)
+
+        if runNow then
+            activate ()
+
+    member _.ActivateDurability() =
+        let activators =
+            lock durabilityActivationGate (fun () ->
+                if durabilityActivated then
+                    []
+                else
+                    durabilityActivated <- true
+                    let pending = List.rev durabilityActivators
+                    durabilityActivators <- []
+                    pending)
+
+        for activate in activators do
+            activate ()
 
     /// Composition-of-owners: Strength decision-local state lives in its own scope.
     member _.Strength = strength

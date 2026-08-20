@@ -263,11 +263,6 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
 
         store.Append [ encoded ]
 
-    static member private currentJournalProjection(store: IEventStore) : Result<ProjectionSet, FoldRejection> =
-        match store.TryCurrent "Journal" with
-        | Some current -> Ok(unbox<ProjectionSet> current)
-        | None -> Ok Fold.empty
-
     static member private initEnvelope (runtimeId: RuntimeId) (processId: int) (startedAt: DateTimeOffset) : Envelope =
         { RuntimeId = runtimeId
           LocalSeq = LocalSeq.create 1L
@@ -297,21 +292,18 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
             return writer :> IJournalWriter, init
         }
 
-    /// Opening an existing workspace is read-only. Current may be observed, but
-    /// merely loading the plugin never appends a runtime watermark.
+    /// Opening an existing workspace is read-only and does not force Current.
+    /// WorkspaceEventStore may be deferred during plugin load; AgentJournal reads
+    /// the canonical Current on first semantic consumption through TryCurrent.
     static member resumeOrCreate
         (runtimeId: RuntimeId, processId: int, startedAt: DateTimeOffset, store: IEventStore)
         : Task<Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>> =
         task {
             let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
+            let writer =
+                EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
 
-            match EventStoreJournalWriter.currentJournalProjection store with
-            | Error rejection -> return Error rejection
-            | Ok projection ->
-                let writer =
-                    EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
-
-                return Ok(writer :> IJournalWriter, init, projection)
+            return Ok(writer :> IJournalWriter, init, Fold.empty)
         }
 
     member private this.CommitRuntimeStartedLocked() : Task<Result<unit, string>> =
