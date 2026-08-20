@@ -437,11 +437,8 @@ module HostSignalBootstrap =
             let observePhysicalAdmission output sessionId physicalId =
                 scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
 
-                match ExplicitResumeSuppression.observePhysicalMaterial sessionId physicalId output with
-                | ExplicitResumeSuppression.PhysicalMaterialObservation.ExplicitResume
-                | ExplicitResumeSuppression.PhysicalMaterialObservation.ReplacedExplicitResume ->
+                if ExplicitResumeSuppression.requiresPhysicalBinding sessionId physicalId output then
                     reconciler.BindPhysicalUserMaterial(sessionId, physicalId)
-                | ExplicitResumeSuppression.PhysicalMaterialObservation.Ordinary -> ()
 
             let ensurePhysicalParentDiscovered (sessionId: SessionId) =
                 task {
@@ -476,43 +473,6 @@ module HostSignalBootstrap =
 
                     SessionExecutionBinding.acceptRoutedExecution dispatchAccepted routedExecution
                 }
-
-            let bindExplicitResumeSession
-                sessionId
-                (profileOpt: PromptAuthority.AuthorityExecutionProfile option)
-                explicitAgent
-                =
-                let resumeAgent =
-                    ModelRouting.managedAgentForAdmission explicitAgent
-                    |> Option.orElseWith (fun () ->
-                        profileOpt
-                        |> Option.map (fun (profile: PromptAuthority.AuthorityExecutionProfile) ->
-                            profile.SelectedAgent))
-
-                resumeAgent
-                |> Option.iter (fun agent ->
-                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
-                    SessionExecutionBinding.observeUserFacingAgent sessionId agent
-                    ProviderLanguageBinding.ensureRoot sessionId |> ignore)
-
-                match profileOpt with
-                | Some profile -> PersonaBinding.ensureFromAuthority profile |> ignore
-                | None -> PersonaBinding.ensureRoot sessionId |> ignore
-
-            let observeExplicitResumeSession (decoded: PromptIngressCodec.DecodedMessage) =
-                match decoded.SessionId with
-                | None -> ()
-                | Some sessionId ->
-                    let profileOpt =
-                        journal
-                        |> Option.bind (fun j ->
-                            PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections
-                            |> Option.orElseWith (fun () ->
-                                PromptAuthorityLedger.lastAuthorityProfile
-                                    sessionId
-                                    (AgentJournal.snapshot j).AgentProjections))
-
-                    bindExplicitResumeSession sessionId profileOpt decoded.ExplicitAgent
 
             let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
@@ -565,21 +525,7 @@ module HostSignalBootstrap =
                         // then materialize it on the real chat.message before any owner
                         // policy can observe the turn. Hosts that already forwarded the
                         // marked part only consume the pending handoff here.
-                        let materialization =
-                            match decoded.SessionId with
-                            | Some sessionId -> ExplicitResumeSuppression.materializePendingBriefing sessionId output
-                            | None -> ExplicitResumeSuppression.BriefingMaterialization.Ordinary
-
-                        let knownExplicitResume =
-                            match decoded.SessionId, decoded.PhysicalUserMessageId with
-                            | Some sessionId, Some physicalId ->
-                                ExplicitResumeSuppression.isPhysicalMaterial sessionId physicalId
-                            | _ -> false
-
-                        let explicitResume =
-                            match materialization with
-                            | ExplicitResumeSuppression.BriefingMaterialization.ExplicitResume -> true
-                            | ExplicitResumeSuppression.BriefingMaterialization.Ordinary -> knownExplicitResume
+                        let explicitResume = ExplicitResumeSuppression.classifyChatMessage decoded output
 
                         // CRASH-018: bind the disclosure marker to this exact
                         // physical user material before any routing/reconcile wake
@@ -601,7 +547,11 @@ module HostSignalBootstrap =
                             // Wanxiangshu does not mint PromptIngress/AuthorityRoot,
                             // acquire a managed business lease, wake joins, or commit a
                             // continuation capability for this physical material.
-                            observeExplicitResumeSession decoded
+                            ExplicitSessionResume.observeChatMessage
+                                (fun sessionId ->
+                                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore)
+                                journal
+                                decoded
                         else
                             // EMR-009 / PROMPT-006: route from typed authority evidence.
                             // Keyless external roots use their explicit managed agent;

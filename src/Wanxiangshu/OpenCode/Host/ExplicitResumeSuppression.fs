@@ -4,6 +4,7 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.OpenCode.ProviderWireDecode
 open Wanxiangshu.OpenCode.ProviderWireCapture
 
@@ -135,6 +136,33 @@ module ExplicitResumeSuppression =
             match markedPhysicalBySession.TryGetValue(SessionId.value sessionId) with
             | true, current -> current = PhysicalUserMessageId.value physicalId
             | false, _ -> false)
+
+    /// CRASH-018 chat.message classification. Materialization and exact-physical
+    /// replay knowledge are one owner decision; Host wiring must not reconstruct
+    /// the precedence between them.
+    let classifyChatMessage (decoded: PromptIngressCodec.DecodedMessage) (output: obj) : bool =
+        let materialization =
+            match decoded.SessionId with
+            | Some sessionId -> materializePendingBriefing sessionId output
+            | None -> BriefingMaterialization.Ordinary
+
+        let knownExplicitResume =
+            match decoded.SessionId, decoded.PhysicalUserMessageId with
+            | Some sessionId, Some physicalId -> isPhysicalMaterial sessionId physicalId
+            | _ -> false
+
+        match materialization with
+        | BriefingMaterialization.ExplicitResume -> true
+        | BriefingMaterialization.Ordinary -> knownExplicitResume
+
+    /// The exact physical material registry decides whether reconciliation must
+    /// bind this user material. Both a marked resume and the first ordinary
+    /// replacement change the binding boundary.
+    let requiresPhysicalBinding sessionId physicalId output =
+        match observePhysicalMaterial sessionId physicalId output with
+        | PhysicalMaterialObservation.ExplicitResume
+        | PhysicalMaterialObservation.ReplacedExplicitResume -> true
+        | PhysicalMaterialObservation.Ordinary -> false
 
     /// CRASH-018: Check if the trailing user message in the transform output
     /// is an explicit resume binding for the given session.

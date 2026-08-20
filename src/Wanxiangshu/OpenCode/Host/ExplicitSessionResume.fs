@@ -6,6 +6,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation.Identity
 
@@ -15,6 +18,46 @@ open Wanxiangshu.Foundation.Identity
 /// tool call, appends recovery facts, or sends a prompt on the user's behalf.
 [<RequireQualifiedAccess>]
 module ExplicitSessionResume =
+
+    let private tryResumeProfile (journal: AgentJournal option) sessionId =
+        journal
+        |> Option.bind (fun durable ->
+            let projections = (AgentJournal.snapshot durable).AgentProjections
+
+            PromptAuthorityLedger.activeProfile sessionId projections
+            |> Option.orElseWith (fun () -> PromptAuthorityLedger.lastAuthorityProfile sessionId projections))
+
+    let private bindChatSession
+        (observeManagedSession: SessionId -> unit)
+        sessionId
+        (profileOpt: PromptAuthority.AuthorityExecutionProfile option)
+        explicitAgent
+        =
+        let resumeAgent =
+            ModelRouting.managedAgentForAdmission explicitAgent
+            |> Option.orElseWith (fun () -> profileOpt |> Option.map (fun profile -> profile.SelectedAgent))
+
+        resumeAgent
+        |> Option.iter (fun agent ->
+            observeManagedSession sessionId
+            SessionExecutionBinding.observeUserFacingAgent sessionId agent
+            ProviderLanguageBinding.ensureRoot sessionId |> ignore)
+
+        match profileOpt with
+        | Some profile -> PersonaBinding.ensureFromAuthority profile |> ignore
+        | None -> PersonaBinding.ensureRoot sessionId |> ignore
+
+    /// CRASH-018 process-local reenlistment of the explicit-resume provider turn.
+    /// The runtime scope supplies only its managed-session observation; durable
+    /// authority/profile interpretation stays here.
+    let observeChatMessage
+        (observeManagedSession: SessionId -> unit)
+        (journal: AgentJournal option)
+        (decoded: PromptIngressCodec.DecodedMessage)
+        =
+        match decoded.SessionId with
+        | None -> ()
+        | Some sessionId -> bindChatSession observeManagedSession sessionId (tryResumeProfile journal sessionId) decoded.ExplicitAgent
 
     [<Emit("$0['continue'] = $1")>]
     let private setContinueCommand (_commands: obj) (_command: obj) : unit = jsNative

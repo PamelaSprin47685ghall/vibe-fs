@@ -518,6 +518,7 @@
     <Compile Include="Execution/Fission/Surface.fs"/>
     <Compile Include="OpenCode/Host/FissionHostSurface.fs"/>
     <Compile Include="OpenCode/Host/ExplicitResumeSuppression.fs"/>
+    <Compile Include="OpenCode/Host/ExplicitSessionResume.fs"/>
     <Compile Include="OpenCode/Host/HostTurnObserver.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionObserver.fs"/>
     <Compile Include="OpenCode/Host/HostSessionDeletion.fs"/>
@@ -540,7 +541,6 @@
     <Compile Include="Execution/Delegation/Fork/CleanBreakSurface.fs"/>
     <Compile Include="OpenCode/JoinResultRendererSurface.fs"/>
     <Compile Include="OpenCode/Tools/ToolRuntimeScope.fs"/>
-    <Compile Include="OpenCode/Host/ExplicitSessionResume.fs"/>
     <Compile Include="OpenCode/Host/ExplicitResumeSurface.fs"/>
     <Compile Include="Mission/Finality/OpenCode/HostPort.fs"/>
     <Compile Include="Execution/Delegation/Handle/OpenCode/OneShotTool.fs"/>
