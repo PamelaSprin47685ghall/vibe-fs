@@ -59,18 +59,40 @@ test('WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-005] package self materialization keeps its package-owned test closure', () => {
+test('WHAT[REQUIREMENT-GROUNDING-005] package materialization strictly extracts direct Markdown and excludes tests plus the manifest for both self and external access', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const snapshot = grounding.materializePackage(dir, 'alpha')
     assert.deepEqual(snapshot.materials.map((material) => material.path), [
-      'requirements/alpha/WHY.md',
-      'requirements/alpha/WHAT.md',
       'requirements/alpha/HOW.md',
-      'requirements/alpha/APPLIES-TO',
-      'requirements/alpha/tests/a.test.mjs',
-      'requirements/alpha/tests/z.test.mjs',
+      'requirements/alpha/WHAT.md',
+      'requirements/alpha/WHY.md',
     ])
+    assert.equal(snapshot.materials.some((m) => m.path.includes('/tests/')), false)
+    assert.equal(snapshot.materials.some((m) => m.path.endsWith('/APPLIES-TO')), false)
+
+    // Direct self-access (reading a file within requirements/<package>/) also strictly injects only direct *.md
+    const opened = await host.createJournal(dir)
+    const selfPath = join(dir, 'requirements', 'alpha', 'WHAT.md')
+    const requested = await host.requestPaths(opened.journal, dir, 's-self-material', [selfPath])
+    assert.equal(requested.needsGrounding, true)
+    const projected = await host.projectWithJournal(opened.journal, 's-self-material', terminalRead(selfPath))
+    assert.equal(projected.ok, true)
+
+    const injectedPaths = projected.value
+      .filter((message) => message.info?.source === host.source)
+      .map((message) => message.parts[0].state.input.filePath)
+      .map((path) => path.replaceAll('\\', '/'))
+      .map((path) => path.slice(path.indexOf('/requirements/') + 1))
+
+    assert.deepEqual(injectedPaths, [
+      'requirements/alpha/HOW.md',
+      'requirements/alpha/WHAT.md',
+      'requirements/alpha/WHY.md',
+    ])
+    assert.equal(injectedPaths.some((path) => path.includes('/tests/')), false)
+    assert.equal(injectedPaths.some((path) => path.endsWith('/APPLIES-TO')), false)
+    host.disposeJournal(opened.journal)
   } finally { cleanup() }
 })
 
@@ -89,7 +111,7 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates workspace package digest iden
     assert.equal(same.needsGrounding, false)
     writeFileSync(join(dir, 'requirements', 'alpha', 'tests', 'a.test.mjs'), 'a-v2\n', 'utf8')
     const testOnlyChange = await host.requestPaths(journal, dir, 's-dedupe', [source])
-    assert.equal(testOnlyChange.needsGrounding, false, 'external APPLIES-TO identity excludes tests/**')
+    assert.equal(testOnlyChange.needsGrounding, false, 'package identity excludes tests/**')
     writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'what-v2\n', 'utf8')
     const changed = await host.requestPaths(journal, dir, 's-dedupe', [source])
     assert.equal(changed.needsGrounding, true)

@@ -24,7 +24,7 @@ Deduplication & Horizon Filter (若同 horizon 已存在相同 digest 则跳过)
 ### 1. 范围解析与材料物化 (Scope Resolution & Materialization)
 
 - **解析逻辑**：`requirements/<package>/**` 内部路径无条件触发本包 self coverage；包外路径按 `<package>/APPLIES-TO` 声明的 glob 规则求值。
-- **外部材料过滤**：外部路径触发时，仅提取 `requirements/<package>/` 根级直接存在的 `*.md` 文件，过滤掉 `tests/**` 与子目录，防止实现细节污染上下文。
+- **规范材料过滤**：统一仅提取 `requirements/<package>/` 根级直接存在的 `*.md` 文件（按文件名升序排列），过滤掉 `tests/**` 与子目录及 `APPLIES-TO` 元数据，防止实现细节与测试代码污染上下文。
 - **摘要指纹**：对所有材料内容按规范顺序计算稳定 digest，与工作区标识绑定为唯一 grounding identity。
 
 ### 2. 宿主钩子与拦截门禁 (Host Hooks & Mutation Gate)

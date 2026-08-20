@@ -16,9 +16,9 @@ Grounding 仅从当前工作区根目录下的 `requirements/` 目录发现 pack
 
 对给定的工作区相对规范路径，解析器必须返回所有匹配 package 的集合，严禁以“最后匹配”、“就近匹配”或单 owner 假设丢弃任何命中的包。解析结果按 package 名称升序进行确定性排序后进入后续流程。
 
-## REQUIREMENT-GROUNDING-005: APPLIES-TO 外部命中只注入同层 Markdown
+## REQUIREMENT-GROUNDING-005: 规范材料严格限制为包根目录 Markdown
 
-当 package 仅因包外路径命中 `APPLIES-TO` 而被触发时，自动载入的材料集合**严格限制**为 `requirements/<package>/` 根目录下直接存在的 `*.md` 普通文件，按文件名升序排列。严禁递归进入子目录（`tests/**` 绝不自动注入），`APPLIES-TO` 文件本身作为元数据亦不得注入。若触碰的是 package 自身目录，则允许使用完整的 package-owned 材料闭包。
+无论触发路径属于包外 `APPLIES-TO` 匹配还是包内自身目录（self coverage），规范接地自动载入的材料集合**严格限制**为 `requirements/<package>/` 根目录下直接存在的 `*.md` 普通文件，按文件名升序排列。任何时候**严禁**注入 `tests/**`（测试代码为可执行证明，非规范文本）以及 `APPLIES-TO`（元数据清单）或任何子目录文件。
 
 ## REQUIREMENT-GROUNDING-006: Grounding identity 按内容版本去重
 
