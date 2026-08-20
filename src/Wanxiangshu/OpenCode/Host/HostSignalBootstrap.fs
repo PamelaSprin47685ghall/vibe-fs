@@ -125,8 +125,8 @@ module HostSignalBootstrap =
                         member _.GetMessages _ =
                             Task.FromResult(Ok([]: SessionMessage list)) }
 
-            // One ITimerPort for provider-recovery deadlines (G4R-CE S2).
-            // Application awaits via IDeadlineHandle; Host owns the Node adapter.
+            // Host visibility catch-up still owns a Node timer backstop. Provider
+            // recovery itself is causal and no longer uses a wall-clock deadline.
             let recoveryTimerPort = PtyTiming.nodeTimerPort ()
 
             // HOST-BOUNDARY-008: projection catch-up wakes on the session's
@@ -145,7 +145,6 @@ module HostSignalBootstrap =
 
             let onTurn =
                 HostTurnObserver.observe
-                    recoveryTimerPort
                     sessionPort
                     eventPort
                     journal
