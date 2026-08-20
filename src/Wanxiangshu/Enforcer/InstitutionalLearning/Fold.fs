@@ -9,4 +9,3 @@ module InstitutionalLearningFactFold =
         Ok
             { projection with
                 InstitutionalLearning = InstitutionalLearningProjection.apply fact projection.InstitutionalLearning }
-

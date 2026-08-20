@@ -22,4 +22,3 @@ type ConcernFactCases =
         {| Generation: string
            Id: string
            OwnerSessionId: SessionId |}
-

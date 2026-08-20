@@ -23,4 +23,3 @@ type InstitutionalLearningFactCases =
            Disposition: LearningDisposition
            FrozenResult: string
            ResurfacedDeferredWorkIds: string list |}
-

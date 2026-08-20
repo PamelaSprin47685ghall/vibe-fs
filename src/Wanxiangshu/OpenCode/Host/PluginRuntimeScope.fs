@@ -256,11 +256,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             // Tests / journal-only scopes never stream deltas. A no-op sensor keeps
             // completion paths callable without inventing an abort port.
             let empty =
-                LoopSensor(
-                    (fun _ -> false),
-                    (fun _ -> Task.FromResult(Ok())),
-                    (fun _ _ _ -> Task.FromResult(Ok()))
-                )
+                LoopSensor((fun _ -> false), (fun _ -> Task.FromResult(Ok())), (fun _ _ _ -> Task.FromResult(Ok())))
 
             loopSensor <- Some empty
             empty

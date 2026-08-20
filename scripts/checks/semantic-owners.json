@@ -452,6 +452,26 @@
       "owner": "guidance-delivery"
     },
     {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
+      "owner": "institutional-learning"
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+      "owner": "institutional-learning"
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
+      "owner": "institutional-learning"
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+      "owner": "institutional-learning"
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
+      "owner": "institutional-learning"
+    },
+    {
       "path": "src/Wanxiangshu/Enforcer/Host.fs",
       "owner": "behavior-diagnosis"
     },
@@ -988,6 +1008,22 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+      "owner": "attention-regulation"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+      "owner": "attention-regulation"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+      "owner": "attention-regulation"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Surface.fs",
+      "owner": "attention-regulation"
+    },
+    {
       "path": "src/Wanxiangshu/Interaction/Authority/Child.fs",
       "owner": "interaction-authority"
     },
@@ -1022,6 +1058,22 @@
     {
       "path": "src/Wanxiangshu/Interaction/Authority/Surface.fs",
       "owner": "interaction-authority"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+      "owner": "concern-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+      "owner": "concern-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+      "owner": "concern-routing"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Surface.fs",
+      "owner": "concern-routing"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Dispatch/AssistancePrompt.fs",
@@ -1824,6 +1876,10 @@
       "owner": "action-affordance"
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs",
+      "owner": "attention-regulation"
+    },
+    {
       "path": "src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs",
       "owner": "action-affordance"
     },
@@ -1834,6 +1890,10 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/CoderTool.fs",
       "owner": "action-affordance"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs",
+      "owner": "concern-routing"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
@@ -1878,6 +1938,10 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
       "owner": "repository-investigation"
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
+      "owner": "institutional-learning"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs",

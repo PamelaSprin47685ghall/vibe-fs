@@ -58,6 +58,7 @@ test('WHAT[INSTITUTIONAL-LEARNING-008] occurrence replay keeps the first frozen 
   assert.equal(learning.frozen('ses-a', 'learn-1', state), 'frozen-first')
 
   const tool = read('src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs')
-  assert.match(tool, /tryFind sessionId occurrence[\s\S]*?Some record -> return record\.FrozenResult/)
+  assert.match(tool, /InstitutionalLearningProjection\.tryFind/)
+  assert.match(tool, /Some record -> return record\.FrozenResult/)
 })
 

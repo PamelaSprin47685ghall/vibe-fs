@@ -22,7 +22,8 @@ module AttentionProjection =
         items sessionId state |> List.filter (fun item -> item.ResurfacedBy.IsNone)
 
     let tryFind sessionId occurrenceId state =
-        items sessionId state |> List.tryFind (fun item -> item.OccurrenceId = occurrenceId)
+        items sessionId state
+        |> List.tryFind (fun item -> item.OccurrenceId = occurrenceId)
 
     let record sessionId occurrenceId text state =
         let current = items sessionId state
@@ -47,9 +48,10 @@ module AttentionProjection =
             items sessionId state
             |> List.map (fun item ->
                 if Set.contains item.OccurrenceId selected && item.ResurfacedBy.IsNone then
-                    { item with ResurfacedBy = Some learningOccurrence }
+                    { item with
+                        ResurfacedBy = Some learningOccurrence }
                 else
                     item)
 
-        { state with BySession = Map.add sessionId updated state.BySession }
-
+        { state with
+            BySession = Map.add sessionId updated state.BySession }

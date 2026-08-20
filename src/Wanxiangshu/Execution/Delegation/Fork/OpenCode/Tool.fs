@@ -410,7 +410,10 @@ module ForkTool =
                 scope.Journal
                 |> Result.requireSome (prose language Path.Fork.HandoffJournalRequired)
 
-            let! handoff = DelegationHandoffLedger.prepareInitial durable runtime.ParentId |> TaskResultCE.ofTask
+            let! handoff =
+                DelegationHandoffLedger.prepareInitial durable runtime.ParentId
+                |> TaskResultCE.ofTask
+
             let! rendered =
                 prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
                 |> TaskResultCE.ofTask
@@ -450,10 +453,12 @@ module ForkTool =
         =
         taskResult {
             let! childId =
-                runtime.TryFindAgent agentId |> Option.bind (fun record -> record.ChildSessionId)
+                runtime.TryFindAgent agentId
+                |> Option.bind (fun record -> record.ChildSessionId)
                 |> Result.requireSome (namedProse language Path.Fork.PersonSessionUnknown agentId)
 
             let! handoff = runtime.PrepareHandoff childId |> TaskResultCE.ofTask
+
             let! rendered =
                 prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
                 |> TaskResultCE.ofTask

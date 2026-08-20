@@ -965,10 +965,7 @@ module PairProgrammingThoughtTransform =
         let messages =
             prepared.Messages
             |> List.map (fun (id, message) ->
-                ProviderProse.render
-                    language
-                    "concern-routing/message-delivery"
-                    (Map [ "id", id; "message", message ]))
+                ProviderProse.render language "concern-routing/message-delivery" (Map [ "id", id; "message", message ]))
 
         match announcements @ messages with
         | [] -> None
@@ -1045,9 +1042,15 @@ module PairProgrammingThoughtTransform =
             let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
 
             let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
-            let concernText, concernPlacement = prepareConcernFragments journal projectionSessionIdOpt language
+
+            let concernText, concernPlacement =
+                prepareConcernFragments journal projectionSessionIdOpt language
+
             let markerText =
-                if String.IsNullOrWhiteSpace concernText then markerText else markerText + "\n\n" + concernText
+                if String.IsNullOrWhiteSpace concernText then
+                    markerText
+                else
+                    markerText + "\n\n" + concernText
 
             let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText concernPlacement messages
 

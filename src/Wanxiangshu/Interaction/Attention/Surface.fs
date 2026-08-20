@@ -26,7 +26,9 @@ module AttentionSurface =
     let pending (session: string) (state: obj) : obj =
         stateOf state
         |> AttentionProjection.pending (SessionId.create session)
-        |> List.map (fun item -> box {| occurrence = item.OccurrenceId; text = item.Text |})
+        |> List.map (fun item ->
+            box
+                {| occurrence = item.OccurrenceId
+                   text = item.Text |})
         |> List.toArray
         |> box
-

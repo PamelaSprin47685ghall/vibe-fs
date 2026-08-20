@@ -45,14 +45,23 @@ module InstitutionalLearningSurface =
         |> Array.toList
         |> InstitutionalEnhancer.rulebookRevision
 
-    let empty () = boxed InstitutionalLearningProjection.empty
+    let empty () =
+        boxed InstitutionalLearningProjection.empty
 
     let commit session occurrence kind experience revision disposition frozen resurfaced state =
-        let kind = if kind = "celebrate" then ExperienceKind.Celebrate else ExperienceKind.Regret
+        let kind =
+            if kind = "celebrate" then
+                ExperienceKind.Celebrate
+            else
+                ExperienceKind.Regret
+
         let disposition =
-            if disposition = "ABSORB" then LearningDisposition.Absorb "existing"
-            elif disposition = "BIRTH" then LearningDisposition.Birth "candidate"
-            else LearningDisposition.Discard "discarded"
+            if disposition = "ABSORB" then
+                LearningDisposition.Absorb "existing"
+            elif disposition = "BIRTH" then
+                LearningDisposition.Birth "candidate"
+            else
+                LearningDisposition.Discard "discarded"
 
         let fact =
             InstitutionalLearningFactCases.LearningDispositionCommitted
@@ -71,4 +80,3 @@ module InstitutionalLearningSurface =
         match InstitutionalLearningProjection.tryFind (SessionId.create session) occurrence (stateOf state) with
         | Some record -> box record.FrozenResult
         | None -> null
-

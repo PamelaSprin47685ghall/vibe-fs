@@ -14,7 +14,9 @@ module DelegationFactFold =
                ParentEndExclusive: int64 |})
         : Result<AgentProjectionSet, FoldRejection> =
         let key = DelegationHandoff.key payload.ParentSessionId payload.DelegateSessionId
-        let previous = Map.tryFind key projection.DelegationHandoffs |> Option.defaultValue 0L
+
+        let previous =
+            Map.tryFind key projection.DelegationHandoffs |> Option.defaultValue 0L
 
         if payload.ParentEndExclusive < previous then
             FoldRejection.reject "DelegationHandoffAdvanced" "parent handoff cursor cannot retreat"

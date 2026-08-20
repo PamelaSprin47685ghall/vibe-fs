@@ -24,23 +24,44 @@ module InstitutionalLearningProjection =
         |> Map.tryFind sessionId
         |> Option.bind (Map.tryFind occurrenceId)
 
+    let private applyCommitted
+        sessionId
+        occurrenceId
+        kind
+        experience
+        rulebookRevision
+        disposition
+        frozenResult
+        resurfacedDeferredWorkIds
+        state
+        =
+        let current = Map.tryFind sessionId state.BySession |> Option.defaultValue Map.empty
+
+        if Map.containsKey occurrenceId current then
+            state
+        else
+            let record =
+                { OccurrenceId = occurrenceId
+                  Kind = kind
+                  Experience = experience
+                  RulebookRevision = rulebookRevision
+                  Disposition = disposition
+                  FrozenResult = frozenResult
+                  ResurfacedDeferredWorkIds = resurfacedDeferredWorkIds }
+
+            { state with
+                BySession = Map.add sessionId (Map.add occurrenceId record current) state.BySession }
+
     let apply fact state =
         match fact with
         | InstitutionalLearningFactCases.LearningDispositionCommitted payload ->
-            let current = Map.tryFind payload.SessionId state.BySession |> Option.defaultValue Map.empty
-
-            if Map.containsKey payload.OccurrenceId current then
+            applyCommitted
+                payload.SessionId
+                payload.OccurrenceId
+                payload.Kind
+                payload.Experience
+                payload.RulebookRevision
+                payload.Disposition
+                payload.FrozenResult
+                payload.ResurfacedDeferredWorkIds
                 state
-            else
-                let record =
-                    { OccurrenceId = payload.OccurrenceId
-                      Kind = payload.Kind
-                      Experience = payload.Experience
-                      RulebookRevision = payload.RulebookRevision
-                      Disposition = payload.Disposition
-                      FrozenResult = payload.FrozenResult
-                      ResurfacedDeferredWorkIds = payload.ResurfacedDeferredWorkIds }
-
-                { state with
-                    BySession = Map.add payload.SessionId (Map.add payload.OccurrenceId record current) state.BySession }
-

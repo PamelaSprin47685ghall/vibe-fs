@@ -128,11 +128,7 @@ module JsToolsBindings =
 
     /// Build the api object for one sandbox run. `staging` collects every
     /// mutation the program makes; the caller commits or discards it.
-    let createApi
-        (root: string)
-        (staging: ResizeArray<JsStagedMutation>)
-        (modelReads: ResizeArray<string>)
-        : obj =
+    let createApi (root: string) (staging: ResizeArray<JsStagedMutation>) (modelReads: ResizeArray<string>) : obj =
         createObj
             [ "js"
               ==> createObj

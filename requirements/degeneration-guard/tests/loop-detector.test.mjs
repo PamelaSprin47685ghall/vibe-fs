@@ -3,6 +3,7 @@ import test from 'node:test'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 
 import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
+import { deriveLoopDetectorEnvelope } from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
 
 const close = (actual, expected, tolerance = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
@@ -31,6 +32,16 @@ test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => 
   assert.equal(result.isAnomalous, false)
   assert.equal(result.step, 0)
   close(result.weightedDistinctTokens, loopDetector.normalWeightedDistinctCount)
+})
+
+test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', () => {
+  const derived = deriveLoopDetectorEnvelope()
+
+  close(loopDetector.halfLife, derived.halfLife)
+  close(loopDetector.lambda, derived.lambda)
+  close(loopDetector.normalWeightedDistinctCount, derived.normalPrior)
+  close(loopDetector.minimumWeightedDistinctCount, derived.minimum)
+  close(loopDetector.maximumWeightedDistinctCount, derived.maximum)
 })
 
 test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {

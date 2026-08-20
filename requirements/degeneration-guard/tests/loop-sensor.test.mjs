@@ -213,3 +213,33 @@ test('WHAT[DG-009] LOOP_008_guard_has_no_fallback_or_nudge_recovery_path', () =>
   assert.doesNotMatch(ordinarySource, /continueAfterLoopKill/)
   assert.doesNotMatch(fallbackSource, /continueAfterLoopKill|LoopContinue/)
 })
+
+test('WHAT[DG-012] LOOP_012_degeneration_guard_is_the_single_closed_recovery_owner', async () => {
+  const continuations = []
+  const sensor = loopSensor.create({
+    owned: ['ses_closed'],
+    abort: () => {},
+    continue: (session, anomaly) => continuations.push([session, anomaly]),
+  })
+
+  loopSensor.observe(sensor, loopSensor.textDelta('ses_closed', repetitiveText()))
+  await wait()
+  assert.deepEqual(loopSensor.consumeAbortCause(sensor, 'ses_closed'), {
+    cause: 'DegenerationGuard',
+    anomaly: 'TooRepetitive',
+  })
+  await wait()
+  assert.deepEqual(continuations, [['ses_closed', 'TooRepetitive']])
+
+  const ordinarySource = readFileSync(
+    join(root, 'src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs'),
+    'utf8',
+  )
+  const fissionSource = readFileSync(join(root, 'src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs'), 'utf8')
+
+  assert.match(ordinarySource, /AbortCause\.DegenerationGuard _ -> AsyncSupport\.completedTask \(\)/)
+  assert.match(
+    fissionSource,
+    /TurnAborted _, AbortCause\.DegenerationGuard _ ->[\s\S]{0,120}DegenerationInterrupted/,
+  )
+})

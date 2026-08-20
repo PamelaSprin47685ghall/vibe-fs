@@ -323,7 +323,11 @@ export async function assertJoinWakePath(workDir, label = 'long-stroke') {
  */
 export function assertInterruptedJoin(scenario, label = 'long-stroke') {
   const results = publicToolResults(scenario.provider?.requests, 'join');
-  const interrupted = results.filter((text) => text.includes('# Something nearer has arrived.'));
+  // Synthetic TOML puts the public consequence in the leading instruction.
+  // A later successful join may legitimately carry an LWR that quotes the
+  // earlier interrupted result; that historical quotation is not a second
+  // interrupted join consequence and must not be classified as one.
+  const interrupted = results.filter((text) => text.startsWith('# Something nearer has arrived.\n'));
   assert.ok(
     interrupted.length >= 1,
     `${label}: interrupted join must reach Manager conversation as the public nearer-arrival result`,

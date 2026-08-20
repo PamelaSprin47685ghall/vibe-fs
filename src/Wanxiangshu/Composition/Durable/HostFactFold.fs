@@ -51,6 +51,28 @@ module HostFactFold =
 
     let private reject = FoldRejection.reject
 
+    let private guidelineRejection =
+        function
+        | GuidelineFoldRejection.NonSequentialOrdinal(expected, actual) ->
+            { Fact = "PairProgrammingGuidelineAnchored"
+              Reason = sprintf "ordinal %d is not the successor of %d (HOST-013)" actual expected }
+        | GuidelineFoldRejection.DuplicateCallId callId ->
+            { Fact = "PairProgrammingGuidelineAnchored"
+              Reason = sprintf "call id %s already exists in this transcript (HOST-013)" callId }
+        | GuidelineFoldRejection.DuplicatePlacement(callGap, resultGap) ->
+            { Fact = "PairProgrammingGuidelineAnchored"
+              Reason = sprintf "placement (%A, %A) already exists in this transcript (HOST-013 §8)" callGap resultGap }
+
+    let private applyConcernPlacement sessionId placement (projection: AgentProjectionSet) =
+        match placement with
+        | None -> Ok projection
+        | Some batch ->
+            ConcernProjection.applyPlacement sessionId batch projection.Concern
+            |> Result.map (fun concern -> { projection with Concern = concern })
+            |> Result.mapError (fun reason ->
+                { Fact = "PairProgrammingGuidelineAnchored"
+                  Reason = reason })
+
     let fold (projection: AgentProjectionSet) (fact: HostFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         | HostFactCases.PairProgrammingGuidelineAnchored payload ->
@@ -69,28 +91,8 @@ module HostFactFold =
                         { session with
                             Guidelines = Some updated }))
                 projection
-            |> function
-                | Ok updated ->
-                    match payload.ConcernPlacement with
-                    | None -> Ok updated
-                    | Some batch ->
-                        ConcernProjection.applyPlacement payload.SessionId batch updated.Concern
-                        |> Result.map (fun concern -> { updated with Concern = concern })
-                        |> Result.mapError (fun reason ->
-                            { Fact = "PairProgrammingGuidelineAnchored"
-                              Reason = reason })
-                | Error(GuidelineFoldRejection.NonSequentialOrdinal(expected, actual)) ->
-                    reject
-                        "PairProgrammingGuidelineAnchored"
-                        (sprintf "ordinal %d is not the successor of %d (HOST-013)" actual expected)
-                | Error(GuidelineFoldRejection.DuplicateCallId callId) ->
-                    reject
-                        "PairProgrammingGuidelineAnchored"
-                        (sprintf "call id %s already exists in this transcript (HOST-013)" callId)
-                | Error(GuidelineFoldRejection.DuplicatePlacement(callGap, resultGap)) ->
-                    reject
-                        "PairProgrammingGuidelineAnchored"
-                        (sprintf "placement (%A, %A) already exists in this transcript (HOST-013 §8)" callGap resultGap)
+            |> Result.mapError guidelineRejection
+            |> Result.bind (applyConcernPlacement payload.SessionId payload.ConcernPlacement)
 
         | HostFactCases.RequirementGroundingRequested payload ->
             Ok(
@@ -118,11 +120,7 @@ module HostFactFold =
 
                         { session with
                             RequirementGrounding =
-                                Some(
-                                    RequirementGroundingProjection.applyMaterialObserved
-                                        payload.Observation
-                                        prior
-                                ) })
+                                Some(RequirementGroundingProjection.applyMaterialObserved payload.Observation prior) })
                     projection
             )
 

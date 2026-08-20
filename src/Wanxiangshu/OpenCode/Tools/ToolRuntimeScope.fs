@@ -99,6 +99,7 @@ type ToolRuntimeScope
         match journal with
         | Some durable -> DelegationHandoffLedger.advance durable parent delegateSession cursor
         | None -> Task.FromResult(Error "delegation handoff requires a durable journal")
+
     let terminalPort = eventPort
     let finalityTimeoutMs = finalityReviewerTimeoutMs
     // DSL-MUTABLE: resource — tool runtime dispose latch

@@ -51,9 +51,7 @@ type LoopSensor
         match outcome with
         | Ok() -> Diagnostic.emit "degeneration-guard" (baseFields @ [ "result", "ok" ])
         | Error reason ->
-            Diagnostic.emit
-                "degeneration-guard"
-                (baseFields @ [ "result", "failed"; "provider_error", reason ])
+            Diagnostic.emit "degeneration-guard" (baseFields @ [ "result", "failed"; "provider_error", reason ])
 
     let runAndReport operation physicalCall sessionId kind directory : Task =
         task {
@@ -78,7 +76,8 @@ type LoopSensor
         lock gate (fun () -> armed.Remove(keyOf sessionId) |> ignore)
 
     member private this.ApplyInterruptOutcome
-        (sessionId: SessionId, kind: DegenerationKind, outcome: Result<unit, string>) =
+        (sessionId: SessionId, kind: DegenerationKind, outcome: Result<unit, string>)
+        =
         match outcome with
         | Ok() -> reportPhysicalOutcome "interrupt" sessionId kind outcome
         | Error _ ->
@@ -126,14 +125,12 @@ type LoopSensor
             detectors.[key] <- updated
             evaluation)
 
-    member private this.InterruptForEvaluation
-        (delta: LoopEventCodec.TextDelta, evaluation: LoopDetector.Evaluation) =
+    member private this.InterruptForEvaluation(delta: LoopEventCodec.TextDelta, evaluation: LoopDetector.Evaluation) =
         match evaluation.State with
         | LoopDetector.State.Normal -> ()
         | LoopDetector.State.TooRepetitive ->
             this.Interrupt(delta.SessionId, DegenerationKind.TooRepetitive, evaluation)
-        | LoopDetector.State.TooRandom ->
-            this.Interrupt(delta.SessionId, DegenerationKind.TooRandom, evaluation)
+        | LoopDetector.State.TooRandom -> this.Interrupt(delta.SessionId, DegenerationKind.TooRandom, evaluation)
 
     member private this.ObserveEligible(delta: LoopEventCodec.TextDelta) =
         let evaluation = this.Evaluate delta

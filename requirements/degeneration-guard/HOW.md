@@ -32,7 +32,7 @@ DEPENDS ON:
 | DG-001 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
 | DG-002 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
 | DG-003 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
-| DG-004 | 无 min/max 数值快照测试；build-time repository derivation 本身即 SSOT |
+| DG-004 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
 | DG-005 | `requirements/degeneration-guard/tests/loop-detector-memory.test.mjs` |
 | DG-006 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
 | DG-007 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |

@@ -55,8 +55,7 @@ type HostForkRuntime
         ?onRunStarted: SessionId -> Role -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> Task<string option>,
         ?childWorkRecordFor: SessionId -> Task<string option>,
-        ?childWorkRecordForRun:
-            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        ?childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
         ?prepareHandoff: SessionId -> SessionId -> Task<PreparedDelegationHandoff>,
         ?advanceHandoff: SessionId -> SessionId -> XTraceCursor -> Task<Result<unit, string>>,
         ?sessionSnapshot: ISessionSnapshotPort,
@@ -210,7 +209,8 @@ type HostForkRuntime
                 { ParentRecord = None
                   ParentEndExclusive = { Sequence = 0L } })
 
-    let advanceDelegationHandoff = defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
+    let advanceDelegationHandoff =
+        defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
 
     let xTraceHead (sessionId: SessionId) : int64 =
         match journal with
@@ -392,10 +392,13 @@ type HostForkRuntime
     member internal _.ChildWorkRecordOf = childWorkRecordOf
     member internal _.ChildWorkRecordOfRun = childWorkRecordOfRun
     member internal _.XTraceHead = xTraceHead
+
     member internal _.PrepareHandoff(delegateSession: SessionId) =
         prepareDelegationHandoff parentId delegateSession
+
     member internal _.AdvanceHandoff(delegateSession: SessionId, cursor: XTraceCursor) =
         advanceDelegationHandoff parentId delegateSession cursor
+
     member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge

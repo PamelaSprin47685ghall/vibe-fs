@@ -209,8 +209,7 @@ module ToolRegistry =
             match workspaceDirectory with
             | None -> Task.FromResult(())
             | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
-            | Some root ->
-                RequirementGroundingGate.programObservation journal root ctx.SessionId readPaths effectPaths
+            | Some root -> RequirementGroundingGate.programObservation journal root ctx.SessionId readPaths effectPaths
 
         let runtime =
             new ToolRuntimeScope(

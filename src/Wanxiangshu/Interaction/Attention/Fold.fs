@@ -27,4 +27,3 @@ module AttentionFactFold =
                             payload.SessionId
                             payload.OccurrenceId
                             payload.ResurfacedDeferredWorkIds }
-

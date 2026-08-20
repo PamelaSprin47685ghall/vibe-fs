@@ -27,11 +27,7 @@ module ProjectionMessageEdit =
         let parts = ProviderWireDecode.rawPartsOf message
 
         { ContainsTodoWrite = parts |> List.exists isTodoWritePart
-          ToolCallIds =
-            parts
-            |> List.choose rawPartCallId
-            |> List.map ToolCallId.create
-            |> Set.ofList }
+          ToolCallIds = parts |> List.choose rawPartCallId |> List.map ToolCallId.create |> Set.ofList }
 
     let prependCompanionMemory
         (rawMessages: obj list)

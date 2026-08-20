@@ -67,7 +67,13 @@ module LoopSensorSurface =
                 Ok()
             else
                 let reason = property value "error"
-                Error(if isNullish reason then "operation failed" else stringOf reason)
+
+                Error(
+                    if isNullish reason then
+                        "operation failed"
+                    else
+                        stringOf reason
+                )
 
     let private abortOf (value: obj) : SessionId -> Task<Result<unit, string>> =
         if not (isFunction value) then
@@ -86,8 +92,9 @@ module LoopSensorSurface =
         fun sessionId kind _directory ->
             task {
                 let! result =
-                    unbox<Task<obj>>
-                        (asPromise (apply2 value (box (SessionId.value sessionId)) (box (LoopSensor.kindName kind))))
+                    unbox<Task<obj>> (
+                        asPromise (apply2 value (box (SessionId.value sessionId)) (box (LoopSensor.kindName kind)))
+                    )
 
                 return resultOf result
             }
@@ -102,7 +109,10 @@ module LoopSensorSurface =
         (sensor :?> SensorHandle).Sensor.Observe raw
 
     let consumeAbortCause (sensor: obj) (session: string) : obj =
-        match (sensor :?> SensorHandle).Sensor.ConsumeAbortCause(SessionId.create session, None) with
+        match
+            (sensor :?> SensorHandle)
+                .Sensor.ConsumeAbortCause(SessionId.create session, None)
+        with
         | AbortCause.External -> box {| cause = "External" |}
         | AbortCause.DegenerationGuard kind ->
             box

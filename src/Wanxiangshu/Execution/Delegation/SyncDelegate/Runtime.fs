@@ -92,12 +92,15 @@ type SyncDelegateRuntime
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
     let projectWorkRecord = defaultArg workRecordFor (fun _ _ _ -> Task.FromResult None)
+
     let prepareDelegationHandoff =
         defaultArg prepareHandoff (fun _ _ ->
             Task.FromResult
                 { ParentRecord = None
                   ParentEndExclusive = { Sequence = 0L } })
-    let advanceDelegationHandoff = defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
+
+    let advanceDelegationHandoff =
+        defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -138,7 +141,9 @@ type SyncDelegateRuntime
             // Opening for AgentOwnerRoot, so the LWR projector would otherwise
             // return None and the bounded record would be undefined. Idempotent:
             // a reused child keeps its first invocation's Opening (PERSIST-010).
-            do! XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge [] |> TaskResultCE.ofTask
+            do!
+                XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
+                |> TaskResultCE.ofTask
 
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
@@ -150,7 +155,8 @@ type SyncDelegateRuntime
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
 
-            let providerPrompt = DelegationHandoff.appendParentDelta request.ProviderPrompt handoff.ParentRecord
+            let providerPrompt =
+                DelegationHandoff.appendParentDelta request.ProviderPrompt handoff.ParentRecord
 
             let! key =
                 dispatcher.SendAgentOwnerRootWithTools
@@ -201,8 +207,7 @@ type SyncDelegateRuntime
                 |> Option.map (fun profile -> profile.SelectedAgent)
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
           DescribeWait = SyncDelegateWait.describe
-          SubscribeFutureTerminal =
-            fun sessionId listener -> sessions.SubscribeFutureTerminal(sessionId, listener) }
+          SubscribeFutureTerminal = fun sessionId listener -> sessions.SubscribeFutureTerminal(sessionId, listener) }
 
     let failPoppedCalls delegateSessionId reason =
         let rec popAll () =

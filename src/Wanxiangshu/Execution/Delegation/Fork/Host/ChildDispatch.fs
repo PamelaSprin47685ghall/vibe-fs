@@ -157,8 +157,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun:
-            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
@@ -247,8 +246,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun:
-            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)

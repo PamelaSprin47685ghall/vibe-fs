@@ -10,7 +10,10 @@ module HandoffSurface =
 
     let handoffWindow (previousEnd: obj) (currentEnd: int) : obj =
         let previous =
-            if isNull previousEnd then None else Some(int64 (string previousEnd))
+            if isNull previousEnd then
+                None
+            else
+                Some(int64 (string previousEnd))
 
         let handoff = DelegationHandoff.window previous (int64 currentEnd)
 
@@ -23,4 +26,5 @@ module HandoffSurface =
         DelegationHandoff.renderPrompt charge (Option.ofObj parentRecord)
 
     let childRange (startInclusive: int) (endExclusive: int) : obj =
-        DelegationHandoff.childRange (int64 startInclusive) (int64 endExclusive) |> rangeView
+        DelegationHandoff.childRange (int64 startInclusive) (int64 endExclusive)
+        |> rangeView

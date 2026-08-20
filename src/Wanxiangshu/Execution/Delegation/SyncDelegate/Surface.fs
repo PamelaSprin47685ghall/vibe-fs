@@ -49,7 +49,8 @@ module SyncDelegateSurface =
             let key = SessionId.value sessionId
             completed[key] <- count completed key + 1
 
-        member _.AdmittedCount(sessionId: SessionId) = count admitted (SessionId.value sessionId)
+        member _.AdmittedCount(sessionId: SessionId) =
+            count admitted (SessionId.value sessionId)
 
         member _.Wait(sessionId: SessionId) : Task<unit> =
             let key = SessionId.value sessionId

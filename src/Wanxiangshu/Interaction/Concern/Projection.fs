@@ -50,22 +50,20 @@ module ConcernProjection =
             Map.tryFind id state.Addresses
             |> Option.exists (fun existing -> existing <> concern)
 
-        if semanticConflict then
-            Error "concern id is permanently bound to another concern"
-        else
-            match activeMailbox id state with
-            | Some mailbox when mailbox.OwnerSessionId = owner && mailbox.Concern = concern -> Ok None
-            | Some _ -> Error "concern id already has a live owner"
-            | None ->
-                Ok(
-                    Some(
-                        ConcernFactCases.MailboxSubscribed
-                            {| Id = id
-                               Concern = concern
-                               Generation = occurrenceId
-                               OwnerSessionId = owner |}
-                    )
+        match semanticConflict, activeMailbox id state with
+        | true, _ -> Error "concern id is permanently bound to another concern"
+        | false, Some mailbox when mailbox.OwnerSessionId = owner && mailbox.Concern = concern -> Ok None
+        | false, Some _ -> Error "concern id already has a live owner"
+        | false, None ->
+            Ok(
+                Some(
+                    ConcernFactCases.MailboxSubscribed
+                        {| Id = id
+                           Concern = concern
+                           Generation = occurrenceId
+                           OwnerSessionId = owner |}
                 )
+            )
 
     let publish sender occurrenceId id message (state: ConcernProjectionState) =
         match activeMailbox id state with
@@ -93,59 +91,78 @@ module ConcernProjection =
         && left.SenderSessionId = right.SenderSessionId
         && left.Message = right.Message
 
+    let private applySubscribed id concern generation ownerSessionId (state: ConcernProjectionState) =
+        let mailbox =
+            { Id = id
+              Concern = concern
+              Generation = generation
+              OwnerSessionId = ownerSessionId
+              Active = true }
+
+        match Map.tryFind generation state.KnownGenerations, Map.tryFind id state.Addresses, activeMailbox id state with
+        | Some known, _, _ when sameMailbox known mailbox -> Ok state
+        | Some _, _, _ -> Error "generation identity conflict"
+        | None, Some knownConcern, _ when knownConcern <> concern -> Error "concern identity conflict"
+        | None, _, Some _ -> Error "mailbox already active"
+        | None, _, None ->
+            Ok
+                { state with
+                    Addresses = Map.add id concern state.Addresses
+                    Mailboxes = Map.add id mailbox state.Mailboxes
+                    KnownGenerations = Map.add generation mailbox state.KnownGenerations }
+
+    let private applyPublished occurrenceId generation id senderSessionId body (state: ConcernProjectionState) =
+        let message =
+            { OccurrenceId = occurrenceId
+              Generation = generation
+              Id = id
+              SenderSessionId = senderSessionId
+              Message = body }
+
+        match Map.tryFind occurrenceId state.Messages, activeMailbox id state with
+        | Some known, _ when sameMessage known message -> Ok state
+        | Some _, _ -> Error "message occurrence identity conflict"
+        | None, Some mailbox when mailbox.Generation = generation ->
+            Ok
+                { state with
+                    Messages = Map.add occurrenceId message state.Messages }
+        | None, _ -> Error "published generation is no longer live"
+
+    let private applyRetired id generation (state: ConcernProjectionState) =
+        match Map.tryFind id state.Mailboxes with
+        | Some mailbox when mailbox.Generation = generation ->
+            Ok
+                { state with
+                    Mailboxes = Map.add id { mailbox with Active = false } state.Mailboxes }
+        | _ when Map.containsKey generation state.KnownGenerations -> Ok state
+        | _ -> Error "unknown mailbox generation"
+
     let applyFact fact (state: ConcernProjectionState) : Result<ConcernProjectionState, string> =
         match fact with
         | ConcernFactCases.MailboxSubscribed payload ->
-            let mailbox =
-                { Id = payload.Id
-                  Concern = payload.Concern
-                  Generation = payload.Generation
-                  OwnerSessionId = payload.OwnerSessionId
-                  Active = true }
-
-            match Map.tryFind payload.Generation state.KnownGenerations with
-            | Some known when sameMailbox known mailbox -> Ok state
-            | Some _ -> Error "generation identity conflict"
-            | None ->
-                match Map.tryFind payload.Id state.Addresses, activeMailbox payload.Id state with
-                | Some concern, _ when concern <> payload.Concern -> Error "concern identity conflict"
-                | _, Some _ -> Error "mailbox already active"
-                | _ ->
-                    Ok
-                        { state with
-                            Addresses = Map.add payload.Id payload.Concern state.Addresses
-                            Mailboxes = Map.add payload.Id mailbox state.Mailboxes
-                            KnownGenerations = Map.add payload.Generation mailbox state.KnownGenerations }
+            applySubscribed payload.Id payload.Concern payload.Generation payload.OwnerSessionId state
         | ConcernFactCases.MessagePublished payload ->
-            let message =
-                { OccurrenceId = payload.OccurrenceId
-                  Generation = payload.Generation
-                  Id = payload.Id
-                  SenderSessionId = payload.SenderSessionId
-                  Message = payload.Message }
-
-            match Map.tryFind payload.OccurrenceId state.Messages with
-            | Some known when sameMessage known message -> Ok state
-            | Some _ -> Error "message occurrence identity conflict"
-            | None ->
-                match activeMailbox payload.Id state with
-                | Some mailbox when mailbox.Generation = payload.Generation ->
-                    Ok { state with Messages = Map.add payload.OccurrenceId message state.Messages }
-                | _ -> Error "published generation is no longer live"
-        | ConcernFactCases.MailboxRetired payload ->
-            match Map.tryFind payload.Id state.Mailboxes with
-            | Some mailbox when mailbox.Generation = payload.Generation ->
-                Ok { state with Mailboxes = Map.add payload.Id { mailbox with Active = false } state.Mailboxes }
-            | _ when Map.containsKey payload.Generation state.KnownGenerations -> Ok state
-            | _ -> Error "unknown mailbox generation"
+            applyPublished
+                payload.OccurrenceId
+                payload.Generation
+                payload.Id
+                payload.SenderSessionId
+                payload.Message
+                state
+        | ConcernFactCases.MailboxRetired payload -> applyRetired payload.Id payload.Generation state
 
     let prepareFragments recipient (state: ConcernProjectionState) =
+        // Test/plugin fixtures and pre-feature in-memory projections may carry the
+        // older AgentProjectionSet shape. Missing concern state is semantically the
+        // same as an empty mailbox projection; durable facts still create the field
+        // through the canonical fold before any real concern can exist.
+        let state = if isNull (box state) then empty else state
+
         let announcements =
             state.Mailboxes
             |> Map.values
             |> Seq.filter _.Active
-            |> Seq.filter (fun mailbox ->
-                not (Set.contains (mailbox.Generation, recipient) state.AnnouncementCoverage))
+            |> Seq.filter (fun mailbox -> not (Set.contains (mailbox.Generation, recipient) state.AnnouncementCoverage))
             |> Seq.sortBy _.Id
             |> Seq.toList
 
@@ -204,4 +221,3 @@ module ConcernProjection =
                     DeliveryCoverage =
                         batch.DeliveredMessages
                         |> List.fold (fun covered occurrence -> Set.add occurrence covered) state.DeliveryCoverage }
-

@@ -26,4 +26,3 @@ module InstitutionalEnhancer =
         |> List.tryFind (fun rule -> lower.Contains(rule.Name.ToLowerInvariant(), StringComparison.Ordinal))
         |> Option.map (fun rule -> LearningDisposition.Absorb rule.Name)
         |> Option.defaultValue (LearningDisposition.Discard "no-reusable-mechanism")
-

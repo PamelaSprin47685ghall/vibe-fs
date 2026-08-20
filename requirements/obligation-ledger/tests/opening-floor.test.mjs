@@ -1,5 +1,5 @@
-// AC15: Manager BlindPlan Opening never compressed (dynamic Pre-T1 floor; Post-T1 nail).
-// AC16: T1 call/result ∈ OpeningMaterial; WorkRecordStart = OpeningBoundary.
+// BlindPlan governs planning/commitment semantics, while context compression
+// protects only the true Life Opening (CONTEXT-COMPRESSION-017).
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -12,20 +12,20 @@ import * as opening from '../../../dist/Mission/WorkRecord/OpeningSemanticSurfac
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const item = (sequence, role, part) => opening.item(sequence, role, part)
 
-test('WHAT[OBLIGATION-LEDGER-017] Pre-T1: effectiveOpeningFloor tracks XTrace head (Opening never enters Y)', () => {
+test('WHAT[OBLIGATION-LEDGER-017] Pre-T1 BlindPlan does not enlarge the structural Opening floor', () => {
   const floor = todo.effectiveOpeningFloor(true, false, 1, null, null, 7, [
     { sequence: 1, kind: 'text', text: 'opening' },
     { sequence: 7, kind: 'text', text: 'head' },
   ])
-  assert.equal(floor, 7)
-  assert.equal(todo.bloggerEffectiveStart(3, floor), 7)
+  assert.equal(floor, 2)
+  assert.equal(todo.bloggerEffectiveStart(3, floor), 3)
 })
 
 test('WHAT[OBLIGATION-LEDGER-017] Pre-T1: no CurrentLife → no floor', () => {
   assert.equal(todo.effectiveOpeningFloor(false, false, 1, null, null, 4, []), null)
 })
 
-test('WHAT[OBLIGATION-LEDGER-016] false planning checkpoints do not close Opening; first true commitment nails WorkRecordStart', () => {
+test('WHAT[OBLIGATION-LEDGER-016] T1 constitutive boundary is independent from the compression floor', () => {
   const callId = 't1-call'
   const parts = [
     { sequence: 1, kind: 'text', text: 'opening' },
@@ -34,9 +34,9 @@ test('WHAT[OBLIGATION-LEDGER-016] false planning checkpoints do not close Openin
     { sequence: 9, kind: 'text', text: 'later' },
   ]
   assert.equal(todo.blindPlanOpeningBoundary(1, 5, callId, parts), 7)
-  assert.equal(todo.effectiveOpeningFloor(true, false, 1, null, null, 9, parts), 9)
+  assert.equal(todo.effectiveOpeningFloor(true, false, 1, null, null, 9, parts), 2)
   const floor = todo.effectiveOpeningFloor(true, true, 1, 5, callId, 9, parts)
-  assert.equal(floor, 7)
+  assert.equal(floor, 2)
   assert.equal(todo.bloggerEffectiveStart(7, floor), 7)
   assert.equal(todo.bloggerEffectiveStart(10, floor), 10)
 })

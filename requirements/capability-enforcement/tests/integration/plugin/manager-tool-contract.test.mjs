@@ -21,6 +21,7 @@ const TOOL_NAMES = [
   'fork', 'commission', 'join', 'horizon', 'todowrite', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume', 'inspect', 'establish-behavior', 'repair-behavior',
+  'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
   'run', 'query-shell', 'stealth-browser-mcp', 'sphinx', 'judge',
   'chronicle', 'fetch',
 ]
@@ -29,6 +30,7 @@ const PLUGIN_TOOL_NAMES = [
   'fork', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'join', 'horizon', 'fission', 'judge', 'suicide', 'run', 'query-shell', 'inspect',
   'establish-behavior', 'repair-behavior', 'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
+  'enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret',
   'js-browser', 'js-coder', 'js-devops', 'js-inspector', 'js-reviewer',
 ]
 
@@ -37,15 +39,16 @@ const HOST_OWNED_TOOL_NAMES = [
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'coder', 'inspector', 'devops', 'browser', 'inquiry', 'reviewer', 'blogger', 'distiller']
+const COGNITIVE_TOOLS = ['enough', 'abandon', 'defer', 'subscribe', 'publish', 'celebrate', 'regret']
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume'],
-  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'assume'],
-  coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume'],
-  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume'],
-  devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume'],
-  browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp', 'assume'],
-  inquiry: ['fission', 'inspect', 'sphinx', 'assume'],
-  reviewer: ['read', 'glob', 'grep', 'judge', 'assume'],
+  orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'join', 'horizon', 'todowrite', 'fission', 'assume', ...COGNITIVE_TOOLS],
+  coder: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'inspect', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
+  inspector: ['fission', 'read', 'glob', 'grep', 'query-shell', 'fetch', 'assume', ...COGNITIVE_TOOLS],
+  devops: ['join', 'horizon', 'read', 'glob', 'grep', 'inspect', 'run', 'establish-behavior', 'repair-behavior', 'assume', ...COGNITIVE_TOOLS],
+  browser: ['fission', 'read', 'glob', 'grep', 'stealth-browser-mcp', 'assume', ...COGNITIVE_TOOLS],
+  inquiry: ['fission', 'inspect', 'sphinx', 'assume', ...COGNITIVE_TOOLS],
+  reviewer: ['read', 'glob', 'grep', 'judge', 'assume', ...COGNITIVE_TOOLS],
   blogger: ['chronicle'],
   distiller: [],
 }
@@ -103,6 +106,13 @@ test('WHAT[ENF-010] MANAGER_host_schemas_are_present_for_every_declared_argument
       chronicle: ['entry', 'tip'],
       'bash-honeypot': [],
       assume: ['assumption'],
+      enough: ['decision'],
+      abandon: ['commitment'],
+      defer: ['new_work'],
+      subscribe: ['id', 'concern'],
+      publish: ['id', 'message'],
+      celebrate: ['experience'],
+      regret: ['experience'],
     }
     for (const toolName in expected) {
       for (const argument of expected[toolName]) {

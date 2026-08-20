@@ -301,13 +301,14 @@ test('WHAT[WORK-RECORD-015] LWR_work_record_start_is_structural_floor_not_stage'
   // opening cursor 0 → floor 1（exclusive）。
   assert.equal(todo.workRecordStart(0), 1)
 
-  // Post-T1：floor = constitutive T1 call+result 之后的 exclusive 边界（结构性推导）
+  // T1 的 constitutive call/result 可以进入 LWR Opening material，但不会扩大
+  // context-compression 的 structural floor；该 floor 始终是真实 Opening 终点。
   const parts = [
     { sequence: 1, kind: 'tool_call', toolCallId: 't1' },
     { sequence: 2, kind: 'tool_result', toolCallId: 't1' },
   ]
-  assert.equal(todo.effectiveOpeningFloor(true, true, 0, 1, 't1', 9, parts), 3)
+  assert.equal(todo.effectiveOpeningFloor(true, true, 0, 1, 't1', 9, parts), 1)
 
-  // Pre-T1：Opening 未关闭，floor 是动态 XTrace head（仍结构性，非 Stage）
-  assert.equal(todo.effectiveOpeningFloor(true, false, 0, null, null, 7, []), 7)
+  // Pre-T1 planning frontier 同样不能把普通历史升级成不可压缩 Opening。
+  assert.equal(todo.effectiveOpeningFloor(true, false, 0, null, null, 7, []), 1)
 })

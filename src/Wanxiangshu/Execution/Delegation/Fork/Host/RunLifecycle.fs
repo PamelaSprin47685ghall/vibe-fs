@@ -39,8 +39,7 @@ open Wanxiangshu.Mission.Obligation.Todo
 module HostForkRunLifecycle =
 
     let workRecordForOutcome
-        (childWorkRecordForRun:
-            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> int64)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
@@ -275,8 +274,7 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun:
-            SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
+        (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (agentId: string)

@@ -7,4 +7,3 @@ type AttentionFactCases =
         {| SessionId: SessionId
            OccurrenceId: string
            Text: string |}
-
