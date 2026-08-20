@@ -1,64 +1,41 @@
-# WHY —— 不可替代的存在理由
+# cognitive-environment — WHY
 
-## 为什么必须独立存在
+## 领域动力与核心张力
 
-participant 面对的材料天然分两层：
+参与者在思考与行动时接触到的认知材料天然包含长期与瞬时两个层次：
 
 ```text
-长期层   World（世界常识）· Role（我是谁）· inherited knowledge（前人学会什么）
-瞬时层   Runtime（此刻发生了什么）· Mission（这个 assignment 要成为什么）
+长期认知层 ──► World（通用常识）· Role（我是谁/Role Law）· Library（继承的技术书籍）
+瞬时上下文 ──► Runtime（此刻生命周期事实）· Mission（当前委托的具体使命）
 ```
 
-两层必须分开，因为：
+若将两者混淆，会导致严重退化：
+- **瞬时状态污染长期自我**：若把任务进度、临时执行档位或具体工具清单写入 Role Law，换任务或换绑定就会导致人格与自我模型漂移。
+- **知识越权授信（Knowledge ≠ Authority）**：技术书籍指导「如何识别缺陷与验证」，但拥有该知识绝不等于获得了修复代码或运行环境的权能。知识可跨越权能边界流动，但权能不随知识流动。
+- **组合权威冲突**：若缺乏统一的组合协议，各层材料互相覆盖甚至产生全序优先级混淆，导致认知环境撕裂。
 
-- **瞬时污染长期**：如果把「当前 mission 的进展」「当前 execution strength」「当前工具清单」写进
-  Role Law，换任务/换 binding 就等于换人格；`fast-`/`deep-` 会演化成两套产品、Peer Fallback 换模型时
-  半途换人。自我模型必须只由稳定事实构成（`The system prompt names the office. The conversation tells
-  you which road is yours.`）。
-- **知识偷渡 authority**：技术书籍会教「怎么识别缺陷、怎么验证」——一旦书被视为资格来源，
-  「读过的角色」就获得了「没读过的角色」没有的权。`Information may cross authority boundaries.
-  Authority does not travel with it.`（PROMPT-016）。knowledge≠authority 是本包核心命题。
-- **组合需要唯一权威**：每个 provider-facing 自然语言材料必须恰属一个主权威，冲突按语义所有权裁决，
-  不设「更靠近 system 者胜」全序（PROMPT-015）——否则 role/office/delegation 各写一份互相矛盾的
-  「我是谁」。
+`cognitive-environment` 的核心不变量：
+- **五层正交组合**：World、Role、Library、Runtime、Mission 各属单一主权威，按规范顺序组装。
+- **工具清单不入 Role 章节**：System Prompt 聚焦自我模型与职责边界，不机械枚举瞬时工具列表。
+- **Role Law 跨档恒定**：同一 Office 的 fast 与 deep 档共享相同的自我模型与 Role Law。
+- **Pair Hint 作为核心 Craft 载体**：规范协作求助、持续维护就绪前沿（Ready Frontier）的无阻塞并发调度，以及先抽象再承诺的思维纪律。
 
-**唯一不可替代的 WHY**：长期认知的组织边界。它可以整体重写（比如换掉 Common Law / Role Law /
-Office Library 的名称与结构）而不动 authority、Persona、action contract；反过来，任何 authority 模型
-的重写都不应要求认知层跟着改。
+## 破裂后果
 
-## RED 长什么样（失败模式）
+- 参与者通过阅读技术书籍误认为自身拥有对应领域的执行权能。
+- 阶段性任务或瞬时生命周期事件修改长期自我模型，导致换执行者时人格漂移。
+- 提示词内机械堆砌工具列表，破坏提示词前缀稳定性并分散模型注意力。
 
-| 症状 | 历史出处 |
-|---|---|
-| 书扩大 Role 权（Library 教识别缺陷却暗示可修复） | 历史 why/prompt 条款「Office Library：knowledge ≠ authority」：拒书授职权 |
-| universal bible 灌每个 persona；同 role 的 fast/deep 异书 | PROMPT-016 禁令；fast/deep 共享同一 Role Law（AGENT-001） |
-| 把隐藏编排写进 Reviewer 书 | PROMPT-016 禁令；REVIEW-012：双 PERFECT 流程不入 Reviewer prompt |
-| 把工具清单/瞬时 capability 枚举进 system prompt | PROMPT-015：`Tools 不是 Role Prompt 章节`；PromptRestoration：Manager Role Law 去掉工具清单 |
-| 从 persona 名/工具名推断 authority | PROMPT-021：模型不得从词汇推断 authority；名字只表达 semantic act |
-| Prompt Restoration 前：system prompt = zh-CN、tool description = English 的半 i18n 世界 | PromptRestoration.md Gate 0：语言不统一会撕裂认知环境（语言面归 `provider-language`，本包取组合纪律） |
+## 边界与关系
 
-## 为什么不是「所有模型该知道的」垃圾桶
+- `participant-identity`：提供 Role 与 Persona 身份事实；本包组织其面向模型的认知呈现。
+- `office-capability`：定义职位的权能边界；本包负责引用而非重新定义这些权能。
+- `attention-regulation`、`concern-routing` 与 `institutional-learning`：提供微原语动作；本包在 Pair Hint 中提供高显著性触发提醒。
 
-旧 `participant-guidance` 名字太容易变成「everything the model should know」（HANDOFF §6.1）。
-本包只拥有**认知层的组织边界**：分层、组合顺序、knowledge≠authority、Role Law 自我模型。
-每个 canonical fact 仍归其真正 owner——Coder mutation authority → `office-capability`；
-PERFECT/REVISE 意义 → `review-judgement`；persona 稳定性 → `participant-identity`。
-Prompt/Role Law 只是这些事实的 presentation surface，不获得 semantic ownership（HANDOFF §6.1 末段）。
+## DEPENDS ON
 
-## 被拒方案（考古）
-
-- **「更靠近 system 者胜」全序覆盖。** 拒绝：Mission 不能授予 Role 没有的权；Library 不能扩大 Role；
-  Handbook 遇 concrete requirement 时具体要求胜；Rulebook 不是 present-case evidence
-  （历史 why/prompt 条款）。
-- **把 Pair Hint 拆成多个独立 synthetic 消息（一个中文、一个 NEEDHELP、一个并行工具）。** 拒绝：
-  一个 canonical Pair Hint occurrence 承载全部 craft；provider renderer 只决定 wire 形状
-  （pair-parallel-tools.md §18）。
-- **把并行理解成固定 wave、阶段 barrier，或把预先画出的依赖图当执行日程。** 拒绝：依赖图只描述
-  当前已知因果，不拥有调度权。若 A/B 已并发且 A 先完成并解锁 A1，等待 B 只会把无关延迟伪造成 A1
-  的前置条件。Pair Hint 因而诱导模型在每个新结果/新事实后重算 ready frontier，立即释放新 ready 的
-  细粒度后继；batch 只可能是同一时刻 ready 调用的自然合并，不是同步边界。
-- **把 NEEDHELP 写成稀缺/失败语言（"only when truly blocked"）。** 拒绝：制造求助羞耻、诱导长时
-  低价值自我挣扎（increase-strength.md §3.1）；budget 是机器侧护栏，不进 provider 文案。
-- **把 Blogger chronicle-direct nudge 对所有模型默认开启。** 拒绝：该 nudge 是针对特定 provider model
-  行为偏差的局部校准，不是 Blogger 的长期认知事实。未知模型默认不得被改写；只有显式 modelID allowlist
-  命中时才投影。空 allowlist = 功能关闭。
+- `participant-identity`
+- `office-capability`
+- `attention-regulation`
+- `concern-routing`
+- `institutional-learning`

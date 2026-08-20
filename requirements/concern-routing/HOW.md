@@ -1,48 +1,26 @@
-# concern-routing — HOW（非 normative）
+# concern-routing — HOW
 
-## 目标实现形状
+## 架构机制与数据流
 
-一个很小的 durable mailbox projection 足够：
+`concern-routing` 通过极简的 durable mailbox 事实流构建动态路由：
 
-```text
-ConcernAddressDeclared(id, concern)              # id semantic meaning; never changes
-Subscribed(generation, id, ownerParticipant)     # explicit owner generation
-Published(messageOccurrence, generation, id, senderParticipant, message)
-SubscriptionAnnounced(generation, recipientParticipant, pairOccurrence)
-MessageDelivered(messageOccurrence, generation, ownerParticipant, pairOccurrence)
-MailboxRetired(generation, id, ownerParticipant)
-```
+1. **事实投影**：
+   - `ConcernAddressDeclared(id, concern)`：记录全局唯一的地址语义映射。
+   - `Subscribed(generation, id, ownerParticipant)`：显式代次的 mailbox 绑定。
+   - `Published(messageOccurrence, generation, id, senderParticipant, message)`：挂靠到具体代次的消息事实。
+   - `SubscriptionAnnounced(generation, recipientParticipant, pairOccurrence)`：公告覆盖跟踪。
+   - `MessageDelivered(messageOccurrence, generation, ownerParticipant, pairOccurrence)`：交付覆盖跟踪。
+   - `MailboxRetired(generation, id, ownerParticipant)`：显式退役记录。
 
-具体 fact 是否合并、哪些字段由现有 participant/session facts 派生属于实现选择；WHAT 只要求结果可重放、不重复、不卡 active context。
+2. **Pair Hint 聚合**：
+   `prepareFragments(participant, pairOccurrence)` 计算当前批次应展示的地址公告与未读消息碎片，暂存待提交的 coverage facts。上层 guideline 模块完成 MarkerText 冻结后，将 Pair Hint 事实与 coverage facts 原子提交，保证不会因为上下文组装失败而丢失消息。
 
-`subscribe` / `publish` adapter 均保持两个 string 参数，不暴露 owner/session/message-id。Pair Hint composition 调本包窄
-`prepareFragments(participant, pairOccurrence)`，返回当前 occurrence 应显示的 typed fragments 与尚未提交的
-`SubscriptionAnnounced` / `MessageDelivered` facts；现有 guideline owner 组合并冻结最终 MarkerText 后，把 pair fact
-与这些 coverage facts 同批原子提交。prepare 本身不消费 queue。
-
-## provider representation
-
-建议紧凑形状：
-
-```text
-Subscriptions discovered:
-- <id>: <concern>
-
-Mailbox messages:
-- <id>: <message>
-```
-
-不输出 ACK、sequence、session id、owner machine name、delivery frontier 等内部字段。
-
-## DEPENDS ON
-
-`concern-routing → participant-identity, participant-horizon, durable-events`
+3. **Provider 呈现**：
+   将已发现的订阅与接收到的邮箱消息紧凑呈现为自然语言文本块，屏蔽底层代次、ACK 序号与内部路由拓扑。
 
 ## 验证与测试落点
 
-可执行 proof 在 review 后由 GAP 建立：
-
-| WHAT | 最低充分 proof |
+| 命题 | 落点测试 |
 |---|---|
 | CONCERN-ROUTING-001 | pure claim/idempotency/conflict algebra；id→concern immutable；workspace isolation |
 | CONCERN-ROUTING-002 | temporal multi-participant Pair Hint coverage；sticky once |
@@ -51,7 +29,3 @@ Mailbox messages:
 | CONCERN-ROUTING-005 | authority negative：peer message 不 mint user authority/obligation |
 | CONCERN-ROUTING-006 | owner termination/late publish；same-concern explicit rebind creates new generation；old messages do not cross generation |
 | CONCERN-ROUTING-007 | architecture negative：无 generic broker/org graph/priority workflow |
-
-## 历史与弃权
-
-不采用 single semantic owner、consult/join、interrupt membrane 等更大的组织机制；当前 accepted primitive 只有 `subscribe/publish`，其价值来自“地址按 concern、交付按自然 attention boundary”。

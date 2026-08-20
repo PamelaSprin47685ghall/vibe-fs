@@ -1,176 +1,53 @@
-# guidance-delivery — WHAT（唯一 normative 合同）
+# guidance-delivery — WHAT
 
-> 命题 = 当前世界必须同时成立的事实。编号 `GUIDANCE-DELIVERY-NNN`（下文简称
-> `GD-NNN`）。每条末尾的证据指针 → `HOW.md` 行号。
-> 边界：diagnosis 是否成立归 `behavior-diagnosis`；provider projection mechanics
-> 归 `provider-projection`；horizon admission general law 归 `participant-horizon`；
-> interaction authority 创建/继续权归 `interaction-authority`。
-> 本包历史正文用 `main.md` 指 remediation text：对 shipped built-in 它物理来自 `main.md` / `main.zh-CN.md`；
-> 对 institutional rule 它来自 `behavior-diagnosis` canonical live Rulebook 中同 TipName 的 MainText。两者在本包
-> 统一称 canonical MainText；文件名不是 normative identity。
+## GD-001: 交付前沿与语义覆盖两轴正交分离
 
-## A. 两轴分离
+Main 会话的 tip 交付必须严格区分两个正交维度：
+1. `TipDeliveryFrontier`：记录哪些 `TipOccurrence` 已向该 Main 完成过首次处置手册交付。基于 occurrence 单调推进，属于持久化事实，在 `ContextReanchored` 事件发生时不重置；
+2. `TipSemanticCoverage`：记录哪些 `TipName` 的完整处置手册（`main.md`）语义当前仍可在 provider horizon 中被有效恢复。基于 TipName 维度且具有 horizon 局部性，在 `ContextReanchored` 时重置清空。
 
-### GD-001 交付前沿 ≠ 语义覆盖，不得压成单一 durable bool
+严禁将两者压缩为一个单一的持久化布尔标志。
 
-Main tip 交付有两个正交轴：
+## GD-002: 首次交付呈现 Full 处置手册全文并推进 Frontier
 
-```text
-TipDeliveryFrontier    哪些 TipOccurrence 已交付给该 Main
-                       durable、monotonic、occurrence-based
-                       ContextReanchored 不重置
+当目标 `TipOccurrence` 不在当前 Main 的 `TipDeliveryFrontier` 中，或当前 `TipSemanticCoverage` 表明该 TipName 全文不可从 horizon 恢复时，系统生成 `TipPresentation.Full` 形式：包含 `# Enforcer Tip` 头部、`tip = "<name>"` 标识以及按 owner 语言选择的完整 `main.md` 处置正文。首次生成 Full 交付时，必须原子追加 `TipGuidanceDelivered { Full }` 事实以推进 Frontier。
 
-TipSemanticCoverage    哪些 TipName 的 full main.md 语义此刻仍可从当前 provider
-                       horizon 恢复
-                       TipName-based、horizon-relative
-                       ContextReanchored 可重置 / 重导
-```
+## GD-003: 覆盖内重复交付仅呈现 IdentityOnly 稳定身份
 
-- 含义：诊断 occurrence 的交付历史与「全文此刻是否还在 horizon」是两回事
-  （ENFORCER-071）；把二者压成一个 durable bool 必然在 reanchor 后误删已交付
-  事实或假装全文仍在。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_002/006`；
-  `tip-delivery-projection.test.mjs` `TDP_001/002/004/005`；`HOW.md` 行 10。
+当目标 `TipOccurrence` 已包含在 `TipDeliveryFrontier` 中，且 `TipSemanticCoverage` 表明该规则全文仍可在当前 horizon 恢复时，系统生成 `TipPresentation.IdentityOnly` 形式：仅输出紧凑的 `tip: <name>`。此时不重复输出 `main.md` 全文，不推进 Frontier，严禁将 Identity 呈现误记为全文永久可恢复的持久事实。
 
-### GD-002 首次交付 = Full main.md
+## GD-004: 交付决策纯粹基于 Durable Facts 的投影判定
 
-`TipOccurrence ∉ Frontier` ∨ `TipSemanticCoverage` 表明该 TipName 全文不可恢复 →
-`TipPresentation.Full`：`# Enforcer Tip` + `tip = "<name>"` + `main.md` 全文（按
-owner 语言取叶子）。Full 且 occurrence ∉ Frontier → append
-`HostFact.TipGuidanceDelivered { Full }`（推进 Frontier）。
+Full 与 IdentityOnly 的呈现判定唯一依赖于 `TipDeliveryProjection`（通过 fold `TipGuidanceDelivered` 等持久化事件派生），按 Main session 严格隔离。严禁使用进程内存集合、临时 JSON 文件或未持久化的提示账本进行判定。系统重启、崩溃恢复与重试后，交付判定结果保持确定性与无漂移。
 
-- 含义：Main 第一次不只看到名字，它完整看到「问题意味着什么/现在做什么/为什么/
-  不要做什么/如何验证/何时算完成」（Rulebook §14）。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_001`；
-  `HOW.md` 行 11。
+## GD-005: 上下文重锚触发语义恢复而不伪造新 Occurrence
 
-### GD-003 重复交付 = IdentityOnly，不重复全文
+当 `ContextReanchored` 事件发生时，投影清空当前的 `TipSemanticCoverage`，但保持 `TipDeliveryFrontier` 不变。重锚后首次遇到该规则时再次呈现 Full 全文属于语义恢复（Semantic Restoration），严禁推进 `TipDeliveryFrontier`，严禁将其记录为新的 `TipOccurrence`，严禁因过期的 IdentityOnly 导致重锚后的会话陷入悬空引用。
 
-`TipOccurrence ∈ Frontier` ∧ `TipSemanticCoverage` 仍可恢复全文 →
-`TipPresentation.IdentityOnly`：紧凑 `tip: <name>`。不重复 `main.md` 全文、
-不推进 Frontier、不得把 Identity 写成「全文永久可恢复」durable bool。
+## GD-006: 目标 Session Owner 确定性解析与空值语义
 
-- 含义：dedupe 的落点——第一次教完整处置协议，后续用稳定身份唤醒已有语义，
-  避免无界全文膨胀（Rulebook §15）。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_002`；
-  `tip-delivery-projection.test.mjs` `TDP_002/003`；`HOW.md` 行 13。
+入参传入 Main 会话 ID 或 Blogger satellite ID 时，系统通过 `SessionAssociation` 确定性解析到对应的 owner Main 会话，并提取最近提交的 RecentTip。若不存在关联的 tip、无会话关联事实或在规则库中未找到对应规则，则返回 None，严禁向模型伪造不存在的 guidance。
 
-### GD-004 交付决策只 fold durable facts，restart-safe
+## GD-007: `latestTipGuidance` 与 `latestTipNudge` 语义完全等价
 
-Full/Identity 判定唯一 substrate = `TipDeliveryProjection`（fold
-`TipGuidanceDelivered` 等 durable facts），按 Main session 隔离；禁止
-process-local「已发送」集合、`delivered-tips.json`、文件 tip ledger 或内存猜测。
-restart / recovery / crash / retry 后判定不漂移。
+`latestTipGuidance` 返回解析后的处置文本，`latestTipNudge` 为其完全等价的历史别名。两者在相同输入下返回完全一致的字符串字节，不引入任何额外的评分或提醒控制流。
 
-- 含义：第一次/重复判定在重启后仍正确（Rulebook §16/A46）；内存集合会忘记或分叉。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_003`
-  （latest 与 resolve 一致）；`tip-delivery-projection.test.mjs` `TDP_001/002`；
-  `HOW.md` 行 14。
+## GD-008: 检测语料与补救手册的 Audience 隔离
 
-### GD-005 reanchor/compaction：语义恢复 ≠ 新 occurrence
+检测边界文本（`enforcer.md`）仅进入 Blogger 的 effective system prompt；补救处置手册（`main.md`）仅进入 Main 的 Full/Identity guidance 交付。Blogger 的历史 tip 记录（`previous_enforcer_tip`）属于低信任观察数据，严禁进入 Main 的 Authority 面。两端共享 TipName 身份，但渲染器与受众上下文严格隔离，互不混用。
 
-`ContextReanchored`（HOST-006）清空 TipSemanticCoverage（≠ Frontier）。Coverage
-不可恢复后再次给出 full main.md = **semantic restoration**，不是新 TipOccurrence、
-不推进 TipDeliveryFrontier。禁止用过期 IdentityOnly 搁浅 post-reanchor transcript。
+## GD-009: Guidance 交付仅作为提示，不创建新的 Interaction Authority
 
-- 含义：压缩改变 horizon 形状，但不重写已发生的交付历史；Main 不会因 compaction
-  丢失处置手册，也不会把恢复误记成又一次世界教训。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_006`；
-  `tip-delivery-projection.test.mjs` `TDP_004/005`；`HOW.md` 行 15。
+向 Main 交付 tip guidance 仅通过 `TipGuidanceDelivered` 投影及合成的 `skill({ name: "" })` 工具调用/结果对（形式为 `<skill_content name="">…</skill_content>`）注入 provider horizon。严禁向 Main 注入伪造的用户角色消息（fake-user message），严禁派发新的 Interaction Authority Root，交付过程保持权限与主体中立。
 
-## B. 决策路径
+## GD-010: 规则语料可区分性由人类 Review 保证
 
-### GD-006 owner 解析与 None 语义
+规则之间的语义正交性、可区分性与无冲突性由规则作者与同行评审在代码审查阶段保障，运行时系统不设立机械词法重叠检测器，不因文本相似度拦截合法的规则交付。
 
-入参可以是 Main session id 或 Blogger satellite id；经 `SessionAssociation` 解析到
-owner Main session 再取最近已提交 tip。无 tip / 无 association / 目录查无规则 →
-`None`，不发明 guidance。
+## GD-011: 已投递 Auto-injected 字节按原文冻结并可确定性重放
 
-- 含义：交付永远挂在 owner Main 上；解析失败就安静地不给，不编造。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_004/005`；
-  `latest-tip-nudge.test.mjs` `ENFORCER_TIP_NUDGE_002/003`；`HOW.md` 行 16。
+每个 auto-injected guideline 对以 `PairProgrammingGuideline { Ordinal; CallId; MarkerText; CallGap; ResultGap }` 持久化记录。`MarkerText` 保存当时实际进入 wire 的精确 payload 字节。历史重放时严格还原存储的原文字节，不随规则库版本的演进而被改写。事件投影严格拒绝序号错乱、重复 CallId 以及同一放置点的重复记录。
 
-### GD-007 `latestTipGuidance` / `latestTipNudge` 同义
+## GD-012: 新 Occurrence 消费当前 Calibration 投影并原子提交冻结
 
-`latestTipGuidance` = resolve 的 Text；`latestTipNudge` 是同义别名（Full/Identity
-文本，不是旧 Nudge 字段）。两者返回同一字节。
-
-- 含义：旧命名不复活旧语义；对外只有一条交付文本路径。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_003`；
-  `latest-tip-nudge.test.mjs` `ENFORCER_TIP_NUDGE_001`；`HOW.md` 行 17。
-
-## C. audience 分离
-
-### GD-008 detection 与 remediation 面向不同 audience，不泄漏职责
-
-`enforcer.md`（检测边界）只进 Blogger effective system；`main.md`（处置手册）只进
-Main Full/Identity 交付；`previous_enforcer_tip` 是低信任 Blogger 历史
-（`[[do_not_exec]]`、role=assistant），不得进 Main Authority。共享 TipName 身份，
-但两边 renderer 不得互用。
-
-- 含义：诊断语料与补救语料同源不同权（Rulebook §20/§27/§28）；Main 指导泄漏进
-  Blogger system 或检测散文冒充 Main 指令都是违规。
-- 证据：`audience-separation.test.mjs` `AUDIENCE_001/002/003`；REUSE
-  `requirements/guidance-delivery/tests/tip-v2-delivery.test.mjs` `ENFORCER_TIP_13`
-  （work record 含 previous_enforcer_tip 块）；`HOW.md` 行 18。
-
-### GD-009 交付不创建 interaction authority
-
-Main tip guidance 只经 `TipGuidanceDelivered` 投影 + synthetic `skill({ name: "" })`
-tool-call/tool-result pair 进入 horizon；其 result 是 `<skill_content name="">…</skill_content>`，不注入工程
-fake-user message、不 mint 新 Authority Root；delivery 不改变 authority/personhood。真实 `skill` 工具保持可用，
-空 name 只保留给 injection-only HOST-013 occurrence。
-
-- 含义：guidance 是 Host-adopted 提示，不是第二 Authority 解释器
-  （ENFORCER-071 / 边界 card）。
-- 证据：`tip-guidance-delivery.test.mjs` `ENFORCER_TIP_DELIVERY_001`（交付形状 =
-  tip header + main.md）；`latest-tip-nudge.test.mjs` `CTX_002_GUIDELINE_001/002`
-  （auto-injected marker 机制）；`audience-separation.test.mjs` `AUDIENCE_003`；
-  `HOW.md` 行 19。
-
-### GD-010（已删除 2026-08-15）
-
-机械 A40 替代检查（`enforcer-cross-family-collision.mjs`）按用户要求删除：词法
-重叠告警噪音大于价值，检测语料可区分性改由 review 判断（Rulebook A40 仍属人类
-tournament 范畴，本包不再设机器载体）。编号保留不回收。
-
-## D. 历史字节
-
-### GD-011 已投递 auto-injected 字节按原文冻结
-
-每个 auto-injected pair 以 `PairProgrammingGuideline { Ordinal; CallId;
-MarkerText; CallGap; ResultGap }` 持久化（HOST-013）：`MarkerText` = provider
-当时实际看到的精确 payload（新 occurrence 为 `<skill_content name="">…</skill_content>`；历史 occurrence 保留其
-原 wire 字节）；replay 必须 byte-identical 恢复原文，不随 authored
-`main.md` 版本演进改写。fold 拒绝：ordinal 乱序、重复 CallId、重复 placement
-（SessionId + 当前 horizon + CallGap + ResultGap 至多一对）。`ContextReanchored` 不删除历史 pair fact，
-但会退休此前 pair 的 provider-visible coverage；post-reanchor 不 replay 旧 marker，下一次正常 pair trigger
-产生新的 ordinal/call-id/MarkerText。冻结意味着“历史事实不改写”，不意味着“跨 Y 永久可见”。
-
-- 含义：历史交付是 EventStore 事实不是文件旁路；restart 后 Main 看到的就是当时
-  收到的那一版（Rulebook §17）。
-- 证据：`guideline-projection.test.mjs` `GP_001..006`；`latest-tip-nudge.test.mjs`
-  `CTX_002_GUIDELINE_001/002`（marker 正文透传）；`HOW.md` 行 20。
-
-### GD-012 新 occurrence 只消费当前 calibration projection，随后冻结最终 MarkerText
-
-HOST-013 每个**新** pair occurrence 在物化时可组合：latest tip guidance、TIME-007 的 session elapsed、
-delegation 的 `remaining expected tool calls` 动态 calibration、`concern-routing` 当前应交付的 subscription
-announcement / mailbox message、canonical pair-programming guideline。动态值只从各 owner 提供的 O(1)
-projection 读取一次；不得扫描 transcript/XTrace/log。无 estimate 时完全省略 tool-estimate fragment；没有
-新的 concern fragment 时同样完全省略对应区块；elapsed 在 `SessionStartedAt` 已绑定后始终存在。组装后的最终
-`MarkerText` 立即进入 GD-011 durable pair；以后 replay 只读已存字节，不用当前 elapsed/remaining/mailbox
-frontier 重写历史 occurrence。concern fragment 的消费与该 frozen pair occurrence 绑定：同一 occurrence replay
-不得重新 drain，下一 occurrence 只取得尚未交付的新 fragment。pair placement 与 `concern-routing` 为该 occurrence
-staging 的 `SubscriptionAnnounced` / `MessageDelivered` coverage facts 必须同一 atomic durable commit；pair 未成功
-冻结则 concern coverage 也不得前进。
-
-- 含义：dynamic calibration 是“这一刻提供了什么指导”的 occurrence 数据；projection 决定新文案，
-  durable MarkerText 决定历史文案。两个时间面不混合。
-- `ContextReanchored` 后若形成新 occurrence，按当时 latest tip / elapsed / remaining / canonical guideline
-  重新 compose；不得把旧 occurrence 原字节作为新 horizon 的默认恢复材料。
-- 边界：elapsed 的起点/采样 → `time-capability` TIME-007；remaining 的 replace/decrement/0 语义 →
-  `delegation` DELEG-022；tool-estimate 提示 craft → `cognitive-environment` COGNITIVE-ENVIRONMENT-014；
-  subscription/message 的地址、mailbox、coverage 与低 authority 语义 → `concern-routing`；
-  prefix placement/stability → `prefix-stability`。
-- 证据：GAP-012；`tests/pair-calibration.test.mjs`。
+每个新的 guideline pair occurrence 在物化时组合：latest tip guidance、session elapsed 时间、动态工具调用校准（remaining expected tool calls）、以及 `concern-routing` 待交付的订阅公告或邮箱消息。动态片段仅从各 owner 的 O(1) 投影读取一次；组装完成后的最终 `MarkerText` 立即写入持久化事件进行冻结，后续重放直接读取原文字节，不再重新执行动态渲染与消息抽取。

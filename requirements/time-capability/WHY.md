@@ -1,51 +1,27 @@
-# WHY — time-capability
+# time-capability — WHY
 
 ## 不可替代的存在理由
 
-**时间若从 ambient wall clock / 全局 timer 偷渡业务代码，同一事实在不同运行时刻会产生不同判断，proof 与 replay 都失去确定性。**
+**时间如果从隐式的全局环境（ambient wall clock / global timer）偷渡进入业务逻辑，同一个事实在不同机器或不同运行时刻就会产生不同的裁决，导致系统的证明体系、回放能力（replay）与测试确定性彻底崩溃。**
 
-产品语义要可重放（replay）、可审计、可测试，前提是**同一个输入永远推出同一个输出**。物理墙钟是最大的隐藏输入：它每秒都在变、随测试机快慢漂移、随时区不同错位。如果业务判断直接读 `UtcNow` / `Date.now` / `setTimeout`：
+可重放性与可测试性的核心基石是「相同输入必定产生确定性的相同输出」。物理环境墙钟是最大的隐式随机源：它随宿主机性能快慢漂移、受系统负载与时区设置干扰。如果业务决策直接读取全局时间（如 `DateTimeOffset.UtcNow`、`Date.now` 或 `setTimeout`）：
+- 相同逻辑在不同运行环境下随机失败或通过；
+- 并发时序的证明退化为依赖调度器快慢的运气，无法可靠复现与排查；
+- 失败用例无法通过记录的数据流进行确定性重放。
 
-- 同一段逻辑今天跑绿、明天跑红，没有任何输入变化；
-- proof 依赖「这次跑得够快/够慢」的运气，无法重放；
-- 失败无法最小复现，因为时间是每次不同的随机源。
+因此，时间严禁作为隐式全局状态存在，必须作为**显式能力（capability）**跨越依赖边界进行注入：任何需要感知时间或设置延时的组件，必须在构造时显式声明对时钟或定时器端口的依赖。
 
-因此时间不能是 ambient（环境的、隐式的、全局的），必须作为 **capability** 显式穿过依赖边界：谁需要时间，谁就在构造时声明要一个 `IClockPort` / `ITimerPort`；测试注入虚拟实现，生产注入物理实现。这是本包唯一的、不可替代的 WHY。
+## 核心张力与设计原则
 
-## 独立变化测试（Independent Change Test）
+- **时间是输入，绝非权威（Time is input, never authority）**：时间值自身不携带任何业务裁决权，只有具体的领域规则结合显式注入的时钟才能给出业务判定。
+- **强类型截止时间（Typed Deadline）**：截止时间必须封装为强类型对象，通过纯函数进行过期与剩余量计算，彻底消除裸时间戳比较带来的时区失配与数值溢出风险。
+- **完全可虚拟化（Virtualizability）**：所有时间端口在测试环境中必须能够被确定性的虚拟时钟与虚拟定时器无缝替换，使时序逻辑能够在毫秒级内通过离散推进完成穷尽验证。
 
-从当前 port 形态改为显式 `Instant`/`Deadline` token + scheduler capability，只要不改变 `causal-wait` 的等待语义、不改变 `process-execution` 的进程语义，本包就允许整体重写。反过来，`causal-wait` 或 `process-execution` 的内部重写也不应该要求本包改变——这证明「时间如何进入系统」是一个独立的语义轴，不能并入任何业务包。
+## 核心不变量与违约状态（RED）
 
-## 失败模式考古（历史上为什么发生过）
-
-### 1. `TurnCompletionProgram` 变成事实上的第二运行时（ce-temporal-ownership.md §1.3）
-
-历史 what/dsl-structured-program 的 DSL 静态门曾有一个机械漏洞，让 `StudentRunCell`（`mutable record` 状态机）整体漏过去；`TurnCompletionProgram` 长期充当「什么都管」的决策器。那时的时序判断散落在长期 `State / Pending / bool` 字段里，业务「走到第几步」与「现在几点」纠缠在一起——这正是 ambient 时间偷渡的温床：下一步靠可变状态 + 隐藏 timer 决定，无法测试、无法重放。`time-capability` 与 `structured-workflow`（无第二程序计数器）互为表里：本包负责时间**以显式能力进入**，`structured-workflow` 负责控制流**以语言结构表达**。
-
-### 2. 轮询与 sleep 充当因果进展（reconciler-event-driven-de-polling.md）
-
-Reconciler 曾按 `[50; 100; 250; 500; 1000; 2000; 3000; 5000]` ms 退避 `setTimeout` 重读 snapshot，`budget = 30_000` ms——用墙钟推进业务探测。教训：**时间不能推进业务判断**。墙钟只能用于「距上次因果进展的静默时长」这类 deadline/watchdog 判据（VERIFY-004），且必须集中、可取消、可注入（`ITimerPort`）。该 change 因此把「等待」分类为四类（A 业务状态探测 / B 事件等待 / C deadline-watchdog / D 跨进程互斥），其中 C 类是唯一允许墙钟的等待，而它的墙钟也必须经 `ITimerPort` 注入——这是 `time-capability` 与 `causal-wait` 的精确分界。
-
-### 3. Node timer 上限与进程生命周期（PtyTiming.fs）
-
-JS `setTimeout` 的 Int32 上限（`0x7FFFFFFF` ms ≈ 24.8 天）意味着「长预算必须分段等待」；长预算（≥1000ms）若 `unref()` 不恰当，干净进程会被 timer 持住不退出。这些物理事实如果散落在各业务调用点，就会各自写出边界错误；集中在 `Deadline.nextWaitMs`（封顶）+ `PtyTiming.timerTask`/`nodeTimerPort`（unref 策略）后，业务只面对一个不会溢出的 typed deadline。
-
-### 4. 时区/裸 Date 陷阱（requirements/verification-system/tests/domain.meta.test.mjs hazard 1）
-
-Fable 的 `DateTimeOffset` 比较依赖 `offset` 字段；测试若用裸 `new Date(iso)` 构造时刻，在非 UTC 时区下 `Deadline.isExpired` 会对未到期的 deadline 返回 true——测试静默错误。教训：时刻值必须带显式 offset（`utcOffset`/`clockAt` facade），deadline 判定必须对进程时区不敏感。这也是「时间值本身不是 authority」的反面教材：值若没有正确语义（offset），连被规则消费的资格都没有。
-
-## 与相邻包的边界（为什么不是它们的子集）
-
-| 相邻语义 | 归属 | 理由 |
-|---|---|---|
-| 等待的业务因果、诊断观测非权威 | `causal-wait` | 等待「为什么没发生」是另一条语义轴；本包只提供时间能力 |
-| 进程有界执行、PTY 物理完成 | `process-execution` | deadline 是 process 语义的**输入**，不是 process 语义本身 |
-| 无第二程序计数器 | `structured-workflow` | 控制流结构独立于时间如何注入 |
-| proof 分层与可红门禁 | `verification-system` | 虚拟时间测试是证明手段，不是产品 guarantee |
-
-## RED 的样子
-
-- 业务层任何一处直接出现 `DateTimeOffset.UtcNow` / `Date.now` / `setTimeout` / `timerTask`（Domain/Application/Session 层）。
-- 两个语义相同的运行，仅因机器快慢/时区/测试顺序给出不同业务结果。
-- deadline 无法在测试中推进（没有虚拟时钟或虚拟 timer 可用）。
-- 一个 deadline 值被当作「真理」直接比较，而没有领域规则解释它的意义。
+仓库处于 RED 状态，当且仅当出现以下任一破坏时间确定性的违约：
+1. 业务层（Domain / Application / Session）直接调用或引用原生全局时间 API。
+2. 业务逻辑脱离领域规则，将时间戳作为独立权威直接用于驱动状态转移或分支选择。
+3. 截止时间未通过强类型 `Deadline` 封装，散落为裸 `DateTimeOffset` 或整数毫秒的手工比较。
+4. 测试用例因缺少虚拟时间支持，被迫使用真实等待（sleep）进行时序验证。
+5. Session 起始时间原点在重试或回放中发生漂移，未能严格执行单次绑定。

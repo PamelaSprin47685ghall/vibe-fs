@@ -1,38 +1,25 @@
-# concern-routing — 为什么必须独立存在
+# concern-routing — WHY
 
-## 1. 一个不可替代的存在理由
+## 1. 领域动机与核心矛盾
 
-multi-agent 最昂贵的通信失败不是“消息发不出去”，而是为了得到相关信息先建立身份关系，或让每个状态变化都即时打断别人。前者让组织拓扑变成路由表，后者把系统变成 Slack。
+多 agent 协作中最昂贵的通信失败不是消息无法送达，而是：
+1. **先建身份拓扑才能通信**：发送方必须先知道“谁负责哪件事”，把动态协作硬编码为静态汇报关系与组织架构。
+2. **即时打断注意力**：状态变更或外部信息即时推入接收方 active context，打断正在执行的推理与尝试。
 
-本包只提供两个动作：
+`concern-routing` 确立以 **concern 寻址**的通信模型：
+- 接收方声明关注点（`subscribe(id, concern)`），创建语义邮箱；
+- 发送方仅面向语义地址投递（`publish(id, message)`），无需感知接收者身份或拓扑；
+- 消息异步存入邮箱，且仅在接收方下一次 Pair Hint 自然认知边界交付。
 
-```text
-subscribe(id, concern)  我创建一个语义地址，声明“我关心什么”
-publish(id, message)    我有与这个 concern 相关的信息，发给该地址
-```
+## 2. 核心不变量与破坏后果
 
-发送者不需要知道 mailbox owner 是谁。消息可以早到，但注意力只在 owner 下一次 Pair Hint 这个自然边界被打断。这样增加知识不增加长期 reporting relation，把 person-to-person coordination 压成 concern-addressed communication。
-
-## 2. 为什么不并入其它包
-
-- 不并入 `interaction-authority`：peer message 不是 user-shaped authority，也不得 mint Authority Root。
-- 不并入 `dispatch-protocol`：这里没有“逻辑 interaction 穿越不可靠 Host”的用户 effect；核心是语义地址、mailbox 与 delayed attention boundary。
-- 不并入 `guidance-delivery`：后者拥有 Enforcer guidance 的 delivery/coverage；本包拥有 mailbox message/subscription announcement 的身份、路由与消费语义。
-- 不并入 `participant-identity`：owner 是 participant，但 concern address 不应把身份结构本身变成通信 API。
-
-## 3. FAILURE MEANING
-
-RED = 发送者必须先知道“谁负责”；subscribe 建立持续 social/reporting topology；publish 立即插入 active context 打断工作；同一消息因 retry/replay 重复出现；旧 owner 结束后 mailbox 继续收信；peer message 被当成 authority/事实；所有状态广播给所有人而不是按 concern 路由。
-
-## 4. 被拒方案
-
-- owner directory / org chart 作为路由真相：发送者再次耦合身份拓扑。
-- generic pub/sub broker with topics/acks/QoS：schema 与运维复杂度远大于两个 speech acts。
-- 即时 push interrupt：破坏自然 attention boundary。
-- 每轮 Pair Hint 重复所有 active subscriptions：把 semantic address 变成永久 prompt tax。
+- **地址解耦**：发送者不依赖接收者运行时身份或生命周期；若破坏，组织拓扑将侵入消息路由，换执行者将导致路由断裂。
+- **注意力保护**：消息早到不等于即时打断，严格在 Pair Hint 边界批量消费；若破坏，并发消息将随机污染执行上下文。
+- **极小事实与不可变语义**：`id → concern` 语义映射一旦出生不可变更，路由仅维护 live subscription 与 delivery coverage 的极小事实集。
+- **低 Authority 信息**：peer message 仅作为可见观察输入，绝不直接升级为 user authority 或自动产生业务 obligation。
 
 ## DEPENDS ON
 
-- `participant-identity`：mailbox owner/lifetime 必须绑定真实 participant。
-- `participant-horizon`：peer message 只是一条可见信息，不得反向制造 authority。
-- `durable-events`：subscription、message 与 delivery coverage 需要 restart/replay 稳定。
+- `participant-identity`
+- `participant-horizon`
+- `durable-events`

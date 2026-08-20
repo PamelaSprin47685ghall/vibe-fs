@@ -1,57 +1,41 @@
-# concern-routing — WHAT（唯一 normative 合同）
+# concern-routing — WHAT
 
-命题前缀 `CONCERN-ROUTING-`。
+## CONCERN-ROUTING-001: `subscribe` 创建 concern-addressed mailbox 而非 reporting relation
 
-## CONCERN-ROUTING-001：`subscribe` 创建 concern-addressed mailbox，而不是 reporting relation
+`subscribe(id, concern)` 接受两个非空自然语言字符串。成功后 `id` 成为当前 workspace 内的语义地址，mailbox owner 即为发起调用的精确 participant。`concern` 仅定义值得投递的信息意图，不授予 owner 对发送者的控制权，亦不要求发送者感知 owner 身份。路由隔离在单一 workspace 内。
 
-`subscribe(id, concern)` 接受两个非空自然语言字符串。成功后 `id` 成为当前 workspace 内的语义地址，mailbox owner = 调用它的精确 participant；`concern` 只描述“什么信息值得发到这里”，不授予 owner 对发送者的管理权，也不要求发送者知道 owner 身份。routing 不跨 workspace。
+`id → concern` 的语义映射在 workspace 内全局稳定且不可变：同一 `id` 永久绑定初始 concern。live mailbox id 不得同时指向多个 owner。同一 owner 对相同 `id + concern` 的重放必须幂等；冲突 claim 必须显式拒绝，禁止 last-writer-wins 覆盖或偷换 concern。
 
-`id → concern` 的语义映射一旦在该 workspace 出生就永久稳定：同一 id 以后不得改表示另一个 concern。一个 live mailbox id 不得同时指向两个 owner。相同 owner 对相同 `id + concern` 的同一 tool occurrence 重放必须幂等；冲突 claim 必须显式拒绝，不能 last-writer-wins 偷换收件人或 concern。
+## CONCERN-ROUTING-002: subscription announcement 是 sticky-once semantic address discovery
 
-## CONCERN-ROUTING-002：subscription announcement 是 sticky-once semantic address discovery
+live subscription 建立后，所有有资格接收 Pair Hint 的 live participant（含 owner 本身）必须在各自下一次新的 Pair Hint occurrence 中获得一次紧凑公告（`id + concern`）。
 
-一个 live subscription 建立后，所有有资格接收 Pair Hint 的 live participant（包括 owner）必须在各自下一次新的 Pair Hint occurrence 中看到一次紧凑 announcement：`id` + `concern`。之后同一 subscription 不再反复占用 Pair Hint；后来新出现的 eligible participant 在其首个可用 Pair Hint 中也应看到当前仍 live、尚未覆盖的 subscription。
+公告仅用于广播语义地址的存在，不暴露 owner 的运行时拓扑，不产生工作义务。同一 subscription 不得在后续 Pair Hint 中重复广播；新加入的 eligible participant 仅在其首个可用 Pair Hint 中接收尚未见过的 live subscriptions。
 
-announcement 只使别人知道“世界上有一个地址关心这件事”，不暴露 mailbox owner 的 runtime topology，也不创建工作义务。
+## CONCERN-ROUTING-003: `publish` 只按 semantic address 路由
 
-## CONCERN-ROUTING-003：`publish` 只按 semantic address 路由，不要求知道收件人
+`publish(id, message)` 接受非空 `id` 与自然语言 `message`。仅当前 live subscription 可接收；未知、已退休或冲突的 `id` 必须 fail-closed，禁止广播或猜测接收方。
 
-`publish(id, message)` 接受非空 id 与非空自然语言 message。只有当前 live subscription 才能接收；未知、已退休或冲突 id 必须返回封闭失败，不静默广播、不猜 owner。
+成功 publish 记录消息事件。发送者身份仅用于审计与去重，无需显式指定 recipient。publish 异步完成，不阻塞等待消费，不打断 owner 当前的 provider attempt。
 
-成功 publish 创建一个 mailbox message occurrence；sender identity 可用于 provenance/dedupe，但 provider 调用方不需要提供 recipient。publish 本身不等待 owner 消费，也不打断 owner 当前 provider attempt。
+消息必须严格绑定接受时的 exact live mailbox generation。若在解析与写入之间 mailbox 发生 retire 或 rebind，publish 必须作为 stale claim 拒绝，禁止自动转投新代次 owner。
 
-message occurrence 必须绑定 publish 被接受瞬间的 exact live mailbox generation。若 id 在 resolve 与 atomic append
-之间 retire/rebind，publish 必须作为 stale claim fail/重试，不能把原本针对旧 generation 的消息自动重定向到
-刚接棒的新 owner；accepted message 一旦带 generation 写入，后续 rebind 也不能改变其收件世代。
+## CONCERN-ROUTING-004: 消息只在 owner 下一次新 Pair Hint 自然边界交付
 
-## CONCERN-ROUTING-004：消息只在 owner 下一次新 Pair Hint 自然边界交付
+已接受的 mailbox 消息不即时注入 active context。owner 仅在下一次新的 Pair Hint occurrence 聚合消费尚未交付的 pending messages，并与该 Pair Hint 的 frozen provider payload 一同呈现。
 
-accepted mailbox message 不即时注入 active context。owner 下一次新的 Pair Hint occurrence 必须组合当前尚未交付的 mailbox messages；这些 message 随该 Pair Hint 的 frozen provider-visible payload 一起被消费。
+同一 Pair Hint 的重放必须保证消息载荷 byte-identical，不重复消费队列。消息交付覆盖（`MessageDelivered`）及公告覆盖（`SubscriptionAnnounced`）必须与 Pair Hint 的生成在同一原子事务中提交；若 placement 放弃或失败，交付状态回滚，留待下一合法 occurrence 重试。
 
-同一 Pair Hint replay 必须 byte-identical 重放同一批消息而不是再次消费 queue；后续 Pair Hint 不重复已经交付的 message。消息可以早到，注意力只能在 Pair Hint 边界被打断。
+## CONCERN-ROUTING-005: peer message 是低 authority 信息
 
-subscription announcement 与 mailbox message 的 delivery coverage 不得先于 Pair Hint placement 单独提交。concern-routing
-必须先 staging 本 occurrence 应组合的 fragments + 对应 coverage facts；只有 `guidance-delivery` 成功冻结该
-Pair Hint occurrence 时，`SubscriptionAnnounced` / `MessageDelivered` 才与 pair placement 在同一 atomic durable
-commit 生效。placement 失败/放弃 → zero concern delivery commit，下一合法 occurrence 仍可重试。
+subscription announcement 与 published message 均不得 mint 或 continue user interaction authority，不得变更 office entitlement，不得自动创建 obligation，亦不得被接收方直接视为已验证的世界事实。接收方必须按领域证据法独立判定是否据此采取行动。
 
-## CONCERN-ROUTING-005：peer message 是低 authority 信息，不是事实/命令
+## CONCERN-ROUTING-006: mailbox 生命周期跟随 owner participant life
 
-subscription announcement 与 published message 都不得 mint/continue user interaction authority、不得改变 office entitlement、不得自动创建 obligation、不得被 receiver 当成已经验证的 world fact。receiver 可据此调查、行动、转述或忽略，是否足以改变 action 仍由对应领域 evidence law 决定。
+mailbox generation 仅在 owner participant 存活期内有效。owner 终结后 generation 退休，此时新的 publish 必须 fail-closed。已接受但未交付的消息随 generation 退休而终结，禁止跨代或向 replacement/child 自动继承。
 
-## CONCERN-ROUTING-006：mailbox 生命周期跟随 owner participant life
+后继 participant 可显式针对同一 `id` 重新 `subscribe`，前提是 `concern` 必须与既有不可变语义完全一致。该操作产生全新的 mailbox generation，并重新触发一次 sticky announcement。旧代次未决消息与 delivery coverage 永久作废。
 
-subscription generation 只在 owner participant life 存活；owner 终止后该 generation 退休，此时 publish 必须 fail closed。已 durable 接受但尚未交付的消息随该 generation retirement 终止为不可再投递，不得自动改投 replacement/child/同 persona 的另一个 execution。
+## CONCERN-ROUTING-007: 路由表保持极小
 
-后来 participant 可以显式 `subscribe` 同一个 `id` 接棒，但只允许 concern 与该 id 的 durable semantic mapping 完全相同；这会创建新的 mailbox generation 并重新触发 CR-002 的 sticky-once announcement。旧 generation 的 pending messages / delivery coverage 不跨代继承。换 owner 必须显式，换 concern 必须换 id。
-
-## CONCERN-ROUTING-007：路由表保持极小
-
-系统只维护 live subscription、message occurrence、per-recipient announcement coverage 与 owner delivery coverage 所需的最小事实。禁止引入组织层级、presence-derived authority、priority、fan-out workflow、实时 ack protocol、topic hierarchy 或 generic event bus 作为产品语义。
-
-## 边界
-
-- Pair Hint 的 canonical craft 正文 → `cognitive-environment`。
-- Pair Hint occurrence 的 frozen wire/coverage → `guidance-delivery` / `prefix-stability`。
-- tool schema/runtime 可见性 → `capability-enforcement`。
-- participant 何时存在/终止 → `participant-identity` / session owners。
+系统仅维护 live subscriptions、message occurrences 以及 recipient announcement/delivery coverage 的最小事实集合。禁止引入组织层级、presence 派生 authority、优先级调度、工作流编排、实时 ACK 协议或通用事件总线机制。

@@ -1,115 +1,29 @@
-# WHAT — js-semantic-surface
+# js-semantic-surface — WHAT
 
-本文件是 `js-semantic-surface` 包的**唯一 normative 合同**。WHY/HOW/PROOF 非 normative。
-
-命题编号 `JS-SEMANTIC-SURFACE-NNN`；每条命题 = 当前世界必须同时成立的事实。证据指针 →
-`HOW.md` 行号。引用别的包一律用包名，不复制其它包命题。
-
-历史编号收编：`SURFACE-001..006`（provider-language / provider-projection / finality /
-participant-horizon / verification-system 的交叉引用）在本包落地为正式条款
-`JS-SEMANTIC-SURFACE-001..006`，引用语义不变。
+本文件是 `js-semantic-surface` 的**唯一 normative 合同**。WHY 与 HOW 非 normative。
 
 ---
 
-## JS-SEMANTIC-SURFACE-001：所有 automated tests 使用 JavaScript
+## JS-SEMANTIC-SURFACE-001: 所有 automated tests 使用 JavaScript
 
-**规范陈述**：`requirements/**/tests/**/*.mjs` 是 automated semantic proof 的唯一载体；语义测试及其
-support、fixtures、helpers、e2e、integration 依赖区不写 F#，不引入第二测试语言。生产代码是
-`.fs`；测试世界是 `.mjs`。
+`requirements/**/tests/**/*.mjs` 是自动化语义证明的唯一有效载体。语义测试及其辅助夹具（support、fixtures、helpers、e2e、integration）必须统一采用 JavaScript（`.mjs`），严禁在测试层引入第二开发语言。生产代码采用 F#（`.fs`），测试世界采用 JavaScript（`.mjs`），实现语言边界的物理隔离。
 
-**含义 / 动机**：语言边界物理性阻止测试触碰实现内部（与 `verification-system` 的契约面
-语言边界同源）；Fable 约定是编译器产物不是领域概念。
+## JS-SEMANTIC-SURFACE-002: JS semantic tests 只能调用正式 semantic surface
 
-**边界**：本命题管「测试语言」，不管「证明技术」（`verification-system`）与「谁拥有什么」
-（`requirement-system`）。编译产物验证（quarantine）测试仍可能直接消费 `dist`，见
-JS-SEMANTIC-SURFACE-002 边界。
+语义测试只能通过正式注册、稳定且具备 JS 原生接口（JS-native）的 Semantic Surface 进入系统。严禁在测试中深层导入内部 dist 模块，严禁通过符号前缀匹配、混淆名反射或遍历模块导出对象进行非授权调用，严禁直接消费编译器底层运行时模块。Surface 存在的唯一正当理由是所属领域组件拥有对外承诺的规范契约，严禁单纯因为测试便利而将内部实现暴露至公开接口。
 
-**证据指针**：→ HOW.md L13。
+## JS-SEMANTIC-SURFACE-003: 值得独立测试的 law 必须有独立 semantic owner + JS surface
 
-## JS-SEMANTIC-SURFACE-002：JS semantic tests 只能调用正式 semantic surface
+任何值得独立验证的语义定理或业务规则，必须归属于明确的 package owner，且该 owner 必须为其提供 JS 原生的 Surface 承载。Surface 必须在所属领域边界处负责完成 JavaScript 原生数据表示与内部领域模型之间的双向适配与转换，严禁建立跨越所有业务领域的集中式上帝外观（god facade）。
 
-**规范陈述**：语义测试只能经正式、稳定、JS-native 的 semantic surface 进入系统；禁止
-deep-import 内部 `dist` 模块、禁止 mangled-name 查找（`Object.keys(mod)` /
-`startsWith('Foo__')` / `endsWith('_Bar')`）、禁止消费 `fable_modules`。surface 存在是因为
-一个 semantic component 拥有 contract，**从不**因为测试需要访问。
+## JS-SEMANTIC-SURFACE-004: 不拥有独立 law 的 helper 不直接测试
 
-**含义 / 动机**：测试经内部路径进入 = 测试在问「F# 是怎么实现的」。surface 跟随 semantic
-owner 分布，不集中成 god facade；「测试需要，所以 export internal」永不成立。
+不具备独立业务失败含义的内部辅助函数、局部夹具或中间工具，严禁作为独立的测试对象直接编写测试用例。内部实现的行为与正确性必须完全通过其所属 Owner 契约面的公开行为进行端到端证明。重命名、内联或替换内部数据结构不得导致测试用例修改。
 
-**边界**：编译产物验证测试（`VERIFY_008_every_emitted_module_actually_loads` 一类）的
-subject 就是编译产物，有资格知道 `dist`；它们归 compiler/build verification quarantine，
-不算 semantic tests。**quarantine 只存在于 compiler/build verification**——产品包的
-`tests/support`、`tests/fixtures`、`*-contract.mjs` 不是第二 quarantine；把 forbidden knowledge
-从 test 文件搬进 support 不减少债务，只是给 white-box 加一层布。`SURFACE_MANIFEST` 的
-module 只有在 owner/laws/source/Compile/emitted dist/representation/kind/active WHAT-authorized
-contract-test 全部闭合时才能成为正式入口；登记、死 import、无关 WHAT law 都不构成 evidence。
-`domain.mjs` 已删除（退场完成）；已有 package-local `*-contract.mjs` 的 baseline 当前为空，
-任何新 adapter 都直接 RED。
+## JS-SEMANTIC-SURFACE-005: semantic data 跨边界必须是 JS-native representation
 
-**证据指针**：→ HOW.md L14。
+跨越 Semantic Surface 边界传递的数据必须完全采用 JavaScript 原生类型体系：`string`、`number`、`boolean`、`null`、`undefined`、标准数组、纯对象（plain object）、`Promise`、标准函数以及必要时的 `bigint` 与不透明资源句柄（opaque handle）。严禁向语义测试暴露编译器特有的链表、哈希表、集合、Option/Result 包装类、DU 运行时实例或类反射元数据。时间跨越边界必须归一化为 ISO-8601 字符串或 epoch 毫秒数。
 
-## JS-SEMANTIC-SURFACE-003：值得独立测试的 law 必须有独立 semantic owner + JS surface
+## JS-SEMANTIC-SURFACE-006: Fable runtime representation 不属于 semantic contract
 
-**规范陈述**：一个值得独立测试的 semantic law，必须有一个明确的 semantic owner，且该
-owner 必须提供 JS-native surface 承载它。surface 不是简单 forwarding：它负责
-JS representation → semantic input → owner → semantic output → JS representation 的翻译，
-翻译发生在 owner boundary。
-
-**含义 / 动机**：没有 surface 的 law 无法被 JS 测试证明；把 boundary 塞进中央
-`TestApi` / `DomainFacade` 会制造假 coherent ownership。surface 跟着语义 owner 分布
-（`Host/Quiescence/Surface.fs`、`Participant/Provider/Attempt/Surface.fs` 形态）。
-
-**边界**：本命题管「law → owner → surface 的归属关系」；具体 surface 文件命名
-（`Surface.fs` / `Api.fs` / `Contract.fs`）是 HOW。
-
-**证据指针**：→ HOW.md L15。
-
-## JS-SEMANTIC-SURFACE-004：不拥有独立 law 的 helper 不直接测试
-
-**规范陈述**：没有独立 failure meaning 的 helper、fixture、内部函数不直接作为测试 subject；
-它们的行为通过 owner 的公开行为证明。测试断言公开行为而非内部协作——调用次数、辅助
-布局、私有结构是「今天怎么写的」证据，不是正确性定义。
-
-**含义 / 动机**：直接测 helper = pin HOW。内部 rename / inline / 换数据结构不要求修改
-JS tests（positive canary），破坏真实 promise 必须让 JS tests 失败（negative canary）。
-
-**边界**：本命题管「测试 subject 的选择」；helper 的具体归属与证明义务由
-`requirement-system` 的 assertion 级 owner 规则承接。
-
-**证据指针**：→ HOW.md L16。
-
-## JS-SEMANTIC-SURFACE-005：semantic data 跨边界必须是 JS-native representation
-
-**规范陈述**：跨 semantic surface 的普通数据只允许 JS-native 形状：`string`、`number`、
-`boolean`、`null` / `undefined`、`array`、`plain object`、`Promise`、`function/callback`；
-必要时允许 `bigint` 与 opaque resource handle（仅 create → pass back → dispose）。
-禁止作为 semantic data 暴露：FSharpList / FSharpMap / FSharpSet / FSharpOption /
-FSharpResult / F# DU instance / F# record runtime class / `tag` / `fields` / `cases()` /
-Fable DateTimeOffset 编码 / curried F# function / mangled instance method。
-
-**含义 / 动机**：JSON-shaped 数据（`JSON.stringify(result)` 理论上应工作）让测试只面对
-语义；Fable runtime value 无法意外穿过新 surface。时间在边界归一为 ISO-8601 string 或
-epoch milliseconds，JS 构造不了 Fable DateTimeOffset。
-
-**边界**：opaque handle 不是 semantic data，是 capability token；测试不能 inspect 其
-fields/prototype。representation 校验器（`assertJsData` / `assertOpaque`）是 HOW/P5。
-
-**证据指针**：→ HOW.md L17。
-
-## JS-SEMANTIC-SURFACE-006：Fable runtime representation 不属于 semantic contract
-
-**规范陈述**：Fable 输出形状（`Module_` 前缀、DU tag ordinal、FSharpMap runtime object、
-Fable reflection metadata、mangled instance method 名）不是 semantic contract 的一部分；
-内部 rename / inline / 换 collection / 重排纯计算不要求修改 JS tests，破坏真实语义 promise
-必须让 JS tests 失败。semantic tests 中不存在 `.tag` / `.fields` / `.cases()` /
-`FSharpList` / `fable_modules` knowledge。
-
-**含义 / 动机**：mangled name 在测试世界里应成为不存在的概念；「内部实现细节」与
-「发布给测试的 contract」之间必须有一条机器可查的线。这条线的 gate 载体
-（`js-boundary-gate` ratchet + `js-contract.mjs` validator）随迁移收紧，最终成为
-absolute prohibition。
-
-**边界**：本命题管「Fable 形状不是 contract」；contract 的语义内容归各产品包 WHAT。
-compiler/build verification quarantine 是唯一有资格知道 Fable 的测试类（见 002 边界）。
-
-**证据指针**：→ HOW.md L18。
+编译器的代码生成约定（包括模块名称前缀、DU 标签序数、内部反射元数据及修饰后的实例方法名）不属于产品语义契约的组成部分。语义测试中严禁出现针对底层运行时表示属性（如 `.tag`、`.fields`、`.cases()`）的硬编码感知与断言。只有专属的编译器产物校验测试（compiler verification quarantine）才具备直接消费底层编译产物的特殊资格。

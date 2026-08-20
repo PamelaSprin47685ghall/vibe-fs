@@ -1,45 +1,34 @@
-# WHY — 为什么 `participant-identity` 必须独立存在
+# participant-identity — WHY
 
-## 不可替代的存在理由
+## 领域动力与核心张力
 
-系统里有三类「这个人是谁」的答案，历史上被绑成一个词，导致三种完全不同的失败：
+系统内关于「参与者身份」存在三条完全正交的维度：
 
 ```text
-Role              = office 身份：你属于哪个职位、负有哪类职责（Coder / Manager / …）
-Persona           = 自我模型：你自称什么、怎样理解自己（Engineer / Lead / …）
-ExecutionBinding  = 物理执行者：当前用哪个模型、哪个 tier、哪份 config（fast-coder / deep-coder）
+Role              = Office 职位：承担哪类系统职责（Manager / Orchestrator / Coder / Inspector / ...）
+Persona           = 自我模型：如何自称与理解自身（Engineer / Lead / ...）
+ExecutionBinding  = 物理执行者：当前使用的模型、推理档位与租约配额（fast-coder / deep-coder）
 ```
 
-如果三者合一或两两混淆，换执行机制会偷偷改变人格与责任。真实事故（历史 why/agent 条款、
-历史 change（universal））：
+当三者混淆时，会产生严重的领域退化：
+- **换执行者变成换人**：模型在执行阶段发生 Peer Fallback 或升档时，责任边界与自我模型发生漂移。
+- **机器身份污染自我认知**：底层的机器执行档位（`fast-*` / `deep-*`）渗透到面向模型的提示词中，使其自称机器名。
+- **副本漂移出独立自我**：用于投机调查的执行副本（Replica）若独立绑定身份，会演化出脱离主体的虚假人格。
 
-- **Bookkeeper 用 `fast-inspector` 创建却收 Inspector prompt**：机器身份（binding）与自我模型
-  （persona）合一，身份轴错位。
-- **Peer Fallback 换模型时半途换人**：fast→deep 本应只是换执行者，却被读成换了一个人，
-  responsibility / self-model 随之漂移。
-- **Strength replica 漂出独立自我**：replica 只应换执行绑定，却可能演化成「另一个自己」。
+`participant-identity` 的核心不变量在于：**换执行者不等于换人**。在单个 participant life 内，Role 与 Persona 绝对稳定且不可变，仅允许 ExecutionBinding 在受控机制下切换。
 
-本包把这三条轴钉死为独立事实：谁在行动（Role）、行动者如何自称（Persona）、谁来物理执行
-（Binding）。三者可独立变化，且只有 Binding 允许在 life 内变化。
+## 破裂后果
 
-## RED 是什么样
+- 模型或执行上下文切换能够静默改写责任模型或 Persona 自称。
+- 同一参与者的不同执行上下文被误判为多个独立主体。
+- 内部调度拓扑与机器档位泄漏至认知层，破坏提示词稳定性与权限边界。
 
-- 换 model / execution context 能偷偷改变 responsibility 或 self-model。
-- 新 participant 与同一人的另一 execution context 无法区分（换了执行者 = 换了一个人）。
-- Persona 被重绑（Fallback / Strength / mid-life 改写自称）。
-- 用户面 session 的 execution binding 被内部 prompt / hook 静默改写，冒充用户选择。
-- `fast-`/`deep-` 机器名出现在 provider 视野里自称「我是 fast-coder」。
+## 边界与关系
 
-## 为什么不并进相邻包
+- `office-capability`：定义职位的权能后果；本包定义行动者身份事实。
+- `capability-enforcement`：保证可见能力与可执行能力同源；本包提供身份输入。
+- `session-ontology`：定义 session 的执行分类与归属；本包消费其主体归属事实。
 
-- `office-capability` 答「这个 office 有资格产生什么后果」；本包答「谁在行动」。同一 Role 名
-  跨 Persona/Binding 不变，是身份事实，不是后果事实。
-- `capability-enforcement` 答「可见/可执行 capability 如何同源不漂移」；身份轴是它的输入前提。
-- `session-ontology` 答 session 的 execution class / ownership / attachment 分类；本包消费它的
-  personhood 轴，但不拥有分类本身。
-- 独立变化测试：把 Persona 从 `Role × initial tier` 改成显式创建时选择，而 office capability 与
-  provider renderer 完全不动——本包必须能单独承受这次变化（boundary card INDEPENDENT CHANGE）。
+## DEPENDS ON
 
-## 一句话
-
-换执行者 ≠ 换人。三者分离是可单独验收、可单独破坏、不可替代的身份合同。
+- `session-ontology`

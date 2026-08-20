@@ -436,7 +436,8 @@ module HostSignalBootstrap =
                     NeedHelpSensor.createInterruptiblePredicate
                         scope.Sessions.OwnedSessions
                         scope.Sessions.SessionParents,
-                    (fun sessionId -> sessionPort.InterruptAttempt sessionId))
+                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+                )
 
             let needHelpSensor =
                 NeedHelpSensor(
@@ -445,7 +446,8 @@ module HostSignalBootstrap =
                         scope.Sessions.SessionParents
                         journal
                         scope.Strength.StrengthRuntime,
-                    (fun sessionId -> sessionPort.InterruptAttempt sessionId))
+                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+                )
 
             do scope.AttachLoopSensor loopSensor
             do scope.AttachNeedHelpSensor needHelpSensor

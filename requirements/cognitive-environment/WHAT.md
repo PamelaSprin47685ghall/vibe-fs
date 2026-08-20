@@ -1,187 +1,85 @@
-# WHAT —— 唯一 normative 合同
+# cognitive-environment — WHAT
 
-命题前缀 `COGNITIVE-ENVIRONMENT-`。每条都是**当前世界必须同时成立**的事实。
-证据指针 → [`HOW.md`](HOW.md)。
+## COGNITIVE-ENVIRONMENT-001: 五层组合，每份材料恰属一个主权威
 
-## 认知层组织（Prompt Composition Protocol）
+系统提示词与上下文遵循五层组合模型，每份自然语言材料具有唯一的主权威源：
+- **World**：普适世界观与通用公理（Common Law）。
+- **Role**：参与者职责与自我模型（Role Law，fast/deep 共享）。
+- **Library**：继承的技术知识与职位经验（Office Library）。
+- **Runtime**：本次调用时刻成立的生命周期与事件注入。
+- **Mission**：本次委托的具体目标与当前任务。
 
-### COGNITIVE-ENVIRONMENT-001：五层组合，每份材料恰属一个主权威
+## COGNITIVE-ENVIRONMENT-002: 层可告知，不得冒充；冲突按语义所有权裁决
 
-万象术没有单一 system prompt。每个 provider-facing 自然语言材料恰属一个主权威（PROMPT-015）：
+各认知层可以向参与者告知相关事实，但严禁冒充其它层级。若材料间发生内容冲突，严格按各事实的领域语义所有权裁决，不设立简单的层级全序覆盖规则。
 
+## COGNITIVE-ENVIRONMENT-003: canonical 组合顺序
+
+标准组合顺序为：
 ```text
-World    什么在这里普遍为真        → Common Law + shared mythology
-Role     你是谁、什么属于你        → Role Law（fast/deep 共享）
-Library  继承的技术知识            → Office Library
-Runtime  这次 invocation 此刻为真  → 生命周期/事件注入
-Mission  这个 assignment 必须成为什么 → 当前 charge
+SYSTEM:  Common Law → Role Law → Office Library
+TOOLS:   当前生成的工具描述集合（独立于 Role 章节）
+RUNTIME: 生命周期与事件注入
+USER:    当前分配的 Mission 任务
 ```
 
-### COGNITIVE-ENVIRONMENT-002：层可告知，不得冒充；冲突按语义所有权裁决
+## COGNITIVE-ENVIRONMENT-004: Tools 不是 Role Prompt 章节
 
-- 层可以 inform（告知相关事实），不得 impersonate（冒充其它层）；
-- 冲突按语义所有权边界裁决，**不**设「更靠近 system 者胜」全序（PROMPT-015）。
+System Prompt 包含职位职责、认识论原则、权能边界与易犯错误，严禁在其中机械枚举当前环境的全部可用工具。工具的可用性由工具面定义，拥有工具不等于获得权能。
 
-### COGNITIVE-ENVIRONMENT-003：canonical 组合顺序
+## COGNITIVE-ENVIRONMENT-005: Role Law 是长期 self-model 层
 
-```text
-SYSTEM: Common Law → Role Law → Office Library
-TOOLS:  当前生成的工具面（不属于 Role 章节）
-RUNTIME/CONVERSATION: 生命周期与事件注入
-USER/ASSIGNMENT: 当前 mission
-```
+Role Law 负责定义「我是什么样的参与者」。同一 Office 的 fast 档与 deep 档共享完全相同的 Role Law 与自我模型，提示词中不出现 `fast-*` 或 `deep-*` 等底层机器路由名称。
 
-（概念顺序 ≠ wire；`Infrastructure/Resources/PromptResources.fs` 的 `systemForRole` 是现行实现。）
+## COGNITIVE-ENVIRONMENT-006: Office Library 是继承的技术书籍，不是 Common Law
 
-### COGNITIVE-ENVIRONMENT-004：Tools 不是 Role Prompt 章节
+Office Library 是历代职位沉淀的技术经验与操作指南，其地位从属于具体的任务需求，不具备定义系统公理或职位权能的效力。
 
-System Prompt 含责任、认识论、authority boundary、craft、易犯认知错误、与相邻 Office 的关系；
-它**不得**枚举当前 runtime 的全部工具。capability 变化不改人格；拥有 tool ≠ 获得 authority
-（PROMPT-015）。
+## COGNITIVE-ENVIRONMENT-007: 知识可跨 authority 边界流动，authority 不随知识流动
 
-### COGNITIVE-ENVIRONMENT-005：Role Law 是长期 self-model 层
+技术书籍可跨越权能边界传授识别缺陷与验证分析的方法，但阅读书籍不代表被赋予修改代码或执行环境的权能。权能严格保持与职位相绑定。
 
-- Role Law 回答「我是什么样的参与者」；
-- 同一 office 的 fast/deep 共享**同一** Role Law、同一 prompt、同一工具面，只模型绑定不同
-  （AGENT-001、COMPANION-004、ENFORCER-030）；
-- Role self-model 不枚举全部瞬时 capability state；不出现 `fast-`/`deep-` 机器身份自称
-  （AGENT-029）。
+## COGNITIVE-ENVIRONMENT-008: Library 三轴：Class × Delivery × Audience
 
-## knowledge ≠ authority
+Office Library 遵循三轴分类：
+- **Class**：Rulebook、Handbook、Ledger、Atlas、Field Notes。
+- **Delivery**：Inherited Volume、Triggered Folio、Request-Bound Volume。
+- **Audience**：按职位角色或请求契约绑定，不按模型推理深度分叉。
 
-### COGNITIVE-ENVIRONMENT-006：Office Library 是继承的技术书籍，不是 Common Law
+## COGNITIVE-ENVIRONMENT-009: Library 禁令
 
-```text
-Law tells you what must remain true.
-Role tells you what is yours to decide.
-Books teach you how predecessors learned to do it well.
-The assignment tells you what must become true now.
-```
+严禁书籍扩大角色权能；严禁向所有角色灌输通用的全能手册；严禁同角色的 fast 与 deep 档阅读不同版本的书籍；严禁将隐藏评审编排写入评审者书籍。
 
-Office Library 保存职位历代 craft；**不是** Common Law，不定义角色 authority（PROMPT-016）。
+## COGNITIVE-ENVIRONMENT-010: 生命周期文本只 orient，不 educate
 
-### COGNITIVE-ENVIRONMENT-007：知识可跨 authority 边界流动，authority 不随知识流动
+生命周期文本（Activation、Reawakening、Continuation、Handoff、Fission、Departure）仅用于为模型建立当前上下文的朝向（orient），不进行重复的说教或知识灌输，亦不得触发 System Prompt 的动态替换。
 
-`Information may cross authority boundaries. Authority does not travel with it.`
-继承知识（书）可以教识别缺陷、验证技术，但**不**授予修复权/执行权。craft 可跨 authority boundary
-流动，authority 不随知识流动（PROMPT-016；boundary card）。
+## COGNITIVE-ENVIRONMENT-011: 瞬时 runtime/mission 不重写长期 self-model
 
-### COGNITIVE-ENVIRONMENT-008：Library 三轴：Class × Delivery × Audience
+瞬时任务与运行时事件通过会话消息通道传递，严禁借由提示词路径伪造激活或篡改长期的 Role 自我模型。
 
-- Class：Rulebook / Handbook / Ledger / Atlas / Field Notes；
-- Delivery：Inherited Volume / Triggered Folio / Request-Bound Volume；
-- Audience 绑 semantic role 或 request contract，**不**绑 model strength；fast/deep 不造第二套
-  思想传统（PROMPT-016）。
+## COGNITIVE-ENVIRONMENT-012: Reviewer prompt 不灌输流程机制
 
-### COGNITIVE-ENVIRONMENT-009：Library 禁令
+Reviewer 的提示词由 Role Law 与评审账本组合而成。双重确认（Double PERFECT）等流程机制完全由 Host 主持，不写入 Reviewer 的提示词中。
 
-禁止：书扩大 Role 权；universal bible 灌每个 persona；同 role 的 fast/deep 异书；把隐藏编排写入
-Reviewer 书；复制已有 canonical 成第二真源。若他处已有 SSOT，Library 组合引用（PROMPT-016）。
+## COGNITIVE-ENVIRONMENT-013: Pair Hint 是 canonical craft payload
 
-## 瞬时与长期的边界
+结对提示（Pair Programming Hint）是标准的技能注入负载，统一承载以下核心工作原则：
+- 使用统一的中文（或对应绑定语言）思考纪律。
+- 将 `[NEEDHELP]` 视为正常的早期协作请求，而非失败或羞耻；不暴露底层 fast/deep 机器身份。
+- 暴露 `todowrite` 时，将其视为实时事实账本：一旦工作义务或焦点发生变化，必须先更新账本再执行后续操作。
+- 持续维护就绪前沿（Ready Frontier）：一旦子任务 A 解锁后继 A1，A1 立即并发发出，不等待同批次其它未完成任务；依赖图仅为事实快照，不构成人为的阶段屏障。
+- 先在思考中完成抽象再通过 `assume` 做出承诺，在缺乏实质性新证据时不得无故动摇判断。
+- 空名称 `skill({ name: "" })` 仅作为内部合成 wire 标识，模型不可主动调用，真实存在的非空 skill 工具保持完全可用。
 
-### COGNITIVE-ENVIRONMENT-010：生命周期文本只 orient，不 educate
+## COGNITIVE-ENVIRONMENT-014: delegated tool estimate 是校准提示，不是服从预算
 
-六种生命周期文本（Activation / Reawakening / Continuation / Handoff / Fission / Departure）只 orient，
-不 educate，不叠第二套 envelope；generic Activation ≠ Manager BlindPlan phase，不得触发 system prompt
-替换（PROMPT-015 / TODO-015）。
+当委任者提供预估工具调用次数（`expected_tool_calls`）时，该数值仅作为参与者评估工作规模与调整验证路径的参考校准提示，不构成硬性的执行上限或停机条件。
 
-### COGNITIVE-ENVIRONMENT-011：瞬时 runtime/mission 不重写长期 self-model
+## COGNITIVE-ENVIRONMENT-015: Blogger 可按 provider model 临时获得 chronicle-direct assistant text nudge
 
-`The system prompt names the office. The conversation tells you which road is yours.`
-T1 revelation 只走 conversation tool result；不得经 Prompt 路径伪造 Activation / system prompt 替换
-（PROMPT-014 引用 / TODO-015）。同一 life 内 system prompt 身份字节稳定（byte-stability 本体归
-`prefix-stability`；本包拥有「身份由 office 决定，不由阶段决定」的认知面）。
+针对特定易产生冗余思考的前缀白名单模型（当前为 `step-3.5-flash`），Blogger 在每次 provider 请求边界可被注入单次临时的直接记账 assistant 文本提示。该提示仅在当次转换中生效，不持久化至日志，亦不污染历史。
 
-### COGNITIVE-ENVIRONMENT-012：Reviewer prompt 不灌输流程机制
+## COGNITIVE-ENVIRONMENT-016: Pair Hint 只保留微原语的高频触发，不重复完整心理合同
 
-Reviewer 提示词 = Role Law + Examiner's Ledger 组合；双 PERFECT 流程完全由 Host 执行，**不**进入
-Reviewer prompt（REVIEW-012）。ProcessReview 隐藏编排（dedicated session / barrier / witness / 2N）
-不进任何 provider 认知层（PROMPT-016 禁令 + 008 的 hidden surface 交叉）。
-
-## craft 资产
-
-### COGNITIVE-ENVIRONMENT-013：Pair Hint 是 canonical craft payload
-
-Pair Programming Hint（HOST-013 occurrence 的正文）是一个 canonical semantic payload，至少同时要求：
-
-- 简体中文思考纪律（或所在语言世界的对应纪律）；
-- 把 `[NEEDHELP]` 视为正常、可早用的协作请求——不是 failure、资源匮乏、羞辱或失败声明；
-  provider-visible guidance 不暴露 fast/deep 内部身份（AGENT-031 / increase-strength §3）；
-- 当前 tool surface 暴露 `todowrite` 时，把它视为工作事实账本而非可选进度播报：只要现实变化使当前
-  account 不再准确（义务完成/解除、新义务出现、义务发生实质变化、确认不再需要，或实际工作焦点切换），
-  必须在继续下一段实质工作或调用其它工作工具前先提交完整最新 account；有 `workingOn` 字段时必须精确
-  指向此刻实际推进的 obligation。不得等阶段结束、用户追问或最后批量补记，自然语言宣称“已完成”或
-  打算稍后更新不构成账本更新。account 与实际焦点都未变化时不得为了形式重复写。
-- 并发调度持续维护 ready frontier，而不是按完整 wave / 阶段 barrier 推进：若 A/B 已并发且 A 先返回并
-  解锁 A1，A1 必须立即发出，不等待仍在运行的 B。预先依赖图只是当前事实快照，不是执行日程；每次结果
-  或新证据到达都重新计算 frontier，最小有用动作一旦参数完整且真实依赖满足就立即并发。无法证明依赖就
-  默认独立；空并发槽或让 ready 工作等待无关任务都视为主动增加 wall-clock。仅真实数据依赖/共享可变
-  owner/协议顺序/破坏性干扰/明确有限容量可阻塞；动作应细到单个结果能立刻解锁后继，又完整到单独执行
-  有明确价值；不猜未知参数、不制造无用调用、不写死全局并发数字（pair-parallel-tools §3-§14）。
-- 先抽象再笃定：面对工作先在思考中抽象本质结构（独立/依赖/领域判断/机械执行）。当前 tool surface 暴露
-  `assume` 时，抽象形成行动结论后调用一次 `assume` 把当前工作假设钉住，再执行、验证；没有新信息不得
-  重开同一判断，也不得为同一未变化判断重复调用。`assume` 是 commitment point，不是 proof，不扩大
-  authority；只有执行/验证/外部输入带来足以改变原结构的新证据才修正。Pair Hint 只保留这个短触发规则，
-  “犹豫不产生新知识只产生新错误”、无依据动摇、domino chain 等完整心理约束由 `assume` 的局部 tool
-  contract 与单次 return 承载，避免在每次 HOST-013 注入中重复长篇正文。
-- 该 hint 是 injection-only skill content；模型不得主动调用 `skill({ name: "" })` / `skill("")`
-  尝试读取它。空 skill name 只作为 HOST-013 synthetic wire identity；真实 skill 工具及所有非空 skill name
-  保持正常可用。
-
-该语义**不**按 provider 复制；wire 形状由 renderer 决定（`prefix-stability` / `provider-projection`）。
-
-### COGNITIVE-ENVIRONMENT-014：delegated tool estimate 是校准提示，不是服从预算
-
-当当前 participant 持有 delegator 提供的 `expected_tool_calls` measurement 时，新的 Pair Hint occurrence
-可追加一段动态 calibration：明确“根据委任者估算，目前还剩约 X 次工具调用”；同时明确 X 不是执行上限。
-若当前方案预计超支，应主动收缩/重排范围、缩短验证路径、提高真实可并行工作，或仅在自身已有相应
-capability 时考虑委派/分裂。提示不得宣称 participant 拥有其实际没有的 delegation/fission capability。
-
-没有 delegator estimate 的 user-facing/root participant 不出现该段；`X=0` 仍只表示估算已耗尽，不要求
-停止工作或停止调用工具。X 的计量与 replace/retain 语义归 `delegation`（DELEG-022）；本包只拥有 provider
-该如何理解这个 measurement 的 craft。
-
-### COGNITIVE-ENVIRONMENT-015：Blogger 可按 provider model 临时获得 chronicle-direct assistant text nudge
-
-Blogger 的普通 provider transform 仅当当前 physical provider attempt 的 `modelID` 命中 chronicle-direct
-prefix allowlist 时，才在当前 request frontier 注入且只注入一个临时 assistant text nudge：
-简体中文为「对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。」；English 为
-「For simple bookkeeping requests, there is no need to trigger thinking at all. Let me call the chronicle tool directly.」
-文案跟随该 Blogger session 已绑定的 provider language。
-
-当前 prefix allowlist 仅包含 `step-3.5-flash`，因此所有 `modelID` 以 `step-3.5-flash` 开头的 Blogger
-provider attempt 都开启该 nudge。匹配使用 ordinal、大小写敏感的前缀比较；不得按 provider 名、agent 名、
-substring 或 fallback tier 推断开启，也不得把其它未列出的 model family 一并放行。
-
-该 nudge 只属于当次 provider-facing transform：不写 Journal、不进入 durable projection、不形成下一次请求必须
-replay 的历史。重复 transform 必须先移除上一轮注入的同文案 assistant `text` part，再按当前 frontier 重建一个；
-Blogger 之外不得注入。wire 形状就是 `role=assistant` message 内唯一一个普通 `text` part，`text` 为上述裸字符串；不得包 `<skill_content>`、
-不得借用 `skill({ name: "" })`、不得携带 `source` / `synthetic` / completed-tool marker。
-
-### COGNITIVE-ENVIRONMENT-016：Pair Hint 只保留微原语的高频触发，不重复完整心理合同
-
-当当前 tool surface 暴露相应 action 时，Pair Hint 必须以极短 craft 触发 participant 在正确时机主动使用：
-
-- `assume`：抽象完成后 commit，没新信息不反复摇摆（013 已定义完整边界）；
-- `enough`：decision-relevant 信息已足够时停止 evidence churn，不用“为了保险”继续搜；
-- `abandon`：允许自己解除自创方向/承诺的心理重量，但不把它误解成取消真实 obligation；
-- `defer`：看见真实但非 blocking 的旁支时先存后返主线，`not now ≠ never ≠ owed now`；
-- `celebrate` / `regret`：一次经历揭示可复用成功机制或不必要代价时，才把它交给制度学习；不得把每个普通步骤机械 ritualize；
-- `subscribe` / `publish`：按 concern 建语义地址、只在有相关信息时发送；发送者不需要知道收件人，publish 不应即时打断 owner。
-
-完整 act contract、return reinforcement、durable queue/mailbox、Enhancer 与 rule mutation 都不归本包。Pair Hint 只承担
-“此刻存在这个离散动作”的高显著性提醒；把完整心理建设每轮重复注入会变成 prompt tax。
-
-`concern-routing` 动态产生的 subscription announcement / mailbox message 不是 authored craft，也不在本条定义内容；
-它们只在新的 Pair Hint occurrence 形成时由各自 owner 提供，再由现有 provider projection/freeze 机制组合。
-
-## 反向覆盖
-
-本包吸收的 OWNED clause（COVERAGE.md 归属）：PROMPT-015、PROMPT-016、AGENT-031（NEEDHELP 正常协作
-craft）、HOST-013（Pair Hint 正文 craft 部分）、COMPANION-004（Blogger Role Law 组合）、
-ENFORCER-030（Blogger 统一 system）、REVIEW-012（Reviewer 提示词组合）。跨边界：NEEDHELP 的
-consultation（delegation）、authority continuity（interaction-authority）、wire 注入
-（provider-projection/prefix-stability）、same-run authority（interaction-authority）**不**归本包
-（HANDOFF §10.2 WATCH 如实标注：craft 归本包，其余归各自 owner）。微原语的运行语义分别归
-`attention-regulation`、`concern-routing`、`institutional-learning`；既有 `assume` 仍归本包的认知 commitment craft。
+在暴露相应工具动作时，Pair Hint 仅保留对 `assume`、`enough`、`abandon`、`defer`、`celebrate`/`regret` 及 `subscribe`/`publish` 的短触发提醒，避免在每轮交互中重复注入长篇心理建设文本。

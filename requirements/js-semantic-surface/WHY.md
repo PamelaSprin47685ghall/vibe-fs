@@ -1,57 +1,34 @@
-# WHY：为什么测试世界必须与 Fable 世界隔离
+# js-semantic-surface — WHY
 
 ## 不可替代的存在理由
 
-「测试能摸到实现内部」是语义证明的第一杀手。它让测试在问「F# 是怎么实现的？」而不是
-「这个 semantic component 承诺什么？」，于是：
+当测试能够随意触碰实现内部时，测试实际上在验证「代码当前是怎么偶然写出的」，而不是「系统对外承诺了什么语义契约」。这种实现与测试的过度耦合会导致严重的脆弱性：
+- 内部辅助函数重命名或内联重构，导致无关测试大面积崩溃。
+- 底层集合类型或数据结构微调（如将 Map 替换为 Dictionary），破坏测试中手写的内部遍历。
+- 联合类型（DU）扩充内部实现分支，迫使外部测试修改无业务含义的枚举断言。
+- 编译工具链或代码生成器版本升级改变输出符号名，导致测试对符号的探测整体失效。
 
-```text
-内部 helper 改名        → 测试崩（与产品承诺无关）
-Map 换 Dictionary      → 测试崩（与产品行为无关）
-DU 增一个 case         → 测试崩（与业务边界无关）
-Fable 版本升级         → 测试崩（与系统语义无关）
-```
+`js-semantic-surface` 的核心存在理由是：**在实现世界与测试世界之间建立不可逾越的机器化隔离边界。** 生产代码（F#）拥有实现自由，测试代码（JavaScript）通过稳定、原生（JS-native）、显式声明的 Semantic Surface 访问系统并验证语义不变量。
 
-每一件都让「绿」变成对偶然实现的供奉。历史教训（G4R 时代 31 个 E2E flake、mangled method
-discovery、`SessionQuiescenceGate` 测试直接扫描 emitted names）是同一条病：测试通过
-**获得不该有的权力**而变脆。
+## 核心张力与元规则定位
 
-`js-semantic-surface` 存在的理由：**把「测试与实现之间的边界」本身变成被证明的规则。**
+业务产品包（如 `managed-session-lifecycle`、`delegation`）拥有各自领域的具体产品语义，并有责任对外暴露对应的 Semantic Surface。`js-semantic-surface` 不拥有具体业务契约，它拥有的是**测试边界与数据表示的元规则**：
+- 确定什么形态的入口才具备作为正式 Surface 的资格；
+- 限制哪些数据表示可以跨越边界传递，禁止将编译器内部结构泄漏至测试；
+- 确立「不拥有独立语义命题的内部 helper 严禁直接测试」的最小化验证原则。
 
-## 为什么是元合同（META）而不是产品包
+## 依赖关系
 
-产品包拥有领域事实：`managed-session-lifecycle` 拥有 session 生命周期，`delegation` 拥有
-fork/join 语义。它们各自有「这条产品规则怎么证明」的义务。
+**DEPENDS ON** `requirement-system`, `verification-system`
 
-本包不拥有任何领域断言，它拥有的是**语义测试边界的通用规则**：什么算正式 surface、
-什么数据形状可以穿过边界、什么权力测试永远拿不到。同一个规则服务于所有产品包——「任意
-产品 law 都值得拥有 JS-native surface」这种共享事实只有 META 包能拥有。
+- 依赖 `requirement-system` 提供的断言级所有权规则与规范唯一性保证：每个 Surface 必须挂载在明确的 Owner 包及其合法命题之下。
+- 依赖 `verification-system` 提供的门禁执行机制与契约面语言边界规范。
 
-## 为什么不能并入 verification-system
+## 核心不变量与违约状态（RED）
 
-`verification-system` 回答「怎么证明」（证据分层、可红性、fail-closed、时间确定性）。
-`js-semantic-surface` 回答「测试世界的边界是什么」（surface 是什么、JS-native 是什么、
-Fable representation 为什么不是 contract）。独立变化测试：把某个 owner surface 换成新的
-JS surface 全家——本包 HOW 变，verification-system 的 ladder/gate 机制不变；把 gate 从
-regex 扫描换成 AST 扫描——verification-system HOW 变，本包宪法不变。
-
-合在一起，一次改动会同时牵动两种失败意义：「这个证明可不可信」与「这个测试有没有越界」。
-
-## RED 是什么样
-
-```text
-语义测试 deep-import dist 内部模块
-语义测试读 .tag/.fields/.cases()
-语义测试构造 FSharpMap/FSharpList 作输入
-语义测试依赖 mangled emitted names
-新增 surface 但无 contract test pin 名字
-测试需要访问 → 生产 export internal
-```
-
-## 考古：本包的条款来源
-
-- 六条宪法直接来自 Operation Clean Slate（TASK.md P0 章节）「先冻结宪法」。
-- SURFACE-001..006 历史编号（provider-language / provider-projection / finality /
-  participant-horizon / verification-system 交叉引用）在本包收编为正式条款，消除悬空引用。
-- JS-001..020（repository-programming HOW 的历史 js-tools 编号）不归本包；它们描述
-  capability 面，不是测试边界。
+仓库处于 RED 状态，当且仅当出现以下任一破坏边界隔离的违约：
+1. 语义测试直接深度导入（deep-import）内部 dist 模块，而非使用正式注册的 Surface。
+2. 语义测试读取编译器内部字段（如 `.tag`、`.fields`、`.cases()`）或直接构造编译器特有运行时类型。
+3. 语义测试依赖混淆的导出符号名称进行动态查找或调用。
+4. 为了满足测试的访问便利，而在生产代码中随意将内部实现导出为 public。
+5. 新增 Surface 但未在 Manifest 中完成注册，或缺少对应的契约测试对其公开接口进行完整锁定。

@@ -1,46 +1,26 @@
-# WHY —— 为什么 dispatch-protocol 必须独立存在
+# dispatch-protocol — WHY
 
-## 一句话
+## 1. 领域动机与核心矛盾
 
-已获授权的 logical interaction 穿过不可靠 Host 时，transport receipt 或 uncertain outcome
-不能许可重复发送同一逻辑动作（boundary card WHY）。
+当已获授权的逻辑交互（Prompt）穿过不可靠的宿主（Host）与网络时，必须解决传输不确定性带来的副作用复制问题：
+1. **传输回执冒充物理落地**：将宿主调用返回的 `accepted-*` 异步收据误认为物理消息已被 provider 消费，导致过早假设状态。
+2. **崩溃重试引发重复执行**：宿主可能已接收消息并触发 provider 运行，系统在崩溃恢复后如果盲目重发，会造成双重逻辑副作用（如两次重复的工具调用或双倍扣费）。
+3. **缺少稳定幂等标识**：依靠时间窗口或随机 ID 无法在进程重启后正确定位同一逻辑动作的物理执行痕迹。
 
-## 不可替代性：为什么别的包解释不了
+`dispatch-protocol` 建立严格的 **at-most-one** 物理调度边界：
+- 唯一入口与确定性 `PromptKey` 绑定；
+- 采用四态 Claim 生命周期（`Claimed → Submitted → PhysicalAccepted / Abandoned`）；
+- 面对不确定物理结果（Uncertain Outcome）严格 fail-closed 挂起，禁止盲目重发。
 
-`interaction-authority` 回答「这条消息有资格开/续 logical interaction 吗」，它在**发送之前**完成；
-一旦决定发送，穿过 Host 的可靠性问题交给本包。把 claim 生命周期塞进 authority，每次重写发送
-机制都会顺带改变「谁能当 root」——两个问题可独立变化（INDEPENDENT CHANGE：Host 原生提供可靠
-idempotency key 时，可整体替换当前 send HOW，authority WHAT 不动）。
+## 2. 核心不变量与破坏后果
 
-`effect-accounting` 回答「副作用 Requested/物理发生/Accepted 如何分型」——是**通用**副作用记账律；
-本包只拥有 prompt 特有的「一次 logical send 不得产生两次 logical effect」防护（boundary card
-DOES NOT OWN：generic effect-accounting law）。`durable-events` 提供事件 substrate；本包消费它，
-不拥有它。
+- **At-Most-One 逻辑效应**：宁可挂起待决状态，绝不虚构 exactly-once 或在未获物理证据前盲目重试；若破坏，并发重试将导致业务世界状态分叉。
+- **Claim 先于物理发送持久化**：必须先完成 durable claim 记录，方可调用底层传输通道；若破坏，崩溃窗口内发生的调用将彻底失联。
+- **Receipt ≠ Physical Message**：传输回执仅代表已入队（Submitted），唯有宿主真实的物理消息证据才能解决 Claim（PhysicalAccepted）。
 
-## 历史上 RED 长什么样（失败模式考古）
+## DEPENDS ON
 
-1. **`accepted-*` 被当物理落地**：旧测试曾断言 transport receipt 能携带 authority/证明落地。
-   `PROMPT-005` 后禁止：`accepted-*` 只是 Host 调用返回的收据；`isAdmissionShaped` 区分
-   - admission 与真实 `msg_*`（历史 shape/prompt 四阶段表）。
-2. **崩溃后重发 = 第二次逻辑效果**：Host 可能已接受消息并开始 provider run。恢复协议选
-   - at-most-once 而非重发（历史 why/prompt 备选与被拒：拒 exactly-once、拒重发）。
-   未证明物理落地就保持 Pending；进程重启次数不再自动制造 Abandoned。
-3. **时间窗口/随机身份**：用时间窗口找落地跨崩溃不可靠，且无法区分「同一 Guard 连发两次」。
-   选 `ClaimSequence` 单调序号，使同 payload 重发成为两个 key。
-4. **fire-and-forget 旁路**：独立 `postPromptFireAndForget` 会绕过 claim/持久化/幂等/错误记录。
-   统一为 `AwaitMode.Detached`——只改调用方等待，不改发送链（PROMPT-007）。
-5. **recovery 在插件构造函数/post-init 自动跑**：与 Host 启动抢事件循环，而且把旧 broken tool 的语义劫持到新进程。当前裁决是完全脱离普通 lifecycle；显式 resume 归 `/continue`。
-
-## 独立变化测试（INDEPENDENT CHANGE）
-
-Host 原生提供可靠 idempotency key：本包可整体替换当前 send/recovery HOW，而
-interaction-authority（谁有资格）与 effect-accounting（分型律）WHAT 不动。
-
-## 边界（DOES NOT OWN）
-
-| 看似邻近的事实 | 真正 owner |
-|---|---|
-| interaction 是否有 authority（Root/Continuation/UnknownOrigin） | `interaction-authority` |
-| generic effect-accounting law（Requested/Accepted 分型） | `effect-accounting` |
-| provider representation、attempt recovery | `provider-projection` / `provider-attempt-recovery` |
-| `RecoveryTailWindow=50` 精确常数 | HOW（WHAT 只要求 bounded evidence read + no blind resend）；restart budget 已退役 |
+- `interaction-authority`
+- `effect-accounting`
+- `host-boundary`
+- `durable-events`

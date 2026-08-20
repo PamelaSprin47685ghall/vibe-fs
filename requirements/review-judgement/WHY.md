@@ -1,63 +1,43 @@
-# WHY — review-judgement
+# review-judgement — WHY
 
-## 不可替代的存在理由
+## 1. 存在理由与核心矛盾
 
-万象术的质量门是 **Reviewer 对工作的判断**，最终汇入 mission 的终局（Finality）与过程节拍（TodoProcessReview）。这条链上最容易坏的环节不是「确认是否发生」（那是 `review-assurance` 的因果证明问题），而是**「判断到底意味着什么」**：
+万象术质量门的核心在于 Reviewer 对交付工作的判断，并最终汇入 mission 的终局（Finality）与过程节拍（TodoProcessReview）。该链条最关键的语义前提在于：
 
-> 一个 reviewer 输出了 `PERFECT` 或 `REVISE`。这两个词在被系统消费之前，必须已经有不可替代的意义。
+> Reviewer 输出的 `PERFECT` 或 `REVISE` 在被系统消费之前，必须具有明确且不可替代的领域意义。
 
-如果判断语义缺席，下列退化就会发生：
+如果缺乏健全的判断哲学，系统将退化为以下失败形态：
 
-- **表演式拒绝**：reviewer 认为「拒绝越多 = 越谨慎」，把无关痛感抬成 withhold。系统里的 REVISE 不再是「工作尚未挣得 acceptance」的信号，而是「reviewer 在摆姿态」的信号——Manager 被迫去修并不存在的缺陷。
-- **固定 checklist 机械总分**：把判断压成必填八维评估表 / Pass 表。审查退化为填表；八维全过就 PERFECT，任何一格没勾就 REVISE。判断的「区分力」被表格结构替代。
-- **无证据偏好冒充缺陷**：reviewer 把「我会写得不同」说成缺陷。REVISE 不购买任何实质改进，只表达口味。
-- **PERFECT 被误读为全知/字面无瑕**：reviewer 不敢在 PERFECT 时说真话（怕「不完美」与「接受」冲突），于是压制真实但 non-blocking 的观察；或者反过来，任何 tiny typo 都自动 REVISE。
-- **判断对象漂移**：判断变成对 reviewer mood 的投射，而不是对 root requirement + 当前被审对象的评估。
-- **过程/结果回执语义混淆**：过程评审的一次 judgement 已经完成本 request，应明确「已收下，请结束」；
-  Finality 的第一次 PERFECT 只是确认协议的第一半，应只要求再次评估。若为了复用一个 tool reply
-  把两段 prose 拼在一起，就会同时命令 Reviewer 结束和继续，判断语义本身被 transport 文案破坏。
+1. **表演式拒绝**：Reviewer 认为「拒绝越多越谨慎」，将无关痛痒的细节抬格为阻断项（withhold）。REVISE 不再代表工作尚未挣得 acceptance，而是退化为姿态表演，迫使执行者修复虚构缺陷。
+2. **固定 Checklist 机械打分**：将判断压缩为必须逐项打勾的表格。审查退化为填表，八维全过即 PERFECT，任一不符即 REVISE，判断的区分力（discrimination）被死板结构替代。
+3. **无证据偏好冒充缺陷**：Reviewer 将个人实现偏好（「我会写得不同」）定性为缺陷。REVISE 无法购买任何实质改进，仅表达个人口味。
+4. **PERFECT 被误读为全知或字面无瑕**：Reviewer 因担心破坏 PERFECT 结论而隐瞒真实且非阻断的工艺观察，或者反之因微小拼写错误而机械 REVISE。
+5. **过程与终结回执语义混淆**：过程评审单次判断即已完成本轮请求，回执应指示结束；终审首个 PERFECT 仅为确认协议的前半段，须要求再次评估。若混淆两类回执，将导致 Reviewer 收到相互冲突的控制指令。
 
-`review-judgement` 存在的意义：**PERFECT/REVISE 必须由 discrimination 挣得**——acceptance 要挣，rejection 也要挣；material defect 才能 withhold；non-blocking workmanship 可以与 acceptance 共存；PERFECT ≠ 全知；REVISE 必须购买实质更好/更真的结果。
+`review-judgement` 保证：**PERFECT 与 REVISE 必须由 discrimination 挣得**。Acceptance 需要证据挣得，Rejection 同样需要证据挣得；唯有 material defect 才能扣留 acceptance；非阻断工艺观察可与 acceptance 共存；PERFECT 不代表全知；REVISE 必须购买实质上更好、更真实的结果。
 
-## RED 长什么样
+## 2. 独立存在测试（Independent Change Test）
 
-满足以下任一情形，世界就是 RED：
+若重写 Role Law 或 Examiner's Ledger 的判断方向（例如引入新的重要性判定准则），只要 `judge` 工具面与 verdict 枚举不变，`review-assurance` 的因果确认协议、witness 数据结构与 record-ready 代数完全无需修改。
 
-1. reviewer 可以凭表演式谨慎（多 REVISE）、固定 checklist、或无证据偏好拒绝/接受工作；
-2. 系统把 `judge` 的 verdict 当作可回声的状态对象（描述字段、回执 echo、旧名 `verdict` 复活）；
-3. 判断不相对 root requirement / 当前被审对象，而相对 reviewer 的情绪或口味；
-4. PERFECT 被当作「字面无瑕 / 全知」的承诺，或 non-blocking 观察被 PERFECT 噤声；
-5. REVISE 不购买任何实质更好/更真的结果（例如 tiny typo 自动 REVISE、「测试必须总跑过」万能律）；
-6. Examiner's Ledger 八维被烙成必填 report 字段 / Pass 表 / 固定八段标题。
-7. reusable dedicated Reviewer 在上一轮成功 `judge` 后，被 session 级“already judged”标记永久静音；下一条独立 review request 到来时仍被当作上一轮重复提交并被 abort。
-8. process `judge` 成功不返回明确 terminal receipt，或 Finality first-PERFECT challenge 复用该
-   terminal receipt，导致同一 tool result 同时要求结束与继续。
+反之，若重写 dual-PERFECT 的因果编排与状态流转，judgement 的 discrimination 语义同样保持独立。两者分属不同失败域：
+- `review-judgement` 失败意味着审查者可凭表演、偏好或死板表格做出裁决。
+- `review-assurance` 失败意味着系统消费了针对旧代码状态、未见 challenge 或缺失报告的裁决。
 
-## 为什么必须独立存在（Independent Change Test）
+## 3. 核心不变量与失败判定
 
-HANDOFF §6.4 / §7.6 的裁决：`review-protocol` 拆成 `review-judgement` 与 `review-assurance`，因为
+系统在以下任一情况发生时判定为 RED：
 
-> 判断哲学可以整体重写，而 witness/finality 因果协议不变；反之亦然。
+- Reviewer 凭表演式谨慎、死板 checklist 或无证据偏好做出 accept/reject 裁决。
+- `judge` 的 verdict 被作为可回声的状态对象，或工具面包含描述字段及已废弃名称。
+- 判断脱离 root requirement 与当前被审对象，受审查者主观情绪或口味支配。
+- PERFECT 被视作全知无瑕的承诺，导致非阻断观察被强制噤声。
+- REVISE 未购买任何实质上更好或更真实的产出。
+- Examiner's Ledger 被固化为必填 report schema、Pass 表或固定标题模板。
+- 过程评审与终审 challenge 的回执语义混淆，导致单次请求收到相互矛盾的终止与继续指令。
 
-具体：你可以把 Role Law / Examiner's Ledger 的判断方向整个换成另一套 craft guidance（比如新的 materiality 理论），`ConfirmedReviewWitness`、typed physical challenge edge、record-ready 代数一行不用改。反过来，你可以重写 dual-PERFECT 的 CE 因果协议，判断的 discrimination 语义也不动。两个 failure meaning 完全不同：
+## 4. 依赖边界
 
-- `review-judgement` RED = reviewer 可以凭表演/checklist/偏好决定 accept/reject；
-- `review-assurance` RED = 系统可以消费针对旧 tree / 未看 challenge / 缺报告 的 judgement。
-
-## 与相邻包的边界（为什么这些不归我）
-
-| 邻近事实 | 真正的 owner | 为什么不归 judgement |
-|---|---|---|
-| 第二次 PERFECT 是否因果成立（direct CE、physical identity、attempt identity、tree invalidation） | `review-assurance` | 那是「这个判断有没有资格被消费」的证明，不是判断本身的含义 |
-| 过程评审 1:1 节拍、Rk 义务、lag-1 | `obligation-ledger` | 何时派生评审义务是账本规则；judgement 只回答这一次判断怎么说 |
-| 终末 cohort、rejection/blessing/rest、drain | `finality` | 不可逆结束的资格建立在 obligations + tree + review evidence 上，judgement 不是 finality 本身 |
-| Reviewer 提示词怎么组合（Common Law → Role Law → Ledger） | `cognitive-environment` | 组合权威是认知环境的事；本包拥有的是判断方向的内容 |
-| Manager 只能看到 outcome/report 窄例外 | `participant-horizon` | 信息准入边界，不是判断语义 |
-| dedicated reviewer session 的 create/retire/replace | `managed-session-lifecycle` | 生命周期管理，非判断含义 |
-
-## 历史教训（考古）
-
-- 历史 why/review「判断哲学是 discrimination，不是 rejection 表演」：曾拒绝过「谨慎 = 多 REVISE」与「可描述偏好即缺陷」两个方向（备选与被拒节）。
-- 历史 what/review REVIEW-011：Examiner's Ledger 是判断方向非 checklist；PERFECT+minor 共存；material defect 才 REVISE；无 prose 的过程 PERFECT 无效。
-- 历史 why/glory「为什么 Manager 不能知道隐藏 review 机制」：旧 prompt 把 review 显式化为 checklist 的最后一步，Manager 会在工作未收敛时机械执行最后一项——checklist 化的代价是真实失败模式。
-- 语义锚 `semantic-anchors.mjs` reviewer family 五条（discrimination / rejection-must-purchase / non-blocking / perfect-not-flawless / acceptance-not-omniscience）逐条对应本包命题——证明这些不是装饰性散文，而是被 gate 校验的合同。
+```text
+DEPENDS ON: cognitive-environment, participant-horizon
+```

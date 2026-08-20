@@ -1,125 +1,68 @@
-# WHAT —— 唯一 normative 合同
+# action-affordance — WHAT
 
-命题前缀 `ACTION-AFFORDANCE-`。每条都是**当前世界必须同时成立**的事实。
-证据指针 → [`HOW.md`](HOW.md)。
+## ACTION-AFFORDANCE-001: 工具描述是局部调用契约而非 tooltip
 
-## act contract
+每个非平凡动词的描述必须在调用边界上使用户能够明确回答五问：
+1. 发生什么动作（What act happens）；
+2. 何时适用（When does this act fit）；
+3. 不执行哪些临近的诱惑行为（What tempting nearby act does this NOT perform）；
+4. 成功返回确立了什么事实（What does a successful return establish）；
+5. 各非显然参数的具体含义（What does each non-obvious argument mean）。
 
-### ACTION-AFFORDANCE-001：Tool description 是调用时局部 contract，不是 tooltip
+描述文本必须包含充分的正向能力（positive affordance）、负向边界（negative affordance）、边界镜像（boundary mirror）、返回后果（returned consequence）与参数语义。
 
-每个非平凡 verb 必须使调用方能回答五问：
+## ACTION-AFFORDANCE-002: 高风险动词具备最低契约与认知锚点约束
 
-```text
-1. What act happens?
-2. When does this act fit?
-3. What tempting nearby act does this NOT perform?
-4. What does a successful return establish?
-5. What does each non-obvious argument mean?
-```
+所有高风险动词（包括 `fork`、`commission`、`inspect`、`run`、`query-shell`、`establish-behavior`、`repair-behavior`、`fetch`、`join`、`horizon`、`judge`、`suicide`、`fission`、`chronicle`、`js-*` 等）必须具备完备的契约定义。
 
-必须包含足够的：positive affordance、negative affordance、boundary mirror、returned consequence、
-argument semantics（PROMPT-020）。
+高风险动作的工具描述必须在多语言下具备对等的语义认知锚点，确保其核心约束在各语言环境中一致成立。
 
-### ACTION-AFFORDANCE-002：高风险 verb 有最低合同集合
+## ACTION-AFFORDANCE-003: inspect 显式声明不实现与不修复代码
 
-现行最低集合（PROMPT-020）：
+`inspect` 的契约必须明确其“does not implement or repair code”的负边界。因果只读（causal read-only）意味着允许检查源码、历史、配置、构建产物及静态调查，但严禁直接修改文件或运行程序以制造新的行为证据。
 
-```text
-fork, commission, inspect, run, query-shell,
-establish-behavior, repair-behavior, fetch, join, horizon,
-judge, suicide, fission, chronicle, js-*
-```
+## ACTION-AFFORDANCE-004: repair-behavior 明确 mechanical 的语义定义
 
-现行 semantic-anchor 义务（ARCH-016 Gate C）：`fork / inspect / commission / establish-behavior /
-repair-behavior / run / query-shell` 七个 description 必须双语同 ID 命中认知锚点。
-清单是证据，可随产品重构；「高风险 verb 必须有合同」是不可替代的命题。
+`repair-behavior` 必须明确声明 mechanical 的语义为“行为含义已被决定”，而非“代码改动物理规模小”。返回的 WorkRecord 仅代表工作完成记录，不作为修复已通过验证的证明。
 
-### ACTION-AFFORDANCE-003：inspect 必须写「does not implement or repair code」
+## ACTION-AFFORDANCE-005: establish-behavior 分离源码修改与执行证据
 
-`inspect` 必须出现「does not implement or repair code」这一认知区别，不只写 `read-only`
-（PROMPT-020）。因果只读 = 可检查 source/history/config/artifact 与建立既有事实所需的静态调查，
-但**不**修改文件、**不**让项目跑起来制造新行为证据。
+`establish-behavior` 必须明确声明：写入或修改源码仅代表在授权范围内完成代码落地，不等于行为已获验证的执行证据，也不代表已实际运行测试。
 
-### ACTION-AFFORDANCE-004：repair-behavior 必须说明 mechanical 的语义
+## ACTION-AFFORDANCE-006: run 与 query-shell 是实际动作而非运行时预测
 
-`repair-behavior` 必须说明 mechanical = **含义已被决定**，不是物理上很小（PROMPT-020）。
-返回的 WorkRecord 不是 repair 已经通过的证明（TOOL_DESCRIPTION_ANCHORS `not-passing-proof`）。
+`run` 契约必须声明命令执行是真实的发起动作与资源承诺，而非无副作用的预测。`query-shell` 契约必须声明其属于只读观察而非通用执行，不适用于构建、测试或校验。
 
-### ACTION-AFFORDANCE-005：establish-behavior 分离 mutation 与 execution evidence
+## ACTION-AFFORDANCE-007: 动作名称表达语义动作而非运行拓扑
 
-`establish-behavior` 必须写明：Coder 写入/修改 source（受托含义内），Coder 完成**不**等于执行证据、
-不运行那些测试（TOOL_DESCRIPTION_ANCHORS `not-execution-evidence`）。DevOps 仍须观察运行中的世界
-（PROMPT-020）。
+工具命名必须采用动词，表达语义动作（semantic act），严禁使用名词或与 Role/Persona/Office 共用名称以承载不同语义。不同语义动作必须采用完全不同的工具名称。
 
-### ACTION-AFFORDANCE-006：run/query-shell 是 act，不是预测
+## ACTION-AFFORDANCE-008: 同一工具名称在全系统中处处代表同一契约
 
-`run`：command 是 act、经济承诺，不是运行时预测（`economic commitments, not runtime predictions`）。
-`query-shell`：observation, not execution；不适合 build/test/lint（TOOL_DESCRIPTION_ANCHORS）。
+相同的工具名称必须对应：
+1. 相同的语义动作；
+2. 相同的参数 Schema 与各参数语义；
+3. 相同的生命周期后果；
+4. 相同的返回语义与关键失败语义。
 
-## 名字与合同同一性
+仅仅 Schema 结构相同不足以构成复用理由。角色可见性隔离不能成为同名异义的借口。
 
-### ACTION-AFFORDANCE-007：动作名称表达 semantic act，不表达 runtime topology
+## ACTION-AFFORDANCE-009: 能力选择禁止退化为裸枚举
 
-人是名词（Role / Persona / office）；工具是动词。不同硬语义必须不同名（`commission` ≠ `fork`）；
-禁止「用户面同名方便」让 Role 与 Tool 共名承载不同语义（ARCH-006，已删 Executor 角色名/工具名案例）。
+`calling` 等参数属于能力与责任的显式选择，严禁退化为无说明的裸枚举。不同 calling 选项需清晰标明其在推理深度或 Persona 定位上的差异，而不改变其 Office 权限边界。
 
-### ACTION-AFFORDANCE-008：同一工具名 = 同一 contract 处处成立
+## ACTION-AFFORDANCE-010: fork 与 commission 必须明确受托人职能与后果
 
-```text
-same tool name
-⇒ same semantic act
-   same argument schema
-   same meaning of every argument
-   same lifecycle consequence
-   same return semantics
-   same important failure semantics
-```
+`fork` 与 `commission` 的契约必须明确回答“工作被委托给具备何种职责的角色”，依据各 Office 的法定后果写明委派边界，并标明网络浏览角色仅从公开网络建立事实、不得用于本地仓库调查。
 
-仅 schema 相同不足；role visibility / 永不同时出现不削弱此不变量。`join` 可在 Manager 与 Orchestrator
-共享，当且仅当语义合同完全同一（ARCH-007）。schema/名字唯一性执行面归 `capability-enforcement`；
-本包拥有「semantic act 合同同一」的认知面。
+## ACTION-AFFORDANCE-011: 关键边界镜像在所有改变决策的界面上
 
-### ACTION-AFFORDANCE-009：capability choice 不能退化成裸 enum
+关键语义区分必须出现在所有可能影响行为选择的决策边界上。单一语义所有权并不要求单一呈现：被调用方的 Role Law 约束必须在调用方的工具描述中镜像展现，严禁因被调用方已定义而省略调用方的边界说明。
 
-`calling` 不是普通 enum；它是 authority / capability 选择（PROMPT-020 / ARCH-017）。
-两个 calling 名（如 navigator/researcher）只差 persona 与推理深度，不差 office authority。
+## ACTION-AFFORDANCE-012: 调用方边界镜像必须包含易混淆相邻动作与禁止请求
 
-## boundary mirror
+调用方工具描述必须明确指出最易混淆的相邻行为与禁止的请求形态。例如 `inspect` 的调用方严禁在 charge 中包含代码修复指令，`commission` 的调用方严禁将其视同 `fork`。
 
-### ACTION-AFFORDANCE-010：fork/commission 必须回答「我把工作交给什么样的人」
+## ACTION-AFFORDANCE-013: 描述文本覆盖可见纪律并隔离隐藏编排
 
-`fork` / `commission` 还须回答：**我把工作交给什么样的人？**（PROMPT-020）
-`fork` description 必须按五个 Office 的 entitled consequence 写明选择依据，并写明
-`navigator`（Fast Browser）与 `researcher`（Deep Browser）只从 public web 建立事实、不得用于本地
-文件或仓库；两个 calling 名只差 persona/深度，不差 authority（AGENT-009）。
-
-### ACTION-AFFORDANCE-011：关键区别出现在每个会改变行动的决策面
-
-> **A critical distinction belongs at every decision boundary where forgetting it can change the action.**
-> **Single semantic ownership does not require single presentation.**（PROMPT-021）
-
-- 同一事实可以、并且常常必须出现在多个决策面（Inspector 因果只读 → Inspector Role Law + `inspect`
-  description；Coder 不执行 → Coder Role Law + establish/repair-behavior + DevOps Role Law；
-  五 Office 按后果选择 → Manager Role Law + `fork` description）；
-- 各投影承担不同认知功能；canonical consequence 只有一处（ARCH-017）；
-- **禁止**因为某边界已在被调用方 Role Law 写过，就从调用方 tool contract 删掉；
-- **禁止**让模型从词汇（persona 名、工具名、「看起来能干」）推断 authority。
-
-### ACTION-AFFORDANCE-012：caller-facing boundary mirror 的完整性
-
-调用方 tool description 必须让 caller 看见最容易被混淆的相邻行为（负边界），包括禁止的请求形状：
-`inspect` 的 caller 不得把「修复」写进 charge（office-boundary eval case `coder-inspect-ownership`）；
-`commission` 的 caller 不得把它当 fork / lifecycle stage。缺失镜像 = 本包 RED。
-
-### ACTION-AFFORDANCE-013：description 覆盖可见纪律且不泄露隐藏编排
-
-tool description（如 `todowrite`）必须覆盖 Manager 可见纪律（`kind` 规则、completed 门禁、lag-1 消费、
-同 message 多 `todowrite` 全拒），且**禁止**泄露隐藏编排（dedicated reviewer、hidden session、Finality
-cohort、barrier、witness、2N）（HOST-018 / TODO-013 / PROMPT-013）。
-description 资源成对本地化 + 语义 anchor 双语同 ID 命中（PROMPT-019/020 / ARCH-016 Gate C）。
-
-## 反向覆盖
-
-本包吸收的 OWNED clause（COVERAGE.md 归属）：PROMPT-020、PROMPT-021、AGENT-009（fork description
-部分）、AGENT-012（inspect description 见证者）、ARCH-006、ARCH-007（semantic contract 面）、
-ARCH-016 Gate A/C（本包部分）、HOST-018（description 覆盖纪律部分）。
+工具描述必须准确覆盖用户可见的操作纪律，同时严禁向模型泄露专职 Reviewer、隐式会话、终止屏障（barrier）等隐藏编排机制。所有描述资源必须成对完成本地化，并在语义锚点上保持严格一致。

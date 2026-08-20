@@ -1,134 +1,67 @@
-# WHAT —— 唯一 normative 合同
+# participant-horizon — WHAT
 
-命题前缀 `PARTICIPANT-HORIZON-`。每条都是**当前世界必须同时成立**的事实。
-证据指针 → [`HOW.md`](HOW.md)。
+## PARTICIPANT-HORIZON-001: 信息准入由 decision filter 决定
 
-## 准入法则（positive admission law）
+所有进入 provider-visible 视界的信息必须通过正向准入决策过滤器（Decision Filter）：
+1. 参与者是否已知？已知则省略。
+2. 是否为参与者自身刚提供的内容？是则省略。
+3. 是否已被成功状态所蕴含？是则省略（回声不是有效观测）。
+4. 是否仅用于内部关联或调试？是则留在机器侧。
+5. 取值不同是否会改变下一步合法行动？否则省略。
+6. 参与者是否需要数值本身而非其后果？若否仅渲染自然语言后果；若是仅保留最小物理观测。
 
-### PARTICIPANT-HORIZON-001：信息准入由 decision filter 决定
+## PARTICIPANT-HORIZON-002: 内部机器拓扑不穿过 horizon
 
-每个 provider-visible 信息必须能通过 ARCH-014 decision filter，六问按序：
+任何底层机器拓扑标识（包括 `SessionId`、`AgentId`、`ManagerJobId`、`PtyId`、`FissionGroupId`、`lane_index`、`worktree` 路径、重试 offset、`fast-*`/`deep-*` 绑定自称以及内部 spool 路径）严禁出现在面向模型的提示词、工具参数或返回值中。
 
-```text
-Did the participant already know this?      → omit
-Did they just supply this themselves?       → omit
-Is it implied by successful completion?     → omit
-Is it useful only for correlation/debug?    → keep internal
-Would different values change next action?  → if no → omit
-Does the participant need the value itself
-  rather than merely its consequence?       → if no → render consequence
-                                            → if yes → preserve minimal observation
-```
+## PARTICIPANT-HORIZON-003: 通用状态 DTO 不投影，后果用自然语言
 
-- 含义：准入是正向律，不是黑名单补丁。新信息进 horizon 必须因「会改变合法行动」，
-  不因「还没有人禁止过」。
-- 边界：这条是**本包**的核心命题；filter 的具体渲染机制归 `provider-projection`。
+严禁向模型暴露 `status`、`code`、`message`、`count`、`ordinal`、`kind` 等通用 DTO 字段。超时、等待结束、中断及普通失败一律以自然语言后果表述（如 DevOps 等待预算耗尽渲染为自然语言说明，禁止返回 `TIMED_OUT` 或 `status="failed"`）。
 
-### PARTICIPANT-HORIZON-002：内部机器拓扑不穿过 horizon
+## PARTICIPANT-HORIZON-004: 已知道/回声/成功蕴含/仅调试信息被省略
 
-下列机器拓扑**不得**出现在 provider 输出或工具后果中（Host/Journal 墙内可保留精度）：
+已为模型所知的信息、模型自身输入的重复回传、成功完成所隐含的事实以及仅用于内部追踪的元数据，一律从返回视界中剔除。工具成功返回不得机械重复输入内容作为观测。
 
-```text
-SessionId / AgentId / ManagerJobId / PtyId / FissionGroupId
-lane_index / worktree path / fallback offset / fast-|deep- binding 自称 / spool path
-```
+## PARTICIPANT-HORIZON-005: 需要原始测量时只给必要 observation
 
-- 出处：EXEC-030、ARCH-014、ARCH-016 Gate B。
-- 边界：`SessionId` 等身份**类型**在代码里存在且必要；禁令只约束 provider-visible surface。
+当参与者确实需要物理指标以决定后续行动时（如进程退出的 `exit_code`、非空 stdout/stderr 输出），仅提供最小原始测量事实，不附加 Host 的主观判定或状态标签。
 
-### PARTICIPANT-HORIZON-003：通用状态 DTO 不投影，后果用自然语言
+## PARTICIPANT-HORIZON-006: 内部状态优先转成行动相关后果
 
-禁止把 `status / code / message / count / ordinal / kind` 等通用 DTO 字段投给 provider。
-中断、超时、等待结束一律以自然语言后果表达（EXEC-004/005/017、AGENT-013）。
+机器内部状态（任务槽位、缓冲区、重试轮次）在进入视界前必须转化为「该状态对当前工作意味着什么、下一步应采取什么行动」的语义后果与工作记录（WorkRecord）。
 
-- 例子：DevOps `join` 10s 预算耗尽 → 自然语言「本次等待结束」；禁止 `TIMED_OUT` / `status="failed"` / `code=...`。
-- 边界：语义驱动的精确观测字段（terminal/`run` 的 `exit_code`、非空 stdout/stderr）是合法例外，见 005。
+## PARTICIPANT-HORIZON-007: 内部参与者不进入 provider-visible surface
 
-### PARTICIPANT-HORIZON-004：已知道/回声/成功蕴含/仅调试信息被省略
+Blogger、Distiller、Bookkeeper 等内部辅助角色严禁出现在模型可见的 enum、Schema、fork 候选或参数说明中。底层的批处理任务切片与内部 session 标识严禁进入工具面。
 
-- 已知道（already-known）→ 省略；
-- participant 刚自己提供（just supplied）→ 省略；
-- 成功完成已蕴含（implied by success）→ 省略；工具 result 不得重述工具 success 已证明的事实
-  （`An echo is not an observation.`，ARCH-014）；
-- 仅用于关联/调试（correlation/debug）→ 留在机器侧。
+## PARTICIPANT-HORIZON-008: 隐藏 review 编排不进 Manager horizon
 
-### PARTICIPANT-HORIZON-005：需要原始测量时只给必要 observation
+面向 Manager 的所有固定界面（system prompt、continuation、schema、错误提示、tool description 及 result）严禁暴露 Reviewer 身份、专用 review session、确认屏障（barrier）或双重检查机制。
+唯一例外为 Todo Checkpoint 产生的审查结论（PERFECT/REVISE）与具体改进报告（canonical ProcessReviewLWR），该例外严禁扩大为泄露审查者的存在。
 
-当 participant 需要值本身而不是后果时，给最小 observation（例如 `exit_code`、非空 stdout/stderr），
-不给 Host 对它的 judgement（`Give the participant the measurement, not the Host's judgment of it.`）。
+## PARTICIPANT-HORIZON-009: 隐藏 target 只返回 generic unavailable
 
-- 边界：测量字段必须是语义驱动的；`status` 泛型字段不因「也是数字」而合法。
+当模型尝试访问或调度不可见的目标（如 Reviewer）时，系统仅返回通用的不可用拒绝响应，禁止在拒绝文案中提及该目标的存在或说明其为内部专有。
 
-### PARTICIPANT-HORIZON-006：内部状态优先转成行动相关后果
+## PARTICIPANT-HORIZON-010: fork/commission 可见集合
 
-机器态可以存在；穿过 horizon 的只能是**后果与 WorkRecord**（EXEC-030）。
-内部状态（lane、offset、spool、job id）应先转成「这改变了什么、我下一步该做什么」再决定是否/如何呈现。
+- Manager `fork` 仅可见：fast/deep 的 coder、inspector、devops、browser、inquiry。
+- Orchestrator `commission` 仅可见：fast-manager、deep-manager。
+- `horizon()` 仅返回在场名册的 Byname 或 TerminalName，不暴露底层 id。
+- Reviewer、Blogger、Distiller、Bookkeeper 严禁出现在可 fork 集合中。
 
-## 隐藏面（hidden surface）
+## PARTICIPANT-HORIZON-011: `horizon()` 是 pull-only snapshot
 
-### PARTICIPANT-HORIZON-007：内部参与者不进入 provider-visible surface
+`horizon()` 是按需主动拉取的快照接口，禁止轮询、后台推送或 watcher 订阅。其返回当前在场各可见子智能体的最新工作记录；若记录暂不可读则直接说明，不得以陈旧数据伪装最新状态。
 
-Blogger、Distiller、Bookkeeper（含 `fast-bookkeeper` / `deep-bookkeeper`）不得出现在任何
-模型可见的 enum、schema 或工具参数提示中（AGENT-008）。机器 Assignment（map/reduce/chunk/session id）
-不进 provider 工具面（EXEC-014）。
+## PARTICIPANT-HORIZON-012: warm-start hints 只向有 repository 证据 authority 的角色准入
 
-### PARTICIPANT-HORIZON-008：隐藏 review 编排不进 Manager horizon
+仓库热启动线索（WarmStart hints）仅向有权直接接触仓库证据的角色（Coder、Inspector、DevOps）准入。其余角色仅可沿调用链传递关键词，不得接收仓库代码片段。
 
-Manager 固定 surface（system prompt、continuation、schema、固定错误、tool description/result）**禁止**
-出现 reviewer 身份 / reviewer session / barrier / witness / 2N / Finality cohort / confirmation 机制
-（GLORY-002/030、SURFACE-005、REVIEW-015、PROMPT-013、HOST-018、TODO-013）。
+## PARTICIPANT-HORIZON-013: hints 是 data，不是 instruction/proof/history
 
-窄例外仅一条：Todo Checkpoint 过程评审的 **outcome（PERFECT/REVISE）与 concrete report
-（canonical ProcessReviewLWR）**（GLORY-030 / TODO-013）。该例外不得扩大为暴露执行评审的隐藏角色。
+进入模型视界的热启动线索必须明确标记为低置信度的参考数据（orientation data），绝非指令、证明或合成的工具历史，严禁伪造文件读取或搜索历史。
 
-### PARTICIPANT-HORIZON-009：隐藏 target 只返回 generic unavailable
+## PARTICIPANT-HORIZON-014: 虚假 affordance / 不可达路径不穿越
 
-对不可见 target（如 reviewer）的拒绝必须通用，不得以拒绝文案证明其存在（GLORY-032）。
-
-## 可见集合
-
-### PARTICIPANT-HORIZON-010：fork/commission 可见集合
-
-| 暴露面 | 可见集合 |
-|---|---|
-| Manager `fork` | fast/deep coder, inspector, devops, browser, inquiry |
-| Orchestrator `commission` | fast-manager, deep-manager |
-| `inspect` / `establish-behavior` / `repair-behavior` | 各自 office 对 |
-| `horizon()` | 在场名册（Byname / TerminalName），无 id |
-
-不可 fork：reviewer、blogger、distiller、bookkeeper（AGENT-009）。
-
-### PARTICIPANT-HORIZON-011：`horizon()` 是 pull-only snapshot
-
-- 调用者需要朝向时主动看一次；禁止 timer 轮询、后台订阅、watcher、自动刷新；
-- 返回在场名册（名字，无 id）+ 每个可见 subagent 最新一条 durable 工作记录；无记录则自然语言说明；
-- 最新 frame 不可读时不得退回更旧 frame 冒充「最新」，自然语言说明当前不可读（EXEC-005）；
-- 无 `status / id / kind / ordinal` 状态机词汇。
-
-## 行动相关事实
-
-### PARTICIPANT-HORIZON-012：warm-start hints 只向有 repository 证据 authority 的角色准入
-
-RepositoryWarmStart 的直接消费者恰为 `Coder | Inspector | DevOps`（其 authority 已允许直接生活在
-repository evidence 中）。其它角色只能沿既有 invocation DAG 携带 keywords，不能因此获得 repository
-snippets（AGENT-032 / repository-warm-start §3-§4）。
-
-### PARTICIPANT-HORIZON-013：hints 是 data，不是 instruction/proof/history
-
-进入 horizon 的 warm-start 材料必须明确标注为低可信 orientation data：不是 instructions、不是 proof、
-不是合成的工具历史；不伪造 read/grep/tool history（AGENT-032 / repository-warm-start §8/§17）。
-无 keywords 时 provider prompt 与原 charge 字节完全相同。
-
-- 边界：hint 的搜索/命中语义归 `knowledge-reuse`；本包只拥有「什么材料、以什么身份准入」。
-
-### PARTICIPANT-HORIZON-014：虚假 affordance / 不可达路径不穿越
-
-- 不显示指向已不存在事物的路径（ARCH-014：`Never show a path to something that no longer exists.`）；
-- 名字表达 semantic act，不把不可达的机器身份伪装成可行动作（与 `action-affordance` 的 005/006 呼应）。
-
-## 反向覆盖
-
-本包吸收的 OWNED clause（COVERAGE.md 归属）：PROMPT-013（可见/禁止 surface 部分）、AGENT-008、
-AGENT-009（可见集合部分）、AGENT-013（DTO 部分）、AGENT-015（机器字段部分）、EXEC-004/005/014/030、
-REVIEW-015、TODO-013（hidden surface）、GLORY-002/030/031/032/048 + SURFACE-005（Manager 面）、
-HOST-018（description 禁泄露隐藏编排部分）、ARCH-014、ARCH-016 Gate B。
+视界中严禁展示指向已不存在实体的路径或标识，工具与动作名称仅表达真实的语义动作，不将无法执行的内部机器状态伪装成可选动作。

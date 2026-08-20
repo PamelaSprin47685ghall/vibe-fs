@@ -1,59 +1,32 @@
-# WHY — 为什么 repository-investigation 必须独立存在
+# repository-investigation — WHY
 
-## 不可替代的存在理由
+## 领域动力与核心张力
 
-> repository claim（「这个文件存在」「这个符号在这里被定义」「这个配置是这样」）必须由对**本地已存在世界**的真实观察建立。推理、semantic search hint、旧 Case、外部 web 都不能自动冒充当前 repository evidence——否则「以为的事实」会以「观察到的事实」的身份进入下游判断（`17-repository.md`）。
+对本地代码仓库状态的任何断言（例如「某文件是否存在」、「某符号在哪里定义」、「某配置项为何值」），必须且仅能由对**当前本地已存在世界**的真实观察建立。推理臆测、语义搜索提示、未经验证的历史缓存或外部网络检索，都严禁直接升级为本地仓库的确定性证据，否则「主观以为的事实」将伪装成「实际观察到的事实」污染下游决策。
 
-Inspector 的存在理由正是一句话（`resources/provider/tool/inspect/description/en.md`）：
+`repository-investigation` 的核心存在理由是确立：**调查必须在因果意义上严格只读；证据采集与语义推理严格分层；语义搜索提示仅作为低信任定向数据，必须经由真实观察核实方可成为证据。**
 
-```text
-Ask an Inspector to establish facts that already exist in the repository.
-The Inspector is read-only in the causal sense.
-```
+## 核心不变量
 
-## 为什么不能并入其它包
+1. **因果只读性（Causal Read-Only）**：观察旨在揭示已存在的事实，严禁为了调查而改变仓库文件系统，严禁通过运行构建、测试、代码检查、迁移或启动应用来制造瞬态行为作为证据。
+2. **证据可定位与可追溯（Locatability & Provenance）**：建立的观察必须包含精确的路径、行号区间或内容哈希，确保同一事实在未来可被复现与复核。
+3. **推理与取证严格分层**：推理层负责提出问题（将事实需求转化为最经济充分的观察计划），取证层负责执行观察。推理本身不增加仓库证据，机械的连续盲目搜索不构成方法。
+4. **最经济充分观察（Cheapest Adequate Observation）**：选择成本最低且足以回答问题的观察动作，一旦事实得到证实或证伪立即停止，避免无界冗余搜索。
+5. **Warm-Start 低信任定向**：基于语义搜索的仓库热启动结果仅作为低信任辅助提示（orientation data），必须经由显式关键词触发，执行过程完全 fail-open，且搜索零命中绝不等价于「确认不存在」。
 
-- 不是 `knowledge-reuse`：reuse 消费**已建立**的知识做 freshness hint；本包保证「当前 claim 由当前观察建立」。investigation RED = 推理/缓存/hint 冒充 fact；reuse RED = 旧 Q/A 被当当前事实。warm-start 管线横跨两者：hint 的低信任定位是本包，hint 能否被 cache 复用是 reuse。
-- 不是 `external-investigation`：Browser 的外部/public-web facts 有不同 source/authority boundary（`17-repository.md` 拆分裁决：不能因为两者都「查资料」并入一个包）。
-- 不是 `office-capability`/`capability-enforcement`：谁能取证（Inquiry 只能 inspect/sphinx、Inspector 只有只读权限集）是 office/gate 的事；本包拥有「取证得到的 observation 如何成为 evidence」的证据合同。
-- 不是 `repository-programming`/`process-execution`：本包不拥有 repository 变换与进程执行；观察只读是它的边界，不是它的工具。
+## 边界与失效模式
 
-独立 change 测试：替换具体文件查询工具 / semantic search orientation（换掉 Semble、换掉 query-shell），而 evidence contract 不变——本包命题全部成立（`17-repository.md` INDEPENDENT CHANGE）。
+- **不负责知识缓存与复用**：历史问答与观察重放机制归 `knowledge-reuse`。
+- **不负责外部网络调查**：公共网络与浏览器取证归 `external-investigation`。
+- **不负责仓库写入与代码生成**：文件修改与代码变换归 `repository-programming`。
+- **不负责进程执行与构建**：通用命令与测试执行归 `process-execution`。
 
-## RED 是什么样（失败模式）
+**失效表现（RED）**：
+- 推理结论、搜索提示或未重放的旧缓存直接充当当前仓库事实；
+- 调查过程中修改了代码仓库或启动了应用构建；
+- 产出的证据缺失行号或路径，无法在代码库中重新定位；
+- 语义搜索零命中被断言为「已确认目标不存在」。
 
-```text
-RED = 推理、旧缓存、搜索 hint 或修改后观察被当成原 repository fact
-    ∨ 为了观察改变 repository / 运行应用制造新行为
-    ∨ provider 无法定位证据（无 provenance）
-    ∨ 搜索命中被写成「Semble 确认 X 不存在」
-```
+## DEPENDS ON
 
-具体可观察形态：
-
-| 形态 | 违反 |
-|---|---|
-| warm-start hint 被渲染成 instructions / proof / 工具历史 | 001/006 |
-| 无 keywords 时 provider prompt 与 charge 字节不同（被悄悄加了东西） | 007 |
-| 非 Coder/Inspector/DevOps 角色收到 repository snippets | 008 |
-| 搜索零命中时 provider 被告知「Semble 确认 X 不存在」 | 006（absence 不是 absence evidence） |
-| Inspector 为了回答问题而 build/test/运行应用 | 005 |
-| 用旧 Case 的 A 直接回答「当前 repo 是什么样」而不重放 | 001（交叉 knowledge-reuse） |
-| 搜索串行 await（非并行 wave）导致时序影响结果 | 009 |
-
-## 历史背景（为什么这些命题不是纸上谈兵）
-
-- **历史 change（repository-warm-start）**：warm-start 是显式 keywords 驱动的低可信仓库定向能力。核心裁决：hints 不是 instructions、不是 proof、不是合成的工具历史；`charge` 是 assignment/authority，`keywords` 是 optional discovery hints——两者 authority 不同（§8）。fail-open 是正确性依赖的反面：Semble disabled/timeout/launch failure/单 query failure 都不能让工作 invocation 失败（§16）。「Absence of hints is not evidence of absence」：provider 措辞永远不能说「Semble confirmed X does not exist」，只能说「no warm-start hints were obtained for this query」（§17）。
-- **历史 change（perm-inspector）**：Casebook 的 replay 机制建立在这个合同上——observation 是 typed 的、可重放的；fetch 的重放结果只是 freshness hint，不是正确性证明。
-- **AGENT-027**：Semble 是进程内 stdio MCP 语义搜索，不是 Host MCP、不是 provider tool、不是 permission、不是 Strength 能力——它的输出永远不能伪装成 `read` 或工具历史（历史 why/agent 条款 拒 Host mcp：语义搜索会漏进所有角色 schema；拒 Strength 注入：假 read 污染 primary 可见历史）。
-
-## 历史拒绝方案（被拒 ≠ 永久命题，记录 WHY）
-
-| 被拒方案 | 拒绝理由 | 现行命题 |
-|---|---|---|
-| 把 Semble 注册成 Host MCP / provider tool / ToolPermission | 语义搜索漏进所有角色 schema；结果成为可调用能力而非 orientation | 001/006 |
-| 自动从 charge 抽词 / tokenizer / cross-call cache | 把优化变成第二 assignment/memory；无证据的「猜词」是推理冒充调查 | 007 |
-| warm-start 注入 provider-visible `read`（假工具历史） | 假 read 污染 primary 可见历史，replay 无法区分真假 | 006 |
-| 搜索零命中 → 告知「确认不存在」 | 零命中可能是 disabled/timeout/截断/index 行为，不是 absence | 006 |
-| 给非直接消费者角色发 repository snippets | 只有本来就允许直接生活在 repository evidence 中的 Coder/Inspector/DevOps 可看 | 008 |
-| 猜 `repoPath = "."` | 错误的 repository hint 比没有 hint 更糟 | 008 |
+`repository-investigation → office-capability, participant-horizon`

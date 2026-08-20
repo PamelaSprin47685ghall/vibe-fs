@@ -1,50 +1,29 @@
-# WHY — external-investigation
+# external-investigation — WHY
 
-## 一句话理由
+## 核心动机与不可替代性
 
-external / public-web facts 来自会变化、会冲突、需要 provenance 的远方世界；网络可达性
-不等于 source ownership，外部可能性也不能自动变成 repository obligation。
+公开网络与外部事实源于会发生变动、存在权威冲突且需要明确溯源（provenance）的远方世界。网络可达性绝不等于来源所有权，外部世界发现的可能性也绝不自动转化为本地仓库的任务义务。
 
-## 不可替代性：为什么不能并进别的包
+外部事实调查在架构中具有独立契约法则：
+- **区别于 `repository-investigation`**：本地仓库事实与公开网络调查的证据法则（source law）截然不同。本地调查基于确定性、可单点检验的文件树；外部调查跨越到变动不居的远岸世界。
+- **区别于 `office-capability`**：Office 后果定义角色的法定权限；本包规定 Browser 角色如何带回具备完整溯源的外部事实。
+- **区别于 `capability-enforcement`**：后者负责运行时权限矩阵的门禁实施；本包负责外部事实的证据契约。
+- **区别于 `host-boundary`**：宿主适配层负责 MCP 与网络通信的物理连通；本包负责定义事实采集的认知边界。
+- **区别于 `epistemic-reasoning`**：认识状态推理负责假设与不确定性综合；本包负责源头事实的采集准则。
 
-- **不是 `repository-investigation`**：本地 repository fact 与 public-web provenance 的
-  source law 不同（HANDOFF §7.8）。Inspector 观察的是本地文件树（可定位、可追溯的真实
-  observation）；Browser 跨越到会变化、会冲突、无法单点验证的远方世界。不能因为两者都
-  「查资料」就并入一个 investigation 包（HANDOFF §6.9）。
-- **不是 `office-capability`**：office 有资格产生什么后果归 office-capability；「Browser
-  这个 office 如何建立带 provenance 的外部事实」归本包。
-- **不是 `capability-enforcement`**：schema/runtime gate 同源归 capability-enforcement；
-  「外部事实的 evidence contract」归本包。
-- **不是 `host-boundary`**：stealth-browser MCP 的 uvx/ref/env 启动判定是 Host adapter
-  机制（host-boundary HOW）；本包拥有的是它建立的事实如何带 provenance。
-- **不是 `epistemic-reasoning`**：认识状态求解器（proposal/evidence/不确定性）归
-  epistemic-reasoning；本包只拥有「外部事实采集的 source law」。
+## 失败模式（RED）
 
-## 失败模式（RED 长什么样）
+- **无溯源断言**：仅因网页可打开或可下载，便在无版本、日期或规范位置溯源的情况下将其作为事实断言。
+- **抹平权威分歧**：在可靠来源相互冲突时，静默计算平均值或合成中间结论，掩盖分歧本身。
+- **外部事实越权升级**：将外部文档中“似乎应该做 X”的描述直接升级为本地仓库的硬性义务。
+- **剥离成立条件**：在压缩或带回证据时丢弃版本、生效环境、地域或特性开关等限定条件，将有条件事实误传为无条件通则。
 
-1. **网络可达内容被无 provenance 当作事实**：一个网页「能打开」不等于「可据此断言」。
-   `Reachability does not determine ownership. Provenance does.`
-2. **来源冲突被抹平**：可靠来源互相冲突时静默平均成合成中间值——`Disagreement is not a
-   confidence average`。分歧本身是远岸显示的一部分。
-3. **外部可能性被直接升级成 repository obligation**：web 上「似乎应该改 X」不自动成为
-   仓库义务；外部事实只建立外部世界事实。
-4. **条件丢失**：version / date / jurisdiction / feature flag 等条件改变即改变事实；
-   把有条件的主张洗成无时间通则 = 事实丢失。
+## 独立变化能力
 
-历史病灶（`resources/provider/role/browser/en.md` 是唯一散文合同，无 F# runtime
-provenance 类型）：真实 browsing 在外部 `stealth-browser-mcp`，Wanxiangshu 只注入服务器
-+ 按角色锁 + Browser Role Law 固化 provenance contract。HANDOFF §29（Oracle 1）发现现有
-proof 只有 5 条**松**锚点（`/disagreement/i`、`/far shore/i` 这类单词级），合同退化成
-反面也能通过——因此强化成 8 条锁定实质区分的锚点，并补 browser-provenance canary。
+无论是更换底层浏览器实现还是接入新的检索服务，只要外部证据的溯源契约与义务隔离边界不变，本包即可独立演进。
 
-## 独立变化测试
+## DEPENDS ON
 
-从当前 browser backend 换成另一 browser/search backend，只要 provenance / evidence
-boundary 不变 → 本包可独立重大变化（`20-capability-external.md` INDEPENDENT CHANGE）。
-
-## DEPENDS ON（`requirements/INDEX.md` 依赖骨架唯一来源）
-
-- `office-capability`：Browser office 的 entitled consequence 是前提（external fact
-  acquisition 是 office 的职责）。
-- `participant-horizon`：外部事实进入 participant experience 的准入过滤是前提。
-- `host-boundary`：外部浏览的物理能力（MCP/网络）由 Host 提供，业务只消费稳定观察。
+- `office-capability`
+- `participant-horizon`
+- `host-boundary`

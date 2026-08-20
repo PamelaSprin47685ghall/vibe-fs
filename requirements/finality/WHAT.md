@@ -1,459 +1,122 @@
 # finality — WHAT
 
-条款前缀：`FINALITY-`。
-本文件是 finality 包的**唯一 normative 合同**。跨域机制（obligation-ledger、review-assurance、
-participant-horizon、work-record、crash-reconciliation）只引用本包命题，不复制合同。
-历史与弃权、实现模型见 `HOW.md`；每条命题的证明落点见 `HOW.md`。
+## FINALITY-001: suicide 专属 Manager 且为终结专用入口
 
-词汇：`suicide` = Manager 的终结工具调用（当前字面名，HOW）；`FinalityRequest` = 一次终结评审
-请求；`cohort` = 该请求的 Reviewer 集合；`Life` = 一个 Manager 生命；`life completion` =
-`LifeCompleted` 不可逆结束。
+`suicide(last_words)` 工具仅赋予 Manager 角色，具有专门的 `ToolPermission.Finality` 权限，不是普通 completion 或判定工具的别名。`suicide` 是终结请求的唯一合法入口，其描述文本由终结工具独立拥有。
 
----
+## FINALITY-002: 终结资格建立在 obligations、current tree 与合格 review evidence 上
 
-## JS semantic boundary
+参与者单方宣告完成不构成不可逆结束的许可。终结资格必须同时满足三重条件：
+1. **当前义务**：遵守 checkpoint 协议，零 checkpoint 严格 fail closed，并抽干所有未消费的 ConsumableReview。
+2. **当前被审对象**：具备绑定当前请求、barrier 与 Git tree 的合格 witness。
+3. **经验分型**：严格按 rejection、blessed 与 rest 分流处理。
 
-Finality semantic contracts have one production owner: `src/Wanxiangshu/Mission/Manager/FinalitySurface.fs`.
-The registered JS module `Mission/Manager/FinalitySurface.js` accepts plain lifecycle,
-review, handle, and ManagerJob history objects/IDs. It returns JSON-shaped objects/arrays;
-its folded `World` is an opaque capability that callers only pass back. Tests do not
-construct F# facts/unions, inspect Fable representations, or import package-internal
-compiled modules. The owner and executable contract evidence are registered in
-`HOW.md`.
+## FINALITY-003: 受理前置条件按序验证且失败零创建
 
+终结受理严格按序验证前置条件：Manager 身份、Journal 在场、已接受权威、处于 open Life、非空 last_words、有效 ToolCallId 与 ProviderRun、无在途或等待合并的子任务、无存活 PTY、正确的 worktree 归属、活跃 ManagerJob，并满足 T1 承诺与 drain 要求。任一前置检查未通过，绝对不得创建 Reviewer 会话、barrier 或终结请求对象。`EndingDisposition` 是纯领域分类，不是 program counter。Tool adapter 不 match disposition case 并分发不同业务效果，而是统一调用 `handleEnding` 并接收 `FinalityEndingOutcome` 边界结果进行渲染。
 
-## FINALITY-001：suicide 只属 Manager，且是终结的专门入口
+## FINALITY-004: 无 plan commitment 时不得进入 Finality
 
-**规范**：`suicide(last_words)` 只属于 Manager；它不是 `verdict` 或普通 completion 的别名。
-仅 Manager 具有 `ToolPermission.Finality`。`src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs` 是
-`suicide` 的唯一入口；`suicide` 的固定 description 由 `FinalityTool` 唯一拥有（GLORY-001/034/035/036）。
+未获得 blessing 的首次 `suicide` 在当前 Life 尚未形成 accepted `planComplete=true` 事实时，必须 fail closed 并分派为 `ContinuePlanning`。Pre-T1 阶段的 planning checkpoint 不赋予终结资格。
 
-**含义 / 动机**：终结请求与评审判断（`judge`）是不同因果身份；普通 completion 不拥有终结语义。
+## FINALITY-005: suicide 是唯一 tail drain
 
-**边界**：`suicide` 字面工具名与叙事风格是当前实现（HOW），不是永久合同。
+`suicide` 是消费最后一轮未决过程评审的唯一 tail drain 途径，禁止通过调用额外的 `todowrite` 尝试清空义务。获得 blessing 后的再次 `suicide` 同样必须首先执行过程评审的 tail drain。
 
-**证据** → HOW.md 行 F-1。
+## FINALITY-006: drain 结果分型（REVISE 回灌与 PERFECT 受理）
 
-## FINALITY-002：终结资格建立在 obligations + current tree + qualified review evidence 上
+存在 checkpoint 时，drain 必须等待最新的 `ConsumableReview`：
+- 若结论为 **REVISE**：回灌规范的 `ProcessReviewLWR` 报告，不创建 FinalityRequest，当前 Life 继续运行，由 Manager 通过后续 checkpoint 修正账目。
+- 若结论为 **PERFECT**：方获准进入后续的终审前置流程。
 
-**规范**：participant 自宣完成 ≠ 世界允许不可逆结束。终结资格由三部分共同构成：
-(1) 当前义务（obligation-ledger：checkpoint 协议、零 checkpoint fail closed、drain 未消费
-ConsumableReview）；(2) 当前被审对象（review-assurance：request/barrier/tree 绑定的合格
-witness）；(3) 终结经验分型（本包：rejection / blessed / rest 各自独立）。
+## FINALITY-007: 无机械 terminal-todo completeness gate
 
-**含义 / 动机**：这是本包的 WHY 总纲（GLORY-037 前置条件 + TODO-010 + GLORY-003/058 组合）。
+存在 plan commitment 不等同于机械要求 obligations 列表必须为空。未完成项的真实性与合规性完全交由过程评审的 PERFECT 或 REVISE 裁决，系统不设立死板的任务清空拦截门。
 
-**边界**：三部分各自的内部机制分别归 obligation-ledger / review-assurance；本包只拥有组合契约与
-participant 经验。
+## FINALITY-008: 受理顺序必须 durable
 
-**证据** → HOW.md 行 F-2。
+合法受理（未获 Blessing 状态下）严格按序执行：校验全部前置条件 → 读取当前代码树 → 持久化 last_words → 写入 `FinalityRequested` 事实 → 递归驱动 cohort 工作流。每个审查成员的因果顺序恒为：创建隐藏会话 → 持久化 enlist 事实 → 打开 barrier → 分配审查任务。首个提示词发送不得早于 barrier 建立。
 
-## FINALITY-003：受理前置条件按序验证；任一失败不建任何评审对象
+## FINALITY-009: roster 与 Dedicated 毕业
 
-**规范**：按序要求：Manager、Journal、accepted authority、open Life（非 completed）、非空
-last_words、ToolCallId、ProviderRun、无 outstanding/completed-awaiting-join child、无 live PTY、
-正确 worktree ownership、active ManagerJob；并满足 FINALITY-004/005/006（TODO-010）。
-任何失败不得创建 Finality Reviewer/barrier/request（GLORY-037）。
+每次 FinalityRequest 包含恰好一名新 Reviewer，以及当前 Life 中尚未毕业的历史 Reviewer；Dedicated Reviewer 在首次进入终审时作为普通 cohort 成员登记，随后完全遵循普通毕业规则。裁决为 REVISE 的 Reviewer 保留会话与历史记录，在后续请求中以新 barrier 重新入组。
 
-`EndingDisposition` 是纯领域分类，不是 program counter（SW-017①）。Tool adapter 不 match disposition case
-并分发不同业务效果；Finality-owned `handleEnding` 函数接收分类 + 执行能力，
-内部 dispatch 并返回边界结果 `FinalityEndingOutcome`（`Refused path | Result toolResult`）。
-Tool adapter 只调用 `handleEnding` 并渲染边界结果。
+## FINALITY-010: graduate 只由 enlistment 与合法 confirmed witness 推导
 
-**含义 / 动机**：终结是资源安全 + 协议纪律的交点；半建 cohort 会留下不可恢复的悬挂评审。
-ending dispatch 由 Finality 域拥有，Tool 层不暴露 child action opcode。
+审查员的毕业资格仅由当前 Life 的登记事实与合法的 confirmed witness 严格推导。过程评审的 PERFECT 不计入终审的 dual-PERFECT；登记进入终审后，必须针对当前请求、当前代码树与新 barrier 重新完成完整的双重确认链。
 
-**边界**：资源检查的 Host 侧实现（child/PTY/worktree）属 host-boundary；本包拥有「失败即零创建」。
-`EndingDisposition` 作为纯分类保留；改变的是 dispatch 所有权从 Tool 层移到 Finality 层。
+## FINALITY-011: REVISE 立即关闭 cohort 且 FinalityRejected 另行 record-ready
 
-**证据** → HOW.md 行 F-3。
+REVISE 是合法业务结果。当 REVISE 事实持久化后，当前请求的审查能力与整个 cohort 立即关闭：停止发送确认提示与 challenge，废除未完成的确认链。该关闭由 REVISE 事实直接派生，不等待 `FinalityRejected`；`FinalityRejected` 仅在拒绝审查员的记录达成 record-ready 后独立落盘。
 
-## FINALITY-004：无 plan commitment 时不得进入 Finality
+## FINALITY-012: 双轨交付 sibling steer
 
-**规范**：`first unblessed suicide ∧ 本 Life 尚无 accepted planComplete=true → fail closed / ContinuePlanning`。
-Pre-T1 的 `planComplete=false` planning checkpoints 不构成终结资格；T1 是第一次 accepted true。
+在密封 `FinalityRejected` 之前，必须完成并行的审查证据记账。首个 durable REVISE 作为 `suicide` 的工具返回结果交付；后续到达的其他 REVISE 则分别物化为指令型 steer continuation（Synthetic TOML）交付给 Manager，严禁并入工具返回字符串或静默丢弃。物化失败必须 fail closed。
 
-**含义 / 动机**：证明 Manager 已明确完成计划并承担该 road，而不是机械要求 obligations 清空
-（与 FINALITY-007 区分）。
+## FINALITY-013: 三种经验分型与 Acceptance 不等于 rest
 
-**边界**：判定输入 `isPlanCommitted` 来自 obligation-ledger 的 durable projection；本包拥有门禁本身。
+模型可见的 Finality 严格区分三种经验：
+1. **Not Accepted（拒绝）**：交付拒绝证据并指导继续改进（`Your ending has not accepted you.`）。
+2. **Accepted But Not At Rest（已接受未安息）**：交付接受保证、工作记录与收尾指导（`Your ending has accepted you. / You are not yet at rest.`）。
+3. **At Rest（安息）**：交付安息确认与最终终止指令（`Rest in peace`）。
+Non-blocking 观察不阻断 acceptance，已接受的事实受保护；幂等重放原样返回原始结果，不引入虚构枚举。
 
-**证据** → HOW.md 行 F-4。
+## FINALITY-014: 拒绝后同一 Life 继续且 Rejected request 永不 blessing
 
-## FINALITY-005：suicide 是唯一 tail drain
+遭遇拒绝后不触发重生或重置，Manager 在同一 Life 内继续执行，账本协议维持运转。被拒绝的请求永久不得转为 blessing；后续再次调用 `suicide` 将开启全新的请求与 barrier。
 
-**规范**：`suicide` 是最后一个尚未被下一次 todowrite 消费的 process review 的**唯一** tail
-drain。禁止再调一次 todowrite flush——那会创造 R(k+1) 无限后移。Blessed 之后的再次 suicide
-**同样先** drain latest process review（TODO-010/GLORY-062）。
+## FINALITY-015: 未 graduate session 不 Dispose 且 Dedicated process duty 保留
 
-**含义 / 动机**：drain 义务不能转移给 todowrite；否则悬挂 Rk 永远无法被消费。
+终审 REVISE 或 Blessing 发生后，过程评审会话严禁 Dispose。Dedicated Reviewer 即使已从 Finality roster 毕业，仍必须继续承担后续过程评审职责，至少保留至 `LifeCompleted`。
 
-**边界**：「Rk 产生后必须被消费」的账本侧义务见 `obligation-ledger` OBLIGATION-LEDGER-022；
-本包拥有「消费动作发生在 suicide」。
+## FINALITY-016: Blessed 不结束 Life 且 minor-work 继续
 
-**证据** → HOW.md 行 F-5。
+当所有当前成员均达成 confirmed 且代码树重读一致后，物化规范 LWR bundle，持久化 `FinalityBlessed` 并下发收尾 continuation。此时绝对不得触发 `LifeCompleted` 或注销 Manager。Manager 收到工作记录后继续处理所有 minor 问题。
 
-## FINALITY-006：drain 结果分型
+## FINALITY-017: rest 对应第二次 suicide 且 last_words 为最终答案
 
-**规范**：有 checkpoint 时 await latest ConsumableReview ≡ `TodoReviewConcluded`（TODO-006）：
+已获 blessing 的 Life 再次调用 `suicide` 时，执行安全检查与过程评审尾抽干；确认无阻塞 REVISE 后，不再重复审查与检查见证，写入本次 last_words，持久化 `LifeCompleted`，向模型返回 at-rest 经验。成功输出逐字等于 `last_words`，严禁附加多余文本。
 
-```text
-REVISE  → 返回 canonical ProcessReviewLWR 报告；不建 FinalityRequest；Life 继续
-          CurrentObligations 仍是 latest Accepted account，由 Manager 后续 checkpoint 修正
-PERFECT → 进入既有 Finality 前置
-```
+## FINALITY-018: Manager deferred completion
 
-**含义 / 动机**：过程 REVISE 是正常业务结果，不是终结拒绝；它只证明「当前账/工作尚需修正」，
-Manager 用后续 todowrite 修正（TODO-005/010）。
+首次合法进入终审的 `suicide` 挂起当前 Manager 执行；过程或终审 REVISE 直接返回工作记录提示，Blessing 返回收尾指导，均不终止 Manager 生命周期。
 
-**边界**：报告物化与 record-ready 属 review-assurance；账本不被评审涂改属 obligation-ledger。
+## FINALITY-019: Manager 面无 Review Guard 且 idle 只发鼓励
 
-**证据** → HOW.md 行 F-6。
+Manager 视野内完全移除 Review Guard 与评审催促逻辑。Manager 的普通空闲仅发送标准鼓励提示；只要当前 Life 存活且未被终审接管，每次新的 completed terminal 均可获得鼓励，不设人为次数上限。终审处理期间或已终结会话不发送鼓励。
 
-## FINALITY-007：无机械 terminal-todo completeness gate
+## FINALITY-020: 隐藏机制不变成 Manager checklist
 
-**规范**：「已有 plan commitment」≠ 机械要求 obligations 清空。未完成项真实性交给过程
-PERFECT/REVISE，不另造机械 terminal-todo completeness gate（TODO-010）。
+Manager 对隐藏 Reviewer、会话、barrier、witness 及 2N 编排完全无感知，严禁在 Manager 视野内暴露执行评审的隐藏角色与中间编排细节，仅暴露影响下一步行动的事实反馈与结论。
 
-**含义 / 动机**：机械全 completed 门与用户过程评审需求无关，且与 REVISE 续命冲突
-（why「Finality 未完成项」裁决）。
+## FINALITY-021: 状态只来自 typed facts
 
-**边界**：obligations 是否为真由 obligation-ledger 的账本 + process review 判定。
+系统生命周期状态完全基于强类型持久化事实与增量投影推导，严禁通过自然语言故事文本匹配反向推断状态。
 
-**证据** → HOW.md 行 F-7。
+## FINALITY-022: Life 开启条件与隔离
 
-## FINALITY-008：受理顺序必须 durable
+HumanRoot Life 仅在权威配置与消息标识严格匹配时开启。旧 Life 终结后，其资源与执行标识被原子释放，下一条合法外部请求方可触发 Reawakening。新 Life 绝不继承旧 Life 的请求、花名册、blessing 或 witness 记录。
 
-**规范**：合法受理（未 Blessed）：验证前置条件（含 FINALITY-004/005/006）→ 读 tree →
-durable last_words → `FinalityRequested` → 递归 cohort CE（roster 见 FINALITY-009）。
-每个 member 的因果顺序恒为：hidden session → durable enlist → barrier → assignment；
-首 prompt 不得早于 barrier。Finality 只等待 durable facts，绝不第二次发送 review continuation
-（GLORY-040/042）。
+## FINALITY-023: Opening durable 顺序与改写幂等
 
-**含义 / 动机**：受理 = durable 事实序列；任意中间失败都不允许留下半建评审对象
-（GLORY-057 恢复前提）。
+原始 HumanRoot 先行持久化 XTrace 与 `LifeOpened` 事实，随后方可执行模型端呈现改写。改写操作具备强类型幂等标识，重复转换不得重复注入。
 
-**边界**：barrier 的 witness/seal 机制属 review-assurance；`FinalityRequested` 事实形态见 HOW。
+## FINALITY-024: 工作期输入不改写
 
-**证据** → HOW.md 行 F-8。
+工作期间的输入消息不改变 Life 归属、工作起点或账本协议状态，亦不重开 Opening。
 
-## FINALITY-009：roster 与 Dedicated 毕业
+## FINALITY-025: 旧 journal 语义
 
-**规范**：每个 FinalityRequest 恰有一个新 ordinary Reviewer，另加本 Life 全部未 graduate 历史
-ordinary Reviewer；Dedicated 在**首次**进入 terminal Finality 时作为普通 cohort member enlist
-（按 physical/session identity 去重），其后完全遵循 ordinary graduate 规则——不发明
-「每轮强制回流 / 永不 graduate」特例。REVISE Reviewer 保留 session/X/Y，下一 request 以新
-barrier 再入 roster（GLORY-003/045；TODO-010）。
+历史已完成的 Life 保持完成状态。历史遗留事实仅作向后兼容解码，现代终结工作流、审查逻辑与工具接口绝对不得新增或返回 `FinalityUndecided` 结果。
 
-**含义 / 动机**：终末 2N 需要「恰好一个新 Reviewer + 全部未毕业历史 Reviewer」；Dedicated 不应
-破坏既有毕业语义，也不应永远缺席终局（why「Dedicated 普通 graduate 却保留 process duty」裁决）。
+## FINALITY-026: 现代 Finality 必有业务裁定且基础设施失败直接 fatal
 
-**边界**：process PERFECT ≠ terminal first PERFECT（FINALITY-010）；roster 推导的纯函数在
-`Composition/Bridges/FinalityReview/FinalityReviewCohort.fs`。
+现代 Finality 的业务裁定空间仅由 `PERFECT` 与 `REVISE` 构成，最终必定收敛至拒绝或祝福，不存在第三种业务结果。审查传输失败、通道异常、存储损坏或状态不变量破坏等基础设施故障必须直接输出诊断并终止进程，绝对不得伪装为业务结论或改写已有裁决。
 
-**证据** → HOW.md 行 F-9。
+## FINALITY-027: 后台资源义务
 
-## FINALITY-010：graduate 只由 enlistment + 合法 confirmed witness 推导
+存在活跃背景子任务或 PTY 时，终结请求被拦截并返回 join 提示，包括已获 Blessing 的状态。后台资源未清偿前，停放终结流程且不发送空闲鼓励。
 
-**规范**：graduate 仅由该 Life 的 enlistment 与合法 confirmed witness 推导。process PERFECT
-**不计入** terminal dual-PERFECT；enlist 后仍要求本 request 的 fresh barrier 与 fresh
-dual-PERFECT 链（新 request/barrier/tree/authority root；可复用同一 physical session/context，
-不可复用过程因果证明）（TODO-010/REVIEW-020/GLORY-058）。
+## FINALITY-028: ManagerJob 不复活
 
-**含义 / 动机**：终结证明只描述当前 tree 和当前请求；历史 process turns 不能冒充终局证据。
-
-**边界**：dual-PERFECT witness 的因果代数（challenge/seal/same-barrier/different-run）属
-review-assurance；本包拥有「谁有资格毕业、process 证明不计入」。
-
-**证据** → HOW.md 行 F-10。
-
-## FINALITY-011：REVISE 立即关闭 cohort；FinalityRejected 另行 record-ready
-
-**规范**：REVISE 是合法业务结果。其 verdict fact durable 后，当前 request 的 Reviewer
-continuation capability 与 cohort 立即关闭：不发送 confirmation/challenge、不等待尚未 durable
-的 sibling terminal；未完成的 PERFECT 确认链同时作废，关闭后不得补发 challenge（REVIEW-002）。
-此关闭由 durable REVISE 派生，不以 `FinalityRejected` 为前提——后者只能在 rejecting Reviewer
-满足 record-ready 后落盘（GLORY-044/072；record-ready → review-assurance）。
-
-**含义 / 动机**：继续发 challenge 或等待 sibling 只会制造与该判断竞争的事实；`FinalityRejected`
-不是 verdict 的别名，它永久引用 canonical LWR（why「REVISE 立即关闭 Reviewer」裁决）。
-
-**边界**：record-ready 判定 / 同 snapshot 物化属 review-assurance；本包拥有关闭语义与
-rejection 经验（FINALITY-013/014）。
-
-**证据** → HOW.md 行 F-11。
-
-## FINALITY-012：双轨交付 sibling steer
-
-**规范**：密封 `FinalityRejected` **之前**必须完成 durable sibling 会计。成功路径：首个 durable
-REVISE 仍是 suicide **工具结果**（rejection 经验，FINALITY-013）；已完成 RevisionRequired 的
-后续 sibling REVISE 各自物化为仅含指令的 steer continuation（instruction-only `# ` Synthetic
-TOML）交给 Manager，**不得**并入工具结果字符串、**不得**静默丢弃。Primary 硬物化失败 →
-`FinalityUndecided` 且零 `FinalitySiblingSteered`；任一 durable sibling 硬物化失败 →
-`FinalityUndecided`，不得在证据未入账时落 `Rejected`（GLORY-044）。
-
-**含义 / 动机**：多个 Reviewer 的 REVISE 都是真证据；拒绝后到达的 sibling 证据必须交付，
-否则 Manager 会基于不完整拒绝继续（why「双轨交付」裁决）。
-
-**边界**：sibling 记录的物化与 fail-closed 属 review-assurance；steer 的指令文案见 HOW
-（SURFACE-005 约束）。
-
-**证据** → HOW.md 行 F-12。
-
-## FINALITY-013：三种经验分型；Acceptance ≠ rest
-
-**规范**：Provider 可见 Finality 只有三种经验：
-
-```text
-not accepted            → rejection evidence + anti-defeatism + continue
-                          （Your ending has not accepted you.）
-accepted but not at rest → acceptance guarantee + minor work guidance + WorkRecords
-                          （Your ending has accepted you. / You are not yet at rest.）
-at rest                 → Rest in peace + terminal instruction
-```
-
-法则：Non-blocking 不阻断 acceptance，≠ 不必做；Acceptance 与 rest 不同阈；Acceptance 保护工作，
-Finishing 保护名字；已知 non-blocking findings 不得仅因选择完成而事后升格为 blocker——新 material
-evidence 是另一事实（GLORY-076）。idempotent replay 重放原 result，不发明新 status 枚举。
-
-**含义 / 动机**：把三种经验压成一个「结束」状态会把未接受当安息，或把已接受当禁止收尾
-（why「Finality：单一结束文案 vs 分型」裁决）。
-
-**边界**：文案逐字字节属 `provider-language` / SURFACE-004；本包拥有经验分型的语义。
-
-**证据** → HOW.md 行 F-13。
-
-## FINALITY-014：拒绝后同一 Life 继续；Rejected request 永不 blessing
-
-**规范**：拒绝不重生、不重新 Activation、不清 X/Y；Manager 正常继续，checkpoint 协议仍按
-obligation-ledger 运转。Rejected request 永不 blessing；其 sibling current attempt 可
-best-effort cancel，但不 Dispose 未 graduate session；下次 suicide 建新 request / new barriers
-（GLORY-054/055）。
-
-**含义 / 动机**：rejection 是「继续工作」的信号，不是 Life 终点；被拒请求不可复活为 blessing。
-
-**边界**：继续工作的 checkpoint 语义属 obligation-ledger。
-
-**证据** → HOW.md 行 F-14。
-
-## FINALITY-015：未 graduate session 不 Dispose；Dedicated process duty 保留
-
-**规范**：Finality REVISE / Blessing 后 process-review session **不** Dispose；ordinary cohort
-仍走既有 carryover/release。Dedicated 即使已从 Finality roster graduate，仍须继续服务后续
-todowrite process reviews，至少保留到 `LifeCompleted`（或 proven-loss replacement）
-（GLORY-055/TODO-008/010）。
-
-**含义 / 动机**：Blessing 即释放 process session 会让后续 checkpoint / 二次 suicide 无人可审
-（why「Dedicated：首次 enlist + ordinary graduate + process 留到 LifeCompleted」裁决）。
-
-**边界**：dedicated session 的物理生命周期归 `managed-session-lifecycle`；process duty 义务见
-obligation-ledger OBLIGATION-LEDGER-020。
-
-**证据** → HOW.md 行 F-15。
-
-## FINALITY-016：Blessed 不结束 Life；minor-work 继续
-
-**规范**：所有 current member confirmed（review-assurance 消费）且 Blessing 前重读 tree 一致后
-（tree 新鲜性 → review-assurance）：materialize stable-ordinal canonical LWR bundle → append
-`FinalityBlessed` → 发 minor-work continuation。**不得** `LifeCompleted`、NotifyTerminal 或清除
-Manager。Blessing 后 Manager 收到全部 canonical work records 与 minor-work prompt；必须处理
-bundle 中每个 minor problem / concern / uncertainty / cleanup——records 是 evidence
-不是新 user instructions（GLORY-059/060/061）。
-
-**含义 / 动机**：第一次全确认只证明「已被接受」，不证明「可以安息」；Acceptance 保护工作，
-Finishing 保护名字（GLORY-076 法则）。
-
-**边界**：tree 重读与 witness 有效性属 review-assurance；LWR bundle 物化属 work-record。
-
-**证据** → HOW.md 行 F-16。
-
-## FINALITY-017：rest = 第二次 suicide（last_words 即最终答案）
-
-**规范**：有 latest blessing 的 open Life 仍先做 FINALITY-003 资源安全与 FINALITY-005 过程评审
-尾抽干（blessing 后仍有未消费 ConsumableReview：REVISE → 回灌并继续 Life，不 `LifeCompleted`）。
-抽干后且无阻塞过程 REVISE 时：**不**读 tree、**不**创建 Finality Reviewer/barrier、**不**检查
-witness。写本次 last_words → append `LifeCompleted` → 注册 terminal 后 NotifyTerminal →
-tool result 为 at-rest 经验（`Rest in peace` + 终止对话指令）。**成功输出逐字等于 last_words，
-Host 零附加文本**（GLORY-062）。
-
-**含义 / 动机**：成功后再唤醒 Manager 写总结会稀释叙事、引入第二轮修改风险；`last_words` 是
-Manager 深思后的最终答案（why「成功输出逐字等于 last_words」裁决）。
-
-**边界**：last_words 进入 LWR Recent work 的表示属 work-record。
-
-**证据** → HOW.md 行 F-17。
-
-## FINALITY-018：Manager deferred completion
-
-**规范**：合法首次进入 Finality 的 `suicide` 停放当前 Manager completion；过程或 Finality
-REVISE 直接返回 work-record prompt；Blessing 返回 minor-work continuation，不结束 Manager
-（GLORY-041）。
-
-**含义 / 动机**：终结受理不是完成；Manager 在评审期间被停放，但 Life 保持 open。
-
-**边界**：completion 停放的 turn 机制属 interaction-authority / host-boundary 交叉。
-
-**证据** → HOW.md 行 F-18。
-
-## FINALITY-019：Manager 面无 Review Guard；idle 只发鼓励
-
-**规范**：删除 Manager completion 对 `HostReviewGuard`、`ManagerGuard` continuation、review
-nudge 的引用；ManagerWorkflow 只判 join / finality / planning / handedOff（REVIEW-007/GLORY-070）。
-Manager 普通 idle 仅发送 FINALITY 之外的四行鼓励 continuation；它不读取或解释隐藏 Reviewer。automatic encouragement **没有跨 terminal 的业务次数上限**：只要当前 Manager Life 仍活着、Finality 未接管、且出现一个新的 completed Manager terminal，就必须再次获得一份 encouragement。幂等边界只覆盖同一个 `ProviderRunIdentity` / idle occasion 的重放；同一 terminal 不重复发送，但新的 ProviderRun 不得因为 Life/plan-commitment condition 上已有历史 claim 就静默。checkpoint 过程评审结论只经 todowrite / suicide 协议面交付，不经 idle。open finality 或 completed Life 不发送 idle（GLORY-005/029/070）。
-
-**含义 / 动机**：Review Guard 只保留 Reviewer 面；Manager 面的 nudge/guard 会让评审重新变成
-显式 checklist（GLORY-070 语义）。
-
-**边界**：idle continuation 的 durable occasion identity 属 interaction-authority；本包只定义 Manager 的 plan-commitment 条件与何时允许鼓励。这里没有 Life 级/condition 级次数预算。
-
-**证据** → HOW.md 行 F-19。
-
-## FINALITY-020：隐藏机制不变成 Manager checklist
-
-**规范**：Manager 不知道隐藏 Reviewer、session、barrier、witness、2N 或 Finality cohort 编排；
-不能创建、复用、nudge、`horizon()` 或 `join()` 隐藏 Reviewer。Manager 普通 fork 永不打开
-Reviewer barrier；Finality workflow 是 Manager finality barrier 的唯一 owner。Reviewer 只得到
-当前 worktree 的权威任务与 Host opening assignment；Manager 看不到它。隐藏终端机制只暴露
-**会改变下一行动的 consequence/report**（GLORY-002/030/031/032/033/046；SURFACE-005）。
-Todo Checkpoint 过程评审 outcome/report 的 Manager 可见窄例外见 obligation-ledger
-OBLIGATION-LEDGER-023 与 participant-horizon；该例外不得扩大为暴露执行评审的隐藏角色。
-
-**含义 / 动机**：把终局质量门从「可勾选的步骤」变成「不可见的命运」（why「Manager 不能知道
-隐藏 review 机制」裁决）。
-
-**边界**：信息准入边界（哪些词/哪些句可见）的 admission 归 participant-horizon；本包只拥有
-「hidden terminal mechanism 不变成 Manager checklist、只暴露 consequence」。
-
-**证据** → HOW.md 行 F-20。
-
-## FINALITY-021：状态只来自 typed facts
-
-**规范**：内部使用 `ManagerLifecycle`、`FinalityRequested`、`FinalityRejected`、`FinalityBlessed`、
-`LifeCompleted` 与 Magic Todo 域事实（见 obligation-ledger）；叙事词只属于 provider surface。
-Projection 只推导 Life 身份、`WorkRecordStart`（obligation-ledger T1）、当前未关闭 Finality
-request、已拒绝记录、latest blessing、completion、graduate eligibility 与 process-review
-retention 所需事实；**不得**保存 rejected/confirmed bool product 或下一函数。禁止故事文本反向
-解析状态（GLORY-008/009/011）。
-
-**含义 / 动机**：状态只能来自 typed facts + projection；文本推导（搜索 suicide/glory 字样）
-在 crash 后无法重建（why「其他被拒方向」裁决）。
-
-**边界**：无持久程序计数器的一般法则属 structured-workflow。
-
-**证据** → HOW.md 行 F-21。
-
-## FINALITY-022：Life 开启条件与隔离
-
-**规范**：HumanRoot Life 的 opening admission 只认一条 typed evidence：当前 immutable
-`AuthorityExecutionProfile` 必须是 `HumanRoot + Manager`，且待处理 physical message id **逐值等于**
-该 profile 的 `AuthorityRootUserMessageId`。仅“这个 session 当前有 HumanRoot authority”、消息 role
-是 user、文本像 opening、XTrace provenance、suicide 文本、title/compaction 排除表，都不得代替这条
-identity equality。无 open Life 时，合法 root 可 Birth；上一 HumanRoot Life 已 completed 后，
-`LifeCompleted` 的 canonical fold 原子释放该 HumanRoot active run（INTERACTION-AUTHORITY-018），
-下一条真实 external + explicit-agent HumanRoot 才可 Reawakening。
-
-AgentOwnerRoot Manager 不走 HumanRoot opening。它只允许在**该 session 从未有任何 Life 历史**时，
-于第一次合法 ending 从 canonical Current XTrace 物化一次 migration Life；一旦 `CompletedLives` 非空，
-`CurrentLife=None` 表示该 Life 已终结，绝不能把同一历史 XTrace 再物化成第二个 migration Life。
-AgentOwnerRoot 的 authority 本身不因 `LifeCompleted` 关闭，因为 owner-directed publish conflict
-resumption 等后续工作仍可合法复用该 session。
-
-新 Life **不继承**旧 request、roster、blessing、witness、prefix 或 Magic Todo canonical list
-（正常新 Life 初始为空；legacy seed 仅 obligation-ledger OBLIGATION-LEDGER-019 窗口）
-（GLORY-012/063/064/065）。
-
-**含义 / 动机**：Life 是终结语义的边界；opening identity 由 authority owner 提供而不是
-NarrativeTransform 自行推断；旧 Life 的 blessing/witness 不能污染新 Life，AgentOwner 的一次性
-migration 也不能在 completion 后自激重生。
-
-**边界**：HumanRoot authority closure → `interaction-authority`；XTrace 不清空与 cursor range 物化属
-semantic-trace；Magic Todo canonical 空账属 obligation-ledger。
-
-**证据** → HOW.md 行 F-22。
-
-## FINALITY-023：Opening durable 顺序与改写幂等
-
-**规范**：原始 HumanRoot 先写 XTrace 与 `LifeOpened`，后改 provider surface（若有）。改写
-identity = SessionId + ManagerLifeId + PhysicalUserMessageId + narrative source；禁止由文本后缀
-推断。重复 transform 不重复注入（GLORY-013/015）。
-
-**含义 / 动机**：durable Opening 永远是原始 `[X]`；provider-facing 改写不得先于落盘。
-
-**边界**：OpeningMaterial 的表示与压缩 floor 属 work-record；seal 机制属 review-assurance /
-prefix-stability 交叉。
-
-**证据** → HOW.md 行 F-23。
-
-## FINALITY-024：工作期输入不改写；持续完成使命
-
-**规范**：工作期 HumanRoot 不改变 Life、`WorkRecordStart` 或 Magic Todo checkpoint 协议状态。
-Post-T1：规划与执行是同一活动；Planning、Delegation、child 或命令成功均非完成；无有用工作且
-满足 TODO-010 时才调用 `suicide`。Manager 拆分、委派、收割并填满安全独立 lane；过程评审进行中
-应继续有用的独立工作，不得空转专等 review（GLORY-007/026/027/028）。
-
-**含义 / 动机**：工作期输入不产生新 Life / 不重开 Opening；「完成」只能由终结协议判定。
-
-**边界**：Pre-T1 不扛路的规划边界属 obligation-ledger（OBLIGATION-LEDGER-017）。
-
-**证据** → HOW.md 行 F-24。
-
-## FINALITY-025：旧 journal 语义
-
-**规范**：旧 completed Life 保持 completed。旧 active 一对一 finality 不猜造
-cohort/graduate，关闭为 undecidable；后续新 request 进入本协议。旧 `WorkActivated` /
-Activation 事实仅 inert decode；open Life 的 Opening floor 迁移为 `WorkRecordStart`
-（obligation-ledger OBLIGATION-LEDGER-017）；Magic Todo 升级瞬间 seed 见
-OBLIGATION-LEDGER-019（GLORY-069）。`FinalityUndecided` 仅是历史 decode/replay 事实：现代
-`FinalityWorkflow`、Reviewer CE 与 `suicide` surface **不得 append、返回或渲染它**，也不得再有
-`finality-undecidable` provider prose 入口。
-
-**含义 / 动机**：迁移不破坏历史事实；历史证据不足的一对一 finality 诚实关闭为 undecidable。
-
-**边界**：migration 的 decode 机制属 durable-events。
-
-**证据** → HOW.md 行 F-25。
-
-## FINALITY-026：现代 Finality 必有业务裁定；基础设施失败直接 fatal
-
-**规范**：现代 Finality 的业务 judgement 空间只有 Reviewer 的 `PERFECT | REVISE`；一次
-FinalityRequest 最终只能走 rejection 或 qualified confirmation→blessing。不存在第三种
-`Undecided` 业务 outcome。Reviewer/session transport、judgement channel、Journal append、blob、
-record-ready、tree read/check、projection invariant 或未知 exception 失败时，系统必须打印
-`finality-infrastructure-failed` 调试信息并 process-fatal；**不得** append `FinalityUndecided`，不得
-向 Manager 返回「未能被裁定」，也不得把已存在的 PERFECT/REVISE 因后处理失败抹成未裁定。
-
-Reviewer 在 required judgement 前**正常结束一个 provider run**不是 infra verdict：Finality review CE
-必须继续追索缺失 judgement（具体 challenge/nudge 因果归 review-assurance），直到取得合法 REVISE 或
-dual-PERFECT。只有真正基础设施失败才 fatal。
-
-**含义 / 动机**：业务判断与系统健康是正交维度。把 infra failure 压成 `Undecided` 会让 Manager
-错误继续劳动，同时把真正故障从日志和 durable provenance 中抹掉；在已有 PERFECT/REVISE 后这么做
-甚至是在改写 Reviewer 已经发生的事实。系统不能继续相信自己的 finality machinery 时应立即熔断。
-
-**边界**：dual-PERFECT / terminal→nudge 的 CE 因果属 review-assurance；fatal 的物理 process kill /
-diagnostic adapter 属 Host/OpenCode；本包拥有「现代 outcome 无 Undecided」与 failure 分类。
-
-**证据** → HOW.md 行 F-26。
-
-## FINALITY-027：后台资源义务
-
-**规范**：背景 child 或 PTY 存在时返回固定 join 提示；Blessed Life 也不例外。有 join 义务且
-仍有 outstanding 后台时，本 turn 只发 JoinGuard Continuation；finality 处理停放，Manager 不做
-idle 鼓励（GLORY-038/EXEC-016/GLORY-029）。
-
-**含义 / 动机**：终结前必须确保无在途资源；join 是终结前置（FINALITY-003）的运行时体现。
-
-**边界**：JoinGuard 的 turn 机制属 interaction-authority。
-
-**证据** → HOW.md 行 F-27。
-
-## FINALITY-028：ManagerJob 不复活
-
-**规范**：已发布/释放 Job 不复活；active owned Job 可由 Orchestrator append requirement，
-仍使用同 session/worktree（GLORY-068）。
-
-**含义 / 动机**：终结后 Job 生命周期不可逆；但 active Job 可被 Orchestrator 追加需求续做。
-
-**边界**：Orchestrator 的 Job 语义属 dispatch-protocol 交叉。
-
-**证据** → HOW.md 行 F-28。
+已发布或已释放的 ManagerJob 永久不得复活；处于 active 状态的 Job 可由编排方追加需求并在同一会话与 worktree 中延续执行。

@@ -1,61 +1,25 @@
-# WHY — host-boundary
-
-## 一句话
-
-业务必须建立在外部 Host 可稳定证明的物理能力上，而不是流式噪声、私有实现、偶然 hook 参数。
+# host-boundary — WHY
 
 ## 不可替代的存在理由
 
-1. **碎片事件拼真相 = 把因果绑在传输噪声上**（ARCH-002 被拒方案：流式碎片积分）。碎片事件的
-   顺序/形状随 Host 版本漂移；从 `message.updated` / `part.delta` 推导完成/失败，上游一改事件
-   shape，业务就悄悄读错。真相源必须固定为「唤醒后读完整 SDK snapshot」。即使物理资源层读取
-   `message.updated` 的 exact identity，也必须区分“provider step 已失败”和“整个 physical execution
-   已结束”：assistant error 可能马上进入同一 `PhysicalUserMessageId` 的 Host retry，不能据此删 lease。
-2. **Transport 状态机不得搬进 Domain**。把 busy/running 加进业务 HostSignal 并在几十处维护
-   if/else（cache.md §16 被拒方案）——transport 状态机不是领域事实。业务只见 typed `HostSignal`
-   （idle/retry/aborted/deleted），且信号只唤醒、不携带事实（`HostSignal.fs` 头注释：
-   FALLBACK-003「Host signals wake, they do not carry facts」）。
-3. **能力缺口必须可证明**。`HostContractUnsupported` 是显式失败：compaction 预防层关不掉 →
-   启动失败；HOST-025 定位 canary 不能唯一 → membrane 禁止上线；HOST-019/024 任一不成立 →
-   membrane fail closed。默默依赖 undocumented API = 生产里第一个炸。
-4. **物理身份可信取得**。Transform→ProviderRunIdentity 用因果读（唯一未完成 assistant）而非
-   same-root 猜测；命中 0/≥2 宁可放弃 seal。Tool 身份双半边（ToolContext 有 message+call id，
-   before/after 只有 call id），缺一 fail closed（HOST-011）。猜 = 假绿。
-5. **多实例按 directory 分叉是现实**。跨实例共享的只能是身份注册表（SessionParents /
-   VerdictSessions），不能是 Journal writer——实测第二实例读不到主实例 verdict（why/host.md §3/§7）。
-6. **不修改 OpenCode 本体**（ARCH-003）。只挂现有 Hook/SDK；修改 Host core = 每次升级维护一个
-   fork，且与 upstream 契约脱节。
-7. **reasoning 不是 visible text 的替身**。HOST-016 只负责把空 content 变成结构合法的非空
-   content；把 reasoning/thinking 原文复制进 synthetic text 会改变 provider transcript 语义，甚至把
-   仅属于模型内部通道的内容伪装成可见 assistant 文本。需要结构占位时只发送无语义 `"."`。
+业务系统的语义真理必须建立在外部宿主（Host）稳定、可验证的物理能力与一致的快照观察之上，绝不能寄托于传输层的流式碎片事件、私有内部状态或偶然的时序竞争。
 
-## RED 是什么样
+1. **禁止流式碎片拼凑业务真相**。流式事件（如 `message.updated`、`part.delta`）的顺序与格式极易随宿主版本漂移。从流式碎片推导业务完成或失败，等同于将系统因果绑定在传输噪声之上。系统的唯一真相源必须是唤醒后读取的完整 SDK 快照。
+2. **传输状态机不得侵入领域层**。底层的忙碌、排队与流式传输属于通信细节，不属于领域事实。领域层仅接受类型化的粗粒度唤醒信号（`HostSignal`），且信号只负责唤醒，不携带业务事实本身。
+3. **物理能力的显式证明与安全失败**。系统依赖的所有宿主能力（如快照定位、Hook 时序、上下文压缩控制等）必须具备可验证的测试证明。一旦环境能力缺失或观测出现二义性，必须显式安全失败（fail closed），严禁在未经验证的环境中静默降级运行。
+4. **物理身份的可靠因果提取**。从快照解析运行身份必须基于严格的因果关系，命中 0 个或多个候选时一律安全失败，绝不依赖位置猜测进行模糊匹配。
+5. **不侵入修改宿主本体**。插件仅通过宿主公开的 Hook 与 SDK 进行集成，严禁私自修改宿主源码。所有暴露给宿主的入口点必须具备致命错误保护膜（fatal membrane），防止异常状态破坏进程不变量。
 
-```text
-RED = 产品语义需要猜 Host private/streaming state 或依赖未经验证的物理能力。
-```
+## 核心不变量
 
-具体症状：
+- 信号仅作唤醒，完整 SDK 快照是唯一业务事实来源。
+- 调和器实行单飞执行（single-flight），依据因果事件驱动收敛，严禁无界的墙钟轮询。
+- 观测不足或存在多解时一律安全失败（fail closed）。
+- 插件加载初始化阶段保持纯洁，严禁执行业务恢复或反向调用宿主业务接口。
 
-- 业务层有 `message.updated` / `part.delta` 处理 → RED（HOST-001/ARCH-002）。
-- 从 idle payload 推断 terminal / 完成 / 失败 → RED。
-- `session.error = ProviderError` 被当成 `AttemptAborted`（或反之）→ RED（HOST-002 分型）。
-- 用 callID 与别处 messageID 猜配对 / 使用 SDK 不存在的字段 → RED（HOST-011）。
-- compaction 关不掉仍继续跑 → RED（HOST-006 prevention 未证明，必须 `HostContractUnsupported`）。
-- reasoning sensor 从 visible text / tool output 触发 → RED（HOST-027）。
+## 违反边界的后果（RED）
 
-## 边界（DOES NOT OWN）
-
-- OpenCode hook 名 / 参数 shape（upstream 实现细节；adapter 内部）。
-- session ontology / lifecycle（→ `session-ontology` / `managed-session-lifecycle`）。
-- provider language、interaction authority、projection（→ 各自包）。
-- Pair guidance、Todo membrane、compaction policy 等 feature 语义（→ prefix-stability /
-  obligation-ledger / context-compression 等）。
-- upstream workaround/quirk（→ 各 feature owner 或 HOW）。
-- Host 假设需要什么 proof 强度（→ `verification-system` 横向治理，非本包语义依赖）。
-- QuiescencePermit 的 idle 资格语义（→ `causal-wait`）；本包只拥有观察 machinery。
-
-## Independent Change Test
-
-迁到另一 Host：只要 adapter 提供同等 capability（snapshot / coarse wake / transform / tool /
-session API / identity observation），participant/mission/durability WHAT 不变（boundary card）。
+- 业务层消费流式碎片，导致在网络重排或上游更新时产生虚假完成判定。
+- 将传输重试或中间错误误判为业务终止，破坏降级与恢复预算。
+- 上下文压缩开关失效却继续运行，导致物理历史丢失而无法感知。
+- 模糊匹配工具调用与消息 ID，引发跨会话的数据错配与假绿测试。

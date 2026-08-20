@@ -1,75 +1,42 @@
-# WHY — review-assurance
+# review-assurance — WHY
 
-## 不可替代的存在理由
+## 1. 存在理由与核心矛盾
 
-`review-judgement` 回答了「PERFECT/REVISE **意味着什么**」。但一个 reviewer 输出了 judgement，**不等于系统已经证明这个 judgement 有资格被消费**。`review-assurance` 回答的问题是：
+`review-judgement` 确立了 `PERFECT` 与 `REVISE` 的判定哲学，但 Reviewer 输出裁决并不等同于系统获准消费该裁决。`review-assurance` 必须解决关键的因果证明问题：
 
-> 这个判断，针对的是当前被审对象吗？它消费了必要的 challenge 吗？它的证据完整到可以被下游使用吗？
+> 当前判断是否针对当前被审对象？它是否真正消费了必要的 challenge？其证据链是否完备到足以供下游系统消费？
 
-如果 assurance 缺席，下列退化就会发生：
+若缺乏严格的保证机制，系统将退化为以下失败形态：
 
-- **旧 tree 上的确认被消费**：rebase 或后续提交改变了被审代码，旧的双 PERFECT 仍被当作当前确认——系统消费的是针对已不存在对象的判断。
-- **same-root 猜测假绿**：Host 重排消息时，仅凭 AuthorityRoot 或 PhysicalMessageId 相同就确认第二次 PERFECT——确认链不证明模型真的看过 challenge，只证明消息「看起来相关」。
-- **外围 Map 补身份**：Guard 依赖外围可变 Map 补 witness 身份——恢复与并发 Job 会静默读到别人的确认或空确认。
-- **「只有 verdict、没有 report」被当作可消费**：VerdictKnown 立即放行下一 TodoWrite——Manager 拿不到 canonical 报告，或 Host 用 terminal 摘要顶替 LWR。
-- **基础设施失败伪装成业务 REVISE**：create/resume/assignment/LWR 物化失败被写成 REVISE——Manager 被派去「修复」系统故障，Journal 里留下伪造 settlement。
-- **过程 PERFECT 冒充终末 witness**：process 一次判断被计入 terminal dual-PERFECT——终末 2N 代数被稀释，mission 在证据不足时结束。
-- **把过程评审与结果评审 DRY 成同一 continuation**：过程评审一次 durable `judge` 已经完成本轮，
-  回执应明确收下并结束；结果评审第一次 PERFECT 恰恰尚未完成，必须只返回 skeptical challenge，
-  再取得第二次独立 judgement。若两者共享同一「received + challenge」回执，模型会同时收到
-  「结束对话」与「继续评估」两个冲突命令，dual-PERFECT 必然出现缺口。
-- **结果 Reviewer 正常结束就放弃确认链**：第一次 PERFECT 后模型可能在 challenge 后结束当前 run。
-  这不是第三种 judgement，也不是可接受的 fail-closed 终点；Finality CE 必须在 waiter/terminal
-  observation 已经就位的前提下 nudge 同一 Reviewer，继续取得缺失 judgement。真正的 transport /
-  Journal / record / tree 失败则属于 fatal infrastructure failure，绝不能伪装成业务 outcome。
+1. **针对过期代码状态的确认被错误消费**：代码发生 rebase 或后续提交后，旧的确认仍被视作当前状态的证明，导致系统消费了针对已失效对象的判断。
+2. **凭同名请求或消息猜测因果**：仅凭 AuthorityRoot 或 PhysicalMessageId 相同就假定第二次 PERFECT 成立，无法证明模型确实消化了 challenge。
+3. **依赖外围可变状态补充身份**：Guard 依赖外部 Map 或存储的布尔标志推导确认状态，导致并发或崩溃恢复时发生身份串扰与空确认。
+4. **未就绪的判断被提前消费**：仅有 `VerdictKnown` 而无完整报告时即放行下游操作，导致下游拿到空壳报告。
+5. **系统故障被伪装为业务结论**：Reviewer 会话创建、分配或报告物化失败被错误记录为业务 REVISE，迫使执行者去修复系统本身的故障。
+6. **过程判断混淆终审证明**：过程评审单次 PERFECT 被计入终审的 dual-PERFECT 证据链，稀释了终结质量门的证明强度。
 
-`review-assurance` 存在的意义：**judgement 的消费资格必须由 bounded evidence（request-range 记录）、fresh witness（当前 tree/barrier）与因果确认（challenge 出现在 seal 里）建立**。
+`review-assurance` 保证：**Judgement 的消费资格必须基于有界事实记录（request-range bounded LWR）、新鲜证人（当前 tree/barrier）以及因果确认（challenge 在物理执行边中被真实消费）建立**。
 
-## RED 长什么样
+## 2. 独立存在测试（Independent Change Test）
 
-满足以下任一情形，世界就是 RED：
+若重写 dual-PERFECT 的因果编排、witness 数据结构或 record-ready 代数，`review-judgement` 的判断哲学（如 discrimination 准则、材料性判定）无需任何改动。
 
-1. 系统可以消费针对旧 tree / 错误 frontier / 未看 challenge / 缺 report 的 judgement；
-2. 确认可以凭 AuthorityRoot / PhysicalMessageId 猜测成功，而不需要 seal 证明 challenge 被消费；
-3. Guard 的确认依据依赖外围 Map 或存储的布尔标志，而不是自包含 witness 的派生谓词；
-4. 在「仅有 verdict、报告未 record-ready」时提前 append 空壳 `TodoReviewConcluded`；
-5. record-ready 判定用较晚 XTrace head 替换冻结 frontier、分两次读取 coverage 与 LWR、或用 timer/sleep/wall-clock 轮询；
-6. 基础设施失败（create/resume/assignment/LWR 物化）被写成业务 PERFECT/REVISE；
-7. process PERFECT 计入 terminal dual-PERFECT，或 process REVISE 被当成 `FinalityRejected` 事实。
-8. Finality 第一次 PERFECT 的 tool result 同时包含「judgement received / conclude」与 challenge，
-   或 Reviewer 在 required second judgement 前正常 terminal 后没有被 nudge。
-9. Finality 的 typed infrastructure failure 被折叠成 `Undecided`、REVISE、PERFECT 或任何 Manager-facing
-   业务经验，而不是 fail-fast diagnostic。
+反之，若整体替换 Reviewer 的提示词引导或打分维度，只要其输出仍为强类型 verdict，`review-assurance` 的因果确认链与失效判定同样保持不变。两个包拥有正交的失败域。
 
-## 为什么必须独立存在（Independent Change Test）
+## 3. 核心不变量与失败判定
 
-HANDOFF §6.4 / §7.6：
+系统在以下任一情况发生时判定为 RED：
 
-> 判断哲学可以整体重写，而 witness/finality 因果协议不变；反之亦然。
+- 系统消费了针对旧 Git tree、错误 frontier、未消费 challenge 或缺失报告的 judgement。
+- 确认判定依赖 AuthorityRoot 或文本猜测，而非基于强类型物理执行标识建立因果。
+- 确认依据依赖外围 Map 或存储的布尔标志，而非自包含 witness 的派生谓词。
+- 在报告未达成 record-ready 时提前持久化 `TodoReviewConcluded`。
+- record-ready 判定使用较晚的 XTrace head、分步读取不一致 snapshot，或采用 wall-clock 轮询。
+- 基础设施异常（如物化失败、传输超时）被折叠为业务 PERFECT 或 REVISE。
+- 过程评审 verdict 计入终审 dual-PERFECT 代数，或过程 REVISE 被视作终审拒绝事实。
 
-具体：你可以重写 dual-PERFECT 的 direct-CE 因果协议，judgement 的 discrimination 语义一行不改；你也可以重写 Role Law / Examiner's Ledger 的判断方向，typed physical challenge edge、attempt identity、tree invalidation、record-ready 代数一行不改。两个 failure meaning 完全不同：
+## 4. 依赖边界
 
-- `review-judgement` RED = reviewer 可以凭表演/checklist/偏好决定 accept/reject；
-- `review-assurance` RED = 系统可以消费针对旧 tree / 未看 challenge / 缺报告 的 judgement。
-
-## 与相邻包的边界（为什么这些不归我）
-
-| 邻近事实 | 真正的 owner | 为什么不归 assurance |
-|---|---|---|
-| PERFECT/REVISE 的意义、materiality、checklist 禁令 | `review-judgement` | 判断哲学；assurance 只消费判断 |
-| 1:1 Rk 派生、lag-1 节拍、CurrentObligations | `obligation-ledger` | 账本规则；assurance 只管「何时可消费」 |
-| 终末 cohort / rejection / blessing / rest / drain | `finality` | 不可逆结束资格；assurance 提供证据原语 |
-| canonical LWR 的表示/物化/三标题 | `work-record` | 记录表示；assurance 只拥有「record-ready 才可消费」与 request 绑定 |
-| Host 因果读的传输侧（physical execution binding / PromptKey acceptance） | `host-boundary` / `interaction-authority` | 传输能力；本包只消费 typed physical identity 并 fail closed |
-| 等待的因果可观测性（awaitChangeFrom） | `causal-wait` | 等待机制；「record-ready 等待必须事件驱动」的 review 用法是本包 |
-| tool 语法红字分类 | `capability-enforcement` | 三态失败分型的工具侧；「infra 不伪装 REVISE」的 review 侧是本包 |
-| infra fatal fail-fast / 崩溃恢复 | `host-boundary` / `crash-reconciliation` | 系统故障处置；本包只要求不伪 REVISE、义务保持 outstanding |
-
-## 历史教训（考古）
-
-- 历史 why/review 条款：单 PERFECT 可被模型随口同意。旧实现曾用双 PERFECT + provider-input seal 证明 challenge 消费；本轮已废弃该文本/digest 推断，改由 direct CE + PromptKey→PhysicalUserMessageId 的 typed physical edge 建立因果。Witness 自包含（拒外围 Map）；tree 变化作废（审的是代码状态不是 Session 情绪）。
-- 历史 why/review「VerdictKnown 与 ConsumableReview 分型」：把「只有判断、尚无 report」挤进同一个 `TodoReviewConcluded`，恢复路径无法区分「已可 settle」与「已可展示报告」。
-- 历史 why/review「为何基础设施失败不是 REVISE」：伪装成 REVISE 会触发错误 semantic merge、推进虚假 ConsumableReview，让 Manager 去修系统故障。
-- 历史 why/review「为何禁止 wall-clock polling」：sleep/timer 把 Journal 因果等待退化成运气；本地 waiter 崩溃后无法从 durable facts 重建同一等待。
-- 历史 change（fix-revise）（GARBAGE transcript 但考古高价值）：Gap A 曾暴露 record-ready 的 fail-closed 回归——Blogger 放弃时 `recordReadiness` 必须判 `RecordUnavailable` 并 fail-close 至 `FinalityUndecided`，绝不产生缺 `# Work log` 的 `FinalityRejected`；waiter 崩溃必须以相同 ToolCallId 从 durable evidence 续等（`awaitChangeFrom`，无 timerTask/sleep re-probe）。
-- 历史 change（magic-todo）：两段式事实分型 `VerdictKnown(k)` vs `TodoReviewConcluded(k) ≡ ConsumableReview(k)`；`ensureReview` 可重入；Rk obligation pending 看的是缺失 Concluded 而非缺失 VerdictKnown。
+```text
+DEPENDS ON: review-judgement, semantic-trace, durable-events, causal-wait
+```

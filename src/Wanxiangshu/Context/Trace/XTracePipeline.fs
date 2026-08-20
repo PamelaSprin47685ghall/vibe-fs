@@ -131,8 +131,7 @@ module XTracePipeline =
                     traceState
                     strengthReplayPlans
 
-            traceState
-            |> Option.iter (refreshCompanionXTrace companions sessionId)
+            traceState |> Option.iter (refreshCompanionXTrace companions sessionId)
 
             do! applyManagerNarrativeRewrite journal (Some sessionId) traceState rawMessages outObj
         }

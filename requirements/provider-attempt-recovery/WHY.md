@@ -1,36 +1,24 @@
-# provider-attempt-recovery — 存在理由
+# provider-attempt-recovery — WHY
 
-## 一句话 WHY
+单次 provider attempt 已确认失败后，系统必须能在不重新选择 Authority、不改变 participant 身份的前提下有界地更换物理执行绑定继续，同时防止无限自动消耗资源。
 
-单次 provider attempt 已确认失败后，系统必须能在**不重新选择 Authority、不改变 participant
-身份**的前提下有界地换物理执行绑定继续，同时防止无限自动消耗资源。
+**provider-attempt-recovery 保证：一次已确认的 provider attempt 失败之后，系统明确下一步如何切换执行者、最多重试几次，以及何时彻底停止。**
 
-## 为什么这个 WHY 不可替代
+## 核心不变量与张力
 
-「换执行者继续」与「崩溃后恢复现场」是两种完全不同的故障（见 `crash-reconciliation` 的 WHY）：
-attempt 失败是**业务层面已经确认的失败**——Host snapshot 证明了这一次物理请求没有成功；崩溃是
-**进程丢失了临时状态**——需要从 durable facts 重建。把两者合并成一个 recovery 概念，会让
-「失败计数」与「恢复预算」互相污染，也会让 crash 后的临时内存冒充恢复权威。
+- **确认失败 vs 进程失忆**：attempt 失败是业务层已由快照确认的失败（与 `crash-reconciliation` 的进程失忆完全区分），必须通过单一 ledger 推进 cursor。
+- **无界侧循环 vs 有界自动预算**：A/A/B/B 侧循环本身无界，但自动恢复预算严格有界（达到预算后停止自动请求，需等待新 Authority Root 或显式动作）。
+- **换执行者 vs 不换身份**：Fallback 仅改变下一次物理执行的 EffectiveAgent，绝不改变 SessionPersona、语言、system prompt 或 Authority 身份。
 
-本包只回答一个问题：**一次已确认的 provider attempt 失败之后，下一步怎么走，走几次，走到哪停。**
+## 违反边界的失败意义
 
-## 世界什么时候 RED
+- provider 失败后系统重新选择 Authority、变更 Persona 或改写 system prompt。
+- 同一次失败被多个观察者重复记账，导致预算被超额消耗。
+- 预算耗尽后系统依然自动发出新的物理请求。
+- 成功停留在奇数 Offset 时被误判为 armed，导致每一轮都错误触发历史压缩。
 
-- provider 失败后系统重选了 Authority、换了 Persona、改了 system prompt 或换了语言（换人/换世界语）；
-- 同一次失败被两个观察者重复记账，预算被错误消耗（一次失败花掉两次预算）；
-- 预算耗尽后系统仍自动发出新的物理请求（无限烧钱）；
-- Host 的传输层 Attempt 序号被当成领域连续失败计数（重启时错误清零或错误耗尽预算）；
-- 成功停在奇数 Offset 后被误判为 armed，每轮都压缩历史（把历史碾到预算地板）；
-- 恢复预算、Offset、SideA/B 等机器代数泄漏进 provider horizon（participant 被迫解码机器状态）。
+## DEPENDS ON
 
-## 与相邻包的边界
-
-| 看似邻近的事实 | 归属 | 为什么 |
-|---|---|---|
-| 进程/插件中断后的恢复 | `crash-reconciliation` | 不是「一次失败」，是「临时状态丢失」 |
-| 病态重复输出的提前止损 | `degeneration-guard` | 是止损，不是换 binding 继续 |
-| cursor 推进只改哪个 agent | `participant-identity`（binding 本体）+ 本包（推进机制） | 换执行者 ≠ 换人；身份字节不变是 identity 的 guarantee |
-| 发送 continuation 的 wire 协议 | `dispatch-protocol` / `interaction-authority` | 本包只决定「发不发、发几次」，不拥有 prompt wire 语义 |
-| 压缩槽（squash/probe）的产物语义 | `context-compression` | armed 合取是恢复槽门，产物是压缩域 |
-| abort 是否等于 terminal | `effect-accounting` | 本包消费「已确认失败」，不定义失败分型 |
-| 恢复槽内是否压缩 | `context-compression`（CTX-006..012） | 本包只负责失败→推进→预算→终止 |
+- `participant-identity`
+- `execution-model-routing`
+- `interaction-authority`

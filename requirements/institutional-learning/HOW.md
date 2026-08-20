@@ -1,57 +1,42 @@
-# institutional-learning — HOW（非 normative）
+# institutional-learning — HOW
 
-## 目标实现形状
+## 架构机制与核心模型
 
-维持一个私有、短生命周期 Enhancer，而不是新 agent society：
+### 1. 私有 Enhancer 提炼流程
 
-```text
-Experience(kind = Celebrate | Regret, text)
-  -> Enhancer(currentRulebook, experience)
-  -> Absorb existingRule | Birth candidateRule | Discard reason
-  -> behavior-diagnosis institutional admission when Birth
-```
+1. **调用模型与输入边界**：
+   - `celebrate` 与 `regret` 作为领域入口，分别构造类型化的 `Experience(kind, text)` 输入；
+   - 调度短生命周期的私有 Enhancer，传入当前会话绑定的 live Rulebook 快照与经验正文，限制其在受控上下文内提炼；
+   - 输出纯代数结果：`Absorb(existingRule)`、`Birth(candidateRule)` 或 `Discard(reason)`。
 
-Enhancer 不获得 provider-facing tool surface；`celebrate/regret` 是唯一入口。它可以使用已有模型调用能力完成抽象，但输入必须被限制在 experience + current canonical Rulebook，不展开新调查。具体模型/tier 是 HOW。
+2. **准入交互与规则合流**：
+   - 对于 `Birth` 结果，调用 `behavior-diagnosis` 的纯准入预检接口，验证中英双语完整性、命名冲突及结构合法性；
+   - 预检通过后获取携带预期 `RulebookRevision` 的准入事实凭证，由底层保证规则库一致性。
 
-## canonical Enforcer admission
+### 2. 原子事务与 Attention Closure
 
-保持 `behavior-diagnosis` 的“一个 live Rulebook / 一个 TipName namespace”不变。BIRTH 生成双语 candidate，调用该 owner 的 institutional admission；ABSORB/DISCARD 都不写任何 rule。admission 负责 durable `InstitutionalRuleBorn` 与 live union validation，不引入 learned-rules database，也不要求安装目录可写。
+1. **Staging 与原子提交**：
+   - 经验评估完成后，首先在内存中阶段化待写入事实；
+   - 若为 `celebrate`，调用 `attention-regulation` 提取当前未弹出的 `DeferredWork` 列表；
+   - 发起单笔原子持久化事务，同时提交：
+     - `LearningDispositionCommitted(occurrenceId, frozenResult, disposition)`
+     - `InstitutionalRuleBorn(...)`（仅 BIRTH 产生）
+     - `DeferredWorkResurfaced(...)`（仅 celebrate 且存在暂缓项时产生）
+   - 若发生预期 `RulebookRevision` 冲突，整笔事务放弃提交并允许一次重新评估。
 
-这使 Enhancer 本身保持纯粹：它只做 generalization/disposition，不获得 repository filesystem mutation 权限。
-
-## celebrate 与 defer 的组合
-
-celebrate 先得到 learning disposition，再调用 `attention-regulation` 的窄 staging surface 读取“本 occurrence 若成功应 resurface 哪一批”，不先写 drain。BIRTH 同理先调用 `behavior-diagnosis` 的 pure admission precheck。全部 precheck 通过后，一次 EventStore atomic commit 写入：
-
-```text
-LearningDispositionCommitted(occurrence, frozenResult, disposition)
-[InstitutionalRuleBorn(...)]             # Birth only
-[DeferredWorkResurfaced(...)]             # Celebrate only, 0..N
-```
-
-tool result 先写 learning outcome，最后追加 frozen deferred items。replay 先查 `LearningDispositionCommitted`，命中则直接返回 frozen result，不重新跑 Enhancer/precheck/projection。
-
-## DEPENDS ON
-
-`institutional-learning → attention-regulation, behavior-diagnosis, durable-events`
+2. **重放与结果冻结**：
+   - 无论学习结果为 ABSORB、BIRTH 还是 DISCARD，均由 `LearningDispositionCommitted` 事实冻结其呈现文本；
+   - 重放路径直接读取持久化事实返回，不重复调用 Enhancer、不重复写入规则、不重复弹出暂缓项。
 
 ## 验证与测试落点
 
-可执行 proof 在 review 后由 GAP 建立：
-
-| WHAT | 最低充分 proof |
+| 命题 | 落点测试 |
 |---|---|
-| INSTITUTIONAL-LEARNING-001 | codec/tool contract：single string + polarity，不要求 schema 化经验 |
-| INSTITUTIONAL-LEARNING-002 | pure disposition algebra；每 evaluation attempt one Enhancer；stale revision 最多一次 fresh re-evaluation；最终 ≤1 committed disposition |
-| INSTITUTIONAL-LEARNING-003 | capability/architecture：Enhancer 无 repository/web investigation surface |
-| INSTITUTIONAL-LEARNING-004 | integration：只有 BIRTH 调 canonical institutional admission；ABSORB/DISCARD 零 mutation、安装目录零写入 |
-| INSTITUTIONAL-LEARNING-005 | validation/property examples：缺 trigger/negative/distinction/novelty 时不能 BIRTH |
-| INSTITUTIONAL-LEARNING-006 | positive success mechanism 可诚实保留，不强制惩罚式改写 |
-| INSTITUTIONAL-LEARNING-007 | temporal：enhance → validate → resurface；regret 不 drain |
-| INSTITUTIONAL-LEARNING-008 | atomic learning transaction：precheck/stale RulebookRevision fail zero-commit；BIRTH/receipt/defer resurfacing 无半提交；replay 不再跑 Enhancer/不重 drain |
-
-## 历史与弃权
-
-- 不新增 `enhance` provider tool；Enhancer 是 `celebrate/regret` 的私有 consequence。
-- 不把 ABSORB/BIRTH/DISCARD 暴露成三个工具。
-- 经验可能被现有 rule 或 primitive（如 `enough`）完整吸收，此时应 ABSORB/DISCARD，不为“学习过”强造新 rule。
+| INSTITUTIONAL-LEARNING-001 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-002 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-003 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-004 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-005 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-006 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-007 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-008 | `requirements/institutional-learning/tests/README.md` |

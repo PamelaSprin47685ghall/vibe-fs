@@ -1,49 +1,42 @@
-# WHY — 为什么 `capability-enforcement` 必须独立存在
+# capability-enforcement — WHY
 
-## 不可替代的存在理由
+## 领域动力与核心张力
 
-office 的 authority 写在 consequence 模型里（`office-capability`）。但如果 provider-visible schema
-与 runtime execution gate 各自维护一份能力表，就会出现两类分叉：
+Office 的权能由其后果模型决定，但在落地到执行层时，面临**模型可见模式（Provider-visible Schema）**与**运行时拦截门禁（Runtime Execution Gate）**可能发生分叉的根本张力：
 
 ```text
-schema 有、gate 无   → provider 看得见工具、schema 撒谎（调用即失败/越权执行被拒但表面可用）
-gate 有、schema 无   → provider 看不见却可能执行（更危险：无资格面被伪造调用命中）
+Schema 有、Gate 无   ──► 产生虚假承诺：模型可见工具但调用即报错
+Gate 有、Schema 无   ──► 产生安全隐患：模型虽不可见但可通过伪造调用越权执行
 ```
 
-真实历史：历史 change（js-capability-projected-tools）明确「手写 role→JS 矩阵 vs 从唯一
-权威投影」被拒——任何第二份矩阵必然与权威漂移；历史 why/agent 条款「双层权限 vs 单层可信」被拒——
-Host 配置可漂，只信一层会在配置异常时漏工具或越权执行。历史 why/js-tools 条款的四层同构
-（capability → base-class member → description → example → runtime gate）是同一律在编程面的应用：
-模型看到的与可执行的必须完全一致，不需要读权限矩阵。
+若手写多套角色与工具映射，或仅依赖单层机制，配置漂移必然发生。
 
-本包把「同源 + 不扩权」钉成独立合同：schema 层与 gate 层读**同一** capability truth；projection
-只能按 office + request contract 收窄，任何执行档（tier / replica / leaf）不得扩大 office
-entitlement。
+`capability-enforcement` 的核心不变量：
+- **同源派生**：Schema 呈现与 Runtime Gate 必须从唯一的 `Roles.permissions` 权威推导，严禁维护第二份映射矩阵。
+- **投影只收窄不扩大**：基于请求类型（RequestKind）的投影可以根据上下文收窄能力，但绝不得突破 Office 的固有权能上限。
+- **档位等权**：同一 Office 的 fast 档与 deep 档拥有完全相同的工具权限。
+- **内部工具隔离**：运行时合成的内部角色工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）绝不进入未受托角色的工具面。
+- **四层同构**：面向编程的 `js-*` 工具在类型方法、描述文案、示例代码与运行时门禁四层保持严格同构。
+- **双层 Fail-Closed**：角色未决时拒绝一切执行；Host 配置异常时优先落地 deny 默认并安全终止进程。
 
-## RED 是什么样
+## 破裂后果
 
-- schema 与 runtime gate 漂移（某工具只见于 schema 或只见于 gate）。
-- 某 execution tier（fast/deep/replica/leaf）获得比同 office 其它档更多的 authority。
-- internal-only participant/action（Blogger/Distiller/Bookkeeper）能被无资格 participant 合成/执行。
-- Host 配置异常时权限写失败，managed agent 回落到 Host 默认（如 `bash` 开放）。
-- Host 配置 gate 已判定非法却只抛可捕获异常，Host 继续运行；后续 managed child 因缺失可信 inventory 才以无关的 binding 错误爆炸。
-- 手写第二份 role→工具矩阵；`js-*` 表面四层不同构（description 有、runtime 拒绝）。
+- Schema 与运行时门禁脱节，导致越权执行或误导模型决策。
+- 派生副本（如 StrengthReplica）或低档位角色获得超出预期的修改权限。
+- 内部专用工具泄漏至交互式会话，导致内部状态被非法操纵。
+- Host 配置异常时降级为全局放行，造成系统级安全漏洞。
 
-## 为什么不并进相邻包
+## 边界与关系
 
-- `office-capability` 答「有资格产生什么后果」（entitlement 语义）；本包答「schema/runtime gate 如何
-  同构、如何保证不扩权」（enforcement 语义）。二者是独立 WHY（INDEX「关键拆分裁决」：新增
-  capability-enforcement，office consequence 与 schema/runtime gate 同构是两个不同 WHY）。
-- `participant-identity` 提供身份轴（谁在行动）；本包消费它，但 gate 同构不是身份问题。
-- `repository-programming` 应用同构律到编程面（JS SDK）；律本身唯一归本包（COVERAGE「1 OVERLAP
-  修复」：同构/同源律唯一归 capability-enforcement，repository-programming 只应用）。
-- `participant-horizon` 答「什么信息有资格被看见」（admission）；本包答「看见的与能执行的如何
-  一致」（执行面）。internal participant 不进无资格 choice surface 的 admission 归 horizon，其
-  schema/gate 拒绝归本包。
-- 独立变化测试：把 ToolPermission Set 改成 capability tokens/traits，并重写 Host/plugin gate，
-  而 office authority 与 participant-visible action contract 不变——本包必须能单独承受
-  （boundary card INDEPENDENT CHANGE）。
+- `office-capability`：定义各职位的权能事实；本包负责在执行层强制同构执行。
+- `participant-identity`：提供身份事实；本包消费其角色分类。
+- `attention-regulation`、`concern-routing` 与 `institutional-learning`：提供特定交互效用动作的边界；本包负责其工具可见性与门禁投影。
+- `participant-horizon`：定义模型视界的信息准入；本包负责工具面的具体暴露与阻断。
 
-## 一句话
+## DEPENDS ON
 
-看见的 = 能执行的，且不扩大 office entitlement。同源是唯一防漂移手段。
+- `office-capability`
+- `participant-identity`
+- `attention-regulation`
+- `concern-routing`
+- `institutional-learning`

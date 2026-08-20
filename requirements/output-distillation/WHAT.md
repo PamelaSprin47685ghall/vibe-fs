@@ -1,168 +1,53 @@
-# output-distillation — 可观察合同
+# output-distillation — WHAT
 
-本文件是 `output-distillation` 包的唯一 normative 语义合同。证据指针 → `HOW.md`。
+## DISTILL-001: 大输出有损但诚实地压成 bounded observation
 
-## DISTILL-001：大输出有损但诚实地压成 bounded observation
+当执行输出超过 participant horizon 的承载上限时，系统必须将其压缩为 bounded observation，严禁将其静默截断为虚假的空成功结果。压缩过程可以有损，但必须保留能够改变后续判断的核心事实，剔除冗余的进度噪声与装饰信息。
 
-当执行输出大到不能原样进入 participant horizon 时，系统把它压成 bounded observation；**不得**静默
-截断成「成功空结果」（EXEC-012）。压缩是有损的，但每个损失都必须是诚实的选择——保留改变后续判断
-的事实，丢弃重复、progress noise、横幅、spinner（`resources/provider/role/distiller/`）。
+## DISTILL-002: 保留会改变后续 judgment 的事实
 
-含义/动机：截断冒充成功是 RED 的第一形态；「诚实」= 摘要必须携带它声称携带的信息，且不假装看见了
-超出其获的东西。
+压缩必须优先保留具体且具备区分度的关键印记：错误类型、带行号的文件路径、失败的断言信息、panic 或异常、互斥的矛盾行、以及携带上下文的原始错误尾部。严禁进行泛化的无差别粗暴抹除。
 
-证据：NEW `tests/distiller-fragment-humility.test.mjs`（失败时承认不完整而非报成功）；anchors
-`distinguishing`（双语言命中）。
+## DISTILL-003: fragment 谦逊——沉默的 fragment ≠ 整体成功
 
-## DISTILL-002：保留会改变后续 judgment 的事实
+单个输出分块（fragment）中未包含失败文本不等于全局执行成功。当分块无法纵览整体时，必须在结果中明确承认分块的视野局限，保持边界可见，严禁将局部无异常升级为整体验收结论。
 
-压缩保留：error type、带行号的 path、失败的 assertion、panic/exception、无法同时为真的矛盾行、
-约束主张的 counts、仍携带伤口的相关 raw tail（Role Law）。不按惯例整类保留（不是每条 stack/path/
-count 都留）；保留那些把这次 failure/conflict/未决 condition 与泛泛失败故事区分开的具体印记。
+## DISTILL-004: 合并多个 fragments 不发明因果或成功率
 
-含义/动机：下一动作由这些区分性事实决定；丢一个关键 condition = 下一动作走错方向。
+多个分块结果的合并必须基于实质失败的并集展开，保留所有冲突与分歧。严禁依据安静分块的数量投票否决真实存在的个别失败，严禁推测因果关系或编造成功率统计。
 
-证据：anchor `distinguishing`；REUSE `requirements/output-distillation/tests/large-gate.test.mjs`（预算合同，见 DISTILL-011）。
+## DISTILL-005: 蒸馏结果对未见过原始输出的 reader 仍可用
 
-## DISTILL-003：fragment 谦逊——沉默的 fragment ≠ 整体成功
+蒸馏产出的摘要必须保持自包含与可定位性，使从未接触过原始大文本的读者能够仅凭摘要中的路径、行号与错误线索直接回到问题现场，严禁假装包含未观察到的上下文。
 
-一个 fragment 里没有 failure 文本 ≠ 全局成功；截断正文上方的绿色 header 不是裁决；当 fragment
-看不见整体时，说出它所能看见的并让边界保持可见（Role Law「保持 fragment 的谦逊」）。蒸馏结果
-**必须**承认 fragment 的视野边界，不得把局部当整体。
+## DISTILL-006: 失败路径 = partial account + 最后 chunk 原始 tail
 
-含义/动机：fragment 的视野边界是认识论事实；伪装成整体成功会污染下游全部判断。
+分块处理过程中任一代理发生超时或失败时，系统严禁伪造完整成功，必须产出部分已解析内容（partial account）并附带最后一个分块的原始字节（raw tail）作为最近未压缩证据；失败代理的工作记录不得作为成功摘要呈现。
 
-证据：NEW `tests/distiller-fragment-humility.test.mjs`（summary 命中
-`/Condensation incomplete|Most recent raw output/`、不含 `summary-for-<failedId>`）；
-anchor `fragment-humility`（`Do not manufacture success`）。
+## DISTILL-007: 蒸馏输入是 spool；chunked map + online reduce
 
-## DISTILL-004：合并多个 fragments 不发明因果或成功率
+蒸馏机制消费流式落盘的 spool 文件并进行固定大小的分块映射（map）。映射结果按分块索引顺序等待，并在线递进归并（reduce）为单一摘要。任一映射失败时，立即取消所有受控的关联代理，但已完成的同伴结果正常参与收尾。
 
-合并按实质性 failures 的并集进行；保留冲突、不调和成更光滑的故事；一个具体 failure 不会被许多
-安静的 chunk 投票否决，许多安静 chunk 也不构成「那次 failure 并不真实」的证据（Role Law
-`merge-conflicts`：`not outvoted`）。不得猜测 cause、不得补全缺失 evidence、不得把听起来合理的解释
-升级成 finding（`no-invented-causality`）。
+## DISTILL-008: 每 chunk 定向 await 一次；permit 门分型
 
-含义/动机：因果与成功率是发明物；合并的唯一合法运算 = 保留冲突的并集。
+每个分块的映射代理仅允许进行一次定向等待，且必须通过恢复准入门。遇到恢复等待状态时进入有限等待，遇到不可恢复故障时直接快速失败，严禁无凭证伪造就绪状态。
 
-证据：anchors `merge-conflicts` / `no-invented-causality`（双语言命中）；NEW
-`tests/distiller-fragment-humility.test.mjs`（失败者被诚实保留而非投票消除）。
+## DISTILL-009: Distiller 是私有 runtime，不进公开 fork/horizon
 
-## DISTILL-005：蒸馏结果对未见过原始输出的 reader 仍可用
+蒸馏执行所用的映射子会话属于宿主私有运行时，具备隐藏句柄所有权，不得向外部模型暴露为公开的 fork 或 horizon 目标，其分块与拓扑细节对业务调用方透明。
 
-一份蒸馏结果必须对从未见过原始大体量文本的读者仍然可用（Role Law）；它不该假装看见了超出其所获
-的东西。可定位性 = 读者能凭摘要中的 path/行号/失败痕迹回到现场。
+## DISTILL-010: Distiller 不执行、不改变世界、不裁决
 
-含义/动机：蒸馏的下游读者只看到摘要；不可定位的摘要 = 没有观察。
+蒸馏角色仅承担“在长度压力下进行事实提炼”的单一职责，不具备外部命令执行、世界状态修改或代码验收裁决的权能，与命令执行角色严格解耦。
 
-证据：anchor `locatable-to-unseen-reader`；NEW `tests/distiller-fragment-humility.test.mjs`
-（verbatim 含 marker——原始 chunk 的定位痕迹必须存活）。
+## DISTILL-011: Large Gate 与输出预算合同一致；禁无界缓冲
 
-## DISTILL-006：失败路径 = partial account + 最后 chunk 原始 tail
+大输出进程的并发执行必须受到单持有者门禁（Large Gate）的严格约束，输出预算估算必须与门禁获取逻辑一致。内存缓冲必须设有上限并在超限前提前流式落盘，严禁无界缓冲。
 
-map/reduce 任一 agent 失败（NotFound 硬失败 / 真超时）：不 throw、不冒充完整成功；产出 partial
-account + 最后一个 chunk 的原始字节（`raw_tail`）作为「最近的原始输出」（`Distillation.partialWithTail`：
-`CondensationIncomplete` 带 account、`CondensationUnavailable` 无 account，二者都带 raw_tail）。
-失败 agent 的 work record 不得出现在 summary 中（不虚构成功）。
+## DISTILL-012: 自定义 tool 文本结果确定性留尾截断
 
-含义/动机：失败时保留最近原始输出 = 对未见过原文的读者诚实交代「我们只压缩到这一点」；
-虚构失败者 summary = 把 fragment 当整体。
+插件回传给宿主的自定义工具文本结果在触发宿主默认头部截断前，必须在指定行数与字节限制下完成确定性留尾截断，保留显式截断标记与最新的尾部完整行，保证最终结果满足边界且不再被二次随机截断。
 
-证据：NEW `tests/distiller-fragment-humility.test.mjs`；MOVE
-`tests/executor-summarize.test.mjs`（`EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await`、
-`EXEC_distill_spool_await_not_found_hard_fail_collects_failure`、`EXEC_distill_spool_family_waiting_timed_out_not_reported_as_success`）。
+## DISTILL-013: 蒸馏不返回 chunk 统计仪表盘
 
-## DISTILL-007：蒸馏输入是 spool；chunked map + online reduce
-
-蒸馏消费 `ProcessOutcome.Spooled` 的 spool 文件（`Spool.readChunks` 按 204800 B 分块）；每 chunk 一个
-map agent（`distillFragment`），结果按 chunk index 顺序等待；在线 reduce（`rippleInsert`，扇入 8）
-把片段逐级归并成单一 account；任一 map 失败 → `cancelOwned()` 取消全部 owned map/reduce agents，
-同时已成功的 siblings 仍各自 await 完成（不 skip）。
-
-含义/动机：并行 map 收敛成确定性单账户；失败立即止损（cancelOwned），但已发起的观察不被丢弃。
-
-证据：MOVE `tests/executor-summarize.test.mjs`（`EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash`、
-`EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent`、`EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await`）。
-
-## DISTILL-008：每 chunk 定向 await 一次；permit 门分型
-
-每个 chunk 的 map agent 恰好一次 `AwaitAgentWithPermit`（无 stash skip、无跨 agent await）；
-`RECOVERY_WAITING` → `ForkError.TimedOut`（等 journal readiness 信号后再一次 fresh permit check，
-无 timer 驱动重探）；`FamilyBlocked` / 真 join 超时 → `ForkError.NotFound`（hard fail，不重试）。
-纯 ForkRuntime 无 journal → fail closed（不铸造 synthetic permit）。
-
-含义/动机：等待必须每次过 permit 门（恢复线性序），且失败分型决定「等一等」还是「认栽」；
-synthetic permit 会伪造恢复就绪。
-
-边界：permit 门与恢复线性序的完整法则 → `crash-reconciliation`；本包只拥有蒸馏侧的等待契约。
-
-证据：MOVE `tests/executor-summarize.test.mjs`（`EXEC_distill_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check`——
-call order `[permit, readiness, permit]`；`EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent`）。
-
-## DISTILL-009：Distiller 是私有 runtime，不进公开 fork/horizon
-
-Distiller 映射子会话是私有 runtime，不暴露为公开 `fork` / `horizon` 目标（EXEC-014、AGENT-008）；
-map/reduce、chunk、session id 属机器 Assignment，不进 provider 工具面；durable handle =
-`HostOwnedHidden`（对父 list/join/horizon/background guard/父恢复不可见，记录仍持久）；`run` 工具
-同步掌控 Distiller 生命周期（fork → permit-gated await → 摘要 → 返回），调用方不 join。
-
-含义/动机：蒸馏是 Host-owned workflow 的私有机制；暴露给 provider 会泄漏机器 Assignment 并把
-内部 worker 变成可委托目标。
-
-边界：隐藏 handle 的生命周期管理 → `managed-session-lifecycle`；Assignment 字段的 horizon 过滤 →
-`participant-horizon`。
-
-证据：REUSE `requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs`（`EXEC_014_distiller_fork_is_host_owned_hidden_and_parent_invisible`）；`tests/distiller-role-contract.test.mjs` 通过 `OpenCode/Tools/DistillationSurface.fs` 观察私有角色合同。
-
-## DISTILL-010：Distiller 不执行、不改变世界、不裁决
-
-蒸馏 role 不执行命令、不改变世界、不判断 implementation 是否值得 acceptance（Role Law）；
-职责是「在长度压力下做选择」。`run`（执行）与 distill（压缩）是两个不同 office 的工具面。
-
-含义/动机：执行证据的产生（process-execution）与执行证据的压缩（本包）必须由不同 authority 承担；
-把二者合一 = 蒸馏者自己制造自己总结的证据。
-
-证据：anchor `no-execution`（distiller Role Law 双语命中，与 `process-execution` 边界互证）；
-`tests/distiller-role-contract.test.mjs` 通过 `OpenCode/Tools/DistillationSurface.fs` 断言零权限与唯一 `run` 执行面；REUSE
-`requirements/process-execution/tests/executor-tool.test.mjs`（`RUN_*` 断言 run ≠ distill，见
-`process-execution` HOW.md）。
-
-## DISTILL-011：Large Gate 与输出预算合同一致；禁无界缓冲
-
-大输出进程的并发由单持有者 gate 约束（`Process/LargeGate.fs`：FIFO cancelable waiters、first holder
-wins、release 泵队）；输出预算合同（estimate → threshold）与 gate 行为一致；禁止无界缓冲
-（EXEC-013）。内存积压封顶（`MemoryBufferBudget`）在到达 OutputLimit 前提前流式落盘。
-
-含义/动机：「输出预算」不是建议——gate 与 collector 必须共同保证一次只允许一个有界的大输出，
-否则预算合同可被并发或积压绕过。
-
-边界：gate 的物理位置在 `Process/`，但其语义 owner 是输出预算合同（本包）；spool 采集本身 →
-`process-execution`。
-
-证据：REUSE `requirements/output-distillation/tests/large-gate.test.mjs`（`VERIFY_009_large_gate_first_acquire_succeeds_immediately`、
-`VERIFY_009_large_gate_second_acquire_waits_until_release`、cancelable waiter 组）；
-`requirements/process-execution/tests/process-runner.test.mjs`（`EXEC_011_large_estimate_acquires_and_releases_the_gate`）。
-
-## DISTILL-012：自定义 tool 文本结果确定性留尾截断
-
-插件返回给 Host 的自定义 tool 文本结果必须在 Host 默认 head truncation 之前完成**确定性留尾截断**
-（ARCH-012 / `Domain/ToolResultBound.fs`）：≤2000 行且 ≤51200 字节时逐字返回；超限时固定 marker
-（`...head truncated (tail kept)...`）+ 确定性尾部（优先最新完整行；单行超限按 UTF-8 scalar 安全
-保留后缀），使最终结果同时满足两项上限、Host 不再二次截断。计量只认 UTF-8 字节与换行。
-
-含义/动机：Host head truncation 丢尾部（最新信息）；确定性留尾 = 压缩方向可预测、可测试。
-边界只限制 tool 返回 wire，不改变内部完整结果的事实来源。
-
-证据：REUSE `requirements/output-distillation/tests/tool-host-codec-full.test.mjs`（ToolResultBound 面，SPLIT 注记见
-HOW.md：wire 渲染 owner → `provider-projection`）。
-
-## DISTILL-013：蒸馏不返回 chunk 统计仪表盘
-
-蒸馏输出不包含 chunk 统计仪表盘、不叙述 map-reduce 机械过程、不报告 success ratio、不用「文本
-如何被切开」的清单装饰返回（Role Law）。被保留的伤口、冲突、count、未决印记才是公开事实。
-
-含义/动机：机械过程是私务；把 success ratio 报告成蒸馏事实 = 用发明物冒充 observation
-（与 DISTILL-004 同源）。
-
-证据：MOVE `tests/executor-summarize.test.mjs`（`DISTILLATION_prompts_carry_no_chunk_index_or_level`——
-prompt 层面 chunk/level 不可见）；anchor `distinguishing`（区分价值是唯一选择标准）。
+蒸馏输出严禁包含分块索引、切片层级、分块计数或成功百分比等反映底层机械切分过程的仪表盘数据。向外部呈现的必须是实质性的业务事实与未决印记。
