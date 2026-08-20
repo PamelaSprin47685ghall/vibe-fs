@@ -76,12 +76,6 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 module HostSignalBootstrap =
 
-    [<RequireQualifiedAccess>]
-    type private ChatExecutionAdmission =
-        | NoRoute
-        | ExternalManaged of SessionId * PhysicalUserMessageId * string
-        | PluginManaged of PromptDispatcher.Runtime * PromptAuthority.PromptClaim * PhysicalUserMessageId * string
-        | Rejected of string
 
     [<RequireQualifiedAccess>]
     type private RoutedChatExecution =
@@ -89,62 +83,11 @@ module HostSignalBootstrap =
         | Superseded
         | ExternalManaged of SessionId * PhysicalUserMessageId * string * OpencodeModel
         | PluginManaged of
-            PromptDispatcher.Runtime *
             PromptAuthority.PromptClaim *
             PhysicalUserMessageId *
             string *
             OpencodeModel
 
-    let private managedAgent (value: string option) =
-        value
-        |> Option.map (fun agent -> agent.Trim())
-        |> Option.filter (fun agent ->
-            not (String.IsNullOrWhiteSpace agent)
-            && (ManagedAgent.requiredNames |> List.contains agent))
-
-    let private externalAdmission sessionId physicalUserMessageId explicitAgent =
-        match managedAgent explicitAgent, physicalUserMessageId with
-        | Some agent, Some physical -> ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent)
-        | Some _, None ->
-            ChatExecutionAdmission.Rejected "EMR-009: managed chat.message has no physical user message id"
-        | None, _ -> ChatExecutionAdmission.NoRoute
-
-    let private agentManagedOfClaim
-        (runtime: PromptDispatcher.Runtime)
-        (claim: PromptAuthority.PromptClaim)
-        (physicalUserMessageId: PhysicalUserMessageId option)
-        =
-        match managedAgent claim.EffectiveAgent, physicalUserMessageId with
-        | Some agent, Some physical -> ChatExecutionAdmission.PluginManaged(runtime, claim, physical, agent)
-        | Some _, None ->
-            ChatExecutionAdmission.Rejected(
-                sprintf
-                    "EMR-009: managed PromptKey %s has no physical user message id"
-                    (PromptKey.value claim.PromptKey)
-            )
-        | None, _ ->
-            ChatExecutionAdmission.Rejected(
-                sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value claim.PromptKey)
-            )
-
-    let private pendingAdmission durable sessionId physicalUserMessageId promptKey =
-        let runtime = PromptDispatcher.forJournal durable
-
-        match runtime.PendingClaim(sessionId, promptKey) with
-        | None -> ChatExecutionAdmission.NoRoute
-        | Some claim -> agentManagedOfClaim runtime claim physicalUserMessageId
-
-    let private pluginAdmission journal sessionId physicalUserMessageId promptKey =
-        match journal with
-        | None -> ChatExecutionAdmission.NoRoute
-        | Some durable -> pendingAdmission durable sessionId physicalUserMessageId promptKey
-
-    let private chatExecutionAdmission journal (decoded: PromptIngressCodec.DecodedMessage) =
-        match decoded.IsHostCompaction, decoded.SessionId, decoded.PromptKey with
-        | true, _, _ -> ChatExecutionAdmission.NoRoute
-        | false, Some sid, Some promptKey -> pluginAdmission journal sid decoded.PhysicalUserMessageId promptKey
-        | false, Some sid, None -> externalAdmission sid decoded.PhysicalUserMessageId decoded.ExplicitAgent
-        | _ -> ChatExecutionAdmission.NoRoute
 
     let private externalRoutedExecution sessionId physical agent =
         function
@@ -152,28 +95,28 @@ module HostSignalBootstrap =
         | ModelRoutingAcquisition.Acquired target ->
             RoutedChatExecution.ExternalManaged(sessionId, physical, agent, ModelRouting.toOpenCodeModel target)
 
-    let private pluginRoutedExecution runtime claim physical agent =
+    let private pluginRoutedExecution claim physical agent =
         function
         | ModelRoutingAcquisition.Superseded -> RoutedChatExecution.Superseded
         | ModelRoutingAcquisition.Acquired target ->
-            RoutedChatExecution.PluginManaged(runtime, claim, physical, agent, ModelRouting.toOpenCodeModel target)
+            RoutedChatExecution.PluginManaged(claim, physical, agent, ModelRouting.toOpenCodeModel target)
 
     let private routeChatExecution (scope: PluginRuntimeScope) admission =
         task {
             match admission with
-            | ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
-            | ChatExecutionAdmission.Rejected error -> return invalidOp error
-            | ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent) ->
+            | ModelRouting.ChatExecutionAdmission.NoRoute -> return RoutedChatExecution.NoRoute
+            | ModelRouting.ChatExecutionAdmission.Rejected error -> return invalidOp error
+            | ModelRouting.ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent) ->
                 let sessionText = SessionId.value sessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
                 SessionExecutionBinding.observeUserFacingAgent sessionId agent
                 let! acquisition = ModelRouting.acquireManagedExecution sessionId physical agent
                 return externalRoutedExecution sessionId physical agent acquisition
-            | ChatExecutionAdmission.PluginManaged(runtime, claim, physical, agent) ->
+            | ModelRouting.ChatExecutionAdmission.PluginManaged(claim, physical, agent) ->
                 let sessionText = SessionId.value claim.SessionId
                 scope.Sessions.ModelRoutingSessions.Add sessionText |> ignore
                 let! acquisition = ModelRouting.acquireManagedExecution claim.SessionId physical agent
-                return pluginRoutedExecution runtime claim physical agent acquisition
+                return pluginRoutedExecution claim physical agent acquisition
         }
 
     let private routedModel =
@@ -181,7 +124,7 @@ module HostSignalBootstrap =
         | RoutedChatExecution.NoRoute
         | RoutedChatExecution.Superseded -> None
         | RoutedChatExecution.ExternalManaged(_, _, _, model)
-        | RoutedChatExecution.PluginManaged(_, _, _, _, model) -> Some model
+        | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
 
     let private requireOutputMessage output =
         let message = if isNull output then null else output?message
@@ -230,10 +173,14 @@ module HostSignalBootstrap =
                     (PromptKey.value claim.PromptKey)
             )
 
-    let private commitExecutionCapability =
+    let private commitExecutionCapability (journal: AgentJournal option) =
         function
-        | RoutedChatExecution.PluginManaged(runtime, claim, physical, agent, model) ->
-            acceptPluginExecution runtime claim physical agent model
+        | RoutedChatExecution.PluginManaged(claim, physical, agent, model) ->
+            match journal with
+            | Some j ->
+                let runtime = PromptDispatcher.forJournal j
+                acceptPluginExecution runtime claim physical agent model
+            | None -> ()
         | RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model) ->
             SessionExecutionBinding.acceptExternalExecution sessionId physical agent model
         | RoutedChatExecution.NoRoute
@@ -649,7 +596,7 @@ module HostSignalBootstrap =
                 }
 
             let projectExternalManagedFissionVisibility (decoded: PromptIngressCodec.DecodedMessage) output =
-                match decoded.SessionId, decoded.PromptKey, managedAgent decoded.ExplicitAgent with
+                match decoded.SessionId, decoded.PromptKey, ModelRouting.managedAgentForAdmission decoded.ExplicitAgent with
                 | Some sessionId, None, Some _ ->
                     let hasPhysicalParent =
                         scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
@@ -657,12 +604,12 @@ module HostSignalBootstrap =
                     projectFissionToolVisibility hasPhysicalParent output
                 | _ -> ()
 
-            let continueRoutedChatMessage routedExecution decoded input output =
+            let continueRoutedChatMessage routedExecution (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
                     projectRoutedModel output routedExecution
 
                     match routedExecution with
-                    | RoutedChatExecution.PluginManaged(_, { SessionId = sessionId }, _, _, _) ->
+                    | RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
                         let hasPhysicalParent =
                             scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
 
@@ -674,7 +621,7 @@ module HostSignalBootstrap =
                     requireDurabilityActivation ()
                     signalExternalJoinWake decoded
                     do! promptIngressHook input output
-                    commitExecutionCapability routedExecution
+                    commitExecutionCapability journal routedExecution
                 }
 
             let bindExplicitResumeSession
@@ -683,7 +630,7 @@ module HostSignalBootstrap =
                 explicitAgent
                 =
                 let resumeAgent =
-                    managedAgent explicitAgent
+                    ModelRouting.managedAgentForAdmission explicitAgent
                     |> Option.orElseWith (fun () ->
                         profileOpt
                         |> Option.map (fun (profile: PromptAuthority.AuthorityExecutionProfile) ->
@@ -714,9 +661,22 @@ module HostSignalBootstrap =
 
                     bindExplicitResumeSession sessionId profileOpt decoded.ExplicitAgent
 
-            let continueOrdinaryChatMessage decoded input output =
+            let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
-                    let admission = chatExecutionAdmission journal decoded
+                    let tryPendingClaim j sid key =
+                        j
+                        |> Option.bind (fun durable ->
+                            (PromptDispatcher.forJournal durable).PendingClaim(sid, key))
+
+                    let admission =
+                        ModelRouting.chatExecutionAdmission
+                            tryPendingClaim
+                            journal
+                            decoded.IsHostCompaction
+                            decoded.SessionId
+                            decoded.PhysicalUserMessageId
+                            decoded.PromptKey
+                            decoded.ExplicitAgent
                     let! routedExecution = routeChatExecution scope admission
 
                     match routedExecution with

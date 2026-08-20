@@ -82,7 +82,7 @@ test('WHAT[EMR-007] EMR_007_chat_message_closes_the_old_idle_window_before_model
   const revoke = barrier.indexOf('Quiescence.ObservePhysicalUserMessage')
   const invoke = chatHook.indexOf('observePhysicalAdmission output sessionId physicalId')
   const ordinaryCall = chatHook.indexOf('continueOrdinaryChatMessage decoded input output')
-  const classify = ordinaryRouting.indexOf('let admission = chatExecutionAdmission')
+  const classify = ordinaryRouting.indexOf('ModelRouting.chatExecutionAdmission')
   const acquire = ordinaryRouting.indexOf('let! routedExecution = routeChatExecution')
 
   assert.notEqual(revoke, -1, 'chat.message must close the preceding idle-send window')

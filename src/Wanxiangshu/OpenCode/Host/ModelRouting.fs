@@ -8,6 +8,10 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Resources
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Persistence.Journal
 
 type ModelRoutingTarget = { Model: string; Reasoning: string }
 
@@ -771,3 +775,66 @@ module ModelRouting =
         | Some runtime ->
             runtime.SuppressProviderStep(SessionId.value sessionId, PhysicalUserMessageId.value physicalUserMessageId)
         | None -> ()
+
+    [<RequireQualifiedAccess>]
+    type ChatExecutionAdmission =
+        | NoRoute
+        | ExternalManaged of SessionId * PhysicalUserMessageId * string
+        | PluginManaged of PromptAuthority.PromptClaim * PhysicalUserMessageId * string
+        | Rejected of string
+
+    let managedAgentForAdmission (value: string option) =
+        value
+        |> Option.map (fun agent -> agent.Trim())
+        |> Option.filter (fun agent ->
+            not (String.IsNullOrWhiteSpace agent)
+            && (ManagedAgent.requiredNames |> List.contains agent))
+
+    let private externalAdmission sessionId physicalUserMessageId explicitAgent =
+        match managedAgentForAdmission explicitAgent, physicalUserMessageId with
+        | Some agent, Some physical -> ChatExecutionAdmission.ExternalManaged(sessionId, physical, agent)
+        | Some _, None ->
+            ChatExecutionAdmission.Rejected "EMR-009: managed chat.message has no physical user message id"
+        | None, _ -> ChatExecutionAdmission.NoRoute
+
+    let private agentManagedOfClaim
+        (claim: PromptAuthority.PromptClaim)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        =
+        match managedAgentForAdmission claim.EffectiveAgent, physicalUserMessageId with
+        | Some agent, Some physical -> ChatExecutionAdmission.PluginManaged(claim, physical, agent)
+        | Some _, None ->
+            ChatExecutionAdmission.Rejected(
+                sprintf
+                    "EMR-009: managed PromptKey %s has no physical user message id"
+                    (PromptKey.value claim.PromptKey)
+            )
+        | None, _ ->
+            ChatExecutionAdmission.Rejected(
+                sprintf "PROMPT-006: PromptKey %s has no managed EffectiveAgent" (PromptKey.value claim.PromptKey)
+            )
+
+    let private pendingAdmission tryPendingClaim durable sessionId physicalUserMessageId promptKey =
+        match tryPendingClaim (Some durable) sessionId promptKey with
+        | None -> ChatExecutionAdmission.NoRoute
+        | Some claim -> agentManagedOfClaim claim physicalUserMessageId
+
+    let private pluginAdmission tryPendingClaim journal sessionId physicalUserMessageId promptKey =
+        match journal with
+        | None -> ChatExecutionAdmission.NoRoute
+        | Some durable -> pendingAdmission tryPendingClaim durable sessionId physicalUserMessageId promptKey
+
+    let chatExecutionAdmission
+        tryPendingClaim
+        journal
+        isHostCompaction
+        (sessionId: SessionId option)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        (promptKey: PromptKey option)
+        (explicitAgent: string option)
+        =
+        match isHostCompaction, sessionId, promptKey with
+        | true, _, _ -> ChatExecutionAdmission.NoRoute
+        | false, Some sid, Some key -> pluginAdmission tryPendingClaim journal sid physicalUserMessageId key
+        | false, Some sid, None -> externalAdmission sid physicalUserMessageId explicitAgent
+        | _ -> ChatExecutionAdmission.NoRoute
