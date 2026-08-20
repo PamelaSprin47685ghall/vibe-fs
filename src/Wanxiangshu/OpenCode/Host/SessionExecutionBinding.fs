@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode.ProviderWireDecode
 open Wanxiangshu.OpenCode.ProviderWireCapture
@@ -188,7 +189,11 @@ module SessionExecutionBinding =
     /// publishes the typed route; this owner alone decides how an accepted route
     /// becomes provider-attempt binding state. The composition root projects the
     /// later-compiled dispatcher into the one predicate this earlier owner needs.
-    let private acceptRoutedPromptExecution claim (physicalUserMessageId, effectiveAgent, model) isAccepted =
+    let private acceptRoutedPromptExecution
+        (claim: PromptAuthority.PromptClaim)
+        (physicalUserMessageId: PhysicalUserMessageId, effectiveAgent: string, model: OpencodeModel)
+        (isAccepted: PromptAuthority.PromptClaim -> bool)
+        =
         if isAccepted claim then
             acceptPromptExecution claim.SessionId claim.PromptKey physicalUserMessageId effectiveAgent model
         else
@@ -198,7 +203,10 @@ module SessionExecutionBinding =
                     (PromptKey.value claim.PromptKey)
             )
 
-    let acceptRoutedExecution dispatchAccepted (routed: ModelRouting.RoutedChatExecution) : unit =
+    let acceptRoutedExecution
+        (dispatchAccepted: (PromptAuthority.PromptClaim -> bool) option)
+        (routed: ModelRouting.RoutedChatExecution)
+        : unit =
         match routed, dispatchAccepted with
         | ModelRouting.RoutedChatExecution.PluginManaged(claim, physical, agent, model), Some isAccepted ->
             acceptRoutedPromptExecution claim (physical, agent, model) isAccepted
