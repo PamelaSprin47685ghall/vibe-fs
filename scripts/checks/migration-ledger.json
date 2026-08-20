@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Temporary Wave 0 architecture migration ledger. Delete after Wave 11 release closure.",
-  "total": 650,
+  "total": 673,
   "entries": [
     {
       "path": "AssemblyInfo.fs",
@@ -718,6 +718,41 @@
       "status": "PENDING"
     },
     {
+      "path": "Enforcer/InstitutionalLearning/Enhancer.fs",
+      "owner": "institutional-learning",
+      "classification": "KEEP",
+      "wave": 5,
+      "status": "PENDING"
+    },
+    {
+      "path": "Enforcer/InstitutionalLearning/Facts.fs",
+      "owner": "institutional-learning",
+      "classification": "KEEP",
+      "wave": 5,
+      "status": "PENDING"
+    },
+    {
+      "path": "Enforcer/InstitutionalLearning/Fold.fs",
+      "owner": "institutional-learning",
+      "classification": "KEEP",
+      "wave": 5,
+      "status": "PENDING"
+    },
+    {
+      "path": "Enforcer/InstitutionalLearning/Projection.fs",
+      "owner": "institutional-learning",
+      "classification": "KEEP",
+      "wave": 5,
+      "status": "PENDING"
+    },
+    {
+      "path": "Enforcer/InstitutionalLearning/Surface.fs",
+      "owner": "institutional-learning",
+      "classification": "KEEP",
+      "wave": 5,
+      "status": "PENDING"
+    },
+    {
       "path": "Enforcer/Observation.fs",
       "owner": "behavior-diagnosis",
       "classification": "KEEP",
@@ -1012,6 +1047,13 @@
       "status": "PENDING"
     },
     {
+      "path": "Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
       "path": "Execution/Delegation/Fork/Payload.fs",
       "owner": "delegation",
       "classification": "KEEP",
@@ -1075,6 +1117,13 @@
       "status": "PENDING"
     },
     {
+      "path": "Execution/Delegation/Handle/OpenCode/JoinWake.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
       "path": "Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
       "owner": "delegation",
       "classification": "KEEP",
@@ -1083,6 +1132,34 @@
     },
     {
       "path": "Execution/Delegation/Handle/Surface.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
+      "path": "Execution/Delegation/Handoff.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
+      "path": "Execution/Delegation/HandoffIdentity.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
+      "path": "Execution/Delegation/HandoffLedger.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
+      "path": "Execution/Delegation/HandoffSurface.fs",
       "owner": "delegation",
       "classification": "KEEP",
       "wave": 4,
@@ -1125,6 +1202,13 @@
     },
     {
       "path": "Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
+      "owner": "delegation",
+      "classification": "KEEP",
+      "wave": 4,
+      "status": "PENDING"
+    },
+    {
+      "path": "Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
       "owner": "delegation",
       "classification": "KEEP",
       "wave": 4,
@@ -1614,6 +1698,34 @@
       "status": "PENDING"
     },
     {
+      "path": "Interaction/Attention/Facts.fs",
+      "owner": "attention-regulation",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
+      "path": "Interaction/Attention/Fold.fs",
+      "owner": "attention-regulation",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
+      "path": "Interaction/Attention/Projection.fs",
+      "owner": "attention-regulation",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
+      "path": "Interaction/Attention/Surface.fs",
+      "owner": "attention-regulation",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
       "path": "Interaction/Authority/Child.fs",
       "owner": "interaction-authority",
       "classification": "KEEP",
@@ -1677,6 +1789,34 @@
       "status": "PENDING"
     },
     {
+      "path": "Interaction/Concern/Facts.fs",
+      "owner": "concern-routing",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
+      "path": "Interaction/Concern/Fold.fs",
+      "owner": "concern-routing",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
+      "path": "Interaction/Concern/Projection.fs",
+      "owner": "concern-routing",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
+      "path": "Interaction/Concern/Surface.fs",
+      "owner": "concern-routing",
+      "classification": "KEEP",
+      "wave": 2,
+      "status": "PENDING"
+    },
+    {
       "path": "Interaction/Dispatch/AssistancePrompt.fs",
       "owner": "dispatch-protocol",
       "classification": "KEEP",
@@ -1723,7 +1863,13 @@
       "owner": "dispatch-protocol",
       "classification": "MOVE",
       "wave": 2,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "scripts/checks/assistance-host-invariant.mjs",
+        "requirements/interaction-authority/tests/assistance-abort-fence.test.mjs",
+        "requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs",
+        "requirements/interaction-authority/tests/assistance-host.test.mjs"
+      ]
     },
     {
       "path": "Interaction/Dispatch/OpenCode/IngressCodec.fs",
@@ -1751,7 +1897,13 @@
       "owner": "dispatch-protocol",
       "classification": "KEEP",
       "wave": 2,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "scripts/checks/cross-callback-pc.mjs",
+        "requirements/host-boundary/tests/needhelp-sensor.test.mjs",
+        "requirements/interaction-authority/tests/assistance-abort-fence.test.mjs",
+        "requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs"
+      ]
     },
     {
       "path": "Interaction/Dispatch/OpenCode/NeedHelpSurface.fs",
@@ -2577,7 +2729,12 @@
       "owner": "host-boundary",
       "classification": "COMPOSITION-ROOT",
       "wave": 1,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "scripts/checks/composition-root-invariant.mjs",
+        "requirements/host-boundary/tests/plugin-load-purity.test.mjs",
+        "requirements/managed-session-lifecycle/tests/shutdown-drain-contract.test.mjs"
+      ]
     },
     {
       "path": "OpenCode/Host/HostSignalSubscribeSurface.fs",
@@ -2654,7 +2811,11 @@
       "owner": "host-boundary",
       "classification": "KEEP",
       "wave": 1,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs",
+        "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs"
+      ]
     },
     {
       "path": "OpenCode/Host/ModelRouting.fs",
@@ -3039,7 +3200,11 @@
       "owner": "host-boundary",
       "classification": "COMPOSITION-ROOT",
       "wave": 1,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "scripts/checks/plugin-transforms-invariant.mjs",
+        "requirements/host-boundary/tests/ordered-transform.test.mjs"
+      ]
     },
     {
       "path": "OpenCode/Plugin/SpikePlugin.fs",
@@ -3077,6 +3242,13 @@
       "status": "PENDING"
     },
     {
+      "path": "OpenCode/Tools/AttentionTools.fs",
+      "owner": "attention-regulation",
+      "classification": "KEEP",
+      "wave": 1,
+      "status": "PENDING"
+    },
+    {
       "path": "OpenCode/Tools/BashHoneypotTool.fs",
       "owner": "action-affordance",
       "classification": "KEEP",
@@ -3093,6 +3265,13 @@
     {
       "path": "OpenCode/Tools/CoderTool.fs",
       "owner": "action-affordance",
+      "classification": "KEEP",
+      "wave": 1,
+      "status": "PENDING"
+    },
+    {
+      "path": "OpenCode/Tools/ConcernTools.fs",
+      "owner": "concern-routing",
       "classification": "KEEP",
       "wave": 1,
       "status": "PENDING"
@@ -3175,6 +3354,13 @@
       "status": "PENDING"
     },
     {
+      "path": "OpenCode/Tools/InstitutionalLearningTools.fs",
+      "owner": "institutional-learning",
+      "classification": "KEEP",
+      "wave": 1,
+      "status": "PENDING"
+    },
+    {
       "path": "OpenCode/Tools/ManagedAgent.fs",
       "owner": "action-affordance",
       "classification": "KEEP",
@@ -3207,7 +3393,14 @@
       "owner": "capability-enforcement",
       "classification": "COMPOSITION-ROOT",
       "wave": 1,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "scripts/checks/composition-root-invariant.mjs",
+        "scripts/checks/capability-isomorphism-gate.mjs",
+        "scripts/checks/tool-referential-integrity.mjs",
+        "requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs",
+        "requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs"
+      ]
     },
     {
       "path": "OpenCode/Tools/ToolRegistrySurface.fs",
@@ -3459,7 +3652,12 @@
       "owner": "durable-convergence",
       "classification": "KEEP",
       "wave": 6,
-      "status": "PENDING"
+      "status": "PENDING",
+      "pinningProofs": [
+        "requirements/durable-events/tests/canonical-integrator.test.mjs",
+        "requirements/durable-events/tests/event-store-journal-boot.test.mjs",
+        "requirements/durable-convergence/tests/event-store-converge.test.mjs"
+      ]
     },
     {
       "path": "Persistence/EventStore/CodecSurface.fs",
