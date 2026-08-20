@@ -200,11 +200,14 @@ module HostEventCodec =
         let failed = not (isNull info) && not (isNull info?error)
         let finish = nonEmptyFieldText info "finish"
 
-        let finalFinish =
-            not failed
-            && completed
-            && (finish
-                |> Option.exists (fun reason -> not (String.Equals(reason, "tool-calls", StringComparison.Ordinal))))
+        let explicitFinalFinish =
+            finish
+            |> Option.exists (fun reason ->
+                String.Equals(reason, "stop", StringComparison.Ordinal)
+                || String.Equals(reason, "length", StringComparison.Ordinal)
+                || String.Equals(reason, "content-filter", StringComparison.Ordinal))
+
+        let finalFinish = not failed && completed && explicitFinalFinish
 
         assistant && finalFinish
 

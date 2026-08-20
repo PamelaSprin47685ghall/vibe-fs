@@ -26,6 +26,10 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
    - 真实 Token Ledger 记录全局占用；Borrowing Decorator 维护 session 派生树。
    - 子节点在 step 级别借用祖先等待中的 token，并在祖先恢复或 step 终结时按序归还。
 
+4. **Physical terminal 证据收敛**：
+   - `HostEventCodec` 把 assistant completion 分成 provider-step terminal 与 physical-execution terminal 两层。
+   - physical terminal 只接受明确最终 `finish`：`stop | length | content-filter`；`tool-calls | unknown | error` 与显式 assistant error 仅结束 step。OpenCode 的 upstream stream failure 可落盘为 `completed + finish="unknown"` 且无 `error`，因此禁止用“非 tool-calls”反推 physical completion。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -36,7 +40,7 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 | EMR-004 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
 | EMR-005 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-006 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
-| EMR-007 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
+| EMR-007 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/host-boundary/tests/provider-retry-host-edge.test.mjs` |
 | EMR-008 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-009 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |

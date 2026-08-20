@@ -36,8 +36,8 @@ Runtime 仅负责加载 scheduler、校验 ABI、维护进程共享的 token led
 
 ## EMR-007: physical execution identity / end evidence 释放 occupancy；session/业务 lifecycle 不拥有槽
 
-租约释放必须依赖确切的物理执行终结证据（无 error 且非 `tool-calls` 的 completed assistant message，且其 parentID 匹配 PhysicalUserMessageId）。
-`finish="tool-calls"` 仅终结单步并归还 step token，不解除 physical execution binding；assistant error 仅作为单步失败归还 step token，不直接删除 execution binding 以便 Host 进行同 material 重试。业务层的 handle 完成、join 或 finality 不直接操作租约。
+租约释放必须依赖确切的物理执行终结证据（无 error、completed assistant、`finish` 明确属于 `stop | length | content-filter`，且其 parentID 匹配 PhysicalUserMessageId）。
+`finish="tool-calls"` 仅终结单步并归还 step token，不解除 physical execution binding；assistant error，以及 Host 将流错误归一化后的 `finish="unknown" | "error"`，都只作为单步终结证据，不直接删除 execution binding，以便 Host 继续同 material retry。业务层的 handle 完成、join 或 finality 不直接操作租约。
 
 ## EMR-008: `opencode.json` model 不再具有 authority；不校验 fast/deep model 互异
 

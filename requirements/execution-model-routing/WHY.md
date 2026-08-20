@@ -15,6 +15,7 @@ MJS 表达策略        ──► (role, running, previous) -> { model, reasonin
 - **单一权威**：唯一配置源为 `~/.config/opencode/wanxiangshu.mjs`；缺失时自动原子生成推荐模板。
 - **职责划分**：Runtime 仅维护真实 lease multiset 与串行仲裁；选择算法完全交由 MJS 纯函数表达。
 - **租约生命周期绑定物理执行**：Managed lease 绑定至 `(SessionId, PhysicalUserMessageId)`，不以 session 为长期独占单位。
+- **终结证据保守**：只有 Host 明确给出的成功终结理由才能结束 physical execution；`unknown`、`error` 等含混/失败归一化只结束 provider step，不能猜测 material 已永久结束。
 - **背压语义**：`null` 表示当前并发占满的等待状态（backpressure），绝非执行失败或错误。
 - **容量与绑定解耦**：物理执行绑定（ExecutionBinding）与请求容量令牌（Capacity Token）分离，容量仅沿 Session Lineage 受控借用并在 step 边界召回。
 
