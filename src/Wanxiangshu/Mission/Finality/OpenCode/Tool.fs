@@ -222,30 +222,11 @@ module FinalityTool =
 
         durableOutstanding || runtimeOutstanding
 
-    let private publishBlessedTerminal
-        (scope: ToolRuntimeScope)
-        (sid: SessionId)
-        (providerRun: ProviderRunIdentity)
-        (authorityRoot: AuthorityRootUserMessageId)
-        (lastWords: string)
-        =
-        match scope.EventPort with
-        | None -> ()
-        | Some eventPort ->
-            let runResult: AgentRunResult =
-                { SessionId = sid
-                  AuthorityRootUserMessageId = authorityRoot
-                  ProviderRun = providerRun
-                  Role = Role.Manager
-                  Directory = scope.DirectoryFor(SessionId.value sid)
-                  TerminalText = lastWords
-                  TurnFormalText = lastWords }
-
-            eventPort.NotifyTerminal sid (TerminalOutcome.Completed runResult) |> ignore
-
-    /// GLORY-062 physical half of the second suicide. Application owns every
-    /// durable Life transition; this adapter only publishes the resulting Host
-    /// terminal after `LifeCompleted` has landed.
+    /// GLORY-062 durable half of the second suicide. `LifeCompleted` is a
+    /// business fact, not physical provider-terminal evidence. The tool-call
+    /// step still has to return its result to the same physical execution so the
+    /// provider can emit the final assistant message; that exact Host terminal
+    /// is published by the ordinary terminal reporter.
     let private completeBlessedLife
         (scope: ToolRuntimeScope)
         (journal: AgentJournal)
@@ -262,8 +243,7 @@ module FinalityTool =
             | Error error -> return infrastructureError "blessed-life-completion" (sprintf "%A" error)
             | Ok BlessedLifeCompletion.AlreadyCompleted ->
                 return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
-            | Ok(BlessedLifeCompletion.Completed authorityRoot) ->
-                publishBlessedTerminal scope sid providerRun authorityRoot lastWords
+            | Ok(BlessedLifeCompletion.Completed _) ->
                 return ToolHostCodec.tomlObjectWithInstructions (restInPeaceInstructions sid) []
         }
 

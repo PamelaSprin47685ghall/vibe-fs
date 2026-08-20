@@ -19,6 +19,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life

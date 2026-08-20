@@ -75,7 +75,7 @@ Non-blocking 观察不阻断 acceptance，已接受的事实受保护；幂等�
 
 ## FINALITY-017: rest 对应第二次 suicide 且 last_words 为最终答案
 
-已获 blessing 的 Life 再次调用 `suicide` 时，执行安全检查与过程评审尾抽干；确认无阻塞 REVISE 后，不再重复审查与检查见证，写入本次 last_words，持久化 `LifeCompleted`，向模型返回 at-rest 经验。成功输出逐字等于 `last_words`，严禁附加多余文本。
+已获 blessing 的 Life 再次调用 `suicide` 时，执行安全检查与过程评审尾抽干；确认无阻塞 REVISE 后，不再重复审查与检查见证，写入本次 last_words，持久化 `LifeCompleted`，向模型返回 at-rest 经验。`LifeCompleted` 只终结业务 Life，不得由 `suicide` tool-call step 直接伪造 provider `TerminalOutcome`；当前 physical execution 必须保留至 Host 观察到同一 `PhysicalUserMessageId` 的真实 final assistant terminal。成功输出逐字等于 `last_words`，严禁附加多余文本。
 
 ## FINALITY-018: Manager deferred completion
 

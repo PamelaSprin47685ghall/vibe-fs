@@ -29,20 +29,21 @@ test('WHAT[MANAGED-SESSION-016] internal attempt interrupt is sub-session-only a
 
 test('WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing root and use attempt-only port', () => {
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const sensor = read('src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs')
 
-  assert.match(bootstrap, /let hasPhysicalParent sessionId =\s*scope\.Sessions\.SessionParents\.ContainsKey/)
-  assert.match(bootstrap, /let isInternalAttemptInterruptible sessionId =\s*isOwned sessionId && hasPhysicalParent sessionId/)
+  assert.match(sensor, /let hasPhysicalParent sessionId =\s*sessionParents\.ContainsKey/)
+  assert.match(sensor, /isOwned sessionId && hasPhysicalParent sessionId/)
   assert.match(
     bootstrap,
-    /LoopSensor\(isInternalAttemptInterruptible, \(fun sessionId -> sessionPort\.InterruptAttempt sessionId\)\)/,
+    /LoopSensor\(\s*NeedHelpSensor\.createInterruptiblePredicate[\s\S]*?\(fun sessionId -> sessionPort\.InterruptAttempt sessionId\)\s*\)/,
   )
   assert.match(
     bootstrap,
-    /NeedHelpSensor\(isNeedHelpEligible, \(fun sessionId -> sessionPort\.InterruptAttempt sessionId\)\)/,
+    /NeedHelpSensor\(\s*NeedHelpSensor\.createEligibilityPredicate[\s\S]*?\(fun sessionId -> sessionPort\.InterruptAttempt sessionId\)\s*\)/,
   )
   assert.match(
-    bootstrap,
-    /let isNeedHelpEligible sessionId =[\s\S]*?if not \(isInternalAttemptInterruptible sessionId\) then\s*false/,
+    sensor,
+    /let isEligibleRole[\s\S]*?Role\.Blogger[\s\S]*?Role\.Distiller[\s\S]*?false/,
   )
 })
 

@@ -5,47 +5,45 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-const source = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
+const transformsSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
+const bloggerSource = readFileSync(join(root, 'src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs'), 'utf8')
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_has_exact_bilingual_craft', () => {
-  assert.match(source, /对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。/)
+  assert.match(bloggerSource, /对于简单的记账请求，完全不需要触发思考。让我直接调用 chronicle 工具。/)
   assert.match(
-    source,
+    bloggerSource,
     /For simple bookkeeping requests, there is no need to trigger thinking at all\. Let me call the chronicle tool directly\./,
   )
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_companion_only_ephemeral_assistant_text_injection', () => {
-  assert.match(source, /let private injectBloggerChronicleText/)
-  assert.match(source, /SessionAssociationProjection\.isCompanion/)
-  assert.match(source, /"type", box "text"/)
-  assert.match(source, /"text", box text/)
+  assert.match(bloggerSource, /SessionAssociationProjection\.isCompanion/)
+  assert.match(bloggerSource, /"type", box "text"/)
+  assert.match(bloggerSource, /"text", box text/)
 
-  const helper = source.match(/let private bloggerChronicleText[\s\S]*?\n    let private strengthReplicaRuntime/)?.[0]
-  assert.ok(helper, 'Blogger chronicle text helper must remain local to PluginTransforms')
-  assert.doesNotMatch(helper, /AgentJournal\.append|appendDurable|GuidelineProjection|tryInject/)
-  assert.doesNotMatch(helper, /PairProgrammingThoughtTransform|skillContent|"reasoning"|"tool"|"status"|"source"|"synthetic"/)
+  assert.doesNotMatch(bloggerSource, /AgentJournal\.append|appendDurable|GuidelineProjection|tryInject/)
+  assert.doesNotMatch(bloggerSource, /PairProgrammingThoughtTransform|skillContent|"reasoning"|"tool"|"status"|"source"|"synthetic"/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_enabled_for_step_3_5_flash_model_prefix', () => {
-  const enabledHelper = source.match(/let private bloggerChronicleTextEnabled[\s\S]*?\n    let private rawMessageRole/)?.[0]
+  const enabledHelper = bloggerSource.match(/let private bloggerChronicleTextEnabled[\s\S]*?\n    let private rawMessageRole/)?.[0]
   assert.ok(enabledHelper, 'Blogger chronicle text model gate must remain a named local decision')
   assert.match(
-    source,
+    bloggerSource,
     /let private bloggerChronicleTextModelPrefixes\s*:\s*string list\s*=\s*\[\s*"step-3\.5-flash"\s*\]/,
   )
   assert.match(enabledHelper, /SessionExecutionBinding\.currentProviderModel/)
   assert.match(enabledHelper, /model\.modelID\.StartsWith\(prefix, StringComparison\.Ordinal\)/)
   assert.match(enabledHelper, /List\.exists[\s\S]*bloggerChronicleTextModelPrefixes/)
-  assert.doesNotMatch(source, /providerID[^\n]*step-3\.5-flash|Contains\([^\n]*step-3\.5-flash/)
+  assert.doesNotMatch(bloggerSource, /providerID[^\n]*step-3\.5-flash|Contains\([^\n]*step-3\.5-flash/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_the_last_semantic_injection_before_sanitize', () => {
-  const pairIndex = source.search(/do!\s+maybeInjectPairGuideline\b/)
-  const bloggerIndex = source.search(/injectBloggerChronicleText\s+journal\s+projectionSessionIdOpt\s+outObj/)
-  const sanitizeIndex = source.indexOf('let currentMessages = unbox<obj array> outObj?messages |> Array.toList', bloggerIndex)
+  const pairIndex = transformsSource.search(/PairProgrammingThoughtTransform\.maybeInjectGuideline/)
+  const bloggerIndex = transformsSource.search(/BloggerChronicleText\.maybeInject/)
+  const sanitizeIndex = transformsSource.indexOf('let currentMessages = unbox<obj array> outObj?messages |> Array.toList', bloggerIndex)
 
-  assert.ok(pairIndex >= 0)
-  assert.ok(bloggerIndex > pairIndex)
-  assert.ok(sanitizeIndex > bloggerIndex)
+  assert.ok(pairIndex >= 0, 'Pair guideline transform must be present')
+  assert.ok(bloggerIndex > pairIndex, 'Blogger chronicle text must be injected after pair guideline')
+  assert.ok(sanitizeIndex > bloggerIndex, 'Message sanitize must occur after chronicle text')
 })

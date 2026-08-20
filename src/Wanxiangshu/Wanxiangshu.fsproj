@@ -461,11 +461,12 @@
     <Compile Include="Strength/OpenCode/PluginScope.fs"/>
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
-    <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"/>
+    <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
+    <Compile Include="Enforcer/Host.fs"/>
     <Compile Include="Context/Companion/Blogger/Runtime/Coordinator.fs"/>
     <Compile Include="Context/Companion/Transform.fs"/>
     <Compile Include="Mission/Review/OpenCode/HostGuard.fs"/>
@@ -482,7 +483,6 @@
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="Context/Trace/TerminalReporter.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
-    <Compile Include="Enforcer/Host.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Surface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>

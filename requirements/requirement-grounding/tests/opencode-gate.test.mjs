@@ -50,7 +50,7 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
     assert.ok(terminal.includes(`${grounding.cursorSeparator}<requirement_read`))
     assert.equal(cursor.value.some((m) => m.info?.source === grounding.source), false, 'Cursor has result-only grounding')
 
-    const pairProjectionAt = pluginTransformsSource.search(/do!\s+maybeInjectPairGuideline\b/)
+    const pairProjectionAt = pluginTransformsSource.search(/PairProgrammingThoughtTransform\.maybeInjectGuideline/)
     const requirementTail = pluginTransformsSource.slice(pairProjectionAt)
     const requirementRelativeAt = requirementTail.search(/do!\s+projectRequirementGrounding\b/)
     const requirementProjectionAt = requirementRelativeAt < 0 ? -1 : pairProjectionAt + requirementRelativeAt

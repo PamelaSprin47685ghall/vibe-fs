@@ -4,6 +4,8 @@
 
 ### 委托接口分流与权能门禁
 
+DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`commission`、`inspect`、`establish-behavior`、`repair-behavior`），改名不动 WHAT 语义定义。
+
 系统定义三类委托途径，由角色权能门禁严格限制：
 
 1. **异步见证委托（`fork`）**：由 Manager 在使命内部调用，创建具有独立 Byname 的子执行者，支持附加历史背景（attachment）与建议性工具调用估算。
