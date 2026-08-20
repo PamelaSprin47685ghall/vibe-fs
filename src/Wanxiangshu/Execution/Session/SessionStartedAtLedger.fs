@@ -50,7 +50,7 @@ module SessionStartedAtLedger =
         : Task<Result<DateTimeOffset option, string>> =
         task {
             match! bind durable sessionId candidate with
-            | Ok startedAt -> return Ok (Some startedAt)
+            | Ok startedAt -> return Ok(Some startedAt)
             | Error reason -> return Error reason
         }
 
@@ -61,6 +61,5 @@ module SessionStartedAtLedger =
         (sessionStartCandidate: DateTimeOffset option)
         : Task<Result<DateTimeOffset option, string>> =
         match journal, projectionSessionIdOpt, sessionStartCandidate with
-        | Some durable, Some sessionId, Some candidate ->
-            bindOrAbort durable (SessionId.create sessionId) candidate
-        | _ -> Task.FromResult (Ok None)
+        | Some durable, Some sessionId, Some candidate -> bindOrAbort durable (SessionId.create sessionId) candidate
+        | _ -> Task.FromResult(Ok None)

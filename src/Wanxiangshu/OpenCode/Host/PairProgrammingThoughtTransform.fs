@@ -124,6 +124,8 @@ module PairProgrammingThoughtTransform =
     let isCursorProvider (providerId: string option) =
         providerId
         |> Option.exists (fun value -> value.Equals("cursor", StringComparison.OrdinalIgnoreCase))
+    // providerId
+    // |> Option.exists (fun value -> value.Equals("google", StringComparison.OrdinalIgnoreCase))
 
     /// The marker's source identity (HOST-013). Filtering must use this, never
     /// the text: a real user may quote the sentence.

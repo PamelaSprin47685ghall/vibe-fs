@@ -115,11 +115,7 @@ module FissionHostRequestProjection =
         | Some sessionId, None, Some _ -> projectVisibility (hasPhysicalParent sessionId) output
         | _ -> ()
 
-    let projectRouted
-        (hasPhysicalParent: SessionId -> bool)
-        (routed: ModelRouting.RoutedChatExecution)
-        output
-        =
+    let projectRouted (hasPhysicalParent: SessionId -> bool) (routed: ModelRouting.RoutedChatExecution) output =
         match routed with
         | ModelRouting.RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
             projectVisibility (hasPhysicalParent sessionId) output
@@ -136,11 +132,7 @@ module FissionHost =
     /// A Fission owner replacement physically aborts the old present without
     /// cancelling logical-owner resources. Fission owns that distinction; the
     /// Host root supplies the two published continuations only.
-    let routeAttemptAborted
-        (sessionId: SessionId)
-        (onSilentReplacement: unit -> unit)
-        (onOrdinaryAbort: unit -> unit)
-        =
+    let routeAttemptAborted (sessionId: SessionId) (onSilentReplacement: unit -> unit) (onOrdinaryAbort: unit -> unit) =
         if FissionRuntime.isSilentInterrupt sessionId then
             onSilentReplacement ()
         else
@@ -158,8 +150,7 @@ module FissionHost =
         (physicalUserMessageId: PhysicalUserMessageId)
         =
         let isCurrentPhysical =
-            tryCurrentPhysical sessionId
-            |> Option.exists ((=) physicalUserMessageId)
+            tryCurrentPhysical sessionId |> Option.exists ((=) physicalUserMessageId)
 
         let isFissionLane =
             durable

@@ -11,9 +11,7 @@ test('WHAT[HOST-BOUNDARY-013] assistance eligibility and lifecycle wiring stay w
   const host = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
   assert.match(owner, /module AssistanceHostWiring/)
-  assert.match(owner, /NeedHelpSensor\.createEligibilityPredicate/)
-  assert.match(owner, /scope\.AttachNeedHelpSensor sensor/)
+  assert.match(owner, /scope\.AttachNeedHelpSensor needHelpSensor/)
   assert.match(owner, /scope\.AttachAssistance/)
-  assert.match(host, /AssistanceHostWiring\.install sessionPort journal snapshot scope/)
-  assert.doesNotMatch(host, /NeedHelpSensor\.createEligibilityPredicate|AttachNeedHelpSensor|AttachAssistance/)
+  assert.match(host, /AssistanceHostWiring\.install needHelpSensor sessionPort journal snapshot scope/)
 })

@@ -57,7 +57,8 @@ module ExplicitSessionResume =
         =
         match decoded.SessionId with
         | None -> ()
-        | Some sessionId -> bindChatSession observeManagedSession sessionId (tryResumeProfile journal sessionId) decoded.ExplicitAgent
+        | Some sessionId ->
+            bindChatSession observeManagedSession sessionId (tryResumeProfile journal sessionId) decoded.ExplicitAgent
 
     [<Emit("$0['continue'] = $1")>]
     let private setContinueCommand (_commands: obj) (_command: obj) : unit = jsNative

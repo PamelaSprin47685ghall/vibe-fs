@@ -231,13 +231,23 @@ module HostSignalBootstrap =
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
             let loopSensor =
-                LoopSensor.create
-                    scope.Sessions.OwnedSessions
-                    scope.Sessions.SessionParents
-                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+                LoopSensor.create scope.Sessions.OwnedSessions scope.Sessions.SessionParents (fun sessionId ->
+                    sessionPort.InterruptAttempt sessionId)
 
             do scope.AttachLoopSensor loopSensor
-            let needHelpSensor = AssistanceHostWiring.install sessionPort journal snapshot scope
+
+            let needHelpSensor =
+                NeedHelpSensor(
+                    NeedHelpSensor.createEligibilityPredicate
+                        scope.Sessions.OwnedSessions
+                        scope.Sessions.SessionParents
+                        journal
+                        scope.Strength.StrengthRuntime,
+                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+                )
+
+            let needHelpSensor =
+                AssistanceHostWiring.install needHelpSensor sessionPort journal snapshot scope
 
             let signalRouter =
                 HostSignalRouter(
@@ -419,10 +429,12 @@ module HostSignalBootstrap =
                     requireDurabilityActivation ()
                     JoinWake.observeChatMessage scope.Sessions.JoinInterrupts decoded
                     do! promptIngressHook input output
+
                     let dispatchAccepted =
                         journal
                         |> Option.map (fun durable ->
                             let runtime = PromptDispatcher.forJournal durable
+
                             fun (claim: PromptAuthority.PromptClaim) ->
                                 runtime.DispatchAccepted(claim.SessionId, claim))
 
@@ -433,8 +445,7 @@ module HostSignalBootstrap =
                 task {
                     let tryPendingClaim j sid key =
                         j
-                        |> Option.bind (fun durable ->
-                            (PromptDispatcher.forJournal durable).PendingClaim(sid, key))
+                        |> Option.bind (fun durable -> (PromptDispatcher.forJournal durable).PendingClaim(sid, key))
 
                     let admission =
                         ModelRouting.chatExecutionAdmission
@@ -445,6 +456,7 @@ module HostSignalBootstrap =
                             decoded.PhysicalUserMessageId
                             decoded.PromptKey
                             decoded.ExplicitAgent
+
                     let! routedExecution =
                         ModelRouting.routeChatExecution
                             (fun sessionId ->

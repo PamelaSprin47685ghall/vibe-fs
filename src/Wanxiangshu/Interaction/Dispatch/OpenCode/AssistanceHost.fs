@@ -960,31 +960,22 @@ module AssistanceHostWiring =
     /// receives the stream sensor it must route raw events into; eligibility,
     /// interruption and assistance lifecycle wiring remain owned here.
     let install
+        (needHelpSensor: NeedHelpSensor)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (snapshot: ISessionSnapshotPort)
         (scope: PluginRuntimeScope)
         =
-        let sensor =
-            NeedHelpSensor(
-                NeedHelpSensor.createEligibilityPredicate
-                    scope.Sessions.OwnedSessions
-                    scope.Sessions.SessionParents
-                    journal
-                    scope.Strength.StrengthRuntime,
-                (fun sessionId -> sessionPort.InterruptAttempt sessionId)
-            )
-
-        scope.AttachNeedHelpSensor sensor
+        scope.AttachNeedHelpSensor needHelpSensor
 
         let assistance =
             AssistanceHost(
                 sessionPort,
                 journal,
-                sensor,
+                needHelpSensor,
                 snapshot,
                 (fun childId -> scope.Sessions.OwnedSessions.Add(SessionId.value childId) |> ignore)
             )
 
         scope.AttachAssistance(assistance.HandleTurn, assistance.DropSignals, assistance.DropSession)
-        sensor
+        needHelpSensor

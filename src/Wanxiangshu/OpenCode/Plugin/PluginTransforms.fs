@@ -198,22 +198,29 @@ module PluginTransforms =
 
                 let! sessionStartedAt =
                     task {
-                        match! SessionStartedAtLedger.tryBindOrAbort
-                                  journal
-                                  projectionSessionIdOpt
-                                  sessionStartCandidate
+                        match!
+                            SessionStartedAtLedger.tryBindOrAbort journal projectionSessionIdOpt sessionStartCandidate
                         with
                         | Ok startedAt -> return startedAt
                         | Error reason ->
                             match projectionSessionIdOpt with
                             | Some sessionId ->
-                                Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
+                                Diagnostic.emit
+                                    "host-013-session-start-bind-failed"
+                                    [ "session_id", sessionId; "result", reason ]
+
                                 let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
                                 let! _ = terminateSession (SessionId.create sessionId) terminalReason
                                 return raise (InvalidOperationException terminalReason)
                             | None ->
-                                Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", ""; "result", reason ]
-                                return raise (InvalidOperationException ("HOST-013 SessionStartedAt bind failed: " + reason))
+                                Diagnostic.emit
+                                    "host-013-session-start-bind-failed"
+                                    [ "session_id", ""; "result", reason ]
+
+                                return
+                                    raise (
+                                        InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason)
+                                    )
                     }
 
                 let! strengthReplayPlans =
@@ -282,8 +289,7 @@ module PluginTransforms =
                         journal
                         workspaceDirectory
                         projectionSessionIdOpt
-                        (fun sessionId reason ->
-                            terminateSession (SessionId.create sessionId) reason)
+                        (fun sessionId reason -> terminateSession (SessionId.create sessionId) reason)
                         outObj
 
                 BloggerChronicleText.maybeInject

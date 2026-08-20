@@ -35,7 +35,7 @@ test('WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing r
   assert.match(sensor, /isOwned sessionId && hasPhysicalParent sessionId/)
   assert.match(
     bootstrap,
-    /LoopSensor\(\s*NeedHelpSensor\.createInterruptiblePredicate[\s\S]*?\(fun sessionId -> sessionPort\.InterruptAttempt sessionId\)\s*\)/,
+    /LoopSensor\.create[\s\S]*?\(fun sessionId ->\s+sessionPort\.InterruptAttempt sessionId\)/,
   )
   assert.match(
     bootstrap,

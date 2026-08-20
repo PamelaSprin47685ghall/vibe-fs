@@ -188,17 +188,20 @@ module SessionExecutionBinding =
     /// publishes the typed route; this owner alone decides how an accepted route
     /// becomes provider-attempt binding state. The composition root projects the
     /// later-compiled dispatcher into the one predicate this earlier owner needs.
+    let private acceptRoutedPromptExecution claim (physicalUserMessageId, effectiveAgent, model) isAccepted =
+        if isAccepted claim then
+            acceptPromptExecution claim.SessionId claim.PromptKey physicalUserMessageId effectiveAgent model
+        else
+            invalidOp (
+                sprintf
+                    "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted"
+                    (PromptKey.value claim.PromptKey)
+            )
+
     let acceptRoutedExecution dispatchAccepted (routed: ModelRouting.RoutedChatExecution) : unit =
         match routed, dispatchAccepted with
         | ModelRouting.RoutedChatExecution.PluginManaged(claim, physical, agent, model), Some isAccepted ->
-            if isAccepted claim then
-                acceptPromptExecution claim.SessionId claim.PromptKey physical agent model
-            else
-                invalidOp (
-                    sprintf
-                        "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted"
-                        (PromptKey.value claim.PromptKey)
-                )
+            acceptRoutedPromptExecution claim (physical, agent, model) isAccepted
         | ModelRouting.RoutedChatExecution.PluginManaged _, None -> ()
         | ModelRouting.RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model), _ ->
             acceptExternalExecution sessionId physical agent model
@@ -319,10 +322,7 @@ module SessionExecutionBinding =
             beginQuiescence sessionId
 
             match
-                beginProviderAttempt
-                    sessionId
-                    physicalUserMessageId
-                    (ProviderWireCapture.lastUserPromptKey rawMessages)
+                beginProviderAttempt sessionId physicalUserMessageId (ProviderWireCapture.lastUserPromptKey rawMessages)
             with
             | Error error -> invalidOp error
             | Ok() ->

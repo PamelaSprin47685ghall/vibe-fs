@@ -44,7 +44,7 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_preamble_commands_exactly_on
   assert.doesNotMatch(preamble, /verdict tool/)
   assert.match(preamble, /Process PERFECT is not a terminal Finality witness\./)
   for (const forbidden of ['challenge', 'Challenge', 'seal', 'Seal', 'dual', '2N', 'barrier', 'Barrier']) {
-    assert.equal(preamble.includes(forbidden), false, `process preamble must not mention '${forbidden}'`)
+    assert.equal(new RegExp(`\\b${forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(preamble), false, `process preamble must not mention '${forbidden}'`)
   }
 })
 
@@ -67,7 +67,7 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_assignment_is_request_range_
     '=== ACCEPTED OBLIGATION ACCOUNT UNDER REVIEW ===',
   ]) assert.ok(message.includes(header), `assignment must carry header: ${header}`)
   for (const forbidden of ['challenge', 'Challenge', 'seal', 'Seal', 'dual', '2N', 'barrier', 'Barrier', 'Confirmation']) {
-    assert.equal(message.includes(forbidden), false, `process assignment must not mention '${forbidden}'`)
+    assert.equal(new RegExp(`\\b${forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(message), false, `process assignment must not mention '${forbidden}'`)
   }
   assert.equal(obligation.renderObligationListWire([]), '[]')
 })

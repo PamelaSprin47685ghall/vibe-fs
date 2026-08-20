@@ -1,5 +1,5 @@
 {
-  "total": 650,
+  "total": 652,
   "owners": [
     "action-affordance",
     "behavior-diagnosis",
@@ -660,6 +660,10 @@
       "owner": "delegation"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
+      "owner": "delegation"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
       "owner": "delegation"
     },
@@ -689,6 +693,10 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
       "owner": "delegation"
     },
     {

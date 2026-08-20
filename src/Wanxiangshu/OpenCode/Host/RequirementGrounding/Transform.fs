@@ -310,11 +310,7 @@ module RequirementGroundingTransform =
             task {
                 let messages = unbox<obj array> outObj?messages |> Array.toList
 
-                let! projected =
-                    tryProject
-                        durable
-                        sessionId
-                        messages
+                let! projected = tryProject durable sessionId messages
 
                 do! applyProjection sessionId projected
             }
