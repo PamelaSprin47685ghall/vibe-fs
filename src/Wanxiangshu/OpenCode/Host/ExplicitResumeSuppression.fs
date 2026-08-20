@@ -4,6 +4,8 @@ open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.OpenCode.ProviderWireDecode
+open Wanxiangshu.OpenCode.ProviderWireCapture
 
 /// CRASH-018 marker for the exact Host user material produced by `/continue`.
 ///
@@ -133,6 +135,18 @@ module ExplicitResumeSuppression =
             match markedPhysicalBySession.TryGetValue(SessionId.value sessionId) with
             | true, current -> current = PhysicalUserMessageId.value physicalId
             | false, _ -> false)
+
+    /// CRASH-018: Check if the trailing user message in the transform output
+    /// is an explicit resume binding for the given session.
+    /// Domain decision: determines whether material is /continue disclosure.
+    let isExplicitResumeBinding (projectionSessionIdOpt: string option) (outObj: obj) : bool =
+        projectionSessionIdOpt
+        |> Option.exists (fun sessionText ->
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+
+            ProviderWireCapture.lastUserMessageId rawMessages
+            |> Option.exists (isPhysicalMaterial (SessionId.create sessionText)))
 
     /// Cleanup only. Exact-new-material replacement is the correctness boundary.
     let dropSession (sessionId: SessionId) : unit =

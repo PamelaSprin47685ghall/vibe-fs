@@ -43,6 +43,7 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Host
+open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -111,94 +112,10 @@ module PluginTransforms =
         fuse reason
         raise (InvalidOperationException reason)
 
-    /// HOST-013: bind session start or abort + fail-closed.
-    let private bindSessionStartedAtOrAbort
-        (durable: AgentJournal)
-        (sessionId: string)
-        (candidate: DateTimeOffset)
-        (terminateSession: SessionTermination)
-        : Task<DateTimeOffset option> =
-        task {
-            match! SessionStartedAtLedger.bind durable (SessionId.create sessionId) candidate with
-            | Ok startedAt -> return Some startedAt
-            | Error reason ->
-                Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
-
-                let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
-                let! _ = terminateSession (SessionId.create sessionId) terminalReason
-
-                return raise (InvalidOperationException terminalReason)
-        }
-
-    let private tryBindSessionStartedAt
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (sessionStartCandidate: DateTimeOffset option)
-        (terminateSession: SessionTermination)
-        : Task<DateTimeOffset option> =
-        match journal, projectionSessionIdOpt, sessionStartCandidate with
-        | Some durable, Some sessionId, Some candidate ->
-            bindSessionStartedAtOrAbort durable sessionId candidate terminateSession
-        | _ -> Task.FromResult None
-
-    let private strengthReplayPlansFor
-        (journal: AgentJournal option)
-        (strengthDurability: StrengthDurabilityPort option)
-        (strengthFailFuse: string -> unit)
-        (projectionSessionIdOpt: string option)
-        (outObj: obj)
-        : Task<StrengthReplayPlan list> =
-        match projectionSessionIdOpt with
-        | Some sessionId ->
-            StrengthReplay.applyBeforeXTrace
-                journal
-                strengthDurability
-                (raiseStrengthFailClosed strengthFailFuse)
-                sessionId
-                outObj
-        | None -> Task.FromResult []
-
     let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
         match projectionSessionIdOpt with
         | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
         | None -> ProviderLanguage.English
-
-    let private projectRequirementGrounding
-        (journal: AgentJournal option)
-        (workspaceDirectory: string option)
-        (projectionSessionIdOpt: string option)
-        (terminateSession: SessionTermination)
-        (outObj: obj)
-        : Task =
-        let applyProjection sessionId projected =
-            match projected with
-            | Ok values ->
-                HostMessageProjection.replaceMessagesInPlace outObj values
-                Task.FromResult()
-            | Error reason ->
-                Diagnostic.emit
-                    "requirement-grounding-projection-fail-closed"
-                    [ "session_id", sessionId; "result", reason ]
-
-                task {
-                    let! _ = terminateSession (SessionId.create sessionId) reason
-                    ()
-                }
-
-        match journal, workspaceDirectory, projectionSessionIdOpt with
-        | Some durable, Some _, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
-            task {
-                let messages = unbox<obj array> outObj?messages |> Array.toList
-
-                let! projected =
-                    Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingTransform.tryProject
-                        durable
-                        sessionId
-                        messages
-
-                do! applyProjection sessionId projected
-            }
-        | _ -> Task.FromResult()
 
     let private strengthReplicaRuntime
         (projectionSessionIdOpt: string option)
@@ -212,47 +129,9 @@ module PluginTransforms =
         if not handled then
             raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
 
-    let private beginPhysicalProviderAttempt (scope: PluginRuntimeScope) (sessionText: string) (outObj: obj) =
-        task {
-            let sessionId = SessionId.create sessionText
-
-            let rawMessages =
-                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
-
-            let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
-            scope.Sessions.Quiescence.BeginProviderAttempt sessionId
-
-            match
-                SessionExecutionBinding.beginProviderAttempt
-                    sessionId
-                    physicalUserMessageId
-                    (ProviderWireCapture.lastUserPromptKey rawMessages)
-            with
-            | Error error -> invalidOp error
-            | Ok() ->
-                match SessionExecutionBinding.currentProviderModel sessionId, physicalUserMessageId with
-                | Some _, Some physical ->
-                    do!
-                        ModelRouting.enterProviderStep
-                            sessionId
-                            physical
-                            (ProviderWireCapture.visibleProviderRuns rawMessages)
-                | Some _, None -> invalidOp "EMR-010: managed provider step has no physical user message id"
-                | None, _ -> ()
-        }
-
-    let private exactExplicitResumeBinding (projectionSessionIdOpt: string option) (outObj: obj) =
-        projectionSessionIdOpt
-        |> Option.exists (fun sessionText ->
-            let rawMessages =
-                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
-
-            ProviderWireCapture.lastUserMessageId rawMessages
-            |> Option.exists (ExplicitResumeSuppression.isPhysicalMaterial (SessionId.create sessionText)))
-
     let private isExplicitResumeProviderMaterial projectionSessionIdOpt outObj =
         ExplicitResumeSuppression.isCurrentMaterial outObj
-        || exactExplicitResumeBinding projectionSessionIdOpt outObj
+        || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj
 
     /// Provider-facing transform composition: order only.
     /// Strength replay/trace → StrengthReplay; speculation → StrengthSpeculate;
@@ -303,7 +182,12 @@ module PluginTransforms =
                 // 立即失效。必须在该 transform 的最早同步位置（任何 let!
                 // 之前）调用，不得等 request 已运行才标 Running。
                 match projectionSessionIdOpt with
-                | Some sessionId -> do! beginPhysicalProviderAttempt scope sessionId outObj
+                | Some sessionId ->
+                    do!
+                        SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                            scope.Sessions.Quiescence.BeginProviderAttempt
+                            (SessionId.create sessionId)
+                            outObj
                 | None -> ()
 
                 // TIME-007: the first provider-facing prompt is the session's
@@ -313,10 +197,35 @@ module PluginTransforms =
                     projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
 
                 let! sessionStartedAt =
-                    tryBindSessionStartedAt journal projectionSessionIdOpt sessionStartCandidate terminateSession
+                    task {
+                        match! SessionStartedAtLedger.tryBindOrAbort
+                                  journal
+                                  projectionSessionIdOpt
+                                  sessionStartCandidate
+                        with
+                        | Ok startedAt -> return startedAt
+                        | Error reason ->
+                            match projectionSessionIdOpt with
+                            | Some sessionId ->
+                                Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
+                                let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
+                                let! _ = terminateSession (SessionId.create sessionId) terminalReason
+                                return raise (InvalidOperationException terminalReason)
+                            | None ->
+                                Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", ""; "result", reason ]
+                                return raise (InvalidOperationException ("HOST-013 SessionStartedAt bind failed: " + reason))
+                    }
 
                 let! strengthReplayPlans =
-                    strengthReplayPlansFor journal strengthDurability strengthFailFuse projectionSessionIdOpt outObj
+                    match projectionSessionIdOpt with
+                    | Some sessionId ->
+                        StrengthReplay.applyBeforeXTrace
+                            journal
+                            strengthDurability
+                            (raiseStrengthFailClosed strengthFailFuse)
+                            sessionId
+                            outObj
+                    | None -> Task.FromResult []
 
                 // COMPANION-003/007: keep the XTrace in step with the
                 // provider-visible semantic projection at the transform
@@ -369,11 +278,12 @@ module PluginTransforms =
                 // the same append-only placement discipline, after HOST-013 so
                 // ordinary and Cursor order is always pseudo-skill → read(s).
                 do!
-                    projectRequirementGrounding
+                    RequirementGroundingTransform.projectOrTerminate
                         journal
                         workspaceDirectory
                         projectionSessionIdOpt
-                        terminateSession
+                        (fun sessionId reason ->
+                            terminateSession (SessionId.create sessionId) reason)
                         outObj
 
                 BloggerChronicleText.maybeInject

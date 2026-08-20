@@ -53,16 +53,16 @@ for (const pattern of forbiddenHelpers) {
 
 // 3. normalTransform semantic ordering lock
 const orderingSteps = [
-  'beginPhysicalProviderAttempt',
-  'tryBindSessionStartedAt',
-  'strengthReplayPlansFor',
+  'beginPhysicalProviderAttemptForTransform',
+  'tryBindOrAbort',
+  'StrengthReplay.applyBeforeXTrace',
   'XTracePipeline.applyPipeline',
   'applyCompanionForOrdinaryMaterial',
   'XWire.applyTransform',
   'EnforcerContinuation.applyContinuation',
   'StrengthSpeculate.tryApply',
   'PairProgrammingThoughtTransform.maybeInjectGuideline',
-  'projectRequirementGrounding',
+  'projectOrTerminate',
   'BloggerChronicleText.maybeInject',
   'sanitizeMessages',
 ]

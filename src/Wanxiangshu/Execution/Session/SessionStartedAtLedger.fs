@@ -41,3 +41,26 @@ module SessionStartedAtLedger =
                     | Some startedAt -> return Ok startedAt
                     | None -> return Error "SessionStartedAtBound did not materialize its projection"
         }
+
+    /// HOST-013: bind session start, returning Result for composition root to handle failure.
+    let bindOrAbort
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (candidate: DateTimeOffset)
+        : Task<Result<DateTimeOffset option, string>> =
+        task {
+            match! bind durable sessionId candidate with
+            | Ok startedAt -> return Ok (Some startedAt)
+            | Error reason -> return Error reason
+        }
+
+    /// HOST-013: try bind session started at from optional journal/session/candidate.
+    let tryBindOrAbort
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (sessionStartCandidate: DateTimeOffset option)
+        : Task<Result<DateTimeOffset option, string>> =
+        match journal, projectionSessionIdOpt, sessionStartCandidate with
+        | Some durable, Some sessionId, Some candidate ->
+            bindOrAbort durable (SessionId.create sessionId) candidate
+        | _ -> Task.FromResult (Ok None)

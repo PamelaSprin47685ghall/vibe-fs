@@ -280,3 +280,42 @@ module RequirementGroundingTransform =
             let pending = RequirementGroundingRuntime.pending journal session
             return! anchorRequested journal sessionId realMessages providerId visibleHistory pending
         }
+
+    /// REQUIREMENT-GROUNDING-007/012: project requirement grounding or terminate on failure.
+    /// Domain decision: projection failure terminates the session.
+    let projectOrTerminate
+        (journal: AgentJournal option)
+        (workspaceDirectory: string option)
+        (projectionSessionIdOpt: string option)
+        (terminateSession: string -> string -> Task<Result<unit, string>>)
+        (outObj: obj)
+        : Task =
+        let applyProjection sessionId projected =
+            match projected with
+            | Ok values ->
+                HostMessageProjection.replaceMessagesInPlace outObj values
+                Task.FromResult()
+            | Error reason ->
+                Diagnostic.emit
+                    "requirement-grounding-projection-fail-closed"
+                    [ "session_id", sessionId; "result", reason ]
+
+                task {
+                    let! _ = terminateSession sessionId reason
+                    ()
+                }
+
+        match journal, workspaceDirectory, projectionSessionIdOpt with
+        | Some durable, Some _, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
+            task {
+                let messages = unbox<obj array> outObj?messages |> Array.toList
+
+                let! projected =
+                    tryProject
+                        durable
+                        sessionId
+                        messages
+
+                do! applyProjection sessionId projected
+            }
+        | _ -> Task.FromResult()

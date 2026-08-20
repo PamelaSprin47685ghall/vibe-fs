@@ -2,9 +2,12 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open System.Threading.Tasks
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.OpenCode.ProviderWireDecode
+open Wanxiangshu.OpenCode.ProviderWireCapture
 
 /// Process-local execution identity binding. Agent identity is frozen/observed here;
 /// physical model authority lives in ModelRouting and is leased by the exact
@@ -277,6 +280,41 @@ module SessionExecutionBinding =
             match providerAttemptBindings.TryGetValue(SessionId.value sessionId) with
             | true, binding -> Some binding.Model
             | false, _ -> None)
+
+    /// HOST-004: Begin a physical provider attempt for the transform boundary.
+    /// Combines quiescence begin, execution binding, and model routing step entry.
+    /// Domain decision: managed provider step must have physical user message id (EMR-010).
+    let beginPhysicalProviderAttemptForTransform
+        (beginQuiescence: SessionId -> unit)
+        (sessionId: SessionId)
+        (outObj: obj)
+        : Task<unit> =
+        task {
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+
+            let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
+
+            beginQuiescence sessionId
+
+            match
+                beginProviderAttempt
+                    sessionId
+                    physicalUserMessageId
+                    (ProviderWireCapture.lastUserPromptKey rawMessages)
+            with
+            | Error error -> invalidOp error
+            | Ok() ->
+                match currentProviderModel sessionId, physicalUserMessageId with
+                | Some _, Some physical ->
+                    do!
+                        ModelRouting.enterProviderStep
+                            sessionId
+                            physical
+                            (ProviderWireCapture.visibleProviderRuns rawMessages)
+                | Some _, None -> invalidOp "EMR-010: managed provider step has no physical user message id"
+                | None, _ -> ()
+        }
 
     let drop (sessionId: SessionId) =
         lock gate (fun () ->

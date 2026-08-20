@@ -52,7 +52,7 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
 
     const pairProjectionAt = pluginTransformsSource.search(/PairProgrammingThoughtTransform\.maybeInjectGuideline/)
     const requirementTail = pluginTransformsSource.slice(pairProjectionAt)
-    const requirementRelativeAt = requirementTail.search(/do!\s+projectRequirementGrounding\b/)
+    const requirementRelativeAt = requirementTail.search(/do!\s+RequirementGroundingTransform\.projectOrTerminate\b/)
     const requirementProjectionAt = requirementRelativeAt < 0 ? -1 : pairProjectionAt + requirementRelativeAt
     assert.ok(pairProjectionAt >= 0 && requirementProjectionAt > pairProjectionAt, 'production transform fixes pair → grounding order')
     grounding.disposeJournal(cursorJournal.journal)
