@@ -887,3 +887,21 @@ module ModelRouting =
         | RoutedChatExecution.Superseded -> None
         | RoutedChatExecution.ExternalManaged(_, _, _, model)
         | RoutedChatExecution.PluginManaged(_, _, _, model) -> Some model
+
+    let private requireOutputMessage output =
+        let message = if isNull output then null else output?message
+
+        if isNull message then
+            invalidOp "EMR-009: managed chat.message routing has no mutable output.message"
+
+        message
+
+    /// EMR-009 Host projection. Routing owns both which outcomes carry a model
+    /// and the exact mutable Host field that receives that model; composition
+    /// roots only invoke this published projection.
+    let projectRoutedModel output routed =
+        match routedModel routed with
+        | None -> ()
+        | Some model ->
+            let message = requireOutputMessage output
+            message?model <- box model

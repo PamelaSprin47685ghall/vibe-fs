@@ -77,22 +77,6 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 module HostSignalBootstrap =
 
-    let private requireOutputMessage output =
-        let message = if isNull output then null else output?message
-
-        if isNull message then
-            invalidOp "EMR-009: managed chat.message routing has no mutable output.message"
-
-        message
-
-    let private projectRoutedModel output routed =
-        match ModelRouting.routedModel routed with
-        | None -> ()
-        | Some model ->
-            let message = requireOutputMessage output
-            let routed = model
-            message?model <- box routed
-
     /// What the composition root needs back from `wire`.
     ///
     /// Exactly the members `SpikePlugin` calls. Six more used to hang here —
@@ -458,7 +442,7 @@ module HostSignalBootstrap =
 
             let continueRoutedChatMessage routedExecution (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
-                    projectRoutedModel output routedExecution
+                    ModelRouting.projectRoutedModel output routedExecution
                     FissionHostRequestProjection.projectRouted hasPhysicalParent routedExecution output
 
                     requireDurabilityActivation ()

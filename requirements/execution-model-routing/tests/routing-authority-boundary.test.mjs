@@ -52,6 +52,7 @@ test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admissi
 
   assert.match(host, /decoded\.PhysicalUserMessageId/)
   assert.match(host, /ModelRouting\.routeChatExecution/)
+  assert.match(host, /ModelRouting\.projectRoutedModel/)
   assert.doesNotMatch(host, /ModelRoutingAcquisition|ChatExecutionAdmission\.(NoRoute|Rejected|ExternalManaged|PluginManaged)/)
   assert.match(routing, /let routeChatExecution/)
   assert.match(routing, /acquireManagedExecution/)
@@ -61,7 +62,8 @@ test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admissi
   assert.match(binding, /let acceptRoutedExecution/)
   assert.doesNotMatch(binding, /PromptDispatcher|DispatchAccepted/)
   assert.doesNotMatch(sessions, /ModelRouting\.acquireManagedExecution/, 'fork/send enqueue must never wait for model capacity')
-  assert.match(host, /message\?model\s*<-\s*box routed/)
+  assert.doesNotMatch(host, /message\?model\s*<-/)
+  assert.match(routing, /message\?model\s*<-\s*box model/)
   assert.match(params, /validateObservedProvider/)
   assert.doesNotMatch(params, /observeUserFacing\s/)
 })
