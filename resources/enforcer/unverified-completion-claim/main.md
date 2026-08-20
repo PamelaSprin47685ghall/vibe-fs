@@ -3,6 +3,8 @@
 ## What To Do Now
 Do not make the completion claim stronger than the evidence.
 
+Also do not use truthful incompleteness as a substitute for doing the work. If you can accurately name required work that remains and you still own a useful action toward it, perform that action. The honesty of the description earns no finality credit.
+
 If obtaining the missing observation belongs to your office, obtain it now with the narrowest faithful check that could prove the claim wrong.
 
 If obtaining that observation belongs to another office, do **not** cross the role boundary just to manufacture a green ending. Leave the candidate work ready for that observation, state exactly what remains unobserved, and keep the overall completion claim open.
@@ -30,6 +32,8 @@ For DevOps, this usually means: run the relevant observation, capture the actual
 
 For a Manager or Reviewer, do not turn a subordinate's implementation report into independent execution evidence. Ask whether the evidence chain contains a real falsifier at the boundary the final claim depends on.
 
+For a mission-bearing Manager, also ask the residual-action question before any ending: “What useful authorized act could I still take toward an unmet requirement?” If the answer names one, continue. A hypothetical future session is not a transfer target.
+
 Prefer the lowest faithful check first, but climb the verification ladder when the claim itself lives at a higher boundary. A unit test cannot certify deployment. A deployment smoke test cannot certify a property it never exercises.
 
 ## Decision Branches
@@ -38,6 +42,7 @@ Prefer the lowest faithful check first, but climb the verification ladder when t
 - **The observation is impossible in the current environment:** state the concrete limitation and downgrade the claim accordingly.
 - **Existing evidence already falsifies the claim:** stop treating this as a verification gap. The work is not complete; address the failure or return it to the rightful owner.
 - **The claim is only about your bounded contribution:** say so explicitly. Do not let readers infer whole-system verification from role-local completion.
+- **You truthfully identify required work for “next session” or “later”:** unless a concrete boundary prevents it or a real authority-bearing transfer has occurred, this is evidence against finality. Continue the work instead of polishing the handoff.
 
 ## Common Wrong Fixes
 - Run an irrelevant easy test so the response can contain the word “passed.” That buys ceremony, not evidence.
@@ -46,6 +51,7 @@ Prefer the lowest faithful check first, but climb the verification ladder when t
 - Say “should pass,” “looks good,” “likely fixed,” or “no reason it would fail” and let modal language smuggle in a completion claim.
 - Give a Coder shell access, or route execution through another role, merely to make the report feel self-contained. That repairs the prose by breaking the authority model.
 - Hide the missing verification in a trailing caveat after opening with “done.” Readers act on the headline.
+- Cite elapsed time, commit count, difficulty overcome, productivity, or a clean checkpoint as reasons the mission has done enough. Those facts price cost and progress; they do not discharge scope.
 
 ## Verification
 The repaired state satisfies this invariant:

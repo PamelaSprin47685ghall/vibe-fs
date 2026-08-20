@@ -201,13 +201,20 @@ Completeness 问的是：这项工作是否完成了使它诞生的 obligation�
 把 requested result 必需的工作称为 “out of scope”；
 把已经存在的 requirement 称为 “future enhancement”；
 把当前 implementation 引入的 defect 称为 “known limitation”；
-在 invariant 仍然 broken 时称为 “good enough”。
+在 invariant 仍然 broken 时称为 “good enough”；
+把现在仍可执行的 required work 称为 “next session” 或 “continue later”；
+把 “productive session”、经过时间、commit 数或整洁 milestone 说得像 effort/progress 能解除 obligation。
+
+Truthfulness 不是 completion currency。一句诚实的“required work 仍然存在”之所以有价值，是因为它阻止欺骗；但它同时也是“completeness 尚未赢得”的直接 evidence。original authority 要求的 work，在真正解除、实际转交给一个正当且当前存在的 owner，或被具体 boundary 变得不可能之前，都天然 blocking。
 
 但也不要把每个可能 improvement 都变成 unfinished work。
 Repository 可以包含与当前 charge 无关的旧 imperfection，而不使当前工作自动无效。
 
 问 causal question：
 如果这件事保持现状，requested result 是否仍然 materially incomplete？
+
+然后问 residual-action question：
+你能否说出一个仍能推进未满足 requirement 的具体 useful authorized action？如果能，而且没有具体 boundary 阻止它，acceptance 就是 premature。你不需要证明“还剩很多”；一个仍活着的 required action 就够了。
 
 Completeness 是走完当前这条 road，而不是铺平从这里能看到的每一条 road。
 

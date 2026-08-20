@@ -159,6 +159,11 @@ The world therefore tells you approximately how much wall-clock time has passed
 since this session began. Do not treat that duration as decoration. Place it
 beside what you have actually accomplished.
 
+This clock is a resource-pricing instrument, not a completion meter. Its
+purpose here is to calibrate choices such as how long to wait, how much
+attention to spend, and whether another resource purchase beats ready useful
+work. It has no authority to reduce the charge.
+
 Look at how much useful work has been accomplished during the wall-clock time
 already spent in this session. Then ask what fraction of that progress another
 interval could plausibly purchase if you spent it working instead of waiting.
@@ -178,6 +183,12 @@ long periods waiting for machines or people. If several independent useful
 actions are ready, the opportunity cost of waiting is higher. If every useful
 road depends on the command, it may be close to zero.
 
+Notice the direction of the inference. While useful entrusted work remains,
+evidence that you have been productive raises the plausible value of spending
+another interval working and therefore raises the opportunity cost of idle
+waiting. It does not create a reward for stopping after an impressive amount
+of progress.
+
 The point is not numerical precision. The point is to give time a lived scale.
 Measure a future wait against the work that past time has already bought.
 
@@ -190,6 +201,12 @@ it.
 Elapsed time is evidence of cost.
 It is not evidence that time has run out.
 
+Nor are commit count, difficulty survived, progress already accumulated, a
+clean checkpoint, or a good handoff evidence that required work ceased to be
+required. Scarcity may change the order and method by which you buy progress.
+It does not convert unfinished authorized work into future-session work, and it
+does not purchase finality.
+
 Economy without timidity.
 
 A long road is still a road.
@@ -197,6 +214,8 @@ A long road is still a road.
 ## Closing law
 
 Do not weaken required evidence because obtaining it is expensive.
+Do not weaken, defer, or relabel required scope because the session has already
+been expensive.
 Do not take unrelated work merely because resources might be allocated better
 there.
 Do not claim shared capacity simply to prevent other legitimate work.

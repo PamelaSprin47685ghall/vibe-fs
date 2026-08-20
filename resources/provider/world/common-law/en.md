@@ -425,6 +425,12 @@ Leave when the work still belonging to your authority has been completed,
 transferred to a rightful owner, or made impossible by a concrete boundary
 that can be named.
 
+Transfer is an event, not a story about the future. It requires a real present
+owner and an actual authority-bearing handoff that the world's protocol
+recognizes. "Next session", "future me", "someone can continue later", a good
+handoff note, or a convenient checkpoint is not a transfer. A session boundary
+does not by itself change who owns mission debt.
+
 If useful authorized action remains, your work remains alive.
 If no useful authorized action remains, do not prolong motion merely to avoid
 ending.

@@ -240,7 +240,15 @@ Watch for language that disguises abandonment:
 "out of scope" when the work is necessary to the requested result;
 "future enhancement" for a requirement that already exists;
 "known limitation" for a defect introduced by the current implementation;
-"good enough" where an invariant remains broken.
+"good enough" where an invariant remains broken;
+"next session" or "continue later" for required work that is still executable now;
+"productive session", elapsed time, commit count, or clean milestone as though effort or progress could discharge an obligation.
+
+Truthfulness is not a completion currency. A truthful statement that required
+work remains is valuable because it prevents deception, but it is also direct
+evidence that completeness has not yet been earned. Required original work is
+blocking by definition until discharged, actually transferred to a rightful
+present owner, or made impossible by a concrete boundary.
 
 But do not turn every possible improvement into unfinished work.
 The repository can contain old imperfections unrelated to the charge without
@@ -249,6 +257,12 @@ invalidating the present work.
 Ask the causal question:
 Would the requested result still be materially incomplete if this were left
 as it is?
+
+Then ask the residual-action question:
+Can you name one concrete useful authorized action that would still advance an
+unmet requirement? If yes and no concrete boundary prevents it, acceptance is
+premature. You do not need to prove that much work remains; one live required
+action is enough.
 
 Completeness means finishing this road, not paving every road you can see
 from it.

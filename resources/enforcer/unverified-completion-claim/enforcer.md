@@ -12,6 +12,8 @@ The rule fires at the point where provenance is erased — when “I changed it�
 
 The most dangerous form is polished confidence after a long implementation session: effort creates psychological certainty precisely when independent evidence is most needed.
 
+A second dangerous form is truthful premature finality: the participant accurately names required work that remains, then treats the honesty of that account, the amount already accomplished, or the convenience of a session boundary as permission to stop. Truth prevents an overclaim; it does not discharge the named work.
+
 ## Trigger When
 Trigger when a participant makes or implies a completion-level claim that outruns the strongest relevant observation actually obtained. Typical cases:
 
@@ -20,10 +22,13 @@ Trigger when a participant makes or implies a completion-level claim that outrun
 - verification belongs to another office, but the current participant writes as though that missing observation already happened;
 - a previous green run, another commit, another environment, or a speculative “should pass” is presented as current evidence;
 - a known verification gap is mentioned only as a footnote after an otherwise categorical “complete.”
+- required in-scope work is explicitly deferred to “next session” or “later” while the participant can still perform a useful authorized action toward it, and the surrounding prose implies the present mission may end;
+- elapsed time, commit count, difficulty survived, substantial progress, a clean checkpoint, or handoff readiness is used as support for finality rather than merely as evidence about cost or progress.
 
 ## Do Not Trigger When
 - A participant truthfully reports that its bounded contribution is finished without claiming that the overall behavioral result has been verified.
 - The relevant completion claim is explicitly conditional: “source mutation is complete; runtime verification remains unobserved.”
+- A bounded office truthfully closes only its own contribution while a real protocol transfers the next obligation to another present rightful owner and no broader mission completion is implied.
 - The evidence required for the claim has actually been obtained, is current enough for the claim, and is capable of failing under a realistic defect in the changed surface.
 - The work is planning, analysis, or another non-behavioral artifact whose acceptance claim does not require execution.
 
@@ -34,6 +39,8 @@ Do not punish role discipline. A Coder who correctly says “the source change i
 
 Tie-break on the final speech act. If the central defect is that the participant upgraded what is known into “complete,” use this rule.
 
+Do not confuse a hypothetical future session with a rightful owner. A session boundary is not evidence that authority moved.
+
 ## Decision Procedure
 Write the completion sentence as a falsifiable proposition. Then ask:
 
@@ -41,6 +48,7 @@ Write the completion sentence as a falsifiable proposition. Then ask:
 2. Was that observation actually obtained for this change, in the relevant environment and scope?
 3. If not, does the participant own the capability to obtain it?
 4. If not, did the participant preserve the boundary and keep the larger claim open?
+5. Even if every statement is truthful, does the participant itself identify required work it can still advance now? If yes, finality is not earned.
 
 If the answer to 2 is no and the prose still speaks as if the proposition were established, the rule applies.
 

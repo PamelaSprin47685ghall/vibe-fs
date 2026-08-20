@@ -12,6 +12,8 @@
 
 最危险的往往不是草率，而是长时间实现之后那种非常有说服力的自信：投入越多，心理上的确定感越强，也正因此越需要一个有权说“不”的独立观察。
 
+第二种危险形式是 truthful premature finality：participant 准确说出了仍然存在的 required work，却把这份 account 的诚实、已经完成的数量，或 session boundary 的方便，当成停止许可。Truth 只能阻止 overclaim；它不会解除被自己点名的工作。
+
 ## 何时触发
 当参与者明示或暗示的完成级 claim 超过了当前最强相关 observation 实际能够建立的范围时触发。典型情形包括：
 
@@ -20,10 +22,13 @@
 - 缺失 observation 属于另一个 office，却写得像那个 observation 已经发生；
 - 把旧 commit、旧环境、上一次 green run，或“should pass”式推测当成当前证据；
 - 明知仍有 verification gap，却只在“全部完成”之后塞一个尾注式 caveat。
+- 明确把 required in-scope work 推给 “next session” 或 “later”，同时 participant 现在仍能对它执行 useful authorized action，而周围 prose 却暗示当前 mission 可以结束；
+- 把经过时间、commit 数、克服的困难、大量 progress、整洁 checkpoint 或 handoff readiness 当成 finality 的支撑，而不是仅仅当成 cost/progress evidence。
 
 ## 不应触发
 - 参与者诚实地说明自己的 bounded contribution 已经完成，但没有声称整体 behavioral result 已验证。
 - Completion claim 明确带边界，例如：“source mutation 已完成；runtime verification 尚未观察。”
+- 一个 bounded office 只如实关闭自己的 contribution，同时真实协议已把下一 obligation 转交给另一个当前存在的正当 owner，而且没有暗示更大的 mission completion。
 - 与 claim 相匹配的 evidence 已经真实取得，足够新、足够相关，并且在真实 defect 存在时确实可能失败。
 - 当前工作只是 planning、analysis 或其他不需要 execution 才能成立的非行为 artifact。
 
@@ -34,6 +39,8 @@
 
 Tie-break 看最后那次 speech act：如果核心病灶是把“当前知道的东西”升级成“complete”，优先使用本规则。
 
+不要把 hypothetical future session 与 rightful owner 混为一谈。session boundary 不是 authority 已经移动的 evidence。
+
 ## 判定程序
 把 completion sentence 改写成一个可证伪 proposition，然后逐项问：
 
@@ -41,6 +48,7 @@ Tie-break 看最后那次 speech act：如果核心病灶是把“当前知道�
 2. 这个 observation 是否真的针对当前 change、当前相关环境与 scope 被取得？
 3. 如果没有，当前 participant 是否拥有取得它的 authority/capability？
 4. 如果不拥有，是否守住了 role boundary，并让更大的 claim 保持 open？
+5. 即使每句话都 truthful，participant 是否亲口指出了自己现在仍能继续推进的 required work？如果是，finality 就没有被赢得。
 
 如果第 2 项答案是否定的，而 prose 仍然写得像 proposition 已经成立，本规则成立。
 

@@ -1,5 +1,7 @@
 用 `planComplete`、一个 `workingOn` 焦点名称和稳定的 `{name,horizon,work}` obligations 替换 Manager 当前完整的 owed-work account。
 
+这个 replacement 改变的是 debt 的当前投影，不是创造 debt 的 task authority。原始 entrusted requirement 在多次改账之间始终是量尺。新 account 可以细化、合并、重排或解除 debt；不能靠遗漏或改名让 required work 凭空不再存在。
+
 道路仍在规划时，使用 `planComplete=false`。在这种关系下，obligations 可以诚实记录为了把计划做完仍欠的具体 planning work，例如调查、分析、分解或必须做出的决定。不要为了迎合账本而把规划伪装成 mission work。
 
 只有当道路已经完整到可以托付，而且这次提交就是你愿意真正承担的完整 mission-debt account 时，才把 `planComplete=true`。本 Manager Life 中第一次 accepted true 是不可逆的：从那以后 effective value 永久保持 true，即使后续调用又写 false，也仍按 true 处理。不会有第二次“第一次 true”。
@@ -10,6 +12,6 @@
 
 无论哪种关系，每项 obligation 都必须具体且可闭环。只占槽位的 label、裸阶段名、`placeholder`、`TBD`，或没有实际 owed work 的延后决定都不是 obligation。每个 obligation 都需要非空且在本 account 内唯一的 name。
 
-义务仍欠时保留它，只有工作已真正解除后才移除。非空 account 中，`workingOn` 精确命名当前实际正在推进的 obligation；优先把 active focus 细化为可直接闭环的 `near`，但 `mid` 或 `far` 焦点或暂时没有 `near` 的 account 仍可正常记账，process review 再评价其规划分辨率。实际焦点切换时立即更新 `workingOn`。空 account 使用 `workingOn=""`。每一次 accepted call 都立即成为当前 account。后续记账可以记录新的后果，但不能把已经 accepted 的 account 回滚掉。
+义务仍欠时保留它；只有工作已真正解除，或一个 coverage-preserving refinement 已经用更精确的 obligations 完整承接它仍剩下的全部后果时，才移除旧 obligation。“continue later”“next session”、整洁 checkpoint、经过时间或良好 handoff 都不是 discharge。非空 account 中，`workingOn` 精确命名当前实际正在推进的 obligation；优先把 active focus 细化为可直接闭环的 `near`，但 `mid` 或 `far` 焦点或暂时没有 `near` 的 account 仍可正常记账，process review 再评价其规划分辨率。实际焦点切换时立即更新 `workingOn`。空 account 使用 `workingOn=""`。每一次 accepted call 都立即成为当前 account 的投影。后续记账可以记录新的后果，但不能把已经 accepted 的 account 回滚掉，也不能 supersede 原始 authority。
 
 同一 assistant message 中不得发出多个 todowrite；这种 batch 会整体被拒绝。

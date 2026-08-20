@@ -14,6 +14,8 @@ The old system had one set of rules, even if ugly. The transitional system has t
 
 Teams frequently stop because the new path works and mainline callers migrated. But background jobs, recovery code, aliases, tests, and rare callbacks preserve old authority for years. The transition becomes the permanent architecture nobody deliberately designed.
 
+Session boundaries do not alter this completion criterion. If you can name a remaining repository-controlled migration step for “next session” and still have authority to perform it, you have named evidence that the refactor is still alive. A productive checkpoint or clean handoff is useful progress, not refactor closure.
+
 ## Repair Strategy
 Treat the refactor as an ownership migration with a closure checklist:
 

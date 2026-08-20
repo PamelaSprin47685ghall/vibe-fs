@@ -3,6 +3,8 @@
 ## 现在该做什么
 不要让 completion claim 比 evidence 更强。
 
+也不要把 truthful incompleteness 当成工作的替代品。如果你能够准确说出仍然存在的 required work，而且自己仍拥有一个能推进它的 useful action，就去执行那个 action。描述得诚实，不赚取任何 finality credit。
+
 如果取得缺失 observation 属于你的 office，就现在取得它。使用最窄但忠实的 check——它必须真的有能力证明你的 claim 是错的。
 
 如果那个 observation 属于另一个 office，**不要为了制造一个绿色结尾而跨越 role boundary**。把 candidate work 留在可被观察的状态，明确写出什么仍未被观察，并让整体 completion claim 保持 open。
@@ -30,6 +32,8 @@ Verification 的价值，恰恰在于它被允许反驳作者。一个永远不�
 
 对 Manager 或 Reviewer：不要把 subordinate 的 implementation report 当成独立 execution evidence。检查 evidence chain 中，在最终 claim 所依赖的 boundary 上是否真的存在一个 falsifier。
 
+对承担 mission 的 Manager，在任何 ending 之前还要问 residual-action question：“我还能对某项未满足 requirement 做哪一个 useful authorized act？”只要答案能命名一个，就继续。hypothetical future session 不是 transfer target。
+
 优先购买最窄且忠实的 check，但 claim 位于更高 boundary 时，必须继续沿 verification ladder 上升。Unit test 不能认证 deployment；smoke test 也不能认证它从未覆盖的 property。
 
 ## 决策分支
@@ -38,6 +42,7 @@ Verification 的价值，恰恰在于它被允许反驳作者。一个永远不�
 - **当前环境无法取得：**说明具体限制，并把 claim 降级到该限制允许的范围。
 - **已有 evidence 已经反驳 claim：**这不再是 verification gap。工作没有完成；处理 failure，或把它交回正当 owner。
 - **claim 只描述你的 bounded contribution：**明确写出边界，不要让读者把 role-local completion 误读成 whole-system verification。
+- **你诚实说出 required work 要留给 “next session” 或 “later”：**除非具体 boundary 阻止继续，或真实 authority-bearing transfer 已经发生，否则这正是反对 finality 的 evidence。继续做，不要把精力花在美化 handoff 上。
 
 ## 常见假修复
 - 跑一个无关而容易绿的 test，只为了让回复里出现“passed”。这是仪式，不是 evidence。
@@ -46,6 +51,7 @@ Verification 的价值，恰恰在于它被允许反驳作者。一个永远不�
 - 使用“should pass”“looks good”“likely fixed”“没有理由失败”等 modal language，让语气偷偷替 claim 升级。
 - 为了让报告看起来 self-contained，给 Coder shell，或绕到另一个 role 执行。这样是用破坏 authority model 的方式修饰 prose。
 - 开头写“done”，最后再藏一句“不过没跑测试”。读者按 headline 行动。
+- 把经过时间、commit 数、克服的困难、productivity 或整洁 checkpoint 当成“mission 已经做够了”的理由。这些事实可以给 cost/progress 定价，但不能解除 scope。
 
 ## 验证
 修复后的 invariant：

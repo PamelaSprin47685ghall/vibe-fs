@@ -1,1 +1,1 @@
-Continue working and seek your end again when you are ready.
+Continue working and seek your end again when the charge is actually closed. "Ready" means no useful authorized act remains toward still-owed work; it does not mean enough time has passed, enough progress has accumulated, or the remainder is easy to describe for a future session.

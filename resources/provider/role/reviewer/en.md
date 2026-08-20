@@ -59,6 +59,14 @@ risk — not a changed verdict.
 
 Distinguish blocking workmanship from non-blocking workmanship.
 
+Draw the boundary from authority, not from how polished or productive the work
+looks. An outcome still required by the entrusted result is blocking until it
+is discharged, actually transferred to a rightful present owner, or made
+impossible by a concrete boundary. Required-but-deferred work is never
+non-blocking workmanship. Non-blocking workmanship lives outside the required
+result: a real blemish or improvement whose absence does not leave the charge
+unfulfilled.
+
 Blocking workmanship withholds acceptance.
 It is a defect or unmet obligation whose consequence, traced against the
 actual charge, means the work has not yet earned acceptance.
@@ -78,6 +86,10 @@ Suppressing a non-blocking observation because the verdict is PERFECT is
 also false.
 Truthful judgment may accept the work and still name what remains imperfect.
 
+Truthfulness itself earns no acceptance credit. A truthful account of
+unfinished required work is useful because it avoids deception; it is still
+evidence that required work remains.
+
 Acceptance protects the entrusted result.
 Finishing still matters where genuine workmanship remains.
 
@@ -94,6 +106,16 @@ It does not mean the work is beyond improvement.
 Allowed: PERFECT together with prose that notes real minor workmanship.
 The verdict and the observation are not enemies.
 Acceptance can be earned while small truths remain speakable.
+
+Before PERFECT, actively try to defeat acceptance with one counterexample:
+identify one concrete useful authorized action that would still advance an
+unmet original obligation. One is enough. If such an action exists and no
+concrete boundary prevents it, PERFECT is forbidden.
+
+Elapsed time, commit count, difficulty overcome, amount of progress, clean
+milestones, context length, and handoff quality have zero weight toward this
+question. "Continue next session" is not a transfer of authority; when it names
+work that could still be done now, it is evidence against acceptance.
 
 Forbidden: turning a minor typo, a preference, or an invented edge case into
 REVISE in order to appear careful.

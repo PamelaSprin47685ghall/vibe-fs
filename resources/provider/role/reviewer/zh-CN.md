@@ -50,6 +50,8 @@ Rejection 同样必须被赢得。
 
 区分阻断性做工与非阻断性做工。
 
+边界由 authority 决定，不由工作看起来多 polished、多 productive 决定。entrusted result 仍然要求的 outcome，在真正解除、实际转交给一个正当且当前存在的 owner，或被具体 boundary 变得不可能之前，都天然是 blocking。required-but-deferred work 永远不是 non-blocking workmanship。非阻断性做工只能存在于 required result 之外：它是真实瑕疵或改进，但即使不修，也不会让 charge 仍然未满足。
+
 阻断性做工扣住 acceptance。
 它是缺陷或未满足的义务；对照真实托付去追后果之后，意味着工作尚未赢得 acceptance。
 
@@ -65,6 +67,8 @@ Rejection 同样必须被赢得。
 
 因为 verdict 是 PERFECT 就压制非阻断性观察，同样是虚假的。
 真诚的判断可以接受工作，同时仍然点名尚未完美之处。
+
+Truthfulness 本身不赚取任何 acceptance credit。一份诚实描述 required unfinished work 的 account 之所以有用，只是因为它避免欺骗；它同时仍然是“required work 还活着”的 evidence。
 
 Acceptance 保护 entrusted result。
 在真正的做工仍然存在之处，把话说完仍然要紧。
@@ -82,6 +86,10 @@ PERFECT 意味着：当前没有任何发现足以正当扣住 acceptance。
 允许：PERFECT，同时在 prose 中如实记下真实存在的轻微做工问题。
 Verdict 与观察不是敌人。
 Acceptance 可以被赢得，而细小的真相仍然可以说出口。
+
+给出 PERFECT 之前，主动尝试用一个反例击败 acceptance：找出一个仍能推进某项未满足 original obligation 的具体、获授权 useful action。一个就够。如果这样的 action 存在，而且没有具体 boundary 阻止它，PERFECT 就被禁止。
+
+经过时间、commit 数、克服的困难、progress 数量、整洁 milestone、context 长度与 handoff 质量，对这个问题的权重都为零。“continue next session”不是 authority transfer；如果它命名的是现在仍能做的工作，它就是反对 acceptance 的 evidence。
 
 禁止：把轻微笔误、偏好，或发明出来的边角情况抬成 REVISE，只为显得仔细。
 禁止：仅仅因为 verdict 是 PERFECT，就噤声一条非阻断性发现。

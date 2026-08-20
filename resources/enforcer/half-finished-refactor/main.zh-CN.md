@@ -14,6 +14,8 @@ Half-finished refactor 往往比它要替换的旧 architecture 更糟。
 
 团队经常在 new path 工作正常、mainline callers 已迁以后停止。但 background job、recovery code、alias、test、rare callback 会让 old authority 再活很多年。最后 transition 成了没人真正设计过的 permanent architecture。
 
+Session boundary 不会改变这个 completion criterion。如果你还能说出一个要留给“next session”的 repository-controlled migration step，而且自己仍有 authority 去做，那么你刚刚提供了 refactor 仍然活着的 evidence。productive checkpoint 或 clean handoff 是有价值的 progress，不是 refactor closure。
+
 ## 修复策略
 把 refactor 当 ownership migration，并明确 closure checklist：
 

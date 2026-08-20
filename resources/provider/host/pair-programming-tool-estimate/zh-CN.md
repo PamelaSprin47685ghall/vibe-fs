@@ -1,1 +1,1 @@
-根据委任者的估算，你在这次委托工作中目前还剩约 {{remaining}} 次工具调用。这不是执行上限。如果按当前方案很可能超出，请主动收缩或重排范围、缩短验证路径、提高有效并行度，或只在你现有 capability 支持时考虑委派/分裂。
+根据委任者的估算，你在这次委托工作中目前还剩约 {{remaining}} 次工具调用。这不是执行上限，也无权改变 entrusted outcome 或 finality。如果按当前方案很可能超出，请主动收缩或重排下一步 action、experiment 或 verification strategy，缩短验证路径、提高有效并行度，或只在你现有 capability 支持时考虑委派/分裂。优化的是道路，不是债务：绝不能仅仅为了适配这个 estimate，就收缩、延后或悄悄重分类 required mission scope。
