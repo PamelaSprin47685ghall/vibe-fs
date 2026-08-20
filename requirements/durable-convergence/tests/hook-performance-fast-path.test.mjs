@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
+
+import { ensure } from '../../../dist/Git/Hook/Dispatcher.js'
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
@@ -46,4 +52,46 @@ test('WHAT[DURABLE-CONVERGENCE-010] confirmed same-root convergence does not pub
   assert.match(gateway, /RootOid\.value merged\.RootOid/)
   assert.match(gateway, /expectedRemote/)
   assert.match(gateway, /return Ok\(\)/)
+})
+
+test('WHAT[DURABLE-CONVERGENCE-010] irrelevant reference transactions exit before starting Node', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-fast-path-'))
+
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    const verdict = ensure(repo)
+    assert.equal(verdict.tag, 0, `hook ensure failed: ${JSON.stringify(verdict)}`)
+
+    const marker = join(repo, 'node-started')
+    const bin = join(repo, 'bin')
+    execFileSync('mkdir', ['-p', bin])
+    const fakeNode = join(bin, 'node')
+    writeFileSync(fakeNode, `#!/bin/sh\nprintf started > ${JSON.stringify(marker)}\n`)
+    chmodSync(fakeNode, 0o755)
+
+    const hook = join(repo, '.git', 'hooks', 'reference-transaction')
+    const localRef = `${'0'.repeat(40)} ${'1'.repeat(40)} refs/heads/main\n`
+    const ignored = spawnSync(hook, ['committed'], {
+      cwd: repo,
+      encoding: 'utf8',
+      input: localRef,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    })
+
+    assert.equal(ignored.status, 0, ignored.stderr || ignored.stdout)
+    assert.equal(existsSync(marker), false, 'ordinary refs must not pay Node/module startup cost')
+
+    const trackedStore = `${'0'.repeat(40)} ${'1'.repeat(40)} refs/wanxiang/remotes/origin/store\n`
+    const relevant = spawnSync(hook, ['committed'], {
+      cwd: repo,
+      encoding: 'utf8',
+      input: trackedStore,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    })
+
+    assert.equal(relevant.status, 0, relevant.stderr || relevant.stdout)
+    assert.equal(readFileSync(marker, 'utf8'), 'started')
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
 })

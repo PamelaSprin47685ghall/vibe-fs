@@ -128,13 +128,27 @@ module HookDispatcher =
         joinPath (joinPath (joinPath packageRoot "resources") "git") "wanxiang-hook.mjs"
 
     let private shimBody kind =
-        String.concat
-            "\n"
+        let runner = shellQuote (runnerPath ())
+
+        let body =
             [ "#!/bin/sh"
               shimHeaderComment
-              sprintf "if [ \"${%s:-}\" = \"1\" ]; then exit 0; fi" SyncActiveEnv
-              sprintf "exec /usr/bin/env node %s %s \"$@\"" (shellQuote (runnerPath ())) (hookRunnerArgument kind)
-              "" ]
+              sprintf "if [ \"${%s:-}\" = \"1\" ]; then exit 0; fi" SyncActiveEnv ]
+
+        let invocation =
+            match kind with
+            | HookKind.ReferenceTransaction ->
+                [ "if [ \"${1:-}\" != \"committed\" ]; then exit 0; fi"
+                  "wanxiang_stdin=$(cat)"
+                  "if ! printf '%s\\n' \"$wanxiang_stdin\" | grep -Eq '^[0-9a-fA-F]+[[:space:]]+[0-9a-fA-F]+[[:space:]]+refs/wanxiang/remotes/[^/]+/store$'; then exit 0; fi"
+                  sprintf
+                      "printf '%%s\\n' \"$wanxiang_stdin\" | exec /usr/bin/env node %s %s \"$@\""
+                      runner
+                      (hookRunnerArgument kind) ]
+            | HookKind.PrePush ->
+                [ sprintf "exec /usr/bin/env node %s %s \"$@\"" runner (hookRunnerArgument kind) ]
+
+        String.concat "\n" (body @ invocation @ [ "" ])
 
     let private hooksDirectory workspace =
         GitSubject.execIn workspace [| "rev-parse"; "--path-format=absolute"; "--git-path"; "hooks" |]

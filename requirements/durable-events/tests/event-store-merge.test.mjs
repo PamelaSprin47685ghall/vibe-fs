@@ -1,6 +1,7 @@
 // DURABLE-EVENTS-003/014: k-way ordering belongs to the merge owner.
 
 import assert from 'node:assert/strict'
+import { performance } from 'node:perf_hooks'
 import test from 'node:test'
 
 import * as eventMerge from '../../../dist/Persistence/EventStore/MergeSurface.js'
@@ -63,4 +64,22 @@ test('WHAT[DURABLE-EVENTS-007] DURABLE_EVENTS_014_missing_parent_fails_closed', 
   const child = envelope('0'.repeat(39) + '3', ['0'.repeat(39) + '9'])
   const result = eventMerge.merge([['a', [child]]])
   assert.equal(result.ok, false)
+})
+
+test('WHAT[DURABLE-EVENTS-014] k-way merge does not re-sort every writer head for every event', () => {
+  const writers = 512
+  const eventsPerWriter = 16
+  let nextId = 0
+  const streams = Array.from({ length: writers }, (_, writer) => [
+    `writer-${String(writer).padStart(4, '0')}`,
+    Array.from({ length: eventsPerWriter }, () => envelope((nextId++).toString(16).padStart(40, '0'))),
+  ])
+
+  const started = performance.now()
+  const merged = eventMerge.merge(streams)
+  const elapsedMs = performance.now() - started
+
+  assert.equal(merged.ok, true)
+  assert.equal(merged.events.length, writers * eventsPerWriter)
+  assert.ok(elapsedMs < 500, `8192-event / 512-writer merge took ${elapsedMs.toFixed(1)}ms`)
 })

@@ -9,8 +9,25 @@ if (process.env.WANXIANG_GIT_SYNC_ACTIVE === '1') {
   process.exit(0)
 }
 
-const HookSync = await import(new URL('../../dist/Git/Hook/Sync.js', import.meta.url))
 const [kind, arg1] = process.argv.slice(2)
+let referenceTransactionInput = null
+
+if (kind === 'reference-transaction') {
+  if (arg1 !== 'committed') {
+    process.exit(0)
+  }
+
+  referenceTransactionInput = readFileSync(0, 'utf8')
+  const relevant = referenceTransactionInput
+    .split('\n')
+    .some((line) => /^[0-9a-fA-F]+[ \t]+[0-9a-fA-F]+[ \t]+refs\/wanxiang\/remotes\/[^/]+\/store$/.test(line))
+
+  if (!relevant) {
+    process.exit(0)
+  }
+}
+
+const HookSync = await import(new URL('../../dist/Git/Hook/Sync.js', import.meta.url))
 
 let error = null
 
@@ -19,8 +36,7 @@ switch (kind) {
     error = await HookSync.runPrePush(arg1 ?? '')
     break
   case 'reference-transaction': {
-    const stdin = readFileSync(0, 'utf8')
-    error = await HookSync.runReferenceTransaction(arg1 ?? '', stdin)
+    error = await HookSync.runReferenceTransaction(arg1 ?? '', referenceTransactionInput ?? '')
     break
   }
   default:

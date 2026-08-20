@@ -56,6 +56,14 @@ test('WHAT[DURABLE-EVENTS-020] empty_boot_is_read_only_and_keeps_RuntimeStarted_
   })
 })
 
+test('WHAT[DURABLE-EVENTS-020] plugin host does not pre-scan canonical history before EventStore activation', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const pluginHost = await readFile(new URL('../../../src/Wanxiangshu/OpenCode/Host/PluginHost.fs', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(pluginHost, /ProcessEventLog\.readStreams/,
+    'PluginHost must not add a second full history scan before CanonicalIntegrator owns replay')
+})
+
 test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {
   const { readFile } = await import('node:fs/promises')
   const integrator = await readFile(new URL('../../../src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs', import.meta.url), 'utf8')

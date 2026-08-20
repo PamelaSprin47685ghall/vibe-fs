@@ -50,20 +50,6 @@ module PluginHost =
         else
             input?directory |> unbox<string> |> nonBlankDirectory
 
-    let private readDurableStreams commonDir runtimeDir =
-        ProcessEventLog.readStreams commonDir
-        |> Result.mapError (fun error -> sprintf "durable bytes unreadable at %s: %A" runtimeDir error)
-
-    let private requirePayloadIntegrity commonDir runtimeDir streams : Result<unit, string> =
-        streams
-        |> List.collect snd
-        |> List.collect (fun envelope -> envelope.PayloadRefs)
-        |> List.tryFind (ProcessEventLog.payloadExists commonDir >> not)
-        |> Option.map (fun payloadRef ->
-            sprintf "durable payload unreadable at %s: %s" runtimeDir (PayloadRef.value payloadRef))
-        |> Option.map Error
-        |> Option.defaultValue (Ok())
-
     let private semanticUnavailable reason : Result<AgentJournal option, string> =
         Diagnostic.emit "journal-semantic-unavailable" [ "result", reason ]
         Ok None
@@ -91,13 +77,9 @@ module PluginHost =
         }
 
     let private createWorkspaceJournal workspace : Task<Result<AgentJournal option, string>> =
-        taskResult {
-            let commonDir = RuntimePath.gitCommonDir workspace
-            let runtimeDir = RuntimePath.forWorkspace workspace
-            let! streams = readDurableStreams commonDir runtimeDir
-            do! requirePayloadIntegrity commonDir runtimeDir streams
-            return! acquireWorkspaceJournal commonDir runtimeDir
-        }
+        let commonDir = RuntimePath.gitCommonDir workspace
+        let runtimeDir = RuntimePath.forWorkspace workspace
+        acquireWorkspaceJournal commonDir runtimeDir
 
     /// Load may read durable bytes, but it never repairs semantic state. Physical
     /// corruption is a load error; a domain fold rejection only disables the journal
