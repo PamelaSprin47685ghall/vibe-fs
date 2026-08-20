@@ -431,48 +431,21 @@ module HostSignalBootstrap =
             // LOOP-002/006 and HOST-027 share one raw Host subscription but own
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
-            let isOwned sessionId =
-                scope.Sessions.OwnedSessions.Contains(SessionId.value sessionId)
-
-            let hasPhysicalParent sessionId =
-                scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
-
-            let isInternalAttemptInterruptible sessionId =
-                isOwned sessionId && hasPhysicalParent sessionId
-
-            let isEligibleRole (profile: PromptAuthority.AuthorityExecutionProfile) =
-                match profile.CanonicalRole with
-                | Role.Blogger
-                | Role.Distiller -> false
-                | _ -> true
-
-            let isCompanionSession sessionId =
-                journal
-                |> Option.exists (fun durable ->
-                    SessionAssociationProjection.isCompanion
-                        sessionId
-                        (AgentJournal.snapshot durable).AgentProjections.Associations)
-
-            let profileIsEligible sessionId =
-                match HostSessionNudge.tryActiveProfile journal sessionId with
-                | Some profile -> isEligibleRole profile
-                | None -> false
-
-            let isNeedHelpEligible sessionId =
-                if not (isInternalAttemptInterruptible sessionId) then
-                    false
-                elif scope.Strength.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome then
-                    false
-                elif isCompanionSession sessionId then
-                    false
-                else
-                    profileIsEligible sessionId
-
             let loopSensor =
-                LoopSensor(isInternalAttemptInterruptible, (fun sessionId -> sessionPort.InterruptAttempt sessionId))
+                LoopSensor(
+                    NeedHelpSensor.createInterruptiblePredicate
+                        scope.Sessions.OwnedSessions
+                        scope.Sessions.SessionParents,
+                    (fun sessionId -> sessionPort.InterruptAttempt sessionId))
 
             let needHelpSensor =
-                NeedHelpSensor(isNeedHelpEligible, (fun sessionId -> sessionPort.InterruptAttempt sessionId))
+                NeedHelpSensor(
+                    NeedHelpSensor.createEligibilityPredicate
+                        scope.Sessions.OwnedSessions
+                        scope.Sessions.SessionParents
+                        journal
+                        scope.Strength.StrengthRuntime,
+                    (fun sessionId -> sessionPort.InterruptAttempt sessionId))
 
             do scope.AttachLoopSensor loopSensor
             do scope.AttachNeedHelpSensor needHelpSensor

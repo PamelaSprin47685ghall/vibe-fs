@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Interaction.Dispatch.OpenCode
 
 open Wanxiangshu.OpenCode
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Git

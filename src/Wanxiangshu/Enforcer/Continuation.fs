@@ -69,6 +69,9 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
+/// Session termination capability — same signature as PluginTransforms.fs private type.
+type SessionTermination = SessionId -> string -> Task<Result<unit, string>>
+
 /// The three continuation branches of EnforcerHost.handleContinuation (the
 /// Blogger continuation-transform host), extracted so EnforcerHost stays a thin
 /// dispatcher (ENFORCER-044).
@@ -1041,7 +1044,224 @@ module EnforcerContinuation =
             | _ -> return project rawMessages
         }
 
-    type SessionTermination = SessionId -> string -> Task<Result<unit, string>>
+    
+    /// Prefer non-empty preferred; else fallback. Never invent a blank list when
+    /// either side has content. Both empty is an invariant break: blanking Host
+    /// transcript yields provider 400 (messages cannot be empty).
+    let private ensureNonEmpty (preferred: obj list) (fallback: obj list) : obj list =
+        if not (List.isEmpty preferred) then
+            preferred
+        elif not (List.isEmpty fallback) then
+            fallback
+        else
+            Diagnostic.fatal
+                "enforcer-empty-projection"
+                [ "result", "ensureNonEmpty: both preferred and fallback are empty" ]
+
+            preferred
+
+    let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
+        ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)
+
+    let private stopPhysicalRun
+        (messages: obj list)
+        (fallback: obj list)
+        (reason: string)
+        : ContinuationOutcome =
+        ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)
+
+    let private isEmptyTextCycleFailure (reason: string) : bool =
+        reason = EnforcerCycleDecode.EmptyTextError
+
+    /// Rebuild provider-semantic turns from durable XTrace (AABB refresh source).
+    /// Current reanchor generation only: Host turn indices restart after HOST-006,
+    /// so mixing generations under groupBy Turn glues voided labels to live ones.
+    let private projectionFromXTrace
+        (journal: AgentJournal)
+        (xTrace: XTraceProjectionState)
+        : Task<ProviderProjection.ProviderSemanticProjection> =
+        task {
+            let byTurn =
+                XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
+                |> List.groupBy (fun part -> part.Turn)
+                |> List.sortBy fst
+
+            let semanticPart (part: XTracePartRef) (body: string) =
+                match part.Kind with
+                | "text" -> Some(ProviderProjection.SemanticText body)
+                | "reasoning" -> Some(ProviderProjection.SemanticReasoning body)
+                | "tool_call" ->
+                    part.ToolName
+                    |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
+                | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
+                | "media_omitted" ->
+                    let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
+                    Some(ProviderProjection.SemanticMedia(mediaType, ""))
+                | _ -> None
+
+            let readSemanticPart (part: XTracePartRef) =
+                task {
+                    match! journal.Writer.BlobWriter.Read part.TextRef with
+                    | Error _ -> return None
+                    | Ok body -> return semanticPart part body
+                }
+
+            let addSemanticPart (semanticParts: ResizeArray<_>) (part: XTracePartRef) =
+                task {
+                    match! readSemanticPart part with
+                    | Some semantic -> semanticParts.Add semantic
+                    | None -> ()
+                }
+
+            let readTurn (_turn, parts) =
+                task {
+                    let ordered = parts |> List.sortBy (fun p -> p.PartIndex)
+
+                    let role =
+                        ordered
+                        |> List.tryHead
+                        |> Option.map (fun p -> p.Role)
+                        |> Option.defaultValue "user"
+
+                    // DSL-MUTABLE: algorithm-scratch — semantic part accumulator
+                    let semanticParts = ResizeArray<_>()
+
+                    for part in ordered do
+                        do! addSemanticPart semanticParts part
+
+                    if semanticParts.Count = 0 then
+                        return None
+                    else
+                        return
+                            Some
+                                { ProviderProjection.SemanticMessage.Role = role
+                                  ProviderProjection.SemanticMessage.Parts = semanticParts |> Seq.toList }
+                }
+
+            let addMessage (messages: ResizeArray<_>) turn =
+                task {
+                    match! readTurn turn with
+                    | Some message -> messages.Add message
+                    | None -> ()
+                }
+
+            // DSL-MUTABLE: algorithm-scratch — message accumulator
+            let messages = ResizeArray<_>()
+
+            for turn in byTurn do
+                do! addMessage messages turn
+
+            return
+                { ProviderId = None
+                  ModelId = None
+                  Variant = None
+                  Tools = []
+                  System = []
+                  Messages = messages |> Seq.toList }
+        }
+
+    /// AABB: re-chunk from current IngestedThrough against latest XTrace.
+    /// Returns None when sealed or no material.
+    let private tryRefreshMainContextFromJournal
+        (scope: IParkedTransformHost)
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        : Task<BloggerRequestContext option> =
+        task {
+            let key = SessionId.value bloggerSessionId
+
+            if BloggerRuntimeHost.blocksNew (Some journal) mainSessionId scope key then
+                return None
+            else
+                let session =
+                    AgentProjection.tryFind mainSessionId (AgentJournal.snapshot journal).AgentProjections
+                    |> Option.defaultValue AgentProjection.emptySession
+
+                let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+                let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
+
+                let epoch =
+                    session.PrefixEpoch
+                    |> Option.map (fun e -> e.EpochId)
+                    |> Option.defaultValue PrefixEpochId.initial
+
+                let! projection = projectionFromXTrace journal xTrace
+
+                let ingestCursor =
+                    XTraceProjection.semanticCursorFor blog.Coverage.IngestedThroughSequence xTrace
+
+                match
+                    BloggerDelta.nextChunk
+                        BloggerDelta.DeltaLimitBytes
+                        ingestCursor
+                        blog.Coverage.CoverableTurnCutoffExclusive
+                        projection.Messages
+                with
+                | None -> return None
+                | Some chunk ->
+                    return EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk
+        }
+
+    /// The Blogger continuation-transform handler (moved from EnforcerHost to
+    /// break the Host.fs ↔ Continuation.fs compile-order cycle).
+    ///
+    /// Thin dispatcher over the three branches (emptyCallsBranch / commitBranch /
+    /// firstRequestBranch): it only derives the closed branch context and forwards.
+    let handleContinuation
+        (scope: IParkedTransformHost)
+        (journal: AgentJournal option)
+        (confirmedFailure: ConfirmedFailurePort option)
+        (recoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe)
+        (bloggerSessionId: SessionId)
+        (rawMessages: obj list)
+        : Task<ContinuationOutcome> =
+        task {
+            let project (msgs: obj list) = projectMessages msgs rawMessages
+
+            let stop (reason: string) =
+                stopPhysicalRun rawMessages rawMessages reason
+
+            let mainSessionId =
+                journal
+                |> Option.bind (fun j ->
+                    SessionAssociationProjection.tryMainSessionOf
+                        bloggerSessionId
+                        (AgentJournal.snapshot j).AgentProjections.Associations)
+
+            let mkCtx (durable: AgentJournal) (owner: SessionId) : Context =
+                { Scope = scope
+                  Journal = journal
+                  Durable = durable
+                  Owner = owner
+                  BloggerSessionId = bloggerSessionId
+                  RawMessages = rawMessages
+                  ConfirmedFailure = confirmedFailure
+                  RecoveryProbe = recoveryProbe
+                  Project = project
+                  Stop = stop
+                  RefreshMainContext = tryRefreshMainContextFromJournal scope durable
+                  IsEmptyTextCycleFailure = isEmptyTextCycleFailure
+                  ParkedTransformLifetime = EnforcerHost.ParkedTransformLifetime }
+
+            let chronicleCallCount = EnforcerRepair.chronicleCallCount rawMessages
+
+            match journal, mainSessionId, EnforcerCycleDecode.extractCalls rawMessages with
+            | Some durable, Some owner, Some(messageId, _, assistantCompleted) when chronicleCallCount > 1 ->
+                return!
+                    invalidCardinalityBranch
+                        (mkCtx durable owner)
+                        messageId
+                        chronicleCallCount
+                        assistantCompleted
+            | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
+                return! emptyCallsBranch (mkCtx durable owner) assistantCompleted
+            | Some durable, Some owner, Some(messageId, calls, assistantCompleted) ->
+                return! commitBranch (mkCtx durable owner) messageId calls assistantCompleted
+            | _ -> return! firstRequestBranch scope journal bloggerSessionId rawMessages project
+        }
+
+
 
     let private projectOrKeepRaw (sessionId: string) (bloggerMessages: obj list) (messages: obj list) : obj list =
         if List.isEmpty messages then
@@ -1159,7 +1379,7 @@ module EnforcerContinuation =
                     }
 
             let! outcome =
-                EnforcerHost.handleContinuation
+                handleContinuation
                     scope.ParkedTransformHost
                     journal
                     (Some confirmedFailure)
@@ -1178,12 +1398,12 @@ module EnforcerContinuation =
         (sid: SessionId)
         (sessionId: string)
         (outObj: obj)
-        (recovery: FamilyRecovery)
+        (recovery: SessionRecovery.FamilyRecovery)
         : Task =
         match recovery with
-        | FamilyRecovery.FamilyBlocked _ -> Task.FromResult()
-        | FamilyRecovery.FamilyWaiting _
-        | FamilyRecovery.FamilyReady _ ->
+        | SessionRecovery.FamilyRecovery.FamilyBlocked _ -> Task.FromResult()
+        | SessionRecovery.FamilyRecovery.FamilyWaiting _
+        | SessionRecovery.FamilyRecovery.FamilyReady _ ->
             runEnforcerWhenFamilyReady scope journal durable terminateSession sid sessionId outObj
 
     let private runEnforcerForMainSession

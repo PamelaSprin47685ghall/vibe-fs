@@ -21,12 +21,14 @@ open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open HostSessionNudge
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
@@ -39,6 +41,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
@@ -64,6 +67,59 @@ type AssistanceAbortClaim =
 module AssistanceAbortClaim =
     let sessionId (claim: AssistanceAbortClaim) = claim.SessionId
     let providerRun (claim: AssistanceAbortClaim) = claim.ProviderRun
+
+module NeedHelpSensor =
+
+    let createInterruptiblePredicate
+        (ownedSessions: HashSet<string>)
+        (sessionParents: Dictionary<string, string>)
+        : SessionId -> bool =
+        fun sessionId ->
+            ownedSessions.Contains(SessionId.value sessionId)
+            && sessionParents.ContainsKey(SessionId.value sessionId)
+
+    let createEligibilityPredicate
+        (ownedSessions: HashSet<string>)
+        (sessionParents: Dictionary<string, string>)
+        (journal: AgentJournal option)
+        (strengthRuntime: StrengthRuntime)
+        : SessionId -> bool =
+        let isOwned sessionId =
+            ownedSessions.Contains(SessionId.value sessionId)
+
+        let hasPhysicalParent sessionId =
+            sessionParents.ContainsKey(SessionId.value sessionId)
+
+        let isInternalAttemptInterruptible sessionId =
+            isOwned sessionId && hasPhysicalParent sessionId
+
+        let isEligibleRole (profile: PromptAuthority.AuthorityExecutionProfile) =
+            match profile.CanonicalRole with
+            | Role.Blogger
+            | Role.Distiller -> false
+            | _ -> true
+
+        let isCompanionSession sessionId =
+            journal
+            |> Option.exists (fun durable ->
+                SessionAssociationProjection.isCompanion
+                    sessionId
+                    (AgentJournal.snapshot durable).AgentProjections.Associations)
+
+        let profileIsEligible sessionId =
+            match HostSessionNudge.tryActiveProfile journal sessionId with
+            | Some profile -> isEligibleRole profile
+            | None -> false
+
+        fun sessionId ->
+            if not (isInternalAttemptInterruptible sessionId) then
+                false
+            elif strengthRuntime.TryFindByReplica sessionId |> Option.isSome then
+                false
+            elif isCompanionSession sessionId then
+                false
+            else
+                profileIsEligible sessionId
 
 /// HOST-027: process-local exact-sentinel sensor over reasoning deltas.
 /// It owns only stream part identity, rolling suffixes, and armed attempt
