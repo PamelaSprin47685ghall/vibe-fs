@@ -46,6 +46,7 @@ test('WHAT[EMR-008] EMR_008_host_inventory_no_longer_exposes_model_binding_autho
 test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admission_owner', async () => {
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
+  const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const params = await source('src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs')
 
@@ -54,6 +55,11 @@ test('WHAT[EMR-009] EMR_009_chat_message_is_the_single_managed_execution_admissi
   assert.doesNotMatch(host, /ModelRoutingAcquisition|ChatExecutionAdmission\.(NoRoute|Rejected|ExternalManaged|PluginManaged)/)
   assert.match(routing, /let routeChatExecution/)
   assert.match(routing, /acquireManagedExecution/)
+  assert.match(host, /SessionExecutionBinding\.acceptRoutedExecution/)
+  assert.doesNotMatch(host, /acceptPromptExecution|acceptExternalExecution/)
+  assert.match(host, /fun \(claim: PromptAuthority\.PromptClaim\) ->[\s\S]{0,100}runtime\.DispatchAccepted\(claim\.SessionId, claim\)/)
+  assert.match(binding, /let acceptRoutedExecution/)
+  assert.doesNotMatch(binding, /PromptDispatcher|DispatchAccepted/)
   assert.doesNotMatch(sessions, /ModelRouting\.acquireManagedExecution/, 'fork/send enqueue must never wait for model capacity')
   assert.match(host, /message\?model\s*<-\s*box routed/)
   assert.match(params, /validateObservedProvider/)

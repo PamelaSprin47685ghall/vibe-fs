@@ -184,6 +184,27 @@ module SessionExecutionBinding =
                 // transform re-prove it from its trailing user message.
                 providerAttemptBindings.[sessionKey] <- binding)
 
+    /// PROMPT-006 process-local execution capability commit. The routing owner
+    /// publishes the typed route; this owner alone decides how an accepted route
+    /// becomes provider-attempt binding state. The composition root projects the
+    /// later-compiled dispatcher into the one predicate this earlier owner needs.
+    let acceptRoutedExecution dispatchAccepted (routed: ModelRouting.RoutedChatExecution) : unit =
+        match routed, dispatchAccepted with
+        | ModelRouting.RoutedChatExecution.PluginManaged(claim, physical, agent, model), Some isAccepted ->
+            if isAccepted claim then
+                acceptPromptExecution claim.SessionId claim.PromptKey physical agent model
+            else
+                invalidOp (
+                    sprintf
+                        "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted"
+                        (PromptKey.value claim.PromptKey)
+                )
+        | ModelRouting.RoutedChatExecution.PluginManaged _, None -> ()
+        | ModelRouting.RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model), _ ->
+            acceptExternalExecution sessionId physical agent model
+        | ModelRouting.RoutedChatExecution.NoRoute, _
+        | ModelRouting.RoutedChatExecution.Superseded, _ -> ()
+
     /// Provider-attempt boundary. The transform must bind the exact trailing
     /// PhysicalUserMessageId that chat.message admitted. PromptKey is still the
     /// plugin authority identity, but it can never substitute for physical

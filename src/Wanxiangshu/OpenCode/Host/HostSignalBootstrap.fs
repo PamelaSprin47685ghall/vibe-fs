@@ -102,39 +102,6 @@ module HostSignalBootstrap =
             tools?fission <- box false
             message?tools <- tools
 
-    let private acceptPluginExecution
-        (runtime: PromptDispatcher.Runtime)
-        (claim: PromptAuthority.PromptClaim)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (agent: string)
-        (model: OpencodeModel)
-        =
-        if runtime.DispatchAccepted(claim.SessionId, claim) then
-            SessionExecutionBinding.acceptPromptExecution
-                claim.SessionId
-                claim.PromptKey
-                physicalUserMessageId
-                agent
-                model
-        else
-            invalidOp (
-                sprintf
-                    "PROMPT-006: PromptKey %s did not reach durable PhysicalAccepted"
-                    (PromptKey.value claim.PromptKey)
-            )
-
-    let private commitExecutionCapability (journal: AgentJournal option) =
-        fun routed ->
-        match routed, journal with
-        | ModelRouting.RoutedChatExecution.PluginManaged(claim, physical, agent, model), Some j ->
-            let runtime = PromptDispatcher.forJournal j
-            acceptPluginExecution runtime claim physical agent model
-        | ModelRouting.RoutedChatExecution.PluginManaged _, None -> ()
-        | ModelRouting.RoutedChatExecution.ExternalManaged(sessionId, physical, agent, model), _ ->
-            SessionExecutionBinding.acceptExternalExecution sessionId physical agent model
-        | ModelRouting.RoutedChatExecution.NoRoute, _
-        | ModelRouting.RoutedChatExecution.Superseded, _ -> ()
-
     let private eventString (value: obj) =
         if isNull value then
             None
@@ -570,7 +537,14 @@ module HostSignalBootstrap =
                     requireDurabilityActivation ()
                     signalExternalJoinWake decoded
                     do! promptIngressHook input output
-                    commitExecutionCapability journal routedExecution
+                    let dispatchAccepted =
+                        journal
+                        |> Option.map (fun durable ->
+                            let runtime = PromptDispatcher.forJournal durable
+                            fun (claim: PromptAuthority.PromptClaim) ->
+                                runtime.DispatchAccepted(claim.SessionId, claim))
+
+                    SessionExecutionBinding.acceptRoutedExecution dispatchAccepted routedExecution
                 }
 
             let bindExplicitResumeSession
