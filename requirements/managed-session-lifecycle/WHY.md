@@ -1,78 +1,27 @@
-# WHY — managed-session-lifecycle
-
-## 一句话
-
-只要系统创建 managed session，就必须有唯一 owner 负责创建、复用、停止、回收与 replacement；
-否则每个 feature 都会复制 parent map、cancel、retire、restore 规则。
+# managed-session-lifecycle — WHY
 
 ## 不可替代的存在理由
 
-1. **所有权事实多个 owner = 恢复与级联必然分叉**。为 SyncDelegate 或 Strength 复制独立
-   parent/child map、恢复、取消、retire 框架（历史 why/host §15 被拒方案），崩溃恢复与
-   级联取消会各自按自己的半套规则走，同一 child 在不同路径下得到不同结局。
-2. **已回收状态必须不可重新激活**。`Retired` / `Abandoned` 是 durable terminal；没有 tombstone
-   语义，restart 会把已消费的 completion 再次投递（EXEC-009），或把「已完成的 child」重新 fork
-   成新逻辑人。
-3. **reuse 必须可证明地安全**。restart 后按 journal 关联（SessionId + agent + title）精确匹配才
-   复用；无关联一律新建、不收养同 root 下别人的 child；查询失败、重复候选、归属冲突 fail closed
-   （HOST-015 / REVIEW-019）。否则「恢复」会静默绑错 session。
-4. **Reusable vs OneShot 是两条互斥生命周期**。SyncDelegate 的 dispose-after 不得套在 dedicated
-   Session 上，反之亦然（EXEC-028）；ReuseScope 是 Dedicated 绑定的真正生命周期，不是 owner
-   Session 的 dispose（universal.md §11）。
-5. **单一 writer**。`HandleLinked / HandleCompleted / HandleAbandoned / HandleRetired` 只有一个
-   writer（`HandleController`），否则 fork 路径、completion 路径、cancel 路径各知一部分顺序，
-   谁也看不见别人是否同意（EXEC-009 注释）。
-6. **级联取消必须完成后才宣告父 abort**。`AbortChildren` 是异步物理效果；调用后丢弃 Task 会让
-   父 `TurnAborted` terminal / teardown 抢先完成。Companion Blogger 于是可能仍在 provider flight 中，
-   是否被真正 interrupt 取决于调度时序，形成同一输入时好时坏的竞态。
-7. **停止当前 attempt ≠ 取消 logical session**。Loop/NeedHelp/Finality/Fission 等内部控制只可能收束
-   managed sub-session 的当前 physical attempt；它们不能借 `AbortSession` 获得 parent-cancel 权限。
-   user-facing/root 没有内部 interrupt 权限：除 Host 已观测到外部用户主动中断外，插件不得主动
-   interrupt root。否则一次局部控制动作会同时杀掉 Manager 与全部 coder，随后 durable handle 仍是
-   `Active`，horizon 又会把已经死亡的 child 报成仍在工作。
-8. **每个内部 attempt interrupt 必须同时拥有 successor**。物理 abort 本身不是业务终态：Loop 必须
-   进入 AABB，NeedHelp 必须在 fresh idle 后进入 assistance，Fission/Reviewer cleanup 必须由各自已存在
-   的 replacement/finality owner 接管；没有 successor 的 invariant/fail-closed stop 必须转成明确
-   `Failed` terminal，使 fork handle 完成并唤醒 parent join。禁止“abort 成功 → 无 recovery、无 terminal、
-   无 parent wake”的 orphan attempt。若 Host abort 请求失败，任何预先 arm 的 cause/claim 必须立即撤销，
-   不得污染下一 attempt。
-9. **plugin dispose 必须晚于全部已准入 Host hook**。provider-facing transform 会同步 XTrace、Strength、
-   grounding 等 durable facts；若 dispose 只 drain detached background/reconcile，却允许已进入的 transform
-   越过 `AgentJournal` release，退出时就会得到 `writer is disposed`。关闭准入后，已进入 hook 必须仍可完成；
-   关闭后的迟到 hook 必须不再触碰 durable substrate。
+只要系统创建与托管 session，就必须有单一且权威的 lifecycle owner 负责创建、复用、停止、回收与替换。如果各业务特性自行复制 parent 映射、取消机制与恢复规则，生命周期状态机必将四分五裂。
 
-## RED 是什么样
+1. **所有权事实的单一写口**。多处并行的生命周期管理器会导致崩溃恢复与级联取消出现分歧，同一子会话在不同路径下会获得相互矛盾的终态。
+2. **终态的不可逆性与 Tombstone 语义**。`Retired` 与 `Abandoned` 是持久化的最终状态。若缺乏严格的墓碑语义，系统重启时可能错误重放已消费的完成结果，或将已终结的子会话重新当作活动人使用。
+3. **安全可证明的复用判据**。重启恢复必须基于 journal 关联（SessionId + agent + title）进行精确匹配；未关联的直接新建，匹配冲突直接安全失败（fail closed），严禁收养无关联的孤儿会话。
+4. **互斥的生命周期形态**。长期复用的 Dedicated 会话（以 ReuseScope 驱动）与即用即弃的 OneShot 会话具有截然不同的生命周期，绝不能混用回收与销毁策略。
+5. **级联取消的物理因果保证**。父会话在对外宣布终止前，必须确保所有子会话（包括 Companion Blogger 等）的物理中断已完全完成，杜绝异步竞争导致的悬挂进程。
+6. **Attempt 中断与 Logical 取消的权限分离**。内部控制收束（如循环终止、求助等）仅能请求中断当前的物理尝试（physical attempt），绝不得篡夺父会话的逻辑取消权限，亦不得擅自中断用户根会话。
 
-```text
-RED = 同一 logical owner 可得到两个活跃 replacement，或 restart/cancel 后 ownership 无法收敛。
-```
+## 核心不变量
 
-具体症状：
+- Handle 生命周期遵循严格的四态模型：`Active → CompletedAwaitingJoin → Retired` 与 `Active | CompletedAwaitingJoin → Abandoned`。
+- Completion cell 实行单赋值竞争，首个到达的完成事实具有唯一权威。
+- 内部尝试中断必须显式闭合后继处理者（successor）或转化为明确的 Failed 终态，防止孤儿尝试挂死父级 join。
+- 系统关闭与资源清理必须等待全部已准入的 durable 操作彻底排空。
 
-- 同一 `(ReuseScopeId, role)` 出现两个 live dedicated Session → RED。
-- restart 后同一 handle id 绑定到不同 child session，或同一 child 恢复成两种 lifecycle → RED。
-- `consume` 后 restart 又把同一条 completion 投递一次 → RED（retire tombstone 缺失）。
-- 父取消后子仍在运行 / 已 Abandoned 的 handle 被 join 消费 → RED。
-- 父 `TurnAborted` 已对外完成，但 Blogger/其它 running child 的 `AbortSession` 仍未完成 → RED。
-- 内部 loop/needhelp/tool 收束 interrupt user-facing/root，或 attempt-only stop 级联 abort descendants → RED。
-- 内部 attempt interrupt 后既没有 AABB/assistance/replacement successor，也没有 `Failed` terminal + parent wake → RED。
-- abort transport 失败后 Loop/NeedHelp cause 仍 armed，下一次无关 abort 被误分类 → RED。
-- child 已被 parent abort 物理停止，但 durable handle 仍 `Active`，导致 horizon 报 “still away” → RED。
-- plugin dispose 已释放 journal，但先前已进入或随后迟到的 provider transform 仍尝试 append → RED。
-- Hidden（HostOwnedHidden）handle 泄漏进父的 list/join/guard/恢复 → RED（EXEC-014 回归：
-  Distiller child 泄漏会阻塞 caller 的 suicide）。
+## 违反边界的后果（RED）
 
-## 边界（DOES NOT OWN）
-
-- 什么 session kind 存在（`session-ontology` 拥有分类；`AttachmentKind` 增删不属本包）。
-- delegation 的业务含义 / SyncDelegate 的 batch / canonical / serialization（→ `delegation`）。
-- participant identity（→ `participant-identity`）。
-- generic crash reconciliation（→ `crash-reconciliation`）；本包只定义 session-specific 合法恢复结果。
-- Host 的具体 session API（→ `host-boundary`）。
-- 假 completion 补偿的 outcome 分型（→ `effect-accounting`；EXEC-021/022）——本包拥有的是
-  handle 状态机对补偿事实的拒绝行为（rejectFalseCompletion），不是「假 abort ≠ 成功」的判定本身。
-
-## Independent Change Test
-
-把当前 runtime registry 换成 durable locator + Host lookup，而不改变 session ontology /
-delegation 的 WHAT —— 生命周期合同不动，机制可换（boundary card）。
+- 同一 `(ReuseScopeId, role)` 产生两个并行的 live Dedicated 会话。
+- 重启后同一 handle 绑定到错误的子会话，或已 Retired 的完成结果被重复消费。
+- 父会话宣布中断后，后台子会话仍在隐蔽运行并产生副作用。
+- 内部错误将局部 attempt 中断放大为整棵会话树的逻辑取消，导致根会话意外退出。
+- 插件释放持久化存储时仍有未排空的异步写入，引发写入损坏与悬挂异常。

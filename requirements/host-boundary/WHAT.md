@@ -1,342 +1,85 @@
-# WHAT — host-boundary（唯一 normative 合同）
+# host-boundary — WHAT
 
-命题前缀：`HOST-BOUNDARY-`。全部命题描述**当前世界必须同时成立**的事实。
-来源：旧 host/architecture 条款（HOST-001..027、ARCH-002/003/012，2026-08-14 归档）与
-历史 completed changes（cache / reconciler-event-driven-de-polling）。落点见 `HOW.md`。
-
----
+## HOST-BOUNDARY-001: 业务层不消费流式碎片事件
 
-## HOST-BOUNDARY-001：业务层不消费流式碎片（事件分层）
+业务逻辑严禁直接消费流式碎片事件（如 `message.updated`、`part.delta` 等）。合法交互路径仅允许由最早边界过滤碎片，转化为粗粒度的唤醒信号，随后读取完整的 SDK 快照作为唯一的业务事实来源。
 
-**规范**：业务层不得消费流式碎片。合法路径只有：`碎片事件 → 最早边界丢弃 → 粗粒度信号
-（idle / retry / deleted）→ single-flight → SDK 完整消息 → 纯策略`（HOST-001；ARCH-002）。
-OpenCode 的 `session.status(status.type="idle")` 与独立 `session.idle` 都只是同一 typed `SessionIdle`
-wake 的物理编码；两者都不得携带 terminal 事实。禁止处理 `message.updated` / `part.delta` /
-`session.updated` / `session.diff` 作为业务输入；禁止从 idle payload 推断 terminal/完成/失败；禁止依赖
-两个 idle 编码的先后顺序推导因果。
+## HOST-BOUNDARY-002: 业务层信号闭集与精准分型
 
-`message.updated` 可以作为**纯 projection-change edge** 唤醒一个已经由上述 coarse signal 建立、但因
-SDK snapshot 尚未看到当前 physical user 对应 assistant 而处于 pending 的 reconcile occasion。这个 edge
-只能触发重新读取完整 SDK snapshot：不得自身携带/推断 terminal 业务事实，也不得在没有 pending
-occasion 时凭空建立新的**普通业务** wake。
+进入业务层的宿主信号严格限于类型化闭集（`SessionIdle`、`ProviderRetry`、`ProviderFailure`、`SessionDeleted` 与 `AttemptAborted`）。中止错误必须解码为专用的物理中断唤醒，绝不得与提供者失败混淆。
 
-唯一窄例外是 same-participant Fission 的 physical-lane liveness bridge：Host 已经按 EMR-007 规则确认
-no-error、completed、non-`tool-calls` 的 exact physical-execution terminal 后，若该 `SessionId` 有 durable
-Fission lane membership，且 edge 的 physical user 与 Scheduler 当前 binding 精确一致，则允许打开一次
-不携带 quiescence/terminal 事实的 snapshot reconcile occasion，以容忍 OpenCode transport 漏掉后续
-`session.status=idle` / `session.idle`。该 edge 仍不得编码为 `HostSignal`，不得直接声明 Completed/Failed/
-Aborted；完整 SDK snapshot 仍是唯一业务 terminal authority。普通 session 不获得这个例外。
+## HOST-BOUNDARY-003: 传输与领域分离且信号仅作唤醒
 
-物理基础设施可以在这个边界并行抽取不进入业务层的资源证据：execution-model-routing 只读取
-最终 assistant `message.updated.info.parentID` 来得到 exact PhysicalUserMessageId。assistant error 只证明当前
-provider step 结束，不得释放 physical execution lease；只有**无 error、completed、且明确非
-`tool-calls` finish** 的 assistant 才是普通 physical execution terminal。该 observation 不得被包装成
-`HostSignal`、不得携带 terminal 业务语义（具体合同归 EMR-007）。
+宿主信号仅作为单向唤醒触发器，不得作为业务事实载体。信号内携带的尝试次数仅供诊断参考，不得直接作为领域的重试或回退计数。
 
-**含义/动机**：碎片顺序/形状随 Host 版本漂移；把因果绑在传输噪声上（why/host.md §4）。
+## HOST-BOUNDARY-004: TurnUnknown 为对齐私有观测而非业务结局
 
-**证据**：`HostEventCodec`（`isHostSignalEvent` / `tryDecode` 在 codec 边界丢弃 fragment）；
-→ HOW.md `HOST-BOUNDARY-001`（MOVE `host001-fragment-events.test.mjs`）。
+快照中未决的中间状态归类为调和器私有的 `TurnUnknown` 观测，严禁跨越调和边界发布为公开的业务完成终态，防止产生虚假的完成或缺失报告。
 
-## HOST-BOUNDARY-002：允许进入业务层的信号是闭集，且分型正确
+## HOST-BOUNDARY-005: Reconciler 单飞快照观测与事件驱动收敛
 
-**规范**：仅 `session.status = idle`、`session.idle`、`session.status = retry`、`session.error =
-MessageAbortedError | AbortError`、`session.deleted` 可进入 Session 生命周期与 Reconciler；两个 idle
-编码都必须归一为不携带业务事实的 `SessionIdle`。
-abort error 必须解码为 typed `AttemptAborted`（撤销当前 attempt 的 idle-derived continuation
-能力；**不是** `ProviderFailure`，不得推进 fallback）（HOST-002）。
+调和器对每个会话严格保证单飞执行（single-flight），接收到粗粒度信号时执行单次完整快照读取。在无新信号或明确投影边缘时，严禁通过墙钟轮询重复读取快照。
 
-**含义/动机**：把 ProviderError 当 AttemptAborted（或反之）会让 fallback 预算被 assistance/用户
-取消污染；分型是 fallback 正确性的前提（why/host.md §1）。
+## HOST-BOUNDARY-006: Raw Part 与 ToolParts 状态投影一致性
 
-**证据**：`HostSignalAdapter` + `HostEventCodec`；→ HOW.md `HOST-BOUNDARY-002`
-（MOVE `host001-fragment-events.test.mjs` `HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary`；
-REUSE `codec/signals.test.mjs`）。
+工具调用的原始分段状态与业务分段状态必须保持严格一致：未完成状态映射为挂起调用，已完成或失败状态映射为调用结果，严禁出现状态分叉投影。
 
-## HOST-BOUNDARY-003：Transport ≠ Domain；typed HostSignal；信号是 wake 不是事实载体
+## HOST-BOUNDARY-007: Compaction 观测门禁之预防与收容
 
-**规范**：Domain 合同永远是 typed `HostSignal`（`SessionIdle | ProviderRetry | ProviderFailure |
-SessionDeleted | AttemptAborted`）；业务层不得观察 raw payload。HostSignal 任何 case 不携带
-message id（FALLBACK-003）；`ProviderRetry.Attempt` 只用于诊断与唤醒，不是 Fallback 领域计数
-（FALLBACK-010）。普通业务事实只从完整 snapshot 读取（ARCH-002）。`ProviderFailure` 是 typed
-physical failure witness：它本身不能命名/推进 provider run；只有当同一次 reconcile 的完整 snapshot
-已经给出 exact current physical user 之后的唯一 assistant（ProviderRunIdentity 仍由 snapshot 确定）时，
-二者合取才可把该 exact run 收敛为 `TurnFailed`。snapshot 尚无 current assistant 时仍不得猜 run。
+宿主压缩控制实行双层防护：启动前严格校验并关闭自动压缩配置，首轮调用若产生非预期压缩则直接拒绝启动；运行时若观测到压缩事实，必须立即触发原子上下文重锚定。
 
-**含义/动机**：从事件字段推导领域事实 = 把传输层偶然参数当权威（`HostSignal.fs` 头注释：
-retry 事件的 messageID 曾被当成失败 assistant 写进 cursor）。
+## HOST-BOUNDARY-008: Transform 到 ProviderRunIdentity 因果读与唯一性
 
-**证据**：`Infrastructure/OpenCode/Signals/HostSignal.fs`；
-→ HOW.md `HOST-BOUNDARY-003`（NEW `host-capability-observation`；MOVE `host001-fragment-events`）。
+从快照提取运行身份必须基于严格的因果规则（角色、完成时间、父节点匹配与最大序列）；当且仅当命中唯一候选时方可确认绑定，命中 0 个或多个候选时一律安全失败。
 
-## HOST-BOUNDARY-004：TurnUnknown 是 reconciliation 私有观测，不是 TurnOutcome
+## HOST-BOUNDARY-009: Tool 身份双半边与缺失 Fail-Closed
 
-**规范**：`finish=None` 的稳定 snapshot 分类为 reconciliation 私有 `SnapshotObservation.TurnUnknown`，
-**不是** 可 publish 的 `TurnOutcome` case；`TurnUnknown` 不得穿过稳定业务 turn 边界
-（HOST-002/004；`ReconcileProgram` 类型注释）。
+工具执行上下文必须同时完整具备消息 ID 与调用 ID 两个半边身份；任一半边缺失直接安全失败，严禁跨上下文推测配对。
 
-**含义/动机**：把「观测不到」当「业务结局」会制造假 terminal / 假 missing-final-report。
+## HOST-BOUNDARY-010: 多实例边界与共享注册表访问纪律
 
-**证据**：`ReconcileProgram.SnapshotObservation` / `TurnOutcome`；→ HOW.md `HOST-BOUNDARY-004`
-（REUSE `domain/reconcile-program.test.mjs` + `codec/signals.test.mjs`）。
+跨工作区实例间仅共享只读或受限的全局身份注册表，且注册表访问不得跨越异步等待点；各实例的持久化日志写入器与状态缓存完全隔离，严禁共享写入通道。
 
-## HOST-BOUNDARY-005：Reconciler 快照观测 machinery（single-flight / pending occasion / 事件驱动收敛）
+## HOST-BOUNDARY-011: 空 Content 预防与连续 User 消息插桩
 
-**规范**：Reconciler 每 session 同时最多一次 reconcile（single-flight）。coarse Host signal 到达时建立/更新
-该 session 的 reconcile occasion，并只读取一次当前完整 SDK snapshot。若当前 physical user 已经明确绑定，
-但 snapshot 尚未出现其对应 assistant，则该 occasion 保持 pending；后续同 session 的 `message.updated`
-projection-change edge 才允许重新 Kick，并必须保留原 occasion 的 wake 权限（尤其 `IdleWake` 的
-`QuiescencePermit`）。没有新的 coarse signal 或 projection-change edge 时，不得通过 retry loop、固定次数
-重读、`setTimeout` 或其它 wall-clock polling 再次 `GetMessages`。
+在向底层提供者交付消息前，必须对空白内容进行安全补占位符处理，并在连续出现的两条用户消息之间插桩无语义的助手消息，防止底层协议报校验错误。
 
-projection-change edge 与“登记 pending”之间不得存在 lost-wakeup race：如果 edge 在一次 snapshot read
-与 pending 登记之间到达，scheduler 必须观察到该 edge 的单调版本变化并立即重新排队。新的 physical user
-binding 必须使旧 pending occasion 失效；`ClearSession` 同样清除其 pending/edge 状态。
+## HOST-BOUNDARY-012: SessionID 与 CallID 定位唯一性
 
-Fission physical-lane liveness bridge 必须先记录同一 exact physical 的 projection edge epoch，再打开一次
-`RetryWake` snapshot occasion；这样即使 terminal event 已到而 SDK snapshot 暂时仍落后，既有 edge-epoch
-机制仍可额外消费一次真实 causal edge，而不是退化成 wall-clock polling。迟到的 coarse idle 允许重复
-Kick，但 single-flight + Fission keyed materialization 必须使其幂等。
+依据 `SessionID + CallID` 在完整快照中解析原始调用分段时，必须证明其能唯一确定对应的运行上下文与追踪范围；若匹配出现歧义或无法定位，必须安全失败。
 
-`ProviderFailure` 与 exact current assistant 已同时可见时，不得再等待 assistant 的 terminal
-`message.updated` 或后续 `SessionIdle`。Host 可以先发布 `session.error`，而 assistant 的
-`error/finish/time.completed` projection 稍后才赶上；current assistant 已提供 run identity，typed failure
-witness 提供 failure finality，同一次 snapshot read 必须立即发布 `TurnFailed`。若 snapshot 连 current
-assistant 都没有，则仍保持 pending，禁止从 session 级 error 猜测 ProviderRunIdentity。
+## HOST-BOUNDARY-013: Reasoning Sensor 专属识别与单 Run 触发限制
 
-**含义/动机**：轮询把时间推进当业务状态探测，而且 Host projection lag 超过任意固定窗口就会把真实
-terminal 永久漏掉。事件驱动只对真实 causal edge 反应，并让 projection lag 的长度不再参与业务正确性。
+求助传感器仅识别推理分段中的专属标识符，普通正文与工具输出均不触发；每个运行周期内至多触发一次，且仅限中断当前子会话的物理尝试。
 
-**证据**：`Composition/Turn/Scheduler.fs`（Scheduler：queued/active/generation/wake + projection edge epoch /
-pending occasion）；`Composition/Turn/TurnReconcile.fs`（当前 physical 已绑定时禁止回退到 authority root 的旧
-assistant）；→ HOW.md `HOST-BOUNDARY-005`。
+## HOST-BOUNDARY-014: 零 Host 源码修改与 Hook Fatal Membrane
 
-## HOST-BOUNDARY-006：同一 raw part 的 Parts/ToolParts 状态投影一致
+系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载的 Hook 函数必须包裹致命保护膜（fatal membrane），在捕获到不变量异常时立即安全熔断。
 
-**规范**：session-shaped `type="tool"` part：`state.status = pending|running` → `Parts =
-ToolCall` + `ToolParts = Pending`；`state.status = completed|error` → `Parts = ToolResult` +
-`ToolParts = Completed|Failed`。禁止 `ToolParts = Failed` 而 `Parts = ToolCall` 的分叉投影
-（HOST-004）。
+## HOST-BOUNDARY-015: Tool 文本返回结果有界截断
 
-**含义/动机**：分叉投影会把已失败 execution 重新表示成 in-flight，错误抑制 interaction repair。
+自定义工具返回的文本结果在进入宿主传输层前必须执行确定性的尾部有界截断，确保超长输出不会导致传输层溢出或阻塞。
 
-**证据**：`SessionSnapshotPort.projectMessages`；→ HOW.md `HOST-BOUNDARY-006`
-（MOVE `session-snapshot-locality.test.mjs` `HOST-004_keeps_failed_session_tool_state_consistent...`）。
+## HOST-BOUNDARY-016: HostEventPort Run 去重与 Sticky 重放
 
-## HOST-BOUNDARY-007：compaction 观测 gate — prevention + containment
+事件端口对同一运行周期的完成事件执行幂等去重，对迟到订阅者提供粘性重放，并在监听器释放后彻底停止投递。
 
-**规范**：HOST-006 两层必须同时成立：预防 = `compaction.auto`（含 overflow）/ `compaction.prune` /
-`compaction.autocontinue` 关闭且**首个 managed session 第一轮请求后 pseudo-run 为零**，否则
-`HostContractUnsupported` 启动失败；收容 = 任意观察到的 compaction pseudo-run → 原子重锚
-（`ContextReanchored`），不区分 manual `/compact` 与 Host 自触发（CTX-005 同构）。
+## HOST-BOUNDARY-017: Host 身份提取与 Managed Config 投影适配
 
-**含义/动机**：关掉配置单独不算已证明（上游键名漂移）；收容只认 transcript 事实，是主防线
-（why/host.md §5）。
+宿主边界负责将原始事件解析为规范的会话与角色身份，并单向将托管配置投影到底层宿主，宿主适配逻辑不反向生成业务权威。
 
-**边界**：重锚的 `ContextReanchored` 语义（PrefixEpoch+1 / Snapshot=None）归 `prefix-stability`；
-恢复失败/容量信号语义归 `context-compression`。本命题只拥有「观测 gate + fail-closed」。
+## HOST-BOUNDARY-018: 默认不 Fork Host 且扩展另立需求
 
-**证据**：`Domain/HostCompactionPolicy.fs`（requiredSettings / autoContinueEnabled /
-judgeFirstTurn / nextReanchor）；`HostCompactionGate/Observer`；→ HOW.md `HOST-BOUNDARY-007`
-（NEW `host-capability-observation`）。
+系统默认维持与官方宿主的无侵入集成；若未来涉及宿主底层代码分叉，必须作为独立架构需求重新立项。
 
-## HOST-BOUNDARY-008：Transform→ProviderRunIdentity 因果读；0/≥2 fail closed
+## HOST-BOUNDARY-019: Host 物理能力缺口必有 Canary 与 Contract 证明
 
-**规范**：transform 绑定用因果读：`role=assistant`、`time.completed` 未设、`parentID` 匹配最后一条
-user、`id` 为 session 内 assistant 最大者 → 命中**恰好一个**才绑定；命中 0 或 ≥2 → fail closed。
-compaction / summary 路径 → fail closed。唯一性前提是单 actor 写 assistant（HOST-010；
-历史 how/host 引理 1–4）。
+业务所依赖的全部宿主物理能力（包括时序、快照解析、模型路由等）必须具备严格的契约测试与金丝雀（canary）测试验证，缺少证明则判定环境不支持。
 
-Host 的公开 session snapshot 可以短暂落后于同一 Host 已接受的 `message.updated`。因此在
-**物理 snapshot 可见性边界**，第一次 `NoBindableRun` 只允许被解释为“projection 尚未赶上”的
-暂态，并做**有界重读**；一旦后续 snapshot 出现满足上述四条件的唯一 assistant 即绑定。窗口
-耗尽仍返回 `NoBindableRun`。`AmbiguousRun` / `NotLatestRun`、snapshot 读取错误，以及
-compaction/summary 永远不是 projection-lag 重试理由，必须立即/最终 fail closed。禁止通过放宽
-parent/completed/latest/compaction 条件解决可见性竞态。
+## HOST-BOUNDARY-020: 观测不足或多解严格 Fail-Closed
 
-**含义/动机**：same-root 猜测在 Host 重排消息时假绿；宁可 fail closed，不赌同一身。
+宿主边界在面临任何观察证据不足、查询超时、多重冲突或数据不一致的情形时，一律执行安全失败（fail closed），严禁妥协猜测。
 
-**证据**：`ProviderRunBinding` / `TurnBinding`（消费因果读）；`Context/Prefix/Wire.fs`
-（armed retry 的 bounded snapshot catch-up）；→ HOW.md `HOST-BOUNDARY-008`
-（NEW `tests/host010-run-id-equivalence.test.mjs`：bindableRun id ≡ ToolContext.messageID encoding；
-共时 Host 穿线仍由 Long Stroke 物理契约承担）
+## HOST-BOUNDARY-021: Plugin Load Phase 纯洁性与 Activation 分界
 
-## HOST-BOUNDARY-009：Tool 身份两个半边；缺一 fail closed
-
-**规范**：`ToolContext`（execute）同时有 message id 与 call id；`tool.execute.before/after` 只有
-call id。`ProviderRunIdentity` + `ToolCallId` 只能同时从 `ToolContext` 取得；任一缺失 → fail
-closed。禁止用 after 的 callID 与别处 messageID 猜测配对；禁止使用 SDK/Host 不存在的字段
-（如 `userMessageID`）冒充物理用户消息身份（HOST-011）。
-
-**含义/动机**：身份半边是 hook 面的物理现实；猜配对 = 假绿（历史 shape/host HOST-011）。
-
-**证据**：`Tools/ToolContext.fs`、`ToolHostCodec`；→ HOW.md `HOST-BOUNDARY-009`
-（REUSE `plugin/tool-host-codec.test.mjs` `HOST-011`）。
-
-## HOST-BOUNDARY-010：多实例边界 — 共享身份注册表，每实例私有状态；不跨 await
-
-**规范**：跨 worktree 实例：`SessionParents` / `VerdictSessions` / `SessionDirectories` /
-`ReviewGuardNudges` 是模块级共享单例；`AgentJournal` / Companions 缓存 / `OwnedSessions` /
-`UserMessageBindings` / hook 订阅 / 每实例 `NudgeSent` 每实例独有（`PluginRuntimeScope`）。
-共享表只由单一 Node.js event loop 访问，单次查改不跨 `await`；跨异步边界先复制不可变快照；
-禁止「读取 → await → 按旧值回写」RMW（HOST-012 C2）。
-`ReviewGuardNudges` 的 key **不得**含 RuntimeId（每实例 Journal 各有 RuntimeId；含之则
-root/worktree 双实例对同一 missing-verdict occasion 各发一次 `ReviewerVerdictRequired`）。
-missing-verdict 的 occasion 必须是 durable `ReviewBarrierId`，不得使用触发观察的
-`ProviderRunIdentity`：同一 review requirement 可被两个实例在不同 provider run 上并发观察，
-但物理 repair 仍只允许一次。无 open barrier 时不得发送未定域的 reviewer repair。
-
-**含义/动机**：第二 worktree 实例读不到主实例 verdict 是实测边界（why/host.md §7）；
-共享 Journal writer 会折叠写盘。
-
-**证据**：`Infrastructure/OpenCode/Host/SharedState.fs`、`PluginRuntimeScope.fs`；
-→ HOW.md `HOST-BOUNDARY-010`（REUSE `host/shared-state.test.mjs`）。
-
-## HOST-BOUNDARY-011：空 Content 预防与连续 User 消息插桩（HOST-016）
-
-**规范**：交付上游 provider 前：无 `tool_calls` 的 `assistant` 消息若只有 reasoning/thinking、没有
-非空 text part，则追加无语义 text part `"."`；若连 reasoning/thinking 也没有，则使用默认 `"..."`。
-`user` 消息 text 为空填充 `"#"`。若出现连续两个 `user` 消息，中间必须插入 `role="assistant"`、text 为 `"."` 的 assistant 消息，防止上游 API 报角色非交替或连续用户消息错误。禁止把 reasoning/thinking 原文复制成 synthetic text。
-禁止向上游发送空 content 消息（上游 400 `messages[i].content cannot be empty`）。
-
-**含义/动机**：依赖外部网关/厂商容错实现不一，且部分上游 API 严格要求消息角色交替；在 transform 末尾兜底是唯一可靠位置
-（why/host.md §8）。
-
-**证据**：`HostMessageProjection.sanitizeMessage/sanitizeMessages`；→ HOW.md `HOST-BOUNDARY-011`
-（MOVE `host-message-projection.test.mjs`）。
-
-## HOST-BOUNDARY-012：sessionID+callID 定位 canary；不能唯一 fail closed（HOST-025）
-
-**规范**：before/after 仅有 `sessionID + callID`（HOST-011）。必须证明经完整 SDK snapshot 能
-**唯一**定位原 ToolPart / assistant message / provider run / ToolPart ordinal / XTrace range；
-命中 0 / ≥2（如 callID 出现在多个持久化 ToolPart）→ fail closed。禁止用 callID 到别处猜配
-messageID。
-
-**含义/动机**：membrane 与 deferred prepare 的定位基础；不能唯一证明 = 上线即错配。
-
-**证据**：`SessionSnapshotPort.locateToolCall`；→ HOW.md `HOST-BOUNDARY-012`
-（MOVE `session-snapshot-locality.test.mjs` `TODO-004_*` 定位断言）。
-## HOST-BOUNDARY-013：HOST-027 reasoning sensor — 只认 reasoning delta，每 run 一次
-
-**规范**：Host 只从 managed Work provider attempt 的 reasoning/thinking delta 识别精确 sentinel
-`[NEEDHELP]`；检测器能跨 delta 边界拼出 sentinel，但只保留有限 rolling suffix；visible text、
-tool output、synthetic Pair Hint 与历史 transcript 中的同字节**不得**触发；每个
-`(SessionId, ProviderRunIdentity)` 至多触发一次（HOST-027）。
-自动 assistance interrupt 只允许有 physical parent 的 managed sub-session；user-facing/root 不得被
-sensor 主动 interrupt。命中时只能请求 current physical attempt interrupt，不能触发 descendant cascade。
-
-**含义/动机**：sensor 是 assistance 的物理入口；把 visible text 扫描伪装成等价实现 =
-把用户正文当求助信号。
-
-**边界**：assistance abort 的 authority 语义（不推进 fallback）归 `interaction-authority`；
-abort cause 分离归 `degeneration-guard`；consultation child 归 `delegation`。本命题只拥有
-「reasoning sensor 的识别/armed 边界」。
-
-**证据**：`NeedHelpEventCodec` + `NeedHelpSensor`（rolling suffix / armed identity / tryTake）；
-→ HOW.md `HOST-BOUNDARY-013`（MOVE `needhelp-sensor.test.mjs`）。
-
-## HOST-BOUNDARY-014：不修改 OpenCode 本体；只用现有 Hook/SDK（ARCH-003）
-
-**规范**：仅使用现有 Hook/SDK：`chat.message`、`experimental.chat.messages.transform`、`tool.definition / tool.execute.before / tool.execute.after`、`experimental.session.compacting / experimental.compaction.autocontinue`、`event`、`client.session.* / prompt_async / session.messages`。禁止要求新 Hook、改 Host 源码、依赖未公开 API（ARCH-003）。
-
-所有交给 OpenCode 的 Wanxiangshu hook callable 必须经过统一 **fatal membrane**：hook 内同步 throw 或返回 Promise rejection 时，先 `Diagnostic.fatal` 再 rethrow。不能只把异常交给 Host `Plugin.trigger`，因为 Host 可记录错误后继续 session loop，使已经失去 invariant 的 Wanxiangshu runtime 继续响应 idle/nudge/tool。`config` / `event` / `dispose` 等非二参 hook 同样遵守；plugin factory/init 若在 hooks 完整建立前异常，也必须 fatal，禁止“半初始化 plugin”继续 Host。业务/Provider 可预期拒绝应以 typed consequence/Result 表达，不得靠抛内部异常冒充。
-
-**含义/动机**：修改 Host core = 每次升级维护 fork；依赖未公开 API = 无声漂移。
-
-**证据**：`Infrastructure/OpenCode/Plugin/PluginTransforms.fs`（hook 顺序收敛）、
-`OpenCodePort`；→ HOW.md `HOST-BOUNDARY-014`（REUSE `plugin/host-hooks.test.mjs`）。
-
-## HOST-BOUNDARY-015：tool 文本结果有界（ARCH-012）
-
-**规范**：自定义 tool 文本结果在 Host 默认 head truncation 之前完成确定性留尾截断：≤2000 行且
-UTF-8 ≤51200 字节时逐字返回；超限时输出固定 marker + 确定性尾部（优先最新完整行；最后一行自身
-超限按 UTF-8 scalar 安全保留后缀）。计量只认 UTF-8 字节与换行（ARCH-012）。
-
-**含义/动机**：结果 wire 有界是 Host 稳定契约；截断只影响返回 wire，不改内部完整事实来源。
-
-**证据**：`Process/LargeGate.fs` / `Domain/ToolResultBound.fs`；→ HOW.md `HOST-BOUNDARY-015`
-（REUSE `context/tool-result-bound.test.mjs`）。
-
-## HOST-BOUNDARY-016：HostEventPort 按 provider run 去重 + sticky replay（观察可靠性）
-
-**规范**：同一 provider run 的 Completed outcome 重复通知被吸收（每 run 恰好一次送达）；无
-provider run 的 Completed 与 failed/aborted outcome 不去重；late subscriber 收到每 session 最后
-一个 sticky outcome；disposed listener 停止投递（HOST-012 观察面；Events.js）。
-
-**含义/动机**：root 与 worktree 实例都 reconcile 同一 child；第二次 Completed 不得用旧 run 的
-outcome 完成新 run。
-
-**证据**：`Infrastructure/OpenCode/Host/Events.js`（`Events_HostEventPort`）；
-→ HOW.md `HOST-BOUNDARY-016`（MOVE `events-port.test.mjs`）。
-
-## HOST-BOUNDARY-017：Host 身份观察 + managed config 投影适配（HostSessionContext / ManagedAgentConfig）
-
-**规范**：Host 边界负责两类薄适配：raw event → `(sessionId, agent)` 提取（`properties.sessionID` 优先，`event.sessionID` 兜底；agent 只从 `properties.info` 取），agent 名 → Role 解析（`fast-coder` → Coder；`build`/`plan` 等 alias 拒绝）经 `AgentRoleIdentity`；以及把 Wanxiangshu-owned managed agent fields 投影到 Host config。`notifyCompleted` 只接受 canonical role label；unknown、空白或缺失 role 返回 `false` 且不投递 Completed，不得静默降级为 Coder。`ManagedAgentConfig` 不再从 Host-final agent inventory 读取 managed model authority，模型来源与容量路由归 `execution-model-routing`。Host 适配不创建任何业务 authority。
-
-**含义/动机**：身份观察与 Host schema 投影都是边界能力；alias 拒绝防止把非 managed 名当真实角色，单向投影防止 `opencode.json` 反向成为模型 truth。
-
-**边界**：Role 身份规则本体归 `participant-identity`；`external_directory` 允许语义归 `capability-enforcement`（AGENT-019 交叉）；managed model scheduler source/lease occupancy 归 `execution-model-routing`；本命题只拥有 Host 观察/投影适配面。
-
-**证据**：`HostSessionContext.read/roleOf`、`ManagedAgentConfig` owned-field projection；model-authority 见 `execution-model-routing` EMR-008/009 与其 PROOF。
-
-## HOST-BOUNDARY-018：默认不修改 Host 本体；Host fork 另立需求
-
-**规范**：当前产品默认不 fork OpenCode；若未来产品选择 Host fork，应另立独立需求（boundary
-card DOES NOT OWN 之外的产品决策）。
-
-**含义/动机**：fork 是产品级决策，不是 adapter 内部优化；它改变所有 capability 的维护契约。
-
-**证据**：ARCH-003（只用现有 Hook/SDK）；→ HOW.md `HOST-BOUNDARY-018`（REUSE
-`plugin/host-hooks.test.mjs`）。
-
-## HOST-BOUNDARY-019：Host capability 缺口必须由 canary/contract proof 证明
-
-**规范**：业务依赖的每条 Host 物理能力（snapshot 定位、hook 时序、compaction 观测、信号边界、因果读唯一性、managed request model mutation 是否真正进入 provider）必须由可红 proof（canary / contract 测试）证明；不能默默依赖 undocumented API 或假设上游默认值（HOST-019/024/025 blocking canaries；HOW.md Magic Todo membrane 现行 canary 清单；模型路由物理 canary 见 `requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs`）。
-
-**含义/动机**：未验证能力 = 上线首炸；`HostContractUnsupported` 是显式失败而非悄悄降级。
-
-**证据**：本包 proof 表全部 canary + HOW.md Magic Todo membrane canary 清单；→ HOW.md
-`HOST-BOUNDARY-019`。
-
-## HOST-BOUNDARY-020：观察不足或多解时 fail closed（家族原则）
-
-**规范**：凡观察不足（查询失败、0 命中）或多解（≥2 命中、多个候选、冲突）一律 fail closed，
-不猜不收养：HOST-010（0/≥2 不写 seal）、HOST-011（缺半边拒绝）、HOST-025（定位不能唯一拒绝）、
-HOST-015 恢复冲突（归 lifecycle 消费）、HOST-013 anchor 缺失不重定位。
-
-**含义/动机**：安全侧失败是 Host 边界的总纪律：宁缺证明，不赌同一身（why/host.md §6）。
-
-**证据**：`session-snapshot-locality`（`Ambiguous`）、`needhelp-sensor`（armed 唯一）、
-`host001-fragment-events`（codec 丢弃）；→ HOW.md `HOST-BOUNDARY-020`。
-
-## HOST-BOUNDARY-021：plugin load/init 不得执行业务语义或反向调用 Host
-
-**规范**：OpenCode 正在等待 plugin factory / init 返回 hooks 的阶段是 **Load Phase**。Load Phase 只允许：解析模块与静态资源、验证配置/持久化载体的结构可读性、构造 adapter/capability、注册 hooks/tools，以及对**缺失的 Wanxiangshu 用户配置载体**执行无业务语义的 create-if-absent bootstrap（当前为 `~/.config/opencode/wanxiangshu.mjs` 推荐模板；已有文件绝不改写）。禁止在此阶段：
-
-- 调用 `client.session.*`、prompt/abort/create/list 等任何会进入 Host 业务路径的 API；
-- 执行 crash/business recovery、全局 recovery sweep、恢复 session/fission/assistance runtime cache；
-- 修改 workspace/Git 配置/hooks/refspec、回滚 transaction、发 prompt、abort session；
-- 追加会改变业务 projection 的 durable fact（包括仅用于 recovery budget 的 runtime watermark）。
-
-业务 projection 的解释进入 **Activation Phase**，但普通 tool/hook 入口不得自动恢复上一进程的未完成 tool。tool crash 只产生“上一执行已中断”的历史事实；任何 abort/send/rollback/replay/补 terminal 都必须有新的显式业务意图。未来若存在 session `/continue`，它是独立、用户显式的 resume 入口，不属于 plugin load，也不得隐藏重启断点。持久化字节若结构不可读可拒绝对应 workspace capability；**历史上已经 durable 且已有 cut/reset 的 semantic conflict 不得在 plugin init 重新炸 Host**。但 Activation Phase 的**新 live append**若产生 semantic cut，按 DURABLE-EVENTS-021 必须 fatal 当前进程，不能用“load purity”误解成可继续。
-
-**含义/动机**：Host 在等待 plugin init 时，plugin 反调同一 Host 会形成自举环；把 recovery 藏进 constructor 还会让一个 feature 的历史状态劫持整个 Host 启动。Load/Activation 分界把「能加载」与「某项业务能恢复」彻底解耦。
-
-**证据**：`OpenCode/Plugin/PluginBoot.fs`、`HostSignalBootstrap.fs`、`WorkspaceEventStore.fs` 的 load-purity gate；→ HOW.md `HOST-BOUNDARY-021`。
-
-## GARBAGE / 弃权（不进入 WHAT）
-
-- `HOST-013` Pair Hint 全链（durable anchored pair、Cursor NUL+BOM、parallel wave、tip nudge、
-  `SessionStartedAt` wall-clock）→ `prefix-stability`（append-only prefix law + placement）、
-  `provider-projection`（renderer）、`cognitive-environment`（正文 craft）、`guidance-delivery`
-  （nudge）、`time-capability`（elapsed）；本包只保留其中「Host 编码/entity 物理面」的观察事实
-  （归 prefix-stability 侧，不复制）。
-- `HOST-017..024` Magic Todo membrane 的 canonical/effect/review/description 语义 → 各 feature
-  owner（obligation-ledger / effect-accounting / review-assurance / action-affordance /
-  participant-horizon）；本包只拥有 `HOST-019` before 时序 barrier、`HOST-020` 原地 mutation、
-  `HOST-025` 定位 canary 三个 Host 观察面（并入 HOST-BOUNDARY-012/019/020，未单列）。
-- `HOST-007` 日志纪律 → `crash-reconciliation` / `structured-workflow`。
-- `HOST-005` XTrace → `semantic-trace`；`HOST-026` ProviderLanguage → `provider-language`。
-- `AGENT-026` stealth-browser MCP 启动判定 → `external-investigation` / HOW（Host adapter 机制）。
-- `HOST-014` Student/Teacher Host 行为 → GARBAGE（G3 删除）。
-
+插件加载初始化阶段仅允许执行资源解析、静态校验与 Hook 注册，严禁调用宿主业务接口、执行崩溃恢复或追加业务持久化事实。

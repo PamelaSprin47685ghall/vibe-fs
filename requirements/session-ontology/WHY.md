@@ -1,56 +1,25 @@
-# WHY — session-ontology
-
-## 一句话
-
-「有一个 session」不等于「出现一个新 participant」。execution topology、ownership 与 personhood
-必须分离，否则 attached work、internal leaf、replica、companion 会制造假的角色与错误能力继承。
+# session-ontology — WHY
 
 ## 不可替代的存在理由
 
-历史教训（历史 change（universal）§13.5、历史 shape/host HOST-008）：
+在多代理与子会话系统中，「拥有一个 session」绝不等于「出现一个新 participant」。如果 execution class、logical ownership、attachment 形式与 participant personhood 互相纠缠，runtime 拓扑就会冒充业务身份，导致能力继承与生命周期管理全面失控。
 
-1. **单轴 SatelliteKind 装不下现实**。旧模型只有 `SatelliteKind = { Companion, Teacher }`。当
-   Dedicated Inspector / Coder 出现——它们是长期 hot-knowledge Work Session，需要 Companion /
-   context 能力——把它们塞进 SatelliteKind 会把「能发普通请求、可挂 Companion 的工作会话」和
-   「短命无 Companion 的叶子」揉成一个分类，两个执行能力边界不同的事实被假装成一个。
-2. **每个 feature 复制 parent/child 框架就会分叉**。若所有权事实（谁是 owner、谁级联取消、谁
-   retire）没有单一 owner，崩溃恢复与级联取消必然分叉（`why/host.md` §15）。
-3. **物理拓扑不能冒充逻辑归属**。Host 树是扁平的（深度 2，HOST-015），UI 只渲染两层；
-   fork↔child、Work↔Companion、Work↔Sync*、Work↔Bookkeeper、Work↔StrengthReplica 的关系
-   只由 durable journal 事实承载。用物理 parentID 推断归属，恢复时就会收养同 root 下别人的 child。
-4. **runtime topology 不决定 Role/Persona/Authority**。一个 session 是 Work 还是 InternalLeaf、
-   是 Root 还是 Attached，只由 `SessionExecutionClass × SessionOwnership` 决定；Role / Tier /
-   工具面 / Logical Run / Authority / Fallback 一律不参与分类。否则「换执行者」会被误写成「换人」，
-   把机器拓扑泄漏成业务身份（历史 why/host §15、boundary card DO-NOT-OWN）。
+1. **单轴分类无法表达执行能力边界**。长期持有上下文与知识的工作会话（如 Dedicated Sync*）需要完整的 Companion 与 context 能力；而短命的叶子节点（如 Bookkeeper、StrengthReplica）则是即用即弃的内部执行单元。单轴分类必然把两者揉成一团，模糊两者的执行能力边界。
+2. **所有权事实必须具有单一来源**。若每个特性各自维护 parent/child 映射与生命周期，级联取消与崩溃恢复逻辑必然出现分歧。
+3. **物理拓扑不得冒充逻辑归属**。Host 的物理展示层级保持扁平（深度为 2），所有逻辑归属关系完全由持久化 journal 事实承载。若依据物理 parentID 推断逻辑归属，系统恢复时将错误收养其他会话的子节点。
+4. **Runtime 拓扑不决定角色与权威**。Session 的本体属性由 ExecutionClass 与 Ownership 正交决定，Role、Tier、工具集与 Authority 绝不参与底层分类。否则更换物理执行绑定会被误解为更换业务身份，将底层机器拓扑泄漏到领域层。
 
-## RED 是什么样
+## 核心不变量
 
-```text
-RED = execution class、logical ownership 与 participant identity 只能靠彼此猜测，不能独立表达。
-```
+- 每个 session 严格且唯一落在 `Work | InternalLeaf` 与 `Root | Attached` 的正交组合中。
+- Attached session 必须恰好属于一个 ownerSessionId，且禁止自引用链接。
+- InternalLeaf 节点禁止持有 Companion、禁止递归附挂子叶，亦不得成为其他 Attached 节点的 owner。
+- 物理 Host parent 统一指向 family root，逻辑归属仅由 journal 关联事实定义。
+- 领域内彻底消除旧式的 Student / Teacher 概念与拓扑。
 
-具体症状：
+## 违反边界的后果（RED）
 
-- 想知道「这个 session 是不是 Companion」只能靠 agent 名字或工具白名单猜 → RED（COMPANION-001 删除
-  了 eligibility 白名单：问题是「此 session 本身是不是 Y」，结构事实只有一个答案）。
-- 想知道「Dedicated Inspector 有没有资格挂 Companion」要从 Role 推导 → RED（分类是 Work+Attached，
-  与 Role 无关）。
-- 恢复时按物理 parentID 收养 child → RED（必须按 journal 关联的 SessionId + agent + title 精确匹配，
-  无关联一律新建，冲突 fail closed）。
-
-## 边界（DOES NOT OWN）
-
-- 当前具体 `AttachmentKind` 列表的增删（`AttachmentKind` 案例本身是本包所拥有；**未来新增哪种 kind**
-  是独立变化——本包只保证分类轴正交且每种 kind 落在一个 cell）。
-- managed session 的 create/reuse/closure/replacement 机制（→ `managed-session-lifecycle`）。
-- delegation 的 charge/return 业务含义（→ `delegation`）。
-- Role / Persona / ExecutionBinding 身份规则（→ `participant-identity`）。本包只拥有「分类不跟随
-  身份」这一负命题，以及 canonical durable role label 的稳定性（`AgentRoleIdentity.roleName`）。
-- `SatelliteKind` 案例、已删除 Student/Teacher 等历史兼容形状（历史沉积，见 HOW「历史与弃权」）。
-- SyncDelegate 的语义 batch / canonical / serialization（→ `delegation`；EXEC-026/028/031）。
-
-## Independent Change Test
-
-新增一种 Attached Work 类型（例如未来的新 Sync*），只要填入 `AttachmentKind` 并沿用
-`Work + Attached` 分类，不需要改 Persona 规则、不需要改 lifecycle protocol —— 证明分类轴与
-身份/生命周期独立。
+- 依赖代理名称或工具白名单猜测会话是否为 Companion 或是否具备上下文能力。
+- 崩溃恢复时依据物理层级匹配子节点，导致错误收养或孤儿会话。
+- 业务角色与执行拓扑强绑定，导致执行绑定切换时意外篡改业务身份与权限。
+- 内部决策用的临时叶子节点被持久化为长期成员，破坏后续决策的独立性。

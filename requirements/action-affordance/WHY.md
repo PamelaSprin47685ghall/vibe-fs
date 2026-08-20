@@ -1,53 +1,32 @@
-# WHY —— 不可替代的存在理由
+# action-affordance — WHY
 
-## 为什么必须独立存在
+## 核心动机与不可替代性
 
-participant 在做决定的那一点上，唯一可靠的输入是**当前 decision surface 上写着的合同**。
-被调用方（另一个 office）的 Role Law 不在调用方眼前；正确理解长期 world model（`cognitive-environment`）
-也不等于知道「此刻这个 verb 到底做什么」。
+在参与者（participant）做决定的瞬间，唯一可靠的认知输入是当前决策界面（decision surface）所呈现的动作契约。被调用方的 Role Law 并不会直接展现在调用方眼前；仅仅掌握长期的世界模型，并不等于清楚当前具体动词（verb）的精确后果与边界。
 
-历史教训（历史 why/prompt 条款「Tool description：tooltip vs 调用合同」）：
+动作契约必须在调用瞬间完整回答核心五问：
+1. **What act happens?**（发生什么动作）
+2. **When does this act fit?**（何时适用）
+3. **What tempting nearby act does this NOT perform?**（不执行哪些临近的诱惑行为）
+4. **What does a successful return establish?**（成功返回确立了什么事实）
+5. **What does each non-obvious argument mean?**（非显然参数的具体语义）
 
-> 拒一句正向描述。调用方看不见被调用方 Role Law；`inspect` 若只说 "Ask an Inspector to establish a
-> repository fact"，Coder 会把修复写进 charge。
+本包独立负责调用边界上的局部认知合同。它保证所有动作描述与参数语义可以在不改动长期认知与 Office 资格模型的前提下独立演进，同时确保边界在调用界面上得到完整镜像。
 
-一个动作的五问必须**在调用瞬间**可回答：
+## 失败模式（RED）
 
-```text
-1. What act happens?
-2. When does this act fit?
-3. What tempting nearby act does this NOT perform?
-4. What does a successful return establish?
-5. What does each non-obvious argument mean?
-```
+- **正向单向描述**：动作描述只写目标（如“建立仓库事实”），未标明因果只读或禁止改码的负边界，导致调用方越界布置任务（例如要求 Inspector 修代码）。
+- **语义降维误解**：将“mechanical”误解为“代码物理改动小”而非“产品含义已被决定”，导致错误使用行为修复工具进行产品设计决策。
+- **一词多义与同名异义**：同一工具名称在不同场景下承载不同的语义契约，破坏契约一致性。
+- **权限退化为裸枚举**：将代表能力与责任差异的选择项（如 calling）退化为无语义的裸枚举。
+- **边界镜像缺失**：因被调用方的 Role Law 已有约束，就从调用方的工具描述中删除对应边界，导致调用方在决策面无法感知限制。
 
-**唯一不可替代的 WHY**：调用瞬间的局部认知合同。它可以整体重写所有动作说明与参数语义，而长期认知
-（`cognitive-environment`）与 office capability model（`office-capability`）完全不动；反过来，office
-consequence 重写也不应要求每个 description 语义重写——mirror 机制保证边界完整性。
+## 边界分离
 
-## RED 长什么样（失败模式）
+- **与 `office-capability` 分离**：后者规定 Office 产生后果的权威资格；本包规定调用瞬间 decision surface 上呈现的动作边界与后果。
+- **与 `capability-enforcement` 分离**：后者保证 Provider 可见接口与 Runtime 执行能力同源；本包负责动作语义与描述契约。
 
-| 症状 | 历史出处 |
-|---|---|
-| `inspect` 只说正向（"Ask an Inspector to establish a repository fact"），无因果只读/不修码负边界 → Coder 把修复写进 charge | 历史 why/prompt 条款；office-boundary eval case `coder-inspect-ownership` |
-| `repair-behavior` 把 mechanical 理解成「物理上很小」→ DevOps 用 repair 做产品含义选择 | PROMPT-020；TOOL_DESCRIPTION_ANCHORS `meaning-decided` |
-| 同一名字两个 contract（`join` 两处语义不同、legacy `executor` 角色名/工具名共用） | ARCH-006/007：`A tool name names one contract everywhere.` |
-| `calling` 当裸 enum → 模型看不出它是 authority/capability 选择 | PROMPT-020：`calling` 不是普通 enum（ARCH-017） |
-| 因为被调用方 Role Law 已写就从调用方 tool contract 删掉同一区别 | PROMPT-021：`Single semantic ownership does not require single presentation.` |
+## DEPENDS ON
 
-## 为什么不是「capability」包
-
-`office-capability` 回答「office 有资格产生什么后果」；`capability-enforcement` 回答「provider 看见的
-与 runtime 能执行的是否同源」。本包回答第三件完全不同的事：**在调用瞬间，参与者的 decision surface
-上是否写清了 act 的边界与后果。** 本包可以多次镜像 canonical 事实（PROMPT-021），但镜像不产生第二
-semantic ownership。
-
-## 被拒方案（考古）
-
-- **tooltip 式一句话正向描述。** 拒绝（见上）。
-- **DRY 掉调用方合同。** 拒绝：`Single semantic ownership does not require single presentation.`
-  机器已知的 office ontology 必须完整成为 participant 能够据以行动的世界知识（历史 why/prompt 条款）。
-- **同工具名复用（schema 相同即可）。** 拒绝：`join` 可在 Manager 与 Orchestrator 共享，当且仅当
-  语义合同完全同一（ARCH-007）。仅 schema 相同不足。
-- **名字当 authority 证据。** 拒绝：禁止让模型从词汇推断 authority；世界已经知道合同时，必须把合同
-  送到做决定的模型面前（PROMPT-021）。
+- `office-capability`
+- `participant-horizon`

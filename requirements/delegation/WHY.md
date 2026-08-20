@@ -1,60 +1,21 @@
-# delegation — 为什么必须独立存在
+# delegation — WHY
 
-## 不可替代的存在理由
+## 领域价值与核心矛盾
 
-系统里有多种「把工作交给别人」的机制：Manager `fork` 使命内开证人、Orchestrator `commission`
-独立道路、`inspect`/`establish-behavior`/`repair-behavior` 同步取证/修复、NEEDHELP 求助 consultation。
-它们共享同一个 WHY：**语义工作转交另一 participant 时，authority、charge、owner 与返回后果必须明确**。
+在多角色协作系统中，工作必须能够从一个 participant 转交至另一个 participant（例如 Manager 启动 witness、Orchestrator 委托独立工作道路、同步取证与行为修复、以及求助咨询）。
 
-没有这个包，以下任一事故都会发生：
+转交的核心矛盾在于：**业务意图上的职责交接必须与底层的机器执行拓扑正交**。若将执行拓扑（SessionId、AgentId、worktree 路径、复用标志等）混入业务协议，模型将被迫充当物理拓扑的解码器，模糊任务所有权与权能边界。
 
-1. **机器拓扑冒充业务委托**：caller 用 `agent_id` / `job_id` / `worktree` / `reused=true` 描述委托，
-   模型被迫当 union decoder，把「创建独立工作」「续做同一路」「同步取证」混成一种模糊 act。
-2. **委托暗中改变 authority/personhood**：续做某 person 却悄悄换成另一个 model / binding，或
-   consultation 的 advice 被当成 replacement assignment，改变 owner 的 charge。
-3. **返回后果没有边界**：一次委托返回一整份 session 历史或字段式 DTO，caller 无法判断它改变了什么认识。
-4. **runtime 拓扑泄漏**：SessionId/AgentId/worktree path 出现在 provider 面，业务语义被物理事实污染。
-5. **背景材料被误当任务转移**：把另一 person 的历史附给 child 时若没有 typed attachment 边界，读取别人的 work 会悄悄变成“替他完成”的新 charge。
-6. **估算被误做执行预算**：delegator 的工具调用估算若复用 `maxSteps`、扫描 transcript/XTrace 或藏进 mutable counter，会同时制造 enforcement、第二真相源与第二运行时；估算应只校准认知，不改变合法动作。
+## 核心不变量
 
-RED 判定：caller 无法从业务语义区分「创建独立工作」「续做同一路」「同步取证」，或委托暗中改变
-authority/personhood。此时世界 RED。
+1. **按后果委任（Entrust by Consequence）**：委任必须明确 charge（语义任务）、office（权能后果）、logical owner（任务归属）以及 bounded 返回后果。
+2. **拓扑隔离**：机器身份与会话拓扑严禁穿透 horizon 污染业务协议面。
+3. **独立道路与续做严格区分**：独立任务与同一道路的连续执行在语义上正交，不因工作量或阶段演进而混淆。
+4. **返回是证据而非权力转移**：委托返回的 WorkRecord 仅更新调用方的认知状态，绝不自动赋予调用方额外权能或解除其既定义务。
+5. **单向载荷与信封隔离**：父向子传递背景必须作为只读数据字段，子向父交付结果必须作为 entry-local 证据，严禁逆向污染。
 
-## 独立变化测试
+## 破坏后果
 
-把 sync delegation 从 dedicated reusable session 改成 one-shot invocation，而 returned consequence
-contract（bounded WorkRecord、canonical/sibling 分型）不变——本包 WHAT 全部不动。反之，把
-`fork`/`commission`/`inspect` 工具改名为其它动词，只要语义合同不变，本包 WHAT 也不动（工具名 = HOW）。
-
-## 历史失败模式（为什么现在是这个形状）
-
-- **fork-manager DTO**（历史 change（orchestrator-e2e-timeout）考古、历史 why/orchestrator 备选节）：
-  旧 `agent=fast-manager|job_id` + `worktree` + `reused=true` 把机器拓扑当世界语言。拒因：双轨期间旧面与新面并存，
-  测试与 prompt 永远对齐泄漏面；一次断，旧符号删。
-- **`return` 双 await**（历史 why/execution SyncDelegate 节；历史 change（universal）§14–16）：
-  旧路径 specialist 调 `return(A)` resolve `Returned`，再等 `TurnCompleted`——「结束协议」伪装成工具能力，
-  污染 self-model，并逼调用方解码双通道。GrandRewrite 删除独立 `return`，选 ordinary completion 物化
-  bounded WorkRecord。
-- **Student–Teacher**（历史 change（universal）、历史 change（ce-student-teacher-collapse））：
-  生命周期 cell + handoff + pending slot 合并把调用栈位置藏进可变字段，terminal handler 必须猜下一步。
-  已 clean-break 删除；SyncDelegate 是后继，不继承该拓扑。
-- **microtask 猜批次**（历史 why/execution Sync batch 备选节）：用「先 drain 一次、创建 child 后再
-  drain」的时间窗口拼批次，或把同一 assistant message 的并发 sync calls 当多轮队列。拒因：批次成员应由
-  Host 已完成的 assistant message 直接给出（ProviderRun + role + tool-call 顺序）。
-- **NEEDHELP 当失败**（历史 change（increase-strength）§3.1/§6）：把求助当 provider failure /
-  fallback / 羞辱会走错恢复分支。consultation 是正常协作，是真实 child 委托（AGENT-031 / HOST-027）。
-- **用户消息唤醒 join 被误当 authority**（历史 change（corrective））：唤醒只结束当前 wait，
-  不创建 HumanRoot / LogicalRun，不 cancel child。低权限 pulse 与 authority transition 是两类事件。
-- **attachment = clone / charge merge**（历史 active change（fork-attach））：复制第三方 Session/Journal 或把其未竟义务并入 child charge 会制造第二 owner。选择 canonical LWR 只读背景；看得见不等于接手。
-- **CommissionerRecord / Attachment LWR 被写成 `# ` instruction**（`9d6cf339` 旁路回归）：角色 prompt 迁移提交把**父→子** TOML 数据字段旁路挪进 `instructions` 再 `Split`，子 session 看到 `# Opening` / `# Chronicle`；oracle 被一并改写后静默绿。裁决：父→子路径上，解释性说明可进 header，LWR 正文必须是 `commissioner_record` / `attached_work_record` 字段值（DELEG-019/021）；永久由 `FORK_CHILD_PAYLOAD_commissioner_lwr_is_toml_field_not_hashed_instructions` / `DELEG_021_attachment_lwr_is_toml_field_not_hashed_instructions` 锁死。**反向**亦禁：不得把该裁决推到子→父 join——join completed 必须保持 `# LWR`（`SyntheticToml.comment`），永久由 `EXEC_004_child_to_parent_lwr_is_hashed_comment_not_toml_field` 锁死。
-- **expected tool calls = hard cap / history scan**：OpenCode `maxSteps` 会强制 text-only，和 advisory 语义相反；从 transcript/XTrace 反算 remaining 又把历史当控制面日志。选择 typed observation facts + pure incremental fold，0 只改变下一次 calibration 文案。
-
-## 与相邻包的边界
-
-- authority/personhood 定义本身 → `participant-identity`；office consequence → `office-capability`。
-- session 创建/复用/取消/retire/级联 → `managed-session-lifecycle`。
-- bounded WorkRecord 的物化格式与三段标题 → `work-record`。
-- 机器信息准入过滤（什么能穿过 horizon）→ `participant-horizon`。
-- 委托「发给 provider 的字节怎么渲染」→ `provider-projection`。
-
-本包只拥有「转交语义」本身：charge 是什么、谁拥有、允许什么后果、返回什么、怎么区分道路与续做。
+- **拓扑冒充业务**：调用方依赖物理 `agent_id` 或 `worktree` 识别委托，导致运行时调度调整时业务逻辑全面断裂。
+- **权能越界与篡夺**：委托被误解为所有权或 Persona 的隐式置换，咨询建议被当成任务重新分配。
+- **认知发散与幻觉**：背景材料被当作新 assignment，导致子会话背离自身使命或重复执行父会话义务。

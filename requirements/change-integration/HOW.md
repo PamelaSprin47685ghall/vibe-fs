@@ -1,146 +1,32 @@
-# change-integration — 实现模型与约束
+# change-integration — HOW
 
-非 normative。WHAT 是唯一权威；本文件解释实现模型与历史裁决。
+## 架构机制
 
-## 实现模型
+### 变基发布循环（rebaseReviewPublishLoop）
 
-### 主程序（`Application/Orchestration/Program.fs`，ORCH-004）
+1. **变基与冲突处理**：从目标 ref 获取最新 head 并尝试在对应 worktree 内变基。发生冲突时产出 `ConflictDetected` 事实并在门禁外交付原 Manager 解决，解决后重新进入循环。
+2. **变基后双重验证**：变基成功后在同一 worktree 内触发 post-rebase review，生成不可变的审查证据。
+3. **短门禁 CAS 发布**：获取 `IntegrationGate` 短锁，重新读取目标 head。若 head 与预期一致，执行快进推送（ffMerge）并记录 `Published` 事实；若 head 发生移动，释放锁并作废旧审查证据，回到循环起点重新变基。
 
-```text
-runManagerJob:
-  use worktree
-  → create Manager（持久 Agent 名；Persona 已绑）
-  → run guarded Manager → candidate
-  → rebaseReviewPublishLoop(job, candidate)
+### 门禁与工作树资源管理
 
-rebaseReviewPublishLoop:
-  read target head T
-  → rebase candidate onto T
-  → post-rebase dual PERFECT（同 worktree / 同 Manager；judge 工具）
-  → acquire short Integration Gate
-  → re-read head
-       still T → ff-only + 写 Published
-       changed → release lock，再进 loop
-```
-
-冲突递归只能发生在 `rebaseReviewPublishLoop` 内；Integration Gate 只覆盖 ref mutation 窗口，
-不在 LLM Review / 冲突修复期间持有（ORCH-005）。
-
-### 持久事实（`Change/Orchestration/OrchestratorFactFold.fs` / `OrchestratorProjection.fs`，ORCH-006）
-
-```fsharp
-ManagerJobCreated = { ManagerJobId; ManagerSessionId; ManagerAgent
-                      WorktreeIdentity; WorktreePath; TargetRef; TargetBranchFrozen }
-CandidateReady / RebasedCandidateReady（含 TargetHeadSnapshot + PostRebaseReviewWitnessId）
-ConflictDetected = { ManagerJobId; CandidateCommit; TargetHeadSnapshot; ConflictFiles; DiagnosticsDigest }
-PublishClaimed = { ManagerJobId; TargetRef; ExpectedHead }
-Published / JobFailed / JobAbandoned
-```
-
-Witness ID 必须指向已持久化 `ConfirmedReviewWitness`；`ConflictDetected` 是恢复所必需（区分「正在解决
-冲突」与「尚未产出 candidate」）。
-
-### 恢复（ORCH-007）
-
-`program` 从 durable projection 读取独立 durable facts（`CandidateReady` /
-`ConflictDetected` / `RebasedCandidateReady` / `PublishClaimed` / `Terminal`），
-加上当前外部现实（target head），重新证明 outstanding obligation，进入对应 CE effect。
-fresh start（无 projection 或全部 facts 为 None）与 restart 共用同一 `awaitAndPublish` entry。
-projection 不 fold 成唯一"最新 case"——每个 fact 独立存储，semantic entry 从 facts + reality
-重证 obligation（SW-003 vs SW-009 消歧）。`classifyRebasedCandidate` / `classifyPublishClaim` 返回领域分类（`RebasedCandidateReality` /
-`PublishClaimReality`），Program.fs match 分类决定 CE effect——不存在 control-token dispatcher。
-
-PublishClaimed 三分支固定顺序不可换：
-
-```text
-1. currentHead = rebasedCommit   → AlreadyFastForwarded → 补写 Published（幂等）
-2. currentHead = ExpectedHead    → PublishReady → 短 gate + 再确认 head → ff-only → Published
-3. 其它                          → ClaimExpired → 丢弃旧 post-rebase witness；回 rebaseReviewPublishLoop
-```
-
-禁止：恢复时新建 worktree 或换 Manager；跳过 post-rebase review；用文件系统状态代替事实。
-
-### 原子发布（`Infrastructure/Git/`）
-
-- `IntegrationGate.fs`：proper-lockfile 短锁；`lockPath(repo, branch)` 稳定；acquire/release/dispose
-  幂等；跨实例互斥（`tests/integration-gate.test.mjs`）。
-- `GitOperations.fs`：typed Git 动词——`freezeTargetBranch`（symbolic-ref；detached/blank → refuse）、
-  `isDirty`（porcelain 非空）、`rebase`/`conflictedFiles`/`hasRebaseHead`、`readHead`/`getTargetHead`
-  （空 → missing）、`ffMerge`（ORCH-008 CAS 梯：branch==frozen ∧ head==expected ∧ ff-only）。
-- `WorktreeResource.fs`：owned worktree（identity 定位，path 仅诊断）；create/release/adopt/durable 生命周期。物理 create 的 argv 必须由真实 temp-repo integration proof 证明当前 Git parser 可接受；fake runner 只验证 typed wiring，不能替代 Git parser 证据。
-- `HookDispatcher.fs`：store sync 的 pre-push / reference-transaction hooks（**归属 `durable-events`**，
-  见 SPLIT@cutover）。
-
-### 编排运行时（`Application/Orchestration/Runtime.fs`）
-
-`forkManager`/`join`/`resumeManager`/`reverify`：通过 GitPort/ManagerPort 缝驱动真实引擎；
-`JoinPublishedAvailable`/`NeedsReview` 结果分型；`WorktreeCreateRequested → WorktreeCreated → ManagerJobCreated`
-事实顺序（effect-accounting 消费）。
-
-## 物理落点（CURRENT EVIDENCE）
-
-- 类型/wiring：`Infrastructure/Git/{IntegrationGate,GitGateway,WorktreeResource,HookDispatcher,GitOperations,GitSubject}.fs`。
-- Fact：`Journal/{OrchestratorProjection,OrchestratorFactFold}.fs`。
-- Failure：PublishClaimed 三分支 CAS、`Application/Reconciliation`（restart reconcile）。
-- Tests：包内 4 文件（MOVE）；REUSE 清单见 HOW.md。
-
-## 边界与弃权（非 normative）
-
-- **GARBAGE——`fork-manager`/`list` 旧面**：Orchestrator 旧工具名（`agent=fast-manager|job_id` +
-  worktree + `reused=true`）已 clean-break 删除，无 alias（历史 why/orchestrator 备选节）。
-- **GARBAGE——`Steward`**：`proposals/Steward.md` 明确「不在本轮创建」（orchestrator why）；
-  不进入未来 WHAT。
-- **HOW——机制常数**：`MaxJoinBatch=32`（join 批次）、`DevOpsJoinTimeoutMs=10_000`（join 等待预算）、
-  gate 锁重试参数（proper-lockfile 50×≤500ms）——有界性与原子性才是 WHAT。
-- **HOW——Git 命令序列**：具体 git 子命令/参数序列（rebase 参数、porcelain 解析、lockfile 库）可换；
-  发布语义不动。
-- **HOW——恢复动作选择表**：事实 → 动作的映射表是当前实现形状；「唯一动作、穷尽分支」才是 WHAT。
-- **归属他包**：Requested/Accepted/Published 效果记账 → `effect-accounting`；store ref 的 hooks 与
-  持久化 → `durable-events`；崩溃后重入 → `crash-reconciliation`；post-rebase witness 的有效性规则 →
-  `review-assurance`；道路语义 → `delegation`。
+- **IntegrationGate 互斥**：基于文件锁实现的轻量互斥机制，仅覆盖目标分支指针更新的几毫秒窗口，不侵占 LLM 执行与代码分析时间。
+- **WorktreeResource 生命周期**：为每个任务分配由 `ManagerJobId` 绑定的独立工作树，完成任务后原子清理，崩溃恢复时按持久化事实精准收拢或复用。projection 不 fold 成唯一「最新 case」，SW-003 vs SW-009 消歧保证恢复重入直接由事实与当前外部 head 判定。
 
 ## 验证与测试落点
 
-| 命题 | 落点测试（文件 + test/describe 锚点） | 类型 | 运行命令 |
-|------|--------------------------------------|------|---------|
-| CHGINT-001 publish lifecycle | `tests/job.test.mjs`（`WHAT[CHGINT-001] ORCH_003_a_created_job_persists_the_manager_agent_and_the_worktree_identity`） | MOVE | `node --test requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-002 Clean Gate | `tests/git-operations.test.mjs`（`WHAT[CHGINT-002] GIT_is_dirty_true_only_on_nonempty_porcelain`、`WHAT[CHGINT-002] GIT_ff_merge_refuses_dirty_target_worktree`）；`tests/runtime.test.mjs`（`WHAT[CHGINT-002] ORCH_007_NeedsReview_preserves_the_active_worktree`——worktree 不被随意清理）；`tests/host.test.mjs`（`WHAT[CHGINT-002] HOST_initializeEngine_runs_sweep_and_caches_the_engine`、`WHAT[CHGINT-002] HOST_sweep_failure_aborts_engine_initialization`、`WHAT[CHGINT-002] HOST_ForkManagerJob_surfaces_the_engine_verdict_error`）；`tests/worktree-resource.test.mjs`（`WHAT[CHGINT-002] WORKTREE_CMD_is_dirty_reads_porcelain`） | MOVE+REUSE | `node --test requirements/change-integration/tests/git-operations.test.mjs requirements/change-integration/tests/runtime.test.mjs requirements/change-integration/tests/host.test.mjs requirements/change-integration/tests/worktree-resource.test.mjs` |
-| CHGINT-003 原子边界、事实标记 | `tests/job.test.mjs`（`WHAT[CHGINT-003] ORCH_007_every_progress_case_yields_exactly_one_action`——穷尽分支 = 无「CandidateCreated 然后随便走」）；`tests/git-operations.test.mjs`（`WHAT[CHGINT-003] GIT_rebase_ok_on_zero_exit`、`WHAT[CHGINT-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase`、`WHAT[CHGINT-003] GIT_rebase_in_progress_stages_and_continues`、`WHAT[CHGINT-003] GIT_rebase_continue_failure_surfaces_stderr`、`WHAT[CHGINT-003] GIT_rebase_stage_failure_is_an_error`、`WHAT[CHGINT-003] GIT_rebase_surfaces_stderr_on_failure`、`WHAT[CHGINT-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists`）；`tests/worktree-resource.test.mjs`（`WHAT[CHGINT-003] WORKTREE_create_propagates_port_error`、`WHAT[CHGINT-003] WORKTREE_CMD_create_returns_identity_on_success`、`WHAT[CHGINT-003] WORKTREE_CMD_create_surfaces_stderr_on_failure`）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-003] THEOREM_publish_claimed_without_rebased_candidate_is_rejected`） | MOVE | `node --test requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/git-operations.test.mjs requirements/change-integration/tests/worktree-resource.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-| CHGINT-004 唯一短 critical section | `tests/integration-gate.test.mjs`（`WHAT[CHGINT-004] GATE_lock_path_is_stable_per_repo_and_branch`、`WHAT[CHGINT-004] GATE_acquire_and_release_round_trips`、`WHAT[CHGINT-004] GATE_dispose_releases_the_lock`、`WHAT[CHGINT-004] GATE_second_acquire_on_held_lock_eventually_fails`——互斥只在持有期间成立）；`tests/job.test.mjs`（`WHAT[CHGINT-004] ORCH_004_multiple_jobs_are_active_at_once_and_terminal_ones_drop_out`——并行不串行化）；`tests/host.test.mjs`（`WHAT[CHGINT-004] HOST_Cancel_reaches_the_runtime_without_throwing`、`WHAT[CHGINT-004] HOST_terminateChildren_tears_down_manager_and_reviewer_children`）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-004] THEOREM_orchestrator_independent_jobs_confluent_across_interleavings`——独立 job 可任意交错） | MOVE | `node --test requirements/change-integration/tests/integration-gate.test.mjs requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/host.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-| CHGINT-005 conflict 门外 repair 再重新 claim | `tests/job.test.mjs`（`WHAT[CHGINT-005] ORCH_003_a_conflict_goes_back_to_the_same_manager_with_the_conflicted_files`）；`tests/worktree-resource.test.mjs`（`WHAT[CHGINT-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity`、`WHAT[CHGINT-005] WORKTREE_release_removes_worktree_and_branch_once`、`WHAT[CHGINT-005] WORKTREE_release_aggregates_both_failures`、`WHAT[CHGINT-005] WORKTREE_release_reports_single_failure_side`、`WHAT[CHGINT-005] WORKTREE_unreleased_resource_disposes_by_releasing`、`WHAT[CHGINT-005] WORKTREE_CMD_remove_force_flag_and_no_cwd`）；`tests/git-operations.test.mjs`（`WHAT[CHGINT-005] GIT_conflicted_files_parses_lines`、`WHAT[CHGINT-005] GIT_conflicted_files_error_propagates`）；`tests/host.test.mjs`（`WHAT[CHGINT-005] HOST_resumeManager_unknown_job_is_rejected`）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-005] THEOREM_conflict_detected_folds_to_resume_conflict_resolution`、`WHAT[CHGINT-005] THEOREM_drop_ephemeral_preserves_conflict_pending_recovery`） | MOVE | `node --test requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/worktree-resource.test.mjs requirements/change-integration/tests/git-operations.test.mjs requirements/change-integration/tests/host.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-| CHGINT-006 恢复 = 最后事实 fold 唯一动作 | `tests/job.test.mjs`（`WHAT[CHGINT-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised`、`WHAT[CHGINT-006] ORCH_006_a_terminal_job_accepts_no_further_progress`、`WHAT[CHGINT-006] ORCH_006_all_three_terminal_cases_end_the_job`、`WHAT[CHGINT-006] ORCH_006_the_journal_replays_into_the_latest_progress_only`、`WHAT[CHGINT-006] ORCH_006_a_progress_fact_before_its_create_is_dropped_not_promoted`、`WHAT[CHGINT-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress`、`WHAT[CHGINT-006] ORCH_003_progress_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry`、`WHAT[CHGINT-006] PERSIST_009_worktree_request_then_created_marks_identity_created`、`WHAT[CHGINT-006] PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested`、`WHAT[CHGINT-006] PERSIST_009_duplicate_created_is_idempotent`、`WHAT[CHGINT-006] PERSIST_009_request_alone_is_not_created`、`WHAT[CHGINT-006] PERSIST_009_direct_request_accept_helpers_match_fold`）；`tests/worktree-resource.test.mjs`（`WHAT[CHGINT-006] WORKTREE_adopt_never_releases_on_dispose`、`WHAT[CHGINT-006] WORKTREE_mark_durable_disposes_without_release`、`WHAT[CHGINT-006] WORKTREE_CMD_list_parses_porcelain_blocks`、`WHAT[CHGINT-006] WORKTREE_CMD_list_error_propagates`、`WHAT[CHGINT-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers`、`WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_uses_force_delete`、`WHAT[CHGINT-006] WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank`）；`tests/host.test.mjs`（`WHAT[CHGINT-006] HOST_ContinueManagerJob_unknown_job_is_rejected`、`WHAT[CHGINT-006] HOST_awaitManager_with_no_worktree_registered_fails_closed`、`WHAT[CHGINT-006] HOST_awaitManager_stages_the_worktree_after_a_completed_manager_run`）；`tests/join-guard-active-jobs.test.mjs`（`WHAT[CHGINT-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator`）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-006] THEOREM_latest_progress_wins_and_published_is_terminal`） | MOVE+REUSE | `node --test requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/worktree-resource.test.mjs requirements/change-integration/tests/host.test.mjs requirements/change-integration/tests/join-guard-active-jobs.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-| CHGINT-007 PublishClaimed 三分支 | `tests/job.test.mjs`（`WHAT[CHGINT-007] ORCH_007_the_three_publish_claim_branches_are_evaluated_in_the_clause_order`、`WHAT[CHGINT-007] ORCH_008_an_unreadable_target_head_fails_closed_for_every_head_dependent_case`）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-007] THEOREM_publish_claimed_three_branch_order_is_fixed`、`WHAT[CHGINT-007] THEOREM_drop_ephemeral_preserves_publish_claimed_branch_algebra`——CAS 窗口崩溃后三分支仍按序） | MOVE | `node --test requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-| CHGINT-008 target ref 冻结 + ff-only CAS | `tests/git-operations.test.mjs`（`WHAT[CHGINT-008] GIT_freeze_target_branch_reads_symbolic_ref`、`WHAT[CHGINT-008] GIT_freeze_target_branch_refuses_detached_head`、`WHAT[CHGINT-008] GIT_freeze_target_branch_blank_stdout_is_detached`、`WHAT[CHGINT-008] GIT_read_head_returns_commit_hash`、`WHAT[CHGINT-008] GIT_read_head_empty_stdout_is_missing`、`WHAT[CHGINT-008] GIT_get_target_head_missing_branch`、`WHAT[CHGINT-008] GIT_ff_merge_happy_path_advances_to_candidate`、`WHAT[CHGINT-008] GIT_ff_merge_refuses_when_repo_on_wrong_branch`、`WHAT[CHGINT-008] GIT_ff_merge_refuses_detached_with_placeholder`、`WHAT[CHGINT-008] GIT_ff_merge_refuses_when_target_moved_since_head_read`、`WHAT[CHGINT-008] GIT_ff_merge_refuses_non_fast_forward_candidate`、`WHAT[CHGINT-008] GIT_ff_merge_ref_moved_lock_diagnostic_maps_to_cas_error`、`WHAT[CHGINT-008] GIT_ff_merge_generic_merge_failure_surfaces_message`、`WHAT[CHGINT-008] GIT_ff_merge_empty_candidate_head_is_an_error`、`WHAT[CHGINT-008] GIT_ff_merge_verify_head_mismatch_reports_actual`、`WHAT[CHGINT-008] GIT_create_with_runner_binds_dot_repo`）；`tests/host.test.mjs`（`WHAT[CHGINT-008] HOST_engine_init_failure_is_reported_and_cached`——freeze 失败 fail closed）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-008] THEOREM_unreadable_target_head_fails_closed`） | MOVE | `node --test requirements/change-integration/tests/git-operations.test.mjs requirements/change-integration/tests/host.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-| CHGINT-009 continuation 的 integration identity | `tests/job.test.mjs`（`WHAT[CHGINT-009] ORCH_003_only_progress_ever_changes_after_creation`、`WHAT[CHGINT-009] ORCH_006_the_worktree_is_located_by_identity_and_the_path_is_only_diagnostic`、`WHAT[CHGINT-009] ORCH_003_a_manager_session_resolves_to_its_one_job`、`WHAT[CHGINT-009] ORCH_003_a_second_create_for_one_job_id_cannot_change_its_manager_or_worktree`）；`tests/host.test.mjs`（`WHAT[CHGINT-009] HOST_ContinueManagerJob_resumes_a_forked_job_in_its_worktree`、`WHAT[CHGINT-009] HOST_ContinueManagerJob_has_no_detached_pending_waiter`——continuation 不得另起 detached waiter）；`tests/worktree-resource.test.mjs`（`WHAT[CHGINT-009] WORKTREE_CMD_identity_of_is_manager_slash_job`） | MOVE+REUSE | `node --test requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/host.test.mjs requirements/change-integration/tests/worktree-resource.test.mjs` |
-| CHGINT-010 长 review 不占门 | `tests/job.test.mjs`（`WHAT[CHGINT-010] ORCH_005_a_rebased_candidate_publishes_only_while_the_target_has_not_moved`——未持锁时 target 可移动，publish 只在 gate 窗口 CAS） | MOVE | `node --test requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-011 墙内机械不进 horizon | `tests/host.test.mjs`（`WHAT[CHGINT-011] HOST_JoinPublishedAvailable_engine_init_failure_is_an_error_result`——provider 面只暴露自然语言后果/错误，不暴露 CAS/worktree 机械） | MOVE+REUSE | `node --test requirements/change-integration/tests/host.test.mjs` |
-| CHGINT-012 恢复禁扫盘/禁跳步 | `tests/job.test.mjs`（`WHAT[CHGINT-012] ORCH_007_progress_that_needs_no_head_derives_its_action_from_the_fact_alone`——恢复动作由事实 alone 派生，不读 head/不扫盘） | MOVE+REUSE | `node --test requirements/change-integration/tests/job.test.mjs` |
-| CHGINT-013 target 变化 → 旧 witness 作废 | `tests/job.test.mjs`（`WHAT[CHGINT-013] REVIEW_008_a_moved_target_discards_the_post_rebase_witness`）；`tests/orchestrator-conflict-confluence.test.mjs`（`WHAT[CHGINT-013] THEOREM_stale_target_on_rebased_candidate_discards_witness`） | MOVE | `node --test requirements/change-integration/tests/job.test.mjs requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |
-
-### 移动文件清单
-
-| 源 | 目标 | 结果 |
-|----|------|------|
-| `requirements/change-integration/tests/integration-gate.test.mjs` | `requirements/change-integration/tests/integration-gate.test.mjs` | `node --test` 绿 |
-| `requirements/change-integration/tests/git-operations.test.mjs` | `requirements/change-integration/tests/git-operations.test.mjs` | `node --test` 绿 |
-| `requirements/change-integration/tests/worktree-resource.test.mjs` | `requirements/change-integration/tests/worktree-resource.test.mjs` | `node --test` 绿 |
-| `requirements/change-integration/tests/job.test.mjs` | `requirements/change-integration/tests/job.test.mjs` | `node --test` 绿 |
-
-（4 文件合计 74 断言全绿；import 深度已适配为 `../../../tests/unit/support` + `../../../dist`。）
-
-### SPLIT@cutover 清单（REUSE 文件拆分计划）
-
-- `requirements/change-integration/tests/host.test.mjs`：job/worktree/发布断言归本包（CHGINT-006/009/011）；commission
-  委托面 → `delegation`；reverify/review barrier → `review-assurance`；engine/HostForkRuntime →
-  `managed-session-lifecycle`。
-- `requirements/change-integration/tests/runtime.test.mjs`：`NeedsReview` 保留 worktree 断言归本包；PERSIST-009
-  事实顺序断言 → `effect-accounting`；恢复 → `crash-reconciliation`。
-- `requirements/durable-events/tests/hook-dispatcher.test.mjs`：整文件 → `durable-events`（store ref 的 pre-push /
-  reference-transaction hooks，非本包发布面）。
-- `tests/unit/execution/` join-recovery 系列：Orchestrator 恢复交叉断言 → `crash-reconciliation`
-  （本包引用其 fold 结果，不复制命题）。
-
-### 本包拥有的 semantic anchor id
-
-`ROLE_SEMANTIC_ANCHORS.orchestrator`：`shared-gate`、`host-vs-orchestrator`
-（`owns-roads`/`same-road-continuation`/`independent-destination` 归 `delegation`）。
+| 命题 | 落点测试 |
+|---|---|
+| CHGINT-001 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-002 | `requirements/change-integration/tests/git-operations.test.mjs` |
+| CHGINT-003 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-004 | `requirements/change-integration/tests/integration-gate.test.mjs` |
+| CHGINT-005 | `requirements/change-integration/tests/worktree-resource.test.mjs` |
+| CHGINT-006 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-007 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-008 | `requirements/change-integration/tests/git-operations.test.mjs` |
+| CHGINT-009 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-010 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-011 | `requirements/change-integration/tests/host.test.mjs` |
+| CHGINT-012 | `requirements/change-integration/tests/job.test.mjs` |
+| CHGINT-013 | `requirements/change-integration/tests/orchestrator-conflict-confluence.test.mjs` |

@@ -1,74 +1,40 @@
 # obligation-ledger — WHY
 
-## 1. 不可替代的存在理由
+## 1. 存在理由与核心矛盾
 
-Manager 是长期 mission 的执行者。系统随时要回答同一个问题：
+Manager 作为长期 mission 的执行者，系统必须随时回答核心问题：
 
 > 这个 mission 现在还欠用户什么？
 
-如果答案不是「一个持续维护的诚实账本」，就会退化成以下任一坏世界：
+如果缺乏一个持续维护的诚实账本，执行过程将退化为不可接受的失败形态：
 
-- **phase/status 伪装进度**：把过程阶段编码成 item status 描述的是「我现在在哪个工作阶段」，
-  不是「用户请求仍缺哪些真」。计划、等待、评审被冒充成债务，系统把过程动作当成用户仍欠的结果。
-- **planning debt 与 mission debt 被强迫伪装成同一种东西**：模型在计划尚未完备时仍需要记录调查、分析、分解等工作；若协议禁止这些工作进入账本，模型只会把它们改名成假的 mission debt，反而让账本失真并过早触发 T1。
-- **reviewer 拥有账本写权**：PERFECT/REVISE 决定哪个 account 才「真正生效」，
-  制造 accepted-but-not-current 半态、回滚语义和第二 writer；崩溃恢复要重演 merge 策略。
-- **崩溃后只能猜**：用内存 Stage、布尔组合、时间猜测恢复，而不是重放 durable Accepted 链。
-- **未来被等分辨率过度展开**：只给模型平面的 `{name,work}` 而不表达相对当前执行前沿的距离，会诱导它把
-  当前动作、下一层结果和遥远结果拆成同一粒度。近处因此不够可执行，远处则提前制造大量脆弱步骤；计划
-  遇到新证据时只能大面积重写。反过来，只保留少数大目标又会让当前前沿失去可闭环动作。
+1. **以过程阶段伪装真实债务**：将调查、等待、评审等过程动作编码为任务状态，把执行活动本身冒充为交付给用户的真实结果。
+2. **混淆规划债务与使命债务**：在计划完备前，模型需要记录调查与分解工作；若协议禁止记录，模型会被迫伪造假的 mission debt，使账本失真并过早触发完备承诺。
+3. **评审者篡夺账本写权**：由 PERFECT/REVISE 决定哪份 account 生效，制造 accepted-but-not-current 半态与多 writer 冲突，破坏崩溃恢复的可重演性。
+4. **状态推导依赖脆弱内存猜测**：崩溃恢复依赖 Stage 状态机或布尔标志，而非重放 durable Accepted 事实链。
+5. **执行前沿缺乏透视分辨率**：以平面粒度展开所有未来任务，导致近处不够可执行、远处提前展开脆弱步骤；或者只保留粗颗粒度，使当前前沿失去闭环动作。
 
-**obligation-ledger 保证：当前 owed work 有一个唯一真相源（last `TodoWriteAccepted` 对应的完整
-account）。`planComplete=false` 时它可以诚实记录把计划做完仍欠的 planning work；第一次 accepted
-`planComplete=true` 是不可逆 commitment，此后同一账本只记录 mission debt。`workingOn` 只指出这份完整
-account 中当前实际推进的一个 name；provider 偶发写错焦点名字时，输入边界把它归一到编辑距离最近的
-obligation name，而不是把业务 authoring mistake 升级成 infrastructure fatal。`horizon` 只表达规划分辨率，
-不参与 `todowrite` admission：焦点暂时落在 `mid/far`，甚至整份非空 account 暂无 `near`，都可由后续 review
-指出规划质量问题，但不能阻断账本更新。归一后的 exact focus 让 Host UI
-能把一行投影为 `in_progress`、其余投影为 `pending`；它不把
-status 枚举带回 canonical obligation。该单调关系由 Journal fold 从 Accepted facts 纯推导，任何阶段机、
-reviewer settlement 或 Host UI 表都无权改写它。**
-
-**同一账本还必须是一张随执行前沿移动的透视图：`workingOn` 是观察原点；近处义务展开到可直接闭环，
-中处只保留下一层有意义结果与依赖，远处以粗粒度 outcome 覆盖全部已知剩余债务而延迟内部拆解。完整计划
-要求 complete coverage，不要求 uniform decomposition。距离改变时允许重写粒度；这种 `near/mid/far`
-分辨率不是 status、phase、priority、时间估算，也不形成第二状态机。**
+`obligation-ledger` 保证：当前 owed work 拥有单一事实源（最新 `TodoWriteAccepted` 对应的完整 account）。在 `planComplete=false` 时，它诚实记录完成计划所需的 planning work；首次 accepted `planComplete=true` 是不可逆的 commitment（T1），此后同一账本只记录 mission debt。`workingOn` 是当前唯一实际推进的焦点，也是 `near/mid/far` 透视分辨率的原点。
 
 ## 2. 独立存在测试（Independent Change Test）
 
-把当前 `todowrite` 的 UI / schema / 工具名整体重写（例如改成另一种 obligation authoring surface）——
-只要「canonical account + checkpoint + supersession」语义不变，其它包（finality、review-assurance、
-work-record、prefix-stability）的 WHAT 一律不需要改。
+若重写 `todowrite` 的 UI、schema 或工具名，只要保持「canonical account + checkpoint + supersession」语义不变，`finality`、`review-assurance` 与 `prefix-stability` 的规范定义无需改动。
 
-反过来，把「Accepted 立即 supersede CurrentObligations」改成「先等 reviewer 批准」或引入
-`kind/id/status` 冷状态机，会让 finality 的 drain、crash 恢复、过程评审节拍全部失真——这是一个独立的失败域。
+反之，若破坏「Accepted 立即 supersede CurrentObligations」、引入评审者写权或加入 `status` 冷状态机，`finality` 的 drain 逻辑、崩溃恢复与过程评审节拍将同时失效。这是一个独立的失败域。
 
-## 3. 失败意义（FAILURE MEANING）
+## 3. 核心不变量与失败判定
 
-RED = 满足下列任一：
+系统在以下任一情况发生时判定为 RED：
 
-1. 当前 mission debt 无唯一真相源（Host TodoTable、reviewer、内存 Stage 都可以当 current）；
-2. `planComplete=false` 时 planning work 被迫伪装成 mission debt，或 commitment 后仍把 planning placeholder 当成 mission debt；
-3. REVISE 能静默回滚已经 accepted 的 account（reviewer settlement / semanticMerge 复活）；
-4. 崩溃恢复不重放 Accepted 链而靠 Stage / 布尔 / 时间猜；
-5. 同一 message 多个**已 materialize** todowrite 有 winner 仲裁，或 infra 失败被降格成 tool 红字；Host
-   流式构造期间尚无 input 的 pending ToolPart 空壳不算第二份账。
-6. 当前执行前沿没有可直接闭环的细粒度义务，或遥远债务被迫以与当前动作相同的细粒度提前展开；
-   `near/mid/far` 被解释成 status/phase/priority/time，而不是相对规划分辨率。
+- 当前 mission debt 失去单一真相源（Host 表、reviewer 或内存状态可充当 current）。
+- `planComplete=false` 时 planning work 被迫伪装为 mission debt，或 commitment 后仍将 planning placeholder 记为 mission debt。
+- REVISE 能够静默回滚或改写已 accepted 的 account。
+- 崩溃恢复不重放 Accepted 链，而是依赖 Stage、布尔标志或时间推算。
+- 同一 message 中多个已 materialize 的 todowrite 存在 winner 仲裁，或基础设施故障被降格为工具红字。
+- 当前执行前沿缺少可闭环的细粒度义务，或遥远债务被迫以细粒度提前展开；`near/mid/far` 被误作生命周期状态机。
 
-## 4. 历史考古（为什么曾经 RED）
+## 4. 依赖边界
 
-历史 change（magic-todo）的 GrandRewrite 之前，provider 冷状态带
-`kind/id/status/priority`，`settled/proposed/semanticMerge` 三态 + status min-merge 决定
-「preview 是否生效」。被拒方案与裁决：
-
-| 被拒方向 | 裁决 |
-|---|---|
-| 同 message 多个已 materialize todowrite 按 hook 到达顺序仲裁 winner | 全部作为语法/协议错误拒绝；无 ordinal winner。`pending + {}` / null construction stub 不是可仲裁 candidate |
-| V2 runner 裸奔（无 hook parity） | Attempt construction fail closed；错入则 fatal |
-| Host 用自然语言关键词分类器识别 meta-work | 分类器无法区分合法 planning work 与 commitment 后的伪 mission debt；改用 provider 显式 `planComplete` + durable 单调 latch |
-| reviewer 以 PERFECT/REVISE 决定哪个 account 生效 | reviewer 只判断并报告；REVISE 不涂改 Tk |
-| 每 Life 从 Host TodoTable adopt 旧项 | 新 Life canonical 空；仅升级瞬间一次 seed |
-| 用 `TodoStage`/`AwaitingReview` 程序计数器 | 恢复只从 durable facts 推导 |
-
-完整推导见历史 why/todo 条款；这些被拒方案记录在 HOW.md「历史与弃权」。
+```text
+DEPENDS ON: durable-events, effect-accounting, semantic-trace
+```

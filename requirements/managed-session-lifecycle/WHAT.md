@@ -1,254 +1,69 @@
-# WHAT — managed-session-lifecycle（唯一 normative 合同）
+# managed-session-lifecycle — WHAT
 
-命题前缀：`MANAGED-SESSION-`。全部命题描述**当前世界必须同时成立**的事实。
-来源：旧 host/execution/companion 条款（HOST-008/009/015、EXEC-006/009/014/017/022/026/028/031，
-2026-08-14 归档）、历史 change（universal §11/13/17、cache §17）。落点见 `HOW.md`。
+## MANAGED-SESSION-001: Attached 会话单一生命周期 Owner
 
----
+`AttachedSessionRuntime` 是所有 Attached 会话的唯一创建、恢复、注册、级联取消与回收所有者；各具体 `AttachmentKind` 仅提供参数与终态策略，严禁各自实现生命周期框架。
 
-## MANAGED-SESSION-001：Attached 会话唯一 lifecycle owner
+## MANAGED-SESSION-002: 创建协议先写关联后发首 Prompt
 
-**规范**：`AttachedSessionRuntime` 是 Attached 会话的唯一创建、恢复、注册、级联取消与 retire
-owner；各 AttachmentKind 只提供 payload/terminal 策略，不得复制所有权框架（HOST-008 shape；
-历史 how/host 条款 HOST-009）。
+创建子会话时必须遵循严格的时序：先持久化写入 `SessionAssociation` 关联记录，随后才允许向子会话发送首个 prompt，确保所有拦截器在首轮交互前即能判定其分类属性。
 
-**含义/动机**：所有权事实单一 owner；否则崩溃恢复与级联取消分叉（WHY §1）。
+## MANAGED-SESSION-003: 重启恢复判据与 Fail-Closed 原则
 
-**证据**：`Session/AttachedSessionRuntime.fs`（`GetOrCreate/TryFind/Remove/RemoveByDelegateSession`）；
-→ HOW.md `MANAGED-SESSION-001`。
+系统重启恢复 Attached 会话时，仅在 journal 关联（SessionId + agent + title）恰好单一匹配时方可复用；关联记录不存在则执行 Replacement 新建并挂载至 family root；无关联记录一律直接新建；若存在属性冲突、多候选或查询失败，必须直接 fail closed 拒绝恢复。
 
-## MANAGED-SESSION-002：创建协议 = 先写关联，再发首个 prompt
+## MANAGED-SESSION-004: Reusable 与 OneShot 生命周期互斥
 
-**规范**：登记顺序：先写入 `SessionAssociation`（`ExecutionClass` + `Ownership`），再发送首个
-prompt（HOST-009）；反向关联必须在首个 prompt 前存在，transform 才能证明该 child 是 leaf
-（`SatelliteRuntime` 注释）。
+专用代理（Dedicated Sync*）实行 Reusable 生命周期，调用完成后不销毁、在同一作用域内跨轮次复用；单次任务（OneShot）则每次新建并在完成后立即终止与释放。两种生命周期模型严格互斥，不得混用。
 
-**含义/动机**：prompt 发出后 transform 即可查询关联；晚写关联会让首轮 transform 把 leaf 当普通
-Work 处理。
+## MANAGED-SESSION-005: ReuseScope 为 Dedicated 绑定生命周期 Key
 
-**证据**：`SatelliteRuntime.start`（`spec.Link` 先于返回 lease）；→ HOW.md `MANAGED-SESSION-002`
-（REUSE `satellite-runtime.test.mjs` 的 create 路径）。
+Dedicated 会话的绑定键为 `(OwnerReuseScopeId, Role)`；同一 scope 内至多存在一个活动 Dedicated 会话，同 scope 兼容续问复用，不同 scope 间相互隔离。
 
-## MANAGED-SESSION-003：restart 恢复判据 — 匹配则复用，无关联新建，冲突 fail closed
+## MANAGED-SESSION-006: Handle 四态与不可逆 Terminal
 
-**规范**：restart 恢复 Attached：query family root children（owner ≠ root 时并查 owner children）→ journal 关联（`RestoredSessionId`）且 id+agent+title 恰好 1 个匹配 → 复用；journal id 不存在 → Replacement（新建，物理挂 root）；无 journal 关联 → 不复用任何候选、直接新建；id 匹配但 agent/title 冲突、多个 id 匹配或查询失败 → fail closed（HOST-009/015；历史 how/host 条款）。
+Handle 生命周期严格限制于 `Active`、`CompletedAwaitingJoin`、`Retired` 与 `Abandoned` 四态；`Retired` 与 `Abandoned` 是持久化终态，绝对不可逆转为活动状态。
 
-Replacement **不是 direct repoint**：当 durable owner 仍链接旧 child 时，必须先建立新的 physical child，再 durable `Close` 旧 attachment，最后 `Link` 新 child。禁止在旧关联仍存在时直接 append `CompanionBloggerLinked(new)`；该事实按 COMPANION-002 必须 semantic reject。Close 或 Link 任一步失败都 abort 本次 fresh replacement；不得把失败 flight 永久 memoize，下一次显式 material/ensure 必须重新观察 Host + durable truth。
+## MANAGED-SESSION-007: Completion Cell 单赋值与首胜规则
 
-**含义/动机**：恢复必须可证明绑对；猜测 = 收养别人的 child（HOST-015）。REVIEW-019：仅 proven
-loss 后替换，不确定 fail closed。
+成功终态、发送失败与取消信号共同竞争唯一 completion cell，实行先到先得的单赋值语义，后续到达者一律直接拒绝覆盖。
 
-**证据**：`SatelliteRuntime.start`（`Reused | Replacement | Created` + 冲突错误）；`HostForkRestart`；
-→ HOW.md `MANAGED-SESSION-003`（REUSE `satellite-runtime` + `host-fork-restart`）。
+## MANAGED-SESSION-008: Retire 为 Consume 的唯一写口
 
-## MANAGED-SESSION-004：Reusable 与 OneShot 是两条互斥生命周期
+`join` 消费完成结果时必须原子写入 `HandleRetired` 墓碑事实；写入未确认时绝不返回有效负载，确保每个完成事实在重启视角下仅被投递一次。
 
-**规范**：SyncDelegate（dedicated `inspect` / `establish-behavior` / `repair-behavior`）走
-reusable：completion 后不 retire / 不 dispose，同 scope 续问复用同一 Session；Residual OneShot
-（若有）每次调用新建 child、成功完成后 abort/dispose，不跨调用复用（EXEC-028）。**不得**混用。
+## MANAGED-SESSION-009: Abandon 为 Durable Terminal 与级联取消顺序
 
-**含义/动机**：把 dispose-after 套在 reusable 上 = 每轮丢 context；把 reusable 当 one-shot =
-永远在重建。
+父会话取消时必须对所拥有的所有活动子会话逐一写入 `HandleAbandoned` 事实；父会话发布终止状态前，必须异步等待所有子会话的物理中断与清理彻底完成。
 
-**证据**：`HostForkRuntime.Reuse`（reuse 不 spawn）；→ HOW.md `MANAGED-SESSION-004`
-（MOVE `host-fork-agent.test.mjs`；REUSE `sync-delegate-runtime.test.mjs`）。
+## MANAGED-SESSION-010: HostOwnedHidden Handle 对父不可见
 
-## MANAGED-SESSION-005：ReuseScope 是 Dedicated 绑定的生命周期 key
+宿主拥有的隐藏 handle（如 Distiller、隐藏评审员）对父会话的列表、等待、视图及恢复完全不可见，其持久化记录仅供宿主自身审计与恢复。
 
-**规范**：dedicated Session 绑定 key = `(OwnerReuseScopeId, SyncDelegateRole)`；同一 scope 至多
-一个 live dedicated Session；同 scope 兼容续问复用、不同 scope 不共享；owner effective tier →
-deterministic delegate tier，复用既有 child 时沿用已绑定 managed agent（EXEC-026/028 §B）。
+## MANAGED-SESSION-011: 永久丢失替换资格与 Durable 关联显式迁移
 
-**含义/动机**：key 不是 `(owner SessionId, role)`——同一语义工作上下文（Logical Run / 可复用
-scope）跨多个 owner session 仍复用同一 dedicated Session（universal.md §11）。
+当且仅当已确认关联子会话永久丢失时，方允许执行替换操作；替换迁移必须遵循原子时序：先建立新子会话，再持久化关闭旧关联，最后建立新关联。
 
-**证据**：`AttachedSessionRuntime`（key = scope + role）；`ReuseScope.ofSession/compatible`；
-→ HOW.md `MANAGED-SESSION-005`（NEW `attached-session-runtime.test.mjs`）。
+## MANAGED-SESSION-012: Child Run 物理生命周期与父记录分离
 
-## MANAGED-SESSION-006：Handle 四态；tombstone 与 abandon 不可回退
+子会话运行时的物理状态（忙碌、空闲、中断、关闭）由独立的 ChildRun 机制管理，与父会话的工作记录严格解耦，父工作记录不得冒充子会话的完成事实。
 
-**规范**：Handle 生命周期四态：`Active → CompletedAwaitingJoin → Retired` 或
-`Active|CompletedAwaitingJoin → Abandoned`；`Retired` 与 `Abandoned` 是 durable terminal，永不复原
-为 Active / CompletedAwaitingJoin；已 Retired 的 id 永远回答 Retired，不得降级成「当 agent 名再
-fork」（EXEC-009）。
+## MANAGED-SESSION-013: 重启按 Durable Handle 投影 Re-enlist
 
-**含义/动机**：tombstone 是防重复投递与防身份回收的物理事实；回退 = 重放历史改变结局。
+重启恢复时完全依据持久化的 HandleLinked 事实与完成数据重建子会话生命周期，过滤隐藏 handle，严禁依据内存残留或猜测恢复状态。
 
-**证据**：`HandleProjection`（`linkNamed/complete/abandon/retire`）；`HandleController.consume`；
-→ HOW.md `MANAGED-SESSION-006`（REUSE `execution/handle.test.mjs`）。
+## MANAGED-SESSION-014: Dedicated 会话生命周期与 ReuseScope 绑定
 
-## MANAGED-SESSION-007：completion cell 单赋值；第一个赢家唯一
+Dedicated 会话的生命周期严格等同于对应 OwnerReuseScope 的生命周期，仅在 scope 显式关闭时执行清理与释放，不受父会话单轮迭代退出的影响。
 
-**规范**：terminal、send-failure 与 cancel 竞争同一个 completion cell：先到者胜，后来者被拒而非
-覆盖（EXEC-004）；`recordCompletion` 只接受 `JoinableCompletion`（Succeeded | Failed finality），
-raw Aborted / 裸 kind+body 不能占 cell（P0-RECOVERY-JOIN-001）。AgentOwnerRoot 首发是 Detached：fork
-工具先交还；若 Host send 后来拒绝，detached failure observer 必须先把该 pending run 结算成 durable Failed
-completion，再触发 process fatal。不得为了同步返回 send-failure 而让 fork 等待 Host Promise，也不得 fatal
-前留下永远 pending 的 run。
+## MANAGED-SESSION-015: Handle 对应 Agent ID 且重启严格对齐
 
-**含义/动机**：覆盖写 = 同一 handle 两个结局；join 必须只读到稳定唯一的完成事实。
+Agent 子会话的 handle 即为其运行时的 Agent ID，重启后必须保证同一 handle ID 严格绑定至相同的子会话实体。
 
-**证据**：`HandleProjection.complete` 拒绝 `AlreadyCompleted`；`HandleController.recordCompletion`；
-→ HOW.md `MANAGED-SESSION-007`（REUSE `execution/handle.test.mjs`）。
+## MANAGED-SESSION-016: Attempt Interrupt 与 Logical Cancel 权限分离
 
-## MANAGED-SESSION-008：retire 是 consume 的唯一写口
+内部控制机制仅有权请求中断子会话当前的物理尝试（attempt interrupt），无权触发逻辑会话取消或级联销毁，且绝对禁止主动中断根会话。
 
-**规范**：`join` 消费 completion 后写 `HandleRetired`（`HandleController.consume`）；`CommitUnknown`
-不得交出 payload（否则 caller 视为已消费而 restart 仍可 join，重复投递）。retirement 使已消费
-completion 不可再返回。
+## MANAGED-SESSION-017: 内部 Interrupt 必须闭合 Successor 与 Parent Wake
 
-**含义/动机**：唯一 consume 路径 + tombstone = 投递 exactly-once（restart 视角）。
-
-**证据**：`HandleController.consume`（`AlreadyRetired` / `AppendFailed`）；→ HOW.md
-`MANAGED-SESSION-008`（REUSE `execution/handle.test.mjs` `EXEC_004_join_may_only_retire...`）。
-
-## MANAGED-SESSION-009：abandon 是 durable terminal；parent cancel 逐 child 写
-
-**规范**：`Abandoned`（含 `ParentCancelled` 等 reason）不可 join、不可回退；parent cancel 对每个
-owned agent 逐个写 `HandleAbandoned`，无批量 fact（EXEC-009）；operator abort → `TurnAborted`
-cleanup 必须取消父全部仍运行的 sub-session（EXEC-017 cascade cancel）。该 cascade 是有序的异步
-效果：`TurnAborted` owner 必须 await `AbortChildren(parent)` 完成后，才可发布父 `Aborted` terminal 或
-返回该 cleanup；禁止 fire-and-forget / ignored Task。Companion Blogger 属于该 running sub-session
-集合，主会话停止后其物理 provider attempt 必须在父 abort 完成前收到并完成 interrupt。任何随后会释放
-`AgentJournal` / EventStore / workspace 的 owner teardown，必须先关闭新的异步工作准入，再等待
-**全部已准入的 durable 尾巴**结束：reconcile drain、Host `SessionDeleted` cleanup、fork terminal /
-`FailRun` callback、one-shot terminal 的 XTrace/WorkRecord 补写、per-session / executor / orchestrator `CancelAndDrain`，以及 parent cancel 的 durable
-`HandleAbandoned` 与 physical child teardown。runtime 从 owner registry 移除时也必须先取得并 await
-其 drain Task，禁止「remove → `Cancel() |> ignore`」使资源从最终 shutdown 的可达集合逃逸；不得用
-任何 detached `Async.StartImmediate` / ignored Task 把 Journal append 留到 store/repository 已释放后继续执行。若 durable writer 因首个 physical append failure 进入 poisoned，则 Host Reconciler 必须同步关闭新的 wake admission，并丢弃尚未开始的 queued reconcile；不得继续在 poisoned writer 上消费 durable effect。
-provider-facing Host hook（尤其 `experimental.chat.messages.transform`）同属该 owner tree：dispose 开始后必须关闭
-新的 hook 准入，等待已准入 transform 完成后才可释放 Journal/EventStore；关闭后的迟到 transform 必须成为 no-op，
-不得在 disposed writer 上做 XTrace/Strength/grounding append。
-Finality blessing 对 hidden reviewer 只取消当前 physical attempt、保留 process-review session；这些 interrupt
-同样属于 owner 已准入工作，Blessing 返回前必须全部 settle，禁止用同步 `unit` port 丢弃 `InterruptAttempt` Task。
-
-**含义/动机**：父取消 = 子全部止损；逐 child 使恢复与审计逐条可定位。
-
-**证据**：`HandleController.cancelChildren` / `recordAbandon`；→ HOW.md `MANAGED-SESSION-009`
-（REUSE `execution/handle-abandoned.test.mjs` + `host-fork-agent` 的 abandoned 拒绝）。
-
-## MANAGED-SESSION-010：HostOwnedHidden handle 对父不可见
-
-**规范**：`HandleOwnership.HostOwnedHidden`（EXEC-014 Distiller child、GLORY-002 hidden Reviewer）
-对父的 `list` / `join` / `horizon` / EXEC-016 background guard / 父恢复（RestoreHandles）全部不可见；
-记录仍持久，仅供 Host-owned workflow 审计与自身恢复。
-
-**含义/动机**：`run` 同步掌控 Distiller 生命周期；若 hidden 泄漏进 `listable`，会阻塞 caller 的
-suicide（`distiller-ownership.test.mjs` 头注释回归）。
-
-**证据**：`HandleProjection.parentVisible` + 视图过滤；→ HOW.md `MANAGED-SESSION-010`
-（MOVE `distiller-ownership.test.mjs`）。
-
-## MANAGED-SESSION-011：proven permanent loss 才有 replacement 资格；replacement 必须显式迁移 durable association
-
-**规范**：journal 关联的 Host child 永久消失（proven）→ 按该 AttachmentKind 恢复合同 Replacement；lookup failure / ownership conflict / 重复候选 → fail closed（HOST-009/015；REVIEW-019）。不确定时宁可不恢复，不得猜。
-
-对允许 Replacement 的 attachment，状态迁移必须是 `old durable link → Close(old) → Link(new)`；不能把 `Link(new)` 当作覆盖赋值。只有新 child 创建成功且 old association 被合法关闭后，新关联才能提交。**每一次 ensure 都必须重新读取当前 durable association**；构造时捕获的一次性 restored id、进程内 `bloggerId` 或 successful-flight cache 都不能在 cache invalidation / send failure 后取代 durable truth。否则进程缓存一清空就会把仍存在的 old durable link“忘掉”，误走 Created→`Link(new)`，把合法 recovery 变成 COMPANION-002 semantic cut。失败 ensure 的 single-flight cache 必须失效，避免一次冲突把未来所有 ensure 永久钉在同一个 rejected Task 上。
-
-**证据**：`SatelliteRuntime.start/linkLease`（journal-linked child 不在 merged candidates → Replacement；Close→Link；冲突 → Error）；→ HOW.md `MANAGED-SESSION-011`（REUSE `satellite-runtime`）。
-## MANAGED-SESSION-012：Child Run 生命周期与父背景记录分离
-
-**规范**：Child Run 生命周期（active / cancel / completion cell 单赋值 / 物理状态投影
-`Busy|Idle|Interrupted|Closed`）与父背景记录分离（EXEC-006）；父背景记录不冒充 child completion
-（EXEC-008）。
-
-**含义/动机**：子运行状态是物理事实；父的「他还在跑/已结束」不得与父自己的工作记录互相污染。
-
-**证据**：`Session/ChildRun.fs` + `ChildRunProjection.fs`（`status`/`toRecord`）；
-→ HOW.md `MANAGED-SESSION-012`（MOVE `child-run-projection.test.mjs`）。
-
-## MANAGED-SESSION-013：restart 按 durable handle 投影 re-enlist child
-
-**规范**：`HostForkRestart.restoreLinkedChildren`（及 journal-only `restoreLinkedChildrenWithoutRuntime`）
-按 durable handle 投影（HandleLinked 事实 + completion blobs）恢复每个 child 的合法 lifecycle：
-active → RecoveredActive、terminal → re-enlist、abandoned/retired → 原样恢复；HostOwnedHidden
-过滤；legacy 假 abort / 无效 blob / 恢复 commit 失败 → 等待 / 阻塞（EXEC-009/GREEN-4）。
-
-**含义/动机**：restart 后 child 的 lifecycle 只能从 durable facts 重建；内存/猜测不得参与。
-
-**边界**：generic 恢复协议与 permit 线性序归 `crash-reconciliation`（EXEC-023）；假 abort 的
-outcome 分型归 `effect-accounting`（EXEC-022）——本命题只拥有「handle 投影恢复出的合法结果」。
-
-**证据**：`Session/HostForkRestart.fs`；→ HOW.md `MANAGED-SESSION-013`（REUSE
-`host-fork-restart.test.mjs`）。
-
-## MANAGED-SESSION-014：Dedicated Session 生命周期 = OwnerReuseScope 生命周期
-
-**规范**：Dedicated Session lifetime = OwnerReuseScope lifetime；graceful ReuseScope close 才
-retire/release（universal.md §17；EXEC-026 §B 不变量 6）；「owner Session 进入最终 retire/dispose」
-不等同 ReuseScope 终结。
-
-**含义/动机**：同一 scope 跨多个 owner session 复用；scope 未关而 retire = 丢 hot knowledge。
-
-**证据**：`SyncDelegateRuntime`（G6 删除 child 时 retire live binding 但为 owner scope close
-保留）→ HOW.md `MANAGED-SESSION-014`（REUSE `sync-delegate-runtime.test.mjs`）。
-
-## MANAGED-SESSION-015：handle 是 agent id；同一 handle restart 后绑同一 child
-
-**规范**：agent child 的 handle IS 其 runtime agent id（`HandleController.agentHandle`）；EXEC-009
-要求 restart 后同一 handle id 绑同一 child session；`ChildSessionId` 只由 Host 签发，禁止从 handle
-id 派生虚构 session（`HandleController.linkNamed` 注释）。
-
-**含义/动机**：第二身份 = 一张需要持续同步的映射表；虚构 session = 每次操作静默 no-op 的幽灵资源。
-
-**证据**：`HandleController.agentHandle/linkNamed`；→ HOW.md `MANAGED-SESSION-015`
-（REUSE `execution/handle.test.mjs` `EXEC_009_a_linked_handle_records_the_child_session_it_drives`）。
-
-## MANAGED-SESSION-016：attempt interrupt 与 logical cancel 权限分离
-
-**规范**：插件内部的 loop-kill、NeedHelp、Finality reviewer 收束、Fission replacement、tool/invariant
-收束只能请求 **current physical attempt interrupt**；该操作不得 detach session、不得调用
-`AbortChildren`、不得写 parent-cancel lifecycle。它只允许作用于有 physical parent 的 managed
-sub-session。`parent=None` 的 user-facing/root session 没有插件内部 interrupt 权限；除 Host 已经因
-外部用户主动中断产生 `TurnAborted` 外，插件不得主动 interrupt root。
-
-真正的 logical session cancel 仍由 `TurnAborted` cleanup / session teardown 拥有。它必须先让
-session-owned runtime 执行 durable parent cancel（每个 active handle → `HandleAbandoned`），再完成
-剩余 physical child cascade，最后才发布 parent `Aborted` terminal。这样 child 物理停止与 horizon
-读取的 durable lifecycle 同步收敛；禁止出现“child 已 interrupt，但 handle 仍 Active”。
-
-**含义/动机**：attempt stop 与 session cancel 共享 Host `abort` transport，但权限完全不同；不在
-port 边界分型就会把局部控制动作放大成 family cancellation，并让 durable/physical truth 分叉。
-
-**证据**：`OpenCode/Host/Sessions.fs`（`InterruptAttempt` vs `AbortSession`）、
-`ToolRuntimeScope.CancelSessionChildren`、`OrdinaryTurnWorkflow.handleAborted`；→ HOW.md
-`MANAGED-SESSION-016`。
-
-## MANAGED-SESSION-017：内部 interrupt 必须闭合 successor / terminal / parent wake
-
-**规范**：任何插件内部 current-attempt interrupt 在请求 Host abort 前必须已经有且仅有一个后继 owner：
-
-- LoopKill → provider AABB；
-- NeedHelp → exact `(SessionId, ProviderRunIdentity)` assistance claim，`TurnAborted` 只占有该 claim，
-  fresh `SessionIdle` 到达前不得消费；idle 后恰一次 escalation/consultation；
-- Fission / Reviewer / Finality control stop → 各自已存在的 replacement / judgement / finality owner；
-- 无合法后继的 invariant / fail-closed stop → `ManagedSessionTermination.terminate`；调用者在同一个
-  causal CE 内证明 managed child、durable-cancel descendants、执行 logical/physical `AbortSession`，随后
-  发布 `TerminalOutcome.Failed reason`。Fork runtime 由该 Failed terminal 写 `HandleCompleted(Failed)` 并
-  pulse agent mailbox，解除 parent `join`。不得把 reason 存进 registry 等未来 `TurnAborted` callback 再消费。
-
-`InterruptAttempt` 只允许上述有显式 successor owner 的调用点；普通 tool/invariant fail-closed 禁止使用。
-Host abort 返回 Error/throw 时，LoopKill arm、NeedHelp claim 必须同步 rollback；失败的 transport 不得留下
-能被未来 turn 消费的 cause。同步 logical termination 即使 teardown effect 报错，也必须完成 Failed delivery，
-避免 parent 因 transport 局部失败永久等待。
-
-**含义/动机**：physical abort 只是 transport effect，不携带“接下来谁负责”。如果先 abort、后碰运气等
-另一个 callback 猜 cause，就会出现 child 已停但 durable handle 仍 Active、parent 永久等待的三不管。
-
-**证据**：`NeedHelpSensor` claim observe/consume split、`AssistanceHost.withFreshAssistanceQuiescence`、
-`ManagedSessionTermination.terminate`、`ToolRuntimeScope.TerminateSession`、
-`HostForkRunLifecycle.complete(Failed)`；→ HOW.md `MANAGED-SESSION-017`。
-
-## GARBAGE / 弃权（不进入 WHAT）
-
-- `EXEC-021/022` 假 completion 补偿的 outcome 分型本体 → `effect-accounting`；本包只拥有 handle
-  状态机对补偿事实的拒绝（`rejectFalseCompletion`），落点仍 REUSE 本包 handle 测试。
-- `EXEC-023` permit→join 线性序、`EXEC-024` Mailbox 双通道 → `crash-reconciliation` /
-  `process-execution`；本包不复制恢复协议。
-- `EXEC-005` horizon 在场名册 / `EXEC-016` JoinGuard continuation 语义 → `delegation` /
-  `interaction-authority`；本包只消费其 outstanding-background 判据（listable handles）。
-- `EXEC-014` 的 Distiller office 语义（map/reduce、机器 Assignment 不进工具面）→
-  `output-distillation` / `participant-horizon`；本包只拥有 hidden handle 的可见性。
-- 历史 `Student/Teacher` 生命周期（`StudentRun`/`teacherCalls` 等）→ GARBAGE（G3 删除；
-  历史 shape/execution EXEC-027 空缺）。
-
+任何内部尝试中断在发起物理中止前，必须确保已存在唯一的后继处理机制（如 AABB、求助处理等）；若无后继者，必须转为明确的 Failed 终态以唤醒父会话的等待，严禁产生悬挂的孤儿尝试。

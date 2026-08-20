@@ -1,135 +1,45 @@
-# WHAT —— 唯一 normative 合同（dispatch-protocol）
+# dispatch-protocol — WHAT
 
-> 当前世界必须同时成立的事实。每条命题的测试落点见 [`HOW.md`](HOW.md)（锚点 `R1`..`R11`）。
+## DISPATCH-PROTOCOL-001: PromptDispatcher 是唯一写入口
 
-```text
-术语：
-  claim           = 一次 logical dispatch 的 durable 记录（PromptKey 定位）。
-  receipt         = Host 调用返回的 transport 收据（accepted-* 形态）。
-  physical 落地   = 真实 chat.message / 明确 msg_* 出现在 Host 上（唯一可证明 accepted 的证据）。
-  logical effect  = 一次 logical send 在 Host/业务世界产生的后果。
-```
+所有由插件或内部机制生成的 user-shaped 消息（包括 Guard、repair、Finality steer、nudge、重试及 Orchestrator 提示等）必须通过统一的 `PromptDispatcher` 发起，绝对禁止任何旁路机制直接绕过滤网向宿主发送提示。
 
-## DISPATCH-PROTOCOL-001 — PromptDispatcher 是唯一写入口
+## DISPATCH-PROTOCOL-002: 四态 claim 生命周期
 
-所有插件产生的 user-shaped message（Guard、repair、Finality steer、busy nudge、provider
-failure continuation、Orchestrator 冲突提示、SyncDelegate 首发与 idle nudge 等）必须经过同一个
-`PromptDispatcher`；禁止第二 writer 直接 `prompt_async`（PROMPT-005 / 历史 shape/prompt 条款）。
+单次调度的持久化事实严格遵循四态流转：`Claimed → Submitted → PhysicalAccepted` 或 `Claimed (→ Submitted) → Abandoned`。`Submitted` 记录传输回执但保持 Claim 处于待决状态；`PhysicalAccepted` 证明物理落地并完成 Claim；`Abandoned` 代表调度放弃且不再重发。在物理发送前若因状态变更失效，必须显式记录为放弃，禁止伪装成传输失败或成功。
 
-- 含义：发出去的每一条内部消息都有 claim 记录，恢复才能凭 PromptKey 找到它。
-- 证据：→ HOW.md R5、R6。
+## DISPATCH-PROTOCOL-003: transport receipt 不等于物理消息身份
 
-## DISPATCH-PROTOCOL-002 — 四态 claim 生命周期
+宿主返回的 `accepted-*` 仅表示传输层已接纳该请求，不是物理消息标识符，亦不是权限生效的证明。系统不能仅凭传输收据推断消息已被实际处理。
 
-一次 dispatch 的持久阶段恰好是四类事实（PROMPT-005）：
+## DISPATCH-PROTOCOL-004: physical acceptance 只由真实物理证据建立
 
-```text
-Claimed → Submitted → PhysicalAccepted
-Claimed → Abandoned
-Claimed → Submitted → Abandoned
-```
+`PhysicalAccepted` 状态必须且只能由真实的物理消息证据确立（例如运行时捕获明确的物理消息 ID，或在恢复阶段在宿主历史中匹配到包含完全一致 `PromptKey` 的物理用户消息）。
 
-`Submitted` 保持 claim pending（只记 receipt），`PhysicalAccepted` 才解决它；`Abandoned` 是终局，
-不改 Active Logical Run，同 PromptKey 不再重发。
+## DISPATCH-PROTOCOL-005: PromptKey 是确定性幂等身份
 
-idle-derived continuation 的 quiescence gate 位于 claim durability **之后**、Host `SendPrompt` **之前**。
-若新 physical material 在 claim 已写但物理发送尚未发生时 supersede 该 idle occasion，则必须走
-`Claimed → Abandoned(SupersededBeforePhysicalSend)`；这是 known-not-sent，不得伪装成 transport
-failure、Submitted 或 PhysicalAccepted，也不得调用真实 Host port。
+`PromptKey` 是由 SessionId、LogicalRunId、AuthorityRootId、Origin、EffectiveAgent、载荷摘要及 ClaimSequence 派生的确定性哈希，禁止使用随机数生成。相同逻辑交互在任何进程中派生完全一致的 Key，任意要素变动均会导致 Key 发生迁移。
 
-- 含义：claim 先于发送持久化（durability 是 sequencing 前提）；`acceptanceCallback` 只在
-  PhysicalAccepted 后触发。
-- 证据：→ HOW.md R1。
+## DISPATCH-PROTOCOL-006: 同 payload 的两个独立 logical act 仍可区分
 
-## DISPATCH-PROTOCOL-003 — transport receipt ≠ 物理消息身份
+`ClaimSequence` 在 `(SessionId, LogicalRunId, Origin, PayloadDigest)` 作用域内单调递增，且在 Claim 注册时立即消费。即使相同载荷的消息在放弃后再次发送，也会获得新的序号与新的 `PromptKey`，确保同载荷的多次独立调用能够被精确区分。
 
-`accepted-*` 是 Host 对调用的回执，**不是**物理 MessageId、**不是** authority 证据；不能从
-`Submitted` 推断 authority 已生效。admission 形态可判别（`TransportReceipt.isAdmissionShaped`）。
+## DISPATCH-PROTOCOL-007: uncertain physical outcome 不自动重发
 
-- 含义：四阶段链保持完整——receipt 只升级到 Submitted；物理落地必须由后续 `chat.message` 建立。
-- 边界：crossing 缺席（receipt 永远到不了 root）的另一半归 `interaction-authority`。
-- 证据：→ HOW.md R1、R2。
+在崩溃恢复或证据核对中若未能检索到物理落地证据，Claim 必须保持 `StillPending` 状态，绝对禁止系统自动重发，亦不得因进程重启次数累积而静默判定放弃。
 
-## DISPATCH-PROTOCOL-004 — physical acceptance 只由真实物理证据建立
+## DISPATCH-PROTOCOL-008: at-most-one logical effect 不虚构 exactly-once
 
-`PhysicalAccepted` 只能由真实物理 message evidence 建立：明确的 `msg_*` 落地（live）或恢复时在
-Host 尾部找到携带同一 PromptKey 的 `role=user` 消息（recovery）。`accepted-*` 永远不够。
+协议坚守至多一次（at-most-one）逻辑执行保障与未知结果 fail-closed 原则。禁止伪造物理投递的 exactly-once，禁止以时间窗口粗暴替代 PromptKey 校验，禁止为消除挂起状态而盲目重发。
 
-- 含义：Authoroty Root 只有在真实物理消息证明后才生效（`AcceptPhysicalAgentOwnerRoot` 先写
-  PhysicalAccepted 再 RegisterAuthority，顺序不可倒）。
-- 证据：→ HOW.md R4。
+## DISPATCH-PROTOCOL-009: Detached 在 durable claim 后立即交还控制
 
-## DISPATCH-PROTOCOL-005 — PromptKey 是确定性幂等身份
+在分离模式（`AwaitMode.Detached`）下，调度器在完成 durable claim 记录与宿主异步调用入栈后即刻返回 `PromptKey`，调用方不得阻塞等待模型容量调度、提供者执行或物理落地证据。若异步入栈后续发生致命拒绝，系统应触发进程级审计报错，且保留 Claim 待决记录而不自动重试。需要同步获知传输拒绝分支的场景必须显式使用 `AwaitMode.Await`。
 
-PromptKey 是派生的，从不随机生成：
+## DISPATCH-PROTOCOL-010: Root 与 dispatch 不得选择、等待或覆盖 model
 
-```text
-PromptKey = digest(SessionId, LogicalRunId, AuthorityRootUserMessageId,
-                   Origin, EffectiveAgent, PayloadDigest, ClaimSequence)
-```
+调度与 Authority Root 阶段严禁指定、修改或等待底层物理模型 ID。发送参数固定为未指定模型，具体的模型分配与算力租赁严格延迟至宿主执行准入阶段由专门路由模块裁决。
 
-同一 logical dispatch 在任何进程派生同一 key；任一组件变化都移动 key（PROMPT-011）。
+## DISPATCH-PROTOCOL-011: 插件 user-shaped message 一律经 PROMPT-005
 
-- 含义：恢复能凭 key 匹配 Host 消息回 pending claim；随机 GUID 无法服务（重启后派生不同 key）。
-- 证据：→ HOW.md R2。
-
-## DISPATCH-PROTOCOL-006 — 同 payload 的两个独立 logical act 仍可区分
-
-`ClaimSequence` 以 `(SessionId, LogicalRunId, Origin, PayloadDigest)` 为 scope 单调递增，
-在 claim **注册**时消费（成功与否都消费）；abandon 后同 payload 再发得到新序号 → 新 key
-（PROMPT-011）。
-
-- 含义：「同一 Guard 连发两次」是两个 key，不是看起来像重复的一个 key。
-- 证据：→ HOW.md R2、R3。
-
-## DISPATCH-PROTOCOL-007 — uncertain physical outcome 不自动重发
-
-显式证据核对时未找到物理落地 → 保持 Pending（`StillPending`），**绝不自动重发，也不因进程重启次数自动 abandon**。进程重启不是替旧 tool 写 terminal 的授权；旧 claim 保持为可审计的中断/未知事实，未来只能由显式 `/continue` 或其它新用户意图决定是否继续。
-
-- 含义：Host 可能已接受消息并开始 provider run；重发会在已落地的消息之外制造第二次逻辑效果；自动 abandon 又会把未知结果伪装成已收尾。
-- 边界：物理证据窗口仍可有界；restart-count recovery budget 已退役。
-- 证据：→ HOW.md R3、R4。
-
-## DISPATCH-PROTOCOL-008 — at-most-one logical effect，不虚构 exactly-once
-
-合同是 `at-most-one logical effect + fail-closed unknown outcome`。不假装 exactly-once physical
-delivery，不用时间窗口代替 PromptKey，不把 `accepted-*` 当物理落地，不为清理挂起而重发
-（PROMPT-011 禁止清单）。
-
-- 含义：unknown 宁可挂起也不重复；预算耗尽时放弃（Abandoned），而非伪装成功。
-- 证据：→ HOW.md R3、R4。
-
-## DISPATCH-PROTOCOL-009 — Detached 在 durable claim 后立即交还控制；不得等待槽、Host run 或 PhysicalAccepted
-
-`AwaitMode.Detached`（fire-and-forget）仍必须先完成 PromptKey、authority claim 与必要 durable append，但**调用方不得等待 managed model capacity、provider execution、`session.promptAsync` Promise settle 或 PhysicalAccepted**。发送边界同步调用 Host `prompt_async` 成功入栈后即可记录 admission-shaped `PluginPromptSubmitted` receipt 并返回 PromptKey；该 receipt 不是物理 message id，真正 PhysicalAccepted 仍只能由后续 `chat.message` 的 PromptKey 证据建立。禁止独立的 `postPromptFireAndForget` 旁路（PROMPT-007）。
-
-若 Detached 已返回后 `prompt_async` 异步 rejection，则 acceptance 已不可可靠判定：当前进程必须 fatal，claim 保持可审计 pending/unknown，**绝不**自动重发。需要在**本次决策内**知道 Host transport 是否拒绝（例如 Blogger nudge 失败后立即转 AABB、JoinGuard/ReviewGuard 失败后释放 reservation、同步 NeedHelp/SyncDelegate 调用）的调用方必须显式选择 `AwaitMode.Await`；这里的 Await 只等待 `ISessionHostPort.SendPrompt` transport 结果，仍不得等待 managed model capacity、provider execution 或 child terminal。只有像 fork AgentOwnerRoot 这种调用方不能以 transport settle 作为返回前置条件的路径才使用 Detached。这样 fork 不被 child slot/run 阻塞，而需要同步决定“发送失败后下一步”的协议仍能拿到确定 transport 结果。
-
-- 含义：Detached 仍返回 PromptKey、仍写 claim/submit；调用方成功只证明本地 dispatch 已交给 Host async enqueue，不证明 provider 已运行或物理消息已落地。
-- 证据：→ HOW.md R5。
-
-## DISPATCH-PROTOCOL-010 — Root / dispatch 不得选择、等待或覆盖 model
-
-发送恒 `Model = None`；`AuthorityExecutionProfile` 没有 model 字段，「Authority Root 覆盖 model」结构性不可表达（PROMPT-002 的 dispatch 半边）。`SendPrompt` 也不得为了补 model 调 scheduler；managed physical model 只在 Host `chat.message` execution admission 由 `execution-model-routing` 解析。
-
-- 含义：root 抬不了 model，fork/continuation dispatch 也不因 model capacity 阻塞。
-- 证据：→ HOW.md R2。
-
-## DISPATCH-PROTOCOL-011 — 插件 user-shaped message 一律经 PROMPT-005
-
-所有 runtime/plugin/Host 构造的 synthetic user-role message 必须经 PromptDispatcher 并携带
-PromptKey / typed origin metadata；禁止 keyless internal sender（PROMPT-012 残留保留 + corrective
-§3.4 closed-world producer invariant 的发送侧）。
-
-- 含义：keyless user message 因此可作为「外部真实用户消息」的判别依据（join wake 候选），
-  无需文本启发式。
-- 边界：wake 本身归 `delegation`；「keyless ⇒ 非插件生产」的 authority 后果归
-  `interaction-authority` 消费。
-- 证据：→ HOW.md R6、R7。
-
-## 反向覆盖核对（COVERAGE.md 归属）
-
-本包 WHAT 覆盖 COVERAGE.md 中单 owner 行：PROMPT-005/007/011、PROMPT-002（Model=None 分片）、
-PROMPT-012 残留（「插件 user-shaped message 仍经 PROMPT-005」）、HOST-002 交叉
-（keyless 用户消息 signal JoinAttempt 的发送侧判别）。Root/Continuation 判定、来源解析顺序 →
-`interaction-authority`（不在此复制）；Requested/Accepted 通用分型 → `effect-accounting`。
+所有内部生成的合成用户消息必须携带合法的 `PromptKey` 与结构化来源元数据。此举保证缺乏插件元数据的消息能够被无歧义地识别为真实的外部物理用户输入。

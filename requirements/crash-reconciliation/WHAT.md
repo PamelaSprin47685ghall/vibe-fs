@@ -1,178 +1,73 @@
-# crash-reconciliation — 唯一 normative 合同
+# crash-reconciliation — WHAT
 
-条款 ID 前缀：`CRASH-`。本文每个命题都是**当前世界必须同时成立的事实**；测试落点见 HOW.md。
-术语：durable facts = EventStore 中已提交的不可变事件；可信物理观察 = Host SDK snapshot、
-Git ref/head、PTY onExit 等可复核的外部事实；process-local 状态 = 仅存在于当前进程内存的
-标志/permit/waiter/sensor。
+## CRASH-001: process-local 状态不是恢复权威
 
-## CRASH-001：process-local 状态不是恢复权威
+进程重启后，所有 process-local 状态（包括 `armedByFailure`、`LoopKillArmed`、`QuiescencePermit` 与 detector 状态）全部清空，绝不得作为恢复权威。没有 fresh evidence 严禁自动产生任何副作用。
 
-进程重启后，以下 state **不得**被当作恢复依据：armed 标志（`armedByFailure`、
-`RecoverySlot.afterRestart = NotArmed`）、`LoopKillArmed`、`QuiescencePermit`、
-`SessionQuiescenceGate` 内容、detector 状态。它们允许在崩溃后安全消失；没有 fresh evidence 就
-没有自动 effect（shape/host.md：gate 重启清空，无 fresh idle → 无 permit → 不自动发送
-idle-derived continuation）。
+## CRASH-002: 重启从 durable facts + 可信物理观察重建世界
 
-含义：崩溃丢失临时状态是**安全侧**（fail-closed），不是需要修复的 bug；把临时状态写进日志或
-Journal 冒充恢复协议才是 bug（HOST-007）。
+系统恢复仅允许两类输入：EventStore 中已提交的不可变事件及其 fold 投影，以及 Host SDK 快照、Git ref 等可信物理观察。严禁使用缓存、墙钟时间或日志散文推断状态。
 
-## CRASH-002：重启从 durable facts + 可信物理观察重建世界
+## CRASH-003: 未决外部 effect 先 reconcile 再决定是否可重试
 
-恢复输入只有两类：durable facts/projections（Journal fold 结果）与可信物理观察（Host snapshot、
-Git ref 等）。禁止用缓存、墙钟时间、「上次大概做到哪」的日志散文推断状态。
+结局未知的外部 effect 严禁直接视为未发生而盲目重放。Reconcile 观察中 `finish=None` 的快照属于私有观测 `TurnUnknown`，必须等待静止证据后由业务层决定处理策略。
 
-含义：`SessionRecoveryWorkflow.recoverFamilyDirect` 从 `RecoveryClosureProjection.discover`
-（durable 关联）构建 family；`ChildRecoveryWorkflow` 读 durable handle projection + Host
-snapshot；ORCH-007 从每个活跃 Job 的最后事实决定唯一恢复动作（`change-integration` 域内应用）。
+## CRASH-004: 恢复复用普通 workflow 入口，不发明程序计数器
 
-## CRASH-003：未决外部 effect 先 reconcile 再决定是否可重试
+恢复过程遵循 `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`。严禁恢复 Program 节点、continuation 或执行步数，严禁引入 `RecoveryStage` 等第二状态机。
 
-outcome unknown 的外部 effect 不得被当作「未发生」而重放。reconcile 的观察分类：
-`finish=None` 的稳定 snapshot 是 reconciliation 私有观测 `TurnUnknown`
-（`SnapshotObservation`），**不是**可 publish 的 `TurnOutcome`（HOST-004）。Requested/Accepted
-分型法律属 `effect-accounting`；本包保证恢复路径在消费该分型之前先完成 reconcile。
+## CRASH-005: ambiguous / multiple / missing 证据 fail closed
 
-## CRASH-004：恢复复用普通 workflow 入口，不发明程序计数器
+恢复证据不足、冲突或缺失时，系统必须显式停留在 `Waiting`、`Blocked` 或 `RecoveryIncomplete` 分支，严禁猜测继续。
 
-恢复 = `Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口`（FLOW-005/DSL-004）。
-禁止恢复 Program 节点、continuation 或「执行到第几步」；禁止 `RecoveryStage` /
-`EnsureRecoveryDone: Task<unit>` 之类的第二状态机。`ReconcileDecision` 只有 observation
-vocabulary（Reread / Publish / StopPass），不含业务 repair 名字。
+## CRASH-006: 没有 fresh evidence 就没有自动 effect
 
-## CRASH-005：ambiguous / multiple / missing 证据 fail closed
+恢复闭合后，所有副作用操作必须持有有效证明：持有 `FamilyRecoveryPermit` 才能执行 join；持有保持 fresh 的 `QuiescencePermit` 才能发送 idle-derived continuation。新的物理用户输入到达时立即幂等撤销旧的静止许可。
 
-恢复证据不足时必须显式停在 `Waiting` / `Blocked` / `RecoveryIncomplete`，而不是猜一个继续：
+## CRASH-007: TurnUnknown 是 reconciliation 私有观测
 
-```text
-SessionRecovery = NoRecoveryRequired | Recovered | Waiting | Blocked
-ChildRecoveryResult = RecoveredActive | RecoveredTerminal | RecoveredAbandoned
-                   | RecoveryIncomplete | RecoveryBlocked
-```
+`TurnUnknown` 仅为 reconciliation 内部观测，严禁作为正式的 `TurnOutcome` 对外发布。
 
-`SnapshotUnreadable`（真读错误）→ `RecoveryIncomplete`（等待，不发 permit，不是硬 block）；
-冲突 / retired / 多个匹配 → `Blocked`。Append CAS retry 耗尽且 EventId 仍不在 store → fail
-closed（PERSIST-003）。Attached restore 中 journal 关联 id 匹配但 agent/title 冲突、或多个 id
-匹配、或查询失败 → fail closed（HOST-009）。
+## CRASH-008: abort 是 typed 控制面，不是 ProviderFailure
 
-## CRASH-006：没有 fresh evidence 就没有自动 effect
+Host 的 abort 信号解码为类型化的 `AttemptAborted` 控制面事件，撤销当前 attempt 的所有 continuation 能力，并唤醒 Reconciler；严禁改写为 `ProviderFailure`。
 
-恢复闭合后，副作用入口必须持有证明：`FamilyRecoveryPermit`（family 恢复闭合的唯一凭据）才可
-join；`QuiescencePermit` 必须一直保持 fresh 到**最终物理 `SendPrompt` 边界**才可发
-idle-derived continuation。claim durability 先于物理发送，因此 permit 可能在 claim 持久化期间被更新
-material 撤销：此时 `TryConsume` 失败 → typed `Superseded`，已写的 claim 必须收束为
-`Abandoned(SupersededBeforePhysicalSend)`，不得调用 Host `SendPrompt`；若 supersession 更早发生则可在
-claim 前结束。两种情况都不能产生 queued user message。线性序：permit → join，禁止跳步（EXEC-023）。
+## CRASH-009: child recovery 没有 Aborted 终态
 
-新的 physical user material 一旦在 `chat.message` 被 Host 接受，就已经否定上一 terminal 的
-idle-send 前提；因此必须在任何异步 routing / ingress / reconcile 之前按 exact
-`PhysicalUserMessageId` 幂等撤销旧 `QuiescencePermit`，不得等到后续
-`experimental.chat.messages.transform` 才标记 provider attempt。否则旧 idle continuation 可在
-admission→transform 窗口排入同一 session，并抢占新 execution 的 routing/authority。相同 physical
-message 的 hook replay 必须 no-op，不能反向撤销它已经开始的 provider attempt。
+Child 终态仅包含 `Succeeded | Failed | Abandoned`，不存在 Aborted 终态。单纯的 abort 观察绝不构成 terminal 证据，JoinableCompletion 必须具有真实解码正文。
 
-## CRASH-007：TurnUnknown 是 reconciliation 私有观测
+## CRASH-010: 恢复结果分支穷尽，Waiting ≠ Blocked
 
-`TurnUnknown` 不得作为 `TurnOutcome` case 发布；`publishDecision` 在类型上不可接收它。
-Unknown 交接用 placeholder Outcome 做 provisional seal / dedupe，业务侧（TurnWorkflow /
-InteractionRepair）在持有 quiescence 时才决定是否 missing-final-report。
+恢复结果分支必须语义互斥且穷尽：`RecoveredActive`（活跃运行中）≠ `RecoveryIncomplete`（缺少终态证据需等待）；`Waiting`（瞬态等待）≠ `Blocked`（硬性失败阻断）。
 
-## CRASH-008：abort 是 typed 控制面，不是 ProviderFailure
+## CRASH-011: 线性序 permit → join，每 join 重新验证
 
-Host 的 `MessageAbortedError` / `AbortError` 解码为 typed `AttemptAborted`，撤销当前 attempt
-的全部 idle-derived continuation capability，原样 signal Reconciler 的 `AbortWake`；禁止改写为
-`ProviderFailure`（不推进 fallback）。`AttemptAborted` 分支先 `RevokeCurrentAttempt`，再进
-Reconciler。
+每次执行 join 之前必须重新验证 `FamilyRecoveryPermit`。Permit 携带恢复闭包的成员集合；若已恢复成员丢失则拒绝执行，恢复后新增成员允许单调准入。
 
-## CRASH-009：child recovery 没有 Aborted 终态
+## CRASH-012: completion 单一 owner
 
-`ChildFinality = Succeeded | Failed | Abandoned`，无 Aborted。aborted-only 观察
-（`HostObservation.AbortedObserved`）**永不**成为 terminal 证据：durable 侧没有 fake aborted
-fact，snapshot 侧只接受 terminal-completed assistant 的正文。`JoinableCompletion` 只由
-`fromDecoded`（decoded v2 terminal）或 `tryFromProvenTerminal` 构造，禁止 raw JSON /
-kind+body / 任意 body 字符串充当证明（EXEC-021）。
+HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采用 blob 先于事实的原则，拒绝重复 claim，并通过 retire 墓碑保证重启后完成态不重复投递。
 
-## CRASH-010：恢复结果分支穷尽，Waiting ≠ Blocked
+## CRASH-013: combine 优先级 Blocked > Waiting > Recovered，按层序无关
 
-恢复分支必须穷尽且语义互斥：`RecoveredActive`（child 还活着，恢复步骤完成）≠
-`RecoveryIncomplete`（缺 terminal 证据，必须等）；`Waiting`（transient/unreadable，不发 permit
-但可等）≠ `Blocked`（硬失败）。`HandleFamilyRecovery.HandlesWaiting` → `SessionRecovery.Waiting`
-（不是 Blocked）；`JobRecoveryUnknown` → Waiting（不是硬 FamilyBlocked）。
+多个恢复结果合并时，优先级严格满足 Blocked 优于 Waiting 优于 Recovered；同层级内的合并与输入顺序无关。
 
-## CRASH-011：线性序 permit → join，每 join 重新验证
+## CRASH-014: closure 校验与 permit 单调准入
 
-`AwaitAgentWithPermit` 每次定向 await 前重新 requirePermit；校验通过才可读目标 agent 的
-Journal 权威 completion。TCS/Pulse 只作唤醒，不构成第二份 RunCompletion 真理源。permit 携带
-closure members（不止 digest）：join 时检查 recovered 的每个 member 仍在场——丢失成员拒绝
-（`FamilyRecoveryPermit.missingFrom`），恢复后新增的成员合法（monotone admission）。
+闭包中若出现重复 session 则判定为 `RecoveryCycle` 并 fail-closed 阻断。Permit 校验要求闭包成员单调不丢失。
 
-## CRASH-012：completion 单一 owner
+## CRASH-015: Attached restore 复用/替换/fail-closed
 
-`HandleController.recordCompletion` 只接受 `JoinableCompletion`（Succeeded | Failed finality），
-blob 先于事实（PERSIST-007）；fold 拒绝第二次 claim。`ChildRecoveryWorkflow` 是生产唯一调用方；
-`recordCompletion` 后仅 Pulse agent handle（唤醒），Journal 是事实源。`retire` tombstone 让已
-消费 completion 不可重复投递（重启后不会把同一次完成再投一次）。
+重启后附加子会话恢复时：匹配唯一关联 ID、agent 与 title 时复用；关联不存在时新建；发生冲突或多重匹配时 fail-closed 阻断。Replacement 必须先证明旧物理会话消失，显式执行 Close 后再 Link 新会话。
 
-## CRASH-013：combine 优先级 Blocked > Waiting > Recovered，按层序无关
+## CRASH-016: Blogger 崩溃窗口按 durable + snapshot 分类
 
-`SessionRecovery.combine`：Blocked 优先于 Waiting 优先于 Recovered 优先于其它；同层内顺序无关。
-`authorizeFamilyResume`：any Blocked → `FamilyBlocked`（硬，无 permit）；else any Waiting →
-`FamilyWaiting`（无 permit，消费方等待）；else `FamilyReady`（私有 permit）。
+对未完成的 Blogger 请求窗口，严格基于 durable 事件与 Host 快照（最新 assistant 的唯一 completed chronicle）分类为 unsent、in-flight 或 tool-present，快照不可读时阻断。
 
-## CRASH-014：closure 校验与 permit 单调准入
+## CRASH-017: 工具中断不恢复；未来 session 续传必须显式
 
-`validateClosurePure`：closure 中同一 session 出现两次 → `RecoveryCycle` block（fail closed）。
-`RecoveryNode.token` 是稳定成员身份（W:/A:/C:/B:/M:/R: 前缀）；permit 的 closureMembers 必须
-仍被当前 family 包含——丢失拒绝、增长合法。
+工具执行本身不设隐式的崩溃恢复 owner。进程死亡时正在运行的工具调用均按中断处理，严禁在新进程启动时自动重放、补写完成态或隐式修复。
 
-## CRASH-015：Attached restore 复用/替换/fail-closed
+## CRASH-018: `/continue` 是唯一显式 session resume；重启断点必须暴露给 LLM
 
-重启后 Attached 创建：有 journal 关联（`RestoredSessionId`）且恰好 1 个 id+agent+title 匹配 → 复用；关联 id 不存在 → Replacement（新建）；无关联 → 不复用任何候选直接新建；id 匹配但 agent/title 冲突、多个匹配或查询失败 → fail closed。登记顺序：先写 `SessionAssociation`，再发首个 prompt（HOST-009）。
-
-Replacement 不得把新的 attached child 直接覆盖到仍然存在的 durable association 上：physical old child 被证明永久消失后，必须 `create fresh → Close(old durable association) → Link(new)`。对 Companion 而言，旧 `CompanionBloggerLinked(old)` 尚存在时直接 append `CompanionBloggerLinked(new)` 按 COMPANION-002 必须拒绝；正确 recovery 不能靠 semantic-cut“帮忙重置”。
-
-## CRASH-016：Blogger 崩溃窗口按 durable + snapshot 分类
-
-`BloggerCrashRecovery.reconcile` 对 open request 窗口分类（unsent / tool-present /
-in-flight），只从 durable 与 Host snapshot 判据得出 `WindowOutcome`；snapshot 不可读 →
-`Unreadable` → `SessionRecovery.Blocked`。`tool-present` 只由 snapshot **最新 assistant** 的具名
-`SessionToolPart` 证明：raw `chronicle` 总数必须恰好 1，且该唯一 part 必须 `Completed`；历史旧
-chronicle、2+ raw chronicle、pending/failed/statusless 都不得把 open request 误判为已 recommit。
-恢复机会经 `HostTurnObserver` 观察，不自行发消息。Blogger protocol 的某一发 AABB 若由 idle 路径实际发出，则以 durable `blogger-aabb` InteractionRepair claim 作为“该 terminal 的这一发已发送”的恢复证据；它不是整个 fallback budget 已耗尽的证据。纯 snapshot/transcript 本身不得凭空推导 AABB issued/exhausted。
-
-## CRASH-017：工具中断不恢复；未来 session 续传必须显式
-
-plugin load、workspace open、EventStore acquire、Host signal subscription 都不是 recovery trigger。更进一步：tool call 本身没有 crash recovery owner。进程死亡时正在执行的 Fission、NEEDHELP consultation、js-* transaction、fork/join/tool workflow 等均按“该次工具执行已中断/失败”处理；不得在新进程中自动 abort/send/rollback/replay/补 terminal，也不得由下一次普通 tool invocation 偷偷替上一工具善后。
-
-未完成 durable facts 只保留为可审计历史证据。旧 session 若未来支持断点续传，只能由用户显式 `/continue`（或等价显式命令）触发：恢复入口必须先把“进程已重启、上一条工具执行中断、历史可能含未完成 sub session”作为可见上下文交给 LLM，再由 LLM 基于公开历史选择复用哪些 sub session。禁止透明续跑、隐藏断点、伪造上一 tool 成功或把坏 tool 从 transcript 抹掉。
-
-一个 feature 的旧未完成状态不得阻断 OpenCode plugin load；普通新 session 也不得因旧 tool 残留被自动恢复逻辑劫持。
-
-## CRASH-018：`/continue` 是唯一显式 session resume；重启断点必须暴露给 LLM
-
-用户在已有 session 中显式执行 `/continue` 时，Wanxiangshu 才可查询该 session 的 durable child linkage 与 Host physical session snapshot，并把仍可访问的 sub session **仅重新登记到当前进程 runtime** 供后续显式复用。`/continue` 自身不得补写旧 tool terminal、不得把 Active/Completed/Retired handle 偷偷改成成功、不得发送新 charge、不得自动 join/abort/replay；真正的新业务 effect 必须来自 LLM 在看到 resume briefing 后作出的后续 tool call。
-
-`/continue` 交给 LLM 的正文必须明确写出：① OpenCode/Wanxiangshu 进程刚刚重启；② 重启前最后一个 tool call 可能中断，保持 transcript 中的坏/未完成状态，不能假定成功；③ 哪些 sub session 仍物理可访问（至少 byname、session id、role/agent、durable lifecycle）；④ 哪些 durable child 已不可访问；⑤ 若要继续，LLM 可用正常 `fork(name=已有 byname, charge=...)`/等价已有复用面选择性复用。禁止把 restart disclosure 放在隐藏日志、system-only side channel 或仅诊断字段里。
-
-`/continue` 自身产生的 provider turn 是 **disclosure-only**。`command.execute.before` 生成的动态 restart briefing 必须通过**真实 Host command → physical user material 通路**进入随后那条 `chat.message`；测试不得把 command hook 的 `output.parts` 手工复制进 `chat.message` 来替 Host 证明这条物理边界。若 Host 不会自动转发 command output part，Wanxiangshu 必须只在本进程保存一次性 pending briefing，并在下一条同 Session 的真实 `chat.message` 上 materialize 后立即消费；若 Host 已经转发 marker，则只绑定、不重复插入。静态 command template 禁止声称存在一个 provider 实际看不到的“attached briefing”。
-
-materialize 后的 Host user part 必须带专用 typed metadata marker；`chat.message` 把该 marker 绑定到**精确的 `(SessionId, PhysicalUserMessageId)`**。该 exact binding 是 disclosure-only 的 process-local authority：后续 provider hooks 不得用 Host wire 上的 agent/model label 把它重新升级成 managed business execution。`chat.params` 必须用其 `message.id` 查询同一 exact binding；命中时既不要求 `SessionExecutionBinding` / model-routing lease，也不应用 managed temperature policy。`messages.transform` 同样不得依赖 Host 必然把自定义 part metadata 原样保留到 provider-facing message projection；trailing user part 仍带 marker **或**其 exact physical id 命中该 binding，任一成立都必须识别为同一 `/continue` material。该 physical material 从初次 provider request 到 tool-result 后续 provider step 都保持 disclosure-only：不得创建新的 AuthorityRoot / PromptKey continuation，不得触发普通 PromptIngress、Manager narrative、Companion/XTrace、Strength、Pair、Blogger 或其它业务 transform/effect；messages transform 只允许执行 Host wire 必需的无语义 sanitization。同一物理 material 的后续 idle/reconcile 也不得生成 InteractionRepair、Manager idle encouragement、provider fallback、Blogger repair 或任何其它 Wanxiangshu 自动 continuation/effect。`/continue` 的 provider prose 不需要“普通 charge 收尾报告”，因此绝不能因为它自然结束而自我 nudge。
-
-该 suppression 不以 SessionId、idle、abort、delete 或“session 是否结束”为生命周期：同一 marked physical material 的 provider retry 仍受抑制；一旦下一条普通 user material 以新的 PhysicalUserMessageId 成为当前请求，即使此前没有任何 end signal，也必须自然恢复正常 Companion 与业务 turn 行为。这样显式 resume 只登记/公开，真正业务 effect 来自后续 LLM tool call，而且不会把可复用 session 错当成一次性 execution。
-
-`/continue` 重复调用必须幂等：重复发现/登记同一 surviving child 不产生 durable fact，不重复发送 prompt，不改变 child transcript。没有 durable journal、没有 snapshot port、某 child snapshot 查询失败都只影响本次 briefing 的对应条目；command 本身仍返回可见说明，不熔断 future `/continue` 或其它功能。
-
-## 反向覆盖说明
-
-`p0-recovery-join` gate（`scripts/checks/p0-recovery-join.mjs`）是共享 checker
-（MECHANISM），SPLIT 后本包拥有其 **recovery 部分**规则：`restore-handles-none-no-recovery`、
-`recover-job-none-no-recovery`、`spike-restore-handles-none`、`host-fork-runtime-recovery-task`、
-`host-fork-runtime-await-recovery-call`、`host-fork-restart-proof-structure`、
-`record-completion-single-owner`、`session-ports-restore-handles-mandatory`、
-`session-ports-recover-jobs-mandatory`、`child-recovery-result-five-cases`、
-`joinable-from-decoded`、`join-with-permit-closure-digest`、`join-tool-family-recovery`、
-`join-tool-family-blocked`、`executor-tool-require-permit`、`distillation-join-with-permit`、
-`distillation-runtime-join-with-permit`、`mailbox-pulse-agent-handle`、
-`false-completion-rejected-fact`、`parent-join-correction-fact`、`fork-recovery-synthetic-restored`、
-`fork-recovery-interrupted-finality`、`ensure-recovery-unit`、`missing-ports-family-ready`、
-`lifecycle-aborted-record`、`lifecycle-aborted-setresult`、`awaiting-evidence-case`；
-**effect-accounting 部分**（aborted≠terminal：`agent-aborted-type` 等）不归本包。
+用户显式执行 `/continue` 是唯一的会话续传入口。系统仅重新登记物理可访问的子会话，并将进程重启、中断工具状态与可复用会话清单作为公开 briefing 放入 provider-visible 消息中，由 LLM 根据公开历史决定后续工具调用。续传材料保持 disclosure-only，不触发自动业务转换。

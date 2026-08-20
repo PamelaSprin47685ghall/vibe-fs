@@ -1,69 +1,34 @@
-# WHY — 为什么 knowledge-reuse 必须独立存在
+# knowledge-reuse — WHY
 
-## 不可替代的存在理由
+## 领域动力与核心张力
 
-> Inspector 的一次调用天然形成知识单元（Question → 调查 → Answer），调用结束后只存在于 transcript；后续 Inspector 面对相同或高度相关的问题必须重新调查，已消耗的 read/glob/grep 证据无法复用。Casebook 让旧答案可 fetch、按当前 worktree 重放 observations、无变化时直接复用——**best-effort semantic cache，不是知识数据库**（历史 why/casebook 条款）。
+历史沉淀的仓库知识（Casebook）能够作为极高价值的语义缓存与新鲜度提示（freshness hint），显著减少针对代码库的重复调查开销。然而，**历史问答与观察记录绝不能直接等同于对当前代码库真实状态的证明**。若将历史缓存直接作为当前真理，代码库演进后的过时答案将成为系统判断的非法真源；若完全禁止复用历史记录，系统又将在每一次相同查询上面临重复的全量调查成本。
 
-本包保证的是一条**复用规则**，而不是「复用内容」：
+`knowledge-reuse` 的核心存在理由是确立基于「先重放、后刷新」的语义缓存机制：
+1. **重放优先与提示语义**：通过 `fetch(shelfmark)` 对当前工作区重放已捕获的类型化观察；观察未发生变化仅表明当前答案具备高新鲜度，属于提示而非绝对证明；
+2. **容忍过时与失败退避**：当观察发生变化时由私有 Bookkeeper 尝试刷新 Case；若刷新失败，返回旧答案并明确告知其属于陈旧记录，容忍过时是预期的产品语义；
+3. **统一持久化权威**：Case 事实完全由统一的 EventStore 承载，淘汰通过追加事件表达，并发冲突由领域冲突（DomainConflict）显式建模，杜绝本地时间戳竞争或私有存储分叉。
 
-```text
-Case = one question + one answer + supporting replayable observations
-fetch 前先重放 observations → freshness hint
-no-delta ≠ correctness proof
-检测到变化 → 基于已提供证据重塑 Case（maintenance 不自动获得回 repository 取证权）
-并发 fork → 显式 DomainConflict，绝不 (revision, wall_clock) LWW
-feature 完全 opt-in；未启用 repository 行为保持不变
-```
+## 核心不变量
 
-## 为什么不能并入其它包
+1. **缓存定位与先重放机制**：Casebook 是尽力而为的语义缓存，`fetch` 调用必须先对当前工作区执行只读观察重放。
+2. **类型化捕获与逐字记录**：观察记录严格从类型化工具执行结果中提取，不从文本推断；问题与答案保持逐字原样记录，不经过第二作者摘要。
+3. **单程序原子维护（Bookkeeper）**：维护操作由私有的 `js-bookkeeper` 在单个事务内原子完成，不支持文件修改权限。
+4. **统一事件溯源与显式冲突**：Case 状态流转通过 `InspectorCaseCaptured`、`InspectorCaseRefreshed`、`InspectorCaseAccessed` 与 `InspectorCaseEvicted` 表达；并发副本合流遵循事件集合并，冲突显式表达为 DomainConflict，严禁使用 LWW（最后写入者胜出）。
+5. **低信任公开索引**：面向外部仅暴露包含 Shelfmark 与规范化问题的低信任索引快照，内部机器字段与状态不泄漏至提示词。
 
-- 不是 `repository-investigation`：investigation 拥有「当前 repository fact 如何被真实观察建立」；本包拥有「**已建立的旧知识如何被安全复用**」。两者 failure meaning 不同：investigation RED = 推理冒充证据；本包 RED = 旧 Q/A 被当当前事实 / freshness 被当 correctness / 并发静默丢分支。reuse 必须**依赖** investigation（replay 是真实观察），但这不是同一个 WHY。
-- 不是 `durable-events`：EventStore 是 Case 的物理 substrate，但「Case 是什么、何时 fetch/refresh、freshness 语义」是领域语义；store proof 不拥有 feature 语义（PROOF-MAP：feature event semantics 不归 store proof）。
-- 不是 `durable-convergence`：replica 按对象语义收敛的**一般律**归它；本包只拥有 Case 对象的复用/维护语义，并**消费** convergence 提供的 DomainConflict 表达。
-- 不是 `epistemic-reasoning` / `speculative-investigation`：Casebook 不生成新知识、不猜、不做认识状态求解；它是已支付成本的复用。
+## 边界与失效模式
 
-独立 change 测试：Case maintenance 从 Bookkeeper agent 改成 deterministic merge + optional LLM，而 Case reuse semantics 不变——本包命题全部成立（`17-repository.md` INDEPENDENT CHANGE）。
+- **不负责当前仓库事实确立**：当前观察的采集法则与只读约束归 `repository-investigation`。
+- **不负责事件持久化底层**：底层事件追加与 CAS 存储归 `durable-events`。
+- **不负责分布式收敛物理律**：事件集合合并与并发收敛机制归 `durable-convergence`。
 
-## RED 是什么样（失败模式）
+**失效表现（RED）**：
+- 历史 Case 未经当前工作区重放即直接断言为当前真相；
+- 从模型文本中猜测提取观察内容而非从类型化工具返回捕获；
+- 引入私有数据库或使用时间戳/版本号执行 LWW 冲突裁决；
+- Inspector 会话在单次调用或每个回合重复触发 finalize。
 
-```text
-RED = 旧 Q/A 被当作当前事实（无 replay / replay 被跳过）
-    ∨ freshness hint 被当作 correctness proof
-    ∨ 并发更新的分支被静默丢弃（LWW）
-    ∨ fetch 改了 subject worktree
-    ∨ 未启用 feature 的 repository 行为被改变
-```
+## DEPENDS ON
 
-具体可观察形态（来自历史 change（perm-inspector）的失败面）：
-
-| 形态 | 违反 |
-|---|---|
-| fetch 不重放 observations 直接返回旧 A | 004/005 |
-| 把「没检测到 observation 变化」说成「答案正确」 | 005 |
-| 用 timestamp / revision 决定 merge winner | 011 |
-| Bookkeeper 拥有 filesystem capability，能回 repository 再取证 | 006 |
-| marker 缺失时 fetch 工具仍可见 / 仍可执行 | 009 |
-| 每个 return 都 finalize 一个 Case（碎片化） | 010 |
-| 崩溃/删除后自动 reconstruct + synthesize 旧 Case | 010 |
-| provider 看到 session id / freshness 机器字段 | 012 |
-
-## 历史背景（为什么这些命题不是纸上谈兵）
-
-历史 change（perm-inspector）（Inspector Casebook）确立的**设计姿态**：
-
-> Casebook 是 hopefully useful 的 best-effort semantic cache，不是证明系统。旧答案可能因 observation capture 不完整、shell 阅读未识别、未观察到的新文件、并发变化、Bookkeeper 失败而过时——这些是**允许的产品行为**。
-
-机械安全边界（fail closed）与 best-effort 性质（允许过时）是两类不同命题：前者进 WHAT（001/003/006/007/009/010/011/012），后者也进 WHAT（004/005 的「不证明正确」）。任何机制都不得被提升为 correctness proof。
-
-## 历史拒绝方案（被拒 ≠ 永久命题，记录 WHY）
-
-| 被拒方案 | 拒绝理由 | 现行命题 |
-|---|---|---|
-| 独立 Git store / refs / hook | feature store 无法共享 Persist 的 merge/CAS/恢复；remote 同步是 dumb-remote ConvergeStore 的职责 | 007 |
-| timestamp / revision 决定 freshness 与 merge winner | 时间戳不证明内容未变；revision 排序制造第二真相 | 004/005/011 |
-| 逐调用 finalize | 每个 return 一次 provider 事务，复用调查被碎片化；ReuseScope close 一次 finalize 才对应一个 Case | 010 |
-| 从 transcript 文本推断 observation | 文本推断重放时不可靠；capture 必须来自工具执行的 typed 结果 | 003 |
-| full knowledge base | Casebook 不保证历史 Q/A 可追溯为产品 API、不建 commit history、不改 subject worktree | 001 |
-| 无 marker 也运行（opt-out） | 未启用 repository 的行为必须与现状逐字节一致 | 009 |
-| `edit-qa(document, old_text, new_text)` 双文档字符串替换 | Q/A 分文件竞态；多次短语编辑无法保证 Case 仍描述同一世界 | 006 |
-| Bookkeeper 借用 Inspector self-model | 调查自我模型暗示可回世界取证，破坏「证据已供给」边界 | 006 |
+`knowledge-reuse → repository-investigation, durable-events, durable-convergence`

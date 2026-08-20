@@ -1044,7 +1044,7 @@ module EnforcerContinuation =
             | _ -> return project rawMessages
         }
 
-    
+
     /// Prefer non-empty preferred; else fallback. Never invent a blank list when
     /// either side has content. Both empty is an invariant break: blanking Host
     /// transcript yields provider 400 (messages cannot be empty).
@@ -1063,11 +1063,7 @@ module EnforcerContinuation =
     let private projectMessages (messages: obj list) (fallback: obj list) : ContinuationOutcome =
         ContinuationOutcome.ProjectMessages(ensureNonEmpty messages fallback)
 
-    let private stopPhysicalRun
-        (messages: obj list)
-        (fallback: obj list)
-        (reason: string)
-        : ContinuationOutcome =
+    let private stopPhysicalRun (messages: obj list) (fallback: obj list) (reason: string) : ContinuationOutcome =
         ContinuationOutcome.StopPhysicalRun(ensureNonEmpty messages fallback, reason)
 
     let private isEmptyTextCycleFailure (reason: string) : bool =
@@ -1200,7 +1196,15 @@ module EnforcerContinuation =
                 with
                 | None -> return None
                 | Some chunk ->
-                    return EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId epoch blog xTrace projection chunk
+                    return
+                        EnforcerHost.mainContextFromChunk
+                            mainSessionId
+                            bloggerSessionId
+                            epoch
+                            blog
+                            xTrace
+                            projection
+                            chunk
         }
 
     /// The Blogger continuation-transform handler (moved from EnforcerHost to
@@ -1248,12 +1252,7 @@ module EnforcerContinuation =
 
             match journal, mainSessionId, EnforcerCycleDecode.extractCalls rawMessages with
             | Some durable, Some owner, Some(messageId, _, assistantCompleted) when chronicleCallCount > 1 ->
-                return!
-                    invalidCardinalityBranch
-                        (mkCtx durable owner)
-                        messageId
-                        chronicleCallCount
-                        assistantCompleted
+                return! invalidCardinalityBranch (mkCtx durable owner) messageId chronicleCallCount assistantCompleted
             | Some durable, Some owner, Some(_messageId, calls, assistantCompleted) when List.isEmpty calls ->
                 return! emptyCallsBranch (mkCtx durable owner) assistantCompleted
             | Some durable, Some owner, Some(messageId, calls, assistantCompleted) ->
@@ -1447,4 +1446,3 @@ module EnforcerContinuation =
             let sid = SessionId.create sessionId
             runEnforcerIfMainAssociated scope journal durable terminateSession sid sessionId outObj
         | _ -> Task.FromResult()
-

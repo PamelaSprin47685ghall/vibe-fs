@@ -1,67 +1,23 @@
-# WHY —— durable-convergence
+# durable-convergence — WHY
 
-## 一句话
+## 1. 领域动机与核心矛盾
 
-两个 replica 都可能各自合法发展（A、B 离线同见 parent=P 各自 append A1/B1）。
-同步不能靠 wall-clock/revision 选「较新」世界——那会**静默丢掉一个合法分支**；必须
-保留共同事实，把真正的 domain conflict 显式交还领域。
+在分布式协作或多进程并发场景下，多个副本（Replicas）可能各自合法地追加事件（例如两个进程基于同一父事件各自产生了互斥的业务操作）。如果同步机制依靠物理时钟（Wall-Clock）、版本号或 Last-Write-Wins (LWW) 简单粗暴地挑选“赢家”，会导致灾难性的后果：
+1. **静默丢失合法事实**：稍晚到达或时钟略慢的合法分支被直接覆盖或删除，用户已依赖的事实凭空消失。
+2. **多副本世界分叉**：相同的事件集合在不同副本上因到达顺序不同而折叠出互相矛盾的业务现实。
+3. **将并发冲突误杀为存储损坏**：将合法的领域并发分支误判为底层的存储格式损坏，导致数据库整体不可恢复。
 
-## 为什么必须独立存在
+`durable-convergence` 确立了确定性事实收敛模型：
+- **存储层永不丢事实**：合并等价于事件集合的有穷并集（Set Union）与标识去重；
+- **并发分支显式表达**：合法并发分叉在投影层明确表达为 `DomainConflict`，通过显式的裁决事件（Resolution Event）完成收敛；
+- **确定性 k-way merge**：无论输入流枚举顺序或在何处执行，相同输入必定产生全局一致的规范序列。
 
-历史 change（storage）§10 明确：万象术不能假设一个 repository = 一个
-Wanxiang process。真实运行允许 OpenCode process A/B/C、IDE、external Git、remote
-replica 同时存在，且任一 process crash 后其内存可以全部消失。因此：
+## 2. 核心不变量与破坏后果
 
-- **没有** master process / leader / 全局锁 / 内存 authority——并发知识只通过
-  immutable snapshot / root ref / CAS conflict / remote tracking snapshot 显现。
-- 每个 process 是**独立 replica**，只 append 自己的 delta；合并是
-  `KWayMerge(snapshot[])` 这个统一 primitive，推广到所有动态 durable 域。
-- 跨机器只是多进程语义跨了机器边界（storage.md §42），不引入新协议。
+- **Merge = Set Union**：两个不同的 EventId 必须全部进入合并后的历史，严禁基于时间戳丢弃任意事实；若破坏，并发协作会发生静默数据丢失。
+- **Resolution 必须覆盖全部 Heads**：解决冲突的裁决事件必须显式将所有竞争分支的 Head 作为其父事件；若破坏，重放历史无法证明冲突已真正被解决。
+- **Dumb Remote 原则**：远端仓库仅作为哑对象存储，不包含任何领域逻辑；所有收敛与验证完全在客户端完成。
 
-若「谁赢」由时间戳决定（LWW），后果是确定的：**晚到的合法分支消失**，而它可能承载
-用户已经依赖的事实。timestamp 不证明内容更新，revision 排序制造第二真相。
+## DEPENDS ON
 
-## 两个不可退让的支柱
-
-1. **Storage 层永不丢事实。** merge = append-only set union + identity dedupe。
-   两个不同 EventId 永远都进入 merged history——即使领域上互斥（同一 Job 同时
-   Accept/Reject、同一 Case 同时 Close/Reopen）。绝对禁止 Store 做
-   `wall_clock newer wins` 把其中一个 durable fact 消失（storage.md §10.6/§19）。
-2. **Persist 负责不丢事实，Domain 负责解释事实是否相容。** 合法并发 fork 是物理层
-   正常产物，不是全局 corruption；领域互斥由 projection 表达为 deterministic
-   `Conflict` 状态，经以**全部 heads 为 parents** 的 resolution event 收敛
-   （storage.md §5.3/§10.9）。真公式是
-   `Projection(KWayMerge(S1..Sk)) = Fold(Union(Events(S1..Sk)))`，不是
-   `Merge(Projection(S1), Projection(S2))`。
-
-## 失败模式（RED 长什么样）
-
-- 同步后一个合法分支消失（LWW 偷删）→ 用户事实丢失，且没有记录。
-- 相同 object set 在 replica A 折叠成世界 W1、在 replica B 折叠成 W2 → 分叉真相。
-- 自然 fork 被误判 StorageInvalid → 历史永久不可恢复。
-- 单向 Pull/Push 让 remote 永远落后（Local={A,B}, Remote={A,C} 成功同步后仍不对称）。
-- no-op hook 仍重读/重解码全部 writer+payload、重建全部 Git objects，或在 pre-push 先做
-  `ls-remote + fetch` 再开始 lease → 同步成本随历史总量增长，普通 Git 操作被历史体积绑架。
-- dumb server 开始理解 domain event → server 变成第二套领域运行时。
-- `Merge(Projection1, Projection2)` 式合并 → 投影层面的 LWW/漂移。
-
-## 被拒方案（考古）
-
-| 方案 | 为什么拒 |
-|---|---|
-| revision + wall_clock LWW 裁决同 Case 冲突 | Store 保存 immutable facts 不是 mutable snapshot；timestamp 不证明内容未变；LWW = 丢分支（历史 change（storage）§19、§10.10；历史 why/casebook 条款） |
-| 单向 PullStore/PushStore/Download/Upload | 永远双向是永久 architecture invariant；任何同步入口都必须 fetch→union→validate→CAS→push（storage.md §11/§17） |
-| server-side merge / pre-receive domain reducer | dumb remote 只懂 objects/refs/CAS/auth；智能全在 client（storage.md §12/§38） |
-| Process Registry / leader / writer election | 所有并发知识只通过 snapshot/root/CAS/remote-tracking 显现（storage.md §10.7） |
-| MergeStateMachine / PendingPeer / NeedMerge 队列 | k-way merge 是纯函数 primitive，从当前真实输入重新计算，不维护同步状态机（storage.md §10.8） |
-| multi-remote CRDT（首版） | 一个 remote 一个同步算法；多 remote 是 future work（storage.md §22） |
-
-## 与相邻包的边界（谁不归我）
-
-- **`durable-events`**：单 store 的 append/CAS/canonical identity/确定性 fold。本包消费
-  它，但「identity collision fail closed」「提交原子性」等单 store 律不归本包。
-- **`knowledge-reuse`（Casebook）**：同一 Case 的合法并发 fork 必须显式 DomainConflict、
-  禁 LWW——这是 Case **对象**语义（KNOWLEDGE-REUSE-011）；本包拥有 general
-  set-union/DomainConflict 物理律，Case 语义归 Casebook。
-- **`crash-reconciliation`**：崩溃后重入普通程序；本包只管 replica 之间的事实交换。
-- 各 domain 的 resolution 语义（`*Resolved` 的具体业务含义）→ 各 domain owner。
+- `durable-events`

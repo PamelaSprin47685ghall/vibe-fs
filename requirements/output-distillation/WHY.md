@@ -1,42 +1,21 @@
-# output-distillation — 为什么必须独立存在
+# output-distillation — WHY
 
-## 不可替代的存在理由
+## 领域价值与核心矛盾
 
-真实执行输出可能远大于 participant horizon（log、test run、trace、capture、dump 动辄几百 KB 到数
-MB）。系统必须把「物理上发生了、输出了什么」压成「能改变后续判断的 bounded observation」。没有本包：
+真实执行输出（日志、测试输出、追踪与转储）往往远超单个 participant horizon 的承载上限。系统必须将大规模物理输出有损但诚实地压缩为足以改变后续判断的 bounded observation。
 
-1. **截断冒充成功**：超限静默截成空结果，caller 以为「跑完且干净」，实际失败被吞。
-2. **fragment 冒充整体**：某一个 chunk 里没有 failure 文本，被当成整次运行成功。
-3. **发明因果**：合并多个 fragments 时把「许多安静 chunk」解读为「那次 failure 不真实」，或编造
-   success ratio。
-4. **失去可定位性**：压缩后读者找不到 path、行号、失败 assertion，蒸馏结果对没看过原文的人无用。
-5. **无界缓冲**：输出预算不设防，物理采集本身变成无界资源消耗。
+核心矛盾在于：**有损压缩必须保留关键事实与失败证据，严禁因追求简短而掩盖失败或捏造虚假成功**。静默截断会导致调用方误判执行成功；而缺乏边界意识的合并则会使局部静默掩盖真实的异常。
 
-RED 判定：截断/压缩把局部片段伪装成整体事实，或丢失足以改变下一动作的关键信息。此时世界 RED。
+## 核心不变量
 
-## 为什么从 process-execution 独立（HANDOFF §6.6）
+1. **诚实压缩与区分性保留**：压缩必须保留错误类型、带行号路径、失败断言、矛盾行与未决状态等能够区分具体失败的印记，剔除重复的进度噪声。
+2. **Fragment 谦逊**：局部 chunk 中未出现错误不代表全局成功；截断正文上方的格式头部不代表执行裁决，局部观察必须承认视野边界。
+3. **无发明因果**：多片段合并基于冲突与实质失败的并集，严禁根据安静 chunk 的数量推测成功率或虚构因果解释。
+4. **面向新读者的可定位性**：压缩结果必须保留关键定位标记，使未接触原始大文本的读者能够准确定位问题现场。
+5. **失败保留原始尾部**：分块处理失败时，必须承认不完整性并保留最后 chunk 的原始字节作为最近证据，禁止伪造摘要。
 
-控制进程（command/signal/exit/cancel）与诚实压缩（有损但诚实的 observation）是两个 WHY：换
-terminal backend 不动蒸馏语义；把 Distiller agent 换成 deterministic+LLM hybrid summarizer 不动
-process execution contract。独立变化测试双向成立，故拆两包。
+## 破坏后果
 
-## 历史失败模式
-
-- **「看起来干净」的空摘要**（EXEC-012）：超限走摘要策略之前，静默截断曾产生「成功空结果」。
-- **fragment 越界**（Oracle 2 / HANDOFF §29）：fragment-humility 语义曾只活在 Distiller Role Law
-  散文里，`raw tail verbatim 保留未断言`——行为面存在（`Distillation.fs` `partialWithTail`）但无
-  可红 fixture。本包新增 `distiller-fragment-humility.test.mjs` 钉死：失败 chunk → 承认不完整 +
-  保留最后 chunk 原文 + 不虚构失败者的 summary。
-- **chunk 统计冒充事实**（Role Law）：把 success ratio、map-reduce 机械过程报告成蒸馏事实，是
-  「切割的私务」外泄。
-- **无界缓冲**（`ProcessOutput.fs` 注释）：跨 OutputLimit 瞬间一次性 dump 积压字节，曾把内存峰值
-  与输出预算脱钩；`MemoryBufferBudget` 提前流式落盘。
-- **JSON 当字符串叠信封**（历史 change（js-tools-toml-result））：工具结果以 `result="{\"...}"`
-  字符串返回，截断语义与值树分离；TTR 后结果走值树 + ARCH-012 确定性留尾截断。
-
-## 与相邻包的边界
-
-- 物理采集（spool 阈值、字节计数）→ `process-execution`；本包消费 spool。
-- 历史记忆/上下文压缩（Blogger、prefix、squash）→ `context-compression`（不同证据源与生命周期）。
-- Reviewer 判断（PERFECT/REVISE）→ `review-judgement`；蒸馏只做「长度压力下的选择」。
-- 工具文本结果 wire 上限（ARCH-012）由本包执行，但 wire 渲染 owner → `provider-projection`。
+- **静默吞并失败**：超限输出被静默截断为空，导致调用方误判命令成功完成。
+- **虚构因果与成功**：局部无异常被提升为全局成功，或通过多数表决抹杀真实的局部异常。
+- **定位断裂**：摘要丢失文件路径与关键报错行，使后续排查失去依据。

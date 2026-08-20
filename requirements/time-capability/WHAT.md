@@ -1,103 +1,33 @@
-# WHAT — time-capability（唯一 normative 合同）
+# time-capability — WHAT
 
-> 本文件是 `time-capability` 的唯一 normative 语义合同。每条命题必须同时为真；测试落点见 `HOW.md`。
-> 术语首次出现给定义；引用精确到 `src/...fs` 与测试文件。
-
----
-
-## TIME-001：时钟与定时器是显式注入的 capability
-
-**规范陈述**：业务代码（Domain / Application / Session 层）不得依赖 ambient 时间原语；凡需要读取当前时刻或安排延时，必须使用显式注入的 capability —— 读取时刻用 `IClockPort.UtcNow()`（`src/Wanxiangshu/Kernel/Temporal.fs`），安排延时用 `ITimerPort.Delay(milliseconds)`（返回 `IDeadlineHandle`）。
-
-**含义/动机**：时间是最危险的隐藏输入。注入使每个消费者在构造时声明「我要时间」，测试就能替换成虚拟实现，生产替换成物理实现（`PtyTiming.nodeClockPort` / `nodeTimerPort`）。不注入，任何一次测试运行都受宿主机器时钟摆布。
-
-**边界**：`Process/` 与 `Infrastructure/` 是物理适配器层，允许直接接触 Node timer / `DateTimeOffset.UtcNow`（`Process/ProcessRunner.fs` 第 92 行 `let clock = fun () -> DateTimeOffset.UtcNow` 是物理层合法形态）；业务层禁止。`ITimerPort` / `IClockPort` 的名字本身是 HOW（`Temporal.fs` 头注释：Contract only，无 Node/setTimeout/Fable JS）。
-
-**证据指针**：→ `HOW.md` TIME-001 行。
+本文件是 `time-capability` 的**唯一 normative 合同**。WHY 与 HOW 非 normative。
 
 ---
 
-## TIME-002：deadline 与 elapsed 有 typed 表达，不散落为裸时刻比较
+## TIME-001: 时钟与定时器是显式注入的 capability
 
-**规范陈述**：截止时间必须由 `Process/Deadline.fs` 的 `Deadline` 类型表达（私有构造 `Deadline of expiresAt`，只能经 `Deadline.ofBudget now budget` 构造），通过 `Deadline.remaining` / `Deadline.isExpired` / `Deadline.nextWaitMs` 消费；已耗时间经注入时钟采样（如 `HostForkJoin` 的 durable join drain 使用 `runtime.Clock.UtcNow()`）。业务代码不得持有裸 `DateTimeOffset` 手写「现在是否超时」。
+业务代码（Domain / Application / Session 层）严禁依赖隐式全局时间原语。凡需要获取当前时刻或安排异步延迟的组件，必须通过显式注入的能力接口实现：获取当前时刻使用 `IClockPort.UtcNow()`，安排延时使用 `ITimerPort.Delay(milliseconds)`（返回强类型的 `IDeadlineHandle`）。
 
-**含义/动机**：typed deadline 把「有界」写进类型：无法从外部读出 `expiresAt` 再自行解释；所有判定必须经注入时钟的纯函数。这同时消灭溢出（`ofBudget` 对 `DateTimeOffset.MaxValue` 截断）与 JS timer Int32 上限问题（`nextWaitMs` 封顶 `MaxTimerWaitMs = 0x7FFFFFFF`，长预算分段等待）。
+## TIME-002: deadline 与 elapsed 有 typed 表达，不散落为裸时刻比较
 
-**边界**：具体超时预算数值（DevOps 10s、process hard limit）是消费方 HOW；`Deadline` 类型与函数是时间能力本身，归本包。`ProcessEstimate.effectiveDeadline`（`Process/ProcessRequest.fs`，min(3×estimate, HardLimit)）是 process-execution 对 deadline 的应用，不重复归本包。
+所有截止时间必须由强类型 `Deadline`（私有构造，仅能通过 `Deadline.ofBudget now budget` 创建）封装表达，并通过 `Deadline.remaining`、`Deadline.isExpired` 与 `Deadline.nextWaitMs` 等纯函数由注入时钟驱动消费。业务代码严禁持有裸 `DateTimeOffset` 进行手工超时比对，防止时间戳溢出与时区错位。
 
-**证据指针**：→ `HOW.md` TIME-002 行。
+## TIME-003: 时间可虚拟化；测试用虚拟实现替换物理时钟与 timer
 
----
+时间系统必须提供确定性的虚拟实现（`createVirtualTimerPort` 与 `createVirtualClockPort`）。虚拟定时器在调用 `Advance` 跨越截止点时精确触发回调，支持取消与清理；虚拟时钟支持从固定时间原点进行确定性的离散时间推进与设置，确保时序证明完全可重放且独立于物理墙钟。
 
-## TIME-003：时间可虚拟化；测试用虚拟实现替换物理时钟与 timer
+## TIME-004: Domain / Application / Session 禁止直接读 ambient 时间
 
-**规范陈述**：`Process/PtyTiming.fs` 必须提供虚拟实现：`createVirtualTimerPort()`（返回 `VirtualTimerPort { Port; Advance; NowMs }`）与 `createVirtualClockPort()`（返回 `VirtualClockPort { Port; AdvanceMs; Set }`）。虚拟 timer 的 `Advance` 只在越过 handle 的截止点时精确触发回调；`Cancel` 后零回调；`Dispose` 后清除全部 pending。虚拟时钟从固定起点（`2000-01-01T00:00:00Z`）开始，可 `AdvanceMs` / `Set`。
+`src/Wanxiangshu/` 下属于 Domain、Application 与 Session 层的源码文件中，严禁出现任何未经授权的全局时间符号（包括 `DateTimeOffset.UtcNow`、`DateTime.Now`、`Date.now`、`setTimeout`、`timerTask`），底层物理适配器层的例外必须通过静态门禁白名单进行显式声明。
 
-**含义/动机**：proof 必须确定、可重放、与墙钟无关（VERIFY-004「Temporal Tests Use Virtual Time」）。虚拟实现让测试在毫秒级精确推进时间，无需真实 sleep；race 以显式 trace 枚举，不靠调度器运气。
+## TIME-005: 时间值本身不是 authority；只有消费它的领域规则 + 注入时钟决定意义
 
-**边界**：虚拟实现的**测试适配**（`requirements/verification-system/tests/support/domain/host.mjs` 的 `timerPort` / `clockPort` facade）属于 test support，不归本包；虚拟实现的**生产类型**（`PtyTiming.fs`）是本包证据。`PtyTiming.timerTask`（无取消面的 fire-and-forget 延时）是物理适配器内部机制，归 HOW。
+时刻值与截止时间本身不具备业务裁决权。相同的截止时间由不同的领域规则消费时将产生不同的业务决策；判定必须由「领域规则 + 显式注入的时钟」共同计算得出，严禁使时间值自身成为独立驱动状态转移的权威。
 
-**证据指针**：→ `HOW.md` TIME-003 行。
+## TIME-006: deadline 是 causal-wait 的可选 escape
 
----
+截止时间作为因果等待（`causal-wait`）的可选终止逃逸路径（`WaitEscape.DeadlineAt`）存在。本包独立提供强类型时刻能力，供因果等待机制在需要有界超时时进行消费，两者之间不存在双向硬依赖。
 
-## TIME-004：Domain / Application / Session 禁止直接读 ambient 时间
+## TIME-007: HOST-013 的 SessionStartedAt 绑定首次 prompt，一次采样形成新 marker 的 elapsed
 
-**规范陈述**：`src/Wanxiangshu/` 下 Domain / Application / Session 三层的 `.fs` 文件不得出现 raw time token：`DateTimeOffset.UtcNow`、`DateTime.Now`、`DateTime.UtcNow`、`Date.now`、`setTimeout`、`timerTask`（物理适配器例外由静态扫描的 allowlist 显式声明）。
-
-**含义/动机**：这是 TIME-001 的可执行版本。静态扫描比 code review 可靠：即使程序员想「这次偷偷读一下墙钟」，gate 会红（`scripts/checks/g4r-ce-vocabulary.mjs` 的 `RAW_TIME_SCAN_LAYERS = ['Domain','Application','Session']` + `RAW_TIME_TOKENS`）。
-
-**边界**：该静态扫描**机制**归 `structured-workflow`（`g4r-ce-vocabulary` gate 的 CE vocabulary 扫描）与 `verification-system`（可红门禁）；本包只拥有「业务层不读 ambient 时间」这条产品事实，并消费该 gate 作为 enforcement。`HOST-013` 的 `SessionStartedAt` 经 `IClockPort` 计量不碰 ambient `UtcNow` 是本条在 Host 场景的实例。
-
-**证据指针**：→ `HOW.md` TIME-004 行。
-
----
-
-## TIME-005：时间值本身不是 authority；只有消费它的领域规则 + 注入时钟决定意义
-
-**规范陈述**：一个时刻值/一个 deadline 值不携带业务意义。同样的值，由不同规则消费得到不同判断；判定必须由「领域规则 + 注入时钟」共同给出，不由值自身、更不由 ambient 时钟给出。`Deadline` 的私有构造保证业务代码无法脱离规则函数单独解释该值。
-
-**含义/动机**：G4R 原则「Time is input, never authority」：race 是代数不是调度器彩票——`fold(A;B) == fold(B;A)`。若时间值自身有 authority，同一个 deadline 在不同时钟/不同规则下会「自己决定」结果，proof 与 replay 同时失效。把时间当输入（input）而非权威（authority），是全部 temporal proof 的基石。
-
-**边界**：具体业务规则（如「超过 10s 结束 join 等待」）归消费方（`process-execution` / `delegation`）；「值不等于判断」这条元规则归本包。`requirements/verification-system/tests/support/temporal-harness.mjs` 的「One World / Pure Time」是这条原则的 proof 侧证据（REUSE）。
-
-**证据指针**：→ `HOW.md` TIME-005 行。
-
----
-
-## TIME-006：deadline 是 causal-wait 的可选 escape（消费关系，非依赖）
-
-**规范陈述**：`causal-wait` 的 `WaitEscape.DeadlineAt of DateTimeOffset`（`src/Wanxiangshu/Kernel/CausalWait.fs`）引用本包提供的 typed 时刻能力作为等待的显式终止路径之一。本包**不**依赖 `causal-wait`：deadline 能力独立成立；`causal-wait` 需要 deadline 时才消费本包（Phase E 已审计：`time-capability → causal-wait` 条件依赖不是 hard edge）。
-
-**含义/动机**：deadline 是「如果 producer 永远不满足，谁负责结束这个等待」（CCE-005）的合法答案之一。把 deadline 表达为 typed escape，等待的诊断可显示「deadline in Ns」而业务无需解释该值。
-
-**边界**：`WaitEscape` 类型与等待语义归 `causal-wait`；本包只提供被引用的时刻值来源（`Deadline`/`IClockPort`）。
-
-**证据指针**：→ `HOW.md` TIME-006 行。
-
----
-
-## TIME-007：HOST-013 的 SessionStartedAt 绑定首次 prompt，一次采样形成新 marker 的 elapsed
-
-**规范陈述**：每个 provider-facing session 的 `SessionStartedAt` 定义为该 session **首次 prompt 开始 materialize/发送**时由显式注入 `IClockPort.UtcNow()` 取得的时刻；只能 bind once。HOST-013 每个新 pair occurrence 再从同一注入时钟采样一次 `now`，计算 `max(0, now - SessionStartedAt)` 并渲染为 human-readable elapsed fragment；该 fragment 随当次最终 `MarkerText` 一起 durable 冻结，历史 occurrence 不重算。restart 后从 bounded session projection O(1) 读取 `SessionStartedAt`，不得扫描 transcript/XTrace/log，也不得用 runtime/plugin start time、Host physical session create time或“首次 marker 时间”替代。
-
-**含义/动机**：elapsed 描述“这次 session 从第一次实际 prompt 开始已经存在多久”，而不是进程活了多久。首次 prompt 就是 session 对 provider 的出生边界；bind-once 使 restart/replay 保持同一时间原点，新 marker 的 fresh sample 又保留真实经过时间。
-
-**边界**：elapsed 文案及与 tip/estimate/guideline 的 occurrence composition → `guidance-delivery` GD-012；历史 MarkerText byte freeze → `prefix-stability` PREFIX-STABILITY-011；本包只拥有时间原点与采样规则。elapsed 不是 authority，不触发 abort、deadline、fallback 或任何执行分支（TIME-005）。
-
-**证据指针**：→ `HOW.md` TIME-007 行。
-
----
-
-## 反向覆盖（源 Clause → 本包命题）
-
-| 源 Clause（COVERAGE.md 归属） | 落点 |
-|---|---|
-| EXEC-011 deadline 有界（时间部分） | TIME-002 / TIME-003 |
-| EXEC-025 / EXEC-004 DevOps 10s → DeadlineExpired（机制部分；10s 数值=HOW） | TIME-002 |
-| HOST-013 `SessionStartedAt` 经 `IClockPort`、禁 ambient `UtcNow` | TIME-004 / TIME-007 |
-| `reconciler-event-driven-de-polling.md` C 类 deadline 允许墙钟但须注入 | TIME-001 / TIME-003 |
-| G4R「Time is input, never authority」 | TIME-005 |
-| `causal-wait` 的 `DeadlineAt` escape | TIME-006 |
-| `g4r-ce-vocabulary` RAW_TIME 扫描（机制归 structured-workflow） | TIME-004（消费） |
-| `loop.md` / `orchestrator.md` | 无本包内容（loop 的 `LoopKillArmed` 进程内事实归 degeneration-guard；orchestrator 无时间条款）→ 弃权记录见 `HOW.md` |
+每个面向 Provider 的 Session 的起始时刻 `SessionStartedAt`，严格定义为该 Session 首次开始构建或发送 prompt 时，由显式注入的 `IClockPort.UtcNow()` 采样获得的时刻，并执行持久化单次绑定（bind-once）。后续每次新 occurrence 再从同一时钟采样当前时间计算经过时长并生成人类可读片段，随当前 MarkerText 固化持久化，严禁在重试或重启时重置时间原点。

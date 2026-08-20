@@ -1,148 +1,41 @@
-# WHAT —— durable-convergence（唯一 normative 合同）
+# durable-convergence — WHAT
 
-条款前缀 `DURABLE-CONVERGENCE-`。每条的落点测试见 `HOW.md`。
-来源：历史 change（storage）（§5.3、§10、§11–§19、§38、§42、§48）、
-历史 what/casebook（CASE-011）、历史 COVERAGE persist 小节
-（PERSIST-003 split）。
+## DURABLE-CONVERGENCE-001: merge 等于 set union 且永不丢事实
 
-## DURABLE-CONVERGENCE-001 —— merge = set union，永不丢事实
+副本之间的事件合并必须严格等价于 append-only 的集合并集与基于 `event_id` 的幂等去重。两个不同 `event_id` 的事件永远都必须完整进入合并后的历史（即便它们在业务领域上存在互斥关系）。存储层绝对禁止使用物理时间戳或版本号裁决所谓“赢家”而导致任何持久化事实丢失。
 
-**规范陈述**：replica merge 是 append-only set union + identity dedupe：按 EventId 去重，
-两个不同 EventId 永远都进入 merged history（即使 DomainConflict 亦保留全部 facts）。
-禁止 Store 用 wall_clock/revision 裁决而让任一 durable fact 消失。
+## DURABLE-CONVERGENCE-002: k-way merge 是统一 primitive
 
-**含义/动机**：Persist 负责不丢事实；Domain 负责解释事实是否相容。丢分支是数据丢失，
-不是策略。
-**边界**：同 EventId 异 bytes 的 identity-collision 裁决（fail closed）归
-`durable-events`（003）；本命题只钉「不同 EventId 永不因冲突丢失」。
-**证据**：→ HOW.md 001。
+多流合并原语 `KWayMerge(writerStreams[])` 必须满足结合律、交换律、幂等性与确定性。同一组有序写者流无论以何种枚举顺序输入、由哪个进程或在哪台机器上执行，都必须产生完全相同的规范事件序列。
 
-## DURABLE-CONVERGENCE-002 —— k-way merge 是统一 primitive
+## DURABLE-CONVERGENCE-003: 生产 writer-stream k-way merge 等价于 union oracle
 
-**规范陈述**：`KWayMerge(writerStreams[])` 满足 associative / commutative / idempotent /
-deterministic：`merge(A, merge(B,C)) = merge(merge(A,B), C)`、`merge(A,B) = merge(B,A)`、
-`merge(A,A) = A`、同一组有序 writer streams 无论枚举顺序/由哪个 process/哪台 machine 执行都产生
-相同 canonical event order。输入可来自当前 process、其它本地 process、remote snapshot、recovery。
+生产环境的合并算法必须与全量集合并集的理论规范等价。本地每个写者文件与远端每个写者 blob 均作为完整的有序输入流，通过 k-way merge 进行流式归并，禁止引入分段切片、临时索引树或复杂的增量对象协议。
 
-**含义/动机**：统一 primitive 是并发模型的地基——boot/recovery 和 remote sync 共用同一个 k-way
-ordering/identity primitive；ordinary local append 只延长自己的单 writer file，不需要先全局 merge。
-**边界**：writer file / blob 的物理映射见 003 与 `durable-events` 005/011/018。
-**证据**：→ HOW.md 002。
+## DURABLE-CONVERGENCE-004: 合法并发 fork 表达为 DomainConflict 而非 StorageInvalid
 
-## DURABLE-CONVERGENCE-003 —— 生产 writer-stream k-way merge ≡ union oracle
+同一业务流基于相同父事件并发追加所产生的合法分叉，属于物理层并发的正常现象。底层必须完整保留全部竞争分支的头部（Heads），并在业务投影中显式表达为确定的 `DomainConflict` 冲突状态，严禁将其升级判定为底层的 `StorageInvalid` 致命损坏。
 
-**规范陈述**：生产 merge 必须与 set-union spec oracle 等价：本地每个
-`.git/wanxiang/events/<WriterId>.ndjson` 与远端每个 WriterId blob 都是一个完整有序流；读取这些流执行
-k-way merge + EventId identity dedupe，结果必须等价于 `union(all events)`。不得引入 segment/chunk、
-EventId→blob index、Git structural merge 或 delta protocol。
+## DURABLE-CONVERGENCE-005: resolution event 以全部 heads 为 parents 才收敛
 
-**含义/动机**：一个 process 一个完整文件让单机多进程与多机完全同构；生产算法只处理 k 个顺序流，
-而不是 Git tree 的物理偶然结构。
-**边界**：same EventId 异 canonical bytes → identity collision；业务含义只由 canonical Integrator 解释。
-**证据**：→ HOW.md 003。
+业务解决冲突的裁决事件必须显式将所有竞争的 Heads 全部声明为其父事件（`parents`）。只有当裁决事件及其包含的全部竞争父事件均已完成折叠时，业务投影方可离开 `DomainConflict` 状态并收敛为唯一的权威状态。
 
-## DURABLE-CONVERGENCE-004 —— 合法并发 fork → DomainConflict，非 StorageInvalid
+## DURABLE-CONVERGENCE-006: 禁止基于 wall-clock 或 revision 的 LWW
 
-**规范陈述**：同一 stream/业务键的合法并发 fork 是物理层正常产物（A、B 离线同见
-parent=P 各自 append A1/B1），必须被定义为 DomainConflict，由 projection 表达为
-deterministic conflict state。Storage 层永不因自然 fork 进入不可恢复；严禁把领域禁止
-的并发 fork 判为 StorageInvalid。history 保留全部 competing heads。
+合并层严禁使用物理时钟、自增版本号或写者到达先后顺序来丢弃事件。时钟或固定决胜规则仅允许作为业务投影层生成当前特定只读视图的纯展示逻辑，绝不允许改变或删除底层的持久化事件。
 
-**含义/动机**：append-only union 必然产生物理 fork；它与「全局不可恢复」正交。
-「forbidden fork」指业务不可接受态，由 projection 表达并经 resolution 收敛。
-**边界**：「不把 DomainConflict 升级为全局 corruption」的反向钉死见
-`durable-events` 008；本命题是正向表达律。
-**证据**：→ HOW.md 004。
+## DURABLE-CONVERGENCE-007: 相同 merged history 导出同一个 Integrator Current
 
-## DURABLE-CONVERGENCE-005 —— resolution event 以全部 heads 为 parents 才收敛
+收敛公式严格定义为 `Current = CanonicalIntegrator(KWayMerge(writerStreams))`，严禁在投影层直接进行状态对象的模糊合并。相同的事件历史输入，经由唯一的规范 Integrator 计算后必须得到完全相同的 `Current`。
 
-**规范陈述**：resolution event（`FooConflictResolved` / 领域具体 `*Resolved`）必须以
-**所有 competing heads 为 parents**（至少包含需裁决的 heads 集合），在 DAG 上显式声明
-「已知并裁决了这些并发分支」；仅当 resolution 及其全部 parents 已 fold，projection
-才离开 conflict state。
+## DURABLE-CONVERGENCE-008: durability activation ensure hooks 且用户 Git 进程独立触发双向 sync
 
-**含义/动机**：收敛不是遗忘：resolution 必须承认并覆盖它裁决的每个分支，否则未来重放
-无法重建「为什么离开 conflict」。
-**边界**：resolution 的领域语义（裁决了什么、为什么）归各 domain owner。
-**证据**：→ HOW.md 005。
+万象术不提供后台常驻同步器或自动上传服务。插件加载期不修改 Git 配置；仅在首次激活持久化能力时确保安装 `reference-transaction` 与 `pre-push` Hook。后续同步完全由用户自身的 Git 操作拉起独立 Hook 子进程执行，通过双向读取本地与远端写者流完成全量 k-way merge，直接原子替换本地写者集合并发布远端快照。
 
-## DURABLE-CONVERGENCE-006 —— 禁止 wall_clock/revision LWW
+## DURABLE-CONVERGENCE-009: dumb remote 无 domain 逻辑
 
-**规范陈述**：merge 不得使用 wall-clock、revision、timestamp 裁决 winner；收敛必须是
-event 集合的纯函数，与 replica 的到达顺序、append 时刻无关。revision/wall_clock/
-deterministic tie 最多只能作为 **projection 层**从完整历史派生当前视图的规则，不允许
-删除 loser event、不允许影响其它 domain。
+远程 Git 仓库严格作为通用、无感知的对象存储，仅提供标准的对象读写、引用推进与 CAS 门禁能力。严禁在服务端引入任何领域事件解释、服务端合并或自定义的万象术专有后端逻辑。
 
-**含义/动机**：时间戳不证明内容未变；revision 排序制造第二真相。LWW 的合法残余位置
-是 projection 规则（如 Casebook 从完整 history 派生 `CurrentCase(session)`），不是
-replication 规则。
-**边界**：Casebook 对象层面的禁 LWW 语义归 `knowledge-reuse`；本命题钉 general merge 律。
-**证据**：→ HOW.md 006。
+## DURABLE-CONVERGENCE-010: hook 热路径成本只随变化量增长
 
-## DURABLE-CONVERGENCE-007 —— 相同 merged history → 同一个 Integrator Current
-
-**规范陈述**：收敛公式是 `Current = CanonicalIntegrator(KWayMerge(writerStreams))`，不是
-`Merge(CurrentA, CurrentB)`，也不是各业务模块各自重扫历史。相同 writer histories 必须得到相同
-Current；唯一 Integrator 与注册规则由 `durable-events` 014/019 保证。
-
-**含义/动机**：Current 不是第二真相源；它只是唯一正规积分器对完整事实历史的最终积分状态。
-**边界**：业务 integration rule 的语义归各 domain owner。
-**证据**：→ HOW.md 007。
-
-## DURABLE-CONVERGENCE-008 —— durability activation ensure hooks；用户 Git 进程独立触发双向 sync
-
-**规范陈述**：Wanxiangshu 不提供 timer/background/event-count 同步器，也不从 OpenCode/Wanxiangshu 产品进程
-主动调用 fetch/pull/push。OpenCode 等待 plugin init 返回的 Load Phase 不得修改 Git；第一次真实 workspace 业务交互进入 durability activation 时才 ensure `reference-transaction` / `pre-push` hook 以及各已知
-remote 的 Wanxiang store fetch-refspec 正确安装；安装失败明确诊断，但不得反向让 plugin load 卡死。之后同步由
-**用户自己的 Git 进程启动的 hook 子进程**执行，即使 OpenCode/Wanxiangshu 已退出也必须可工作。hook shim
-不得固化安装时宿主的 `process.execPath`（OpenCode/Bun/其它 host binary 都不是 Node runtime）；它必须通过
-`/usr/bin/env node <package>/resources/git/wanxiang-hook.mjs` 调起随包 runner，由 package 的 Node `>=20` runtime 独立解释，
-且不得依赖 runner 文件本身具有 executable bit。随后读取 local writer
-files + remote writer blobs → k-way merge/validate → 直接替换本地同步后的 writer-file 集合 → 将每个完整 writer
-file 编码为一个 blob 并发布 remote snapshot。成功终态必须 local/remote 表示同一 event history；不得提供可成功的
-Store-only 单向 Download/Upload 模式。
-
-`reference-transaction` 消费用户 fetch/pull 已更新的 Wanxiang remote-tracking ref后，**仍执行完整双向收敛**：
-以该 observed remote root 为输入，local+remote k-way merge，替换本地 writer truth，并把统一后的 Wanxiang store ref 发布回
-remote；`pre-push` 也在用户 push 真正发送普通 refs 前执行同一完整双向收敛。两者差别只在 remote root 的发现方式，
-不是同步方向。hook 内部为完成该次用户操作而进行的 store-ref fetch/push 使用递归 guard，不构成产品进程主动同步。
-
-**含义/动机**：`Local={A,B}, Remote={A,C}` 成功后都是 `{A,B,C}`；`git push` 可能发生在 Wanxiangshu 完全未运行时，
-因此同步执行权必须属于已安装 hook，而不是某个 process-local EventStore/GitGateway object。
-**边界**：transport 物理故障（offline/auth/lease contention）可使 remote pending，但不得撤销已本地 committed facts。
-**证据**：→ HOW.md 008。
-
-## DURABLE-CONVERGENCE-009 —— dumb remote 无 domain 逻辑
-
-**规范陈述**：remote 是完全 dumb 的 Git remote：只提供 objects / refs / fetch / push /
-lease / CAS / authentication；不知道 Event / Projection / 任何 Wanxiang domain。
-同步智能全部在 client。禁止 server-side merge、pre-receive domain reducer、
-post-receive projection、Wanxiang-specific server API。
-
-**含义/动机**：普通 GitHub/GitLab/Gitea/bare repository 即可作为 Store remote；把领域
-逻辑塞进 server 等于再造一套领域运行时。
-**边界**：hook 安装/chain 的安全规则（不覆盖用户 hook）→ `Infrastructure/Git` 实现面
-（proof 见 `durable-events` 的 hook-dispatcher 测试）。
-**证据**：→ HOW.md 009。
-
-## DURABLE-CONVERGENCE-010 —— hook 热路径成本只随变化量增长
-
-**规范陈述**：成功完成一次完整同步后，client 可以保存不具备真相权威的 materialization cache：
-`physical file stat fingerprint → StoreSnapshot.RootOid`。fingerprint 必须覆盖同步 writer/payload 文件集合及
-每个文件足以检测普通写入/替换的 filesystem identity/stat；cache 缺失、损坏或 fingerprint 不同只能退回完整
-读取、canonical validation、materialization，绝不能把 cache 当 durable truth。
-
-当当前 physical fingerprint 命中 cache 且 remote root 与 cached root 相同，`WriterStreamSync` 必须直接复用
-cached snapshot：不得重读历史 body、不得逐 remote blob 解压/解码、不得重做 k-way merge。
-当 fingerprint 未命中但存在上次已验证 materialization manifest 时，近似相同的 local/remote 也必须按文件差异工作：
-同名文件只有在 cached stat identity 或 remote blob OID 与当前物理状态不能证明相同时才读取 body；unchanged payload
-不得因为另一个 writer append 而被重新读取/解压/写 blob。payload closure presence 检查只做 existence probe，不得为了
-回答“是否存在”读取 payload body。
-`reference-transaction` 的 observed root 已由用户 fetch/pull 确认为当前 remote；candidate root 相同则不得再发
-一次空 `git push`。`pre-push` 不得在 common path 先做 `ls-remote + fetch`：应以本地 remote-tracking store ref
-作为 optimistic lease expectation，直接尝试 CAS push；只有 lease rejection 才 discover/fetch remote 并完整重试。
-
-**含义/动机**：无变化 sync 的本地成本应接近 Git index stat scan，而不是 O(total durable bytes)；push/pull
-保留同一双向语义，但额外 work 只在真实 local/remote delta 或 CAS race 时发生。
-**边界**：cache 是 performance hint，删除它不改变结果；CAS/remote ref 才证明跨机器当前性。
-**证据**：→ HOW.md 010。
+同步机制允许使用无权威属性的物理状态指纹缓存。当物理文件指纹与远端头部均未发生变动时，Hook 直接复用既有快照，避免重复全量读取与解压 blob；增量变化时仅针对变动文件进行读写与验证，保证同步开销与实际数据增量成比例。

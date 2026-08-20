@@ -1,45 +1,35 @@
-# attention-regulation — WHAT（唯一 normative 合同）
+# attention-regulation — WHAT
 
-命题前缀 `ATTENTION-REGULATION-`。每条都是当前世界必须同时成立的事实；证据落点见 `HOW.md`。
+## ATTENTION-REGULATION-001: enough 是决策调查的主动吸收态
 
-## ATTENTION-REGULATION-001：`enough` 是 decision investigation 的主动吸收态
+`enough(decision)` 接受非空自然语言，表示 participant 判定当前已有信息已充分支撑该决策的下一步行动。调用成功后，系统明确要求停止为追求更多边缘证据而重复搜寻或重开同一判断。只有出现新的、此前未消费且足以改变决策路径的事实时，方可重新发起调查。
 
-`enough(decision)` 接受一段非空自然语言，表示 participant 已判断：当前已取得的信息足够支撑这个 decision 的下一步行动。成功 return 必须明确：停止继续为“更多证据本身”而搜寻或重开同一判断；只有能指出一个新的、尚未消费且足以改变 action 的事实时才有资格重新调查。
+`enough` 不证明决策正确性、不生成权威事实、不建立持久认知状态机，无新事实时的重复调用不产生语义增量。
 
-`enough` 不证明 decision 正确、不产生事实、不扩大 authority、不替代后续执行/验证，也不建立持久 epistemic state。没有新信息时重复调用同一个未变化 decision 不增加任何语义。
+## ATTENTION-REGULATION-002: abandon 是无约束 decommit，不是真实义务取消
 
-## ATTENTION-REGULATION-002：`abandon` 是无约束 decommit ceremony，不是真实义务取消
+`abandon(commitment)` 接受非空自然语言，表示 participant 主动放弃自我生成的计划、推论方向或心理假设，使其不再因前文历史而在后续推理中自动获得注意力。
 
-`abandon(commitment)` 接受一段非空自然语言，表示 participant 主动允许自己不再继续背负某条自我生成的计划、方向、承诺或心理债。成功 return 必须明确：这条内容不再因为“之前想过/说过/计划过”而自动获得未来注意力。
+`abandon` 属于纯粹的认知解脱动作，不要求审批或理由检验。`abandon` 严禁用于取消 `obligation-ledger` 中的真实任务义务、撤销用户授权、删除仓库工作产物或终止会话生命周期。
 
-Host 不要求 reason/evidence/approval，不验证其“是否值得放弃”，也不持久化心理状态。`abandon` 不得取消 `obligation-ledger` 中真实 obligation、撤销用户 authority、删除 repository work、终止 child/session 或改变任何外部事实；若存在真实 obligation，必须经其 owner 的正式动作处理。
+## ATTENTION-REGULATION-003: defer 表示延后处理，非当前欠账且非自动执行
 
-## ATTENTION-REGULATION-003：`defer` = not now ≠ never ≠ owed now
+`defer(new_work)` 接受非空自然语言，将新发现且非阻塞的工作登记为 DeferredWork，使其移出当前工作记忆，使 participant 得以立即聚焦当前主线。
 
-`defer(new_work)` 接受一段非空自然语言，把当前 participant 新发现、真实但非 blocking 的工作记录为 DeferredWork。成功意味着它已经离开 working memory 的“必须一直惦记”状态；participant 应立即回到当前主线。
+DeferredWork 既不是活动义务，也不是后台作业或授权。`defer` 不触发自动委派或后台执行，系统与参与者均不得将 DeferredWork 视为当前已欠付的任务债务。
 
-DeferredWork 不是 active obligation、todo、promise、background job 或 authority。`defer` 不执行它、不自动委派它、不改变当前 work frontier；调用方不得因为 DeferredWork 存在就宣称当前 mission 仍欠它。
+## ATTENTION-REGULATION-004: DeferredWork 按 participant life 隔离与重放
 
-## ATTENTION-REGULATION-004：DeferredWork 按 participant life 隔离并可重放
+每个被接受的 DeferredWork 具备内部稳定的 occurrence 标识，严格归属于特定的 participant life。在系统重启或重放时不得丢失、不得跨参与者泄漏，且同一 tool occurrence 重放不得产生重复条目。
 
-每个被接受的 DeferredWork 必须有内部稳定 occurrence identity，归属精确 participant life；restart/replay 后不得丢失、跨 participant 泄漏或因同一 tool occurrence 重放而产生第二条 deferred item。用户可见 schema 保持一个自然语言参数；内部 identity 不泄漏到 provider 形成状态管理负担。
+若 participant life 在触发 resurface 前终止，未处理的 DeferredWork 随生命周期自然结束，不得跨生命周期继承或自动转为 durable mission debt。
 
-若 participant life 在 celebrate resurfacing 前终止，尚未 resurfaced 的 DeferredWork 随该 life 退休：不转移给 replacement/child/同 persona 的另一个 execution，不阻塞 finality，也不升级为 durable mission debt。`defer` 本来就只承诺“这段 life 稍后提醒我”，不是“世界永远欠着这件事”。
+## ATTENTION-REGULATION-005: 仅在 celebrate 尾部统一 resurface 且不自动激活
 
-## ATTENTION-REGULATION-005：只有 `celebrate` 尾部统一 resurfacing，且 resurfacing 不自动激活
+`institutional-learning` 的一次成功 `celebrate` 在完成经验沉淀后，必须将该 participant 尚未消费的 DeferredWork 于结果尾部统一返回，并标记为已露出；同一 celebration occurrence 重放时保持结果幂等。
 
-`institutional-learning` 的一次成功 `celebrate` 在完成本次经验处理后，必须把该 participant 当前尚未 resurface 的 DeferredWork 放在 tool result 最后统一返回；同一批 item 随该 celebration occurrence 标记为已 resurfaced，replay 同一 celebration 只重放同一结果，不再次 drain 新批次。
+重新浮现的条目不自动转变为活动义务。模型可自主决定当场处理、再次 `defer`、写入 formal obligation 或执行 `abandon`。
 
-resurfaced item 仍不是 obligation。模型可以现在处理、再次 `defer`、显式写入正式 obligation，或 `abandon`；系统不得自动选任何一种。
+## ATTENTION-REGULATION-006: 不引入工作流引擎与状态机
 
-## ATTENTION-REGULATION-006：三个动作不形成 planner / workflow engine
-
-本包不得拥有 stage、priority、deadline、dependency graph、auto-resume、background executor、confidence score 或 generic cognitive state machine。允许的持久状态只有 DeferredWork 的最小 append/projection 与 celebrate resurfacing receipt；`enough` / `abandon` 保持近乎纯 return reinforcement。
-
-## 边界
-
-- Pair Hint 如何提示这些动作 → `cognitive-environment`。
-- tool description 的五问合同 → `action-affordance`。
-- tool schema/runtime 可见性与 office gate → `capability-enforcement`。
-- `celebrate` 的学习/Enhancer 语义 → `institutional-learning`。
-- mission 当前真正欠什么 → `obligation-ledger`。
+本包严禁引入阶段流转（stage）、优先级（priority）、截止期（deadline）、依赖图谱（dependency graph）、自动恢复（auto-resume）、后台执行器或通用认知状态机。持久化状态仅限于 DeferredWork 的最小追加投影及 celebration 消费凭据。

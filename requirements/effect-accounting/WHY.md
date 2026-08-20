@@ -1,71 +1,23 @@
-# WHY —— effect-accounting
+# effect-accounting — WHY
 
-## 一句话
+## 1. 领域动机与核心矛盾
 
-**Requested ≠ Accepted，unknown outcome ≠ not happened，unknown outcome ≠ success。**
-外部效果（发 Prompt、建 worktree、publish、写 Todo checkpoint）的「请求了」「可能已经
-发生了」「系统确认发生了」是三个不同事实；压成一个 bool 会在中断窗口造成**重复
-effect** 或**虚假成功**。
+与纯内部事件不同，外部副作用（如发起网络 Prompt、创建 worktree、发布 Git 分支、写入持久化 Checkpoint 等）的执行结局由外部世界决定。若将副作用状态简化为一个布尔值或内存标识，系统在崩溃或中断窗口内会出现严重破坏：
+1. **重复副作用（Duplicate Effect）**：已持久化请求（Requested）但在物理确认（Accepted）前崩溃。若系统将其当成“未发生”直接重试，会导致两次重复调用或重复创建分支。
+2. **虚假成功（False Success）**：若系统跳过外部物理证据核对，直接将已发起的请求假设为已完成，会导致后续逻辑建立在未完成的副作用之上。
+3. **取消冒充终态（False Finality）**：将控制面的取消（aborted）错误地视作业务终态，导致恢复与 Fallback 流程走入错误分支。
 
-## 为什么必须独立存在
+`effect-accounting` 确立了通用的外部副作用记账公理：
+- **明确分型**：区分 Requested（已发起意图）与 Accepted/Created/Published（已物理确认）；
+- **先记账后行动**：意图持久化必须先于物理动作与权威内存更新；
+- **未知不等于未发生**：结果未知时必须先核对外部物理证据，禁止盲目重试。
 
-历史 why/what persist（PERSIST-009）反复确认同一个失败模式：
-**内存记账「好像做了」会在崩溃后无法按效果身份核对。**
+## 2. 核心不变量与破坏后果
 
-外部世界的 effect 与内部 event 有本质区别：event 一旦 append 就是事实；effect 是
-**对世界的一次请求**，它的结局由世界决定，可能在我们确认之前就发生了。因此：
+- **Requested ≠ Accepted**：严禁单字段表示副作用状态；若破坏，中断窗口内的状态恢复无法判定真实物理结局。
+- **物理证据优先于重试**：只有证明物理动作不存在且领域合同允许重试时方可重试；若破坏，盲目重发将制造不可逆的双重外部效应。
+- **Accepted 状态不可逆**：已确认的外部结果不可折回 Requested，重复确认必须幂等。
 
-- 崩溃窗口里，`Requested` 已 durable、`Accepted` 还没写 → 结局**未知**。此时绝不能
-  假装「未发生」重发（重复 effect），也不能假装「成功」（虚假成功）。
-- 只有**先核对物理效果身份**（worktree 存在吗？ref 前进了吗？provider 收到了吗？），
-  证明效果不存在、且该效果的合同允许幂等重试，才能重试。
+## DEPENDS ON
 
-这个失败 meaning 与「event 怎么存」无关——`durable-events` 只保证 append 的机械面；
-「未知结局意味着什么、什么时候能重试」是独立的语义，跨 Prompt、Git publish、worktree、
-repository transaction、Todo checkpoint 共享。
-
-## 三个不可退让的支柱
-
-1. **分型。** 每个外部效果有两类 typed durable fact：Request/Claim（意图）与
-   Accepted/Created/Published（已确认）。没有「一个 status 字段」——0.5.1 的通用
-   `DurableEffectRequested/Accepted` union 已被 typed facts 取代（拒绝 decode）。
-2. **先记账后行动。** durable intent 先于权威内存状态更新，也先于物理 effect：
-   `WorktreeCreateRequested` 先于 `git worktree add`，`TodoWritePrepared` 先于 provider
-   调用。崩溃后重放只能看到「已经请求过」。
-3. **Accepted 不可逆。** Accepted/Created/Published 不折回 Requested；重复 acceptance
-   幂等。错误事实用新事实纠正，不 rewrite 旧事实（`durable-events` append-only 的自然
-   推论，这里是它在 effect 层的语义）。
-
-## 失败模式（RED 长什么样）
-
-- Requested-only 被当成「未发生」→ 盲重发 → **重复 effect**（两封 prompt、两个 worktree、
-  两次 publish）。
-- Requested-only 被当成「成功」→ 崩溃后恢复跳过核对 → **虚假成功**。
-- Accepted 被折回 Requested（重放 retry 重写旧事实）→ 已完成的 effect 被撤销。
-- aborted 被当成 agent 终态 → 恢复/fallback 走错分支（EXEC-020 的 false finality）。
-- 写盘失败后假装 committed → 内存看见无证据的未来。
-- 先执行后记账 → 崩溃窗口里 effect 发生了但系统不知道，无法 reconcile。
-
-## 被拒方案（考古）
-
-| 方案 | 为什么拒 |
-|---|---|
-| 内存「好像做了」记账 | 崩溃后无法按效果身份核对（PERSIST-009 拒绝面） |
-| 通用 `DurableEffectRequested/Accepted` union | 一个通用 DU 无法区分效果类型与各自的 reconcile 规则；0.5.1 已弃，decode 拒绝（FactCodec pre050 marker） |
-| unknown 一律自动重试 | 未知 ≠ 未发生；未核对物理证据的重试是重复 effect 的配方（PERSIST-009） |
-| ABORTED 当 agent 终态 | 取消是控制面不是业务结果；把 abort 洗成终态让恢复/fallback 走错分支（EXEC-020/021/022） |
-| CommitUnknown 永久无法确定 | 提交结局由 canonical root 判定（`durable-events` 006）；本包承接「未知后的政策」 |
-| Prompt 盲重发 | at-most-one：按 PromptKey 检索；policy 归 `dispatch-protocol`，本包钉「先证后重试」律 |
-
-## 与相邻包的边界（谁不归我）
-
-- **`durable-events`**：event 的 append/CAS/commit witness。本包消费它，但「怎么写盘」
-  不归本包。
-- **`dispatch-protocol`**：Prompt 的 PromptKey、claim lifecycle、no-blind-resend policy。
-  本包拥有通用的 Requested/Accepted 分型律；Prompt 特有政策归 dispatch。
-- **`change-integration`**：Git publish/worktree/repository transaction 的编排。
-  本包拥有其中的 effect 记账律（PublishClaimed 三分支、Worktree Requested/Created）。
-- **`crash-reconciliation`**：进程中断后如何从 durable facts + 物理观察重入普通程序
-  （P0 §十 recovery 侧）；本包拥有其中的 aborted≠terminal / false-finality 半边。
-- **`obligation-ledger`**：Todo checkpoint 的义务语义；本包拥有
-  `TodoWritePrepared → TodoWriteAccepted` 的 effect 身份律。
+- `durable-events`
