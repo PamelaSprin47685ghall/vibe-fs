@@ -66,11 +66,14 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-009] Host convergence performs ring tak
   assert.ok(physicalEndAt >= 0, 'physical execution terminal callback must exist')
   const physicalEndBlock = bootstrap.slice(physicalEndAt, bootstrap.indexOf('let! subscriptionResult', physicalEndAt))
   assert.match(physicalEndBlock, /reconciler\.NotifyProjectionChanged\(sessionId, physicalUserMessageId\)/)
-  assert.match(physicalEndBlock, /reconciler\.TryPhysicalUserMessage\(sessionId\)/)
-  assert.match(physicalEndBlock, /FissionProjection\.tryMembershipOfLane/)
+  assert.match(physicalEndBlock, /FissionHost\.observePhysicalExecutionEnd/)
+  assert.doesNotMatch(physicalEndBlock, /FissionProjection\.tryMembershipOfLane|let isCurrentPhysical|let isFissionLane/)
+  assert.match(host, /let observePhysicalExecutionEnd/)
+  assert.match(host, /tryCurrentPhysical sessionId/)
+  assert.match(host, /FissionProjection\.tryMembershipOfLane/)
   assert.match(
-    physicalEndBlock,
-    /reconciler\.Kick\(sessionId, ReconcileProgram\.ReconcileWake\.RetryWake\)/,
+    host,
+    /if isCurrentPhysical && isFissionLane then[\s\S]{0,120}?kick sessionId/,
     'a successful exact Fission lane terminal must open a snapshot reconcile occasion even when OpenCode drops session.idle',
   )
 })

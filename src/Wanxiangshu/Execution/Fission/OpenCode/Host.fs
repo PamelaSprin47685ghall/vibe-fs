@@ -133,6 +133,32 @@ module FissionHostRequestProjection =
 /// old logical owner's SessionId/completion cell.
 module FissionHost =
 
+    /// INTRA-PARTICIPANT-PARALLELISM-009: an exact physical terminal is only
+    /// a reconciliation occasion for the durable Fission lane that still owns
+    /// that exact current physical material. The Host root supplies observation
+    /// and wake capabilities; Fission owns the membership/currentness decision.
+    let observePhysicalExecutionEnd
+        (tryCurrentPhysical: SessionId -> PhysicalUserMessageId option)
+        (durable: AgentJournal option)
+        (kick: SessionId -> unit)
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        =
+        let isCurrentPhysical =
+            tryCurrentPhysical sessionId
+            |> Option.exists ((=) physicalUserMessageId)
+
+        let isFissionLane =
+            durable
+            |> Option.exists (fun journal ->
+                FissionProjection.tryMembershipOfLane
+                    sessionId
+                    (AgentJournal.snapshot journal).AgentProjections.Fission
+                |> Option.isSome)
+
+        if isCurrentPhysical && isFissionLane then
+            kick sessionId
+
     let private appendFission durable owner providerRun fact =
         task {
             match! AgentJournal.appendAgent (StreamId.Session owner) providerRun fact durable with

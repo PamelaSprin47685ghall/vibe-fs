@@ -350,20 +350,12 @@ module HostSignalBootstrap =
                             // the projection edge above before Kick also preserves
                             // Scheduler's edge-epoch lost-wakeup protection if the
                             // SDK snapshot is briefly behind the event stream.
-                            let isCurrentPhysical =
-                                reconciler.TryPhysicalUserMessage(sessionId)
-                                |> Option.exists ((=) physicalUserMessageId)
-
-                            let isFissionLane =
+                            FissionHost.observePhysicalExecutionEnd
+                                reconciler.TryPhysicalUserMessage
                                 journal
-                                |> Option.exists (fun durable ->
-                                    FissionProjection.tryMembershipOfLane
-                                        sessionId
-                                        (AgentJournal.snapshot durable).AgentProjections.Fission
-                                    |> Option.isSome)
-
-                            if isCurrentPhysical && isFissionLane then
-                                reconciler.Kick(sessionId, ReconcileProgram.ReconcileWake.RetryWake))
+                                (fun sid -> reconciler.Kick(sid, ReconcileProgram.ReconcileWake.RetryWake))
+                                sessionId
+                                physicalUserMessageId)
                 )
 
             let! subscriptionResult = HostSignalSubscribe.trySubscribe input signalRouter.Observe None
