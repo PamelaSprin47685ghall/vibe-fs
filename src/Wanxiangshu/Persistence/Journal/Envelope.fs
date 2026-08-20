@@ -6,12 +6,23 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Thoth.Json
+open Wanxiangshu.Change
+open Wanxiangshu.Context.Companion
+open Wanxiangshu.Enforcer.InstitutionalLearning
+open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
     | Workspace
@@ -138,6 +149,108 @@ module Envelope =
     let private providerRunDecoder: Decoder<ProviderRunIdentity option> =
         Decode.option (Decode.string |> Decode.map ProviderRunIdentity.create)
 
+    let private taggedStringDecoder expected create : Decoder<'a> =
+        Decode.index 0 Decode.string
+        |> Decode.andThen (fun actual ->
+            if actual = expected then
+                Decode.index 1 Decode.string |> Decode.map create
+            else
+                Decode.fail (sprintf "expected %s, got %s" expected actual))
+
+    let private sessionIdDecoder = taggedStringDecoder "SessionId" SessionId.create
+    let private blobRefDecoder = taggedStringDecoder "BlobRef" BlobRef.create
+    let private blobDigestDecoder = taggedStringDecoder "BlobDigest" BlobDigest.create
+
+    let private providerRunIdentityDecoder =
+        taggedStringDecoder "ProviderRunIdentity" ProviderRunIdentity.create
+
+    let private toolCallIdDecoder = taggedStringDecoder "ToolCallId" ToolCallId.create
+    let private hostToolPartIdDecoder = taggedStringDecoder "HostToolPartId" HostToolPartId.create
+
+    let private xTracePartAppendedPayloadDecoder =
+        Decode.object (fun get ->
+            {| SessionId = get.Required.Field "SessionId" sessionIdDecoder
+               CursorSequence = get.Required.Field "CursorSequence" Decode.int64
+               Role = get.Required.Field "Role" Decode.string
+               Turn = get.Required.Field "Turn" Decode.int
+               PartIndex = get.Required.Field "PartIndex" Decode.int
+               Kind = get.Required.Field "Kind" Decode.string
+               ToolName = get.Optional.Field "ToolName" Decode.string
+               TextRef = get.Required.Field "TextRef" blobRefDecoder
+               TextDigest = get.Required.Field "TextDigest" blobDigestDecoder
+               Provenance = get.Required.Field "Provenance" Decode.string
+               ProviderRun = get.Optional.Field "ProviderRun" providerRunIdentityDecoder
+               ToolCallId = get.Optional.Field "ToolCallId" toolCallIdDecoder
+               HostToolPartId = get.Optional.Field "HostToolPartId" hostToolPartIdDecoder |})
+
+    let private xTracePartAppendedDecoder: Decoder<CompanionFactCases> =
+        Decode.index 1 xTracePartAppendedPayloadDecoder
+        |> Decode.map CompanionFactCases.XTracePartAppended
+
+    let private runtimeFactDecoder = Decode.Auto.generateDecoderCached<RuntimeFact>(extra = extra)
+    let private promptFactDecoder = Decode.Auto.generateDecoderCached<PromptFactCases>(extra = extra)
+    let private fallbackFactDecoder = Decode.Auto.generateDecoderCached<FallbackFactCases>(extra = extra)
+    let private reviewFactDecoder = Decode.Auto.generateDecoderCached<ReviewFactCases>(extra = extra)
+    let private executionFactDecoder = Decode.Auto.generateDecoderCached<ExecutionFactCases>(extra = extra)
+    let private orchestratorFactDecoder = Decode.Auto.generateDecoderCached<OrchestratorFactCases>(extra = extra)
+
+    let private genericCompanionFactDecoder =
+        Decode.Auto.generateDecoderCached<CompanionFactCases>(extra = extra)
+
+    let private companionFactDecoder: Decoder<CompanionFactCases> =
+        Decode.index 0 Decode.string
+        |> Decode.andThen (function
+            | "XTracePartAppended" -> xTracePartAppendedDecoder
+            | _ -> genericCompanionFactDecoder)
+
+    let private contextFactDecoder = Decode.Auto.generateDecoderCached<ContextFactCases>(extra = extra)
+    let private hostFactDecoder = Decode.Auto.generateDecoderCached<HostFactCases>(extra = extra)
+    let private fissionFactDecoder = Decode.Auto.generateDecoderCached<FissionFactCases>(extra = extra)
+    let private delegationFactDecoder = Decode.Auto.generateDecoderCached<DelegationFactCases>(extra = extra)
+    let private attentionFactDecoder = Decode.Auto.generateDecoderCached<AttentionFactCases>(extra = extra)
+    let private concernFactDecoder = Decode.Auto.generateDecoderCached<ConcernFactCases>(extra = extra)
+
+    let private institutionalLearningFactDecoder =
+        Decode.Auto.generateDecoderCached<InstitutionalLearningFactCases>(extra = extra)
+
+    let private managerLifecycleFactDecoder =
+        Decode.Auto.generateDecoderCached<ManagerLifecycleFact>(extra = extra)
+
+    let private familyCase decoder wrap =
+        Decode.index 1 decoder |> Decode.map wrap
+
+    let private agentFactDecoder: Decoder<AgentFact> =
+        Decode.index 0 Decode.string
+        |> Decode.andThen (function
+            | "Prompt" -> familyCase promptFactDecoder AgentFact.Prompt
+            | "Fallback" -> familyCase fallbackFactDecoder AgentFact.Fallback
+            | "Review" -> familyCase reviewFactDecoder AgentFact.Review
+            | "Execution" -> familyCase executionFactDecoder AgentFact.Execution
+            | "Orchestrator" -> familyCase orchestratorFactDecoder AgentFact.Orchestrator
+            | "Companion" -> familyCase companionFactDecoder AgentFact.Companion
+            | "Context" -> familyCase contextFactDecoder AgentFact.Context
+            | "Host" -> familyCase hostFactDecoder AgentFact.Host
+            | "Fission" -> familyCase fissionFactDecoder AgentFact.Fission
+            | "Delegation" -> familyCase delegationFactDecoder AgentFact.Delegation
+            | "Attention" -> familyCase attentionFactDecoder AgentFact.Attention
+            | "Concern" -> familyCase concernFactDecoder AgentFact.Concern
+            | "InstitutionalLearning" ->
+                familyCase institutionalLearningFactDecoder AgentFact.InstitutionalLearning
+            | name -> Decode.fail ("Cannot find AgentFact case " + name))
+
+    let private factDecoder: Decoder<Fact> =
+        Decode.index 0 Decode.string
+        |> Decode.andThen (function
+            | "Runtime" -> Decode.index 1 runtimeFactDecoder |> Decode.map Fact.Runtime
+            | "Agent" -> Decode.index 1 agentFactDecoder |> Decode.map Fact.Agent
+            | "ManagerLifecycle" ->
+                Decode.index 1 managerLifecycleFactDecoder |> Decode.map Fact.ManagerLifecycle
+            | "MagicTodo" -> Decode.fail "MagicTodo uses its canonical custom envelope decoder"
+            | name -> Decode.fail ("Cannot find Fact case " + name))
+
+    let private decodeExtra =
+        Extra.withCustom (fun (_: Fact) -> Encode.nil) factDecoder extra
+
     let private magicTodoEnvelopeDecoder: Decoder<Envelope> =
         Decode.object (fun get ->
             let canonical =
@@ -157,7 +270,7 @@ module Envelope =
             | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
 
     let private currentEnvelopeDecoder: Decoder<Envelope> =
-        Decode.Auto.generateDecoderCached<Envelope>(extra = extra)
+        Decode.Auto.generateDecoderCached<Envelope>(extra = decodeExtra)
 
     let private decodeMagicTodoEnvelope decoder json =
         match Decode.fromString decoder json with

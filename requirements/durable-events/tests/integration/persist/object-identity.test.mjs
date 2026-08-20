@@ -56,6 +56,39 @@ test('WHAT[DURABLE-EVENTS-003] canonical_event_bytes_decode_to_the_same_plain_ev
   })
 })
 
+test('WHAT[DURABLE-EVENTS-003] decode_rejects_noncanonical_key_and_set_order_without_reencoding_the_event', async () => {
+  const base = {
+    event_id: 'e'.repeat(40),
+    event_type: 'JobRequested',
+    parents: [],
+    payload: { a: 1, b: 2 },
+    payload_refs: [],
+    stream_id: 'identity/proof',
+  }
+
+  const wrongTopLevelOrder = `${JSON.stringify({ stream_id: base.stream_id, ...base })}\n`
+  const wrongPayloadOrder = `${JSON.stringify({ ...base, payload: { b: 2, a: 1 } })}\n`
+  const wrongParentOrder = `${JSON.stringify({ ...base, parents: ['b'.repeat(40), 'a'.repeat(40)] })}\n`
+  const duplicateRefs = `${JSON.stringify({ ...base, payload_refs: ['ref-a', 'ref-a'] })}\n`
+
+  for (const text of [wrongTopLevelOrder, wrongPayloadOrder, wrongParentOrder, duplicateRefs]) {
+    const decoded = codec.decode(text)
+    assert.equal(decoded.ok, false, text)
+    assert.equal(decoded.error.code, 'NonCanonical')
+  }
+
+  const { readFile } = await import('node:fs/promises')
+  const source = await readFile(
+    new URL('../../../../../src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs', import.meta.url),
+    'utf8',
+  )
+  assert.doesNotMatch(
+    source,
+    /let private ensureCanonical[\s\S]{0,350}encode\s+normalized/,
+    'decode must validate parsed canonical shape directly instead of allocating a second normalized event encoding',
+  )
+})
+
 test('WHAT[DURABLE-EVENTS-003] merge_by_identity_dedupes_equal_bytes_and_rejects_collisions', () => {
   const same = codec.mergeByIdentity([event(), event()])
   assert.equal(same.ok, true)

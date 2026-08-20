@@ -92,6 +92,32 @@ test('WHAT[DURABLE-EVENTS-020] parsed Journal payload replay does not stringify 
   )
   assert.match(envelope, /FactCodec\.legacyDecodeErrorForValue\s+value/)
   assert.match(factCodec, /let\s+legacyDecodeErrorForValue/)
+  assert.doesNotMatch(factCodec, /const stack = \[root\]/,
+    'legacy checks must inspect the Fact DU boundary, not traverse arbitrary large payload material')
+})
+
+test('WHAT[DURABLE-EVENTS-020] Journal replay precompiles outer fact-family dispatch instead of reflecting nested unions per event', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
+
+  assert.match(envelope, /let\s+private\s+agentFactDecoder/)
+  assert.match(envelope, /"Prompt"[\s\S]{0,200}AgentFact\.Prompt/)
+  assert.match(envelope, /"Host"[\s\S]{0,200}AgentFact\.Host/)
+  assert.match(envelope, /Extra\.withCustom[\s\S]{0,120}factDecoder/)
+  assert.match(envelope, /generateDecoderCached<Envelope>\(extra\s*=\s*decodeExtra\)/)
+  assert.doesNotMatch(envelope, /generateDecoderCached<Envelope>\(extra\s*=\s*extra\)/,
+    'Envelope Auto decoding may preserve the wire representation, but Fact must use the precompiled custom decoder')
+})
+
+test('WHAT[DURABLE-EVENTS-020] dominant XTracePartAppended history case has a direct decoder with compatibility fallback', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const envelope = await readFile(new URL('../../../src/Wanxiangshu/Persistence/Journal/Envelope.fs', import.meta.url), 'utf8')
+
+  assert.match(envelope, /let\s+private\s+xTracePartAppendedDecoder/)
+  assert.match(envelope, /let\s+private\s+xTracePartAppendedDecoder[\s\S]{0,1400}CompanionFactCases\.XTracePartAppended/)
+  assert.match(envelope, /"XTracePartAppended"\s*->\s*xTracePartAppendedDecoder/)
+  assert.match(envelope, /genericCompanionFactDecoder/,
+    'non-dominant Companion cases must keep the existing generic decoder as the compatibility fallback')
 })
 
 test('WHAT[DURABLE-EVENTS-013] boot_and_live_use_one_CanonicalIntegrator_program', async () => {

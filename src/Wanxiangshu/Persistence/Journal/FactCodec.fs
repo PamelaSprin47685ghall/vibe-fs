@@ -84,37 +84,37 @@ module FactCodec =
 
     [<Emit("""
     (function (root, pre050) {
-      const stack = [root];
-      while (stack.length !== 0) {
-        const value = stack.pop();
-        if (typeof value === 'string') {
-          if (pre050.has(value)) return 1;
-          continue;
-        }
-        if (value === null || typeof value !== 'object') continue;
+      if (!root || typeof root !== 'object') return 0;
+      const fact = root.Fact;
+      if (!Array.isArray(fact)) return 0;
 
-        if (Array.isArray(value)) {
-          for (let i = 0; i < value.length; i += 1) {
-            const item = value[i];
-            if (typeof item === 'string') {
-              if (pre050.has(item)) return 1;
-              if (item === 'BlogObservationCommitted' || item === 'BlogEntryCommitted') {
-                const payload = value[i + 1];
-                if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-                  if (Object.prototype.hasOwnProperty.call(payload, 'ScoreVectorRef')
-                      || !Object.prototype.hasOwnProperty.call(payload, 'TipRuleId')) return 2;
-                }
-              }
-            }
-            stack.push(item);
-          }
-          continue;
-        }
+      const legacyTag = (value) => typeof value === 'string' && pre050.has(value);
+      const outerTag = fact[0];
+      if (legacyTag(outerTag)) return 1;
 
-        for (const key of Object.keys(value)) {
-          if (pre050.has(key)) return 1;
-          stack.push(value[key]);
-        }
+      let leaf = fact[1];
+      if (outerTag === 'Agent' && Array.isArray(leaf)) {
+        if (legacyTag(leaf[0])) return 1;
+        leaf = leaf[1];
+      }
+
+      if (!Array.isArray(leaf)) return 0;
+      const caseName = leaf[0];
+      if (legacyTag(caseName)) return 1;
+
+      const payload = leaf[1];
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return 0;
+
+      // The pre-0.5 fallback counters/model ids were fields on the leaf payload.
+      // Case-name migration markers are handled above; never scan arbitrary body
+      // strings such as grounding snapshots or recorded source text.
+      for (const key of Object.keys(payload)) {
+        if (pre050.has(key)) return 1;
+      }
+
+      if (caseName === 'BlogObservationCommitted' || caseName === 'BlogEntryCommitted') {
+        if (Object.prototype.hasOwnProperty.call(payload, 'ScoreVectorRef')
+            || !Object.prototype.hasOwnProperty.call(payload, 'TipRuleId')) return 2;
       }
       return 0;
     })($0, $1)

@@ -23,6 +23,7 @@ module ForkToolSurface =
         let children = ResizeArray<OpenCodeChildInfo>()
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
+        let promptWaiters = Dictionary<string, ResizeArray<int * TaskCompletionSource<unit>>>()
         let physicalRoots = Dictionary<string, ResizeArray<string>>()
         // DSL-MUTABLE: algorithm-scratch — exactly one next Host send outcome in the harness
         let mutable nextSendOutcome: SendOutcome option = None
@@ -38,6 +39,33 @@ module ForkToolSurface =
                 let values = ResizeArray<string>()
                 source[key] <- values
                 values
+
+        let waitersOf key =
+            match promptWaiters.TryGetValue key with
+            | true, values -> values
+            | false, _ ->
+                let values = ResizeArray<int * TaskCompletionSource<unit>>()
+                promptWaiters[key] <- values
+                values
+
+        let promptCountForKey key =
+            match prompts.TryGetValue key with
+            | true, values -> values.Count
+            | false, _ -> 0
+
+        let retainPromptWaiters key pending =
+            match pending with
+            | [] -> promptWaiters.Remove key |> ignore
+            | values -> promptWaiters[key] <- ResizeArray(values)
+
+        let releasePromptWaiters key =
+            match promptWaiters.TryGetValue key with
+            | false, _ -> ()
+            | true, waiters ->
+                let admitted = promptCountForKey key
+                let ready, pending = waiters |> Seq.toList |> List.partition (fun (target, _) -> admitted >= target)
+                retainPromptWaiters key pending
+                ready |> List.iter (fun (_, waiter) -> AsyncSupport.trySetResult waiter () |> ignore)
 
         let subscribe sessionId listener =
             let key = SessionId.value sessionId
@@ -61,9 +89,17 @@ module ForkToolSurface =
         member _.ChildCount = children.Count
 
         member _.PromptCount(sessionId: SessionId) =
-            match prompts.TryGetValue(SessionId.value sessionId) with
-            | true, values -> values.Count
-            | false, _ -> 0
+            promptCountForKey (SessionId.value sessionId)
+
+        member _.WaitForPromptCount(sessionId: SessionId, count: int) : Task =
+            let key = SessionId.value sessionId
+
+            if promptCountForKey key >= count then
+                Task.FromResult(()) :> Task
+            else
+                let waiter = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+                waitersOf key |> fun values -> values.Add(count, waiter)
+                waiter.Task :> Task
 
         member _.Prompt(sessionId: SessionId, index: int) =
             match prompts.TryGetValue(SessionId.value sessionId) with
@@ -92,6 +128,7 @@ module ForkToolSurface =
             member _.SendPrompt(sessionId, text, _) =
                 let key = SessionId.value sessionId
                 historyOf prompts key |> fun values -> values.Add text
+                releasePromptWaiters key
 
                 match nextSendOutcome with
                 | Some outcome ->
@@ -288,6 +325,17 @@ module ForkToolSurface =
         harness.Sessions.LatestChild
         |> Option.map harness.Sessions.PromptCount
         |> Option.defaultValue 0
+
+    let awaitPromptCount (value: obj) (count: int) : Task =
+        let harness = unbox<ForkHarness> value
+
+        match harness.Sessions.LatestChild with
+        | Some childId -> harness.Sessions.WaitForPromptCount(childId, count)
+        | None ->
+            task {
+                return raise (InvalidOperationException "fork surface has no child to await")
+            }
+            :> Task
 
     let prompt (value: obj) (index: int) : obj =
         let harness = unbox<ForkHarness> value

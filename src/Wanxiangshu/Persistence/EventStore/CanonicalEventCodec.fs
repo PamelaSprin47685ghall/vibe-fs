@@ -123,11 +123,52 @@ module CanonicalEventCodec =
 
         loop events Map.empty
 
-    let private ensureCanonical (text: string) (normalized: EventEnvelope) =
-        if encode normalized <> text then
-            Error(StorageInvalid.NonCanonical "event bytes are not §5.0 canonical")
+    [<Emit("""
+    (function (value) {
+      function orderedTree(current) {
+        if (Array.isArray(current)) {
+          for (let i = 0; i < current.length; i += 1) {
+            if (!orderedTree(current[i])) return false;
+          }
+          return true;
+        }
+
+        if (current !== null && typeof current === 'object') {
+          const keys = Object.keys(current);
+          for (let i = 1; i < keys.length; i += 1) {
+            if (keys[i - 1] > keys[i]) return false;
+          }
+          for (const key of keys) {
+            if (!orderedTree(current[key])) return false;
+          }
+        }
+        return true;
+      }
+
+      function sortedUnique(values) {
+        for (let i = 1; i < values.length; i += 1) {
+          if (!(values[i - 1] < values[i])) return false;
+        }
+        return true;
+      }
+
+      const allowed = new Set(['event_id', 'event_type', 'parents', 'payload', 'payload_refs', 'stream_id']);
+      return Object.keys(value).every(key => allowed.has(key))
+        && orderedTree(value)
+        && sortedUnique(value.parents)
+        && sortedUnique(value.payload_refs);
+    })($0)
+    """)>]
+    let private hasCanonicalStructure (parsed: obj) : bool = jsNative
+
+    [<Emit("JSON.stringify($0) + '\\n' === $1")>]
+    let private hasCanonicalJsonText (parsed: obj) (text: string) : bool = jsNative
+
+    let private ensureCanonicalParsed (text: string) (parsed: obj) =
+        if hasCanonicalStructure parsed && hasCanonicalJsonText parsed text then
+            Ok()
         else
-            Ok normalized
+            Error(StorageInvalid.NonCanonical "event bytes are not §5.0 canonical")
 
     let private decodeParsed (text: string) (parsed: obj) : Result<EventEnvelope, StorageInvalid> =
         let hasShape: bool =
@@ -138,23 +179,17 @@ module CanonicalEventCodec =
         if not hasShape then
             Error(StorageInvalid.MalformedEnvelope "event JSON missing required fields")
         else
-            let parents =
-                (unbox<string[]> parsed?parents) |> Array.toList |> List.map EventId.create
-
-            let payloadRefs =
-                (unbox<string[]> parsed?payload_refs)
-                |> Array.toList
-                |> List.map PayloadRef.create
-
-            let envelope =
+            ensureCanonicalParsed text parsed
+            |> Result.map (fun () ->
                 { EventId = EventId.create (unbox<string> parsed?event_id)
                   StreamId = EventStreamId.create (unbox<string> parsed?stream_id)
                   EventType = unbox<string> parsed?event_type
-                  Parents = parents
+                  Parents = (unbox<string[]> parsed?parents) |> Array.toList |> List.map EventId.create
                   Payload = parsed?payload
-                  PayloadRefs = payloadRefs }
-
-            EventEnvelope.normalize envelope |> ensureCanonical text
+                  PayloadRefs =
+                    (unbox<string[]> parsed?payload_refs)
+                    |> Array.toList
+                    |> List.map PayloadRef.create })
 
     let private tryDecodeCanonical (text: string) : Result<EventEnvelope, StorageInvalid> =
         try

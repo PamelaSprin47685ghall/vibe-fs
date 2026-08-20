@@ -27,13 +27,7 @@ const toolModule = {
   },
 }
 
-const waitForPromptCount = async (runtime, count) => {
-  for (let attempt = 0; attempt < 1000; attempt += 1) {
-    if (forkTool.promptCount(runtime) >= count) return
-    await new Promise((resolve) => setImmediate(resolve))
-  }
-  throw new Error(`fork prompt ${count} was not admitted`)
-}
+const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 
 const remainsPending = async (promise) => Promise.race([
   promise.then((value) => ({ kind: 'resolved', value })),
