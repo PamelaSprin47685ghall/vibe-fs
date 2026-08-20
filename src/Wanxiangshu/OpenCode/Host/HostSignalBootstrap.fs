@@ -233,12 +233,10 @@ module HostSignalBootstrap =
             // disjoint stream fields. Both abort physically; only their typed armed
             // marks decide the later reconciled-turn meaning.
             let loopSensor =
-                LoopSensor(
-                    NeedHelpSensor.createInterruptiblePredicate
-                        scope.Sessions.OwnedSessions
-                        scope.Sessions.SessionParents,
+                LoopSensor.create
+                    scope.Sessions.OwnedSessions
+                    scope.Sessions.SessionParents
                     (fun sessionId -> sessionPort.InterruptAttempt sessionId)
-                )
 
             do scope.AttachLoopSensor loopSensor
             let needHelpSensor = AssistanceHostWiring.install sessionPort journal snapshot scope

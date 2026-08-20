@@ -166,3 +166,23 @@ type LoopSensor(isOwned: SessionId -> bool, abortSession: SessionId -> Task<Resu
         match LoopEventCodec.tryDecodeTextDelta raw with
         | None -> ()
         | Some delta -> this.ObserveOwned delta
+
+module LoopSensor =
+
+    let private interruptiblePredicate
+        (ownedSessions: HashSet<string>)
+        (sessionParents: Dictionary<string, string>)
+        : SessionId -> bool =
+        fun sessionId ->
+            let key = SessionId.value sessionId
+            ownedSessions.Contains key && sessionParents.ContainsKey key
+
+    /// LOOP-002/006 Host construction. Physical child ownership is the only
+    /// eligibility fact LoopSensor needs; assistance policy must not be borrowed
+    /// merely because it happened to expose the same predicate shape.
+    let create
+        (ownedSessions: HashSet<string>)
+        (sessionParents: Dictionary<string, string>)
+        (abortSession: SessionId -> Task<Result<unit, string>>)
+        =
+        LoopSensor(interruptiblePredicate ownedSessions sessionParents, abortSession)
