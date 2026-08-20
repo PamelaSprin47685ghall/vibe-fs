@@ -30,8 +30,8 @@ module EventsSurface =
                   Directory = None
                   TerminalText = text
                   TurnFormalText = text }
-        | "Aborted" -> TerminalOutcome.Aborted text
-        | _ -> TerminalOutcome.Failed text
+        | "Aborted" -> TerminalOutcome.Aborted(TerminalStop.session text)
+        | _ -> TerminalOutcome.Failed(TerminalStop.session text)
 
     let private snapshot (outcome: TerminalOutcome) : obj =
         match outcome with
@@ -40,20 +40,44 @@ module EventsSurface =
                 {| kind = "Completed"
                    providerRun = ProviderRunIdentity.value result.ProviderRun
                    text = result.TerminalText |}
-        | TerminalOutcome.Aborted reason ->
+        | TerminalOutcome.Aborted stop ->
             box
                 {| kind = "Aborted"
                    providerRun = ""
-                   text = reason |}
-        | TerminalOutcome.Failed error ->
+                   text = stop.Reason
+                   authorityRoot =
+                    stop.AuthorityRootUserMessageId
+                    |> Option.map AuthorityRootUserMessageId.value
+                    |> Option.defaultValue "" |}
+        | TerminalOutcome.Failed stop ->
             box
                 {| kind = "Failed"
                    providerRun = ""
-                   text = error |}
+                   text = stop.Reason
+                   authorityRoot =
+                    stop.AuthorityRootUserMessageId
+                    |> Option.map AuthorityRootUserMessageId.value
+                    |> Option.defaultValue "" |}
 
     let notify (port: obj) (sessionId: string) (kind: string) (providerRun: string) (text: string) : bool =
         let typed = port :?> IEventObservationPort
         typed.NotifyTerminal (SessionId.create sessionId) (terminal sessionId kind providerRun text)
+
+    let notifyForAuthority
+        (port: obj)
+        (sessionId: string)
+        (kind: string)
+        (authorityRoot: string)
+        (text: string)
+        : bool =
+        let stop = TerminalStop.forAuthority (AuthorityRootUserMessageId.create authorityRoot) text
+
+        let outcome =
+            match kind with
+            | "Aborted" -> TerminalOutcome.Aborted stop
+            | _ -> TerminalOutcome.Failed stop
+
+        (port :?> IEventObservationPort).NotifyTerminal (SessionId.create sessionId) outcome
 
     let subscribe (port: obj) (listener: obj -> obj -> unit) : obj =
         let typed = port :?> IEventObservationPort

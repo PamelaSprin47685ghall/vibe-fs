@@ -6,26 +6,27 @@ open Wanxiangshu.Composition.Durable
 
 module DelegationFactFold =
 
-    let private advanceHandoff
+    let private completeHandoff
         (projection: AgentProjectionSet)
         (payload:
             {| ParentSessionId: Identity.SessionId
-               DelegateSessionId: Identity.SessionId
+               Route: DelegationHandoffRoute
                ParentEndExclusive: int64 |})
         : Result<AgentProjectionSet, FoldRejection> =
-        let key = DelegationHandoff.key payload.ParentSessionId payload.DelegateSessionId
+        let key = DelegationHandoff.key payload.ParentSessionId payload.Route
 
         let previous =
-            Map.tryFind key projection.DelegationHandoffs |> Option.defaultValue 0L
+            Map.tryFind key projection.DelegationCompletedHandoffs |> Option.defaultValue 0L
 
         if payload.ParentEndExclusive < previous then
-            FoldRejection.reject "DelegationHandoffAdvanced" "parent handoff cursor cannot retreat"
+            FoldRejection.reject "DelegationHandoffCompleted" "completed parent handoff frontier cannot retreat"
         elif payload.ParentEndExclusive < 0L then
-            FoldRejection.reject "DelegationHandoffAdvanced" "parent handoff cursor must be non-negative"
+            FoldRejection.reject "DelegationHandoffCompleted" "completed parent handoff frontier must be non-negative"
         else
             Ok
                 { projection with
-                    DelegationHandoffs = Map.add key payload.ParentEndExclusive projection.DelegationHandoffs }
+                    DelegationCompletedHandoffs =
+                        Map.add key payload.ParentEndExclusive projection.DelegationCompletedHandoffs }
 
     let private replaceEstimate
         (projection: AgentProjectionSet)
@@ -65,4 +66,4 @@ module DelegationFactFold =
         match fact with
         | DelegationFactCases.DelegatedToolEstimateReplaced payload -> replaceEstimate projection payload
         | DelegationFactCases.DelegatedToolCallObserved payload -> observeEstimate projection payload
-        | DelegationFactCases.DelegationHandoffAdvanced payload -> advanceHandoff projection payload
+        | DelegationFactCases.DelegationHandoffCompleted payload -> completeHandoff projection payload

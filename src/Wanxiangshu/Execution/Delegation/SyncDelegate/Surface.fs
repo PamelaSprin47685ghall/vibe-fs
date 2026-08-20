@@ -5,11 +5,13 @@ open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
@@ -29,15 +31,26 @@ module SyncDelegateSurface =
         let admitted = Dictionary<string, int>()
         let completed = Dictionary<string, int>()
         let waiters = Dictionary<string, TaskCompletionSource<unit>>()
+        let prompts = Dictionary<string, ResizeArray<string>>()
 
         let count (source: Dictionary<string, int>) key =
             match source.TryGetValue key with
             | true, value -> value
             | false, _ -> 0
 
-        member _.Mark(sessionId: SessionId) =
+        member _.Mark(sessionId: SessionId, prompt: string) =
             let key = SessionId.value sessionId
             admitted[key] <- count admitted key + 1
+
+            let history =
+                match prompts.TryGetValue key with
+                | true, current -> current
+                | false, _ ->
+                    let created = ResizeArray<string>()
+                    prompts[key] <- created
+                    created
+
+            history.Add prompt
 
             match waiters.TryGetValue key with
             | true, waiter ->
@@ -51,6 +64,11 @@ module SyncDelegateSurface =
 
         member _.AdmittedCount(sessionId: SessionId) =
             count admitted (SessionId.value sessionId)
+
+        member _.Prompt(sessionId: SessionId, index: int) =
+            match prompts.TryGetValue(SessionId.value sessionId) with
+            | true, history when index >= 0 && index < history.Count -> Some history[index]
+            | _ -> None
 
         member _.Wait(sessionId: SessionId) : Task<unit> =
             let key = SessionId.value sessionId
@@ -72,6 +90,7 @@ module SyncDelegateSurface =
             journal: AgentJournal,
             runtime: SyncDelegateRuntime,
             scope: ToolRuntimeScope,
+            sessions: SessionPort,
             readiness: PromptReadiness,
             children: ResizeArray<SessionId>,
             ownerPrefix: string
@@ -79,6 +98,7 @@ module SyncDelegateSurface =
         member _.Journal = journal
         member _.Runtime = runtime
         member _.Scope = scope
+        member _.Sessions = sessions
         member _.Readiness = readiness
         member _.Children = children
         member _.OwnerSession(owner: string) = SessionId.create (ownerPrefix + owner)
@@ -88,19 +108,47 @@ module SyncDelegateSurface =
             (scope :> IDisposable).Dispose()
             (journal :> IDisposable).Dispose()
 
-    type private SessionPort(children: ResizeArray<SessionId>, readiness: PromptReadiness) =
+    and private SessionPort(children: ResizeArray<SessionId>, readiness: PromptReadiness) =
+        let mutable physicalSequence = 0
+        let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
+
+        let subscribe sessionId listener =
+            let key = SessionId.value sessionId
+
+            let registrations =
+                match listeners.TryGetValue key with
+                | true, current -> current
+                | false, _ ->
+                    let created = ResizeArray<TerminalCompletionListener>()
+                    listeners[key] <- created
+                    created
+
+            registrations.Add listener
+
+            { new IDisposable with
+                member _.Dispose() = registrations.Remove listener |> ignore }
+
+        member _.Notify(sessionId: SessionId, outcome: TerminalOutcome) =
+            match listeners.TryGetValue(SessionId.value sessionId) with
+            | true, registrations ->
+                for listener in registrations |> Seq.toList do
+                    listener sessionId outcome
+            | false, _ -> ()
+
         interface ISessionHostPort with
-            member _.SubscribeTerminal(_, _) =
-                { new IDisposable with
-                    member _.Dispose() = () }
+            member _.SubscribeTerminal(sessionId, listener) = subscribe sessionId listener
 
-            member _.SubscribeFutureTerminal(_, _) =
-                { new IDisposable with
-                    member _.Dispose() = () }
+            member _.SubscribeFutureTerminal(sessionId, listener) = subscribe sessionId listener
 
-            member _.SendPrompt(sessionId, _, _) =
-                readiness.Mark sessionId
-                Task.FromResult(SendOutcome.AdmittedWithPhysicalMessage(PhysicalUserMessageId.create "msg-physical"))
+            member _.SendPrompt(sessionId, prompt, _) =
+                readiness.Mark(sessionId, prompt)
+                physicalSequence <- physicalSequence + 1
+
+                Task.FromResult(
+                    SendOutcome.AdmittedWithPhysicalMessage(
+                        PhysicalUserMessageId.create (sprintf "msg-physical-%d" physicalSequence)
+                    )
+                )
 
             member _.AbortSession _ = Task.FromResult(Ok())
             member _.InterruptAttempt _ = Task.FromResult(Ok())
@@ -151,7 +199,9 @@ module SyncDelegateSurface =
             | Some child ->
                 do! readiness.Wait child
 
-                if runtime.HasOpeningCursor child then
+                let! accepted = runtime.AwaitAssignmentReady child
+
+                if accepted && runtime.HasOpeningCursor child then
                     return Some child
                 else
                     return None
@@ -211,7 +261,8 @@ module SyncDelegateSurface =
             // DSL-MUTABLE: resource — session id backing registry for SessionPort
             let children = ResizeArray<SessionId>()
             let readiness = PromptReadiness()
-            let sessions = SessionPort(children, readiness) :> ISessionHostPort
+            let sessionPort = SessionPort(children, readiness)
+            let sessions = sessionPort :> ISessionHostPort
             let dispatcher = PromptDispatcher.Runtime(journal)
             let attached = new AttachedSessionRuntime()
             let gate = new SessionQuiescenceGate()
@@ -236,11 +287,9 @@ module SyncDelegateSurface =
                     (fun _ -> Some AgentTier.Fast),
                     (fun _ _ -> ()),
                     gate,
-                    directory,
-                    workRecordFor = workRecordFor,
-                    prepareHandoff = (fun parent child -> DelegationHandoffLedger.prepare journal parent child),
-                    advanceHandoff =
-                        (fun parent child cursor -> DelegationHandoffLedger.advance journal parent child cursor)
+                    workRecordFor,
+                    DelegationHandoffLedger.port journal,
+                    workspaceDirectory = directory
                 )
 
             let scope =
@@ -263,7 +312,7 @@ module SyncDelegateSurface =
             let ownerPrefix =
                 sprintf "sync-delegate-surface-%s-" (ToolHostCodec.digest directory)
 
-            return box (Harness(journal, runtime, scope, readiness, children, ownerPrefix))
+            return box (Harness(journal, runtime, scope, sessionPort, readiness, children, ownerPrefix))
         }
 
     /// Execute the real InspectorTool specification against the opaque scope and
@@ -321,7 +370,60 @@ module SyncDelegateSurface =
             return handled
         }
 
+    let private activeAuthorityRoot (harness: Harness) (child: SessionId) =
+        PromptAuthorityLedger.activeProfile child (AgentJournal.snapshot harness.Journal).AgentProjections
+        |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+
+    let private settleReadyChild
+        (harness: Harness)
+        (role: SyncDelegateRole)
+        (child: SessionId)
+        (answer: string)
+        (runId: string)
+        (authorityRoot: string)
+        =
+        let parts =
+            if String.IsNullOrWhiteSpace answer then
+                [||]
+            else
+                [| MessagePart.Text answer |]
+
+        handleTurn
+            harness
+            child
+            { SessionId = child
+              PhysicalUserMessageId = PhysicalUserMessageId.create authorityRoot
+              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRoot
+              ProviderRun = ProviderRunIdentity.create runId
+              Role = Some(roleValue role)
+              Directory = None
+              Parts = parts
+              Finish = Some "stop"
+              ErrorName = None
+              Model = None
+              Outcome = ReconcileProgram.TurnCompleted
+              Observation = None }
+
     /// Settle the current managed child through the real HandleTurn path.
+    let settleWithAuthorityRoot
+        (value: obj)
+        (owner: string)
+        (role: string)
+        (answer: string)
+        (runId: string)
+        (authorityRoot: string)
+        : Task<bool> =
+        task {
+            let harness = unbox<Harness> value
+
+            match roleOf role with
+            | Error _ -> return false
+            | Ok role ->
+                match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
+                | None -> return false
+                | Some child -> return! settleReadyChild harness role child answer runId authorityRoot
+        }
+
     let settle (value: obj) (owner: string) (role: string) (answer: string) (runId: string) : Task<bool> =
         task {
             let harness = unbox<Harness> value
@@ -332,27 +434,42 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
-                    let parts =
-                        if String.IsNullOrWhiteSpace answer then
-                            [||]
-                        else
-                            [| MessagePart.Text answer |]
+                    match activeAuthorityRoot harness child with
+                    | None -> return false
+                    | Some root -> return! settleReadyChild harness role child answer runId root
+        }
 
-                    let turn =
-                        { SessionId = child
-                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                          ProviderRun = ProviderRunIdentity.create runId
-                          Role = Some(roleValue role)
-                          Directory = None
-                          Parts = parts
-                          Finish = Some "stop"
-                          ErrorName = None
-                          Model = None
-                          Outcome = ReconcileProgram.TurnCompleted
-                          Observation = None }
+    let failWithAuthorityRoot
+        (value: obj)
+        (owner: string)
+        (role: string)
+        (reason: string)
+        (authorityRoot: string)
+        : Task<bool> =
+        task {
+            let harness = unbox<Harness> value
 
-                    return! handleTurn harness child turn
+            match roleOf role with
+            | Error _ -> return false
+            | Ok role ->
+                match harness.Runtime.TryFind(harness.OwnerSession owner, role) with
+                | None -> return false
+                | Some child ->
+                    let! accepted = harness.Runtime.AwaitAssignmentReady child
+
+                    if not accepted then
+                        return false
+                    else
+                        let wasPending = harness.Runtime.HasOpeningCursor child
+
+                        harness.Sessions.Notify(
+                            child,
+                            TerminalOutcome.Failed(
+                                TerminalStop.forAuthority (AuthorityRootUserMessageId.create authorityRoot) reason
+                            )
+                        )
+
+                        return wasPending && not (harness.Runtime.HasOpeningCursor child)
         }
 
     let observeTurn
@@ -373,27 +490,30 @@ module SyncDelegateSurface =
                 match! waitForReadyCall harness.Runtime harness.Readiness (harness.OwnerSession owner) role with
                 | None -> return false
                 | Some child ->
-                    let parts =
-                        if outcomeName = "TurnCompleted" && not (String.IsNullOrWhiteSpace answer) then
-                            [| MessagePart.Text answer |]
-                        else
-                            [||]
+                    match activeAuthorityRoot harness child with
+                    | None -> return false
+                    | Some root ->
+                        let parts =
+                            if outcomeName = "TurnCompleted" && not (String.IsNullOrWhiteSpace answer) then
+                                [| MessagePart.Text answer |]
+                            else
+                                [||]
 
-                    let turn =
-                        { SessionId = child
-                          PhysicalUserMessageId = PhysicalUserMessageId.create "msg-physical"
-                          AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg-root"
-                          ProviderRun = ProviderRunIdentity.create runId
-                          Role = Some(roleValue role)
-                          Directory = None
-                          Parts = parts
-                          Finish = Some "stop"
-                          ErrorName = None
-                          Model = None
-                          Outcome = outcome
-                          Observation = None }
+                        let turn =
+                            { SessionId = child
+                              PhysicalUserMessageId = PhysicalUserMessageId.create root
+                              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                              ProviderRun = ProviderRunIdentity.create runId
+                              Role = Some(roleValue role)
+                              Directory = None
+                              Parts = parts
+                              Finish = Some "stop"
+                              ErrorName = None
+                              Model = None
+                              Outcome = outcome
+                              Observation = None }
 
-                    return! handleTurn harness child turn
+                        return! handleTurn harness child turn
         }
 
     let child (value: obj) (owner: string) (role: string) : obj =
@@ -440,6 +560,54 @@ module SyncDelegateSurface =
             harness.Runtime.TryFind(harness.OwnerSession owner, role)
             |> Option.map harness.Readiness.AdmittedCount
             |> Option.defaultValue 0
+
+    let prompt (value: obj) (owner: string) (role: string) (index: int) : obj =
+        let harness = unbox<Harness> value
+
+        match roleOf role with
+        | Error _ -> null
+        | Ok role ->
+            harness.Runtime.TryFind(harness.OwnerSession owner, role)
+            |> Option.bind (fun child -> harness.Readiness.Prompt(child, index))
+            |> Option.map box
+            |> Option.defaultValue null
+
+    let captureOwnerOpening (value: obj) (owner: string) (text: string) : Task =
+        let harness = unbox<Harness> value
+        XTraceCapture.captureOpening (Some harness.Journal) (harness.OwnerSession owner) text [] :> Task
+
+    let captureOwnerDeltaPart (value: obj) (owner: string) (text: string) (providerRun: string) : Task =
+        task {
+            let harness = unbox<Harness> value
+
+            match! harness.Journal.WriteBlob text with
+            | Error error -> return raise (InvalidOperationException error)
+            | Ok blob ->
+                do!
+                    XTraceCapture.captureLastWords
+                        (Some harness.Journal)
+                        (harness.OwnerSession owner)
+                        blob.BlobRef
+                        blob.BlobDigest
+                        (ProviderRunIdentity.create providerRun)
+        }
+        :> Task
+
+    let handoffFrontier (value: obj) (owner: string) (role: string) : obj =
+        let harness = unbox<Harness> value
+        let parent = harness.OwnerSession owner
+
+        match roleOf role with
+        | Error _ -> null
+        | Ok role ->
+            let scope = ReuseScope.ofSession parent
+            let route = DelegationHandoffRoute.syncRole scope role
+            let key = DelegationHandoff.key parent route
+
+            (AgentJournal.snapshot harness.Journal).AgentProjections.DelegationCompletedHandoffs
+            |> Map.tryFind key
+            |> Option.map box
+            |> Option.defaultValue null
 
     let batchOrder (roleName: string) (toolNames: string array) (currentCall: string) : obj =
         match roleOf roleName with

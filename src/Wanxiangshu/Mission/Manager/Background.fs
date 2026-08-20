@@ -93,7 +93,11 @@ module ManagerBackground =
         task {
             match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
             | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                eventPort.NotifyTerminal turn.SessionId (Wanxiangshu.OpenCode.TerminalOutcome.Failed reason)
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (Wanxiangshu.OpenCode.TerminalOutcome.Failed(
+                        Wanxiangshu.OpenCode.TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason
+                    ))
                 |> ignore
             | _ -> ()
         }

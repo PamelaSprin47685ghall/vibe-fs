@@ -13,7 +13,8 @@
 3. **独立道路与续做严格区分**：独立任务与同一道路的连续执行在语义上正交，不因工作量或阶段演进而混淆。
 4. **返回是证据而非权力转移**：委托返回的 WorkRecord 仅更新调用方的认知状态，绝不自动赋予调用方额外权能或解除其既定义务。
 5. **单向载荷与信封隔离**：父向子传递背景必须作为只读数据字段，子向父交付结果必须作为 entry-local 证据，严禁逆向污染。
-6. **复用不是重放**：复用同一 participant/session 只复用身份与上下文，不复用上一 work unit 的完成信号或返回记录。每次新 charge 都必须形成新的 handoff 窗口。
+6. **复用的是 participant，不是物理 session 或上一轮执行态**：同一 Byname / dedicated role 可以连续承接多个 work unit；每个新 charge 都拥有独立的输入窗口、执行身份与完成证据。
+7. **已发生的 effect 不得被后置 bookkeeping 否认**：一旦某个 work unit 已经 durable admission 并进入物理 dispatch，后续 projection/affinity/frontier 写入失败只能进入明确的失败或 reconciliation 语义，绝不能把调用结果降格成“没有放置”。
 
 ## 破坏后果
 
@@ -21,3 +22,5 @@
 - **权能越界与篡夺**：委托被误解为所有权或 Persona 的隐式置换，咨询建议被当成任务重新分配。
 - **认知发散与幻觉**：背景材料被当作新 assignment，导致子会话背离自身使命或重复执行父会话义务。
 - **旧结果冒充新完成**：上一轮 sticky terminal 或全生命周期 WorkRecord 被下一次复用直接消费，调用方看见“新工作已完成”，实际 child 根本没有处理新需求。
+- **命令/现实分叉**：Host 已经启动 child、模型已经在工作，tool 却因发送后的第二次 journal append 失败返回“无法放置”；调用方随后重试，只会撞上一个自己刚刚被告知“不存在”的 busy participant。
+- **物理拓扑偷走连续性**：把 parent delta frontier 挂在 `SessionId` 上，session replacement/recovery 后同一 logical participant 会被误当成第一次 handoff，重复或丢失背景。

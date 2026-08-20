@@ -101,7 +101,7 @@ module OrchestratorHostSurface =
             let sessionId = sessionValue (field value "sessionId")
 
             match roleOf (field value "role") with
-            | None -> TerminalOutcome.Failed "invalid role"
+            | None -> TerminalOutcome.Failed(TerminalStop.session "invalid role")
             | Some role ->
                 TerminalOutcome.Completed
                     { SessionId = sessionId
@@ -112,8 +112,8 @@ module OrchestratorHostSurface =
                       Directory = optionalString (field value "directory")
                       TerminalText = stringOf (field value "terminalText")
                       TurnFormalText = stringOf (field value "turnFormalText") }
-        | "Aborted" -> TerminalOutcome.Aborted(stringOf (field value "reason"))
-        | _ -> TerminalOutcome.Failed(stringOf (field value "error"))
+        | "Aborted" -> TerminalOutcome.Aborted(TerminalStop.session (stringOf (field value "reason")))
+        | _ -> TerminalOutcome.Failed(TerminalStop.session (stringOf (field value "error")))
 
     let private sendOutcome (value: obj) : Outcome.SendOutcome =
         match stringOf (field value "kind") with

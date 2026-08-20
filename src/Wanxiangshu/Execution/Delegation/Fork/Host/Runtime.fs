@@ -56,8 +56,7 @@ type HostForkRuntime
         ?parentWorkRecordFor: SessionId -> Task<string option>,
         ?childWorkRecordFor: SessionId -> Task<string option>,
         ?childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
-        ?prepareHandoff: SessionId -> SessionId -> Task<PreparedDelegationHandoff>,
-        ?advanceHandoff: SessionId -> SessionId -> XTraceCursor -> Task<Result<unit, string>>,
+        ?handoff: ReusableHandoffPort,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
         /// REVIEW-007: a Manager's own review fork opens a barrier for the forked
@@ -203,14 +202,7 @@ type HostForkRuntime
     let childWorkRecordOfRun =
         defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
 
-    let prepareDelegationHandoff =
-        defaultArg prepareHandoff (fun _ _ ->
-            Task.FromResult
-                { ParentRecord = None
-                  ParentEndExclusive = { Sequence = 0L } })
-
-    let advanceDelegationHandoff =
-        defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
+    let handoffPort = handoff
 
     let xTraceHead (sessionId: SessionId) : int64 =
         match journal with
@@ -334,6 +326,9 @@ type HostForkRuntime
                         pending.AgentName
                         (this.DirectoryOf agentId)
                         pending.Prompt
+                        (fun physical ->
+                            pendingRunForAgent ()
+                            |> Option.iter (fun run -> HostForkRunLifecycle.bindAuthorityRoot run physical))
                         failPendingRun
 
                 return
@@ -392,12 +387,16 @@ type HostForkRuntime
     member internal _.ChildWorkRecordOf = childWorkRecordOf
     member internal _.ChildWorkRecordOfRun = childWorkRecordOfRun
     member internal _.XTraceHead = xTraceHead
+    member internal _.HandoffPort = handoffPort
 
-    member internal _.PrepareHandoff(delegateSession: SessionId) =
-        prepareDelegationHandoff parentId delegateSession
-
-    member internal _.AdvanceHandoff(delegateSession: SessionId, cursor: XTraceCursor) =
-        advanceDelegationHandoff parentId delegateSession cursor
+    member internal _.PrepareHandoff(route: DelegationHandoffRoute) : Task<Result<PreparedDelegationHandoff, string>> =
+        match handoffPort with
+        | Some port ->
+            task {
+                let! prepared = port.Prepare parentId route
+                return Ok prepared
+            }
+        | None -> Task.FromResult(Error "reusable delegation handoff capability is unavailable")
 
     member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
@@ -425,12 +424,14 @@ type HostForkRuntime
         startOwnedWork (fun () ->
             task {
                 let! workRecord = workRecordForOutcome run outcome
-                do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
+                do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions handoffPort run outcome workRecord
             }
             :> Task)
         |> ignore
 
-    member this.InstallRun(agentId: string, childId: SessionId, role: Role) =
+    member this.InstallRun
+        (agentId: string, childId: SessionId, role: Role, ?preparedHandoff: PreparedDelegationHandoff)
+        =
         lock gate (fun () -> processOwnedAgents.Add agentId |> ignore)
 
         let run =
@@ -443,6 +444,8 @@ type HostForkRuntime
                 childWorkRecordOfRun
                 xTraceHead
                 (fun work -> startOwnedWork work |> ignore)
+                handoffPort
+                preparedHandoff
                 agentId
                 childId
                 role
@@ -452,7 +455,8 @@ type HostForkRuntime
         run
 
     member this.FailRun(run: PendingHostRun, error: string) : Task =
-        startOwnedWork (fun () -> HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error)
+        startOwnedWork (fun () ->
+            HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions handoffPort run error)
 
     member this.MarkReady(run: PendingHostRun) =
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.

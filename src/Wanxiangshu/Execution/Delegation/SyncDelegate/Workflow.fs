@@ -6,6 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Attachment
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.OpenCode
 
 /// Composition-internal CE module: referenced only by SyncDelegateRuntime.
@@ -22,7 +23,8 @@ module internal SyncDelegateWorkflow =
           CleanupInspectorDraft: string -> unit
           Directory: string option
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
-          SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
+          SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
+          CheckpointCompletedHandoff: SessionId -> PreparedDelegationHandoff -> Task<Result<unit, string>>
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait
           SubscribeFutureTerminal: SessionId -> TerminalCompletionListener -> System.IDisposable }
@@ -108,10 +110,21 @@ module internal SyncDelegateWorkflow =
             return results |> Seq.toList
         }
 
-    let private failPoppedCall (store: SyncDelegateCallStore) (delegateSession: SessionId) (message: string) =
-        match store.TryPopCallByDelegate delegateSession with
-        | Some call -> store.FailCall(call, message)
-        | None -> ()
+    let private failCurrentCall
+        (store: SyncDelegateCallStore)
+        (delegateSession: SessionId)
+        (stop: TerminalStop)
+        (message: string)
+        =
+        match store.TryPeekCallByDelegate delegateSession with
+        | Some call when
+            call.AcceptedAuthorityRoot
+            |> Option.exists (fun root -> TerminalStop.belongsTo root stop)
+            ->
+            match store.TryPopCallByDelegate delegateSession with
+            | Some current -> store.FailCall(current, message)
+            | None -> ()
+        | _ -> ()
 
     let private onTerminalOutcome
         (store: SyncDelegateCallStore)
@@ -120,11 +133,25 @@ module internal SyncDelegateWorkflow =
         (outcome: TerminalOutcome)
         =
         match outcome with
-        | TerminalOutcome.Failed error ->
-            failPoppedCall store delegateSession (sprintf "SyncDelegate run failed: %s" error)
-        | TerminalOutcome.Aborted reason ->
-            failPoppedCall store delegateSession (sprintf "SyncDelegate run aborted: %s" reason)
+        | TerminalOutcome.Failed stop ->
+            failCurrentCall store delegateSession stop (sprintf "SyncDelegate run failed: %s" stop.Reason)
+        | TerminalOutcome.Aborted stop ->
+            failCurrentCall store delegateSession stop (sprintf "SyncDelegate run aborted: %s" stop.Reason)
         | TerminalOutcome.Completed _ -> ()
+
+    let private checkpointCompletedOrCrash
+        (deps: Dependencies)
+        (owner: SessionId)
+        (handoff: PreparedDelegationHandoff)
+        : Task<Result<unit, string>> =
+        task {
+            match! deps.CheckpointCompletedHandoff owner handoff with
+            | Ok() -> return Ok()
+            | Error error ->
+                let detail = sprintf "delegation completed-handoff append failed: %s" error
+                FatalProcess.trip "SyncDelegate.checkpointCompletedHandoff" detail
+                return raise (System.InvalidOperationException detail)
+        }
 
     let private sendAndAwait
         (deps: Dependencies)
@@ -139,16 +166,19 @@ module internal SyncDelegateWorkflow =
             use _terminalSub =
                 deps.SubscribeFutureTerminal delegateSession (onTerminalOutcome store delegateSession)
 
-            do! deps.SendPrompt call request
+            let! handoff = deps.SendPrompt call request
 
             if role = SyncDelegateRole.Inspector then
                 deps.NoteInspectorPrompt (SessionId.value delegateSession) request.Charge
 
-            return!
+            let! workRecord =
                 CausalAwait.awaitTask
                     CausalWaitHub.observer
                     (deps.DescribeWait(DelegateCompletion(batchOwner, delegateSession, role)))
                     call.Answer.Task
+
+            do! checkpointCompletedOrCrash deps batchOwner handoff
+            return workRecord
         }
 
     let private dispatchBegunCall

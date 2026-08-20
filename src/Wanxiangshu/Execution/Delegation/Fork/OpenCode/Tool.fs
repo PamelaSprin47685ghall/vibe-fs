@@ -406,13 +406,8 @@ module ForkTool =
         (managed: ManagedAgent)
         =
         taskResult {
-            let! durable =
-                scope.Journal
-                |> Result.requireSome (prose language Path.Fork.HandoffJournalRequired)
-
-            let! handoff =
-                DelegationHandoffLedger.prepareInitial durable runtime.ParentId
-                |> TaskResultCE.ofTask
+            let route = DelegationHandoffRoute.forkByname request.Name
+            let! handoff = runtime.PrepareHandoff route
 
             let! rendered =
                 prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
@@ -427,17 +422,9 @@ module ForkTool =
                     None,
                     renderedPrompt = rendered,
                     byname = request.Name,
-                    ?expectedToolCalls = request.ExpectedToolCalls
+                    ?expectedToolCalls = request.ExpectedToolCalls,
+                    preparedHandoff = handoff
                 )
-
-            let! childId =
-                runtime.TryFindAgent handleId
-                |> Option.bind (fun record -> record.ChildSessionId)
-                |> Result.requireSome (namedProse language Path.Fork.PersonSessionUnknown handleId)
-
-            do!
-                runtime.AdvanceHandoff(childId, handoff.ParentEndExclusive)
-                |> TaskResult.mapError (reasonProse language Path.Fork.HandoffAppendFailed)
 
             return result
         }
@@ -452,12 +439,8 @@ module ForkTool =
         agentId
         =
         taskResult {
-            let! childId =
-                runtime.TryFindAgent agentId
-                |> Option.bind (fun record -> record.ChildSessionId)
-                |> Result.requireSome (namedProse language Path.Fork.PersonSessionUnknown agentId)
-
-            let! handoff = runtime.PrepareHandoff childId |> TaskResultCE.ofTask
+            let route = DelegationHandoffRoute.forkByname request.Name
+            let! handoff = runtime.PrepareHandoff route
 
             let! rendered =
                 prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
@@ -468,32 +451,11 @@ module ForkTool =
                     agentId,
                     request.Charge,
                     renderedPrompt = rendered,
-                    ?expectedToolCalls = request.ExpectedToolCalls
+                    ?expectedToolCalls = request.ExpectedToolCalls,
+                    preparedHandoff = handoff
                 )
 
-            do!
-                runtime.AdvanceHandoff(childId, handoff.ParentEndExclusive)
-                |> TaskResult.mapError (reasonProse language Path.Fork.HandoffAppendFailed)
-
             return! runtime.AwaitCurrentWorkRecord agentId
-        }
-
-    let private sealManagerAffinity
-        (scope: ToolRuntimeScope)
-        (runtime: HostForkRuntime)
-        (context: HostToolContext)
-        agentKey
-        language
-        (request: Request)
-        denyPath
-        =
-        task {
-            match! recordFissionAffinity scope context agentKey with
-            | Error _ -> return consequence (prose language denyPath)
-            | Ok() ->
-                announceChild runtime context agentKey
-
-                return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
         }
 
     let private commitNewManagerFork
@@ -508,28 +470,16 @@ module ForkTool =
         =
         task {
             let handleId = ToolHostCodec.newHandleId ()
-            let! forkResult = runManagerFork scope runtime role request language attachment handleId managed
-
-            match forkResult with
+            match! recordFissionAffinity scope context handleId with
             | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
-            | Ok _ ->
-                return! sealManagerAffinity scope runtime context handleId language request Path.Fork.ChargeNotPlaced
-        }
-
-    let private sealIdleReuse
-        (scope: ToolRuntimeScope)
-        (runtime: HostForkRuntime)
-        (context: HostToolContext)
-        language
-        agentId
-        workRecord
-        =
-        task {
-            match! recordFissionAffinity scope context agentId with
-            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
             | Ok() ->
-                announceChild runtime context agentId
-                return ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
+                let! forkResult = runManagerFork scope runtime role request language attachment handleId managed
+
+                match forkResult with
+                | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
+                | Ok _ ->
+                    announceChild runtime context handleId
+                    return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
         }
 
     let private finishNewManagerFork
@@ -565,14 +515,8 @@ module ForkTool =
         else
             finishNewManagerFork scope runtime context request language handles managed role
 
-    let private reuseWhileActive (runtime: HostForkRuntime) agentId (request: Request) language =
-        task {
-            match! runtime.Reuse(agentId, request.Charge, ?expectedToolCalls = request.ExpectedToolCalls) with
-            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-            | Ok _ when request.Attach.IsSome ->
-                return successInstruction (namedProse language Path.Fork.AttachBusy (request.Name.Trim()))
-            | Ok _ -> return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
-        }
+    let private reuseWhileActive language =
+        Task.FromResult(consequence (prose language Path.Fork.PersonCannotTakeCharge))
 
     let private commitIdleReuse
         (scope: ToolRuntimeScope)
@@ -585,11 +529,16 @@ module ForkTool =
         attachment
         =
         task {
-            let! reuseResult = runManagerReuse scope runtime record.Role request language attachment agentId
-
-            match reuseResult with
+            match! recordFissionAffinity scope context agentId with
             | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-            | Ok workRecord -> return! sealIdleReuse scope runtime context language agentId workRecord
+            | Ok() ->
+                let! reuseResult = runManagerReuse scope runtime record.Role request language attachment agentId
+
+                match reuseResult with
+                | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+                | Ok workRecord ->
+                    announceChild runtime context agentId
+                    return ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
         }
 
     let private reuseWhileIdle
@@ -622,7 +571,7 @@ module ForkTool =
             lock runtime.Gate (fun () -> runtime.PendingRuns.ContainsKey agentId)
 
         if activeRun then
-            reuseWhileActive runtime agentId request language
+            reuseWhileActive language
         else
             reuseWhileIdle scope runtime context request language handles record agentId
 

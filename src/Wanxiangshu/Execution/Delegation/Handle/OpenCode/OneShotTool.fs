@@ -315,10 +315,10 @@ module OneShotAgentTool =
         // EXEC-028: Completed requires child LWR (includeOpening=false); missing → Error.
         | Wanxiangshu.OpenCode.TerminalOutcome.Completed terminal ->
             admitCompletedTerminal scope childId terminal succeed fail latch completion
-        | Wanxiangshu.OpenCode.TerminalOutcome.Aborted reason ->
-            fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel reason))
-        | Wanxiangshu.OpenCode.TerminalOutcome.Failed error ->
-            fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel error))
+        | Wanxiangshu.OpenCode.TerminalOutcome.Aborted stop ->
+            fail (InvalidOperationException(sprintf "%s aborted: %s" roleLabel stop.Reason))
+        | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop ->
+            fail (InvalidOperationException(sprintf "%s failed: %s" roleLabel stop.Reason))
 
     let private raceCompletionDeadline
         (outputTask: Task<Result<string * string option, string>>)

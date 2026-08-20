@@ -6,6 +6,7 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
@@ -31,6 +32,8 @@ type PendingHostRun =
       ChildId: SessionId
       Role: Role
       StartCursor: int64
+      Handoff: PreparedDelegationHandoff option
+      mutable AuthorityRoot: AuthorityRootUserMessageId option
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
       mutable Finished: bool }

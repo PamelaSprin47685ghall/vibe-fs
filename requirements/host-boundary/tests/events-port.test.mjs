@@ -60,6 +60,19 @@ test('WHAT[DELEG-025] EVT_future_subscriber_does_not_replay_sticky_terminal', ()
   EventsSurface.dispose(subscription)
 })
 
+test('WHAT[DELEG-025] EVT_run_scoped_failure_preserves_authority_root_across_host_event_port', () => {
+  const port = EventsSurface.create()
+  const seen = []
+  EventsSurface.subscribeFuture(port, (_, outcome) => seen.push(outcome))
+
+  EventsSurface.notifyForAuthority(port, 'ses-causal-failure', 'Failed', 'root-2', 'provider exhausted')
+
+  assert.equal(seen.length, 1)
+  assert.equal(seen[0].kind, 'Failed')
+  assert.equal(seen[0].text, 'provider exhausted')
+  assert.equal(seen[0].authorityRoot, 'root-2')
+})
+
 test('WHAT[HOST-BOUNDARY-016] EVT_disposed_listener_stops_delivery_and_listener_count_reporting', () => {
   const port = EventsSurface.create()
   const received = []

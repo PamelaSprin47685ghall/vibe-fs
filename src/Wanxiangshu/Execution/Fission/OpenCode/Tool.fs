@@ -484,7 +484,7 @@ module FissionTool =
         =
         match outcome with
         | Wanxiangshu.OpenCode.TerminalOutcome.Aborted _ -> ()
-        | Wanxiangshu.OpenCode.TerminalOutcome.Failed error ->
+        | Wanxiangshu.OpenCode.TerminalOutcome.Failed stop ->
             captureAndBroadcast
                 scope
                 durable
@@ -494,7 +494,7 @@ module FissionTool =
                 owner
                 lanes
                 completionId
-                (String.concat "\n" [ "status=failed"; "error=" + error ])
+                (String.concat "\n" [ "status=failed"; "error=" + stop.Reason ])
             |> ignore
         | Wanxiangshu.OpenCode.TerminalOutcome.Completed terminal ->
             captureCompletedTerminal

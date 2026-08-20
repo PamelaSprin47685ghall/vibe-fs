@@ -749,7 +749,7 @@ module FissionHost =
             | Ok() ->
                 do! abortAllLaneSessions sessionPort group
 
-                eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed reason)
+                eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed(TerminalStop.session reason))
                 |> ignore
 
                 FissionAdmission.releaseOwner group.OwnerSessionId

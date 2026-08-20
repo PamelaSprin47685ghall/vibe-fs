@@ -45,15 +45,25 @@ module HostForkAgentOwner =
         (agent: string)
         (directory: string option)
         (prompt: string)
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
         (onDetachedFailure: (string -> Task) option)
         : Task<Result<PromptKey, string>> =
         let sendClaimed (durable: AgentJournal) =
             let dispatcher = PromptDispatcher.forJournal durable
 
-            match onDetachedFailure with
-            | Some callback ->
+            match onAccepted, onDetachedFailure with
+            | Some accepted, _ ->
+                dispatcher.SendAgentOwnerRoot
+                    sessions
+                    childId
+                    prompt
+                    agent
+                    directory
+                    PromptDispatcher.AwaitMode.Await
+                    (Some accepted)
+            | None, Some callback ->
                 dispatcher.SendAgentOwnerRootDetachedObserved sessions childId prompt agent directory callback
-            | None ->
+            | None, None ->
                 // PROMPT-007 Detached: child owner root does not wait for PhysicalAccepted.
                 dispatcher.SendAgentOwnerRoot
                     sessions
@@ -69,7 +79,7 @@ module HostForkAgentOwner =
         | Some durable -> sendClaimed durable
 
     let sendFirstPrompt sessions journal childId agent directory prompt =
-        sendFirstPromptCore sessions journal childId agent directory prompt None
+        sendFirstPromptCore sessions journal childId agent directory prompt None None
 
-    let sendFirstPromptObserved sessions journal childId agent directory prompt onDetachedFailure =
-        sendFirstPromptCore sessions journal childId agent directory prompt (Some onDetachedFailure)
+    let sendFirstPromptObserved sessions journal childId agent directory prompt onAccepted onDetachedFailure =
+        sendFirstPromptCore sessions journal childId agent directory prompt (Some onAccepted) (Some onDetachedFailure)

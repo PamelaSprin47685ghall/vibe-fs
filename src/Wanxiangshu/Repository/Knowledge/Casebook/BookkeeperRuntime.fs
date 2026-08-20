@@ -240,8 +240,8 @@ module BookkeeperRuntime =
         : unit =
         match outcome with
         | TerminalOutcome.Completed _ -> AsyncSupport.trySetResult completion (Ok()) |> ignore
-        | TerminalOutcome.Failed error -> AsyncSupport.trySetResult completion (Error error) |> ignore
-        | TerminalOutcome.Aborted reason -> AsyncSupport.trySetResult completion (Error reason) |> ignore
+        | TerminalOutcome.Failed stop -> AsyncSupport.trySetResult completion (Error stop.Reason) |> ignore
+        | TerminalOutcome.Aborted stop -> AsyncSupport.trySetResult completion (Error stop.Reason) |> ignore
 
     let private sendFailureOf =
         function

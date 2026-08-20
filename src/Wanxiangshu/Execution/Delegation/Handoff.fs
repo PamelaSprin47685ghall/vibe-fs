@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation
 
+open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Trace
@@ -10,14 +11,20 @@ type DelegationHandoffWindow =
       IsInitial: bool }
 
 type PreparedDelegationHandoff =
-    { ParentRecord: string option
+    { Route: DelegationHandoffRoute
+      ParentStartInclusive: XTraceCursor
+      ParentRecord: string option
       ParentEndExclusive: XTraceCursor }
+
+type ReusableHandoffPort =
+    { Prepare: SessionId -> DelegationHandoffRoute -> Task<PreparedDelegationHandoff>
+      CheckpointCompleted: SessionId -> PreparedDelegationHandoff -> Task<Result<unit, string>> }
 
 [<RequireQualifiedAccess>]
 module DelegationHandoff =
 
-    let key (parent: SessionId) (delegateSession: SessionId) =
-        SessionId.value parent + "\x1f" + SessionId.value delegateSession
+    let key (parent: SessionId) (route: DelegationHandoffRoute) =
+        SessionId.value parent + "\x1f" + DelegationHandoffRoute.value route
 
     let window (previousEnd: int64 option) (currentEnd: int64) : DelegationHandoffWindow =
         let start = previousEnd |> Option.defaultValue 0L

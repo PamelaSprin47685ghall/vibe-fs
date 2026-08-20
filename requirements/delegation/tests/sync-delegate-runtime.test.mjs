@@ -23,6 +23,11 @@ const waitForPromptCount = async (h, owner, role, count) => {
   throw new Error(`delegate prompt ${count} was not admitted for ${owner}/${role}`)
 }
 const settle = async (h, owner, role, answer, run = 'run-1') => sync.settle(h, owner, role, answer, run)
+const remainsPending = async (promise) =>
+  Promise.race([
+    promise.then((value) => ({ kind: 'resolved', value })),
+    new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
+  ])
 
 for (const role of ['Inspector', 'Coder']) {
   test(`WHAT[DELEG-021] SYNC_RUNTIME_${role.toLowerCase()}_invoke_admits_one_managed_child_and_settles_answer`, async () => {
@@ -46,6 +51,43 @@ for (const role of ['Inspector', 'Coder']) {
     } finally { sync.dispose(h) }
   })
 }
+
+test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_cannot_fail_reused_call', async () => {
+  const h = await live()
+  try {
+    const first = sync.invoke(h, 'owner-failure-causality', 'Inspector', 'FIRST')
+    await waitForPromptCount(h, 'owner-failure-causality', 'Inspector', 1)
+    assert.equal(await settle(h, 'owner-failure-causality', 'Inspector', 'FIRST-ANSWER', 'run-first'), true)
+    assert.equal((await first).ok, true)
+
+    const second = sync.invoke(h, 'owner-failure-causality', 'Inspector', 'SECOND')
+    await waitForPromptCount(h, 'owner-failure-causality', 'Inspector', 2)
+
+    assert.equal(
+      await sync.failWithAuthorityRoot(
+        h,
+        'owner-failure-causality',
+        'Inspector',
+        'late previous failure',
+        'msg-physical-1',
+      ),
+      false,
+    )
+    assert.deepEqual(await remainsPending(second), { kind: 'pending' })
+
+    assert.equal(
+      await sync.failWithAuthorityRoot(
+        h,
+        'owner-failure-causality',
+        'Inspector',
+        'current failure',
+        'msg-physical-2',
+      ),
+      true,
+    )
+    assert.deepEqual(await second, { ok: false, error: 'SyncDelegate run failed: current failure' })
+  } finally { sync.dispose(h) }
+})
 
 test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion', async () => {
   const h = await live()
@@ -75,6 +117,53 @@ test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion',
     assert.equal(sync.childCount(h), 1)
   } finally { sync.dispose(h) }
 })
+
+for (const role of ['Inspector', 'Coder']) {
+  test(`WHAT[DELEG-024/025] SYNC_RUNTIME_${role.toLowerCase()}_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta`, async () => {
+    const h = await live()
+    const owner = `owner-handoff-${role.toLowerCase()}`
+    try {
+      await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
+
+      const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
+      await waitForPromptCount(h, owner, role, 1)
+      assert.equal(sync.handoffFrontier(h, owner, role), null)
+      assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
+
+      assert.equal(await settle(h, owner, role, 'FIRST-ANSWER', 'run-first'), true)
+      const firstResult = await first
+      assert.equal(firstResult.ok, true)
+      assert.match(firstResult.value, /FIRST-ANSWER/)
+      const firstFrontier = sync.handoffFrontier(h, owner, role)
+      assert.notEqual(firstFrontier, null)
+
+      await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
+
+      const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
+      await waitForPromptCount(h, owner, role, 2)
+      const secondPrompt = sync.prompt(h, owner, role, 1)
+      assert.match(secondPrompt, /SECOND-CHARGE/)
+      assert.match(secondPrompt, /parent_delta_work_record\s*=/)
+      assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
+      assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
+      assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
+
+      assert.equal(
+        await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
+        false,
+      )
+      assert.deepEqual(await remainsPending(second), { kind: 'pending' })
+
+      assert.equal(await settle(h, owner, role, 'SECOND-ANSWER', 'run-second'), true)
+      const secondResult = await second
+      assert.equal(secondResult.ok, true)
+      assert.match(secondResult.value, /SECOND-ANSWER/)
+      assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
+      assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
+      assert.equal(sync.childCount(h), 1)
+    } finally { sync.dispose(h) }
+  })
+}
 
 
 test('WHAT[DELEG-008] SYNC_RUNTIME_provider_tool_call_collection_preserves_role_order', () => {

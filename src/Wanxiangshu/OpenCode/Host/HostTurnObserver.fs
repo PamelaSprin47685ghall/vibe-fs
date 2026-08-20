@@ -312,7 +312,9 @@ module HostTurnObserver =
             let! fissionOwned = FissionHost.failLaneIfActive sessionPort eventPort journal turn.SessionId reason
 
             if not fissionOwned then
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
                 |> ignore
         }
         :> Task

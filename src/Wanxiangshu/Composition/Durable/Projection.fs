@@ -133,7 +133,7 @@ type AgentProjectionSet =
 
         /// DELEG-024: last parent XTrace cursor physically handed to each reusable
         /// delegate session. Keyed pair lookup; never inferred from prompt text.
-        DelegationHandoffs: Map<string, int64>
+        DelegationCompletedHandoffs: Map<string, int64>
 
         Attention: AttentionProjectionState
         Concern: ConcernProjectionState
@@ -173,7 +173,7 @@ module AgentProjection =
           HandleByChildSession = Map.empty
           Fission = FissionProjection.empty
           MagicTodo = MagicTodoProjection.empty
-          DelegationHandoffs = Map.empty
+          DelegationCompletedHandoffs = Map.empty
           Attention = AttentionProjection.empty
           Concern = ConcernProjection.empty
           InstitutionalLearning = InstitutionalLearningProjection.empty

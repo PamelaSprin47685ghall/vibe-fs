@@ -30,6 +30,8 @@ type HostForkRunLifecycleHandle
               ChildId = SessionId.create childId
               Role = Role.Coder
               StartCursor = 0L
+              Handoff = None
+              AuthorityRoot = None
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }
@@ -71,8 +73,8 @@ module HostForkRunLifecycleSurface =
                   Directory = None
                   TerminalText = terminalText
                   TurnFormalText = terminalText }
-        | "Aborted" -> TerminalOutcome.Aborted(detail value "reason")
-        | "Failed" -> TerminalOutcome.Failed(detail value "message")
+        | "Aborted" -> TerminalOutcome.Aborted(TerminalStop.session (detail value "reason"))
+        | "Failed" -> TerminalOutcome.Failed(TerminalStop.session (detail value "message"))
         | other -> invalidArg "outcome" (sprintf "unknown terminal outcome: %s" other)
 
     let private completionView (outcome: AgentCompletionOutcome) : obj =
@@ -111,6 +113,7 @@ module HostForkRunLifecycleSurface =
             None
             typed.ParentId
             Unchecked.defaultof<ISessionHostPort>
+            None
             typed.Run
             (terminal typed outcome)
             None

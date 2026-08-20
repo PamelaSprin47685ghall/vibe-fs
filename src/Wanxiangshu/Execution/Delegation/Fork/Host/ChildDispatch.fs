@@ -124,7 +124,9 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (handoffPort: ReusableHandoffPort option)
+        (sendChildPrompt:
+            string -> SessionId -> Role -> string -> string -> (PhysicalUserMessageId -> unit) -> Task<Result<unit, string>>)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -138,13 +140,15 @@ module HostForkChildDispatch =
             HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
             let payload = Option.defaultValue prompt enrichedPrompt
             // ofTask keeps Result intact so Error still settles failRun (not bare bind).
-            let! sent = sendChildPrompt agentId childId role agent payload |> TaskResultCE.ofTask
+            let! sent =
+                sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
+                |> TaskResultCE.ofTask
 
             match decideExistingSendAcceptance sent result with
             | Ok accepted -> return accepted
             | Error err ->
                 do!
-                    HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run err
+                    HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions handoffPort run err
                     |> awaitUnit
                     |> TaskResultCE.ofTask
 
@@ -161,8 +165,11 @@ module HostForkChildDispatch =
         (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
-        (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (handoffPort: ReusableHandoffPort option)
+        (sendChildPrompt:
+            string -> SessionId -> Role -> string -> string -> (PhysicalUserMessageId -> unit) -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
+        (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -190,6 +197,8 @@ module HostForkChildDispatch =
                     childWorkRecordForRun
                     xTraceHead
                     trackOwnedWork
+                    handoffPort
+                    preparedHandoff
                     agentId
                     childId
                     role
@@ -208,6 +217,7 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
+                        handoffPort
                         run
                         "Fork runtime is cancelled"
                     |> awaitUnit
@@ -222,6 +232,7 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
+                        handoffPort
                         sendChildPrompt
                         agentId
                         childId
@@ -250,9 +261,12 @@ module HostForkChildDispatch =
         (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
-        (sendChildPrompt: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
+        (handoffPort: ReusableHandoffPort option)
+        (sendChildPrompt:
+            string -> SessionId -> Role -> string -> string -> (PhysicalUserMessageId -> unit) -> Task<Result<unit, string>>)
         (sendBusyNudge: string -> SessionId -> Role -> string -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
+        (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -269,6 +283,8 @@ module HostForkChildDispatch =
 
             match activeRun, runtime.IsCancelled with
             | Some _, true -> return! Error "Fork runtime is cancelled"
+            | Some _, false when preparedHandoff.IsSome ->
+                return! Error(sprintf "Agent already has an active assignment: %s" agentId)
             | Some _, false ->
                 // Active run: BusyAgentNudge continuation (same LogicalRun).
                 return! nudgeBusyChild sendBusyNudge agentId childId role agent prompt
@@ -284,8 +300,10 @@ module HostForkChildDispatch =
                         xTraceHead
                         trackOwnedWork
                         runtime
+                        handoffPort
                         sendChildPrompt
                         onRunStarted
+                        preparedHandoff
                         agentId
                         childId
                         role

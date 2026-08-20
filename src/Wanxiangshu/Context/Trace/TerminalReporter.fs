@@ -93,7 +93,11 @@ module TerminalReporter =
 
                 return wasAborted, true
             else
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "completed with empty terminal output"
+                    ))
                 |> ignore
 
                 return wasAborted, false
@@ -116,7 +120,11 @@ module TerminalReporter =
 
             match turn.Role with
             | None ->
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "completed with no resolved role"
+                    ))
                 |> ignore
 
                 return wasAborted, false

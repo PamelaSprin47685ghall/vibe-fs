@@ -157,20 +157,17 @@ module PluginSessionWiring =
                     SyncDelegateTier.fromDispatcher dispatcher,
                     registerDelegate,
                     scope.Sessions.Quiescence,
+                    (fun sessionId range providerRun ->
+                        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                            (Some durable)
+                            sessionId
+                            range
+                            providerRun),
+                    DelegationHandoffLedger.port durable,
                     ?workspaceDirectory = workspaceDirectory,
                     ?onInspectorPrompt = Some CasebookLifecycle.notePrompt,
                     ?onInspectorAnswer = Some CasebookLifecycle.noteAnswer,
-                    ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector,
-                    ?workRecordFor =
-                        Some(fun sessionId range providerRun ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                                (Some durable)
-                                sessionId
-                                range
-                                providerRun),
-                    ?prepareHandoff = Some(fun parent child -> DelegationHandoffLedger.prepare durable parent child),
-                    ?advanceHandoff =
-                        Some(fun parent child cursor -> DelegationHandoffLedger.advance durable parent child cursor)
+                    ?onInspectorCleanup = Some CasebookLifecycle.cleanupInspector
                 )
 
             scope.AttachSyncDelegateRuntime syncDelegate

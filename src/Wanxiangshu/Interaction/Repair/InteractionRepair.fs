@@ -109,7 +109,11 @@ module InteractionRepairWorkflow =
                 // The one bounded repair already ran and this LogicalRun is still
                 // unusable. This is now a proved recovery exhaustion, not another
                 // invitation to synthesize user input.
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "INTERACTION_REPAIR_EXHAUSTED")
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "INTERACTION_REPAIR_EXHAUSTED"
+                    ))
                 |> ignore
             | HostSessionNudge.IdleRepairFamilyOutcome.Failed error ->
                 // Journal/authority/transport failures are Wanxiangshu invariant
@@ -119,7 +123,11 @@ module InteractionRepairWorkflow =
                     "interaction-repair-infrastructure-failed"
                     [ "session_id", SessionId.value turn.SessionId; "result", error ]
 
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed("WANXIANGSHU_FATAL: " + error))
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId ("WANXIANGSHU_FATAL: " + error)
+                    ))
                 |> ignore
         }
         :> Task
@@ -147,7 +155,9 @@ module InteractionRepairWorkflow =
             "blogger-protocol-repair-failed"
             [ "session_id", SessionId.value turn.SessionId; "result", reason ]
 
-        eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+        eventPort.NotifyTerminal
+            turn.SessionId
+            (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
         |> ignore
 
     let private exhaustBloggerProtocol

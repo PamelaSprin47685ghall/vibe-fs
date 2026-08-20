@@ -126,7 +126,9 @@ module OrdinaryTurnWorkflow =
                 do! cancelSessionChildren turn.SessionId
                 do! sessionPort.AbortChildren turn.SessionId
 
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Aborted reason)
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Aborted(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
                 |> ignore
 
                 return ()
@@ -143,7 +145,9 @@ module OrdinaryTurnWorkflow =
         task {
             match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
             | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
                 |> ignore
             | _ -> ()
         }

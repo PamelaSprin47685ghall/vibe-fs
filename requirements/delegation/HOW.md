@@ -23,12 +23,15 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 - **单栈执行与结果分发**：串行化键为直接调用方的 `ReuseScope`。仅第一位 canonical 调用方获得完整 WorkRecord，其余 sibling 调用方获得引用句柄。
 - **普通完成收口**：被委托方普通 Assistant 结束即触发返回，无独立 return 协议通道。
 
-### Reusable work-unit handoff
+### Reusable work unit
 
-- 每个 `(parent, delegate)` 维护 durable parent-handoff cursor。新 work unit 先冻结 parent 当前 XTrace head；首次发送附当前 parent LWR，后续发送只附 `[previousHandoff, currentHead)` 的 bounded delta LWR。
-- handoff cursor 仅在新 prompt 已被 Host 接受后推进；发送失败不得吞掉尚未交付的 parent delta。
-- reusable work unit 使用 fresh-only terminal subscription。Host 的 sticky terminal replay 仍保留给 recovery/late observer，但不进入新 invocation。
-- callee 在发送前冻结自身 XTrace head；新 terminal 到达后以 `[start, end)` + terminal provider run 物化 bounded LWR。fork continuation 与 SyncDelegate 共用这条窗口语义，不允许任何 full-lifecycle fallback。
+- 业务控制流只存在于 F# CE：`prepareHandoff → dispatch → await own completion → checkpointCompletedHandoff`。禁止 `Stage/Phase/ActiveWorkUnit/Started→Finished` 等第二运行时或 durable program counter。
+- durable truth 只记录已经发生的事实：某个 logical route 的一次已完成 handoff 确实让 callee 看到了 parent XTrace 截止到哪个 cursor。projection 仅把这些 completion facts 积分成 `latestDeliveredThrough(route)`；它不拥有执行位置。
+- 新调用从 `latestDeliveredThrough(route)` 到当前 parent XTrace head 物化 delta；route 首次调用取完整 parent LWR。logical route = fork Byname 或 caller scope 下的 dedicated SyncDelegate role，绝不以 physical child `SessionId` 作为连续性身份。
+- invocation-local 的 child start cursor、expected Authority Root、waiter/subscription 属于物理 correlation resource，可跨 callback 保存；它们不得 durable 化为 workflow stage。
+- Host sticky terminal 可以继续服务 late observer/recovery；delegation CE 只接受与本次 dispatch 的 causal identity 匹配的 completion，不能把“订阅之后”当作身份。
+- fork 新 participant 是异步 assignment：返回只由本次 dispatch 成败决定；same-road continuation 与 SyncDelegate 是同步 CE：等待本调用 completion、物化 bounded callee LWR、再 checkpoint completed handoff。
+- 新 charge 遇到仍在运行的同 route 调用直接拒绝。Busy nudge 只服务同一 LogicalRun 的内部 continuation，彻底退出 assignment 工具路径。
 
 ### Join 消费与中断
 
@@ -61,5 +64,11 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-021 | `requirements/delegation/tests/fork-attachment.test.mjs` |
 | DELEG-022 | `requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs` |
 | DELEG-023 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-024 | `requirements/delegation/tests/reusable-handoff.test.mjs` + `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-025 | `requirements/host-boundary/tests/events-port.test.mjs` + `requirements/delegation/tests/reusable-handoff.test.mjs` |
+| DELEG-024 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
+| DELEG-025 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + Host fork lifecycle proofs |
+| DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
+| DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + fork reuse integration proof |
+
+## GAP
+
+- `GAP-027`：旧 reusable handoff 以 physical child `SessionId` 持有 cursor，并在 prompt 已 dispatch 后追加 `DelegationHandoffAdvanced`；append 失败会让调用方得到“未放置”而 child 实际已运行。另有 active fork assignment 被降格为 `BusyAgentNudge` 的双重语义。关闭条件：cursor-only writer 删除；新增 direct-CE `ReusableHandoffWorkflow`；frontier 只由 completed-handoff fact 推导；fork/SyncDelegate 无 post-dispatch normal-error bookkeeping；真实 reuse regression 证明 completed call 后同 participant 可再次接单，active charge 明确拒绝。

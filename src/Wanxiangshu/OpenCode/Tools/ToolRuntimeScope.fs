@@ -87,18 +87,7 @@ type ToolRuntimeScope
     let childRecordForRun sessionId range providerRun =
         LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sessionId range providerRun
 
-    let prepareDelegationHandoff parent delegateSession =
-        match journal with
-        | Some durable -> DelegationHandoffLedger.prepare durable parent delegateSession
-        | None ->
-            Task.FromResult
-                { ParentRecord = None
-                  ParentEndExclusive = { Sequence = 0L } }
-
-    let advanceDelegationHandoff parent delegateSession cursor =
-        match journal with
-        | Some durable -> DelegationHandoffLedger.advance durable parent delegateSession cursor
-        | None -> Task.FromResult(Error "delegation handoff requires a durable journal")
+    let reusableHandoff = journal |> Option.map DelegationHandoffLedger.port
 
     let terminalPort = eventPort
     let finalityTimeoutMs = finalityReviewerTimeoutMs
@@ -208,8 +197,7 @@ type ToolRuntimeScope
             parentWorkRecordFor = (fun parentId -> parentRecord (SessionId.value parentId)),
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
             childWorkRecordForRun = childRecordForRun,
-            prepareHandoff = prepareDelegationHandoff,
-            advanceHandoff = advanceDelegationHandoff,
+            ?handoff = reusableHandoff,
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
             treeHashFor =

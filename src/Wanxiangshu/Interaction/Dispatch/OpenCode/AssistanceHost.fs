@@ -373,7 +373,7 @@ type AssistanceHost
 
     let observeChildTerminal childId _session outcome =
         match outcome with
-        | TerminalOutcome.Failed error -> onFailedConsultationTerminal childId error
+        | TerminalOutcome.Failed stop -> onFailedConsultationTerminal childId stop.Reason
         | _ -> ()
 
     let registerChildSubscription (childId: SessionId) =

@@ -10,9 +10,9 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module DelegationHandoffLedger =
 
-    let private previousEnd (journal: AgentJournal) parent delegateSession =
+    let private previousEnd (journal: AgentJournal) parent route =
         let projection = (AgentJournal.snapshot journal).AgentProjections
-        Map.tryFind (DelegationHandoff.key parent delegateSession) projection.DelegationHandoffs
+        Map.tryFind (DelegationHandoff.key parent route) projection.DelegationCompletedHandoffs
 
     let private traceHead (journal: AgentJournal) sessionId =
         AgentJournal.snapshot journal
@@ -24,10 +24,10 @@ module DelegationHandoffLedger =
     let prepare
         (journal: AgentJournal)
         (parent: SessionId)
-        (delegateSession: SessionId)
+        (route: DelegationHandoffRoute)
         : Task<PreparedDelegationHandoff> =
         task {
-            let previous = previousEnd journal parent delegateSession
+            let previous = previousEnd journal parent route
             let current = traceHead journal parent
             let handoff = DelegationHandoff.window previous current
 
@@ -40,36 +40,31 @@ module DelegationHandoffLedger =
                     LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) parent handoff.Range
 
             return
-                { ParentRecord = parentRecord
+                { Route = route
+                  ParentStartInclusive = handoff.Range.StartInclusive
+                  ParentRecord = parentRecord
                   ParentEndExclusive = handoff.Range.EndExclusive }
         }
 
-    let prepareInitial (journal: AgentJournal) (parent: SessionId) : Task<PreparedDelegationHandoff> =
-        task {
-            let current = traceHead journal parent
-            let! parentRecord = LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) parent true
-
-            return
-                { ParentRecord = parentRecord
-                  ParentEndExclusive = { Sequence = current } }
-        }
-
-    let advance
+    let checkpointCompleted
         (journal: AgentJournal)
         (parent: SessionId)
-        (delegateSession: SessionId)
-        (parentEndExclusive: XTraceCursor)
+        (handoff: PreparedDelegationHandoff)
         : Task<Result<unit, string>> =
         task {
             let! appended =
                 AgentJournal.appendAgent
                     (StreamId.Session parent)
                     None
-                    (DelegationFact.DelegationHandoffAdvanced
+                    (DelegationFact.DelegationHandoffCompleted
                         {| ParentSessionId = parent
-                           DelegateSessionId = delegateSession
-                           ParentEndExclusive = parentEndExclusive.Sequence |})
+                           Route = handoff.Route
+                           ParentEndExclusive = handoff.ParentEndExclusive.Sequence |})
                     journal
 
             return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
         }
+
+    let port (journal: AgentJournal) : ReusableHandoffPort =
+        { Prepare = fun parent route -> prepare journal parent route
+          CheckpointCompleted = fun parent handoff -> checkpointCompleted journal parent handoff }

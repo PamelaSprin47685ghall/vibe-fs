@@ -32,6 +32,8 @@ type internal SyncDelegateCall =
       Delegate: SessionId
       Agent: string
       Invocations: SyncDelegateInvocation list
+      AcceptedRoot: TaskCompletionSource<AuthorityRootUserMessageId>
+      mutable AcceptedAuthorityRoot: AuthorityRootUserMessageId option
       Answer: TaskCompletionSource<Result<string, string>> }
 
 /// A single caller's pending invocation to a sync delegate.
@@ -435,6 +437,9 @@ type internal SyncDelegateCallStore() as this =
                 let answer =
                     TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
+                let acceptedRoot =
+                    TaskCompletionSource<AuthorityRootUserMessageId>(TaskCreationOptions.RunContinuationsAsynchronously)
+
                 let call =
                     { Owner = owner
                       OwnerScope = ownerScope
@@ -442,6 +447,8 @@ type internal SyncDelegateCallStore() as this =
                       Delegate = delegateSession
                       Agent = agent
                       Invocations = invocations
+                      AcceptedRoot = acceptedRoot
+                      AcceptedAuthorityRoot = None
                       Answer = answer }
 
                 (ownerCallsOf callsByOwnerScope ownerKey).Add call

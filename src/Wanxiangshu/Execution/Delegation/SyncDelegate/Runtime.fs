@@ -73,34 +73,20 @@ type SyncDelegateRuntime
         resolveOwnerTier: SessionId -> AgentTier option,
         onDelegateReady: SessionId -> string -> unit,
         quiescence: SessionQuiescenceGate,
+        workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
+        handoff: ReusableHandoffPort,
         ?workspaceDirectory: string,
         /// Casebook draft hooks (wired from SpikePlugin → CasebookLifecycle; compile-order seam).
         ?onInspectorPrompt: string -> string -> unit,
         ?onInspectorAnswer: string -> string -> unit,
-        ?onInspectorCleanup: string -> unit,
-        /// EXEC-031: per-invocation bounded WorkRecord projector
-        /// (includeOpening=false). Injected from plugin wiring so Session does
-        /// not depend on Finality compile order; range = the invocation's
-        /// XTrace [StartInclusive, EndExclusive).
-        ?workRecordFor: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
-        ?prepareHandoff: SessionId -> SessionId -> Task<PreparedDelegationHandoff>,
-        ?advanceHandoff: SessionId -> SessionId -> XTraceCursor -> Task<Result<unit, string>>
+        ?onInspectorCleanup: string -> unit
     ) =
     let store = SyncDelegateCallStore()
     let directory = workspaceDirectory
     let noteInspectorPrompt = defaultArg onInspectorPrompt (fun _ _ -> ())
     let noteInspectorAnswer = defaultArg onInspectorAnswer (fun _ _ -> ())
     let cleanupInspectorDraft = defaultArg onInspectorCleanup (fun _ -> ())
-    let projectWorkRecord = defaultArg workRecordFor (fun _ _ _ -> Task.FromResult None)
-
-    let prepareDelegationHandoff =
-        defaultArg prepareHandoff (fun _ _ ->
-            Task.FromResult
-                { ParentRecord = None
-                  ParentEndExclusive = { Sequence = 0L } })
-
-    let advanceDelegationHandoff =
-        defaultArg advanceHandoff (fun _ _ _ -> Task.FromResult(Ok()))
+    let projectWorkRecord = workRecordFor
 
     let sessionKey (sessionId: SessionId) = SessionId.value sessionId
 
@@ -134,7 +120,8 @@ type SyncDelegateRuntime
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
         taskResult {
             let tools = toolMap (canonicalRole call.Role)
-            let! handoff = prepareDelegationHandoff call.Owner call.Delegate |> TaskResultCE.ofTask
+            let route = DelegationHandoffRoute.syncRole call.OwnerScope call.Role
+            let! prepared = handoff.Prepare call.Owner route |> TaskResultCE.ofTask
 
             // EXEC-031: capture the Opening from the raw Charge (not the
             // provider envelope), matching OneShotAgentTool. PromptIngress omits
@@ -156,9 +143,9 @@ type SyncDelegateRuntime
                 inv.StartCursor <- Some startCursor
 
             let providerPrompt =
-                DelegationHandoff.appendParentDelta request.ProviderPrompt handoff.ParentRecord
+                DelegationHandoff.appendParentDelta request.ProviderPrompt prepared.ParentRecord
 
-            let! key =
+            let! _ =
                 dispatcher.SendAgentOwnerRootWithTools
                     sessions
                     call.Delegate
@@ -166,15 +153,15 @@ type SyncDelegateRuntime
                     call.Agent
                     directory
                     PromptDispatcher.AwaitMode.Await
-                    None
+                    (Some(fun physical ->
+                        let root = PhysicalUserMessageId.promoteToAuthorityRoot physical
+                        call.AcceptedAuthorityRoot <- Some root
+                        AsyncSupport.trySetResult call.AcceptedRoot root |> ignore))
                     tools
                     None
 
-            do!
-                advanceDelegationHandoff call.Owner call.Delegate handoff.ParentEndExclusive
-                |> TaskResult.mapError (fun error -> sprintf "delegation handoff append failed: %s" error)
-
-            return key
+            let! _ = call.AcceptedRoot.Task |> TaskResultCE.ofTask
+            return prepared
         }
 
     let deps: SyncDelegateWorkflow.Dependencies =
@@ -194,10 +181,8 @@ type SyncDelegateRuntime
                 }
           SendPrompt =
             fun call request ->
-                task {
-                    let! result = sendDelegatePrompt call request
-                    return result |> Result.map ignore
-                }
+                sendDelegatePrompt call request
+          CheckpointCompletedHandoff = fun parent prepared -> handoff.CheckpointCompleted parent prepared
           ResolveBoundAgent =
             fun childId ->
                 let projections = (AgentJournal.snapshot journal).AgentProjections
@@ -266,22 +251,27 @@ type SyncDelegateRuntime
             return finishCompletedCall turn.SessionId call workRecord
         }
 
-    let tryConsumeReadyCall (store: SyncDelegateCallStore) (sessionId: SessionId) =
-        match store.TryPeekCallByDelegate sessionId with
-        | Some call when
-            call.Invocations
-            |> List.exists (fun invocation -> invocation.StartCursor.IsNone)
-            ->
-            // The provider prompt owns the opening capture and cursor
-            // assignment. A synthetic or early completion observation must
-            // not consume the call before that bounded range exists.
-            None
-        | Some _ -> store.TryPopCallByDelegate sessionId
-        | None -> None
+    let tryConsumeReadyCall (store: SyncDelegateCallStore) (turn: ReconciledTurn) : Task<SyncDelegateCall option> =
+        task {
+            match store.TryPeekCallByDelegate turn.SessionId with
+            | Some call when
+                call.Invocations
+                |> List.exists (fun invocation -> invocation.StartCursor.IsNone)
+                ->
+                return None
+            | Some call ->
+                let! expectedRoot = call.AcceptedRoot.Task
+
+                if expectedRoot = turn.AuthorityRootUserMessageId then
+                    return store.TryPopCallByDelegate turn.SessionId
+                else
+                    return None
+            | None -> return None
+        }
 
     let handleCompletedRoleTurn (turn: ReconciledTurn) =
         task {
-            match tryConsumeReadyCall store turn.SessionId with
+            match! tryConsumeReadyCall store turn with
             | Some call -> return! handleCompletedCall turn call
             | None -> return false
         }
@@ -393,6 +383,15 @@ type SyncDelegateRuntime
             && call.Invocations
                |> List.forall (fun invocation -> invocation.StartCursor.IsSome)
         | None -> false
+
+    member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =
+        match store.TryPeekCallByDelegate sessionId with
+        | None -> Task.FromResult false
+        | Some call ->
+            task {
+                let! _ = call.AcceptedRoot.Task
+                return true
+            }
 
     member _.CancelSession(sessionId: SessionId) : unit =
         let asOwnerScope = ReuseScope.ofSession sessionId

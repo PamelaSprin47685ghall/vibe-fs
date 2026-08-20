@@ -164,7 +164,11 @@ module ManagerIdle =
             | HostSessionNudge.IdleContinuationOutcome.Sent _
             | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
             | HostSessionNudge.IdleContinuationOutcome.Failed error ->
-                eventPort.NotifyTerminal turn.SessionId (Wanxiangshu.OpenCode.TerminalOutcome.Failed error)
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (Wanxiangshu.OpenCode.TerminalOutcome.Failed(
+                        Wanxiangshu.OpenCode.TerminalStop.forAuthority turn.AuthorityRootUserMessageId error
+                    ))
                 |> ignore
         }
 

@@ -168,7 +168,11 @@ module ProviderRecoveryWorkflow =
         =
         match continuation with
         | Ok _ -> ()
-        | Error _ -> eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed error) |> ignore
+        | Error _ ->
+            eventPort.NotifyTerminal
+                turn.SessionId
+                (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId error))
+            |> ignore
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
     ///
@@ -190,7 +194,9 @@ module ProviderRecoveryWorkflow =
         : Task =
         task {
             let fail reason =
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed reason)
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
                 |> ignore
 
             match journal with

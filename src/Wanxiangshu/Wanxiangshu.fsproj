@@ -53,6 +53,7 @@
     <Compile Include="Execution/Session/Wait/CausalWait.fs"/>
     <Compile Include="Execution/Session/Ownership.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
+    <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
     <Compile Include="Foundation/Outcome.fs"/>
     <Compile Include="Requirement/Grounding/Model.fs"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Model.fs"/>
@@ -313,7 +314,6 @@
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
     <Compile Include="Context/Prefix/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
-    <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
     <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
     <Compile Include="Resources/PromptResources.fs"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
@@ -608,6 +608,7 @@
     <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fs"/>

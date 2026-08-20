@@ -64,13 +64,13 @@ module HostForkRunLifecycle =
         (agent: string)
         (directory: string option)
         (prompt: string)
+        (onAccepted: PhysicalUserMessageId -> unit)
         : Task<Result<unit, string>> =
         task {
             match journal with
             | None -> return Error "No journal: an AgentOwnerRoot prompt cannot be claimed"
             | Some durable ->
                 let svc = PromptDispatcher.forJournal durable
-                // PROMPT-007 Detached: child dispatch does not wait for PhysicalAccepted.
                 let! sent =
                     svc.SendAgentOwnerRoot
                         sessions
@@ -78,8 +78,8 @@ module HostForkRunLifecycle =
                         prompt
                         agent
                         directory
-                        PromptDispatcher.AwaitMode.Detached
-                        None
+                        PromptDispatcher.AwaitMode.Await
+                        (Some onAccepted)
 
                 return sent |> Result.map ignore
         }
@@ -98,12 +98,50 @@ module HostForkRunLifecycle =
         (agent: string)
         (directory: string option)
         (prompt: string)
+        (onAccepted: PhysicalUserMessageId -> unit)
         =
-        sendAgentOwnerRoot sessions journal childId agent directory prompt
+        sendAgentOwnerRoot sessions journal childId agent directory prompt onAccepted
 
     let childPromptSender sessions parentId journal directoryOf =
-        fun agentId childId (_role: Role) agent prompt ->
-            sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt
+        fun agentId childId (_role: Role) agent prompt onAccepted ->
+            sendChildPrompt sessions parentId journal childId agent (directoryOf agentId) prompt onAccepted
+
+    let bindAuthorityRoot (run: PendingHostRun) (physical: PhysicalUserMessageId) =
+        run.AuthorityRoot <- Some(PhysicalUserMessageId.promoteToAuthorityRoot physical)
+
+    let private completionBelongsToRun (run: PendingHostRun) (result: AgentRunResult) =
+        match run.Handoff with
+        | None -> true
+        | Some _ -> run.AuthorityRoot = Some result.AuthorityRootUserMessageId
+
+    let private stopBelongsToRun (run: PendingHostRun) (stop: TerminalStop) =
+        match run.Handoff with
+        | None -> true
+        | Some _ ->
+            run.AuthorityRoot
+            |> Option.exists (fun root -> TerminalStop.belongsTo root stop)
+
+    let private checkpointCompletedOrCrash
+        (handoffPort: ReusableHandoffPort option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        : Task =
+        task {
+            match run.Handoff, handoffPort with
+            | None, _ -> ()
+            | Some handoff, Some port ->
+                match! port.CheckpointCompleted parentId handoff with
+                | Ok() -> ()
+                | Error error ->
+                    let detail = sprintf "delegation completed-handoff append failed: %s" error
+                    FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
+                    return raise (InvalidOperationException detail)
+            | Some _, None ->
+                let detail = "reusable fork run has no handoff capability"
+                FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
+                return raise (InvalidOperationException detail)
+        }
+        :> Task
 
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.
@@ -189,12 +227,40 @@ module HostForkRunLifecycle =
             Task.FromResult(())
         | Ok proof -> deliverClaimedCompletion pendingRuns gate journal parentId run proof agentOutcome
 
+    let private deliverFailedCompletion
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (error: string)
+        : Task =
+        let childId = run.ChildId
+        let runId = "run-" + run.AgentId
+        let handle = HandleController.agentHandle run.AgentId
+        let code = if error = "cancelled" then "CANCELLED" else "ERROR"
+
+        let agentOutcome =
+            AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
+
+        let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+        deliverProvenCompletion
+            gate
+            pendingRuns
+            journal
+            parentId
+            run
+            (TerminalEvidence.failed run.AgentId handle childId body)
+            agentOutcome
+
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
+        (handoffPort: ReusableHandoffPort option)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         (workRecord: string option)
@@ -220,30 +286,37 @@ module HostForkRunLifecycle =
             // AbandonRoundProduct, never FailSlot). Concluding MISSING_FINAL_REPORT
             // here would fail the run before the last effort. Observation only.
             Task.FromResult(())
+        | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
-            let agentOutcome =
-                AgentCompletion.completed
-                    run.AgentId
-                    childId
-                    runId
-                    run.Role
-                    result.AuthorityRootUserMessageId
-                    // HOST-010/HOST-011: terminal provider run IS the assistant message.
-                    result.ProviderRun
-                    (completedWorkRecord |> Option.defaultValue "")
-                    result.Directory
+            task {
+                do! checkpointCompletedOrCrash handoffPort parentId run
 
-            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+                let agentOutcome =
+                    AgentCompletion.completed
+                        run.AgentId
+                        childId
+                        runId
+                        run.Role
+                        result.AuthorityRootUserMessageId
+                        result.ProviderRun
+                        (completedWorkRecord |> Option.defaultValue "")
+                        result.Directory
 
-            deliverProvenCompletion
-                gate
-                pendingRuns
-                journal
-                parentId
-                run
-                (TerminalEvidence.completed run.AgentId handle childId body)
-                agentOutcome
-        | Failed error when error = "MISSING_FINAL_REPORT" || error.Contains("MISSING_FINAL_REPORT") ->
+                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+                do!
+                    deliverProvenCompletion
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        (TerminalEvidence.completed run.AgentId handle childId body)
+                        agentOutcome
+            }
+            :> Task
+        | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
+        | Failed stop when stop.Reason = "MISSING_FINAL_REPORT" || stop.Reason.Contains("MISSING_FINAL_REPORT") ->
             // FALLBACK-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
             // proven terminal failure. The subagent auto-retries and continues (its
             // reconcile loop keeps repairing the empty terminal); delivering a
@@ -251,22 +324,7 @@ module HostForkRunLifecycle =
             // last effort (the same reason the `Aborted` branch observes only).
             // Observation only — keep pending run Active for a later proven terminal.
             Task.FromResult(())
-        | Failed error ->
-            let code = if error = "cancelled" then "CANCELLED" else "ERROR"
-
-            let agentOutcome =
-                AgentCompletion.failed run.AgentId runId (Some run.Role) (Some childId) code error
-
-            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
-
-            deliverProvenCompletion
-                gate
-                pendingRuns
-                journal
-                parentId
-                run
-                (TerminalEvidence.failed run.AgentId handle childId body)
-                agentOutcome
+        | Failed stop -> deliverFailedCompletion gate pendingRuns journal parentId run stop.Reason
 
     let installRun
         (gate: obj)
@@ -277,6 +335,8 @@ module HostForkRunLifecycle =
         (childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> int64)
         (trackOwnedWork: (unit -> Task) -> unit)
+        (handoffPort: ReusableHandoffPort option)
+        (handoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -287,6 +347,8 @@ module HostForkRunLifecycle =
               ChildId = childId
               Role = role
               StartCursor = xTraceHead childId
+              Handoff = handoff
+              AuthorityRoot = None
               Source = HostPendingRun.completionSource ()
               Subscription = None
               Finished = false }
@@ -300,7 +362,7 @@ module HostForkRunLifecycle =
                     trackOwnedWork (fun () ->
                         task {
                             let! workRecord = workRecordForOutcome childWorkRecordForRun xTraceHead run outcome
-                            do! complete gate pendingRuns journal parentId sessions run outcome workRecord
+                            do! complete gate pendingRuns journal parentId sessions handoffPort run outcome workRecord
                         }
                         :> Task))
             )
@@ -341,10 +403,11 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
+        (handoffPort: ReusableHandoffPort option)
         (run: PendingHostRun)
         (error: string)
         =
-        complete gate pendingRuns journal parentId sessions run (TerminalOutcome.Failed error) None
+        deliverFailedCompletion gate pendingRuns journal parentId run error
 
     /// Terminal outcomes are always accepted by complete. Call sites keep
     /// MarkReady for API shape; body is intentionally a no-op.

@@ -92,10 +92,20 @@ fork 携带的 attachment 仅将指定同伴的历史工作记录作为只读数
 
 被委托方在执行过程中遇到单次尝试失败时，属于局部瞬态故障，不得立即向父调用方报告失败；必须等待子会话内的所有恢复重试路径完全耗尽或会话确定性终结后，方可向调用方交付最终失败。
 
-## DELEG-024: reusable handoff = parent delta LWR + fresh charge → fresh completion → callee delta LWR
+## DELEG-024: reusable delegation 由 logical route 上的一次 direct-CE invocation 定义
 
-复用既有 participant/session 发起新工作时，每次调用都形成新的 work unit。输入必须由“调用方自上一次成功 handoff 之后的 delta LifecycleWorkRecord”与本次新 charge 组成；首次 handoff 以当前调用方 LifecycleWorkRecord 作为初始背景。调用方必须等待本 work unit 的新完成，返回值只能物化 callee 本 work unit 的 bounded delta LifecycleWorkRecord，严禁返回 callee 全生命周期记录或上一 work unit 的结果。该合同同时适用于 fork 的 same-road continuation 与 `inspect` / `establish-behavior` / `repair-behavior` 等 reusable synchronous delegation。
+复用既有 participant 发起新工作时，每次调用都是宿主 F# CE 中的一次独立 invocation，不建立 durable `Stage/Phase/ActiveWorkUnit` 或第二状态机。invocation 属于稳定 logical route：fork continuation 由 Byname 标识，SyncDelegate 由 caller scope + dedicated role 标识；物理 `SessionId` 只是本次执行目标，不拥有 handoff 连续性。
 
-## DELEG-025: 新 work unit 只能由订阅之后产生的 terminal 完成
+work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。同步调用必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord。fork same-road continuation、`inspect`、`establish-behavior`、`repair-behavior` 共用这一合同。
 
-复用 session 的新 work unit 在发送新 prompt 之前建立 fresh-only terminal subscription。历史 sticky terminal 只服务 late-observer/recovery，不得 replay 进新 work unit 的 completion cell。旧 provider run、旧 terminal、旧 completion cache 均不能完成或失败新的调用。
+## DELEG-025: work unit completion 由 causal identity 决定，不由订阅时刻决定
+
+terminal 能完成 work unit，当且仅当它属于该 work unit 实际接受的 Authority Root / provider execution。历史 sticky terminal、晚到的上一 provider run、旧 completion cache 即使发生在新订阅之后也不得完成或失败新 work unit。时间先后可以作为 transport 优化，绝不是 completion identity。
+
+## DELEG-026: effect truth 只能沿 direct CE 单向前进
+
+新 assignment 的业务流程必须直接写成 `prepare → dispatch → await own completion → checkpoint completed handoff` 的 F# CE。物理 dispatch 之前的 durable claim 复用 `PromptAuthority` 已有事实，不另造 delegation program-state。确定未发送的 dispatch failure 可以作为本次调用失败；一旦 dispatch 已发生或 outcome unknown，任何后置 handoff/frontier/affinity bookkeeping 都不得把调用结果改写成“未放置”。route 的 parent frontier 只能由“本次 interaction 已完成”的 durable fact推进。调用方因此永远不会同时得到“无法放置”与“后台其实已经启动”两种互斥现实。
+
+## DELEG-027: 新 assignment 不得伪装成 busy nudge
+
+同一 logical route 同时至多一个 active work unit。已有 work unit 未终结时到来的新 assignment 必须明确拒绝；`BusyAgentNudge` 只允许作为既有 LogicalRun 的内部 continuation，不得承载新的 fork/synchronous charge。前一 work unit `Finished` 后，同一 participant 必须立即可承接下一 work unit，无需依赖 join 消费或重新创建 participant。

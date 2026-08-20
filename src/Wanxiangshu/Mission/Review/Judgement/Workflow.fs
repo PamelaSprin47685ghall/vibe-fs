@@ -151,7 +151,11 @@ module ReviewerWorkflow =
             else
                 do! appendAttemptClosed journal turn
 
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with empty terminal output")
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "completed with empty terminal output"
+                    ))
                 |> ignore
         }
 
@@ -188,7 +192,11 @@ module ReviewerWorkflow =
             // default.
             match turn.Role with
             | None ->
-                eventPort.NotifyTerminal turn.SessionId (TerminalOutcome.Failed "completed with no resolved role")
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "completed with no resolved role"
+                    ))
                 |> ignore
             | Some role ->
                 let runResult: AgentRunResult =
@@ -205,11 +213,15 @@ module ReviewerWorkflow =
 
     let private reportContinuationFailure
         (eventPort: IEventObservationPort)
-        (sessionId: SessionId)
+        (turn: ReconciledTurn)
         (outcome: Result<unit, string>)
         =
         match outcome with
-        | Error reason -> eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed reason) |> ignore
+        | Error reason ->
+            eventPort.NotifyTerminal
+                turn.SessionId
+                (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+            |> ignore
         | Ok() -> ()
 
     let private observeProcessReview
@@ -226,7 +238,7 @@ module ReviewerWorkflow =
                 let! outcome =
                     ReviewerContinuation.ensureVerdictSubmitted continuationPort journal turn.SessionId reviewerKey
 
-                reportContinuationFailure eventPort turn.SessionId outcome
+                reportContinuationFailure eventPort turn outcome
             }
             :> Task
         | ReviewerEvidence.Need.CompleteProcessReview -> completeReviewer eventPort journal turn true
