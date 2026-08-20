@@ -16,6 +16,9 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
@@ -77,6 +80,11 @@ module Fold =
         | AgentFact.Host host -> HostFactFold.fold projection host
         | AgentFact.Fission fission -> FissionFactFold.fold projection fission
         | AgentFact.Delegation delegation -> DelegationFactFold.fold projection delegation
+        | AgentFact.Attention attention -> AttentionFactFold.fold projection attention
+        | AgentFact.Concern concern -> ConcernFactFold.fold projection concern
+        | AgentFact.InstitutionalLearning learning ->
+            InstitutionalLearningFactFold.fold projection learning
+            |> Result.bind (fun updated -> AttentionFactFold.foldLearning updated learning)
 
     let private foldMagicTodo (projection: ProjectionSet) (eventId: EventId) (fact: MagicTodoFacts.MagicTodoFact) =
         match fact with

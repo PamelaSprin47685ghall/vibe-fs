@@ -78,7 +78,8 @@ module PairProgrammingThoughtSurface =
                    CallId = ToolCallId.create (textOf payload?callId)
                    MarkerText = textOf payload?markerText
                    CallGap = transcriptGapOf payload?callGapAfter
-                   ResultGap = transcriptGapOf payload?resultGapAfter |}
+                   ResultGap = transcriptGapOf payload?resultGapAfter
+                   ConcernPlacement = None |}
 
         fact, sessionId
 

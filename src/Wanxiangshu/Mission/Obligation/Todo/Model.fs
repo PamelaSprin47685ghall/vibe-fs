@@ -311,24 +311,29 @@ module MagicTodo =
         else
             minimum
 
-    /// Context compression protects only the true Opening message. Planning stage
-    /// does not grant a larger raw-X prefix: pre-T1 and post-T1 both start Y at the
-    /// first XTrace position after Opening. WorkRecord may still classify BlindPlan
-    /// T1 material as constitutive Opening; that archival projection is independent
-    /// from provider-context compression.
+    /// BlindPlan keeps the whole live planning frontier in Opening until T1.
+    /// Once T1 commits, the structural floor becomes the exclusive end after the
+    /// constitutive T1 call/result pair and remains independent from later X growth.
     let effectiveOpeningFloor
         (hasOpenLife: bool)
-        (_planCommitted: bool)
+        (planCommitted: bool)
         (openingCursor: XTraceCursor)
-        (_t1CallCursor: XTraceCursor option)
-        (_t1ToolCallId: ToolCallId option)
-        (_xTraceHeadSequence: int64)
-        (_parts: TracePartAnchor list)
+        (t1CallCursor: XTraceCursor option)
+        (t1ToolCallId: ToolCallId option)
+        (xTraceHeadSequence: int64)
+        (parts: TracePartAnchor list)
         : XTraceCursor option =
+        let committedFloor =
+            match t1CallCursor, t1ToolCallId with
+            | Some callCursor, Some callId -> blindPlanOpeningBoundary openingCursor callCursor callId parts
+            | _ -> workRecordStart openingCursor
+
         if not hasOpenLife then
             None
+        elif not planCommitted then
+            Some { Sequence = xTraceHeadSequence }
         else
-            Some(workRecordStart openingCursor)
+            Some committedFloor
 
     let bloggerEffectiveStart (recordCoverage: RecordCoverage) (workRecordStartCursor: XTraceCursor) : XTraceCursor =
         if recordCoverage.IngestedThrough.Sequence > workRecordStartCursor.Sequence then

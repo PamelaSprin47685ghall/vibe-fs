@@ -149,6 +149,13 @@ module ToolRegistry =
         | "repair-behavior" -> fun r -> r = Role.DevOps
         | "chronicle" -> fun r -> r = Role.Blogger && ChronicleTool.hasLiveCycle parkedHost sessionId
         | "assume" -> fun r -> r <> Role.Blogger && r <> Role.Distiller
+        | "enough"
+        | "abandon"
+        | "defer"
+        | "subscribe"
+        | "publish"
+        | "celebrate"
+        | "regret" -> fun r -> r <> Role.Blogger && r <> Role.Distiller
         // CASE-009: fetch is the next-session Casebook read. Inspector/Coder
         // consume reusable Q/A; Bookkeeper is js-bookkeeper only (gateExecute).
         | "fetch" -> fun r -> r = Role.Inspector || r = Role.Coder
@@ -260,6 +267,9 @@ module ToolRegistry =
               // Cognitive commitment point: no authority or persistence. Kept
               // out of Blogger/Distiller by the ordinary role gate.
               yield AssumeTool.spec factory
+              yield! AttentionTools.specs factory journal
+              yield! ConcernTools.specs factory journal
+              yield! InstitutionalLearningTools.specs factory journal
               // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
               // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
               yield ChronicleTool.spec factory runtime parkedHost

@@ -18,6 +18,7 @@ open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
@@ -69,7 +70,15 @@ module HostFactFold =
                             Guidelines = Some updated }))
                 projection
             |> function
-                | Ok updated -> Ok updated
+                | Ok updated ->
+                    match payload.ConcernPlacement with
+                    | None -> Ok updated
+                    | Some batch ->
+                        ConcernProjection.applyPlacement payload.SessionId batch updated.Concern
+                        |> Result.map (fun concern -> { updated with Concern = concern })
+                        |> Result.mapError (fun reason ->
+                            { Fact = "PairProgrammingGuidelineAnchored"
+                              Reason = reason })
                 | Error(GuidelineFoldRejection.NonSequentialOrdinal(expected, actual)) ->
                     reject
                         "PairProgrammingGuidelineAnchored"

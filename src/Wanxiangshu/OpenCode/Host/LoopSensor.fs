@@ -28,8 +28,10 @@ type LoopSensor
     ) =
 
     let gate = obj ()
+    /// DSL-cross-callback-proof: physical resource — bounded detector algorithm scratch per physical attempt
     // DSL-MUTABLE: resource — bounded detector state per physical attempt.
     let detectors = Dictionary<string, LoopDetector.Detector>()
+    /// DSL-cross-callback-proof: physical single-flight — process-local anomaly ownership until reconcile
     // DSL-MUTABLE: single-flight — process-local anomaly ownership until reconcile.
     let armed = Dictionary<string, DegenerationKind>()
 

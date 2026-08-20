@@ -23,6 +23,7 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
@@ -262,7 +263,8 @@ module PairProgrammingThoughtTransform =
           CallId: string
           MarkerText: string
           CallGap: TranscriptGap
-          ResultGap: TranscriptGap }
+          ResultGap: TranscriptGap
+          ConcernPlacement: ConcernPlacementBatch option }
 
     /// Process-local fallback when journal is unavailable (tests / no workspace).
     /// Keyed by transcript identity; append-only within process.
@@ -717,7 +719,8 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.value pair.CallId
                   MarkerText = pair.MarkerText
                   CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap })
+                  ResultGap = pair.ResultGap
+                  ConcernPlacement = None })
 
     let private readDurableVisibleHistory
         (journal: AgentJournal)
@@ -734,7 +737,8 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.value pair.CallId
                   MarkerText = pair.MarkerText
                   CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap })
+                  ResultGap = pair.ResultGap
+                  ConcernPlacement = None })
 
     let private readMemoryHistory (key: string) : PairProgrammingGuidelineWire list =
         match memoryLedger.TryGetValue key with
@@ -765,7 +769,8 @@ module PairProgrammingThoughtTransform =
                        CallId = ToolCallId.create pair.CallId
                        MarkerText = pair.MarkerText
                        CallGap = pair.CallGap
-                       ResultGap = pair.ResultGap |}
+                       ResultGap = pair.ResultGap
+                       ConcernPlacement = pair.ConcernPlacement |}
 
             match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
             | Ok _ -> return Ok()
@@ -792,6 +797,7 @@ module PairProgrammingThoughtTransform =
         (append: PairProgrammingGuidelineWire -> Task<Result<unit, string>>)
         (sessionId: string option)
         (markerText: string)
+        (concernPlacement: ConcernPlacementBatch option)
         (realMessages: obj list)
         (callGap: TranscriptGap)
         (resultGap: TranscriptGap)
@@ -809,7 +815,8 @@ module PairProgrammingThoughtTransform =
                       CallId = stableCallId sessionId ordinal
                       MarkerText = skillContent markerText
                       CallGap = callGap
-                      ResultGap = resultGap }
+                      ResultGap = resultGap
+                      ConcernPlacement = concernPlacement }
 
                 let! rendered = replay providerId realMessages (visibleHistory @ [ candidate ])
                 do! append candidate
@@ -833,6 +840,7 @@ module PairProgrammingThoughtTransform =
         (journal: AgentJournal option)
         (sessionId: string option)
         (markerText: string)
+        (concernPlacement: ConcernPlacementBatch option)
         (rawMessages: obj list)
         : Task<Result<obj list, string>> =
         taskResult {
@@ -900,6 +908,7 @@ module PairProgrammingThoughtTransform =
                     append
                     sessionId
                     markerText
+                    concernPlacement
                     realMessages
                     callGap
                     resultGap
@@ -943,6 +952,44 @@ module PairProgrammingThoughtTransform =
                 return PairProgrammingCalibration.composeWithElapsed guidance elapsed toolEstimate guideline
             }
         | _ -> Task.FromResult(PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline)
+
+    let private concernFragmentText language (prepared: ConcernPreparedFragments) =
+        let announcements =
+            prepared.Announcements
+            |> List.map (fun (id, concern) ->
+                ProviderProse.render
+                    language
+                    "concern-routing/subscription-announcement"
+                    (Map [ "id", id; "concern", concern ]))
+
+        let messages =
+            prepared.Messages
+            |> List.map (fun (id, message) ->
+                ProviderProse.render
+                    language
+                    "concern-routing/message-delivery"
+                    (Map [ "id", id; "message", message ]))
+
+        match announcements @ messages with
+        | [] -> None
+        | fragments ->
+            Some(
+                ProviderProse.render language "concern-routing/pair-heading" Map.empty
+                + "\n"
+                + String.concat "\n" fragments
+            )
+
+    let private prepareConcernFragments journal projectionSessionIdOpt language =
+        match journal, projectionSessionIdOpt with
+        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
+            let recipient = SessionId.create sessionId
+            let state = (AgentJournal.snapshot durable).AgentProjections.Concern
+            let prepared = ConcernProjection.prepareFragments recipient state
+
+            concernFragmentText language prepared
+            |> Option.map (fun text -> text, Some prepared.Batch)
+            |> Option.defaultValue ("", None)
+        | _ -> "", None
 
     let private terminateSessionIfPresent
         (terminateSession: SessionTermination)
@@ -998,8 +1045,11 @@ module PairProgrammingThoughtTransform =
             let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
 
             let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
+            let concernText, concernPlacement = prepareConcernFragments journal projectionSessionIdOpt language
+            let markerText =
+                if String.IsNullOrWhiteSpace concernText then markerText else markerText + "\n\n" + concernText
 
-            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText messages
+            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText concernPlacement messages
 
             do! applyPairInjectResult terminateSession projectionSessionIdOpt outObj injectResult
         }
@@ -1031,4 +1081,4 @@ module PairProgrammingThoughtTransform =
         (markerText: string)
         (rawMessages: obj list)
         : Task<Result<obj list, string>> =
-        tryInjectCore journal sessionId markerText rawMessages
+        tryInjectCore journal sessionId markerText None rawMessages

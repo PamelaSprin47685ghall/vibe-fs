@@ -110,6 +110,13 @@ module StaticTools =
           "grep"
           "skill"
           "assume"
+          "enough"
+          "abandon"
+          "defer"
+          "subscribe"
+          "publish"
+          "celebrate"
+          "regret"
           "mv"
           "rm"
           "bash-honeypot"
@@ -144,7 +151,18 @@ module StaticTools =
         let allowedNames = namesForPermissions allowed
 
         knownToolNames
-        |> List.map (fun name -> name, name = "skill" || name = "assume" || Set.contains name allowedNames)
+        |> List.map (fun name ->
+            name,
+            (name = "skill"
+             || name = "assume"
+             || name = "enough"
+             || name = "abandon"
+             || name = "defer"
+             || name = "subscribe"
+             || name = "publish"
+             || name = "celebrate"
+             || name = "regret"
+             || Set.contains name allowedNames))
         |> Map.ofList
 
     let private defaultPermission allowed name =
@@ -176,6 +194,9 @@ module StaticTools =
         | "assume", Role.Blogger
         | "assume", Role.Distiller -> "deny"
         | "assume", _ -> "allow"
+        | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Blogger
+        | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), Role.Distiller -> "deny"
+        | ("enough" | "abandon" | "defer" | "subscribe" | "publish" | "celebrate" | "regret"), _ -> "allow"
         | "js-bookkeeper", _ -> "deny"
         | name, _ when name.StartsWith "js-" -> jsPermission role name
         | _ -> defaultPermission allowed name

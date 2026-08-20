@@ -22,10 +22,10 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| CONCERN-ROUTING-001 | pure claim/idempotency/conflict algebra；id→concern immutable；workspace isolation |
-| CONCERN-ROUTING-002 | temporal multi-participant Pair Hint coverage；sticky once |
-| CONCERN-ROUTING-003 | publish route：sender 不知道 recipient；unknown/retired fail closed；resolve→append generation stale 不自动 retarget |
-| CONCERN-ROUTING-004 | temporal：publish 不 interrupt；next pair delivers；pair placement + concern coverage atomic；failed placement zero-consume；replay byte-stable/no redrain |
-| CONCERN-ROUTING-005 | authority negative：peer message 不 mint user authority/obligation |
-| CONCERN-ROUTING-006 | owner termination/late publish；same-concern explicit rebind creates new generation；old messages do not cross generation |
-| CONCERN-ROUTING-007 | architecture negative：无 generic broker/org graph/priority workflow |
+| CONCERN-ROUTING-001 | `requirements/concern-routing/tests/concern-routing.test.mjs` |
+| CONCERN-ROUTING-002 | `requirements/concern-routing/tests/concern-routing.test.mjs` |
+| CONCERN-ROUTING-003 | `requirements/concern-routing/tests/concern-routing.test.mjs` |
+| CONCERN-ROUTING-004 | `requirements/concern-routing/tests/concern-routing.test.mjs` |
+| CONCERN-ROUTING-005 | `requirements/concern-routing/tests/concern-routing.test.mjs` |
+| CONCERN-ROUTING-006 | `requirements/concern-routing/tests/concern-routing.test.mjs` |
+| CONCERN-ROUTING-007 | `requirements/concern-routing/tests/concern-routing.test.mjs` |

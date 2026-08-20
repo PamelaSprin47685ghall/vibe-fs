@@ -32,11 +32,11 @@
 
 | 命题 | 落点测试 |
 |---|---|
-| INSTITUTIONAL-LEARNING-001 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-002 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-003 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-004 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-005 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-006 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-007 | `requirements/institutional-learning/tests/README.md` |
-| INSTITUTIONAL-LEARNING-008 | `requirements/institutional-learning/tests/README.md` |
+| INSTITUTIONAL-LEARNING-001 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-002 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-003 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-004 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-005 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-006 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-007 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |
+| INSTITUTIONAL-LEARNING-008 | `requirements/institutional-learning/tests/institutional-learning.test.mjs` |

@@ -129,16 +129,16 @@ type SyncDelegateRuntime
         |> Option.defaultValue 0L
 
     let sendDelegatePrompt (call: SyncDelegateCall) (request: SyncDelegatePromptRequest) =
-        task {
+        taskResult {
             let tools = toolMap (canonicalRole call.Role)
-            let! handoff = prepareDelegationHandoff call.Owner call.Delegate
+            let! handoff = prepareDelegationHandoff call.Owner call.Delegate |> TaskResultCE.ofTask
 
             // EXEC-031: capture the Opening from the raw Charge (not the
             // provider envelope), matching OneShotAgentTool. PromptIngress omits
             // Opening for AgentOwnerRoot, so the LWR projector would otherwise
             // return None and the bounded record would be undefined. Idempotent:
             // a reused child keeps its first invocation's Opening (PERSIST-010).
-            do! XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge []
+            do! XTraceCapture.captureOpening (Some journal) call.Delegate request.Charge [] |> TaskResultCE.ofTask
 
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
@@ -152,7 +152,7 @@ type SyncDelegateRuntime
 
             let providerPrompt = DelegationHandoff.appendParentDelta request.ProviderPrompt handoff.ParentRecord
 
-            let! sent =
+            let! key =
                 dispatcher.SendAgentOwnerRootWithTools
                     sessions
                     call.Delegate
@@ -164,12 +164,11 @@ type SyncDelegateRuntime
                     tools
                     None
 
-            match sent with
-            | Error error -> return Error error
-            | Ok key ->
-                match! advanceDelegationHandoff call.Owner call.Delegate handoff.ParentEndExclusive with
-                | Error error -> return Error(sprintf "delegation handoff append failed: %s" error)
-                | Ok() -> return Ok key
+            do!
+                advanceDelegationHandoff call.Owner call.Delegate handoff.ParentEndExclusive
+                |> TaskResult.mapError (fun error -> sprintf "delegation handoff append failed: %s" error)
+
+            return key
         }
 
     let deps: SyncDelegateWorkflow.Dependencies =

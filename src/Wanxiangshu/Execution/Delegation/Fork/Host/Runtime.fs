@@ -455,17 +455,17 @@ type HostForkRuntime
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.
         HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
 
-    member internal _.AwaitCurrentWorkRecord(agentId: string) : Task<Result<string, string>> =
-        task {
-            match! runtime.AwaitAgent agentId with
-            | Error error -> return Error error
-            | Ok completion ->
-                match completion.Outcome with
-                | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) ->
-                    return Ok payload.WorkRecord
-                | AgentCompleted _ -> return Error "reusable fork completed without bounded delta WorkRecord"
-                | AgentFailed payload -> return Error payload.Message
-                | AgentAbandoned(_, reason) -> return Error reason
+    member private _.WorkRecordFromCompletion(completion: RunCompletion) : Result<string, string> =
+        match completion.Outcome with
+        | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) -> Ok payload.WorkRecord
+        | AgentCompleted _ -> Error "reusable fork completed without bounded delta WorkRecord"
+        | AgentFailed payload -> Error payload.Message
+        | AgentAbandoned(_, reason) -> Error reason
+
+    member internal this.AwaitCurrentWorkRecord(agentId: string) : Task<Result<string, string>> =
+        taskResult {
+            let! completion = runtime.AwaitAgent agentId
+            return! this.WorkRecordFromCompletion completion
         }
 
     member this.CancelAndDrain() : Task =

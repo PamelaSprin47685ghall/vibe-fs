@@ -18,6 +18,9 @@ open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
@@ -132,6 +135,10 @@ type AgentProjectionSet =
         /// delegate session. Keyed pair lookup; never inferred from prompt text.
         DelegationHandoffs: Map<string, int64>
 
+        Attention: AttentionProjectionState
+        Concern: ConcernProjectionState
+        InstitutionalLearning: InstitutionalLearningProjectionState
+
         /// Historical count of folded `RuntimeStarted` envelopes. Retained for
         /// audit/backward-compatible projections; it no longer drives recovery.
         RuntimeStartCount: int
@@ -167,6 +174,9 @@ module AgentProjection =
           Fission = FissionProjection.empty
           MagicTodo = MagicTodoProjection.empty
           DelegationHandoffs = Map.empty
+          Attention = AttentionProjection.empty
+          Concern = ConcernProjection.empty
+          InstitutionalLearning = InstitutionalLearningProjection.empty
           RuntimeStartCount = 0 }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =

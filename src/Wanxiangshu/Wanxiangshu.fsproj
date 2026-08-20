@@ -57,6 +57,9 @@
     <Compile Include="Requirement/Grounding/Model.fs"/>
     <Compile Include="OpenCode/Host/RequirementGrounding/Model.fs"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
+    <Compile Include="Interaction/Attention/Facts.fs"/>
+    <Compile Include="Interaction/Concern/Facts.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Facts.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Facts.fs"/>
     <Compile Include="Mission/Review/Facts.fs"/>
     <Compile Include="Execution/Delegation/Facts.fs"/>
@@ -83,6 +86,7 @@
     <Compile Include="Participant/Provider/Attempt/TerminalValidity.fs"/>
     <Compile Include="Context/Prefix/Candidate.fs"/>
     <Compile Include="Enforcer/Catalog.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Enhancer.fs"/>
     <Compile Include="Enforcer/Codec.fs"/>
     <Compile Include="Enforcer/ChronicleExecution.fs"/>
     <Compile Include="Enforcer/Cycle/Model.fs"/>
@@ -211,6 +215,12 @@
     <Compile Include="Execution/Delegation/DelegatedToolEstimateProjection.fs"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateSurface.fs"/>
     <Compile Include="Execution/Session/SessionStartedAtProjection.fs"/>
+    <Compile Include="Interaction/Attention/Projection.fs"/>
+    <Compile Include="Interaction/Concern/Projection.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Projection.fs"/>
+    <Compile Include="Interaction/Attention/Surface.fs"/>
+    <Compile Include="Interaction/Concern/Surface.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Surface.fs"/>
     <Compile Include="Composition/Durable/Projection.fs"/>
     <Compile Include="Mission/Manager/Life/OpeningFloor.fs"/>
     <Compile Include="Enforcer/Observation.fs"/>
@@ -231,6 +241,9 @@
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
     <Compile Include="Composition/Durable/HostFactFold.fs"/>
     <Compile Include="Execution/Delegation/DelegationFactFold.fs"/>
+    <Compile Include="Interaction/Attention/Fold.fs"/>
+    <Compile Include="Interaction/Concern/Fold.fs"/>
+    <Compile Include="Enforcer/InstitutionalLearning/Fold.fs"/>
     <Compile Include="Composition/Durable/Fold.fs"/>
     <Compile Include="Execution/Delegation/Handle/FoldSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationEnvelopeSurface.fs"/>
@@ -566,6 +579,9 @@
     <Compile Include="OpenCode/Tools/FileMutationTools.fs"/>
     <Compile Include="OpenCode/Tools/BashHoneypotTool.fs"/>
     <Compile Include="OpenCode/Tools/AssumeTool.fs"/>
+    <Compile Include="OpenCode/Tools/AttentionTools.fs"/>
+    <Compile Include="OpenCode/Tools/ConcernTools.fs"/>
+    <Compile Include="OpenCode/Tools/InstitutionalLearningTools.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
     <Compile Include="Execution/Fission/OpenCode/Tool.fs"/>
     <Compile Include="Repository/Programming/Js/Utf8Fs.fs"/>

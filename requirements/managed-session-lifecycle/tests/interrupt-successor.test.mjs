@@ -75,14 +75,14 @@ test('WHAT[MANAGED-SESSION-017] failed Host abort rolls back Loop and NeedHelp o
   const loop = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
   const needHelp = read('src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs')
 
-  const loopOutcome = loop.match(/let applyAbortOutcome([\s\S]*?)let abortAndReport/)
+  const loopOutcome = loop.match(/member private this\.ApplyInterruptOutcome([\s\S]*?)member private this\.RunInterrupt/)
   assert.ok(loopOutcome, 'Loop abort outcome classifier must be inspectable')
-  assert.match(loopOutcome[1], /\| Error reason ->[\s\S]*?rollback \(\)/)
+  assert.match(loopOutcome[1], /\| Error _ ->[\s\S]*?this\.RollbackArm sessionId/)
 
-  const loopAbort = loop.match(/let abortAndReport([\s\S]*?)member private this\.Evaluate/)
+  const loopAbort = loop.match(/member private this\.RunInterrupt([\s\S]*?)member private this\.Interrupt/)
   assert.ok(loopAbort, 'Loop abort observation must be inspectable')
-  assert.match(loopAbort[1], /rollback \(\)/)
-  assert.match(loopAbort[1], /with ex ->[\s\S]*?rollback \(\)/)
+  assert.match(loopAbort[1], /this\.ApplyInterruptOutcome/)
+  assert.match(loopAbort[1], /with ex ->[\s\S]*?this\.RollbackArm sessionId/)
 
   const needHelpOutcome = needHelp.match(/member private this\.ApplyAbortOutcome([\s\S]*?)member private this\.AbortAndReport/)
   assert.ok(needHelpOutcome, 'NeedHelp abort outcome classifier must be inspectable')

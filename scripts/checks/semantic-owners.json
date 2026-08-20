@@ -528,6 +528,18 @@
       "owner": "delegation"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
+      "owner": "delegation"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
       "owner": "delegation"
     },

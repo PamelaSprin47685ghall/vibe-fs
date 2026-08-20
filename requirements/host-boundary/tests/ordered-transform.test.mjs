@@ -140,8 +140,8 @@ test('WHAT[HOST-BOUNDARY-019] explicit resume suppression short-circuits before 
 test('WHAT[HOST-BOUNDARY-019] create entry delegates to createWithCaps and default capabilities', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
-  assert.match(text, /let\s+defaultCapabilities\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\):\s*NormalTransformCapabilities/)
-  assert.match(text, /let\s+defaultBranchCapabilities\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\):\s*TransformBranchCapabilities/)
+  assert.match(text, /let\s+defaultCapabilities\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\)\s*:\s*NormalTransformCapabilities/)
+  assert.match(text, /let\s+defaultBranchCapabilities\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\)\s*:\s*TransformBranchCapabilities/)
   assert.match(
     text,
     /let\s+create\s*\(boot:\s*PluginBoot\.Boot\)\s*\(host:\s*PluginHostWiring\.Host\)[\s\S]*?let\s+caps\s*=\s*defaultCapabilities\s+boot\s+host[\s\S]*?let\s+branches\s*=\s*defaultBranchCapabilities\s+boot\s+host[\s\S]*?createWithCaps\s+caps\s+branches/,

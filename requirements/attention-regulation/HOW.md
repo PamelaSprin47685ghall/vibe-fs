@@ -19,9 +19,9 @@
 
 | 命题 | 最低充分 proof |
 |---|---|
-| ATTENTION-REGULATION-001 | tool contract + return semantic test；证明无持久状态与无 authority side effect |
-| ATTENTION-REGULATION-002 | tool contract + negative authority/obligation mutation test |
-| ATTENTION-REGULATION-003 | pure/event semantic test：证明 defer 后不产生 obligation 或后台任务 |
-| ATTENTION-REGULATION-004 | replay/idempotency + participant isolation + owner-life termination retires outstanding defer |
-| ATTENTION-REGULATION-005 | temporal：celebrate 先学习后尾部 drain；同 occurrence replay 不重复 drain |
-| ATTENTION-REGULATION-006 | architecture negative：无 planner/stage/timer/background executor |
+| ATTENTION-REGULATION-001 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
+| ATTENTION-REGULATION-002 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
+| ATTENTION-REGULATION-003 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
+| ATTENTION-REGULATION-004 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
+| ATTENTION-REGULATION-005 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |
+| ATTENTION-REGULATION-006 | `requirements/attention-regulation/tests/attention-regulation.test.mjs` |

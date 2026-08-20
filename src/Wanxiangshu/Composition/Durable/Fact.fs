@@ -8,6 +8,9 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Interaction.Attention
+open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
@@ -38,6 +41,9 @@ module Fact =
         | Host of HostFactCases
         | Fission of FissionFactCases
         | Delegation of DelegationFactCases
+        | Attention of AttentionFactCases
+        | Concern of ConcernFactCases
+        | InstitutionalLearning of InstitutionalLearningFactCases
 
     type Fact =
         | Runtime of RuntimeFact

@@ -86,6 +86,13 @@ module Events =
             for registration in handlers do
                 notifyRegistration sessionId outcome registration
 
+        let replayStickyTerminals listener =
+            let stickyReplay =
+                lock lockObj (fun () -> stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
+
+            for sessionKey, outcome in stickyReplay do
+                listener (SessionId.create sessionKey) outcome
+
         let subscribe replaySticky listener =
             let registration: ListenerRegistration =
                 lock lockObj (fun () ->
@@ -95,11 +102,7 @@ module Events =
                     registration)
 
             if replaySticky then
-                let stickyReplay =
-                    lock lockObj (fun () -> stickyTerminal |> Seq.map (fun kv -> kv.Key, kv.Value) |> Seq.toList)
-
-                for sessionKey, outcome in stickyReplay do
-                    listener (SessionId.create sessionKey) outcome
+                replayStickyTerminals listener
 
             { new IDisposable with
                 member _.Dispose() =

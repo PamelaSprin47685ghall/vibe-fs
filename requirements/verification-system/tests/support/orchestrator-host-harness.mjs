@@ -35,6 +35,7 @@ export const fakeSessions = (behaviour = {}) => {
   let childSeq = 0
   let sendSeq = 0
   const terminalListeners = new Map()
+  const futureTerminalListeners = new Map()
   const stickyTerminals = new Map()
 
   const sessionKey = (value) => String(value)
@@ -46,6 +47,7 @@ export const fakeSessions = (behaviour = {}) => {
     const key = sessionKey(session)
     stickyTerminals.set(key, outcome)
     for (const callback of terminalListeners.get(key) ?? []) invokeTerminalCallback(callback, session, outcome)
+    for (const callback of futureTerminalListeners.get(key) ?? []) invokeTerminalCallback(callback, session, outcome)
   }
 
   return {
@@ -97,6 +99,17 @@ export const fakeSessions = (behaviour = {}) => {
       return {
         Dispose: () => {
           terminalListeners.get(key)?.delete(callback)
+        },
+      }
+    },
+    SubscribeFutureTerminal: (childId, callback) => {
+      calls.push(['SubscribeFutureTerminal', childId])
+      const key = sessionKey(childId)
+      if (!futureTerminalListeners.has(key)) futureTerminalListeners.set(key, new Set())
+      futureTerminalListeners.get(key).add(callback)
+      return {
+        Dispose: () => {
+          futureTerminalListeners.get(key)?.delete(callback)
         },
       }
     },

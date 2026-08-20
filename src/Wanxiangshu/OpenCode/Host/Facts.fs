@@ -4,6 +4,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Interaction.Concern
 
 /// Rulebook Main tip presentation for auto-injected guidance.
 [<RequireQualifiedAccess>]
@@ -19,7 +20,8 @@ type HostFactCases =
            CallId: ToolCallId
            MarkerText: string
            CallGap: TranscriptGap
-           ResultGap: TranscriptGap |}
+           ResultGap: TranscriptGap
+           ConcernPlacement: ConcernPlacementBatch option |}
     | RequirementGroundingRequested of
         {| SessionId: SessionId
            Snapshot: GroundingSnapshot |}

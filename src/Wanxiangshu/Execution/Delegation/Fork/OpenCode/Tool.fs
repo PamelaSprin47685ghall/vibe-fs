@@ -159,6 +159,15 @@ module ForkTool =
             [<Literal>]
             let PersonCannotTakeCharge = "tool/fork/person-cannot-take-charge"
 
+            [<Literal>]
+            let HandoffJournalRequired = "tool/fork/handoff-journal-required"
+
+            [<Literal>]
+            let PersonSessionUnknown = "tool/fork/person-session-unknown"
+
+            [<Literal>]
+            let HandoffAppendFailed = "tool/fork/handoff-append-failed"
+
         [<RequireQualifiedAccess>]
         module Commission =
             [<Literal>]
@@ -211,6 +220,9 @@ module ForkTool =
 
     let private namedProse language path byname =
         ProviderProse.render language path (Map [ "name", byname ])
+
+    let private reasonProse language path reason =
+        ProviderProse.render language path (Map [ "reason", reason ])
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
         let lang = ProviderProse.languageOf sessionId
@@ -312,18 +324,6 @@ module ForkTool =
                 return basePrompt
         }
 
-    let private prepareForkPrompt
-        (scope: ToolRuntimeScope)
-        (runtime: HostForkRuntime)
-        (role: Role)
-        (request: Request)
-        (attachment: string option)
-        =
-        task {
-            let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
-            return! prepareForkPromptWithRecord scope runtime role request parentWorkRecord attachment
-        }
-
     let private isSelfAttachment (request: Request) =
         request.Attach
         |> Option.exists (fun attach ->
@@ -400,38 +400,43 @@ module ForkTool =
         (runtime: HostForkRuntime)
         role
         (request: Request)
+        language
         attachment
         handleId
         (managed: ManagedAgent)
         =
-        task {
-            match scope.Journal with
-            | None -> return Error "delegation handoff requires a durable journal"
-            | Some durable ->
-                let! handoff = DelegationHandoffLedger.prepareInitial durable runtime.ParentId
-                let! rendered =
-                    prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+        taskResult {
+            let! durable =
+                scope.Journal
+                |> Result.requireSome (prose language Path.Fork.HandoffJournalRequired)
 
-                match!
-                    runtime.Fork(
-                        handleId,
-                        role,
-                        managed.Name,
-                        request.Charge,
-                        None,
-                        renderedPrompt = rendered,
-                        byname = request.Name,
-                        ?expectedToolCalls = request.ExpectedToolCalls
-                    )
-                with
-                | Error error -> return Error error
-                | Ok result ->
-                    match runtime.TryFindAgent handleId |> Option.bind (fun record -> record.ChildSessionId) with
-                    | None -> return Error(sprintf "Unknown agent id: %s" handleId)
-                    | Some childId ->
-                        match! runtime.AdvanceHandoff(childId, handoff.ParentEndExclusive) with
-                        | Error error -> return Error(sprintf "delegation handoff append failed: %s" error)
-                        | Ok() -> return Ok result
+            let! handoff = DelegationHandoffLedger.prepareInitial durable runtime.ParentId |> TaskResultCE.ofTask
+            let! rendered =
+                prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+                |> TaskResultCE.ofTask
+
+            let! result =
+                runtime.Fork(
+                    handleId,
+                    role,
+                    managed.Name,
+                    request.Charge,
+                    None,
+                    renderedPrompt = rendered,
+                    byname = request.Name,
+                    ?expectedToolCalls = request.ExpectedToolCalls
+                )
+
+            let! childId =
+                runtime.TryFindAgent handleId
+                |> Option.bind (fun record -> record.ChildSessionId)
+                |> Result.requireSome (namedProse language Path.Fork.PersonSessionUnknown handleId)
+
+            do!
+                runtime.AdvanceHandoff(childId, handoff.ParentEndExclusive)
+                |> TaskResult.mapError (reasonProse language Path.Fork.HandoffAppendFailed)
+
+            return result
         }
 
     let private runManagerReuse
@@ -439,33 +444,33 @@ module ForkTool =
         (runtime: HostForkRuntime)
         role
         (request: Request)
+        language
         attachment
         agentId
         =
-        task {
-            let child =
+        taskResult {
+            let! childId =
                 runtime.TryFindAgent agentId |> Option.bind (fun record -> record.ChildSessionId)
+                |> Result.requireSome (namedProse language Path.Fork.PersonSessionUnknown agentId)
 
-            match child with
-            | None -> return Error(sprintf "Unknown agent id: %s" agentId)
-            | Some childId ->
-                let! handoff = runtime.PrepareHandoff childId
-                let! rendered =
-                    prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+            let! handoff = runtime.PrepareHandoff childId |> TaskResultCE.ofTask
+            let! rendered =
+                prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+                |> TaskResultCE.ofTask
 
-                match!
-                    runtime.Reuse(
-                        agentId,
-                        request.Charge,
-                        renderedPrompt = rendered,
-                        ?expectedToolCalls = request.ExpectedToolCalls
-                    )
-                with
-                | Error error -> return Error error
-                | Ok _ ->
-                    match! runtime.AdvanceHandoff(childId, handoff.ParentEndExclusive) with
-                    | Error error -> return Error(sprintf "delegation handoff append failed: %s" error)
-                    | Ok() -> return! runtime.AwaitCurrentWorkRecord agentId
+            let! _ =
+                runtime.Reuse(
+                    agentId,
+                    request.Charge,
+                    renderedPrompt = rendered,
+                    ?expectedToolCalls = request.ExpectedToolCalls
+                )
+
+            do!
+                runtime.AdvanceHandoff(childId, handoff.ParentEndExclusive)
+                |> TaskResult.mapError (reasonProse language Path.Fork.HandoffAppendFailed)
+
+            return! runtime.AwaitCurrentWorkRecord agentId
         }
 
     let private sealManagerAffinity
@@ -498,12 +503,28 @@ module ForkTool =
         =
         task {
             let handleId = ToolHostCodec.newHandleId ()
-            let! forkResult = runManagerFork scope runtime role request attachment handleId managed
+            let! forkResult = runManagerFork scope runtime role request language attachment handleId managed
 
             match forkResult with
             | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
             | Ok _ ->
                 return! sealManagerAffinity scope runtime context handleId language request Path.Fork.ChargeNotPlaced
+        }
+
+    let private sealIdleReuse
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        language
+        agentId
+        workRecord
+        =
+        task {
+            match! recordFissionAffinity scope context agentId with
+            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
+            | Ok() ->
+                announceChild runtime context agentId
+                return ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
         }
 
     let private finishNewManagerFork
@@ -559,16 +580,11 @@ module ForkTool =
         attachment
         =
         task {
-            let! reuseResult = runManagerReuse scope runtime record.Role request attachment agentId
+            let! reuseResult = runManagerReuse scope runtime record.Role request language attachment agentId
 
             match reuseResult with
             | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-            | Ok workRecord ->
-                match! recordFissionAffinity scope context agentId with
-                | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-                | Ok() ->
-                    announceChild runtime context agentId
-                    return ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
+            | Ok workRecord -> return! sealIdleReuse scope runtime context language agentId workRecord
         }
 
     let private reuseWhileIdle
