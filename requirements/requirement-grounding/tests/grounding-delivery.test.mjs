@@ -59,7 +59,7 @@ test('WHAT[REQUIREMENT-GROUNDING-005] APPLIES-TO external grounding injects only
   } finally { cleanup() }
 })
 
-test('WHAT[REQUIREMENT-GROUNDING-005/006] direct Markdown read counts as visible grounding material and only unread siblings are injected', async () => {
+test('WHAT[REQUIREMENT-GROUNDING-006] direct Markdown read counts as visible grounding material and only unread siblings are injected', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const snapshot = grounding.materializePackage(dir, 'alpha')
@@ -132,7 +132,7 @@ test('WHAT[REQUIREMENT-GROUNDING-006] deduplicates material content versions and
       .slice(-1)
       .map((message) => message.parts[0].state.input.filePath.replaceAll('\\', '/'))
     assert.equal(changedReads.length, 1)
-    assert.ok(changedReads[0].endsWith('/requirements/alpha/WHAT.md'))
+    assert.ok(changedReads[0].endsWith('requirements/alpha/WHAT.md'))
     host.disposeJournal(journal)
   } finally { cleanup() }
 })

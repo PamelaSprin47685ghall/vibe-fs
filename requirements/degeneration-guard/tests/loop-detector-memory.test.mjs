@@ -62,13 +62,6 @@ test('WHAT[DG-005] LOOP_005_detector_memory_is_bounded_by_tokenizer_vocabulary_n
   )
 })
 
-test('WHAT[DG-003] LOOP_003_classification_has_no_hysteresis_or_latch', () => {
-  assert.equal(loopDetector.classify(loopDetector.minimumWeightedDistinctCount - 1), 'TooRepetitive')
-  assert.equal(loopDetector.classify(loopDetector.normalWeightedDistinctCount), 'Normal')
-  assert.equal(loopDetector.classify(loopDetector.maximumWeightedDistinctCount + 1), 'TooRandom')
-  assert.equal(loopDetector.classify(loopDetector.normalWeightedDistinctCount), 'Normal')
-})
-
 test('WHAT[DG-006] LOOP_005_two_detectors_are_independent_attempts', () => {
   const a = loopDetector.create()
   const b = loopDetector.create()

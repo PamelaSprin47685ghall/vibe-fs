@@ -117,7 +117,7 @@ module RequirementGroundingRuntime =
                 { Workspace = snapshot.Workspace
                   PackageName = snapshot.PackageName
                   Path = material.Path
-                  Digest = material.Digest }
+                  Digest = GroundingIdentity.materialDigest material.Path material.ResultBytes }
 
             taskResult {
                 let! _ =

@@ -9,7 +9,7 @@
     ".": "./dist/OpenCode/Plugin/Plugin.js"
   },
   "imports": {
-    "#wanxiangshu-loop-detector-calibration": "./dist/Execution/Session/LoopDetectorCalibration.js"
+    "#wanxiangshu-loop-detector-envelope": "./dist/Execution/Session/LoopDetectorEnvelope.js"
   },
   "files": [
     "dist/",

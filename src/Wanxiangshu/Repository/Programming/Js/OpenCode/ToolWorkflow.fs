@@ -261,22 +261,24 @@ module JsToolWorkflow =
         | None -> commitEphemeral root mutations value |> Task.FromResult
         | Some durable -> commitDurable durable root mutations value prepared
 
+    let private invokeObservation observe readPaths effectPaths : Task<Result<unit, JsFailure>> =
+        task {
+            try
+                do! observe readPaths effectPaths
+            with _ ->
+                ()
+
+            return Ok()
+        }
+
     let private observeFileAccess
         (observer: FileAccessObservation option)
         readPaths
         effectPaths
         : Task<Result<unit, JsFailure>> =
-        task {
-            match observer with
-            | None -> return Ok()
-            | Some observe ->
-                try
-                    do! observe readPaths effectPaths
-                with _ ->
-                    ()
-
-                return Ok()
-        }
+        match observer with
+        | None -> Task.FromResult(Ok())
+        | Some observe -> invokeObservation observe readPaths effectPaths
 
     /// Run a model program against root. `baseClassSource` is the generated
     /// JsProgram (JS-002); `modelSource` is the model's `class Js ... run()`.

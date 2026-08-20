@@ -25,15 +25,13 @@ module RequirementGroundingProjection =
     let private occurrenceKey (occurrence: RequirementGroundingOccurrence) =
         GroundingIdentity.key occurrence.Workspace occurrence.PackageName occurrence.Digest
 
-    let private materialKey workspace packageName path digest =
-        GroundingIdentity.materialKey workspace packageName path digest
+    let private observedMaterialKey workspace packageName path digest =
+        GroundingIdentity.materialVersionKey workspace packageName path digest
 
     let isSnapshotGrounded snapshot state =
         snapshot.Materials
         |> List.forall (fun material ->
-            Set.contains
-                (GroundingIdentity.snapshotMaterialKey snapshot material)
-                state.VisibleMaterials)
+            Set.contains (GroundingIdentity.snapshotMaterialKey snapshot material) state.VisibleMaterials)
 
     let snapshotRequested snapshot state =
         Map.containsKey (GroundingIdentity.snapshotKey snapshot) state.Pending
@@ -47,9 +45,7 @@ module RequirementGroundingProjection =
                 snapshot.Materials
                 |> List.filter (fun material ->
                     not (
-                        Set.contains
-                            (GroundingIdentity.snapshotMaterialKey snapshot material)
-                            state.VisibleMaterials
+                        Set.contains (GroundingIdentity.snapshotMaterialKey snapshot material) state.VisibleMaterials
                     ))
 
             if List.isEmpty missing then
@@ -88,7 +84,7 @@ module RequirementGroundingProjection =
 
     let applyMaterialObserved (observation: RequirementGroundingMaterialObserved) state =
         let key =
-            materialKey observation.Workspace observation.PackageName observation.Path observation.Digest
+            observedMaterialKey observation.Workspace observation.PackageName observation.Path observation.Digest
 
         let visible = Set.add key state.VisibleMaterials
 
@@ -97,11 +93,7 @@ module RequirementGroundingProjection =
             |> Map.filter (fun _ snapshot ->
                 snapshot.Materials
                 |> List.exists (fun material ->
-                    not (
-                        Set.contains
-                            (GroundingIdentity.snapshotMaterialKey snapshot material)
-                            visible
-                    )))
+                    not (Set.contains (GroundingIdentity.snapshotMaterialKey snapshot material) visible)))
 
         { state with
             Pending = pending
@@ -121,7 +113,11 @@ module RequirementGroundingProjection =
                 |> List.fold
                     (fun current read ->
                         Set.add
-                            (materialKey occurrence.Workspace occurrence.PackageName read.Path read.MaterialDigest)
+                            (observedMaterialKey
+                                occurrence.Workspace
+                                occurrence.PackageName
+                                read.Path
+                                (GroundingIdentity.materialDigest read.Path read.ResultBytes))
                             current)
                     state.VisibleMaterials
 

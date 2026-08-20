@@ -7,9 +7,8 @@ import { spawn } from 'node:child_process'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
 import {
-  calibrateFromRepository,
-  writeLoopDetectorCalibrationArtifact,
-} from './lib/calibrate-loop-detector.mjs'
+  writeLoopDetectorEnvelopeArtifact,
+} from './lib/derive-loop-detector-envelope.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
@@ -380,13 +379,12 @@ async function barrierSync() {
 // ── Resource & Artifact Verification ─────────────────────────────────────────
 
 function verifyArtifacts() {
-  // DG-004: calibration is build input, never tracked source. Compute once from
-  // the current repository corpus; materialize values only as generated dist JS.
+  // DG-004: repository is the SSOT. Derive the current envelope on every build;
+  // materialize it only as an ephemeral runtime import.
   try {
-    const loopDetectorCalibration = calibrateFromRepository(root)
-    writeLoopDetectorCalibrationArtifact(root, loopDetectorCalibration)
+    writeLoopDetectorEnvelopeArtifact(root)
   } catch (err) {
-    fail(`Failed to generate loop detector calibration artifact: ${err.message}`)
+    fail(`Failed to derive loop detector repository envelope: ${err.message}`)
   }
 
   const entry = path.join(root, 'dist/OpenCode/Plugin/Plugin.js')

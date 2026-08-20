@@ -63,10 +63,13 @@ module RequirementGroundingGate =
         | Some durable ->
             RequirementGroundingRuntime.observeReadPaths durable workspace (SessionId.create sessionId) paths
 
-    let private ignoreDecision (operation: Task<Result<RequirementGroundingDecision, string>>) : Task<unit> =
+    let private ignoreDecision (operation: unit -> Task<Result<RequirementGroundingDecision, string>>) : Task<unit> =
         task {
-            let! _ = operation
-            return ()
+            try
+                let! _ = operation ()
+                return ()
+            with _ ->
+                return ()
         }
 
     let decideMutation journal workspace sessionId paths =
@@ -105,7 +108,7 @@ module RequirementGroundingGate =
         match workspace with
         | None -> Task.FromResult(())
         | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
-        | Some root -> request journal root sessionId (mutationPaths toolName args) |> ignoreDecision
+        | Some root -> ignoreDecision (fun () -> request journal root sessionId (mutationPaths toolName args))
 
     let after
         (journal: AgentJournal option)
@@ -134,21 +137,13 @@ module RequirementGroundingGate =
         match workspace with
         | None -> Task.FromResult(())
         | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
-        | Some root -> decideRead journal root sessionId (observationPaths toolName args) |> ignoreDecision
+        | Some root -> ignoreDecision (fun () -> decideRead journal root sessionId (observationPaths toolName args))
 
-    let programObservation
-        journal
-        workspace
-        sessionId
-        readPaths
-        effectPaths
-        : Task<unit> =
+    let programObservation journal workspace sessionId readPaths effectPaths : Task<unit> =
         task {
             if not (List.isEmpty readPaths) then
-                let! _ = decideRead journal workspace sessionId readPaths
-                ()
+                do! ignoreDecision (fun () -> decideRead journal workspace sessionId readPaths)
 
             if not (List.isEmpty effectPaths) then
-                let! _ = decideMutation journal workspace sessionId effectPaths
-                ()
+                do! ignoreDecision (fun () -> decideMutation journal workspace sessionId effectPaths)
         }

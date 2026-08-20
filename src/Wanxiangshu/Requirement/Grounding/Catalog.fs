@@ -198,7 +198,6 @@ module GroundingCatalog =
                 let path = "requirements/" + package.Name + "/" + slash packageRelative
 
                 { Path = path
-                  Digest = HostDigest.sha256Hex (path + "\u0000" + resultBytes)
                   ResultBytes = resultBytes })
 
         let digestInput =

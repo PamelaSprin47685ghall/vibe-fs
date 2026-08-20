@@ -5,7 +5,7 @@
 ### 直接语料包络
 
 - `LoopDetector` 继续使用 `o200k_base` token 与指数衰减加权相异度 $D_t$；状态只有 `Normal | TooRepetitive | TooRandom`。
-- 构建滴定只做确定性聚合：仓库行长 → half-life；第一遍 corpus replay → fresh prior 均值；第二遍以该 prior + 空 `lastSeen` 重放 → `minimum` / `maximum`。
+- build 每次直接从 repository SSOT 派生：仓库行长 → half-life；第一遍 corpus replay → fresh prior；第二遍以该 prior + 空 `lastSeen` 重放 → 当前 `minimum` / `maximum`。生成文件只是 ephemeral runtime import，不是配置。
 - 生产判定只比较 `D_t < minimum` 与 `D_t > maximum`。Beta、quantile、variance/std threshold 全部删除。
 - `lastSeen[token]` 是唯一算法 scratch；每 token 更新 $O(1)$，空间受 tokenizer vocabulary 上界约束。
 
@@ -23,6 +23,7 @@
 DEPENDS ON:
 - `host-boundary`
 - `interaction-authority`
+- `dispatch-protocol`
 
 ## 验证与测试落点
 
@@ -31,7 +32,7 @@ DEPENDS ON:
 | DG-001 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
 | DG-002 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
 | DG-003 | `requirements/degeneration-guard/tests/loop-detector.test.mjs` |
-| DG-004 | `requirements/degeneration-guard/tests/loop-calibration.test.mjs` |
+| DG-004 | 无 min/max 数值快照测试；build-time repository derivation 本身即 SSOT |
 | DG-005 | `requirements/degeneration-guard/tests/loop-detector-memory.test.mjs` |
 | DG-006 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |
 | DG-007 | `requirements/degeneration-guard/tests/loop-sensor.test.mjs` |

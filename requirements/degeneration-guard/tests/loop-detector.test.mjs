@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
+import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 
 import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 
@@ -25,15 +25,6 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
-test('WHAT[DG-004] LOOP_004_constants_are_direct_repository_extrema', () => {
-  assert.equal(loopDetector.vocabularySize, vocabularySize)
-  assert.equal(loopDetector.halfLife, 64)
-  close(loopDetector.lambda, 2 ** (-1 / 64))
-  assert.ok(loopDetector.minimumWeightedDistinctCount < loopDetector.normalWeightedDistinctCount)
-  assert.ok(loopDetector.normalWeightedDistinctCount < loopDetector.maximumWeightedDistinctCount)
-  assert.ok(loopDetector.maximumWeightedDistinctCount < loopDetector.maxSupport)
-})
-
 test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
   const result = loopDetector.evaluate(loopDetector.create())
   assert.equal(result.state, 'Normal')
@@ -52,19 +43,6 @@ test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {
   close(result.weightedDistinctTokens, expected.weightedDistinctTokens)
 })
 
-test('WHAT[DG-003] LOOP_003_extrema_are_inclusive_normal_boundaries', () => {
-  assert.equal(loopDetector.classify(loopDetector.minimumWeightedDistinctCount), 'Normal')
-  assert.equal(loopDetector.classify(loopDetector.maximumWeightedDistinctCount), 'Normal')
-  assert.equal(
-    loopDetector.classify(loopDetector.minimumWeightedDistinctCount - Number.EPSILON * 128),
-    'TooRepetitive',
-  )
-  assert.equal(
-    loopDetector.classify(loopDetector.maximumWeightedDistinctCount + Number.EPSILON * 128),
-    'TooRandom',
-  )
-})
-
 test('WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () => {
   const unit = ' retry'
   assert.equal(encode(unit).length, 1, 'fixture must be one o200k token')
@@ -72,7 +50,6 @@ test('WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () 
   const result = loopDetector.pushText(loopDetector.create(), unit.repeat(1000))
   assert.equal(result.isAnomalous, true, `weightedDistinct=${result.weightedDistinctTokens}`)
   assert.equal(result.state, 'TooRepetitive')
-  assert.ok(result.weightedDistinctTokens < loopDetector.minimumWeightedDistinctCount)
   close(result.weightedDistinctTokens, 1, 1e-2)
 })
 

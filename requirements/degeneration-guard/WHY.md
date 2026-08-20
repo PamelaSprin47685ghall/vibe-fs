@@ -7,8 +7,8 @@ Provider attempt 可能在尚未正常结束前向两个方向退化：重复度
 ## 核心不变量与张力
 
 - **语料包络 vs 概率拟合**：正常性来自仓库语料实际极值，不拟合 Beta/正态分布，不引入置信区间、分位数或经验安全系数。
-- **检测 owner = 恢复 owner**：guard 负责 `detect → interrupt → classify → continue` 完整闭环；其它 turn/fallback/nudge 逻辑只看见“该 abort 已由 degeneration-guard 接管”，不得再次恢复。
-- **固定参数 vs 特例森林**：构建期从仓库 strict UTF-8 语料生成极值，运行期不按角色、模型、语言动态放宽边界。
+- **检测 owner = 恢复 owner**：guard 负责 `observe → classify → interrupt → reconcile → continue` 完整闭环；其它 turn/fallback/nudge 逻辑只看见“该 abort 已由 degeneration-guard 接管”，不得再次恢复。
+- **Repository SSOT vs 特例森林**：每次 build 从当前 strict UTF-8 仓库语料即时派生 envelope，运行期不按角色、模型、语言动态放宽边界，也不存在第二份可手调配置。
 - **有界内存与严格绑定**：检测器状态仅保存有限 token 词表的最近出现步数，生命周期绑定单次 `ProviderRunIdentity`，禁止跨 attempt 复用。
 
 ## 违反边界的失败意义
@@ -24,3 +24,4 @@ Provider attempt 可能在尚未正常结束前向两个方向退化：重复度
 
 - `host-boundary`
 - `interaction-authority`
+- `dispatch-protocol`

@@ -114,6 +114,13 @@ test('WHAT[REQUIREMENT-GROUNDING-008] mutation grounding is weak observation and
     const second = await grounding.mutationDecision(opened.journal, dir, 'mutation', [sourcePath])
     assert.equal(second.allowed, true)
     assert.equal(second.needsGrounding, false)
+
+    writeFileSync(join(dir, 'requirements', 'alpha', 'APPLIES-TO'), '[\n', 'utf8')
+    assert.equal(
+      await grounding.weakMutationObservation(opened.journal, dir, 'mutation-broken-grounding', sourcePath),
+      true,
+      'broken grounding metadata is fail-open and cannot turn into a write failure',
+    )
     grounding.disposeJournal(opened.journal)
   } finally { cleanup() }
 })

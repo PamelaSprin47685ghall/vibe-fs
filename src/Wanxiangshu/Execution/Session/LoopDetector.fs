@@ -12,35 +12,31 @@ module LoopDetector =
         [<Import("encode", "./GptTokens.js")>]
         let encode (_text: string) : int[] = jsNative
 
-    module private Calibration =
-        [<Import("vocabularySize", "#wanxiangshu-loop-detector-calibration")>]
+    module private RepositoryEnvelope =
+        [<Import("vocabularySize", "#wanxiangshu-loop-detector-envelope")>]
         let vocabularySize: int = jsNative
 
-        [<Import("halfLife", "#wanxiangshu-loop-detector-calibration")>]
+        [<Import("halfLife", "#wanxiangshu-loop-detector-envelope")>]
         let halfLife: float = jsNative
 
-        [<Import("lambda", "#wanxiangshu-loop-detector-calibration")>]
+        [<Import("lambda", "#wanxiangshu-loop-detector-envelope")>]
         let lambda: float = jsNative
 
-        [<Import("maxSupport", "#wanxiangshu-loop-detector-calibration")>]
-        let maxSupport: float = jsNative
-
-        [<Import("normalWeightedDistinctCount", "#wanxiangshu-loop-detector-calibration")>]
+        [<Import("normalWeightedDistinctCount", "#wanxiangshu-loop-detector-envelope")>]
         let normalWeightedDistinctCount: float = jsNative
 
-        [<Import("minimumWeightedDistinctCount", "#wanxiangshu-loop-detector-calibration")>]
+        [<Import("minimumWeightedDistinctCount", "#wanxiangshu-loop-detector-envelope")>]
         let minimumWeightedDistinctCount: float = jsNative
 
-        [<Import("maximumWeightedDistinctCount", "#wanxiangshu-loop-detector-calibration")>]
+        [<Import("maximumWeightedDistinctCount", "#wanxiangshu-loop-detector-envelope")>]
         let maximumWeightedDistinctCount: float = jsNative
 
-    let TokenVocabularySize = Calibration.vocabularySize
-    let HalfLife = Calibration.halfLife
-    let Lambda = Calibration.lambda
-    let MaxSupport = Calibration.maxSupport
-    let NormalWeightedDistinctCount = Calibration.normalWeightedDistinctCount
-    let MinimumWeightedDistinctCount = Calibration.minimumWeightedDistinctCount
-    let MaximumWeightedDistinctCount = Calibration.maximumWeightedDistinctCount
+    let TokenVocabularySize = RepositoryEnvelope.vocabularySize
+    let HalfLife = RepositoryEnvelope.halfLife
+    let Lambda = RepositoryEnvelope.lambda
+    let NormalWeightedDistinctCount = RepositoryEnvelope.normalWeightedDistinctCount
+    let MinimumWeightedDistinctCount = RepositoryEnvelope.minimumWeightedDistinctCount
+    let MaximumWeightedDistinctCount = RepositoryEnvelope.maximumWeightedDistinctCount
 
     [<RequireQualifiedAccess>]
     type State =

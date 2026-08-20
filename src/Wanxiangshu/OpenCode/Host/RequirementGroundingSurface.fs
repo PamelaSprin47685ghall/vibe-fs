@@ -80,6 +80,20 @@ module RequirementGroundingSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
+    let weakMutationObservation journal workspace sessionId path : Task<bool> =
+        task {
+            do!
+                RequirementGroundingGate.before
+                    (Some(agentJournalOf journal))
+                    (Some workspace)
+                    (box
+                        {| tool = "write"
+                           sessionID = sessionId |})
+                    (box {| args = box {| filePath = path |} |})
+
+            return true
+        }
+
     let observationDecision journal workspace sessionId (toolName: string) (args: obj) _output : Task<obj> =
         task {
             let paths =
@@ -92,12 +106,7 @@ module RequirementGroundingSurface =
                 else
                     []
 
-            let! result =
-                RequirementGroundingGate.decideRead
-                    (Some(agentJournalOf journal))
-                    workspace
-                    sessionId
-                    paths
+            let! result = RequirementGroundingGate.decideRead (Some(agentJournalOf journal)) workspace sessionId paths
 
             return
                 match result with

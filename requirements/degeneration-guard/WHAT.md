@@ -18,9 +18,9 @@ LoopSensor 仅从 Host 流式事件提取 assistant `text` 与 reasoning/thinkin
 
 边界值本身属于正常语料；判定必须使用严格不等式。
 
-## DG-004: artifact-local 直接极值滴定
+## DG-004: Repository SSOT 即用即派生
 
-检测参数在构建期由仓库全量 strict UTF-8 语料生成并仅存在于构建产物。半衰期仍由仓库非空行 token 数 p99 向上取二次幂得到；随后先以完整语料求一个 fresh-detector 初值均值，再以该初值从空最近出现表重放完整语料，直接记录实际 $D_t$ 极小值与极大值。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
+Repository 本身是检测边界的唯一 SSOT。每次 build 直接读取当前 strict UTF-8 仓库语料，派生 half-life、fresh prior 以及实际 $D_t$ 极小/极大值；生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
 
 ## DG-005: O(1) 更新与有界内存
 

@@ -5,7 +5,6 @@ open Wanxiangshu.Foundation.Identity
 type RequirementGroundingAnchoredRead =
     { CallId: ToolCallId
       Path: string
-      MaterialDigest: string
       ArgsJson: string
       ResultBytes: string
       CursorResultBytes: string }

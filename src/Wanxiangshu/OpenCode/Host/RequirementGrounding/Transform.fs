@@ -181,7 +181,6 @@ module RequirementGroundingTransform =
                     stableCallId sessionId snapshot.Workspace snapshot.PackageName snapshot.Digest ordinal index
                 )
               Path = material.Path
-              MaterialDigest = material.Digest
               ArgsJson = argsJson material.Path
               ResultBytes = material.ResultBytes
               CursorResultBytes = cursorResult material.Path material.ResultBytes })
