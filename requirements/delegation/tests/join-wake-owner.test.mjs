@@ -6,7 +6,7 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('EXEC-017 external chat material join wake is owned by Handle/OpenCode', () => {
+test('WHAT[DELEG-015] external chat material join wake is owned by Handle/OpenCode', () => {
   const owner = read('src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs')
   const host = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 

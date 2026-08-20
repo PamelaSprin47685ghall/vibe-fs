@@ -6,7 +6,7 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('LOOP-002 LoopSensor owns its physical child interruptibility predicate', () => {
+test('WHAT[DG-002] LoopSensor owns its physical child interruptibility predicate', () => {
   const owner = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
   const host = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
