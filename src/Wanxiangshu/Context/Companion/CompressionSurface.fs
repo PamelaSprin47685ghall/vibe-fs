@@ -580,6 +580,31 @@ module CompressionSurface =
             { Sequence = int64 workRecordStartSequence }
         |> fun cursor -> int cursor.Sequence
 
+    let retainTodoWriteRounds (messages: obj array) : bool array =
+        messages
+        |> Array.toList
+        |> List.map (fun message ->
+            let containsTodoWrite =
+                not (isNullish message?containsTodoWrite)
+                && unbox<bool> message?containsTodoWrite
+
+            let callIds =
+                if isNullish message?callIds then
+                    Set.empty
+                else
+                    message?callIds
+                    |> unbox<string array>
+                    |> Array.map ToolCallId.create
+                    |> Set.ofArray
+
+            let facts: XPrefixProjection.RawPrefixMessageFacts =
+                { ContainsTodoWrite = containsTodoWrite
+                  ToolCallIds = callIds }
+
+            facts)
+        |> XPrefixProjection.retainTodoWriteRounds
+        |> List.toArray
+
     let diagnosticEmit (operation: string) (fields: obj array) : unit =
         let pairs =
             fields

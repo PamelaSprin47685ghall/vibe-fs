@@ -311,33 +311,24 @@ module MagicTodo =
         else
             minimum
 
-    let private committedOpeningFloor
-        (openingCursor: XTraceCursor)
-        (t1CallCursor: XTraceCursor option)
-        (t1ToolCallId: ToolCallId option)
-        (parts: TracePartAnchor list)
-        =
-        match t1CallCursor, t1ToolCallId with
-        | Some callCursor, Some callId -> Some(blindPlanOpeningBoundary openingCursor callCursor callId parts)
-        | _ -> Some(workRecordStart openingCursor)
-
-    /// Pre-T1 uses the dynamic XTrace head; post-T1 uses the constitutive T1 boundary.
-    /// Accepted planning checkpoints do not close Opening.
+    /// Context compression protects only the true Opening message. Planning stage
+    /// does not grant a larger raw-X prefix: pre-T1 and post-T1 both start Y at the
+    /// first XTrace position after Opening. WorkRecord may still classify BlindPlan
+    /// T1 material as constitutive Opening; that archival projection is independent
+    /// from provider-context compression.
     let effectiveOpeningFloor
         (hasOpenLife: bool)
-        (planCommitted: bool)
+        (_planCommitted: bool)
         (openingCursor: XTraceCursor)
-        (t1CallCursor: XTraceCursor option)
-        (t1ToolCallId: ToolCallId option)
-        (xTraceHeadSequence: int64)
-        (parts: TracePartAnchor list)
+        (_t1CallCursor: XTraceCursor option)
+        (_t1ToolCallId: ToolCallId option)
+        (_xTraceHeadSequence: int64)
+        (_parts: TracePartAnchor list)
         : XTraceCursor option =
         if not hasOpenLife then
             None
-        elif not planCommitted then
-            Some { Sequence = xTraceHeadSequence }
         else
-            committedOpeningFloor openingCursor t1CallCursor t1ToolCallId parts
+            Some(workRecordStart openingCursor)
 
     let bloggerEffectiveStart (recordCoverage: RecordCoverage) (workRecordStartCursor: XTraceCursor) : XTraceCursor =
         if recordCoverage.IngestedThrough.Sequence > workRecordStartCursor.Sequence then

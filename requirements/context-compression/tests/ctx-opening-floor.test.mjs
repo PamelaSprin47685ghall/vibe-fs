@@ -2,9 +2,9 @@
 // LifeOpened + XTrace, never from WorkActivated / planning-stage business.
 //
 // This file pins the context-compression side: Blogger/Y effective start is
-// `max(RecordCoverage, WorkRecordStart)`, the floor comes from the XTrace
-// head while Opening is open (Pre-T1), and the legacy WorkActivated fact is
-// inert — supplying it must not move the floor.
+// `max(RecordCoverage, WorkRecordStart)`. T1 never expands that compression
+// floor beyond the true Opening, and todowrite rounds survive X→Y replacement
+// as raw X messages.
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -20,10 +20,17 @@ const floor = ({ hasOpenLife = true, planCommitted = false, xTraceHeadSequence =
     parts: [],
   })
 
-test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_pre_t1_floor_is_the_xtrace_head_not_an_activation_cursor', () => {
-  // LifeOpened + two XTrace parts; no todowrite accepted yet → Opening still
-  // open, Blogger must not start before the XTrace head (structural floor).
-  assert.equal(Number(floor({ xTraceHeadSequence: 2 })), 2, 'Pre-T1 floor = XTrace head (exclusive)')
+test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_pre_t1_floor_stops_after_true_opening', () => {
+  assert.equal(
+    Number(floor({ planCommitted: false, xTraceHeadSequence: 17 })),
+    2,
+    'Pre-T1 planning material after the opening is ordinary compressible history',
+  )
+})
+
+test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_t1_does_not_change_the_compression_floor', () => {
+  assert.equal(Number(floor({ planCommitted: false, xTraceHeadSequence: 17 })), 2)
+  assert.equal(Number(floor({ planCommitted: true, xTraceHeadSequence: 17 })), 2)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_work_activated_is_inert_and_does_not_move_the_floor', () => {
@@ -45,5 +52,18 @@ test('WHAT[CONTEXT-COMPRESSION-017] CTX_016_blogger_effective_start_is_max_of_re
     Number(compression.bloggerEffectiveStart(5, 3)),
     5,
     'coverage ahead of floor → effective start = record coverage',
+  )
+})
+
+test('WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retained across a Y cutoff', () => {
+  assert.deepEqual(
+    compression.retainTodoWriteRounds([
+      { containsTodoWrite: false, callIds: [] },
+      { containsTodoWrite: true, callIds: ['todo-call-1'] },
+      { containsTodoWrite: false, callIds: ['todo-call-1'] },
+      { containsTodoWrite: false, callIds: ['other-call'] },
+    ]),
+    [false, true, true, false],
+    'only the todowrite round punches through an otherwise replaceable prefix',
   )
 })

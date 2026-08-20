@@ -64,9 +64,9 @@ Blogger 处于 busy 状态、请求失败、结果为空或为纯 XML 时，严�
 
 Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产物，严禁使用 RawGap。CoverableTurnCutoffExclusive 仅在完整 Host turn 边界推进。
 
-## CONTEXT-COMPRESSION-017: Opening floor（WorkRecordStart）
+## CONTEXT-COMPRESSION-017: 只有真实 Opening 构成不可压缩 floor
 
-Opening 永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，在 compaction 与 recovery 中完整保留。Blogger 的 effectiveStart 始终取 `max(RecordCoverage, Life.WorkRecordStart)`。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
+真实 Opening 消息永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，在 compaction 与 recovery 中完整保留。Manager 是否已到 T1 不得改变压缩 floor；pre-T1 与 post-T1 普通工作历史一视同仁，Blogger 的 effectiveStart 始终取 `max(RecordCoverage, Life.WorkRecordStart)`，其中 `Life.WorkRecordStart` 仅表示真实 Opening 之后的首个 XTrace 位置，不再扩张到动态 XTrace head 或 BlindPlan T1 commitment 边界。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
 
 ## CONTEXT-COMPRESSION-018: Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 在同一存活执行内必须 park 等未来 material
 
@@ -75,3 +75,7 @@ Opening 永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，�
 ## CONTEXT-COMPRESSION-019: X→Y 后旧辅助注入不跨 horizon 保留
 
 任何代表 X→Y 冷边界的重锚操作，必须将旧 provider horizon 中的辅助注入（如 pair guideline、tip、grounding read）可见性彻底归零。持久化事件保留作为审计事实，但新 horizon 的初始消息不再回放旧辅助材料，仅在后续各自正常触发时逐步重新生成。
+
+## CONTEXT-COMPRESSION-020: `todowrite` 所在回合永远保留 X 原文
+
+任何包含 `todowrite` tool call 的 Host 消息，以及与该 call id 对应的 tool result 消息，都不得被 Y 前缀替换删除。Prefix cutoff 可以越过这些回合并压缩其余历史，但写回 provider context 时必须从被 drop 的 X 前缀中提取这些消息并原样保留；该规则不依赖 Manager 的 T1/T2 阶段，也适用于 AABB/recovery 后形成的 Y replacement。

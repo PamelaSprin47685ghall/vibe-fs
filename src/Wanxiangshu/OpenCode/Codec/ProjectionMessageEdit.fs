@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation
@@ -15,6 +16,23 @@ open Wanxiangshu.Foundation.Identity
 /// `ProviderWireDecode` / `ProviderWireCapture`.
 module ProjectionMessageEdit =
 
+    let private rawPartCallId (part: obj) =
+        ProviderWireDecode.firstString part [ "callID"; "callId"; "toolCallId"; "id" ]
+
+    let private isTodoWritePart (part: obj) =
+        ProviderWireDecode.firstString part [ "tool"; "name" ]
+        |> Option.exists (fun tool -> String.Equals(tool, "todowrite", StringComparison.OrdinalIgnoreCase))
+
+    let private retentionFacts (message: obj) : XPrefixProjection.RawPrefixMessageFacts =
+        let parts = ProviderWireDecode.rawPartsOf message
+
+        { ContainsTodoWrite = parts |> List.exists isTodoWritePart
+          ToolCallIds =
+            parts
+            |> List.choose rawPartCallId
+            |> List.map ToolCallId.create
+            |> Set.ofList }
+
     let prependCompanionMemory
         (rawMessages: obj list)
         (syntheticId: string)
@@ -24,12 +42,18 @@ module ProjectionMessageEdit =
         if dropLeading > List.length rawMessages then
             invalidArg "dropLeading" "X-wire prefix cutoff exceeds the current provider snapshot"
 
+        let dropped = List.take dropLeading rawMessages
+
+        let preservedTodoRounds =
+            List.zip dropped (dropped |> List.map retentionFacts |> XPrefixProjection.retainTodoWriteRounds)
+            |> List.choose (fun (message, retain) -> if retain then Some message else None)
+
         let head =
             createObj
                 [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
                   "parts", box [| createObj [ "type", box "text"; "text", box memory ] |] ]
 
-        head :: List.skip dropLeading rawMessages
+        head :: (preservedTodoRounds @ List.skip dropLeading rawMessages)
 
     let private canonicalValue (canonical: string) : obj =
         try

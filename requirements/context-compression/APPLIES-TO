@@ -13,6 +13,7 @@
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
 /src/Wanxiangshu/OpenCode/Host/RequirementGrounding/**
 /src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs
+/src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs
 /src/Wanxiangshu/Enforcer/Guidance/**
 /src/Wanxiangshu/Participant/Provider/Projection/Intent.fs
 /src/Wanxiangshu/Participant/Provider/Projection/Planner.fs

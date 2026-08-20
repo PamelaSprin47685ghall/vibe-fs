@@ -38,6 +38,27 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module XPrefixProjection =
 
+    type RawPrefixMessageFacts =
+        { ContainsTodoWrite: bool
+          ToolCallIds: Set<ToolCallId> }
+
+    /// CONTEXT-COMPRESSION-020: Y may replace ordinary dropped history, but a
+    /// todowrite round remains raw X. The call message establishes the protected
+    /// call id; any dropped message carrying that id (notably the result) belongs
+    /// to the same protected round. A malformed call without an id still protects
+    /// its own message rather than silently deleting the live obligation ledger.
+    let retainTodoWriteRounds (messages: RawPrefixMessageFacts list) : bool list =
+        let todoCallIds =
+            messages
+            |> List.filter (fun message -> message.ContainsTodoWrite)
+            |> List.collect (fun message -> Set.toList message.ToolCallIds)
+            |> Set.ofList
+
+        messages
+        |> List.map (fun message ->
+            message.ContainsTodoWrite
+            || not (Set.intersect message.ToolCallIds todoCallIds |> Set.isEmpty))
+
     /// COMPANION-009: the intent for one request.
     ///
     /// `frozenRecordPrefixBody` is the FrozenRecordPrefix text, already read from the blob the snapshot

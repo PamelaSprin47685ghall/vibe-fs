@@ -81,6 +81,25 @@ test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_prepend_companion_memory', (
   assert.throws(() => wire.prependCompanionMemory(raw, 's', 'm', 5), /cutoff exceeds/)
 })
 
+test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_y_prefix_preserves_raw_todowrite_rounds', () => {
+  const message = (id, role, parts) => ({ info: { id, role }, parts })
+  const raw = [
+    message('u0', 'user', [{ type: 'text', text: 'ordinary old context' }]),
+    message('a0', 'assistant', [
+      { type: 'text', text: 'updating obligations' },
+      { type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { planComplete: false } },
+    ]),
+    message('t0', 'tool', [{ type: 'tool-result', callID: 'todo-call-1', result: { ok: true } }]),
+    message('a1', 'assistant', [{ type: 'text', text: 'ordinary replaced tail' }]),
+    message('u1', 'user', [{ type: 'text', text: 'live request' }]),
+  ]
+
+  const projected = wire.prependCompanionMemory(raw, 'y-prefix', 'compressed ordinary history', 4)
+  assert.deepEqual(projected.map(item => item.info.id), ['y-prefix', 'a0', 't0', 'u1'])
+  assert.equal(projected[1], raw[1], 'todowrite call message remains the exact raw Host object')
+  assert.equal(projected[2], raw[2], 'matching result message remains the exact raw Host object')
+})
+
 test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_apply_rendered_prefix_both_shapes', () => {
   const raw = [{ info: { id: 'm1' } }]
   const synthetic = { name: 'SyntheticPrefix', activation: { syntheticMessageId: 'syn-9', memory: 'memory text', dropLeading: 0 } }

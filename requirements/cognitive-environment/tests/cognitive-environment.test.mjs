@@ -264,3 +264,24 @@ test('WHAT[COGNITIVE-ENVIRONMENT-011] CE_011_transient_texts_do_not_rewrite_role
     assert.doesNotMatch(text, /\b(fast|deep)-[a-z]+/, 'transient texts never expose fast/deep machine identity')
   }
 })
+
+test('WHAT[COGNITIVE-ENVIRONMENT-016] CE_016_pair_hint_retains_brief_trigger_without_repeating_full_psychological_contract', () => {
+  for (const locale of ['en', 'zh-CN']) {
+    const hint = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
+    const assumeDesc = read(`resources/provider/tool/assume/description/${locale}.md`)
+
+    // Pair hint must include the brief trigger for micro-primitives like assume
+    assert.match(hint, /`assume`/)
+    assert.match(hint, /抽象|abstract/i)
+    assert.match(hint, /笃定|commit/i)
+
+    // Pair hint must offload long psychological argument (e.g. domino chain, extended psychological essay)
+    assert.doesNotMatch(hint, /多米诺|domino/i, `${locale} pair hint must not repeat long psychological contract`)
+    assert.doesNotMatch(hint, /经验丰富|experienced participant/i, `${locale} pair hint must not repeat long essay`)
+
+    // The full psychological reasoning lives in tool descriptions, not in the recurring per-turn hint
+    assert.match(assumeDesc, /多米诺|domino/i, `${locale} tool description carries the complete psychological reasoning`)
+    assert.match(assumeDesc, /经验丰富|experienced participant/i, `${locale} tool description carries the complete psychological reasoning`)
+    assert.match(assumeDesc, /抽象.*笃定.*执行.*验证|abstract.*commit.*execute.*verify/is)
+  }
+})

@@ -42,7 +42,7 @@ open Wanxiangshu.Mission.Obligation.Todo
 
 /// TODO-001 / GLORY-074 / COMPANION-014: production Opening floor owner.
 ///
-/// Derives Blogger / Companion effective floor from Life + MagicTodo + XTrace.
+/// Derives Blogger / Companion effective floor from the true Life Opening.
 /// Never reads WorkActivated / ProtectedPrefixEnd.
 module ManagerOpeningFloor =
 
@@ -79,39 +79,19 @@ module ManagerOpeningFloor =
         | Some state when not (MagicTodoProjection.isPlanCommitted state) -> None
         | Some state -> workRecordStartAfterPlan life state xTrace
 
-    let private effectiveFloorForCurrentLife
-        (current: LifeProjection)
-        (magicTodo: MagicTodoProjection.MagicTodoProjectionState)
-        (xTrace: XTraceProjectionState)
-        =
-        let magic = MagicTodoProjection.tryLife current.LifeId magicTodo
-        let planCommitted = magic |> Option.exists MagicTodoProjection.isPlanCommitted
-
-        let callCursor, callId =
-            magic
-            |> Option.bind t1Anchor
-            |> Option.map (fun (cursor, id) -> Some cursor, Some id)
-            |> Option.defaultValue (None, None)
-
-        MagicTodo.effectiveOpeningFloor
-            true
-            planCommitted
-            current.OpeningCursor
-            callCursor
-            callId
-            (XTraceProjection.headSequence xTrace)
-            (partAnchors xTrace)
+    let private effectiveFloorForCurrentLife (current: LifeProjection) =
+        Some(MagicTodo.workRecordStart current.OpeningCursor)
 
     /// Production floor for BloggerCoordinator / CompanionTransform.
     let effectiveOpeningFloor
         (life: LifeProjection option)
-        (magicTodo: MagicTodoProjection.MagicTodoProjectionState)
-        (xTrace: XTraceProjectionState)
+        (_magicTodo: MagicTodoProjection.MagicTodoProjectionState)
+        (_xTrace: XTraceProjectionState)
         : XTraceCursor option =
         match life with
         | None -> None
         | Some current when current.Completed -> None
-        | Some current -> effectiveFloorForCurrentLife current magicTodo xTrace
+        | Some current -> effectiveFloorForCurrentLife current
 
     /// Session helper: CurrentLife floor sequence for Blogger max(coverage, floor).
     let floorSequence (sessionId: SessionId) (projections: AgentProjectionSet) : int64 option =
