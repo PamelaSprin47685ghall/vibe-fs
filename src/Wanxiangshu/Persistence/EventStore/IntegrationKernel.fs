@@ -49,6 +49,9 @@ type IntegrationRule =
     { Name: string
       Initial: obj
       Accepts: EventEnvelope -> bool
+      /// Semantic-failure quarantine domain. Rules with independent durable streams
+      /// must not let one bad stream suppress unrelated streams in the same rule.
+      FaultScope: EventEnvelope -> string
       Integrate: obj -> EventEnvelope -> Result<obj, string>
       PlanCut: obj -> EventEnvelope -> string -> bool -> Result<SemanticCutPlan, string>
       ApplyCut: obj -> string -> Result<obj, string> }

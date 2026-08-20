@@ -275,7 +275,9 @@ CE program、同一组注册规则。独立 remote-sync hook 可以为**纯物�
 
 ## DURABLE-EVENTS-021 —— semantic failure 仍写 durable cut-tail，但**当前进程必须 fatal**
 
-**规范陈述**：registered business integration rule 对某个 EventEnvelope 返回语义错误时，Storage 不得抹掉已结构合法的坏 fact。Integrator 必须按原时序：① durable 保留坏 fact；② 该 rule 进入 faulted tail，Current 保持 last-good；③ 由该业务 rule 根据当前事实推断最小 reset patch；④ 在同一次 live append 中紧随坏 fact写入 first-class `ProjectionCutTail(rule, failed_event_id, reason, reset)`；⑤ replay 严格按 canonical 顺序先看到坏 fact，再看到 cut/reset，再继续后续 fact。`ProjectionCutTail` 与普通 writer fact 一样参与 remote sync。
+**规范陈述**：registered business integration rule 对某个 EventEnvelope 返回语义错误时，Storage 不得抹掉已结构合法的坏 fact。每个 rule 必须给出确定性的 **fault scope**；semantic fault 只隔离同一 `(rule, scope)` 的后续事件，**不得**因为一个 scope 的坏事实而跳过同 rule 的其它独立 scope。Journal rule 的 fault scope 是 outer `EventStreamId`（例如 `journal/session/<SessionId>`）；因此一个 session/child/process Journal stream 的 fold rejection 不得使其它 Journal stream 的 `LifeOpened`、handle、todo 或其它事实从 Current 消失。
+
+在该 fault scope 内，Integrator 必须按原时序：① durable 保留坏 fact；② 该 `(rule, scope)` 进入 faulted tail，Current 保持 last-good；③ 由该业务 rule 根据当前事实推断最小 reset patch；④ 在同一次 live append 中紧随坏 fact 写入 first-class `ProjectionCutTail(rule, failed_event_id, reason, reset)`；⑤ replay 严格按 canonical 顺序先看到坏 fact，再看到 cut/reset，再继续该 scope 的后续 fact；其它 scope 可在两者之间继续正常积分。`ProjectionCutTail` 不新增 scope 字段：`failed_event_id` 指向的 canonical failed event 唯一决定其 scope。它与普通 writer fact 一样参与 remote sync。
 
 但 durable 可恢复 **不等于当前进程仍可信**。live append 一旦收到“自己的 EventId 被 cut”的 typed `FactRejected` receipt，journal append boundary 必须在返回调用方之前触发 process-level fatal；禁止把 semantic cut 转成普通 tool consequence、`Result.Error` 后继续接受新 prompt/nudge/effect。原因是产生坏 fact 的同一调用可能已经改变 process-local ownership、single-flight cache、pending task 或 Host session 状态，cut-tail 只能修 durable projection，无法回滚这些内存/物理副作用。
 

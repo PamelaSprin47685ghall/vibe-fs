@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
@@ -7,8 +7,19 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import * as eventStore from '../../../dist/Persistence/EventStore/Surface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 
 const id = (n) => n.toString(16).padStart(40, '0')
+
+const canonicalize = (value) => {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]))
+  }
+  return value
+}
+
+const canonicalEventLine = (event) => `${JSON.stringify(canonicalize(event))}\n`
 
 const withTemp = (fn) => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-event-store-append-'))
@@ -78,6 +89,72 @@ test('WHAT[DURABLE-EVENTS-021] semantic_failure_writes_cut_tail_reset_and_the_sa
     }
   } finally {
     eventStore.dispose(store)
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DURABLE-EVENTS-021] an uncut historical Journal fault suppresses only its own journal stream', async () => {
+  const dir = withTemp((base) => base)
+  const eventsDir = path.join(dir, 'wanxiang', 'events')
+  mkdirSync(eventsDir, { recursive: true })
+
+  const lifeOpened = ({ session, life, message, seq, id }) =>
+    canonicalEventLine({
+      event_id: id,
+      stream_id: `journal/session/${session}`,
+      event_type: 'JournalEnvelope',
+      parents: [],
+      payload: {
+        EventId: ['EventId', id],
+        Fact: [
+          'ManagerLifecycle',
+          [
+            'LifeOpened',
+            {
+              LifeId: ['ManagerLifeId', life],
+              OpeningCursorSequence: '1',
+              OpeningTextDigest: ['BlobDigest', `digest-${life}`],
+              OpeningTextRef: ['BlobRef', `blobs/${life}`],
+              OpeningUserMessageId: ['PhysicalUserMessageId', message],
+              SessionId: ['SessionId', session],
+            },
+          ],
+        ],
+        LocalSeq: ['LocalSeq', String(seq)],
+        ObservedAt: `2026-01-01T00:00:0${seq}.000+00:00`,
+        RuntimeId: ['RuntimeId', 'rt_journal_fault_scope'],
+        Stream: ['Session', ['SessionId', session]],
+      },
+      payload_refs: [],
+    })
+
+  const historical = [
+    lifeOpened({ session: 'ses_fault_a', life: 'life_a1', message: 'msg_a1', seq: 1, id: '1'.repeat(40) }),
+    // A second open Life is deliberately invalid. This fixture models old current-layout
+    // history that predates the invariant which writes ProjectionCutTail in the same live append.
+    lifeOpened({ session: 'ses_fault_a', life: 'life_a2', message: 'msg_a2', seq: 2, id: '2'.repeat(40) }),
+    lifeOpened({ session: 'ses_healthy_b', life: 'life_b1', message: 'msg_b1', seq: 3, id: '3'.repeat(40) }),
+  ]
+
+  writeFileSync(path.join(eventsDir, 'historical.ndjson'), historical.join(''))
+
+  try {
+    const booted = await journal.JournalSurface_bootWithWriterId(
+      dir,
+      'reopen-proof',
+      'rt_reopen',
+      4242,
+      '2026-01-02T00:00:00Z',
+    )
+    assert.equal(booted.ok, true, `historical replay should boot: ${JSON.stringify(booted.error)}`)
+    assert.equal(journal.JournalSurface_hasSession(booted.journal, 'ses_fault_a'), true)
+    assert.equal(
+      journal.JournalSurface_hasSession(booted.journal, 'ses_healthy_b'),
+      true,
+      'a semantic fault in one Journal stream must not black out later independent session streams',
+    )
+    journal.JournalSurface_dispose(booted.journal)
+  } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 })

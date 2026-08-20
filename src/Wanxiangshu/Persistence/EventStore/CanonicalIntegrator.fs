@@ -73,6 +73,7 @@ module StructuralIntegration =
         { Name = "Structural"
           Initial = box StructuralProjection.empty
           Accepts = fun _ -> true
+          FaultScope = fun _ -> "global"
           Integrate =
             fun current envelope ->
                 StructuralProjection.apply (unbox<StructuralProjection> current) envelope
@@ -88,6 +89,10 @@ module JournalIntegration =
         { Name = "Journal"
           Initial = box Fold.empty
           Accepts = fun envelope -> envelope.EventType = EventStoreJournalCodec.JournalEnvelopeEventType
+          // A Journal EventStreamId is the durable isolation boundary. A semantic
+          // rejection in one session/child/process stream must not black out other
+          // Journal streams while waiting for that stream's cut-tail.
+          FaultScope = fun envelope -> EventStreamId.value envelope.StreamId
           Integrate =
             fun current envelope ->
                 match EventStoreJournalCodec.tryDecode envelope with
@@ -105,6 +110,7 @@ module StrengthIntegration =
     let rule: IntegrationRule =
         { Name = "Strength"
           Initial = box StrengthProjection.empty
+          FaultScope = fun _ -> "global"
           Accepts = fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType
           Integrate =
             fun current envelope ->
@@ -122,6 +128,7 @@ module CasebookIntegration =
     let rule: IntegrationRule =
         { Name = "Casebook"
           Initial = box CasebookProjection.emptyState
+          FaultScope = fun _ -> "global"
           Accepts = fun envelope -> CasebookStore.isCasebookEventType envelope.EventType
           Integrate =
             fun current envelope ->
@@ -136,6 +143,7 @@ module JsTransactionIntegration =
     let rule: IntegrationRule =
         { Name = "JsTransaction"
           Initial = box JsTransactionProjection.empty
+          FaultScope = fun _ -> "global"
           Accepts = fun envelope -> JsToolsTransactionStore.isTransactionEventType envelope.EventType
           Integrate =
             fun current envelope ->
@@ -178,6 +186,10 @@ module CanonicalIntegrator =
             register JsTransactionIntegration.rule
         }
 
+    type private RuleFaultKey =
+        { Rule: string
+          Scope: string }
+
     type private RuleFault =
         { FailedEventId: EventId
           Reason: string }
@@ -185,11 +197,11 @@ module CanonicalIntegrator =
     type private IntegratorState =
         { Currents: Map<string, obj>
           Events: Map<string, EventEnvelope>
-          Faults: Map<string, RuleFault> }
+          Faults: Map<RuleFaultKey, RuleFault> }
 
     type private IntegrationStep =
         { State: IntegratorState
-          FailedRules: (string * string) list }
+          FailedRules: (RuleFaultKey * string) list }
 
     type private BusinessRuleDecision =
         | RuleSkipped
@@ -219,6 +231,10 @@ module CanonicalIntegrator =
 
     let private tryRule name =
         businessRules |> List.tryFind (fun rule -> rule.Name = name)
+
+    let private faultKey (rule: IntegrationRule) (envelope: EventEnvelope) =
+        { Rule = rule.Name
+          Scope = rule.FaultScope envelope }
 
     let private encodeCutPayload (payload: CutPayload) =
         Encode.object
@@ -253,7 +269,12 @@ module CanonicalIntegrator =
                 Currents = Map.add structuralRule.Name next state.Currents }
         | Error _ -> state
 
-    let private applyCutForRule (state: IntegratorState) (payload: CutPayload) (rule: IntegrationRule) =
+    let private applyCutForRule
+        (state: IntegratorState)
+        (payload: CutPayload)
+        (rule: IntegrationRule)
+        (key: RuleFaultKey)
+        =
         let current =
             state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
 
@@ -262,12 +283,12 @@ module CanonicalIntegrator =
         | Ok reset ->
             { state with
                 Currents = Map.add rule.Name reset state.Currents
-                Faults = Map.remove rule.Name state.Faults }
+                Faults = Map.remove key state.Faults }
 
     let private applyCut (state: IntegratorState) (payload: CutPayload) =
-        tryRule payload.Rule
-        |> Option.map (applyCutForRule state payload)
-        |> Option.defaultValue state
+        match tryRule payload.Rule, Map.tryFind (eventKey payload.FailedEventId) state.Events with
+        | Some rule, Some failed -> applyCutForRule state payload rule (faultKey rule failed)
+        | _ -> state
 
     let private evaluateBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
         let prior =
@@ -278,7 +299,7 @@ module CanonicalIntegrator =
         | Error reason -> RuleFailed reason
 
     let private decideBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
-        if Map.containsKey rule.Name state.Faults then
+        if Map.containsKey (faultKey rule normalized) state.Faults then
             RuleSkipped
         else
             evaluateBusinessRule state normalized rule
@@ -286,7 +307,7 @@ module CanonicalIntegrator =
     let private applyBusinessDecision
         (normalized: EventEnvelope)
         (rule: IntegrationRule)
-        ((state: IntegratorState), (failures: (string * string) list))
+        ((state: IntegratorState), (failures: (RuleFaultKey * string) list))
         (decision: BusinessRuleDecision)
         =
         match decision with
@@ -296,17 +317,19 @@ module CanonicalIntegrator =
                 Currents = Map.add rule.Name next state.Currents },
             failures
         | RuleFailed reason ->
+            let key = faultKey rule normalized
+
             let fault =
                 { FailedEventId = normalized.EventId
                   Reason = reason }
 
             { state with
-                Faults = Map.add rule.Name fault state.Faults },
-            (rule.Name, reason) :: failures
+                Faults = Map.add key fault state.Faults },
+            (key, reason) :: failures
 
     let private applyBusinessRule
         (normalized: EventEnvelope)
-        ((state: IntegratorState), (failures: (string * string) list))
+        ((state: IntegratorState), (failures: (RuleFaultKey * string) list))
         (rule: IntegrationRule)
         =
         decideBusinessRule state normalized rule
@@ -514,9 +537,13 @@ module CanonicalIntegrator =
               PayloadRefs = [] }
             |> EventEnvelope.normalize
 
-        let ensureRuleReset (currentState: IntegratorState) (rule: IntegrationRule) =
+        let ensureRuleReset
+            (currentState: IntegratorState)
+            (rule: IntegrationRule)
+            (key: RuleFaultKey)
+            =
             result {
-                match Map.tryFind rule.Name currentState.Faults with
+                match Map.tryFind key currentState.Faults with
                 | None -> return currentState, [], []
                 | Some fault ->
                     let! plan = planCut currentState rule fault
@@ -538,18 +565,22 @@ module CanonicalIntegrator =
                     match remaining with
                     | [] -> return state, cuts, receipts
                     | rule :: tail ->
-                        let! next, addedCuts, addedReceipts = ensureRuleReset state rule
+                        let key = faultKey rule envelope
+                        let! next, addedCuts, addedReceipts = ensureRuleReset state rule key
                         return! loop next (cuts @ addedCuts) (receipts @ addedReceipts) tail
                 }
 
             loop currentState [] [] (matchingBusinessRules envelope)
 
-        let closeFailure (state, addedEvents, addedCuts) (ruleName, _) =
-            match tryRule ruleName with
+        let closeFailure
+            (state, addedEvents, addedCuts)
+            ((key: RuleFaultKey), _)
+            =
+            match tryRule key.Rule with
             | None -> Ok(state, addedEvents, addedCuts)
             | Some rule ->
                 result {
-                    let! next, eventCuts, receipts = ensureRuleReset state rule
+                    let! next, eventCuts, receipts = ensureRuleReset state rule key
                     return next, addedEvents @ eventCuts, addedCuts @ receipts
                 }
 
