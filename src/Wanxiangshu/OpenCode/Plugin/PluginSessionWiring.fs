@@ -87,6 +87,7 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Strength
 
 module PluginSessionWiring =
@@ -111,8 +112,23 @@ module PluginSessionWiring =
             | Some managed -> wired.BindActiveRun replicaId managed.Role workspaceDirectory
             | None -> ()
 
+        let seedDurableSessions (durable: AgentJournal) =
+            let snapshot = AgentJournal.snapshot durable
+
+            snapshot.AgentProjections.Sessions
+            |> Map.iter (fun sessionId sessionProj ->
+                sessionProj.PromptAuthority
+                |> Option.bind (fun a -> a.ActiveLogicalRun |> Option.orElse a.LastAuthorityProfile)
+                |> Option.iter (fun profile ->
+                    let agent = profile.SelectedAgent
+                    SessionExecutionBinding.observeUserFacingAgent sessionId agent
+                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
+                    ProviderLanguageBinding.ensureRoot sessionId |> ignore))
+
         match journal with
         | Some durable ->
+            seedDurableSessions durable
+
             // SyncDelegate attaches whenever the durable journal exists.
             let attached =
                 AttachedSessionRuntime(

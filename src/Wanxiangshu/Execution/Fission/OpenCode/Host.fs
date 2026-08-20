@@ -917,11 +917,7 @@ module FissionHost =
         | Stale
         | Current
 
-    let private acceptedDispatchForPromptKey
-        (durable: AgentJournal)
-        laneSessionId
-        promptKey
-        =
+    let private acceptedDispatchForPromptKey (durable: AgentJournal) laneSessionId promptKey =
         AgentProjection.tryFind laneSessionId (AgentJournal.snapshot durable).AgentProjections
         |> Option.bind (fun session -> session.PromptAuthority)
         |> Option.bind (fun authority ->

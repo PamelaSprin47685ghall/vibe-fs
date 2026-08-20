@@ -692,7 +692,11 @@ module PluginTransforms =
                         terminateSession
                         outObj
 
-                BloggerChronicleText.maybeInject journal projectionSessionIdOpt (languageFor projectionSessionIdOpt) outObj
+                BloggerChronicleText.maybeInject
+                    journal
+                    projectionSessionIdOpt
+                    (languageFor projectionSessionIdOpt)
+                    outObj
 
                 // HOST-016: 对 provider-facing 消息做非空 content 兜底保障，
                 // 避免仅推理/空 content 导致上游 API 报 400 messages[i].content cannot be empty。

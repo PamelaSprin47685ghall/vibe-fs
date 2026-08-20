@@ -702,6 +702,26 @@ module HostSignalBootstrap =
                     commitExecutionCapability routedExecution
                 }
 
+            let observeExplicitResumeSession (decoded: PromptIngressCodec.DecodedMessage) =
+                match decoded.SessionId with
+                | None -> ()
+                | Some sessionId ->
+                    let resumeAgent =
+                        managedAgent decoded.ExplicitAgent
+                        |> Option.orElseWith (fun () ->
+                            journal
+                            |> Option.bind (fun j ->
+                                PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections
+                                |> Option.orElseWith (fun () ->
+                                    PromptAuthorityLedger.lastAuthorityProfile sessionId (AgentJournal.snapshot j).AgentProjections))
+                            |> Option.map (fun profile -> profile.SelectedAgent))
+
+                    resumeAgent
+                    |> Option.iter (fun agent ->
+                        scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
+                        SessionExecutionBinding.observeUserFacingAgent sessionId agent
+                        ProviderLanguageBinding.ensureRoot sessionId |> ignore)
+
             let continueOrdinaryChatMessage decoded input output =
                 task {
                     let admission = chatExecutionAdmission journal decoded
@@ -771,7 +791,7 @@ module HostSignalBootstrap =
                             // Wanxiangshu does not mint PromptIngress/AuthorityRoot,
                             // acquire a managed business lease, wake joins, or commit a
                             // continuation capability for this physical material.
-                            ()
+                            observeExplicitResumeSession decoded
                         else
                             // EMR-009 / PROMPT-006: route from typed authority evidence.
                             // Keyless external roots use their explicit managed agent;

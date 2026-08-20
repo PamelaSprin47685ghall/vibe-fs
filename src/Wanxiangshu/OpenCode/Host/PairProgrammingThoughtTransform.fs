@@ -997,8 +997,7 @@ module PairProgrammingThoughtTransform =
 
             let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
 
-            let! injectResult =
-                tryInjectCore journal projectionSessionIdOpt markerText messages
+            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText messages
 
             do! applyPairInjectResult terminateSession projectionSessionIdOpt outObj injectResult
         }
@@ -1015,7 +1014,14 @@ module PairProgrammingThoughtTransform =
         if skipPairGuideline journal projectionSessionIdOpt then
             Task.FromResult()
         else
-            injectPairProgrammingGuideline journal projectionSessionIdOpt sessionStartedAt clock terminateSession language outObj
+            injectPairProgrammingGuideline
+                journal
+                projectionSessionIdOpt
+                sessionStartedAt
+                clock
+                terminateSession
+                language
+                outObj
 
     let tryInject
         (journal: AgentJournal option)

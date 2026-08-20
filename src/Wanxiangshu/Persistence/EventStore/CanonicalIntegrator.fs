@@ -186,9 +186,7 @@ module CanonicalIntegrator =
             register JsTransactionIntegration.rule
         }
 
-    type private RuleFaultKey =
-        { Rule: string
-          Scope: string }
+    type private RuleFaultKey = { Rule: string; Scope: string }
 
     type private RuleFault =
         { FailedEventId: EventId
@@ -537,11 +535,7 @@ module CanonicalIntegrator =
               PayloadRefs = [] }
             |> EventEnvelope.normalize
 
-        let ensureRuleReset
-            (currentState: IntegratorState)
-            (rule: IntegrationRule)
-            (key: RuleFaultKey)
-            =
+        let ensureRuleReset (currentState: IntegratorState) (rule: IntegrationRule) (key: RuleFaultKey) =
             result {
                 match Map.tryFind key currentState.Faults with
                 | None -> return currentState, [], []
@@ -572,10 +566,7 @@ module CanonicalIntegrator =
 
             loop currentState [] [] (matchingBusinessRules envelope)
 
-        let closeFailure
-            (state, addedEvents, addedCuts)
-            ((key: RuleFaultKey), _)
-            =
+        let closeFailure (state, addedEvents, addedCuts) ((key: RuleFaultKey), _) =
             match tryRule key.Rule with
             | None -> Ok(state, addedEvents, addedCuts)
             | Some rule ->
