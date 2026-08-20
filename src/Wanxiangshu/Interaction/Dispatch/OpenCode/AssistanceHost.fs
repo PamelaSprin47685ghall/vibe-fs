@@ -4,14 +4,8 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Change
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Mission.Manager.OpenCode
-open Wanxiangshu.Mission.Obligation.Todo.OpenCode
-open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Repository.Investigation.Semble
-open Wanxiangshu.Strength.OpenCode
-open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Collections.Generic
@@ -36,9 +30,7 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -49,9 +41,6 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.OpenCode
