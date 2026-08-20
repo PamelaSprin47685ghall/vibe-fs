@@ -240,29 +240,8 @@ module HostSignalBootstrap =
                     (fun sessionId -> sessionPort.InterruptAttempt sessionId)
                 )
 
-            let needHelpSensor =
-                NeedHelpSensor(
-                    NeedHelpSensor.createEligibilityPredicate
-                        scope.Sessions.OwnedSessions
-                        scope.Sessions.SessionParents
-                        journal
-                        scope.Strength.StrengthRuntime,
-                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
-                )
-
             do scope.AttachLoopSensor loopSensor
-            do scope.AttachNeedHelpSensor needHelpSensor
-
-            let assistance =
-                AssistanceHost(
-                    sessionPort,
-                    journal,
-                    needHelpSensor,
-                    snapshot,
-                    (fun childId -> scope.Sessions.OwnedSessions.Add(SessionId.value childId) |> ignore)
-                )
-
-            do scope.AttachAssistance(assistance.HandleTurn, assistance.DropSignals, assistance.DropSession)
+            let needHelpSensor = AssistanceHostWiring.install sessionPort journal snapshot scope
 
             let signalRouter =
                 HostSignalRouter(

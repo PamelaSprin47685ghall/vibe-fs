@@ -952,3 +952,39 @@ type AssistanceHost
                 ()
         }
         :> Task
+
+[<RequireQualifiedAccess>]
+module AssistanceHostWiring =
+
+    /// HOST-027 owner composition. The Host root supplies runtime resources and
+    /// receives the stream sensor it must route raw events into; eligibility,
+    /// interruption and assistance lifecycle wiring remain owned here.
+    let install
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (snapshot: ISessionSnapshotPort)
+        (scope: PluginRuntimeScope)
+        =
+        let sensor =
+            NeedHelpSensor(
+                NeedHelpSensor.createEligibilityPredicate
+                    scope.Sessions.OwnedSessions
+                    scope.Sessions.SessionParents
+                    journal
+                    scope.Strength.StrengthRuntime,
+                (fun sessionId -> sessionPort.InterruptAttempt sessionId)
+            )
+
+        scope.AttachNeedHelpSensor sensor
+
+        let assistance =
+            AssistanceHost(
+                sessionPort,
+                journal,
+                sensor,
+                snapshot,
+                (fun childId -> scope.Sessions.OwnedSessions.Add(SessionId.value childId) |> ignore)
+            )
+
+        scope.AttachAssistance(assistance.HandleTurn, assistance.DropSignals, assistance.DropSession)
+        sensor
