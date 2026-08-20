@@ -43,6 +43,7 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Host
 open Wanxiangshu.Change
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
@@ -92,10 +93,25 @@ module ManagerJobHandoff =
         || job.PublishClaimed.IsSome
         || job.Terminal.IsSome
 
-    let private isTransferred (outcome: ReconcileProgram.TurnOutcome) (job: ManagerJobProjection) =
+    let private managerLifeArchived (journal: AgentJournal option) (sessionId: SessionId) =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.ManagerLife)
+        |> Option.exists ManagerLifecycleProjection.isLifeArchived
+
+    let private isTransferred
+        (journal: AgentJournal option)
+        (sessionId: SessionId)
+        (outcome: ReconcileProgram.TurnOutcome)
+        (job: ManagerJobProjection)
+        =
         match outcome with
         | ReconcileProgram.TurnInProgress -> orchestrationOwnsTurn job
-        | ReconcileProgram.TurnCompleted -> orchestrationOwnsTurn job || job.ConflictDetected.IsSome
+        | ReconcileProgram.TurnCompleted ->
+            orchestrationOwnsTurn job
+            || job.ConflictDetected.IsSome
+            || managerLifeArchived journal sessionId
         | _ -> false
 
     let private completeInProgress
@@ -106,7 +122,7 @@ module ManagerJobHandoff =
         =
         task {
             match tryJob journal turn.SessionId with
-            | Some job when isTransferred turn.Outcome job ->
+            | Some job when isTransferred journal turn.SessionId turn.Outcome job ->
                 let! _ = TerminalReporter.complete eventPort journal abortedSessions turn
                 return HandoffOutcome.Transferred
             | _ -> return HandoffOutcome.ManagerOwnsTurn
@@ -139,7 +155,7 @@ module ManagerJobHandoff =
         =
         task {
             match tryJob journal turn.SessionId with
-            | Some job when isTransferred turn.Outcome job ->
+            | Some job when isTransferred journal turn.SessionId turn.Outcome job ->
                 let! _, terminalValid = TerminalReporter.complete eventPort journal abortedSessions turn
                 do! recordFallbackSuccessIfValid journal turn terminalValid
                 return HandoffOutcome.Transferred

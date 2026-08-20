@@ -353,8 +353,8 @@ async function barrierSync() {
           accumulatedLogs.includes('Compilation failed')
 
         const hasFinishedCycle =
-          accumulatedLogs.includes('Watching src/Wanxiangshu') ||
-          accumulatedLogs.includes('Fable compilation finished')
+          accumulatedLogs.includes('Fable compilation finished') ||
+          (accumulatedLogs.includes('Watching ') && accumulatedLogs.includes('src/Wanxiangshu'))
 
         if (hasErrors && hasFinishedCycle) {
           // Give a tiny moment for full flush
