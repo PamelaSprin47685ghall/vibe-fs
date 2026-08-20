@@ -53,6 +53,16 @@ test('WHAT[PID-010] child_session_persona_inherits_owner_persona', () => {
   assert.equal(session.tryGet(replica), 'Engineer')
 })
 
+test('WHAT[PID-010] child_session_persona_inherits_even_when_owner_was_not_yet_queried', () => {
+  session.clear()
+  const child = 'ses_unseeded_child'
+
+  const inherited = session.inheritFromOwner('Coordinator', child)
+  assert.equal(inherited.ok, true)
+  assert.equal(inherited.value, 'Coordinator')
+  assert.equal(session.tryGet(child), 'Coordinator')
+})
+
 test('WHAT[PID-005] system_prompt_id_follows_canonical_role_not_effective_agent_tier', () => {
   const rolePrompt = prompt.systemPromptIdForRole('coder')
   assert.equal(rolePrompt, 'coder')

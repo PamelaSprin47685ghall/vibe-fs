@@ -123,7 +123,8 @@ module PluginSessionWiring =
                     let agent = profile.SelectedAgent
                     SessionExecutionBinding.observeUserFacingAgent sessionId agent
                     scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
-                    ProviderLanguageBinding.ensureRoot sessionId |> ignore))
+                    ProviderLanguageBinding.ensureRoot sessionId |> ignore
+                    PersonaBinding.ensureFromAuthority profile |> ignore))
 
         match journal with
         | Some durable ->

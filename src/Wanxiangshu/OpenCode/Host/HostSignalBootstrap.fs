@@ -702,25 +702,42 @@ module HostSignalBootstrap =
                     commitExecutionCapability routedExecution
                 }
 
+            let bindExplicitResumeSession
+                sessionId
+                (profileOpt: PromptAuthority.AuthorityExecutionProfile option)
+                explicitAgent
+                =
+                let resumeAgent =
+                    managedAgent explicitAgent
+                    |> Option.orElseWith (fun () ->
+                        profileOpt
+                        |> Option.map (fun (profile: PromptAuthority.AuthorityExecutionProfile) ->
+                            profile.SelectedAgent))
+
+                resumeAgent
+                |> Option.iter (fun agent ->
+                    scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
+                    SessionExecutionBinding.observeUserFacingAgent sessionId agent
+                    ProviderLanguageBinding.ensureRoot sessionId |> ignore)
+
+                match profileOpt with
+                | Some profile -> PersonaBinding.ensureFromAuthority profile |> ignore
+                | None -> PersonaBinding.ensureRoot sessionId |> ignore
+
             let observeExplicitResumeSession (decoded: PromptIngressCodec.DecodedMessage) =
                 match decoded.SessionId with
                 | None -> ()
                 | Some sessionId ->
-                    let resumeAgent =
-                        managedAgent decoded.ExplicitAgent
-                        |> Option.orElseWith (fun () ->
-                            journal
-                            |> Option.bind (fun j ->
-                                PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections
-                                |> Option.orElseWith (fun () ->
-                                    PromptAuthorityLedger.lastAuthorityProfile sessionId (AgentJournal.snapshot j).AgentProjections))
-                            |> Option.map (fun profile -> profile.SelectedAgent))
+                    let profileOpt =
+                        journal
+                        |> Option.bind (fun j ->
+                            PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot j).AgentProjections
+                            |> Option.orElseWith (fun () ->
+                                PromptAuthorityLedger.lastAuthorityProfile
+                                    sessionId
+                                    (AgentJournal.snapshot j).AgentProjections))
 
-                    resumeAgent
-                    |> Option.iter (fun agent ->
-                        scope.Sessions.ModelRoutingSessions.Add(SessionId.value sessionId) |> ignore
-                        SessionExecutionBinding.observeUserFacingAgent sessionId agent
-                        ProviderLanguageBinding.ensureRoot sessionId |> ignore)
+                    bindExplicitResumeSession sessionId profileOpt decoded.ExplicitAgent
 
             let continueOrdinaryChatMessage decoded input output =
                 task {

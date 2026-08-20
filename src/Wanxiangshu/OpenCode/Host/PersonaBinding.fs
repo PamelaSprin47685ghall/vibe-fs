@@ -77,20 +77,36 @@ module PersonaBinding =
         | Some inherited, true -> inherited
         | _ -> bindAuthorityPersona profile
 
+    let private resolveRootRoleAndTier (sessionId: SessionId) =
+        SessionExecutionBinding.tryAgent sessionId
+        |> Option.map (fun v -> v.Trim())
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.bind ManagedAgent.tryParse
+        |> function
+            | Some managed -> managed.Role, managed.Tier
+            | None -> Role.Manager, AgentTier.Fast
+
+    let private resolveRootPersona (sessionId: SessionId) =
+        let role, tier = resolveRootRoleAndTier sessionId
+        PersonaCatalog.persona role tier
+
+    let private bindPersonaFallback (sessionId: SessionId) (persona: string) =
+        match SessionPersona.bindOnce sessionId persona with
+        | Ok bound -> bound
+        | Error _ -> SessionPersona.tryGet sessionId |> Option.defaultValue persona
+
+    /// Root / first-touch: bind once from resolved role/tier or default Manager Fast.
+    let ensureRoot (sessionId: SessionId) : string =
+        match SessionPersona.tryGet sessionId with
+        | Some persona -> persona
+        | None -> bindPersonaFallback sessionId (resolveRootPersona sessionId)
+
     /// InternalLeaf / attached child: inherit owner SessionPersona; never re-read tier.
     let ensureInherited (ownerId: SessionId) (childId: SessionId) : string =
         let ownerPersona =
             match SessionPersona.tryGet ownerId with
             | Some persona -> persona
-            | None ->
-                raise (
-                    InvalidOperationException(
-                        sprintf
-                            "owner %s has no SessionPersona; child %s cannot inherit (AGENT-028)"
-                            (SessionId.value ownerId)
-                            (SessionId.value childId)
-                    )
-                )
+            | None -> ensureRoot ownerId
 
         match SessionPersona.inheritFromOwner ownerPersona childId with
         | Ok persona -> persona
