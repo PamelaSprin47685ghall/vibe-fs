@@ -220,8 +220,6 @@ module HostTurnObserver =
                 do!
                     TurnWorkflow.observe
                         recoveryTimerPort
-                        Pty.abortParent
-                        (fun sessionId -> scope.CancelSessionChildren(SessionId.value sessionId))
                         sessionPort
                         eventPort
                         journal

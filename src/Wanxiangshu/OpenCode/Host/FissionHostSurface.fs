@@ -205,8 +205,6 @@ module FissionHostSurface =
             do!
                 OrdinaryTurnWorkflow.observe
                     (DummyTimer() :> ITimerPort)
-                    (fun _ -> ())
-                    (fun _ -> Task.FromResult(()) :> Task)
                     sessionPort
                     eventPort
                     None

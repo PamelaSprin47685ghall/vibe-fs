@@ -104,8 +104,6 @@ module OrdinaryTurnWorkflow =
     /// Guard armed state is not exposed; CE branches on the typed abort outcome.
     let private handleAborted
         (timerPort: ITimerPort)
-        (abortParent: string -> unit)
-        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -122,9 +120,12 @@ module OrdinaryTurnWorkflow =
         | AbortCause.External ->
             task {
                 abortedSessions.Add sessionKey |> ignore
-                abortParent sessionKey
-                do! cancelSessionChildren turn.SessionId
-                do! sessionPort.AbortChildren turn.SessionId
+
+                // MANAGED-SESSION-018: TurnAborted is an attempt observation, not
+                // proof that the logical parent/session ceased to exist. Do not
+                // escalate ambiguous AbortError into ParentCancelled and do not
+                // physically destroy background children. SessionDeleted or an
+                // explicit successor-less termination owns that irreversible act.
 
                 eventPort.NotifyTerminal
                     turn.SessionId
@@ -198,8 +199,6 @@ module OrdinaryTurnWorkflow =
 
     let private handleOutcome
         (timerPort: ITimerPort)
-        (abortParent: string -> unit)
-        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -225,8 +224,6 @@ module OrdinaryTurnWorkflow =
         | ReconcileProgram.TurnAborted reason ->
             handleAborted
                 timerPort
-                abortParent
-                cancelSessionChildren
                 sessionPort
                 eventPort
                 journal
@@ -258,8 +255,6 @@ module OrdinaryTurnWorkflow =
 
     let observe
         (timerPort: ITimerPort)
-        (abortParent: string -> unit)
-        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -291,8 +286,6 @@ module OrdinaryTurnWorkflow =
 
             handleOutcome
                 timerPort
-                abortParent
-                cancelSessionChildren
                 sessionPort
                 eventPort
                 journal

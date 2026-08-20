@@ -18,7 +18,9 @@
 
 - **权限分型**：区分仅作用于子会话单次物理尝试的 `InterruptAttempt` 与执行完整资源清理的 `AbortSession`。根会话受保护，免受内部意外中断。
 - **后继闭合**：内部中断必须显式挂接恢复后继（如求助处理、重试等）或直接发布 `Failed` 终态唤醒父级等待。
-- **有序清理**：会话关闭时遵循严格的异步排空序列，先切断新工作准入，依次排空后台调和、子会话级联取消与持久化写入，最后释放底层资源。
+- **Abandon 授权闸门**：`HandleController.recordAbandon/cancelChildren` 只能由已确认的 logical parent/session 终止或 child 永久丢失恢复证明调用。`TurnAborted` 只描述当前 attempt，不拥有 child logical-cancel capability；process/plugin shutdown 也只拥有 observer detach capability。
+- **双排空语义**：logical cancel 使用 `CancelAndDrain`，允许 durable `HandleAbandoned` + 物理 child teardown；process/plugin shutdown 使用 `DetachAndDrain`，只排空 callback、解绑订阅与本地 runtime/PTY 资源，绝不写 `HandleAbandoned`、绝不 `AbortSession` live agent child。重启后由 durable `HandleLinked(Active)` 恢复。
+- **有序清理**：明确会话终止时遵循严格的异步排空序列，先切断新工作准入，依次排空后台调和、经授权的子会话级联取消与持久化写入，最后释放底层资源；仅 process shutdown 时则执行无业务终态的 detach 后释放 durable substrate。
 
 ## DEPENDS ON
 
@@ -46,3 +48,4 @@
 | MANAGED-SESSION-015 | `requirements/managed-session-lifecycle/tests/handle.test.mjs` |
 | MANAGED-SESSION-016 | `requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` |
 | MANAGED-SESSION-017 | `requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs` |
+| MANAGED-SESSION-018 | `requirements/managed-session-lifecycle/tests/shutdown-drain-contract.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` |

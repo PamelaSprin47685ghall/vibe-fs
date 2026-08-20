@@ -680,10 +680,10 @@ type ToolRuntimeScope
             let! ownedFailure = stopOwnedWorkAndDrain ()
 
             for runtime in forkRuntimes do
-                do! runtime.CancelAndDrain()
+                do! runtime.DetachAndDrain()
 
             for host in orchestrators do
-                do! host.CancelAndDrain()
+                do! host.DetachAndDrain()
 
             match ownedFailure with
             | Some failure -> return raise failure

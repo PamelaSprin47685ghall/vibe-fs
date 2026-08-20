@@ -152,7 +152,9 @@ module HostForkChildDispatch =
         taskResult {
             HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
             let payload = Option.defaultValue prompt enrichedPrompt
-            let! sent = sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
+            let! sent =
+                sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
+                |> TaskResultCE.ofTask
 
             match decideExistingSendAcceptance sent result with
             | Ok accepted -> return accepted

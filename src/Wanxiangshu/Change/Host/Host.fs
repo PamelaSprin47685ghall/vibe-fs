@@ -617,4 +617,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     member _.CancelAndDrain() : Task = runtime.CancelAndDrain()
 
+    member _.DetachAndDrain() : Task = runtime.DetachAndDrain()
+
     member _.Cancel() = runtime.Cancel()

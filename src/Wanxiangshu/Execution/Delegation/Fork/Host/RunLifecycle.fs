@@ -28,6 +28,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -46,6 +47,12 @@ module HostForkRunLifecycle =
         | AcceptanceUncertain of string
         | Rejected of string
 
+    [<RequireQualifiedAccess>]
+    type private DurableDispatchObservation =
+        | Accepted of PromptAuthority.AcceptedDispatch
+        | Pending of PromptAuthority.PromptClaim
+        | Dispatchable
+
     let private durableDispatchObservation
         (durable: AgentJournal)
         (childId: SessionId)
@@ -54,17 +61,17 @@ module HostForkRunLifecycle =
         let projections = (AgentJournal.snapshot durable).AgentProjections
 
         match PromptAuthorityLedger.dispatchStatusFor childId payloadDigest projections with
-        | PromptAuthorityLedger.DispatchStatus.Accepted evidence -> Choice1Of3 evidence
+        | PromptAuthorityLedger.DispatchStatus.Accepted evidence -> DurableDispatchObservation.Accepted evidence
         | PromptAuthorityLedger.DispatchStatus.Pending ->
             match PromptAuthorityLedger.pendingDispatchClaim childId payloadDigest projections with
-            | Some claim -> Choice2Of3 claim
+            | Some claim -> DurableDispatchObservation.Pending claim
             | None ->
                 raise (
                     InvalidOperationException(
                         "PromptAuthority projection reported Pending without the matching durable claim"
                     )
                 )
-        | PromptAuthorityLedger.DispatchStatus.Dispatchable -> Choice3Of3()
+        | PromptAuthorityLedger.DispatchStatus.Dispatchable -> DurableDispatchObservation.Dispatchable
 
     let private classifySendError
         (durable: AgentJournal)
@@ -75,7 +82,7 @@ module HostForkRunLifecycle =
         =
         let payloadDigest = HostDigest.sha256Hex prompt
 
-        let accepted evidence =
+        let accepted (evidence: PromptAuthority.AcceptedDispatch) =
             // Close the race where PhysicalAccepted landed after the dispatcher
             // cancelled its synchronous waiter but before we inspected durable
             // evidence. Binding the same root twice is idempotent assignment.
@@ -83,9 +90,9 @@ module HostForkRunLifecycle =
             AgentOwnerDispatchOutcome.Accepted
 
         match durableDispatchObservation durable childId payloadDigest with
-        | Choice1Of3 evidence -> accepted evidence
-        | Choice3Of3() -> AgentOwnerDispatchOutcome.Rejected error
-        | Choice2Of3 claim ->
+        | DurableDispatchObservation.Accepted evidence -> accepted evidence
+        | DurableDispatchObservation.Dispatchable -> AgentOwnerDispatchOutcome.Rejected error
+        | DurableDispatchObservation.Pending claim ->
             // AcceptanceUnknown intentionally leaves the claim Pending. Restore
             // the process-local callback that PromptDispatcher cancelled when its
             // synchronous Result was Error, then re-read durable truth to close
@@ -93,11 +100,11 @@ module HostForkRunLifecycle =
             PromptPhysicalAcceptance.register claim.PromptKey onAccepted
 
             match durableDispatchObservation durable childId payloadDigest with
-            | Choice1Of3 evidence ->
+            | DurableDispatchObservation.Accepted evidence ->
                 PromptPhysicalAcceptance.cancel claim.PromptKey
                 accepted evidence
-            | Choice2Of3 _ -> AgentOwnerDispatchOutcome.AcceptanceUncertain error
-            | Choice3Of3() ->
+            | DurableDispatchObservation.Pending _ -> AgentOwnerDispatchOutcome.AcceptanceUncertain error
+            | DurableDispatchObservation.Dispatchable ->
                 PromptPhysicalAcceptance.cancel claim.PromptKey
                 AgentOwnerDispatchOutcome.Rejected error
 

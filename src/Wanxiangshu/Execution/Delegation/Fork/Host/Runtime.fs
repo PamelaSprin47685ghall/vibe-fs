@@ -96,8 +96,10 @@ type HostForkRuntime
     let ownedWorkGate = obj ()
     // DSL-MUTABLE: single-flight — duplicate joins fail before waiting
     let mutable joinInFlight = false
-    // DSL-MUTABLE: resource — one parent-cancel drain owns durable abandon + physical teardown.
-    let mutable cancelDrainTask: Task option = None
+    // DSL-MUTABLE: resource — one terminal runtime teardown owns either logical
+    // cancel or process-local detach. A process detach must never race a later
+    // durable parent-cancel writer.
+    let mutable teardownTask: Task option = None
     // DSL-MUTABLE: resource — terminal/failure callback admission latch.
     let mutable acceptingOwnedWork = true
     // DSL-MUTABLE: resource — in-flight runtime-owned callback count.
@@ -331,7 +333,7 @@ type HostForkRuntime
                         failPendingRun
 
                 return
-                match sent with
+                    match sent with
                     | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted ->
                         lock gate (fun () -> deferredFirstPrompts.Remove agentId |> ignore)
                         Ok()
@@ -407,6 +409,27 @@ type HostForkRuntime
     member internal _.SendBusyNudge = sendBusyNudge
     member internal _.ParentAbortToken = parentAbortToken
 
+    member private _.DetachPendingObservers() =
+        let subscriptions =
+            lock gate (fun () ->
+                let values =
+                    pendingRuns.Values
+                    |> Seq.choose (fun run ->
+                        run.Finished <- true
+                        run.Subscription)
+                    |> Seq.toList
+
+                pendingRuns.Clear()
+                children.Clear()
+                dormantChildren.Clear()
+                processOwnedAgents.Clear()
+                deferredFirstPrompts.Clear()
+                ptyRuns.Clear()
+                terminalByName.Clear()
+                values)
+
+        subscriptions |> List.iter (fun subscription -> subscription.Dispose())
+
     member internal _.ManagerOpensReviewBarrier =
         defaultArg managerOpensReviewBarrier false
 
@@ -481,7 +504,7 @@ type HostForkRuntime
 
     member this.CancelAndDrain() : Task =
         lock cancelGate (fun () ->
-            match cancelDrainTask with
+            match teardownTask with
             | Some drain -> drain
             | None ->
                 let drain =
@@ -513,7 +536,37 @@ type HostForkRuntime
                     }
                     :> Task
 
-                cancelDrainTask <- Some drain
+                teardownTask <- Some drain
+                drain)
+
+    /// MANAGED-SESSION-018: plugin/process lifetime ending is not a logical
+    /// parent cancellation. Stop this process's observers and local runtime
+    /// resources without writing HandleAbandoned and without aborting live Host
+    /// child sessions. Durable Active handles remain the restart authority.
+    member this.DetachAndDrain() : Task =
+        lock cancelGate (fun () ->
+            match teardownTask with
+            | Some drain -> drain
+            | None ->
+                let drain =
+                    task {
+                        do! stopOwnedWorkAndDrain ()
+
+                        // Cancel only process-local ChildRun/mailbox waiters. This
+                        // does not call the Host AbortSession port and does not
+                        // write any durable handle terminal.
+                        runtime.Cancel()
+                        this.DetachPendingObservers()
+
+                        // PTYs are process-owned OS resources and are not durable
+                        // agent sessions; close them while preventing exit fan-out
+                        // from re-entering the detached runtime.
+                        do! ptyPortInstance.CloseAll()
+                        Pty.unregisterParentAbort parentKey parentAbortToken
+                    }
+                    :> Task
+
+                teardownTask <- Some drain
                 drain)
 
     member this.Cancel() : unit = this.CancelAndDrain() |> ignore

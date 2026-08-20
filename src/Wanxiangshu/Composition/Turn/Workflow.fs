@@ -73,8 +73,6 @@ module TurnWorkflow =
     /// Ordinary. Ordinary falls through when Manager does not claim the turn.
     let observe
         (timerPort: ITimerPort)
-        (abortParent: string -> unit)
-        (cancelSessionChildren: SessionId -> Task)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -150,8 +148,6 @@ module TurnWorkflow =
             let observeOrdinary current =
                 OrdinaryTurnWorkflow.observe
                     timerPort
-                    abortParent
-                    cancelSessionChildren
                     sessionPort
                     eventPort
                     journal

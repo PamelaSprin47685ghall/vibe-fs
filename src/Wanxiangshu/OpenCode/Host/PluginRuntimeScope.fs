@@ -77,8 +77,9 @@ type ISessionRuntimeOwner =
     abstract CancelSessionChildren: string -> Task
     abstract DisposeSession: string -> Task
     abstract DisposeExecutorRuntime: string -> Task
-    /// MANAGED-SESSION-009: plugin shutdown must await durable parent-cancel drain
-    /// before the shared Journal/EventStore lifetime is released.
+    /// MANAGED-SESSION-018: plugin shutdown drains process-local observers without
+    /// manufacturing logical parent cancellation. Durable Active handles survive
+    /// for restart recovery before the shared Journal/EventStore is released.
     abstract DisposeAsync: unit -> Task
     /// EXEC-016: live PTY still tracked for this parent session (DevOps).
     abstract HasLivePty: string -> bool
@@ -551,8 +552,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             syncDelegateRuntime <- None
             remember (captureSyncFailure (fun () -> strength.Dispose()))
 
-            // MANAGED-SESSION-009: the shared durable substrate is the last owner
-            // released, after scheduler/background/durable parent-cancel drains.
+            // MANAGED-SESSION-018: the shared durable substrate is the last owner
+            // released, after scheduler/background/process-local detach drains.
             let! journalFailure = captureTaskFailure (SharedAgentJournal.releaseAsync journal)
             remember journalFailure
             remember (captureSyncFailure (fun () -> SharedTerminalBus.release sharedTerminalKey sharedTerminalPort))
