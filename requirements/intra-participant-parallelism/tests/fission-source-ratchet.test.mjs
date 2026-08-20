@@ -102,9 +102,14 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-003] sibling creation is a distinct Hos
 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-013] request visibility and tool adapter both enforce origin before use', () => {
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  assert.match(bootstrap, /FissionRequestProjection\.apply/)
+  const fissionHost = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
+  assert.match(fissionHost, /module FissionHostRequestProjection/)
+  assert.match(fissionHost, /FissionRequestProjection\.apply/)
+  assert.match(fissionHost, /ModelRouting\.RoutedChatExecution\.PluginManaged/)
+  assert.doesNotMatch(bootstrap, /FissionRequestProjection\.apply|tools\?fission\s*<-/)
+  assert.match(bootstrap, /FissionHostRequestProjection\.projectRouted/)
   assert.match(bootstrap, /SessionParents\.ContainsKey/)
-  const externalProjectionAt = bootstrap.indexOf('projectExternalManagedFissionVisibility decoded output')
+  const externalProjectionAt = bootstrap.indexOf('FissionHostRequestProjection.projectExternalManaged hasPhysicalParent decoded output')
   const explicitResumeAt = bootstrap.indexOf('if explicitResume then')
   assert.ok(externalProjectionAt >= 0 && externalProjectionAt < explicitResumeAt, 'root tool deny must precede explicit-resume routing bypass')
 

@@ -92,16 +92,6 @@ module HostSignalBootstrap =
             let routed = model
             message?model <- box routed
 
-    let private ensureToolsObject (message: obj) : obj =
-        if isNull message?tools then createObj [] else message?tools
-
-    let private projectFissionToolVisibility hasPhysicalParent output =
-        if FissionRequestProjection.apply hasPhysicalParent then
-            let message = requireOutputMessage output
-            let tools = ensureToolsObject message
-            tools?fission <- box false
-            message?tools <- tools
-
     let private eventString (value: obj) =
         if isNull value then
             None
@@ -511,28 +501,13 @@ module HostSignalBootstrap =
                         | _ -> ()
                 }
 
-            let projectExternalManagedFissionVisibility (decoded: PromptIngressCodec.DecodedMessage) output =
-                match decoded.SessionId, decoded.PromptKey, ModelRouting.managedAgentForAdmission decoded.ExplicitAgent with
-                | Some sessionId, None, Some _ ->
-                    let hasPhysicalParent =
-                        scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
-
-                    projectFissionToolVisibility hasPhysicalParent output
-                | _ -> ()
+            let hasPhysicalParent sessionId =
+                scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
 
             let continueRoutedChatMessage routedExecution (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
                     projectRoutedModel output routedExecution
-
-                    match routedExecution with
-                    | ModelRouting.RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
-                        let hasPhysicalParent =
-                            scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
-
-                        projectFissionToolVisibility hasPhysicalParent output
-                    | ModelRouting.RoutedChatExecution.ExternalManaged _
-                    | ModelRouting.RoutedChatExecution.NoRoute
-                    | ModelRouting.RoutedChatExecution.Superseded -> ()
+                    FissionHostRequestProjection.projectRouted hasPhysicalParent routedExecution output
 
                     requireDurabilityActivation ()
                     signalExternalJoinWake decoded
@@ -628,7 +603,7 @@ module HostSignalBootstrap =
                         // narrowing is independent of business-root admission. In
                         // particular, CRASH-018 explicit /continue still performs a
                         // provider turn even though it deliberately skips PromptIngress.
-                        projectExternalManagedFissionVisibility decoded output
+                        FissionHostRequestProjection.projectExternalManaged hasPhysicalParent decoded output
 
                         // CRASH-018: command.execute.before has no physical message id.
                         // Carry its dynamic restart disclosure across that one Host seam,

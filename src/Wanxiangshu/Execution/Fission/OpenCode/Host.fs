@@ -19,6 +19,7 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
@@ -83,6 +84,48 @@ open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
+
+[<RequireQualifiedAccess>]
+module FissionHostRequestProjection =
+
+    let private requireOutputMessage output =
+        let message = if isNull output then null else output?message
+
+        if isNull message then
+            invalidOp "INTRA-PARTICIPANT-PARALLELISM-013: fission request projection has no mutable output.message"
+
+        message
+
+    let private ensureToolsObject (message: obj) : obj =
+        if isNull message?tools then createObj [] else message?tools
+
+    let private projectVisibility hasPhysicalParent output =
+        if FissionRequestProjection.apply hasPhysicalParent then
+            let message = requireOutputMessage output
+            let tools = ensureToolsObject message
+            tools?fission <- box false
+            message?tools <- tools
+
+    let projectExternalManaged
+        (hasPhysicalParent: SessionId -> bool)
+        (decoded: PromptIngressCodec.DecodedMessage)
+        output
+        =
+        match decoded.SessionId, decoded.PromptKey, ModelRouting.managedAgentForAdmission decoded.ExplicitAgent with
+        | Some sessionId, None, Some _ -> projectVisibility (hasPhysicalParent sessionId) output
+        | _ -> ()
+
+    let projectRouted
+        (hasPhysicalParent: SessionId -> bool)
+        (routed: ModelRouting.RoutedChatExecution)
+        output
+        =
+        match routed with
+        | ModelRouting.RoutedChatExecution.PluginManaged({ SessionId = sessionId }, _, _, _) ->
+            projectVisibility (hasPhysicalParent sessionId) output
+        | ModelRouting.RoutedChatExecution.ExternalManaged _
+        | ModelRouting.RoutedChatExecution.NoRoute
+        | ModelRouting.RoutedChatExecution.Superseded -> ()
 
 /// Host-side terminal bridge for same-participant Fission lanes. A physical lane
 /// terminal is not a parent-visible agent completion. It materializes one keyed
