@@ -186,6 +186,7 @@ type ToolRuntimeScope
         HostForkRuntime(
             SessionId.create sid,
             sessions,
+            childRecordForRun,
             ?journal = journal,
             onChildCreated = (fun _ role childId -> registerChild sid role childId),
             onChildCreatedDir =
@@ -196,7 +197,6 @@ type ToolRuntimeScope
             onRunStarted = onStarted,
             parentWorkRecordFor = (fun parentId -> parentRecord (SessionId.value parentId)),
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
-            childWorkRecordForRun = childRecordForRun,
             ?handoff = reusableHandoff,
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
@@ -463,6 +463,7 @@ type ToolRuntimeScope
                     HostForkRuntime(
                         SessionId.create ctx.SessionId,
                         sessions,
+                        childRecordForRun,
                         ?journal = journal,
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
                         // EXEC-014: map/reduce Distiller children are Host-owned and
@@ -601,14 +602,20 @@ type ToolRuntimeScope
     /// fork handle and wakes the parent; no future TurnAborted callback carries
     /// workflow continuation state.
     member this.TerminateSession(sessionId: string, reason: string) : Task<Result<unit, string>> =
-        match terminalPort with
-        | None -> Task.FromResult(Error "MANAGED-SESSION-017: terminal event port unavailable")
-        | Some eventPort ->
+        let authorityRoot =
+            currentPhysicalUserMessage sessionId
+            |> Option.map (PhysicalUserMessageId.create >> PhysicalUserMessageId.promoteToAuthorityRoot)
+
+        match terminalPort, authorityRoot with
+        | None, _ -> Task.FromResult(Error "MANAGED-SESSION-017: terminal event port unavailable")
+        | _, None -> Task.FromResult(Error "MANAGED-SESSION-017: current authority root unavailable")
+        | Some eventPort, Some root ->
             ManagedSessionTermination.terminate
                 (fun sid -> this.CancelSessionChildren(SessionId.value sid))
                 sessions
                 eventPort
                 (SessionId.create sessionId)
+                root
                 reason
 
     member _.DisposeSession(sessionId: string) : Task =

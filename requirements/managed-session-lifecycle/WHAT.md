@@ -66,4 +66,4 @@ Agent 子会话的 handle 即为其运行时的 Agent ID，重启后必须保证
 
 ## MANAGED-SESSION-017: 内部 Interrupt 必须闭合 Successor 与 Parent Wake
 
-任何内部尝试中断在发起物理中止前，必须确保已存在唯一的后继处理机制（如 AABB、求助处理等）；若无后继者，必须转为明确的 Failed 终态以唤醒父会话的等待，严禁产生悬挂的孤儿尝试。
+任何内部尝试中断在发起物理中止前，必须确保已存在唯一的后继处理机制（如 AABB、求助处理等）；若无后继者，必须转为明确的 Failed 终态以唤醒父会话的等待，严禁产生悬挂的孤儿尝试。该 Failed 终态必须携带当前物理用户消息提升得到的 Authority Root；拿不到当前 Authority Root 时必须 fail closed，绝不能退化成 session-scoped/rootless 终态，因为后者无法证明属于当前 reusable work unit。

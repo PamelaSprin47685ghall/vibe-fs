@@ -28,9 +28,14 @@ test('WHAT[MANAGED-SESSION-017] fail-closed interrupt becomes Failed terminal so
   assert.match(sessions, /member _\.IsManagedChild\(sessionId\) = managedChild sessionId/)
   assert.match(
     termination[1],
-    /cancelSessionChildren sessionId[\s\S]*?sessionPort\.AbortSession sessionId[\s\S]*?NotifyTerminal sessionId \(TerminalOutcome\.Failed reason\)/,
+    /cancelSessionChildren sessionId[\s\S]*?sessionPort\.AbortSession sessionId[\s\S]*?NotifyTerminal[\s\S]*?TerminalOutcome\.Failed\(TerminalStop\.forAuthority authorityRoot reason\)/,
   )
-  assert.match(lifecycle, /\| Failed error ->[\s\S]*?deliverProvenCompletion/)
+  assert.doesNotMatch(termination[1], /TerminalStop\.session reason/)
+  assert.match(read('src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs'), /currentPhysicalUserMessage sessionId[\s\S]*?PhysicalUserMessageId\.promoteToAuthorityRoot/)
+  assert.match(read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), /wired\.CurrentPhysicalUserMessage[\s\S]*?PhysicalUserMessageId\.promoteToAuthorityRoot/)
+  assert.match(lifecycle, /let private stopBelongsToRun[\s\S]*?TerminalStop\.belongsTo root stop/)
+  assert.match(lifecycle, /\| Failed stop when not \(stopBelongsToRun run stop\) -> Task\.FromResult\(\(\)\)/)
+  assert.match(lifecycle, /\| Failed stop -> deliverFailedCompletion/)
   assert.match(runtime, /PulseAgentHandle/)
   assert.doesNotMatch(sessions, /attemptTerminations|TryTakeAttemptTermination|TerminateAttempt/)
 })
@@ -63,7 +68,7 @@ test('WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to w
   const callers = walkFs('src/Wanxiangshu')
     .filter((path) => /\.InterruptAttempt\b/.test(read(path)))
     .filter((path) => !path.endsWith('/Sessions.fs'))
-    .filter((path) => !path.endsWith('/Surface.fs'))
+    .filter((path) => !path.endsWith('Surface.fs'))
     .filter((path) => !path.endsWith('/DispatchSurface.fs'))
     .filter((path) => !path.endsWith('/ReviewHostSurface.fs'))
     .filter((path) => !path.endsWith('/FissionHostSurface.fs'))

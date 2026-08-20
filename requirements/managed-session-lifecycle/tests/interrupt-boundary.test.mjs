@@ -59,6 +59,6 @@ test('WHAT[MANAGED-SESSION-016] logical TurnAborted durably cancels runtime chil
 
   assert.match(
     ordinary,
-    /let private handleAborted[\s\S]*?do! cancelSessionChildren turn\.SessionId[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal turn\.SessionId \(TerminalOutcome\.Aborted reason\)/,
+    /let private handleAborted[\s\S]*?do! cancelSessionChildren turn\.SessionId[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal\s+turn\.SessionId\s+\(TerminalOutcome\.Aborted\(TerminalStop\.forAuthority turn\.AuthorityRootUserMessageId reason\)\)/,
   )
 })

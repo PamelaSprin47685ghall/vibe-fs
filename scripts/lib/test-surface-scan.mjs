@@ -276,6 +276,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Execution/Delegation/Fork/OpenCode/ToolSurface.js',
+    owner: 'delegation',
+    laws: ['DELEG-024', 'DELEG-025', 'DELEG-026'],
+    source: 'src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Execution/Fission/Surface.js',
     owner: 'intra-participant-parallelism',
     laws: [

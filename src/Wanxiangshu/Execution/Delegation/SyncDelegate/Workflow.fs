@@ -116,15 +116,12 @@ module internal SyncDelegateWorkflow =
         (stop: TerminalStop)
         (message: string)
         =
-        match store.TryPeekCallByDelegate delegateSession with
-        | Some call when
+        store.TryPeekCallByDelegate delegateSession
+        |> Option.filter (fun call ->
             call.AcceptedAuthorityRoot
-            |> Option.exists (fun root -> TerminalStop.belongsTo root stop)
-            ->
-            match store.TryPopCallByDelegate delegateSession with
-            | Some current -> store.FailCall(current, message)
-            | None -> ()
-        | _ -> ()
+            |> Option.exists (fun root -> TerminalStop.belongsTo root stop))
+        |> Option.bind (fun _ -> store.TryPopCallByDelegate delegateSession)
+        |> Option.iter (fun current -> store.FailCall(current, message))
 
     let private onTerminalOutcome
         (store: SyncDelegateCallStore)

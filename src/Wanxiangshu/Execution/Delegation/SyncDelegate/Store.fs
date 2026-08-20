@@ -25,6 +25,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// In-flight sync delegate answer (ordinary completion → WorkRecord).
+/// DSL-state-combination: physical — AcceptedAuthorityRoot mirrors the accepted
+/// physical prompt beside its one-shot signal for callback-time causal matching.
 type internal SyncDelegateCall =
     { Owner: SessionId
       OwnerScope: ReuseScopeId

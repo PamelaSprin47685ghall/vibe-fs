@@ -14,7 +14,7 @@ test('WHAT[DELEG-026] reusable delegation has no durable program-counter/state-m
   assert.match(ledger, /DelegationHandoffCompleted/)
 })
 
-test('WHAT[DELEG-026/027] fork admission failures happen before dispatch and active assignment never becomes BusyAgentNudge', () => {
+test('WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch', () => {
   const forkTool = readFileSync(
     new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs', import.meta.url),
     'utf8',
@@ -25,6 +25,13 @@ test('WHAT[DELEG-026/027] fork admission failures happen before dispatch and act
 
   const reuse = forkTool.slice(forkTool.indexOf('let private commitIdleReuse'), forkTool.indexOf('let private reuseWhileIdle'))
   assert.ok(reuse.indexOf('recordFissionAffinity') < reuse.indexOf('runManagerReuse'))
+})
+
+test('WHAT[DELEG-027] active fork assignment never becomes BusyAgentNudge', () => {
+  const forkTool = readFileSync(
+    new URL('../../../src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs', import.meta.url),
+    'utf8',
+  )
 
   const active = forkTool.slice(forkTool.indexOf('let private reuseWhileActive'), forkTool.indexOf('let private commitIdleReuse'))
   assert.doesNotMatch(active, /runtime\.Reuse|BusyAgentNudge|ChargeCarried/)

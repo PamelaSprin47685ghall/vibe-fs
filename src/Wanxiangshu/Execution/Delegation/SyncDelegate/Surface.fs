@@ -109,7 +109,8 @@ module SyncDelegateSurface =
             (journal :> IDisposable).Dispose()
 
     and private SessionPort(children: ResizeArray<SessionId>, readiness: PromptReadiness) =
-        let mutable physicalSequence = 0
+        // DSL-MUTABLE: algorithm-scratch — synthetic physical message id counter for the harness
+        let physicalSequence = ref 0
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
 
         let subscribe sessionId listener =
@@ -142,11 +143,11 @@ module SyncDelegateSurface =
 
             member _.SendPrompt(sessionId, prompt, _) =
                 readiness.Mark(sessionId, prompt)
-                physicalSequence <- physicalSequence + 1
+                physicalSequence.Value <- physicalSequence.Value + 1
 
                 Task.FromResult(
                     SendOutcome.AdmittedWithPhysicalMessage(
-                        PhysicalUserMessageId.create (sprintf "msg-physical-%d" physicalSequence)
+                        PhysicalUserMessageId.create (sprintf "msg-physical-%d" physicalSequence.Value)
                     )
                 )
 
@@ -445,23 +446,21 @@ module SyncDelegateSurface =
         (role: string)
         (reason: string)
         (authorityRoot: string)
-        : Task<bool> =
+        : Task<string> =
         task {
             let harness = unbox<Harness> value
 
             match roleOf role with
-            | Error _ -> return false
+            | Error _ -> return "Unavailable"
             | Ok role ->
                 match harness.Runtime.TryFind(harness.OwnerSession owner, role) with
-                | None -> return false
+                | None -> return "Unavailable"
                 | Some child ->
                     let! accepted = harness.Runtime.AwaitAssignmentReady child
 
                     if not accepted then
-                        return false
+                        return "Unavailable"
                     else
-                        let wasPending = harness.Runtime.HasOpeningCursor child
-
                         harness.Sessions.Notify(
                             child,
                             TerminalOutcome.Failed(
@@ -469,7 +468,7 @@ module SyncDelegateSurface =
                             )
                         )
 
-                        return wasPending && not (harness.Runtime.HasOpeningCursor child)
+                        return if harness.Runtime.HasOpeningCursor child then "Ignored" else "Claimed"
         }
 
     let observeTurn

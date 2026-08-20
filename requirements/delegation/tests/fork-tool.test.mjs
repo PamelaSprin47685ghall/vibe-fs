@@ -1,7 +1,44 @@
 // Fork tool payload and unknown-calling consequences through ForkSurface.
 import assert from 'node:assert/strict'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import * as fork from '../../../dist/Execution/Delegation/Fork/Surface.js'
+import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+
+const schemaNode = (kind, extra = {}) => ({
+  kind,
+  ...extra,
+  describe: () => schemaNode(`${kind}-described`, extra),
+  optional: () => schemaNode(`${kind}-optional`, extra),
+  int: () => schemaNode(`${kind}-int`, extra),
+  nonnegative: () => schemaNode(`${kind}-nonnegative`, extra),
+})
+
+const toolModule = {
+  tool: {
+    schema: {
+      string: () => schemaNode('string'),
+      number: () => schemaNode('number'),
+      enum: (values) => schemaNode('enum', { values }),
+      array: (inner) => schemaNode('array', { inner }),
+    },
+  },
+}
+
+const waitForPromptCount = async (runtime, count) => {
+  for (let attempt = 0; attempt < 1000; attempt += 1) {
+    if (forkTool.promptCount(runtime) >= count) return
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+  throw new Error(`fork prompt ${count} was not admitted`)
+}
+
+const remainsPending = async (promise) => Promise.race([
+  promise.then((value) => ({ kind: 'resolved', value })),
+  new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
+])
 
 test('WHAT[DELEG-019] FORK_TOOL_payload_has_assignment_and_requirements', () => {
   const wire = fork.render('en', {
@@ -46,5 +83,67 @@ test('WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_
   assert.equal(result.tier, 'deep')
   assert.equal(result.authorityTransferred, false)
   assert.equal(Object.hasOwn(result, 'agentId'), false)
+})
+
+test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_waits_for_own_completion_and_returns_only_own_delta', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-reuse-'))
+  const runtime = await forkTool.createRuntime(directory)
+  const owner = 'manager-reuse'
+
+  try {
+    await forkTool.captureOwnerOpening(runtime, owner, 'ROOT-OPENING-MARKER')
+
+    const first = await forkTool.executeManagerFork(
+      runtime,
+      toolModule,
+      owner,
+      'coder',
+      'Ada',
+      'FIRST-FORK-CHARGE',
+    )
+    await waitForPromptCount(runtime, 1)
+    assert.equal(forkTool.childCount(runtime), 1)
+    const child = forkTool.child(runtime)
+    assert.notEqual(child, null)
+    assert.match(forkTool.prompt(runtime, 0), /FIRST-FORK-CHARGE/)
+    assert.match(forkTool.prompt(runtime, 0), /ROOT-OPENING-MARKER/)
+    assert.match(first, /Ada/)
+
+    assert.equal(await forkTool.settle(runtime, owner, 'FIRST-FORK-ANSWER', 'fork-run-1'), true)
+
+    await forkTool.captureOwnerDeltaPart(runtime, owner, 'PARENT-FRESH-DELTA-MARKER', 'parent-run-2')
+
+    const second = forkTool.executeManagerFork(
+      runtime,
+      toolModule,
+      owner,
+      '',
+      'Ada',
+      'SECOND-FORK-CHARGE',
+    )
+
+    await waitForPromptCount(runtime, 2)
+    assert.equal(forkTool.child(runtime), child, 'same Byname must reuse the same physical child')
+    assert.equal(forkTool.childCount(runtime), 1)
+
+    const secondPrompt = forkTool.prompt(runtime, 1)
+    assert.match(secondPrompt, /SECOND-FORK-CHARGE/)
+    assert.match(secondPrompt, /commissioner_record\s*=/)
+    assert.match(secondPrompt, /PARENT-FRESH-DELTA-MARKER/)
+    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
+
+    assert.deepEqual(
+      await remainsPending(second),
+      { kind: 'pending' },
+      'same-road reuse must wait for this invocation rather than replaying the previous result',
+    )
+
+    assert.equal(await forkTool.settle(runtime, owner, 'SECOND-FORK-ANSWER', 'fork-run-2'), true)
+    const secondResult = await second
+    assert.match(secondResult, /SECOND-FORK-ANSWER/)
+    assert.doesNotMatch(secondResult, /FIRST-FORK-ANSWER/)
+  } finally {
+    forkTool.disposeRuntime(runtime)
+  }
 })
 

@@ -51,6 +51,7 @@ open Wanxiangshu.Change
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Mission.WorkRecord
 open FsToolkit.ErrorHandling
 
 /// Host wiring for the Orchestrator: forks Managers and reviewers under one
@@ -76,9 +77,13 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         deps.OnChildCreated agentId role childId
 
     let runtime =
+        let childWorkRecordForRun childId range providerRun =
+            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun deps.Journal childId range providerRun
+
         HostForkRuntime(
             orchestratorId,
             deps.Sessions,
+            childWorkRecordForRun,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,
             onChildCreatedDir =

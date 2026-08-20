@@ -126,22 +126,29 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (run: PendingHostRun)
         : Task =
-        task {
+        let fail detail =
+            FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
+            raise (InvalidOperationException detail)
+
+        let requireCheckpoint =
+            function
+            | Ok() -> ()
+            | Error error -> fail (sprintf "delegation completed-handoff append failed: %s" error)
+
+        let checkpoint =
             match run.Handoff, handoffPort with
-            | None, _ -> ()
-            | Some handoff, Some port ->
-                match! port.CheckpointCompleted parentId handoff with
-                | Ok() -> ()
-                | Error error ->
-                    let detail = sprintf "delegation completed-handoff append failed: %s" error
-                    FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
-                    return raise (InvalidOperationException detail)
-            | Some _, None ->
-                let detail = "reusable fork run has no handoff capability"
-                FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
-                return raise (InvalidOperationException detail)
-        }
-        :> Task
+            | None, _ -> None
+            | Some handoff, Some port -> Some(port, handoff)
+            | Some _, None -> fail "reusable fork run has no handoff capability"
+
+        match checkpoint with
+        | None -> Task.FromResult(()) :> Task
+        | Some(port, handoff) ->
+            task {
+                let! result = port.CheckpointCompleted parentId handoff
+                return requireCheckpoint result
+            }
+            :> Task
 
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.

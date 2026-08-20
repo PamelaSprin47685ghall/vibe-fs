@@ -3,8 +3,15 @@
 # Ordinary rules include matching paths. A leading ! excludes an exception from earlier includes.
 
 /src/Wanxiangshu/Execution/Delegation/**
+/src/Wanxiangshu/Change/Host/Host.fs
 /src/Wanxiangshu/Interaction/Authority/Child.fs
+/src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs
+/src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs
+/src/Wanxiangshu/OpenCode/Host/Events.fs
+/src/Wanxiangshu/OpenCode/Host/Sessions.fs
 /src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs
+/src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs
+/src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
 /resources/provider/delegation/**
 /resources/provider/tool/fork/**
 /resources/provider/tool/commission/**

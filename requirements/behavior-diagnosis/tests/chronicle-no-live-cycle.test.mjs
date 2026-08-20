@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import { chronicleExecutionContract } from '../../../dist/Enforcer/Surface.js'
 import {
-  acceptAuthorityRoot,
   bindManagedChild,
   withExecutablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
@@ -21,7 +20,19 @@ test('WHAT[BD-006] CHRONICLE_no_live_cycle_aborts_then_host_adapter_exposes_sdk_
     const parentID = 'ses-manager'
     const sessionID = 'blogger-no-live-cycle'
     bindManagedChild(parentID, sessionID, 'fast-blogger')
-    await acceptAuthorityRoot(runtime, sessionID, 'fast-blogger')
+    await hooks['chat.message'](
+      { sessionID, agent: 'fast-blogger' },
+      {
+        message: {
+          id: `root-${sessionID}`,
+          role: 'user',
+          sessionID,
+          agent: 'fast-blogger',
+          model: { providerID: 'host', modelID: 'placeholder' },
+        },
+        parts: [],
+      },
+    )
 
     await assert.rejects(
       () => hooks.tool.chronicle.execute(

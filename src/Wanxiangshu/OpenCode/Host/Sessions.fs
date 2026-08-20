@@ -83,6 +83,7 @@ module ManagedSessionTermination =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (sessionId: SessionId)
+        (authorityRoot: AuthorityRootUserMessageId)
         (reason: string)
         : Task<Result<unit, string>> =
         if not (sessionPort.IsManagedChild sessionId) then
@@ -94,7 +95,10 @@ module ManagedSessionTermination =
                 let! cancelOutcome = captureUnit (fun () -> cancelSessionChildren sessionId)
                 let! abortOutcome = captureResult (fun () -> sessionPort.AbortSession sessionId)
 
-                eventPort.NotifyTerminal sessionId (TerminalOutcome.Failed(TerminalStop.session reason)) |> ignore
+                eventPort.NotifyTerminal
+                    sessionId
+                    (TerminalOutcome.Failed(TerminalStop.forAuthority authorityRoot reason))
+                |> ignore
 
                 return combineEffects cancelOutcome abortOutcome
             }

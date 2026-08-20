@@ -221,9 +221,6 @@ module ForkTool =
     let private namedProse language path byname =
         ProviderProse.render language path (Map [ "name", byname ])
 
-    let private reasonProse language path reason =
-        ProviderProse.render language path (Map [ "reason", reason ])
-
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
         let lang = ProviderProse.languageOf sessionId
 
@@ -470,16 +467,18 @@ module ForkTool =
         =
         task {
             let handleId = ToolHostCodec.newHandleId ()
-            match! recordFissionAffinity scope context handleId with
-            | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
-            | Ok() ->
-                let! forkResult = runManagerFork scope runtime role request language attachment handleId managed
 
-                match forkResult with
-                | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
-                | Ok _ ->
+            let! placement =
+                taskResult {
+                    do! recordFissionAffinity scope context handleId
+                    let! _ = runManagerFork scope runtime role request language attachment handleId managed
                     announceChild runtime context handleId
                     return successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
+                }
+
+            match placement with
+            | Ok wire -> return wire
+            | Error _ -> return consequence (prose language Path.Fork.ChargeNotPlaced)
         }
 
     let private finishNewManagerFork
@@ -529,16 +528,17 @@ module ForkTool =
         attachment
         =
         task {
-            match! recordFissionAffinity scope context agentId with
-            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-            | Ok() ->
-                let! reuseResult = runManagerReuse scope runtime record.Role request language attachment agentId
-
-                match reuseResult with
-                | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
-                | Ok workRecord ->
+            let! placement =
+                taskResult {
+                    do! recordFissionAffinity scope context agentId
+                    let! workRecord = runManagerReuse scope runtime record.Role request language attachment agentId
                     announceChild runtime context agentId
                     return ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
+                }
+
+            match placement with
+            | Ok wire -> return wire
+            | Error _ -> return consequence (prose language Path.Fork.PersonCannotTakeCharge)
         }
 
     let private reuseWhileIdle

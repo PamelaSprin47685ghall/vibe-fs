@@ -83,6 +83,6 @@ test('WHAT[MANAGED-SESSION-009] TurnAborted awaits child cascade before publishi
   assert.doesNotMatch(ordinary, /sessionPort\.AbortChildren turn\.SessionId\s*\|> ignore/)
   assert.match(
     ordinary,
-    /AbortCause\.External ->[\s\S]*?do! cancelSessionChildren turn\.SessionId[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal turn\.SessionId \(TerminalOutcome\.Aborted reason\)/,
+    /AbortCause\.External ->[\s\S]*?do! cancelSessionChildren turn\.SessionId[\s\S]*?do! sessionPort\.AbortChildren turn\.SessionId[\s\S]*?eventPort\.NotifyTerminal\s+turn\.SessionId\s+\(TerminalOutcome\.Aborted\(TerminalStop\.forAuthority turn\.AuthorityRootUserMessageId reason\)\)/,
   )
 })

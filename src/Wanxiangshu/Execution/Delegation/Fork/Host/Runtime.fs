@@ -47,6 +47,7 @@ type HostForkRuntime
     (
         parentId: SessionId,
         sessions: ISessionHostPort,
+        childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
         ?journal: AgentJournal,
         ?onChildCreated: string -> Role -> SessionId -> unit,
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
@@ -55,7 +56,6 @@ type HostForkRuntime
         ?onRunStarted: SessionId -> Role -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> Task<string option>,
         ?childWorkRecordFor: SessionId -> Task<string option>,
-        ?childWorkRecordForRun: SessionId -> MagicTodoLwr.BoundedRange -> ProviderRunIdentity -> Task<string option>,
         ?handoff: ReusableHandoffPort,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
@@ -199,8 +199,7 @@ type HostForkRuntime
     let childWorkRecordOf =
         defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
-    let childWorkRecordOfRun =
-        defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
+    let childWorkRecordOfRun = childWorkRecordForRun
 
     let handoffPort = handoff
 

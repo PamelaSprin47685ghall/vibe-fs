@@ -1,5 +1,5 @@
 {
-  "total": 652,
+  "total": 654,
   "owners": [
     "action-affordance",
     "behavior-diagnosis",
@@ -552,6 +552,10 @@
       "owner": "delegation"
     },
     {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
+      "owner": "delegation"
+    },
+    {
       "path": "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
       "owner": "delegation"
     },
@@ -653,6 +657,10 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
       "owner": "delegation"
     },
     {

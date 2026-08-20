@@ -97,6 +97,12 @@ module FinalityHostPort =
             HostForkRuntime(
                 managerSessionId,
                 scope.Sessions,
+                (fun childId range providerRun ->
+                    LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                        scope.Journal
+                        childId
+                        range
+                        providerRun),
                 ?journal = scope.Journal,
                 onChildCreated =
                     (fun _ _ childId ->

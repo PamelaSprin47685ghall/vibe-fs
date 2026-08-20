@@ -100,7 +100,7 @@ work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent
 
 ## DELEG-025: work unit completion 由 causal identity 决定，不由订阅时刻决定
 
-terminal 能完成 work unit，当且仅当它属于该 work unit 实际接受的 Authority Root / provider execution。历史 sticky terminal、晚到的上一 provider run、旧 completion cache 即使发生在新订阅之后也不得完成或失败新 work unit。时间先后可以作为 transport 优化，绝不是 completion identity。
+terminal 能完成或失败 work unit，当且仅当它属于该 work unit 实际接受的 Authority Root / provider execution。`Completed`、`Failed`、`Aborted` 的 run-scoped 终结都必须保留这一 causal identity；只有真正的 session-wide 物理故障才允许没有 Authority Root。历史 sticky terminal、晚到的上一 provider run、旧 completion cache 即使发生在新订阅之后也不得完成或失败新 work unit。时间先后可以作为 transport 优化，绝不是 completion identity。
 
 ## DELEG-026: effect truth 只能沿 direct CE 单向前进
 
@@ -108,4 +108,4 @@ terminal 能完成 work unit，当且仅当它属于该 work unit 实际接受�
 
 ## DELEG-027: 新 assignment 不得伪装成 busy nudge
 
-同一 logical route 同时至多一个 active work unit。已有 work unit 未终结时到来的新 assignment 必须明确拒绝；`BusyAgentNudge` 只允许作为既有 LogicalRun 的内部 continuation，不得承载新的 fork/synchronous charge。前一 work unit `Finished` 后，同一 participant 必须立即可承接下一 work unit，无需依赖 join 消费或重新创建 participant。
+同一 logical route 同时至多一个 active work unit。已有 work unit 未终结时到来的新 assignment 必须明确拒绝；`BusyAgentNudge` 只允许作为既有 LogicalRun 的内部 continuation，不得承载新的 fork/synchronous charge。前一 work unit 已完成后，同一 participant 必须立即可承接下一 work unit，无需依赖 join 消费或重新创建 participant。

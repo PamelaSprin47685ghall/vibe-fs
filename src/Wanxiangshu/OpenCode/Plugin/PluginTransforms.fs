@@ -169,12 +169,18 @@ module PluginTransforms =
 
         let terminateSession: SessionTermination =
             fun sessionId reason ->
-                ManagedSessionTermination.terminate
-                    (fun ownerId -> scope.CancelSessionChildren(SessionId.value ownerId))
-                    sessionPort
-                    eventPort
-                    sessionId
-                    reason
+                match wired.CurrentPhysicalUserMessage(SessionId.value sessionId) with
+                | None -> Task.FromResult(Error "MANAGED-SESSION-017: current authority root unavailable")
+                | Some physical ->
+                    ManagedSessionTermination.terminate
+                        (fun ownerId -> scope.CancelSessionChildren(SessionId.value ownerId))
+                        sessionPort
+                        eventPort
+                        sessionId
+                        (physical
+                         |> PhysicalUserMessageId.create
+                         |> PhysicalUserMessageId.promoteToAuthorityRoot)
+                        reason
 
         let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj : Task<unit> =
             task {

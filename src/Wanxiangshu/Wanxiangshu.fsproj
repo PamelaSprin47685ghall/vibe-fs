@@ -314,6 +314,7 @@
     <Compile Include="Context/Companion/ProjectionSurface.fs"/>
     <Compile Include="Context/Prefix/Surface.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoSemanticSurface.fs"/>
+    <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
     <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
     <Compile Include="Resources/PromptResources.fs"/>
     <Compile Include="Resources/EnforcerCatalogResource.fs"/>
@@ -608,7 +609,7 @@
     <Compile Include="Persistence/EventStore/EventStoreHandle.fs"/>
     <Compile Include="Persistence/EventStore/Surface.fs"/>
     <Compile Include="Persistence/EventStore/StrengthSurface.fs"/>
-    <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
+    <Compile Include="Execution/Delegation/Fork/OpenCode/ToolSurface.fs"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/Surface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/IndexSurface.fs"/>

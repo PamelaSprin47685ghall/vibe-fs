@@ -25,11 +25,11 @@ DELEG-020 约束：委托语义不依赖当前工具名字面值（`fork`、`com
 
 ### Reusable work unit
 
-- 业务控制流只存在于 F# CE：`prepareHandoff → dispatch → await own completion → checkpointCompletedHandoff`。禁止 `Stage/Phase/ActiveWorkUnit/Started→Finished` 等第二运行时或 durable program counter。
+- 业务控制流只存在于 F# CE：`prepareHandoff → dispatch → await own completion → checkpointCompletedHandoff`。禁止 `Stage/Phase/ActiveWorkUnit`、显式 transition API 等第二运行时或 durable program counter。
 - durable truth 只记录已经发生的事实：某个 logical route 的一次已完成 handoff 确实让 callee 看到了 parent XTrace 截止到哪个 cursor。projection 仅把这些 completion facts 积分成 `latestDeliveredThrough(route)`；它不拥有执行位置。
 - 新调用从 `latestDeliveredThrough(route)` 到当前 parent XTrace head 物化 delta；route 首次调用取完整 parent LWR。logical route = fork Byname 或 caller scope 下的 dedicated SyncDelegate role，绝不以 physical child `SessionId` 作为连续性身份。
 - invocation-local 的 child start cursor、expected Authority Root、waiter/subscription 属于物理 correlation resource，可跨 callback 保存；它们不得 durable 化为 workflow stage。
-- Host sticky terminal 可以继续服务 late observer/recovery；delegation CE 只接受与本次 dispatch 的 causal identity 匹配的 completion，不能把“订阅之后”当作身份。
+- Host sticky terminal 可以继续服务 late observer/recovery；delegation CE 只接受与本次 dispatch 的 causal identity 匹配的 completion/failure。run-scoped `Completed/Failed/Aborted` 都保留 Authority Root；不能把“订阅之后”当作身份。
 - fork 新 participant 是异步 assignment：返回只由本次 dispatch 成败决定；same-road continuation 与 SyncDelegate 是同步 CE：等待本调用 completion、物化 bounded callee LWR、再 checkpoint completed handoff。
 - 新 charge 遇到仍在运行的同 route 调用直接拒绝。Busy nudge 只服务同一 LogicalRun 的内部 continuation，彻底退出 assignment 工具路径。
 
@@ -64,11 +64,11 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-021 | `requirements/delegation/tests/fork-attachment.test.mjs` |
 | DELEG-022 | `requirements/delegation/tests/delegated-tool-estimate-surface.test.mjs` |
 | DELEG-023 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-024 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-025 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + Host fork lifecycle proofs |
+| DELEG-024 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` + `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
+| DELEG-025 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` + `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/host-boundary/tests/events-port.test.mjs` |
 | DELEG-026 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/delegation-structure-contract.test.mjs` |
-| DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + fork reuse integration proof |
+| DELEG-027 | `requirements/delegation/tests/reusable-work-unit.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` |
 
 ## GAP
 
-- `GAP-027`：旧 reusable handoff 以 physical child `SessionId` 持有 cursor，并在 prompt 已 dispatch 后追加 `DelegationHandoffAdvanced`；append 失败会让调用方得到“未放置”而 child 实际已运行。另有 active fork assignment 被降格为 `BusyAgentNudge` 的双重语义。关闭条件：cursor-only writer 删除；新增 direct-CE `ReusableHandoffWorkflow`；frontier 只由 completed-handoff fact 推导；fork/SyncDelegate 无 post-dispatch normal-error bookkeeping；真实 reuse regression 证明 completed call 后同 participant 可再次接单，active charge 明确拒绝。
+- `GAP-027`（CLOSED）：旧 reusable handoff 以 physical child `SessionId` 持有 cursor，并在 prompt 已 dispatch 后追加可失败 bookkeeping；旧 sticky terminal 还能跨 invocation 重放，fork idle reuse 又会立即返回旧/全生命周期结果，active new charge 还会混入 `BusyAgentNudge`。现已收口为 direct F# CE：logical-route frontier 只由 completed-handoff fact 推导；same-road fork/SyncDelegate 都执行 `prepare delta → dispatch → await own causal completion → bounded callee LWR → checkpoint`；fresh-only terminal observation 与 Authority Root 共同阻断上一轮 Completed/Failed；active assignment 明确拒绝；HostForkRuntime 的 bounded WorkRecord projector 为必需 capability，不能再构造“可完成但无 invocation delta”的 runtime。真实 fork tool 与 inspector/coder reuse 回归均已覆盖，authoritative runner 3405/3405 green。

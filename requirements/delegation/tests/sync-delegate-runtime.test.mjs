@@ -71,7 +71,7 @@ test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_can
         'late previous failure',
         'msg-physical-1',
       ),
-      false,
+      'Ignored',
     )
     assert.deepEqual(await remainsPending(second), { kind: 'pending' })
 
@@ -83,7 +83,7 @@ test('WHAT[DELEG-025] SYNC_RUNTIME_late_failure_from_previous_authority_root_can
         'current failure',
         'msg-physical-2',
       ),
-      true,
+      'Claimed',
     )
     assert.deepEqual(await second, { ok: false, error: 'SyncDelegate run failed: current failure' })
   } finally { sync.dispose(h) }
@@ -119,7 +119,7 @@ test('WHAT[DELEG-010] SYNC_RUNTIME_same_role_reuses_one_child_after_completion',
 })
 
 for (const role of ['Inspector', 'Coder']) {
-  test(`WHAT[DELEG-024/025] SYNC_RUNTIME_${role.toLowerCase()}_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta`, async () => {
+  test(`WHAT[DELEG-024] SYNC_RUNTIME_${role.toLowerCase()}_reuse_sends_parent_delta_waits_for_own_root_and_returns_own_child_delta`, async () => {
     const h = await live()
     const owner = `owner-handoff-${role.toLowerCase()}`
     try {

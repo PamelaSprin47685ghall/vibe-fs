@@ -251,23 +251,26 @@ type SyncDelegateRuntime
             return finishCompletedCall turn.SessionId call workRecord
         }
 
-    let tryConsumeReadyCall (store: SyncDelegateCallStore) (turn: ReconciledTurn) : Task<SyncDelegateCall option> =
+    let popIfAuthorityMatches
+        (store: SyncDelegateCallStore)
+        (turn: ReconciledTurn)
+        (call: SyncDelegateCall)
+        : Task<SyncDelegateCall option> =
         task {
-            match store.TryPeekCallByDelegate turn.SessionId with
-            | Some call when
-                call.Invocations
-                |> List.exists (fun invocation -> invocation.StartCursor.IsNone)
-                ->
-                return None
-            | Some call ->
-                let! expectedRoot = call.AcceptedRoot.Task
-
-                if expectedRoot = turn.AuthorityRootUserMessageId then
-                    return store.TryPopCallByDelegate turn.SessionId
-                else
-                    return None
-            | None -> return None
+            let! expectedRoot = call.AcceptedRoot.Task
+            return if expectedRoot = turn.AuthorityRootUserMessageId then store.TryPopCallByDelegate turn.SessionId else None
         }
+
+    let tryConsumeReadyCall (store: SyncDelegateCallStore) (turn: ReconciledTurn) : Task<SyncDelegateCall option> =
+        let candidate =
+            store.TryPeekCallByDelegate turn.SessionId
+            |> Option.filter (fun call ->
+                call.Invocations
+                |> List.forall (fun invocation -> invocation.StartCursor.IsSome))
+
+        match candidate with
+        | Some call -> popIfAuthorityMatches store turn call
+        | None -> Task.FromResult None
 
     let handleCompletedRoleTurn (turn: ReconciledTurn) =
         task {
