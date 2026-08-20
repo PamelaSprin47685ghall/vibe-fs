@@ -479,7 +479,7 @@ user = "# The account is not yet ready to entrust."
 [[turn]]
 id = "manager-process-review"
 internal = true
-user = "You are reviewing the ongoing quality and truthfulness of a work process."
+user = "You are reviewing the ongoing quality, coverage, and truthfulness of a work process."
 tools = ["judge"]
 
   [[turn.step]]
