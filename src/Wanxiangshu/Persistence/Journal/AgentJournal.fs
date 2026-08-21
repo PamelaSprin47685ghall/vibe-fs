@@ -2,6 +2,7 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System
 open System.Collections.Generic
+open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation
@@ -78,30 +79,25 @@ module JournalAppendFailure =
 
 module private AgentJournalInternals =
 
-    let awaitAdvancedChange
-        (lastChange: JournalChange option)
-        (fromRevision: JournalRevision)
-        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>)
-        : Task<JournalChange> =
-        match lastChange with
-        | Some change -> Task.FromResult change
-        | None ->
-            let tcs = TaskCompletionSource<JournalChange>()
-            waiters.Add(fromRevision, tcs)
-            tcs.Task
-
     let registerWaiter
         (fromRevision: JournalRevision)
-        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>)
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>)
         =
-        let tcs = TaskCompletionSource<JournalChange>()
+        let tcs = TaskCompletionSource<JournalChange option>(TaskCreationOptions.RunContinuationsAsynchronously)
         waiters.Add(fromRevision, tcs)
-        tcs.Task
+        tcs
+
+    let removeWaiter
+        (fromRevision: JournalRevision)
+        (tcs: TaskCompletionSource<JournalChange option>)
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>)
+        =
+        waiters.Remove((fromRevision, tcs)) |> ignore
 
     let partitionWaiters
         (revision: JournalRevision)
         (change: JournalChange)
-        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>)
+        (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>)
         =
         let ready, kept =
             waiters
@@ -110,9 +106,9 @@ module private AgentJournalInternals =
 
         ready |> List.map (fun (_, tcs) -> tcs, change), kept
 
-    let notifyWaiters (notify: (TaskCompletionSource<JournalChange> * JournalChange) list) =
+    let notifyWaiters (notify: (TaskCompletionSource<JournalChange option> * JournalChange) list) =
         for tcs, change in notify do
-            AsyncSupport.trySetResult tcs change |> ignore
+            AsyncSupport.trySetResult tcs (Some change) |> ignore
 
 open AgentJournalInternals
 
@@ -130,7 +126,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
     // DSL-MUTABLE: resource — last journal change notification payload
     let mutable lastChange: JournalChange option = None
-    let waiters = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange>>()
+    let waiters = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>()
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId
@@ -156,19 +152,38 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
 
 
 
+    member _.AwaitChangeFromOrCancel
+        (fromRevision: JournalRevision, cancellation: CancellationToken)
+        : Task<JournalChange option> =
+        task {
+            let pending, registered =
+                lock gate (fun () ->
+                    match JournalRevision.isAfter revision fromRevision, lastChange with
+                    | true, Some change -> Task.FromResult(Some change), None
+                    | _ ->
+                        let waiter = registerWaiter fromRevision waiters
+                        waiter.Task, Some waiter)
+
+            match registered with
+            | None -> return! pending
+            | Some waiter ->
+                use _registration =
+                    cancellation.Register(fun () ->
+                        lock gate (fun () -> removeWaiter fromRevision waiter waiters)
+                        AsyncSupport.trySetResult waiter None |> ignore)
+
+                return! pending
+        }
+
     /// Wait until a successful fold advances past `fromRevision`.
-    ///
-    /// Recheck under lock before registering: if already advanced and lastChange
-    /// exists, complete immediately (no full history replay).
-    member _.AwaitChangeFrom(fromRevision: JournalRevision) : Task<JournalChange> =
-        lock gate (fun () ->
-            if JournalRevision.isAfter revision fromRevision then
-                // Revision advanced without a process-local lastChange (boot
-                // only). Wait for the next successful fold rather than hang
-                // on a synthetic envelope.
-                awaitAdvancedChange lastChange fromRevision waiters
-            else
-                registerWaiter fromRevision waiters)
+    member this.AwaitChangeFrom(fromRevision: JournalRevision) : Task<JournalChange> =
+        task {
+            let! change = this.AwaitChangeFromOrCancel(fromRevision, CancellationToken.None)
+
+            match change with
+            | Some committed -> return committed
+            | None -> return failwith "unreachable: uncancelled journal wait"
+        }
 
     /// Append one fact and fold it.
     ///
@@ -250,7 +265,7 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         (fact: Fact)
         : Task<
               Result<
-                  (ProjectionSet * Envelope) * (TaskCompletionSource<JournalChange> * JournalChange) list,
+                  (ProjectionSet * Envelope) * (TaskCompletionSource<JournalChange option> * JournalChange) list,
                   JournalAppendFailure
                >
            >
@@ -343,6 +358,13 @@ module AgentJournal =
 
     let awaitChangeFrom (fromRevision: JournalRevision) (journal: AgentJournal) : Task<JournalChange> =
         journal.AwaitChangeFrom fromRevision
+
+    let awaitChangeFromOrCancel
+        (fromRevision: JournalRevision)
+        (cancellation: CancellationToken)
+        (journal: AgentJournal)
+        : Task<JournalChange option> =
+        journal.AwaitChangeFromOrCancel(fromRevision, cancellation)
 
 
 

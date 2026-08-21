@@ -130,6 +130,7 @@ module ProviderRecoveryWorkflow =
     /// producer proof; commit/abandon facts close it and coverage facts may make
     /// a probe available. No process-local flight state and no clock participate.
     let rec private awaitLinkedProducer
+        (host: IBloggerRuntimeHost)
         (durable: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
@@ -140,11 +141,13 @@ module ProviderRecoveryWorkflow =
             match recoveryMaterialState projection mainSessionId bloggerSessionId with
             | RecoveryMaterialState.Ready -> return ()
             | RecoveryMaterialState.AwaitCommittedFact ->
-                let! _ = AgentJournal.awaitChangeFrom revision durable
-                return! awaitLinkedProducer durable mainSessionId bloggerSessionId
+                match! AgentJournal.awaitChangeFromOrCancel revision host.Cancellation durable with
+                | None -> return ()
+                | Some _ -> return! awaitLinkedProducer host durable mainSessionId bloggerSessionId
         }
 
     let awaitRecoveryMaterial
+        (host: IBloggerRuntimeHost)
         (durable: AgentJournal)
         (mainSessionId: SessionId)
         : Task =
@@ -152,7 +155,7 @@ module ProviderRecoveryWorkflow =
 
         match bloggerOfMain projection mainSessionId with
         | None -> Task.FromResult(()) :> Task
-        | Some bloggerSessionId -> awaitLinkedProducer durable mainSessionId bloggerSessionId
+        | Some bloggerSessionId -> awaitLinkedProducer host durable mainSessionId bloggerSessionId
 
     let private currentFallback (durable: AgentJournal) (sessionId: SessionId) =
         FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable)
@@ -349,6 +352,7 @@ module ProviderRecoveryWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
         (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
@@ -357,7 +361,7 @@ module ProviderRecoveryWorkflow =
         task {
             if opportunityAfterAdvance durable turn.SessionId = RecoveryOpportunity.RecoveryAttempt then
                 armRecovery turn.SessionId
-                do! awaitRecoveryMaterial durable turn.SessionId
+                do! awaitRecoveryMaterial scope durable turn.SessionId
 
             let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
             handleContinuation eventPort turn error continuation
@@ -421,6 +425,7 @@ module ProviderRecoveryWorkflow =
                                 sessionPort
                                 eventPort
                                 durable
+                                scope
                                 armRecovery
                                 turn
                                 continuationPrompt

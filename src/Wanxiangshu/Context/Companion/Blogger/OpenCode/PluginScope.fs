@@ -209,3 +209,4 @@ type PluginBloggerScope() =
             drainWindows.Clear())
 
         shutdown.Dispose()
+

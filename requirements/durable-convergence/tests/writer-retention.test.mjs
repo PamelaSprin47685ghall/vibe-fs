@@ -99,6 +99,63 @@ test('WHAT[DURABLE-CONVERGENCE-011] stale remote snapshot cannot revive writer a
   })
 })
 
+test('WHAT[DURABLE-CONVERGENCE-011] manifest-less legacy remote is ignored instead of refreshing writer activity', async () => {
+  await withRepo(async (repo, commonDir) => {
+    const born = Date.parse('2026-08-20T00:00:00Z')
+    const writerPath = await writeEvent(commonDir, 'writer-legacy-remote', make(A, 'retention/legacy'))
+    utimesSync(writerPath, born / 1000, born / 1000)
+
+    const current = await retention.syncAt(repo, commonDir, null, born + 60_000)
+    assert.equal(current.ok, true, current.ok ? '' : JSON.stringify(current.error))
+
+    const rootEntries = execFileSync('git', ['-C', repo, 'ls-tree', current.root], { encoding: 'utf8' })
+      .split('\n')
+      .filter((line) => line && !line.endsWith('\twriter-manifest'))
+      .join('\n') + '\n'
+    const legacyRoot = execFileSync('git', ['-C', repo, 'mktree'], {
+      encoding: 'utf8',
+      input: rootEntries,
+    }).trim()
+
+    const after = await retention.syncAt(repo, commonDir, legacyRoot, born + DAY + 60_000)
+    assert.equal(after.ok, true, after.ok ? '' : JSON.stringify(after.error))
+    assert.equal(existsSync(writerPath), false)
+    const writers = execFileSync('git', ['-C', repo, 'ls-tree', `${after.root}:writers`], { encoding: 'utf8' })
+    assert.doesNotMatch(writers, /writer-legacy-remote\.ndjson/)
+  })
+})
+
+test('WHAT[DURABLE-CONVERGENCE-011] declared manifest must cover every remote writer blob exactly', async () => {
+  await withRepo(async (repo, commonDir) => {
+    const born = Date.parse('2026-08-20T00:00:00Z')
+    const writerPath = await writeEvent(commonDir, 'writer-invalid-manifest', make(A, 'retention/invalid-manifest'))
+    utimesSync(writerPath, born / 1000, born / 1000)
+
+    const current = await retention.syncAt(repo, commonDir, null, born + 60_000)
+    assert.equal(current.ok, true, current.ok ? '' : JSON.stringify(current.error))
+
+    const emptyManifestOid = execFileSync('git', ['-C', repo, 'hash-object', '-w', '--stdin'], {
+      encoding: 'utf8',
+      input: 'v1\n',
+    }).trim()
+    const malformedRootEntries = execFileSync('git', ['-C', repo, 'ls-tree', current.root], { encoding: 'utf8' })
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => line.endsWith('\twriter-manifest')
+        ? `100644 blob ${emptyManifestOid}\twriter-manifest`
+        : line)
+      .join('\n') + '\n'
+    const malformedRoot = execFileSync('git', ['-C', repo, 'mktree'], {
+      encoding: 'utf8',
+      input: malformedRootEntries,
+    }).trim()
+
+    const result = await retention.syncAt(repo, commonDir, malformedRoot, born + 120_000)
+    assert.equal(result.ok, false)
+    assert.match(String(result.error), /writer manifest does not bind writer blob/i)
+  })
+})
+
 test('WHAT[DURABLE-CONVERGENCE-011] source binds activity to blob oid and never derives it from fetch mtime', () => {
   const source = readFileSync(new URL('../../../src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs', import.meta.url), 'utf8')
   const log = readFileSync(new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url), 'utf8')
@@ -107,5 +164,5 @@ test('WHAT[DURABLE-CONVERGENCE-011] source binds activity to blob oid and never 
   assert.match(source, /nextExpiry|NextExpiry/)
   assert.match(log, /readSync/)
   assert.match(log, /lastIndexOfLf|readLastCompleteLine/)
-  assert.doesNotMatch(source, /fetch.*Date\.now|Date\.now.*fetch/is)
+  assert.doesNotMatch(source, /fetch[^\n]*Date\.now|Date\.now[^\n]*fetch/i)
 })

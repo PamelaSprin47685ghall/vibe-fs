@@ -99,8 +99,8 @@ module ChronicleTool =
         else
             Ok trimmed
 
-    let hasLiveCycle (parkedHost: IBloggerRuntimeHost option) (sessionId: string) : bool =
-        match parkedHost with
+    let hasLiveCycle (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) : bool =
+        match bloggerHost with
         | None -> false
         | Some host -> host.HasFlight sessionId
 
@@ -147,14 +147,14 @@ module ChronicleTool =
 
     let private executeChronicle
         (runtime: ToolRuntimeScope)
-        (parkedHost: IBloggerRuntimeHost option)
+        (bloggerHost: IBloggerRuntimeHost option)
         language
         (args: HostToolArguments)
         (ctx: HostToolContext)
         : System.Threading.Tasks.Task<ChronicleExecution> =
         task {
             let execution =
-                if hasLiveCycle parkedHost ctx.SessionId then
+                if hasLiveCycle bloggerHost ctx.SessionId then
                     ChronicleExecution.decide true (executeValidEntry language args)
                 else
                     ChronicleExecution.decide false ""
@@ -169,7 +169,7 @@ module ChronicleTool =
     let spec
         (factory: HostToolFactory)
         (runtime: ToolRuntimeScope)
-        (parkedHost: IBloggerRuntimeHost option)
+        (bloggerHost: IBloggerRuntimeHost option)
         : ToolSpec =
         let fields = tipFieldNames ()
         let ruleCount = List.length fields
@@ -189,7 +189,7 @@ module ChronicleTool =
             fun args ctx ->
                 task {
                     let language = lang ctx
-                    let! execution = executeChronicle runtime parkedHost language args ctx
+                    let! execution = executeChronicle runtime bloggerHost language args ctx
 
                     match execution with
                     | ChronicleExecution.Completed value -> return value

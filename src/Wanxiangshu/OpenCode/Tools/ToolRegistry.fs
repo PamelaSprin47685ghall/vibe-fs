@@ -125,8 +125,8 @@ module ToolRegistry =
             ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
 
     /// AGENT-007 role gate, plus request-scoped `chronicle` (CurrentRequest / InFlight).
-    /// sessionId is the tool call's Host session; parkedHost is optional for tests.
-    let rolePredicate (specName: string) (parkedHost: IBloggerRuntimeHost option) (sessionId: string) : Role -> bool =
+    /// sessionId is the tool call's Host session; bloggerHost is optional for tests.
+    let rolePredicate (specName: string) (bloggerHost: IBloggerRuntimeHost option) (sessionId: string) : Role -> bool =
         match specName with
         | "fork" -> fun r -> r = Role.Manager
         | "commission" -> fun r -> r = Role.Orchestrator
@@ -147,7 +147,7 @@ module ToolRegistry =
         | "bash-honeypot" -> fun r -> Roles.isAllowed r ToolPermission.BashHoneypot
         | "establish-behavior"
         | "repair-behavior" -> fun r -> r = Role.DevOps
-        | "chronicle" -> fun r -> r = Role.Blogger && ChronicleTool.hasLiveCycle parkedHost sessionId
+        | "chronicle" -> fun r -> r = Role.Blogger && ChronicleTool.hasLiveCycle bloggerHost sessionId
         | "assume" -> fun r -> r <> Role.Blogger && r <> Role.Distiller
         | "enough"
         | "abandon"
@@ -194,7 +194,7 @@ module ToolRegistry =
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
-        (parkedHost: IBloggerRuntimeHost option)
+        (bloggerHost: IBloggerRuntimeHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (strengthRuntime: StrengthRuntime option)
         (finalityReviewerTimeoutMs: int option)
@@ -270,8 +270,8 @@ module ToolRegistry =
               yield! ConcernTools.specs factory journal
               yield! InstitutionalLearningTools.specs factory journal
               // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
-              // parkedHost + CurrentRequest gate request-scoped execute (InFlight).
-              yield ChronicleTool.spec factory runtime parkedHost
+              // bloggerHost + CurrentRequest gate request-scoped execute (InFlight).
+              yield ChronicleTool.spec factory runtime bloggerHost
               // CASE-009: the conditional fetch / js-bookkeeper tools.
               yield! casebookToolSpecs
               // JS-001/JS-073: the capability-projected js-* tools. The surface
@@ -345,7 +345,7 @@ module ToolRegistry =
 
             fun args (ctx: HostToolContext) ->
                 task {
-                    let allowed = rolePredicate spec.Name parkedHost ctx.SessionId
+                    let allowed = rolePredicate spec.Name bloggerHost ctx.SessionId
 
                     let isStrengthReplica =
                         match strengthRuntime with

@@ -17,6 +17,7 @@
 3. **双向无损同步（Bidirectional Convergence）**：
    - 独立 Git Hook 进程在执行同步时，以同一 `now`/24h TTL 对本地与远端 writer 做整流 retention；writer 内部仍保持完整 append-only 流。
    - snapshot 根包含 `writer-manifest`，逐 writer 原子记录完整 blob OID 与 `lastActivity`。远端导入复用该 activity，不允许 fetch 动作刷新 writer 生命周期。
+   - 完全没有 `writer-manifest` 的旧 snapshot 采用 clean break：不导入其 writer tree。新协议 snapshot 一旦存在 manifest，则要求 manifest 与 `writers/` 一一覆盖并绑定精确 blob OID；结构不完整直接 `StorageInvalid`。没有 activity 证据时禁止根据 fetch 时间、对象到达时间或本地新 mtime 猜测活跃性。
    - retention 后执行 k-way merge；过期 writer 文件从本地删除，新的远端 `writers/` tree 也不再包含它，因此旧 snapshot 再参与同步时仍会被相同 retention predicate 过滤而不能稳定复活。
    - 热路径利用文件元数据指纹与 manifest 跳过无变更文件的重复读取与编解码；materialization cache 同时记录“下一次 expiry”，跨过该时刻即使文件未变化也必须重新 materialize。
    - NDJSON 尾记录读取使用从 EOF 反向按块 `pread` 查找裸 LF 的确定性算法；不猜测最后一行长度，也不解码整条 writer。

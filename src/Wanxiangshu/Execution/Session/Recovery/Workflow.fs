@@ -39,7 +39,7 @@ module SessionRecoveryWorkflow =
     type SessionRecoveryPorts =
         { Journal: AgentJournal
           Snapshot: ISessionSnapshotPort
-          ParkedHost: IBloggerRuntimeHost
+          BloggerHost: IBloggerRuntimeHost
           RecoverPromptClaims: SessionId -> Task<SessionRecovery>
           RecoverBlogger: SessionId -> Task<SessionRecovery>
           RestoreHandles: SessionId -> Task<HandleFamilyRecovery>

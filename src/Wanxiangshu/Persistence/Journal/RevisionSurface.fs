@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Persistence.Journal
 
 open System
+open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
@@ -21,4 +22,19 @@ module JournalRevisionSurface =
                 box
                     {| revision = JournalRevision.value change.Revision |> int
                        envelope = Envelope.serialize change.Envelope |}
+        }
+
+    let awaitCancelled (fromRevision: int64) (handle: JournalHandle) : Task<bool> =
+        task {
+            use cancellation = new CancellationTokenSource()
+
+            let pending =
+                AgentJournal.awaitChangeFromOrCancel
+                    (JournalRevision.create fromRevision)
+                    cancellation.Token
+                    handle.Journal
+
+            cancellation.Cancel()
+            let! change = pending
+            return change.IsNone
         }

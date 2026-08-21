@@ -87,3 +87,11 @@ test('WHAT[DURABLE-EVENTS-013] EXEC_AwaitChangeFrom_before_append_waits_then_com
     assert.ok(change.envelope.length > 0)
   })
 })
+
+test('WHAT[DURABLE-EVENTS-013] EXEC_cancelled_revision_subscription_unregisters_without_a_fact', async () => {
+  await withJournal('revision-cancel', async (handle) => {
+    const from = revisionOf(handle)
+    assert.equal(await revisions.awaitCancelled(from, handle), true)
+    assert.equal(revisionOf(handle), from, 'cancellation is not a durable fact')
+  })
+})

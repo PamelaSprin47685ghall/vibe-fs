@@ -320,12 +320,22 @@ module WriterStreamSync =
         let lines = text.Trim().Split('\n', StringSplitOptions.RemoveEmptyEntries)
 
         if lines.Length = 0 || lines.[0] <> writerManifestVersion then
-            Map.empty
+            Error "writer manifest has an unknown or missing version"
         else
             lines
             |> Array.skip 1
-            |> Array.choose parseManifestLine
-            |> Map.ofArray
+            |> Array.fold
+                (fun state line ->
+                    result {
+                        let! manifest = state
+
+                        match parseManifestLine line with
+                        | None -> return! Error "writer manifest contains a malformed entry"
+                        | Some(name, _) when Map.containsKey name manifest ->
+                            return! Error(sprintf "writer manifest contains duplicate entry: %s" name)
+                        | Some(name, entry) -> return Map.add name entry manifest
+                    })
+                (Ok Map.empty)
 
     let private nextExpiry (writers: MaterializedWriter list) =
         writers
@@ -468,15 +478,23 @@ module WriterStreamSync =
     let private readOptionalManifest
         (raw: IGitRawStore)
         (entry: TreeEntry option)
-        : Task<Map<string, WriterManifestEntry>> =
-        task {
+        : Task<Result<Map<string, WriterManifestEntry> option, ConvergeError>> =
+        taskResult {
             match entry with
-            | None -> return Map.empty
-            | Some manifest when manifest.Mode <> blobMode -> return Map.empty
+            | None -> return None
             | Some manifest ->
-                match! raw.ReadObject manifest.Oid with
-                | None -> return Map.empty
-                | Some bytes -> return bytes |> Encoding.UTF8.GetString |> writerManifestFromText
+                do! requireBlobMode manifest
+                let! bytesOpt = TaskResultCE.ofTask (raw.ReadObject manifest.Oid)
+
+                match bytesOpt with
+                | None -> return! Error(asStorage "missing writer-manifest blob")
+                | Some bytes ->
+                    return!
+                        bytes
+                        |> Encoding.UTF8.GetString
+                        |> writerManifestFromText
+                        |> Result.map Some
+                        |> Result.mapError asStorage
         }
 
     let private manifestForEntry (manifest: Map<string, WriterManifestEntry>) (entry: TreeEntry) =
@@ -493,7 +511,20 @@ module WriterStreamSync =
         |> List.filter (fun entry ->
             match manifestForEntry manifest entry with
             | Some info -> isWriterActiveAt nowMs info.LastActivityMs
-            | None -> true)
+            | None -> false)
+
+    let private validateManifestCoverage
+        (manifest: Map<string, WriterManifestEntry>)
+        (entries: TreeEntry list)
+        =
+        let missingOrMismatched =
+            entries |> List.tryFind (fun entry -> manifestForEntry manifest entry |> Option.isNone)
+
+        match missingOrMismatched with
+        | Some entry -> Error(asStorage (sprintf "writer manifest does not bind writer blob: %s" entry.Name))
+        | None when manifest.Count <> entries.Length ->
+            Error(asStorage "writer manifest contains entries absent from writers tree")
+        | None -> Ok()
 
     let private remoteEntryNeeded
         (cacheFiles: Map<string, CachedFile>)
@@ -551,8 +582,23 @@ module WriterStreamSync =
         =
         taskResult {
             let! writerEntries = readRequiredTree raw writerTree.Oid "writers"
-            let! manifest = readOptionalManifest raw manifestEntry |> TaskResultCE.ofTask
-            let retainedEntries = retainedRemoteEntries nowMs manifest writerEntries
+            let! manifestOpt = readOptionalManifest raw manifestEntry
+            let manifest = manifestOpt |> Option.defaultValue Map.empty
+
+            // A snapshot predating writer activity metadata cannot participate in
+            // retention safely: importing it would assign fetch-time mtime and
+            // resurrect arbitrary old process writers. Clean-break by ignoring
+            // its writer tree; a new snapshot will publish only locally-known
+            // writers with canonical activity metadata.
+            let retainedEntries =
+                match manifestOpt with
+                | None -> []
+                | Some _ -> retainedRemoteEntries nowMs manifest writerEntries
+
+            do!
+                match manifestOpt with
+                | None -> Ok()
+                | Some _ -> validateManifestCoverage manifest writerEntries
             let writerStats = ProcessEventLog.writerPhysicalStats commonDir |> Map.ofList
 
             let neededWriterEntries =

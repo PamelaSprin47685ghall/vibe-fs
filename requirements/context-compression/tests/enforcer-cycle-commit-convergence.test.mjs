@@ -58,12 +58,12 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_catchup_drains_next_window_after_id
   assert.equal(frames.frameCount(state), 2)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_without_material_projects_raw', async () => {
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_cancel_is_the_only_non_material_wake', async () => {
   const scope = runtime.scope()
-  const parked = runtime.park(scope, 'ses-blog', 1000)
+  const parked = runtime.park(scope, 'ses-blog')
   assert.equal(runtime.hasParked(scope, 'ses-blog'), true)
-  assert.equal(runtime.resumeParked(scope, 'ses-blog'), true)
-  assert.equal(await parked, true)
+  runtime.cancelParked(scope, 'ses-blog')
+  assert.deepEqual(await parked, { kind: 'Cancelled', context: null })
   assert.equal(runtime.hasParked(scope, 'ses-blog'), false)
   runtime.dispose(scope)
 })
@@ -81,12 +81,14 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_d
   runtime.dispose(scope)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_expired_with_fresh_material_drains', async () => {
+test('WHAT[CONTEXT-COMPRESSION-023] ENFORCER_park_never_expires_without_an_event', async () => {
   const scope = runtime.scope()
-  await runtime.park(scope, 'ses-blog', 1)
-  await new Promise((resolve) => setTimeout(resolve, 5))
-  assert.equal(runtime.hasParked(scope, 'ses-blog'), false)
-  assert.equal(runtime.decideMaterial(false, false, runtime.main({ toml: 'fresh' })), 'Start')
+  const parked = runtime.park(scope, 'ses-blog')
+  assert.equal(runtime.hasParked(scope, 'ses-blog'), true)
+  assert.equal(runtime.offerParked(scope, 'ses-blog', runtime.main({ toml: 'fresh' })), 'Delivered')
+  const wake = await parked
+  assert.equal(wake.kind, 'MaterialAvailable')
+  assert.equal(wake.context.toml, 'fresh')
   runtime.dispose(scope)
 })
 
