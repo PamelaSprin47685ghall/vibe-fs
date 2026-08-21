@@ -25,10 +25,10 @@ module WriterStreamSync =
     let private treeMode = "40000"
 
     [<Literal>]
-    let private materializationCacheVersion = "v3"
+    let private materializationCacheVersion = "v4"
 
     [<Literal>]
-    let private writerManifestVersion = "v1"
+    let private writerManifestVersion = "v2"
 
     type private CachedFile =
         { StatIdentity: string
@@ -489,12 +489,18 @@ module WriterStreamSync =
                 match bytesOpt with
                 | None -> return! Error(asStorage "missing writer-manifest blob")
                 | Some bytes ->
-                    return!
-                        bytes
-                        |> Encoding.UTF8.GetString
-                        |> writerManifestFromText
-                        |> Result.map Some
-                        |> Result.mapError asStorage
+                    let text = Encoding.UTF8.GetString bytes
+
+                    if text = "v1" || text.StartsWith("v1\n", StringComparison.Ordinal) then
+                        // v1 encoded producer/fetch file mtime, not durable Journal
+                        // observation time. It cannot participate in v2 retention.
+                        return None
+                    else
+                        return!
+                            text
+                            |> writerManifestFromText
+                            |> Result.map Some
+                            |> Result.mapError asStorage
         }
 
     let private manifestForEntry (manifest: Map<string, WriterManifestEntry>) (entry: TreeEntry) =

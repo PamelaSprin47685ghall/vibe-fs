@@ -117,6 +117,12 @@ module ProcessEventLog =
     [<Emit("Date.now()")>]
     let private currentTimeMs () : float = jsNative
 
+    [<Emit("Date.parse($0)")>]
+    let private parseDateMs (value: string) : float = jsNative
+
+    [<Emit("Number.isFinite($0)")>]
+    let private isFiniteNumber (value: float) : bool = jsNative
+
     [<Import("openSync", "node:fs")>]
     let private openSync (path: string) (flags: string) : int = jsNative
 
@@ -321,6 +327,42 @@ module ProcessEventLog =
 
         bytes
 
+    type private TailLine =
+        { Start: int
+          Text: string }
+
+    let private readCompleteLineBefore fd path lineEnd : Result<TailLine, string> =
+        if lineEnd <= 0 then
+            Error(sprintf "writer file contains empty final line: %s" path)
+        else
+            let blockSize = 4096
+            // DSL-MUTABLE: algorithm-scratch — exclusive end of next reverse pread.
+            let mutable cursor = lineEnd
+            // DSL-MUTABLE: algorithm-scratch — exact line start once previous LF is found.
+            let mutable lineStart = -1
+
+            while cursor > 0 && lineStart < 0 do
+                let start = max 0 (cursor - blockSize)
+                let length = cursor - start
+                let buffer = readExactAt fd start length
+                let delimiter = lastIndexOfLf buffer length
+
+                if delimiter >= 0 then
+                    lineStart <- start + delimiter + 1
+                elif start = 0 then
+                    lineStart <- 0
+                else
+                    cursor <- start
+
+            let length = lineEnd - lineStart
+
+            if length <= 0 then
+                Error(sprintf "writer file contains empty final line: %s" path)
+            else
+                Ok
+                    { Start = lineStart
+                      Text = readExactAt fd lineStart length |> Encoding.UTF8.GetString }
+
     /// Exact O(last-line-bytes) NDJSON tail lookup. The scan searches raw LF bytes
     /// backwards with positional reads; UTF-8 boundaries do not matter because an
     /// unescaped LF cannot occur inside a valid JSON string.
@@ -342,41 +384,84 @@ module ProcessEventLog =
                         if trailing.[0] <> 10uy then
                             Error(sprintf "writer file has incomplete trailing line: %s" path)
                         else
-                            let lineEnd = size - 1
-
-                            if lineEnd = 0 then
-                                Error(sprintf "writer file contains empty final line: %s" path)
-                            else
-                                let blockSize = 4096
-                                // DSL-MUTABLE: algorithm-scratch — exclusive end of next reverse pread.
-                                let mutable cursor = lineEnd
-                                // DSL-MUTABLE: algorithm-scratch — exact line start once previous LF is found.
-                                let mutable lineStart = -1
-
-                                while cursor > 0 && lineStart < 0 do
-                                    let start = max 0 (cursor - blockSize)
-                                    let length = cursor - start
-                                    let buffer = readExactAt fd start length
-                                    let delimiter = lastIndexOfLf buffer length
-
-                                    if delimiter >= 0 then
-                                        lineStart <- start + delimiter + 1
-                                    elif start = 0 then
-                                        lineStart <- 0
-                                    else
-                                        cursor <- start
-
-                                let length = lineEnd - lineStart
-
-                                if length <= 0 then
-                                    Error(sprintf "writer file contains empty final line: %s" path)
-                                else
-                                    readExactAt fd lineStart length
-                                    |> Encoding.UTF8.GetString
-                                    |> Some
-                                    |> Ok
+                            readCompleteLineBefore fd path (size - 1)
+                            |> Result.map (fun line -> Some line.Text)
                     with ex ->
                         Error ex.Message
+                finally
+                    closeSync fd
+
+    type private TailActivity =
+        | JournalActivity of float
+        | ProjectionCutTail
+        | NoDurableActivity
+
+    let private classifyTailActivity (line: string) =
+        try
+            let value: obj = JS.JSON.parse line
+            let eventType = if isNull value?event_type then "" else unbox<string> value?event_type
+
+            match eventType with
+            | "JournalEnvelope" ->
+                let payload: obj = value?payload
+
+                if isNull payload || isNull payload?ObservedAt then
+                    NoDurableActivity
+                else
+                    let observedAt = parseDateMs (unbox<string> payload?ObservedAt)
+
+                    if isFiniteNumber observedAt then
+                        JournalActivity observedAt
+                    else
+                        NoDurableActivity
+            | "ProjectionCutTail" -> ProjectionCutTail
+            | _ -> NoDurableActivity
+        with _ ->
+            NoDurableActivity
+
+    /// Journal envelopes carry their producer observation time in durable bytes.
+    /// A trailing ProjectionCutTail is integrator metadata for the immediately
+    /// preceding fact, so it does not advance process activity by itself.
+    let private durableTailActivity path : float option =
+        if not (existsSync path) then
+            None
+        else
+            let size = statSync path |> statSize
+
+            if size = 0 then
+                None
+            else
+                let fd = openSync path "r"
+
+                try
+                    try
+                        let trailing = readExactAt fd (size - 1) 1
+
+                        if trailing.[0] <> 10uy then
+                            None
+                        else
+                            // DSL-MUTABLE: algorithm-scratch — LF ending the candidate record.
+                            let mutable lineEnd = size - 1
+                            // DSL-MUTABLE: algorithm-scratch — resolved durable activity, if any.
+                            let mutable activity: float option = None
+                            // DSL-MUTABLE: algorithm-scratch — only cut-tail metadata may be skipped.
+                            let mutable searching = true
+
+                            while searching && lineEnd > 0 do
+                                match readCompleteLineBefore fd path lineEnd with
+                                | Error _ -> searching <- false
+                                | Ok line ->
+                                    match classifyTailActivity line.Text with
+                                    | JournalActivity observedAt ->
+                                        activity <- Some observedAt
+                                        searching <- false
+                                    | ProjectionCutTail when line.Start > 0 -> lineEnd <- line.Start - 1
+                                    | ProjectionCutTail
+                                    | NoDurableActivity -> searching <- false
+
+                            activity
+                    with _ ->
+                        None
                 finally
                     closeSync fd
 
@@ -414,11 +499,12 @@ module ProcessEventLog =
     let private writerMetadata directory names =
         names
         |> List.map (fun name ->
-            let stat = statSync (join2 directory name)
+            let path = join2 directory name
+            let stat = statSync path
 
             { Name = name
               StatIdentity = statIdentity stat
-              LastActivityMs = statMtimeMs stat })
+              LastActivityMs = durableTailActivity path |> Option.defaultValue (statMtimeMs stat) })
 
     /// Git-index-style physical cache key. It never replaces canonical validation:
     /// a cache miss falls back to reading bytes, while a hit only reuses a snapshot
