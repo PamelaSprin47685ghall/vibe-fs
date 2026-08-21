@@ -54,6 +54,48 @@ test('WHAT[DURABLE-CONVERGENCE-010] clean tracked snapshot skips all Wanxiang tr
   assert.match(gateway, /readTrackedRemote/)
 })
 
+test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multiplex without clobbering ssh identity options', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-mux-'))
+
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    const base = 'ssh -F /dev/null -i /tmp/wxs-test-key'
+    execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', base])
+
+    const first = ensure(repo)
+    assert.equal(first.tag, 0, `hook ensure failed: ${JSON.stringify(first)}`)
+    const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
+
+    assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
+    assert.match(configured, /ControlMaster=auto/)
+    assert.match(configured, /ControlPersist=15s/)
+    assert.match(configured, /ControlPath=/)
+
+    const second = ensure(repo)
+    assert.equal(second.tag, 0, `second hook ensure failed: ${JSON.stringify(second)}`)
+    const configuredAgain = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
+    assert.equal(configuredAgain, configured, 'repeated ensure must not stack SSH multiplex options')
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DURABLE-CONVERGENCE-010] hook installer respects user-owned SSH multiplex configuration', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-user-owned-'))
+
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    const userOwned = 'ssh -o ControlMaster=yes -o ControlPath=/tmp/user-owned-%C'
+    execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', userOwned])
+    const verdict = ensure(repo)
+    assert.equal(verdict.tag, 0, `hook ensure failed: ${JSON.stringify(verdict)}`)
+    const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
+    assert.equal(configured, userOwned)
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[DURABLE-CONVERGENCE-010] confirmed same-root convergence does not publish an empty snapshot', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
 

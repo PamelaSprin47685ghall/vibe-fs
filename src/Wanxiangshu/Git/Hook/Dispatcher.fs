@@ -52,6 +52,9 @@ module HookDispatcher =
     [<Import("chmodSync", "node:fs")>]
     let private chmodSync (path: string) (mode: int) : unit = jsNative
 
+    [<Import("mkdirSync", "node:fs")>]
+    let private mkdirSync (path: string) (options: obj) : unit = jsNative
+
     [<Import("join", "node:path")>]
     let private joinPath (left: string) (right: string) : string = jsNative
 
@@ -187,6 +190,42 @@ module HookDispatcher =
         for remote in remotes workspace do
             ensureRemoteStoreFetchRefspec workspace remote
 
+    let private tryGitConfig workspace key =
+        try
+            let value = GitSubject.execIn workspace [| "config"; "--get"; key |] |> fun output -> output.Trim()
+            if String.IsNullOrWhiteSpace value then None else Some value
+        with _ ->
+            None
+
+    let private gitCommonDir workspace =
+        GitSubject.execIn workspace [| "rev-parse"; "--path-format=absolute"; "--git-common-dir" |]
+        |> fun value -> value.Trim()
+
+    let private hasUserSshMultiplex (command: string) =
+        let lower = command.ToLowerInvariant()
+        lower.Contains("controlmaster=") || lower.Contains("controlpath=")
+
+    let private ensureSshMultiplex workspace =
+        let baseCommand = tryGitConfig workspace "core.sshCommand" |> Option.defaultValue "ssh"
+
+        if hasUserSshMultiplex baseCommand then
+            ()
+        else
+            let commonDir = gitCommonDir workspace
+            let socketDir = joinPath commonDir "wanxiang"
+            mkdirSync socketDir (createObj [ "recursive" ==> true; "mode" ==> 0o700 ])
+            let controlPath = joinPath socketDir "ssh-%C"
+
+            let managed =
+                String.concat
+                    " "
+                    [ baseCommand
+                      "-o ControlMaster=auto"
+                      "-o ControlPersist=15s"
+                      "-o " + shellQuote ("ControlPath=" + controlPath) ]
+
+            GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managed |] |> ignore
+
     let private ensureWorkspace workspace : Result<unit, string> =
         let hooksDir = hooksDirectory workspace
 
@@ -206,6 +245,7 @@ module HookDispatcher =
         | Some error -> Error error
         | None ->
             ensureRemoteRefs workspace
+            ensureSshMultiplex workspace
             Ok()
 
     /// Startup-only ensure. There is intentionally no fetch/pull/push here.
