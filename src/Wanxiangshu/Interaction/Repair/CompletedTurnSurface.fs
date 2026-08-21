@@ -85,6 +85,32 @@ module CompletedTurnSurface =
 
         CompletedTurnClassifier.needsInteractionRepair roleValue classified typedParts
 
+    let private repairDecisionName =
+        function
+        | CompletedTurnClassifier.RepairDefectDecision.RequestRepair -> "RequestRepair"
+        | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal -> "AwaitRepairTerminal"
+        | CompletedTurnClassifier.RepairDefectDecision.RepairExhausted -> "RepairExhausted"
+        | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> "NoRepair"
+
+    let repairDefectDecision (currentAttemptIsRepair: bool) (completed: bool) (finish: string) (parts: obj) : string =
+        let classified =
+            CompletedTurnClassifier.classifyOutcome
+                completed
+                (optionalText (box finish))
+                None
+                (partsOf parts)
+
+        match classified with
+        | :? ReconcileProgram.SnapshotObservation as observation ->
+            CompletedTurnClassifier.decideRepairDefect
+                currentAttemptIsRepair
+                (Some observation)
+                (ReconcileProgram.TurnNeedsContinuation "private-snapshot-observation")
+        | :? ReconcileProgram.TurnOutcome as outcome ->
+            CompletedTurnClassifier.decideRepairDefect currentAttemptIsRepair None outcome
+        | _ -> CompletedTurnClassifier.RepairDefectDecision.NoRepair
+        |> repairDecisionName
+
     let roleOfAgent (agent: string) (fallback: string) : string =
         let result =
             CompletedTurnClassifier.roleOfAgent (optionalText (box agent)) (optionalRole fallback)

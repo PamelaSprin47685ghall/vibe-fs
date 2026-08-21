@@ -33,7 +33,8 @@
 
 1. **有界 Nudge 与 AABB 机制**：
    - 首次无效 terminal 由 `SessionIdle` 触发专用 Nudge，每个 RequestId 仅限一次。
-   - 再次无效则进入 AABB 修复，严格保留 RequestId 与目标 terminal 身份。
+   - 再次无效必须由新的 ProviderRunIdentity 证明后才进入 AABB；同一 terminal 的重复 Nudge admission 返回 typed `AlreadyAdmitted` 并等待，不得作为失败推进恢复。
+   - send admission 使用 typed outcome 区分 `Sent / AlreadyAdmitted / Superseded / Retired / Failed`，禁止通过错误字符串反解析幂等状态。
    - 恢复重判仅承认包含 `chronicle` 的 completed 状态，杜绝模糊猜测。
 
 2. **RulebookRevision 冻结**：

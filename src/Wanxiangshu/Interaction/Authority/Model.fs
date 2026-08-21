@@ -485,7 +485,12 @@ module PromptAuthority =
     /// prompt's own bad terminal from minting another repair forever.
     let repairFamilyPayloadDigest (repairKind: string) = repairKind
 
-    let repairFamilyAlreadyClaimed
+    [<RequireQualifiedAccess>]
+    type RepairFamilyAdmission =
+        | Available
+        | AlreadyAdmitted
+
+    let repairFamilyAdmission
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
         (repairKind: string)
@@ -498,7 +503,10 @@ module PromptAuthority =
                 (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
                 (repairFamilyPayloadDigest repairKind)
 
-        nextClaimSequence scope projection > 1
+        if nextClaimSequence scope projection > 1 then
+            RepairFamilyAdmission.AlreadyAdmitted
+        else
+            RepairFamilyAdmission.Available
 
     /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one repair.
     /// Blogger protocol repair deliberately uses both axes: request identity

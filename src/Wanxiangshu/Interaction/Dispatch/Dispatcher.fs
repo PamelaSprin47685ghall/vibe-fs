@@ -313,11 +313,11 @@ module PromptDispatcher =
         /// Ordinary missing-final/incomplete repair is bounded by the LogicalRun +
         /// repair family, not by each terminal. Otherwise every repair response
         /// would create a fresh terminal and legally mint the same nudge forever.
-        member this.RepairFamilyAlreadyClaimed
+        member this.RepairFamilyAdmission
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (repairKind: string)
-            : bool =
-            PromptAuthority.repairFamilyAlreadyClaimed
+            =
+            PromptAuthority.repairFamilyAdmission
                 profile.SessionId
                 profile.LogicalRunId
                 repairKind

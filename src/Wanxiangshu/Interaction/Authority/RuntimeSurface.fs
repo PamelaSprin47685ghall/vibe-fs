@@ -489,12 +489,16 @@ module RuntimeSurface =
             kind
             (projectionOf projection)
 
-    let repairFamilyAlreadyClaimed (session: string) (logicalRun: string) (kind: string) (projection: obj) : bool =
-        PromptAuthority.repairFamilyAlreadyClaimed
-            (SessionId.create session)
-            (LogicalRunId.create logicalRun)
-            kind
-            (projectionOf projection)
+    let repairFamilyAdmission (session: string) (logicalRun: string) (kind: string) (projection: obj) : string =
+        match
+            PromptAuthority.repairFamilyAdmission
+                (SessionId.create session)
+                (LogicalRunId.create logicalRun)
+                kind
+                (projectionOf projection)
+        with
+        | PromptAuthority.RepairFamilyAdmission.Available -> "Available"
+        | PromptAuthority.RepairFamilyAdmission.AlreadyAdmitted -> "AlreadyAdmitted"
 
     let idleAlreadyClaimed
         (session: string)

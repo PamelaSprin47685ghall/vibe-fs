@@ -69,9 +69,10 @@ open Wanxiangshu.Strength
 /// time → zero physical prompt, zero claim, zero terminal.
 module InteractionRepairWorkflow =
 
-    /// Generic repair is bounded by LogicalRun + repair family, gated on a fresh
-    /// idle permit (HOST-004). A repair response is still part of the same logical
-    /// run, so a new ProviderRunIdentity must not mint the same nudge again.
+    /// Generic repair admission is bounded by LogicalRun + repair family, gated on
+    /// a fresh idle permit (HOST-004). Admission does not prove the admitted repair
+    /// has finished; duplicate observations are absorbed until typed terminal
+    /// evidence lets the Repair owner classify the attempt.
     ///
     /// The task is awaited rather than discarded. `|> ignore` on the task also
     /// discarded the claim/abandon bookkeeping inside it, so a failed repair left
@@ -104,17 +105,8 @@ module InteractionRepairWorkflow =
             match outcome with
             | HostSessionNudge.IdleRepairFamilyOutcome.Sent _
             | HostSessionNudge.IdleRepairFamilyOutcome.Superseded
+            | HostSessionNudge.IdleRepairFamilyOutcome.AlreadyAdmitted
             | HostSessionNudge.IdleRepairFamilyOutcome.Retired -> ()
-            | HostSessionNudge.IdleRepairFamilyOutcome.BudgetExhausted ->
-                // The one bounded repair already ran and this LogicalRun is still
-                // unusable. This is now a proved recovery exhaustion, not another
-                // invitation to synthesize user input.
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(
-                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "INTERACTION_REPAIR_EXHAUSTED"
-                    ))
-                |> ignore
             | HostSessionNudge.IdleRepairFamilyOutcome.Failed error ->
                 // Journal/authority/transport failures are Wanxiangshu invariant
                 // failures, not model behavior. In production fatal kills the
@@ -145,6 +137,49 @@ module InteractionRepairWorkflow =
         match context.Quiescence with
         | None -> AsyncSupport.completedTask ()
         | Some permit -> sendRepair quiescence permit sessionPort eventPort journal context.Turn prompt repairKind
+
+    let private continuationKindOf (journal: AgentJournal option) (turn: ReconciledTurn) =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections)
+        |> Option.bind (fun session -> session.PromptAuthority)
+        |> Option.bind (fun authority -> Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
+
+    let private isInteractionRepairAttempt journal turn =
+        continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.InteractionRepair
+
+    let private exhaustRepair (eventPort: IEventObservationPort) (turn: ReconciledTurn) : Task =
+        eventPort.NotifyTerminal
+            turn.SessionId
+            (TerminalOutcome.Failed(
+                TerminalStop.forAuthority turn.AuthorityRootUserMessageId "INTERACTION_REPAIR_EXHAUSTED"
+            ))
+        |> ignore
+
+        AsyncSupport.completedTask ()
+
+    let private repairDefect
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (prompt: string)
+        (repairKind: string)
+        : Task =
+        let turn = context.Turn
+
+        match
+            CompletedTurnClassifier.decideRepairDefect
+                (isInteractionRepairAttempt journal turn)
+                turn.Observation
+                turn.Outcome
+        with
+        | CompletedTurnClassifier.RepairDefectDecision.RequestRepair ->
+            trySendIdleRepair quiescence context sessionPort eventPort journal prompt repairKind
+        | CompletedTurnClassifier.RepairDefectDecision.RepairExhausted -> exhaustRepair eventPort turn
+        | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal
+        | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> AsyncSupport.completedTask ()
 
     let private notifyBloggerProtocolFailure
         (eventPort: IEventObservationPort)
@@ -416,15 +451,7 @@ module InteractionRepairWorkflow =
     /// accepted as `ProviderRetryAttempt`. That is the recovery continue's identity,
     /// not a runtime whitelist and not a substitute for HOST-004 on ordinary mains.
     let private isRecoveryContinue (journal: AgentJournal option) (turn: ReconciledTurn) : bool =
-        match journal with
-        | None -> false
-        | Some durable ->
-            AgentProjection.tryFind turn.SessionId (AgentJournal.snapshot durable).AgentProjections
-            |> Option.bind (fun session -> session.PromptAuthority)
-            |> Option.exists (fun authority ->
-                authority.AcceptedContinuationIds
-                |> Map.tryFind turn.PhysicalUserMessageId
-                |> Option.exists (fun kind -> kind = PromptAuthority.ContinuationKind.ProviderRetryAttempt))
+        continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.ProviderRetryAttempt
 
     let private isFissionReplaced (journal: AgentJournal option) (sessionId: SessionId) : bool =
         FissionRuntime.isSilentInterrupt sessionId
@@ -451,7 +478,7 @@ module InteractionRepairWorkflow =
         then
             AsyncSupport.completedTask ()
         else
-            trySendIdleRepair
+            repairDefect
                 quiescence
                 context
                 sessionPort
@@ -474,7 +501,7 @@ module InteractionRepairWorkflow =
         if isFissionReplaced journal turn.SessionId || isRecoveryContinue journal turn then
             AsyncSupport.completedTask ()
         elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
-            trySendIdleRepair
+            repairDefect
                 quiescence
                 context
                 sessionPort

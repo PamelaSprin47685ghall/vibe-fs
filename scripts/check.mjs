@@ -15,6 +15,7 @@ const checks = [
   join(root, 'checks/semantic-owners.mjs'),
   join(root, 'checks/plugin-transforms-invariant.mjs'),
   join(root, 'checks/assistance-host-invariant.mjs'),
+  join(root, 'checks/interaction-repair-invariant.mjs'),
   join(root, 'checks/composition-root-invariant.mjs'),
   join(root, 'checks/deadcode.mjs'),
   join(root, 'checks/p0-recovery-join.mjs'),

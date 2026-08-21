@@ -251,6 +251,11 @@ module HostSessionNudge =
                         profile
         }
 
+    let private interactionRepairOutcomeOfResult =
+        function
+        | Ok key -> InteractionRepairSendOutcome.Sent key
+        | Error error -> InteractionRepairSendOutcome.Failed error
+
     let private sendInteractionRepairWithProfile
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
@@ -262,11 +267,11 @@ module HostSessionNudge =
         (repairKind: string)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        : Task<Result<PromptKey, string>> =
+        : Task<InteractionRepairSendOutcome> =
         let rt = PromptDispatcher.forJournal durable
 
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
-            Task.FromResult(Error "Interaction repair already claimed for this provider run")
+            Task.FromResult InteractionRepairSendOutcome.AlreadyAdmitted
         else
             let agent = agentForActiveCursor journal sessionId profile
 
@@ -286,6 +291,7 @@ module HostSessionNudge =
                 (liveDirectory directory)
                 PromptDispatcher.AwaitMode.Await
                 None
+            |> TaskValue.map interactionRepairOutcomeOfResult
 
     /// FALLBACK-008: an empty / XML-only terminal earns at most one repair.
     ///
@@ -304,12 +310,13 @@ module HostSessionNudge =
         (requestId: BloggerRequestId)
         (terminalProviderRun: ProviderRunIdentity)
         (repairKind: string)
-        : Task<Result<PromptKey, string>> =
+        : Task<InteractionRepairSendOutcome> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
-            | true, _, _ -> return Error "Session is retired by Fission"
-            | false, None, _ -> return Error "No journal: an interaction repair cannot be claimed"
-            | false, Some _, None -> return Error "No active authority profile"
+            | true, _, _ -> return InteractionRepairSendOutcome.Retired
+            | false, None, _ ->
+                return InteractionRepairSendOutcome.Failed "No journal: an interaction repair cannot be claimed"
+            | false, Some _, None -> return InteractionRepairSendOutcome.Failed "No active authority profile"
             | false, Some durable, Some profile ->
                 return!
                     sendInteractionRepairWithProfile
@@ -337,6 +344,11 @@ module HostSessionNudge =
         /// claim persistence, the dispatcher closes that audit trail with
         /// `PluginPromptAbandoned(SupersededBeforePhysicalSend)`.
         | Superseded
+        /// A concurrent observer already admitted this exact durable occasion.
+        /// This is idempotency evidence, never transport/protocol failure.
+        | AlreadyAdmitted
+        /// The logical owner was replaced before this idle continuation could act.
+        | Retired
         | Failed of string
 
     let private idleOutcomeOfDispatch =
@@ -364,9 +376,7 @@ module HostSessionNudge =
         let rt = PromptDispatcher.forJournal durable
 
         if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
-            Task.FromResult(
-                IdleContinuationOutcome.Failed "Manager idle encouragement already claimed for this terminal"
-            )
+            Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
             let agent = agentForActiveCursor journal sessionId profile
 
@@ -398,7 +408,7 @@ module HostSessionNudge =
         : Task<IdleContinuationOutcome> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
-            | true, _, _ -> return IdleContinuationOutcome.Failed "Session is retired by Fission"
+            | true, _, _ -> return IdleContinuationOutcome.Retired
             | false, None, _ ->
                 return IdleContinuationOutcome.Failed "No journal: a manager idle encouragement cannot be claimed"
             | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
@@ -419,20 +429,6 @@ module HostSessionNudge =
                         profile
         }
 
-    [<RequireQualifiedAccess>]
-    type IdleRepairFamilyOutcome =
-        | Sent of PromptKey
-        | Superseded
-        | BudgetExhausted
-        | Retired
-        | Failed of string
-
-    let private idleRepairOutcomeOfDispatch =
-        function
-        | PromptDispatcher.SendAttemptOutcome.Sent key -> IdleRepairFamilyOutcome.Sent key
-        | PromptDispatcher.SendAttemptOutcome.Superseded -> IdleRepairFamilyOutcome.Superseded
-        | PromptDispatcher.SendAttemptOutcome.Failed error -> IdleRepairFamilyOutcome.Failed error
-
     let private sendIdleRepairFamilyWithProfile
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
@@ -444,12 +440,13 @@ module HostSessionNudge =
         (repairKind: string)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
-        : Task<IdleRepairFamilyOutcome> =
+        : Task<IdleContinuationOutcome> =
         let rt = PromptDispatcher.forJournal durable
 
-        if rt.RepairFamilyAlreadyClaimed profile repairKind then
-            Task.FromResult IdleRepairFamilyOutcome.BudgetExhausted
-        else
+        match rt.RepairFamilyAdmission profile repairKind with
+        | PromptAuthority.RepairFamilyAdmission.AlreadyAdmitted ->
+            Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
+        | PromptAuthority.RepairFamilyAdmission.Available ->
             let agent = agentForActiveCursor journal sessionId profile
 
             rt.SendIdleRepairFamily
@@ -462,7 +459,7 @@ module HostSessionNudge =
                 (liveDirectory directory)
                 PromptDispatcher.AwaitMode.Detached
                 (fun () -> quiescence.TryConsume permit)
-            |> TaskValue.map idleRepairOutcomeOfDispatch
+            |> TaskValue.map idleOutcomeOfDispatch
 
     /// Ordinary idle-derived repair: one send per LogicalRun + repair family.
     let trySendIdleRepairFamily
@@ -474,13 +471,13 @@ module HostSessionNudge =
         (directory: string option)
         (journal: AgentJournal option)
         (repairKind: string)
-        : Task<IdleRepairFamilyOutcome> =
+        : Task<IdleContinuationOutcome> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
-            | true, _, _ -> return IdleRepairFamilyOutcome.Retired
+            | true, _, _ -> return IdleContinuationOutcome.Retired
             | false, None, _ ->
-                return IdleRepairFamilyOutcome.Failed "No journal: an interaction repair cannot be claimed"
-            | false, Some _, None -> return IdleRepairFamilyOutcome.Failed "No active authority profile"
+                return IdleContinuationOutcome.Failed "No journal: an interaction repair cannot be claimed"
+            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
             | false, Some durable, Some profile ->
                 return!
                     sendIdleRepairFamilyWithProfile
@@ -516,7 +513,7 @@ module HostSessionNudge =
         let rt = PromptDispatcher.forJournal durable
 
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
-            Task.FromResult(IdleContinuationOutcome.Failed "Interaction repair already claimed for this provider run")
+            Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
             let agent = agentForActiveCursor journal sessionId profile
 
@@ -548,7 +545,7 @@ module HostSessionNudge =
         : Task<IdleContinuationOutcome> =
         task {
             match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
-            | true, _, _ -> return IdleContinuationOutcome.Failed "Session is retired by Fission"
+            | true, _, _ -> return IdleContinuationOutcome.Retired
             | false, None, _ ->
                 return IdleContinuationOutcome.Failed "No journal: an interaction repair cannot be claimed"
             | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"

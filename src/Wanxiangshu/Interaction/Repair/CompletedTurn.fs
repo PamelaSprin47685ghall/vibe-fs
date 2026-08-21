@@ -63,6 +63,13 @@ open Wanxiangshu.OpenCode
 /// tags) is interaction repair (continuation), never durable fallback.
 module CompletedTurnClassifier =
 
+    [<RequireQualifiedAccess>]
+    type RepairDefectDecision =
+        | RequestRepair
+        | AwaitRepairTerminal
+        | RepairExhausted
+        | NoRepair
+
     let private supportsInteractionRepair =
         function
         | Some Role.Manager
@@ -178,6 +185,19 @@ module CompletedTurnClassifier =
                 | ReconcileProgram.TurnAborted _
                 | ReconcileProgram.TurnFailed _ -> false
             | _ -> false)
+
+    let decideRepairDefect
+        (currentAttemptIsRepair: bool)
+        (observation: ReconcileProgram.SnapshotObservation option)
+        (outcome: ReconcileProgram.TurnOutcome)
+        : RepairDefectDecision =
+        match currentAttemptIsRepair, observation, outcome with
+        | false, _, _ -> RepairDefectDecision.RequestRepair
+        | true, Some ReconcileProgram.TurnUnknown, _ -> RepairDefectDecision.AwaitRepairTerminal
+        | true, None, ReconcileProgram.TurnInProgress -> RepairDefectDecision.AwaitRepairTerminal
+        | true, None, ReconcileProgram.TurnNeedsContinuation _ -> RepairDefectDecision.RepairExhausted
+        | true, None, (ReconcileProgram.TurnCompleted | ReconcileProgram.TurnAborted _ | ReconcileProgram.TurnFailed _) ->
+            RepairDefectDecision.NoRepair
 
     let roleOfAgent (agent: string option) (fallback: Role option) =
         match agent with

@@ -73,6 +73,8 @@ Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前
 4. Nudge 后的再次无效 terminal 记录 confirmed failure 并无条件执行首发 AABB；AABB 阶段严格保留 BloggerRequestId 与目标 terminal 身份。
 5. 恢复重判仅从包含 `ToolName=chronicle` 的 completed 工具执行状态派生，禁止猜测或别名兼容。
 
+其中“再次无效 terminal”必须由**新的 ProviderRunIdentity** 证明；同一 terminal 的 Nudge claim 在并发 idle/reconcile 中被第二个观察者再次看见，只能解释为 `AlreadyAdmitted` 并幂等等待，严禁伪装成 send failure、严禁提前推进 AABB。任何依赖错误字符串（例如匹配 `already claimed`）区分幂等冲突与真实发送失败的实现均为 RED。
+
 ## BD-018: RulebookRevision 按 Blogger life 冻结与生效边界
 
 每个 Blogger participant life 在创建时绑定确定的 `RulebookRevision`，同时决定 system prompt 字节、`chronicle.tip` 枚举、解码映射表与 Main 处置索引。Blogger life 存活期间四者保持冻结，新规则的诞生不打断当前 in-flight cycle，仅在下一 cycle 创建 fresh life 时绑定最新 revision，确保 byte stability 与工具定义不分叉。

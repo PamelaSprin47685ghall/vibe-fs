@@ -16,6 +16,7 @@
 
 - **PhysicalUserMessage ≠ AuthorityTurn**：物理层消息必须经由显式、受控的提升函数在物理落地证明后才能升级为 AuthorityRoot；若破坏，任意中间件即可劫持会话权限。
 - **Continuation 严格受限**：Continuation 必须继承既有 Root 权威，禁止新建 RunId、修改 SelectedAgent 或重置 Fallback 预算；若破坏，自动修复会无限死循环。
+- **Admission ≠ Outcome**：repair claim 只证明一次自动修复已获准进入物理执行，不证明该修复已经返回、更不证明它失败。若把“已 claim”直接解释成“已耗尽”，同一 repair 在飞行期间的合法 idle/reconcile 竞态会把仍在生成的有效结果提前判死。
 - **原子 Profile 不可拼装**：执行身份由不可变的 `AttemptExecutionProfile` 原子携带，禁止从历史消息碎片中动态拼凑。
 
 ## DEPENDS ON

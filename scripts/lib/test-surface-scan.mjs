@@ -968,7 +968,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Interaction/Repair/CompletedTurnSurface.js',
     owner: 'interaction-authority',
-    laws: ['INTERACTION-AUTHORITY-004'],
+    laws: ['INTERACTION-AUTHORITY-004', 'INTERACTION-AUTHORITY-019'],
     source: 'src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs',
     representation: 'json',
     kind: 'pure',

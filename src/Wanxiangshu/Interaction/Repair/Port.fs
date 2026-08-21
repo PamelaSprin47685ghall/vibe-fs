@@ -32,6 +32,13 @@ open Wanxiangshu.Persistence.Journal
 ///
 /// Signature matches HostSessionNudge.trySendInteractionRepair with sessionPort
 /// closed at the injection site.
+[<RequireQualifiedAccess>]
+type InteractionRepairSendOutcome =
+    | Sent of PromptKey
+    | AlreadyAdmitted
+    | Retired
+    | Failed of string
+
 type InteractionRepairNudge =
     SessionId
         -> string
@@ -40,4 +47,4 @@ type InteractionRepairNudge =
         -> BloggerRequestId
         -> ProviderRunIdentity
         -> string
-        -> Task<Result<PromptKey, string>>
+        -> Task<InteractionRepairSendOutcome>

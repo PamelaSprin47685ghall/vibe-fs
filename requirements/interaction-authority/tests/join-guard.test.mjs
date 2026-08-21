@@ -11,13 +11,13 @@ const root = authority.createAuthorityRoot(hash, 'rt_join', 'ses_jg', 'AgentOwne
 
 test('WHAT[INTERACTION-AUTHORITY-010] PROMPT_010_generic_repair_family_is_bounded_once_per_run', () => {
   let state = authority.registerAuthority(root, authority.empty)
-  assert.equal(authority.repairFamilyAlreadyClaimed('ses_jg', root.logicalRun, 'missing-final-report', state), false)
+  assert.equal(authority.repairFamilyAdmission('ses_jg', root.logicalRun, 'missing-final-report', state), 'Available')
   state = authority.registerClaim(
     authority.claimContinuation('pk-repair', 'ses_jg', 'InteractionRepair', root, 'fast-coder', 'missing-final-report'),
     state,
   )
-  assert.equal(authority.repairFamilyAlreadyClaimed('ses_jg', root.logicalRun, 'missing-final-report', state), true)
-  assert.equal(authority.repairFamilyAlreadyClaimed('ses_jg', root.logicalRun, 'incomplete-interaction', state), false)
+  assert.equal(authority.repairFamilyAdmission('ses_jg', root.logicalRun, 'missing-final-report', state), 'AlreadyAdmitted')
+  assert.equal(authority.repairFamilyAdmission('ses_jg', root.logicalRun, 'incomplete-interaction', state), 'Available')
 })
 
 test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_contract_fails_closed_without_durable_authority', () => {
@@ -27,4 +27,12 @@ test('WHAT[INTERACTION-AUTHORITY-014] JNGD_nudge_contract_fails_closed_without_d
   assert.match(nudge, /No active authority profile/)
   assert.match(source, /ContinuationKind\.JoinGuard/)
   assert.match(source, /AlreadyOutstanding/)
+})
+
+test('WHAT[INTERACTION-AUTHORITY-010] duplicate_idle_continuation_admission_is_not_terminal_failure', () => {
+  const nudge = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
+  const manager = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Manager/Idle.fs'), 'utf8')
+  assert.match(nudge, /IdleContinuationOutcome\.AlreadyAdmitted/)
+  assert.doesNotMatch(nudge, /Manager idle encouragement already claimed for this terminal/)
+  assert.match(manager, /IdleContinuationOutcome\.AlreadyAdmitted/)
 })

@@ -10,6 +10,7 @@ const recoverySrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/B
 const enforcerSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Continuation.fs'), 'utf8')
 const repairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Repair.fs'), 'utf8')
 const interactionRepairSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs'), 'utf8')
+const sessionNudgeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs'), 'utf8')
 const pluginTransformsSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs'), 'utf8')
 const probeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs'), 'utf8')
 const runtimeSrc = readFileSync(join(ROOT, 'src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs'), 'utf8')
@@ -136,5 +137,19 @@ test('WHAT[BD-017] ENFORCER_066_first_protocol_nudge_is_idle_owned_never_sent_fr
     pluginTransformsSrc,
     /trySendInteractionRepair/,
     'the provider transform wiring must not possess a physical interaction-repair sender',
+  )
+})
+
+test('WHAT[BD-017] duplicate_nudge_admission_is_idempotent_not_AABB_failure', () => {
+  assert.match(sessionNudgeSrc, /IdleContinuationOutcome\.AlreadyAdmitted/)
+  assert.doesNotMatch(
+    sessionNudgeSrc,
+    /IdleContinuationOutcome\.Failed\s+"Interaction repair already claimed/,
+    'a racing duplicate claim is admission evidence, not a failed repair',
+  )
+  assert.doesNotMatch(
+    interactionRepairSrc,
+    /IndexOf\("already claimed"/,
+    'AABB must never recover typed idempotency by parsing error prose',
   )
 })

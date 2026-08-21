@@ -18,6 +18,9 @@
 3. **权威事实折叠（Authority Fold）**：
    投影严格从持久化事件中重放生成，内存中不维护独立的可变 authority 状态副本。`LifeCompleted` 事件在折叠时自动清空 `ActiveLogicalRun` 及关联的局部 claims，保证会话终结后权限原子回收。
 
+4. **Repair 因果分层**：
+   repair family 的 `ClaimSequence` 只回答“该 LogicalRun 是否已经 admission 过一次该 family”。Dispatch 层遇到重复 family 只返回 `AlreadyAdmitted`，不拥有 failure/exhaustion 语义。Repair owner 根据当前物理 turn 的 typed provenance 与 `TurnUnknown | TurnInProgress | TurnNeedsContinuation | terminal` 分类决定：首次缺陷→发送一次；repair 飞行态→等待；repair 自身稳定不可用→耗尽；普通旧 turn 的重复观察→幂等吸收。这样 claim、物理执行、终结结果三种事实不再互相冒充。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -40,3 +43,4 @@
 | INTERACTION-AUTHORITY-016 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-017 | `requirements/interaction-authority/tests/continuation-origin.test.mjs` |
 | INTERACTION-AUTHORITY-018 | `requirements/interaction-authority/tests/logical-run-close.test.mjs` |
+| INTERACTION-AUTHORITY-019 | `requirements/interaction-authority/tests/repair-lifecycle.test.mjs` |
