@@ -65,6 +65,24 @@ module SessionStartedAtLedger =
         | Some durable, Some sessionId, Some candidate -> bindOrAbort durable (SessionId.create sessionId) candidate
         | _ -> Task.FromResult(Ok None)
 
+    let private failSessionStartBind
+        (terminateSession: SessionId -> string -> Task<Result<unit, string>>)
+        (emitDiagnostic: string -> (string * string) list -> unit)
+        (projectionSessionIdOpt: string option)
+        (reason: string)
+        : Task<DateTimeOffset option> =
+        task {
+            let sessionId = projectionSessionIdOpt |> Option.defaultValue ""
+            emitDiagnostic "host-013-session-start-bind-failed" [ "session_id", sessionId; "result", reason ]
+            let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
+
+            match projectionSessionIdOpt with
+            | Some value ->
+                let! _ = terminateSession (SessionId.create value) terminalReason
+                return raise (InvalidOperationException terminalReason)
+            | None -> return raise (InvalidOperationException terminalReason)
+        }
+
     /// HOST-013: bind session start for transform boundary, logging diagnostics and terminating on error.
     let bindSessionStartedAt
         (journal: AgentJournal option)
@@ -80,16 +98,5 @@ module SessionStartedAtLedger =
             match! tryBindOrAbort journal projectionSessionIdOpt sessionStartCandidate with
             | Ok startedAt -> return startedAt
             | Error reason ->
-                match projectionSessionIdOpt with
-                | Some sessionId ->
-                    emitDiagnostic
-                        "host-013-session-start-bind-failed"
-                        [ "session_id", sessionId; "result", reason ]
-
-                    let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
-                    let! _ = terminateSession (SessionId.create sessionId) terminalReason
-                    return raise (InvalidOperationException terminalReason)
-                | None ->
-                    emitDiagnostic "host-013-session-start-bind-failed" [ "session_id", ""; "result", reason ]
-                    return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
+                return! failSessionStartBind terminateSession emitDiagnostic projectionSessionIdOpt reason
         }

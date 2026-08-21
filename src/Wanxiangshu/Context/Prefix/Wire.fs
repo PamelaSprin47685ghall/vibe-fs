@@ -367,21 +367,24 @@ module XWire =
                 | AttemptOutcome.Failed
                 | AttemptOutcome.Aborted -> Task.FromResult(Ok())
 
-            match committed with
-            | Error reason ->
-                return raise (InvalidOperationException(sprintf "prefix rebase commit failed: %s" reason))
-            | Ok() ->
-                let! success =
-                    match outcome with
-                    | AttemptOutcome.Completed -> recordSuccessfulAttempt durable sessionId providerRun plan
-                    | AttemptOutcome.CompletedInvalid
-                    | AttemptOutcome.Failed
-                    | AttemptOutcome.Aborted -> Task.FromResult(Ok())
+            committed
+            |> Result.mapError (fun reason -> sprintf "prefix rebase commit failed: %s" reason)
+            |> requireOk
+            |> ignore
 
-                match success with
-                | Error reason ->
-                    return raise (InvalidOperationException(sprintf "provider success commit failed: %s" reason))
-                | Ok() -> scope.ConsumeAttemptPlan sessionId providerRun |> ignore
+            let! success =
+                match outcome with
+                | AttemptOutcome.Completed -> recordSuccessfulAttempt durable sessionId providerRun plan
+                | AttemptOutcome.CompletedInvalid
+                | AttemptOutcome.Failed
+                | AttemptOutcome.Aborted -> Task.FromResult(Ok())
+
+            success
+            |> Result.mapError (fun reason -> sprintf "provider success commit failed: %s" reason)
+            |> requireOk
+            |> ignore
+
+            scope.ConsumeAttemptPlan sessionId providerRun |> ignore
         }
 
     let private toolContinuationRun (rawMessage: obj) : ProviderRunIdentity option =
@@ -398,6 +401,16 @@ module XWire =
             -> Some(ProviderRunIdentity.create providerRun)
         | _ -> None
 
+    let private settleVisibleToolContinuation
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        : Task =
+        match scope.TryAttemptPlan sessionId providerRun with
+        | None -> Task.FromResult(())
+        | Some plan -> settleAttemptPlan durable scope sessionId providerRun AttemptOutcome.Completed plan
+
     let private settleVisibleToolContinuations
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
@@ -406,9 +419,7 @@ module XWire =
         : Task =
         task {
             for providerRun in rawMessages |> List.choose toolContinuationRun |> List.distinct do
-                match scope.TryAttemptPlan sessionId providerRun with
-                | None -> ()
-                | Some plan -> do! settleAttemptPlan durable scope sessionId providerRun AttemptOutcome.Completed plan
+                do! settleVisibleToolContinuation durable scope sessionId providerRun
         }
 
     let private applyCommittedPrefix
@@ -437,6 +448,17 @@ module XWire =
                 let transformed = renderPrefixMessages rawMessages intents
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
         }
+
+    let private applyOrdinaryCommittedPrefix
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (rawMessages: obj list)
+        (output: obj)
+        : Task =
+        match sessionProjection durable sessionId with
+        | None ->
+            raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
+        | Some state -> applyCommittedPrefix durable sessionId state rawMessages output
 
     let private awaitProjectionSignal
         (messageVisibility: MessageVisibilityHub option)
@@ -591,11 +613,7 @@ module XWire =
             // Host callback is only rendezvous/observation; presence no longer drives business branching
             // outside the owning CE.
             match scope.TryTakeRecoveryPermit sessionId, physical, snapshot with
-            | None, _, _ ->
-                match sessionProjection durable sessionId with
-                | None ->
-                    raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
-                | Some state -> return! applyCommittedPrefix durable sessionId state rawMessages output
+            | None, _, _ -> return! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
             | Some _, None, _ ->
                 raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
             | Some _, _, None ->
@@ -642,13 +660,20 @@ module XWire =
         | None, ReconcileProgram.TurnFailed _ -> Some AttemptOutcome.Failed
         | None, ReconcileProgram.TurnAborted _ -> Some AttemptOutcome.Aborted
 
+    let private reconcilePlannedAttempt
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        (plan: AttemptPlan)
+        : Task =
+        match attemptOutcomeOfTurn turn with
+        | Some outcome -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun outcome plan
+        | None -> Task.FromResult(())
+
     /// Settle the physical provider attempt, not the larger Host turn.
     /// `finish=tool-calls` therefore closes a successful attempt plan while the
     /// Host tool loop continues; only a genuinely provisional snapshot keeps it.
     let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
         match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
-        | Some durable, Some plan ->
-            match attemptOutcomeOfTurn turn with
-            | Some outcome -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun outcome plan
-            | None -> Task.FromResult(())
+        | Some durable, Some plan -> reconcilePlannedAttempt durable scope turn plan
         | _ -> Task.FromResult(())

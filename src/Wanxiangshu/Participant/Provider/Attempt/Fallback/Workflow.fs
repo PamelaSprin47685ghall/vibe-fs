@@ -187,9 +187,6 @@ module ProviderRecoveryWorkflow =
         | None -> Task.FromResult(()) :> Task
         | Some bloggerSessionId -> awaitLinkedProducer host durable mainSessionId bloggerSessionId
 
-    let private currentFallback (durable: AgentJournal) (sessionId: SessionId) =
-        FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable)
-
     let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
         SessionAssociationProjection.tryMainSessionOf
             bloggerSessionId

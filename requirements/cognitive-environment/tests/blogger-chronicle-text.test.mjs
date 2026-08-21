@@ -39,11 +39,17 @@ test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_enabled_for_step
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-015] BLOGGER_CHRONICLE_TEXT_is_the_last_semantic_injection_before_sanitize', () => {
-  const pairIndex = transformsSource.search(/PairProgrammingThoughtTransform\.maybeInjectGuideline/)
-  const bloggerIndex = transformsSource.search(/BloggerChronicleText\.maybeInject/)
-  const sanitizeIndex = transformsSource.indexOf('let currentMessages = unbox<obj array> outObj?messages |> Array.toList', bloggerIndex)
+  const score = transformsSource.slice(
+    transformsSource.indexOf('let normalTransform'),
+    transformsSource.indexOf('let private ordinaryProviderTransform'),
+  )
+  const pairIndex = score.indexOf('caps.InjectPairGuideline')
+  const groundingIndex = score.indexOf('caps.ProjectRequirementGrounding')
+  const bloggerIndex = score.indexOf('caps.InjectBloggerChronicle')
+  const sanitizeIndex = score.indexOf('caps.SanitizeMessages')
 
   assert.ok(pairIndex >= 0, 'Pair guideline transform must be present')
   assert.ok(bloggerIndex > pairIndex, 'Blogger chronicle text must be injected after pair guideline')
+  assert.ok(bloggerIndex > groundingIndex, 'Blogger chronicle text must be injected after requirement grounding')
   assert.ok(sanitizeIndex > bloggerIndex, 'Message sanitize must occur after chronicle text')
 })

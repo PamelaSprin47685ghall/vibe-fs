@@ -49,10 +49,12 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
     assert.ok(terminal.includes(`${grounding.cursorSeparator}<requirement_read`))
     assert.equal(cursor.value.some((m) => m.info?.source === grounding.source), false, 'Cursor has result-only grounding')
 
-    const pairProjectionAt = pluginTransformsSource.search(/PairProgrammingThoughtTransform\.maybeInjectGuideline/)
-    const requirementTail = pluginTransformsSource.slice(pairProjectionAt)
-    const requirementRelativeAt = requirementTail.search(/do!\s+RequirementGroundingTransform\.projectOrTerminate\b/)
-    const requirementProjectionAt = requirementRelativeAt < 0 ? -1 : pairProjectionAt + requirementRelativeAt
+    const score = pluginTransformsSource.slice(
+      pluginTransformsSource.indexOf('let normalTransform'),
+      pluginTransformsSource.indexOf('let private ordinaryProviderTransform'),
+    )
+    const pairProjectionAt = score.indexOf('caps.InjectPairGuideline')
+    const requirementProjectionAt = score.indexOf('caps.ProjectRequirementGrounding')
     assert.ok(pairProjectionAt >= 0 && requirementProjectionAt > pairProjectionAt, 'production transform fixes pair → grounding order')
     grounding.disposeJournal(cursorJournal.journal)
   } finally { cleanup() }

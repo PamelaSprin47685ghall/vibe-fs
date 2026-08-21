@@ -10,11 +10,14 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns applyCompanionForOrdinaryMaterial entry point', () => {
+test('WHAT[CONTEXT-COMPRESSION-018] CompanionTransform owns ordinary-material entry and consumes Host suppression as a capability', () => {
   const companion = read('src/Wanxiangshu/Context/Companion/Transform.fs')
   const pt = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   assert.match(companion, /let\s+applyCompanionForOrdinaryMaterial/)
-  assert.match(companion, /ExplicitResumeSuppression\.isCurrentMaterial/)
+  assert.match(companion, /\(isExplicitResume:\s*string option -> obj -> bool\)/)
+  assert.match(companion, /if isExplicitResume projectionSessionIdOpt outObj then/)
+  assert.doesNotMatch(companion, /ExplicitResumeSuppression/)
   assert.match(pt, /CompanionTransform\.applyCompanionForOrdinaryMaterial/)
+  assert.match(pt, /CompanionTransform\.applyCompanionForOrdinaryMaterial[\s\S]*isExplicitResumeProviderMaterial/)
 })

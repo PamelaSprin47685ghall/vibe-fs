@@ -194,14 +194,19 @@ test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_ordinary_request_keeps_committed_prefi
     new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url),
     'utf8',
   )
+  const committed = source.slice(
+    source.indexOf('let private applyOrdinaryCommittedPrefix'),
+    source.indexOf('let private awaitProjectionSignal'),
+  )
   const ordinary = source.slice(
     source.indexOf('let private applyNonReplicaTransform'),
     source.indexOf('let private applySessionTransform'),
   )
 
   assert.match(ordinary, /settleVisibleToolContinuations/)
-  assert.match(ordinary, /\| None, _, _ ->[\s\S]*applyCommittedPrefix/)
+  assert.match(ordinary, /\| None, _, _ ->[^\n]*applyOrdinaryCommittedPrefix/)
   assert.doesNotMatch(ordinary, /\| None, _, _ ->\s*return \(\)/)
+  assert.match(committed, /applyCommittedPrefix durable sessionId state rawMessages output/)
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_without_probe_clears_without_promoting', () => {

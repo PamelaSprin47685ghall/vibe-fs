@@ -164,6 +164,21 @@ module StrengthReplay =
             | Error error -> return failClosed error
         }
 
+    let private applyForSession
+        (journal: AgentJournal option)
+        (strengthDurability: StrengthDurabilityPort option)
+        (strengthFailFuse: string -> unit)
+        (sessionId: string)
+        (outObj: obj)
+        : Task<StrengthReplayPlan list> =
+        let failClosed reason =
+            strengthFailFuse reason
+            raise (InvalidOperationException reason)
+
+        match strengthDurability with
+        | None -> Task.FromResult([])
+        | Some durability -> plansOrFailClosed failClosed (replayWithDurability journal durability sessionId outObj)
+
     /// Replay durable Promoted frames before XTrace. Returns plans that still
     /// need Promoted→Traced close after capture (raw-replayed only).
     let applyBeforeXTrace
@@ -175,15 +190,7 @@ module StrengthReplay =
         : Task<StrengthReplayPlan list> =
         task {
             match projectionSessionIdOpt with
-            | Some sessionId ->
-                let failClosed reason =
-                    strengthFailFuse reason
-                    raise (InvalidOperationException reason)
-
-                match strengthDurability with
-                | None -> return []
-                | Some durability ->
-                    return! plansOrFailClosed failClosed (replayWithDurability journal durability sessionId outObj)
+            | Some sessionId -> return! applyForSession journal strengthDurability strengthFailFuse sessionId outObj
             | None -> return []
         }
 
