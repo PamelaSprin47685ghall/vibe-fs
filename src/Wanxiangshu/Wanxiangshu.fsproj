@@ -623,8 +623,6 @@
     <Compile Include="Repository/Programming/Js/OpenCode/ToolWorkflow.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/BookkeeperTool.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ToolHost.fs"/>
-    <Compile Include="OpenCode/Tools/ToolRegistry.fs"/>
-    <Compile Include="OpenCode/Tools/ToolRegistrySurface.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStore.fs"/>
     <Compile Include="OpenCode/Host/WorkspaceEventStoreSurface.fs"/>
     <Compile Include="Repository/Programming/Js/GeneratorSurface.fs"/>
@@ -653,6 +651,8 @@
     <Compile Include="OpenCode/Tools/FetchTool.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/FetchSurface.fs"/>
     <Compile Include="Repository/Knowledge/Casebook/OpenCode/Tools.fs"/>
+    <Compile Include="OpenCode/Tools/ToolRegistry.fs"/>
+    <Compile Include="OpenCode/Tools/ToolRegistrySurface.fs"/>
     <Compile Include="OpenCode/Host/PluginHost.fs"/>
     <Compile Include="Strength/OpenCode/Settings.fs"/>
     <Compile Include="Strength/OpenCode/Speculate.fs"/>

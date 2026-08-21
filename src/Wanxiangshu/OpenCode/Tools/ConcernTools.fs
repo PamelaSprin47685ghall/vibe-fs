@@ -160,7 +160,10 @@ module ConcernTools =
             | _ -> return render ctx Path.DurableUnavailable Map.empty
         }
 
+    let admission: ToolAdmission = fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
+
     let specs factory journal =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         [ { Name = "subscribe"
@@ -172,6 +175,7 @@ module ConcernTools =
                 ToolHostCodec.stringSchemaDescribed
                     (ProviderProse.render language Path.SubscribeConcern Map.empty)
                     factory ]
+            Admission = admission
             Execute = subscribeExecute journal }
           { Name = "publish"
             Description = ProviderProse.render language Path.PublishDescription Map.empty
@@ -182,4 +186,5 @@ module ConcernTools =
                 ToolHostCodec.stringSchemaDescribed
                     (ProviderProse.render language Path.PublishMessage Map.empty)
                     factory ]
+            Admission = admission
             Execute = publishExecute journal } ]

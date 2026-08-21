@@ -30,7 +30,7 @@ Roles.permissions (Kernel 层单一真相源)
 | 命题 | 落点测试 |
 |---|---|
 | ENF-001 | `requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs` |
-| ENF-002 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` |
+| ENF-002 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs`, `requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs` |
 | ENF-003 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` |
 | ENF-004 | `requirements/capability-enforcement/tests/agent-permission-gate.test.mjs` |
 | ENF-005 | `requirements/capability-enforcement/tests/strength-replica-tool-map.test.mjs` |

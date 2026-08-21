@@ -98,6 +98,19 @@ module ReviewerWorkflow =
             && part.ToolCallId = Some attempt.ToolCallId)
         |> Option.map (fun part -> part.Cursor.Sequence + 1L)
 
+    let private tryAppendAgent
+        (stream: StreamId)
+        (providerRun: ProviderRunIdentity option)
+        (fact: Fact.AgentFact)
+        (journal: AgentJournal)
+        : Task<Result<ProjectionSet, JournalAppendFailure>> =
+        task {
+            try
+                return! AgentJournal.appendAgent stream providerRun fact journal
+            with ex ->
+                return Error(JournalAppendFailure.WriteUnknown(EventId.create "err", Outcome.JournalFailure.WriteFailed ex.Message))
+        }
+
     let private appendSubmittedAttemptClosed
         (journal: AgentJournal)
         (attempt: ReviewAttemptIdentity)
@@ -114,7 +127,7 @@ module ReviewerWorkflow =
                        FrozenFrontierSequence = frontier |}
 
             match!
-                AgentJournal.appendAgent
+                tryAppendAgent
                     (StreamId.Session attempt.ReviewerSessionId)
                     (Some attempt.ProviderRun)
                     closed

@@ -275,7 +275,8 @@
         "src/Wanxiangshu/Mission/Finality/Blessing.fs"
       ],
       "proofs": [
-        "requirements/review-assurance/tests/consumable-review.test.mjs"
+        "requirements/review-assurance/tests/consumable-review.test.mjs",
+        "requirements/review-judgement/tests/process-review-judgement.test.mjs"
       ],
       "architecture_gates": [
         "architecture.mjs"
@@ -372,7 +373,7 @@
         "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs"
       ],
       "proofs": [
-        "requirements/action-affordance/tests/tool-specs.test.mjs"
+        "requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs"
       ],
       "architecture_gates": [
         "tool-referential-integrity.mjs"
@@ -383,8 +384,9 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "READY",
-      "result": "PENDING"
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "proof: requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；ToolRegistry 瘦身为纯聚合 Composition Root，各工具自包含强类型 ToolAdmission 业务准入规则"
     },
     {
       "id": "opencode-host-signal-bootstrap-cutover",
@@ -415,7 +417,7 @@
         "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs"
       ],
       "proofs": [
-        "requirements/host-boundary/tests/host-signals.test.mjs"
+        "requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs"
       ],
       "architecture_gates": [
         "composition-root-invariant.mjs"
@@ -426,8 +428,9 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "READY",
-      "result": "CUTOVER"
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "proof: requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；HostSignalBootstrap 削减为纯基础设施 wiring/subscribe/route/dispose/drain，清除领域决策与隐式 PC"
     }
   ],
   "debt_face": {

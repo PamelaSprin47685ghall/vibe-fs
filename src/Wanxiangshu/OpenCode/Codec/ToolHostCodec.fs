@@ -174,10 +174,13 @@ type HostToolContext =
 type HostToolFactory = private HostToolFactory of obj
 type HostSchema = private HostSchema of obj
 
+type ToolAdmission = HostToolContext -> Role -> bool
+
 type ToolSpec =
     { Name: string
       Description: string
       Arguments: (string * HostSchema) list
+      Admission: ToolAdmission
       Execute: HostToolArguments -> HostToolContext -> Task<string> }
 
 /// The only dynamic JS boundary used by tool definitions and invocations.

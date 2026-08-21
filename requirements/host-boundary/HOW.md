@@ -51,4 +51,4 @@
 | HOST-BOUNDARY-018 | `requirements/host-boundary/tests/host018-no-fork.test.mjs` |
 | HOST-BOUNDARY-019 | `requirements/host-boundary/tests/host-capability-observation.test.mjs`, `requirements/host-boundary/tests/ordered-transform.test.mjs` |
 | HOST-BOUNDARY-020 | `requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
-| HOST-BOUNDARY-021 | `requirements/host-boundary/tests/plugin-load-purity.test.mjs` |
+| HOST-BOUNDARY-021 | `requirements/host-boundary/tests/plugin-load-purity.test.mjs`, `requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs` |

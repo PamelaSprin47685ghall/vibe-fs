@@ -459,9 +459,12 @@ module FinalityTool =
             | None, _, _ -> return refuse context Path.TryAgainLater
         }
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Finality
+
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "suicide"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = [ "last_words", ToolHostCodec.stringSchema factory ]
+          Admission = admission
           Execute = execute scope }

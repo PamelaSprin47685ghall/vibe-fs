@@ -232,9 +232,12 @@ module HorizonTool =
             | Some journal -> return! executeWithJournal language scope context journal
         }
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Horizon
+
     let spec scope =
         { Name = "horizon"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
+          Admission = admission
           Execute = execute scope }

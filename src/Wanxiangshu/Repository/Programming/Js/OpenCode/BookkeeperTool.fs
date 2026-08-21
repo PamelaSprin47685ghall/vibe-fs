@@ -393,10 +393,14 @@ module JsBookkeeperTool =
             | Ok value -> return succeeded language value
         }
 
+    let admission: ToolAdmission =
+        fun ctx _ -> not (String.IsNullOrWhiteSpace ctx.SessionId) && BookkeeperRuntime.isAttached ctx.SessionId
+
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         { Name = "js-bookkeeper"
           Description = assembleDescription language
           Arguments = [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
+          Admission = admission
           Execute = execute }

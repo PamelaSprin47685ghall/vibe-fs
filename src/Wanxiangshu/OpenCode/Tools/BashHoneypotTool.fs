@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open ToolHostCodec
 
@@ -32,9 +33,12 @@ module BashHoneypotTool =
             return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) []
         }
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.BashHoneypot
+
     let spec: ToolSpec =
         { Name = "bash-honeypot"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
+          Admission = admission
           Execute = execute }

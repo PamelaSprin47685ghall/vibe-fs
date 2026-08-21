@@ -141,7 +141,10 @@ module InstitutionalLearningTools =
             | _ -> return instructionResult language Path.DurableUnavailable Map.empty
         }
 
+    let admission: ToolAdmission = fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
+
     let specs factory journal =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         let argument =
@@ -152,8 +155,10 @@ module InstitutionalLearningTools =
         [ { Name = "celebrate"
             Description = ProviderProse.render language Path.CelebrateDescription Map.empty
             Arguments = [ "experience", argument ]
+            Admission = admission
             Execute = execute ExperienceKind.Celebrate journal }
           { Name = "regret"
             Description = ProviderProse.render language Path.RegretDescription Map.empty
             Arguments = [ "experience", argument ]
+            Admission = admission
             Execute = execute ExperienceKind.Regret journal } ]

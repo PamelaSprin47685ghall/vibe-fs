@@ -40,6 +40,8 @@ module AssumeTool =
                 |> LlmFacing.renderInstructions
         }
 
+    let admission: ToolAdmission = fun _ r -> r <> Role.Blogger && r <> Role.Distiller
+
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
@@ -48,4 +50,5 @@ module AssumeTool =
           Arguments =
             [ "assumption",
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgAssumption Map.empty) factory ]
+          Admission = admission
           Execute = execute }

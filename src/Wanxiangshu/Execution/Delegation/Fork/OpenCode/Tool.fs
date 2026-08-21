@@ -784,6 +784,9 @@ module ForkTool =
                 return! executeOrchestratorAfterGuards scope request context language
         }
 
+    let managerAdmission: ToolAdmission = fun _ r -> r = Role.Manager
+    let orchestratorAdmission: ToolAdmission = fun _ r -> r = Role.Orchestrator
+
     let managerSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
@@ -800,6 +803,7 @@ module ForkTool =
               "keywords", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgKeywords) factory
               "attach", ToolHostCodec.optionalStringSchemaDescribed (prose language Path.Fork.ArgAttach) factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Admission = managerAdmission
           Execute =
             fun args context ->
                 task {
@@ -824,6 +828,7 @@ module ForkTool =
               "name", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgName) factory
               "charge", ToolHostCodec.stringSchemaDescribed (prose language Path.Commission.ArgCharge) factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Admission = orchestratorAdmission
           Execute =
             fun args context ->
                 task {

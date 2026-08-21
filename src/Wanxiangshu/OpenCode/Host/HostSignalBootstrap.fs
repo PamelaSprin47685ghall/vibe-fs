@@ -3,79 +3,30 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open FsToolkit.ErrorHandling
-open Fable.Core.JsInterop
+open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
+open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Execution.Delegation.Handle.OpenCode
+open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
+open Wanxiangshu.Execution.Fission.OpenCode
+open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Git.Hook
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Resources
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Host
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Git.Hook
-open Wanxiangshu.Composition.Durable
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Process
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.Handle.OpenCode
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Review.OpenCode
-open Wanxiangshu.Execution.Fission.OpenCode
-open Wanxiangshu.Execution.Delegation.Fork.OpenCode
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
+open Wanxiangshu.Resources
+open Wanxiangshu.Strength
+open Wanxiangshu.Strength.Persistence
 
 module HostSignalBootstrap =
 
@@ -288,15 +239,6 @@ module HostSignalBootstrap =
                             // rely on that lossy coarse wake because its ordinary
                             // terminal is the only route into lane materialization
                             // and eventual takeover of the old logical owner.
-                            //
-                            // This exact physical-terminal edge still carries no
-                            // business outcome. It only opens one snapshot
-                            // reconciliation occasion for a durable Fission lane;
-                            // Completed/Failed/Aborted remains classified from the
-                            // full SDK message snapshot in ReconcilePass. Recording
-                            // the projection edge above before Kick also preserves
-                            // Scheduler's edge-epoch lost-wakeup protection if the
-                            // SDK snapshot is briefly behind the event stream.
                             FissionHost.observePhysicalExecutionEnd
                                 reconciler.TryPhysicalUserMessage
                                 journal
@@ -457,7 +399,7 @@ module HostSignalBootstrap =
 
             let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
-                    let tryPendingClaim j sid key =
+                    let tryPendingClaim (j: AgentJournal option) (sid: SessionId) (key: PromptKey) : PromptAuthority.PromptClaim option =
                         j
                         |> Option.bind (fun durable -> (PromptDispatcher.forJournal durable).PendingClaim(sid, key))
 

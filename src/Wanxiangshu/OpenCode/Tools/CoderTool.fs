@@ -256,6 +256,8 @@ module CoderTool =
                 return renderResult context surface result
         }
 
+    let behaviorAdmission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Behavior
+
     let private behaviorSpec
         (name: string)
         (surface: Surface)
@@ -275,6 +277,7 @@ module CoderTool =
                   (ProviderProse.render language surface.ArgKeywords Map.empty)
                   factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Admission = behaviorAdmission
           Execute = execute name surface scope syncDelegate }
 
     let establishSpec

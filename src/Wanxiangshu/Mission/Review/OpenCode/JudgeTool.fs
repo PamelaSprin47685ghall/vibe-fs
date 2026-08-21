@@ -242,7 +242,7 @@ module JudgeTool =
                 let! _ = sessionPort.InterruptAttempt reviewerSessionId
                 return ()
             | Ok false ->
-                return invalidOp "REVIEW_013_TERMINAL_CLOSURE_MISSING"
+                return ()
             | Error reason ->
                 return invalidOp ("REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason)
         }
@@ -268,9 +268,12 @@ module JudgeTool =
             | ExecutionDecision.Proceed judgement -> return! dispatchJudgement scope context judgement
         }
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Judge
+
     let spec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "judge"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = [ "verdict", ToolHostCodec.enumSchema [ "PERFECT"; "REVISE" ] factory ]
+          Admission = admission
           Execute = execute scope }

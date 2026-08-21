@@ -42,6 +42,19 @@ const pcPatterns = [
   /\bPendingSecondRetry\b/,
   /\bFallbackPhase\b/,
 ]
+// Forbidden foreign internal namespace opens in composition roots (AGENTS.md Chapter 26)
+const forbiddenInternalOpens = [
+  /^\s*open\s+Wanxiangshu\.Mission\.Review\.Judgement\b/m,
+  /^\s*open\s+Wanxiangshu\.Mission\.Obligation\.Todo(?!\.OpenCode)\b/m,
+  /^\s*open\s+Wanxiangshu\.Mission\.Finality(?!\.OpenCode)\b/m,
+  /^\s*open\s+Wanxiangshu\.Mission\.Manager\.Life\b/m,
+  /^\s*open\s+Wanxiangshu\.Strength\.Prediction\b/m,
+  /^\s*open\s+Wanxiangshu\.Strength\.Replica\b/m,
+  /^\s*open\s+Wanxiangshu\.Enforcer\.Guidance\b/m,
+  /^\s*open\s+Wanxiangshu\.Enforcer\.Cycle\b/m,
+  /^\s*open\s+Wanxiangshu\.Context\.Trace\b/m,
+]
+
 
 let hasViolations = false
 
@@ -50,7 +63,7 @@ for (const file of FILES) {
   const relPath = file.replace(ROOT + '/', '')
   const violations = []
 
-  for (const pattern of [...domainPolicyPatterns, ...pcPatterns]) {
+  for (const pattern of [...domainPolicyPatterns, ...pcPatterns, ...forbiddenInternalOpens]) {
     if (pattern.test(text)) {
       violations.push(`forbidden pattern: ${pattern}`)
     }

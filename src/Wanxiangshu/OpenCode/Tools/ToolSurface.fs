@@ -5,6 +5,11 @@ namespace Wanxiangshu.OpenCode
 /// owner-defined identity and catalog facts needed by semantic unit laws.
 module ToolSurface =
 
+    let toolSpecNames () : string array =
+        StaticTools.knownToolNames |> List.toArray
+
+
+
     let bashHoneypotContract () : obj =
         box
             {| name = BashHoneypotTool.spec.Name

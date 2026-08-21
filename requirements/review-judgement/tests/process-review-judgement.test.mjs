@@ -1,12 +1,17 @@
 // REVIEW-JUDGEMENT-008 / REVIEW-013 process-review judgement boundary.
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import * as provider from '../../../dist/Participant/Provider/LanguageSurface.js'
 import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
 import * as todo from '../../../dist/Mission/Review/ReviewTodoSurface.js'
 import * as obligation from '../../../dist/Mission/Obligation/Todo/Surface.js'
+import * as judge from '../../../dist/Mission/Review/OpenCode/JudgeSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
+import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
 
 const sha256 = (value) => `digest:${value}`
 const life = 'life-process-judgement'
@@ -126,4 +131,128 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
   assert.match(transforms, /JudgeTool\.interruptAfterSubmittedJudgement[\s\S]*?journal[\s\S]*?wired\.CurrentPhysicalUserMessage[\s\S]*?sessionPort/)
   assert.match(transforms, /caps\.SanitizeMessages outObj[\s\S]*?do! caps\.InterruptAfterSubmittedJudgement projectionSessionIdOpt/)
   assert.match(judgeTool, /ensureSubmittedAttemptClosed[\s\S]*?sessionPort\.InterruptAttempt/, 'durable closure must precede the physical interrupt')
+})
+
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_ensure_submitted_attempt_closed_returns_ok_false_when_tool_result_missing_and_does_not_interrupt', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-review-missing-tool-result-'))
+  const opened = await journal.JournalSurface_bootWithWriterId(directory, 'writer-missing-tool-result', 'rt-missing-tool-result', 4242, '2026-01-01T00:00:00Z')
+  try {
+    const reviewerSessionId = 'ses-reviewer-missing'
+    const managerSessionId = 'ses-manager'
+    const physicalUserMessageId = 'msg-user-1'
+
+    await reviewJournal.appendReview(opened.journal, reviewerSessionId, null, 'ReviewBarrierStarted', {
+      ReviewerSessionId: reviewerSessionId,
+      ManagerSessionId: managerSessionId,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+    })
+    await reviewJournal.appendReview(opened.journal, reviewerSessionId, 'run-1', 'ReviewVerdictRecorded', {
+      ReviewerSessionId: reviewerSessionId,
+      ManagerSessionId: managerSessionId,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      Verdict: 'PERFECT',
+    })
+
+    const closureResult = await judge.ensureSubmittedAttemptClosed(opened.journal, reviewerSessionId)
+    assert.deepEqual(closureResult, { ok: true, closed: false })
+
+    judge.markVerdictSubmitted(reviewerSessionId, physicalUserMessageId)
+    let interrupted = false
+    const sessionPort = {
+      InterruptAttempt: async () => {
+        interrupted = true
+        return { ok: true }
+      },
+    }
+
+    const interruptResult = await judge.interruptAfterSubmittedJudgement(
+      opened.journal,
+      physicalUserMessageId,
+      sessionPort,
+      reviewerSessionId,
+    )
+    assert.equal(interruptResult.ok, true, `unexpected error: ${interruptResult.error}`)
+    assert.equal(interrupted, false, 'interrupt must NOT be triggered when tool_result part is missing from XTrace')
+    assert.equal(interruptResult.interrupted, false)
+
+    const session = reviewJournal.sessionView(opened.journal, reviewerSessionId)
+    assert.equal(session.closedAttempts.length, 0, 'no closed attempt must be recorded')
+  } finally {
+    judge.clearVerdictSubmissions()
+    journal.JournalSurface_dispose(opened.journal)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_ensure_submitted_attempt_closed_returns_error_on_append_failure_and_fails_closed', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-review-append-fail-'))
+  const opened = await journal.JournalSurface_bootWithWriterId(directory, 'writer-append-fail', 'rt-append-fail', 4242, '2026-01-01T00:00:00Z')
+  try {
+    const reviewerSessionId = 'ses-reviewer-append-fail'
+    const managerSessionId = 'ses-manager'
+    const physicalUserMessageId = 'msg-user-2'
+
+    await reviewJournal.appendReview(opened.journal, reviewerSessionId, null, 'ReviewBarrierStarted', {
+      ReviewerSessionId: reviewerSessionId,
+      ManagerSessionId: managerSessionId,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+    })
+    await reviewJournal.appendReview(opened.journal, reviewerSessionId, 'run-1', 'ReviewVerdictRecorded', {
+      ReviewerSessionId: reviewerSessionId,
+      ManagerSessionId: managerSessionId,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      Verdict: 'PERFECT',
+    })
+    await reviewJournal.appendAgent(opened.journal, reviewerSessionId, 'run-1', 'Companion', 'XTracePartAppended', {
+      SessionId: reviewerSessionId,
+      CursorSequence: 5,
+      Role: 'assistant',
+      Turn: 1,
+      PartIndex: 0,
+      Kind: 'tool_result',
+      ToolName: null,
+      TextRef: 'blob-judge-result',
+      TextDigest: 'digest-judge-result',
+      Provenance: 'g:0/msg:review-run/host-part:judge-result',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      HostToolPartId: 'prt-judge-result',
+    })
+
+    journal.JournalSurface_dispose(opened.journal)
+
+    const closureResult = await judge.ensureSubmittedAttemptClosed(opened.journal, reviewerSessionId)
+    assert.equal(closureResult.ok, false, 'ensureSubmittedAttemptClosed must return Error on append failure')
+    assert.ok(typeof closureResult.error === 'string' && closureResult.error.length > 0)
+
+    judge.markVerdictSubmitted(reviewerSessionId, physicalUserMessageId)
+    let interrupted = false
+    const sessionPort = {
+      InterruptAttempt: async () => {
+        interrupted = true
+        return { ok: true }
+      },
+    }
+
+    const interruptResult = await judge.interruptAfterSubmittedJudgement(
+      opened.journal,
+      physicalUserMessageId,
+      sessionPort,
+      reviewerSessionId,
+    )
+    assert.equal(interruptResult.ok, false, 'interruptAfterSubmittedJudgement must fail closed on append failure')
+    assert.match(interruptResult.error, /REVIEW_013_TERMINAL_CLOSURE_FAILED/i)
+    assert.equal(interrupted, false, 'interrupt must NOT be triggered when closure append fails')
+  } finally {
+    judge.clearVerdictSubmissions()
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

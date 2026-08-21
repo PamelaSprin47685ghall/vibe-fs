@@ -1,11 +1,15 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
 
+open System
+open System.Threading.Tasks
+open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Contract
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Resources
-open Wanxiangshu.Foundation.Identity
 
 /// Public judgement-tool owner boundary. It exposes the exact parser/schema and
 /// contract view; ToolRuntimeScope and HostToolCodec remain implementation-only.
@@ -80,3 +84,54 @@ module JudgeSurface =
         |> SharedState.VerdictSubmissions.Contains
 
     let clearVerdictSubmissions () : unit = SharedState.VerdictSubmissions.Clear()
+
+    let private tryGetJournal (handle: JournalHandle) : Result<AgentJournal, string> =
+        try
+            Ok handle.Journal
+        with ex ->
+            Error ex.Message
+
+    let ensureSubmittedAttemptClosed (handle: JournalHandle) (sessionId: string) : Task<obj> =
+        task {
+            let! result =
+                match tryGetJournal handle with
+                | Error reason -> Task.FromResult(Error reason)
+                | Ok journal -> ReviewerWorkflow.ensureSubmittedAttemptClosed journal (SessionId.create sessionId)
+
+            match result with
+            | Ok closed ->
+                return box {| ok = true; closed = closed |}
+            | Error reason ->
+                return box {| ok = false; error = reason |}
+        }
+
+    let interruptAfterSubmittedJudgement
+        (handle: JournalHandle)
+        (physicalUserMessageId: string)
+        (sessionPort: obj)
+        (sessionId: string)
+        : Task<obj> =
+        task {
+            let reviewer = SessionId.create sessionId
+            let isSubmitted =
+                JudgementRequestIdentity.key reviewer (PhysicalUserMessageId.create physicalUserMessageId)
+                |> SharedState.VerdictSubmissions.Contains
+
+            let! closedResult =
+                match isSubmitted, tryGetJournal handle with
+                | false, _ -> Task.FromResult(Ok false)
+                | true, Error reason -> Task.FromResult(Error reason)
+                | true, Ok journal -> ReviewerWorkflow.ensureSubmittedAttemptClosed journal reviewer
+
+            match closedResult with
+            | Ok true ->
+                let fn = Fable.Core.JsInterop.emitJsExpr (sessionPort, "InterruptAttempt") "$0[$1]"
+                let! _ =
+                    if isNull fn then Task.FromResult(Ok())
+                    else Fable.Core.JsInterop.emitJsExpr (sessionPort, sessionId) "$0.InterruptAttempt($1)"
+                return box {| ok = true; interrupted = true |}
+            | Ok false ->
+                return box {| ok = true; interrupted = false |}
+            | Error reason ->
+                return box {| ok = false; error = "REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason; interrupted = false |}
+        }

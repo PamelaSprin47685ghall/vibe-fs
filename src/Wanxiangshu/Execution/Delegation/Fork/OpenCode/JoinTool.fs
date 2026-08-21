@@ -366,9 +366,12 @@ module JoinTool =
                 return! executeAfterSession scope context language (SessionId.create context.SessionId)
         }
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Join
+
     let spec scope =
         { Name = "join"
           Description =
             ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) Path.Description Map.empty
           Arguments = []
+          Admission = admission
           Execute = execute scope }

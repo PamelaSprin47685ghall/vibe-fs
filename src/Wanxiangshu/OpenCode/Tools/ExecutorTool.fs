@@ -381,6 +381,9 @@ module ExecutorTool =
             | Ok _ -> return! runPrepared scope request context language
         }
 
+    let runAdmission: ToolAdmission = fun _ r -> r = Role.DevOps
+    let queryShellAdmission: ToolAdmission = fun _ r -> r = Role.Inspector
+
     let runSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
@@ -393,6 +396,7 @@ module ExecutorTool =
               "output_budget_bytes",
               ToolHostCodec.numberSchemaDescribed (prose language Path.Run.ArgOutputBudgetBytes) factory
               "world_lock", ToolHostCodec.boolSchemaDescribed (prose language Path.Run.ArgWorldLock) factory ]
+          Admission = runAdmission
           Execute =
             fun args context ->
                 match decodeRun (lang context) args with
@@ -406,6 +410,7 @@ module ExecutorTool =
           Description = prose language Path.QueryShell.Description
           Arguments =
             [ "command", ToolHostCodec.stringSchemaDescribed (prose language Path.QueryShell.ArgCommand) factory ]
+          Admission = queryShellAdmission
           Execute =
             fun args context ->
                 match decodeQueryShell (lang context) args with

@@ -166,6 +166,9 @@ module ChronicleTool =
                 return execution
         }
 
+    let admission (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission =
+        fun ctx r -> r = Role.Blogger && hasLiveCycle bloggerHost ctx.SessionId
+
     let spec
         (factory: HostToolFactory)
         (runtime: ToolRuntimeScope)
@@ -185,6 +188,7 @@ module ChronicleTool =
           Arguments =
             [ "entry", ToolHostCodec.stringSchema factory
               "tip", ToolHostCodec.enumSchema fields factory ]
+          Admission = admission bloggerHost
           Execute =
             fun args ctx ->
                 task {

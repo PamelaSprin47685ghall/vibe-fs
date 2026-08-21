@@ -189,10 +189,13 @@ module FetchTool =
                 fetchInFlight.[shelfmark] <- work
                 work)
 
+    let admission: ToolAdmission = fun _ r -> r = Role.Inspector || r = Role.Coder
+
     let spec (factory: HostToolFactory) (workspaceRoot: string) (store: IEventStore) : ToolSpec =
         { Name = "fetch"
           Description = prose (ProviderLanguageBinding.readGlobalPreference ()) Path.Description
           Arguments = [ "shelfmark", ToolHostCodec.stringSchema factory ]
+          Admission = admission
           Execute =
             fun args ctx ->
                 task {

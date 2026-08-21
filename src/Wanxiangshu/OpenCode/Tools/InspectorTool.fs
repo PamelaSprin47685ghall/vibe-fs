@@ -197,6 +197,8 @@ module InspectorTool =
                 return renderResult context result
         }
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Inspect
+
     let spec
         (factory: HostToolFactory)
         (scope: ToolRuntimeScope)
@@ -214,4 +216,5 @@ module InspectorTool =
                   (ProviderProse.render language Path.ArgKeywords Map.empty)
                   factory
               "expected_tool_calls", DelegatedToolEstimate.schema language factory ]
+          Admission = admission
           Execute = execute scope syncDelegate }

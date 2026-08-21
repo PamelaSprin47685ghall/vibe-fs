@@ -334,7 +334,8 @@ export function runSelfTest(validLedger, ownersManifest) {
   // 3. Fixture: READY state with non-DONE dependency
   {
     const readyNotDoneLedger = clone(validLedger)
-    const readyNode = readyNotDoneLedger.nodes.find((n) => n.state === 'READY' && n.depends_on.length > 0)
+    const readyNode = readyNotDoneLedger.nodes.find((n) => n.depends_on && n.depends_on.length > 0)
+    readyNode.state = 'READY'
     const depNodeId = readyNode.depends_on[0].id
     const depNode = readyNotDoneLedger.nodes.find((n) => n.id === depNodeId)
     depNode.state = 'PENDING'

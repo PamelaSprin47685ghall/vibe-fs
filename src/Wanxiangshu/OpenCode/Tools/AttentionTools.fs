@@ -118,18 +118,24 @@ module AttentionTools =
     let private argumentSchema factory language path =
         ToolHostCodec.stringSchemaDescribed (ProviderProse.render language path Map.empty) factory
 
+    let admission: ToolAdmission = fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
+
     let specs factory journal =
+        let language = ProviderLanguageBinding.readGlobalPreference ()
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         [ { Name = "enough"
             Description = ProviderProse.render language Path.EnoughDescription Map.empty
             Arguments = [ "decision", argumentSchema factory language Path.EnoughArgument ]
+            Admission = admission
             Execute = simpleExecute "decision" Path.EnoughAccepted }
           { Name = "abandon"
             Description = ProviderProse.render language Path.AbandonDescription Map.empty
             Arguments = [ "commitment", argumentSchema factory language Path.AbandonArgument ]
+            Admission = admission
             Execute = simpleExecute "commitment" Path.AbandonAccepted }
           { Name = "defer"
             Description = ProviderProse.render language Path.DeferDescription Map.empty
             Arguments = [ "new_work", argumentSchema factory language Path.DeferArgument ]
+            Admission = admission
             Execute = deferExecute journal } ]

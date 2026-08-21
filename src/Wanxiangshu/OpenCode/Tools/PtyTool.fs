@@ -317,6 +317,8 @@ module PtyTool =
           PtySignal.User1Name
           PtySignal.User2Name ]
 
+    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Pty
+
     let openSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         { Name = "open-terminal"
           Description =
@@ -327,6 +329,7 @@ module PtyTool =
           Arguments =
             [ "name", ToolHostCodec.stringSchema factory
               "command", ToolHostCodec.stringSchema factory ]
+          Admission = admission
           Execute = openExecute scope }
 
     let sendSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
@@ -339,6 +342,7 @@ module PtyTool =
           Arguments =
             [ "name", ToolHostCodec.stringSchema factory
               "input", ToolHostCodec.stringSchema factory ]
+          Admission = admission
           Execute = sendExecute scope }
 
     let readSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
@@ -349,6 +353,7 @@ module PtyTool =
                 Path.ReadTerminal.Description
                 Map.empty
           Arguments = [ "name", ToolHostCodec.stringSchema factory ]
+          Admission = admission
           Execute = readExecute scope }
 
     let signalSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
@@ -361,6 +366,7 @@ module PtyTool =
           Arguments =
             [ "name", ToolHostCodec.stringSchema factory
               "signal", ToolHostCodec.enumSchema signalValues factory ]
+          Admission = admission
           Execute = signalExecute scope }
 
     /// All four terminal verb specs.

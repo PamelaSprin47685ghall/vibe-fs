@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Resources
 open Wanxiangshu.Resources
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
 /// mv / rm — Coder-only file mutation tools (AGENT-016/017/018).
@@ -200,12 +201,16 @@ module FileMutationTools =
         else
             Some value
 
+    let mvAdmission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Move
+    let rmAdmission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Remove
+
     let mvSpec (factory: HostToolFactory) : ToolSpec =
         { Name = "mv"
           Description = specDescription Path.MvDescription
           Arguments =
             [ "source", ToolHostCodec.stringSchema factory
               "destination", ToolHostCodec.stringSchema factory ]
+          Admission = mvAdmission
           Execute =
             fun args ctx ->
                 let lang = languageOf ctx
@@ -218,6 +223,7 @@ module FileMutationTools =
         { Name = "rm"
           Description = specDescription Path.RmDescription
           Arguments = [ "path", ToolHostCodec.stringSchema factory ]
+          Admission = rmAdmission
           Execute =
             fun args ctx ->
                 let lang = languageOf ctx
