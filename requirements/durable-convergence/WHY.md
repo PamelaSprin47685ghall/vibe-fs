@@ -19,6 +19,7 @@
 - **Resolution 必须覆盖全部 Heads**：解决冲突的裁决事件必须显式将所有竞争分支的 Head 作为其父事件；若破坏，重放历史无法证明冲突已真正被解决。
 - **Dumb Remote 原则**：远端仓库仅作为哑对象存储，不包含任何领域逻辑；所有收敛与验证完全在客户端完成。
 - **Activity 不等于 fetch 时间**：远端 snapshot 必须携带 writer blob OID 绑定的 activity manifest；否则一次下载就会错误延长 writer 寿命，导致历史无法按窗口收缩。
+- **Payload identity 已经是内容证明**：payload 文件名/缓存 OID 与远端 payload tree OID 同属 content-addressed identity；本地 stat identity 未变且缓存 OID 等于远端 OID 时，再读取同一 remote payload blob 不增加任何事实，只会把同步成本放大到历史 payload 总量，并让持有 store gate 的 Git Hook 长时间阻塞在线 append。
 
 ## DEPENDS ON
 

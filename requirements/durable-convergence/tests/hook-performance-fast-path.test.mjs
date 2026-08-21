@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 import { ensure } from '../../../dist/Git/Hook/Surface.js'
+import { remotePayloadNeedsRead } from '../../../dist/Persistence/EventStore/RetentionSurface.js'
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
@@ -24,6 +25,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] no-op sync reuses stat-fingerprint materiali
 test('WHAT[DURABLE-CONVERGENCE-010] near-equal worst path reads and blobifies only changed files', async () => {
   const log = await read('src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs')
   const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
+  const remoteTrees = sync.slice(sync.indexOf('let private readRemoteTrees'), sync.indexOf('let private readRemote\n'))
 
   assert.match(log, /writerPhysicalStats/)
   assert.match(log, /payloadPhysicalStats/)
@@ -32,8 +34,17 @@ test('WHAT[DURABLE-CONVERGENCE-010] near-equal worst path reads and blobifies on
   assert.match(sync, /cachedOid/)
   assert.match(sync, /remoteEntryNeeded/)
   assert.match(sync, /changedRemoteEntries/)
+  assert.match(sync, /changedRemotePayloadEntries/)
   assert.match(sync, /cached\.Oid = entry\.Oid/)
+  assert.doesNotMatch(remoteTrees, /changedRemoteEntries[\s\S]*Map\.empty[\s\S]*payloadEntries/)
   assert.doesNotMatch(sync, /readRemoteTrees[\s\S]*readBlobList raw writerEntries[\s\S]*readBlobList raw payloadEntries/)
+})
+
+test('WHAT[DURABLE-CONVERGENCE-010] unchanged remote payload is not reread merely because payloads have no writer manifest', () => {
+  assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'a'.repeat(40), true), false)
+  assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-b', 'a'.repeat(40), true), true)
+  assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'b'.repeat(40), true), true)
+  assert.equal(remotePayloadNeedsRead('stat-a', 'a'.repeat(40), 'stat-a', 'a'.repeat(40), false), true)
 })
 
 test('WHAT[DURABLE-CONVERGENCE-010] pre-push starts from tracking ref and only discovers remote after lease rejection', async () => {

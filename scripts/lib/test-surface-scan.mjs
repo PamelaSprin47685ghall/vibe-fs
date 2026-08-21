@@ -857,7 +857,7 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Persistence/EventStore/RetentionSurface.js',
     owner: 'durable-convergence',
-    laws: ['DURABLE-CONVERGENCE-011'],
+    laws: ['DURABLE-CONVERGENCE-010', 'DURABLE-CONVERGENCE-011'],
     source: 'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
     representation: 'json',
     kind: 'resource',

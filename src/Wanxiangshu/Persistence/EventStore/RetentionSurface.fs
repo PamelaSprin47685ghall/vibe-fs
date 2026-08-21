@@ -18,6 +18,20 @@ module RetentionSurface =
         | Ok streams -> streams |> List.map fst |> List.toArray
         | Error error -> failwith (sprintf "%A" error)
 
+    let remotePayloadNeedsRead
+        (cachedStatIdentity: string)
+        (cachedOid: string)
+        (currentStatIdentity: string)
+        (remoteOid: string)
+        (isBlob: bool)
+        : bool =
+        WriterStreamSync.payloadNeedsRemoteRead
+            (Some cachedStatIdentity)
+            (Some(GitObjectId.create cachedOid))
+            (Some currentStatIdentity)
+            (GitObjectId.create remoteOid)
+            isBlob
+
     let syncAt (repoPath: string) (commonDir: string) (remoteRoot: string) (nowMs: float) : Task<obj> =
         task {
             let raw = ProcessGitRawStore.create repoPath

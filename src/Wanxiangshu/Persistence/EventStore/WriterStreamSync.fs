@@ -568,6 +568,41 @@ module WriterStreamSync =
         =
         entries |> List.filter (remoteEntryNeeded cacheFiles currentStats manifest)
 
+    let payloadNeedsRemoteRead
+        (cachedStatIdentity: string option)
+        (cachedOid: GitObjectId option)
+        (currentStatIdentity: string option)
+        (remoteOid: GitObjectId)
+        (isBlob: bool)
+        : bool =
+        match cachedStatIdentity, cachedOid, currentStatIdentity with
+        | Some cachedStat, Some cachedObject, Some currentStat when
+            isBlob && cachedStat = currentStat && cachedObject = remoteOid
+            ->
+            false
+        | _ -> true
+
+    let private remotePayloadEntryNeeded
+        (cacheFiles: Map<string, CachedFile>)
+        (currentStats: Map<string, string>)
+        (entry: TreeEntry)
+        =
+        let cached = Map.tryFind entry.Name cacheFiles
+
+        payloadNeedsRemoteRead
+            (cached |> Option.map _.StatIdentity)
+            (cached |> Option.map _.Oid)
+            (Map.tryFind entry.Name currentStats)
+            entry.Oid
+            (entry.Mode = blobMode)
+
+    let private changedRemotePayloadEntries
+        (cacheFiles: Map<string, CachedFile>)
+        (currentStats: Map<string, string>)
+        (entries: TreeEntry list)
+        =
+        entries |> List.filter (remotePayloadEntryNeeded cacheFiles currentStats)
+
     let private writerFromBlob
         (manifest: Map<string, WriterManifestEntry>)
         (entryByName: Map<string, TreeEntry>)
@@ -637,10 +672,9 @@ module WriterStreamSync =
             let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir |> Map.ofList
 
             let neededPayloadEntries =
-                changedRemoteEntries
+                changedRemotePayloadEntries
                     (cacheFiles (fun value -> value.Payloads) cache)
                     payloadStats
-                    Map.empty
                     payloadEntries
 
             let! payloadBlobs = readBlobList raw neededPayloadEntries

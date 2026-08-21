@@ -38,7 +38,7 @@
 
 ## DURABLE-CONVERGENCE-010: hook 热路径成本只随变化量增长
 
-同步机制允许使用无权威属性的物理状态指纹缓存。当物理文件 fingerprint 未变、cache 未跨 retention expiry 且 tracking ref 等于 cached root 时，`pre-push` 必须在启动任何 Wanxiang Git transport 前直接复用既有快照；不得为 no-op 额外执行 `ls-remote`、`fetch` 或内部 `git push`。Hook 自动安装器还必须仅在当前仓库内为未自定义 SSH multiplex 的 `core.sshCommand` 保留原命令/identity 参数并追加短生命周期 `ControlMaster=auto` 复用，使用户 push 已建立的 SSH transport 可被 Wanxiang 的内部 CAS push 复用；若用户已显式配置 `ControlMaster` 或 `ControlPath`，安装器不得覆盖。增量变化时仅针对变动文件进行读写与验证，并通过现有 CAS convergence 处理远端竞争，保证同步开销与实际数据增量成比例。
+同步机制允许使用无权威属性的物理状态指纹缓存。当物理文件 fingerprint 未变、cache 未跨 retention expiry 且 tracking ref 等于 cached root 时，`pre-push` 必须在启动任何 Wanxiang Git transport 前直接复用既有快照；不得为 no-op 额外执行 `ls-remote`、`fetch` 或内部 `git push`。Hook 自动安装器还必须仅在当前仓库内为未自定义 SSH multiplex 的 `core.sshCommand` 保留原命令/identity 参数并追加短生命周期 `ControlMaster=auto` 复用，使用户 push 已建立的 SSH transport 可被 Wanxiang 的内部 CAS push 复用；若用户已显式配置 `ControlMaster` 或 `ControlPath`，安装器不得覆盖。增量变化时仅针对变动文件进行读写与验证，并通过现有 CAS convergence 处理远端竞争，保证同步开销与实际数据增量成比例。writer 的 remote-read 判定仍必须比较 `writer-manifest` activity；payload 没有 writer activity 语义，因此当 cache 中该 payload 的 stat identity 等于当前本地 stat identity、cached OID 等于 remote payload tree OID 且 entry 为 blob 时，必须判定为无需读取 remote blob。禁止把 writer manifest 的存在条件复用于 payload，否则一次无关 writer 变化会把全部历史 payload 重新读取，并在全局 store gate 内形成 O(total payload history) 临界区。
 
 ## DURABLE-CONVERGENCE-011: writer 以最后输出活动时间整体过期且不可被旧快照复活
 
