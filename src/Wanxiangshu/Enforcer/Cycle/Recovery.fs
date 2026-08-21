@@ -461,7 +461,7 @@ module EnforcerFrameRecovery =
     /// not in the list). Healing open here re-binds a new RequestId to an old
     /// provider run (stale-cycle race). Crash recovery re-arms InFlight before
     /// handleContinuation when the open request is still live.
-    let tryLiveCycleContext (scope: IParkedTransformHost) (bloggerSessionId: SessionId) : BloggerRequestContext option =
+    let tryLiveCycleContext (scope: IBloggerRuntimeHost) (bloggerSessionId: SessionId) : BloggerRequestContext option =
         scope.TryPeekCurrentRequest(SessionId.value bloggerSessionId)
 
     let private tryOpenBloggerRequest (journal: AgentJournal) mainSessionId bloggerSessionId =
@@ -480,7 +480,7 @@ module EnforcerFrameRecovery =
     /// Rebuild / empty-calls only: live InFlight, else reload open without
     /// committing. Does not SetCurrentRequest (no side effect on authority).
     let resolveCycleContext
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)

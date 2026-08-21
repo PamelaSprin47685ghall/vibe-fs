@@ -94,7 +94,7 @@ type PluginBloggerScope() =
     // DSL-MUTABLE: single-flight — physical drain-window slot
     let drainWindows = Dictionary<string, DrainWindow>()
 
-    interface IParkedTransformHost with
+    interface IBloggerRuntimeHost with
         member this.ParkTransform(sessionId: string) : Task<ParkWake> =
             lock parkedGate (fun () ->
                 match pendingOffer.TryGetValue sessionId with

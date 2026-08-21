@@ -251,7 +251,7 @@ module BloggerCoordinator =
                 reason
 
     let stageContinuationContext
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)
         : Task<Result<unit, string>> =
@@ -267,7 +267,7 @@ module BloggerCoordinator =
         materializeRequest journal ctx (Some promptKey)
 
     let abandonContinuationContext
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)
         (reason: string)
@@ -291,7 +291,7 @@ module BloggerCoordinator =
     let private failAfterSend
         (journal: AgentJournal option)
         (host: CompanionHost)
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (key: string)
         (ctx: BloggerRequestContext)
         (reason: string)
@@ -315,7 +315,7 @@ module BloggerCoordinator =
         }
 
     let private proceedAfterPreSend
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (j: AgentJournal)
@@ -332,7 +332,7 @@ module BloggerCoordinator =
         }
 
     let private afterPreSendMaterialize
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (j: AgentJournal)
@@ -350,7 +350,7 @@ module BloggerCoordinator =
             proceedAfterPreSend scope host journal j key ctx
 
     let private materializeThenSend
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (j: AgentJournal)
@@ -365,7 +365,7 @@ module BloggerCoordinator =
         }
 
     let private startWithJournal
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (j: AgentJournal)
@@ -383,7 +383,7 @@ module BloggerCoordinator =
             materializeThenSend scope host journal j mainId key ctx
 
     let private startFrozen
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (key: string)
@@ -394,7 +394,7 @@ module BloggerCoordinator =
         | Some j -> startWithJournal scope host journal j key ctx
 
     let private applyMainDecision
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (key: string)
@@ -408,7 +408,7 @@ module BloggerCoordinator =
         | BloggerRuntime.Decision.Skip -> Task.FromResult DecisionEffect.SkippedInFlight
 
     let private startMainOrNone
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (key: string)
@@ -420,7 +420,7 @@ module BloggerCoordinator =
 
     /// Unique production entry for main-session material → Blogger lifecycle.
     let onMainMaterial
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
         (mainSessionId: SessionId)

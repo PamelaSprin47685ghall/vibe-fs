@@ -30,7 +30,7 @@ module CompanionRuntimeSurface =
     let private scopeOf (value: obj) : Wanxiangshu.OpenCode.PluginRuntimeScope =
         unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value
 
-    let private hostOf (value: obj) : IParkedTransformHost = (scopeOf value).ParkedTransformHost
+    let private hostOf (value: obj) : IBloggerRuntimeHost = (scopeOf value).BloggerRuntimeHost
     let private companionOf (value: obj) : Companion = unbox<Companion> value
 
     let private contextOfJs (value: obj) : BloggerRequestContext =

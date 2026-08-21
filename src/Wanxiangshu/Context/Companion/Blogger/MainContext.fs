@@ -119,7 +119,7 @@ module BloggerMainContext =
         }
 
     let fromJournal
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)

@@ -40,7 +40,7 @@ module BloggerRuntimeHost =
     let blocksNew
         (journal: AgentJournal option)
         (mainSessionId: SessionId)
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (bloggerKey: string)
         : bool =
         BloggerRuntime.blocksNewRequest
@@ -50,13 +50,13 @@ module BloggerRuntimeHost =
 
     /// Close drain + drop PendingOffer + cancel park waiter.
     /// Existing physical flight ownership survives until its terminal owner clears it.
-    let forceSealRuntime (scope: IParkedTransformHost) (bloggerKey: string) : unit =
+    let forceSealRuntime (scope: IBloggerRuntimeHost) (bloggerKey: string) : unit =
         scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
         scope.TryTakePendingOffer bloggerKey |> ignore
         scope.CancelParked bloggerKey
 
     /// Close drain + drop pending offer (keep CurrentRequest until caller clears).
-    let forceSealCellDropOffer (scope: IParkedTransformHost) (bloggerKey: string) : unit =
+    let forceSealCellDropOffer (scope: IBloggerRuntimeHost) (bloggerKey: string) : unit =
         scope.SetDrainWindow(bloggerKey, DrainWindow.Closed)
         scope.TryTakePendingOffer bloggerKey |> ignore
 
@@ -64,7 +64,7 @@ module BloggerRuntimeHost =
     /// identity is recorded on the window so a stale reactivation (an older root
     /// arriving after a newer seal) cannot reopen a window it no longer owns.
     let reactivateAfterNewRoot
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (bloggerSessionId: SessionId)
         (root: AuthorityRootUserMessageId)
         : unit =

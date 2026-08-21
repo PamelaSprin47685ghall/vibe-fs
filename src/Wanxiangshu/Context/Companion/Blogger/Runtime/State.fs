@@ -72,7 +72,7 @@ type DrainWindow =
     | Open of DrainPermit
 
 /// Pure routing + physical drain helpers. Busy ownership is the host flight
-/// registry (`IParkedTransformHost.HasFlight`); drain is the physical drain slot
+/// registry (`IBloggerRuntimeHost.HasFlight`); drain is the physical drain slot
 /// (`GetDrainWindow` / `SetDrainWindow` / `IsDrainOpen`). No runtime State DU.
 [<RequireQualifiedAccess>]
 module BloggerRuntime =

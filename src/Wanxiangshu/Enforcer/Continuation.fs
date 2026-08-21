@@ -114,7 +114,7 @@ module EnforcerContinuation =
     /// injects every dependency the branch bodies touch, so the branches are pure
     /// transforms with no ambient module state.
     type Context =
-        { Scope: IParkedTransformHost
+        { Scope: IBloggerRuntimeHost
           Journal: AgentJournal option
           Durable: AgentJournal
           Owner: SessionId
@@ -181,7 +181,7 @@ module EnforcerContinuation =
             onExhausted ()
         | _ -> onContinue ()
 
-    let private ensureFlightOrSet (scope: IParkedTransformHost) (sessionKey: string) (live: BloggerRequestContext) =
+    let private ensureFlightOrSet (scope: IBloggerRuntimeHost) (sessionKey: string) (live: BloggerRequestContext) =
         if not (scope.HasFlight sessionKey) then
             scope.SetCurrentRequest(sessionKey, live)
 
@@ -1041,7 +1041,7 @@ module EnforcerContinuation =
     /// durable frames + typed CurrentRequest. Never extract TOML from raw user
     /// messages (C2).
     let firstRequestBranch
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
         (bloggerSessionId: SessionId)
         (rawMessages: obj list)
@@ -1086,7 +1086,7 @@ module EnforcerContinuation =
     /// Thin dispatcher over the three branches (emptyCallsBranch / commitBranch /
     /// firstRequestBranch): it only derives the closed branch context and forwards.
     let handleContinuation
-        (scope: IParkedTransformHost)
+        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal option)
         (confirmedFailure: ConfirmedFailurePort option)
         (recoveryProbe: AgentJournal -> SessionId -> obj list -> RecoveryStageProbe)

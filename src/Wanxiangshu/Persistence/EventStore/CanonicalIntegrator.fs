@@ -355,14 +355,23 @@ module CanonicalIntegrator =
                 { semantic.State with
                     Events = Map.add key normalized semantic.State.Events } }
 
-    let private integrateNew (state: IntegratorState) (normalized: EventEnvelope) key =
+    let private integrateNew allowExternalParents (state: IntegratorState) (normalized: EventEnvelope) key =
         let missingParent =
             normalized.Parents
             |> List.tryFind (fun parent -> not (Map.containsKey (eventKey parent) state.Events))
 
         match missingParent with
-        | Some parent -> Error(sprintf "missing parent during integration: %s" (EventId.value parent))
+        | Some parent when not allowExternalParents ->
+            Error(sprintf "missing parent during integration: %s" (EventId.value parent))
         | None ->
+            semanticStep (structuralStep state normalized) normalized
+            |> addIntegratedEvent key normalized
+            |> Ok
+        | Some _ ->
+            // Retained replay may begin after this event's causal predecessor
+            // aged out as a whole writer. EventKWayMerge.mergeRetained already
+            // proved the parent is absent from the entire retained set; only
+            // this boot/reload mode may treat that boundary as satisfied.
             semanticStep (structuralStep state normalized) normalized
             |> addIntegratedEvent key normalized
             |> Ok
@@ -371,7 +380,11 @@ module CanonicalIntegrator =
     /// order exactly: a semantic failure leaves last-good Current in place and
     /// marks that rule faulted; a later durable ProjectionCutTail applies the
     /// rule-owned reset patch and clears the fault.
-    let private integrateOne (state: IntegratorState) (envelope: EventEnvelope) : Result<IntegrationStep, string> =
+    let private integrateOne
+        allowExternalParents
+        (state: IntegratorState)
+        (envelope: EventEnvelope)
+        : Result<IntegrationStep, string> =
         let normalized = EventEnvelope.normalize envelope
         let key = eventKey normalized.EventId
 
@@ -380,7 +393,7 @@ module CanonicalIntegrator =
             CanonicalEventCodec.checkIdentity existing normalized
             |> Result.mapError (sprintf "identity collision: %A")
             |> Result.map (fun () -> { State = state; FailedRules = [] })
-        | None -> integrateNew state normalized key
+        | None -> integrateNew allowExternalParents state normalized key
 
     /// Boot history ordering is delegated to the one structural k-way primitive.
     /// Business semantic failures never abort replay; they cut only that rule's
@@ -396,7 +409,7 @@ module CanonicalIntegrator =
             let mutable failure: string option = None
 
             let advance () =
-                match integrateOne state (List.head remaining) with
+                match integrateOne true state (List.head remaining) with
                 | Ok step ->
                     state <- step.State
                     remaining <- List.tail remaining
@@ -543,7 +556,7 @@ module CanonicalIntegrator =
                 | Some fault ->
                     let! plan = planCut currentState rule fault
                     let cut = cutEnvelope currentState rule fault plan
-                    let! integrated = integrateOne currentState cut
+                    let! integrated = integrateOne false currentState cut
 
                     let receipt =
                         { Rule = rule.Name
@@ -590,7 +603,7 @@ module CanonicalIntegrator =
                     | raw :: tail ->
                         let normalized = EventEnvelope.normalize raw
                         let! before, resetEvents, resetCuts = ensureMatchingResets current normalized
-                        let! step = integrateOne before normalized
+                        let! step = integrateOne false before normalized
                         let! after, postCutEvents, postCuts = closeFailures step.State step.FailedRules
 
                         return!

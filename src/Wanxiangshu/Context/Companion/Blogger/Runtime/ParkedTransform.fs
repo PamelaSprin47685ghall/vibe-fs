@@ -63,7 +63,7 @@ type MaterialOfferDisposition =
 /// CurrentRequest ownership = physical flight registry (HasFlight / TryGetFlight).
 /// PendingOffer = the next Main material staged only while Parked (own slot).
 /// Drain window = physical drain slot (GetDrainWindow / SetDrainWindow / IsDrainOpen).
-type IParkedTransformHost =
+type IBloggerRuntimeHost =
     abstract ParkTransform: string -> Task<ParkWake>
     abstract CancelParked: string -> unit
     abstract HasParked: string -> bool
