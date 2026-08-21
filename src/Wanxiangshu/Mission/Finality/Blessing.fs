@@ -53,7 +53,10 @@ module BlessingWorkflow =
 
     let private blessedPrompt (managerSessionId: SessionId) (logs: (int * string) list) =
         FinalityPrompt.blessedFromLogs
-            (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Blessed Map.empty)
+            (ProviderProse.instructionLines
+                (ProviderProse.languageOf managerSessionId)
+                FinalityPrompt.Path.Blessed
+                Map.empty)
             logs
 
     let private treeUnchanged (treePort: FinalityTreePort) (managerSessionId: SessionId) (expected: GitTreeHash) =
@@ -82,7 +85,7 @@ module BlessingWorkflow =
 
             let logs =
                 orderedRecords
-                |> List.map (fun (ordinal, record) -> ordinal + 1, SyntheticToml.normalizeNewlines record)
+                |> List.map (fun (ordinal, record) -> ordinal + 1, LlmFacing.normalizeNewlines record)
 
             let material = logs |> List.map snd |> String.concat "\n\n"
             let! blob = journal.WriteBlob material

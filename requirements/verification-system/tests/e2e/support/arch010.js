@@ -1,10 +1,11 @@
 /**
  * arch010.js — validate a rendered payload against ARCH-010's document rules.
  *
- * The clause's gate section lists what must be checked: instruction not encoded as a field, data not
- * emitted as a top-level comment, instruction always first, no top-level comment once the data body
- * begins, no `"""`, the closing delimiter alone on its line, and the whole thing parseable with the
- * value equal to the original plus one trailing newline.
+ * The clause's gate section lists what can be checked from bytes alone: instruction not encoded as a
+ * field, instruction always first, no top-level comment once the data body begins, no `"""`, the
+ * closing delimiter alone on its line, and the whole thing parseable. Whether a comment is semantically
+ * instruction or data is not recoverable from text; that classification is enforced before rendering
+ * by the typed LlmFacing boundary and producer proofs.
  *
  * ── why this is separate from the writer's own tests ────────────────────────
  *
@@ -81,6 +82,14 @@ export function splitDocument(document) {
       }
 
       content.push(line);
+      return;
+    }
+
+    // Instruction-plane text is opaque. It may quote TOML notation verbatim — `x = 1`, `[[table]]`,
+    // or even `'''` — without opening or closing a data literal. The receiver semantics were decided
+    // before rendering; a validator must not try to reverse-infer them from words inside a comment.
+    if (text.startsWith('#')) {
+      syntax.push(line);
       return;
     }
 
@@ -218,22 +227,6 @@ export function auditPayload(document, { origin = 'payload' } = {}) {
         line.line,
         `assigns instruction-shaped field '${name}'; ARCH-010 requires instruction as a leading ` +
           'comment, and a field name however clear may not carry it',
-      );
-    }
-  }
-
-  // ── data must not be a top-level comment ────────────────────────────────
-  //
-  // Not mechanically decidable in general: whether a sentence is a rule or a record is semantic. What
-  // IS decidable is the shape the clause's own counter-example takes — a comment holding a `key =
-  // value` assertion is data wearing a comment's clothes.
-  for (const line of headerLines) {
-    const body = line.text.replace(/^#\s?/, '');
-    if (/^[A-Za-z_][A-Za-z0-9_-]*\s*=\s*\S/.test(body)) {
-      at(
-        line.line,
-        'is a comment containing a field assignment; ARCH-010 requires facts as fields, not as ' +
-          'explanatory comments',
       );
     }
   }

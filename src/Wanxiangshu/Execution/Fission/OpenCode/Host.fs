@@ -357,13 +357,10 @@ module FissionHost =
             && delivered = Set.ofList [ 0 .. group.LaneCount - 1 ])
 
     let private takeoverPrompt aggregate =
-        String.concat
-            "\n"
+        LlmFacing.renderInstructions
             [ "The Fission ring has collected every lane's canonical work record and returned the complete handoff to this final present."
               "Continue as the same logical participant. Integrate the handoff below and now produce the ordinary final report to your commissioner."
               "Do not report lane mechanics, physical session ids, or the internal Fission topology."
-              ""
-              "[fission_ring_handoff]"
               aggregate ]
 
     let private appendTakeoverClaimed
@@ -595,13 +592,12 @@ module FissionHost =
         let effectiveAgent = authority.SelectedAgent
 
         let prompt =
-            String.concat
-                "\n"
+            LlmFacing.instructions
                 [ "A completion that was already outstanding before Fission now belongs to every present of this same participant."
-                  "Treat it as one shared completion fact, not as newly delegated work."
-                  "completion_id = " + completionId
-                  ""
+                  "Treat the completion payload below as part of your current responsibility, not as newly delegated work."
                   payload ]
+            |> LlmFacing.withData [ LlmFacing.Data.stringField "completion_id" completionId ]
+            |> LlmFacing.render
 
         let dispatcher = PromptDispatcher.forJournal durable
 

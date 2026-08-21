@@ -28,6 +28,7 @@ const checks = [
   join(root, 'checks/unified-store-gate.mjs'),
   join(root, 'checks/tool-referential-integrity.mjs'),
   join(root, 'checks/provider-leak-gate.mjs'),
+  join(root, 'checks/llm-facing-format-gate.mjs'),
   join(root, 'checks/language-parity-gate.mjs'),
   join(root, 'checks/prompt-depth-ratchet.mjs'),
   join(root, 'checks/provider-prose-ownership.mjs'),

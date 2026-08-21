@@ -3,6 +3,7 @@ namespace Wanxiangshu.Participant.Provider.Projection
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -226,15 +227,20 @@ module ProjectionSurface =
         else
             stringOf value?messageId, stringOf value?toml
 
-    let private optionalPair (value: obj) : (string * string) option =
-        if isNullish value then None else Some(pairOf value)
+    let private physicalDeltaOf (value: obj) =
+        if isNullish value then
+            None
+        else
+            match BloggerDeltaItemWire.tryListOfJs value?items with
+            | Ok items -> Some(stringOf value?messageId, items)
+            | Error error -> invalidArg "physicalDelta.items" error
 
     let private blogFramesIntentOf (value: obj) : BlogFramesIntent =
         { RequestKind = stringOf value?requestKind
           SquashFrameCount = intOf value?squashFrameCount
           BloggerSessionId = stringOf value?bloggerSessionId
           FrameEpoch = int64Of value?frameEpoch
-          PhysicalDelta = optionalPair value?physicalDelta
+          PhysicalDelta = physicalDeltaOf value?physicalDelta
           PreviousTips = arrayOf value?previousTips |> Array.toList |> List.map pairOf
           NormalInstructionLines = arrayOf value?normalInstructionLines |> Array.map stringOf |> Array.toList
           SquashInstructionLines = arrayOf value?squashInstructionLines |> Array.map stringOf |> Array.toList }

@@ -56,7 +56,7 @@ const toolResult = (id, tool, callID, output = 'ok') => ({
 })
 
 const pairMessages = (messages) => messages.filter((m) => isPairProgrammingThought(m))
-const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
+const skillContent = (markerText) => markerText
 
 const assertPairShape = (msg, callId, markerText) => {
   assert.equal(msg.info.role, 'assistant')

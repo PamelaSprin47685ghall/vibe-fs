@@ -156,10 +156,11 @@ module RepositoryWarmStartSurface =
         (basePrompt: string)
         (searches: obj array)
         : string =
-        RepositoryWarmStartPrompt.appendToProviderPrompt
+        RepositoryWarmStartPrompt.appendToDocument
             (appendixInstructions |> Array.toList)
-            basePrompt
+            (LlmFacing.instruction basePrompt)
             (searchesOfJs searches)
+        |> LlmFacing.render
 
     let prepareWithSearch
         (capability: obj)

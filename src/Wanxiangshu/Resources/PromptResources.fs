@@ -122,34 +122,39 @@ module PromptResources =
         | Role.DevOps -> [ "library/scarcity" ]
         | _ -> []
 
-    let private compose (parts: string list) =
+    let private composeInstructions (parts: string list) =
         parts
         |> List.filter (System.String.IsNullOrWhiteSpace >> not)
         |> List.map (fun text -> text.Trim())
-        |> String.concat "\n\n---\n\n"
 
-    let systemForRole (lang: ProviderLanguage) (role: Role) =
+    let instructionTextsForRole (lang: ProviderLanguage) (role: Role) =
         ensureParity ()
         let common = read lang "world/common-law"
         let law = read lang (roleSemanticPath role)
         let inherited = libraryPaths role
 
         if List.isEmpty inherited then
-            compose [ common; law ]
+            composeInstructions [ common; law ]
         else
             let books = inherited |> List.map (read lang)
 
-            compose (
+            composeInstructions (
                 [ common; law; read lang "library/ingress" ]
                 @ books
                 @ [ read lang "library/closing" ]
             )
 
+    let systemForRole (lang: ProviderLanguage) (role: Role) =
+        instructionTextsForRole lang role |> LlmFacing.renderInstructions
+
     /// InternalLeaf Bookkeeper is not a public Role, but it shares the same
     /// Common Law and receives its own Role Law.
-    let loadBookkeeperSystemFor (lang: ProviderLanguage) : string =
+    let bookkeeperInstructionTextsFor (lang: ProviderLanguage) : string list =
         ensureParity ()
-        compose [ read lang "world/common-law"; read lang "role/bookkeeper" ]
+        composeInstructions [ read lang "world/common-law"; read lang "role/bookkeeper" ]
+
+    let loadBookkeeperSystemFor (lang: ProviderLanguage) : string =
+        bookkeeperInstructionTextsFor lang |> LlmFacing.renderInstructions
 
     let loadBookkeeperSystem () : string =
         loadBookkeeperSystemFor ProviderLanguage.English

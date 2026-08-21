@@ -218,7 +218,9 @@ test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_k
     assert.deepEqual(marker.parts?.[0]?.state?.input, { name: '' })
     assert.equal(marker.parts?.[0]?.state?.status, 'completed')
     const markerOutput = marker.parts?.[0]?.state?.output ?? ''
-    assert.match(markerOutput, /^<skill_content name="">\n/)
+    assert.match(markerOutput, /^# /)
+    assert.doesNotMatch(markerOutput, /<skill_content|<\/skill_content>/)
+    assert.equal(markerOutput.split('\n').filter(Boolean).every((line) => line.startsWith('#')), true)
     assert.match(markerOutput, /\[NEEDHELP\]/)
     assert.match(markerOutput, /todowrite/i)
     assert.match(markerOutput, /ready frontier/i)

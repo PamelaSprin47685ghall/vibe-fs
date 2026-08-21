@@ -290,7 +290,12 @@ module BlogSurface =
             if isNullish value?physicalDelta then
                 None
             else
-                Some(text value?physicalDelta?id, text value?physicalDelta?toml)
+                let items =
+                    match BloggerDeltaItemWire.tryListOfJs value?physicalDelta?items with
+                    | Ok parsed -> parsed
+                    | Error error -> invalidArg "physicalDelta.items" error
+
+                Some(text value?physicalDelta?id, items)
 
         let previousTips =
             arrayOf value?previousTips

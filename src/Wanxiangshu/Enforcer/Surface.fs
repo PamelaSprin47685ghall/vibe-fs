@@ -162,7 +162,13 @@ module EnforcerSurface =
             | "simplifiedChinese" -> ProviderLanguage.SimplifiedChinese
             | _ -> ProviderLanguage.English
 
-        EnforcerCatalogResource.composeBloggerSystemPromptFor lang basePrompt (rulebook ())
+        let baseInstructions =
+            if System.String.IsNullOrWhiteSpace basePrompt then
+                []
+            else
+                [ basePrompt ]
+
+        EnforcerCatalogResource.composeBloggerSystemPromptFor lang baseInstructions (rulebook ())
 
     /// Load a localized catalog through the same fail-fast resource owner.
     let loadFor (locale: string) : obj array =
@@ -176,10 +182,10 @@ module EnforcerSurface =
 
     /// UTF-8 byte limits enforced before a cycle can be committed.
     let validateBounds (textValue: string) (evidenceValue: string option) : obj =
-        let textBytes = SyntheticToml.byteCount textValue
+        let textBytes = LlmFacing.byteCount textValue
 
         let evidenceBytes =
-            evidenceValue |> Option.map SyntheticToml.byteCount |> Option.defaultValue 0
+            evidenceValue |> Option.map LlmFacing.byteCount |> Option.defaultValue 0
 
         if textBytes > maxBlogTextBytes then
             box

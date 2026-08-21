@@ -75,15 +75,15 @@ test('WHAT[DISTRIBUTION-002] PROMPT_resources_load_from_package_independent_of_c
 
 test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_composition_common_law_role_law_then_inherited_library', () => {
   const prompts = promptResources.load()
-  inOrder(prompts.ManagerSystemPrompt, ['# Common Law', '# Management', '# Office Library', '# The Kolmogorov Book', '# The Book of Scarcity'])
-  inOrder(prompts.CoderSystemPrompt, ['# Common Law', '# Mutation', '# Office Library', '# The Kolmogorov Book'])
-  inOrder(prompts.ReviewerSystemPrompt, ['# Common Law', '# Judgment', '# Office Library', '# The Kolmogorov Book', "# The Examiner's Ledger"])
-  inOrder(prompts.InspectorSystemPrompt, ['# Common Law', '# Evidence', '# Office Library', '# The Book of Scarcity'])
-  inOrder(prompts.DevopsSystemPrompt, ['# Common Law', '# The Engine Room', '# Office Library', '# The Book of Scarcity'])
+  inOrder(prompts.ManagerSystemPrompt, ['# # Common Law', '# # Management', '# # Office Library', '# # The Kolmogorov Book', '# # The Book of Scarcity'])
+  inOrder(prompts.CoderSystemPrompt, ['# # Common Law', '# # Mutation', '# # Office Library', '# # The Kolmogorov Book'])
+  inOrder(prompts.ReviewerSystemPrompt, ['# # Common Law', '# # Judgment', '# # Office Library', '# # The Kolmogorov Book', "# # The Examiner's Ledger"])
+  inOrder(prompts.InspectorSystemPrompt, ['# # Common Law', '# # Evidence', '# # Office Library', '# # The Book of Scarcity'])
+  inOrder(prompts.DevopsSystemPrompt, ['# # Common Law', '# # The Engine Room', '# # Office Library', '# # The Book of Scarcity'])
 
   for (const field of ['OrchestratorSystemPrompt', 'BrowserSystemPrompt', 'InquirySystemPrompt', 'DistillerSystemPrompt', 'BloggerSystemPrompt']) {
-    assert.match(prompts[field], /^# Common Law/)
-    assert.doesNotMatch(prompts[field], /# Office Library/)
+    assert.match(prompts[field], /^# # Common Law/)
+    assert.doesNotMatch(prompts[field], /# # Office Library/)
   }
 })
 
@@ -129,9 +129,9 @@ test('WHAT[PROVIDER-LANGUAGE-006] PROMPT_017_zh_cn_is_authored_chinese_not_an_en
 test('WHAT[COGNITIVE-ENVIRONMENT-003] PROMPT_bookkeeper_inherits_common_law_and_casebook_role_law', () => {
   const en = promptResources.loadBookkeeperSystemFor(english)
   const zh = promptResources.loadBookkeeperSystemFor(simplifiedChinese)
-  inOrder(en, ['# Common Law', '# The Casebook'])
-  assert.match(zh, /^# 共同法/)
-  assert.match(zh, /# Casebook/)
+  inOrder(en, ['# # Common Law', '# # The Casebook'])
+  assert.match(zh, /^# # 共同法/)
+  assert.match(zh, /# # Casebook/)
 })
 
 test('WHAT[COGNITIVE-ENVIRONMENT-005] PROMPT_no_legacy_provider_ontology_in_composed_prompts', () => {

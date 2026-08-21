@@ -113,7 +113,6 @@ test('WHAT[GD-006] ENFORCER_TIP_NUDGE_003_missing_owner_returns_none', async () 
 })
 
 const guideline = '# Pair programming auto-injected'
-const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
 const anchor = [{ info: { id: 'user-1', role: 'user' }, parts: [{ type: 'text', text: 'task' }] }]
 const markerOutput = (messages) => {
   // pair sits before trailing user: completed synthetic skill, user
@@ -122,16 +121,20 @@ const markerOutput = (messages) => {
 }
 
 test('WHAT[GD-009] CTX_002_GUIDELINE_001_marker_without_nudge_is_guideline_text', async () => {
-  const result = await tryInject(undefined, `${guideline}`, anchor)
+  const marker = pair.text
+  const result = await tryInject(undefined, marker, anchor)
   assert.equal(result.ok, true, result.error)
-  assert.equal(markerOutput(result.value), skillContent(guideline))
+  assert.equal(markerOutput(result.value), marker)
+  assert.match(marker, /^# /)
 })
 
-test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_uses_double_newline', async () => {
+test('WHAT[GD-009] CTX_002_GUIDELINE_002_marker_with_nudge_is_one_instruction_plane', async () => {
   const nudge = 'A domain concept is crossing a boundary as a primitive. Introduce a distinct type so invalid substitutions become impossible.'
-  const result = await tryInject(undefined, `${nudge}\n\n${guideline}`, [
+  const marker = `# ${nudge}\n${pair.text}`
+  const result = await tryInject(undefined, marker, [
     { info: { id: 'user-2', role: 'user' }, parts: [{ type: 'text', text: 'task' }] },
   ])
   assert.equal(result.ok, true, result.error)
-  assert.equal(markerOutput(result.value), skillContent(`${nudge}\n\n${guideline}`))
+  assert.equal(markerOutput(result.value), marker)
+  assert.ok(marker.indexOf('# A domain concept') < marker.indexOf(pair.text.trim()))
 })

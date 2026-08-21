@@ -27,7 +27,7 @@ type AssistanceTurnDisposition =
     | ClaimedButUnresolved
 
 /// AGENT-031 / PROMPT-018 provider-facing assistance continuations.
-/// Paths + SyntheticToml layout here; Class A prose lives in ProviderResources.
+/// Paths + LlmFacing plane classification here; Class A prose lives in ProviderResources.
 [<RequireQualifiedAccess>]
 module AssistancePrompt =
 
@@ -55,14 +55,11 @@ module AssistancePrompt =
         else
             text.Replace(Sentinel, "")
 
-    let escalation (instructions: string list) = SyntheticToml.document instructions []
+    let escalation (instructions: string list) =
+        LlmFacing.renderInstructions instructions
 
     let advice (instructions: string list) (childWorkRecord: string) =
-        SyntheticToml.document
-            instructions
-            [ SyntheticToml.field "consultation_record" (SyntheticToml.renderString childWorkRecord) ]
+        LlmFacing.renderInstructions (instructions @ [ childWorkRecord ])
 
     let consultationFailed (instructions: string list) (reason: string) =
-        SyntheticToml.document
-            instructions
-            [ SyntheticToml.field "consultation_failure" (SyntheticToml.renderString reason) ]
+        LlmFacing.renderInstructions (instructions @ [ reason ])

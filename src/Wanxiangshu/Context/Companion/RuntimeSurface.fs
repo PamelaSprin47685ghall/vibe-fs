@@ -50,10 +50,16 @@ module CompanionRuntimeSurface =
                     |> List.map BlobDigest.create
                   ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
         | _ ->
+            let items =
+                match BloggerDeltaItemWire.tryListOfJs value?items with
+                | Ok parsed -> parsed
+                | Error error -> invalidArg "items" error
+
             BloggerRequestContext.Main
                 { RequestId = BloggerRequestId.create (text value?requestId)
                   MainSessionId = SessionId.create (text value?mainSession)
                   BloggerSessionId = SessionId.create (text value?bloggerSession)
+                  Items = items
                   Toml = text value?toml
                   PreviousIngestedThroughSequence = int64Value value?previousIngested
                   NextIngestedThroughSequence = int64Value value?nextIngested
@@ -69,6 +75,7 @@ module CompanionRuntimeSurface =
         | BloggerRequestContext.Main main ->
             box
                 {| kind = "Main"
+                   items = main.Items |> List.map BloggerDeltaItemWire.toJs |> List.toArray
                    toml = main.Toml
                    previousIngested = int main.PreviousIngestedThroughSequence
                    nextIngested = int main.NextIngestedThroughSequence

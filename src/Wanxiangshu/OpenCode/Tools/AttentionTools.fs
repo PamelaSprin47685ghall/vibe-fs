@@ -56,7 +56,8 @@ module AttentionTools =
             ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
 
     let private render ctx path substitutions =
-        ProviderProse.render (languageOf ctx) path substitutions
+        ProviderProse.instructionLines (languageOf ctx) path substitutions
+        |> LlmFacing.renderInstructions
 
     let private nonBlank (value: string) =
         if isNull value then "" else value.Trim()

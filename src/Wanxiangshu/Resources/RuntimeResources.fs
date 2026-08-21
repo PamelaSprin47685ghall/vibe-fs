@@ -94,7 +94,10 @@ module RuntimeResources =
         let promptsWithRulebook =
             { prompts with
                 BloggerSystemPrompt =
-                    EnforcerCatalogResource.composeBloggerSystemPromptFor lang prompts.BloggerSystemPrompt rules }
+                    EnforcerCatalogResource.composeBloggerSystemPromptFor
+                        lang
+                        (PromptResources.instructionTextsForRole lang Role.Blogger)
+                        rules }
 
         { Prompts = promptsWithRulebook
           EnforcerRules = rules

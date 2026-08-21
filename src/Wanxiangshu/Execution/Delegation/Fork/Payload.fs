@@ -64,7 +64,7 @@ module ForkChildPayload =
     let AttachmentPath = "delegation/fork-child-attachment"
     let RequirementsPath = "delegation/fork-child-requirements"
 
-    let render (prose: ForkChildInstructions) (input: ForkChildAssignment) : string =
+    let document (prose: ForkChildInstructions) (input: ForkChildAssignment) : LlmFacing.Document =
         let requirements =
             input.RootRequirements
             |> List.filter (fun text -> not (System.String.IsNullOrWhiteSpace text))
@@ -96,33 +96,30 @@ module ForkChildPayload =
             @ (if List.isEmpty requirements then
                    []
                else
-                   [ prose.Requirements ])
+                   prose.Requirements :: requirements)
 
         let body =
             (match input.Payload with
              | Some payload when not (System.String.IsNullOrWhiteSpace payload) ->
-                 [ SyntheticToml.field "content" (SyntheticToml.renderString payload) ]
+                 [ LlmFacing.Data.stringField "content" payload ]
              | _ -> [])
             // Commissioner / attachment LWR as ARCH-010 data fields (DELEG-019/021).
             // Parent → child only: instruction header names the field; the record
             // itself is a TOML string value — never Split into `# Opening` /
             // `# Chronicle` comments, never dumped as bare prose outside a field.
             // Child → parent join is the opposite plane (`# LWR` via
-            // JoinResultRenderer / SyntheticToml.comment) — do not conflate.
+            // JoinResultRenderer instruction plane) — do not conflate.
             @ (match commissionerRecord with
-               | Some record -> [ SyntheticToml.field "commissioner_record" (SyntheticToml.renderString record) ]
+               | Some record -> [ LlmFacing.Data.stringField "commissioner_record" record ]
                | None -> [])
             @ (match attachment with
-               | Some record -> [ SyntheticToml.field "attached_work_record" (SyntheticToml.renderString record) ]
+               | Some record -> [ LlmFacing.Data.stringField "attached_work_record" record ]
                | None -> [])
-            @ (requirements
-               |> List.mapi (fun index text ->
-                   SyntheticToml.tableArrayEntry
-                       "root_requirement"
-                       [ SyntheticToml.field "ordinal" (string (index + 1))
-                         SyntheticToml.field "text" (SyntheticToml.renderString text) ]))
 
-        SyntheticToml.document instructions body
+        LlmFacing.instructions instructions |> LlmFacing.withData body
+
+    let render (prose: ForkChildInstructions) (input: ForkChildAssignment) : string =
+        document prose input |> LlmFacing.render
 
     /// The positional form, for a call site that reads better without a record literal.
     let relay
@@ -134,6 +131,22 @@ module ForkChildPayload =
         (payload: string option)
         : string =
         render
+            prose
+            { Assignment = assignment
+              CommissionerRecord = commissionerRecord
+              Attachment = attachment
+              RootRequirements = requirements
+              Payload = payload }
+
+    let relayDocument
+        (prose: ForkChildInstructions)
+        (assignment: string)
+        (commissionerRecord: string option)
+        (attachment: string option)
+        (requirements: string list)
+        (payload: string option)
+        : LlmFacing.Document =
+        document
             prose
             { Assignment = assignment
               CommissionerRecord = commissionerRecord

@@ -157,7 +157,7 @@ module EnforcerFrameRecovery =
             let messageId =
                 CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
-            "normal", 0, Some(messageId, main.Toml)
+            "normal", 0, Some(messageId, main.Items)
         | BloggerRequestContext.Squash squash -> "squash", squash.CoveredFrameCount, None
 
     let private previousTipsOf (projections: ProjectionSet) (owner: SessionId) =
@@ -412,6 +412,7 @@ module EnforcerFrameRecovery =
             let toml = asString raw "toml"
             let deltaDigestRaw = asString raw "delta_digest"
             let deltaDigest = resolveDeltaDigest openReq toml deltaDigestRaw
+            let items = BloggerDeltaItemWire.tryListOfJs raw?items |> Result.toOption
 
             let prevIngest =
                 asInt64 raw "prev_ingest"
@@ -421,11 +422,13 @@ module EnforcerFrameRecovery =
                 asInt64 raw "next_ingest"
                 |> Option.defaultValue openReq.NextIngestedThroughSequence
 
-            Some(
+            items
+            |> Option.map (fun typedItems ->
                 BloggerRequestContext.Main
                     { RequestId = openReq.RequestId
                       MainSessionId = openReq.MainSessionId
                       BloggerSessionId = openReq.BloggerSessionId
+                      Items = typedItems
                       Toml = toml
                       PreviousIngestedThroughSequence = prevIngest
                       NextIngestedThroughSequence = nextIngest
@@ -434,8 +437,7 @@ module EnforcerFrameRecovery =
                       NextCoveredPrefixDigest = asString raw "next_prefix_digest"
                       FrameEpochId = openReq.FrameEpochId
                       DeltaDigest = deltaDigest
-                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-            )
+                      ObservedPrefixEpochId = openReq.ObservedPrefixEpochId })
 
     let private decodeRequestContextJson (openReq: OpenBloggerRequest) (json: string) : BloggerRequestContext option =
         try

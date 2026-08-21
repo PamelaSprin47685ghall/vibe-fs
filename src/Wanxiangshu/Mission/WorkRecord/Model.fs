@@ -56,8 +56,8 @@ type OpeningMaterial =
 /// - 父 → 子：`includeOpening = true`（子未见父任务全文）
 /// - 子 → 父：`includeOpening = false`（布置者已知任务，勿回传 Opening）
 /// 同 Session prefix replacement 不是第三种 delegation：它用
-/// `includeOpening = true` 保留自己的章程，并由 Companion memory `<work-log>`
-/// 外层承载；不得改写成 `commissioner_record` / `attached_work_record`。
+/// `includeOpening = true` 保留自己的章程，并由 Companion memory 作为同一
+/// participant 的既有责任重新注入；不得改写成 `commissioner_record` / `attached_work_record`。
 ///
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
 /// tool call/result 不得作为 raw 进入 Recent；T1 constitutive 属 Opening。
@@ -94,7 +94,7 @@ module LifecycleWorkRecord =
 
     /// 稳定 Markdown 渲染。空段整段省略。
     /// 段标题为纯文本（Opening / Chronicle / Recent work）；`# `
-    /// 仅由 `SyntheticToml.comment` 在 wire 注入，避免 `# # Chronicle`。
+    /// 仅由 `LlmFacing` 在 wire 注入 comment plane，避免业务层手工加 `#`。
     /// `includeOpening=false` 时省略 Opening（子→父）。
     /// `Gap` 须已 `forWorkRecord`；render 再次过滤 fail-closed。
     let render (includeOpening: bool) (record: LifecycleWorkRecord) : string =

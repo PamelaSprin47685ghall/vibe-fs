@@ -28,7 +28,8 @@ test('WHAT[PROVIDER-LANGUAGE-005] system transform localizes only the wanxiangsh
   const output = await transformBookkeeperSystem(SID, [english, hostOwned])
 
   assert.deepEqual(output.system, [chinese, hostOwned])
-  assert.match(output.system[0], /^# 共同法/)
+  assert.match(output.system[0], /^# # 共同法/)
+  assert.equal(output.system[0].split('\n').filter(Boolean).every((line) => line === '#' || line.startsWith('# ')), true)
 })
 
 test('WHAT[PROVIDER-LANGUAGE-001] system transform is stable for an English session', async () => {

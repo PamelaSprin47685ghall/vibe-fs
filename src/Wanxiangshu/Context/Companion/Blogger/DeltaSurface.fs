@@ -105,7 +105,7 @@ module BloggerDeltaSurface =
     let toolCall (tool: string) (args: string) : obj = toolCallPart tool args
     let toolResult (value: string) : obj = toolResultPart value
     let media (mediaType: obj) (digest: string) : obj = mediaPart mediaType digest
-    let byteCount (value: string) : int = SyntheticToml.byteCount value
+    let byteCount (value: string) : int = LlmFacing.byteCount value
     let messages (values: obj array) : obj = box values
 
     let cursor (turn: int) (part: int) : obj = box {| turn = turn; part = part |}
@@ -129,7 +129,7 @@ module BloggerDeltaSurface =
 
         BloggerDelta.nextChunk (intValue request?limit) cursor previousCutoff (messagesOfJs request?messages)
         |> Option.map (fun chunk ->
-            let bytes = SyntheticToml.byteCount chunk.Toml
+            let bytes = LlmFacing.byteCount chunk.Toml
             let items = chunk.Items |> List.map itemToJs |> List.toArray
 
             box

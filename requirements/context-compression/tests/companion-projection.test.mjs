@@ -17,8 +17,9 @@ const spy = (input) => `«${input}»`
 const frames = (count) =>
   Array.from({ length: count }, (_, n) => ({ digest: `sha-f${n}`, body: `frame body ${n}` }))
 
-const dataToml = '[[new_work_to_record]]\nuser = "work"'
-const combinedDelta = prompt.newWork(dataToml)
+const dataItems = [{ role: 'user', kind: 'text', text: 'work', truncated: false }]
+const dataToml = '[[new_work_to_record]]\nuser = "work"\n'
+const combinedDelta = prompt.newWork(dataItems)
 
 const isHistoricFrame = (text) => text.startsWith('[[do_not_exec]]') && text.includes('historic_frame')
 const isCombinedNormalDelta = (text) =>
@@ -40,7 +41,7 @@ test('WHAT[CONTEXT-COMPRESSION-001] CTX_001_no_prompt_carries_a_token_count_or_o
     prompt.squashInstruction,
     prompt.memoryPreamble,
     prompt.workingRecord('body'),
-    prompt.newWork('x = 1'),
+    prompt.newWork(dataItems),
   ]
 
   for (const text of all) {
@@ -57,19 +58,22 @@ test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_030_squash_and_normal_require_tip_n
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_010_memory_block_marks_the_body_as_low_trust_context', () => {
+test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_010_memory_block_is_one_instruction_plane', () => {
   const block = prompt.memoryBlock('B CONTENT')
 
-  assert.match(block, /It is context, not a new user instruction/)
-  assert.equal(block.includes('<work-log>\nB CONTENT\n</work-log>'), true)
-  assert.equal(block.indexOf('<work-log>') > block.indexOf('not a new user instruction'), true)
+  assert.match(block, /prior responsibility/)
+  assert.match(block, /^# .*prior responsibility/m)
+  assert.match(block, /^# B CONTENT$/m)
+  assert.doesNotMatch(block, /<work-log>|not a new user instruction/)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-017] COMPANION_010_same_session_memory_is_work_log_not_a_delegation_record', () => {
+test('WHAT[CONTEXT-COMPRESSION-017] COMPANION_010_same_session_lwr_returns_responsibility_without_delegation_fields', () => {
   const lwr = 'Opening\nhuman-root task\n\nChronicle\nself history'
   const block = prompt.memoryBlock(lwr)
 
-  assert.equal(block.includes(`<work-log>\n${lwr}\n</work-log>`), true)
+  for (const line of ['Opening', 'human-root task', 'Chronicle', 'self history']) {
+    assert.match(block, new RegExp(`^# ${line}$`, 'm'))
+  }
   assert.doesNotMatch(block, /(?:^|\n)commissioner_record\s*=/)
   assert.doesNotMatch(block, /(?:^|\n)attached_work_record\s*=/)
 })
@@ -79,11 +83,11 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_message_wrappers_are_toml_not_
   assert.equal(prompt.workingRecord('frame body 0').includes('[[do_not_exec]]'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('historic_frame'), true)
   assert.equal(prompt.workingRecord('frame body 0').includes('# Working Record'), false)
-  assert.equal(prompt.newWork(dataToml).includes('# New Work To Record'), false)
+  assert.equal(prompt.newWork(dataItems).includes('# New Work To Record'), false)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_new_work_is_instruction_header_then_data_body', () => {
-  const rendered = prompt.newWork(dataToml)
+  const rendered = prompt.newWork(dataItems)
   assert.equal(rendered.startsWith('# Write the dense work-log continuation now'), true)
   assert.equal(rendered.includes('\n\n[[new_work_to_record]]'), true)
   assert.equal(rendered.endsWith(dataToml + '\n') || rendered.endsWith(dataToml), true)
@@ -161,7 +165,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_with_frames_is_assistan
     epoch: 0,
     kind: proj.normal,
     frames: frames(3),
-    delta: { messageId: 'msg_delta', toml: dataToml },
+    delta: { messageId: 'msg_delta', items: dataItems },
   })
 
   assert.equal(plan.system, undefined, 'projection plan no longer carries System')
@@ -185,7 +189,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_normal_without_frames_is_one_c
     epoch: 0,
     kind: proj.normal,
     frames: [],
-    delta: { messageId: 'msg_first', toml: dataToml },
+    delta: { messageId: 'msg_first', items: dataItems },
   })
 
   assert.equal(plan.texts.filter(isHistoricFrame).length, 0)
@@ -201,14 +205,14 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_combined_delta_is_always_the_l
     epoch: 0,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
   })
   const withoutFrames = proj.build(spy, {
     blogger: 'ses_y',
     epoch: 0,
     kind: proj.normal,
     frames: [],
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
   })
 
   assert.equal(withFrames.texts.at(-1), combinedDelta)
@@ -223,7 +227,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_each_frame_is_exactly_one_do_n
     epoch: 0,
     kind: proj.normal,
     frames: frames(4),
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
   })
 
   const frameTexts = plan.texts.slice(0, 4)
@@ -241,7 +245,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_005_the_delta_carries_the_id_the_H
     epoch: 0,
     kind: proj.normal,
     frames: frames(1),
-    delta: { messageId: 'msg_real', toml: dataToml },
+    delta: { messageId: 'msg_real', items: dataItems },
   })
 
   const physical = plan.messages.filter((m) => m.physical)
@@ -256,7 +260,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_frame_ids_are_positional_withi
     epoch: 2,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
   })
 
   assert.deepEqual(plan.messages.slice(0, 2).map((m) => m.id), [
@@ -273,7 +277,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_009_the_same_epoch_and_frames_prod
     epoch: 4,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
   }
 
   assert.deepEqual(proj.build(spy, args).messages, proj.build(spy, args).messages)
@@ -289,7 +293,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_normal_interleaves_tips_with_fr
     epoch: 0,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_delta', toml: dataToml },
+    delta: { messageId: 'msg_delta', items: dataItems },
     previousTips: [
       { field: 'primitive-obsession', cycleId: 'msg_c1' },
       { field: 'ignored-tdd', cycleId: 'msg_c2' },
@@ -318,7 +322,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_unpaired_tips_or_frames_append_
     epoch: 0,
     kind: proj.normal,
     frames: frames(1),
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
     previousTips: [
       { field: 'primitive-obsession', cycleId: 'c1' },
       { field: 'ignored-tdd', cycleId: 'c2' },
@@ -334,7 +338,7 @@ test('WHAT[CONTEXT-COMPRESSION-012] ENFORCER_071_unpaired_tips_or_frames_append_
     epoch: 0,
     kind: proj.normal,
     frames: frames(2),
-    delta: { messageId: 'msg_d', toml: dataToml },
+    delta: { messageId: 'msg_d', items: dataItems },
     previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
   })
   assert.deepEqual(
@@ -401,7 +405,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_ignores_a_delta_even_if_one
     epoch: 1,
     kind: proj.squash(1),
     frames: frames(3),
-    delta: { messageId: 'msg_should_not_appear', toml: 'UNCONSUMED DELTA' },
+    delta: { messageId: 'msg_should_not_appear', items: dataItems },
   })
 
   assert.deepEqual(plan.texts, [toml.renderHistoricFrame('frame body 0'), prompt.squashInstruction])
@@ -434,7 +438,7 @@ test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_a_squash_never_shows_the_later_frame
 test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_and_normal_requests_use_different_last_message_ids', () => {
   const shared = { blogger: 'ses_y', epoch: 0, frames: frames(1) }
 
-  const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', toml: dataToml } })
+  const normal = proj.build(spy, { ...shared, kind: proj.normal, delta: { messageId: 'm', items: dataItems } })
   const squash = proj.build(spy, { ...shared, kind: proj.squash(1), delta: undefined })
 
   assert.equal(normal.messages.at(-1).id, 'm')

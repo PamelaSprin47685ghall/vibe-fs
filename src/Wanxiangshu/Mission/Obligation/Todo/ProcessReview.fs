@@ -49,23 +49,23 @@ module MagicTodoProcessReview =
 
     /// `preamble` is already-localized ProcessReviewer prose (PROMPT-019).
     let renderAssignmentUserMessage (preamble: string) (req: ProcessReviewRequest) : string =
-        let openingSections =
+        let instructions =
             if System.String.IsNullOrWhiteSpace req.OpeningRaw then
-                []
+                [ preamble ]
             else
-                [ "=== OpeningRaw (task authority) ==="; req.OpeningRaw ]
+                [ preamble; req.OpeningRaw ]
 
-        MagicTodoSurface.renderAssignmentUserMessage
-            preamble
-            [ yield! openingSections
-              "=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ==="
-              req.ManagerCheckpointLwr
-              "=== ACCOUNT RELATION ==="
-              sprintf "EffectivePlanComplete = %s" (if req.EffectivePlanComplete then "true" else "false")
-              "=== PRIOR CURRENT OBLIGATIONS ==="
-              MagicTodoSurface.renderObligationListWire req.OldTodo
-              "=== ACCEPTED OBLIGATION ACCOUNT UNDER REVIEW ==="
-              MagicTodoSurface.renderObligationListWire req.ProposedTodo ]
+        LlmFacing.instructions instructions
+        |> LlmFacing.withData
+            [ LlmFacing.Data.stringField "manager_checkpoint_lwr" req.ManagerCheckpointLwr
+              LlmFacing.Data.boolField "effective_plan_complete" req.EffectivePlanComplete
+              LlmFacing.Data.stringField
+                  "prior_current_obligations"
+                  (MagicTodoSurface.renderObligationListWire req.OldTodo)
+              LlmFacing.Data.stringField
+                  "accepted_obligation_account_under_review"
+                  (MagicTodoSurface.renderObligationListWire req.ProposedTodo) ]
+        |> LlmFacing.render
 
     /// ensureReview obligation predicate (HOST-021 / TODO-006):
     /// Accepted ∧ ¬TodoReviewConcluded → Rk must be ensure-able from any reentry site.

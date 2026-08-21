@@ -654,7 +654,7 @@ module SyncDelegateSurface =
                         role,
                         charge,
                         batch,
-                        (fun () -> Task.FromResult charge)
+                        (fun () -> Task.FromResult(LlmFacing.instruction charge))
                     )
 
                 return

@@ -84,19 +84,17 @@ module FissionStartup =
     /// Fresh lane startup deliberately uses a bounded LWR rather than transcript
     /// cloning. The lane input is copied exactly after the canonical parser.
     let render laneCount (lane: FissionLanePrompt) (ownerWorkRecord: string) =
-        String.concat
-            "\n"
+        LlmFacing.instructions
             [ "You are one coequal present of the same logical participant after Fission."
-              sprintf "lane_index = %d" lane.Index
-              sprintf "lane_count = %d" laneCount
-              ""
-              "[fission_input]"
+              "Your lane input follows. Carry it as your own current responsibility."
               lane.Prompt
-              ""
-              "[owner_lifecycle_work_record]"
+              "The owner lifecycle work record follows. Continue its unfinished responsibility."
               ownerWorkRecord
-              ""
               "Continue the same participant's responsibility. Do not treat sibling lanes as delegated agents." ]
+        |> LlmFacing.withData
+            [ LlmFacing.Data.intField "lane_index" lane.Index
+              LlmFacing.Data.intField "lane_count" laneCount ]
+        |> LlmFacing.render
 
 module FissionAdmission =
 

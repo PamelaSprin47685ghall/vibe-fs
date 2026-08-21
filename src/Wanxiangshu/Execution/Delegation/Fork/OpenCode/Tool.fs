@@ -300,8 +300,8 @@ module ForkTool =
         (attachment: string option)
         =
         task {
-            let basePrompt =
-                ForkChildPayload.relay
+            let baseDocument =
+                ForkChildPayload.relayDocument
                     (forkInstructions runtime.ParentId)
                     request.Charge
                     commissionerRecord
@@ -311,17 +311,17 @@ module ForkTool =
 
             if hasKeywords request then
                 match!
-                    RepositoryWarmStart.appendToBase
+                    RepositoryWarmStart.appendToBaseDocument
                         runtime.ParentId
                         role
                         scope.WorkspaceDirectory
                         request.Keywords
-                        basePrompt
+                        baseDocument
                 with
-                | Ok prompt -> return prompt
-                | Error _ -> return basePrompt
+                | Ok prompt -> return LlmFacing.render prompt
+                | Error _ -> return LlmFacing.render baseDocument
             else
-                return basePrompt
+                return LlmFacing.render baseDocument
         }
 
     let private isSelfAttachment (request: Request) =

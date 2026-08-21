@@ -81,9 +81,8 @@ open Wanxiangshu.Strength
 /// No status / count / ordinal / kind / agent / code / message DTO plane.
 ///
 /// Directional LWR plane (DELEG-013 / DELEG-019 / PROVIDER-PROJECTION-009):
-/// child → parent join MUST keep the WorkRecord as entry-local `# LWR`
-/// (`SyntheticToml.comment`). Do NOT wrap it in `work_record = …` or any other
-/// TOML data field. Parent → child fork payload is the opposite contract
+/// child → parent join MUST keep the WorkRecord in Instruction Plane. Do NOT
+/// wrap it in `work_record = …` or any other TOML data field. Parent → child fork payload is the opposite contract
 /// (`commissioner_record` / `attached_work_record` fields) — do not conflate.
 module JoinResultRenderer =
 
@@ -156,11 +155,9 @@ module JoinResultRenderer =
 
     let private ensureInstruction (text: string) = text.Trim()
 
-    let private renderEntry (instructions: string list) (body: string list) : string =
-        SyntheticToml.document (instructions |> List.map ensureInstruction) body
-
-    let private joinBlocks (blocks: string list) : string =
-        (String.concat "\n\n" (blocks |> List.filter (fun s -> s <> ""))) + "\n"
+    let private entry (instructions: string list) (body: LlmFacing.DataBlock list) : LlmFacing.Document =
+        LlmFacing.instructions (instructions |> List.map ensureInstruction)
+        |> LlmFacing.withData body
 
     let private fallbackByname (agentId: string) (agentNameRaw: string) =
         match ManagedAgent.tryParse agentNameRaw with
@@ -198,12 +195,12 @@ module JoinResultRenderer =
         | _, Some _ -> ""
         | _, None -> outcome
 
-    let private terminalBody (outcome: string) (detail: string option) : string list =
+    let private terminalBody (outcome: string) (detail: string option) : LlmFacing.DataBlock list =
         let exitCode = tryParseExitCode outcome
 
         let fields =
             match exitCode with
-            | Some code -> [ SyntheticToml.field "exit_code" (string code) ]
+            | Some code -> [ LlmFacing.Data.intField "exit_code" code ]
             | None -> []
 
         let output = outputText outcome detail exitCode
@@ -211,7 +208,7 @@ module JoinResultRenderer =
         if String.IsNullOrWhiteSpace output then
             fields
         else
-            fields @ [ SyntheticToml.field "output" (SyntheticToml.renderString output) ]
+            fields @ [ LlmFacing.Data.stringField "output" output ]
 
     let private terminalLabel lang (resolveTerminalLabel: string -> string) (ptyId: string) =
         let resolved = resolveTerminalLabel ptyId
@@ -229,55 +226,50 @@ module JoinResultRenderer =
             | JoinInterruptReason.UserMessageArrived -> Path.InterruptUserMessage
             | JoinInterruptReason.DeadlineExpired -> Path.InterruptDeadline
 
-        renderEntry [ prose lang path Map.empty ] []
+        entry [ prose lang path Map.empty ] [] |> LlmFacing.render
 
     let private renderAgentCompleted
         (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (completion: RunCompletion)
         (payload: AgentCompletionPayload)
-        : string =
+        : LlmFacing.Document =
         let name =
             byname resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
 
-        let instructions = [ bynameLine lang Path.AgentReturned name ]
-
-        let body =
-            // Child → parent: `# LWR` (entry-local comment). Never a TOML field.
+        let instructions =
             if String.IsNullOrWhiteSpace payload.WorkRecord then
-                []
+                [ bynameLine lang Path.AgentReturned name ]
             else
-                [ SyntheticToml.comment payload.WorkRecord ]
+                [ bynameLine lang Path.AgentReturned name; payload.WorkRecord ]
 
-        renderEntry instructions body
+        entry instructions []
 
     let private renderAgentFailed
         (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (completion: RunCompletion)
         (payload: AgentFailurePayload)
-        : string =
+        : LlmFacing.Document =
         let name =
             byname resolveAgentName (AgentCompletion.agentId completion.Outcome) completion.AgentName
 
-        let instructions = [ bynameLine lang Path.AgentFailed name ]
-
-        let body =
+        let instructions =
             if String.IsNullOrWhiteSpace payload.Message then
-                []
+                [ bynameLine lang Path.AgentFailed name ]
             else
-                [ SyntheticToml.comment payload.Message ]
+                [ bynameLine lang Path.AgentFailed name; payload.Message ]
 
-        renderEntry instructions body
+        entry instructions []
 
     let private renderAgentAbandoned
         (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (agentId: string)
         (agentNameRaw: string)
-        : string =
+        : LlmFacing.Document =
         let name = byname resolveAgentName agentId agentNameRaw
-        renderEntry [ bynameLine lang Path.AgentDidNotReturn name ] []
+        entry [ bynameLine lang Path.AgentDidNotReturn name ] []
 
     let private renderPtyEnded
         (lang: ProviderLanguage)
@@ -286,16 +278,16 @@ module JoinResultRenderer =
         (ptyId: string)
         (outcome: string)
         (detail: string option)
-        : string =
+        : LlmFacing.Document =
         let label = terminalLabel lang resolveTerminalLabel ptyId
-        renderEntry [ prose lang templatePath (Map [ "label", label ]) ] (terminalBody outcome detail)
+        entry [ prose lang templatePath (Map [ "label", label ]) ] (terminalBody outcome detail)
 
     let private renderAgentJoinItem
         (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (completion: RunCompletion)
         (item: AgentJoinItem)
-        : string =
+        : LlmFacing.Document =
         match item with
         | AgentCompletedItem payload -> renderAgentCompleted lang resolveAgentName completion payload
         | AgentFailedItem payload -> renderAgentFailed lang resolveAgentName completion payload
@@ -305,7 +297,7 @@ module JoinResultRenderer =
         (lang: ProviderLanguage)
         (resolveTerminalLabel: string -> string)
         (item: PtyJoinItem)
-        : string =
+        : LlmFacing.Document =
         match item with
         | PtyExited payload -> renderPtyEnded lang resolveTerminalLabel Path.PtyEnded payload.PtyId payload.Outcome None
         | PtyFailed payload ->
@@ -323,7 +315,7 @@ module JoinResultRenderer =
         (lang: ProviderLanguage)
         (resolveAgentName: string -> string)
         (agentItem: AgentJoinItem)
-        : string =
+        : LlmFacing.Document =
         let nameStub =
             match agentItem with
             | AgentCompletedItem p ->
@@ -352,7 +344,7 @@ module JoinResultRenderer =
         (resolveAgentName: string -> string)
         (resolveTerminalLabel: string -> string)
         (item: JoinItem)
-        : string =
+        : LlmFacing.Document =
         match item with
         | AgentItem agentItem -> renderAgentItem lang resolveAgentName agentItem
         | PtyItem ptyItem -> renderPtyJoinItem lang resolveTerminalLabel ptyItem
@@ -366,7 +358,8 @@ module JoinResultRenderer =
         : string =
         NonEmptyBatch.toList batch
         |> List.map (renderJoinItem lang resolveAgentName resolveTerminalLabel)
-        |> joinBlocks
+        |> LlmFacing.combine
+        |> LlmFacing.render
 
     let private orchestratorLine (lang: ProviderLanguage) (verdict: OrchestratorVerdict) : string =
         let path =
@@ -382,8 +375,9 @@ module JoinResultRenderer =
     /// EXEC-019: orchestrator verdict batch (FIFO; caller already capped at MaxJoinBatch).
     let renderOrchestratorBatch (lang: ProviderLanguage) (verdicts: NonEmptyBatch<OrchestratorVerdict>) : string =
         NonEmptyBatch.toList verdicts
-        |> List.map (fun verdict -> renderEntry [ orchestratorLine lang verdict ] [])
-        |> joinBlocks
+        |> List.map (fun verdict -> entry [ orchestratorLine lang verdict ] [])
+        |> LlmFacing.combine
+        |> LlmFacing.render
 
     /// True ForkError path — natural language only (not user interrupt).
     let renderForkError (lang: ProviderLanguage) (error: ForkError) (resolveAgentName: string -> string) : string =
@@ -400,4 +394,4 @@ module JoinResultRenderer =
             | ForkError.TimedOut -> prose lang Path.ForkTimedOut Map.empty
             | ForkError.TerminalMaterializationFailed _ -> prose lang Path.ForkMaterializationFailed Map.empty
 
-        renderEntry [ line ] []
+        entry [ line ] [] |> LlmFacing.render

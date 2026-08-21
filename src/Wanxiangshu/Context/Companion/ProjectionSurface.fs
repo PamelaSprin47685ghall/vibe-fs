@@ -53,8 +53,13 @@ module CompanionProjectionSurface =
     let previousTip (fieldName: string) (cycleId: string) : string =
         CompanionPrompt.previousTipMessage fieldName cycleId
 
-    let newWork (toml: string) : string =
-        CompanionPrompt.newWorkMessage normalLines toml
+    let private itemsOfJs (value: obj) =
+        match BloggerDeltaItemWire.tryListOfJs value with
+        | Ok items -> items
+        | Error error -> invalidArg "items" error
+
+    let newWork (items: obj array) : string =
+        CompanionPrompt.newWorkMessage normalLines (itemsOfJs (box items))
 
     let memoryBlock (body: string) : string =
         CompanionPrompt.companionMemoryBlock memoryPreambleValue body
@@ -136,7 +141,7 @@ module CompanionProjectionSurface =
             if isNullish value?delta then
                 None
             else
-                Some(text value?delta?messageId, text value?delta?toml)
+                Some(text value?delta?messageId, itemsOfJs value?delta?items)
 
         let tipValues =
             if isNullish value?previousTips then

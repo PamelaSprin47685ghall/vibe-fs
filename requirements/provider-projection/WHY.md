@@ -16,6 +16,9 @@
 - **意图冲突静默选边**：多个意图修改同一锚点且缺乏明确合并律时，系统静默选择先注册者生效而非显式报错（fail-closed）。
 - **表示层反向解析为权威**：将渲染后的 Wire/TOML 文本反向解析为控制流、领域状态或权限凭证。
 - **混淆语义相等与传输相等**：将包含易失元数据（时间戳、耗时、调用 ID）的传输层视图用于计算规范语义摘要。
+- **把来源误当成分面依据**：看到“record/evidence/result”就机械放入字段，忽略它对当前 Agent 实际承担的是责任交接或行动约束；child → parent LWR 因而被错误降格成“参考数据”。
+- **多 renderer 漂移**：feature owner 各自拼 `#`、Markdown/XML envelope、TOML table 或空行，单处看似可读，组合后却出现第二 instruction block、字段被 table 吸收、或同一概念在不同路径使用不同形状。
+- **render 后再组合**：多个各自合法的 document 在字符串层拼接，导致整体不再满足 instruction-first/data-second 的唯一语法与认知结构。
 
 ## 独立变化能力
 

@@ -112,6 +112,7 @@ module BloggerCoordinator =
             [],
             createObj
                 [ "kind", box "main"
+                  "items", box (main.Items |> List.map BloggerDeltaItemWire.toJs |> List.toArray)
                   "toml", box main.Toml
                   "delta_digest", box (BlobDigest.value main.DeltaDigest)
                   "prev_ingest", box main.PreviousIngestedThroughSequence

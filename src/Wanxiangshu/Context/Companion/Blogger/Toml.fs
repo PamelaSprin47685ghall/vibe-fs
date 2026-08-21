@@ -28,7 +28,7 @@ open Wanxiangshu.Strength.Prediction
 
 /// CTX-013: what a Blogger delta part is, and how it renders as TOML.
 ///
-/// Shared syntax lives in `SyntheticToml` (ARCH-010). This module owns the
+/// Shared syntax lives in `LlmFacing` (ARCH-010). This module owns the
 /// Blogger-local schema only:
 ///
 ///   delta item     → `[[new_work_to_record]]` with a kind field
@@ -91,27 +91,34 @@ module BloggerToml =
     ///   media_omitted = media_type | "untyped"
     ///
     /// Absent optional fields are omitted. `truncated = true` only when set.
-    let renderItem (item: BloggerDeltaItem) : string =
-        let field name value = SyntheticToml.field name value
-        let value text = SyntheticToml.renderString text
-        let truncated = if item.Truncated then [ field "truncated" "true" ] else []
+    let dataBlock (item: BloggerDeltaItem) : LlmFacing.DataBlock =
+        let truncated =
+            if item.Truncated then
+                [ LlmFacing.Data.boolMember "truncated" true ]
+            else
+                []
 
         let entry fields =
-            SyntheticToml.tableArrayEntry NewWorkTable (fields @ truncated)
+            LlmFacing.Data.tableArray NewWorkTable (fields @ truncated)
 
         match item.Part with
         | BloggerDeltaPart.TextPart text ->
             // Role is the field name: user / assistant / tool / …
-            entry [ field item.Role (value text) ]
-        | BloggerDeltaPart.ReasoningPart text -> entry [ field "reasoning" (value text) ]
+            entry [ LlmFacing.Data.stringMember item.Role text ]
+        | BloggerDeltaPart.ReasoningPart text -> entry [ LlmFacing.Data.stringMember "reasoning" text ]
         | BloggerDeltaPart.ToolCallPart(tool, args) ->
             // `args` is already canonical from the Host codec; do not re-sort.
-            entry [ field "tool_call" (value tool); field "arguments" (value args) ]
-        | BloggerDeltaPart.ToolResultPart text -> entry [ field "tool_result" (value text) ]
+            entry
+                [ LlmFacing.Data.stringMember "tool_call" tool
+                  LlmFacing.Data.stringMember "arguments" args ]
+        | BloggerDeltaPart.ToolResultPart text -> entry [ LlmFacing.Data.stringMember "tool_result" text ]
         | BloggerDeltaPart.ImageOmitted mediaType
         | BloggerDeltaPart.MediaOmitted mediaType ->
             let mediaValue = mediaType |> Option.defaultValue "untyped"
-            entry [ field "media_omitted" (value mediaValue) ]
+            entry [ LlmFacing.Data.stringMember "media_omitted" mediaValue ]
+
+    let renderItem (item: BloggerDeltaItem) : string =
+        LlmFacing.empty |> LlmFacing.withData [ dataBlock item ] |> LlmFacing.render
 
     /// Message-layer historic frame: low-trust prior work-log, not an instruction.
     ///
@@ -120,11 +127,10 @@ module BloggerToml =
     ///
     /// Frame blob text stays pure body; this wrapper is projection-only (COMPANION-005).
     let renderHistoricFrame (frameBody: string) : string =
-        SyntheticToml.document
-            []
-            [ SyntheticToml.tableArrayEntry
-                  DoNotExecTable
-                  [ SyntheticToml.field "historic_frame" (SyntheticToml.renderString frameBody) ] ]
+        LlmFacing.empty
+        |> LlmFacing.withData
+            [ LlmFacing.Data.tableArray DoNotExecTable [ LlmFacing.Data.stringMember "historic_frame" frameBody ] ]
+        |> LlmFacing.render
 
     /// ENFORCER-071: one low-trust prior tip block (not a parent instruction).
     ///
@@ -133,17 +139,22 @@ module BloggerToml =
     ///   tip = "primitive-obsession"
     ///   cycle = "…"
     let renderPreviousEnforcerTip (tipField: string) (cycleId: string) : string =
-        SyntheticToml.document
-            []
-            [ SyntheticToml.tableArrayEntry
+        LlmFacing.empty
+        |> LlmFacing.withData
+            [ LlmFacing.Data.tableArray
                   DoNotExecTable
-                  [ SyntheticToml.field "kind" (SyntheticToml.renderString "previous_enforcer_tip")
-                    SyntheticToml.field "tip" (SyntheticToml.renderString tipField)
-                    SyntheticToml.field "cycle" (SyntheticToml.renderString cycleId) ] ]
+                  [ LlmFacing.Data.stringMember "kind" "previous_enforcer_tip"
+                    LlmFacing.Data.stringMember "tip" tipField
+                    LlmFacing.Data.stringMember "cycle" cycleId ] ]
+        |> LlmFacing.render
+
+    let documentWith (instructions: string list) (items: BloggerDeltaItem list) : LlmFacing.Document =
+        LlmFacing.instructions instructions
+        |> LlmFacing.withData (items |> List.map dataBlock)
 
     /// CTX-013: the whole document, optionally carrying an instruction header.
     let renderWith (instructions: string list) (items: BloggerDeltaItem list) : string =
-        SyntheticToml.document instructions (items |> List.map renderItem)
+        documentWith instructions items |> LlmFacing.render
 
     /// The data-only document for callers whose instruction is carried separately.
     let render (items: BloggerDeltaItem list) : string = renderWith [] items

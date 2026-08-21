@@ -47,7 +47,7 @@ and internal SyncDelegateInvocation =
         Role: SyncDelegateRole
         Charge: string
         ExpectedToolCalls: int option
-        PrepareProviderPrompt: unit -> Task<string>
+        PrepareProviderPrompt: unit -> Task<LlmFacing.Document>
         Batch: SyncDelegateBatch option
         Completion: TaskCompletionSource<Result<SyncDelegateInvocationResult, string>>
         /// EXEC-031: XTrace head (one-past last part, 0 when empty) captured at

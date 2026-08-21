@@ -87,7 +87,7 @@ const assertWireEqual = (a, b, label) => {
 }
 
 const toolNames = (messages) => messages.map((m) => m.parts[0]?.tool)
-const skillContent = (markerText) => `<skill_content name="">\n${markerText.trim()}\n</skill_content>`
+const skillContent = (markerText) => markerText
 const callIdOf = (messages, index) => messages[index].parts[0].callID
 
 /** Fresh durable journal in a temp dir. */
@@ -158,7 +158,7 @@ test('WHAT[PREFIX-STABILITY-010] H13_02_historical_pair_never_relocates_to_curre
   assertPrefixLaw(wire1, wire2, 'H13-02 no historical relocation')
 })
 
-test('WHAT[PREFIX-STABILITY-010] H13_02b_pre_skill_history_replays_its_original_hyphen_wire', async () => {
+test('WHAT[PREFIX-STABILITY-010] H13_02b_durable_history_replays_the_current_skill_wire_only', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-h1302b-'))
   const opened = await openJournal(dir)
   try {
@@ -166,8 +166,8 @@ test('WHAT[PREFIX-STABILITY-010] H13_02b_pre_skill_history_replays_its_original_
     const appended = await pair.appendAnchoredPair(opened.journal, {
       session,
       ordinal: 1n,
-      callId: 'legacy-pair-call',
-      markerText: 'legacy raw marker bytes',
+      callId: 'pair-call',
+      markerText: pair.text,
       callGapAfter: { kind: 'start' },
       resultGapAfter: { kind: 'start' },
     })
@@ -175,9 +175,9 @@ test('WHAT[PREFIX-STABILITY-010] H13_02b_pre_skill_history_replays_its_original_
 
     const wire = await inject(opened.journal, session, [])
     assert.equal(wire.length, 1)
-    assert.equal(wire[0].parts[0].tool, '-')
-    assert.deepEqual(wire[0].parts[0].state.input, {})
-    assert.equal(wire[0].parts[0].state.output, 'legacy raw marker bytes')
+    assert.equal(wire[0].parts[0].tool, 'skill')
+    assert.deepEqual(wire[0].parts[0].state.input, { name: '' })
+    assert.equal(wire[0].parts[0].state.output, pair.text)
   } finally {
     pair.disposeJournal(opened.journal)
     rmSync(dir, { recursive: true, force: true })

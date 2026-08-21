@@ -97,13 +97,12 @@ test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_renderer_enforces_24_hint_and
   assert.ok(parsed.repository_hint_omitted > 0)
 })
 
-test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_append_preserves_authoritative_base_prompt_and_only_adds_appendix', () => {
-  const base = '# authoritative assignment\ncontent = "keep-me"\n'
+test('WHAT[REPOSITORY-INVESTIGATION-009] AGENT_032_append_composes_authoritative_instruction_before_reference_hints', () => {
+  const base = 'authoritative assignment'
   const rendered = appendAppendix(base, [search(1, 'q', [hint(1, 1, 'src/a.fs', 'orientation')])])
 
-  assert.ok(rendered.startsWith(base.trimEnd()))
+  assert.ok(rendered.startsWith('# authoritative assignment\n'))
   const parsed = parseToml(rendered)
-  assert.equal(parsed.content, 'keep-me')
   assert.equal(parsed.repository_hint[0].content, 'orientation')
 })
 
@@ -165,7 +164,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-007] AGENT_032_zero_keywords_is_byte_exact_z
 
   try {
     const zero = await warmStart.prepareWithSearch(searchFn, sid, 'Browser', root, ' \r\n ', 'raw charge')
-    assert.deepEqual(zero, { ok: true, value: 'raw charge' })
+    assert.deepEqual(zero, { ok: true, value: '# raw charge\n' })
     assert.equal(calls, 0)
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -187,7 +186,7 @@ test('WHAT[REPOSITORY-INVESTIGATION-008] AGENT_032_nonconsumer_nonempty_keywords
     assert.equal(calls, 0)
 
     const noWorkspace = await warmStart.appendToBaseWithSearch(searchFn, sid, 'Coder', undefined, 'repo', 'base')
-    assert.deepEqual(noWorkspace, { ok: true, value: 'base' })
+    assert.deepEqual(noWorkspace, { ok: true, value: '# base\n' })
     assert.equal(calls, 0)
   } finally {
     rmSync(root, { recursive: true, force: true })

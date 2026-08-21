@@ -731,6 +731,9 @@ export const G2_INSPECTOR_CANARY_PROMPT =
 export const G2_Q1 = 'G2Q1: who owns PromptAuthority?';
 export const G2_Q2 = 'G2Q2: what is ReuseScope?';
 export const G2_Q3 = 'G2Q3: when does CaseFinalize run?';
+const G2_Q1_WIRE = '# G2Q1: who owns PromptAuthority?';
+const G2_Q2_WIRE = '# G2Q2: what is ReuseScope?';
+const G2_Q3_WIRE = '# G2Q3: when does CaseFinalize run?';
 export const G2_A1 = 'G2A1: Host owns PromptAuthority.';
 export const G2_A2 = 'G2A2: Owner session scope for one Inspector.';
 export const G2_A3 = 'G2A3: On owner ReuseScope close.';
@@ -769,7 +772,7 @@ export function extractInspectorIdFromOwnerRequests(requests) {
   const chats = chatRequests(requests ?? []);
   for (const body of chats) {
     const text = lastUserText(body);
-    if (text.startsWith(G2_Q1) || text.startsWith(G2_Q2) || text.startsWith(G2_Q3)) {
+    if (text.startsWith(G2_Q1_WIRE) || text.startsWith(G2_Q2_WIRE) || text.startsWith(G2_Q3_WIRE)) {
       const sid = body.sessionID;
       if (typeof sid === 'string' && sid.length > 0) return sid;
     }
@@ -846,9 +849,9 @@ export function assertG2InspectorBatchCoalescing(scenario, expectedInspectorSess
 
 export function assertG2InspectorPrefixLaw(scenario) {
   const requests = chatRequests(scenario.provider.requests);
-  const q1 = requests.filter((body) => lastUserText(body).startsWith(G2_Q1));
-  const q2 = requests.filter((body) => lastUserText(body).startsWith(G2_Q2));
-  const q3 = requests.filter((body) => lastUserText(body).startsWith(G2_Q3));
+  const q1 = requests.filter((body) => lastUserText(body).startsWith(G2_Q1_WIRE));
+  const q2 = requests.filter((body) => lastUserText(body).startsWith(G2_Q2_WIRE));
+  const q3 = requests.filter((body) => lastUserText(body).startsWith(G2_Q3_WIRE));
   // Each Inspector question begins with the SyncDelegate SendPrompt wire pinned by
   // g2-inspector-qN.0. After EXEC-031 the child completes with ordinary assistant
   // text — no return tool on the wire.

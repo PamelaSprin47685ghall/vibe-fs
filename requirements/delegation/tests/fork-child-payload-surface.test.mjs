@@ -56,24 +56,24 @@ test('WHAT[DELEG-019] P3_SURFACE_commissioner_record_is_toml_data_field', () => 
   assert.ok(!doc.includes(`# ${RECORD}`))
 })
 
-test('WHAT[DELEG-019] P3_SURFACE_requirements_render_table_array_with_one_based_ordinals', () => {
+test('WHAT[DELEG-019] P3_SURFACE_root_requirements_are_child_instructions_not_reference_data', () => {
   const doc = render('en', input({ RootRequirements: ['Ship it.', 'Add tests.'] }))
   const parsed = parseToml(doc)
-  assert.deepEqual(parsed.root_requirement, [
-    { ordinal: 1, text: 'Ship it.' },
-    { ordinal: 2, text: 'Add tests.' },
-  ])
+  assert.match(doc, /^# Ship it\.$/m)
+  assert.match(doc, /^# Add tests\.$/m)
+  assert.equal(parsed.root_requirement, undefined)
 })
 
-test('WHAT[DELEG-019] P3_SURFACE_payload_renders_content_field_first', () => {
+test('WHAT[DELEG-019] P3_SURFACE_payload_is_reference_data_after_all_instructions', () => {
   const doc = render('en', input({ Payload: 'hello' }))
   const parsed = parseToml(doc)
   assert.equal(parsed.content, 'hello')
   assert.ok(doc.includes('content = "hello"'))
 
-  // With requirements present, content still precedes the table array.
+  // Root requirements constrain the child, so they remain comments before data.
   const both = render('en', input({ Payload: 'hello', RootRequirements: ['Ship it.'] }))
-  assert.ok(both.indexOf('content =') < both.indexOf('[[root_requirement]]'))
+  assert.ok(both.indexOf('# Ship it.') < both.indexOf('content ='))
+  assert.equal(parseToml(both).root_requirement, undefined)
 })
 
 test('WHAT[DELEG-019] P3_SURFACE_undefined_optional_fields_are_absent_not_empty', () => {

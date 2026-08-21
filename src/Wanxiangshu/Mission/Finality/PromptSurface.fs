@@ -19,12 +19,15 @@ module PromptSurface =
 
     let private rawResource (semanticPath: string) : string =
         ProviderResources.readText english semanticPath
-        |> SyntheticToml.normalizeNewlines
+        |> LlmFacing.normalizeNewlines
         |> fun text -> text.Trim()
 
     let private document (semanticPath: string) : string =
         ProviderProse.document english semanticPath Map.empty
-        |> SyntheticToml.normalizeNewlines
+        |> LlmFacing.normalizeNewlines
+
+    let private instructionLines (semanticPath: string) : string list =
+        ProviderProse.instructionLines english semanticPath Map.empty
 
     let private narrativePartView (part: ManagerNarrative.NarrativePart) : obj =
         box
@@ -47,7 +50,7 @@ module PromptSurface =
         document ManagerNarrative.Path.T1Revelation
 
     let wrapT1AcceptedResult (todoWriteResult: string) : string =
-        ManagerNarrative.wrapT1AcceptedResult (t1RevelationDocument ()) todoWriteResult
+        ManagerNarrative.wrapT1AcceptedResult (instructionLines ManagerNarrative.Path.T1Revelation) todoWriteResult
 
     let firstBirth (userTextRaw: string) : obj =
         ManagerNarrative.firstBirth userTextRaw (planningTableDocument ())
@@ -75,10 +78,10 @@ module PromptSurface =
         document ManagerLifecyclePrompt.Path.IdleEncouragementPostT1
 
     let rejected (reviewerWorkRecord: string) : string =
-        FinalityPrompt.rejected (document FinalityPrompt.Path.Rejected) reviewerWorkRecord
+        FinalityPrompt.rejected (instructionLines FinalityPrompt.Path.Rejected) reviewerWorkRecord
 
     let blessed (workRecordBundle: string) : string =
-        FinalityPrompt.blessed (document FinalityPrompt.Path.Blessed) workRecordBundle
+        FinalityPrompt.blessed (instructionLines FinalityPrompt.Path.Blessed) workRecordBundle
 
     let rest () : string = document FinalityPrompt.Path.Rest
 

@@ -43,10 +43,11 @@ test('WHAT[REQUIREMENT-GROUNDING-007] ordinary providers replay anchored read ca
     const cursorPair = await pair.tryInject('cursor', pair.text, toolBatch('cursor', sourcePath))
     const cursor = await grounding.projectWithJournal(cursorJournal.journal, 'cursor', cursorPair.value)
     const terminal = cursor.value.at(-1).parts[0].state.output
-    const skillAt = terminal.indexOf('<skill_content name="">')
-    const requirementAt = terminal.indexOf('<requirement_read path="requirements/alpha/WHAT.md">')
-    assert.ok(skillAt >= 0 && requirementAt > skillAt)
-    assert.ok(terminal.includes(`${grounding.cursorSeparator}<requirement_read`))
+    const pairAt = terminal.indexOf(pair.text.trim())
+    const requirementAt = terminal.indexOf('requirement_source_path = "requirements/alpha/WHAT.md"')
+    assert.ok(pairAt >= 0 && requirementAt > pairAt)
+    assert.ok(terminal.includes(`${grounding.cursorSeparator}# ground truth`))
+    assert.doesNotMatch(terminal, /<skill_content|<requirement_read/)
     assert.equal(cursor.value.some((m) => m.info?.source === grounding.source), false, 'Cursor has result-only grounding')
 
     const score = pluginTransformsSource.slice(

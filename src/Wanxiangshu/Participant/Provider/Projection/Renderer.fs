@@ -38,7 +38,9 @@ open Wanxiangshu.Foundation.Identity
 module ProjectionConstants =
     /// InteractionRepair 协议修复指令（ENFORCER-060/061）。Domain 单源。
     let RepairInstruction =
-        "# Protocol repair\n\nCall the chronicle tool exactly once with a non-empty entry. Do not answer in prose."
+        LlmFacing.renderInstructions
+            [ "Protocol repair"
+              "Call the chronicle tool exactly once with a non-empty entry. Do not answer in prose." ]
 
     /// HOST-013 pair guideline semantic path (PROMPT-019). Prose lives in
     /// `resources/provider/host/pair-programming-guideline/{en,zh-CN}.md`.

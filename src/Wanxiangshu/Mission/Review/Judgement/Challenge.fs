@@ -9,4 +9,4 @@ module ReviewChallenge =
 
     let Path = "review/challenge"
 
-    let promptOf (text: string) : string = SyntheticToml.document [ text ] []
+    let promptOf (text: string) : string = LlmFacing.renderInstruction text

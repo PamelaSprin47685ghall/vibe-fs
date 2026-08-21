@@ -37,7 +37,9 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 
 ## PROVIDER-PROJECTION-009: 指令面与数据面的划分由消费语义决定
 
-合成内容中的分面规则基于接收方角色对内容的消费语义裁决：面向行动与认知的即时指导归入 Instruction Plane（顶部 `#` 注释），状态、参数与证据值归入 Data Plane（TOML 字段/表格）。来源可信度或语法外形不得作为划分依据。
+合成内容中的分面规则基于**当前接收 Agent 对内容的消费语义**裁决，而不是内容的来源：凡是要求当前 Agent 行动、约束当前 Agent、改变其推理前提、为其续接责任或告诉它“接下来据此做什么”的内容，均属于广义 Instruction Plane，必须位于顶部连续 `#` 注释；只有当前 Agent 仅作参考、不由该材料本身产生行动要求的状态、参数、观测与证据值，才属于 Data Plane，必须编码为 TOML 字段/表格。
+
+因此“事实”不天然等于 Data。典型反例：child → parent 的 LifecycleWorkRecord 虽然是已发生事实，但其接收语义是把未完成责任交还父 Agent 继续执行，所以属于 Instruction Plane；repository hint、可核对的状态快照等仅供参考材料才属于 Data Plane。来源可信度、生产模块、原始语法或是否称作 record/report 均不得代替接收语义判断。
 
 ## PROVIDER-PROJECTION-010: 表示层严禁反向创造权威与状态
 
@@ -50,3 +52,13 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 ## PROVIDER-PROJECTION-012: 确定性渲染器保证同输入必同字节
 
 渲染器必须保证纯函数确定性：统一采用 LF 换行、固定的转义规则与字段排序，以 UTF-8 字节计算长度。相同语义输入在任何运行环境下必须产生完全相同的字节序列。
+
+## PROVIDER-PROJECTION-013: 所有 LLM-facing 合成内容只有一个表示所有者
+
+所有 production 中由 Wanxiangshu 合成并最终可被 LLM 看到的 system prompt、user/assistant synthetic message、continuation、fork/fission/delegation handoff、tool result、provider projection 注入、context/prefix material 与其它广义提示，只能先构造成 `LlmFacing.Document`，再由 `LlmFacing.render` 一次性得到最终文本。业务模块只能声明 Instruction Plane 与 Data Plane 的语义内容，不得自行添加 `#`、`[table]`、`key = value`、XML/Markdown envelope、空行分隔、TOML 转义，也不得把多个已经 render 的 document 再用字符串拼接。
+
+`SyntheticToml` 是 `LlmFacing` 背后的低层 canonical TOML writer，不是业务模块的格式化 API。任何新的 LLM-facing 表示需求必须扩展 `LlmFacing` 的强类型构造能力，而不是在 feature owner 中复制格式规则。
+
+## PROVIDER-PROJECTION-014: 一个物理 LLM-facing payload 只能 render 一次
+
+Instruction 与 Data 必须在 render 前组合。禁止 `render(A) + render(B)`、`render(A) + prose`、`prose + render(B)` 或任何等价的后渲染拼接。该规则确保所有 instruction 永远位于第一个 data field/table 之前，并阻止后追加 bare field 被 TOML 最后一个 table 静默吸收。批量 join、warm-start appendix、parent delta、finality record、T1 tool result 等组合场景同样适用。

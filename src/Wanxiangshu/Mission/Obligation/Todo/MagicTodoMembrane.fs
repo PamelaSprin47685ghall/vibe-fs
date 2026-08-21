@@ -474,22 +474,34 @@ module MagicTodoMembrane =
         else
             Error AcceptRejection.OutputDigestMismatch
 
-    let private previousReviewBody (lang: ProviderLanguage) (previousReview: PreviousReviewView option) =
+    let private previousReviewInstructions (lang: ProviderLanguage) (previousReview: PreviousReviewView option) =
         match previousReview with
         | Some previous when previous.Verdict = ProcessReviewVerdict.Revise ->
-            ProviderProse.render
+            ProviderProse.instructionLines
                 lang
                 MagicTodoSurface.Path.PreviousReviewBody
                 (MagicTodoSurface.previousReviewSubs (ProcessReviewVerdict.wire previous.Verdict) previous.ReportText)
-        | _ -> ""
+        | _ -> []
 
-    let private enrichAcceptedResult (managerSessionId: SessionId) (isT1Commitment: bool) (rendered: string) =
-        if isT1Commitment then
-            ManagerNarrative.wrapT1AcceptedResult
-                (ProviderProse.documentFor managerSessionId ManagerNarrative.Path.T1Revelation Map.empty)
-                rendered
-        else
-            rendered
+    let private enrichAcceptedResult
+        (managerSessionId: SessionId)
+        (isT1Commitment: bool)
+        (document: LlmFacing.Document)
+        =
+        let combined =
+            if isT1Commitment then
+                LlmFacing.combine
+                    [ LlmFacing.instructions (
+                          ProviderProse.instructionLines
+                              (ProviderProse.languageOf managerSessionId)
+                              ManagerNarrative.Path.T1Revelation
+                              Map.empty
+                      )
+                      document ]
+            else
+                document
+
+        LlmFacing.render combined
 
     let private acceptFresh
         (journal: AgentJournal)
@@ -522,16 +534,12 @@ module MagicTodoMembrane =
                   SemanticVersion = bridge.Prepared.SemanticVersion }
 
             let lang = ProviderProse.languageOf bridge.ManagerSessionId
-            let previousBody = previousReviewBody lang bridge.PreviousReview
-
-            let acceptedEpilogue =
-                ProviderProse.render lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
 
             let rendered =
-                ProviderProse.render
-                    lang
-                    MagicTodoSurface.Path.ObligationWriteResult
-                    (MagicTodoSurface.obligationWriteSubs previousBody acceptedEpilogue)
+                LlmFacing.instructions (
+                    previousReviewInstructions lang bridge.PreviousReview
+                    @ ProviderProse.instructionLines lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
+                )
 
             let enrichedResult =
                 enrichAcceptedResult bridge.ManagerSessionId isT1Commitment rendered

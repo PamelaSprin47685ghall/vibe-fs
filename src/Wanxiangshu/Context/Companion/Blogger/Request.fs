@@ -40,6 +40,7 @@ type BloggerMainRequestContext =
     { RequestId: BloggerRequestId
       MainSessionId: SessionId
       BloggerSessionId: SessionId
+      Items: BloggerDeltaItem list
       Toml: string
       PreviousIngestedThroughSequence: int64
       NextIngestedThroughSequence: int64

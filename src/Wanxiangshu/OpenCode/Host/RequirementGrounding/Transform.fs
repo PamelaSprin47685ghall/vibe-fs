@@ -47,24 +47,10 @@ module RequirementGroundingTransform =
 
         "requirement-grounding-read-" + (HostDigest.sha256Hex input).Substring(0, 24)
 
-    let private escapeAttribute (value: string) =
-        value
-            .Replace("&", "&amp;")
-            .Replace("\"", "&quot;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;")
-            .Replace("'", "&apos;")
-
     let cursorResult path resultBytes =
-        "<requirement_read path=\""
-        + escapeAttribute path
-        + "\">\n"
-        + resultBytes
-        + (if resultBytes.EndsWith("\n", StringComparison.Ordinal) then
-               ""
-           else
-               "\n")
-        + "</requirement_read>"
+        LlmFacing.instructions [ resultBytes ]
+        |> LlmFacing.withData [ LlmFacing.Data.stringField "requirement_source_path" path ]
+        |> LlmFacing.render
 
     let private buildReadMessage (read: RequirementGroundingAnchoredRead) : obj =
         let input = createObj [ "filePath", box read.Path ]

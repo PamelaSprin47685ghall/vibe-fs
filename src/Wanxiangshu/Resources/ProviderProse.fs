@@ -62,7 +62,7 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation.Identity
 
-/// PROMPT-019: load + substitute provider prose. Layout stays in SyntheticToml.
+/// PROMPT-019: load + substitute provider prose. LLM-facing layout stays in LlmFacing.
 /// Domain owns semantic paths and pure assembly; this module owns language binding.
 [<RequireQualifiedAccess>]
 module ProviderProse =
@@ -105,7 +105,7 @@ module ProviderProse =
         ProviderResources.requireLanguagePair semanticPath
         substitute (ProviderResources.readText lang semanticPath) subs
 
-    /// Instruction lines for SyntheticToml.document: preserve blank lines as "".
+    /// Instruction lines for LlmFacing: preserve blank lines as "".
     let instructionLines (lang: ProviderLanguage) (semanticPath: string) (subs: Map<string, string>) : string list =
         render lang semanticPath subs
         |> fun text -> text.Replace("\r\n", "\n").TrimEnd('\n')
@@ -113,7 +113,7 @@ module ProviderProse =
         |> Array.toList
 
     let document (lang: ProviderLanguage) (semanticPath: string) (subs: Map<string, string>) : string =
-        SyntheticToml.document (instructionLines lang semanticPath subs) []
+        LlmFacing.renderInstructions (instructionLines lang semanticPath subs)
 
     let documentFor (sessionId: SessionId) (semanticPath: string) (subs: Map<string, string>) : string =
         document (languageOf sessionId) semanticPath subs

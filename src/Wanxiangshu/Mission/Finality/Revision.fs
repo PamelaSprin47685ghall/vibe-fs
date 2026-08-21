@@ -57,11 +57,19 @@ module RevisionWorkflow =
 
     let private rejectedPrompt (managerSessionId: SessionId) (workRecord: string) =
         FinalityPrompt.rejected
-            (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Rejected Map.empty)
+            (ProviderProse.instructionLines
+                (ProviderProse.languageOf managerSessionId)
+                FinalityPrompt.Path.Rejected
+                Map.empty)
             workRecord
 
     let private steerPrompt (managerSessionId: SessionId) (workRecord: string) =
-        FinalityPrompt.steer (ProviderProse.documentFor managerSessionId FinalityPrompt.Path.Steer Map.empty) workRecord
+        FinalityPrompt.steer
+            (ProviderProse.instructionLines
+                (ProviderProse.languageOf managerSessionId)
+                FinalityPrompt.Path.Steer
+                Map.empty)
+            workRecord
 
     let private steerUnavailablePrompt (managerSessionId: SessionId) =
         ProviderProse.documentFor managerSessionId FinalityPrompt.Path.SteerUnavailable Map.empty

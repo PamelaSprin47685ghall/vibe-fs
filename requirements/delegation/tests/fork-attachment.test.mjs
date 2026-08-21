@@ -28,17 +28,18 @@ test('WHAT[DELEG-021] DELEG_021_attachment_is_background_between_commissioner_an
   const requirementsInstructionIndex = document.indexOf(en.Requirements)
   const commissionerFieldIndex = document.indexOf('commissioner_record =')
   const attachedFieldIndex = document.indexOf('attached_work_record =')
-  const requirementsTableIndex = document.indexOf('[[root_requirement]]')
+  const requirementIndex = document.indexOf('# Keep authority with this assignment.')
 
-  // Instruction header names the fields; LWR values live in TOML data fields.
+  // Parent background stays data; root requirements constrain the child and stay instructions.
   assert.ok(commissionerInstructionIndex >= 0)
   assert.ok(attachmentInstructionIndex > commissionerInstructionIndex)
   assert.ok(requirementsInstructionIndex > attachmentInstructionIndex)
+  assert.ok(requirementIndex > requirementsInstructionIndex)
   assert.ok(commissionerFieldIndex > requirementsInstructionIndex)
   assert.ok(attachedFieldIndex > commissionerFieldIndex)
-  assert.ok(requirementsTableIndex > attachedFieldIndex)
   assert.equal(parsed.commissioner_record, commissioner)
   assert.equal(parsed.attached_work_record, `${attachment}\n`)
+  assert.equal(parsed.root_requirement, undefined)
   assert.match(en.Attachment, /background|context|背景/i)
   assert.match(en.Attachment, /does not|not .*assignment|不.*任务|不.*义务/i)
 })

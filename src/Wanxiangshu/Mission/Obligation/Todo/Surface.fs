@@ -119,10 +119,6 @@ module MagicTodoSurface =
     let obligationWriteSubs (previousBody: string) (acceptedEpilogue: string) : Map<string, string> =
         Map [ "previous_body", previousBody; "accepted_epilogue", acceptedEpilogue ]
 
-    /// Process reviewer assignment body: preamble already localized by caller.
-    let renderAssignmentUserMessage (preamble: string) (sections: string list) : string =
-        String.concat "\n\n" (preamble :: sections)
-
     /// GLORY-030 relaxation boundary: Manager may see process PERFECT/REVISE
     /// outcome + concrete ProcessReviewLWR report; never reviewer identity /
     /// session / barrier / witness / 2N / confirmation mechanics.

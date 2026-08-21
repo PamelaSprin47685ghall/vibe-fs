@@ -87,7 +87,7 @@ module HostForkBusyNudge =
         task {
             let busyAgent = managedBusyAgent profile agent
             let rt = PromptDispatcher.forJournal j
-            let syntheticPrompt = SyntheticToml.document [ prompt ] []
+            let syntheticPrompt = LlmFacing.renderInstruction prompt
 
             let! sent =
                 rt.SendContinuation

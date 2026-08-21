@@ -11,8 +11,11 @@
    - `ProviderSemanticProjection` 剥离易失传输元数据，提供跨会话一致的语义等价视图，作为 `CanonicalDigest` 计算的唯一输入。
    - `ProviderWireProjection` 在语义视图之上补充合成 ID 与本地时间线标记，服务于前缀缓存与物理传输。
 
-3. **SyntheticToml 规范渲染**：
-   - 统一管理换行规范化（CRLF → LF）、字符串转义、值树编码与注释排版。
+3. **LlmFacing 语义边界 + SyntheticToml 字节 writer**：
+   - `Foundation/LlmFacing.fs` 是所有 LLM-facing 合成内容的唯一 production API。调用方只构造 `LlmFacing.Document`，显式把内容归为 instruction 或 reference data，并在最后一次性 render。
+   - `Foundation/SyntheticToml.fs` 退为 `LlmFacing` 背后的 canonical byte writer，统一管理换行规范化（CRLF → LF）、字符串转义、值树编码与注释排版；feature owner 不直接使用其文档/字段/注释构造 API。
+   - document composition 只发生在 typed/structured 阶段。appendix、handoff、batch 等必须合并 instruction/data 集合后再 render，禁止拼 rendered string。
+   - 分面按 receiver semantics：对当前 Agent 的责任交接、行动要求、推理约束（包括 child → parent LWR）属于 instruction；仅供参考的事实材料属于 data。
    - 故意不提供业务解析器，确保单向渲染安全。
 
 ## 验证与测试落点
@@ -31,3 +34,5 @@
 | PROVIDER-PROJECTION-010 | `requirements/provider-projection/tests/pair-thought-transform.test.mjs` |
 | PROVIDER-PROJECTION-011 | `requirements/provider-projection/tests/projection-algebra.test.mjs` |
 | PROVIDER-PROJECTION-012 | `requirements/provider-projection/tests/synthetic-toml.test.mjs` |
+| PROVIDER-PROJECTION-013 | `scripts/checks/llm-facing-format-gate.mjs` + `requirements/provider-projection/tests/llm-facing.test.mjs` |
+| PROVIDER-PROJECTION-014 | `requirements/provider-projection/tests/llm-facing.test.mjs` |

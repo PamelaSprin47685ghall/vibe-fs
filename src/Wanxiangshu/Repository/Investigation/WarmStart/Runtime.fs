@@ -131,18 +131,18 @@ module RepositoryWarmStart =
                 return! collectAtWorkspace search workspaceDirectory keywords
         }
 
-    let prepareWithSearch
+    let prepareDocumentWithSearch
         (search: Search)
         (sessionId: SessionId)
         (role: Role)
         (workspaceDirectory: string option)
         (keywordsRaw: string)
         (charge: string)
-        : Task<Result<string, string>> =
+        : Task<Result<LlmFacing.Document, string>> =
         task {
             match! collectWithSearch search role workspaceDirectory keywordsRaw with
             | Error error -> return Error error
-            | Ok None -> return Ok charge
+            | Ok None -> return Ok(LlmFacing.instruction charge)
             | Ok(Some searches) ->
                 let lang = ProviderProse.languageOf sessionId
 
@@ -152,11 +152,44 @@ module RepositoryWarmStart =
                         RepositoryWarmStartPrompt.ChargeEnvelope
                         (Map [ "charge", charge ])
 
-                return Ok(RepositoryWarmStartPrompt.render instructions charge searches)
+                return Ok(RepositoryWarmStartPrompt.buildDocument instructions charge searches)
         }
+
+    let prepareWithSearch
+        (search: Search)
+        (sessionId: SessionId)
+        (role: Role)
+        (workspaceDirectory: string option)
+        (keywordsRaw: string)
+        (charge: string)
+        : Task<Result<string, string>> =
+        prepareDocumentWithSearch search sessionId role workspaceDirectory keywordsRaw charge
+        |> TaskValue.map (Result.map LlmFacing.render)
 
     /// Fork path: preserve ForkChildPayload's assignment + commissioner record
     /// and append repository_search/repository_hint tables as low-trust data.
+    let appendToBaseDocumentWithSearch
+        (search: Search)
+        (sessionId: SessionId)
+        (role: Role)
+        (workspaceDirectory: string option)
+        (keywordsRaw: string)
+        (baseDocument: LlmFacing.Document)
+        : Task<Result<LlmFacing.Document, string>> =
+        task {
+            match! collectWithSearch search role workspaceDirectory keywordsRaw with
+            | Error error -> return Error error
+            | Ok None -> return Ok baseDocument
+            | Ok(Some searches) ->
+                let appendix =
+                    ProviderProse.instructionLines
+                        (ProviderProse.languageOf sessionId)
+                        RepositoryWarmStartPrompt.Appendix
+                        Map.empty
+
+                return Ok(RepositoryWarmStartPrompt.appendToDocument appendix baseDocument searches)
+        }
+
     let appendToBaseWithSearch
         (search: Search)
         (sessionId: SessionId)
@@ -165,19 +198,14 @@ module RepositoryWarmStart =
         (keywordsRaw: string)
         (basePrompt: string)
         : Task<Result<string, string>> =
-        task {
-            match! collectWithSearch search role workspaceDirectory keywordsRaw with
-            | Error error -> return Error error
-            | Ok None -> return Ok basePrompt
-            | Ok(Some searches) ->
-                let appendix =
-                    ProviderProse.instructionLines
-                        (ProviderProse.languageOf sessionId)
-                        RepositoryWarmStartPrompt.Appendix
-                        Map.empty
-
-                return Ok(RepositoryWarmStartPrompt.appendToProviderPrompt appendix basePrompt searches)
-        }
+        appendToBaseDocumentWithSearch
+            search
+            sessionId
+            role
+            workspaceDirectory
+            keywordsRaw
+            (LlmFacing.instruction basePrompt)
+        |> TaskValue.map (Result.map LlmFacing.render)
 
     let prepare
         (sessionId: SessionId)
@@ -187,6 +215,21 @@ module RepositoryWarmStart =
         (charge: string)
         : Task<Result<string, string>> =
         prepareWithSearch SembleMcpClient.searchFromEnvironment sessionId role workspaceDirectory keywordsRaw charge
+
+    let prepareDocument
+        (sessionId: SessionId)
+        (role: Role)
+        (workspaceDirectory: string option)
+        (keywordsRaw: string)
+        (charge: string)
+        : Task<Result<LlmFacing.Document, string>> =
+        prepareDocumentWithSearch
+            SembleMcpClient.searchFromEnvironment
+            sessionId
+            role
+            workspaceDirectory
+            keywordsRaw
+            charge
 
     let appendToBase
         (sessionId: SessionId)
@@ -202,3 +245,18 @@ module RepositoryWarmStart =
             workspaceDirectory
             keywordsRaw
             basePrompt
+
+    let appendToBaseDocument
+        (sessionId: SessionId)
+        (role: Role)
+        (workspaceDirectory: string option)
+        (keywordsRaw: string)
+        (baseDocument: LlmFacing.Document)
+        : Task<Result<LlmFacing.Document, string>> =
+        appendToBaseDocumentWithSearch
+            SembleMcpClient.searchFromEnvironment
+            sessionId
+            role
+            workspaceDirectory
+            keywordsRaw
+            baseDocument

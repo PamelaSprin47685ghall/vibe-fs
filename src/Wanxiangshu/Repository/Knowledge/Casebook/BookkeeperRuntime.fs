@@ -124,11 +124,8 @@ module BookkeeperRuntime =
 
     let private currentPort () : ISessionHostPort option = lock gate (fun () -> sessionPort)
 
-    let private systemPrompt (ownerSessionId: string) =
-        PromptResources.loadBookkeeperSystemFor (ProviderProse.languageOf (SessionId.create ownerSessionId))
-
-    let private table (name: string) (fields: string list) : string =
-        String.concat "\n" (("[" + name + "]") :: fields)
+    let private systemInstructions (ownerSessionId: string) =
+        PromptResources.bookkeeperInstructionTextsFor (ProviderProse.languageOf (SessionId.create ownerSessionId))
 
     let private evidencePatch (observations: Observation list) : string =
         observations
@@ -148,36 +145,34 @@ module BookkeeperRuntime =
                 "grep " + pattern + " " + flat)
         |> String.concat "\n"
 
-    let private evidenceBlocks (observations: Observation list) : string list =
+    let private evidenceBlocks (observations: Observation list) : LlmFacing.DataBlock list =
         observations
         |> Observations.normalize
         |> List.map (fun observation ->
             match observation with
             | Observation.FileRead(path, hash) ->
-                SyntheticToml.tableArrayEntry
+                LlmFacing.Data.tableArray
                     "evidence"
-                    [ SyntheticToml.field "kind" (SyntheticToml.renderString "file_read")
-                      SyntheticToml.field "path" (SyntheticToml.renderString path)
-                      SyntheticToml.field "hash" (SyntheticToml.renderString hash) ]
+                    [ LlmFacing.Data.stringMember "kind" "file_read"
+                      LlmFacing.Data.stringMember "path" path
+                      LlmFacing.Data.stringMember "hash" hash ]
             | Observation.GlobResult(pattern, paths) ->
-                SyntheticToml.tableArrayEntry
+                LlmFacing.Data.tableArray
                     "evidence"
-                    [ SyntheticToml.field "kind" (SyntheticToml.renderString "glob")
-                      SyntheticToml.field "pattern" (SyntheticToml.renderString pattern)
-                      SyntheticToml.field
-                          "paths"
-                          (SyntheticToml.renderString (paths |> List.sort |> String.concat "\n")) ]
+                    [ LlmFacing.Data.stringMember "kind" "glob"
+                      LlmFacing.Data.stringMember "pattern" pattern
+                      LlmFacing.Data.stringMember "paths" (paths |> List.sort |> String.concat "\n") ]
             | Observation.GrepResult(pattern, matches) ->
                 let flat =
                     matches
                     |> List.map (fun (path, index, text) -> sprintf "%s:%d:%s" path index text)
                     |> String.concat "\n"
 
-                SyntheticToml.tableArrayEntry
+                LlmFacing.Data.tableArray
                     "evidence"
-                    [ SyntheticToml.field "kind" (SyntheticToml.renderString "grep")
-                      SyntheticToml.field "pattern" (SyntheticToml.renderString pattern)
-                      SyntheticToml.field "matches" (SyntheticToml.renderString flat) ])
+                    [ LlmFacing.Data.stringMember "kind" "grep"
+                      LlmFacing.Data.stringMember "pattern" pattern
+                      LlmFacing.Data.stringMember "matches" flat ])
 
     let private envelope
         (kind: BookkeeperRequest)
@@ -195,20 +190,22 @@ module BookkeeperRuntime =
         let transcriptBlock =
             match kind, extraTranscript with
             | BookkeeperRequest.CaseFinalize, Some text when not (String.IsNullOrWhiteSpace text) ->
-                [ table "transcript" [ SyntheticToml.field "content" (SyntheticToml.renderString text) ] ]
+                [ LlmFacing.Data.table "transcript" [ LlmFacing.Data.stringMember "content" text ] ]
             | _ -> []
 
-        SyntheticToml.document
-            [ systemPrompt ownerSessionId ]
-            ([ table "request" [ SyntheticToml.field "kind" (SyntheticToml.renderString kindLabel) ]
-               table "case" [ SyntheticToml.field "session_id" (SyntheticToml.renderString ownerSessionId) ]
-               table "question" [ SyntheticToml.field "content" (SyntheticToml.renderString q) ]
-               table "answer" [ SyntheticToml.field "content" (SyntheticToml.renderString a) ]
-               table
-                   "repository_change"
-                   [ SyntheticToml.field "patch" (SyntheticToml.renderString (evidencePatch observations)) ] ]
-             @ evidenceBlocks observations
-             @ transcriptBlock)
+        LlmFacing.instructions (systemInstructions ownerSessionId)
+        |> LlmFacing.withData (
+            [ LlmFacing.Data.table "request" [ LlmFacing.Data.stringMember "kind" kindLabel ]
+              LlmFacing.Data.table "case" [ LlmFacing.Data.stringMember "session_id" ownerSessionId ]
+              LlmFacing.Data.table "question" [ LlmFacing.Data.stringMember "content" q ]
+              LlmFacing.Data.table "answer" [ LlmFacing.Data.stringMember "content" a ]
+              LlmFacing.Data.table
+                  "repository_change"
+                  [ LlmFacing.Data.stringMember "patch" (evidencePatch observations) ] ]
+            @ evidenceBlocks observations
+            @ transcriptBlock
+        )
+        |> LlmFacing.render
 
     let private childOptions (txId: string) : OpenCodeChildOptions =
         { Title = Some("bookkeeper:" + txId)

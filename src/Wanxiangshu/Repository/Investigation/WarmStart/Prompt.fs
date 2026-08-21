@@ -82,7 +82,7 @@ module RepositoryWarmStartPrompt =
             []
         else
             raw
-            |> SyntheticToml.normalizeNewlines
+            |> LlmFacing.normalizeNewlines
             |> fun normalized -> normalized.Split '\n'
             |> collectKeywords
 
@@ -104,93 +104,95 @@ module RepositoryWarmStartPrompt =
         |> List.rev
 
     let private renderSearch (search: RepositoryWarmStartSearch) =
-        SyntheticToml.tableArrayEntry
+        LlmFacing.Data.tableArray
             "repository_search"
-            [ SyntheticToml.field "ordinal" (string search.Ordinal)
-              SyntheticToml.field "query" (SyntheticToml.renderString search.Query)
-              SyntheticToml.field "candidate_count" (string (List.length search.Hints)) ]
+            [ LlmFacing.Data.intMember "ordinal" search.Ordinal
+              LlmFacing.Data.stringMember "query" search.Query
+              LlmFacing.Data.intMember "candidate_count" (List.length search.Hints) ]
 
     let private renderHint (hint: RepositoryWarmStartHint) =
-        SyntheticToml.tableArrayEntry
+        LlmFacing.Data.tableArray
             "repository_hint"
-            [ SyntheticToml.field "keyword_ordinal" (string hint.KeywordOrdinal)
-              SyntheticToml.field "local_rank" (string hint.LocalRank)
-              SyntheticToml.field "file_path" (SyntheticToml.renderString hint.FilePath)
-              SyntheticToml.field "start_line" (string hint.StartLine)
-              SyntheticToml.field "end_line" (string hint.EndLine)
-              SyntheticToml.field "content" (SyntheticToml.renderString hint.Content)
-              SyntheticToml.field "score" (SyntheticToml.renderFloat hint.Score)
-              SyntheticToml.field "total_lines" (string hint.TotalLines) ]
+            [ LlmFacing.Data.intMember "keyword_ordinal" hint.KeywordOrdinal
+              LlmFacing.Data.intMember "local_rank" hint.LocalRank
+              LlmFacing.Data.stringMember "file_path" hint.FilePath
+              LlmFacing.Data.intMember "start_line" hint.StartLine
+              LlmFacing.Data.intMember "end_line" hint.EndLine
+              LlmFacing.Data.stringMember "content" hint.Content
+              LlmFacing.Data.floatMember "score" hint.Score
+              LlmFacing.Data.intMember "total_lines" hint.TotalLines ]
 
     let private bodyBlocks (searches: RepositoryWarmStartSearch list) (hints: RepositoryWarmStartHint list) omitted =
         [ if omitted > 0 then
-              yield SyntheticToml.field "repository_hint_omitted" (string omitted)
+              yield LlmFacing.Data.intField "repository_hint_omitted" omitted
           yield! searches |> List.map renderSearch
           yield! hints |> List.map renderHint ]
 
-    let private renderDocument
+    let private document
         (instructions: string list)
         (searches: RepositoryWarmStartSearch list)
         (hints: RepositoryWarmStartHint list)
         omitted
         =
-        SyntheticToml.document instructions (bodyBlocks searches hints omitted)
+        LlmFacing.instructions instructions
+        |> LlmFacing.withData (bodyBlocks searches hints omitted)
 
-    let rec private fitToBudget render fallback kept omitted =
-        let rendered = render kept omitted
+    let rec private fitToBudget build fallback kept omitted =
+        let candidate = build kept omitted
 
-        if SyntheticToml.byteCount rendered <= MaxWarmStartBytes then
-            rendered
+        if candidate |> LlmFacing.render |> LlmFacing.byteCount <= MaxWarmStartBytes then
+            candidate
         else
-            trimOverBudget render fallback kept omitted
+            trimOverBudget build fallback kept omitted
 
-    and private trimOverBudget render fallback kept omitted =
+    and private trimOverBudget build fallback kept omitted =
         match List.rev kept with
         | [] -> fallback
-        | _ :: restRev -> fitToBudget render fallback (List.rev restRev) (omitted + 1)
+        | _ :: restRev -> fitToBudget build fallback (List.rev restRev) (omitted + 1)
+
+    let private orderedHintsAndOmitted searches =
+        let orderedHints =
+            searches
+            |> List.collect (fun search -> search.Hints)
+            |> stableDedupeHints
+            |> List.truncate MaxHintsTotal
+
+        let originalCount = searches |> List.sumBy (fun search -> List.length search.Hints)
+        orderedHints, max 0 (originalCount - List.length orderedHints)
+
+    let buildDocument
+        (instructions: string list)
+        (fallbackInstruction: string)
+        (searches: RepositoryWarmStartSearch list)
+        : LlmFacing.Document =
+        let orderedHints, initialOmitted = orderedHintsAndOmitted searches
+
+        fitToBudget
+            (fun kept omitted -> document instructions searches kept omitted)
+            (LlmFacing.instruction fallbackInstruction)
+            orderedHints
+            initialOmitted
 
     /// Render while preserving whole TOML entries. If the authority header alone
     /// exceeds the warm-start byte budget, fail open to the raw charge rather than
     /// truncating authority text.
     let render (instructions: string list) (charge: string) (searches: RepositoryWarmStartSearch list) : string =
-        let orderedHints =
-            searches
-            |> List.collect (fun search -> search.Hints)
-            |> stableDedupeHints
-            |> List.truncate MaxHintsTotal
+        buildDocument instructions charge searches |> LlmFacing.render
 
-        let originalCount = searches |> List.sumBy (fun search -> List.length search.Hints)
-        let initialOmitted = max 0 (originalCount - List.length orderedHints)
-
-        fitToBudget
-            (fun kept omitted -> renderDocument instructions searches kept omitted)
-            charge
-            orderedHints
-            initialOmitted
-
-    /// Add low-trust repository tables to an already-rendered authoritative
-    /// provider prompt (ForkChildPayload). The 64 KiB budget applies only to the
-    /// warm-start appendix, so a large pre-existing charge is never truncated.
-    let appendToProviderPrompt
+    /// Add low-trust repository tables before the one final render. The 64 KiB
+    /// budget applies only to this appendix document.
+    let appendToDocument
         (appendixInstructions: string list)
-        (basePrompt: string)
+        (baseDocument: LlmFacing.Document)
         (searches: RepositoryWarmStartSearch list)
-        : string =
-        let orderedHints =
-            searches
-            |> List.collect (fun search -> search.Hints)
-            |> stableDedupeHints
-            |> List.truncate MaxHintsTotal
+        : LlmFacing.Document =
+        let orderedHints, initialOmitted = orderedHintsAndOmitted searches
 
-        let originalCount = searches |> List.sumBy (fun search -> List.length search.Hints)
-        let initialOmitted = max 0 (originalCount - List.length orderedHints)
+        let appendix =
+            fitToBudget
+                (fun kept omitted -> document appendixInstructions searches kept omitted)
+                LlmFacing.empty
+                orderedHints
+                initialOmitted
 
-        fitToBudget
-            (fun kept omitted ->
-                let appendix =
-                    SyntheticToml.document appendixInstructions (bodyBlocks searches kept omitted)
-
-                basePrompt.TrimEnd() + "\n\n" + appendix)
-            basePrompt
-            orderedHints
-            initialOmitted
+        LlmFacing.combine [ baseDocument; appendix ]

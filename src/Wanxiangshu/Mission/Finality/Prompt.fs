@@ -21,8 +21,6 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Repository.Investigation.WarmStart
 
-open System
-
 /// GLORY-052/076 + §9.2.2–9.2.4 + SURFACE-004: Finality experience prompt owner.
 /// Prose meaning lives in `resources/provider/lifecycle/finality/**` (PROMPT-019).
 module FinalityPrompt =
@@ -44,38 +42,33 @@ module FinalityPrompt =
         [<Literal>]
         let SteerUnavailable = "lifecycle/finality/steer-unavailable"
 
-    let private withOptionalRecord (headerDocument: string) (recordBody: string) =
-        let header = headerDocument.TrimEnd('\n')
-        let normalized = SyntheticToml.normalizeNewlines recordBody
+    let private withOptionalRecord (headerInstructions: string list) (recordBody: string) =
+        let normalized = LlmFacing.normalizeNewlines recordBody
 
-        if String.IsNullOrWhiteSpace normalized then
-            header + "\n"
+        if System.String.IsNullOrWhiteSpace normalized then
+            LlmFacing.renderInstructions headerInstructions
         else
-            header + "\n\n" + SyntheticToml.comment normalized + "\n"
+            LlmFacing.renderInstructions (headerInstructions @ [ normalized ])
 
-    let blessedFromLogs (blessingHeaderDocument: string) (logs: (int * string) list) =
-        let header = blessingHeaderDocument.TrimEnd('\n')
-
-        let recordBlocks =
+    let blessedFromLogs (blessingHeaderInstructions: string list) (logs: (int * string) list) =
+        let records =
             logs
             |> List.sortBy fst
             |> List.choose (fun (_, content) ->
-                let normalized = SyntheticToml.normalizeNewlines content
+                let normalized = LlmFacing.normalizeNewlines content
 
-                if String.IsNullOrWhiteSpace normalized then
+                if System.String.IsNullOrWhiteSpace normalized then
                     None
                 else
-                    Some(SyntheticToml.comment normalized))
+                    Some normalized)
 
-        match recordBlocks with
-        | [] -> header + "\n"
-        | blocks -> header + "\n\n" + String.concat "\n\n" blocks + "\n"
+        LlmFacing.renderInstructions (blessingHeaderInstructions @ records)
 
-    let blessed (blessingHeaderDocument: string) (workRecordBundle: string) =
-        withOptionalRecord blessingHeaderDocument workRecordBundle
+    let blessed (blessingHeaderInstructions: string list) (workRecordBundle: string) =
+        withOptionalRecord blessingHeaderInstructions workRecordBundle
 
-    let rejected (rejectionHeaderDocument: string) (reviewerWorkRecord: string) =
-        withOptionalRecord rejectionHeaderDocument reviewerWorkRecord
+    let rejected (rejectionHeaderInstructions: string list) (reviewerWorkRecord: string) =
+        withOptionalRecord rejectionHeaderInstructions reviewerWorkRecord
 
-    let steer (steerHeaderDocument: string) (siblingWorkRecord: string) =
-        withOptionalRecord steerHeaderDocument siblingWorkRecord
+    let steer (steerHeaderInstructions: string list) (siblingWorkRecord: string) =
+        withOptionalRecord steerHeaderInstructions siblingWorkRecord

@@ -44,21 +44,23 @@ module DelegationHandoff =
         { StartInclusive = { Sequence = startInclusive }
           EndExclusive = { Sequence = endExclusive } }
 
-    let renderPrompt (charge: string) (parentRecord: string option) =
+    let promptDocument (charge: string) (parentRecord: string option) =
         let body =
             parentRecord
             |> Option.map (fun record -> record.Trim())
             |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-            |> Option.map (fun record ->
-                [ SyntheticToml.field "parent_delta_work_record" (SyntheticToml.renderString record) ])
+            |> Option.map (fun record -> [ LlmFacing.Data.stringField "parent_delta_work_record" record ])
             |> Option.defaultValue []
 
-        SyntheticToml.document [ charge ] body
+        LlmFacing.instruction charge |> LlmFacing.withData body
+
+    let renderPrompt (charge: string) (parentRecord: string option) =
+        promptDocument charge parentRecord |> LlmFacing.render
 
     /// Append parent delta to an already-rendered provider prompt without
     /// reinterpreting or re-rendering the existing bytes. Warm-start and other
     /// typed provider documents keep their own instruction/data structure.
-    let appendParentDelta (providerPrompt: string) (parentRecord: string option) =
+    let appendParentDelta (providerPrompt: LlmFacing.Document) (parentRecord: string option) =
         match
             parentRecord
             |> Option.map (fun record -> record.Trim())
@@ -66,9 +68,5 @@ module DelegationHandoff =
         with
         | None -> providerPrompt
         | Some record ->
-            let appendix =
-                SyntheticToml.document
-                    []
-                    [ SyntheticToml.field "parent_delta_work_record" (SyntheticToml.renderString record) ]
-
-            providerPrompt.TrimEnd() + "\n\n" + appendix
+            providerPrompt
+            |> LlmFacing.withData [ LlmFacing.Data.stringField "parent_delta_work_record" record ]

@@ -40,18 +40,18 @@ test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_tool_call_renders_as_new_
       '[[new_work_to_record]]',
       'tool_call = "edit"',
       'arguments = "{\\"filePath\\":\\"a.fs\\"}"',
-    ].join('\n'),
+    ].join('\n') + '\n',
   )
 })
 
 test('WHAT[PROVIDER-PROJECTION-009] P6_BLOGGER_SURFACE_part_kind_is_the_field_name', () => {
   assert.equal(
     toml.renderItem(item(part.text('Fix the race.'))),
-    ['[[new_work_to_record]]', 'user = "Fix the race."'].join('\n'),
+    ['[[new_work_to_record]]', 'user = "Fix the race."'].join('\n') + '\n',
   )
   assert.equal(
     toml.renderItem(item(part.reasoning('considered'))),
-    ['[[new_work_to_record]]', 'reasoning = "considered"'].join('\n'),
+    ['[[new_work_to_record]]', 'reasoning = "considered"'].join('\n') + '\n',
   )
 })
 

@@ -367,7 +367,7 @@ user = "G2Q1: who owns PromptAuthority?"
 [[turn]]
 id = "g2-inspector-q1"
 internal = true
-user = "G2Q1: who owns PromptAuthority?"
+user = "# G2Q1: who owns PromptAuthority?"
 
   [[turn.step]]
   respond = { type = "text", text = "G2A1: Host owns PromptAuthority." }
@@ -375,7 +375,7 @@ user = "G2Q1: who owns PromptAuthority?"
 [[turn]]
 id = "g2-inspector-q2"
 internal = true
-user = "G2Q2: what is ReuseScope?"
+user = "# G2Q2: what is ReuseScope?"
 
   [[turn.step]]
   respond = { type = "text", text = "G2A2: Owner session scope for one Inspector." }
@@ -383,7 +383,7 @@ user = "G2Q2: what is ReuseScope?"
 [[turn]]
 id = "g2-inspector-q3"
 internal = true
-user = "G2Q3: when does CaseFinalize run?"
+user = "# G2Q3: when does CaseFinalize run?"
 
   [[turn.step]]
   respond = { type = "text", text = "G2A3: On owner ReuseScope close." }
@@ -391,7 +391,7 @@ user = "G2Q3: when does CaseFinalize run?"
 [[turn]]
 id = "g2-inspector-batch"
 internal = true
-user = ["G2B1: establish the first repository fact.", "G2B2: establish the second repository fact.", "G2B3: establish the third repository fact."]
+user = ["# G2B1: establish the first repository fact.", "# G2B2: establish the second repository fact.", "# G2B3: establish the third repository fact."]
 
   [[turn.step]]
   respond = { type = "text", text = "G2B: all three repository facts were established together." }
@@ -479,7 +479,7 @@ user = "# The account is not yet ready to entrust."
 [[turn]]
 id = "manager-process-review"
 internal = true
-user = "You are reviewing the ongoing quality, coverage, and truthfulness of a work process."
+user = "# You are reviewing the ongoing quality, coverage, and truthfulness of a work process."
 tools = ["judge"]
 
   [[turn.step]]
@@ -598,7 +598,7 @@ tools = ["write"]
 [[turn]]
 id = "conflict-resume"
 internal = true
-user = "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:"
+user = "# Conflict resumption: an in-progress rebase hit conflicts."
 tools = ["fork", "join", "horizon", "suicide"]
 
   [[turn.step]]

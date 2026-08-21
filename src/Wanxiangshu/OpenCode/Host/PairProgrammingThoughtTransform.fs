@@ -75,7 +75,7 @@ open Wanxiangshu.Resources
 ///
 /// Ordinary Host 编码是 ResultGap 上的一条 completed synthetic `skill({ name: "" })` tool part。
 /// OpenCode `toModelMessagesEffect` 把它展开成 provider tool-call + tool-result；Cursor 保持真实
-/// terminal tool result，并在 NUL+BOM 后拼同一 `<skill_content name="">` payload。
+/// terminal tool result，并在 NUL+BOM 后拼同一 canonical instruction payload。
 /// 禁止 pending/running：Host 会把它们收成 "[Tool execution was interrupted]"。
 /// 每个 occurrence 的 transcript 位置由 durable CallGap/ResultGap 决定；同一 placement
 /// occasion（SessionId + CallGap + ResultGap）最多一个 pair，重复 transform 只 replay、
@@ -84,7 +84,11 @@ module PairProgrammingThoughtTransform =
 
     /// HOST-013 English canonical used by tests; production loads via session language.
     let text =
-        ProviderProse.render ProviderLanguage.English ProjectionConstants.PairProgrammingGuidelinePath Map.empty
+        ProviderProse.instructionLines
+            ProviderLanguage.English
+            ProjectionConstants.PairProgrammingGuidelinePath
+            Map.empty
+        |> LlmFacing.renderInstructions
 
     // ── JS Evidence parsers（flat；无嵌套 decision）──────────────────────────
 
@@ -132,8 +136,6 @@ module PairProgrammingThoughtTransform =
     /// the text: a real user may quote the sentence.
     let source = "pair-programming-auto-injected"
 
-    let private legacySource = "pair-programming-thought"
-
     let private idPrefix = "pair-programming-auto-injected-"
 
     /// HOST-013 borrows the Host-owned skill wire. Empty name is injection-only;
@@ -142,21 +144,7 @@ module PairProgrammingThoughtTransform =
 
     let skillName = ""
 
-    let private skillContentPrefix = "<skill_content name=\"\">"
-
-    let skillContent (body: string) : string =
-        let content = if isNull body then "" else body.Trim()
-
-        if
-            content.StartsWith(skillContentPrefix, StringComparison.Ordinal)
-            && content.EndsWith("</skill_content>", StringComparison.Ordinal)
-        then
-            content
-        else
-            String.concat "\n" [ skillContentPrefix; content; "</skill_content>" ]
-
-    let private isMarkerSource (markerSource: string) =
-        markerSource = source || markerSource = legacySource
+    let private isMarkerSource (markerSource: string) = markerSource = source
 
     /// HOST-013：marker 身份仅按 `info.source`。
     let isPairProgrammingThought (rawMsg: obj) : bool =
@@ -281,27 +269,16 @@ module PairProgrammingThoughtTransform =
         idPrefix + digest.Substring(0, 24)
 
     let private buildPairMessage (callId: string) (markerText: string) : obj =
-        let currentSkillWire =
-            markerText.TrimStart().StartsWith(skillContentPrefix, StringComparison.Ordinal)
-
-        let currentToolName = if currentSkillWire then toolName else "-"
-
-        let input =
-            if currentSkillWire then
-                createObj [ "name", box skillName ]
-            else
-                createObj []
-
         let part =
             createObj
                 [ "type", box "tool"
-                  "tool", box currentToolName
+                  "tool", box toolName
                   "callID", box callId
                   "state",
                   box (
                       createObj
                           [ "status", box "completed"
-                            "input", box input
+                            "input", box (createObj [ "name", box skillName ])
                             "output", box markerText
                             "time", box (createObj [ "start", box 0; "end", box 0 ]) ]
                   ) ]
@@ -813,7 +790,7 @@ module PairProgrammingThoughtTransform =
                 let candidate =
                     { Ordinal = ordinal
                       CallId = stableCallId sessionId ordinal
-                      MarkerText = skillContent markerText
+                      MarkerText = markerText
                       CallGap = callGap
                       ResultGap = resultGap
                       ConcernPlacement = concernPlacement }
@@ -937,23 +914,23 @@ module PairProgrammingThoughtTransform =
             |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
         | _ -> None
 
-    let private composeMarkerText
+    let private composeMarkerDocument
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
         (elapsed: string option)
         (toolEstimate: string option)
         (guideline: string)
-        : Task<string> =
+        : Task<LlmFacing.Document> =
         match journal, projectionSessionIdOpt with
         | Some durable, Some sessionId ->
             task {
                 let! guidance = EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
 
-                return PairProgrammingCalibration.composeWithElapsed guidance elapsed toolEstimate guideline
+                return PairProgrammingCalibration.documentWithElapsed guidance elapsed toolEstimate guideline
             }
-        | _ -> Task.FromResult(PairProgrammingCalibration.composeWithElapsed None elapsed toolEstimate guideline)
+        | _ -> Task.FromResult(PairProgrammingCalibration.documentWithElapsed None elapsed toolEstimate guideline)
 
-    let private concernFragmentText language (prepared: ConcernPreparedFragments) =
+    let private concernInstructions language (prepared: ConcernPreparedFragments) =
         let announcements =
             prepared.Announcements
             |> List.map (fun (id, concern) ->
@@ -968,13 +945,10 @@ module PairProgrammingThoughtTransform =
                 ProviderProse.render language "concern-routing/message-delivery" (Map [ "id", id; "message", message ]))
 
         match announcements @ messages with
-        | [] -> None
+        | [] -> []
         | fragments ->
-            Some(
-                ProviderProse.render language "concern-routing/pair-heading" Map.empty
-                + "\n"
-                + String.concat "\n" fragments
-            )
+            ProviderProse.render language "concern-routing/pair-heading" Map.empty
+            :: fragments
 
     let private prepareConcernFragments journal projectionSessionIdOpt language =
         match journal, projectionSessionIdOpt with
@@ -983,10 +957,8 @@ module PairProgrammingThoughtTransform =
             let state = (AgentJournal.snapshot durable).AgentProjections.Concern
             let prepared = ConcernProjection.prepareFragments recipient state
 
-            concernFragmentText language prepared
-            |> Option.map (fun text -> text, Some prepared.Batch)
-            |> Option.defaultValue ("", None)
-        | _ -> "", None
+            concernInstructions language prepared, Some prepared.Batch
+        | _ -> [], None
 
     let private terminateSessionIfPresent
         (terminateSession: SessionTermination)
@@ -1041,16 +1013,15 @@ module PairProgrammingThoughtTransform =
 
             let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
 
-            let! markerText = composeMarkerText journal projectionSessionIdOpt elapsed toolEstimate guideline
+            let! markerDocument = composeMarkerDocument journal projectionSessionIdOpt elapsed toolEstimate guideline
 
-            let concernText, concernPlacement =
+            let concernInstructions, concernPlacement =
                 prepareConcernFragments journal projectionSessionIdOpt language
 
             let markerText =
-                if String.IsNullOrWhiteSpace concernText then
-                    markerText
-                else
-                    markerText + "\n\n" + concernText
+                markerDocument
+                |> LlmFacing.withInstructions concernInstructions
+                |> LlmFacing.render
 
             let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText concernPlacement messages
 

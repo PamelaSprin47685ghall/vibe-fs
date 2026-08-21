@@ -54,14 +54,20 @@ module PairProgrammingCalibration =
         |> Option.map (fun text -> text.Trim())
         |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
-    let private join fragments =
-        fragments |> List.map nonBlank |> List.choose id |> String.concat "\n\n"
+    let private instructionTexts fragments =
+        fragments |> List.map nonBlank |> List.choose id
+
+    let document tip toolEstimate guideline =
+        LlmFacing.instructions (instructionTexts [ tip; toolEstimate; Some guideline ])
+
+    let documentWithElapsed tip elapsed toolEstimate guideline =
+        LlmFacing.instructions (instructionTexts [ tip; elapsed; toolEstimate; Some guideline ])
 
     let compose tip toolEstimate guideline =
-        join [ tip; toolEstimate; Some guideline ]
+        document tip toolEstimate guideline |> LlmFacing.render
 
     let composeWithElapsed tip elapsed toolEstimate guideline =
-        join [ tip; elapsed; toolEstimate; Some guideline ]
+        documentWithElapsed tip elapsed toolEstimate guideline |> LlmFacing.render
 
     let renderToolEstimate language remaining =
         ProviderProse.render language ToolEstimatePath (Map [ "remaining", string remaining ])

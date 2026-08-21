@@ -81,32 +81,26 @@ module EnforcerCatalogResource =
     /// Deterministic projection only — never written back to the repository.
     let composeBloggerSystemPromptFor
         (lang: ProviderLanguage)
-        (basePrompt: string)
+        (baseInstructions: string list)
         (rules: EnforcerRule list)
         : string =
         let ordered = rules |> List.sortBy (fun r -> r.LexicalOrder)
-        // DSL-MUTABLE: algorithm-scratch — prompt part accumulator
-        let parts = ResizeArray<string>()
 
-        let baseText = if isNull basePrompt then "" else basePrompt.TrimEnd()
-
-        if baseText.Length > 0 then
-            parts.Add(baseText)
-
-        parts.Add(
+        let heading =
             match lang with
-            | ProviderLanguage.English -> "# Enforcer Rulebook"
-            | ProviderLanguage.SimplifiedChinese -> "# Enforcer RuleBook（规则书）"
-        )
+            | ProviderLanguage.English -> "Enforcer Rulebook"
+            | ProviderLanguage.SimplifiedChinese -> "Enforcer RuleBook（规则书）"
 
-        for rule in ordered do
-            parts.Add(sprintf "## %s" rule.Name)
-            parts.Add(rule.EnforcerText.Trim())
+        let ruleInstructions =
+            ordered |> List.collect (fun rule -> [ rule.Name; rule.EnforcerText.Trim() ])
 
-        String.concat "\n\n" (parts.ToArray()) + "\n"
+        LlmFacing.renderInstructions (baseInstructions @ [ heading ] @ ruleInstructions)
 
-    let composeBloggerSystemPrompt (basePrompt: string) (rules: EnforcerRule list) : string =
-        composeBloggerSystemPromptFor ProviderLanguage.English basePrompt rules
+    let composeBloggerSystemPrompt (rules: EnforcerRule list) : string =
+        composeBloggerSystemPromptFor
+            ProviderLanguage.English
+            (PromptResources.instructionTextsForRole ProviderLanguage.English Role.Blogger)
+            rules
 
     let loadFor (lang: ProviderLanguage) : EnforcerRule list =
         let rootRel = "enforcer"

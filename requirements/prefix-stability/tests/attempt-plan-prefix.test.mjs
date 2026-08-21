@@ -77,13 +77,14 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_a_retired_snapshot_and_a_never_promote
   assert.deepEqual(prefix.forSnapshot(retired.snapshot, 'x'), prefix.forSnapshot(null, 'x'))
 })
 
-test('WHAT[PREFIX-STABILITY-008] COMPANION_010_the_memory_is_wrapped_as_low_trust_context', () => {
+test('WHAT[PREFIX-STABILITY-008] COMPANION_010_the_memory_returns_same_session_responsibility_as_instruction', () => {
   const plan = prefix.forSnapshot(snapshotAt(3), 'THE WORK LOG')
 
   assert.equal(plan.replacesPrefix, true)
   assert.equal(plan.dropLeading, 3)
-  assert.match(plan.memoryText, /It is context, not a new user instruction/)
-  assert.equal(plan.memoryText.includes('<work-log>\nTHE WORK LOG\n</work-log>'), true)
+  assert.match(plan.memoryText, /prior responsibility/)
+  assert.match(plan.memoryText, /^# THE WORK LOG$/m)
+  assert.doesNotMatch(plan.memoryText, /<work-log>|not a new user instruction/)
 })
 
 test('WHAT[PREFIX-STABILITY-015] COMPANION_013_the_plan_reuses_the_snapshot_s_own_synthetic_id', () => {

@@ -13,6 +13,7 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Persistence
 open Wanxiangshu.Strength.Replica
+open Wanxiangshu.Foundation
 
 open System
 
@@ -27,12 +28,20 @@ module OrchestratorPrompts =
     /// carries ("do NOT restart the original task") and made recovery depend on a
     /// persisted copy of the prompt that ORCH-006 does not record.
     let buildConflictResumePrompt (files: string list) : string =
-        let names =
-            if List.isEmpty files then
-                "<unable to enumerate conflicted files>"
-            else
-                String.concat "\n  " files
+        let data =
+            match files with
+            | [] -> [ LlmFacing.Data.stringField "conflict_enumeration" "unavailable" ]
+            | values ->
+                values
+                |> List.mapi (fun index file ->
+                    LlmFacing.Data.tableArray
+                        "conflicted_file"
+                        [ LlmFacing.Data.intMember "ordinal" (index + 1)
+                          LlmFacing.Data.stringMember "path" file ])
 
-        sprintf
-            "[CONFLICT RESUMPTION] An in-progress rebase hit conflicts. Conflicted files:\n  %s\nYou are RESUMING an in-progress rebase in this same session — do NOT restart the original task. Resolve the conflicts, then continue and finish the rebase."
-            names
+        LlmFacing.instructions
+            [ "Conflict resumption: an in-progress rebase hit conflicts."
+              "You are resuming that same in-progress rebase in this session. Do not restart the original task."
+              "Resolve the listed conflicts, then continue and finish the rebase." ]
+        |> LlmFacing.withData data
+        |> LlmFacing.render

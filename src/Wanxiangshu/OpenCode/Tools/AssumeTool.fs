@@ -1,6 +1,7 @@
 namespace Wanxiangshu.OpenCode
 
 open System
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Resources
 open ToolHostCodec
@@ -34,7 +35,9 @@ module AssumeTool =
         task {
             let assumption = args.Text "assumption"
 
-            return ProviderProse.render (languageOf ctx) Path.Committed (Map [ "assumption", assumption ])
+            return
+                ProviderProse.instructionLines (languageOf ctx) Path.Committed (Map [ "assumption", assumption ])
+                |> LlmFacing.renderInstructions
         }
 
     let spec (factory: HostToolFactory) : ToolSpec =

@@ -53,25 +53,25 @@ module InstitutionalLearningTools =
     let private trim (value: string) =
         if isNull value then "" else value.Trim()
 
-    let private renderDisposition language disposition =
+    let private dispositionInstructions language disposition =
         match disposition with
-        | LearningDisposition.Absorb rule -> ProviderProse.render language Path.Absorbed (Map [ "rule", rule ])
-        | LearningDisposition.Birth tip -> ProviderProse.render language Path.Absorbed (Map [ "rule", tip ])
-        | LearningDisposition.Discard _ -> ProviderProse.render language Path.Discarded Map.empty
+        | LearningDisposition.Absorb rule ->
+            ProviderProse.instructionLines language Path.Absorbed (Map [ "rule", rule ])
+        | LearningDisposition.Birth tip -> ProviderProse.instructionLines language Path.Absorbed (Map [ "rule", tip ])
+        | LearningDisposition.Discard _ -> ProviderProse.instructionLines language Path.Discarded Map.empty
 
-    let private renderResurfaced language (items: DeferredWorkItem list) =
+    let private resurfacedInstructions language (items: DeferredWorkItem list) =
         match items with
-        | [] -> ""
+        | [] -> []
         | values ->
-            let body =
-                values
-                |> List.map (fun item -> ProviderProse.render language Path.ResurfacedItem (Map [ "work", item.Text ]))
-                |> String.concat "\n"
+            ProviderProse.instructionLines language Path.ResurfacedHeading Map.empty
+            @ (values
+               |> List.collect (fun item ->
+                   ProviderProse.instructionLines language Path.ResurfacedItem (Map [ "work", item.Text ])))
 
-            "\n\n"
-            + ProviderProse.render language Path.ResurfacedHeading Map.empty
-            + "\n"
-            + body
+    let private instructionResult language path subs =
+        ProviderProse.instructionLines language path subs
+        |> LlmFacing.renderInstructions
 
     let private pendingFor kind sessionId attention =
         match kind with
@@ -96,7 +96,10 @@ module InstitutionalLearningTools =
                 let pending = pendingFor kind sessionId snapshot.AgentProjections.Attention
 
                 let frozen =
-                    renderDisposition language disposition + renderResurfaced language pending
+                    LlmFacing.renderInstructions (
+                        dispositionInstructions language disposition
+                        @ resurfacedInstructions language pending
+                    )
 
                 let fact =
                     AgentFact.InstitutionalLearning(
@@ -123,7 +126,7 @@ module InstitutionalLearningTools =
 
             match result with
             | Ok frozen -> return frozen
-            | Error _ -> return ProviderProse.render language Path.DurableUnavailable Map.empty
+            | Error _ -> return instructionResult language Path.DurableUnavailable Map.empty
         }
 
     let private execute kind (journal: AgentJournal option) (args: HostToolArguments) (ctx: HostToolContext) =
@@ -132,10 +135,10 @@ module InstitutionalLearningTools =
             let language = languageOf ctx
 
             match journal, ctx.ToolCallId with
-            | _, _ when experience.Length = 0 -> return ProviderProse.render language Path.Invalid Map.empty
+            | _, _ when experience.Length = 0 -> return instructionResult language Path.Invalid Map.empty
             | Some durable, Some callId when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
                 return! executeDurable kind durable experience language callId ctx
-            | _ -> return ProviderProse.render language Path.DurableUnavailable Map.empty
+            | _ -> return instructionResult language Path.DurableUnavailable Map.empty
         }
 
     let specs factory journal =

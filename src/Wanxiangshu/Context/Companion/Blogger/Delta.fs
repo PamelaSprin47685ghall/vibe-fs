@@ -193,7 +193,7 @@ module BloggerDelta =
         // invalid item.
         | None -> item
         | Some text ->
-            let normalized = SyntheticToml.normalizeNewlines text
+            let normalized = LlmFacing.normalizeNewlines text
             let suffix = "\n" + BloggerToml.TruncationMarker
 
             let rendered length =
@@ -206,12 +206,10 @@ module BloggerDelta =
             let overhead =
                 let dummyDoc = renderChunk [ rendered 0 ]
 
-                SyntheticToml.byteCount dummyDoc
-                - SyntheticToml.byteCount (SyntheticToml.renderString suffix)
+                LlmFacing.byteCount dummyDoc - LlmFacing.stringValueByteCount suffix
 
             let documentBytes prefixLength =
-                overhead
-                + SyntheticToml.renderStringByteCountPrefix normalized prefixLength suffix
+                overhead + LlmFacing.stringValuePrefixByteCount normalized prefixLength suffix
 
             // Largest prefix length whose rendered document fits. Binary search rather
             // than byte arithmetic: the escaping and the string-form choice both
@@ -229,7 +227,7 @@ module BloggerDelta =
     let private fitsLimit (limitBytes: int) (accepted: PendingEntry list) (entry: PendingEntry) =
         let candidate = accepted @ [ entry ]
         let rendered = renderChunk (candidate |> List.map (fun e -> e.Item))
-        SyntheticToml.byteCount rendered <= limitBytes
+        LlmFacing.byteCount rendered <= limitBytes
 
     let private accumulateUntilLimit (limitBytes: int) (pending: PendingEntry list) =
         // Accumulate while the rendered document still fits. Rendering the whole

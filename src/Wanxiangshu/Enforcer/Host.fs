@@ -141,6 +141,7 @@ module EnforcerHost =
                     { RequestId = requestId
                       MainSessionId = mainSessionId
                       BloggerSessionId = bloggerSessionId
+                      Items = chunk.Items
                       Toml = chunk.Toml
                       PreviousIngestedThroughSequence = blog.Coverage.IngestedThroughSequence
                       NextIngestedThroughSequence = nextSeq

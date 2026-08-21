@@ -24,7 +24,7 @@ open Wanxiangshu.Foundation
 /// GLORY-014/064/074 + SURFACE-004: BlindPlan lifecycle text owner.
 /// Production Birth / Reawakening use Planning Table (§7.4.1).
 /// Prose meaning lives in `resources/provider/lifecycle/manager/**`; this module
-/// owns semantic paths + pure SyntheticToml assembly (PROMPT-019).
+/// owns semantic paths + canonical LlmFacing assembly (PROMPT-019).
 module ManagerNarrative =
 
     [<RequireQualifiedAccess>]
@@ -68,13 +68,13 @@ module ManagerNarrative =
               syntheticPart planningTableDocument ] }
 
     /// TODO-015 / GLORY-074: canonical T1 tool result = entrustment revelation + enriched todo body.
-    let wrapT1AcceptedResult (t1RevelationDocument: string) (todoWriteResult: string) =
-        let normalized = SyntheticToml.normalizeNewlines todoWriteResult
+    let wrapT1AcceptedResult (t1RevelationInstructions: string list) (todoWriteResult: string) =
+        let normalized = LlmFacing.normalizeNewlines todoWriteResult
 
         if String.IsNullOrWhiteSpace normalized then
-            t1RevelationDocument
+            LlmFacing.renderInstructions t1RevelationInstructions
         else
-            t1RevelationDocument.TrimEnd('\n') + "\n\n" + normalized
+            LlmFacing.renderInstructions (t1RevelationInstructions @ [ normalized ])
 
     let renderText (projection: NarrativeProjection) =
         projection.Parts

@@ -228,9 +228,9 @@ module EnforcerCycleDecode =
         : Result<EnforcerCycle.CanonicalCycle * ToolCallId list, string> =
         if not (EnforcerCycle.isValidCycle cycle) then
             Error EmptyTextError
-        elif SyntheticToml.byteCount cycle.MergedText > MaxBlogTextBytes then
+        elif LlmFacing.byteCount cycle.MergedText > MaxBlogTextBytes then
             Error(sprintf "blog cycle text exceeds MaxBlogTextBytes=%d" MaxBlogTextBytes)
-        elif SyntheticToml.byteCount cycle.MergedEvidence > MaxEvidenceBytes then
+        elif LlmFacing.byteCount cycle.MergedEvidence > MaxEvidenceBytes then
             Error(sprintf "blog cycle evidence exceeds MaxEvidenceBytes=%d" MaxEvidenceBytes)
         else
             Ok(cycle, [ callId ])

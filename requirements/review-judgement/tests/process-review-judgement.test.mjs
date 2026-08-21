@@ -1,6 +1,7 @@
 // REVIEW-JUDGEMENT-008 / REVIEW-013 process-review judgement boundary.
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { parse as parseToml } from 'smol-toml'
 import * as provider from '../../../dist/Participant/Provider/LanguageSurface.js'
 import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
 import * as todo from '../../../dist/Mission/Review/ReviewTodoSurface.js'
@@ -60,12 +61,13 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_process_assignment_is_request_range_
     OldTodo: [],
     ProposedTodo: [],
   })
-  for (const header of [
-    '=== OpeningRaw (task authority) ===',
-    '=== ManagerCheckpointLWR (includeOpening=false; frontier-bounded) ===',
-    '=== PRIOR CURRENT OBLIGATIONS ===',
-    '=== ACCEPTED OBLIGATION ACCOUNT UNDER REVIEW ===',
-  ]) assert.ok(message.includes(header), `assignment must carry header: ${header}`)
+  const parsed = parseToml(message)
+  assert.match(message, /^# original task authority text$/m)
+  assert.equal(parsed.manager_checkpoint_lwr, 'frontier-bounded work record for this checkpoint')
+  assert.equal(parsed.effective_plan_complete, false)
+  assert.equal(parsed.prior_current_obligations, '[]')
+  assert.equal(parsed.accepted_obligation_account_under_review, '[]')
+  assert.equal(parsed.opening_raw, undefined)
   for (const forbidden of ['challenge', 'Challenge', 'seal', 'Seal', 'dual', '2N', 'barrier', 'Barrier', 'Confirmation']) {
     assert.equal(new RegExp(`\\b${forbidden.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(message), false, `process assignment must not mention '${forbidden}'`)
   }
@@ -87,8 +89,9 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_continuation_process_assignment_does
 
   assert.doesNotMatch(message, /OpeningRaw \(task authority\)/)
   assert.doesNotMatch(message, /original task authority text/)
-  assert.match(message, /only work since the reviewer last concluded/)
-  assert.match(message, /ManagerCheckpointLWR \(includeOpening=false; frontier-bounded\)/)
+  const parsed = parseToml(message)
+  assert.equal(parsed.manager_checkpoint_lwr, 'only work since the reviewer last concluded')
+  assert.equal(parsed.effective_plan_complete, true)
 })
 
 test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_a_process_verdict_never_becomes_a_confirmed_witness_by_itself', () => {

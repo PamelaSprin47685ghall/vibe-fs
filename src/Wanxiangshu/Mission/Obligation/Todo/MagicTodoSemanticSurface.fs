@@ -376,7 +376,12 @@ module MagicTodoSemanticSurface =
         MagicTodoPrefixEpoch.requiresLag1Rebase (stringOption previousCommitted |> Option.map TodoWriteId.create)
 
     let wrapT1AcceptedResult (sessionId: string) (body: string) : string =
+        let session = SessionId.create sessionId
+
         let revelation =
-            ProviderProse.documentFor (SessionId.create sessionId) ManagerNarrative.Path.T1Revelation Map.empty
+            ProviderProse.instructionLines
+                (ProviderProse.languageOf session)
+                ManagerNarrative.Path.T1Revelation
+                Map.empty
 
         ManagerNarrative.wrapT1AcceptedResult revelation body

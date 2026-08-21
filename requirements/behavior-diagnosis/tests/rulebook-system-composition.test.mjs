@@ -16,11 +16,12 @@ test('WHAT[BD-004] BEHAVIOR_DIAGNOSIS_SYSTEM_001_composed_prompt_contains_every_
   const composed = enforcer.composeBloggerSystemPrompt(BASE, 'en')
   assert.ok(composed.includes(BASE), 'base prompt must be preserved')
   assert.ok(composed.includes('# Enforcer Rulebook'), 'rulebook header must be present')
+  assert.equal(composed.split('\n').filter(Boolean).every((line) => line === '#' || line.startsWith('# ')), true)
 
   const names = enforcer.rules().map((r) => r.name)
   assert.equal(names.length, 120)
   for (const name of names) {
-    const occurrences = composed.split(`## ${name}`).length - 1
+    const occurrences = composed.split('\n').filter((line) => line === `# ${name}`).length
     assert.equal(occurrences, 1, `TipName ${name} must appear exactly once, got ${occurrences}`)
   }
 })

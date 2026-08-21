@@ -344,8 +344,10 @@ module JsBookkeeperTool =
     let private failed language (reason: string) =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unchanged; reason ] []
 
-    let private succeeded language (value: SyntheticToml.DataValue) =
-        SyntheticToml.document [ prose language Path.Accepted ] (SyntheticToml.encodeData value)
+    let private succeeded language (value: LlmFacing.Data.Value) =
+        LlmFacing.instruction (prose language Path.Accepted)
+        |> LlmFacing.withData (LlmFacing.Data.structuredValue value)
+        |> LlmFacing.render
 
     let execute (args: HostToolArguments) (context: HostToolContext) =
         task {

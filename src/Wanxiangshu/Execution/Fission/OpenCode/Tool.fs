@@ -154,10 +154,15 @@ module FissionTool =
         | _ -> profile.SelectedAgent
 
     let private deliveryPrompt owner completionId payload =
-        ProviderProse.render
-            (ProviderLanguageBinding.ensureRoot owner)
-            Path.SharedCompletion
-            (Map [ "completion_id", completionId; "payload", payload ])
+        let instruction =
+            ProviderProse.render
+                (ProviderLanguageBinding.ensureRoot owner)
+                Path.SharedCompletion
+                (Map [ "completion_id", completionId; "payload", payload ])
+
+        LlmFacing.instruction instruction
+        |> LlmFacing.withData [ LlmFacing.Data.stringField "completion_id" completionId ]
+        |> LlmFacing.render
 
     let private capturedGroup (durable: AgentJournal) groupId =
         FissionProjection.tryGroup groupId (AgentJournal.snapshot durable).AgentProjections.Fission

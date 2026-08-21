@@ -231,7 +231,7 @@ module private StrengthReplicaRuntimeLogic =
                     dispatcher.SendAgentOwnerRootWithTools
                         sessions
                         replica
-                        "Continue."
+                        (LlmFacing.renderInstruction "Continue.")
                         fastAgent
                         directory
                         PromptDispatcher.AwaitMode.Detached

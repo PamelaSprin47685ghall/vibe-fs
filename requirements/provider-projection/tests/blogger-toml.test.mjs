@@ -37,7 +37,7 @@ test('WHAT[PROVIDER-PROJECTION-009] CTX_013_tool_call_renders_as_new_work_table_
       '[[new_work_to_record]]',
       'tool_call = "edit"',
       'arguments = "{\\"filePath\\":\\"a.fs\\"}"',
-    ].join('\n'),
+    ].join('\n') + '\n',
   )
 })
 
@@ -54,7 +54,7 @@ test('WHAT[PROVIDER-PROJECTION-009] CTX_013_a_multiline_body_keeps_the_key_order
       '  "a": 1',
       '}',
       "'''",
-    ].join('\n'),
+    ].join('\n') + '\n',
   )
 
   assert.equal(parseToml(rendered).new_work_to_record[0].arguments, '{\n  "a": 1\n}\n')
@@ -65,7 +65,7 @@ test('WHAT[PROVIDER-PROJECTION-009] CTX_013_a_text_part_uses_role_as_field_name'
 
   assert.equal(
     rendered,
-    ['[[new_work_to_record]]', 'user = "Fix the race."'].join('\n'),
+    ['[[new_work_to_record]]', 'user = "Fix the race."'].join('\n') + '\n',
   )
 })
 
@@ -74,7 +74,7 @@ test('WHAT[PROVIDER-PROJECTION-009] CTX_013_an_assistant_text_part_uses_assistan
 
   assert.equal(
     rendered,
-    ['[[new_work_to_record]]', 'assistant = "I will read jwt.ts"'].join('\n'),
+    ['[[new_work_to_record]]', 'assistant = "I will read jwt.ts"'].join('\n') + '\n',
   )
 })
 
@@ -83,7 +83,7 @@ test('WHAT[PROVIDER-PROJECTION-009] CTX_013_a_reasoning_part_uses_reasoning_fiel
 
   assert.equal(
     rendered,
-    ['[[new_work_to_record]]', 'reasoning = "considered"'].join('\n'),
+    ['[[new_work_to_record]]', 'reasoning = "considered"'].join('\n') + '\n',
   )
 })
 

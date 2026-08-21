@@ -144,6 +144,7 @@ type SyncDelegateRuntime
 
             let providerPrompt =
                 DelegationHandoff.appendParentDelta request.ProviderPrompt prepared.ParentRecord
+                |> LlmFacing.render
 
             let! _ =
                 dispatcher.SendAgentOwnerRootWithTools
@@ -334,7 +335,7 @@ type SyncDelegateRuntime
         (ownerSessionKey: string, role: SyncDelegateRole, charge: string, ?expectedToolCalls: int)
         : Task<Result<string, string>> =
         SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge expectedToolCalls None (fun () ->
-            Task.FromResult charge)
+            Task.FromResult(LlmFacing.instruction charge))
         |> singletonResult
 
     /// EXEC-032 composition seam: caller supplies a low-trust provider prompt
@@ -344,7 +345,7 @@ type SyncDelegateRuntime
             ownerSessionKey: string,
             role: SyncDelegateRole,
             charge: string,
-            prepareProviderPrompt: unit -> Task<string>,
+            prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
             ?expectedToolCalls: int
         ) : Task<Result<string, string>> =
         SyncDelegateWorkflow.invoke store deps ownerSessionKey role charge expectedToolCalls None prepareProviderPrompt
@@ -356,7 +357,7 @@ type SyncDelegateRuntime
             role: SyncDelegateRole,
             charge: string,
             batch: SyncDelegateBatch,
-            prepareProviderPrompt: unit -> Task<string>,
+            prepareProviderPrompt: unit -> Task<LlmFacing.Document>,
             ?expectedToolCalls: int
         ) : Task<Result<SyncDelegateInvocationResult, string>> =
         SyncDelegateWorkflow.invoke

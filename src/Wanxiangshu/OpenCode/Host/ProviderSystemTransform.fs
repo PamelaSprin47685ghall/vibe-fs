@@ -117,15 +117,13 @@ module ProviderSystemTransform =
         | Role.Blogger -> catalog.BloggerSystemPrompt
 
     let private localizedRolePrompt lang role =
-        let basePrompt = PromptResources.systemForRole lang role
-
         match role with
         | Role.Blogger ->
             EnforcerCatalogResource.composeBloggerSystemPromptFor
                 lang
-                basePrompt
+                (PromptResources.instructionTextsForRole lang role)
                 (RuntimeResources.enforcerRulesFor lang)
-        | _ -> basePrompt
+        | _ -> PromptResources.systemForRole lang role
 
     let private replaceOwnedSegment (oldPrompt: string) (nextPrompt: string) (system: string array) =
         let canonical (text: string) = if isNull text then "" else text.Trim()

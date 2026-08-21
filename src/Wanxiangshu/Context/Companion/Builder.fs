@@ -96,7 +96,7 @@ module CompanionProjectionBuilder =
         (frameEpoch: FrameEpochId)
         (kind: CompanionRequestKind)
         (frameBodies: (BlobDigest * string) list)
-        (physicalDelta: (string * string) option)
+        (physicalDelta: (string * BloggerDeltaItem list) option)
         (previousTips: (string * string) list)
         (normalInstructionLines: string list)
         (squashInstructionLines: string list)
@@ -121,10 +121,10 @@ module CompanionProjectionBuilder =
 
         let deltaMessagesForPhysical =
             match physicalDelta with
-            | Some(messageId, toml) ->
+            | Some(messageId, items) ->
                 [ { MessageId = messageId
                     Role = "user"
-                    Text = CompanionPrompt.newWorkMessage normalInstructionLines toml
+                    Text = CompanionPrompt.newWorkMessage normalInstructionLines items
                     IsPhysical = true } ]
             | None -> []
 

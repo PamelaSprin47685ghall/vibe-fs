@@ -90,18 +90,18 @@ module internal SyncDelegateWorkflow =
         | [] -> None
         | values -> Some(List.sum values)
 
-    let private prepareOnePrompt (item: SyncDelegateInvocation) : Task<string> =
+    let private prepareOnePrompt (item: SyncDelegateInvocation) : Task<LlmFacing.Document> =
         task {
             try
                 return! item.PrepareProviderPrompt()
             with _ ->
-                return item.Charge
+                return LlmFacing.instruction item.Charge
         }
 
-    let private prepareAllPrompts (invocations: SyncDelegateInvocation list) : Task<string list> =
+    let private prepareAllPrompts (invocations: SyncDelegateInvocation list) : Task<LlmFacing.Document list> =
         task {
             // DSL-MUTABLE: algorithm-scratch — prompt result accumulator
-            let results = ResizeArray<string>()
+            let results = ResizeArray<LlmFacing.Document>()
 
             for item in invocations do
                 let! prompt = prepareOnePrompt item
@@ -186,7 +186,7 @@ module internal SyncDelegateWorkflow =
         (delegateSession: SessionId)
         (invocations: SyncDelegateInvocation list)
         (combinedCharge: string)
-        (combinedProviderPrompt: string)
+        (combinedProviderPrompt: LlmFacing.Document)
         (begun: SyncDelegateCall * System.IDisposable)
         : Task<unit> =
         task {
@@ -210,7 +210,7 @@ module internal SyncDelegateWorkflow =
         (sendAgent: string)
         (invocations: SyncDelegateInvocation list)
         (combinedCharge: string)
-        (combinedProviderPrompt: string)
+        (combinedProviderPrompt: LlmFacing.Document)
         : Task<unit> =
         match store.BeginCall(batchOwner, ownerScope, role, delegateSession, sendAgent, invocations) with
         | Error error ->
@@ -245,7 +245,7 @@ module internal SyncDelegateWorkflow =
             let combinedCharge =
                 invocations |> List.map (fun item -> item.Charge) |> String.concat "\n\n"
 
-            let combinedProviderPrompt = preparedPrompts |> String.concat "\n\n"
+            let combinedProviderPrompt = preparedPrompts |> LlmFacing.combine
 
             let sendAgent =
                 deps.ResolveBoundAgent delegateSession |> Option.defaultValue attachedAgent
@@ -348,7 +348,7 @@ module internal SyncDelegateWorkflow =
         (charge: string)
         (expectedToolCalls: int option)
         (batch: SyncDelegateBatch option)
-        (prepareProviderPrompt: unit -> Task<string>)
+        (prepareProviderPrompt: unit -> Task<LlmFacing.Document>)
         : Task<Result<SyncDelegateInvocationResult, string>> =
         task {
             let owner = SessionId.create ownerSessionKey

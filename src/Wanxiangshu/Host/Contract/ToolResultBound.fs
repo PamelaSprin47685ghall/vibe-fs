@@ -90,7 +90,7 @@ module ToolResultBound =
         elif isHighSurrogate c && index + 1 < text.Length && isLowSurrogate text.[index + 1] then
             2, 4
         else
-            // BMP non-ASCII, unpaired surrogate → 3 (matches SyntheticToml.byteCount)
+            // BMP non-ASCII, unpaired surrogate → 3 (matches LlmFacing.byteCount)
             1, 3
 
     let private scalarStepBack (text: string) (start: int) : int =
@@ -119,7 +119,7 @@ module ToolResultBound =
     let private utf8Tail (text: string) (maxBytes: int) : string =
         if maxBytes <= 0 then
             ""
-        elif SyntheticToml.byteCount text <= maxBytes then
+        elif LlmFacing.byteCount text <= maxBytes then
             text
         else
             sliceFrom text (walkUtf8Tail text maxBytes 0 text.Length)
@@ -147,7 +147,7 @@ module ToolResultBound =
         : string list =
         let segStart, newlineAt = findLineBounds text segEnd
         let line = text.Substring(segStart, segEnd - segStart)
-        let lineBytes = SyntheticToml.byteCount line
+        let lineBytes = LlmFacing.byteCount line
         let size = lineBytes + (if count = 0 then 0 else 1)
         let overBudget = count >= ContentMaxLines || accBytes + size > ContentMaxBytes
 
@@ -178,7 +178,7 @@ module ToolResultBound =
         n
 
     let private boundNonEmpty (text: string) : string =
-        let totalBytes = SyntheticToml.byteCount text
+        let totalBytes = LlmFacing.byteCount text
         // split('\n').length == newline count + 1 (trailing empty counts).
         let totalLines = countLines text
 

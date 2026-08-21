@@ -64,7 +64,7 @@ open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Process
 
-/// Parse the sandbox JSON string into SyntheticToml.DataValue and enforce JS-010.
+/// Parse the sandbox JSON string into LlmFacing reference data and enforce JS-010.
 module JsToolsData =
 
     [<Emit("$0 === null")>]
@@ -93,21 +93,21 @@ module JsToolsData =
 
     let private maxSafeInteger = 9007199254740991.0
 
-    let rec private isPrimitiveTree (value: SyntheticToml.DataValue) =
+    let rec private isPrimitiveTree (value: LlmFacing.Data.Value) =
         match value with
-        | SyntheticToml.DataValue.Bool _
-        | SyntheticToml.DataValue.Integer _
-        | SyntheticToml.DataValue.Float _
-        | SyntheticToml.DataValue.String _ -> true
-        | SyntheticToml.DataValue.Array items -> List.forall isPrimitiveTree items
-        | SyntheticToml.DataValue.Null
-        | SyntheticToml.DataValue.Object _ -> false
+        | LlmFacing.Data.Value.Bool _
+        | LlmFacing.Data.Value.Integer _
+        | LlmFacing.Data.Value.Float _
+        | LlmFacing.Data.Value.String _ -> true
+        | LlmFacing.Data.Value.Array items -> List.forall isPrimitiveTree items
+        | LlmFacing.Data.Value.Null
+        | LlmFacing.Data.Value.Object _ -> false
 
-    let private validateArray (items: SyntheticToml.DataValue list) : Result<unit, JsFailure> =
+    let private validateArray (items: LlmFacing.Data.Value list) : Result<unit, JsFailure> =
         if
             items
             |> List.exists (function
-                | SyntheticToml.DataValue.Null -> true
+                | LlmFacing.Data.Value.Null -> true
                 | _ -> false)
         then
             Error JsFailure.InvalidReturnValue
@@ -116,7 +116,7 @@ module JsToolsData =
         elif
             items
             |> List.forall (function
-                | SyntheticToml.DataValue.Object _ -> true
+                | LlmFacing.Data.Value.Object _ -> true
                 | _ -> false)
         then
             Ok()
@@ -125,25 +125,25 @@ module JsToolsData =
         else
             Error JsFailure.InvalidReturnValue
 
-    let private ofJsNumber (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+    let private ofJsNumber (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
         if not (jsIsFinite value) then
             Error JsFailure.InvalidReturnValue
         elif not (jsIsInteger value) then
-            Ok(SyntheticToml.DataValue.Float(unbox value))
+            Ok(LlmFacing.Data.Value.Float(unbox value))
         elif abs (unbox<float> value) <= maxSafeInteger then
-            Ok(SyntheticToml.DataValue.Integer(int64 (unbox<float> value)))
+            Ok(LlmFacing.Data.Value.Integer(int64 (unbox<float> value)))
         else
-            Ok(SyntheticToml.DataValue.Float(unbox<float> value))
+            Ok(LlmFacing.Data.Value.Float(unbox<float> value))
 
-    let rec private ofJsValue (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+    let rec private ofJsValue (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
         let ty = jsType value
 
         if jsNull value then
-            Ok SyntheticToml.DataValue.Null
+            Ok LlmFacing.Data.Value.Null
         elif ty = "boolean" then
-            Ok(SyntheticToml.DataValue.Bool(unbox value))
+            Ok(LlmFacing.Data.Value.Bool(unbox value))
         elif ty = "string" then
-            Ok(SyntheticToml.DataValue.String(unbox value))
+            Ok(LlmFacing.Data.Value.String(unbox value))
         elif ty = "number" then
             ofJsNumber value
         elif jsIsArray value then
@@ -153,17 +153,17 @@ module JsToolsData =
         else
             Error JsFailure.InvalidReturnValue
 
-    and ofJsArray (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+    and ofJsArray (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
         result {
             let! items =
                 [ 0 .. jsLength value - 1 ]
                 |> List.traverseResultM (fun index -> ofJsValue (jsGet value index))
 
             do! validateArray items
-            return SyntheticToml.DataValue.Array items
+            return LlmFacing.Data.Value.Array items
         }
 
-    and ofJsObject (value: obj) : Result<SyntheticToml.DataValue, JsFailure> =
+    and ofJsObject (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
         result {
             let keys = jsKeys value
 
@@ -173,10 +173,10 @@ module JsToolsData =
                     ofJsValue (jsGet value keys.[index])
                     |> Result.map (fun item -> keys.[index], item))
 
-            return SyntheticToml.DataValue.Object fields
+            return LlmFacing.Data.Value.Object fields
         }
 
-    let parse (json: string) : Result<SyntheticToml.DataValue, JsFailure> =
+    let parse (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
         try
             ofJsValue (JS.JSON.parse json)
         with _ ->
@@ -195,7 +195,7 @@ module JsToolWorkflow =
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure.
     type JsToolOutcome =
-        | Succeeded of value: SyntheticToml.DataValue * rewritten: string list * created: string list
+        | Succeeded of value: LlmFacing.Data.Value * rewritten: string list * created: string list
         | Failed of JsFailure
 
     let private rewrittenPaths (mutations: JsStagedMutation list) =
@@ -217,8 +217,8 @@ module JsToolWorkflow =
     let private commitEphemeral
         (root: string)
         (mutations: JsStagedMutation list)
-        (value: SyntheticToml.DataValue)
-        : Result<SyntheticToml.DataValue * string list * string list, JsFailure> =
+        (value: LlmFacing.Data.Value)
+        : Result<LlmFacing.Data.Value * string list * string list, JsFailure> =
         result {
             do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
             return value, rewrittenPaths mutations, createdPaths mutations
@@ -236,9 +236,9 @@ module JsToolWorkflow =
         (durable: IJsTransactionPersistence)
         (root: string)
         (mutations: JsStagedMutation list)
-        (value: SyntheticToml.DataValue)
+        (value: LlmFacing.Data.Value)
         (prepared: JsTransactionPrepared)
-        : Task<Result<SyntheticToml.DataValue * string list * string list, JsFailure>> =
+        : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
         taskResult {
             let! _ = durable.AppendPrepared prepared |> mapPrepareFailure
             do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
@@ -249,9 +249,9 @@ module JsToolWorkflow =
     let private commitMutations
         (root: string)
         (mutations: JsStagedMutation list)
-        (value: SyntheticToml.DataValue)
+        (value: LlmFacing.Data.Value)
         (persistence: IJsTransactionPersistence option)
-        : Task<Result<SyntheticToml.DataValue * string list * string list, JsFailure>> =
+        : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
         let prepared =
             { TransactionId = JsTransactionId.generate ()
               WorkspaceRoot = root
@@ -368,9 +368,15 @@ module JsToolsResult =
     let render (outcome: JsToolWorkflow.JsToolOutcome) : string =
         match outcome with
         | JsToolWorkflow.JsToolOutcome.Succeeded(value, rewritten, created) ->
-            SyntheticToml.document [ "ok" ] (SyntheticToml.encodeData value @ SyntheticToml.encodeFs rewritten created)
+            LlmFacing.instruction "ok"
+            |> LlmFacing.withData (
+                LlmFacing.Data.structuredValue value
+                @ LlmFacing.Data.fileEffects rewritten created
+            )
+            |> LlmFacing.render
         | JsToolWorkflow.JsToolOutcome.Failed failure ->
-            SyntheticToml.document
-                [ "failed" ]
-                [ SyntheticToml.field "code" (SyntheticToml.renderString (JsFailure.code failure))
-                  SyntheticToml.field "reason" (SyntheticToml.renderString (JsFailure.reason failure)) ]
+            LlmFacing.instruction "failed"
+            |> LlmFacing.withData
+                [ LlmFacing.Data.stringField "code" (JsFailure.code failure)
+                  LlmFacing.Data.stringField "reason" (JsFailure.reason failure) ]
+            |> LlmFacing.render

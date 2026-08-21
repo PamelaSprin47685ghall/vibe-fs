@@ -420,28 +420,57 @@ module ToolHostCodec =
         | TBool of bool
         | TTable of (string * TomlValue) list
 
-    let rec private renderTomlField (name: string) (value: TomlValue) =
+    let private scalarMember name value =
         match value with
-        | TString text -> SyntheticToml.field name (SyntheticToml.renderString text)
-        | TInt number -> SyntheticToml.field name (string number)
-        | TInt64 number -> SyntheticToml.field name (string number)
-        | TBool flag -> SyntheticToml.field name (if flag then "true" else "false")
+        | TString text -> Some(LlmFacing.Data.stringMember name text)
+        | TInt number -> Some(LlmFacing.Data.intMember name number)
+        | TInt64 number -> Some(LlmFacing.Data.int64Member name number)
+        | TBool flag -> Some(LlmFacing.Data.boolMember name flag)
+        | TTable _ -> None
+
+    let rec private blocksForField (name, value) =
+        match value with
+        | TString text -> [ LlmFacing.Data.stringField name text ]
+        | TInt number -> [ LlmFacing.Data.intField name number ]
+        | TInt64 number -> [ LlmFacing.Data.int64Field name number ]
+        | TBool flag -> [ LlmFacing.Data.boolField name flag ]
         | TTable entries ->
-            String.concat "\n" (("[" + name + "]") :: (entries |> List.map (fun (n, v) -> renderTomlField n v)))
+            let local =
+                entries
+                |> List.choose (fun (fieldName, fieldValue) -> scalarMember fieldName fieldValue)
+
+            let nested = entries |> List.collect nestedBlocksForField
+            LlmFacing.Data.table name local :: nested
+
+    and private nestedBlocksForField (name, value) =
+        match value with
+        | TTable _ -> blocksForField (name, value)
+        | _ -> []
+
+    let private objectBlocks fields = fields |> List.collect blocksForField
 
     let tomlObject (fields: (string * TomlValue) list) : string =
-        SyntheticToml.document [] (fields |> List.map (fun (name, value) -> renderTomlField name value))
+        LlmFacing.empty |> LlmFacing.withData (objectBlocks fields) |> LlmFacing.render
 
     let tomlObjectWithInstructions (instructions: string list) (fields: (string * TomlValue) list) : string =
-        SyntheticToml.document instructions (fields |> List.map (fun (name, value) -> renderTomlField name value))
+        LlmFacing.instructions instructions
+        |> LlmFacing.withData (objectBlocks fields)
+        |> LlmFacing.render
+
+    let private tableMember (name: string, value: TomlValue) =
+        match value with
+        | TString text -> LlmFacing.Data.stringMember name text
+        | TInt number -> LlmFacing.Data.intMember name number
+        | TInt64 number -> LlmFacing.Data.int64Member name number
+        | TBool flag -> LlmFacing.Data.boolMember name flag
+        | TTable _ -> invalidArg "entries" "nested table values are not valid inside a table-array row"
 
     let tomlTable (name: string) (entries: (string * TomlValue) list list) : string =
         let blocks =
             entries
-            |> List.map (fun entry ->
-                SyntheticToml.tableArrayEntry name (entry |> List.map (fun (n, v) -> renderTomlField n v)))
+            |> List.map (fun entry -> LlmFacing.Data.tableArray name (entry |> List.map tableMember))
 
-        SyntheticToml.document [] blocks
+        LlmFacing.empty |> LlmFacing.withData blocks |> LlmFacing.render
 
     let looksLikeHandleId (value: string) =
         if String.IsNullOrWhiteSpace value then

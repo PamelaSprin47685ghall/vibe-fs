@@ -17,6 +17,12 @@ const WORK_LOG_B = readFileSync(join(FIXTURES, 'observation-b-work-log.txt'), 'u
 const NEW_MATERIAL_SIMILAR_TO_A = `[[new_work_to_record]]
 assistant = "Coder 修改 /src/tenancy/bind.ts：userId 与 tenantId 均声明为 string，绑定函数可互换两个标识。"
 `
+const NEW_MATERIAL_SIMILAR_TO_A_ITEMS = [{
+  role: 'assistant',
+  kind: 'text',
+  text: 'Coder 修改 /src/tenancy/bind.ts：userId 与 tenantId 均声明为 string，绑定函数可互换两个标识。',
+  truncated: false,
+}]
 
 const cycle = (n, tip, run) => ({
   mainSessionId: 'ses-paired-main',
@@ -147,7 +153,7 @@ test('WHAT[BD-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_mat
     frameEpoch: 0,
     kind: 'Normal',
     frameBodies: frames,
-    physicalDelta: { id: 'msg-new-similar-to-a', toml: NEW_MATERIAL_SIMILAR_TO_A },
+    physicalDelta: { id: 'msg-new-similar-to-a', items: NEW_MATERIAL_SIMILAR_TO_A_ITEMS },
     previousTips,
     normalInstructionLines: ['normal history'],
     squashInstructionLines: ['squash history'],

@@ -41,8 +41,7 @@ module CompanionPrompt =
     let MemoryPreamble = "lifecycle/companion/memory-preamble"
 
     /// Plain lines → ARCH-010 comment-style instruction claim body.
-    let asCommentedInstruction (lines: string list) =
-        lines |> List.map (fun line -> "# " + line) |> String.concat "\n"
+    let asCommentedInstruction (lines: string list) = LlmFacing.renderInstructions lines
 
     /// COMPANION-005: durable frame body as assistant message text.
     /// Still wrapped as `[[do_not_exec]] historic_frame`; only the message role is assistant.
@@ -56,15 +55,11 @@ module CompanionPrompt =
     /// COMPANION-005: normal delta user message = instruction header first, then data body.
     ///
     /// ARCH-010: comment header + one blank line + `[[new_work_to_record]]` tables.
-    /// `toml` is data-only (CTX-013); header is projection-only and not part of the
+    /// `items` are typed data (CTX-013); header is projection-only and not part of the
     /// 200 KiB chunk meter (metered at nextChunk before wrap).
-    let newWorkMessage (instructionLines: string list) (toml: string) =
-        let body = if isNull toml then "" else toml.TrimEnd('\n', '\r')
-
-        match body with
-        | "" -> SyntheticToml.document instructionLines []
-        | data -> SyntheticToml.document instructionLines [ data ]
+    let newWorkMessage (instructionLines: string list) (items: BloggerDeltaItem list) =
+        BloggerToml.documentWith instructionLines items |> LlmFacing.render
 
     /// COMPANION-010: wrap a frozen record prefix body for injection into X.
     let companionMemoryBlock (preamble: string) (frozenRecordPrefix: string) =
-        preamble + "\n\n<work-log>\n" + frozenRecordPrefix + "\n</work-log>"
+        LlmFacing.renderInstructions [ preamble; frozenRecordPrefix ]

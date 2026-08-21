@@ -71,8 +71,8 @@ type BlogFramesIntent =
         SquashFrameCount: int
         BloggerSessionId: string
         FrameEpoch: int64
-        /// Normal 路径的 combined delta：`(messageId, toml)`。Squash 为 `None`。
-        PhysicalDelta: (string * string) option
+        /// Normal 路径的 combined delta：`(messageId, typed items)`。Squash 为 `None`。
+        PhysicalDelta: (string * BloggerDeltaItem list) option
         /// ENFORCER-071：`(tipField, cycleId)`，oldest → newest。
         PreviousTips: (string * string) list
         /// PROMPT-019：已本地化的 Companion normal / squash 指令行。

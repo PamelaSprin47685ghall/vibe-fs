@@ -181,7 +181,7 @@ module CoderTool =
         (role: SyncDelegateRole)
         (context: HostToolContext)
         (charge: string)
-        (prepareProviderPrompt: unit -> Task<string>)
+        (prepareProviderPrompt: unit -> Task<LlmFacing.Document>)
         (batch: SyncDelegateBatch option)
         (expectedToolCalls: int option)
         =
@@ -240,13 +240,13 @@ module CoderTool =
             | Some _, false, Ok _, true -> return consequence context surface.NeedsCharge (Map [ "tool", toolName ])
             | Some sd, false, Ok expectedToolCalls, false ->
                 let prepareProviderPrompt () =
-                    RepositoryWarmStart.prepare
+                    RepositoryWarmStart.prepareDocument
                         (SessionId.create context.SessionId)
                         Role.Coder
                         scope.WorkspaceDirectory
                         keywords
                         charge
-                    |> TaskValue.map (Result.defaultValue charge)
+                    |> TaskValue.map (Result.defaultValue (LlmFacing.instruction charge))
 
                 let! batch = SyncDelegateBatching.resolve sd scope SyncDelegateRole.Coder context
 
