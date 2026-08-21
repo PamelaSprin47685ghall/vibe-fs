@@ -672,10 +672,7 @@ module WriterStreamSync =
             let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir |> Map.ofList
 
             let neededPayloadEntries =
-                changedRemotePayloadEntries
-                    (cacheFiles (fun value -> value.Payloads) cache)
-                    payloadStats
-                    payloadEntries
+                changedRemotePayloadEntries (cacheFiles (fun value -> value.Payloads) cache) payloadStats payloadEntries
 
             let! payloadBlobs = readBlobList raw neededPayloadEntries
             return remoteWriters, payloadBlobs
