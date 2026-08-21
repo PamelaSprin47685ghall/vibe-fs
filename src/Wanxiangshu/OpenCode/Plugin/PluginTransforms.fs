@@ -120,7 +120,8 @@ module PluginTransforms =
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle: string option -> obj -> unit
-          SanitizeMessages: obj -> unit }
+          SanitizeMessages: obj -> unit
+          InterruptAfterSubmittedJudgement: string option -> Task<unit> }
 
     type TransformBranchCapabilities =
         { IsExplicitResume: string option -> obj -> bool
@@ -257,7 +258,9 @@ module PluginTransforms =
                     projectionSessionIdOpt
                     (languageFor projectionSessionIdOpt)
                     outObj
-          SanitizeMessages = HostMessageProjection.sanitizeOutputMessages }
+          SanitizeMessages = HostMessageProjection.sanitizeOutputMessages
+          InterruptAfterSubmittedJudgement =
+            JudgeTool.interruptAfterSubmittedJudgement wired.CurrentPhysicalUserMessage sessionPort }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
@@ -321,6 +324,9 @@ module PluginTransforms =
 
             // 12. HostMessageProjection.sanitizeMessages
             caps.SanitizeMessages outObj
+
+            // 13. JudgeTool.interruptAfterSubmittedJudgement
+            do! caps.InterruptAfterSubmittedJudgement projectionSessionIdOpt
             ()
         }
 

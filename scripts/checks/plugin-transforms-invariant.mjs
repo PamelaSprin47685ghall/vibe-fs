@@ -6,7 +6,7 @@
 //   - use static explicit ordering (no dynamic middleware list)
 //   - not contain foreign domain decision helpers (decide/recover/classify/calculate/maintain)
 //   - not introduce ITransformMiddleware or pipeline registration patterns
-//   - preserve the fixed semantic ordering of normalTransform's 12 named steps
+//   - preserve the fixed semantic ordering of normalTransform's 13 named steps
 //
 // This gate is a structural regression guard, not a semantic proof.
 
@@ -65,6 +65,7 @@ const orderingSteps = [
   'projectOrTerminate',
   'BloggerChronicleText.maybeInject',
   'sanitizeMessages',
+  'interruptAfterSubmittedJudgement',
 ]
 
 const allLines = text.split('\n')

@@ -30,7 +30,7 @@ Reviewer 依据 Examiner's Ledger 的判断方向建立审查视角，仅在存�
 
 ## REVIEW-JUDGEMENT-008: 过程评审一次 durable judge 即 terminal
 
-TodoProcessReview（过程评审）是针对当前 checkpoint 的单次真实判断，单次持久化 `judge` 即为 terminal。防重机制绑定于当前物理请求，同一物理请求内的重复调用予以收束，不同请求复用同一 dedicated 会话时重新具备单次 `judge` 资格。过程评审成功回执明确指示结束，且不走 challenge 或二次 PERFECT 流程。Finality 首次 PERFECT 严禁复用过程评审的 terminal received 回执，必须返回 skeptical challenge 并要求再次评估。无实质文本记录的过程 PERFECT 无效。
+TodoProcessReview（过程评审）是针对当前 checkpoint 的单次真实判断，单次持久化 `judge` 即为 terminal。防重机制绑定于当前物理请求，同一物理请求内的重复调用予以收束，不同请求复用同一 dedicated 会话时重新具备单次 `judge` 资格。过程评审成功回执文本保持不变并明确指示结束；当 Host 准备把该 terminal tool result 送入同一物理请求的下一次 LLM continuation 时，provider transform 必须在 hook 内中断当前 managed attempt，同时让 transform 正常完成。interrupt 由首次成功提交建立的 request-scoped 标记触发，不得等待第二次 `judge` 才触发。Finality 首次 PERFECT 严禁复用过程评审的 terminal received 回执，必须返回 skeptical challenge 并要求再次评估；只有 terminal judgement 被标记后才适用 transform interrupt。无实质文本记录的过程 PERFECT 无效。
 
 ## REVIEW-JUDGEMENT-009: 拒绝必须把伤口说清且不发明 obligation
 

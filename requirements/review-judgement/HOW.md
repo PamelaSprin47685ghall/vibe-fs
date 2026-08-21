@@ -7,6 +7,7 @@
   - 过程评审（TodoProcessReview）成功后返回 `tool/judge/received`，明确提示判断已被收下并指示会话收束，回执中绝不回显 verdict。
   - 终局评审（FinalityReview）首次 PERFECT 触发 `Challenge` 逻辑，仅渲染质疑提示（`resources/provider/review/challenge`），严禁拼接收束回执；仅在第二次判断或 REVISE 时完成工具调用。
 - **防重与幂等范围**：已裁决状态（already judged）的作用域限定于当前 `(ReviewerSessionId, PhysicalUserMessageId)` 物理请求。单次请求内的重复调用被收束以避免空转；当同一 dedicated 会话接收新的物理请求时，自动重置并恢复单次裁决资格。
+- **terminal 回执的物理收束**：首次 terminal judgement durable 后只写 request-scoped submitted 标记，不在 `judge` 的 duplicate 分支中等待第二次提交再杀。普通 provider transform 在完成消息投影后检查“当前 PhysicalUserMessageId 是否已有 submitted judgement”；命中则调用 managed-session `InterruptAttempt`，忽略其返回值并让 transform 正常返回。这样 tool result 文本仍由 Host 正常形成，但同一物理请求不得再进入 LLM continuation。新物理请求因 identity 不同自然恢复正常执行；Finality 首次 PERFECT challenge 未建立 submitted 标记，因此继续正常二次评估。
 
 ## 2. 判断哲学载体与引导机制
 

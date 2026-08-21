@@ -1,5 +1,6 @@
 // REVIEW-JUDGEMENT-008 / REVIEW-013 process-review judgement boundary.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { parse as parseToml } from 'smol-toml'
 import * as provider from '../../../dist/Participant/Provider/LanguageSurface.js'
@@ -27,6 +28,7 @@ const read = (value) => {
 }
 const providerLanguage = { english: 'English', simplifiedChinese: 'SimplifiedChinese' }
 const providerResources = { readText: (language, path) => provider.readText(language, path) }
+const source = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8')
 
 test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_the_request_kind_is_typed_process_vs_finality', () => {
   assert.deepEqual(todo.requestKindNames(), ['TodoProcess', 'FinalityTerminal'])
@@ -106,4 +108,19 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_a_process_verdict_never_becomes_a_co
   assert.equal(revised.ok, true)
   assert.equal(revised.value.Witness.state, 'RevisionWitness')
   assert.equal(review.isConfirmed(revised.value.Witness), false)
+})
+
+test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically_enforced_at_provider_transform', () => {
+  const judgeTool = source('src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs')
+  const transforms = source('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
+
+  const duplicate = judgeTool.match(/\| ExecutionDecision\.AlreadyJudged ->([\s\S]*?)\| ExecutionDecision\.Proceed judgement/)
+  assert.ok(duplicate, 'duplicate judgement branch must remain explicit')
+  assert.match(duplicate[1], /return alreadyJudged context/)
+  assert.doesNotMatch(duplicate[1], /InterruptAttempt|abortSession/, 'second judge must not own physical termination')
+
+  assert.match(judgeTool, /let interruptAfterSubmittedJudgement[\s\S]*?currentPhysicalUserMessage[\s\S]*?SharedState\.VerdictSubmissions\.Contains[\s\S]*?sessionPort\.InterruptAttempt/)
+  assert.match(transforms, /InterruptAfterSubmittedJudgement:\s*string option -> Task<unit>/)
+  assert.match(transforms, /JudgeTool\.interruptAfterSubmittedJudgement wired\.CurrentPhysicalUserMessage sessionPort/)
+  assert.match(transforms, /caps\.SanitizeMessages outObj[\s\S]*?do! caps\.InterruptAfterSubmittedJudgement projectionSessionIdOpt/)
 })

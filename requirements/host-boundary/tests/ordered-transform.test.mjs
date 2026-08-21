@@ -1,6 +1,6 @@
 // requirements/host-boundary/tests/ordered-transform.test.mjs — WHAT[HOST-BOUNDARY-019]
 //
-// OrderedTransformProof: verifies the 12-step static semantic score of
+// OrderedTransformProof: verifies the 13-step static semantic score of
 // PluginTransforms.normalTransform alongside the StrengthReplica and
 // ExplicitResumeSuppression branch isolation paths without illegal deep-dist imports.
 
@@ -12,7 +12,7 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 12 named fields', () => {
+test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 13 named fields', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   assert.match(text, /type\s+NormalTransformCapabilities\s*=/)
@@ -28,9 +28,10 @@ test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilit
   assert.match(text, /ProjectRequirementGrounding:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /InjectBloggerChronicle:\s*string option -> obj -> unit/)
   assert.match(text, /SanitizeMessages:\s*obj -> unit/)
+  assert.match(text, /InterruptAfterSubmittedJudgement:\s*string option -> Task<unit>/)
 })
 
-test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 12-step static score in order', () => {
+test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 13-step static score in order', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   const orderingSteps = [
@@ -46,6 +47,7 @@ test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 12-step static scor
     'ProjectRequirementGrounding',
     'InjectBloggerChronicle',
     'SanitizeMessages',
+    'InterruptAfterSubmittedJudgement',
   ]
 
   const allLines = text.split('\n')

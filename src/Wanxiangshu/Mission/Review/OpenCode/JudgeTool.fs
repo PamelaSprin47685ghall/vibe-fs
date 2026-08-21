@@ -203,20 +203,34 @@ module JudgeTool =
                   ToolCallId = toolCallId
                   Verdict = value }
 
-    let private abortSession (scope: ToolRuntimeScope) (sessionId: string) : Task =
+    let interruptAfterSubmittedJudgement
+        (currentPhysicalUserMessage: string -> string option)
+        (sessionPort: ISessionHostPort)
+        (projectionSessionIdOpt: string option)
+        : Task<unit> =
         task {
-            if not (String.IsNullOrWhiteSpace sessionId) then
-                let! _ = scope.Sessions.InterruptAttempt(SessionId.create sessionId)
-                ()
+            let currentRequest =
+                projectionSessionIdOpt
+                |> Option.bind (fun sessionId ->
+                    currentPhysicalUserMessage sessionId
+                    |> Option.map (fun physicalUserMessageId -> sessionId, physicalUserMessageId))
+
+            match currentRequest with
+            | Some(sessionId, physicalUserMessageId)
+                when JudgementRequestIdentity.key
+                         (SessionId.create sessionId)
+                         (PhysicalUserMessageId.create physicalUserMessageId)
+                     |> SharedState.VerdictSubmissions.Contains ->
+                let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
+                return ()
+            | _ -> return ()
         }
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {
             match decideExecution scope args context with
             | ExecutionDecision.Refused reason -> return notReceived context reason
-            | ExecutionDecision.AlreadyJudged ->
-                do! abortSession scope context.SessionId
-                return alreadyJudged context
+            | ExecutionDecision.AlreadyJudged -> return alreadyJudged context
             | ExecutionDecision.Proceed judgement -> return! dispatchJudgement scope context judgement
         }
 
