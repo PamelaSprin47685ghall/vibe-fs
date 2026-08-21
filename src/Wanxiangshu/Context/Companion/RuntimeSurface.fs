@@ -245,12 +245,36 @@ module CompanionRuntimeSurface =
         | None -> null
         | Some value -> contextToJs value
 
-    let setCurrentRequest (scope: obj) (sessionId: string) (context: obj) : unit =
-        hostOf scope
-        |> fun host -> host.SetCurrentRequest(sessionId, contextOfJs context)
+    let private flightClaimName (claim: BloggerFlightClaim) =
+        match claim with
+        | BloggerFlightClaim.Claimed -> "Claimed"
+        | BloggerFlightClaim.Refreshed -> "Refreshed"
+        | BloggerFlightClaim.Conflict existing -> "Conflict:" + BloggerRequestId.value existing
 
-    let clearCurrentRequest (scope: obj) (sessionId: string) : unit =
-        hostOf scope |> fun host -> host.ClearCurrentRequest sessionId
+    let claimCurrentRequest (scope: obj) (sessionId: string) (context: obj) : string =
+        hostOf scope
+        |> fun host -> host.ClaimCurrentRequest(sessionId, contextOfJs context)
+        |> flightClaimName
+
+    let acquireMaterialization (scope: obj) (sessionId: string) : Task<obj> =
+        task {
+            let! lease = hostOf scope |> fun host -> host.AcquireMaterialization sessionId
+            return box lease
+        }
+
+    let releaseMaterialization (lease: obj) : unit =
+        (unbox<BloggerMaterializationLease> lease).Release()
+
+    let private flightReleaseName (release: BloggerFlightRelease) =
+        match release with
+        | BloggerFlightRelease.Released -> "Released"
+        | BloggerFlightRelease.Missing -> "Missing"
+        | BloggerFlightRelease.Conflict existing -> "Conflict:" + BloggerRequestId.value existing
+
+    let releaseCurrentRequest (scope: obj) (sessionId: string) (requestId: string) : string =
+        hostOf scope
+        |> fun host -> host.ReleaseCurrentRequest(sessionId, BloggerRequestId.create requestId)
+        |> flightReleaseName
 
     let hasFlight (scope: obj) (sessionId: string) : bool =
         hostOf scope |> fun host -> host.HasFlight sessionId

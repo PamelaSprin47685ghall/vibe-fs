@@ -68,7 +68,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_cell_has_no_sealed_mirror_du
   assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)
 
   assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
-  parkedTransform.setCurrentRequest(scope, KEY, ctx())
+  parkedTransform.claimCurrentRequest(scope, KEY, ctx())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
 })
 
@@ -107,9 +107,9 @@ test('WHAT[CONTEXT-COMPRESSION-018] BLOGGER_RUNTIME_reactivated_catchup_forceSea
   assert.equal(bloggerRuntime.blocksNewRequest(true, false, true), false)
 
   assert.equal(bloggerRuntime.decideMaterial(false, false, ctx()), 'Start')
-  parkedTransform.setCurrentRequest(scope, KEY, ctx())
+  parkedTransform.claimCurrentRequest(scope, KEY, ctx())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
   // Flag still true after commit — host must forceSeal when tryRefresh returns None.
   assert.equal(parkedTransform.isDrainOpen(scope, KEY), true)

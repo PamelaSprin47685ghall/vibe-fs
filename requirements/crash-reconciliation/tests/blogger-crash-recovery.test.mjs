@@ -94,7 +94,7 @@ test('WHAT[CRASH-016] C5_snapshot_tool_evidence_uses_latest_assistant_and_exactl
   assert.match(recoverySrc, /\[\| part \|\]/, 'only exact-one raw chronicle may prove completion')
 })
 
-test('WHAT[CRASH-016] C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
+test('WHAT[CRASH-016] C5_crash_recovery_uses_physical_claim_not_cell_State', () => {
   // PR7 Slice 3: window windows use physical flight ownership.
   // Forbidden: match live.State / BloggerRuntimeState.InFlight as restore authority.
   assert.doesNotMatch(
@@ -105,7 +105,7 @@ test('WHAT[CRASH-016] C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
   assert.doesNotMatch(
     recoverySrc,
     /BloggerRuntimeState\.(InFlight|Idle)/,
-    'restoreRuntime must not take BloggerRuntimeState; write flight via SetCurrentRequest/ClearCurrentRequest',
+    'restoreRuntime must not take BloggerRuntimeState',
   )
   assert.match(
     recoverySrc,
@@ -114,12 +114,22 @@ test('WHAT[CRASH-016] C5_crash_recovery_reads_HasFlight_not_cell_State', () => {
   )
   assert.match(
     recoverySrc,
-    /host\.SetCurrentRequest/,
-    'restore InFlight rebuilds physical flight via SetCurrentRequest',
+    /host\.AcquireMaterialization/,
+    'crash recovery must join the same per-Blogger materialization admission',
   )
   assert.match(
     recoverySrc,
-    /host\.ClearCurrentRequest/,
-    'abandon / clear path uses ClearCurrentRequest',
+    /BloggerRuntimeHost\.requireCurrentRequest/,
+    'restore InFlight rebuilds physical flight through the non-overwrite claim owner',
+  )
+  assert.match(
+    recoverySrc,
+    /BloggerRuntimeHost\.requireReleaseCurrentRequest/,
+    'abandon / clear releases only the expected RequestId owner',
+  )
+  assert.doesNotMatch(
+    recoverySrc,
+    /SetCurrentRequest|ClearCurrentRequest/,
+    'legacy overwrite / unqualified clear APIs must not survive crash recovery',
   )
 })

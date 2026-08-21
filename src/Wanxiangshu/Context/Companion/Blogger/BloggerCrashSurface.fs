@@ -13,4 +13,5 @@ module BloggerCrashSurface =
         | Some(BloggerCrashRecovery.WindowOutcome.ReceiptedIdle _) -> "ReceiptedIdle"
         | Some(BloggerCrashRecovery.WindowOutcome.PendingMaterial _) -> "PendingMaterial"
         | Some(BloggerCrashRecovery.WindowOutcome.AlreadyLive _) -> "AlreadyLive"
+        | Some(BloggerCrashRecovery.WindowOutcome.Superseded _) -> "Superseded"
         | Some(BloggerCrashRecovery.WindowOutcome.Unreadable _) -> "Unreadable"

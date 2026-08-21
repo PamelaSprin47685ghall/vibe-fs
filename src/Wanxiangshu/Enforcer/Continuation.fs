@@ -208,7 +208,7 @@ module EnforcerContinuation =
         task {
             Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
             do! BloggerAbandon.openRequest ctx.Durable ctx.Owner ctx.BloggerSessionId currentCtx reason
-            ctx.Scope.ClearCurrentRequest sessionKey
+            BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
             return ctx.Project ctx.RawMessages
         }
 
@@ -226,7 +226,7 @@ module EnforcerContinuation =
             else
                 let! refreshed = ctx.RefreshMainContext ctx.Owner ctx.BloggerSessionId
                 let fresh = refreshed |> Option.defaultValue live
-                ctx.Scope.SetCurrentRequest(sessionKey, fresh)
+                BloggerRuntimeHost.requireCurrentRequest ctx.Scope sessionKey fresh
                 Diagnostic.emit "enforcer-cycle-repair" [ "session_id", sessionKey; "result", reason ]
                 let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId fresh)
                 let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-repair-run"
@@ -461,7 +461,7 @@ module EnforcerContinuation =
                 |> TaskResult.mapError (fun reason -> "Blogger context materialize failed: " + reason)
 
             do!
-                BloggerCoordinator.bindContinuationContext ctx.Durable live promptKey
+                BloggerCoordinator.bindContinuationContext ctx.Scope ctx.Durable live promptKey
                 |> TaskResult.mapError (fun reason -> "Blogger PromptKey bind failed: " + reason)
         }
 
@@ -518,7 +518,7 @@ module EnforcerContinuation =
                 let! rebuilt = resumeWithContext ctx live
                 return ctx.Project rebuilt
             else
-                ctx.Scope.SetCurrentRequest(sessionKey, live)
+                BloggerRuntimeHost.requireCurrentRequest ctx.Scope sessionKey live
                 let! rebuilt = resumeWithContext ctx live
                 return ctx.Project rebuilt
         }
@@ -559,10 +559,10 @@ module EnforcerContinuation =
                 AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections
             then
                 BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return ctx.Stop caughtUpReason
             else
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return! parkAfterCatchUpClear ctx mainSessionId sessionKey caughtUpReason
         }
 
@@ -670,10 +670,10 @@ module EnforcerContinuation =
                         liveCtx
                         (reason + "; aabb-refresh-empty")
 
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return CycleDisposition.Working
             | Some freshCtx ->
-                ctx.Scope.SetCurrentRequest(sessionKey, freshCtx)
+                BloggerRuntimeHost.requireCurrentRequest ctx.Scope sessionKey freshCtx
                 Diagnostic.emit "enforcer-cycle-repair" [ "session_id", sessionKey; "result", reason ]
                 return CycleDisposition.InjectRepair freshCtx
         }
@@ -688,7 +688,7 @@ module EnforcerContinuation =
         task {
             Diagnostic.fatal "enforcer-cycle-failed" [ "session_id", sessionKey; "result", reason ]
             do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
-            ctx.Scope.ClearCurrentRequest sessionKey
+            BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
             return CycleDisposition.Working
         }
 
@@ -702,7 +702,7 @@ module EnforcerContinuation =
         task {
             Diagnostic.emit "enforcer-cycle-stale" [ "session_id", sessionKey; "result", reason ]
             do! BloggerAbandon.openRequest ctx.Durable mainSessionId ctx.BloggerSessionId liveCtx reason
-            ctx.Scope.ClearCurrentRequest sessionKey
+            BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
             return CycleDisposition.AbandonThenCatchUp
         }
 
@@ -727,7 +727,7 @@ module EnforcerContinuation =
                     mergedText
             with
             | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return CycleDisposition.Committed None
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
@@ -767,7 +767,7 @@ module EnforcerContinuation =
             with
             | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
                 sealIfMainSealedAfterCommit ctx mainSessionId sessionKey
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return CycleDisposition.Committed None
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey liveCtx reason
@@ -891,7 +891,7 @@ module EnforcerContinuation =
                         liveCtx
                         "blog aabb exhausted; auto-recovery budget spent"
 
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return failwith "unreachable: fatalEnd ends the cycle"
             | _ ->
                 let requestKey = BloggerRequestId.value (BloggerRequestContext.requestId live)
@@ -920,10 +920,10 @@ module EnforcerContinuation =
                 AgentProjection.mainSealedForBlogger mainSessionId (AgentJournal.snapshot ctx.Durable).AgentProjections
             then
                 BloggerRuntimeHost.forceSealCellDropOffer ctx.Scope sessionKey
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return ctx.Stop "main-sealed-caught-up"
             else
-                ctx.Scope.ClearCurrentRequest sessionKey
+                BloggerRuntimeHost.requireReleaseObservedCurrentRequest ctx.Scope sessionKey
                 return! parkAfterCatchUpClear ctx mainSessionId sessionKey "park-ended-catch-up-complete"
         }
 

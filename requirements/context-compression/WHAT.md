@@ -91,3 +91,7 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 ## CONTEXT-COMPRESSION-023: recovery/park 全事件驱动且时间无关
 
 Context compression 与 provider recovery 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`、调用 timer/deadline/Delay 或以超时作为状态转换。Blogger park 的完成值必须携带 typed event，而非 `bool` 再从第二个槽位取 material。WorkMain recovery 若需要等待正在生产的 Y，只能以 durable `BloggerRequestMaterialized` open request 证明 producer 存在，并订阅 `AgentJournal` 的已提交 change；每个 change 后重新读取 projection，直到出现严格更新的 coverage 或该 durable open request 被 commit/abandon 关闭。`HasFlight`、PendingOffer、进程内 waiter 与时间窗口均不得作为 recovery correctness 证明。
+
+## CONTEXT-COMPRESSION-024: Blogger materialization admission 串行；flight 不得跨 RequestId 覆盖
+
+同一 BloggerSession 的 `BloggerRequestMaterialized` / PromptKey bind / `BloggerRequestAbandoned` 命令必须通过跨 plugin instance 的 process-local materialization admission 串行化；每次取得 admission 后必须重新读取 canonical journal projection 再决定 abandon/materialize，禁止 snapshot-check 与 append 之间存在并发竞态。该 admission 仅保护命令临界区，不是 durable producer proof。live flight claim 必须原子：空槽可建立、同 RequestId 可刷新、不同 RequestId 必须返回 typed conflict 且保留原 owner，严禁覆盖写。normal start、provider retry 与 crash recovery 必须共享这一条 claim/admission 语义。

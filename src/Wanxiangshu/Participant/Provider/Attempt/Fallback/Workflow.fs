@@ -267,7 +267,7 @@ module ProviderRecoveryWorkflow =
                         |> TaskResult.mapError BloggerContinuationFailure.Send
 
                     do!
-                        BloggerCoordinator.bindContinuationContext durable ctx promptKey
+                        BloggerCoordinator.bindContinuationContext scope durable ctx promptKey
                         |> TaskResult.mapError BloggerContinuationFailure.Bind
                 }
 

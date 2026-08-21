@@ -478,7 +478,7 @@ module EnforcerFrameRecovery =
         }
 
     /// Rebuild / empty-calls only: live InFlight, else reload open without
-    /// committing. Does not SetCurrentRequest (no side effect on authority).
+    /// committing. Does not claim physical flight (no side effect on authority).
     let resolveCycleContext
         (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)

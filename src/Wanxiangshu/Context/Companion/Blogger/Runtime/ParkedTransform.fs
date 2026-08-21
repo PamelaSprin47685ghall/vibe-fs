@@ -48,6 +48,7 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 type ParkWake =
@@ -58,6 +59,73 @@ type ParkWake =
 type MaterialOfferDisposition =
     | Delivered
     | Staged
+
+[<RequireQualifiedAccess>]
+type BloggerFlightClaim =
+    | Claimed
+    | Refreshed
+    | Conflict of BloggerRequestId
+
+[<RequireQualifiedAccess>]
+type BloggerFlightRelease =
+    | Released
+    | Missing
+    | Conflict of BloggerRequestId
+
+type BloggerMaterializationLease internal (release: unit -> unit) =
+    let gate = obj ()
+    // DSL-MUTABLE: resource — one-shot materialization admission release latch
+    let mutable released = false
+
+    member _.Release() =
+        let shouldRelease =
+            lock gate (fun () ->
+                if released then
+                    false
+                else
+                    released <- true
+                    true)
+
+        if shouldRelease then
+            release ()
+
+type BloggerMaterializationAdmission() =
+    let gate = obj ()
+
+    let queues =
+        System.Collections.Generic.Dictionary<
+            string,
+            System.Collections.Generic.Queue<TaskCompletionSource<BloggerMaterializationLease>>
+         >()
+
+    let rec release sessionId =
+        let next =
+            lock gate (fun () ->
+                match queues.TryGetValue sessionId with
+                | true, waiters when waiters.Count > 0 -> Some(waiters.Dequeue())
+                | true, _ ->
+                    queues.Remove sessionId |> ignore
+                    None
+                | false, _ -> None)
+
+        match next with
+        | Some waiter -> waiter.SetResult(BloggerMaterializationLease(fun () -> release sessionId))
+        | None -> ()
+
+    member _.Acquire(sessionId: string) : Task<BloggerMaterializationLease> =
+        lock gate (fun () ->
+            match queues.TryGetValue sessionId with
+            | true, waiters ->
+                let waiter =
+                    TaskCompletionSource<BloggerMaterializationLease>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
+
+                waiters.Enqueue waiter
+                waiter.Task
+            | false, _ ->
+                queues.Add(sessionId, System.Collections.Generic.Queue())
+                Task.FromResult(BloggerMaterializationLease(fun () -> release sessionId)))
 
 /// Parking + dual request slots (ENFORCER-047/050/160).
 ///
@@ -72,9 +140,10 @@ type IBloggerRuntimeHost =
     /// Physical single-flight: entry present = a Blogger request owns this session.
     abstract HasFlight: string -> bool
     abstract TryGetFlight: string -> BloggerRequestContext option
-    abstract SetCurrentRequest: string * BloggerRequestContext -> unit
+    abstract ClaimCurrentRequest: string * BloggerRequestContext -> BloggerFlightClaim
     abstract TryPeekCurrentRequest: string -> BloggerRequestContext option
-    abstract ClearCurrentRequest: string -> unit
+    abstract ReleaseCurrentRequest: string * BloggerRequestId -> BloggerFlightRelease
+    abstract AcquireMaterialization: string -> Task<BloggerMaterializationLease>
     abstract OfferMaterial: string * BloggerRequestContext -> MaterialOfferDisposition
     abstract TryTakePendingOffer: string -> BloggerRequestContext option
     /// Physical drain-window slot.

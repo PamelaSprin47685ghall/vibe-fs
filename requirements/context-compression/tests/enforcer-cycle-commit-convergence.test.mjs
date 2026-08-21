@@ -41,10 +41,10 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_without_promptkey_binding_is_u
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_open_bound_promptkey_commits_and_clears_open', () => {
   const scope = runtime.scope()
-  runtime.setCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-open', toml: 'bound' }))
+  runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ requestId: 'req-open', toml: 'bound' }))
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
   assert.equal(runtime.currentRequest(scope, 'ses-blog').toml, 'bound')
-  runtime.clearCurrentRequest(scope, 'ses-blog')
+  runtime.releaseCurrentRequest(scope, 'ses-blog', 'req-open')
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), false)
   runtime.dispose(scope)
 })
@@ -75,7 +75,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_caught_up_park_absorbs_future_mater
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_park_resumed_with_flight_projects_directly', () => {
   const scope = runtime.scope()
-  runtime.setCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'live' }))
+  runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'live' }))
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
   assert.equal(runtime.decideMaterial(false, true, runtime.currentRequest(scope, 'ses-blog')), 'Skip')
   runtime.dispose(scope)

@@ -99,6 +99,7 @@ module SessionRecoveryWorkflow =
                         | BloggerCrashRecovery.WindowOutcome.AlreadyLive id
                         | BloggerCrashRecovery.WindowOutcome.Unreadable(id, _) -> id = sessionId
                         | BloggerCrashRecovery.WindowOutcome.AbandonedUnsent _
+                        | BloggerCrashRecovery.WindowOutcome.Superseded _
                         | BloggerCrashRecovery.WindowOutcome.Recommitted _ -> false)
 
                 match NonEmpty.ofList blocked with

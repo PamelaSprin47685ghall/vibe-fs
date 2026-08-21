@@ -96,6 +96,8 @@ module BloggerCrashRecovery =
         | RestoredInFlight of SessionId
         /// Live process already owns the request; recovery is a no-op.
         | AlreadyLive of SessionId
+        /// Startup snapshot was superseded before this Blogger acquired materialization admission.
+        | Superseded of BloggerRequestId
         | Unreadable of SessionId * reason: string
 
     let private openRequests (journal: AgentJournal) : (SessionId * OpenBloggerRequest) list =
@@ -130,11 +132,8 @@ module BloggerCrashRecovery =
             Some(WindowOutcome.RestoredInFlight(SessionId.create "decision"))
 
     /// CE rebuild step: idempotent fold of BloggerRequestMaterialized into the
-    /// physical flight registry. The durable fact (reloaded via
-    /// tryReloadMainContext) is the authority; SetCurrentRequest is only called
-    /// when the live process does not already hold flight ownership (HasFlight).
-    /// Drain stays Closed — SetDrainWindow keeps the physical drain slot closed
-    /// without re-authoring any shadow state.
+    /// physical flight registry. Caller holds the per-Blogger materialization
+    /// admission, so the durable open request and physical claim cannot cross.
     let private restoreFlight
         (host: IBloggerRuntimeHost)
         (bloggerSessionId: SessionId)
@@ -142,15 +141,31 @@ module BloggerCrashRecovery =
         : unit =
         let key = SessionId.value bloggerSessionId
 
-        if not (host.HasFlight key) then
-            host.SetCurrentRequest(key, ctx)
+        BloggerRuntimeHost.requireCurrentRequest host key ctx
 
         host.SetDrainWindow(key, DrainWindow.Closed)
 
     /// CE clear step: abandon physical flight ownership after durable abandon.
-    let private clearFlight (host: IBloggerRuntimeHost) (bloggerSessionId: SessionId) : unit =
+    let private clearFlight
+        (host: IBloggerRuntimeHost)
+        (bloggerSessionId: SessionId)
+        (requestId: BloggerRequestId)
+        : unit =
         let key = SessionId.value bloggerSessionId
-        host.ClearCurrentRequest key
+
+        match host.TryPeekCurrentRequest key with
+        | None -> ()
+        | Some current when BloggerRequestContext.requestId current = requestId ->
+            BloggerRuntimeHost.requireReleaseCurrentRequest host key current
+        | Some current ->
+            FatalProcess.trip
+                "blogger-crash-flight-release-conflict"
+                (sprintf
+                    "cannot release crash request %s because Blogger %s is owned by %s"
+                    (BloggerRequestId.value requestId)
+                    key
+                    (BloggerRequestId.value (BloggerRequestContext.requestId current)))
+
         host.SetDrainWindow(key, DrainWindow.Closed)
 
     /// C5: one reload path — EnforcerFrameRecovery.tryReloadRequestContext (full cutoff/digest).
@@ -244,7 +259,7 @@ module BloggerCrashRecovery =
         task {
             // Cold crash: Host session unreadable → abandon window A.
             do! abandon journal openReq (sprintf "crash-window-A: host snapshot error: %s" reason)
-            clearFlight host openReq.BloggerSessionId
+            clearFlight host openReq.BloggerSessionId openReq.RequestId
             return WindowOutcome.AbandonedUnsent openReq.RequestId
         }
 
@@ -270,6 +285,46 @@ module BloggerCrashRecovery =
         | None -> Task.FromResult(WindowOutcome.Unreadable(openReq.BloggerSessionId, "no snapshot port"))
         | Some snapshot -> reconcileOpenWithSnapshot journal host snapshot openReq
 
+    let private reconcileLiveFlight
+        (journal: AgentJournal)
+        (host: IBloggerRuntimeHost)
+        (snapshotOpt: ISessionSnapshotPort option)
+        (openReq: OpenBloggerRequest)
+        : Task<WindowOutcome> =
+        let bloggerKey = SessionId.value openReq.BloggerSessionId
+
+        match host.TryGetFlight bloggerKey with
+        | Some live when BloggerRequestContext.requestId live = openReq.RequestId ->
+            Task.FromResult(WindowOutcome.AlreadyLive openReq.BloggerSessionId)
+        | Some live ->
+            FatalProcess.trip
+                "blogger-crash-flight-conflict"
+                (sprintf
+                    "durable open request %s conflicts with live request %s for Blogger %s"
+                    (BloggerRequestId.value openReq.RequestId)
+                    (BloggerRequestId.value (BloggerRequestContext.requestId live))
+                    bloggerKey)
+
+            Task.FromResult(WindowOutcome.AlreadyLive openReq.BloggerSessionId)
+        | None -> reconcileOpenWhenIdle journal host snapshotOpt openReq
+
+    let private reconcileCurrentOpen
+        (journal: AgentJournal)
+        (host: IBloggerRuntimeHost)
+        (snapshotOpt: ISessionSnapshotPort option)
+        (openReq: OpenBloggerRequest)
+        : Task<WindowOutcome> =
+        let currentOpen =
+            (AgentJournal.snapshot journal).AgentProjections.Sessions
+            |> Map.tryFind openReq.MainSessionId
+            |> Option.bind (fun session -> session.BloggerCycles)
+            |> Option.bind (BloggerCycleProjection.tryOpenByBlogger openReq.BloggerSessionId)
+
+        match currentOpen with
+        | Some current when current.RequestId = openReq.RequestId ->
+            reconcileLiveFlight journal host snapshotOpt openReq
+        | _ -> Task.FromResult(WindowOutcome.Superseded openReq.RequestId)
+
     let private reconcileOpenRequest
         (journal: AgentJournal)
         (host: IBloggerRuntimeHost)
@@ -278,13 +333,12 @@ module BloggerCrashRecovery =
         : Task<WindowOutcome> =
         task {
             let bloggerKey = SessionId.value openReq.BloggerSessionId
+            let! lease = host.AcquireMaterialization bloggerKey
 
-            // Live process already owns this request: do not stomp.
-            // Physical flight registry is the authority (not cell.State).
-            if host.HasFlight bloggerKey then
-                return WindowOutcome.AlreadyLive openReq.BloggerSessionId
-            else
-                return! reconcileOpenWhenIdle journal host snapshotOpt openReq
+            try
+                return! reconcileCurrentOpen journal host snapshotOpt openReq
+            finally
+                lease.Release()
         }
 
     let private reconcileAllOpen

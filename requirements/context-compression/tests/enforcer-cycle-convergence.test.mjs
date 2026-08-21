@@ -91,7 +91,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_host_completed_blog_second_window_a
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolveCycleContext_prefers_live_inflight_request', () => {
   const scope = runtime.scope()
-  runtime.setCurrentRequest(scope, 'ses-blog', request('live'))
+  runtime.claimCurrentRequest(scope, 'ses-blog', request('live'))
   const live = runtime.currentRequest(scope, 'ses-blog')
   assert.equal(live.toml, 'live')
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)

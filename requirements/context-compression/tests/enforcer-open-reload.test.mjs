@@ -94,7 +94,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_reload_corrupt_json_returns_none', 
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolve_cycle_prefers_live_request_over_open', () => {
   const scope = runtime.scope()
-  runtime.setCurrentRequest(scope, 'ses-blog', runtime.main(mainJson({ toml: 'live-toml' })))
+  runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main(mainJson({ toml: 'live-toml' })))
   const live = runtime.currentRequest(scope, 'ses-blog')
   assert.equal(live.toml, 'live-toml')
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
@@ -118,7 +118,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_digests_mismatch_aband
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_other_blogger_session_abandons', () => {
   const scope = runtime.scope()
-  runtime.setCurrentRequest(scope, 'ses-other-blog', runtime.squash(squashJson({ bloggerSession: 'ses-other-blog' })))
+  runtime.claimCurrentRequest(scope, 'ses-other-blog', runtime.squash(squashJson({ bloggerSession: 'ses-other-blog' })))
   assert.equal(runtime.hasFlight(scope, 'ses-other-blog'), true)
   assert.equal(runtime.currentRequest(scope, 'ses-other-blog').kind, 'Squash')
   runtime.dispose(scope)

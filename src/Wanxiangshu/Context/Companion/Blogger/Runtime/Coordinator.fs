@@ -183,7 +183,7 @@ module BloggerCoordinator =
     /// C5: durable materialization. Context blob is the irrecomputable semantic
     /// input. Pre-send PromptKey=None; after physical send, re-append with the
     /// same ContextDigest + Some PromptKey so commit can prove ownership.
-    let materializeRequest
+    let private materializeRequest
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)
         (promptKey: PromptKey option)
@@ -250,21 +250,90 @@ module BloggerCoordinator =
                 (Some ctx)
                 reason
 
-    let stageContinuationContext
+    let private withMaterialization
+        (scope: IBloggerRuntimeHost)
+        (bloggerSessionId: SessionId)
+        (work: unit -> Task<'T>)
+        : Task<'T> =
+        task {
+            let! lease = scope.AcquireMaterialization(SessionId.value bloggerSessionId)
+
+            try
+                return! work ()
+            finally
+                lease.Release()
+        }
+
+    let private foreignFlightReason (scope: IBloggerRuntimeHost) (ctx: BloggerRequestContext) : string option =
+        let bloggerKey = SessionId.value (BloggerRequestContext.bloggerSessionId ctx)
+        let requestId = BloggerRequestContext.requestId ctx
+
+        match scope.TryGetFlight bloggerKey with
+        | Some existing when BloggerRequestContext.requestId existing <> requestId ->
+            Some(
+                sprintf
+                    "Blogger flight %s already belongs to request %s; refusing to materialize request %s"
+                    bloggerKey
+                    (BloggerRequestId.value (BloggerRequestContext.requestId existing))
+                    (BloggerRequestId.value requestId)
+            )
+        | _ -> None
+
+    let private claimMaterializedContinuation
         (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (ctx: BloggerRequestContext)
         : Task<Result<unit, string>> =
         task {
-            match! materializeRequest journal ctx None with
-            | Error reason -> return Error reason
-            | Ok() ->
-                scope.SetCurrentRequest(SessionId.value (BloggerRequestContext.bloggerSessionId ctx), ctx)
-                return Ok()
+            match
+                BloggerRuntimeHost.claimCurrentRequest
+                    scope
+                    (SessionId.value (BloggerRequestContext.bloggerSessionId ctx))
+                    ctx
+            with
+            | Ok() -> return Ok()
+            | Error reason ->
+                do! abandonRequest (Some journal) ctx ("materialized flight claim failed: " + reason)
+                return Error reason
         }
 
-    let bindContinuationContext (journal: AgentJournal) (ctx: BloggerRequestContext) (promptKey: PromptKey) =
-        materializeRequest journal ctx (Some promptKey)
+    let private materializeAndClaimContinuation
+        (scope: IBloggerRuntimeHost)
+        (journal: AgentJournal)
+        (ctx: BloggerRequestContext)
+        : Task<Result<unit, string>> =
+        taskResult {
+            do! materializeRequest journal ctx None
+            return! claimMaterializedContinuation scope journal ctx
+        }
+
+    let stageContinuationContext
+        (scope: IBloggerRuntimeHost)
+        (journal: AgentJournal)
+        (ctx: BloggerRequestContext)
+        : Task<Result<unit, string>> =
+        withMaterialization scope (BloggerRequestContext.bloggerSessionId ctx) (fun () ->
+            match foreignFlightReason scope ctx with
+            | Some reason -> Task.FromResult(Error reason)
+            | None -> materializeAndClaimContinuation scope journal ctx)
+
+    let bindContinuationContext
+        (scope: IBloggerRuntimeHost)
+        (journal: AgentJournal)
+        (ctx: BloggerRequestContext)
+        (promptKey: PromptKey)
+        =
+        withMaterialization scope (BloggerRequestContext.bloggerSessionId ctx) (fun () ->
+            task {
+                match
+                    BloggerRuntimeHost.claimCurrentRequest
+                        scope
+                        (SessionId.value (BloggerRequestContext.bloggerSessionId ctx))
+                        ctx
+                with
+                | Error reason -> return Error reason
+                | Ok() -> return! materializeRequest journal ctx (Some promptKey)
+            })
 
     let abandonContinuationContext
         (scope: IBloggerRuntimeHost)
@@ -272,10 +341,15 @@ module BloggerCoordinator =
         (ctx: BloggerRequestContext)
         (reason: string)
         : Task =
-        task {
-            do! abandonRequest (Some journal) ctx reason
-            scope.ClearCurrentRequest(SessionId.value (BloggerRequestContext.bloggerSessionId ctx))
-        }
+        withMaterialization scope (BloggerRequestContext.bloggerSessionId ctx) (fun () ->
+            task {
+                do! abandonRequest (Some journal) ctx reason
+
+                BloggerRuntimeHost.requireReleaseCurrentRequest
+                    scope
+                    (SessionId.value (BloggerRequestContext.bloggerSessionId ctx))
+                    ctx
+            })
 
     let private blocksNew = BloggerRuntimeHost.blocksNew
     let private forceSealRuntime = BloggerRuntimeHost.forceSealRuntime
@@ -298,7 +372,19 @@ module BloggerCoordinator =
         : Task<DecisionEffect> =
         task {
             do! abandonRequest journal ctx reason
-            scope.ClearCurrentRequest key
+            BloggerRuntimeHost.requireReleaseCurrentRequest scope key ctx
+            host.InvalidateBloggerCache()
+            return DecisionEffect.StartFailed reason
+        }
+
+    let private failBeforeFlightClaim
+        (journal: AgentJournal option)
+        (host: CompanionHost)
+        (ctx: BloggerRequestContext)
+        (reason: string)
+        : Task<DecisionEffect> =
+        task {
+            do! abandonRequest journal ctx ("materialized flight claim failed: " + reason)
             host.InvalidateBloggerCache()
             return DecisionEffect.StartFailed reason
         }
@@ -314,6 +400,22 @@ module BloggerCoordinator =
             return startedEffect ctx
         }
 
+    let private finishClaimedSend
+        (journal: AgentJournal option)
+        (host: CompanionHost)
+        (scope: IBloggerRuntimeHost)
+        (j: AgentJournal)
+        (key: string)
+        (ctx: BloggerRequestContext)
+        : Task<DecisionEffect> =
+        task {
+            let! outcome = bindSendAndPostMaterialize host j ctx
+
+            match outcome with
+            | Ok effect -> return effect
+            | Error reason -> return! failAfterSend journal host scope key ctx reason
+        }
+
     let private proceedAfterPreSend
         (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
@@ -323,12 +425,9 @@ module BloggerCoordinator =
         (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
         task {
-            scope.SetCurrentRequest(key, ctx)
-            let! outcome = bindSendAndPostMaterialize host j ctx
-
-            match outcome with
-            | Ok effect -> return effect
-            | Error reason -> return! failAfterSend journal host scope key ctx reason
+            match BloggerRuntimeHost.claimCurrentRequest scope key ctx with
+            | Error reason -> return! failBeforeFlightClaim journal host ctx reason
+            | Ok() -> return! finishClaimedSend journal host scope j key ctx
         }
 
     let private afterPreSendMaterialize
@@ -372,15 +471,19 @@ module BloggerCoordinator =
         (key: string)
         (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
-        // Order (C2/C5): materialize durable → flight ownership (SetCurrentRequest) → send.
-        // No cell.State write: physical flight registry is the busy authority.
+        // Order (C2/C5): admission → materialize durable → atomic flight claim → send.
+        // The admission is process-local serialization only; the durable open request
+        // remains the producer/ownership proof.
         let mainId = BloggerRequestContext.mainSessionId ctx
 
-        if blocksNew (Some j) mainId scope key then
-            forceSealRuntime scope key
-            Task.FromResult DecisionEffect.Sealed
-        else
-            materializeThenSend scope host journal j mainId key ctx
+        withMaterialization scope (BloggerRequestContext.bloggerSessionId ctx) (fun () ->
+            if blocksNew (Some j) mainId scope key then
+                forceSealRuntime scope key
+                Task.FromResult DecisionEffect.Sealed
+            elif scope.HasFlight key then
+                Task.FromResult DecisionEffect.SkippedInFlight
+            else
+                materializeThenSend scope host journal j mainId key ctx)
 
     let private startFrozen
         (scope: IBloggerRuntimeHost)

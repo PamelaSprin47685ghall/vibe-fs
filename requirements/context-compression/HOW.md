@@ -20,6 +20,7 @@
 7. **Host Compaction 收容**：观察到外部 compaction 时触发 `ContextReanchored`，推进 epoch 并将旧 horizon 的辅助注入可见性清空。
 8. **Opening floor**：Manager Life 只以真实 Opening 后的 `WorkRecordStart` 作为压缩下界；T1 commitment 仍可属于 WorkRecord 的 constitutive Opening，但不再获得 provider-context 的 raw 常驻权。
 9. **TodoWrite X 穿透**：X-wire 应用 synthetic prefix 时，在 `dropLeading` 范围内先收集 `todowrite` call id，再把含该 call 或对应 result 的原始 Host 消息穿透到 synthetic memory 与未覆盖 tail 之间；其余 dropped 历史继续由 Y replacement 取代。
+10. **Blogger materialization admission**：同一 Blogger 的 materialize / PromptKey bind / abandon 先取得 process-wide、跨 plugin instance 的 keyed admission；取得后再读 durable projection 并执行 open-request 转换。normal start 持有 admission 直到 durable materialize、原子 flight claim 与 send/bind 完成，provider retry 的 stage/bind/abandon 也复用同一 admission。flight claim 只允许空槽建立或同 RequestId 刷新；不同 RequestId 返回 conflict，不覆盖 owner。该 admission/flight 都是物理资源，不参与 recovery correctness proof。
 
 ## 依赖关系
 
@@ -54,9 +55,11 @@ DEPENDS ON:
 | CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | CONTEXT-COMPRESSION-023 | `requirements/context-compression/tests/parked-transform.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
+| CONTEXT-COMPRESSION-024 | `requirements/context-compression/tests/parked-transform.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 
 ## GAP
 
 - CONTEXT-COMPRESSION-017/020：`ctx-opening-floor.test.mjs` 证明 pre/post-T1 floor 等价与 todo round retention 纯判定；`provider-projection/tests/projection.test.mjs` 证明真实 Y prefix write-back 越过 `todowrite` 时 call/result 仍以原始 X Host 消息存在。CLOSED。
 - CONTEXT-COMPRESSION-021/022：failure-local Y recovery 与唯一 `BloggerMainContext` 已进入 production graph；旧 recovery waiter / future-X squash 入口已删除。CLOSED。
 - CONTEXT-COMPRESSION-023：park 与 recovery wait 均只由 typed/durable event 推动；correctness path 无 timer/deadline/timeout。CLOSED。
+- CONTEXT-COMPRESSION-024：同一 Blogger 的 materialize / bind / abandon 已由跨 plugin instance admission 串行；normal start 在 admission 内重检 `HasFlight`，retry 对 foreign flight fail-before-write，crash recovery 取得 admission 后重读 durable open；flight claim / release 均 RequestId-aware，拒绝跨 owner 覆盖或删除。RED→GREEN、静态门禁、Fable build、3455-test verification suite、integration 与 distribution package gates 全绿。CLOSED。

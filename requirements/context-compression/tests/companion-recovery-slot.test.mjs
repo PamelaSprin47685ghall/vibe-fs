@@ -94,6 +94,40 @@ test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_
   )
 })
 
+test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_all_materialization_owners_share_admission_and_nonoverwrite_flight', () => {
+  const coordinator = source('src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs')
+  const recovery = source('src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs')
+  const scope = source('src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs')
+  const allProduction = production.map((file) => readFileSync(file, 'utf8')).join('\n')
+
+  assert.match(coordinator, /let private materializeRequest/)
+  assert.match(coordinator, /let private withMaterialization[\s\S]*AcquireMaterialization/)
+  assert.match(
+    coordinator,
+    /stageContinuationContext[\s\S]*withMaterialization[\s\S]*foreignFlightReason[\s\S]*materializeRequest/,
+  )
+  assert.match(
+    coordinator,
+    /claimMaterializedContinuation[\s\S]*claimCurrentRequest[\s\S]*abandonRequest/,
+    'a post-materialize claim conflict must close the durable request before returning error',
+  )
+  assert.match(
+    coordinator,
+    /failBeforeFlightClaim[\s\S]*abandonRequest[\s\S]*StartFailed/,
+    'normal start claim conflict must abandon its materialized request without clearing a foreign flight',
+  )
+  assert.match(coordinator, /bindContinuationContext[\s\S]*withMaterialization/)
+  assert.match(coordinator, /abandonContinuationContext[\s\S]*withMaterialization/)
+  assert.match(
+    coordinator,
+    /startWithJournal[\s\S]*withMaterialization[\s\S]*scope\.HasFlight[\s\S]*materializeThenSend/,
+  )
+  assert.match(recovery, /AcquireMaterialization/)
+  assert.match(scope, /BloggerFlightClaim\.Conflict/)
+  assert.match(scope, /BloggerFlightRelease\.Conflict/)
+  assert.doesNotMatch(allProduction, /\bSetCurrentRequest\b|\bClearCurrentRequest\b/)
+})
+
 const recoveryWaitSource = () => {
   const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
   return workflow.slice(

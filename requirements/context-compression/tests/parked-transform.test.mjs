@@ -73,13 +73,13 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_drops_staged_material_wi
   const key = 'ses-blogger'
 
   runtime.offerParked(scope, key, main('staged'))
-  runtime.setCurrentRequest(scope, key, main('already-flying'))
+  runtime.claimCurrentRequest(scope, key, main('already-flying'))
   runtime.cancelParked(scope, key)
 
   assert.equal(runtime.consumeStaged(scope, key), null)
   assert.equal(runtime.hasFlight(scope, key), true)
   assert.equal(runtime.peekCurrentRequest(scope, key)?.toml, 'already-flying')
-  runtime.clearCurrentRequest(scope, key)
+  runtime.releaseCurrentRequest(scope, key, 'request-main')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_cancels_wait_without_revoking_existing_flight', async () => {
@@ -87,7 +87,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_cancels_wait_without_revoking_
   const key = 'ses-blogger'
   const waiter = runtime.park(scope, key)
 
-  runtime.setCurrentRequest(scope, key, main('seal-in-flight'))
+  runtime.claimCurrentRequest(scope, key, main('seal-in-flight'))
   runtime.setDrainWindow(scope, key, runtime.openDrain('root-1'))
   runtime.sealRuntime(scope, key)
 
@@ -95,7 +95,7 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_cancels_wait_without_revoking_
   assert.equal(runtime.isDrainOpen(scope, key), false)
   assert.equal(runtime.hasFlight(scope, key), true)
   assert.equal(runtime.peekCurrentRequest(scope, key)?.toml, 'seal-in-flight')
-  runtime.clearCurrentRequest(scope, key)
+  runtime.releaseCurrentRequest(scope, key, 'request-main')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent', async () => {
@@ -116,11 +116,61 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flig
   const key = 'ses-blogger'
 
   assert.equal(runtime.hasFlight(scope, key), false)
-  runtime.setCurrentRequest(scope, key, main('coverage-delta'))
+  runtime.claimCurrentRequest(scope, key, main('coverage-delta'))
   assert.equal(runtime.hasFlight(scope, key), true)
   assert.equal(runtime.tryGetFlight(scope, key)?.toml, 'coverage-delta')
-  runtime.clearCurrentRequest(scope, key)
+  runtime.releaseCurrentRequest(scope, key, 'request-main')
   assert.equal(runtime.hasFlight(scope, key), false)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_flight_claim_never_overwrites_another_request', () => {
+  const scope = runtime.scope()
+  const key = 'ses-blogger'
+
+  assert.equal(
+    runtime.claimCurrentRequest(scope, key, runtime.main({ requestId: 'req-a', toml: 'first' })),
+    'Claimed',
+  )
+  assert.equal(
+    runtime.claimCurrentRequest(scope, key, runtime.main({ requestId: 'req-b', toml: 'second' })),
+    'Conflict:req-a',
+  )
+  assert.equal(runtime.currentRequest(scope, key).toml, 'first')
+})
+
+test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_stale_release_cannot_clear_a_newer_owner', () => {
+  const scope = runtime.scope()
+  const key = 'ses-blogger'
+
+  assert.equal(
+    runtime.claimCurrentRequest(scope, key, runtime.main({ requestId: 'req-a', toml: 'first' })),
+    'Claimed',
+  )
+  assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-b'), 'Conflict:req-a')
+  assert.equal(runtime.currentRequest(scope, key).toml, 'first')
+  assert.equal(runtime.releaseCurrentRequest(scope, key, 'req-a'), 'Released')
+  assert.equal(runtime.hasFlight(scope, key), false)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_materialization_admission_is_cross_instance_single_flight', async () => {
+  const firstScope = runtime.scope()
+  const secondScope = runtime.scope()
+  const key = 'ses-blogger'
+  const first = await runtime.acquireMaterialization(firstScope, key)
+  let secondAcquired = false
+
+  const second = runtime.acquireMaterialization(secondScope, key).then((lease) => {
+    secondAcquired = true
+    return lease
+  })
+
+  await Promise.resolve()
+  assert.equal(secondAcquired, false)
+
+  runtime.releaseMaterialization(first)
+  const secondLease = await second
+  assert.equal(secondAcquired, true)
+  runtime.releaseMaterialization(secondLease)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-023] CTX_023_park_has_no_clock_or_timeout_dependency', () => {

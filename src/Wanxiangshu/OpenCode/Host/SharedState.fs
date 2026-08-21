@@ -4,6 +4,7 @@ open System.Collections.Generic
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
@@ -47,7 +48,7 @@ open Wanxiangshu.Foundation.Identity
 /// fork 的 worktree 子会话由 worktree 实例的工具处理）。这些集合被这条链的
 /// 两端读写，per-instance 时必然失配——实测 deep-reviewer 的 `VerdictTool`
 /// 读不到主实例注册的 `SessionParents`，REVIEW-008 fail closed 拒绝 verdict；
-/// worktree 上 SetCurrentRequest 的 blogger flight 读不到 root 实例 BlogTool 的
+/// worktree 上 claim 的 blogger flight 读不到 root 实例 BlogTool 的
 /// HasFlight，会 AbortSession → Finality journal-work-log hang；guard nudge
 /// 若按 RuntimeId 分槽，root+worktree 会对同一 occasion 各发一次
 /// ReviewerVerdictRequired。
@@ -87,16 +88,18 @@ module SharedState =
     // DSL-MUTABLE: resource — process-local root workspace pin for worktree plugin instances
     let mutable RootWorkspace: string option = None
 
-    /// Physical Blogger flight ownership (HasFlight / SetCurrentRequest).
+    /// Physical Blogger flight ownership (HasFlight / ClaimCurrentRequest).
     ///
     /// Same cross-instance rule as SessionParents: the worktree plugin materializes
-    /// the companion request (SetCurrentRequest) while the blogger session itself
+    /// the companion request (ClaimCurrentRequest) while the blogger session itself
     /// lives under RootWorkspace, so BlogTool runs on the root plugin instance.
     /// Per-instance flights made HasFlight miss → AbortSession → no BlogObservationCommitted
     /// → Finality hung on journal-work-log (orchestrator-publish frontier).
     let BloggerFlightGate = obj ()
     // DSL-MUTABLE: resource — cross-instance blogger flight ownership registry
     let BloggerFlights = Dictionary<string, BloggerRequestContext>()
+    // DSL-MUTABLE: resource — cross-instance per-Blogger materialization admission
+    let BloggerMaterializationAdmission = BloggerMaterializationAdmission()
 
     /// Unit-test isolation only: production Dispose must not wipe cross-instance flights.
     let clearBloggerFlightsForTests () =

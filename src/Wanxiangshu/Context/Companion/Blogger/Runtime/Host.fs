@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Enforcer.Guidance
@@ -28,6 +29,65 @@ open Wanxiangshu.Foundation.Identity
 /// Pure routing stays in BloggerRuntime; material CE stays in BloggerCoordinator;
 /// continuation CE stays in EnforcerHost. Seal/block recipes are not duplicated.
 module BloggerRuntimeHost =
+
+    let claimCurrentRequest
+        (scope: IBloggerRuntimeHost)
+        (bloggerKey: string)
+        (context: BloggerRequestContext)
+        : Result<unit, string> =
+        match scope.ClaimCurrentRequest(bloggerKey, context) with
+        | BloggerFlightClaim.Claimed
+        | BloggerFlightClaim.Refreshed -> Ok()
+        | BloggerFlightClaim.Conflict existing ->
+            Error(
+                sprintf
+                    "Blogger flight %s already belongs to request %s; cannot claim request %s"
+                    bloggerKey
+                    (BloggerRequestId.value existing)
+                    (BloggerRequestId.value (BloggerRequestContext.requestId context))
+            )
+
+    let requireCurrentRequest
+        (scope: IBloggerRuntimeHost)
+        (bloggerKey: string)
+        (context: BloggerRequestContext)
+        : unit =
+        match claimCurrentRequest scope bloggerKey context with
+        | Ok() -> ()
+        | Error reason -> FatalProcess.trip "blogger-flight-claim-conflict" reason
+
+    let releaseCurrentRequest
+        (scope: IBloggerRuntimeHost)
+        (bloggerKey: string)
+        (context: BloggerRequestContext)
+        : Result<unit, string> =
+        let requestId = BloggerRequestContext.requestId context
+
+        match scope.ReleaseCurrentRequest(bloggerKey, requestId) with
+        | BloggerFlightRelease.Released
+        | BloggerFlightRelease.Missing -> Ok()
+        | BloggerFlightRelease.Conflict existing ->
+            Error(
+                sprintf
+                    "Blogger flight %s belongs to request %s; cannot release as request %s"
+                    bloggerKey
+                    (BloggerRequestId.value existing)
+                    (BloggerRequestId.value requestId)
+            )
+
+    let requireReleaseCurrentRequest
+        (scope: IBloggerRuntimeHost)
+        (bloggerKey: string)
+        (context: BloggerRequestContext)
+        : unit =
+        match releaseCurrentRequest scope bloggerKey context with
+        | Ok() -> ()
+        | Error reason -> FatalProcess.trip "blogger-flight-release-conflict" reason
+
+    let requireReleaseObservedCurrentRequest (scope: IBloggerRuntimeHost) (bloggerKey: string) : unit =
+        match scope.TryPeekCurrentRequest bloggerKey with
+        | None -> ()
+        | Some context -> requireReleaseCurrentRequest scope bloggerKey context
 
     let durableSealed (journal: AgentJournal option) (mainSessionId: SessionId) : bool =
         match journal with

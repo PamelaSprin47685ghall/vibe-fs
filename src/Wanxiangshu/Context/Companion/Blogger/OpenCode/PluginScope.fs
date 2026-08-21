@@ -27,6 +27,7 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
@@ -138,8 +139,18 @@ type PluginBloggerScope() =
                 | true, ctx -> Some ctx
                 | false, _ -> None)
 
-        member this.SetCurrentRequest(sessionId: string, context: BloggerRequestContext) : unit =
-            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.[sessionId] <- context)
+        member this.ClaimCurrentRequest(sessionId: string, context: BloggerRequestContext) : BloggerFlightClaim =
+            lock SharedState.BloggerFlightGate (fun () ->
+                match SharedState.BloggerFlights.TryGetValue sessionId with
+                | false, _ ->
+                    SharedState.BloggerFlights.Add(sessionId, context)
+                    BloggerFlightClaim.Claimed
+                | true, existing when
+                    BloggerRequestContext.requestId existing = BloggerRequestContext.requestId context
+                    ->
+                    SharedState.BloggerFlights.[sessionId] <- context
+                    BloggerFlightClaim.Refreshed
+                | true, existing -> BloggerFlightClaim.Conflict(BloggerRequestContext.requestId existing))
 
         member this.TryPeekCurrentRequest(sessionId: string) : BloggerRequestContext option =
             lock SharedState.BloggerFlightGate (fun () ->
@@ -147,8 +158,17 @@ type PluginBloggerScope() =
                 | true, ctx -> Some ctx
                 | false, _ -> None)
 
-        member this.ClearCurrentRequest(sessionId: string) : unit =
-            lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove sessionId |> ignore)
+        member this.ReleaseCurrentRequest(sessionId: string, requestId: BloggerRequestId) : BloggerFlightRelease =
+            lock SharedState.BloggerFlightGate (fun () ->
+                match SharedState.BloggerFlights.TryGetValue sessionId with
+                | false, _ -> BloggerFlightRelease.Missing
+                | true, existing when BloggerRequestContext.requestId existing = requestId ->
+                    SharedState.BloggerFlights.Remove sessionId |> ignore
+                    BloggerFlightRelease.Released
+                | true, existing -> BloggerFlightRelease.Conflict(BloggerRequestContext.requestId existing))
+
+        member _.AcquireMaterialization(sessionId: string) : Task<BloggerMaterializationLease> =
+            SharedState.BloggerMaterializationAdmission.Acquire sessionId
 
         member this.OfferMaterial(sessionId: string, context: BloggerRequestContext) : MaterialOfferDisposition =
             lock parkedGate (fun () ->

@@ -11,6 +11,7 @@ Provider 会话历史可能超过模型的可用上下文窗口。如果压缩�
 - **覆盖边界 vs 辅助残留**：X→Y 压缩冷边界发生后，旧 horizon 的辅助注入（如 guideline、tip、grounding read）可见性彻底归零，防止历史噪音在重锚后重新膨胀。
 - **宪章 Opening vs 工作历史**：只有真实 Opening 消息是不可替换宪章；Manager 的 pre-T1 规划材料与 post-T1 普通历史遵循同一压缩规则，不能因 planning stage 获得额外 X 常驻权。
 - **语义账本 vs 摘要替换**：承载 `todowrite` 的 Host 回合是 Manager 当前义务账本的原始证据；即使其前后历史已被 Y 覆盖，该回合仍必须以 X 原文留在 provider context。
+- **durable open ownership vs 进程并发**：`BloggerRequestMaterialized` 是 Blogger 当前请求所有权的 durable 事实；同一 Blogger 的 materialize / bind / abandon 命令必须经 process-local admission 串行，但 admission 只拥有物理并发，不得取代 durable open request。live flight 允许同 RequestId 刷新，严禁不同 RequestId 覆盖。
 
 ## 违反边界的失败意义
 
@@ -18,6 +19,7 @@ Provider 会话历史可能超过模型的可用上下文窗口。如果压缩�
 - 压缩覆盖不完整证据（如将半 turn 冒充为完整 prefix 证明，或改写侵吞真实 Opening / `todowrite` 原始回合）。
 - 依据模型窗口大小或上下文比例主动触发改写。
 - 重锚后将已退休的辅助注入重新灌回 provider context。
+- 两个并发 materialize 都从旧 snapshot 推导“可开新 request”，随后第二个 durable fact 被 canonical fold 拒绝并触发 semantic cut；或不同 RequestId 静默覆盖 live flight，使 durable ownership 与物理执行分叉。
 
 ## DEPENDS ON
 

@@ -24,11 +24,11 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_inflight_plus_material_skips_wi
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_cycle_commit_clears_flight', () => {
   const scope = parkedTransform.scope()
-  parkedTransform.setCurrentRequest(scope, KEY, main())
+  parkedTransform.claimCurrentRequest(scope, KEY, main())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY)?.toml, 'work')
 
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), null)
 })
@@ -40,26 +40,26 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_idle_plus_parked_waiter_offers'
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_flight_is_idempotent', () => {
   // Physical clear: second clear on empty ownership is a no-op (no NotInFlight cell error).
   const scope = parkedTransform.scope()
-  parkedTransform.setCurrentRequest(scope, KEY, main())
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.claimCurrentRequest(scope, KEY, main())
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_clear_without_flight_is_idempotent', () => {
   const scope = parkedTransform.scope()
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_squash_commit_clears_flight', () => {
   // Squash commit path uses the same physical clear as cycle commit.
   const scope = parkedTransform.scope()
-  parkedTransform.setCurrentRequest(scope, KEY, main())
+  parkedTransform.claimCurrentRequest(scope, KEY, main())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
   assert.equal(parkedTransform.peekCurrentRequest(scope, KEY), null)
 })
@@ -68,16 +68,16 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_session_delete_is_registry_remo
   // DSL-003: owner lifetime is the physical registry — session delete removes
   // flight ownership. There is no Disposed state tag.
   const scope = parkedTransform.scope()
-  parkedTransform.setCurrentRequest(scope, KEY, main())
+  parkedTransform.claimCurrentRequest(scope, KEY, main())
   assert.equal(parkedTransform.hasFlight(scope, KEY), true)
-  parkedTransform.clearCurrentRequest(scope, KEY)
+  parkedTransform.releaseCurrentRequest(scope, KEY, 'request-main')
   assert.equal(parkedTransform.hasFlight(scope, KEY), false)
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_two_inflight_contexts_cannot_coexist', () => {
   // hasFlight already true → Skip; production keeps the registered flight.
   const scope = parkedTransform.scope()
-  parkedTransform.setCurrentRequest(scope, KEY, main())
+  parkedTransform.claimCurrentRequest(scope, KEY, main())
   assert.equal(rt.decideMaterial(false, true, main2()), 'Skip')
   assert.equal(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'work')
   assert.notEqual(parkedTransform.tryGetFlight(scope, KEY)?.toml, 'more')

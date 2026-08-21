@@ -181,9 +181,10 @@ module InteractionRepairWorkflow =
                         turn.SessionId
                         (Some request)
                         reason
+
+                BloggerRuntimeHost.requireReleaseCurrentRequest host key request
             | None -> ()
 
-            host.ClearCurrentRequest key
             notifyBloggerProtocolFailure eventPort turn reason
         }
         :> Task
