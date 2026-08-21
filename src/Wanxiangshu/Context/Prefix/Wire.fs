@@ -336,7 +336,11 @@ module XWire =
                            SolvingProviderRun = providerRun |}
 
                 let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact durable
-                return appended |> Result.map (fun _ -> ()) |> Result.mapError JournalAppendFailure.describe
+
+                return
+                    appended
+                    |> Result.map (fun _ -> ())
+                    |> Result.mapError JournalAppendFailure.describe
             | _ -> return Ok()
         }
 
@@ -398,7 +402,8 @@ module XWire =
         | Some role, Some finish, Some providerRun when
             role.Equals("assistant", StringComparison.OrdinalIgnoreCase)
             && finish.Equals("tool-calls", StringComparison.OrdinalIgnoreCase)
-            -> Some(ProviderRunIdentity.create providerRun)
+            ->
+            Some(ProviderRunIdentity.create providerRun)
         | _ -> None
 
     let private settleVisibleToolContinuation
@@ -456,8 +461,7 @@ module XWire =
         (output: obj)
         : Task =
         match sessionProjection durable sessionId with
-        | None ->
-            raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
+        | None -> raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
         | Some state -> applyCommittedPrefix durable sessionId state rawMessages output
 
     let private awaitProjectionSignal

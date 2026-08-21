@@ -97,6 +97,5 @@ module SessionStartedAtLedger =
 
             match! tryBindOrAbort journal projectionSessionIdOpt sessionStartCandidate with
             | Ok startedAt -> return startedAt
-            | Error reason ->
-                return! failSessionStartBind terminateSession emitDiagnostic projectionSessionIdOpt reason
+            | Error reason -> return! failSessionStartBind terminateSession emitDiagnostic projectionSessionIdOpt reason
         }

@@ -20,19 +20,17 @@
 // so integration/package share the same verdict-silence criterion (VERIFY-004).
 // UNIT_VERDICT_SILENCE_MS remains the unit budget.
 
-import { existsSync, statSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { UNIT_VERDICT_SILENCE_MS } from './e2e/support/time-budget.js'
 import { superviseNodeTest } from './e2e/support/supervise-node-test.mjs'
+import { checkBuildFreshness } from './support/build-freshness.mjs'
 import { walk } from '../../../scripts/lib/walk.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
 
 const REQUIREMENTS_ROOT = 'requirements'
-const PRODUCTION_ROOT = 'src/Wanxiangshu'
-const BUILD_ROOT = 'dist'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 const skipStaleness = process.argv.includes('--skip-staleness-check')
@@ -48,53 +46,6 @@ if (withCoverage) {
 }
 
 // ── staleness gate ──────────────────────────────────────────────────────────
-
-const newestFile = (files) => {
-  let newest = null
-  for (const file of files) {
-    let stat
-    try {
-      stat = statSync(file)
-    } catch {
-      continue
-    }
-    if (newest === null || stat.mtimeMs > newest.mtimeMs) newest = { file, mtimeMs: stat.mtimeMs }
-  }
-  return newest
-}
-
-const checkBuildFreshness = () => {
-  const sources = [...walk(PRODUCTION_ROOT, ['.fs']), ...walk(PRODUCTION_ROOT, ['.fsproj'])]
-  if (sources.length === 0) return { ok: false, reason: `no sources found under ${PRODUCTION_ROOT}/` }
-
-  // fable_modules holds vendored library output that Fable does not rewrite on every build;
-  // comparing against it would mask a stale project build.
-  // dist is a build artifact; guard existence explicitly before walk (fail-closed walker).
-  if (!existsSync(BUILD_ROOT)) {
-    return { ok: false, reason: `${BUILD_ROOT}/ does not exist — run: npm run format-build-test` }
-  }
-  const artifacts = walk(BUILD_ROOT, ['.js']).filter((file) => !file.includes('fable_modules'))
-  if (artifacts.length === 0) {
-    return { ok: false, reason: `${BUILD_ROOT}/ has no compiled output — run: npm run format-build-test` }
-  }
-
-  const newestSource = newestFile(sources)
-  const newestArtifact = newestFile(artifacts)
-
-  if (newestSource.mtimeMs > newestArtifact.mtimeMs) {
-    const staleBy = Math.round((newestSource.mtimeMs - newestArtifact.mtimeMs) / 1000)
-    return {
-      ok: false,
-      reason: [
-        `${BUILD_ROOT}/ is stale by ${staleBy}s — run: npm run format-build-test`,
-        `  newest source:   ${relative('.', newestSource.file)}`,
-        `  newest artifact: ${relative('.', newestArtifact.file)}`,
-      ].join('\n'),
-    }
-  }
-
-  return { ok: true, sources: sources.length, artifacts: artifacts.length }
-}
 
 if (skipStaleness) {
   console.error('runner: staleness check SKIPPED by flag — results do not describe current sources')

@@ -99,7 +99,9 @@ module FallbackLedger =
         task {
             match AgentPairCursor.recoveryVerdict budget next with
             | AgentPairCursor.MayContinue _ ->
-                let opportunity = RecoverySlot.opportunity RecoverySlot.afterFailureAdvance next.Offset
+                let opportunity =
+                    RecoverySlot.opportunity RecoverySlot.afterFailureAdvance next.Offset
+
                 return Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity)
             | AgentPairCursor.Exhausted _ -> return! appendExhausted journal sessionId providerRun current next
         }

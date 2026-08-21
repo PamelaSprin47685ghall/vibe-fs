@@ -593,7 +593,12 @@ export async function oracleLongStroke(scenario, _ctx) {
   assert.equal(
     scenario.provider.matchCount('manager-idle.0'),
     2,
-    'long-stroke determinism: ManagerIdle step 0 must have exactly two physical deliveries (fault then suicide)',
+    'long-stroke determinism: ManagerIdle step 0 is first faulted, then reached again as a later independent idle occasion',
+  );
+  assert.equal(
+    scenario.provider.matchCount('continue.0'),
+    1,
+    'long-stroke determinism: the confirmed failure owns exactly one ProviderRetryAttempt continuation',
   );
   for (const id of ['manager-idle.1', 'manager-idle.2', 'manager-idle.3', 'manager-idle.4', 'manager-idle.5']) {
     assert.equal(

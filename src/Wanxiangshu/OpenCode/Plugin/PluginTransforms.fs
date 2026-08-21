@@ -184,8 +184,7 @@ module PluginTransforms =
                 scope.Sessions.Quiescence.BeginProviderAttempt
           BindSessionStartedAt =
             SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
-          ApplyStrengthReplay =
-            StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
+          ApplyStrengthReplay = StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
           ApplyXTracePipeline =
             fun projectionSessionIdOpt outObj strengthReplayPlans ->
                 task {
@@ -225,8 +224,7 @@ module PluginTransforms =
                             projectionSessionIdOpt
                             outObj
                 }
-          ApplyStrengthSpeculate =
-            StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope
+          ApplyStrengthSpeculate = StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {

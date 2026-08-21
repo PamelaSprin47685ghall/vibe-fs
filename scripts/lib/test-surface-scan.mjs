@@ -40,9 +40,6 @@ export const BUILD_VERIFICATION_FILES = new Set([
   // Representation validator: its subject is the JS-native boundary rules,
   // so it must be able to spell out the forbidden Fable shapes.
   'requirements/verification-system/tests/support/js-contract.mjs',
-  // Test runner: its subject is the coverage/build denominator itself,
-  // including the literal fable_modules exclusion that keeps coverage honest.
-  'requirements/verification-system/tests/run.mjs',
   'requirements/verification-system/tests/support/run-inner.mjs',
   'requirements/verification-system/tests/support/coverage-policy.mjs',
 ])

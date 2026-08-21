@@ -331,11 +331,15 @@ module SessionExecutionBinding =
         (outObj: obj)
         : Task =
         task {
-            let rawMessages = ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+            let rawMessages =
+                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+
             let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
             beginQuiescence sessionId
 
-            match beginProviderAttempt sessionId physicalUserMessageId (ProviderWireCapture.lastUserPromptKey rawMessages) with
+            match
+                beginProviderAttempt sessionId physicalUserMessageId (ProviderWireCapture.lastUserPromptKey rawMessages)
+            with
             | Error error -> invalidOp error
             | Ok() -> do! enterBoundProviderStep sessionId physicalUserMessageId rawMessages
         }

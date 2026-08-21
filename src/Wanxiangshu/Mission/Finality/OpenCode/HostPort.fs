@@ -195,7 +195,12 @@ module FinalityHostPort =
                 let accepting = ref false
 
                 use subscription =
-                    scope.Sessions.SubscribeTerminal(
+                    // Finality arms this wait before StartReview sends the current
+                    // physical request, so only a future terminal can belong to
+                    // this review occasion. Replaying the session's sticky terminal
+                    // would let a previous Finality request terminate a reused
+                    // Reviewer and break the same-prompt dual-PERFECT challenge.
+                    scope.Sessions.SubscribeFutureTerminal(
                         reviewerSessionId,
                         fun _ outcome ->
                             if accepting.Value then

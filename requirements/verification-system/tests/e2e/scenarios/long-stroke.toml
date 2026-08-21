@@ -528,11 +528,13 @@ turn = "continue"
 step = 0
 reason = "prefix-probe"
 
-# GLORY-029 normal Manager idle continuation. The first physical occasion is
-# refused by the sole provider-error fault; fallback then causes a second
-# physical occasion. Both are the same declared step and therefore share one
-# delivery counter. The successful second occasion owns the rest of the Manager
-# tool loop, so no same-lane external prompt races it.
+# GLORY-029 normal Manager idle continuation. The sole provider-error fault
+# consumes this physical occasion. The confirmed failure then creates one fresh
+# recovery opportunity whose ProviderRetryAttempt is the `continue.0` turn above;
+# that is the only prefix-probe boundary for this failure. Requiring another
+# prefix-probe on `manager-idle.0` would grant one failure two compression probes.
+# After the successful continuation, later Manager-idle occasions own the rest
+# of the Manager tool loop, so no same-lane external prompt races it.
 [[turn]]
 id = "manager-idle"
 internal = true
@@ -556,11 +558,6 @@ tools = ["fork", "join", "horizon", "fission", "todowrite", "suicide"]
 
   [[turn.step]]
   respond = { type = "text", text = "Manager rest in peace." }
-
-[[epoch]]
-turn = "manager-idle"
-step = 0
-reason = "prefix-probe"
 
 [[turn]]
 id = "coder"

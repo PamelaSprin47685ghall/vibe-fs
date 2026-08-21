@@ -1,8 +1,8 @@
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { countTokens, encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
+import { loopDetectorRepositoryTexts } from './loop-detector-repository-corpus.mjs'
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -11,27 +11,6 @@ const nextPowerOfTwo = (value) => 2 ** Math.ceil(Math.log2(Math.max(1, value)))
 const percentile = (values, percentileValue) => {
   const sorted = [...values].sort((left, right) => left - right)
   return sorted[Math.floor((sorted.length - 1) * percentileValue)]
-}
-
-const repositoryTexts = (root = defaultRoot) => {
-  const decoder = new TextDecoder('utf-8', { fatal: true })
-  const paths = execFileSync('git', [
-    '-C', root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z',
-  ])
-    .toString('utf8')
-    .split('\0')
-    .filter(Boolean)
-
-  const readable = []
-  for (const relPath of paths) {
-    if (relPath === 'src/Wanxiangshu/FableBarrier.fs' || relPath.endsWith('/FableBarrier.fs')) continue
-    try {
-      readable.push(decoder.decode(readFileSync(path.join(root, relPath))))
-    } catch {
-      // Repository SSOT is strict UTF-8 text; binary/invalid UTF-8 is outside the corpus.
-    }
-  }
-  return readable
 }
 
 const replay = (tokens, lambda, initialValue) => {
@@ -58,7 +37,7 @@ const replay = (tokens, lambda, initialValue) => {
 }
 
 export const deriveLoopDetectorEnvelope = (root = defaultRoot) => {
-  const texts = repositoryTexts(root)
+  const texts = loopDetectorRepositoryTexts(root)
   const lineLengths = []
   for (const text of texts) {
     for (const line of text.split(/\r?\n/)) {

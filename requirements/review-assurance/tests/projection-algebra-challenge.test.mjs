@@ -26,3 +26,14 @@ test('WHAT[REVIEW-ASSURANCE-002] PROJ_008_review_challenge_is_the_typed_judge_re
   assert.match(judgeTool, /finish \(challenged context\)/)
   assert.doesNotMatch([workflow, judgeTool, host].join('\n'), /ReviewJudgementReply|ReviewConfirmation|sendContinuationResult|SendChallenge/)
 })
+
+test('WHAT[REVIEW-ASSURANCE-002] Finality reviewer terminal wait is future-only so a reused reviewer cannot replay the previous request terminal', () => {
+  const host = read('src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs')
+  const start = host.indexOf('let awaitTerminal reviewerSessionId')
+  const end = host.indexOf('let sendMissingJudgementNudge', start)
+  assert.ok(start >= 0 && end > start, 'FinalityHostPort must keep a named reviewer terminal boundary')
+
+  const awaitTerminal = host.slice(start, end)
+  assert.match(awaitTerminal, /scope\.Sessions\.SubscribeFutureTerminal\(/)
+  assert.doesNotMatch(awaitTerminal, /scope\.Sessions\.SubscribeTerminal\(/)
+})
