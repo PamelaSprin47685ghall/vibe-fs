@@ -121,7 +121,10 @@ test('WHAT[DURABLE-EVENTS-021] an uncut historical Journal fault suppresses only
           ],
         ],
         LocalSeq: ['LocalSeq', String(seq)],
-        ObservedAt: `2026-01-01T00:00:0${seq}.000+00:00`,
+        // This proof is about Journal fault-scope isolation, not writer retention.
+        // A fixed far-future observation keeps the writer retained without reading
+        // the wall clock or coupling the test to the 24h physical retention law.
+        ObservedAt: `9999-01-01T00:00:0${seq}.000+00:00`,
         RuntimeId: ['RuntimeId', 'rt_journal_fault_scope'],
         Stream: ['Session', ['SessionId', session]],
       },

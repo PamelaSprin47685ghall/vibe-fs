@@ -138,8 +138,8 @@ test('WHAT[DURABLE-EVENTS-020] Journal replay precompiles outer fact-family disp
   assert.match(envelope, /"Prompt"[\s\S]{0,200}AgentFact\.Prompt/)
   assert.match(envelope, /"Host"[\s\S]{0,200}AgentFact\.Host/)
   assert.match(envelope, /Extra\.withCustom[\s\S]{0,120}factDecoder/)
-  assert.match(envelope, /generateDecoderCached<Envelope>\(extra\s*=\s*decodeExtra\)/)
-  assert.doesNotMatch(envelope, /generateDecoderCached<Envelope>\(extra\s*=\s*extra\)/,
+  assert.match(envelope, /generateDecoderCached<Envelope>\s*\(\s*extra\s*=\s*decodeExtra\s*\)/)
+  assert.doesNotMatch(envelope, /generateDecoderCached<Envelope>\s*\(\s*extra\s*=\s*extra\s*\)/,
     'Envelope Auto decoding may preserve the wire representation, but Fact must use the precompiled custom decoder')
 })
 
