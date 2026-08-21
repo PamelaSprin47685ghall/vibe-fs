@@ -80,22 +80,40 @@ module OrdinaryTurnWorkflow =
         |> Option.bind (BloggerCycleProjection.tryReceipt turn.ProviderRun)
         |> Option.map (fun receipt -> receipt.Kind)
 
+    let private requestKindWithoutBloggerReceipt (journal: AgentJournal) (turn: ReconciledTurn) =
+        let continuationKind =
+            PromptAuthorityLedger.projectionFor turn.SessionId (AgentJournal.snapshot journal).AgentProjections
+            |> Option.bind (fun authority -> Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
+
+        match continuationKind, turn.Role with
+        | Some PromptAuthority.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
+        // A Blogger terminal without a durable cycle receipt did not prove a
+        // business Main or maintenance Squash success. Never clear fallback
+        // from Role alone.
+        | _, Some Role.Blogger -> None
+        | _ -> Some ProviderRequestKind.WorkMain
+
     let private requestKindOfCompleted (journal: AgentJournal) (turn: ReconciledTurn) =
         match bloggerReceiptKind journal turn with
         | Some BlogFrameKind.Squash -> Some ProviderRequestKind.BloggerSquash
         | Some BlogFrameKind.Entry -> Some ProviderRequestKind.BloggerMain
-        | None ->
-            let continuationKind =
-                PromptAuthorityLedger.projectionFor turn.SessionId (AgentJournal.snapshot journal).AgentProjections
-                |> Option.bind (fun authority -> Map.tryFind turn.PhysicalUserMessageId authority.AcceptedContinuationIds)
+        | None -> requestKindWithoutBloggerReceipt journal turn
 
-            match continuationKind, turn.Role with
-            | Some PromptAuthority.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
-            // A Blogger terminal without a durable cycle receipt did not prove a
-            // business Main or maintenance Squash success. Never clear fallback
-            // from Role alone.
-            | _, Some Role.Blogger -> None
-            | _ -> Some ProviderRequestKind.WorkMain
+    let private successClearingRequest (journal: AgentJournal option) (turn: ReconciledTurn) =
+        journal
+        |> Option.bind (fun durable ->
+            requestKindOfCompleted durable turn
+            |> Option.filter ProviderRequestKind.clearsFailureCountOnSuccess
+            |> Option.map (fun _ -> durable))
+
+    let private recordSuccessIfValid (journal: AgentJournal option) (turn: ReconciledTurn) =
+        task {
+            match successClearingRequest journal turn with
+            | Some durable ->
+                let! _ = FallbackLedger.recordConfirmedSuccess durable turn.SessionId turn.ProviderRun
+                return ()
+            | None -> return ()
+        }
 
     /// Revisit a previously delivered turn only for work whose authority comes
     /// from a fresh idle observation. Terminal plumbing remains first-delivery only.
@@ -202,21 +220,8 @@ module OrdinaryTurnWorkflow =
                 else
                     completeAgent ()
 
-            let recordSuccessIfValid (journal: AgentJournal option) =
-                task {
-                    match journal with
-                    | Some j ->
-                        match requestKindOfCompleted j turn with
-                        | Some kind when ProviderRequestKind.clearsFailureCountOnSuccess kind ->
-                            let! _ = FallbackLedger.recordConfirmedSuccess j turn.SessionId turn.ProviderRun
-                            ()
-                        | Some _
-                        | None -> ()
-                    | None -> ()
-                }
-
             if terminalValid then
-                do! recordSuccessIfValid journal
+                do! recordSuccessIfValid journal turn
 
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
                 return ()
@@ -253,15 +258,7 @@ module OrdinaryTurnWorkflow =
             // (The XTrace parts are captured at the transform boundary.)
             InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
         | ReconcileProgram.TurnAborted reason ->
-            handleAborted
-                sessionPort
-                eventPort
-                journal
-                abortedSessions
-                abortCause
-                turn
-                sessionKey
-                reason
+            handleAborted sessionPort eventPort journal abortedSessions abortCause turn sessionKey reason
         | ReconcileProgram.TurnFailed error ->
             ProviderRecoveryWorkflow.continueAfterConfirmedFailure
                 sessionPort

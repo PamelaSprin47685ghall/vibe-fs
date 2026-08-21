@@ -1,5 +1,5 @@
 {
-  "total": 673,
+  "total": 674,
   "owners": [
     "action-affordance",
     "behavior-diagnosis",
@@ -213,6 +213,10 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
+      "owner": "context-compression"
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
       "owner": "context-compression"
     },
     {
@@ -1552,11 +1556,11 @@
       "owner": "host-boundary"
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Host/Fact.fs",
+      "path": "src/Wanxiangshu/Host/Fact.fs",
       "owner": "requirement-grounding"
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Host/Facts.fs",
+      "path": "src/Wanxiangshu/Host/Facts.fs",
       "owner": "requirement-grounding"
     },
     {
@@ -1729,10 +1733,6 @@
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
-      "owner": "requirement-grounding"
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Model.fs",
       "owner": "requirement-grounding"
     },
     {
@@ -2154,6 +2154,10 @@
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
       "owner": "durable-events"
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
+      "owner": "durable-convergence"
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs",

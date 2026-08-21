@@ -173,7 +173,7 @@ module RequirementGroundingTransform =
     let private argsJson path =
         CanonicalJson.canonicalJson (createObj [ "filePath", box path ])
 
-    let private anchoredReads sessionId ordinal snapshot =
+    let private anchoredReads sessionId ordinal (snapshot: GroundingSnapshot) : RequirementGroundingAnchoredRead list =
         snapshot.Materials
         |> List.mapi (fun index material ->
             { CallId =
@@ -185,7 +185,13 @@ module RequirementGroundingTransform =
               ResultBytes = material.ResultBytes
               CursorResultBytes = cursorResult material.Path material.ResultBytes })
 
-    let private occurrence sessionId ordinal callGap resultGap snapshot =
+    let private occurrence
+        sessionId
+        ordinal
+        callGap
+        resultGap
+        (snapshot: GroundingSnapshot)
+        : RequirementGroundingOccurrence =
         { Workspace = snapshot.Workspace
           PackageName = snapshot.PackageName
           Digest = snapshot.Digest
@@ -194,7 +200,7 @@ module RequirementGroundingTransform =
           CallGap = callGap
           ResultGap = resultGap }
 
-    let private appendOneRequested journal sessionId callGap resultGap snapshot =
+    let private appendOneRequested journal sessionId callGap resultGap (snapshot: GroundingSnapshot) =
         let next =
             RequirementGroundingRuntime.nextOrdinal journal (SessionId.create sessionId)
 
@@ -208,7 +214,7 @@ module RequirementGroundingTransform =
             return ()
         }
 
-    let private appendRequested journal sessionId callGap resultGap snapshots =
+    let private appendRequested journal sessionId callGap resultGap (snapshots: GroundingSnapshot list) =
         let rec loop remaining =
             match remaining with
             | [] -> Task.FromResult(Ok())

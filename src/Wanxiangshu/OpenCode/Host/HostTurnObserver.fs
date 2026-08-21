@@ -265,14 +265,7 @@ module HostTurnObserver =
             | FamilyRecovery.FamilyWaiting _
             | FamilyRecovery.FamilyReady _ ->
                 return!
-                    observeFamilyReady
-                        sessionPort
-                        eventPort
-                        journal
-                        scope
-                        reviewerContinuationPort
-                        abortCause
-                        context
+                    observeFamilyReady sessionPort eventPort journal scope reviewerContinuationPort abortCause context
         }
 
     let private closeUnresolvedAssistance
@@ -385,11 +378,4 @@ module HostTurnObserver =
             // or interaction-repair effects from this physical material.
             Task.FromResult(()) :> Task
         else
-            observeBusinessTurn
-                sessionPort
-                eventPort
-                journal
-                strengthDurability
-                scope
-                reviewerContinuationPort
-                context
+            observeBusinessTurn sessionPort eventPort journal strengthDurability scope reviewerContinuationPort context

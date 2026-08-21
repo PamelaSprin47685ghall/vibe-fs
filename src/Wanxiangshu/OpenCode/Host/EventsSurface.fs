@@ -70,7 +70,8 @@ module EventsSurface =
         (authorityRoot: string)
         (text: string)
         : bool =
-        let stop = TerminalStop.forAuthority (AuthorityRootUserMessageId.create authorityRoot) text
+        let stop =
+            TerminalStop.forAuthority (AuthorityRootUserMessageId.create authorityRoot) text
 
         let outcome =
             match kind with

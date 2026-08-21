@@ -31,7 +31,6 @@ module CompanionRuntimeSurface =
         unbox<Wanxiangshu.OpenCode.PluginRuntimeScope> value
 
     let private hostOf (value: obj) : IBloggerRuntimeHost = (scopeOf value).BloggerRuntimeHost
-    let private companionOf (value: obj) : Companion = unbox<Companion> value
 
     let private contextOfJs (value: obj) : BloggerRequestContext =
         match text value?kind with
@@ -210,7 +209,10 @@ module CompanionRuntimeSurface =
 
     let private parkWakeToJs (wake: ParkWake) : obj =
         match wake with
-        | ParkWake.MaterialAvailable context -> box {| kind = "MaterialAvailable"; context = contextToJs context |}
+        | ParkWake.MaterialAvailable context ->
+            box
+                {| kind = "MaterialAvailable"
+                   context = contextToJs context |}
         | ParkWake.Cancelled -> box {| kind = "Cancelled"; context = null |}
 
     let private offerDispositionName (disposition: MaterialOfferDisposition) =

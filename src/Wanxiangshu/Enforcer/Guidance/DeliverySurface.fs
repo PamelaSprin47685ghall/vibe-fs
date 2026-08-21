@@ -28,10 +28,10 @@ module DeliverySurface =
 
         { FullDeliveredTips = names |> Array.toList |> Set.ofList }
 
-    let private presentationOf (value: obj) : Wanxiangshu.OpenCode.Host.TipPresentation =
+    let private presentationOf (value: obj) : Wanxiangshu.Host.TipPresentation =
         match text value with
-        | "IdentityOnly" -> Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly
-        | _ -> Wanxiangshu.OpenCode.Host.TipPresentation.Full
+        | "IdentityOnly" -> Wanxiangshu.Host.TipPresentation.IdentityOnly
+        | _ -> Wanxiangshu.Host.TipPresentation.Full
 
     let empty: obj = stateToJs TipDeliveryProjection.empty
 

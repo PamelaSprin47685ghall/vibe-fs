@@ -112,6 +112,12 @@ module ProviderRecoveryWorkflow =
         | Ready
         | AwaitCommittedFact
 
+    [<RequireQualifiedAccess>]
+    type private BloggerContinuationFailure =
+        | Materialize of string
+        | Send of string
+        | Bind of string
+
     let private recoveryMaterialState
         (projection: ProjectionSet)
         (mainSessionId: SessionId)
@@ -138,19 +144,43 @@ module ProviderRecoveryWorkflow =
         task {
             let projection, revision = AgentJournal.snapshotWithRevision durable
 
-            match recoveryMaterialState projection mainSessionId bloggerSessionId with
-            | RecoveryMaterialState.Ready -> return ()
-            | RecoveryMaterialState.AwaitCommittedFact ->
-                match! AgentJournal.awaitChangeFromOrCancel revision host.Cancellation durable with
-                | None -> return ()
-                | Some _ -> return! awaitLinkedProducer host durable mainSessionId bloggerSessionId
+            return!
+                awaitRecoveryMaterialState
+                    host
+                    durable
+                    mainSessionId
+                    bloggerSessionId
+                    revision
+                    (recoveryMaterialState projection mainSessionId bloggerSessionId)
         }
 
-    let awaitRecoveryMaterial
+    and private awaitRecoveryMaterialState
         (host: IBloggerRuntimeHost)
         (durable: AgentJournal)
         (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        revision
+        state
         : Task =
+        match state with
+        | RecoveryMaterialState.Ready -> Task.FromResult(()) :> Task
+        | RecoveryMaterialState.AwaitCommittedFact ->
+            awaitRecoveryMaterialEvent host durable mainSessionId bloggerSessionId revision
+
+    and private awaitRecoveryMaterialEvent
+        (host: IBloggerRuntimeHost)
+        (durable: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        revision
+        : Task =
+        task {
+            match! AgentJournal.awaitChangeFromOrCancel revision host.Cancellation durable with
+            | None -> return ()
+            | Some _ -> return! awaitLinkedProducer host durable mainSessionId bloggerSessionId
+        }
+
+    let awaitRecoveryMaterial (host: IBloggerRuntimeHost) (durable: AgentJournal) (mainSessionId: SessionId) : Task =
         let projection = AgentJournal.snapshot durable
 
         match bloggerOfMain projection mainSessionId with
@@ -174,13 +204,15 @@ module ProviderRecoveryWorkflow =
             bloggerSessionId
             (AgentJournal.snapshot durable).AgentProjections.Associations
 
-    let private recoverySquashContext
-        (durable: AgentJournal)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        =
-        let session = AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
-        let blog = session |> Option.bind (fun value -> value.Blog) |> Option.defaultValue BlogProjection.empty
+    let private recoverySquashContext (durable: AgentJournal) (mainSessionId: SessionId) (bloggerSessionId: SessionId) =
+        let session =
+            AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
+
+        let blog =
+            session
+            |> Option.bind (fun value -> value.Blog)
+            |> Option.defaultValue BlogProjection.empty
+
         let epoch =
             session
             |> Option.bind (fun value -> value.PrefixEpoch)
@@ -225,7 +257,7 @@ module ProviderRecoveryWorkflow =
         | Ok _ -> ()
         | Error _ -> notifyFailure eventPort turn error
 
-    let private sendStagedBloggerContinuation
+    let rec private sendStagedBloggerContinuation
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
@@ -236,19 +268,43 @@ module ProviderRecoveryWorkflow =
         (failureReason: string)
         : Task =
         task {
-            match! BloggerCoordinator.stageContinuationContext scope durable ctx with
-            | Error reason -> notifyFailure eventPort turn reason
-            | Ok() ->
-                match! sendContinuation sessionPort turn (Some durable) prompt with
-                | Error reason ->
-                    do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
-                    notifyFailure eventPort turn failureReason
-                | Ok promptKey ->
-                    match! BloggerCoordinator.bindContinuationContext durable ctx promptKey with
-                    | Ok() -> ()
-                    | Error reason ->
-                        do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
-                        notifyFailure eventPort turn reason
+            let! outcome =
+                taskResult {
+                    do!
+                        BloggerCoordinator.stageContinuationContext scope durable ctx
+                        |> TaskResult.mapError BloggerContinuationFailure.Materialize
+
+                    let! promptKey =
+                        sendContinuation sessionPort turn (Some durable) prompt
+                        |> TaskResult.mapError BloggerContinuationFailure.Send
+
+                    do!
+                        BloggerCoordinator.bindContinuationContext durable ctx promptKey
+                        |> TaskResult.mapError BloggerContinuationFailure.Bind
+                }
+
+            return! settleBloggerContinuationFailure eventPort durable scope turn ctx failureReason outcome
+        }
+
+    and private settleBloggerContinuationFailure
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (turn: ReconciledTurn)
+        (ctx: BloggerRequestContext)
+        (failureReason: string)
+        outcome
+        : Task =
+        task {
+            match outcome with
+            | Ok() -> ()
+            | Error(BloggerContinuationFailure.Materialize reason) -> notifyFailure eventPort turn reason
+            | Error(BloggerContinuationFailure.Send reason) ->
+                do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
+                notifyFailure eventPort turn failureReason
+            | Error(BloggerContinuationFailure.Bind reason) ->
+                do! BloggerCoordinator.abandonContinuationContext scope durable ctx reason
+                notifyFailure eventPort turn reason
         }
 
     let private replaceFailedBloggerRequest
@@ -263,24 +319,102 @@ module ProviderRecoveryWorkflow =
         (failureReason: string)
         : Task =
         task {
-            do!
-                BloggerCoordinator.abandonContinuationContext
-                    scope
-                    durable
-                    failed
-                    "provider-attempt-failed"
+            do! BloggerCoordinator.abandonContinuationContext scope durable failed "provider-attempt-failed"
 
-            return!
-                sendStagedBloggerContinuation
-                    sessionPort
-                    eventPort
-                    durable
-                    scope
-                    turn
-                    next
-                    prompt
-                    failureReason
+            return! sendStagedBloggerContinuation sessionPort eventPort durable scope turn next prompt failureReason
         }
+
+    let private continueFailedBloggerMain
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (turn: ReconciledTurn)
+        (mainSessionId: SessionId)
+        (continuationPrompt: string)
+        (error: string)
+        (opportunity: RecoveryOpportunity)
+        (squash: BloggerRequestContext option)
+        (failed: BloggerRequestContext)
+        : Task =
+        match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerMain opportunity squash.IsSome, squash with
+        | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
+            replaceFailedBloggerRequest
+                sessionPort
+                eventPort
+                durable
+                scope
+                turn
+                failed
+                squashCtx
+                (squashPrompt mainSessionId)
+                error
+        | Ok ProviderRequestKind.BloggerMain, _ ->
+            replaceFailedBloggerRequest sessionPort eventPort durable scope turn failed failed continuationPrompt error
+        | Ok _, _
+        | Error _, _ ->
+            notifyFailure eventPort turn "Blogger recovery produced an invalid next request kind"
+            Task.FromResult(()) :> Task
+
+    let private rebuildMainAfterFailedSquash
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (turn: ReconciledTurn)
+        (mainSessionId: SessionId)
+        (continuationPrompt: string)
+        (error: string)
+        (failed: BloggerRequestContext)
+        : Task =
+        task {
+            match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
+            | None -> notifyFailure eventPort turn "Blogger squash failed and no main material can be rebuilt"
+            | Some main ->
+                return!
+                    replaceFailedBloggerRequest
+                        sessionPort
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        failed
+                        main
+                        continuationPrompt
+                        error
+        }
+
+    let private continueFailedBloggerSquash
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (turn: ReconciledTurn)
+        (mainSessionId: SessionId)
+        (continuationPrompt: string)
+        (error: string)
+        (opportunity: RecoveryOpportunity)
+        (squash: BloggerRequestContext option)
+        (failed: BloggerRequestContext)
+        : Task =
+        match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerSquash opportunity squash.IsSome with
+        | Error _ ->
+            notifyFailure eventPort turn "Blogger squash recovery produced an invalid next request kind"
+            Task.FromResult(()) :> Task
+        | Ok ProviderRequestKind.BloggerMain ->
+            rebuildMainAfterFailedSquash
+                sessionPort
+                eventPort
+                durable
+                scope
+                turn
+                mainSessionId
+                continuationPrompt
+                error
+                failed
+        | Ok _ ->
+            notifyFailure eventPort turn "Blogger squash recovery did not return to main"
+            Task.FromResult(()) :> Task
 
     let private continueBlogger
         (sessionPort: ISessionHostPort)
@@ -300,52 +434,33 @@ module ProviderRecoveryWorkflow =
             match current with
             | None -> notifyFailure eventPort turn "Blogger recovery has no owned request context"
             | Some((BloggerRequestContext.Main _) as failed) ->
-                match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerMain opportunity squash.IsSome, squash with
-                | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
-                    return!
-                        replaceFailedBloggerRequest
-                            sessionPort
-                            eventPort
-                            durable
-                            scope
-                            turn
-                            failed
-                            squashCtx
-                            (squashPrompt mainSessionId)
-                            error
-                | Ok ProviderRequestKind.BloggerMain, _ ->
-                    return!
-                        replaceFailedBloggerRequest
-                            sessionPort
-                            eventPort
-                            durable
-                            scope
-                            turn
-                            failed
-                            failed
-                            continuationPrompt
-                            error
-                | Ok _, _
-                | Error _, _ -> notifyFailure eventPort turn "Blogger recovery produced an invalid next request kind"
+                return!
+                    continueFailedBloggerMain
+                        sessionPort
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        mainSessionId
+                        continuationPrompt
+                        error
+                        opportunity
+                        squash
+                        failed
             | Some((BloggerRequestContext.Squash _) as failed) ->
-                match RecoverySlot.nextBloggerRequest ProviderRequestKind.BloggerSquash opportunity squash.IsSome with
-                | Error _ -> notifyFailure eventPort turn "Blogger squash recovery produced an invalid next request kind"
-                | Ok ProviderRequestKind.BloggerMain ->
-                    match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
-                    | None -> notifyFailure eventPort turn "Blogger squash failed and no main material can be rebuilt"
-                    | Some main ->
-                        return!
-                            replaceFailedBloggerRequest
-                                sessionPort
-                                eventPort
-                                durable
-                                scope
-                                turn
-                                failed
-                                main
-                                continuationPrompt
-                                error
-                | Ok _ -> notifyFailure eventPort turn "Blogger squash recovery did not return to main"
+                return!
+                    continueFailedBloggerSquash
+                        sessionPort
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        mainSessionId
+                        continuationPrompt
+                        error
+                        opportunity
+                        squash
+                        failed
         }
 
     let private continueWorkMain
@@ -365,6 +480,76 @@ module ProviderRecoveryWorkflow =
 
             let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
             handleContinuation eventPort turn error continuation
+        }
+
+    let private continueAdvancedFailure
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (armRecovery: SessionId -> unit)
+        (turn: ReconciledTurn)
+        (continuationPrompt: string)
+        (error: string)
+        : Task =
+        match mainSessionOfBlogger durable turn.SessionId with
+        | Some mainSessionId ->
+            continueBlogger sessionPort eventPort durable scope turn mainSessionId continuationPrompt error
+        | None -> continueWorkMain sessionPort eventPort durable scope armRecovery turn continuationPrompt error
+
+    let private settleFailureAdmission
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (armRecovery: SessionId -> unit)
+        (turn: ReconciledTurn)
+        (continuationPrompt: string)
+        (error: string)
+        admission
+        : Task =
+        match admission with
+        | Error reason ->
+            notifyFailure eventPort turn reason
+            Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
+            notifyFailure eventPort turn error
+            Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.AlreadyRecorded
+        | Ok ConfirmedFailureOutcome.NoActiveRun -> Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
+            continueAdvancedFailure sessionPort eventPort durable scope armRecovery turn continuationPrompt error
+
+    let private continueDurableFailure
+        (sessionPort: ISessionHostPort)
+        (eventPort: IEventObservationPort)
+        (durable: AgentJournal)
+        (scope: IBloggerRuntimeHost)
+        (armRecovery: SessionId -> unit)
+        (turn: ReconciledTurn)
+        (continuationPrompt: string)
+        (error: string)
+        : Task =
+        task {
+            let! admission =
+                FallbackLedger.recordConfirmedFailure
+                    durable
+                    AgentPairCursor.DefaultAutoRecoveryBudget
+                    turn.SessionId
+                    turn.ProviderRun
+                    error
+
+            return!
+                settleFailureAdmission
+                    sessionPort
+                    eventPort
+                    durable
+                    scope
+                    armRecovery
+                    turn
+                    continuationPrompt
+                    error
+                    admission
         }
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
@@ -387,48 +572,10 @@ module ProviderRecoveryWorkflow =
         (continuationPrompt: string)
         : Task =
         task {
-            let fail reason = notifyFailure eventPort turn reason
-
             match journal with
-            | None -> fail error
+            | None -> notifyFailure eventPort turn error
             | Some durable ->
-                match!
-                    FallbackLedger.recordConfirmedFailure
-                        durable
-                        AgentPairCursor.DefaultAutoRecoveryBudget
-                        turn.SessionId
-                        turn.ProviderRun
-                        error
-                with
-                | Error reason -> fail reason
-                | Ok ConfirmedFailureOutcome.RecoveryExhausted -> fail error
-                // A second observe of the same APIError must not NotifyTerminal Failed or
-                // issue a second continuation; the original admitted recovery remains owner.
-                | Ok ConfirmedFailureOutcome.AlreadyRecorded
-                | Ok ConfirmedFailureOutcome.NoActiveRun -> ()
-                | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
-                    match mainSessionOfBlogger durable turn.SessionId with
-                    | Some mainSessionId ->
-                        return!
-                            continueBlogger
-                                sessionPort
-                                eventPort
-                                durable
-                                scope
-                                turn
-                                mainSessionId
-                                continuationPrompt
-                                error
-                    | None ->
-                        return!
-                            continueWorkMain
-                                sessionPort
-                                eventPort
-                                durable
-                                scope
-                                armRecovery
-                                turn
-                                continuationPrompt
-                                error
+                return!
+                    continueDurableFailure sessionPort eventPort durable scope armRecovery turn continuationPrompt error
         }
         :> Task

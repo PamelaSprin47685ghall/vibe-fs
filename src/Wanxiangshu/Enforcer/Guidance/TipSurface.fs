@@ -154,8 +154,8 @@ module TipSurface =
             {| tipName = guidance.TipName
                presentation =
                 match guidance.Presentation with
-                | Wanxiangshu.OpenCode.Host.TipPresentation.Full -> "Full"
-                | Wanxiangshu.OpenCode.Host.TipPresentation.IdentityOnly -> "IdentityOnly"
+                | Wanxiangshu.Host.TipPresentation.Full -> "Full"
+                | Wanxiangshu.Host.TipPresentation.IdentityOnly -> "IdentityOnly"
                text = guidance.Text |}
 
     /// Resolve one Main/Blogger session to the localized Full or Identity

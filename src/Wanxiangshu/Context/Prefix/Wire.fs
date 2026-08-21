@@ -392,8 +392,7 @@ module XWire =
 
                 let opportunity = RecoverySlot.opportunity arming fallback.Cursor.Offset
 
-                let! candidateResult =
-                    selectCandidateForOpportunity opportunity durable sessionId snapshot state cutoff
+                let! candidateResult = selectCandidateForOpportunity opportunity durable sessionId snapshot state cutoff
 
                 let selectProbe () = candidateResult
 

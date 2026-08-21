@@ -179,9 +179,7 @@ type SyncDelegateRuntime
                     | Some expected -> do! DelegatedToolEstimateLedger.replace journal sessionId expected
                     | None -> ()
                 }
-          SendPrompt =
-            fun call request ->
-                sendDelegatePrompt call request
+          SendPrompt = fun call request -> sendDelegatePrompt call request
           CheckpointCompletedHandoff = fun parent prepared -> handoff.CheckpointCompleted parent prepared
           ResolveBoundAgent =
             fun childId ->
@@ -258,7 +256,12 @@ type SyncDelegateRuntime
         : Task<SyncDelegateCall option> =
         task {
             let! expectedRoot = call.AcceptedRoot.Task
-            return if expectedRoot = turn.AuthorityRootUserMessageId then store.TryPopCallByDelegate turn.SessionId else None
+
+            return
+                if expectedRoot = turn.AuthorityRootUserMessageId then
+                    store.TryPopCallByDelegate turn.SessionId
+                else
+                    None
         }
 
     let tryConsumeReadyCall (store: SyncDelegateCallStore) (turn: ReconciledTurn) : Task<SyncDelegateCall option> =

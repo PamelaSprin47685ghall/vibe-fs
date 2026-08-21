@@ -5,6 +5,7 @@
 // gated on a probe attempt with a usable terminal.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as cursorOwner from '../../../dist/Participant/Provider/Attempt/Fallback/CursorSurface.js'
@@ -15,6 +16,8 @@ const prefix = compression
 const prefixProbe = compression.prefixProbe
 const requestKind = compression.requestKind
 const slot = compression
+
+const source = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   prefix.snapshot({
@@ -114,6 +117,19 @@ test('WHAT[PAR-010] PAR_010_only_a_business_main_success_clears_the_failure_coun
   assert.equal(clears(requestKind.bloggerMain), true)
   assert.equal(clears(requestKind.bloggerSquash), false)
   assert.equal(clears(requestKind.interactionRepair), false)
+})
+
+test('WHAT[PAR-016] PAR_016_success_accounting_requires_proven_request_kind', () => {
+  const workflow = source('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
+
+  assert.match(workflow, /BloggerCycleProjection\.tryReceipt/)
+  assert.match(workflow, /Some BlogFrameKind\.Squash -> Some ProviderRequestKind\.BloggerSquash/)
+  assert.match(workflow, /Some BlogFrameKind\.Entry -> Some ProviderRequestKind\.BloggerMain/)
+  assert.match(workflow, /AcceptedContinuationIds/)
+  assert.match(workflow, /Some PromptAuthority\.InteractionRepair[^\n]*ProviderRequestKind\.InteractionRepair/)
+  assert.match(workflow, /Some Role\.Blogger -> None/)
+  assert.match(workflow, /successClearingRequest[\s\S]*ProviderRequestKind\.clearsFailureCountOnSuccess/)
+  assert.match(workflow, /recordSuccessIfValid[\s\S]*FallbackLedger\.recordConfirmedSuccess/)
 })
 
 // ── PAR-008: 空 / XML-only terminal 不计入推进 ───────────────────────────────

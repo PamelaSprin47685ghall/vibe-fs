@@ -57,9 +57,9 @@
   并发→Promise.all，超时→Promise.race 组合子。可见失败禁止裸抛异常。promise 内部就地 try...with 捕获→转为强类型 Result 分支→逼迫调用方匹配，不给异常留改道机会。
 
 ## 关于工具调用
-- 只要需要→并行调用多个工具：并行读取+并行编辑+同文件+异文件=绝对安全。
-- 强烈鼓励对同文件+异文件提交大量并行编辑。
-- 并行工具执行顺序≠线性(系统不保证顺序)→∃依赖时禁止高并发调用。
+- 只要独立→并行读取/调查/验证；并行度服务于因果清晰，不服务于工具数量。
+- 同文件重叠编辑、存在先后依赖的编辑、依赖上一结果的命令必须串行。系统不保证并行工具执行顺序。
+- 异文件也先判断语义依赖；共享类型/公共接口先定边界，再迁调用方，最后删旧路径。
 - 拒绝频繁全量重写文件→精准修改=核心。
 - 鼓励多意图并发→拆分独立元素+对每个意图提供完备背景知识(上下文互隔离)。
 - 诉求拆细→细粒度并发。拒绝大块意图→规避长时延迟。
@@ -81,6 +81,35 @@
 - 宁慢且稳，严禁使用自动化程序批量增删改查程序代码。
 - 脚本=急速幻觉+反复返工；手工编辑=脚踏实地+步步为营。慢=快。
 
+## 守江山 — 已完成架构，禁止倒退
+
+本节只收录已经同时落到 production + executable proof + architecture gate 的事实。迁移提案中的某项达到这个标准后，删掉对应长篇施工说明，只把不可退化的不变量压进本节；未达到三件套的内容继续留在 Active Migration Proposal。
+
+- 状态只能被事实改变，等待只能被事件结束。correctness path 禁止用 wall clock、`TimeSpan`、timer、deadline、sleep、polling 或 timeout 推断业务状态；取消是显式事件，不是时间流逝。
+- durable fact 是业务事实唯一来源。process-local registry/waiter/flight 只拥有物理资源，不得充当持久业务状态、恢复资格或成功证明。
+- 一条语义只有一个 owner、一个 vocabulary、一个推导公式。durable/domain 类型不得为了复用反向依赖 Host/OpenCode adapter；adapter 只能消费/产生领域词汇。
+- 恢复必须 failure-driven 且 typed。Provider attempt 的 `ProviderRequestKind`、slot outcome、durable receipt/authority evidence 决定推进与成功记账；禁止按错误字符串、Role 猜测、terminal 文案或 parked cursor 位置恢复。
+- 禁止平行状态机与“测试镜像实现”。production 与 test surface 必须调用同一纯 decision；surface 只做表示转换。发现 callback 已接线却无生产调用者、facade 只遮旧实现、第二套 reconstruction/formula 时，完成所有权迁移并删除旧路径。
+- 类型必须拒绝非法世界。不要用 `bool + option + stage/phase/generation` 拼状态；有限状态用 DU，合法 case 携带所需数据。wake/resume 这类结果必须把证据放进 case，而不是先返回 bool 再查第二槽。
+- F# 主因果流必须从上到下读。`fsharp-control-pyramid` 是绝对零门禁：Error/Ok plumbing 用 `result`/`taskResult`，Option plumbing 用组合子/CE，独立状态一次 tuple match，领域内层 decision 提取为有业务名字的 Evidence→Decision。严禁 suppression、allowlist、baseline 增长或换语法骗 gate。
+- 测试只能通过注册 semantic surface 穿越 Fable 边界。禁止 requirements 测试 deep-import production `dist/**` 私有模块、读取 F# DU `.tag/.fields/.cases()` 或靠私有声明排版证明行为；需要能力就增加最窄的正式 Surface，并登记 owner/law/consumer。
+- 每个 executable test 恰有一个 primary `WHAT[ID]`。跨包性质拆成多个独立 proof；HOW 只链接真实可执行 proof，不用 prose 代替测试。
+- clean break 完成即删尸体：旧类型、旧 namespace、dead callback、兼容 facade、重复 formula、失效 baseline/ledger 不得保留。版本控制负责历史，不让生产树负责考古。
+- 改公共边界时先迁 owner，再迁 consumer，再删旧 owner；每一步都让编译器暴露遗漏。不要先造 adapter 保两套世界同时活着。
+- Git/store 协议字符串也属于单一 vocabulary。hook/脚本若必须使用同一 ref/path/protocol，应从 owner 的定义派生或通过正式 surface 暴露，不复制第二份正则/字符串常量。
+- 关键 composition trace 已进入静态守城：PluginTransforms 顺序、Assistance Host capability seam、composition-root wiring、recovery/join、cross-callback PC 都有独立 gate；禁止把显式乐谱重新包装成动态 middleware/service-locator。
+- production semantic ownership 已全覆盖：每个 production `.fs` 必须出现在 `scripts/checks/semantic-owners.json` 且恰有一个 primary owner；新增/移动文件必须同步 owner，不得靠目录猜 owner。
+- 当前 F# control-pyramid、dead private binding、JS semantic-boundary debt 均为 0；这是零基线，不是未来可重新积累的 allowance。
+- durable store 已统一到 canonical EventStore spine；feature-owned durable backend/private ref、dual-write migrator、业务层 Git bypass 由 `unified-store-gate` 拒绝。
+- provider/context recovery 已切到 failure-driven + durable-event-driven + time-independent；任何重新引入 timeout/polling/process-local recovery proof 的改动都是回归。
+
+## 交付门禁
+
+- 生产代码/规范/测试变更至少通过 `node scripts/build.mjs` 与 `node scripts/check.mjs`。
+- 涉及行为、持久化、Host/provider、Git、分发或跨包边界时，继续跑对应 requirement suite；准备提交主干时优先跑 `npm run format-build-test`。
+- `scripts/check.mjs` 中 architecture / ownership / deadcode / semantic surface / requirement trace 等门禁只能修源码或契约使其变绿；禁止扩大 baseline、增加 suppression/allowlist、删测试或降低阈值。
+- 提交前重新 `git status` + diff 审查：确认无无关用户改动被覆盖、无临时文件、无调试输出、无旧路径残留、无生成物误入。
+
 # 文档生命周期
 
 正式语义在 `requirements/<package>/`（每包 WHY/WHAT/HOW + 测试）。
@@ -94,214 +123,14 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 - 工作区可能包含用户改动。修改前查看 `git status` 和相关 diff；保留无关改动。
 - 自动提交 git commit。允许推送 `master`；禁止 force push master。
 
----
+# Active Migration Proposal — 完成前保留
 
+以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-    思考了 2m 46s
-    
-    可以。这次我不再把它写成“架构建议”，而是写成一份可以照着执行、可以逐阶段验收、可以防止重构本身把系统搞坏的迁移手册。
-    
-    先给一个总裁决：你们现在其实已经拥有最终体系的大部分“局部定理”，问题不是缺少好思想，而是这些好思想还没有被统一成一套互斥的角色系统，也没有全部升级为 repository-wide
-        mechanically enforced architecture。
-    
-    尤其要先避免一个新的误区：
-    
-    &gt; “教科书级”不等于冻结成某个永恒的 49 包、某棵永恒目录树、某套永恒 decorator 分类。
-    
-    
-    
-    你们自己的 requirements/INDEX.md 已经说得非常正确：当前是 49 张 boundary card，但 49 不是目标，也不是稳定 API；后续发现 orphan /
-        overlap / garbage 仍应继续拆并。
-    
-    真正的终态应该是：
-    
-    &gt;
-        任何一个语义事实、能力、时序规则、物理资源、持久化事实、跨模块依赖，都能回答“谁拥有它、为什么它存在、谁有资格消费它、如何组合、如何失败、如何恢复、怎样证明”；并且凡是机器可以判断的边界，都由 CI 直接拒绝非法世界。
-    
-    
-    
-    
-    你们现有 requirement-system 已经规定每条 normative proposition 恰有一个 package owner，而且明确说文件共址不是 owner
-        判据，ownership 由 WHY + failure meaning + independent change 决定。
-    
-    所以我们不是推倒重来。
-    
-    我们要做的是完成最后一次 architecture rotation：
-    
-    从“Requirement Ownership”升级到“Semantic Capability Architecture”
-    
-    最终我建议把整个系统稳定成下面这张图：
-    
-    ┌─────────────────────────┐
-                             │      Domain Truth       │
-                             │ ADT / Facts / Evidence  │
-                             │ Pure Decision / Laws    │
-                             └────────────┬────────────┘
-                                          │ establishes
-                                          ▼
-                             ┌─────────────────────────┐
-                             │         Witness         │
-                             │     “P is now known”    │
-                             └────────────┬────────────┘
-                                          │ admission
-                                          ▼
-                             ┌─────────────────────────┐
-                             │       Capability        │
-                             │   “effect E is allowed” │
-                             │ scope / epoch / owner   │
-                             └────────────┬────────────┘
-                                          │ consumed by
-                                          ▼
-    ┌──────────────────┐      ┌─────────────────────────┐
-    │ Semantic Policy  │─────▶│   Capability-Passing    │
-    │ / Vocabulary     │      │         CE              │
-    └──────────────────┘      │ sequence / bind / scope │
-                              └────────────┬────────────┘
-                                          │ invokes
-                                          ▼
-                             ┌─────────────────────────┐
-                             │          Ports          │
-                             └────────────┬────────────┘
-                                          │
-                     ┌────────────────────┼─────────────────────┐
-                     ▼                    ▼                     ▼
-           Port Decorator       Capability Transformer    Physical Adapter
-           invocation law       authority derivation     Host/Git/process
-                     └────────────────────┬─────────────────────┘
-                                          │
-                                          ▼
-                                   Physical Effect
-                                          │
-                                          ▼
-                                 Durable Fact / Receipt
-                                          │
-                                          ▼
-                             Canonical Event Integrator
-                                          │
-                                          ▼
-                                     Projection
-    
-    横跨所有东西的是：
-    
-    Primary Semantic Owner
-            +
-    Published Contract
-            +
-    Requirement Law
-            +
-    Proof Ladder
-            +
-    Architecture Gate
-    
-    下面开始真正的迁移。
-    
-    
-    ---
-    
-    第一章：先不要改业务代码——先冻结你现在已经证明正确的世界
-    
-    这是整个重构最重要的一步。
-    
-    第一阶段不搬一个文件，不重命名一个大模块，不引入一个新抽象。
-    
-    原因很简单：你们现在不是从烂代码开始。相反，仓库中已经有很多非常昂贵、非常精细的因果不变量。
-    
-    例如 PluginTransforms.normalTransform 当前实际顺序包含：
-    
-    begin physical provider attempt
-    → bind SessionStartedAt
-    → Strength replay
-    → XTrace capture
-    → Companion projection
-    → XWire
-    → Blogger/Enforcer continuation
-    → Strength speculation
-    → Pair guideline
-    → Requirement grounding
-    → Blogger chronicle
-    → Host message sanitization
-    
-    而源代码注释已经明确钉住诸如：
-    
-    XTrace 必须在 Companion rewrite / X-wire 之前；
-    
-    Strength speculate 必须在 Enforcer 之后、Pair marker 之前；
-    
-    requirement grounding 必须在 HOST-013 之后；
-    
-    provider-facing sanitation 最后进行。
-    
-    
-    这意味着：
-    
-    PluginTransforms 很泥，但它不是随机泥。
-    
-    它里面混着很多已经成立的时序定理。
-    
-    所以第一次重构最危险的事情就是：
-    
-    transforms
-    |&gt; List.map apply
-    
-    或者：
-    
-    MiddlewarePipeline.register(...)
-    
-    那会把一个显式、可读、有 law 的顺序，改成一个“漂亮但失去主权”的动态解释器。
-    
-    因此 Phase 0 的任务只有一个：
-    
-    给现有行为拍“宪法级快照”
-    
-    先确保下面这些入口全部继续成立：
-    
-    node scripts/check.mjs
-    node requirements/verification-system/tests/run.mjs
-    npm run format-build-test
-    
-    你们现有 verification system 已经定义：
-    
-    0 Static
-    1 Pure
-    2 Temporal
-    3 Adapter
-    4 Long Stroke
-    5 Release
-    
-    并要求顺序被机器 pin。
-    
-    所以迁移过程中严格实行：
-    
-    每一次结构重构：
-    L0 architecture 必须先绿
-    → build
-    → owner-specific pure/temporal tests
-    → relevant adapter
-    → 最后才跑 Long Stroke
-    
-    绝对不要用：
-    
-    &gt; “E2E 还绿，所以重构没问题。”
-    
-    
-    
-    因为你们自己的规范已经正确指出：E2E 是稀缺物理证明，不是 semantic coverage 捷径。
-    
-    Phase 0 完成条件
-    
-    不改行为，只记录：
-    
-    A. PluginTransforms 当前 exact semantic order
-    B. Assistance abort → idle → successor 当前 exact trace
-    C. model routing capacity borrowing 当前 trace
-    D. canonical event append/replay 当前 trace
-    E. shutdown/drain 当前 trace
-    F. recovery re-entry 当前 trace
-    
-    这六套 trace 后面就是重构的“不动点”。
-    
-    
-    ---
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。当前 migration ledger 仍有 `PENDING`，所以 Wave 1–7 等 production cutover 路线继续保留。
+
+原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
+
     
     第二章：建立全仓统一的语义词典——从此不再允许 Token 万金油
     
@@ -650,29 +479,9 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     
     ---
     
-    3.5 Fable/JS 边界
-    
-    不要相信 F# private 是 JavaScript 安全边界。
-    
-    F# private 是源码/类型层封装。
-    
-    跨 Fable semantic surface 时继续采用你们已经在用的规则：
-    
-    opaque handle
-    obtain
-    pass back
-    dispose
-    never inspect
-    
-    durable-events 的 semantic boundary 已经明确把 EventStoreHandle / JournalHandle 暴露为 opaque capability，而
-        JSON-shaped values 才作为普通语义数据跨 JS 边界。
-    
-    Quiescence semantic test 也已经证明 JS 侧只 obtain/pass-back opaque gate/permit，而不检查 F# representation。
-    
-    
-    推广这个现有模式，不要发明 JS Symbol 安全框架。
-    
-    除非未来真的存在 adversarial JS plugin security boundary；目前 semantic opacity 足够。
+    3.5 已毕业 → 守江山：Fable/JS semantic boundary
+
+    JS 测试只经注册 Surface，opaque capability 只 obtain/pass-back/dispose、不检查 F# representation；`test-boundary` + `js-boundary-gate` 当前零债。以后只守，不再迁移。
     
     
     ---
@@ -1131,146 +940,10 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     
     ---
     
-    第九章：现在开始建立缺失的那一层——Production Semantic Ownership Graph
-    
-    这是我认为本仓下一次最大 architecture upgrade。
-    
-    你们已经有：
-    
-    Requirement proposition owner
-    Requirement dependency graph
-    APPLIES-TO
-    JS semantic surface owner
-    
-    但还没有一张足够强的：
-    
-    production artifact
-    → primary semantic owner
-    → public contracts
-    → allowed owner dependencies
-    
-    
-    ---
-    
-    9.1 不要滥用 APPLIES-TO
-    
-    现在 structured-workflow/APPLIES-TO 覆盖整个：
-    
-    /src/Wanxiangshu/**/*.fs
-    
-    以及大量 gate scripts。
-    
-    这本身不一定错。
-    
-    因为 structured-workflow 是全仓结构规则，当然可以“观察”全仓。
-    
-    错误在于把：
-    
-    APPLIES-TO
-    
-    误解成：
-    
-    OWNS
-    
-    所以我现在不会建议简单把 APPLIES-TO 缩掉。
-    
-    我建议语义上明确三种关系：
-    
-    OWNS
-    GOVERNS
-    OBSERVES
-    
-    最低成本实现可以不改文件格式：
-    
-    WHAT owner
-    APPLIES-TO = governance/observation scope
-    architecture ownership manifest = production primary owner
-    
-    这样：
-    
-    structured-workflow
-    
-    可以合法治理 646 个 F# 文件而一个业务功能都不拥有。
-    
-    这是正确的 Meta Package。
-    
-    
-    ---
-    
-    9.2 增加 architecture/semantic-owners.*
-    
-    名字可自行定。
-    
-    例如：
-    
-    [[owner]]
-    path = &quot;src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs&quot;
-    primary = &quot;execution-model-routing&quot;
-    
-    [[owner]]
-    path = &quot;src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs&quot;
-    primary = &quot;interaction-authority&quot;
-    
-    [[owner]]
-    path = &quot;src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs&quot;
-    primary = &quot;host-boundary&quot;
-    kind = &quot;composition-root&quot;
-    
-    重点不是 TOML。
-    
-    重点是：
-    
-    &gt; 任何 production module 必须有恰一个 primary semantic owner。
-    
-    
-    
-    允许：
-    
-    一个文件实现其它 package law 的消费
-    
-    但不允许：
-    
-    两个 package 都说“这段行为是我定义的”
-    
-    你们 js-semantic-surface 已经出现类似成熟模式：surface entry 带明确 owner、laws、representation、kind，并在跨 owner law 时使用
-        lawOwners。
-    
-    把这个思想推广到 production architecture。
-    
-    
-    ---
-    
-    9.3 Primary Owner 不等于目录
-    
-    这点千万别退化回 Layer Architecture。
-    
-    例如：
-    
-    OpenCode/Host/ModelCapacity.fs
-    
-    物理上在 OpenCode/Host。
-    
-    语义 owner 可以是：
-    
-    execution-model-routing
-    
-    没问题。
-    
-    Requirement system 自己已经说：
-    
-    &gt; 文件/模块共址不是 owner 判据。
-    
-    
-    
-    所以不要重新建立：
-    
-    Domain/
-    Application/
-    Infrastructure/
-    
-    然后以为目录就是语义。
-    
-    
+    第九章已毕业 → 守江山
+
+    Production Semantic Ownership Graph 已落到 `scripts/checks/semantic-owners.json` + `semantic-owners` hard gate；APPLIES-TO=治理范围、primary owner≠目录已成为守城事实。本章施工说明删除，后续只允许收紧 owner dependency，不允许退回“目录即 owner”或多 owner 模糊状态。
+
     ---
     
     第十章：建立 Owner Dependency Gate
@@ -3046,24 +2719,9 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     
     ---
     
-    第五十六章：禁止 feature.db / private ref
-    
-    这个可以直接 L0。
-    
-    扫描：
-    
-    *.db
-    *.sqlite
-    refs/*
-    .git/wanxiang/*
-    
-    在允许的 infrastructure zones 之外出现即红。
-    
-    但要允许正常静态 repository content。
-    
-    你们现有 durable-events 已明确要求所有动态 durable event truth 统一进入 writer files，不允许 feature-owned backend。
-    
-    所以直接把 normative law 机械化即可。
+    第五十六章已毕业 → 守江山
+
+    feature-owned durable backend / private ref / dual-write / Git bypass 已由 `unified-store-gate` 机械拒绝；保持零债，不再保留施工说明。
     
     
     ---

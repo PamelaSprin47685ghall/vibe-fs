@@ -104,10 +104,9 @@ module HostForkChildDispatch =
         (result: ForkResult)
         =
         match sent, result with
-        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted,
-          (ForkResult.Nudged _ | ForkResult.Created _) -> Ok result
-        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted, _ ->
-            Error "Existing agent did not accept a new run"
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted, (ForkResult.Nudged _ | ForkResult.Created _) ->
+            Ok result
+        | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted, _ -> Error "Existing agent did not accept a new run"
         | HostForkRunLifecycle.AgentOwnerDispatchOutcome.AcceptanceUncertain _, _ ->
             Ok(ForkResult.DispatchUncertain result.AgentId)
         | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Rejected err, _ -> Error err
@@ -152,6 +151,7 @@ module HostForkChildDispatch =
         taskResult {
             HostForkRunLifecycle.markReady gate pendingRuns journal parentId sessions run None
             let payload = Option.defaultValue prompt enrichedPrompt
+
             let! sent =
                 sendChildPrompt agentId childId role agent payload (HostForkRunLifecycle.bindAuthorityRoot run)
                 |> TaskResultCE.ofTask

@@ -47,11 +47,10 @@ module WorkspaceEventStore =
 
     let private deferredStore (commonDir: string) : IEventStore =
         let active =
-            lazy (
-                let writerId = Guid.NewGuid().ToString("N")
-                let integrator = CanonicalIntegrator.create ()
-                EventStore.createLocal commonDir writerId integrator
-            )
+            lazy
+                (let writerId = Guid.NewGuid().ToString("N")
+                 let integrator = CanonicalIntegrator.create ()
+                 EventStore.createLocal commonDir writerId integrator)
 
         { new IEventStore with
             member _.Append(events) = active.Value.Append events

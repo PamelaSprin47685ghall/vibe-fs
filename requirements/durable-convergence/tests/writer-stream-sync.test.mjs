@@ -24,6 +24,14 @@ test('WHAT[DURABLE-CONVERGENCE-002] one k-way primitive is shared by integrator 
   assert.doesNotMatch(sync, /observed_at.*runtime_id.*local_seq/is, 'sync must not invent a second event-ordering algorithm')
 })
 
+test('WHAT[DURABLE-CONVERGENCE-002] k-way cursor readiness is one finite state not parallel mutable axes', async () => {
+  const primitive = await read('src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs')
+
+  assert.match(primitive, /type private CursorReadiness\s*=\s*[\s\S]*Waiting[\s\S]*Queued[\s\S]*Exhausted/)
+  assert.doesNotMatch(primitive, /mutable\s+(Remaining|Generation|MissingParents|Queued)\b/)
+  assert.doesNotMatch(primitive, /\bGeneration\b/, 'the writer offset itself must be the waiter generation witness')
+})
+
 test('WHAT[DURABLE-CONVERGENCE-003] sync blobifies each complete writer file once without segments or index', async () => {
   const source = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
 

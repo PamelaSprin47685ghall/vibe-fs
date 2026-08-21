@@ -450,7 +450,18 @@ type HostForkRuntime
         startOwnedWork (fun () ->
             task {
                 let! workRecord = workRecordForOutcome run outcome
-                do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions handoffPort run outcome workRecord
+
+                do!
+                    HostForkRunLifecycle.complete
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        sessions
+                        handoffPort
+                        run
+                        outcome
+                        workRecord
             }
             :> Task)
         |> ignore

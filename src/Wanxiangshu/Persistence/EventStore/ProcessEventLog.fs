@@ -299,18 +299,18 @@ module ProcessEventLog =
         decodeWriterText path (readTextFileSync path "utf8")
 
     let private lastIndexOfLf (buffer: byte[]) count =
-        // DSL-MUTABLE: algorithm-scratch — reverse byte cursor inside one pread block.
-        let mutable index = count - 1
-        // DSL-MUTABLE: algorithm-scratch — exact delimiter position, -1 when absent.
-        let mutable found = -1
+        buffer
+        |> Array.take count
+        |> Array.tryFindIndexBack ((=) 10uy)
+        |> Option.defaultValue -1
 
-        while index >= 0 && found < 0 do
-            if buffer.[index] = 10uy then
-                found <- index
-            else
-                index <- index - 1
+    let private readRequiredChunk fd bytes offset count position =
+        let read = readSync fd bytes offset count position
 
-        found
+        if read <= 0 then
+            failwith "unexpected EOF while reading writer tail"
+        else
+            read
 
     let private readExactAt fd position length =
         let bytes = Array.zeroCreate<byte> length
@@ -318,152 +318,207 @@ module ProcessEventLog =
         let mutable filled = 0
 
         while filled < length do
-            let count = readSync fd bytes filled (length - filled) (position + filled)
-
-            if count <= 0 then
-                failwith "unexpected EOF while reading writer tail"
-
-            filled <- filled + count
+            filled <- filled + readRequiredChunk fd bytes filled (length - filled) (position + filled)
 
         bytes
 
-    type private TailLine =
-        { Start: int
-          Text: string }
+    type private TailLine = { Start: int; Text: string }
+
+    type private ReverseBlock =
+        | LocatedLineStart of int
+        | ContinueBefore of int
+
+    let private scanReverseBlock fd blockSize cursor =
+        let start = max 0 (cursor - blockSize)
+        let length = cursor - start
+
+        let delimiter =
+            readExactAt fd start length |> fun buffer -> lastIndexOfLf buffer length
+
+        if delimiter >= 0 then
+            ReverseBlock.LocatedLineStart(start + delimiter + 1)
+        elif start = 0 then
+            ReverseBlock.LocatedLineStart 0
+        else
+            ReverseBlock.ContinueBefore start
+
+    let private locateLineStart fd lineEnd =
+        let blockSize = 4096
+        // DSL-MUTABLE: algorithm-scratch — reverse pread search carries only the next byte boundary.
+        let mutable search = ReverseBlock.ContinueBefore lineEnd
+
+        let isSearching () =
+            match search with
+            | ReverseBlock.ContinueBefore _ -> true
+            | ReverseBlock.LocatedLineStart _ -> false
+
+        let advance () =
+            let cursor =
+                match search with
+                | ReverseBlock.ContinueBefore value -> value
+                | ReverseBlock.LocatedLineStart value -> value
+
+            search <- scanReverseBlock fd blockSize cursor
+
+        while isSearching () do
+            advance ()
+
+        match search with
+        | ReverseBlock.LocatedLineStart lineStart -> lineStart
+        | ReverseBlock.ContinueBefore _ -> lineEnd
+
+    let private readTailLine fd path lineEnd lineStart =
+        let length = lineEnd - lineStart
+
+        if length <= 0 then
+            Error(sprintf "writer file contains empty final line: %s" path)
+        else
+            Ok
+                { Start = lineStart
+                  Text = readExactAt fd lineStart length |> Encoding.UTF8.GetString }
 
     let private readCompleteLineBefore fd path lineEnd : Result<TailLine, string> =
         if lineEnd <= 0 then
             Error(sprintf "writer file contains empty final line: %s" path)
         else
-            let blockSize = 4096
-            // DSL-MUTABLE: algorithm-scratch — exclusive end of next reverse pread.
-            let mutable cursor = lineEnd
-            // DSL-MUTABLE: algorithm-scratch — exact line start once previous LF is found.
-            let mutable lineStart = -1
+            locateLineStart fd lineEnd |> readTailLine fd path lineEnd
 
-            while cursor > 0 && lineStart < 0 do
-                let start = max 0 (cursor - blockSize)
-                let length = cursor - start
-                let buffer = readExactAt fd start length
-                let delimiter = lastIndexOfLf buffer length
+    let private tryPhysical action onError =
+        try
+            action ()
+        with ex ->
+            onError ex
 
-                if delimiter >= 0 then
-                    lineStart <- start + delimiter + 1
-                elif start = 0 then
-                    lineStart <- 0
-                else
-                    cursor <- start
+    let private withReadFd path onError action =
+        let fd = openSync path "r"
 
-            let length = lineEnd - lineStart
+        try
+            tryPhysical (fun () -> action fd) onError
+        finally
+            closeSync fd
 
-            if length <= 0 then
-                Error(sprintf "writer file contains empty final line: %s" path)
-            else
-                Ok
-                    { Start = lineStart
-                      Text = readExactAt fd lineStart length |> Encoding.UTF8.GetString }
+    let private nonEmptyFileSize path =
+        let exists = existsSync path
+        let size = if exists then statSync path |> statSize else 0
+
+        match exists, size with
+        | false, _
+        | true, 0 -> None
+        | true, value -> Some value
+
+    let private readLastLineFromFd path size fd =
+        let trailing = readExactAt fd (size - 1) 1
+
+        if trailing.[0] <> 10uy then
+            Error(sprintf "writer file has incomplete trailing line: %s" path)
+        else
+            readCompleteLineBefore fd path (size - 1)
+            |> Result.map (fun line -> Some line.Text)
 
     /// Exact O(last-line-bytes) NDJSON tail lookup. The scan searches raw LF bytes
     /// backwards with positional reads; UTF-8 boundaries do not matter because an
     /// unescaped LF cannot occur inside a valid JSON string.
     let readLastCompleteLine (path: string) : Result<string option, string> =
-        if not (existsSync path) then
-            Ok None
-        else
-            let size = statSync path |> statSize
-
-            if size = 0 then
-                Ok None
-            else
-                let fd = openSync path "r"
-
-                try
-                    try
-                        let trailing = readExactAt fd (size - 1) 1
-
-                        if trailing.[0] <> 10uy then
-                            Error(sprintf "writer file has incomplete trailing line: %s" path)
-                        else
-                            readCompleteLineBefore fd path (size - 1)
-                            |> Result.map (fun line -> Some line.Text)
-                    with ex ->
-                        Error ex.Message
-                finally
-                    closeSync fd
+        nonEmptyFileSize path
+        |> Option.map (fun size -> withReadFd path (fun ex -> Error ex.Message) (readLastLineFromFd path size))
+        |> Option.defaultValue (Ok None)
 
     type private TailActivity =
         | JournalActivity of float
         | ProjectionCutTail
         | NoDurableActivity
 
-    let private classifyTailActivity (line: string) =
+    let private tryParseJson line =
         try
-            let value: obj = JS.JSON.parse line
-            let eventType = if isNull value?event_type then "" else unbox<string> value?event_type
-
-            match eventType with
-            | "JournalEnvelope" ->
-                let payload: obj = value?payload
-
-                if isNull payload || isNull payload?ObservedAt then
-                    NoDurableActivity
-                else
-                    let observedAt = parseDateMs (unbox<string> payload?ObservedAt)
-
-                    if isFiniteNumber observedAt then
-                        JournalActivity observedAt
-                    else
-                        NoDurableActivity
-            | "ProjectionCutTail" -> ProjectionCutTail
-            | _ -> NoDurableActivity
+            Some(JS.JSON.parse line)
         with _ ->
-            NoDurableActivity
+            None
+
+    let private observedJournalActivity (value: obj) =
+        let payload: obj = value?payload
+
+        let observedAt =
+            if isNull payload || isNull payload?ObservedAt then
+                None
+            else
+                Some(parseDateMs (unbox<string> payload?ObservedAt))
+
+        observedAt
+        |> Option.filter isFiniteNumber
+        |> Option.map TailActivity.JournalActivity
+        |> Option.defaultValue TailActivity.NoDurableActivity
+
+    let private classifyParsedTail (value: obj) =
+        let eventType =
+            if isNull value?event_type then
+                ""
+            else
+                unbox<string> value?event_type
+
+        match eventType with
+        | "JournalEnvelope" -> observedJournalActivity value
+        | "ProjectionCutTail" -> TailActivity.ProjectionCutTail
+        | _ -> TailActivity.NoDurableActivity
+
+    let private classifyTailActivity (line: string) =
+        tryParseJson line
+        |> Option.map classifyParsedTail
+        |> Option.defaultValue TailActivity.NoDurableActivity
+
+    type private TailSearch =
+        | SearchBefore of int
+        | ResolvedActivity of float option
+
+    let private decideTailSearch (line: TailLine) =
+        match classifyTailActivity line.Text with
+        | TailActivity.JournalActivity observedAt -> TailSearch.ResolvedActivity(Some observedAt)
+        | TailActivity.ProjectionCutTail when line.Start > 0 -> TailSearch.SearchBefore(line.Start - 1)
+        | TailActivity.ProjectionCutTail
+        | TailActivity.NoDurableActivity -> TailSearch.ResolvedActivity None
+
+    let private advanceTailSearch fd path lineEnd =
+        readCompleteLineBefore fd path lineEnd
+        |> Result.map decideTailSearch
+        |> Result.defaultValue (TailSearch.ResolvedActivity None)
+
+    let private findDurableActivity fd path lineEnd =
+        // DSL-MUTABLE: algorithm-scratch — finite reverse scan position/result.
+        let mutable search = TailSearch.SearchBefore lineEnd
+
+        let isSearching () =
+            match search with
+            | TailSearch.SearchBefore _ -> true
+            | TailSearch.ResolvedActivity _ -> false
+
+        let advance () =
+            let lineEnd =
+                match search with
+                | TailSearch.SearchBefore value -> value
+                | TailSearch.ResolvedActivity _ -> 0
+
+            search <- advanceTailSearch fd path lineEnd
+
+        while isSearching () do
+            advance ()
+
+        match search with
+        | TailSearch.ResolvedActivity activity -> activity
+        | TailSearch.SearchBefore _ -> None
+
+    let private durableActivityFromFd path size fd =
+        let trailing = readExactAt fd (size - 1) 1
+
+        if trailing.[0] = 10uy then
+            findDurableActivity fd path (size - 1)
+        else
+            None
 
     /// Journal envelopes carry their producer observation time in durable bytes.
     /// A trailing ProjectionCutTail is integrator metadata for the immediately
     /// preceding fact, so it does not advance process activity by itself.
     let private durableTailActivity path : float option =
-        if not (existsSync path) then
-            None
-        else
-            let size = statSync path |> statSize
-
-            if size = 0 then
-                None
-            else
-                let fd = openSync path "r"
-
-                try
-                    try
-                        let trailing = readExactAt fd (size - 1) 1
-
-                        if trailing.[0] <> 10uy then
-                            None
-                        else
-                            // DSL-MUTABLE: algorithm-scratch — LF ending the candidate record.
-                            let mutable lineEnd = size - 1
-                            // DSL-MUTABLE: algorithm-scratch — resolved durable activity, if any.
-                            let mutable activity: float option = None
-                            // DSL-MUTABLE: algorithm-scratch — only cut-tail metadata may be skipped.
-                            let mutable searching = true
-
-                            while searching && lineEnd > 0 do
-                                match readCompleteLineBefore fd path lineEnd with
-                                | Error _ -> searching <- false
-                                | Ok line ->
-                                    match classifyTailActivity line.Text with
-                                    | JournalActivity observedAt ->
-                                        activity <- Some observedAt
-                                        searching <- false
-                                    | ProjectionCutTail when line.Start > 0 -> lineEnd <- line.Start - 1
-                                    | ProjectionCutTail
-                                    | NoDurableActivity -> searching <- false
-
-                            activity
-                    with _ ->
-                        None
-                finally
-                    closeSync fd
+        nonEmptyFileSize path
+        |> Option.bind (fun size -> withReadFd path (fun _ -> None) (durableActivityFromFd path size))
 
     let private writerFileNames commonDir =
         let directory = eventsDirectory commonDir
@@ -548,6 +603,8 @@ module ProcessEventLog =
 
     let private currentWriterActivity path = statSync path |> statMtimeMs
 
+    let private someWhen condition value = if condition then Some value else None
+
     let private reconcileEqualWriterActivity path incomingActivity =
         match incomingActivity with
         | None -> ()
@@ -573,8 +630,8 @@ module ProcessEventLog =
         let existing = if exists then readTextFileSync path "utf8" else ""
 
         if existing = incoming then
-            if exists then
-                reconcileEqualWriterActivity path incomingActivityMs
+            someWhen exists path
+            |> Option.iter (fun _ -> reconcileEqualWriterActivity path incomingActivityMs)
 
             Ok()
         elif incoming.StartsWith(existing, StringComparison.Ordinal) then
@@ -594,19 +651,14 @@ module ProcessEventLog =
     let removeWriterFile (commonDir: string) (name: string) : unit =
         if name.EndsWith(".ndjson", StringComparison.Ordinal) then
             let path = join2 (eventsDirectory commonDir) name
-
-            if existsSync path then
-                unlinkSync path
+            someWhen (existsSync path) path |> Option.iter unlinkSync
         else
             invalidArg "name" "writer filename must end in .ndjson"
 
     /// Frozen retained writer streams, sorted only by WriterId for deterministic
     /// enumeration. Retention is whole-writer physical policy; the canonical
     /// Integrator still owns cross-stream ordering and interpretation.
-    let readStreamsAt
-        (commonDir: string)
-        (nowMs: float)
-        : Result<(string * EventEnvelope list) list, StorageInvalid> =
+    let readStreamsAt (commonDir: string) (nowMs: float) : Result<(string * EventEnvelope list) list, StorageInvalid> =
         let rec read remaining acc =
             result {
                 match remaining with

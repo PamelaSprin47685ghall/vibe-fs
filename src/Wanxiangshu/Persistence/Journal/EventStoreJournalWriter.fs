@@ -300,6 +300,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         : Task<Result<IJournalWriter * Envelope * ProjectionSet, FoldRejection>> =
         task {
             let init = EventStoreJournalWriter.initEnvelope runtimeId processId startedAt
+
             let writer =
                 EventStoreJournalWriter(runtimeId, init, EventStoreBlobWriter.Create store, store)
 

@@ -14,7 +14,7 @@ open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.OpenCode
-open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Host
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -468,7 +468,11 @@ module SyncDelegateSurface =
                             )
                         )
 
-                        return if harness.Runtime.HasOpeningCursor child then "Ignored" else "Claimed"
+                        return
+                            if harness.Runtime.HasOpeningCursor child then
+                                "Ignored"
+                            else
+                                "Claimed"
         }
 
     let observeTurn
@@ -603,7 +607,8 @@ module SyncDelegateSurface =
             let route = DelegationHandoffRoute.syncRole scope role
             let key = DelegationHandoff.key parent route
 
-            (AgentJournal.snapshot harness.Journal).AgentProjections.DelegationCompletedHandoffs
+            (AgentJournal.snapshot harness.Journal)
+                .AgentProjections.DelegationCompletedHandoffs
             |> Map.tryFind key
             |> Option.map box
             |> Option.defaultValue null

@@ -1,9 +1,7 @@
-namespace Wanxiangshu.OpenCode.Host
+namespace Wanxiangshu.Host
 
 open Wanxiangshu.Composition.Durable.Fact
 
-/// Host fact constructors — bridge from Host-owned HostFactCases
-/// into the Composition-owned AgentFact outer routing union.
 module HostFact =
     let inline PairProgrammingGuidelineAnchored payload =
         AgentFact.Host(HostFactCases.PairProgrammingGuidelineAnchored payload)

@@ -26,11 +26,7 @@ module RetentionSurface =
                 if String.IsNullOrWhiteSpace remoteRoot then
                     None
                 else
-                    Some
-                        { RootOid =
-                            remoteRoot
-                            |> GitObjectId.create
-                            |> RootOid.create }
+                    Some { RootOid = remoteRoot |> GitObjectId.create |> RootOid.create }
 
             match! WriterStreamSync.syncWriterStreamsAt raw commonDir remote nowMs with
             | Ok snapshot ->
@@ -38,9 +34,5 @@ module RetentionSurface =
                     createObj
                         [ "ok" ==> true
                           "root" ==> (snapshot.RootOid |> RootOid.value |> GitObjectId.value) ]
-            | Error error ->
-                return
-                    createObj
-                        [ "ok" ==> false
-                          "error" ==> sprintf "%A" error ]
+            | Error error -> return createObj [ "ok" ==> false; "error" ==> sprintf "%A" error ]
         }

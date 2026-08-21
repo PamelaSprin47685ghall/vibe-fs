@@ -858,6 +858,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Persistence/EventStore/RetentionSurface.js',
+    owner: 'durable-convergence',
+    laws: ['DURABLE-CONVERGENCE-011'],
+    source: 'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
+    representation: 'json',
+    kind: 'resource',
+  },
+  {
     module: 'Process/DeadlineSurface.js',
     owner: 'time-capability',
     laws: ['TIME-002', 'TIME-005'],
@@ -1600,6 +1608,7 @@ export const SURFACE_CONSUMERS = {
   'Execution/Session/AssociationSurface.js': ['session-ontology'],
   'Execution/Session/Wait/Surface.js': ['time-capability'],
   'Foundation/RolesSurface.js': ['capability-enforcement', 'cognitive-environment', 'repository-programming'],
+  'Git/Hook/Surface.js': ['durable-convergence'],
   'Interaction/Authority/RuntimeSurface.js': ['delegation', 'dispatch-protocol'],
   'Interaction/Authority/Surface.js': ['prefix-stability'],
   'Interaction/Dispatch/DispatchSurface.js': ['degeneration-guard', 'dispatch-protocol'],

@@ -14,7 +14,7 @@ open Wanxiangshu.Enforcer.InstitutionalLearning
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
-open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Durable routing vocabulary. Concrete fact families live with their semantic

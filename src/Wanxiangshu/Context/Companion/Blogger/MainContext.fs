@@ -59,37 +59,72 @@ module BloggerMainContext =
         (projection: ProviderProjection.ProviderSemanticProjection)
         : BloggerRequestContext option =
         nextChunk journal mainSessionId blog xTrace projection
-        |> Option.bind (EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection)
+        |> Option.bind (
+            EnforcerHost.mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection
+        )
 
     let private semanticPart (part: XTracePartRef) (body: string) =
         match part.Kind with
         | "text" -> Some(ProviderProjection.SemanticText body)
         | "reasoning" -> Some(ProviderProjection.SemanticReasoning body)
-        | "tool_call" -> part.ToolName |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
+        | "tool_call" ->
+            part.ToolName
+            |> Option.map (fun name -> ProviderProjection.SemanticToolCall(name, body))
         | "tool_result" -> Some(ProviderProjection.SemanticToolResult body)
         | "media_omitted" ->
             let mediaType = if String.IsNullOrWhiteSpace body then None else Some body
             Some(ProviderProjection.SemanticMedia(mediaType, ""))
         | _ -> None
 
+    let rec private readSemanticParts
+        (journal: AgentJournal)
+        (remaining: XTracePartRef list)
+        : Task<ProviderProjection.SemanticPart list> =
+        task {
+            match remaining with
+            | [] -> return []
+            | part :: tail ->
+                let! body = journal.Writer.BlobWriter.Read part.TextRef
+
+                let current =
+                    body |> Result.toOption |> Option.bind (semanticPart part) |> Option.toList
+
+                let! rest = readSemanticParts journal tail
+                return current @ rest
+        }
+
     let private readTurn (journal: AgentJournal) (_turn, parts: XTracePartRef list) =
         task {
             let ordered = parts |> List.sortBy (fun part -> part.PartIndex)
-            let role = ordered |> List.tryHead |> Option.map (fun part -> part.Role) |> Option.defaultValue "user"
-            let semanticParts = ResizeArray<_>()
 
-            for part in ordered do
-                match! journal.Writer.BlobWriter.Read part.TextRef with
-                | Ok body -> semanticPart part body |> Option.iter semanticParts.Add
-                | Error _ -> ()
+            let role =
+                ordered
+                |> List.tryHead
+                |> Option.map (fun part -> part.Role)
+                |> Option.defaultValue "user"
+
+            let! semanticParts = readSemanticParts journal ordered
 
             return
-                if semanticParts.Count = 0 then
+                if List.isEmpty semanticParts then
                     None
                 else
                     Some
                         { ProviderProjection.SemanticMessage.Role = role
-                          ProviderProjection.SemanticMessage.Parts = semanticParts |> Seq.toList }
+                          ProviderProjection.SemanticMessage.Parts = semanticParts }
+        }
+
+    let rec private readMessages
+        (journal: AgentJournal)
+        (remaining: (int * XTracePartRef list) list)
+        : Task<ProviderProjection.SemanticMessage list> =
+        task {
+            match remaining with
+            | [] -> return []
+            | turn :: tail ->
+                let! current = readTurn journal turn
+                let! rest = readMessages journal tail
+                return Option.toList current @ rest
         }
 
     let projectionFromXTrace
@@ -102,20 +137,17 @@ module BloggerMainContext =
                 |> List.groupBy (fun part -> part.Turn)
                 |> List.sortBy fst
 
-            let messages = ResizeArray<_>()
+            let! messages = readMessages journal turns
 
-            for turn in turns do
-                match! readTurn journal turn with
-                | Some message -> messages.Add message
-                | None -> ()
-
-            return
+            let projection: ProviderProjection.ProviderSemanticProjection =
                 { ProviderId = None
                   ModelId = None
                   Variant = None
                   Tools = []
                   System = []
-                  Messages = messages |> Seq.toList }
+                  Messages = messages }
+
+            return projection
         }
 
     let fromJournal
@@ -136,7 +168,12 @@ module BloggerMainContext =
 
                 let blog = session.Blog |> Option.defaultValue BlogProjection.empty
                 let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
-                let epoch = session.PrefixEpoch |> Option.map (fun prefix -> prefix.EpochId) |> Option.defaultValue PrefixEpochId.initial
+
+                let epoch =
+                    session.PrefixEpoch
+                    |> Option.map (fun prefix -> prefix.EpochId)
+                    |> Option.defaultValue PrefixEpochId.initial
+
                 let! projection = projectionFromXTrace journal xTrace
                 return fromProjection (Some journal) mainSessionId bloggerSessionId epoch blog xTrace projection
         }

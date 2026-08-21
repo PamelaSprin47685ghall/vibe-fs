@@ -8,7 +8,7 @@ open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts

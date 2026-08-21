@@ -99,6 +99,7 @@ type ParkedTransform(sessionId: string) as this =
             settled <- true
             completion.SetResult result
 
-    member _.TryResume(context: BloggerRequestContext) = this.TrySettle(ParkWake.MaterialAvailable context)
+    member _.TryResume(context: BloggerRequestContext) =
+        this.TrySettle(ParkWake.MaterialAvailable context)
 
     member _.TryCancel() = this.TrySettle ParkWake.Cancelled

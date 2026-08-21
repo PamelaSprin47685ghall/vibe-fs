@@ -13,6 +13,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
@@ -21,7 +22,6 @@ open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Review
-open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
@@ -165,7 +165,9 @@ module Envelope =
         taggedStringDecoder "ProviderRunIdentity" ProviderRunIdentity.create
 
     let private toolCallIdDecoder = taggedStringDecoder "ToolCallId" ToolCallId.create
-    let private hostToolPartIdDecoder = taggedStringDecoder "HostToolPartId" HostToolPartId.create
+
+    let private hostToolPartIdDecoder =
+        taggedStringDecoder "HostToolPartId" HostToolPartId.create
 
     let private xTracePartAppendedPayloadDecoder =
         Decode.object (fun get ->
@@ -187,15 +189,26 @@ module Envelope =
         Decode.index 1 xTracePartAppendedPayloadDecoder
         |> Decode.map CompanionFactCases.XTracePartAppended
 
-    let private runtimeFactDecoder = Decode.Auto.generateDecoderCached<RuntimeFact>(extra = extra)
-    let private promptFactDecoder = Decode.Auto.generateDecoderCached<PromptFactCases>(extra = extra)
-    let private fallbackFactDecoder = Decode.Auto.generateDecoderCached<FallbackFactCases>(extra = extra)
-    let private reviewFactDecoder = Decode.Auto.generateDecoderCached<ReviewFactCases>(extra = extra)
-    let private executionFactDecoder = Decode.Auto.generateDecoderCached<ExecutionFactCases>(extra = extra)
-    let private orchestratorFactDecoder = Decode.Auto.generateDecoderCached<OrchestratorFactCases>(extra = extra)
+    let private runtimeFactDecoder =
+        Decode.Auto.generateDecoderCached<RuntimeFact> (extra = extra)
+
+    let private promptFactDecoder =
+        Decode.Auto.generateDecoderCached<PromptFactCases> (extra = extra)
+
+    let private fallbackFactDecoder =
+        Decode.Auto.generateDecoderCached<FallbackFactCases> (extra = extra)
+
+    let private reviewFactDecoder =
+        Decode.Auto.generateDecoderCached<ReviewFactCases> (extra = extra)
+
+    let private executionFactDecoder =
+        Decode.Auto.generateDecoderCached<ExecutionFactCases> (extra = extra)
+
+    let private orchestratorFactDecoder =
+        Decode.Auto.generateDecoderCached<OrchestratorFactCases> (extra = extra)
 
     let private genericCompanionFactDecoder =
-        Decode.Auto.generateDecoderCached<CompanionFactCases>(extra = extra)
+        Decode.Auto.generateDecoderCached<CompanionFactCases> (extra = extra)
 
     let private companionFactDecoder: Decoder<CompanionFactCases> =
         Decode.index 0 Decode.string
@@ -203,18 +216,29 @@ module Envelope =
             | "XTracePartAppended" -> xTracePartAppendedDecoder
             | _ -> genericCompanionFactDecoder)
 
-    let private contextFactDecoder = Decode.Auto.generateDecoderCached<ContextFactCases>(extra = extra)
-    let private hostFactDecoder = Decode.Auto.generateDecoderCached<HostFactCases>(extra = extra)
-    let private fissionFactDecoder = Decode.Auto.generateDecoderCached<FissionFactCases>(extra = extra)
-    let private delegationFactDecoder = Decode.Auto.generateDecoderCached<DelegationFactCases>(extra = extra)
-    let private attentionFactDecoder = Decode.Auto.generateDecoderCached<AttentionFactCases>(extra = extra)
-    let private concernFactDecoder = Decode.Auto.generateDecoderCached<ConcernFactCases>(extra = extra)
+    let private contextFactDecoder =
+        Decode.Auto.generateDecoderCached<ContextFactCases> (extra = extra)
+
+    let private hostFactDecoder =
+        Decode.Auto.generateDecoderCached<HostFactCases> (extra = extra)
+
+    let private fissionFactDecoder =
+        Decode.Auto.generateDecoderCached<FissionFactCases> (extra = extra)
+
+    let private delegationFactDecoder =
+        Decode.Auto.generateDecoderCached<DelegationFactCases> (extra = extra)
+
+    let private attentionFactDecoder =
+        Decode.Auto.generateDecoderCached<AttentionFactCases> (extra = extra)
+
+    let private concernFactDecoder =
+        Decode.Auto.generateDecoderCached<ConcernFactCases> (extra = extra)
 
     let private institutionalLearningFactDecoder =
-        Decode.Auto.generateDecoderCached<InstitutionalLearningFactCases>(extra = extra)
+        Decode.Auto.generateDecoderCached<InstitutionalLearningFactCases> (extra = extra)
 
     let private managerLifecycleFactDecoder =
-        Decode.Auto.generateDecoderCached<ManagerLifecycleFact>(extra = extra)
+        Decode.Auto.generateDecoderCached<ManagerLifecycleFact> (extra = extra)
 
     let private familyCase decoder wrap =
         Decode.index 1 decoder |> Decode.map wrap
@@ -234,8 +258,7 @@ module Envelope =
             | "Delegation" -> familyCase delegationFactDecoder AgentFact.Delegation
             | "Attention" -> familyCase attentionFactDecoder AgentFact.Attention
             | "Concern" -> familyCase concernFactDecoder AgentFact.Concern
-            | "InstitutionalLearning" ->
-                familyCase institutionalLearningFactDecoder AgentFact.InstitutionalLearning
+            | "InstitutionalLearning" -> familyCase institutionalLearningFactDecoder AgentFact.InstitutionalLearning
             | name -> Decode.fail ("Cannot find AgentFact case " + name))
 
     let private factDecoder: Decoder<Fact> =
@@ -243,8 +266,7 @@ module Envelope =
         |> Decode.andThen (function
             | "Runtime" -> Decode.index 1 runtimeFactDecoder |> Decode.map Fact.Runtime
             | "Agent" -> Decode.index 1 agentFactDecoder |> Decode.map Fact.Agent
-            | "ManagerLifecycle" ->
-                Decode.index 1 managerLifecycleFactDecoder |> Decode.map Fact.ManagerLifecycle
+            | "ManagerLifecycle" -> Decode.index 1 managerLifecycleFactDecoder |> Decode.map Fact.ManagerLifecycle
             | "MagicTodo" -> Decode.fail "MagicTodo uses its canonical custom envelope decoder"
             | name -> Decode.fail ("Cannot find Fact case " + name))
 
@@ -254,9 +276,7 @@ module Envelope =
     let private magicTodoEnvelopeDecoder: Decoder<Envelope> =
         Decode.object (fun get ->
             let canonical =
-                get.Required.Field
-                    "Fact"
-                    (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
+                get.Required.Field "Fact" (Decode.object (fun fget -> fget.Required.Field "MagicTodo" Decode.string))
 
             match MagicTodoFactCodec.tryDecode canonical with
             | Ok fact ->
@@ -270,37 +290,44 @@ module Envelope =
             | Error reason -> failwith ("invalid MagicTodo canonical payload: " + reason))
 
     let private currentEnvelopeDecoder: Decoder<Envelope> =
-        Decode.Auto.generateDecoderCached<Envelope>(extra = decodeExtra)
+        Decode.Auto.generateDecoderCached<Envelope> (extra = decodeExtra)
 
     let private decodeMagicTodoEnvelope decoder json =
         match Decode.fromString decoder json with
         | Ok envelope -> Some envelope
         | Error _ -> None
 
+    let private tryDecodeMagicTodoJson json =
+        try
+            decodeMagicTodoEnvelope magicTodoEnvelopeDecoder json
+        with _ ->
+            None
+
     let private tryDecodeMagicTodoEnvelope (json: string) : Envelope option =
         if json.IndexOf("\"MagicTodo\"", StringComparison.Ordinal) < 0 then
             None
         else
-            try
-                decodeMagicTodoEnvelope magicTodoEnvelopeDecoder json
-            with _ ->
-                None
+            tryDecodeMagicTodoJson json
 
     let private hasMagicTodoFact (value: JsonValue) : bool =
         emitJsExpr
             value
             "!!$0 && typeof $0 === 'object' && !!$0.Fact && typeof $0.Fact === 'object' && Object.prototype.hasOwnProperty.call($0.Fact, 'MagicTodo')"
 
+    let private decodeMagicTodoEnvelopeValue (value: JsonValue) =
+        Decode.fromValue "$" magicTodoEnvelopeDecoder value |> Result.toOption
+
+    let private tryDecodeMagicTodoValue value =
+        try
+            decodeMagicTodoEnvelopeValue value
+        with _ ->
+            None
+
     let private tryDecodeMagicTodoEnvelopeValue (value: JsonValue) : Envelope option =
         if not (hasMagicTodoFact value) then
             None
         else
-            try
-                match Decode.fromValue "$" magicTodoEnvelopeDecoder value with
-                | Ok envelope -> Some envelope
-                | Error _ -> None
-            with _ ->
-                None
+            tryDecodeMagicTodoValue value
 
     let private deserializeCurrentEnvelope json =
         match tryDecodeMagicTodoEnvelope json with
@@ -322,5 +349,4 @@ module Envelope =
 
     /// EventStore already owns a parsed canonical payload. Decode it directly
     /// instead of stringify -> parse on every replayed Journal event.
-    let deserializeValue (value: JsonValue) : Result<Envelope, string> =
-        deserializeCurrentEnvelopeValue value
+    let deserializeValue (value: JsonValue) : Result<Envelope, string> = deserializeCurrentEnvelopeValue value

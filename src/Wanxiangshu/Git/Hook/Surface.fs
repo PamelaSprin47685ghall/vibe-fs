@@ -35,3 +35,6 @@ module HookSurface =
     let installOrDiagnose (hooksDirectory: string) (kind: string) (shimBody: string) : string =
         HookDispatcher.installOrDiagnose hooksDirectory (kindOf kind) shimBody
         |> verdictName
+
+    let ensure (workspace: string) : bool =
+        HookDispatcher.ensure workspace |> Result.isOk

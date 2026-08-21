@@ -440,7 +440,9 @@ type internal SyncDelegateCallStore() as this =
                     TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
                 let acceptedRoot =
-                    TaskCompletionSource<AuthorityRootUserMessageId>(TaskCreationOptions.RunContinuationsAsynchronously)
+                    TaskCompletionSource<AuthorityRootUserMessageId>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    )
 
                 let call =
                     { Owner = owner

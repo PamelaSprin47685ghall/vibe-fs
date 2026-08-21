@@ -2,6 +2,7 @@
 // Fact values never cross into this semantic test zone.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import * as journalCodec from '../../../dist/Persistence/Journal/CodecSurface.js'
@@ -38,6 +39,18 @@ const mustOk = (result, label = 'result') => {
   assert.equal(result.ok, true, `${label} should be Ok: ${JSON.stringify(result.error)}`)
   return result.value
 }
+
+test('WHAT[DURABLE-EVENTS-016] durable fact vocabulary has no OpenCode infrastructure dependency', () => {
+  const readSource = (path) => readFileSync(new URL(`../../../${path}`, import.meta.url), 'utf8')
+  const envelope = readSource('src/Wanxiangshu/Persistence/Journal/Envelope.fs')
+  const fact = readSource('src/Wanxiangshu/Composition/Durable/Fact.fs')
+  const hostFacts = readSource('src/Wanxiangshu/Host/Facts.fs')
+
+  assert.doesNotMatch(envelope, /Wanxiangshu\.OpenCode/)
+  assert.doesNotMatch(fact, /Wanxiangshu\.OpenCode/)
+  assert.match(hostFacts, /namespace Wanxiangshu\.Host/)
+  assert.doesNotMatch(hostFacts, /Wanxiangshu\.OpenCode/)
+})
 
 test('WHAT[DURABLE-EVENTS-002] PERSIST_001_an_envelope_serializes_to_exactly_one_line', () => {
   const line = journalCodec.serialize(env({ seq: 7 }))

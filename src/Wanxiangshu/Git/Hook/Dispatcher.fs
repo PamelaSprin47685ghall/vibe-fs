@@ -137,6 +137,12 @@ module HookDispatcher =
         let packageRoot = dirname (dirname (dirname here))
         joinPath (joinPath (joinPath packageRoot "resources") "git") "wanxiang-hook.mjs"
 
+    let private remoteTrackingRefPattern () =
+        let marker = "__wanxiang_remote__"
+
+        StoreRef.remoteTracking marker
+        |> fun template -> template.Replace(marker, "[^/]+")
+
     let private shimBody kind =
         let runner = shellQuote (runnerPath ())
 
@@ -150,13 +156,14 @@ module HookDispatcher =
             | HookKind.ReferenceTransaction ->
                 [ "if [ \"${1:-}\" != \"committed\" ]; then exit 0; fi"
                   "wanxiang_stdin=$(cat)"
-                  "if ! printf '%s\\n' \"$wanxiang_stdin\" | grep -Eq '^[0-9a-fA-F]+[[:space:]]+[0-9a-fA-F]+[[:space:]]+refs/wanxiang/remotes/[^/]+/store$'; then exit 0; fi"
+                  sprintf
+                      "if ! printf '%%s\\n' \"$wanxiang_stdin\" | grep -Eq '^[0-9a-fA-F]+[[:space:]]+[0-9a-fA-F]+[[:space:]]+%s$'; then exit 0; fi"
+                      (remoteTrackingRefPattern ())
                   sprintf
                       "printf '%%s\\n' \"$wanxiang_stdin\" | exec /usr/bin/env node %s %s \"$@\""
                       runner
                       (hookRunnerArgument kind) ]
-            | HookKind.PrePush ->
-                [ sprintf "exec /usr/bin/env node %s %s \"$@\"" runner (hookRunnerArgument kind) ]
+            | HookKind.PrePush -> [ sprintf "exec /usr/bin/env node %s %s \"$@\"" runner (hookRunnerArgument kind) ]
 
         String.concat "\n" (body @ invocation @ [ "" ])
 
@@ -199,7 +206,10 @@ module HookDispatcher =
 
     let private tryGitConfig workspace key =
         try
-            let value = GitSubject.execIn workspace [| "config"; "--get"; key |] |> fun output -> output.Trim()
+            let value =
+                GitSubject.execIn workspace [| "config"; "--get"; key |]
+                |> fun output -> output.Trim()
+
             if String.IsNullOrWhiteSpace value then None else Some value
         with _ ->
             None
@@ -231,7 +241,9 @@ module HookDispatcher =
             None
 
     let private shortManagedControlPath commonDir =
-        let repoKey = HostDigest.sha256Hex commonDir |> fun digest -> digest.Substring(0, 12)
+        let repoKey =
+            HostDigest.sha256Hex commonDir |> fun digest -> digest.Substring(0, 12)
+
         let socketDir = joinPath (tempDirectory ()) ("wanxiang-ssh-" + repoKey)
         mkdirSync socketDir (createObj [ "recursive" ==> true; "mode" ==> 0o700 ])
 
@@ -240,25 +252,30 @@ module HookDispatcher =
         chmodSync socketDir 0o700
         joinPath socketDir "ssh-%C"
 
+    let private ensureUnixSshMultiplex workspace =
+        let commonDir = gitCommonDir workspace
+        let current = tryGitConfig workspace "core.sshCommand" |> Option.defaultValue "ssh"
+
+        let baseCommand =
+            match tryStripLegacyManagedCommand commonDir current with
+            | Some legacyBase -> Some legacyBase
+            | None when hasUserSshMultiplex current -> None
+            | None -> Some current
+
+        match baseCommand with
+        | None -> ()
+        | Some baseCommand ->
+            let controlPath = shortManagedControlPath commonDir
+            let managed = baseCommand + " " + multiplexSuffix controlPath
+
+            GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managed |]
+            |> ignore
+
     let private ensureSshMultiplex workspace =
         if platform = "win32" then
             ()
         else
-            let commonDir = gitCommonDir workspace
-            let current = tryGitConfig workspace "core.sshCommand" |> Option.defaultValue "ssh"
-
-            let baseCommand =
-                match tryStripLegacyManagedCommand commonDir current with
-                | Some legacyBase -> Some legacyBase
-                | None when hasUserSshMultiplex current -> None
-                | None -> Some current
-
-            match baseCommand with
-            | None -> ()
-            | Some baseCommand ->
-                let controlPath = shortManagedControlPath commonDir
-                let managed = baseCommand + " " + multiplexSuffix controlPath
-                GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managed |] |> ignore
+            ensureUnixSshMultiplex workspace
 
     let private ensureWorkspace workspace : Result<unit, string> =
         let hooksDir = hooksDirectory workspace

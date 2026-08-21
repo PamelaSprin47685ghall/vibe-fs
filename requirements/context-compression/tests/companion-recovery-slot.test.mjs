@@ -83,29 +83,40 @@ test('WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_B
 
 test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_new_prompt', () => {
   const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
-  const replace = workflow.slice(
-    workflow.indexOf('let private replaceFailedBloggerRequest'),
-    workflow.indexOf('let private continueBlogger'),
-  )
-  const send = workflow.slice(
-    workflow.indexOf('let private sendStagedBloggerContinuation'),
-    workflow.indexOf('let private replaceFailedBloggerRequest'),
-  )
 
-  assert.match(replace, /abandonContinuationContext[\s\S]*sendStagedBloggerContinuation/)
-  assert.match(send, /stageContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/)
+  assert.match(
+    workflow,
+    /let private replaceFailedBloggerRequest[\s\S]*abandonContinuationContext[\s\S]*sendStagedBloggerContinuation/,
+  )
+  assert.match(
+    workflow,
+    /sendStagedBloggerContinuation[\s\S]*taskResult[\s\S]*stageContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/,
+  )
 })
 
-test('WHAT[CONTEXT-COMPRESSION-023] WHAT[PAR-018] recovery_wait_is_durable_event_driven_and_time_independent', () => {
+const recoveryWaitSource = () => {
   const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
-  const wait = workflow.slice(
+  return workflow.slice(
     workflow.indexOf('let private hasOpenBloggerRequest'),
     workflow.indexOf('let private currentFallback'),
   )
+}
+
+test('WHAT[CONTEXT-COMPRESSION-023] recovery_wait_has_no_clock_or_process_local_correctness_state', () => {
+  const wait = recoveryWaitSource()
 
   assert.match(wait, /AgentJournal\.snapshotWithRevision/)
-  assert.match(wait, /BloggerCycleProjection\.tryOpenByBlogger/)
   assert.match(wait, /AgentJournal\.awaitChangeFromOrCancel/)
   assert.match(wait, /host\.Cancellation/)
+  assert.doesNotMatch(wait, /HasFlight|HasPendingOffer|TimeSpan|ITimerPort|\.Delay\b|deadline|timeout|sleep/i)
+})
+
+test('WHAT[PAR-018] recovery_continuation_waits_only_on_durable_open_producer_events', () => {
+  const wait = recoveryWaitSource()
+
+  assert.match(wait, /BloggerCycleProjection\.tryOpenByBlogger/)
+  assert.match(wait, /sessionHasFreshCoverage/)
+  assert.match(wait, /RecoveryMaterialState\.AwaitCommittedFact/)
+  assert.match(wait, /AgentJournal\.awaitChangeFromOrCancel/)
   assert.doesNotMatch(wait, /HasFlight|HasPendingOffer|TimeSpan|ITimerPort|\.Delay\b|deadline|timeout|sleep/i)
 })

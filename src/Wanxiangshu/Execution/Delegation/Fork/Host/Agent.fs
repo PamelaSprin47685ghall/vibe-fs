@@ -399,7 +399,8 @@ module HostForkAgent =
             }
         | Ok() ->
             task {
-                let run = runtime.InstallRun(agentId, childId, role, ?preparedHandoff = preparedHandoff)
+                let run =
+                    runtime.InstallRun(agentId, childId, role, ?preparedHandoff = preparedHandoff)
 
                 lock runtime.Gate (fun () -> runtime.Children.[agentId] <- childId)
 
@@ -822,8 +823,7 @@ module HostForkAgent =
                 ?renderedPrompt: string,
                 ?expectedToolCalls: int,
                 ?preparedHandoff: PreparedDelegationHandoff
-            )
-            : Task<Result<ForkResult, string>> =
+            ) : Task<Result<ForkResult, string>> =
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 // After join retires the prior work unit, reuse of the same

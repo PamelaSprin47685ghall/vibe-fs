@@ -181,10 +181,6 @@ module EnforcerContinuation =
             onExhausted ()
         | _ -> onContinue ()
 
-    let private ensureFlightOrSet (scope: IBloggerRuntimeHost) (sessionKey: string) (live: BloggerRequestContext) =
-        if not (scope.HasFlight sessionKey) then
-            scope.SetCurrentRequest(sessionKey, live)
-
     let private mainSealedNow (ctx: Context) (sessionKey: string) =
         AgentProjection.mainSealedForBlogger ctx.Owner (AgentJournal.snapshot ctx.Durable).AgentProjections
         && not (ctx.Scope.IsDrainOpen sessionKey)
@@ -454,31 +450,32 @@ module EnforcerContinuation =
     let private mainBlocks (ctx: Context) (mainSessionId: SessionId) (sessionKey: string) =
         BloggerRuntimeHost.blocksNew (Some ctx.Durable) mainSessionId ctx.Scope sessionKey
 
+    let private materializeCatchUp (ctx: Context) (live: BloggerRequestContext) : Task<Result<unit, string>> =
+        taskResult {
+            let! promptKey =
+                ProviderWireCapture.lastUserPromptKey ctx.RawMessages
+                |> Result.requireSome "next Blogger provider step has no physical PromptKey"
+
+            do!
+                BloggerCoordinator.stageContinuationContext ctx.Scope ctx.Durable live
+                |> TaskResult.mapError (fun reason -> "Blogger context materialize failed: " + reason)
+
+            do!
+                BloggerCoordinator.bindContinuationContext ctx.Durable live promptKey
+                |> TaskResult.mapError (fun reason -> "Blogger PromptKey bind failed: " + reason)
+        }
+
     let private resumeCatchUpWithLive
         (ctx: Context)
         (sessionKey: string)
         (live: BloggerRequestContext)
         : Task<ContinuationOutcome> =
         task {
-            match ProviderWireCapture.lastUserPromptKey ctx.RawMessages with
-            | None ->
-                return!
-                    fatalProjectRaw
-                        ctx
-                        sessionKey
-                        (Some live)
-                        "next Blogger provider step has no physical PromptKey"
-            | Some promptKey ->
-                match! BloggerCoordinator.stageContinuationContext ctx.Scope ctx.Durable live with
-                | Error reason ->
-                    return! fatalProjectRaw ctx sessionKey (Some live) ("Blogger context materialize failed: " + reason)
-                | Ok() ->
-                    match! BloggerCoordinator.bindContinuationContext ctx.Durable live promptKey with
-                    | Error reason ->
-                        return! fatalProjectRaw ctx sessionKey (Some live) ("Blogger PromptKey bind failed: " + reason)
-                    | Ok() ->
-                        let! rebuilt = resumeWithContext ctx live
-                        return ctx.Project rebuilt
+            match! materializeCatchUp ctx live with
+            | Error reason -> return! fatalProjectRaw ctx sessionKey (Some live) reason
+            | Ok() ->
+                let! rebuilt = resumeWithContext ctx live
+                return ctx.Project rebuilt
         }
 
     let private refreshGapAfterPark

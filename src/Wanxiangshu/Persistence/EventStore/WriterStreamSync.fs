@@ -86,7 +86,8 @@ module WriterStreamSync =
     [<Emit("String($0)")>]
     let private numberText (value: float) : string = jsNative
 
-    let retentionMilliseconds () = ProcessEventLog.writerRetentionMilliseconds ()
+    let retentionMilliseconds () =
+        ProcessEventLog.writerRetentionMilliseconds ()
 
     let isWriterActiveAt nowMs lastActivityMs =
         ProcessEventLog.isWriterActiveAt nowMs lastActivityMs
@@ -108,11 +109,13 @@ module WriterStreamSync =
             let parsed = numberOfString value
             if isFiniteNumber parsed then Some parsed else None
 
-    let private formatFloat (value: float) =
-        numberText value
+    let private formatFloat (value: float) = numberText value
 
-    let private parseExpiry value =
-        if value = "-" then None else tryParseFiniteFloat value
+    let private parseOptionalExpiry value =
+        if value = "-" then
+            Some None
+        else
+            tryParseFiniteFloat value |> Option.map Some
 
     let private parseCacheLine (line: string) =
         match line.Split('\t') with
@@ -147,11 +150,8 @@ module WriterStreamSync =
             && validHex 64 fingerprint
             && validHex 40 root
             ->
-            match nextExpiry with
-            | "-" -> Some(fingerprint, root, None)
-            | _ ->
-                tryParseFiniteFloat nextExpiry
-                |> Option.map (fun expiry -> fingerprint, root, Some expiry)
+            parseOptionalExpiry nextExpiry
+            |> Option.map (fun expiry -> fingerprint, root, expiry)
         | _ -> None
 
     let private cacheFromText (text: string) =
@@ -196,7 +196,8 @@ module WriterStreamSync =
         |> Option.filter (fun cache -> cache.Fingerprint = fingerprint && cacheTimeValid nowMs cache)
 
     let tryCachedLocalSnapshot (commonDir: string) : StoreSnapshot option =
-        tryCachedLocal commonDir (currentTimeMs ()) |> Option.map (fun cache -> cache.Root)
+        tryCachedLocal commonDir (currentTimeMs ())
+        |> Option.map (fun cache -> cache.Root)
 
     let private sameRoot (left: StoreSnapshot) (right: StoreSnapshot) =
         RootOid.value left.RootOid = RootOid.value right.RootOid
@@ -212,7 +213,8 @@ module WriterStreamSync =
     // Keep OID reuse as an explicit primitive: near-equal sync paths should be
     // visibly and mechanically tied to the validated stat cache.
     let private cachedOid (cacheFiles: Map<string, CachedFile>) name statIdentity =
-        exactCached cacheFiles name statIdentity |> Option.map (fun cached -> cached.Oid)
+        exactCached cacheFiles name statIdentity
+        |> Option.map (fun cached -> cached.Oid)
 
     let private resolveBlobOid (raw: IGitRawStore) (readBytes: string -> byte[]) cacheFiles name statIdentity =
         match cachedOid cacheFiles name statIdentity with
@@ -249,6 +251,12 @@ module WriterStreamSync =
         (cacheFiles: Map<string, CachedFile>)
         (metadata: ProcessEventLog.WriterPhysicalMetadata)
         =
+        let activityForWrittenBlob oid =
+            Map.tryFind metadata.Name cacheFiles
+            |> Option.filter (fun cached -> cached.Oid = oid)
+            |> Option.bind _.LastActivityMs
+            |> Option.defaultValue metadata.LastActivityMs
+
         task {
             match exactCached cacheFiles metadata.Name metadata.StatIdentity with
             | Some cached ->
@@ -262,19 +270,13 @@ module WriterStreamSync =
             | None ->
                 let! oid = raw.WriteBlob(ProcessEventLog.readWriterFileBytes commonDir metadata.Name)
 
-                let activity =
-                    match Map.tryFind metadata.Name cacheFiles with
-                    | Some cached when cached.Oid = oid ->
-                        cached.LastActivityMs |> Option.defaultValue metadata.LastActivityMs
-                    | _ -> metadata.LastActivityMs
-
                 return
                     { Entry =
                         { Mode = blobMode
                           Name = metadata.Name
                           Oid = oid }
                       StatIdentity = metadata.StatIdentity
-                      LastActivityMs = activity }
+                      LastActivityMs = activityForWrittenBlob oid }
         }
 
     let private materializeWriters
@@ -319,26 +321,33 @@ module WriterStreamSync =
                   LastActivityMs = lastActivity })
         | _ -> None
 
+    let private addManifestLine state line =
+        result {
+            let! manifest = state
+
+            let! name, entry =
+                parseManifestLine line
+                |> Result.requireSome "writer manifest contains a malformed entry"
+
+            do!
+                if Map.containsKey name manifest then
+                    Error(sprintf "writer manifest contains duplicate entry: %s" name)
+                else
+                    Ok()
+
+            return Map.add name entry manifest
+        }
+
+    let private parseManifestLines lines =
+        lines |> Array.skip 1 |> Array.fold addManifestLine (Ok Map.empty)
+
     let private writerManifestFromText (text: string) =
         let lines = text.Trim().Split('\n', StringSplitOptions.RemoveEmptyEntries)
 
         if lines.Length = 0 || lines.[0] <> writerManifestVersion then
             Error "writer manifest has an unknown or missing version"
         else
-            lines
-            |> Array.skip 1
-            |> Array.fold
-                (fun state line ->
-                    result {
-                        let! manifest = state
-
-                        match parseManifestLine line with
-                        | None -> return! Error "writer manifest contains a malformed entry"
-                        | Some(name, _) when Map.containsKey name manifest ->
-                            return! Error(sprintf "writer manifest contains duplicate entry: %s" name)
-                        | Some(name, entry) -> return Map.add name entry manifest
-                    })
-                (Ok Map.empty)
+            parseManifestLines lines
 
     let private nextExpiry (writers: MaterializedWriter list) =
         writers
@@ -371,8 +380,7 @@ module WriterStreamSync =
             let root = RootOid.value snapshot.RootOid |> GitObjectId.value
             let payloadStatByName = Map.ofList payloadStats
 
-            let expiry =
-                nextExpiry writers |> Option.map formatFloat |> Option.defaultValue "-"
+            let expiry = nextExpiry writers |> Option.map formatFloat |> Option.defaultValue "-"
 
             let body =
                 [ yield String.concat "\t" [ materializationCacheVersion; fingerprint; root; expiry ]
@@ -387,7 +395,8 @@ module WriterStreamSync =
 
     let private removeExpiredLocalWriters nowMs (writers: MaterializedWriter list) commonDir =
         let active, expired =
-            writers |> List.partition (fun writer -> isWriterActiveAt nowMs writer.LastActivityMs)
+            writers
+            |> List.partition (fun writer -> isWriterActiveAt nowMs writer.LastActivityMs)
 
         expired
         |> List.iter (fun writer -> ProcessEventLog.removeWriterFile commonDir writer.Entry.Name)
@@ -440,7 +449,9 @@ module WriterStreamSync =
                 |> List.choose (fun writer ->
                     retainedStats
                     |> Map.tryFind writer.Entry.Name
-                    |> Option.map (fun stat -> { writer with StatIdentity = stat.StatIdentity }))
+                    |> Option.map (fun stat ->
+                        { writer with
+                            StatIdentity = stat.StatIdentity }))
 
             writeMaterializationCache commonDir snapshot retainedWriters payloadStats payloadEntries
             return snapshot
@@ -482,28 +493,26 @@ module WriterStreamSync =
         (raw: IGitRawStore)
         (entry: TreeEntry option)
         : Task<Result<Map<string, WriterManifestEntry> option, ConvergeError>> =
+        let parseManifestBytes (bytes: byte[]) =
+            let text = Encoding.UTF8.GetString bytes
+
+            if text = "v1" || text.StartsWith("v1\n", StringComparison.Ordinal) then
+                Ok None
+            else
+                text |> writerManifestFromText |> Result.map Some |> Result.mapError asStorage
+
+        let readManifestEntry manifest =
+            taskResult {
+                do! requireBlobMode manifest
+                let! bytesOpt = TaskResultCE.ofTask (raw.ReadObject manifest.Oid)
+                let! bytes = bytesOpt |> Result.requireSome (asStorage "missing writer-manifest blob")
+                return! parseManifestBytes bytes
+            }
+
         taskResult {
             match entry with
             | None -> return None
-            | Some manifest ->
-                do! requireBlobMode manifest
-                let! bytesOpt = TaskResultCE.ofTask (raw.ReadObject manifest.Oid)
-
-                match bytesOpt with
-                | None -> return! Error(asStorage "missing writer-manifest blob")
-                | Some bytes ->
-                    let text = Encoding.UTF8.GetString bytes
-
-                    if text = "v1" || text.StartsWith("v1\n", StringComparison.Ordinal) then
-                        // v1 encoded producer/fetch file mtime, not durable Journal
-                        // observation time. It cannot participate in v2 retention.
-                        return None
-                    else
-                        return!
-                            text
-                            |> writerManifestFromText
-                            |> Result.map Some
-                            |> Result.mapError asStorage
+            | Some manifest -> return! readManifestEntry manifest
         }
 
     let private manifestForEntry (manifest: Map<string, WriterManifestEntry>) (entry: TreeEntry) =
@@ -522,12 +531,10 @@ module WriterStreamSync =
             | Some info -> isWriterActiveAt nowMs info.LastActivityMs
             | None -> false)
 
-    let private validateManifestCoverage
-        (manifest: Map<string, WriterManifestEntry>)
-        (entries: TreeEntry list)
-        =
+    let private validateManifestCoverage (manifest: Map<string, WriterManifestEntry>) (entries: TreeEntry list) =
         let missingOrMismatched =
-            entries |> List.tryFind (fun entry -> manifestForEntry manifest entry |> Option.isNone)
+            entries
+            |> List.tryFind (fun entry -> manifestForEntry manifest entry |> Option.isNone)
 
         match missingOrMismatched with
         | Some entry -> Error(asStorage (sprintf "writer manifest does not bind writer blob: %s" entry.Name))
@@ -541,15 +548,16 @@ module WriterStreamSync =
         (manifest: Map<string, WriterManifestEntry>)
         (entry: TreeEntry)
         =
-        match Map.tryFind entry.Name cacheFiles, Map.tryFind entry.Name currentStats with
-        | Some cached, Some currentStat when
+        match
+            Map.tryFind entry.Name cacheFiles, Map.tryFind entry.Name currentStats, manifestForEntry manifest entry
+        with
+        | Some cached, Some currentStat, Some remoteInfo when
             entry.Mode = blobMode
             && cached.StatIdentity = currentStat
             && cached.Oid = entry.Oid
             ->
-            match manifestForEntry manifest entry, cached.LastActivityMs with
-            | Some remoteInfo, Some localActivity -> remoteInfo.LastActivityMs <> localActivity
-            | _ -> false
+            cached.LastActivityMs
+            |> Option.exists (fun localActivity -> remoteInfo.LastActivityMs <> localActivity)
         | _ -> true
 
     let private changedRemoteEntries
@@ -608,6 +616,7 @@ module WriterStreamSync =
                 match manifestOpt with
                 | None -> Ok()
                 | Some _ -> validateManifestCoverage manifest writerEntries
+
             let writerStats = ProcessEventLog.writerPhysicalStats commonDir |> Map.ofList
 
             let neededWriterEntries =
@@ -618,10 +627,11 @@ module WriterStreamSync =
                     retainedEntries
 
             let! writerBlobs = readBlobList raw neededWriterEntries
-            let entryByName = retainedEntries |> List.map (fun entry -> entry.Name, entry) |> Map.ofList
 
-            let remoteWriters =
-                writerBlobs |> List.map (writerFromBlob manifest entryByName)
+            let entryByName =
+                retainedEntries |> List.map (fun entry -> entry.Name, entry) |> Map.ofList
+
+            let remoteWriters = writerBlobs |> List.map (writerFromBlob manifest entryByName)
 
             let! payloadEntries = readRequiredTree raw payloadTree.Oid "payloads"
             let payloadStats = ProcessEventLog.payloadPhysicalStats commonDir |> Map.ofList
@@ -655,7 +665,8 @@ module WriterStreamSync =
                 rootEntries
                 |> List.tryFind (fun entry -> entry.Name = "payloads" && entry.Mode = treeMode)
 
-            let manifest = rootEntries |> List.tryFind (fun entry -> entry.Name = "writer-manifest")
+            let manifest =
+                rootEntries |> List.tryFind (fun entry -> entry.Name = "writer-manifest")
 
             match writers, payloads with
             | Some writerTree, Some payloadTree ->

@@ -96,6 +96,14 @@ type PluginBloggerScope() =
     // DSL-MUTABLE: single-flight — physical drain-window slot
     let drainWindows = Dictionary<string, DrainWindow>()
 
+    let parkExistingOrCreate sessionId =
+        match parked.TryGetValue sessionId with
+        | true, existing -> existing.Completion
+        | false, _ ->
+            let created = ParkedTransform(sessionId)
+            parked.[sessionId] <- created
+            created.Completion
+
     interface IBloggerRuntimeHost with
         member _.Cancellation = shutdown.Token
 
@@ -105,13 +113,7 @@ type PluginBloggerScope() =
                 | true, context ->
                     pendingOffer.Remove sessionId |> ignore
                     Task.FromResult(ParkWake.MaterialAvailable context)
-                | false, _ ->
-                    match parked.TryGetValue sessionId with
-                    | true, existing -> existing.Completion
-                    | false, _ ->
-                        let created = ParkedTransform(sessionId)
-                        parked.[sessionId] <- created
-                        created.Completion)
+                | false, _ -> parkExistingOrCreate sessionId)
 
         member this.CancelParked(sessionId: string) : unit =
             lock parkedGate (fun () ->
@@ -209,4 +211,3 @@ type PluginBloggerScope() =
             drainWindows.Clear())
 
         shutdown.Dispose()
-

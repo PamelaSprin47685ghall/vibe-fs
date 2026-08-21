@@ -56,7 +56,6 @@
     <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
     <Compile Include="Foundation/Outcome.fs"/>
     <Compile Include="Requirement/Grounding/Model.fs"/>
-    <Compile Include="OpenCode/Host/RequirementGrounding/Model.fs"/>
     <Compile Include="Interaction/Authority/Facts.fs"/>
     <Compile Include="Interaction/Attention/Facts.fs"/>
     <Compile Include="Interaction/Concern/Facts.fs"/>
@@ -67,7 +66,7 @@
     <Compile Include="Context/Companion/Facts.fs"/>
     <Compile Include="Execution/Fission/Facts.fs"/>
     <Compile Include="Change/Facts.fs"/>
-    <Compile Include="OpenCode/Host/Facts.fs"/>
+    <Compile Include="Host/Facts.fs"/>
     <Compile Include="Mission/Manager/Life/Facts.fs"/>
     <Compile Include="Mission/Obligation/Todo/Model.fs"/>
     <Compile Include="Mission/Obligation/Todo/Facts.fs"/>
@@ -79,7 +78,7 @@
     <Compile Include="Context/Companion/Fact.fs"/>
     <Compile Include="Execution/Fission/Fact.fs"/>
     <Compile Include="Change/Fact.fs"/>
-    <Compile Include="OpenCode/Host/Fact.fs"/>
+    <Compile Include="Host/Fact.fs"/>
     <Compile Include="Foundation/Temporal.fs"/>
     <Compile Include="Participant/Persona/Catalog.fs"/>
     <Compile Include="Participant/Provider/Language.fs"/>

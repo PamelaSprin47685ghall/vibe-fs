@@ -23,7 +23,10 @@ module ForkToolSurface =
         let children = ResizeArray<OpenCodeChildInfo>()
         let listeners = Dictionary<string, ResizeArray<TerminalCompletionListener>>()
         let prompts = Dictionary<string, ResizeArray<string>>()
-        let promptWaiters = Dictionary<string, ResizeArray<int * TaskCompletionSource<unit>>>()
+
+        let promptWaiters =
+            Dictionary<string, ResizeArray<int * TaskCompletionSource<unit>>>()
+
         let physicalRoots = Dictionary<string, ResizeArray<string>>()
         // DSL-MUTABLE: algorithm-scratch — exactly one next Host send outcome in the harness
         let mutable nextSendOutcome: SendOutcome option = None
@@ -63,9 +66,14 @@ module ForkToolSurface =
             | false, _ -> ()
             | true, waiters ->
                 let admitted = promptCountForKey key
-                let ready, pending = waiters |> Seq.toList |> List.partition (fun (target, _) -> admitted >= target)
+
+                let ready, pending =
+                    waiters |> Seq.toList |> List.partition (fun (target, _) -> admitted >= target)
+
                 retainPromptWaiters key pending
-                ready |> List.iter (fun (_, waiter) -> AsyncSupport.trySetResult waiter () |> ignore)
+
+                ready
+                |> List.iter (fun (_, waiter) -> AsyncSupport.trySetResult waiter () |> ignore)
 
         let subscribe sessionId listener =
             let key = SessionId.value sessionId
@@ -97,7 +105,9 @@ module ForkToolSurface =
             if promptCountForKey key >= count then
                 Task.FromResult(()) :> Task
             else
-                let waiter = TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+                let waiter =
+                    TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
                 waitersOf key |> fun values -> values.Add(count, waiter)
                 waiter.Task :> Task
 
@@ -143,6 +153,7 @@ module ForkToolSurface =
             member _.AbortSession _ =
                 abortCount <- abortCount + 1
                 Task.FromResult(Ok())
+
             member _.InterruptAttempt _ = Task.FromResult(Ok())
             member _.IsManagedChild _ = true
             member _.AbortChildren _ = Task.FromResult()
@@ -158,7 +169,8 @@ module ForkToolSurface =
                 |> Task.FromResult
 
             member _.CreateChildSession(parent, options) =
-                let childId = SessionId.create (sprintf "%s-fork-child-%d" (SessionId.value parent) (children.Count + 1))
+                let childId =
+                    SessionId.create (sprintf "%s-fork-child-%d" (SessionId.value parent) (children.Count + 1))
 
                 children.Add
                     { SessionId = childId
@@ -182,12 +194,7 @@ module ForkToolSurface =
                 |> Option.defaultValue sessionId
 
     type private ForkHarness
-        (
-            journal: AgentJournal,
-            scope: ToolRuntimeScope,
-            sessions: ForkSessionPort,
-            ownerPrefix: string
-        ) =
+        (journal: AgentJournal, scope: ToolRuntimeScope, sessions: ForkSessionPort, ownerPrefix: string) =
         member _.Journal = journal
         member _.Scope = scope
         member _.Sessions = sessions
@@ -199,7 +206,8 @@ module ForkToolSurface =
 
     let private createJournal (directory: string) : Task<AgentJournal> =
         task {
-            let store = EventStore.createLocal directory (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
+            let store =
+                EventStore.createLocal directory (Guid.NewGuid().ToString("N")) (CanonicalIntegrator.create ())
 
             match!
                 EventStoreJournalWriter.resumeOrCreate (
@@ -331,11 +339,7 @@ module ForkToolSurface =
 
         match harness.Sessions.LatestChild with
         | Some childId -> harness.Sessions.WaitForPromptCount(childId, count)
-        | None ->
-            task {
-                return raise (InvalidOperationException "fork surface has no child to await")
-            }
-            :> Task
+        | None -> task { return raise (InvalidOperationException "fork surface has no child to await") } :> Task
 
     let prompt (value: obj) (index: int) : obj =
         let harness = unbox<ForkHarness> value

@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Requirement.Grounding
 
 open Wanxiangshu.Host
+open Wanxiangshu.Foundation.Identity
 
 type GroundingMaterial = { Path: string; ResultBytes: string }
 
@@ -9,6 +10,28 @@ type GroundingSnapshot =
       PackageName: string
       Digest: string
       Materials: GroundingMaterial list }
+
+type RequirementGroundingAnchoredRead =
+    { CallId: ToolCallId
+      Path: string
+      ArgsJson: string
+      ResultBytes: string
+      CursorResultBytes: string }
+
+type RequirementGroundingMaterialObserved =
+    { Workspace: string
+      PackageName: string
+      Path: string
+      Digest: string }
+
+type RequirementGroundingOccurrence =
+    { Workspace: string
+      PackageName: string
+      Digest: string
+      Ordinal: int64
+      Reads: RequirementGroundingAnchoredRead list
+      CallGap: TranscriptGap
+      ResultGap: TranscriptGap }
 
 module GroundingIdentity =
 

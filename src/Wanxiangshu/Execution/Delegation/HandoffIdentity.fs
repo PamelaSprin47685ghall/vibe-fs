@@ -20,4 +20,3 @@ module DelegationHandoffRoute =
         | SyncDelegateRole.Coder -> create "sync" (ReuseScopeId.value scope + ":coder")
 
     let value (DelegationHandoffRoute value) = value
-

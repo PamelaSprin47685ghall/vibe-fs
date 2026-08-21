@@ -83,7 +83,9 @@ module private AgentJournalInternals =
         (fromRevision: JournalRevision)
         (waiters: ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>)
         =
-        let tcs = TaskCompletionSource<JournalChange option>(TaskCreationOptions.RunContinuationsAsynchronously)
+        let tcs =
+            TaskCompletionSource<JournalChange option>(TaskCreationOptions.RunContinuationsAsynchronously)
+
         waiters.Add(fromRevision, tcs)
         tcs
 
@@ -126,7 +128,9 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
     let mutable revision = JournalRevision.create writer.LastCommittedLocalSeq
     // DSL-MUTABLE: resource — last journal change notification payload
     let mutable lastChange: JournalChange option = None
-    let waiters = ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>()
+
+    let waiters =
+        ResizeArray<JournalRevision * TaskCompletionSource<JournalChange option>>()
 
     member _.Writer = writer
     member _.RuntimeId = writer.RuntimeId

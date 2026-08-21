@@ -65,7 +65,6 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
-open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation.Identity
 
 /// Tip guidance body for Main auto-injected marker (without pair-programming trailer).

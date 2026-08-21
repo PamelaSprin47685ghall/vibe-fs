@@ -1,18 +1,14 @@
-namespace Wanxiangshu.OpenCode.Host
+namespace Wanxiangshu.Host
 
-open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Requirement.Grounding
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Requirement.Grounding
 
-/// Rulebook Main tip presentation for auto-injected guidance.
 [<RequireQualifiedAccess>]
 type TipPresentation =
     | Full
     | IdentityOnly
 
-/// Durable Host transcript facts owned by the Host boundary.
 type HostFactCases =
     | PairProgrammingGuidelineAnchored of
         {| SessionId: SessionId

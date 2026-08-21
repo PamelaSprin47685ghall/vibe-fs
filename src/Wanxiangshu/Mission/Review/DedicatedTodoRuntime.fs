@@ -240,11 +240,7 @@ module DedicatedTodoReviewerRuntime =
             managerSessionId,
             sessions,
             (fun childId range providerRun ->
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                    (Some journal)
-                    childId
-                    range
-                    providerRun),
+                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun (Some journal) childId range providerRun),
             ?journal = Some journal,
             onChildCreated =
                 (fun _ _ childId ->

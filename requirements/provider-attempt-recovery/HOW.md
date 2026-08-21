@@ -43,6 +43,6 @@ DEPENDS ON:
 | PAR-013 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
 | PAR-014 | `requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs` |
 | PAR-015 | `requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs` |
-| PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
+| PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` |
 | PAR-017 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |

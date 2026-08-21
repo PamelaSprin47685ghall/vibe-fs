@@ -144,13 +144,7 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe
-                    sessionPort
-                    eventPort
-                    journal
-                    strengthDurability
-                    scope
-                    reviewerContinuationPort
+                HostTurnObserver.observe sessionPort eventPort journal strengthDurability scope reviewerContinuationPort
 
             let onSnapshot = HostCompactionObserver.observe scope journal
 

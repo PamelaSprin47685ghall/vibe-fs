@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { ensure } from '../../../dist/Git/Hook/Dispatcher.js'
+import { ensure } from '../../../dist/Git/Hook/Surface.js'
 
 const read = (relative) => readFile(new URL(`../../../${relative}`, import.meta.url), 'utf8')
 
@@ -62,8 +62,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multip
     const base = 'ssh -F /dev/null -i /tmp/wxs-test-key'
     execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', base])
 
-    const first = ensure(repo)
-    assert.equal(first.tag, 0, `hook ensure failed: ${JSON.stringify(first)}`)
+    assert.equal(ensure(repo), true, 'hook ensure failed')
     const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
 
     assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
@@ -71,8 +70,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multip
     assert.match(configured, /ControlPersist=15s/)
     assert.match(configured, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
 
-    const second = ensure(repo)
-    assert.equal(second.tag, 0, `second hook ensure failed: ${JSON.stringify(second)}`)
+    assert.equal(ensure(repo), true, 'second hook ensure failed')
     const configuredAgain = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
     assert.equal(configuredAgain, configured, 'repeated ensure must not stack SSH multiplex options')
   } finally {
@@ -90,8 +88,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the obsolete long re
     const legacy = `${base} -o ControlMaster=auto -o ControlPersist=15s -o 'ControlPath=${join(commonDir, 'wanxiang', 'ssh-%C')}'`
     execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', legacy])
 
-    const verdict = ensure(repo)
-    assert.equal(verdict.tag, 0, `hook ensure failed: ${JSON.stringify(verdict)}`)
+    assert.equal(ensure(repo), true, 'hook ensure failed')
     const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
     assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
     assert.match(configured, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
@@ -108,8 +105,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer respects user-owned SSH multi
     execFileSync('git', ['init', '--quiet', repo])
     const userOwned = 'ssh -o ControlMaster=yes -o ControlPath=/tmp/user-owned-%C'
     execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', userOwned])
-    const verdict = ensure(repo)
-    assert.equal(verdict.tag, 0, `hook ensure failed: ${JSON.stringify(verdict)}`)
+    assert.equal(ensure(repo), true, 'hook ensure failed')
     const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
     assert.equal(configured, userOwned)
   } finally {
@@ -131,8 +127,7 @@ test('WHAT[DURABLE-CONVERGENCE-010] irrelevant reference transactions exit befor
 
   try {
     execFileSync('git', ['init', '--quiet', repo])
-    const verdict = ensure(repo)
-    assert.equal(verdict.tag, 0, `hook ensure failed: ${JSON.stringify(verdict)}`)
+    assert.equal(ensure(repo), true, 'hook ensure failed')
 
     const marker = join(repo, 'node-started')
     const bin = join(repo, 'bin')

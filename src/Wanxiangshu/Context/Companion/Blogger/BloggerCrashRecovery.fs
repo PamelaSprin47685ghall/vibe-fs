@@ -319,8 +319,8 @@ module BloggerCrashRecovery =
         }
 
     /// Single-flight gate, same lifecycle as PromptRecovery (not in constructor).
-    type RecoveryGate
-        (journal: AgentJournal option, host: IBloggerRuntimeHost, snapshotOpt: ISessionSnapshotPort option) =
+    type RecoveryGate(journal: AgentJournal option, host: IBloggerRuntimeHost, snapshotOpt: ISessionSnapshotPort option)
+        =
 
         let gate = obj ()
         // DSL-MUTABLE: single-flight — memoized reconcile task (latch, not a stage)

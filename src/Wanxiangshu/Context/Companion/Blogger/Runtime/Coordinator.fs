@@ -441,6 +441,7 @@ module BloggerCoordinator =
             // No cell: decideMaterial routes from HasParked + HasFlight only.
             task {
                 let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
+
                 return!
                     startMainOrNone
                         scope

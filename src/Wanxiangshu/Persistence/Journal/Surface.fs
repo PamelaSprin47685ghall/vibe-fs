@@ -12,7 +12,7 @@ open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Host
 
 /// Opaque capability for one journal projection and its local writer.
 type JournalHandle private (journal: AgentJournal, release: unit -> unit) =

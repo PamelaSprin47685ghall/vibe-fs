@@ -63,11 +63,7 @@ module HostForkRunLifecycle =
                 )
             )
 
-    let private durableDispatchObservation
-        (durable: AgentJournal)
-        (childId: SessionId)
-        (payloadDigest: string)
-        =
+    let private durableDispatchObservation (durable: AgentJournal) (childId: SessionId) (payloadDigest: string) =
         let projections = (AgentJournal.snapshot durable).AgentProjections
 
         match PromptAuthorityLedger.dispatchStatusFor childId payloadDigest projections with
@@ -131,6 +127,7 @@ module HostForkRunLifecycle =
         : Task<AgentOwnerDispatchOutcome> =
         task {
             let svc = PromptDispatcher.forJournal durable
+
             let! sent =
                 svc.SendAgentOwnerRoot
                     sessions
@@ -177,9 +174,7 @@ module HostForkRunLifecycle =
         : Task<AgentOwnerDispatchOutcome> =
         match journal with
         | None ->
-            Task.FromResult(
-                AgentOwnerDispatchOutcome.Rejected "No journal: an AgentOwnerRoot prompt cannot be claimed"
-            )
+            Task.FromResult(AgentOwnerDispatchOutcome.Rejected "No journal: an AgentOwnerRoot prompt cannot be claimed")
         | Some durable -> sendAgentOwnerRootWithJournal sessions durable childId agent directory prompt onAccepted
 
     /// PROMPT-006: every child prompt is an AgentOwnerRoot through the Dispatcher.
@@ -421,7 +416,10 @@ module HostForkRunLifecycle =
             }
             :> Task
         | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
-        | Failed stop when stop.Reason = "MISSING_FINAL_REPORT" || stop.Reason.Contains("MISSING_FINAL_REPORT") ->
+        | Failed stop when
+            stop.Reason = "MISSING_FINAL_REPORT"
+            || stop.Reason.Contains("MISSING_FINAL_REPORT")
+            ->
             // FALLBACK-008 / P0-RECOVERY-JOIN-001: a missing final report is not a
             // proven terminal failure. The subagent auto-retries and continues (its
             // reconcile loop keeps repairing the empty terminal); delivering a

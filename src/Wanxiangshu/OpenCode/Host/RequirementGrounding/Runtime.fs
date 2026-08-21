@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.OpenCode.Host
+open Wanxiangshu.Host
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Requirement.Grounding
 

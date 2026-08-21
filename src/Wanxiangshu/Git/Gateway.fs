@@ -176,17 +176,21 @@ module GitGateway =
                 | Error _ -> return! Error ConvergeError.ConvergeRetryExhausted
             }
 
-        taskResult {
-            match observedRemote with
-            | Some snapshot ->
-                let expected = Some(RootOid.value snapshot.RootOid)
-                return! loop (Some snapshot) expected true maxRetries
-            | None ->
+        let convergeWithoutObservedRemote () =
+            taskResult {
                 let! snapshot, expected = readTrackedRemote raw remote |> TaskResultCE.ofTask
 
                 match snapshot, WriterStreamSync.tryCachedLocalSnapshot commonDir with
                 | Some tracked, Some cached when sameSnapshot tracked cached -> return cached
                 | _ -> return! loop snapshot expected false maxRetries
+            }
+
+        taskResult {
+            match observedRemote with
+            | Some snapshot ->
+                let expected = Some(RootOid.value snapshot.RootOid)
+                return! loop (Some snapshot) expected true maxRetries
+            | None -> return! convergeWithoutObservedRemote ()
         }
 
     /// Estimate for hook-process Git transport (fetch / push / ls-remote).
