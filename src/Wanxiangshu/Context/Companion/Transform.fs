@@ -69,6 +69,21 @@ open HostMessageProjection
 
 module CompanionTransform =
 
+    let private requireCanonicalProjection result =
+        match result with
+        | Ok value -> value
+        | Error error -> raise (InvalidOperationException error)
+
+    let private materializeCanonicalProjection
+        (journal: AgentJournal option)
+        (xTrace: XTraceProjectionState)
+        : Task<ProviderProjection.ProviderSemanticProjection> =
+        match journal with
+        | None -> Task.FromResult XTraceMaterialization.empty
+        | Some durable ->
+            XTraceMaterialization.currentProjection durable xTrace
+            |> TaskValue.map requireCanonicalProjection
+
     let private restoredBloggerId (journal: AgentJournal option) (sessionId: string) =
         journal
         |> Option.bind (fun j ->
@@ -137,6 +152,7 @@ module CompanionTransform =
         (sessionId: string)
         (blog: BlogProjectionState)
         (xTrace: XTraceProjectionState)
+        (observedEpoch: PrefixEpochId)
         (projection: ProviderProjection.ProviderSemanticProjection)
         : Task<unit> =
         task {
@@ -146,16 +162,21 @@ module CompanionTransform =
             if hasMaterial then
                 let! bloggerId = companion.EnsureBloggerAsync()
 
-                let! _ =
-                    BloggerCoordinator.onMainMaterial
-                        scope.BloggerRuntimeHost
-                        companion
+                match
+                    BloggerMainContext.fromProjection
                         journal
                         (SessionId.create sessionId)
                         bloggerId
+                        observedEpoch
+                        blog
+                        xTrace
                         projection
+                with
+                | None -> return ()
+                | Some context ->
+                    let! _ = BloggerCoordinator.onMainContext scope.BloggerRuntimeHost companion journal context
 
-                ()
+                    return ()
         }
 
     let private transformNonSatellite
@@ -177,13 +198,9 @@ module CompanionTransform =
             // Host view unchanged (CTX-002). Coordinator owns all Blogger effects.
             companion.TransformRaw rawMessages |> replaceMessagesInPlace rawOutObj
 
-            let projection =
-                ProviderWireCapture.decodeMessageView rawMessages
-                |> ProviderProjection.toSemantic
-
             // No child until there is a real X gap. Empty fixture transforms
             // (HOST-009 positional hooks) must not require Host transport.
-            let blog, xTrace =
+            let blog, xTrace, observedEpoch =
                 match journal with
                 | Some j ->
                     let sessions = (AgentJournal.snapshot j).AgentProjections.Sessions
@@ -194,10 +211,16 @@ module CompanionTransform =
                      |> Option.defaultValue BlogProjection.empty),
                     (session
                      |> Option.bind (fun s -> s.XTrace)
-                     |> Option.defaultValue XTraceProjection.empty)
-                | None -> companion.Memory.Blog, companion.Memory.XTrace
+                     |> Option.defaultValue XTraceProjection.empty),
+                    (session
+                     |> Option.bind (fun s -> s.PrefixEpoch)
+                     |> Option.map (fun epoch -> epoch.EpochId)
+                     |> Option.defaultValue PrefixEpochId.initial)
+                | None -> companion.Memory.Blog, companion.Memory.XTrace, PrefixEpochId.initial
 
-            do! updateMaterializedBlogger scope companion journal sessionId blog xTrace projection
+            let! projection = materializeCanonicalProjection journal xTrace
+
+            do! updateMaterializedBlogger scope companion journal sessionId blog xTrace observedEpoch projection
         }
 
     let private processSession

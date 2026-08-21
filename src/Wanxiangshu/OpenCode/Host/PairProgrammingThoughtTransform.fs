@@ -400,7 +400,7 @@ module PairProgrammingThoughtTransform =
     ///
     /// Anchor 不在当前真实消息里的 historical pair **不重放、不报错**。
     /// XWire prefix probe 用 FrozenRecordPrefix 替换已覆盖前缀时会 drop 那些
-    /// 消息（CTX-010 `DropLeading`）；被覆盖区里的 pair 属于被替换的前缀，
+    /// 消息（CTX-010 canonical `CutoffExclusive`）；被覆盖区里的 pair 属于被替换的前缀，
     /// 不应再注入 rewritten view，更不能因此 AbortSession 杀死 recovery slot。
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
     let cursorGuidanceSeparator = "\u0000\uFEFF"

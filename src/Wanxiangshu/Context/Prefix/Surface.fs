@@ -132,7 +132,7 @@ module PrefixSurface =
         | ProjectionIntent.ActivatePrefixEpoch value ->
             box
                 {| replacesPrefix = true
-                   dropLeading = value.DropLeading
+                   dropLeading = value.CutoffExclusive
                    memoryId = value.SyntheticMessageId
                    memoryText = value.Memory |}
         | _ ->

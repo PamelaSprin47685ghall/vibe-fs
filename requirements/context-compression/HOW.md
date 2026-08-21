@@ -12,14 +12,14 @@
 ### Blogger 压缩与连续追平
 
 1. **Delta 分块**：依据 200 KiB 上限按语义 part 边界切分，cutoff 仅在完整 turn 推进。
-2. **唯一 Main 重建**：`BloggerMainContext` 是 normal catch-up、AABB/crash refresh、Squash 后 Main 与失败 retry 的唯一 next-main 公式，统一 Opening floor、current XTrace generation、cursor、chunk 与 digest。
+2. **唯一 canonical-X Main 重建**：`XTraceMaterialization.currentProjection` 先从 durable current-generation XTrace 物化 canonical X；`BloggerMainContext` 再作为 normal catch-up、AABB/crash refresh、Squash 后 Main 与失败 retry 的唯一 next-main 公式，统一 Opening floor、cursor、chunk 与 digest。request-local provider presentation 永不参与 coverage proof。
 3. **失败本地 Squash**：BloggerMain 失败并 advance 到 primed 槽时，若 durable frames 可 squash，则 recovery workflow 当场关闭失败 request、materialize Squash、绑定新 PromptKey 并发送；不依赖未来主 X transform。
 4. **typed park event**：caught-up 不启动 timer。`AwaitMaterial` 只返回 `MaterialAvailable BloggerRequestContext | Cancelled`；offer-first material 被下一次 await 直接消费，parked offer 直接完成当前 waiter。wake 自带 material，不再返回 bool 后访问第二份 pending 状态。
 5. **durable recovery event**：WorkMain recovery 只读取 `snapshotWithRevision`。若 linked Blogger 有 durable open request 且 coverage 尚未严格前进，则通过 `AgentJournal.awaitChangeFromOrCancel` 订阅下一 committed fact；commit/abandon/coverage fact 到达后重算，plugin shutdown 则注销订阅并结束等待。没有 open producer 立即 retry。process-local flight/pending 与 wall clock 不参与 correctness。
 6. **连续 catch-up**：每次 cycle 提交后直接从当前 canonical coverage 与 XTrace Current 重新派生下一块；暂时无材料时等待 typed material/cancel event，不设置冻结上限或超时。
 7. **Host Compaction 收容**：观察到外部 compaction 时触发 `ContextReanchored`，推进 epoch 并将旧 horizon 的辅助注入可见性清空。
 8. **Opening floor**：Manager Life 只以真实 Opening 后的 `WorkRecordStart` 作为压缩下界；T1 commitment 仍可属于 WorkRecord 的 constitutive Opening，但不再获得 provider-context 的 raw 常驻权。
-9. **TodoWrite X 穿透**：X-wire 应用 synthetic prefix 时，在 `dropLeading` 范围内先收集 `todowrite` call id，再把含该 call 或对应 result 的原始 Host 消息穿透到 synthetic memory 与未覆盖 tail 之间；其余 dropped 历史继续由 Y replacement 取代。
+9. **Stable-identity X 穿透**：X-wire 的 cutoff 是 canonical XTrace semantic-turn boundary，不是本次 provider 数组下标。写回时由 XTrace provenance 解析被 coverage 证明覆盖的 Host message id，明确排除 raw Opening，并在这些覆盖消息中保留 `todowrite` call/result 原始回合；request-local synthetic/presentation row 不在 covered id set 中，因此不会移动 cutoff 或被误删。
 10. **Blogger materialization admission**：同一 Blogger 的 materialize / PromptKey bind / abandon 先取得 process-wide、跨 plugin instance 的 keyed admission；取得后再读 durable projection 并执行 open-request 转换。normal start 持有 admission 直到 durable materialize、原子 flight claim 与 send/bind 完成，provider retry 的 stage/bind/abandon 也复用同一 admission。flight claim 只允许空槽建立或同 RequestId 刷新；不同 RequestId 返回 conflict，不覆盖 owner。该 admission/flight 都是物理资源，不参与 recovery correctness proof。
 
 ## 依赖关系

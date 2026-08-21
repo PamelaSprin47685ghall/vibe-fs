@@ -380,6 +380,10 @@
       "owner": "semantic-trace"
     },
     {
+      "path": "src/Wanxiangshu/Context/Trace/Materialization.fs",
+      "owner": "semantic-trace"
+    },
+    {
       "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
       "owner": "semantic-trace"
     },

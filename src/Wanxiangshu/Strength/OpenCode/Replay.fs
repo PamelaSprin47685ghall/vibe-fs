@@ -194,22 +194,6 @@ module StrengthReplay =
             | None -> return []
         }
 
-    /// Host id inside stable provenance g:N/msg:{id}/part:P.
-    let private stableHostIdOfProvenance (provenance: string) =
-        let marker = "/msg:"
-        let start = provenance.IndexOf(marker, StringComparison.Ordinal)
-        let idStart = start + marker.Length
-
-        let stop =
-            if start < 0 then
-                -1
-            else
-                provenance.IndexOf("/part:", idStart, StringComparison.Ordinal)
-
-        if start < 0 then None
-        elif stop < 0 then None
-        else Some(provenance.Substring(idStart, stop - idStart))
-
     let private resolveObservedParts
         (durable: AgentJournal)
         (parts: XTracePartRef list)
@@ -274,8 +258,7 @@ module StrengthReplay =
 
         let byStableId =
             parts
-            |> List.filter (fun part ->
-                stableHostIdOfProvenance part.Provenance |> Option.exists expectedIdSet.Contains)
+            |> List.filter (fun part -> XTraceProjection.tryHostMessageId part |> Option.exists expectedIdSet.Contains)
 
         let expectedCount = StrengthLifecycle.framePartCount plan.Bundle
 

@@ -5,6 +5,8 @@
 // stale closure (COMPANION-011).
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
 
 import * as providerCodec from '../../../dist/OpenCode/Codec/ProviderProjectionSurface.js'
@@ -66,5 +68,22 @@ test('WHAT[PREFIX-STABILITY-009] CTX_011_step5_the_proof_reads_the_SNAPSHOT_not_
     cutoffDigest(sha256, before, 2),
     cutoffDigest(sha256, after, 2),
     'the same cutoff over a grown projection must not produce the same proof',
+  )
+})
+
+test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace_not_request_local_message_positions', () => {
+  const wireSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
+    'utf8',
+  )
+
+  assert.match(wireSource, /XTraceMaterialization\.currentProjection/)
+  assert.match(wireSource, /XTraceProjection\.tryTurnOfHostMessageId/)
+  assert.match(wireSource, /XTraceProjection\.hostMessageIdsBeforeTurn/)
+  assert.match(wireSource, /applyRenderedPrefixByHostIds/)
+  assert.doesNotMatch(
+    wireSource,
+    /ProviderWireCapture\.decodeMessageView\(rawMessages\)[\s\S]{0,500}ProjectionRenderer\.cutoffDigest/,
+    'step-5 proof must not hash the mutable request presentation',
   )
 })

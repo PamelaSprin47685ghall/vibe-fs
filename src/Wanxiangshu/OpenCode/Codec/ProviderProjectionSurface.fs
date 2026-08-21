@@ -332,6 +332,22 @@ module ProviderProjectionSurface =
             dropLeading
         |> List.toArray
 
+    let prependCompanionMemoryByHostIds
+        (raw: obj array)
+        (syntheticId: string)
+        (memory: string)
+        (coveredHostMessageIds: string array)
+        : obj array =
+        ProjectionMessageEdit.prependCompanionMemoryByHostIds
+            (if isNull raw then [] else Array.toList raw)
+            syntheticId
+            memory
+            (if isNull coveredHostMessageIds then
+                 []
+             else
+                 Array.toList coveredHostMessageIds)
+        |> List.toArray
+
     let private wireMessageOf value : ProviderProjection.WireMessage =
         { Role = string value?role
           Parts =

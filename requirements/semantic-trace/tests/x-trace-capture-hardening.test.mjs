@@ -45,6 +45,45 @@ test('WHAT[SEMANTIC-TRACE-007] COMPANION_007_capture_projection_is_idempotent_ac
   })
 })
 
+test('WHAT[SEMANTIC-TRACE-007] XTrace_materialization_is_the_canonical_X_view_not_the_latest_request_presentation', async () => {
+  await withJournal(async (handle) => {
+    await xTrace.captureProjection(
+      handle,
+      SEM,
+      xTrace.semantic({
+        messages: [
+          { role: 'user', parts: [xTrace.textPart('raw opening')] },
+          { role: 'assistant', parts: [xTrace.textPart('raw answer')] },
+        ],
+      }),
+    )
+
+    const first = await xTrace.materializeCurrentProjection(handle, SEM)
+    assert.deepEqual(first.messages, [
+      { role: 'user', parts: [{ kind: 'text', text: 'raw opening' }] },
+      { role: 'assistant', parts: [{ kind: 'text', text: 'raw answer' }] },
+    ])
+
+    // The same Host coordinates may be presented differently on a later request
+    // (manager narrative, request-local replay, grounding, etc.). XTrace is the
+    // already-accepted semantic history, so a presentation rewrite must not mutate
+    // the canonical X projection used by Blogger coverage / prefix proof.
+    await xTrace.captureProjection(
+      handle,
+      SEM,
+      xTrace.semantic({
+        messages: [
+          { role: 'user', parts: [xTrace.textPart('request-local rewritten opening')] },
+          { role: 'assistant', parts: [xTrace.textPart('raw answer')] },
+        ],
+      }),
+    )
+
+    const second = await xTrace.materializeCurrentProjection(handle, SEM)
+    assert.deepEqual(second, first)
+  })
+})
+
 test('WHAT[SEMANTIC-TRACE-001] COMPANION_007_capture_projection_appends_only_new_turns', async () => {
   await withJournal(async (handle) => {
     const first = await xTrace.captureProjection(

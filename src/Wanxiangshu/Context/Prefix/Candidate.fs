@@ -12,10 +12,12 @@ open Wanxiangshu.Foundation.Identity
 /// COMPANION-009: the frozen companion memory that replaces X's raw prefix, and
 /// the proof it may.
 ///
-/// `CutoffExclusive` is an index into X's provider-visible messages, so it is only
-/// meaningful under the numbering that produced `CoveredPrefixDigest`. Both travel
-/// together for that reason — a snapshot carrying one without the other could not
-/// be re-verified before use (COMPANION-011).
+/// `CutoffExclusive` is a canonical current-generation XTrace semantic-turn
+/// boundary. It is meaningful only under the XTrace materialization that produced
+/// `CoveredPrefixDigest`; Host write-back maps that boundary through stable message
+/// provenance rather than treating it as a request-local provider-array index.
+/// Both values travel together so a snapshot cannot be used without re-verifying
+/// the exact canonical history it claims to replace (COMPANION-011).
 ///
 /// Lives in Domain, not Journal: `AttemptExecutionProfile` carries a candidate
 /// (PROMPT-008), the fold validates one (PERSIST-010), and the candidate selector

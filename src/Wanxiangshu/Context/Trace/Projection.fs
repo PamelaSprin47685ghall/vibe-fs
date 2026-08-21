@@ -261,6 +261,71 @@ module XTraceProjection =
         | [] -> []
         | first :: rest -> collectCurrentGeneration first.Generation [ first ] rest
 
+    /// Stable Host message identity encoded by the capture provenance.
+    /// Positional legacy provenance intentionally returns None: callers may use a
+    /// bounded legacy fallback, but new prefix proof/writeback must not mistake a
+    /// request-local array index for historical identity.
+    let private nonBlankHostMessageId (messageId: string) : string option =
+        if System.String.IsNullOrWhiteSpace messageId then
+            None
+        else
+            Some messageId
+
+    let private hostMessageIdFrom (part: XTracePartRef) (idStart: int) : string option =
+        let slash = part.Provenance.IndexOf('/', idStart)
+        let idEnd = if slash < 0 then part.Provenance.Length else slash
+        let length = idEnd - idStart
+
+        if length <= 0 then
+            None
+        else
+            part.Provenance.Substring(idStart, length) |> nonBlankHostMessageId
+
+    let tryHostMessageId (part: XTracePartRef) : string option =
+        let marker = "/msg:"
+        let start = part.Provenance.IndexOf(marker, System.StringComparison.Ordinal)
+
+        if start < 0 then
+            None
+        else
+            hostMessageIdFrom part (start + marker.Length)
+
+    /// Canonical semantic turn occupied by one physical Host message in the
+    /// current reanchor generation.
+    let tryTurnOfHostMessageId (messageId: string) (state: XTraceProjectionState) : int option =
+        state
+        |> parts
+        |> currentGenerationParts
+        |> List.tryPick (fun part ->
+            match tryHostMessageId part with
+            | Some stable when stable = messageId -> Some part.Turn
+            | _ -> None)
+
+    /// The first stable user message in the current Host generation is the raw
+    /// session Opening. Same-session prefix replacement must never delete it;
+    /// WORK-RECORD-007 renders frozen-prefix records with includeOpening=false.
+    let tryOpeningHostMessageId (state: XTraceProjectionState) : string option =
+        state
+        |> parts
+        |> currentGenerationParts
+        |> List.tryPick (fun part ->
+            if part.Role.Equals("user", System.StringComparison.OrdinalIgnoreCase) then
+                tryHostMessageId part
+            else
+                None)
+
+    /// Stable physical messages whose canonical X semantic turn is strictly
+    /// before cutoff. Distinct preserves encounter order, so prefix writeback can
+    /// delete exactly the historical rows proved by XTrace without moving an
+    /// unrelated request-local presentation row across the boundary.
+    let hostMessageIdsBeforeTurn (cutoffExclusive: int) (state: XTraceProjectionState) : string list =
+        state
+        |> parts
+        |> currentGenerationParts
+        |> List.filter (fun part -> part.Turn < cutoffExclusive)
+        |> List.choose tryHostMessageId
+        |> List.distinct
+
     /// Map an ingest cursor (sequence of the last COVERED part) to the semantic
     /// cursor of the first UNCOVERED part. `>` not `>=`: the coverage sequence
     /// names a part already consumed, so the delta starts strictly after it.

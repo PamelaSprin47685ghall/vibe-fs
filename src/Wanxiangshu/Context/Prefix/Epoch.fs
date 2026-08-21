@@ -145,9 +145,10 @@ module PrefixEpochProjection =
     /// PERSIST-010 `ContextReanchored`: HOST-006 containment.
     ///
     /// Retirement, not replacement. The projection cannot repoint the snapshot at a
-    /// position after the Host summary: `CutoffExclusive` is an index in the voided
-    /// numbering, and the Companion may have been behind the Host when compaction
-    /// happened, so any new index would be a claim the journal cannot support.
+    /// position after the Host summary: `CutoffExclusive` belongs to the voided
+    /// current-generation XTrace semantic-turn numbering, and the Companion may have
+    /// been behind the Host when compaction happened, so any new cutoff would be a
+    /// claim the journal cannot support.
     ///
     /// The epoch still advances. This is a real cold boundary — the provider-visible
     /// prefix changed and the seal barrier broke — and COMPANION-009's byte-stability

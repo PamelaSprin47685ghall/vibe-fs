@@ -153,7 +153,9 @@ module PluginTransforms =
         (projectionSessionIdOpt: string option)
         (outObj: obj)
         : TransformMode =
-        match branches.IsExplicitResume projectionSessionIdOpt outObj, branches.ReplicaRuntime projectionSessionIdOpt with
+        match
+            branches.IsExplicitResume projectionSessionIdOpt outObj, branches.ReplicaRuntime projectionSessionIdOpt
+        with
         | true, _ -> ExplicitResumeDisclosure
         | false, Some runtime -> StrengthReplica runtime
         | false, None -> Ordinary
@@ -217,7 +219,9 @@ module PluginTransforms =
                     wired.RegisterOwned(SessionId.value bloggerId)
                     wired.BindActiveRun bloggerId Role.Blogger None))
                 SharedState.RootWorkspace
-                (fun projectionSessionIdOpt outObj -> ExplicitResumeSuppression.isCurrentMaterial outObj || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)
+                (fun projectionSessionIdOpt outObj ->
+                    ExplicitResumeSuppression.isCurrentMaterial outObj
+                    || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)
           ApplyXWire = XWire.applyTransform snapshotOpt journal scope
           ApplyEnforcerContinuation =
             fun projectionSessionIdOpt outObj ->
@@ -261,9 +265,16 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let wired = host.Wired
 
-        { IsExplicitResume = fun projectionSessionIdOpt outObj -> ExplicitResumeSuppression.isCurrentMaterial outObj || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj
+        { IsExplicitResume =
+            fun projectionSessionIdOpt outObj ->
+                ExplicitResumeSuppression.isCurrentMaterial outObj
+                || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj
           RegisterOwned = wired.RegisterOwned
-          ReplicaRuntime = fun projectionSessionIdOpt -> match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime | _ -> None
+          ReplicaRuntime =
+            fun projectionSessionIdOpt ->
+                match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
+                | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
+                | _ -> None
           ReplicaXWire = XWire.applyTransform snapshotOpt journal scope
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages
           ExplicitResumeSanitize = HostMessageProjection.sanitizeOutputMessages }

@@ -418,6 +418,7 @@
     <Compile Include="Interaction/Repair/CompletedTurn.fs"/>
     <Compile Include="Interaction/Repair/CompletedTurnSurface.fs"/>
     <Compile Include="Context/Trace/Capture.fs"/>
+    <Compile Include="Context/Trace/Materialization.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocality.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoLocalitySurface.fs"/>
     <Compile Include="Mission/Obligation/LedgerWorkflow.fs"/>

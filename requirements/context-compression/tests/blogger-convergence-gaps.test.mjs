@@ -179,10 +179,16 @@ test('WHAT[CONTEXT-COMPRESSION-018] C0_commit_uses_live_InFlight_only_not_open_h
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] C0_single_main_material_coordinator_entry', () => {
-  const hasCoordinator = filesContaining(/BloggerCoordinator\.onMainMaterial\b/).map(rel)
-  assert.ok(
-    hasCoordinator.length > 0,
-    'missing BloggerCoordinator.onMainMaterial production call',
+  const hasCoordinator = filesContaining(/BloggerCoordinator\.onMainContext\b/).map(rel)
+  assert.deepEqual(
+    hasCoordinator,
+    ['src/Wanxiangshu/Context/Companion/Transform.fs'],
+    'ordinary Blogger material must enter the physical coordinator exactly once through Transform',
+  )
+  assert.deepEqual(
+    filesContaining(/BloggerCoordinator\.onMainMaterial\b/).map(rel),
+    [],
+    'the pre-cutover projection-recomputing coordinator entry must stay deleted',
   )
   const offerSites = filesContaining(/offerToBlogger\b/).map(rel)
   assert.equal(

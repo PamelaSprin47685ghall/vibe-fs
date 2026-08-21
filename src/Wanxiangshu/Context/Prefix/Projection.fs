@@ -87,7 +87,7 @@ module XPrefixProjection =
             ProjectionIntent.ActivatePrefixEpoch
                 { SyntheticMessageId = value.SyntheticMessageId
                   Memory = CompanionPrompt.companionMemoryBlock memoryPreamble frozenRecordPrefixBody
-                  DropLeading = value.CutoffExclusive }
+                  CutoffExclusive = value.CutoffExclusive }
 
     /// CTX-010: the intent this attempt's profile calls for.
     ///

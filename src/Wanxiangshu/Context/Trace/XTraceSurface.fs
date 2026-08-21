@@ -97,6 +97,14 @@ module XTraceSurface =
                    mediaType = mediaType |> Option.map box |> Option.toObj
                    digest = digest |}
 
+    let private semanticMessageView (message: SemanticMessage) : obj =
+        box
+            {| role = message.Role
+               parts = message.Parts |> List.map semanticPartView |> List.toArray |}
+
+    let private semanticProjectionView (projection: ProviderSemanticProjection) : obj =
+        box {| messages = projection.Messages |> List.map semanticMessageView |> List.toArray |}
+
     /// Plain capture-part constructors. Call identities stay in the input only
     /// long enough for the owner mapper to discard them from SemanticPart.
     let textPart (value: string) : obj = box {| kind = "text"; text = value |}
@@ -580,6 +588,23 @@ module XTraceSurface =
                     (semanticProjectionOf projection)
 
             return result |> Option.map projectionView
+        }
+
+    /// Canonical current-X materialization used by Blogger/prefix proof tests.
+    /// The result comes from durable XTrace, never from the latest provider
+    /// presentation passed to a messages.transform hook.
+    let materializeCurrentProjection (handle: JournalHandle) (sessionId: string) : Task<obj> =
+        task {
+            let identity = SessionId.create sessionId
+
+            let trace =
+                AgentProjection.tryFind identity (AgentJournal.snapshot handle.Journal).AgentProjections
+                |> Option.bind (fun session -> session.XTrace)
+                |> Option.defaultValue XTraceProjection.empty
+
+            match! XTraceMaterialization.currentProjection handle.Journal trace with
+            | Ok projection -> return semanticProjectionView projection
+            | Error error -> return raise (InvalidOperationException error)
         }
 
     let captureOpening

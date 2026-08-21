@@ -414,7 +414,8 @@ module XWireSurface =
                                                 { Role = "user"
                                                   Parts = [ SemanticText activation.Memory ] }
 
-                                            let tail = currentProjection.Messages |> List.skip activation.DropLeading
+                                            let tail =
+                                                currentProjection.Messages |> List.skip activation.CutoffExclusive
 
                                             let transformed =
                                                 { currentProjection with

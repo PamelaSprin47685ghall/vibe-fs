@@ -34,3 +34,11 @@ test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived 
   assert.equal(freshness.ok, false)
   assert.match(freshness.reason, /requirements\.md/)
 })
+
+test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded from the build corpus', () => {
+  const repositoryRoot = new URL('../../../', import.meta.url).pathname
+
+  assert.doesNotThrow(() =>
+    execFileSync('git', ['-C', repositoryRoot, 'check-ignore', '-q', 'repomix-src-part1.xml']),
+  )
+})

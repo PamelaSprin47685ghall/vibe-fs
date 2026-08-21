@@ -36,9 +36,9 @@ Office system prompt 在同一个生命周期（Life）内保持逐字节一致�
 
 FrozenRecordPrefix 以明确标记的 low-trust context block 注入上下文，绝不伪装为人类或系统指令；同一 epoch 内其内容保持完全冻结。
 
-## PREFIX-STABILITY-009: cutoff 只在完整语义 turn 边界，digest 失配 fail closed
+## PREFIX-STABILITY-009: cutoff 只在 canonical XTrace 完整语义 turn 边界，digest 失配 fail closed
 
-Cutoff 游标只能位于完整的 semantic turn 边界。投影前重新计算 `CoveredPrefixDigest`，若与快照失配必须 fail-closed 拒绝执行。
+Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic turn 边界。`CoveredPrefixDigest` 的生产与 probe step-5 重算必须对同一个 `XTraceMaterialization.currentProjection` 做截断；请求级 provider presentation 的合法变化不得制造假 `CutoffProofFailed`。写回 Host 时必须把 semantic-turn cutoff 映射为 stable XTrace Host message identity，严禁把 cutoff 当作本次 provider message 数组下标。真实 canonical X 历史发生变化时 digest 仍必须失配并 fail-closed 拒绝执行。
 
 ## PREFIX-STABILITY-010: 同一 horizon 的 historical synthetic pair 原位 replay；reanchor 退休旧 replay set
 

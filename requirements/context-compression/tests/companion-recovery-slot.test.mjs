@@ -66,8 +66,16 @@ test('WHAT[CONTEXT-COMPRESSION-022] CTX_022_all_production_main_rebuilds_share_B
   const enforcer = source('src/Wanxiangshu/Enforcer/Continuation.fs')
   const recovery = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
 
-  assert.match(coordinator, /BloggerMainContext\.fromProjection/)
+  assert.match(coordinator, /onMainContext/)
+  assert.doesNotMatch(coordinator, /ProviderSemanticProjection|BloggerMainContext\.fromProjection/)
+  assert.match(transform, /XTraceMaterialization\.currentProjection/)
   assert.match(transform, /BloggerMainContext\.hasMaterial/)
+  assert.match(transform, /BloggerMainContext\.fromProjection/)
+  assert.doesNotMatch(
+    transform,
+    /ProviderWireCapture\.decodeMessageView/,
+    'normal Blogger materialization must never derive coverage from request-local provider presentation',
+  )
   assert.match(enforcer, /BloggerMainContext\.fromJournal/)
   assert.match(recovery, /BloggerMainContext\.fromJournal/)
 

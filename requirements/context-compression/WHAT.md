@@ -66,7 +66,7 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## CONTEXT-COMPRESSION-017: 只有真实 Opening 构成不可压缩 floor
 
-真实 Opening 消息永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，在 compaction 与 recovery 中完整保留。Manager 是否已到 T1 不得改变压缩 floor；pre-T1 与 post-T1 普通工作历史一视同仁，Blogger 的 effectiveStart 始终取 `max(RecordCoverage, Life.WorkRecordStart)`，其中 `Life.WorkRecordStart` 仅表示真实 Opening 之后的首个 XTrace 位置，不再扩张到动态 XTrace head 或 BlindPlan T1 commitment 边界。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
+真实 Opening 消息永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，在 compaction 与 recovery 中完整保留。same-session FrozenRecordPrefix 必须采用 `includeOpening=false`；其 canonical WorkRecord 仍保存 Opening 事实，但 provider write-back 必须通过 XTrace stable Host identity 明确保留 raw Opening，而不是把 Opening 复制进 Y memory 后删除原消息。Manager 是否已到 T1 不得改变压缩 floor；pre-T1 与 post-T1 普通工作历史一视同仁，Blogger 的 effectiveStart 始终取 `max(RecordCoverage, Life.WorkRecordStart)`，其中 `Life.WorkRecordStart` 仅表示真实 Opening 之后的首个 XTrace 位置，不再扩张到动态 XTrace head 或 BlindPlan T1 commitment 边界。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
 
 ## CONTEXT-COMPRESSION-018: Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 只等待事件
 
@@ -84,9 +84,9 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 `BloggerMain` 的已确认失败在 Fallback advance 后若进入 primed Offset 且当前 X 存在可 squash frames，则该 Blogger 的下一次 continuation 必须先物化 `BloggerRequestContext.Squash` 并发送 `BloggerSquash`；不得先重发失败的 BloggerMain，也不得注册 process-local recovery waiter 等待未来主 X transform。`BloggerSquash` 成功提交后，下一次 provider step 必须从 durable Blog + XTrace 重新派生 BloggerMain；Squash 失败则结束该槽、再次 advance 后才允许进入下一槽。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
 
-## CONTEXT-COMPRESSION-022: BloggerMainContext 是唯一重建公式
+## CONTEXT-COMPRESSION-022: BloggerMainContext 是唯一重建公式，canonical XTrace 是唯一输入宇宙
 
-正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash/AABB refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest cursor、同一 200 KiB chunk 与同一 coverage digest 规则。严禁在 Coordinator、Enforcer 或 recovery workflow 中复制第二套 next-main 算法。
+正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash/AABB refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest cursor、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 recovery 从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 recovery workflow 中复制第二套 next-main 算法。
 
 ## CONTEXT-COMPRESSION-023: recovery/park 全事件驱动且时间无关
 

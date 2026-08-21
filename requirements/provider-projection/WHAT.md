@@ -19,6 +19,8 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 2. **Pure Projection Planner**：负责收集意图、规范排序与冲突仲裁；
 3. **Canonical Renderer**：负责纯函数式渲染最终字节与确定性表示。
 
+当 semantic intent 携带的是历史 cutoff 而 Host 当前 message view 还包含 request-local presentation row 时，Renderer 只渲染 typed prefix activation；Host write-back adapter 必须通过 owner 提供的 stable Host identity 集合执行删除，严禁把 semantic cutoff 重新解释为当前数组下标。
+
 ## PROVIDER-PROJECTION-005: 功能模块仅声明 ProjectionIntent
 
 功能模块与渲染器之间的交互仅限于预定义的封闭意图集合（如保持物理前缀、激活前缀纪元、插入博客帧、插入修复指令等）。严禁功能模块直接拦截或修改原始消息流。

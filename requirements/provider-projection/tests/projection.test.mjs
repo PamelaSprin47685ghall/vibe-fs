@@ -100,6 +100,66 @@ test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_y_prefix_preserves_raw_todow
   assert.equal(projected[2], raw[2], 'matching result message remains the exact raw Host object')
 })
 
+test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_removes_covered_history_by_stable_Host_identity_not_request_local_index', () => {
+  const message = (id, role, text) => ({
+    info: { id, role },
+    parts: [{ type: 'text', text }],
+  })
+  const raw = [
+    message('covered-u', 'user', 'old user'),
+    message('request-local', 'assistant', 'request-local presentation only'),
+    message('covered-a', 'assistant', 'old answer'),
+    message('live-u', 'user', 'live request'),
+  ]
+
+  const projected = wire.prependCompanionMemoryByHostIds(
+    raw,
+    'y-prefix',
+    'compressed canonical X',
+    ['covered-u', 'covered-a'],
+  )
+
+  assert.deepEqual(
+    projected.map(item => item.info.id),
+    ['y-prefix', 'request-local', 'live-u'],
+    'an unrelated presentation row must not move the replacement boundary',
+  )
+  assert.equal(projected[1], raw[1])
+  assert.equal(projected[2], raw[3])
+})
+
+test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_stable_identity_deletion_preserves_surviving_raw_message_order', () => {
+  const message = (id, role, parts) => ({ info: { id, role }, parts })
+  const raw = [
+    message('todo-call-msg', 'assistant', [
+      { type: 'tool-call', tool: 'todowrite', callID: 'todo-call-1', args: { planComplete: false } },
+    ]),
+    message('request-local', 'assistant', [{ type: 'text', text: 'request-local presentation only' }]),
+    message('todo-result-msg', 'tool', [
+      { type: 'tool-result', callID: 'todo-call-1', result: { ok: true } },
+    ]),
+    message('covered-ordinary', 'assistant', [{ type: 'text', text: 'replace me' }]),
+    message('live-u', 'user', [{ type: 'text', text: 'live request' }]),
+  ]
+
+  const projected = wire.prependCompanionMemoryByHostIds(
+    raw,
+    'y-prefix',
+    'compressed canonical X',
+    ['todo-call-msg', 'todo-result-msg', 'covered-ordinary'],
+  )
+
+  assert.deepEqual(
+    projected.map(item => item.info.id),
+    ['y-prefix', 'todo-call-msg', 'request-local', 'todo-result-msg', 'live-u'],
+    'stable deletion may remove covered rows, but it must not reorder any raw row that survives',
+  )
+  assert.equal(projected[1], raw[0])
+  assert.equal(projected[2], raw[1])
+  assert.equal(projected[3], raw[2])
+  assert.equal(projected[4], raw[4])
+})
+
 test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_apply_rendered_prefix_both_shapes', () => {
   const raw = [{ info: { id: 'm1' } }]
   const synthetic = { name: 'SyntheticPrefix', activation: { syntheticMessageId: 'syn-9', memory: 'memory text', dropLeading: 0 } }

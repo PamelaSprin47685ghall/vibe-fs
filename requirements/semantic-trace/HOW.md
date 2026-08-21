@@ -9,6 +9,7 @@
    - `forOpening`：保留初始任务及宪章性承诺，作为 OpeningMaterial 永久封存；
    - `forWorkRecord`：过滤原始工具调用及结果，保留正文与推理，用于物化 LifecycleWorkRecord；
    - `flatten`：将消息与部件平铺为带角色的标准语义流，供下游增量记忆（Blogger）消费。
+   - `XTraceMaterialization.currentProjection`：从当前 reanchor generation 的 durable part/blob 重建 canonical X semantic projection。Blogger coverage、crash/retry main rebuild 与 XWire cutoff digest 只使用此入口，不读取本次 `messages.transform` 已被其它功能改写后的 presentation。
 
 ### 捕获管线与重锚持久化
 
@@ -25,7 +26,7 @@
 | SEMANTIC-TRACE-004 | `requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs` |
 | SEMANTIC-TRACE-005 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
 | SEMANTIC-TRACE-006 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
-| SEMANTIC-TRACE-007 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
+| SEMANTIC-TRACE-007 | `requirements/semantic-trace/tests/x-trace.test.mjs`, `x-trace-capture-hardening.test.mjs` |
 | SEMANTIC-TRACE-008 | `requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs` |
 | SEMANTIC-TRACE-009 | `requirements/semantic-trace/tests/x-trace-compaction-survival.test.mjs` |
 | SEMANTIC-TRACE-010 | `requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs` |

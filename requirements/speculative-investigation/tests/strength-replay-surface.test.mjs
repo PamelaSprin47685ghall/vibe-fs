@@ -16,5 +16,7 @@ test('WHAT[SPEC-INV-008] StrengthReplay owns applyBeforeXTrace entry point for r
 
   assert.match(replay, /let\s+applyBeforeXTrace/)
   assert.match(replay, /plansOrFailClosed/)
+  assert.match(replay, /XTraceProjection\.tryHostMessageId/)
+  assert.doesNotMatch(replay, /stableHostIdOfProvenance|IndexOf\("\\\/part:/)
   assert.match(pt, /StrengthReplay\.applyBeforeXTrace/)
 })

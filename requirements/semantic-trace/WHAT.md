@@ -24,9 +24,9 @@ XTrace 实体在内部持有溯源归属，但在执行语义渲染输出时，�
 
 XTrace 提供确定性的半开区间定位能力，支持按起始点与排他终点精确切片。工作记录覆盖游标作为持久化事实记录消费进度，允许精准落在半轮位置。在审查前沿建立时，必须基于完整的宿主快照与持久化 XTrace 精确收敛，消除未完成传输切片的不确定性。
 
-## SEMANTIC-TRACE-007: XTrace 是 Y delta / LWR gap / terminal 的单一 source
+## SEMANTIC-TRACE-007: XTrace 是 Y delta / prefix proof / LWR gap / terminal 的单一 source
 
-下游的增量压缩输入（delta）、生命周期工作记录缺口（LWR gap）与终端输出捕获均以 XTrace 为单一事实源。针对不同消费场景采用确定的同源投影规则，严禁针对同一历史片段维护多套相互冲突的解析逻辑。
+下游的增量压缩输入（delta）、`CoveredPrefixDigest` / prefix step-5 proof、生命周期工作记录缺口（LWR gap）与终端输出捕获均以 XTrace 为单一事实源。`XTraceMaterialization.currentProjection` 是 canonical X semantic projection 的唯一物化入口；请求级 provider presentation（Manager narrative、Strength replay 的临时呈现、guideline、grounding、repair 等）不得被持久化为 prefix coverage 的证明宇宙，也不得在下一请求中被拿来与其自身的旧 presentation hash 对账。针对不同消费场景采用确定的同源投影规则，严禁针对同一历史片段维护多套相互冲突的解析逻辑。
 
 ## SEMANTIC-TRACE-008: 未发生材料永不写成历史
 

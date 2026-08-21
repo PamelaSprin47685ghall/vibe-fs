@@ -29,6 +29,15 @@ module ProjectionMessageEdit =
         { ContainsTodoWrite = parts |> List.exists isTodoWritePart
           ToolCallIds = parts |> List.choose rawPartCallId |> List.map ToolCallId.create |> Set.ofList }
 
+    let private retainedTodoRounds (covered: obj list) =
+        List.zip covered (covered |> List.map retentionFacts |> XPrefixProjection.retainTodoWriteRounds)
+        |> List.choose (fun (message, retain) -> if retain then Some message else None)
+
+    let private companionHead (syntheticId: string) (memory: string) =
+        createObj
+            [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
+              "parts", box [| createObj [ "type", box "text"; "text", box memory ] |] ]
+
     let prependCompanionMemory
         (rawMessages: obj list)
         (syntheticId: string)
@@ -40,16 +49,30 @@ module ProjectionMessageEdit =
 
         let dropped = List.take dropLeading rawMessages
 
-        let preservedTodoRounds =
-            List.zip dropped (dropped |> List.map retentionFacts |> XPrefixProjection.retainTodoWriteRounds)
-            |> List.choose (fun (message, retain) -> if retain then Some message else None)
+        companionHead syntheticId memory
+        :: (retainedTodoRounds dropped @ List.skip dropLeading rawMessages)
 
-        let head =
-            createObj
-                [ "info", box (createObj [ "id", box syntheticId; "role", box "user" ])
-                  "parts", box [| createObj [ "type", box "text"; "text", box memory ] |] ]
+    /// Prefix replacement for stable XTrace-backed sessions.
+    ///
+    /// `coveredHostMessageIds` names the physical historical messages proved by
+    /// canonical XTrace. Request-local provider rows are not in that set, so a
+    /// narrative/replay/grounding insertion can neither shift the cutoff nor be
+    /// accidentally deleted merely because it occupies an earlier array index.
+    let prependCompanionMemoryByHostIds
+        (rawMessages: obj list)
+        (syntheticId: string)
+        (memory: string)
+        (coveredHostMessageIds: string list)
+        : obj list =
+        let coveredIds = coveredHostMessageIds |> Set.ofList
 
-        head :: (preservedTodoRounds @ List.skip dropLeading rawMessages)
+        let covered, live =
+            rawMessages
+            |> List.partition (fun message ->
+                ProviderWireDecode.hostMessageId message
+                |> Option.exists (fun messageId -> Set.contains messageId coveredIds))
+
+        companionHead syntheticId memory :: (retainedTodoRounds covered @ live)
 
     let private canonicalValue (canonical: string) : obj =
         try
@@ -466,4 +489,25 @@ module ProjectionMessageEdit =
         match rendered with
         | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.PhysicalPrefix -> rawMessages
         | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.SyntheticPrefix activation ->
-            prependCompanionMemory rawMessages activation.SyntheticMessageId activation.Memory activation.DropLeading
+            prependCompanionMemory
+                rawMessages
+                activation.SyntheticMessageId
+                activation.Memory
+                activation.CutoffExclusive
+
+    /// Stable-identity counterpart of `applyRenderedPrefix`. The renderer keeps
+    /// carrying the canonical semantic cutoff for identity/seal purposes; the
+    /// Host adapter resolves deletion through XTrace-owned physical identities.
+    let applyRenderedPrefixByHostIds
+        (rawMessages: obj list)
+        (coveredHostMessageIds: string list)
+        (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedPrefix)
+        : obj list =
+        match rendered with
+        | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.PhysicalPrefix -> rawMessages
+        | Wanxiangshu.Participant.Provider.Projection.RenderedPrefix.SyntheticPrefix activation ->
+            prependCompanionMemoryByHostIds
+                rawMessages
+                activation.SyntheticMessageId
+                activation.Memory
+                coveredHostMessageIds

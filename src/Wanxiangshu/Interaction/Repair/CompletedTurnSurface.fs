@@ -94,11 +94,7 @@ module CompletedTurnSurface =
 
     let repairDefectDecision (currentAttemptIsRepair: bool) (completed: bool) (finish: string) (parts: obj) : string =
         let classified =
-            CompletedTurnClassifier.classifyOutcome
-                completed
-                (optionalText (box finish))
-                None
-                (partsOf parts)
+            CompletedTurnClassifier.classifyOutcome completed (optionalText (box finish)) None (partsOf parts)
 
         match classified with
         | :? ReconcileProgram.SnapshotObservation as observation ->

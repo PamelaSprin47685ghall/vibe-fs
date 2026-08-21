@@ -74,35 +74,6 @@ module BloggerCoordinator =
         | StartFailed of string
         | MaterializeFailed of string
 
-    let private loadProjections
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (host: CompanionHost)
-        : BlogProjectionState * XTraceProjectionState * PrefixEpochId =
-        match journal with
-        | Some j ->
-            let projections = (AgentJournal.snapshot j).AgentProjections
-            let session = projections.Sessions |> Map.tryFind mainSessionId
-
-            let blog =
-                session
-                |> Option.bind (fun s -> s.Blog)
-                |> Option.defaultValue BlogProjection.empty
-
-            let xTrace =
-                session
-                |> Option.bind (fun s -> s.XTrace)
-                |> Option.defaultValue XTraceProjection.empty
-
-            let epoch =
-                session
-                |> Option.bind (fun s -> s.PrefixEpoch)
-                |> Option.map (fun e -> e.EpochId)
-                |> Option.defaultValue PrefixEpochId.initial
-
-            blog, xTrace, epoch
-        | None -> host.Memory.Blog, host.Memory.XTrace, PrefixEpochId.initial
-
     let private encodeContextPayload (ctx: BloggerRequestContext) =
         match ctx with
         | BloggerRequestContext.Main main ->
@@ -511,26 +482,17 @@ module BloggerCoordinator =
             Task.FromResult DecisionEffect.OfferedParked
         | BloggerRuntime.Decision.Skip -> Task.FromResult DecisionEffect.SkippedInFlight
 
-    let private startMainOrNone
+    /// Unique production entry for an already-derived main Blogger context.
+    /// Context derivation belongs to BloggerMainContext; this coordinator owns
+    /// only physical materialization / offer / flight effects.
+    let onMainContext
         (scope: IBloggerRuntimeHost)
         (host: CompanionHost)
         (journal: AgentJournal option)
-        (key: string)
-        (ctxOpt: BloggerRequestContext option)
+        (ctx: BloggerRequestContext)
         : Task<DecisionEffect> =
-        match ctxOpt with
-        | None -> Task.FromResult DecisionEffect.NoMaterial
-        | Some ctx -> applyMainDecision scope host journal key ctx
-
-    /// Unique production entry for main-session material → Blogger lifecycle.
-    let onMainMaterial
-        (scope: IBloggerRuntimeHost)
-        (host: CompanionHost)
-        (journal: AgentJournal option)
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (projection: ProviderSemanticProjection)
-        : Task<DecisionEffect> =
+        let mainSessionId = BloggerRequestContext.mainSessionId ctx
+        let bloggerSessionId = BloggerRequestContext.bloggerSessionId ctx
         let key = SessionId.value bloggerSessionId
 
         if blocksNew journal mainSessionId scope key then
@@ -540,24 +502,4 @@ module BloggerCoordinator =
             // Busy = physical flight ownership, not cell.State match.
             Task.FromResult DecisionEffect.SkippedInFlight
         else
-            // No sealed mirror: blocksNew above already applied the durable
-            // seal (DecisionEffect.Sealed) before this point.
-            // No cell: decideMaterial routes from HasParked + HasFlight only.
-            task {
-                let blog, xTrace, observedEpoch = loadProjections journal mainSessionId host
-
-                return!
-                    startMainOrNone
-                        scope
-                        host
-                        journal
-                        key
-                        (BloggerMainContext.fromProjection
-                            journal
-                            mainSessionId
-                            bloggerSessionId
-                            observedEpoch
-                            blog
-                            xTrace
-                            projection)
-            }
+            applyMainDecision scope host journal key ctx

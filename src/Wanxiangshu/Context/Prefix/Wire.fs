@@ -115,12 +115,16 @@ module XWire =
             return bodies |> Result.map (fun values -> String.concat "\n\n" values)
         }
 
-    let private requestStartCutoff (physical: PhysicalUserMessageId) (rawMessages: obj list) =
-        rawMessages
-        |> List.tryFindIndex (fun raw ->
-            ProviderWireDecode.hostMessageId raw = Some(PhysicalUserMessageId.value physical))
+    /// Prefix coverage is expressed only in canonical XTrace semantic-turn
+    /// coordinates. A positional legacy trace is insufficient proof and fails
+    /// closed instead of silently interpreting a provider-array index as history.
+    let private requestStartCutoff (physical: PhysicalUserMessageId) (xTrace: XTraceProjectionState) =
+        XTraceProjection.tryTurnOfHostMessageId (PhysicalUserMessageId.value physical) xTrace
         |> Option.defaultWith (fun () ->
-            raise (InvalidOperationException "X-wire cannot bind the physical user message to the transform snapshot"))
+            raise (
+                InvalidOperationException
+                    "X-wire cannot bind the physical user message to stable canonical XTrace provenance"
+            ))
 
     /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
     /// prefix. RawGap never participates — it has no Y coverage proof.
@@ -140,13 +144,12 @@ module XWire =
                       AuthoritativeRequirements = []
                       ConstitutiveBody = "" }
 
-            // Opening + frames only. Gap/terminal are live X material and must not
-            // enter a frozen replacement (COMPANION-009).
-            // COMPANION-009: FrozenRecordPrefix is same-session X memory, not a
-            // parent/child hand-off. Opening stays (includeOpening=true).
+            // Same-session FrozenRecordPrefix omits Opening (WORK-RECORD-007):
+            // the true raw Opening remains physically present outside the Y
+            // replacement. Gap/terminal are live X material and also stay out.
             return
                 LifecycleWorkRecord.render
-                    true
+                    false
                     { Opening = opening
                       Frames = frameBodies
                       Gap = [] }
@@ -296,14 +299,47 @@ module XWire =
         | Some _ -> [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
         | None -> [ prefixIntent ]
 
-    let private renderPrefixMessages (rawMessages: obj list) (intents: ProjectionIntent list) =
+    let private requireStableReplacementIds
+        (activation: PrefixActivation)
+        (xTrace: XTraceProjectionState)
+        : string list =
+        let coveredHostMessageIds =
+            XTraceProjection.hostMessageIdsBeforeTurn activation.CutoffExclusive xTrace
+
+        if activation.CutoffExclusive > 0 && List.isEmpty coveredHostMessageIds then
+            raise (
+                InvalidOperationException
+                    "X-wire cannot replace a covered prefix without stable canonical XTrace message identities"
+            )
+
+        let openingHostMessageId = XTraceProjection.tryOpeningHostMessageId xTrace
+
+        coveredHostMessageIds
+        |> List.filter (fun messageId -> Some messageId <> openingHostMessageId)
+
+    let private applyPlannedPrefix
+        (state: SessionAgentProjection)
+        (rawMessages: obj list)
+        (ordered: ProjectionIntent list)
+        =
+        let rendered = ProjectionRenderer.renderPrefix ordered
+
+        match rendered with
+        | RenderedPrefix.PhysicalPrefix -> rawMessages
+        | RenderedPrefix.SyntheticPrefix activation ->
+            let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+            let replaceableHostMessageIds = requireStableReplacementIds activation xTrace
+
+            ProjectionMessageEdit.applyRenderedPrefixByHostIds rawMessages replaceableHostMessageIds rendered
+
+    let private renderPrefixMessages
+        (state: SessionAgentProjection)
+        (rawMessages: obj list)
+        (intents: ProjectionIntent list)
+        =
         match ProjectionPlanner.plan intents with
         | Error conflict -> raise (InvalidOperationException(sprintf "X-wire projection conflict: %A" conflict))
-        | Ok ordered ->
-            // ReanchorAfterCompaction 是 wire no-op；prefix 写回仍用
-            // applyRenderedPrefix（与既有 Host id 字节合同一致）。
-            let rendered = ProjectionRenderer.renderPrefix ordered
-            ProjectionMessageEdit.applyRenderedPrefix rawMessages rendered
+        | Ok ordered -> applyPlannedPrefix state rawMessages ordered
 
     let private commitPromotablePrefixRebase
         (durable: AgentJournal)
@@ -450,7 +486,7 @@ module XWire =
                     XPrefixProjection.forChoice choice (Some committed) memoryPreamble frozenRecordPrefixBody
 
                 let intents = intentsForHostReanchor (observeHostReanchor prefix) prefixIntent
-                let transformed = renderPrefixMessages rawMessages intents
+                let transformed = renderPrefixMessages state rawMessages intents
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
         }
 
@@ -525,13 +561,14 @@ module XWire =
                 sessionProjection durable sessionId
             with
             | Some authority, Some fallback, Some state ->
-                let current =
-                    ProviderWireCapture.decodeMessageView rawMessages
-                    |> ProviderProjection.toSemantic
-
-                let cutoff = requestStartCutoff physical rawMessages
                 let blog = state.Blog |> Option.defaultValue BlogProjection.empty
                 let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+                let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+
+                let! currentResult = XTraceMaterialization.currentProjection durable xTrace
+                let current = requireOk currentResult
+
+                let cutoff = requestStartCutoff physical xTrace
                 // Reuse the arming bound before the snapshot await: a session
                 // deleted inside that window would otherwise make a second
                 // TryRecoveryArming return None and Option.get throw (TOCTOU).
@@ -584,7 +621,7 @@ module XWire =
                         frozenRecordPrefixBody
 
                 let intents = intentsForHostReanchor hostReanchor prefixIntent
-                let transformed = renderPrefixMessages rawMessages intents
+                let transformed = renderPrefixMessages state rawMessages intents
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
 

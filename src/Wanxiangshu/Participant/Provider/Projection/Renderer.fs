@@ -52,7 +52,8 @@ module ProjectionConstants =
 type RenderedPrefix =
     /// 物理前缀原样（无替换）。
     | PhysicalPrefix
-    /// 合成前缀：`PrefixActivation` 头部替换前 `DropLeading` 条。
+    /// 合成前缀 activation。真实 Host 删除由 adapter 通过 stable identity 完成；
+    /// 此 DU 不证明当前 message 数组的前 N 条就是 canonical covered history。
     | SyntheticPrefix of PrefixActivation
 
 /// PROJ-004：Canonical Renderer 一次产出——wire 正文 + Host 写回侧信道。
@@ -85,9 +86,12 @@ module ProjectionRenderer =
         | Some(ProjectionIntent.ActivatePrefixEpoch activation) -> RenderedPrefix.SyntheticPrefix activation
         | Some _ -> invalidOp "unreachable: prefix filter admits only Keep/Activate/Mirror"
 
-    let private validateDropLeading (activation: PrefixActivation) (messages: ProviderProjection.WireMessage list) =
-        if activation.DropLeading > List.length messages then
-            invalidArg "DropLeading" "prefix cutoff exceeds the current message view"
+    let private validateLegacyPositionalCutoff
+        (activation: PrefixActivation)
+        (messages: ProviderProjection.WireMessage list)
+        =
+        if activation.CutoffExclusive > List.length messages then
+            invalidArg "CutoffExclusive" "prefix cutoff exceeds the current message view"
 
     /// wire 层视图：合成头部 + 保留尾部。
     ///
@@ -104,13 +108,13 @@ module ProjectionRenderer =
         match rendered with
         | RenderedPrefix.PhysicalPrefix -> messages
         | RenderedPrefix.SyntheticPrefix activation ->
-            validateDropLeading activation messages
+            validateLegacyPositionalCutoff activation messages
 
             let head: ProviderProjection.WireMessage =
                 { Role = "user"
                   Parts = [ ProviderProjection.WireText activation.Memory ] }
 
-            head :: List.skip activation.DropLeading messages
+            head :: List.skip activation.CutoffExclusive messages
 
     let private textMessage (role: string) (text: string) : ProviderProjection.WireMessage =
         let message: ProviderProjection.WireMessage =
@@ -214,12 +218,12 @@ module ProjectionRenderer =
           HostMessageIds = acc.HostMessageIds @ [ None ]
           HostIsPhysical = acc.HostIsPhysical @ [ false ] }
 
-    /// Activate 合成前缀：头部无代数 MessageId；尾部侧信道按 DropLeading 截齐。
+    /// Legacy pure-render path：头部无代数 MessageId；尾部侧信道按 canonical cutoff 截齐。
     let private applyActivate (activation: PrefixActivation) (acc: RenderedMessages) : RenderedMessages =
         let rendered =
             renderMessages acc.Messages (RenderedPrefix.SyntheticPrefix activation)
 
-        let drop = activation.DropLeading
+        let drop = activation.CutoffExclusive
         let headId: string option = None
         let headPhysical = false
 
@@ -425,10 +429,11 @@ module ProjectionRenderer =
         : ProviderProjection.WireMessage list =
         (renderMessagesWithHostIds id snapshot baseMessages intents).Messages
 
-    /// CTX-011 step 5：候选 cutoff 处 X 当前前缀的 digest 证明。
+    /// CTX-011 step 5：候选 cutoff 处 canonical X 当前前缀的 digest 证明。
     ///
-    /// attempt-local（PROJ-008 迁移顺序第 2 步）：只对本次 attempt 的当前投影做
-    /// cutoff 截断后计算语义 digest。这是「功能模块声明意图、渲染器负责投影」的
+    /// attempt-local（PROJ-008 迁移顺序第 2 步）：调用方必须提供由 durable
+    /// XTrace materialization 得到的 canonical projection，再做 cutoff 截断后计算语义
+    /// digest。这是「功能模块声明意图、渲染器负责投影」的
     /// 边界落点——调用方不再直接 `List.truncate` 消息列表（PROJ-001）。
     ///
     /// `List.truncate` 语义：cutoff 越界时返回全量消息（不报错），与

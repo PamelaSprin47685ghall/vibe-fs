@@ -34,11 +34,13 @@ open Wanxiangshu.Foundation.Identity
 /// `SyntheticMessageId` 复用快照自己的 id（CTX-012：该 id 在候选构建时固定，provider 在本
 /// epoch 已见过；再派生一次就是同一身份的第二个构建点，任何漂移都会让后续每个请求多付一次
 /// 冷边界）。`Memory` 是已解析的 FrozenRecordPrefix 经 companion memory preamble 包裹后的
-/// 低信任上下文。`DropLeading` 是被替换的 provider-visible 消息条数（cutoff）。
+/// 低信任上下文。`CutoffExclusive` 是 canonical XTrace semantic-turn cutoff；
+/// effectful Host adapter 通过 stable message identity 执行真实删除，不能把这个数
+/// 直接解释成当前 request-local provider 数组下标。
 type PrefixActivation =
     { SyntheticMessageId: string
       Memory: string
-      DropLeading: int }
+      CutoffExclusive: int }
 
 /// Domain 镜像的 BlogFrame 种类（Entry/Squash）。定义在 Domain 以避免引用 Journal。
 /// 故意不叫 `BlogFrameKind`：Journal 权威 fold 类型同名；`open Wanxiangshu.Domain`

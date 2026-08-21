@@ -7,6 +7,7 @@
 // as raw X messages.
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as compression from '../../../dist/Context/Companion/CompressionSurface.js'
 
@@ -66,4 +67,23 @@ test('WHAT[CONTEXT-COMPRESSION-020] todowrite call and matching result are retai
     [false, true, true, false],
     'only the todowrite round punches through an otherwise replaceable prefix',
   )
+})
+
+test('WHAT[CONTEXT-COMPRESSION-017] same_session_Y_prefix_never_repackages_or_deletes_the_raw_Opening', () => {
+  const wire = readFileSync(new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url), 'utf8')
+
+  const frozen = wire.slice(
+    wire.indexOf('let private materializeFrozenRecordPrefix'),
+    wire.indexOf('let private candidate'),
+  )
+  assert.match(frozen, /LifecycleWorkRecord\.render\s+false/)
+  assert.doesNotMatch(frozen, /LifecycleWorkRecord\.render\s+true/)
+
+  const replacement = wire.slice(
+    wire.indexOf('let private requireStableReplacementIds'),
+    wire.indexOf('let private commitPromotablePrefixRebase'),
+  )
+  assert.match(replacement, /XTraceProjection\.tryOpeningHostMessageId/)
+  assert.match(replacement, /List\.filter/)
+  assert.match(replacement, /applyRenderedPrefixByHostIds/)
 })

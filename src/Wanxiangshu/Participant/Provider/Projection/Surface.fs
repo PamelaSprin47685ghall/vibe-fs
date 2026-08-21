@@ -248,7 +248,7 @@ module ProjectionSurface =
     let private activationOf (value: obj) : PrefixActivation =
         { SyntheticMessageId = stringOf value?syntheticMessageId
           Memory = stringOf value?memory
-          DropLeading = intOf value?dropLeading }
+          CutoffExclusive = intOf value?dropLeading }
 
     let private strengthExchangeOf (value: obj) : StrengthToolExchange =
         { ToolName = stringOf value?toolName
@@ -333,7 +333,7 @@ module ProjectionSurface =
         box
             {| syntheticMessageId = activation.SyntheticMessageId
                memory = activation.Memory
-               dropLeading = activation.DropLeading |}
+               dropLeading = activation.CutoffExclusive |}
 
     let private intentToJs (intent: ProjectionIntent) : obj =
         match intent with
