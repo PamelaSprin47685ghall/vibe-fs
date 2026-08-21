@@ -260,6 +260,21 @@ test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_width_is_ceil_half_and_does_n
   assert.deepEqual([1, 2, 3, 4, 5, 6].map(widthAfter), [1, 1, 2, 2, 3, 3])
 })
 
+test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_single_frame_squash_may_replace_text_with_a_new_digest', () => {
+  const state = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }).value
+  const rewritten = blog.frame({
+    kind: 'Squash',
+    digest: 'sha-squash-rewritten',
+    ref: 'blob-squash-rewritten',
+    coveredFrom: 0,
+    coveredThrough: 1,
+  })
+
+  const squashed = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 1, frame: rewritten }, state)
+  assert.equal(squashed.ok, true, squashed.ok ? '' : squashed.error)
+  assert.equal(blog.frames(squashed.value)[0].digest, 'sha-squash-rewritten')
+})
+
 test('WHAT[CONTEXT-COMPRESSION-011] CTX_012_squash_frames_are_interchangeable_with_entries_so_cascade_works', () => {
   let state = threeEntries()
   // [Entry, Entry, Entry] → squash 2 → [Squash, Entry]

@@ -42,7 +42,7 @@
 
 ## CONTEXT-COMPRESSION-011: 提交语义分型
 
-X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；无 `RecoveryOpportunity` 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。Y squash 成功时提交 squashed observation 并使 FrameEpoch 递增，失败时不修改现有 frames 与 coverage。
+X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；无 `RecoveryOpportunity` 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。Y squash 成功时提交 squashed observation 并使 FrameEpoch 递增，失败时不修改现有 frames 与 coverage。`m=1` 时仍允许 `k=1` 的真实 rewrite；新的 squash terminal blob 是新的历史表示，其 `TextDigest` 可以且通常应与被替换 Entry 不同，不得把 digest 相等误作单帧 squash 的 PERSIST-010 条件。
 
 ## CONTEXT-COMPRESSION-012: Blogger delta TOML 合同
 

@@ -49,7 +49,7 @@ const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cu
     run,
   )
 
-const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}` }) =>
+const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}`, textDigest }) =>
   next(
     {
       family: 'Context',
@@ -62,7 +62,7 @@ const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}` 
         NextFrameEpochId: nextEpoch,
         CoveredFrameCount: count,
         TextRef: `blob-s${n}`,
-        TextDigest: count === 1 ? 'sha-e1' : `sha-s${n}`,
+        TextDigest: textDigest ?? (count === 1 ? 'sha-e1' : `sha-s${n}`),
         ProviderRun: run,
       },
     },
@@ -130,6 +130,16 @@ test('WHAT[DURABLE-EVENTS-015] PERSIST_010_entry_and_squash_fold_into_the_blog_p
   assert.equal(Number(session.Blog.FrameEpochId), 1)
   assert.deepEqual(coverageOf(session), { ingestedThroughSequence: 2, cutoff: 2, digest: 'd-2' })
   assert.equal(session.PrefixEpoch == null, true)
+})
+
+test('WHAT[DURABLE-EVENTS-015] PERSIST_010_single_frame_squash_accepts_the_new_terminal_blob_digest', () => {
+  const session = foldOk([
+    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
+    squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1, textDigest: 'sha-squash-rewritten' }),
+  ])
+
+  assert.equal(Number(session.Blog.FrameEpochId), 1)
+  assert.deepEqual(session.Blog.FrameKinds, ['Squash'])
 })
 
 test('WHAT[DURABLE-EVENTS-015] CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
