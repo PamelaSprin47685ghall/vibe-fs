@@ -292,10 +292,10 @@ module RequirementGroundingTransform =
     let projectOrTerminate
         (journal: AgentJournal option)
         (workspaceDirectory: string option)
+        (terminateSession: SessionId -> string -> Task<Result<unit, string>>)
         (projectionSessionIdOpt: string option)
-        (terminateSession: string -> string -> Task<Result<unit, string>>)
         (outObj: obj)
-        : Task =
+        : Task<unit> =
         let applyProjection sessionId projected =
             match projected with
             | Ok values ->
@@ -307,7 +307,7 @@ module RequirementGroundingTransform =
                     [ "session_id", sessionId; "result", reason ]
 
                 task {
-                    let! _ = terminateSession sessionId reason
+                    let! _ = terminateSession (SessionId.create sessionId) reason
                     ()
                 }
 
@@ -315,9 +315,7 @@ module RequirementGroundingTransform =
         | Some durable, Some _, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
             task {
                 let messages = unbox<obj array> outObj?messages |> Array.toList
-
                 let! projected = tryProject durable sessionId messages
-
                 do! applyProjection sessionId projected
             }
         | _ -> Task.FromResult()

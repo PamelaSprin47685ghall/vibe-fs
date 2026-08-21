@@ -169,15 +169,22 @@ module StrengthReplay =
     let applyBeforeXTrace
         (journal: AgentJournal option)
         (strengthDurability: StrengthDurabilityPort option)
-        (strengthFailClosed: string -> StrengthReplayPlan list)
-        (sessionId: string)
+        (strengthFailFuse: string -> unit)
+        (projectionSessionIdOpt: string option)
         (outObj: obj)
         : Task<StrengthReplayPlan list> =
         task {
-            match strengthDurability with
+            match projectionSessionIdOpt with
+            | Some sessionId ->
+                let failClosed reason =
+                    strengthFailFuse reason
+                    raise (InvalidOperationException reason)
+
+                match strengthDurability with
+                | None -> return []
+                | Some durability ->
+                    return! plansOrFailClosed failClosed (replayWithDurability journal durability sessionId outObj)
             | None -> return []
-            | Some durability ->
-                return! plansOrFailClosed strengthFailClosed (replayWithDurability journal durability sessionId outObj)
         }
 
     /// Host id inside stable provenance g:N/msg:{id}/part:P.

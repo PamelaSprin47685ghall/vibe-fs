@@ -290,3 +290,33 @@ module CompanionTransform =
                         rawMessages
                         rawOutObj
         }
+
+    let applyCompanionForOrdinaryMaterial
+        (companions: Dictionary<string, CompanionHost>)
+        (gate: obj)
+        (scope: PluginRuntimeScope)
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal option)
+        (onBloggerCreated: (SessionId -> unit) option)
+        (workspaceDirectory: string option)
+        (isExplicitResume: string option -> obj -> bool)
+        (projectionSessionIdOpt: string option)
+        (inObj: obj)
+        (outObj: obj)
+        : Task<unit> =
+        task {
+            if isExplicitResume projectionSessionIdOpt outObj then
+                return ()
+            else
+                do!
+                    handleCompanionTransform
+                        companions
+                        gate
+                        scope
+                        sessionPort
+                        journal
+                        onBloggerCreated
+                        workspaceDirectory
+                        inObj
+                        outObj
+        }

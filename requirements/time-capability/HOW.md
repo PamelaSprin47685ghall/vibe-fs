@@ -41,4 +41,4 @@
 | TIME-004 | `requirements/time-capability/tests/ambient-time-forbidden.test.mjs` |
 | TIME-005 | `requirements/time-capability/tests/deadline-typed.test.mjs` |
 | TIME-006 | `requirements/time-capability/tests/until-signal-or-deadline.test.mjs` |
-| TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs` |
+| TIME-007 | `requirements/time-capability/tests/pair-session-elapsed.test.mjs`, `requirements/time-capability/tests/session-started-at-bind-surface.test.mjs` |

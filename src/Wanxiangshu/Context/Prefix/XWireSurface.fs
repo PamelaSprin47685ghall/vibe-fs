@@ -485,7 +485,8 @@ module XWireSurface =
                 | _ -> false
 
             match outcome with
-            | "completed" ->
+            | "completed"
+            | "tool-calls" ->
                 // CTX-012: only a probe based on the current epoch can promote.
                 box
                     {| promoted = hasProbe && epochMatches

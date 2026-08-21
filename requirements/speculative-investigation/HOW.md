@@ -57,13 +57,13 @@
 | 命题 | 落点测试 |
 |---|---|
 | SPEC-INV-001 | `requirements/speculative-investigation/tests/host-canary-k0.test.mjs` |
-| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
+| SPEC-INV-002 | `requirements/speculative-investigation/tests/authority-policy.test.mjs`, `requirements/speculative-investigation/tests/strength-speculate-surface.test.mjs` |
 | SPEC-INV-003 | `requirements/speculative-investigation/tests/batch-collector.test.mjs` |
 | SPEC-INV-004 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
 | SPEC-INV-005 | `requirements/speculative-investigation/tests/frame-projection.test.mjs` |
 | SPEC-INV-006 | `requirements/speculative-investigation/tests/commit-promotion.test.mjs` |
 | SPEC-INV-007 | `requirements/speculative-investigation/tests/turn-evidence.test.mjs` |
-| SPEC-INV-008 | `requirements/speculative-investigation/tests/lifecycle-recovery.test.mjs` |
+| SPEC-INV-008 | `requirements/speculative-investigation/tests/lifecycle-recovery.test.mjs`, `requirements/speculative-investigation/tests/strength-replay-surface.test.mjs` |
 | SPEC-INV-009 | `requirements/speculative-investigation/tests/projection-algebra.test.mjs` |
 | SPEC-INV-010 | `requirements/speculative-investigation/tests/authority-policy.test.mjs` |
 | SPEC-INV-011 | `requirements/speculative-investigation/tests/host-policy.test.mjs` |

@@ -49,7 +49,7 @@ open Wanxiangshu.Foundation.Identity
 
 [<RequireQualifiedAccess>]
 type ConfirmedFailureOutcome =
-    | RecoveryAdvanced
+    | RecoveryAdvanced of RecoveryOpportunity
     | RecoveryExhausted
     | AlreadyRecorded
     | NoActiveRun
@@ -98,7 +98,9 @@ module FallbackLedger =
         : Task<Result<ConfirmedFailureOutcome, string>> =
         task {
             match AgentPairCursor.recoveryVerdict budget next with
-            | AgentPairCursor.MayContinue _ -> return Ok ConfirmedFailureOutcome.RecoveryAdvanced
+            | AgentPairCursor.MayContinue _ ->
+                let opportunity = RecoverySlot.opportunity RecoverySlot.afterFailureAdvance next.Offset
+                return Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity)
             | AgentPairCursor.Exhausted _ -> return! appendExhausted journal sessionId providerRun current next
         }
 
@@ -221,7 +223,7 @@ module FallbackLedger =
                 outcome
                 |> Result.map (function
                     | ConfirmedFailureOutcome.RecoveryExhausted -> RecoveryAdmission.RecoveryExhausted
-                    | ConfirmedFailureOutcome.RecoveryAdvanced
+                    | ConfirmedFailureOutcome.RecoveryAdvanced _
                     | ConfirmedFailureOutcome.AlreadyRecorded
                     | ConfirmedFailureOutcome.NoActiveRun -> RecoveryAdmission.ContinueRecovery)
         }

@@ -96,7 +96,7 @@ fork 携带的 attachment 仅将指定同伴的历史工作记录作为只读数
 
 复用既有 participant 发起新工作时，每次调用都是宿主 F# CE 中的一次独立 invocation，不建立 durable `Stage/Phase/ActiveWorkUnit` 或第二状态机。invocation 属于稳定 logical route：fork continuation 由 Byname 标识，SyncDelegate 由 caller scope + dedicated role 标识；物理 `SessionId` 只是本次执行目标，不拥有 handoff 连续性。
 
-work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。同步调用必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord。fork same-road continuation、`inspect`、`establish-behavior`、`repair-behavior` 共用这一合同。
+work unit 的输入窗口为该 route 上“上一已完成 work unit 的 parent frontier”到本次 admission 时 parent XTrace head 的 delta LifecycleWorkRecord；route 首次 work unit 使用当前 parent LifecycleWorkRecord（含 Opening）作为初始背景。prompt = 本次新 charge + 该 parent record。**同步**委托（`inspect`、`establish-behavior`、`repair-behavior`）必须等待本 work unit 自己的完成，并只返回 callee 在本 work unit XTrace 范围内的 bounded delta LifecycleWorkRecord；**异步** `fork`（包括 same-road continuation）只负责原子 admission + dispatch，成功即返回“该 Byname 已承接本次 charge”的放置后果，绝不等待 callee completion、绝不直接返回 WorkRecord。fork completion 的唯一 pull 边界是 `join` / `horizon`。
 
 ## DELEG-025: work unit completion 由 causal identity 决定，不由订阅时刻决定
 
@@ -104,7 +104,7 @@ terminal 能完成或失败 work unit，当且仅当它属于该 work unit 实�
 
 ## DELEG-026: effect truth 只能沿 direct CE 单向前进
 
-新 assignment 的业务流程必须直接写成 `prepare → dispatch → await own completion → checkpoint completed handoff` 的 F# CE。物理 dispatch 之前的 durable claim 复用 `PromptAuthority` 已有事实，不另造 delegation program-state。确定未发送的 dispatch failure 可以作为本次调用失败；一旦 dispatch 已发生或 outcome unknown，任何后置 handoff/frontier/affinity bookkeeping 都不得把调用结果改写成“未放置”。Host 对 prompt acceptance 给出 unknown 时，durable Pending claim 继续拥有恢复权：不得伪造 terminal failure、不得释放本次 run 的 terminal observer、不得自动重发；调用方必须得到明确的“可能已接受、不要另起重复委托”后果。route 的 parent frontier 只能由“本次 interaction 已完成”的 durable fact推进。调用方因此永远不会同时得到“无法放置”与“后台其实已经启动”两种互斥现实。
+新 assignment 的业务流程必须直接写成 F# CE，且 effect truth 单向前进。同步委托为 `prepare → dispatch → await own completion → checkpoint completed handoff`；异步 `fork` 为 `prepare → dispatch → return placement`，completion 与 WorkRecord 由后续 `join` / `horizon` 独立消费，fork invocation 本身严禁跨过 dispatch 去等待 child。物理 dispatch 之前的 durable claim 复用 `PromptAuthority` 已有事实，不另造 delegation program-state。确定未发送的 dispatch failure 可以作为本次调用失败；一旦 dispatch 已发生或 outcome unknown，任何后置 handoff/frontier/affinity bookkeeping 都不得把调用结果改写成“未放置”。Host 对 prompt acceptance 给出 unknown 时，durable Pending claim 继续拥有恢复权：不得伪造 terminal failure、不得释放本次 run 的 terminal observer、不得自动重发；调用方必须得到明确的“可能已接受、不要另起重复委托”后果。route 的 parent frontier 只能由“本次 interaction 已完成”的 durable fact推进。调用方因此永远不会同时得到“无法放置”与“后台其实已经启动”两种互斥现实。
 
 ## DELEG-027: 新 assignment 不得伪装成 busy nudge
 

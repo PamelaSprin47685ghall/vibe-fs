@@ -130,9 +130,6 @@ module PluginTransforms =
           ReplicaSanitize: obj -> unit
           ExplicitResumeSanitize: obj -> unit }
 
-    let private raiseStrengthFailClosed (fuse: string -> unit) (reason: string) : 'a =
-        fuse reason
-        raise (InvalidOperationException reason)
 
     let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
         match projectionSessionIdOpt with
@@ -182,82 +179,13 @@ module PluginTransforms =
                          |> PhysicalUserMessageId.promoteToAuthorityRoot)
                         reason
 
-        let applyCompanionForOrdinaryMaterial projectionSessionIdOpt inObj outObj : Task<unit> =
-            task {
-                if ExplicitResumeSuppression.isCurrentMaterial outObj then
-                    return ()
-                else
-                    do!
-                        CompanionTransform.handleCompanionTransform
-                            scope.Sessions.Companions
-                            scope.Sessions.CompanionGate
-                            scope
-                            sessionPort
-                            journal
-                            (Some(fun bloggerId ->
-                                // Register ownership + ActiveRun so idle→reconcile
-                                // emits TerminalOutcome.Completed for this child.
-                                wired.RegisterOwned(SessionId.value bloggerId)
-                                wired.BindActiveRun bloggerId Role.Blogger None))
-                            SharedState.RootWorkspace
-                            inObj
-                            outObj
-            }
-
         { BeginPhysicalProviderAttempt =
-            fun projectionSessionIdOpt outObj ->
-                task {
-                    match projectionSessionIdOpt with
-                    | Some sessionId ->
-                        do!
-                            SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
-                                scope.Sessions.Quiescence.BeginProviderAttempt
-                                (SessionId.create sessionId)
-                                outObj
-                    | None -> return ()
-                }
-
+            SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                scope.Sessions.Quiescence.BeginProviderAttempt
           BindSessionStartedAt =
-            fun projectionSessionIdOpt ->
-                task {
-                    let sessionStartCandidate =
-                        projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
-
-                    match!
-                        SessionStartedAtLedger.tryBindOrAbort journal projectionSessionIdOpt sessionStartCandidate
-                    with
-                    | Ok startedAt -> return startedAt
-                    | Error reason ->
-                        match projectionSessionIdOpt with
-                        | Some sessionId ->
-                            Diagnostic.emit
-                                "host-013-session-start-bind-failed"
-                                [ "session_id", sessionId; "result", reason ]
-
-                            let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
-                            let! _ = terminateSession (SessionId.create sessionId) terminalReason
-                            return raise (InvalidOperationException terminalReason)
-                        | None ->
-                            Diagnostic.emit "host-013-session-start-bind-failed" [ "session_id", ""; "result", reason ]
-
-                            return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
-                }
-
+            SessionStartedAtLedger.bindSessionStartedAt journal clock terminateSession Diagnostic.emit
           ApplyStrengthReplay =
-            fun projectionSessionIdOpt outObj ->
-                task {
-                    match projectionSessionIdOpt with
-                    | Some sessionId ->
-                        return!
-                            StrengthReplay.applyBeforeXTrace
-                                journal
-                                strengthDurability
-                                (raiseStrengthFailClosed strengthFailFuse)
-                                sessionId
-                                outObj
-                    | None -> return []
-                }
-
+            StrengthReplay.applyBeforeXTrace journal strengthDurability strengthFailFuse
           ApplyXTracePipeline =
             fun projectionSessionIdOpt outObj strengthReplayPlans ->
                 task {
@@ -271,11 +199,21 @@ module PluginTransforms =
                             outObj
                             strengthReplayPlans
                 }
-
-          ApplyCompanion = applyCompanionForOrdinaryMaterial
-
-          ApplyXWire = fun outObj -> task { do! XWire.applyTransform snapshotOpt journal scope outObj }
-
+          ApplyCompanion =
+            CompanionTransform.applyCompanionForOrdinaryMaterial
+                scope.Sessions.Companions
+                scope.Sessions.CompanionGate
+                scope
+                sessionPort
+                journal
+                (Some(fun bloggerId ->
+                    // Register ownership + ActiveRun so idle→reconcile
+                    // emits TerminalOutcome.Completed for this child.
+                    wired.RegisterOwned(SessionId.value bloggerId)
+                    wired.BindActiveRun bloggerId Role.Blogger None))
+                SharedState.RootWorkspace
+                isExplicitResumeProviderMaterial
+          ApplyXWire = XWire.applyTransform snapshotOpt journal scope
           ApplyEnforcerContinuation =
             fun projectionSessionIdOpt outObj ->
                 task {
@@ -287,10 +225,8 @@ module PluginTransforms =
                             projectionSessionIdOpt
                             outObj
                 }
-
           ApplyStrengthSpeculate =
-            fun outObj -> task { do! StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope outObj }
-
+            StrengthSpeculate.tryApply snapshotOpt journal strengthDurability scope
           InjectPairGuideline =
             fun projectionSessionIdOpt sessionStartedAt outObj ->
                 task {
@@ -304,19 +240,8 @@ module PluginTransforms =
                             (languageFor projectionSessionIdOpt)
                             outObj
                 }
-
           ProjectRequirementGrounding =
-            fun projectionSessionIdOpt outObj ->
-                task {
-                    do!
-                        RequirementGroundingTransform.projectOrTerminate
-                            journal
-                            workspaceDirectory
-                            projectionSessionIdOpt
-                            (fun sessionId reason -> terminateSession (SessionId.create sessionId) reason)
-                            outObj
-                }
-
+            RequirementGroundingTransform.projectOrTerminate journal workspaceDirectory terminateSession
           InjectBloggerChronicle =
             fun projectionSessionIdOpt outObj ->
                 BloggerChronicleText.maybeInject
@@ -324,12 +249,7 @@ module PluginTransforms =
                     projectionSessionIdOpt
                     (languageFor projectionSessionIdOpt)
                     outObj
-
-          SanitizeMessages =
-            fun outObj ->
-                let currentMessages = unbox<obj array> outObj?messages |> Array.toList
-                let sanitized = HostMessageProjection.sanitizeMessages currentMessages
-                HostMessageProjection.replaceMessagesInPlace outObj sanitized }
+          SanitizeMessages = HostMessageProjection.sanitizeOutputMessages }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
@@ -337,17 +257,12 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let wired = host.Wired
 
-        let sanitize outObj =
-            let currentMessages = unbox<obj array> outObj?messages |> Array.toList
-            let sanitized = HostMessageProjection.sanitizeMessages currentMessages
-            HostMessageProjection.replaceMessagesInPlace outObj sanitized
-
         { IsExplicitResume = isExplicitResumeProviderMaterial
           RegisterOwned = wired.RegisterOwned
           ReplicaRuntime = fun projectionSessionIdOpt -> strengthReplicaRuntime projectionSessionIdOpt scope
-          ReplicaXWire = fun outObj -> task { do! XWire.applyTransform snapshotOpt journal scope outObj }
-          ReplicaSanitize = sanitize
-          ExplicitResumeSanitize = sanitize }
+          ReplicaXWire = XWire.applyTransform snapshotOpt journal scope
+          ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages
+          ExplicitResumeSanitize = HostMessageProjection.sanitizeOutputMessages }
 
     let normalTransform
         (caps: NormalTransformCapabilities)

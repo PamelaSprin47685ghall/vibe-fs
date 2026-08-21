@@ -36,7 +36,7 @@ PromptResources.systemForRole (语言 lang, 角色 role)
 | COGNITIVE-ENVIRONMENT-010 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
 | COGNITIVE-ENVIRONMENT-011 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
 | COGNITIVE-ENVIRONMENT-012 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
-| COGNITIVE-ENVIRONMENT-013 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
+| COGNITIVE-ENVIRONMENT-013 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs`, `requirements/cognitive-environment/tests/session-execution-attempt-surface.test.mjs` |
 | COGNITIVE-ENVIRONMENT-014 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |
 | COGNITIVE-ENVIRONMENT-015 | `requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs` |
 | COGNITIVE-ENVIRONMENT-016 | `requirements/cognitive-environment/tests/cognitive-environment.test.mjs` |

@@ -4,6 +4,7 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Host
+open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Persistence.Journal
@@ -63,3 +64,32 @@ module SessionStartedAtLedger =
         match journal, projectionSessionIdOpt, sessionStartCandidate with
         | Some durable, Some sessionId, Some candidate -> bindOrAbort durable (SessionId.create sessionId) candidate
         | _ -> Task.FromResult(Ok None)
+
+    /// HOST-013: bind session start for transform boundary, logging diagnostics and terminating on error.
+    let bindSessionStartedAt
+        (journal: AgentJournal option)
+        (clock: IClockPort)
+        (terminateSession: SessionId -> string -> Task<Result<unit, string>>)
+        (emitDiagnostic: string -> (string * string) list -> unit)
+        (projectionSessionIdOpt: string option)
+        : Task<DateTimeOffset option> =
+        task {
+            let sessionStartCandidate =
+                projectionSessionIdOpt |> Option.map (fun _ -> clock.UtcNow())
+
+            match! tryBindOrAbort journal projectionSessionIdOpt sessionStartCandidate with
+            | Ok startedAt -> return startedAt
+            | Error reason ->
+                match projectionSessionIdOpt with
+                | Some sessionId ->
+                    emitDiagnostic
+                        "host-013-session-start-bind-failed"
+                        [ "session_id", sessionId; "result", reason ]
+
+                    let terminalReason = "HOST-013 SessionStartedAt bind failed: " + reason
+                    let! _ = terminateSession (SessionId.create sessionId) terminalReason
+                    return raise (InvalidOperationException terminalReason)
+                | None ->
+                    emitDiagnostic "host-013-session-start-bind-failed" [ "session_id", ""; "result", reason ]
+                    return raise (InvalidOperationException("HOST-013 SessionStartedAt bind failed: " + reason))
+        }

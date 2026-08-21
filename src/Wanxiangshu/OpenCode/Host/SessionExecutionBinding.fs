@@ -318,31 +318,35 @@ module SessionExecutionBinding =
     /// Domain decision: managed provider step must have physical user message id (EMR-010).
     let beginPhysicalProviderAttemptForTransform
         (beginQuiescence: SessionId -> unit)
-        (sessionId: SessionId)
+        (projectionSessionIdOpt: string option)
         (outObj: obj)
         : Task<unit> =
         task {
-            let rawMessages =
-                ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
+            match projectionSessionIdOpt with
+            | Some sid ->
+                let sessionId = SessionId.create sid
+                let rawMessages =
+                    ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
 
-            let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
+                let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
 
-            beginQuiescence sessionId
+                beginQuiescence sessionId
 
-            match
-                beginProviderAttempt sessionId physicalUserMessageId (ProviderWireCapture.lastUserPromptKey rawMessages)
-            with
-            | Error error -> invalidOp error
-            | Ok() ->
-                match currentProviderModel sessionId, physicalUserMessageId with
-                | Some _, Some physical ->
-                    do!
-                        ModelRouting.enterProviderStep
-                            sessionId
-                            physical
-                            (ProviderWireCapture.visibleProviderRuns rawMessages)
-                | Some _, None -> invalidOp "EMR-010: managed provider step has no physical user message id"
-                | None, _ -> ()
+                match
+                    beginProviderAttempt sessionId physicalUserMessageId (ProviderWireCapture.lastUserPromptKey rawMessages)
+                with
+                | Error error -> invalidOp error
+                | Ok() ->
+                    match currentProviderModel sessionId, physicalUserMessageId with
+                    | Some _, Some physical ->
+                        do!
+                            ModelRouting.enterProviderStep
+                                sessionId
+                                physical
+                                (ProviderWireCapture.visibleProviderRuns rawMessages)
+                    | Some _, None -> invalidOp "EMR-010: managed provider step has no physical user message id"
+                    | None, _ -> ()
+            | None -> return ()
         }
 
     let drop (sessionId: SessionId) =

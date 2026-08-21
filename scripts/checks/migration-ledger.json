@@ -3200,7 +3200,7 @@
       "owner": "host-boundary",
       "classification": "COMPOSITION-ROOT",
       "wave": 1,
-      "status": "PENDING",
+      "status": "CUTOVER",
       "pinningProofs": [
         "scripts/checks/plugin-transforms-invariant.mjs",
         "requirements/host-boundary/tests/ordered-transform.test.mjs"

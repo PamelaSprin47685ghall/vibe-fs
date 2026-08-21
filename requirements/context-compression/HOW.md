@@ -48,7 +48,7 @@ DEPENDS ON:
 | CONTEXT-COMPRESSION-015 | `requirements/context-compression/tests/blog-projection.test.mjs` |
 | CONTEXT-COMPRESSION-016 | `requirements/context-compression/tests/probe-selection.test.mjs` |
 | CONTEXT-COMPRESSION-017 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` |
-| CONTEXT-COMPRESSION-018 | `requirements/context-compression/tests/blogger-delta.test.mjs` |
+| CONTEXT-COMPRESSION-018 | `requirements/context-compression/tests/blogger-delta.test.mjs`, `requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs` |
 | CONTEXT-COMPRESSION-019 | `requirements/context-compression/tests/injected-context-reanchor.test.mjs` |
 | CONTEXT-COMPRESSION-020 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` + `requirements/provider-projection/tests/projection.test.mjs` |
 | CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |

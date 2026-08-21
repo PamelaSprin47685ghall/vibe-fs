@@ -190,15 +190,6 @@ module ProviderRecoveryWorkflow =
     let private currentFallback (durable: AgentJournal) (sessionId: SessionId) =
         FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable)
 
-    let private opportunityAfterAdvance (durable: AgentJournal) (sessionId: SessionId) =
-        currentFallback durable sessionId
-        |> Option.map (fun fallback ->
-            if AgentPairCursor.isRecoverySlot fallback.Cursor.Offset then
-                RecoveryOpportunity.RecoveryAttempt
-            else
-                RecoveryOpportunity.OrdinaryAttempt)
-        |> Option.defaultValue RecoveryOpportunity.OrdinaryAttempt
-
     let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
         SessionAssociationProjection.tryMainSessionOf
             bloggerSessionId
@@ -425,10 +416,10 @@ module ProviderRecoveryWorkflow =
         (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
+        (opportunity: RecoveryOpportunity)
         : Task =
         task {
             let current = scope.TryPeekCurrentRequest(SessionId.value turn.SessionId)
-            let opportunity = opportunityAfterAdvance durable turn.SessionId
             let squash = recoverySquashContext durable mainSessionId turn.SessionId
 
             match current with
@@ -472,9 +463,10 @@ module ProviderRecoveryWorkflow =
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
+        (opportunity: RecoveryOpportunity)
         : Task =
         task {
-            if opportunityAfterAdvance durable turn.SessionId = RecoveryOpportunity.RecoveryAttempt then
+            if opportunity = RecoveryOpportunity.RecoveryAttempt then
                 armRecovery turn.SessionId
                 do! awaitRecoveryMaterial scope durable turn.SessionId
 
@@ -491,11 +483,13 @@ module ProviderRecoveryWorkflow =
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
+        (opportunity: RecoveryOpportunity)
         : Task =
         match mainSessionOfBlogger durable turn.SessionId with
         | Some mainSessionId ->
-            continueBlogger sessionPort eventPort durable scope turn mainSessionId continuationPrompt error
-        | None -> continueWorkMain sessionPort eventPort durable scope armRecovery turn continuationPrompt error
+            continueBlogger sessionPort eventPort durable scope turn mainSessionId continuationPrompt error opportunity
+        | None ->
+            continueWorkMain sessionPort eventPort durable scope armRecovery turn continuationPrompt error opportunity
 
     let private settleFailureAdmission
         (sessionPort: ISessionHostPort)
@@ -517,8 +511,17 @@ module ProviderRecoveryWorkflow =
             Task.FromResult(()) :> Task
         | Ok ConfirmedFailureOutcome.AlreadyRecorded
         | Ok ConfirmedFailureOutcome.NoActiveRun -> Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.RecoveryAdvanced ->
-            continueAdvancedFailure sessionPort eventPort durable scope armRecovery turn continuationPrompt error
+        | Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity) ->
+            continueAdvancedFailure
+                sessionPort
+                eventPort
+                durable
+                scope
+                armRecovery
+                turn
+                continuationPrompt
+                error
+                opportunity
 
     let private continueDurableFailure
         (sessionPort: ISessionHostPort)

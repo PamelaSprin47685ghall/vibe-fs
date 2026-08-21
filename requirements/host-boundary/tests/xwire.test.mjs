@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import * as XWireSurface from '../../../dist/Context/Prefix/XWireSurface.js'
 
@@ -173,6 +174,34 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_with_probe_promotes_and_
   assert.equal(result.promoted, true)
   assert.equal(result.cleared, true)
   assert.equal(result.keptPlan, false)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_tool_call_provider_success_promotes_and_clears_before_host_turn_finishes', () => {
+  const result = XWireSurface.reconcile({
+    hasPlan: true,
+    outcome: 'tool-calls',
+    hasProbe: true,
+    currentEpoch: 0,
+    probeEpoch: 0,
+  })
+  assert.equal(result.promoted, true)
+  assert.equal(result.cleared, true)
+  assert.equal(result.keptPlan, false)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_ordinary_request_keeps_committed_prefix_instead_of_resurrecting_raw_x', () => {
+  const source = readFileSync(
+    new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url),
+    'utf8',
+  )
+  const ordinary = source.slice(
+    source.indexOf('let private applyNonReplicaTransform'),
+    source.indexOf('let private applySessionTransform'),
+  )
+
+  assert.match(ordinary, /settleVisibleToolContinuations/)
+  assert.match(ordinary, /\| None, _, _ ->[\s\S]*applyCommittedPrefix/)
+  assert.doesNotMatch(ordinary, /\| None, _, _ ->\s*return \(\)/)
 })
 
 test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_completed_without_probe_clears_without_promoting', () => {

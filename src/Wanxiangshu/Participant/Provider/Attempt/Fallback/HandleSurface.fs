@@ -15,7 +15,7 @@ module FallbackHandleSurface =
 
     let private outcomeName outcome =
         match outcome with
-        | ConfirmedFailureOutcome.RecoveryAdvanced -> "Advanced"
+        | ConfirmedFailureOutcome.RecoveryAdvanced _ -> "Advanced"
         | ConfirmedFailureOutcome.RecoveryExhausted -> "Exhausted"
         | ConfirmedFailureOutcome.AlreadyRecorded -> "AlreadyRecorded"
         | ConfirmedFailureOutcome.NoActiveRun -> "NoActiveRun"

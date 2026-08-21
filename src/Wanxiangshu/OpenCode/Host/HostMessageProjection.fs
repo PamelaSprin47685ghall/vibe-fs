@@ -165,3 +165,8 @@ module HostMessageProjection =
         messages
         |> List.map sanitizeMessage
         |> intersperseAssistantBetweenConsecutiveUsers
+
+    let sanitizeOutputMessages (outObj: obj) : unit =
+        let currentMessages = unbox<obj array> outObj?messages |> Array.toList
+        let sanitized = sanitizeMessages currentMessages
+        replaceMessagesInPlace outObj sanitized

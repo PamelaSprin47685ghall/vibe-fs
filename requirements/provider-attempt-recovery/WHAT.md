@@ -42,7 +42,7 @@ Host 传输层的重试序号是宿主内部状态，不得写入领域连续失
 
 ## PAR-011: typed recovery opportunity 与 parked-cursor 陷阱
 
-`RecoveryOpportunity` 仅由“本次已确认失败刚刚 advance”与“新 Offset 为 primed”共同产生；材料资格由后续候选/frames 证明，不得提前折叠进 opportunity。Opportunity 只属于紧随该 advance 的一个物理 attempt，发送普通请求也会消费它；新 Run 或崩溃重启后安全归零。严禁仅凭持久化奇数 Offset 重新 arm，严禁 NoCoverage 后把许可跨 attempt re-arm。
+`RecoveryOpportunity` 仅由“本次已确认失败刚刚 advance”与“该次 advance 得到的新 Offset 为 primed”共同产生；`FallbackLedger` 必须把这一本次 advance 的 typed opportunity 作为 admission 结果向后传递，后继 workflow 严禁再次读取 durable cursor 奇偶来重建 opportunity。材料资格由后续候选/frames 证明，不得提前折叠进 opportunity。Opportunity 只属于紧随该 advance 的一个物理 attempt，发送普通请求也会消费它；新 Run 或崩溃重启后安全归零。严禁仅凭持久化奇数 Offset 重新 arm，严禁 NoCoverage 后把许可跨 attempt re-arm。
 
 ## PAR-012: Host abort / cleanup 残留不计入推进
 
@@ -62,7 +62,7 @@ StrengthReplica attempt 的成功或失败属于投机调查分支，严禁进�
 
 ## PAR-016: RequestKind 决定成功记账
 
-成功终态是否写 `FallbackSucceeded` 必须由可证明的 `ProviderRequestKind` 决定：`WorkMain | BloggerMain` 的有效成功清零连续失败计数；`BloggerSquash | InteractionRepair | StrengthReplica` 不清零。Blogger 的 RequestKind 优先由当前 typed request / `BloggerCycleReceipt` 证明，Continuation kind 由 `AcceptedContinuationIds` 证明；禁止仅凭 Role 或 terminal 文本把维护请求误记为业务成功。
+成功 provider attempt 是否写 `FallbackSucceeded` 必须由可证明的 `ProviderRequestKind` 决定：`WorkMain | BloggerMain` 的有效成功清零连续失败计数；`BloggerSquash | InteractionRepair | StrengthReplica` 不清零。`finish=tool-calls` 是 provider attempt 的有效成功而非失败/未完成；它可以在 Host turn 继续执行工具的同时结算本次 provider recovery。Blogger 的 RequestKind 优先由当前 typed request / `BloggerCycleReceipt` 证明，Continuation kind 由 `AcceptedContinuationIds` 证明；禁止仅凭 Role 或 terminal 文本把维护请求误记为业务成功。
 
 ## PAR-017: Blogger retry 必须更换物理绑定
 

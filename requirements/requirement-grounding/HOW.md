@@ -55,7 +55,7 @@ Missing-Material Filter (同 horizon 已看见的材料逐文件跳过)
 | REQUIREMENT-GROUNDING-004 | `requirements/requirement-grounding/tests/scope-resolution.test.mjs` |
 | REQUIREMENT-GROUNDING-005 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs` |
 | REQUIREMENT-GROUNDING-006 | `requirements/requirement-grounding/tests/grounding-delivery.test.mjs` |
-| REQUIREMENT-GROUNDING-007 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs` |
+| REQUIREMENT-GROUNDING-007 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs`, `requirements/requirement-grounding/tests/requirement-grounding-project-surface.test.mjs` |
 | REQUIREMENT-GROUNDING-008 | `requirements/requirement-grounding/tests/opencode-gate.test.mjs` |
 | REQUIREMENT-GROUNDING-009 | `requirements/requirement-grounding/tests/repository-programming-gate.test.mjs` |
 | REQUIREMENT-GROUNDING-010 | `requirements/requirement-grounding/tests/repository-programming-gate.test.mjs` |

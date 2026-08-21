@@ -41,7 +41,7 @@
 | HOST-BOUNDARY-008 | `requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs` |
 | HOST-BOUNDARY-009 | `requirements/host-boundary/tests/tool-host-codec.test.mjs` |
 | HOST-BOUNDARY-010 | `requirements/host-boundary/tests/shared-state.test.mjs` |
-| HOST-BOUNDARY-011 | `requirements/host-boundary/tests/host-message-projection.test.mjs` |
+| HOST-BOUNDARY-011 | `requirements/host-boundary/tests/host-message-projection.test.mjs`, `requirements/host-boundary/tests/host-message-sanitize-surface.test.mjs` |
 | HOST-BOUNDARY-012 | `requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-013 | `requirements/host-boundary/tests/needhelp-sensor.test.mjs` |
 | HOST-BOUNDARY-014 | `requirements/host-boundary/tests/host-hooks.test.mjs` |

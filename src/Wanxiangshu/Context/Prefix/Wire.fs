@@ -305,6 +305,139 @@ module XWire =
             let rendered = ProjectionRenderer.renderPrefix ordered
             ProjectionMessageEdit.applyRenderedPrefix rawMessages rendered
 
+    let private commitPromotablePrefixRebase
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (plan: AttemptPlan)
+        : Task<Result<unit, string>> =
+        task {
+            let projections = AgentJournal.snapshot durable
+
+            let epoch =
+                AgentProjection.tryFind sessionId projections.AgentProjections
+                |> Option.bind (fun state -> state.PrefixEpoch)
+                |> Option.defaultValue PrefixEpochProjection.empty
+
+            match AttemptPlanner.promotableProbe plan AttemptOutcome.Completed with
+            | Some probe when epoch.EpochId = probe.BasedOnEpochId ->
+                let fact =
+                    ContextFact.PrefixRebaseCommitted
+                        {| SessionId = sessionId
+                           PreviousEpochId = probe.BasedOnEpochId
+                           NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
+                           FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
+                           FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
+                           CutoffExclusive = probe.Candidate.CutoffExclusive
+                           CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
+                           SealRoot = probe.Candidate.SealRoot
+                           SyntheticMessageId = probe.Candidate.SyntheticMessageId
+                           ProbeId = probe.ProbeId
+                           SolvingProviderRun = providerRun |}
+
+                let! appended = AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact durable
+                return appended |> Result.map (fun _ -> ()) |> Result.mapError JournalAppendFailure.describe
+            | _ -> return Ok()
+        }
+
+    let private recordSuccessfulAttempt
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (plan: AttemptPlan)
+        : Task<Result<unit, string>> =
+        if ProviderRequestKind.clearsFailureCountOnSuccess plan.Profile.RequestKind then
+            FallbackLedger.recordConfirmedSuccess durable sessionId providerRun
+        else
+            Task.FromResult(Ok())
+
+    let private settleAttemptPlan
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (providerRun: ProviderRunIdentity)
+        (outcome: AttemptOutcome)
+        (plan: AttemptPlan)
+        : Task =
+        task {
+            let! committed =
+                match outcome with
+                | AttemptOutcome.Completed -> commitPromotablePrefixRebase durable sessionId providerRun plan
+                | AttemptOutcome.CompletedInvalid
+                | AttemptOutcome.Failed
+                | AttemptOutcome.Aborted -> Task.FromResult(Ok())
+
+            match committed with
+            | Error reason ->
+                return raise (InvalidOperationException(sprintf "prefix rebase commit failed: %s" reason))
+            | Ok() ->
+                let! success =
+                    match outcome with
+                    | AttemptOutcome.Completed -> recordSuccessfulAttempt durable sessionId providerRun plan
+                    | AttemptOutcome.CompletedInvalid
+                    | AttemptOutcome.Failed
+                    | AttemptOutcome.Aborted -> Task.FromResult(Ok())
+
+                match success with
+                | Error reason ->
+                    return raise (InvalidOperationException(sprintf "provider success commit failed: %s" reason))
+                | Ok() -> scope.ConsumeAttemptPlan sessionId providerRun |> ignore
+        }
+
+    let private toolContinuationRun (rawMessage: obj) : ProviderRunIdentity option =
+        let info = ProviderWireDecode.infoObject rawMessage
+
+        match
+            ProviderWireDecode.firstString info [ "role" ],
+            ProviderWireDecode.firstString info [ "finish" ],
+            ProviderWireDecode.hostMessageId rawMessage
+        with
+        | Some role, Some finish, Some providerRun when
+            role.Equals("assistant", StringComparison.OrdinalIgnoreCase)
+            && finish.Equals("tool-calls", StringComparison.OrdinalIgnoreCase)
+            -> Some(ProviderRunIdentity.create providerRun)
+        | _ -> None
+
+    let private settleVisibleToolContinuations
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (rawMessages: obj list)
+        : Task =
+        task {
+            for providerRun in rawMessages |> List.choose toolContinuationRun |> List.distinct do
+                match scope.TryAttemptPlan sessionId providerRun with
+                | None -> ()
+                | Some plan -> do! settleAttemptPlan durable scope sessionId providerRun AttemptOutcome.Completed plan
+        }
+
+    let private applyCommittedPrefix
+        (durable: AgentJournal)
+        (sessionId: SessionId)
+        (state: SessionAgentProjection)
+        (rawMessages: obj list)
+        (output: obj)
+        : Task<unit> =
+        task {
+            let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
+
+            match prefix.Snapshot with
+            | None -> return ()
+            | Some committed ->
+                let choice = XProjectionChoice.UseCommittedEpoch
+                let! frozenRecordPrefixBody = readFrozenRecordPrefixBody durable choice (Some committed)
+
+                let memoryPreamble =
+                    ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
+
+                let prefixIntent =
+                    XPrefixProjection.forChoice choice (Some committed) memoryPreamble frozenRecordPrefixBody
+
+                let intents = intentsForHostReanchor (observeHostReanchor prefix) prefixIntent
+                let transformed = renderPrefixMessages rawMessages intents
+                Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
+        }
+
     let private awaitProjectionSignal
         (messageVisibility: MessageVisibilityHub option)
         (sessionId: SessionId)
@@ -449,11 +582,20 @@ module XWire =
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
             let physical = ProviderWireCapture.lastUserMessageId rawMessages
 
+            // A successful probe may have ended with tool calls. That provider
+            // attempt is complete even though the Host turn continues through the
+            // tool loop. Settle it before reading PrefixEpoch for this request.
+            do! settleVisibleToolContinuations durable scope sessionId rawMessages
+
             // Owning recovery CE consumes the typed arming permit exactly once (SW-017②, PAR-011).
             // Host callback is only rendezvous/observation; presence no longer drives business branching
             // outside the owning CE.
             match scope.TryTakeRecoveryPermit sessionId, physical, snapshot with
-            | None, _, _ -> return ()
+            | None, _, _ ->
+                match sessionProjection durable sessionId with
+                | None ->
+                    raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
+                | Some state -> return! applyCommittedPrefix durable sessionId state rawMessages output
             | Some _, None, _ ->
                 raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
             | Some _, _, None ->
@@ -491,87 +633,22 @@ module XWire =
             | _ -> return ()
         }
 
-    let private commitPromotablePrefixRebase
-        (durable: AgentJournal)
-        (turn: ReconciledTurn)
-        (plan: AttemptPlan)
-        : Task<unit> =
-        task {
-            let projections = AgentJournal.snapshot durable
+    let private attemptOutcomeOfTurn (turn: ReconciledTurn) : AttemptOutcome option =
+        match turn.Observation, turn.Outcome with
+        | Some _, _ -> None
+        | None, ReconcileProgram.TurnCompleted -> Some AttemptOutcome.Completed
+        | None, ReconcileProgram.TurnInProgress -> Some AttemptOutcome.Completed
+        | None, ReconcileProgram.TurnNeedsContinuation _ -> Some AttemptOutcome.CompletedInvalid
+        | None, ReconcileProgram.TurnFailed _ -> Some AttemptOutcome.Failed
+        | None, ReconcileProgram.TurnAborted _ -> Some AttemptOutcome.Aborted
 
-            let epoch =
-                AgentProjection.tryFind turn.SessionId projections.AgentProjections
-                |> Option.bind (fun state -> state.PrefixEpoch)
-                |> Option.defaultValue PrefixEpochProjection.empty
-
-            match AttemptPlanner.promotableProbe plan AttemptOutcome.Completed with
-            | Some probe when epoch.EpochId = probe.BasedOnEpochId ->
-                let fact =
-                    ContextFact.PrefixRebaseCommitted
-                        {| SessionId = turn.SessionId
-                           PreviousEpochId = probe.BasedOnEpochId
-                           NextEpochId = PrefixEpochId.next probe.BasedOnEpochId
-                           FrozenRecordPrefixRef = probe.Candidate.FrozenRecordPrefixRef
-                           FrozenRecordPrefixDigest = probe.Candidate.FrozenRecordPrefixDigest
-                           CutoffExclusive = probe.Candidate.CutoffExclusive
-                           CoveredPrefixDigest = probe.Candidate.CoveredPrefixDigest
-                           SealRoot = probe.Candidate.SealRoot
-                           SyntheticMessageId = probe.Candidate.SyntheticMessageId
-                           ProbeId = probe.ProbeId
-                           SolvingProviderRun = turn.ProviderRun |}
-
-                let! _ = AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some turn.ProviderRun) fact durable
-
-                ()
-            | _ -> ()
-        }
-
-    let private reconcileArmedAttempt
-        (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        (plan: AttemptPlan)
-        : Task =
-        // Typed handle already consumed by reconcileAttempt via TryTakeAttemptPlan.
-        // Keep the plan across provisional / unknown rereads of the SAME
-        // provider run only inside the owning CE: TurnCompleted commits the
-        // promotable prefix rebase; terminal outcomes release the handle
-        // (already consumed); provisional keeps nothing (no second read).
-        match turn.Outcome with
-        | ReconcileProgram.TurnCompleted ->
-            task {
-                do! commitPromotablePrefixRebase durable turn plan
-                ()
-            }
-            :> Task
-        | ReconcileProgram.TurnFailed _
-        | ReconcileProgram.TurnAborted _ -> Task.FromResult(())
-        | ReconcileProgram.TurnNeedsContinuation _
-        | ReconcileProgram.TurnInProgress -> Task.FromResult(())
-
-    /// Terminal outcome dispatch: consume the typed handle and delegate to the
-    /// armed attempt CE; provisional/unknown turns keep the plan alive (SW-009,
-    /// SW-017②, PAR-011).
-    let private reconcileTerminalAttempt
-        (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        (plan: AttemptPlan)
-        : Task =
-        match turn.Outcome with
-        | ReconcileProgram.TurnCompleted
-        | ReconcileProgram.TurnFailed _
-        | ReconcileProgram.TurnAborted _ ->
-            scope.ConsumeAttemptPlan turn.SessionId turn.ProviderRun |> ignore
-            reconcileArmedAttempt durable scope turn plan
-        | ReconcileProgram.TurnNeedsContinuation _
-        | ReconcileProgram.TurnInProgress -> Task.FromResult(())
-
-    /// Owning recovery CE peeks the frozen attempt plan first; consumes only on terminal
-    /// outcomes. Provisional/unknown turns keep the plan alive for the terminal reread,
-    /// eliminating the premature-clear bug where FallbackCursorAdvanced had no matching
-    /// PrefixRebaseCommitted (SW-009, SW-017②, PAR-011).
+    /// Settle the physical provider attempt, not the larger Host turn.
+    /// `finish=tool-calls` therefore closes a successful attempt plan while the
+    /// Host tool loop continues; only a genuinely provisional snapshot keeps it.
     let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
         match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
-        | Some durable, Some plan -> reconcileTerminalAttempt durable scope turn plan
+        | Some durable, Some plan ->
+            match attemptOutcomeOfTurn turn with
+            | Some outcome -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun outcome plan
+            | None -> Task.FromResult(())
         | _ -> Task.FromResult(())

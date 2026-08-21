@@ -252,7 +252,7 @@ module InteractionRepairWorkflow =
                 do! sendAabb ()
             | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
                 do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-            | Ok ConfirmedFailureOutcome.RecoveryAdvanced -> do! sendAabb ()
+            | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> do! sendAabb ()
         }
         :> Task
 

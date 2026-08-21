@@ -29,11 +29,6 @@ const toolModule = {
 
 const waitForPromptCount = (runtime, count) => forkTool.awaitPromptCount(runtime, count)
 
-const remainsPending = async (promise) => Promise.race([
-  promise.then((value) => ({ kind: 'resolved', value })),
-  new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
-])
-
 test('WHAT[DELEG-019] FORK_TOOL_payload_has_assignment_and_requirements', () => {
   const wire = fork.render('en', {
     Assignment: 'inspect',
@@ -79,7 +74,7 @@ test('WHAT[DELEG-006] FORK_continuation_reuses_bound_managed_agent_and_does_not_
   assert.equal(Object.hasOwn(result, 'agentId'), false)
 })
 
-test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_waits_for_own_completion_and_returns_only_own_delta', async () => {
+test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-reuse-'))
   const runtime = await forkTool.createRuntime(directory)
   const owner = 'manager-reuse'
@@ -126,16 +121,23 @@ test('WHAT[DELEG-024] FORK_TOOL_same_byname_reuse_waits_for_own_completion_and_r
     assert.match(secondPrompt, /PARENT-FRESH-DELTA-MARKER/)
     assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
 
-    assert.deepEqual(
-      await remainsPending(second),
-      { kind: 'pending' },
-      'same-road reuse must wait for this invocation rather than replaying the previous result',
+    const secondResult = await second
+    assert.match(secondResult, /Ada/)
+    assert.doesNotMatch(secondResult, /SECOND-FORK-ANSWER/)
+    assert.doesNotMatch(secondResult, /FIRST-FORK-ANSWER/)
+
+    assert.equal(
+      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
+      'Active',
+      'fork return must not imply that the reused child already completed',
     )
 
     assert.equal(await forkTool.settle(runtime, owner, 'SECOND-FORK-ANSWER', 'fork-run-2'), true)
-    const secondResult = await second
-    assert.match(secondResult, /SECOND-FORK-ANSWER/)
-    assert.doesNotMatch(secondResult, /FIRST-FORK-ANSWER/)
+    assert.equal(
+      forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
+      'CompletedAwaitingJoin',
+      'completion remains a separately consumable join fact',
+    )
   } finally {
     forkTool.disposeRuntime(runtime)
   }

@@ -179,3 +179,14 @@ test('WHAT[PAR-011] PAR_011_arming_is_a_control_flow_fact_not_a_position', () =>
   assert.equal(slot.onMain({ kind: requestKind.workMain, outcome: 'Completed' }).nextArmingName, 'NotArmed')
   assert.equal(slot.onMain({ kind: requestKind.workMain, outcome: 'Failed' }).nextArmingName, 'ArmedByAdvance')
 })
+
+test('WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_workflow_never_rebuilds_it_from_cursor_parity', () => {
+  const ledger = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs')
+  const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
+
+  assert.match(ledger, /RecoveryAdvanced of RecoveryOpportunity/)
+  assert.match(ledger, /RecoverySlot\.opportunity RecoverySlot\.afterFailureAdvance next\.Offset/)
+  assert.match(workflow, /RecoveryAdvanced opportunity/)
+  assert.doesNotMatch(workflow, /opportunityAfterAdvance/)
+  assert.doesNotMatch(workflow, /AgentPairCursor\.isRecoverySlot/)
+})

@@ -446,7 +446,7 @@ module ForkTool =
                 prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
                 |> TaskResultCE.ofTask
 
-            let! _ =
+            return!
                 runtime.Reuse(
                     agentId,
                     request.Charge,
@@ -454,8 +454,6 @@ module ForkTool =
                     ?expectedToolCalls = request.ExpectedToolCalls,
                     preparedHandoff = handoff
                 )
-
-            return! runtime.AwaitCurrentWorkRecord agentId
         }
 
     let private commitNewManagerFork
@@ -539,9 +537,14 @@ module ForkTool =
             let! placement =
                 taskResult {
                     do! recordFissionAffinity scope context agentId
-                    let! workRecord = runManagerReuse scope runtime record.Role request language attachment agentId
+                    let! result = runManagerReuse scope runtime record.Role request language attachment agentId
                     announceChild runtime context agentId
-                    return ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
+
+                    return
+                        match result with
+                        | ForkResult.DispatchUncertain _ ->
+                            consequence (namedProse language Path.Fork.ChargePlacementUncertain (request.Name.Trim()))
+                        | _ -> successInstruction (namedProse language Path.Fork.ChargeCarried (request.Name.Trim()))
                 }
 
             match placement with

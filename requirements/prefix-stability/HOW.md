@@ -26,7 +26,7 @@ DEPENDS ON:
 
 | 命题 | 落点测试 |
 |---|---|
-| PREFIX-STABILITY-001 | `requirements/prefix-stability/tests/prefix-append-only-law.test.mjs` |
+| PREFIX-STABILITY-001 | `requirements/prefix-stability/tests/prefix-append-only-law.test.mjs`, `requirements/prefix-stability/tests/xwire-transform-surface.test.mjs` |
 | PREFIX-STABILITY-002 | `requirements/prefix-stability/tests/prefix-epoch.test.mjs` |
 | PREFIX-STABILITY-003 | `requirements/prefix-stability/tests/prefix-epoch.test.mjs` |
 | PREFIX-STABILITY-004 | `requirements/prefix-stability/tests/prefix-epoch-todo-checkpoint.test.mjs` |
