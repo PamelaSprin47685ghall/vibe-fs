@@ -3,6 +3,7 @@ namespace Wanxiangshu.Git.Hook
 open Wanxiangshu.Change
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Git
+open Wanxiangshu.Host
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Repository.Knowledge.Casebook
@@ -61,11 +62,17 @@ module HookDispatcher =
     [<Import("dirname", "node:path")>]
     let private dirname (path: string) : string = jsNative
 
+    [<Import("tmpdir", "node:os")>]
+    let private tempDirectory () : string = jsNative
+
     [<Import("fileURLToPath", "node:url")>]
     let private fileURLToPath (url: string) : string = jsNative
 
     [<Emit("import.meta.url")>]
     let private importMetaUrl: string = jsNative
+
+    [<Emit("process.platform")>]
+    let private platform: string = jsNative
 
     let private hookFileName =
         function
@@ -205,26 +212,53 @@ module HookDispatcher =
         let lower = command.ToLowerInvariant()
         lower.Contains("controlmaster=") || lower.Contains("controlpath=")
 
-    let private ensureSshMultiplex workspace =
-        let baseCommand = tryGitConfig workspace "core.sshCommand" |> Option.defaultValue "ssh"
+    let private multiplexSuffix controlPath =
+        String.concat
+            " "
+            [ "-o ControlMaster=auto"
+              "-o ControlPersist=15s"
+              "-o " + shellQuote ("ControlPath=" + controlPath) ]
 
-        if hasUserSshMultiplex baseCommand then
+    let private legacyManagedControlPath commonDir =
+        joinPath (joinPath commonDir "wanxiang") "ssh-%C"
+
+    let private tryStripLegacyManagedCommand commonDir (command: string) =
+        let suffix = " " + multiplexSuffix (legacyManagedControlPath commonDir)
+
+        if command.EndsWith(suffix, StringComparison.Ordinal) then
+            Some(command.Substring(0, command.Length - suffix.Length))
+        else
+            None
+
+    let private shortManagedControlPath commonDir =
+        let repoKey = HostDigest.sha256Hex commonDir |> fun digest -> digest.Substring(0, 12)
+        let socketDir = joinPath (tempDirectory ()) ("wanxiang-ssh-" + repoKey)
+        mkdirSync socketDir (createObj [ "recursive" ==> true; "mode" ==> 0o700 ])
+
+        // A predictable tmp name is safe only if the directory remains private to
+        // this OS user. chmod also fails closed if another user pre-created it.
+        chmodSync socketDir 0o700
+        joinPath socketDir "ssh-%C"
+
+    let private ensureSshMultiplex workspace =
+        if platform = "win32" then
             ()
         else
             let commonDir = gitCommonDir workspace
-            let socketDir = joinPath commonDir "wanxiang"
-            mkdirSync socketDir (createObj [ "recursive" ==> true; "mode" ==> 0o700 ])
-            let controlPath = joinPath socketDir "ssh-%C"
+            let current = tryGitConfig workspace "core.sshCommand" |> Option.defaultValue "ssh"
 
-            let managed =
-                String.concat
-                    " "
-                    [ baseCommand
-                      "-o ControlMaster=auto"
-                      "-o ControlPersist=15s"
-                      "-o " + shellQuote ("ControlPath=" + controlPath) ]
+            let baseCommand =
+                match tryStripLegacyManagedCommand commonDir current with
+                | Some legacyBase -> Some legacyBase
+                | None when hasUserSshMultiplex current -> None
+                | None -> Some current
 
-            GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managed |] |> ignore
+            match baseCommand with
+            | None -> ()
+            | Some baseCommand ->
+                let controlPath = shortManagedControlPath commonDir
+                let managed = baseCommand + " " + multiplexSuffix controlPath
+                GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managed |] |> ignore
 
     let private ensureWorkspace workspace : Result<unit, string> =
         let hooksDir = hooksDirectory workspace

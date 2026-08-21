@@ -69,12 +69,33 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multip
     assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
     assert.match(configured, /ControlMaster=auto/)
     assert.match(configured, /ControlPersist=15s/)
-    assert.match(configured, /ControlPath=/)
+    assert.match(configured, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
 
     const second = ensure(repo)
     assert.equal(second.tag, 0, `second hook ensure failed: ${JSON.stringify(second)}`)
     const configuredAgain = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
     assert.equal(configuredAgain, configured, 'repeated ensure must not stack SSH multiplex options')
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the obsolete long repo-local control socket path', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-migrate-'))
+
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    const commonDir = execFileSync('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim()
+    const base = 'ssh -F /dev/null -i /tmp/wxs-test-key'
+    const legacy = `${base} -o ControlMaster=auto -o ControlPersist=15s -o 'ControlPath=${join(commonDir, 'wanxiang', 'ssh-%C')}'`
+    execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', legacy])
+
+    const verdict = ensure(repo)
+    assert.equal(verdict.tag, 0, `hook ensure failed: ${JSON.stringify(verdict)}`)
+    const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
+    assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
+    assert.match(configured, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
+    assert.doesNotMatch(configured, new RegExp(`${commonDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/wanxiang/ssh-%C`))
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }
