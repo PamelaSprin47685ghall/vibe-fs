@@ -107,10 +107,39 @@ if (normalTransformStart < 0) {
   }
 }
 
+// 4. Explicit TransformMode dispatch — composition root must use typed mode
+// Reject implicit helper dispatch patterns that hide mode decision.
+const implicitModeHelpers = [
+  /let\s+private\s+strengthReplicaRuntime\b/,
+  /let\s+private\s+isExplicitResumeProviderMaterial\b/,
+  /let\s+private\s+requireReplicaHandled\b/,
+  /let\s+private\s+ordinaryProviderTransform\b/,
+]
+for (const pattern of implicitModeHelpers) {
+  if (pattern.test(text)) {
+    violations.push(`implicit mode helper still present: ${pattern} — use TransformMode + determineTransformMode + explicit match`)
+  }
+}
+if (!/type\s+private\s+TransformMode\b/.test(text)) {
+  violations.push('missing type private TransformMode — composition root must declare explicit mode DU')
+}
+if (!/let\s+private\s+determineTransformMode\b/.test(text)) {
+  violations.push('missing determineTransformMode — mode decision must be named and typed')
+}
+if (!/match\s+determineTransformMode\b/.test(text)) {
+  violations.push('missing explicit match determineTransformMode — dispatch must be match on TransformMode')
+}
+const modeCases = ['ExplicitResumeDisclosure', 'StrengthReplica', 'Ordinary']
+for (const c of modeCases) {
+  if (!text.includes(c)) {
+    violations.push(`TransformMode case not wired in dispatch: ${c}`)
+  }
+}
+
 if (violations.length > 0) {
   console.error('plugin-transforms-invariant: VIOLATIONS')
   for (const v of violations) console.error(`  ${v}`)
   process.exit(1)
 }
 
-console.log('plugin-transforms-invariant: OK — static composition, no dynamic pipeline, no foreign decisions, ordering locked')
+console.log('plugin-transforms-invariant: OK — static composition, no dynamic pipeline, no foreign decisions, ordering locked, TransformMode explicit')

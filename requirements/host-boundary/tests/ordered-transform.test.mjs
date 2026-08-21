@@ -81,37 +81,50 @@ test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 12-step static scor
   }
 })
 
-test('WHAT[HOST-BOUNDARY-019] strength replica branch executes replica sequence and excludes normal transform', () => {
+test('WHAT[HOST-BOUNDARY-019] strength replica branch executes replica sequence via explicit TransformMode and excludes normal transform', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
-  const allLines = text.split('\n')
-  const ordinaryStart = allLines.findIndex((l) => /^\s*let\s+(?:private\s+)?ordinaryProviderTransform\b/.test(l))
-  assert.ok(ordinaryStart >= 0, 'ordinaryProviderTransform must exist in PluginTransforms.fs')
+  // New explicit mode shape — would be red if reverted to implicit ordinaryProviderTransform
+  assert.match(text, /type\s+private\s+TransformMode/)
+  assert.match(text, /\|\s*ExplicitResumeDisclosure/)
+  assert.match(text, /\|\s*StrengthReplica\s+of\s+StrengthReplicaRuntime/)
+  assert.match(text, /\|\s*Ordinary/)
+  assert.match(text, /let\s+private\s+determineTransformMode/)
+  assert.match(text, /match\s+branches\.IsExplicitResume[\s\S]*?,\s*branches\.ReplicaRuntime/)
+  assert.match(text, /let\s+private\s+failIfReplicaDecisionLost/)
+  assert.doesNotMatch(text, /let\s+private\s+ordinaryProviderTransform\b/)
+  assert.doesNotMatch(text, /let\s+private\s+requireReplicaHandled\b/)
+  assert.doesNotMatch(text, /let\s+private\s+strengthReplicaRuntime\b/)
 
-  const startIndent = allLines[ordinaryStart].length - allLines[ordinaryStart].trimStart().length
-  let ordinaryEnd = allLines.length
-  for (let i = ordinaryStart + 1; i < allLines.length; i++) {
+  const allLines = text.split('\n')
+  const createStart = allLines.findIndex((l) => /^\s*let\s+createWithCaps\b/.test(l))
+  assert.ok(createStart >= 0, 'createWithCaps must exist in PluginTransforms.fs')
+
+  const startIndent = allLines[createStart].length - allLines[createStart].trimStart().length
+  let createEnd = allLines.length
+  for (let i = createStart + 1; i < allLines.length; i++) {
     const line = allLines[i]
     if (line.trim() === '') continue
     const indent = line.length - line.trimStart().length
-    if (indent <= startIndent && /^\s*let\s/.test(line)) {
-      ordinaryEnd = i
+    if (indent <= startIndent && /^\s*let\s+create\b/.test(line)) {
+      createEnd = i
       break
     }
   }
 
-  const body = allLines.slice(ordinaryStart, ordinaryEnd).join('\n')
+  const body = allLines.slice(createStart, createEnd).join('\n')
 
+  assert.match(body, /match\s+determineTransformMode\s+branches\s+projectionSessionIdOpt\s+outObj\s+with/)
+  assert.match(body, /\|\s*StrengthReplica\s+runtime\s*->/)
   assert.match(body, /projectionSessionIdOpt\s*\|\>\s*Option\.iter\s+branches\.RegisterOwned/)
-  assert.match(body, /match\s+branches\.ReplicaRuntime\s+projectionSessionIdOpt\s+with/)
   assert.match(body, /do!\s+branches\.ReplicaXWire\s+outObj/)
   assert.match(body, /let!\s+handled\s*=\s*runtime\.HandleTransform\s+outObj/)
-  assert.match(body, /requireReplicaHandled\s+handled/)
+  assert.match(body, /failIfReplicaDecisionLost\s+handled/)
   assert.match(body, /branches\.ReplicaSanitize\s+outObj/)
-  assert.match(body, /None\s*->[\s\S]*?do!\s+normalTransform\s+caps\s+projectionSessionIdOpt\s+inObj\s+outObj/)
+  assert.match(body, /\|\s*Ordinary\s*->[\s\S]*?do!\s+normalTransform\s+caps\s+projectionSessionIdOpt\s+inObj\s+outObj/)
 })
 
-test('WHAT[HOST-BOUNDARY-019] explicit resume suppression short-circuits before ordinary provider transform', () => {
+test('WHAT[HOST-BOUNDARY-019] explicit resume suppression short-circuits via TransformMode before ordinary provider transform', () => {
   const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
 
   const allLines = text.split('\n')
@@ -132,9 +145,15 @@ test('WHAT[HOST-BOUNDARY-019] explicit resume suppression short-circuits before 
 
   const body = allLines.slice(createStart, createEnd).join('\n')
 
-  assert.match(body, /if\s+branches\.IsExplicitResume\s+projectionSessionIdOpt\s+outObj\s+then/)
-  assert.match(body, /branches\.ExplicitResumeSanitize\s+outObj/)
-  assert.match(body, /else[\s\S]*?do!\s+ordinaryProviderTransform\s+caps\s+branches/)
+  assert.match(body, /match\s+determineTransformMode\s+branches\s+projectionSessionIdOpt\s+outObj\s+with/)
+  assert.match(body, /\|\s*ExplicitResumeDisclosure\s*->[\s\S]*?branches\.ExplicitResumeSanitize\s+outObj/)
+  assert.doesNotMatch(body, /if\s+branches\.IsExplicitResume\s+projectionSessionIdOpt\s+outObj\s+then/)
+  assert.doesNotMatch(body, /do!\s+ordinaryProviderTransform\s+caps\s+branches/)
+  const explicitIdx = body.indexOf('ExplicitResumeDisclosure')
+  const replicaIdx = body.indexOf('StrengthReplica runtime')
+  const ordinaryIdx = body.indexOf('| Ordinary')
+  assert.ok(explicitIdx >= 0 && replicaIdx >= 0 && ordinaryIdx >= 0, 'all three TransformMode cases must be wired')
+  assert.ok(explicitIdx < replicaIdx && replicaIdx < ordinaryIdx, 'TransformMode cases must be ExplicitResumeDisclosure -> StrengthReplica -> Ordinary')
 })
 
 test('WHAT[HOST-BOUNDARY-019] create entry delegates to createWithCaps and default capabilities', () => {

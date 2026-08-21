@@ -136,21 +136,27 @@ module PluginTransforms =
         | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
         | None -> ProviderLanguage.English
 
-    let private strengthReplicaRuntime
-        (projectionSessionIdOpt: string option)
-        (scope: PluginRuntimeScope)
-        : StrengthReplicaRuntime option =
-        match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
-        | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
-        | _ -> None
+    // Explicit composition mode — replaces the previous implicit helper dispatch
+    // (strengthReplicaRuntime / isExplicitResumeProviderMaterial / ordinaryProviderTransform).
+    // This type is representation-level (composition topology), not a foreign domain decision.
+    type private TransformMode =
+        | ExplicitResumeDisclosure
+        | StrengthReplica of StrengthReplicaRuntime
+        | Ordinary
 
-    let private requireReplicaHandled (handled: bool) =
+    let private failIfReplicaDecisionLost (handled: bool) : unit =
         if not handled then
             raise (InvalidOperationException "StrengthReplica transform lost its live decision binding")
 
-    let private isExplicitResumeProviderMaterial projectionSessionIdOpt outObj =
-        ExplicitResumeSuppression.isCurrentMaterial outObj
-        || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj
+    let private determineTransformMode
+        (branches: TransformBranchCapabilities)
+        (projectionSessionIdOpt: string option)
+        (outObj: obj)
+        : TransformMode =
+        match branches.IsExplicitResume projectionSessionIdOpt outObj, branches.ReplicaRuntime projectionSessionIdOpt with
+        | true, _ -> ExplicitResumeDisclosure
+        | false, Some runtime -> StrengthReplica runtime
+        | false, None -> Ordinary
 
     let defaultCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : NormalTransformCapabilities =
         let scope = boot.Scope
@@ -211,7 +217,7 @@ module PluginTransforms =
                     wired.RegisterOwned(SessionId.value bloggerId)
                     wired.BindActiveRun bloggerId Role.Blogger None))
                 SharedState.RootWorkspace
-                isExplicitResumeProviderMaterial
+                (fun projectionSessionIdOpt outObj -> ExplicitResumeSuppression.isCurrentMaterial outObj || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj)
           ApplyXWire = XWire.applyTransform snapshotOpt journal scope
           ApplyEnforcerContinuation =
             fun projectionSessionIdOpt outObj ->
@@ -255,9 +261,9 @@ module PluginTransforms =
         let snapshotOpt = host.SnapshotOpt
         let wired = host.Wired
 
-        { IsExplicitResume = isExplicitResumeProviderMaterial
+        { IsExplicitResume = fun projectionSessionIdOpt outObj -> ExplicitResumeSuppression.isCurrentMaterial outObj || ExplicitResumeSuppression.isExplicitResumeBinding projectionSessionIdOpt outObj
           RegisterOwned = wired.RegisterOwned
-          ReplicaRuntime = fun projectionSessionIdOpt -> strengthReplicaRuntime projectionSessionIdOpt scope
+          ReplicaRuntime = fun projectionSessionIdOpt -> match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime | _ -> None
           ReplicaXWire = XWire.applyTransform snapshotOpt journal scope
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages
           ExplicitResumeSanitize = HostMessageProjection.sanitizeOutputMessages }
@@ -307,29 +313,6 @@ module PluginTransforms =
             ()
         }
 
-    let private ordinaryProviderTransform
-        (caps: NormalTransformCapabilities)
-        (branches: TransformBranchCapabilities)
-        (projectionSessionIdOpt: string option)
-        (inObj: obj)
-        (outObj: obj)
-        : Task<unit> =
-        task {
-            projectionSessionIdOpt |> Option.iter branches.RegisterOwned
-
-            match branches.ReplicaRuntime projectionSessionIdOpt with
-            | Some runtime ->
-                // STRENGTH-004/009: Replica uses exactly one request-plan
-                // writer plus its mirror/K gate. XTrace, Manager narrative,
-                // Companion, Enforcer, Pair and Review are owner-only.
-                do! branches.ReplicaXWire outObj
-                let! handled = runtime.HandleTransform outObj
-                requireReplicaHandled handled
-
-                branches.ReplicaSanitize outObj
-            | None -> do! normalTransform caps projectionSessionIdOpt inObj outObj
-        }
-
     let createWithCaps
         (caps: NormalTransformCapabilities)
         (branches: TransformBranchCapabilities)
@@ -348,7 +331,8 @@ module PluginTransforms =
                         else
                             None)
 
-                if branches.IsExplicitResume projectionSessionIdOpt outObj then
+                match determineTransformMode branches projectionSessionIdOpt outObj with
+                | ExplicitResumeDisclosure ->
                     // CRASH-018: the exact /continue material stays disclosure-only
                     // for every provider step, including steps after tool results.
                     // The trailing marker is the direct path; the exact physical
@@ -356,8 +340,18 @@ module PluginTransforms =
                     // drops custom part metadata after chat.message.
                     // Do not reinterpret it through ordinary semantic transforms.
                     branches.ExplicitResumeSanitize outObj
-                else
-                    do! ordinaryProviderTransform caps branches projectionSessionIdOpt inObj outObj
+                | StrengthReplica runtime ->
+                    projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+                    // STRENGTH-004/009: Replica uses exactly one request-plan
+                    // writer plus its mirror/K gate. XTrace, Manager narrative,
+                    // Companion, Enforcer, Pair and Review are owner-only.
+                    do! branches.ReplicaXWire outObj
+                    let! handled = runtime.HandleTransform outObj
+                    do failIfReplicaDecisionLost handled
+                    branches.ReplicaSanitize outObj
+                | Ordinary ->
+                    projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+                    do! normalTransform caps projectionSessionIdOpt inObj outObj
             }
 
     /// Provider-facing transform composition: order only.
