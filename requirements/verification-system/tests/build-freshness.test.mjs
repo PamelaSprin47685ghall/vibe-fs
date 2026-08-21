@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
+import { loopDetectorRepositoryInputFiles } from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
 import { checkBuildFreshness } from './support/build-freshness.mjs'
 
 test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived artifact inputs beyond F# sources', () => {
@@ -36,9 +37,21 @@ test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived 
 })
 
 test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded from the build corpus', () => {
-  const repositoryRoot = new URL('../../../', import.meta.url).pathname
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-build-corpus-ignore-'))
+  try {
+    execFileSync('git', ['init', '-q', root])
+    writeFileSync(join(root, '.gitignore'), 'repomix-src-part*.xml\n', 'utf8')
+    writeFileSync(join(root, 'keep.md'), 'real repository input\n', 'utf8')
+    writeFileSync(join(root, 'repomix-src-part1.xml'), '<temporary-export/>\n', 'utf8')
+    execFileSync('git', ['-C', root, 'add', '.gitignore', 'keep.md'])
 
-  assert.doesNotThrow(() =>
-    execFileSync('git', ['-C', repositoryRoot, 'check-ignore', '-q', 'repomix-src-part1.xml']),
-  )
+    const inputs = loopDetectorRepositoryInputFiles(root)
+    assert.ok(inputs.includes(join(root, 'keep.md')), 'tracked repository input must remain in the corpus')
+    assert.ok(
+      !inputs.includes(join(root, 'repomix-src-part1.xml')),
+      'ignored local repository export must never become a build-freshness input',
+    )
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })

@@ -63,16 +63,40 @@ module ProjectionMessageEdit =
         (syntheticId: string)
         (memory: string)
         (coveredHostMessageIds: string list)
+        (insertAfterHostMessageId: string option)
         : obj list =
         let coveredIds = coveredHostMessageIds |> Set.ofList
 
-        let covered, live =
+        let covered =
             rawMessages
-            |> List.partition (fun message ->
+            |> List.filter (fun message ->
                 ProviderWireDecode.hostMessageId message
                 |> Option.exists (fun messageId -> Set.contains messageId coveredIds))
 
-        companionHead syntheticId memory :: (retainedTodoRounds covered @ live)
+        let retainedCoveredIds =
+            retainedTodoRounds covered
+            |> List.choose ProviderWireDecode.hostMessageId
+            |> Set.ofList
+
+        let survivesReplacement message =
+            match ProviderWireDecode.hostMessageId message with
+            | Some messageId when Set.contains messageId coveredIds -> Set.contains messageId retainedCoveredIds
+            | _ -> true
+
+        let surviving = rawMessages |> List.filter survivesReplacement
+        let head = companionHead syntheticId memory
+
+        let insertionIndex =
+            insertAfterHostMessageId
+            |> Option.map (fun anchor ->
+                surviving
+                |> List.tryFindIndex (fun message -> ProviderWireDecode.hostMessageId message = Some anchor)
+                |> Option.defaultWith (fun () ->
+                    invalidArg "insertAfterHostMessageId" "stable prefix insertion anchor is absent from Host view"))
+            |> Option.defaultValue -1
+
+        let before, after = List.splitAt (insertionIndex + 1) surviving
+        before @ (head :: after)
 
     let private canonicalValue (canonical: string) : obj =
         try
@@ -501,6 +525,7 @@ module ProjectionMessageEdit =
     let applyRenderedPrefixByHostIds
         (rawMessages: obj list)
         (coveredHostMessageIds: string list)
+        (insertAfterHostMessageId: string option)
         (rendered: Wanxiangshu.Participant.Provider.Projection.RenderedPrefix)
         : obj list =
         match rendered with
@@ -511,3 +536,4 @@ module ProjectionMessageEdit =
                 activation.SyntheticMessageId
                 activation.Memory
                 coveredHostMessageIds
+                insertAfterHostMessageId

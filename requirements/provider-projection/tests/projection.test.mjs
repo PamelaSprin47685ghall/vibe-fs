@@ -117,6 +117,7 @@ test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_removes_covered_history_by_stable_H
     'y-prefix',
     'compressed canonical X',
     ['covered-u', 'covered-a'],
+    '',
   )
 
   assert.deepEqual(
@@ -147,6 +148,7 @@ test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_stable_identity_deletion_preserves_
     'y-prefix',
     'compressed canonical X',
     ['todo-call-msg', 'todo-result-msg', 'covered-ordinary'],
+    '',
   )
 
   assert.deepEqual(
@@ -158,6 +160,34 @@ test('WHAT[PROVIDER-PROJECTION-004] Y_prefix_stable_identity_deletion_preserves_
   assert.equal(projected[2], raw[1])
   assert.equal(projected[3], raw[2])
   assert.equal(projected[4], raw[4])
+})
+
+test('WHAT[PROVIDER-PROJECTION-004] same_session_Y_prefix_is_inserted_after_the_preserved_raw_Opening', () => {
+  const message = (id, role, text) => ({
+    info: { id, role },
+    parts: [{ type: 'text', text }],
+  })
+  const raw = [
+    message('opening-u', 'user', 'raw opening'),
+    message('covered-a', 'assistant', 'covered work'),
+    message('live-u', 'user', 'live request'),
+  ]
+
+  const projected = wire.prependCompanionMemoryByHostIds(
+    raw,
+    'y-prefix',
+    'compressed post-opening history',
+    ['covered-a'],
+    'opening-u',
+  )
+
+  assert.deepEqual(
+    projected.map(item => item.info.id),
+    ['opening-u', 'y-prefix', 'live-u'],
+    'FrozenRecordPrefix(includeOpening=false) must follow, never precede, the raw Opening it summarizes after',
+  )
+  assert.equal(projected[0], raw[0])
+  assert.equal(projected[2], raw[2])
 })
 
 test('WHAT[PROVIDER-PROJECTION-004] MISC_projection_apply_rendered_prefix_both_shapes', () => {

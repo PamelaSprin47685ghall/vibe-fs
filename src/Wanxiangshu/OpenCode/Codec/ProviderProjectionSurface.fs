@@ -337,6 +337,7 @@ module ProviderProjectionSurface =
         (syntheticId: string)
         (memory: string)
         (coveredHostMessageIds: string array)
+        (insertAfterHostMessageId: string)
         : obj array =
         ProjectionMessageEdit.prependCompanionMemoryByHostIds
             (if isNull raw then [] else Array.toList raw)
@@ -346,6 +347,10 @@ module ProviderProjectionSurface =
                  []
              else
                  Array.toList coveredHostMessageIds)
+            (if System.String.IsNullOrWhiteSpace insertAfterHostMessageId then
+                 None
+             else
+                 Some insertAfterHostMessageId)
         |> List.toArray
 
     let private wireMessageOf value : ProviderProjection.WireMessage =

@@ -80,7 +80,7 @@ test('WHAT[CONTEXT-COMPRESSION-017] same_session_Y_prefix_never_repackages_or_de
   assert.doesNotMatch(frozen, /LifecycleWorkRecord\.render\s+true/)
 
   const replacement = wire.slice(
-    wire.indexOf('let private requireStableReplacementIds'),
+    wire.indexOf('let private requireStableReplacement'),
     wire.indexOf('let private commitPromotablePrefixRebase'),
   )
   assert.match(replacement, /XTraceProjection\.tryOpeningHostMessageId/)

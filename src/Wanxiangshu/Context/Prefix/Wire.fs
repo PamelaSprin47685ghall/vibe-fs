@@ -299,10 +299,10 @@ module XWire =
         | Some _ -> [ prefixIntent; ProjectionIntent.ReanchorAfterCompaction ]
         | None -> [ prefixIntent ]
 
-    let private requireStableReplacementIds
+    let private requireStableReplacement
         (activation: PrefixActivation)
         (xTrace: XTraceProjectionState)
-        : string list =
+        : string list * string option =
         let coveredHostMessageIds =
             XTraceProjection.hostMessageIdsBeforeTurn activation.CutoffExclusive xTrace
 
@@ -314,8 +314,15 @@ module XWire =
 
         let openingHostMessageId = XTraceProjection.tryOpeningHostMessageId xTrace
 
+        if activation.CutoffExclusive > 0 && Option.isNone openingHostMessageId then
+            raise (
+                InvalidOperationException
+                    "X-wire cannot place same-session memory without the stable raw Opening identity"
+            )
+
         coveredHostMessageIds
-        |> List.filter (fun messageId -> Some messageId <> openingHostMessageId)
+        |> List.filter (fun messageId -> Some messageId <> openingHostMessageId),
+        openingHostMessageId
 
     let private applyPlannedPrefix
         (state: SessionAgentProjection)
@@ -328,9 +335,15 @@ module XWire =
         | RenderedPrefix.PhysicalPrefix -> rawMessages
         | RenderedPrefix.SyntheticPrefix activation ->
             let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
-            let replaceableHostMessageIds = requireStableReplacementIds activation xTrace
 
-            ProjectionMessageEdit.applyRenderedPrefixByHostIds rawMessages replaceableHostMessageIds rendered
+            let replaceableHostMessageIds, openingHostMessageId =
+                requireStableReplacement activation xTrace
+
+            ProjectionMessageEdit.applyRenderedPrefixByHostIds
+                rawMessages
+                replaceableHostMessageIds
+                openingHostMessageId
+                rendered
 
     let private renderPrefixMessages
         (state: SessionAgentProjection)
