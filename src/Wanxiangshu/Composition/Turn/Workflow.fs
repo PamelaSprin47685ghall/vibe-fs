@@ -75,7 +75,7 @@ module TurnWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
-        (recoveryScope: IParkedTransformHost)
+        (recoveryScope: IBloggerRuntimeHost)
         (armRecovery: SessionId -> unit)
         (syncDelegate: SyncDelegateRuntime option)
         (reviewerContinuationPort: ReviewerContinuationPort)

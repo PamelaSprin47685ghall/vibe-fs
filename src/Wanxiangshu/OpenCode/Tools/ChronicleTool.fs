@@ -99,7 +99,7 @@ module ChronicleTool =
         else
             Ok trimmed
 
-    let hasLiveCycle (parkedHost: IParkedTransformHost option) (sessionId: string) : bool =
+    let hasLiveCycle (parkedHost: IBloggerRuntimeHost option) (sessionId: string) : bool =
         match parkedHost with
         | None -> false
         | Some host -> host.HasFlight sessionId
@@ -147,7 +147,7 @@ module ChronicleTool =
 
     let private executeChronicle
         (runtime: ToolRuntimeScope)
-        (parkedHost: IParkedTransformHost option)
+        (parkedHost: IBloggerRuntimeHost option)
         language
         (args: HostToolArguments)
         (ctx: HostToolContext)
@@ -169,7 +169,7 @@ module ChronicleTool =
     let spec
         (factory: HostToolFactory)
         (runtime: ToolRuntimeScope)
-        (parkedHost: IParkedTransformHost option)
+        (parkedHost: IBloggerRuntimeHost option)
         : ToolSpec =
         let fields = tipFieldNames ()
         let ruleCount = List.length fields

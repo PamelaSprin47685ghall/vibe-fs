@@ -393,7 +393,7 @@ module HostSignalBootstrap =
 
                 match SessionAssociationProjection.tryBloggerOf mainSessionId associations with
                 | None -> ()
-                | Some bloggerId -> BloggerCoordinator.reactivateAfterNewRoot scope.ParkedTransformHost bloggerId root
+                | Some bloggerId -> BloggerCoordinator.reactivateAfterNewRoot scope.BloggerRuntimeHost bloggerId root
 
             let onAuthorityRoot (mainSessionId: SessionId, root: AuthorityRootUserMessageId) =
                 match journal with

@@ -126,7 +126,7 @@ module ToolRegistry =
 
     /// AGENT-007 role gate, plus request-scoped `chronicle` (CurrentRequest / InFlight).
     /// sessionId is the tool call's Host session; parkedHost is optional for tests.
-    let rolePredicate (specName: string) (parkedHost: IParkedTransformHost option) (sessionId: string) : Role -> bool =
+    let rolePredicate (specName: string) (parkedHost: IBloggerRuntimeHost option) (sessionId: string) : Role -> bool =
         match specName with
         | "fork" -> fun r -> r = Role.Manager
         | "commission" -> fun r -> r = Role.Orchestrator
@@ -194,7 +194,7 @@ module ToolRegistry =
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
-        (parkedHost: IParkedTransformHost option)
+        (parkedHost: IBloggerRuntimeHost option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (strengthRuntime: StrengthRuntime option)
         (finalityReviewerTimeoutMs: int option)

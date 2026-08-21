@@ -156,7 +156,7 @@ module PluginHostInterop =
                 snapshot
                 cancelSignals
                 eventPort
-                (Some scope.ParkedTransformHost)
+                (Some scope.BloggerRuntimeHost)
                 scope.SyncDelegateRuntime
                 (Some scope.Strength.StrengthRuntime)
                 finalityReviewerTimeoutMs

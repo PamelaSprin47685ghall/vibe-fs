@@ -219,7 +219,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     /// Composition-of-owners: Blogger parking/flight/drain state lives in its own scope.
     member _.Blogger = blogger
-    member _.ParkedTransformHost: IParkedTransformHost = blogger :> IParkedTransformHost
+    member _.BloggerRuntimeHost: IBloggerRuntimeHost = blogger :> IBloggerRuntimeHost
 
     /// Composition-of-owners: per-instance session registries live in their own scope.
     member _.Sessions = sessions
@@ -478,7 +478,7 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             let cancelKeys = (sessionId :: linkedBloggerKeys) |> List.distinct
 
             for key in cancelKeys do
-                (blogger :> IParkedTransformHost).CancelParked key
+                (blogger :> IBloggerRuntimeHost).CancelParked key
 
                 lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove key |> ignore)
 
@@ -530,6 +530,8 @@ type PluginRuntimeScope(journal: AgentJournal option) =
             // awaiting either drain, so no durable work can enter during shutdown.
             remember (captureSyncFailure (fun () -> subscription |> Option.iter (fun active -> active.Dispose())))
             subscription <- None
+
+            blogger.BeginShutdown()
 
             let reconcileDrain = this.TakeReconcileDrain()
             let ownedWorkDrain = this.StopOwnedWorkAndDrain()

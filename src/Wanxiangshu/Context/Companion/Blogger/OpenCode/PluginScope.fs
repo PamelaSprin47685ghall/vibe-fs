@@ -13,6 +13,7 @@ open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Collections.Generic
+open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -74,6 +75,7 @@ open Wanxiangshu.Strength
 /// serial (the dictionary entry is the guard); flights live in SharedState
 /// because they must be visible across worktree/root instances.
 type PluginBloggerScope() =
+    let shutdown = new CancellationTokenSource()
     /// ENFORCER-160/162: parked continuation transforms, keyed by session id.
     ///
     /// At most one parked transform per session (a session's step loop is
@@ -95,6 +97,8 @@ type PluginBloggerScope() =
     let drainWindows = Dictionary<string, DrainWindow>()
 
     interface IBloggerRuntimeHost with
+        member _.Cancellation = shutdown.Token
+
         member this.ParkTransform(sessionId: string) : Task<ParkWake> =
             lock parkedGate (fun () ->
                 match pendingOffer.TryGetValue sessionId with
@@ -185,13 +189,23 @@ type PluginBloggerScope() =
     member _.DropDrainWindow(sessionId: string) =
         lock parkedGate (fun () -> drainWindows.Remove sessionId |> ignore)
 
-    /// ENFORCER-162: plugin dispose emits Cancelled to every material waiter.
-    member _.Dispose() =
+    member _.BeginShutdown() =
+        if not shutdown.IsCancellationRequested then
+            shutdown.Cancel()
+
         lock parkedGate (fun () ->
             for entry in parked.Values |> Seq.toList do
                 entry.TryCancel()
 
             parked.Clear()
-            pendingOffer.Clear()
+            pendingOffer.Clear())
+
+    /// ENFORCER-162: plugin dispose emits Cancelled to every material waiter.
+    member this.Dispose() =
+        this.BeginShutdown()
+
+        lock parkedGate (fun () ->
             // BloggerFlights are SharedState — do not clear on one instance dispose.
             drainWindows.Clear())
+
+        shutdown.Dispose()

@@ -39,7 +39,7 @@ module SessionRecoveryWorkflow =
     type SessionRecoveryPorts =
         { Journal: AgentJournal
           Snapshot: ISessionSnapshotPort
-          ParkedHost: IParkedTransformHost
+          ParkedHost: IBloggerRuntimeHost
           RecoverPromptClaims: SessionId -> Task<SessionRecovery>
           RecoverBlogger: SessionId -> Task<SessionRecovery>
           RestoreHandles: SessionId -> Task<HandleFamilyRecovery>
@@ -63,7 +63,7 @@ module SessionRecoveryWorkflow =
     /// Default RecoverBlogger implementation using BloggerCrashRecovery.
     let defaultRecoverBlogger
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (snapshot: ISessionSnapshotPort)
         : SessionId -> Task<SessionRecovery> =
         // DSL-MUTABLE: algorithm-scratch — per-call blogger recovery memoization cache

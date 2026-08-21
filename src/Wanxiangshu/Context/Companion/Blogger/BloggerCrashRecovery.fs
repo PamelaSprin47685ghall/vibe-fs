@@ -136,7 +136,7 @@ module BloggerCrashRecovery =
     /// Drain stays Closed — SetDrainWindow keeps the physical drain slot closed
     /// without re-authoring any shadow state.
     let private restoreFlight
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (bloggerSessionId: SessionId)
         (ctx: BloggerRequestContext)
         : unit =
@@ -148,7 +148,7 @@ module BloggerCrashRecovery =
         host.SetDrainWindow(key, DrainWindow.Closed)
 
     /// CE clear step: abandon physical flight ownership after durable abandon.
-    let private clearFlight (host: IParkedTransformHost) (bloggerSessionId: SessionId) : unit =
+    let private clearFlight (host: IBloggerRuntimeHost) (bloggerSessionId: SessionId) : unit =
         let key = SessionId.value bloggerSessionId
         host.ClearCurrentRequest key
         host.SetDrainWindow(key, DrainWindow.Closed)
@@ -167,7 +167,7 @@ module BloggerCrashRecovery =
     /// NotArmed after restart) — leave flight clear so material flows through
     /// startFrozen; drain re-checks receipts via tryRefreshMainContextFromJournal.
     let private receiptedIdleDecision
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (cycles: BloggerCycleProjectionState)
         (bloggerId: SessionId)
         : WindowOutcome option =
@@ -187,12 +187,12 @@ module BloggerCrashRecovery =
         | Some companion -> companion.BloggerSessionId
         | None -> None
 
-    let private tryReceiptedIdle (host: IParkedTransformHost) (session: SessionAgentProjection) =
+    let private tryReceiptedIdle (host: IBloggerRuntimeHost) (session: SessionAgentProjection) =
         match session.BloggerCycles, companionBloggerId session with
         | Some cycles, Some bloggerId -> receiptedIdleDecision host cycles bloggerId
         | _ -> None
 
-    let private collectReceiptedIdle (host: IParkedTransformHost) (durable: AgentJournal) =
+    let private collectReceiptedIdle (host: IBloggerRuntimeHost) (durable: AgentJournal) =
         (AgentJournal.snapshot durable).AgentProjections.Sessions
         |> Map.toList
         |> List.choose (fun (_, session) -> tryReceiptedIdle host session)
@@ -220,7 +220,7 @@ module BloggerCrashRecovery =
 
     let private restoreFromMessages
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (openReq: OpenBloggerRequest)
         (messages: SessionMessage list)
         : Task<WindowOutcome> =
@@ -237,7 +237,7 @@ module BloggerCrashRecovery =
 
     let private abandonUnreadableSnapshot
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (openReq: OpenBloggerRequest)
         (reason: string)
         : Task<WindowOutcome> =
@@ -250,7 +250,7 @@ module BloggerCrashRecovery =
 
     let private reconcileOpenWithSnapshot
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (snapshot: ISessionSnapshotPort)
         (openReq: OpenBloggerRequest)
         : Task<WindowOutcome> =
@@ -262,7 +262,7 @@ module BloggerCrashRecovery =
 
     let private reconcileOpenWhenIdle
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (snapshotOpt: ISessionSnapshotPort option)
         (openReq: OpenBloggerRequest)
         : Task<WindowOutcome> =
@@ -272,7 +272,7 @@ module BloggerCrashRecovery =
 
     let private reconcileOpenRequest
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (snapshotOpt: ISessionSnapshotPort option)
         (openReq: OpenBloggerRequest)
         : Task<WindowOutcome> =
@@ -289,7 +289,7 @@ module BloggerCrashRecovery =
 
     let private reconcileAllOpen
         (journal: AgentJournal)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (snapshotOpt: ISessionSnapshotPort option)
         : Task<WindowOutcome list> =
         task {
@@ -306,7 +306,7 @@ module BloggerCrashRecovery =
     /// Startup pass: walk open materializations + receipts.
     let reconcile
         (journal: AgentJournal option)
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (snapshotOpt: ISessionSnapshotPort option)
         : Task<WindowOutcome list> =
         task {
@@ -320,7 +320,7 @@ module BloggerCrashRecovery =
 
     /// Single-flight gate, same lifecycle as PromptRecovery (not in constructor).
     type RecoveryGate
-        (journal: AgentJournal option, host: IParkedTransformHost, snapshotOpt: ISessionSnapshotPort option) =
+        (journal: AgentJournal option, host: IBloggerRuntimeHost, snapshotOpt: ISessionSnapshotPort option) =
 
         let gate = obj ()
         // DSL-MUTABLE: single-flight — memoized reconcile task (latch, not a stage)

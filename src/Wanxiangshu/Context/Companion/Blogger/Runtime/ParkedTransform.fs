@@ -10,6 +10,7 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System.Threading.Tasks
+open System.Threading
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -64,6 +65,7 @@ type MaterialOfferDisposition =
 /// PendingOffer = the next Main material staged only while Parked (own slot).
 /// Drain window = physical drain slot (GetDrainWindow / SetDrainWindow / IsDrainOpen).
 type IBloggerRuntimeHost =
+    abstract Cancellation: CancellationToken
     abstract ParkTransform: string -> Task<ParkWake>
     abstract CancelParked: string -> unit
     abstract HasParked: string -> bool

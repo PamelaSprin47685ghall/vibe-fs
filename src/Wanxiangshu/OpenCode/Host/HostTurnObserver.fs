@@ -191,7 +191,7 @@ module HostTurnObserver =
                 // causal boundary that can still send exact-one nudge / AABB.
                 return!
                     InteractionRepairWorkflow.repairBloggerProtocol
-                        scope.ParkedTransformHost
+                        scope.BloggerRuntimeHost
                         scope.Sessions.Quiescence
                         context
                         sessionPort
@@ -205,7 +205,7 @@ module HostTurnObserver =
                         sessionPort
                         eventPort
                         journal
-                        scope.ParkedTransformHost
+                        scope.BloggerRuntimeHost
                         scope.ArmRecovery
                         scope.SyncDelegateRuntime
                         reviewerContinuationPort

@@ -1251,7 +1251,7 @@ module EnforcerContinuation =
 
             let! outcome =
                 handleContinuation
-                    scope.ParkedTransformHost
+                    scope.BloggerRuntimeHost
                     journal
                     (Some confirmedFailure)
                     makeRecoveryProbe

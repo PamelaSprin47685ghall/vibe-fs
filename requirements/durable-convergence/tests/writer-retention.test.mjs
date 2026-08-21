@@ -60,6 +60,14 @@ test('WHAT[DURABLE-CONVERGENCE-011] 24h expiry removes local writer and remote m
     assert.deepEqual(retention.retainedWriterIdsAt(commonDir, now), ['writer-fresh'],
       'activation/replay must not read an expired writer even before physical GC')
 
+    const reopened = eventStore.create(commonDir, 'writer-retained-replay')
+    try {
+      assert.deepEqual(eventStore.heads(reopened, 'retention/fresh'), [B],
+        'retained replay treats a parent outside the window as an already-satisfied causal boundary')
+    } finally {
+      eventStore.dispose(reopened)
+    }
+
     const result = await retention.syncAt(repo, commonDir, null, now)
     assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
     assert.equal(existsSync(oldPath), false)

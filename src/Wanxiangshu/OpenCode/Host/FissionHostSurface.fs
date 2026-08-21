@@ -199,7 +199,7 @@ module FissionHostSurface =
                     sessionPort
                     eventPort
                     None
-                    (PluginBloggerScope() :> IParkedTransformHost)
+                    (PluginBloggerScope() :> IBloggerRuntimeHost)
                     ignore
                     (HashSet<string>())
                     (fun _ -> false)

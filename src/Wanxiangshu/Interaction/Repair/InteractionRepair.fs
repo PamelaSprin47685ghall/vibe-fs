@@ -161,7 +161,7 @@ module InteractionRepairWorkflow =
         |> ignore
 
     let private exhaustBloggerProtocol
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
         (context: ReconciledTurnContext)
@@ -189,7 +189,7 @@ module InteractionRepairWorkflow =
         :> Task
 
     let private sendBloggerAabbAfterPermitConsumed
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal)
@@ -257,7 +257,7 @@ module InteractionRepairWorkflow =
         :> Task
 
     let private consumeThenSendBloggerAabb
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
@@ -281,7 +281,7 @@ module InteractionRepairWorkflow =
         | _ -> AsyncSupport.completedTask ()
 
     let private sendBloggerNudge
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
@@ -323,7 +323,7 @@ module InteractionRepairWorkflow =
         :> Task
 
     let private repairOwnedBloggerProtocol
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
@@ -380,7 +380,7 @@ module InteractionRepairWorkflow =
     /// Historical/unowned idle is observation only: without the exact live
     /// BloggerRequest there is no protocol budget to spend.
     let repairBloggerProtocol
-        (host: IParkedTransformHost)
+        (host: IBloggerRuntimeHost)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (sessionPort: ISessionHostPort)
