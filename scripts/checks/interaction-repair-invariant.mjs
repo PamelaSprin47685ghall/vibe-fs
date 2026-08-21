@@ -34,6 +34,7 @@ for (const legacy of [
   'repairFamilyAlreadyClaimed',
   'RepairFamilyAdmissionSpent',
   'repairFamilyAdmissionSpent',
+  'IdleRepairFamilyOutcome',
 ]) {
   const owners = [...source.entries()].filter(([, text]) => text.includes(legacy)).map(([path]) => path)
   if (owners.length > 0) violations.push(`legacy claim=outcome vocabulary ${legacy}: ${owners.join(', ')}`)
@@ -41,6 +42,12 @@ for (const legacy of [
 
 if (!dispatch.includes('AlreadyAdmitted')) {
   violations.push('dispatch must expose duplicate repair admission as AlreadyAdmitted')
+}
+if (/IdleContinuationOutcome\.Failed\s+"[^"]*already claimed/i.test(dispatch)) {
+  violations.push('duplicate idle admission must never be encoded as Failed prose')
+}
+if (/IndexOf\("already claimed"/i.test(repair)) {
+  violations.push('repair workflow must never recover idempotency by parsing error prose')
 }
 if (!repair.includes('CompletedTurnClassifier.decideRepairDefect')) {
   violations.push('repair workflow must route defect handling through the owner decision algebra')

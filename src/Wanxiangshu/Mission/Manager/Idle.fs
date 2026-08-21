@@ -162,7 +162,9 @@ module ManagerIdle =
                     turn.ProviderRun
             with
             | HostSessionNudge.IdleContinuationOutcome.Sent _
-            | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+            | HostSessionNudge.IdleContinuationOutcome.Superseded
+            | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
+            | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
             | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                 eventPort.NotifyTerminal
                     turn.SessionId

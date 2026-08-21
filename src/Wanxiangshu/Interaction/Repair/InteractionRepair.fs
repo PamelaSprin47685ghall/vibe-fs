@@ -103,11 +103,11 @@ module InteractionRepairWorkflow =
                     repairKind
 
             match outcome with
-            | HostSessionNudge.IdleRepairFamilyOutcome.Sent _
-            | HostSessionNudge.IdleRepairFamilyOutcome.Superseded
-            | HostSessionNudge.IdleRepairFamilyOutcome.AlreadyAdmitted
-            | HostSessionNudge.IdleRepairFamilyOutcome.Retired -> ()
-            | HostSessionNudge.IdleRepairFamilyOutcome.Failed error ->
+            | HostSessionNudge.IdleContinuationOutcome.Sent _
+            | HostSessionNudge.IdleContinuationOutcome.Superseded
+            | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
+            | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
+            | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                 // Journal/authority/transport failures are Wanxiangshu invariant
                 // failures, not model behavior. In production fatal kills the
                 // process; the terminal signal keeps node:test fail-closed too.
@@ -250,10 +250,11 @@ module InteractionRepairWorkflow =
                             turn.ProviderRun
                             BloggerRecoveryProbe.BloggerAabbRepairKind
                     with
-                    | Ok _ -> ()
-                    | Error error when error.IndexOf("already claimed", System.StringComparison.OrdinalIgnoreCase) >= 0 ->
-                        ()
-                    | Error error -> notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
+                    | InteractionRepairSendOutcome.Sent _
+                    | InteractionRepairSendOutcome.AlreadyAdmitted
+                    | InteractionRepairSendOutcome.Retired -> ()
+                    | InteractionRepairSendOutcome.Failed error ->
+                        notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
                 }
 
             let fallbackStillOpen () =
@@ -343,7 +344,9 @@ module InteractionRepairWorkflow =
                         BloggerRecoveryProbe.BloggerMissingToolRepairKind
                 with
                 | HostSessionNudge.IdleContinuationOutcome.Sent _
-                | HostSessionNudge.IdleContinuationOutcome.Superseded -> ()
+                | HostSessionNudge.IdleContinuationOutcome.Superseded
+                | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
+                | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
                 | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                     do!
                         sendBloggerAabbAfterPermitConsumed
