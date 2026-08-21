@@ -30,7 +30,7 @@
 
 ## DURABLE-CONVERGENCE-008: durability activation ensure hooks 且用户 Git 进程独立触发双向 sync
 
-万象术不提供后台常驻同步器或自动上传服务。插件加载期不修改 Git 配置；仅在首次激活持久化能力时确保安装 `reference-transaction` 与 `pre-push` Hook。后续同步完全由用户自身的 Git 操作拉起独立 Hook 子进程执行，通过双向读取本地与远端写者流完成全量 k-way merge，直接原子替换本地写者集合并发布远端快照。
+万象术不提供后台常驻同步器或自动上传服务。插件加载期不修改 Git 配置；仅在首次激活持久化能力时确保安装 `reference-transaction` 与 `pre-push` Hook。后续同步完全由用户自身的 Git 操作拉起独立 Hook 子进程执行。若本地物理 fingerprint、retention expiry 与上次成功 materialization 均未变化，且本地 tracking ref 仍等于该 cached snapshot，则本次 `pre-push` 没有新的 Wanxiang truth 需要发布，必须零网络直接复用该 snapshot。任一 writer/payload 变化、TTL 跨界或已观察 tracking ref 变化时，才通过双向读取本地与远端写者流完成全量 k-way merge，原子替换本地写者集合并 CAS 发布远端快照。未被本机观察到的远端推进不会被 clean no-op `pre-push` 主动拉取，但也绝不会被覆盖；下一次本地 truth 变化或 tracking 更新时必须进入完整 convergence。
 
 ## DURABLE-CONVERGENCE-009: dumb remote 无 domain 逻辑
 
@@ -38,7 +38,7 @@
 
 ## DURABLE-CONVERGENCE-010: hook 热路径成本只随变化量增长
 
-同步机制允许使用无权威属性的物理状态指纹缓存。当物理文件指纹与远端头部均未发生变动时，Hook 直接复用既有快照，避免重复全量读取与解压 blob；增量变化时仅针对变动文件进行读写与验证，保证同步开销与实际数据增量成比例。
+同步机制允许使用无权威属性的物理状态指纹缓存。当物理文件 fingerprint 未变、cache 未跨 retention expiry 且 tracking ref 等于 cached root 时，`pre-push` 必须在启动任何 Wanxiang Git transport 前直接复用既有快照；不得为 no-op 额外执行 `ls-remote`、`fetch` 或内部 `git push`。增量变化时仅针对变动文件进行读写与验证，并通过现有 CAS convergence 处理远端竞争，保证同步开销与实际数据增量成比例。
 
 ## DURABLE-CONVERGENCE-011: writer 以最后输出活动时间整体过期且不可被旧快照复活
 

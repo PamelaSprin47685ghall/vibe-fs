@@ -195,6 +195,9 @@ module WriterStreamSync =
         readMaterializationCache commonDir
         |> Option.filter (fun cache -> cache.Fingerprint = fingerprint && cacheTimeValid nowMs cache)
 
+    let tryCachedLocalSnapshot (commonDir: string) : StoreSnapshot option =
+        tryCachedLocal commonDir (currentTimeMs ()) |> Option.map (fun cache -> cache.Root)
+
     let private sameRoot (left: StoreSnapshot) (right: StoreSnapshot) =
         RootOid.value left.RootOid = RootOid.value right.RootOid
 

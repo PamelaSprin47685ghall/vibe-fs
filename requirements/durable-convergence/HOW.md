@@ -21,6 +21,7 @@
    - 完全没有 `writer-manifest` 或仍为 mtime 语义 `v1` 的旧 snapshot 采用 clean break：不导入其 writer tree。新协议 v2 snapshot 要求 manifest 与 `writers/` 一一覆盖并绑定精确 blob OID；结构不完整直接 `StorageInvalid`。没有 v2 activity 证据时禁止根据 fetch 时间、对象到达时间或本地新 mtime 猜测活跃性。
    - retention 后执行 k-way merge；过期 writer 文件从本地删除，新的远端 `writers/` tree 也不再包含它，因此旧 snapshot 再参与同步时仍会被相同 retention predicate 过滤而不能稳定复活。
    - 热路径利用文件元数据指纹与 manifest 跳过无变更文件的重复读取与编解码；materialization cache 同时记录“下一次 expiry”，跨过该时刻即使文件未变化也必须重新 materialize。
+   - `pre-push` 先读取本地 Wanxiang tracking ref。若 materialization cache 的物理 fingerprint 仍精确命中、未跨 `NextExpiryMs`，且 cached root 与 tracking root 相同，则直接返回该 snapshot，不启动 Wanxiang 网络 transport。只有本地 truth/retention 变化或 tracking 已变化时才进入现有 merge + CAS publish；CAS reject 后再执行 remote discovery/fetch/retry。
    - NDJSON 尾记录读取使用从 EOF 反向按块 `pread` 查找裸 LF 的确定性算法；不猜测最后一行长度，也不解码整条 writer。
 
 ## 验证与测试落点

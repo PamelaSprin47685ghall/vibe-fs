@@ -135,6 +135,9 @@ module GitGateway =
             return expected |> Option.map (fun oid -> { RootOid = RootOid.create oid }), expected
         }
 
+    let private sameSnapshot (left: StoreSnapshot) (right: StoreSnapshot) =
+        RootOid.value left.RootOid = RootOid.value right.RootOid
+
     let private publishIfNeeded run remote remoteKnownCurrent expectedRemote (merged: StoreSnapshot) =
         task {
             let next = RootOid.value merged.RootOid
@@ -180,7 +183,10 @@ module GitGateway =
                 return! loop (Some snapshot) expected true maxRetries
             | None ->
                 let! snapshot, expected = readTrackedRemote raw remote |> TaskResultCE.ofTask
-                return! loop snapshot expected false maxRetries
+
+                match snapshot, WriterStreamSync.tryCachedLocalSnapshot commonDir with
+                | Some tracked, Some cached when sameSnapshot tracked cached -> return cached
+                | _ -> return! loop snapshot expected false maxRetries
         }
 
     /// Estimate for hook-process Git transport (fetch / push / ls-remote).

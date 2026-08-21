@@ -45,6 +45,15 @@ test('WHAT[DURABLE-CONVERGENCE-010] pre-push starts from tracking ref and only d
   assert.doesNotMatch(gateway, /\| None ->\s*let! snapshot, expected = discoverRemote run remote/)
 })
 
+test('WHAT[DURABLE-CONVERGENCE-010] clean tracked snapshot skips all Wanxiang transport', async () => {
+  const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
+  const sync = await read('src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs')
+
+  assert.match(sync, /tryCachedLocalSnapshot/)
+  assert.match(gateway, /tryCachedLocalSnapshot[\s\S]*sameSnapshot[\s\S]*return cached/s)
+  assert.match(gateway, /readTrackedRemote/)
+})
+
 test('WHAT[DURABLE-CONVERGENCE-010] confirmed same-root convergence does not publish an empty snapshot', async () => {
   const gateway = await read('src/Wanxiangshu/Git/Gateway.fs')
 
