@@ -127,7 +127,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。当前 migration ledger 仍有 `PENDING`，所以 Wave 1–7 等 production cutover 路线继续保留。
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。当前 migration DAG 仍有未闭合节点，所以第五十七章的 dependency-driven production cutover 路线继续保留。
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 
@@ -2726,64 +2726,183 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     
     ---
     
-    第五十七章：交付型全仓重构路线图——执行完即交付
+    第五十七章：DAG 驱动全仓重构——ready 即执行，无全局 wave barrier
     
-    旧 wave 的根本缺陷：把 inventory、gate、baseline、census 当成重构成果。它们只能证明“知道问题在哪里”，不能证明生产所有权已经迁移。
+    wave 的根本缺陷不是“阶段”这个词，而是全局 barrier：A 与 B 无依赖，只因同属不同 wave 就被强制串行；某个大区域剩一个慢节点，会饿死其它区域全部可执行工作。
     
-    从本章开始，只有 production cutover 算进度。
+    从本章开始，施工顺序只来自真实依赖图。目录只负责 coverage，不负责 scheduling。只有 production cutover 算进度。
     
-    一个 owner slice 的固定施工单元：
-    1. 读对应 WHY / WHAT / HOW + 当前 proof。
-    2. 先补会因旧实现而失败、因目标边界而通过的最低层 proof。
-    3. 把 decision / vocabulary / capability / effect ownership 搬到唯一 owner。
-    4. 建最窄 published contract；foreign owner 只见 outcome / evidence / capability / port。
-    5. 一次迁完全部 production callers；禁止“先 facade，未来再迁”。
-    6. 同一 slice 删除旧 implementation、旧 alias、旧 adapter、旧 compatibility path；Git 负责历史。
-    7. 跑 owner proof + architecture gate + build；绿后提交，再进入下一个 slice。
+    定义 migration DAG：
     
-    四条完成铁律：
-    A. report-only / baseline-only / gate-only commit 永远不能关闭一个 migration wave。
-    B. KEEP 不是默认值。KEEP 必须证明：单一 owner、边界凝聚、foreign callers 只经 published contract、无重复知识。
-    C. 每个 wave 结束时不得留下“新旧并存待后续删除”。迁移与删除属于同一 wave。
-    D. baseline 只能是施工期临时护栏；最终交付时必须归零或删除。不存在“baseline 持续下降即完成”。
+    G = (V, E)
     
-    全仓覆盖矩阵，任何一级 production 区域都不能漏：
-    Wave 0 — 全文件 target ledger；只建立施工闭环，不算重构进度。
-    Wave 1 — OpenCode composition shell：Plugin / Host / Tools / Signals / Codec。
-    Wave 2 — Interaction：Authority / Dispatch / Assistance / Repair。
-    Wave 3 — Mission：Manager / Finality / Review / Obligation / WorkRecord。
-    Wave 4 — Execution + Composition：Session / Delegation / Fission / Agent / Turn。
-    Wave 5 — Context + Strength + Enforcer + Participant。
-    Wave 6 — Persistence + Change + Git。
-    Wave 7 — Process + Repository + Sphinx + Foundation + Resources + Host + Requirement + Verification + 其余 production。
-    Wave 8 — 全仓 primary-owner / published-contract / dependency hard cut。
-    Wave 9 — 物理目录与模块 rotation；删除旧树、空壳 Surface、过渡 facade。
-    Wave 10 — requirements / structured-workflow / proof graph 与最终代码同步。
-    Wave 11 — release closure：零迁移债 + 全梯度验证 + 可打包交付。
+    V = semantic cutover nodes
+    E = 必须先成立的真实 prerequisite
     
-    Wave 1–7 必须共同关闭 Wave 0 ledger 的全部 production rows；Wave 8–11 只做全仓收口，不再接受新的“以后再搬”。
+    任意时刻：
     
+    READY = { v ∈ V | deps(v) 全 DONE }
+    
+    调度器持续从 READY 取节点执行。不存在“等同组全部完成再进入下一组”。
     
     ---
     
-    Wave 0：建立唯一施工账本，不把账本当成果
+    57.1 DAG 节点——最小可独立交付 semantic slice
     
-    创建临时 architecture migration ledger，逐一覆盖 src/Wanxiangshu 下全部 production .fs。
+    一个节点不是目录，不是 package，不是“做完 Interaction”。
     
-    每行必须有：
-    current path
-    primary semantic owner
+    一个节点必须能独立回答：
+    owner 是谁；迁哪条 law/knowledge/authority；发布什么 contract；迁哪些 callers；删什么旧路径；用什么 proof 闭合。
+    
+    节点固定字段：
+    
+    id
+    primary owner
+    intent / WHAT proposition
+    current files
+    target files/modules
     classification = KEEP / MOVE / SPLIT / DELETE / COMPOSITION-ROOT / ADAPTER
-    target path / target modules
-    published contracts consumed / published
-    foreign owner dependencies
-    proofs that pin current law
-    assigned wave
-    status = PENDING / CUTOVER / DELETED / PROVEN-KEEP
+    publishes
+    consumes
+    depends_on
+    production callers to migrate
+    proofs
+    architecture gates
+    touched paths
+    coverage tags
+    state = PENDING / READY / RUNNING / DONE
+    result = CUTOVER / DELETED / PROVEN-KEEP
     
-    semantic-owners.json 只能作为候选 owner inventory。文件被填了一个 owner ≠ ownership 已正确；必须由源码职责、WHAT owner、foreign imports 三者共同裁决。
+    `coverage tags` 只用于证明全仓没漏，如 OpenCode / Interaction / Mission / Execution / Context / Persistence / Platform；禁止拿 tag 生成先后顺序。
     
-    ownership-adjudication.json 里的多 owner 列表视为 governance/APPLIES-TO evidence，不得冒充 primary ownership。
+    `depends_on` 必须能用一句因果命题解释。解释不了的边就删。
+    
+    KEEP 不是默认值。PROVEN-KEEP 必须证明：单一 owner、边界凝聚、foreign callers 只经 published contract、无重复知识。
+    
+    ---
+    
+    57.2 节点内部固定闭环
+    
+    每个 cutover node 内部仍严格串行：
+    
+    1. 读对应 WHY / WHAT / HOW + 当前 proof。
+    2. 先补会因旧实现而失败、因目标边界而通过的最低层 proof。
+    3. 把 decision / vocabulary / capability / effect ownership 搬到唯一 owner。
+    4. 建最终形态的最窄 published contract；foreign owner 只见 outcome / evidence / witness / capability / port。
+    5. 一次迁完该节点声明的全部 production callers。
+    6. 同节点删除旧 implementation、旧 alias、旧 adapter、旧 compatibility path；禁止临时 facade。
+    7. 跑 owner proof + affected architecture gate + `node scripts/check.mjs` + `node scripts/build.mjs`。
+    8. 绿后提交，state=DONE；立即释放所有后继节点。
+    
+    节点不能用 inventory / report / baseline / gate-only commit 伪装完成。
+    
+    ---
+    
+    57.3 只有四类合法依赖边
+    
+    Contract edge：
+    
+    Provider publishes C
+    → Consumer may cut over to C
+    
+    Consumer 只依赖 C 已成为最终 contract，不依赖 Provider 整个目录“全部重构完”。
+    
+    Ownership edge：
+    
+    duplicated knowledge K
+    → canonical owner K established
+    → foreign copies may be deleted
+    
+    先确定唯一知识 owner，再删消费者复制品。
+    
+    Physical/compile edge：
+    
+    new module/type/path must exist
+    → dependent compile edge may migrate
+    
+    只表达编译上不可逆的前置，不表达“习惯上先做”。
+    
+    Closure edge：
+    
+    all nodes in exact closure scope DONE
+    → local hard-cut / rotation / requirement-sync / release node may run
+    
+    closure scope 必须最小。一个 owner 的目录 rotation 只等该 owner 与其直接 consumers 稳定，不等全仓。
+    
+    禁止边：
+    
+    same top-level directory
+    same old wave
+    “看起来应该先做”
+    “先把基础设施全部做完”
+    “等另一个团队/区域整体结束”
+    
+    没有 contract/ownership/compile/closure 因果，就没有 edge。
+    
+    ---
+    
+    57.4 并发铁律——最大化 ready frontier，不制造假依赖
+    
+    ∀ READY 节点，只要 touched paths 不冲突，就应并行。
+    
+    同文件重叠编辑不是 semantic dependency，只是短期 edit mutex：一个节点持锁，另一个保持 READY；锁释放后 rebase/复查上下文再执行。禁止为了避免 merge conflict 给整个 owner/目录加永久 DAG 边。
+    
+    多节点共享同一 public contract 时，先抽一个 canonical owner node；消费者形成 fan-out：
+    
+    OwnerContract
+     ├→ ConsumerA
+     ├→ ConsumerB
+     ├→ ConsumerC
+     └→ ConsumerD
+    
+    禁止写成：
+    
+    OwnerContract → A → B → C → D
+    
+    除非 B 真的依赖 A 的产物。
+    
+    多前置汇合使用 join：
+    
+    ReviewWitness ─┐
+    CandidatePort ─┼→ FinalityCutover
+    DrainEvidence ─┤
+    Authority ─────┘
+    
+    Finality 不应等待 Todo、Repository、Sphinx 等无关节点。
+    
+    调度优先级：
+    1. 解锁后继最多的 contract/owner node。
+    2. 位于当前 critical path 的节点。
+    3. 小而独立、可快速释放 fan-out 的节点。
+    4. 最后才做不解锁生产 cutover 的纯整理。
+    
+    ---
+    
+    57.5 DAG 必须保持无环
+    
+    migration graph 出现 cycle 不是“互相等一下”，而是架构债被显式暴露。
+    
+    A → B → C → A 时只能三选一：
+    
+    1. 三者其实同一 semantic sovereignty → 合并 owner/node locality。
+    2. 真实双向物理协作 → 提取窄 published bridge，把语义依赖变单向。
+    3. 某条边是假依赖 → 删除。
+    
+    禁止用 baseline、allowlist、temporary facade、双写、双 runtime 打断 cycle。
+    
+    新节点/新边加入 ledger 时必须立即检查 acyclic；发现 cycle 先裁决图，再写生产代码。
+    
+    ---
+    
+    57.6 Ledger 不再有“先做完 inventory 才能施工”的总 barrier
+    
+    migration ledger 逐 semantic slice 增量建立。一个 slice 一旦完成 owner 裁决、依赖识别、proof freeze，就可进入 READY；不必等 src/Wanxiangshu 100% inventory 完成。
+    
+    但全仓 coverage 是 release invariant：最终每个 production `.fs` 必须被至少一个 node 覆盖，且最终归于恰一个 primary owner。
+    
+    semantic-owners.json 只能作为候选 owner inventory。文件被填 owner ≠ ownership 已正确；必须由源码职责、WHAT owner、foreign imports 三者共同裁决。
+    
+    ownership-adjudication.json 多 owner 列表只算 governance/APPLIES-TO evidence，不得冒充 primary ownership。
     
     热点 proof freeze 至少覆盖：
     PluginTransforms exact trace
@@ -2793,53 +2912,23 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     shutdown/drain
     recovery re-entry
     
-    完成标准：
-    100% production files 有 row；0 UNKNOWN；所有 row 已分配到 Wave 1–7；KEEP 都有可验证理由。
-    
-    注意：Wave 0 完成只表示“可以施工”，不得被称为“重构完成”。
-    
-    
     ---
     
-    Wave 1：OpenCode composition shell 真正瘦身
+    57.7 Coverage matrix——覆盖全部 production，但绝不代表执行顺序
     
-    强制起点：
+    Coverage A — OpenCode composition shell
+    
     OpenCode/Plugin/PluginTransforms.fs
     OpenCode/Host/HostSignalBootstrap.fs
     OpenCode/Tools/ToolRegistry.fs
     OpenCode/Host/PairProgrammingThoughtTransform.fs
     OpenCode/Host/ModelRouting.fs
     OpenCode/Host/ModelCapacity.fs
-    以及 PluginBoot / PluginHostWiring / PluginRecoveryWiring / PluginSessionWiring 与其直接 Host/Codec/Signals collaborators。
+    PluginBoot / PluginHostWiring / PluginRecoveryWiring / PluginSessionWiring
+    OpenCode/Host/Tools/Signals/Codec collaborators
     
-    施工顺序：
-    1. PluginTransforms：逐项把 XTrace / Companion / Enforcer / Strength / Pair guidance / Requirement grounding 语义实现迁回 owner；root 只保留 typed mode + 固定顺序 + owner-published calls + Host shape。
-    2. HostSignalBootstrap：把 model/recovery/fission/finality/assistance policy 搬出；只保留 construct / subscribe / route typed signal / drain / dispose。
-    3. ToolRegistry：每个 tool owner 发布 ToolSpec + admission；registry 只 aggregate + Host projection，删除 registry 内业务 availability 判断。
-    4. PairProgrammingThoughtTransform：把 context/guidance/prefix/grounding decision 迁回各 owner，保留 transform composition。
-    5. ModelRouting / ModelCapacity：只保留 execution-model-routing owner 知识；provider recovery / host representation 通过 published boundary 接入。
-    6. 扫完 OpenCode/Plugin、Host、Tools、Signals、Codec 的 Wave 0 rows；逐个 CUTOVER / DELETE / PROVEN-KEEP。
+    Coverage B — Interaction
     
-    禁止：
-    ITransformMiddleware / dynamic pipeline / service locator / giant capability bag。
-    抽一个新 facade 包住旧泥球然后宣布完成。
-    只减少 LOC 而保留 foreign policy。
-    
-    Wave 1 完成标准：
-    OpenCode 对应 ledger rows 0 PENDING。
-    PluginTransforms 与 HostSignalBootstrap 可宽 fan-out，但只依赖 published contracts，不 match foreign internals。
-    ToolRegistry 不拥有工具业务可用性。
-    迁出的旧 helper / alias / internal path 全删。
-    ordered transform proof + affected owner tests + node scripts/check.mjs + node scripts/build.mjs 全绿。
-    
-    
-    
-    
-    ---
-    
-    Wave 2：Interaction ownership cut——Assistance 不再是 Host 泥球
-    
-    强制起点：
     Interaction/Dispatch/OpenCode/AssistanceHost.fs
     Interaction/Dispatch/OpenCode/NeedHelpSensor.fs
     Interaction/Dispatch/Send.fs
@@ -2849,286 +2938,237 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     Interaction/Authority/*
     Interaction/Repair/*
     
-    施工顺序：
-    1. 固化 AssistanceAbortClaim exact identity、abort 不消费、fresh idle 后 consume once、late child 不复活 owner 的 temporal proof。
-    2. 把 fast/deep selection、current-run validation、consultation classification、recursive assistance policy 搬到 dispatch/assistance owner。
-    3. Git / Review / Todo / Strength / Fork 只通过 assistance-specific ports / witness / capability 接入；Assistance workflow 不直接引用这些 owner 的 internal namespace。
-    4. NeedHelpSensor 只检测 typed observation，不决定 assistance policy；PhysicalAcceptance 只拥有物理接受事实。
-    5. Send / Dispatcher 只拥有 dispatch protocol 与 transport ordering；authority issuance/validation/consume 迁回 Interaction/Authority。
-    6. Repair 只处理 completed-turn repair contract，不偷取 normal dispatch ownership。
-    7. 迁完全部 Interaction callers 后删除 AssistanceHost 内旧业务分支与跨域 helper。
+    Coverage C — Mission
     
-    Wave 2 完成标准：
-    Interaction ledger rows 0 PENDING。
-    Assistance workflow 输入只含自己的 evidence / witness / capability / ports。
-    无 Git/Review/Todo/Strength/Fork internal import。
-    abort → fresh idle → successor trace 与 recovery trace 全绿。
-    旧 Assistance policy path 0 references。
-    
-    
-    ---
-    
-    Wave 3：Mission vertical cuts——Manager / Finality / Review / Obligation / WorkRecord 各归其主
-    
-    强制热点：
-    Mission/Manager/FinalitySurface.fs
-    Mission/Manager/Workflow.fs
+    Mission/Manager/*
     Mission/Finality/*
-    Mission/Review/DedicatedTodoRuntime.fs
-    Mission/Review/Judgement/*
-    Mission/Obligation/Todo/MagicTodoMembrane.fs
-    Mission/Obligation/Todo/Projection.fs
+    Mission/Review/*
+    Mission/Obligation/*
     Mission/WorkRecord/*
     
-    施工顺序：
-    1. Finality owner 只消费 typed facts / projections / review witness / cohort outcomes；foreign code 不得知道 Finality private algebra。
-    2. Review 拆清 judgement、assurance、barrier、host adapter；Review witness 由 review owner 生产，Finality 只消费。
-    3. Obligation/Todo 把 canonical obligation、projection、Host V1 compatibility sink 分层；compat sink 只能单向 canonical → host，不可反向成为 truth。
-    4. Manager 只做 mission lifecycle/orchestration，不重新实现 Finality、Review、Todo policy。
-    5. WorkRecord 只拥有工作记录 materialization 与 opening semantics，不变成通用 mission state bag。
-    6. 对 FinalitySurface / MagicTodoMembrane / DedicatedTodoRuntime 做 semantic slice：凝聚的 owner 私有大模块可 KEEP；跨 owner 的部分必须 MOVE/SPLIT。
-    7. 每个 cutover 同步删掉旧 membrane/facade 中对应分支，禁止保留双实现。
+    Coverage D — Execution + Composition
     
-    Wave 3 完成标准：
-    Mission ledger rows 0 PENDING。
-    Finality/Review/Todo/Manager/WorkRecord 之间的依赖只经 published contracts。
-    没有“Manager knows everything”或“Membrane owns both sides”路径。
-    Finality、review witness、obligation durability 与 Host compatibility owner tests 全绿。
+    Execution/Session/*
+    Execution/Delegation/*
+    Execution/Fission/*
+    Composition/Turn/*
     
+    Coverage E — Context + Strength + Enforcer + Participant
     
+    Context/*
+    Strength/*
+    Enforcer/*
+    Participant/*
     
+    Coverage F — Persistence + Change + Git
     
-    ---
-    
-    Wave 4：Execution + Composition——把 child/session/fission lifecycle 从 Host 条件树变成 owner workflows
-    
-    强制热点：
-    Execution/Fission/OpenCode/Host.fs
-    Execution/Fission/OpenCode/Tool.fs
-    Execution/Delegation/Fork/OpenCode/Tool.fs
-    Execution/Delegation/Fork/Host/Agent.fs
-    Execution/Delegation/Fork/Host/Restart.fs
-    Execution/Delegation/Fork/Host/Join.fs
-    Execution/Session/Recovery/*
-    Execution/Session/Wait/*
-    Composition/Turn/ReconcilePass.fs
-    Composition/Turn/Scheduler.fs
-    Composition/Turn/Workflow.fs
-    
-    施工顺序：
-    1. Session owner 固定 association、attachment、wait、recovery 的 published lifecycle surface。
-    2. Delegation owner 固定 child run / handle / join / recovery 的 durable facts 与 completion outcomes；Host adapter 不重造 child state。
-    3. Fission owner 固定 admission、lane materialization、takeover、delivery claim；OpenCode Host/Tool 只做物理投影与 tool boundary。
-    4. Composition/Turn 只 orchestration：宽 fan-out 合法，但不得读 foreign internal Stage/Step/Dictionary 来决定语义。
-    5. recovery 从 durable facts + physical observation 重建，不恢复隐藏 program counter。
-    6. 合并/删除重复的 join、restart、reconcile、completion path；同一个 lifecycle transition 只能有一个 semantic owner。
-    7. 对 legitimate physical registries 保留 mutable，但必须局限在 resource boundary，不把 registry presence 当业务事实。
-    
-    Wave 4 完成标准：
-    Execution + Composition ledger rows 0 PENDING。
-    父流程只能消费 child outcome/evidence/capability，不能消费 child execution position。
-    abort/retry/crash/join/drain 均有 temporal proof。
-    旧 lifecycle 分支与重复 recovery path 0 references。
-    
-    
-    ---
-    
-    Wave 5：Context + Strength + Enforcer + Participant——把横向大 Surface 切回真正 owner
-    
-    强制热点：
-    Strength/Surface.fs
-    Strength/OpenCode/Speculate.fs
-    Strength/Replica/Runtime.fs
-    Enforcer/Continuation.fs
-    Context/Trace/XTraceSurface.fs
-    Context/Trace/Capture.fs
-    Context/Companion/CompressionSurface.fs
-    Context/Companion/Blogger/Runtime/Coordinator.fs
-    Context/Prefix/Wire.fs
-    Participant/Provider/*
-    Participant/Persona/*
-    
-    施工顺序：
-    1. Context：Trace / Prefix / Companion 各自拥有 canonical model/projection/workflow；OpenCode transform 只能调用其 published operations。
-    2. Strength：Budget / Prediction / Replica / Persistence 分清；Surface 只发布稳定业务 contract，不承载跨层 orchestration。
-    3. Enforcer：Rulebook / observation / continuation / guidance 分清；Continuation 只组合 owned decisions，不重做 Context 或 Host policy。
-    4. Participant：Persona、Provider Language、Provider Attempt、Provider Projection 的知识边界分离；Session binding 只持 identity/capability，不泄漏 provider internals。
-    5. 对每个超过一屏的 Surface 逐段标 owner；owner-private cohesive code 可 KEEP，foreign policy 必须迁出。
-    6. 删除为旧跨域调用保留的 helper/facade，更新全部 callers。
-    
-    Wave 5 完成标准：
-    Context / Strength / Enforcer / Participant ledger rows 0 PENDING。
-    不存在“Surface 因为方便所以拥有多个 owner 规则”。
-    cross-owner callers 只依赖 Surface/contract，不依赖 private runtime/projection internals。
-    Strength counterfactual、Enforcer continuation、Context trace/prefix、participant binding proofs 全绿。
-    
-    
-    ---
-    
-    Wave 6：Persistence + Change + Git——耐久真相只走一条 canonical spine
-    
-    强制热点：
-    Persistence/EventStore/CanonicalIntegrator.fs
-    Persistence/EventStore/ProcessEventLog.fs
-    Persistence/EventStore/GitObjectDatabase.fs
-    Persistence/EventStore/Store.fs
-    Persistence/Journal/EventStoreJournalWriter.fs
-    Persistence/Journal/AgentJournal.fs
+    Persistence/*
     Change/*
     Git/*
     
-    施工顺序：
-    1. CanonicalIntegrator 保持全局 replay / merge / boot convergence 唯一 owner；feature 不得自己扫描历史重建第二套真相。
-    2. 每个 feature fold 只成为 single-event transition oracle；full-history traversal、merge ordering、common-dir integration 只在 persistence owner。
-    3. Journal writer 只拥有 append/flush/close/poison 等物理 durability；业务 workflow 不观察 writer lifecycle 推导业务状态。
-    4. Change owner 通过 ports 使用 Git/Review/Session 物理能力；Change Host 不复制 Git semantics 或 Review judgement。
-    5. Git 只拥有 repository physical operations / integration gate / worktree resource，不成为 mission/change policy owner。
-    6. 清理所有 feature-owned durable backend、history reader、duplicate replay loop、legacy migration writer；历史兼容只允许 decode/refuse 或明确 named creditor 的 bounded projection。
-    7. 对 cleanup/legacy-ledger.md 每个 survivor 再确认 creditor、writer、exit condition；UNKNOWN/“以后再说”直接删除或迁移。
+    Coverage G — Platform + remaining production
     
-    禁止：
-    因为 EventStore 大就 wholesale rewrite。
-    为迁移方便新增双写、影子 store、feature 私有 replay。
-    用 snapshot/state cell 代替 canonical durable fact。
-    
-    Wave 6 完成标准：
-    Persistence / Change / Git ledger rows 0 PENDING。
-    canonical replay path 唯一；feature full-history reader = 0。
-    所有 acknowledged durable effect 在 restart 后可从 writer facts 重建。
-    boot/live equivalence、crash cut、merge、writer failure proofs 全绿。
-    
-    
-    ---
-    
-    Wave 7：Platform + Repository + remaining production——关闭全仓最后一批 production rows
-    
-    覆盖：
     Process/*
-    Repository/Investigation/*
-    Repository/Knowledge/*
-    Repository/Programming/*
+    Repository/*
     Sphinx/*
     Foundation/*
     Resources/*
     Host/*
     Requirement/Grounding/*
     Verification/*
-    以及 Wave 0 ledger 中尚未被 Wave 1–6 覆盖的任何 production file。
+    以及所有未被 A–F 覆盖的 production file。
     
-    强制热点至少包括 Process/Surface.fs、Repository/Programming/Js/*、Sphinx/Session.fs、Resources/ProviderProse.fs、Foundation 中被业务层大量引用的 primitives。
-    
-    施工顺序：
-    1. Process 把 PTY / node process / deadline / large gate / spool 分成物理 primitives；Surface 只发布进程能力，不拥有调用方业务 policy。
-    2. Repository 分清 investigation、knowledge reuse、programming；工具 host 只适配，不把 workflow 和 filesystem 实现揉成一层。
-    3. Sphinx 把 epistemic domain state 与 MCP/codec/physical session adapter 分层；process-local store 不冒充 durable business truth。
-    4. Foundation 只留下真正通用、无业务 owner 的 algebra/primitives；任何 owner-specific helper 移回 owner。
-    5. Resources 只 materialize package/provider/prompt resources；禁止通过资源层重新拥有 routing/provider semantics。
-    6. Host 顶层只保留 host contract/projection，不承载 OpenCode 或 mission policy。
-    7. Requirement/Grounding production surface 只实现 requirement-grounding owner；meta constitution 留到 Wave 10。
-    8. Verification production surface 只提供 proof primitive/temporal harness，不拥有被验证业务。
-    9. 最后遍历 Wave 0 ledger；任何 PENDING row 必须在本 wave 内 MOVE/SPLIT/DELETE/PROVEN-KEEP，不准顺延。
-    
-    Wave 7 完成标准：
-    Wave 0 ledger 全部 production rows 0 PENDING。
-    所有一级 src/Wanxiangshu 区域都完成 production cutover。
-    Foundation/Resources/Host/Verification 不拥有 foreign business policy。
-    此时才允许进入全仓 dependency hard cut。
-    
+    任何 Coverage 都可同时产生 READY 节点。禁止 A→B→C→D→E→F→G 的人工串行。
     
     ---
     
-    Wave 8：全仓 owner dependency hard cut——gate 只验收，不再替代施工
+    57.8 推荐初始 DAG——按真实 contract fan-out，不按目录排队
     
-    当前 semantic-owners manifest 的“每文件一个 owner”只是必要条件，不是完成条件。这个 wave 要让 manifest 与真实代码依赖相符。
+    以下只是 seed topology，最终 edge 必须以实际源码/import/WHAT 为证据，不得把示例本身变新教条。
     
-    逐文件、逐 edge 做：
-    1. 每个 production file 恰有一个 primary semantic owner；owner 必须与 WHAT ownership 和源码职责一致。
-    2. 每个 cross-owner dependency 必须落到对方 published contract；private Model/Runtime/Projection/Host internals 不得被 foreign owner import。
-    3. Composition roots 可宽 fan-out，但只做 wiring/order/lifetime，不 match foreign domain cases，不持 foreign workflow position。
-    4. Meta packages 的 APPLIES-TO 只表示 governance scope，不能因此获得 production ownership。
-    5. Foreign owner 可消费 outcome / evidence / witness / capability / port，不能消费 Stage / Step / cursor / mutable registry presence 等 execution position。
-    6. 对 owner graph 每个 cycle 裁决：若是同一语义主权则合并 owner/locality；若是物理组合则建立窄 bridge；禁止靠 baseline 永久豁免。
-    7. architecture gate 必须检查实际 imports/compile edges，而不只是 manifest 是否覆盖；若现有 gate 不够，先补 gate，再立即修掉所有红边。
+    Context.TraceContract ───────────────┐
+    Context.CompanionContract ──────────┤
+    Context.PrefixContract ─────────────┤
+    Strength.Contract ──────────────────┤
+    Enforcer.ContinuationContract ──────┤
+    PairGuidance.Contract ──────────────┤
+    RequirementGrounding.Contract ──────┼→ OpenCode.PluginTransformsCutover
+    Participant.ProviderProjection ─────┘
     
-    Wave 8 完成标准：
-    UNOWNED = 0。
-    wrong-primary-owner = 0。
-    cross-owner internal imports = 0。
-    unjustified owner cycles = 0。
-    composition-root foreign policy = 0。
-    任何 architecture baseline / allowlist 中的迁移债 = 0；不能以“只下降”为完成。
+    ModelRouting.Contract ──────────────┐
+    Session.RecoveryContract ───────────┤
+    Fission.Contract ───────────────────┤
+    Finality.Contract ──────────────────┤
+    Assistance.Contract ────────────────┼→ OpenCode.HostSignalBootstrapCutover
+    HostSignalPhysicalContract ─────────┘
     
+    ToolOwner*.ToolSpec ────────────────→ OpenCode.ToolRegistryCutover
     
-    ---
+    Interaction.Authority ──────────────┐
+    NeedHelp.Observation ───────────────┤
+    Session.Quiescence ─────────────────┤
+    Consultation.Contract ──────────────┼→ Assistance.WorkflowCutover
+    AdviceDelivery.Contract ────────────┘
     
-    Wave 9：Physical Tree Rotation——让目录树终于投影最终语义拓扑
+    Review.Witness ─────────────────────┐
+    Git.CandidateContract ──────────────┤
+    HandleDrain.Evidence ───────────────┤
+    Mission.Authority ──────────────────┼→ Finality.Cutover
+    Durability.Contract ────────────────┘
     
-    只有 Wave 8 真实 owner graph 稳定后才搬目录。
+    Session.Lifecycle ──────────────────┐
+    Delegation.ChildOutcome ────────────┤
+    Fission.Lifecycle ──────────────────┼→ Composition.TurnCutover
+    Participant.Binding ────────────────┤
+    Context.Contracts ──────────────────┤
+    Strength.Contract ──────────────────┘
     
-    施工顺序：
-    1. 按 primary owner + runtime locality 生成 target tree；目录名表达 owner/physical adapter/composition role，而不是历史事故。
-    2. MOVE 已裁决文件到 target locality；更新 Wanxiangshu.fsproj compile order 与 namespace/module references。
-    3. SPLIT 文件按 owner operation 切开；每个新文件必须有单一 owner，禁止按“凑 500 行”机械切。
-    4. DELETE 旧目录、空壳 Surface、只转发的过渡 facade、旧 alias、旧 namespace compatibility wrapper。
-    5. 合并只有历史原因才分离的同 owner 微模块；减少无语义价值的 translator layers。
-    6. 全仓 grep 旧 path / namespace / symbol，必须 0 production references。
-    
-    Wave 9 完成标准：
-    不存在 old-tree/new-tree 双骨架。
-    不存在空目录、stale fsproj entry、transition alias、facade-hides-mess。
-    project tree 能从物理布局直接看出 semantic owner 与 adapter/composition locality。
-    全 build + architecture gates 在真实新路径上通过。
-    
-    
-    ---
-    
-    Wave 10：Requirement / structured-workflow / proof graph 同步最终代码
-    
-    现在才改“宪法”，因为 production topology 已经稳定。
-    
-    施工顺序：
-    1. 遍历全部 requirement package 的 WHAT：分类为 Universal Structural Law / Owner-specific Law / Historical-Garbage。
-    2. structured-workflow 只保留 universal meta law；owner-specific law 迁到真实 owner package。
-    3. APPLIES-TO 明确等于 governance scope，不等于 production ownership；semantic owner 以最终 source topology + manifest 为准。
-    4. 每条保留 WHAT 都必须有最低足够层 proof；测试引用最终 module/path，删除旧 topology 的测试入口。
-    5. 删除已经完成使命的 migration baseline、census snapshot、temporary allowlist；仍有长期价值的 cleanup 文档改成事实性 architecture record，而不是施工状态。
-    6. requirements/INDEX、GAP、WHY/HOW、proof ownership 与最终代码逐 owner 对账。
-    7. 故意破坏关键边界，确认对应 gate/test 会红；恢复后再提交。
-    
-    Wave 10 完成标准：
-    owner-specific law 在 meta package = 0。
-    stale path / stale module / deleted behavior 的 normative prose = 0。
-    每条 critical WHAT 有 owned proof；每个 critical gate 可 demonstrably red。
-    
+    CanonicalIntegrator 已是守江山事实，因此 feature durable cleanup 不需要等待“Persistence 整包重构”；只要依赖的 canonical EventStore contract 已存在，各 feature 可独立删除 history reader / duplicate replay / private backend。
     
     ---
     
-    Wave 11：Release Closure——只有这里通过才允许说“全仓大重构完成”
+    57.9 关键节点的目标约束
     
-    先做零债扫描：
-    Wave 0 ledger PENDING = 0。
+    PluginTransformsCutover：
+    root 只保留 typed mode + 固定顺序 + owner-published calls + Host shape；禁止 ITransformMiddleware / dynamic pipeline / service locator / giant capability bag。XTrace / Companion / Enforcer / Strength / Pair guidance / Requirement grounding 的 semantic decision 必须回 owner。ordered transform proof 必须锁死。
+    
+    HostSignalBootstrapCutover：
+    只保留 construct / subscribe / route typed signal / drain / dispose。model/recovery/fission/finality/assistance policy 全部由 owner contract 提供。
+    
+    ToolRegistryCutover：
+    tool owner 发布 ToolSpec + admission；registry 只 aggregate + Host projection，不拥有业务 availability。
+    
+    Assistance.WorkflowCutover：
+    保持 AssistanceAbortClaim exact identity、abort 不消费、fresh idle 后 consume once、late child 不复活 owner。workflow 输入只含 assistance 自己的 evidence / witness / capability / ports；不得 import Git/Review/Todo/Strength/Fork internals。
+    
+    Mission nodes：
+    Review 生产 review witness；Finality 只消费 typed facts/projection/witness；Todo canonical → Host compatibility 单向；Manager 只 orchestration；WorkRecord 只 materialization/opening。FinalitySurface / MagicTodoMembrane / DedicatedTodoRuntime 按 semantic slice 裁决，不按 LOC 拆。
+    
+    Execution nodes：
+    Session 拥有 association/attachment/wait/recovery；Delegation 拥有 child run/handle/join/recovery durable facts；Fission 拥有 admission/lane/takeover/delivery claim；Turn 只 orchestration。父流程只消费 child outcome/evidence/capability，不读 Stage/Step/cursor/registry presence。
+    
+    Context/Strength/Enforcer/Participant nodes：
+    Trace/Prefix/Companion、Budget/Prediction/Replica/Persistence、Rulebook/Continuation/Guidance、Persona/Provider Language/Attempt/Projection 分别归主。大 Surface 逐语义 operation 切，不让 Surface 因“方便”拥有多个 owner law。
+    
+    Persistence/Change/Git nodes：
+    CanonicalIntegrator 保持唯一 full-history interpreter；feature 只提供 single-event oracle。Journal 只管 append/flush/close/poison 物理 durability。Change 经 ports 使用 Git/Review/Session；Git 只管 repository physical operations/integration/worktree。禁止双写、影子 store、feature 私有 replay、snapshot/state cell 冒充 truth。
+    
+    Platform nodes：
+    Process 只发布 PTY/process/deadline/gate/spool physical primitives；Repository 分 investigation/knowledge/programming；Sphinx 分 epistemic domain 与 MCP/codec/session adapter；Foundation 只留真正通用 primitive；Resources 只 materialize resources；Host 顶层只 host contract/projection；Requirement/Grounding 只归 grounding owner；Verification 只 proof primitive/temporal harness。
+    
+    ---
+    
+    57.10 Hard cut 不再是全仓末尾阶段，而是每个子图的局部 closure
+    
+    每个 owner/cutover node DONE 后，立刻创建或释放对应 hard-cut node：
+    
+    OwnerCutover
+      → OwnerDependencyGate
+      → OwnerTreeRotation
+      → OwnerRequirementSync
+    
+    但三者是否完全串行取决于真实依赖。若 requirement 文档同步只依赖 owner contract 稳定，可与物理目录 rotation 并行；若 rotation 改测试路径，则 requirement proof-link 更新依赖 rotation。
+    
+    OwnerDependencyGate 必须验证：
+    每个 production file 恰一 primary owner。
+    cross-owner dependency 只落 published contract。
+    composition root 只 wiring/order/lifetime，不 match foreign internals。
+    foreign owner 不消费 Stage/Step/cursor/registry presence。
+    unjustified owner cycle = 0。
+    migration baseline / allowlist 对该 closure scope = 0。
+    
+    不允许“等所有 production cutover 完成后再统一发现依赖图错误”。边界一旦迁完，就立刻 harden。
+    
+    ---
+    
+    57.11 Physical Tree Rotation 改成 owner-local rotation
+    
+    不再等“全仓 owner graph 稳定”。某 owner 子图满足：
+    
+    canonical owner established
+    direct consumers cut over
+    old references = 0
+    local dependency gate green
+    
+    即可搬目录。
+    
+    rotation node：
+    1. 按 primary owner + runtime locality MOVE/SPLIT。
+    2. 更新 Wanxiangshu.fsproj compile order 与 namespace/module references。
+    3. 删除旧目录、空壳 Surface、过渡 facade、alias、namespace wrapper。
+    4. 合并只因历史原因分离的同 owner 微模块。
+    5. grep 旧 path / namespace / symbol = 0 production references。
+    
+    不同 owner 的 rotation touched paths 不冲突时可并行。
+    
+    ---
+    
+    57.12 Requirement / proof graph 同步也改成 owner-local closure
+    
+    不再“最后统一改宪法”。owner contract 稳定后即可同步它自己的 WHY/WHAT/HOW/proof：
+    
+    OwnerCutover
+      ├→ RequirementSync
+      └→ ProofGraphSync
+    
+    structured-workflow 的 universal meta law 是唯一需要跨 owner 汇总的部分；owner-specific law 一旦所有权确定就立即迁回真实 package。
+    
+    每个 RequirementSync node 必须：
+    1. 分类 Universal Structural Law / Owner-specific Law / Historical-Garbage。
+    2. APPLIES-TO = governance scope ≠ production ownership。
+    3. 每条保留 WHAT 有最低足够 proof。
+    4. 删除 stale path/module/behavior normative prose。
+    5. 删除该 owner 已无用途的 baseline/census/temporary allowlist。
+    6. 故意破坏关键边界，证明 gate/test 会红；恢复后提交。
+    
+    ---
+    
+    57.13 节点拆分与动态发现
+    
+    DAG 允许施工中发现新节点，但不允许偷偷扩大 RUNNING 节点到大泥球。
+    
+    若发现一个节点包含两个可独立 owner/law：停止继续扩张，拆成 A/B 两节点，补真实 edge，再继续。
+    
+    若发现新 dependency：
+    未开始节点 → 直接加边并重新计算 READY。
+    RUNNING 节点 → 若前置事实尚未满足，停止该节点，在安全边界拆出 prerequisite；禁止靠临时 adapter 绕过。
+    DONE 节点 → 不可改写历史语义；创建 follow-up node 修正，并把暴露出的 invariant 加 hard gate。
+    
+    DAG ledger 是施工事实，不是永恒架构文档。最终 release 后删除；architecture truth 回到代码、requirements、semantic owner manifest 与机械 gate。
+    
+    ---
+    
+    57.14 全仓完成条件——只有一个 global sink
+    
+    全局唯一必须等待所有节点的地方是 ReleaseClosure。
+    
+    ReleaseClosure depends on：
+    全部 production coverage nodes DONE。
+    全部 owner dependency closure DONE。
+    全部需要的 tree rotation DONE。
+    全部 requirement/proof sync DONE。
     migration baseline / temporary allowlist = 0。
     old namespace / old path / deleted symbol production refs = 0。
-    TODO/FIXME/compatibility shim 中属于本次迁移债的项目 = 0。
-    bounded compatibility 只允许 named external/durable creditor + evidence + writer policy + exit condition；无 creditor 即删除。
+    本次迁移 TODO/FIXME/compatibility shim = 0。
+    bounded compatibility 只有 named external/durable creditor + evidence + writer policy + exit condition。
+    Chapter 92 Definition of Done 全成立。
     
-    再做完整交付验证：
+    最终验证：
     1. node scripts/check.mjs
     2. node scripts/build.mjs
     3. node requirements/verification-system/tests/run.mjs
     4. npm run format-build-test
     
-    npm run format-build-test 是最终 release gate：format + checks + build + verification integration + package integration + warmup + e2e + npm pack --dry-run 必须整条通过。
+    `npm run format-build-test` 是 release sink：format + checks + build + verification integration + package integration + warmup + e2e + npm pack --dry-run 整条通过。
     
     最后人工审查：
     git diff 无临时调试/迁移脚手架。
     git status 只含本次应交付变化。
-    Chapter 92 Definition of Done 每一项逐条成立。
-    删除临时 architecture migration ledger；它的任务已经结束，最终 architecture truth 在代码、requirements 和机械 gate 中。
+    删除临时 migration DAG ledger。
     
     最终完成标准只有一句：
     
-    &gt; Wave 1–7 已实际迁完全部 production code，Wave 8–10 已把拓扑/目录/规范收敛到同一个事实，Wave 11 全梯度通过；此时执行完即可交付，不存在下一轮“真正的重构还没开始”。
+    &gt; 所有 semantic cutover 节点沿真实依赖 DAG 闭合；独立节点并发执行，局部子图随完成随 harden/rotate/sync；最终 ReleaseClosure 全梯度通过。全仓不存在人为 wave barrier，也不存在下一轮“真正的重构还没开始”。
     
     
     ---
@@ -4412,20 +4452,21 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     
     第九十三章：实施顺序只有一个来源
     
-    旧的 14 步“明天开始”清单删除。
+    旧的 14 步清单与 wave 顺序全部失效。
     
-    原因不是它的局部建议全错，而是它允许只做 inventory、几个热点、gate、baseline、最后目录 rotation，就形成“清单完成”的错觉；它没有保证 src/Wanxiangshu 每一个 production file 都被真实裁决和迁移。
+    原因不是局部建议全错，而是线性计划会把无依赖工作人为串行，并允许 inventory、几个热点、gate、baseline、最后目录 rotation 形成“清单完成”的错觉；它既损失并发，也不能证明 src/Wanxiangshu 每一个 production file 都被真实裁决和迁移。
     
-    从现在起，第五十七章《交付型全仓重构路线图——执行完即交付》是唯一施工顺序。
+    从现在起，第五十七章《DAG 驱动全仓重构——ready 即执行，无全局 wave barrier》是唯一施工调度来源。
     
-    任何后续 issue / todo / agent instruction 可以把第五十七章拆成更小 commit，但不得：
-    跳过某个一级 production 区域。
+    任何后续 issue / todo / agent instruction 可以把第五十七章拆成更小 node/commit，但不得：
+    跳过任何 production coverage。
+    用目录/旧 wave/团队边界制造假 dependency edge。
     把 report/gate/baseline 当成 migration completion。
-    把旧实现删除推给未来 wave。
+    把旧实现删除推给未来节点而保留双路径。
     提前宣布 Debt Zero，而 physical tree / requirements / production callers 仍指向旧拓扑。
-    创建第二套更短、但弱化 exit criteria 的“实际施工顺序”。
+    创建第二套线性“实际施工顺序”弱化 DAG 的 ready-frontier 与 exit criteria。
     
-    如果第五十七章与其他章节的旧计划性文字冲突，以第五十七章的 coverage matrix、per-slice cutover protocol 和 Wave 11 release gate 为准。
+    如果第五十七章与其他章节的旧计划性文字冲突，以第五十七章的 node schema、dependency edge law、coverage matrix、per-node cutover protocol 与 ReleaseClosure 为准。
     
     
     ---
