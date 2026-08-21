@@ -95,42 +95,19 @@ type PluginBloggerScope() =
     let drainWindows = Dictionary<string, DrainWindow>()
 
     interface IParkedTransformHost with
-        member this.ParkTransform(sessionId: string, lifetime: TimeSpan) : Task<bool> =
-            task {
-                let (entry, staged) =
-                    lock parkedGate (fun () ->
-                        match parked.TryGetValue sessionId with
-                        | true, existing -> existing, false
-                        | false, _ ->
-                            let created = ParkedTransform(sessionId, lifetime)
-                            parked.[sessionId] <- created
-
-                            // ENFORCER-050 offer-first merge: PendingOffer staged
-                            // while no transform was parked makes this park return
-                            // immediately with `true`.
-                            created, pendingOffer.ContainsKey sessionId)
-
-                if staged then
-                    entry.TryResume()
-
-                let! resumed = entry.Completion
-
-                lock parkedGate (fun () ->
-                    match parked.TryGetValue sessionId with
-                    | true, current when obj.ReferenceEquals(current, entry) -> parked.Remove sessionId |> ignore
-                    | _ -> ())
-
-                return resumed
-            }
-
-        member this.ResumeParked(sessionId: string) : bool =
+        member this.ParkTransform(sessionId: string) : Task<ParkWake> =
             lock parkedGate (fun () ->
-                match parked.TryGetValue sessionId with
-                | true, entry ->
-                    entry.TryResume()
-                    parked.Remove sessionId |> ignore
-                    true
-                | false, _ -> false)
+                match pendingOffer.TryGetValue sessionId with
+                | true, context ->
+                    pendingOffer.Remove sessionId |> ignore
+                    Task.FromResult(ParkWake.MaterialAvailable context)
+                | false, _ ->
+                    match parked.TryGetValue sessionId with
+                    | true, existing -> existing.Completion
+                    | false, _ ->
+                        let created = ParkedTransform(sessionId)
+                        parked.[sessionId] <- created
+                        created.Completion)
 
         member this.CancelParked(sessionId: string) : unit =
             lock parkedGate (fun () ->
@@ -167,19 +144,16 @@ type PluginBloggerScope() =
         member this.ClearCurrentRequest(sessionId: string) : unit =
             lock SharedState.BloggerFlightGate (fun () -> SharedState.BloggerFlights.Remove sessionId |> ignore)
 
-        member this.SetPendingOffer(sessionId: string, context: BloggerRequestContext) : bool =
+        member this.OfferMaterial(sessionId: string, context: BloggerRequestContext) : MaterialOfferDisposition =
             lock parkedGate (fun () ->
-                pendingOffer.[sessionId] <- context
-
                 match parked.TryGetValue sessionId with
                 | true, entry ->
-                    entry.TryResume()
                     parked.Remove sessionId |> ignore
-                    true
-                | false, _ -> false)
-
-        member this.HasPendingOffer(sessionId: string) : bool =
-            lock parkedGate (fun () -> pendingOffer.ContainsKey sessionId)
+                    entry.TryResume context
+                    MaterialOfferDisposition.Delivered
+                | false, _ ->
+                    pendingOffer.[sessionId] <- context
+                    MaterialOfferDisposition.Staged)
 
         member this.TryTakePendingOffer(sessionId: string) : BloggerRequestContext option =
             lock parkedGate (fun () ->
@@ -211,9 +185,7 @@ type PluginBloggerScope() =
     member _.DropDrainWindow(sessionId: string) =
         lock parkedGate (fun () -> drainWindows.Remove sessionId |> ignore)
 
-    /// ENFORCER-162: plugin dispose cancels every parked waiter. The resolved
-    /// `false` releases each suspended transform so the Host's step loop can
-    /// finish its current request cycle.
+    /// ENFORCER-162: plugin dispose emits Cancelled to every material waiter.
     member _.Dispose() =
         lock parkedGate (fun () ->
             for entry in parked.Values |> Seq.toList do

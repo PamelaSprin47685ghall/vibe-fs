@@ -63,29 +63,45 @@ module EventKWayMerge =
 
         pending
 
+    let private allKnownIds (cursors: WriterCursor array) =
+        let known = HashSet<string>()
+
+        for cursor in cursors do
+            for envelope in cursor.Remaining do
+                known.Add(eventKey envelope.EventId) |> ignore
+
+        known
+
     let private earlierParent (candidate: EventId) (current: EventId option) =
         match current with
         | None -> Some candidate
         | Some existing when compare (eventKey candidate) (eventKey existing) < 0 -> Some candidate
         | Some _ -> current
 
-    let private frontierError (seen: Dictionary<string, EventEnvelope>) (cursors: WriterCursor array) =
-        let pendingIds = allPendingIds cursors
-        let mutable missing: EventId option = None
+    let private frontierError
+        allowExternalParents
+        (seen: Dictionary<string, EventEnvelope>)
+        (cursors: WriterCursor array)
+        =
+        if allowExternalParents then
+            StorageInvalid.NonCanonical "retained writer-stream order has a cyclic or backward causal frontier"
+        else
+            let pendingIds = allPendingIds cursors
+            let mutable missing: EventId option = None
 
-        for cursor in cursors do
-            match cursor.Remaining with
-            | head :: _ ->
-                for parent in head.Parents do
-                    let key = eventKey parent
+            for cursor in cursors do
+                match cursor.Remaining with
+                | head :: _ ->
+                    for parent in head.Parents do
+                        let key = eventKey parent
 
-                    if not (seen.ContainsKey key) && not (pendingIds.Contains key) then
-                        missing <- earlierParent parent missing
-            | [] -> ()
+                        if not (seen.ContainsKey key) && not (pendingIds.Contains key) then
+                            missing <- earlierParent parent missing
+                | [] -> ()
 
-        match missing with
-        | Some parent -> StorageInvalid.MissingParent parent
-        | None -> StorageInvalid.NonCanonical "writer-stream order has a cyclic or backward causal frontier"
+            match missing with
+            | Some parent -> StorageInvalid.MissingParent parent
+            | None -> StorageInvalid.NonCanonical "writer-stream order has a cyclic or backward causal frontier"
 
     let private compareQueuedCursor (cursors: WriterCursor array) left right =
         let leftCursor = cursors.[left]
@@ -168,6 +184,8 @@ module EventKWayMerge =
             heapPush cursors heap index
 
     let private scheduleCursor
+        allowExternalParents
+        (knownIds: HashSet<string>)
         (seen: Dictionary<string, EventEnvelope>)
         (parentWaiters: Dictionary<string, ResizeArray<int * int>>)
         (duplicateWaiters: Dictionary<string, ResizeArray<int * int>>)
@@ -193,7 +211,10 @@ module EventKWayMerge =
                 for parent in head.Parents do
                     let parentKey = eventKey parent
 
-                    if not (seen.ContainsKey parentKey) then
+                    if
+                        not (seen.ContainsKey parentKey)
+                        && (not allowExternalParents || knownIds.Contains parentKey)
+                    then
                         missing.Add parentKey |> ignore
 
                 cursor.MissingParents <- missing.Count
@@ -251,6 +272,8 @@ module EventKWayMerge =
                     queueCursor cursors heap cursorIndex
 
     let private advanceCursor
+        allowExternalParents
+        (knownIds: HashSet<string>)
         (seen: Dictionary<string, EventEnvelope>)
         (parentWaiters: Dictionary<string, ResizeArray<int * int>>)
         (duplicateWaiters: Dictionary<string, ResizeArray<int * int>>)
@@ -273,19 +296,31 @@ module EventKWayMerge =
             match seen.TryGetValue key with
             | true, existing ->
                 CanonicalEventCodec.checkIdentity existing head
-                |> Result.map (fun () -> scheduleCursor seen parentWaiters duplicateWaiters cursors heap index)
+                |> Result.map (fun () ->
+                    scheduleCursor
+                        allowExternalParents
+                        knownIds
+                        seen
+                        parentWaiters
+                        duplicateWaiters
+                        cursors
+                        heap
+                        index)
             | false, _ ->
                 seen.Add(key, head)
                 ordered.Add head
                 wakeParent parentWaiters cursors heap key
                 wakeDuplicate duplicateWaiters cursors heap key
-                scheduleCursor seen parentWaiters duplicateWaiters cursors heap index
+                scheduleCursor allowExternalParents knownIds seen parentWaiters duplicateWaiters cursors heap index
                 Ok()
 
     /// Preserve each writer's append order. Among currently causally-ready heads,
     /// EventId text is the deterministic tie-break; writer name only breaks an
     /// impossible same-id/same-bytes duplicate tie.
-    let merge (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
+    let private mergeCore
+        allowExternalParents
+        (streams: (string * EventEnvelope list) list)
+        : Result<EventEnvelope list, StorageInvalid> =
         // Collapse duplicate writer keys exactly as the previous Map-backed
         // implementation did, but keep the hot loop on mutable cursors. The old
         // loop rebuilt/filter/sorted every writer head for every emitted event;
@@ -302,6 +337,8 @@ module EventKWayMerge =
                   Queued = false })
             |> List.toArray
 
+        let knownIds = allKnownIds cursors
+
         // DSL-MUTABLE: algorithm-scratch — stack depth and allocation must not scale
         // with history * writer-count on the k-way hot path.
         let seen = Dictionary<string, EventEnvelope>()
@@ -312,17 +349,28 @@ module EventKWayMerge =
         let mutable outcome: Result<EventEnvelope list, StorageInvalid> option = None
 
         for index = 0 to cursors.Length - 1 do
-            scheduleCursor seen parentWaiters duplicateWaiters cursors ready index
+            scheduleCursor allowExternalParents knownIds seen parentWaiters duplicateWaiters cursors ready index
 
         let advance () =
             if ready.Count > 0 then
                 let readyIndex = heapPop cursors ready
 
-                match advanceCursor seen parentWaiters duplicateWaiters cursors ready ordered readyIndex with
+                match
+                    advanceCursor
+                        allowExternalParents
+                        knownIds
+                        seen
+                        parentWaiters
+                        duplicateWaiters
+                        cursors
+                        ready
+                        ordered
+                        readyIndex
+                with
                 | Ok() -> ()
                 | Error invalid -> outcome <- Some(Error invalid)
             elif cursors |> Array.exists (fun cursor -> not (List.isEmpty cursor.Remaining)) then
-                outcome <- Some(Error(frontierError seen cursors))
+                outcome <- Some(Error(frontierError allowExternalParents seen cursors))
             else
                 outcome <- Some(Ok(ordered |> Seq.toList))
 
@@ -330,3 +378,15 @@ module EventKWayMerge =
             advance ()
 
         outcome.Value
+
+    /// Strict merge for complete histories. Any parent absent from the supplied
+    /// writer set is storage corruption.
+    let merge (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
+        mergeCore false streams
+
+    /// Retention-window merge. A parent absent from the entire retained set is a
+    /// causal predecessor before the truncation boundary and is considered
+    /// satisfied. Dependencies that are present inside the retained set still
+    /// participate in ordering and cycle detection.
+    let mergeRetained (streams: (string * EventEnvelope list) list) : Result<EventEnvelope list, StorageInvalid> =
+        mergeCore true streams

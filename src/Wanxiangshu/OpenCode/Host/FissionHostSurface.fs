@@ -35,16 +35,6 @@ module FissionHostSurface =
         // DSL-MUTABLE: single-flight — one-shot terminal notified latch.
         member val TerminalNotified = false with get, set
 
-    type private DummyDeadline() =
-        interface IDeadlineHandle with
-            member _.Delay = Task.FromResult(())
-            member _.Cancel() = ()
-
-    type private DummyTimer() =
-        interface ITimerPort with
-            member _.Delay _ = DummyDeadline() :> IDeadlineHandle
-            member _.Dispose() = ()
-
     type private DummySessionPort(flags: CallFlags) =
         interface ISessionHostPort with
             member _.SubscribeTerminal(_, _) =
@@ -206,7 +196,6 @@ module FissionHostSurface =
 
             do!
                 OrdinaryTurnWorkflow.observe
-                    (DummyTimer() :> ITimerPort)
                     sessionPort
                     eventPort
                     None

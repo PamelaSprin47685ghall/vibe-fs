@@ -9,7 +9,6 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Turn
@@ -48,7 +47,16 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Foundation
-open Wanxiangshu.Process
+
+[<RequireQualifiedAccess>]
+type ParkWake =
+    | MaterialAvailable of BloggerRequestContext
+    | Cancelled
+
+[<RequireQualifiedAccess>]
+type MaterialOfferDisposition =
+    | Delivered
+    | Staged
 
 /// Parking + dual request slots (ENFORCER-047/050/160).
 ///
@@ -56,8 +64,7 @@ open Wanxiangshu.Process
 /// PendingOffer = the next Main material staged only while Parked (own slot).
 /// Drain window = physical drain slot (GetDrainWindow / SetDrainWindow / IsDrainOpen).
 type IParkedTransformHost =
-    abstract ParkTransform: string * TimeSpan -> Task<bool>
-    abstract ResumeParked: string -> bool
+    abstract ParkTransform: string -> Task<ParkWake>
     abstract CancelParked: string -> unit
     abstract HasParked: string -> bool
     /// Physical single-flight: entry present = a Blogger request owns this session.
@@ -66,53 +73,30 @@ type IParkedTransformHost =
     abstract SetCurrentRequest: string * BloggerRequestContext -> unit
     abstract TryPeekCurrentRequest: string -> BloggerRequestContext option
     abstract ClearCurrentRequest: string -> unit
-    /// Stage PendingOffer. Returns true when a parked waiter was resumed.
-    abstract SetPendingOffer: string * BloggerRequestContext -> bool
-    abstract HasPendingOffer: string -> bool
+    abstract OfferMaterial: string * BloggerRequestContext -> MaterialOfferDisposition
     abstract TryTakePendingOffer: string -> BloggerRequestContext option
     /// Physical drain-window slot.
     abstract GetDrainWindow: string -> DrainWindow
     abstract SetDrainWindow: string * DrainWindow -> unit
     abstract IsDrainOpen: string -> bool
 
-/// One parkable transform wait for one session (ENFORCER-160).
-/// Lifetime armed via ITimerPort.Delay; Cancel on settle (physical timer stays in Process).
-type ParkedTransform(sessionId: string, lifetime: TimeSpan, ?timerPort: ITimerPort) as this =
-    let timers = defaultArg timerPort (PtyTiming.nodeTimerPort ())
-
+/// One event wait for one Blogger continuation.
+type ParkedTransform(sessionId: string) as this =
     let completion =
-        TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously)
+        TaskCompletionSource<ParkWake>(TaskCreationOptions.RunContinuationsAsynchronously)
 
     // DSL-MUTABLE: resource — one-shot settle latch for the transform wait
     let mutable settled = false
-    // DSL-MUTABLE: resource — injectable deadline (cleared / Cancelled on settle)
-    let mutable deadline: IDeadlineHandle option = None
-
-    do
-        let ms = max 1 (int lifetime.TotalMilliseconds)
-        let handle = timers.Delay ms
-        deadline <- Some handle
-
-        let arm () =
-            task {
-                do! handle.Delay
-                this.TrySettle false
-            }
-            :> Task
-
-        arm () |> ignore
 
     member _.SessionId = sessionId
 
-    member _.Completion: Task<bool> = completion.Task
+    member _.Completion: Task<ParkWake> = completion.Task
 
-    member private _.TrySettle(result: bool) =
+    member private _.TrySettle(result: ParkWake) =
         if not settled then
             settled <- true
-            deadline |> Option.iter (fun h -> h.Cancel())
-            deadline <- None
             completion.SetResult result
 
-    member _.TryResume() = this.TrySettle true
+    member _.TryResume(context: BloggerRequestContext) = this.TrySettle(ParkWake.MaterialAvailable context)
 
-    member _.TryCancel() = this.TrySettle false
+    member _.TryCancel() = this.TrySettle ParkWake.Cancelled

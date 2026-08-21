@@ -95,3 +95,16 @@ test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_
   assert.match(replace, /abandonContinuationContext[\s\S]*sendStagedBloggerContinuation/)
   assert.match(send, /stageContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/)
 })
+
+test('WHAT[CONTEXT-COMPRESSION-023] WHAT[PAR-018] recovery_wait_is_durable_event_driven_and_time_independent', () => {
+  const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
+  const wait = workflow.slice(
+    workflow.indexOf('let rec private awaitLinkedProducer'),
+    workflow.indexOf('let private currentFallback'),
+  )
+
+  assert.match(wait, /AgentJournal\.snapshotWithRevision/)
+  assert.match(wait, /BloggerCycleProjection\.tryOpenByBlogger/)
+  assert.match(wait, /AgentJournal\.awaitChangeFrom/)
+  assert.doesNotMatch(wait, /HasFlight|HasPendingOffer|TimeSpan|ITimerPort|\.Delay\b|deadline|timeout|sleep/i)
+})

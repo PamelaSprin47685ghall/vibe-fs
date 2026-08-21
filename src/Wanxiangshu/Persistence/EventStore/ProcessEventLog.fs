@@ -114,6 +114,9 @@ module ProcessEventLog =
     [<Import("utimesSync", "node:fs")>]
     let private utimesSync (path: string) (atime: float) (mtime: float) : unit = jsNative
 
+    [<Emit("Date.now()")>]
+    let private currentTimeMs () : float = jsNative
+
     [<Import("openSync", "node:fs")>]
     let private openSync (path: string) (flags: string) : int = jsNative
 
@@ -159,6 +162,13 @@ module ProcessEventLog =
         { Name: string
           StatIdentity: string
           LastActivityMs: float }
+
+    let private writerRetentionMs = 24.0 * 60.0 * 60.0 * 1000.0
+
+    let writerRetentionMilliseconds () = writerRetentionMs
+
+    let isWriterActiveAt nowMs lastActivityMs =
+        lastActivityMs >= nowMs - writerRetentionMs
 
     /// Cross-process physical serialization shared by runtime append and the
     /// standalone Git-hook synchronizer. It protects bytes/snapshot boundaries
@@ -326,46 +336,47 @@ module ProcessEventLog =
                 let fd = openSync path "r"
 
                 try
-                    let trailing = readExactAt fd (size - 1) 1
+                    try
+                        let trailing = readExactAt fd (size - 1) 1
 
-                    if trailing.[0] <> 10uy then
-                        Error(sprintf "writer file has incomplete trailing line: %s" path)
-                    else
-                        let lineEnd = size - 1
-
-                        if lineEnd = 0 then
-                            Error(sprintf "writer file contains empty final line: %s" path)
+                        if trailing.[0] <> 10uy then
+                            Error(sprintf "writer file has incomplete trailing line: %s" path)
                         else
-                            let blockSize = 4096
-                            // DSL-MUTABLE: algorithm-scratch — exclusive end of next reverse pread.
-                            let mutable cursor = lineEnd
-                            // DSL-MUTABLE: algorithm-scratch — exact line start once previous LF is found.
-                            let mutable lineStart = -1
+                            let lineEnd = size - 1
 
-                            while cursor > 0 && lineStart < 0 do
-                                let start = max 0 (cursor - blockSize)
-                                let length = cursor - start
-                                let buffer = readExactAt fd start length
-                                let delimiter = lastIndexOfLf buffer length
-
-                                if delimiter >= 0 then
-                                    lineStart <- start + delimiter + 1
-                                elif start = 0 then
-                                    lineStart <- 0
-                                else
-                                    cursor <- start
-
-                            let length = lineEnd - lineStart
-
-                            if length <= 0 then
+                            if lineEnd = 0 then
                                 Error(sprintf "writer file contains empty final line: %s" path)
                             else
-                                readExactAt fd lineStart length
-                                |> Encoding.UTF8.GetString
-                                |> Some
-                                |> Ok
-                with ex ->
-                    Error ex.Message
+                                let blockSize = 4096
+                                // DSL-MUTABLE: algorithm-scratch — exclusive end of next reverse pread.
+                                let mutable cursor = lineEnd
+                                // DSL-MUTABLE: algorithm-scratch — exact line start once previous LF is found.
+                                let mutable lineStart = -1
+
+                                while cursor > 0 && lineStart < 0 do
+                                    let start = max 0 (cursor - blockSize)
+                                    let length = cursor - start
+                                    let buffer = readExactAt fd start length
+                                    let delimiter = lastIndexOfLf buffer length
+
+                                    if delimiter >= 0 then
+                                        lineStart <- start + delimiter + 1
+                                    elif start = 0 then
+                                        lineStart <- 0
+                                    else
+                                        cursor <- start
+
+                                let length = lineEnd - lineStart
+
+                                if length <= 0 then
+                                    Error(sprintf "writer file contains empty final line: %s" path)
+                                else
+                                    readExactAt fd lineStart length
+                                    |> Encoding.UTF8.GetString
+                                    |> Some
+                                    |> Ok
+                    with ex ->
+                        Error ex.Message
                 finally
                     closeSync fd
 
@@ -503,9 +514,13 @@ module ProcessEventLog =
         else
             invalidArg "name" "writer filename must end in .ndjson"
 
-    /// Frozen writer streams, sorted only by WriterId for deterministic enumeration.
-    /// The canonical Integrator owns cross-stream ordering and interpretation.
-    let readStreams (commonDir: string) : Result<(string * EventEnvelope list) list, StorageInvalid> =
+    /// Frozen retained writer streams, sorted only by WriterId for deterministic
+    /// enumeration. Retention is whole-writer physical policy; the canonical
+    /// Integrator still owns cross-stream ordering and interpretation.
+    let readStreamsAt
+        (commonDir: string)
+        (nowMs: float)
+        : Result<(string * EventEnvelope list) list, StorageInvalid> =
         let rec read remaining acc =
             result {
                 match remaining with
@@ -517,7 +532,13 @@ module ProcessEventLog =
                     return! read tail ((writer, events) :: acc)
             }
 
-        read (writerFileNames commonDir) []
+        writerPhysicalMetadata commonDir
+        |> List.filter (fun writer -> isWriterActiveAt nowMs writer.LastActivityMs)
+        |> List.map (fun writer -> writer.Name)
+        |> fun names -> read names []
+
+    let readStreams (commonDir: string) : Result<(string * EventEnvelope list) list, StorageInvalid> =
+        readStreamsAt commonDir (currentTimeMs ())
 
     let private payloadDigest (content: byte[]) =
         createHash "sha256" |> fun hash -> hashUpdate hash content |> hashHex

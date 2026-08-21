@@ -67,3 +67,7 @@ StrengthReplica attempt 的成功或失败属于投机调查分支，严禁进�
 ## PAR-017: Blogger retry 必须更换物理绑定
 
 Blogger provider attempt 失败后，旧 `BloggerRequestMaterialized` 必须先以 `BloggerRequestAbandoned` 关闭。任何自动 retry（包括相同 Main context 的 retry、Main→Squash、Squash→下一槽 Main）都必须重新 materialize typed context 并绑定新 `PromptKey`，严禁让旧 PromptKey 跨物理 retry 继续充当所有权证明。
+
+## PAR-018: recovery continuation 只由 durable 事件解锁
+
+WorkMain 失败进入 primed recovery opportunity 后，若 linked Blogger 已有 durable open request 且尚无严格更新的 prefix coverage，则 recovery continuation 必须等待该 journal stream 的下一次已提交事实并重算条件；open request 的 commit/abandon 或 coverage advance 是唯一解锁事件。禁止 timer、deadline、sleep、polling、process-local flight/pending 状态参与该等待。若没有 durable open producer，则立即进入本次物理 retry，不等待未来材料。

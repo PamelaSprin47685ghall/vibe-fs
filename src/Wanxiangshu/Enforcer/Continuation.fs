@@ -125,8 +125,7 @@ module EnforcerContinuation =
           Project: obj list -> ContinuationOutcome
           Stop: string -> ContinuationOutcome
           RefreshMainContext: SessionId -> SessionId -> Task<BloggerRequestContext option>
-          IsEmptyTextCycleFailure: string -> bool
-          ParkedTransformLifetime: System.TimeSpan }
+          IsEmptyTextCycleFailure: string -> bool }
 
     let key (ctx: Context) = SessionId.value ctx.BloggerSessionId
 
@@ -531,13 +530,12 @@ module EnforcerContinuation =
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
+        (offered: BloggerRequestContext)
         : Task<ContinuationOutcome> =
         task {
-            ctx.Scope.TryTakePendingOffer sessionKey |> ignore
-
             match! ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId with
             | Some live -> return! projectAfterParkWake ctx mainSessionId sessionKey live
-            | None -> return ctx.Project ctx.RawMessages
+            | None -> return! projectAfterParkWake ctx mainSessionId sessionKey offered
         }
 
     let private parkAfterCatchUpClear
@@ -547,12 +545,9 @@ module EnforcerContinuation =
         (caughtUpReason: string)
         : Task<ContinuationOutcome> =
         task {
-            let! resumed = ctx.Scope.ParkTransform(sessionKey, ctx.ParkedTransformLifetime)
-
-            if resumed then
-                return! afterParkResumed ctx mainSessionId sessionKey
-            else
-                return! afterParkNotResumed ctx mainSessionId sessionKey caughtUpReason
+            match! ctx.Scope.ParkTransform sessionKey with
+            | ParkWake.MaterialAvailable offered -> return! afterParkResumed ctx mainSessionId sessionKey offered
+            | ParkWake.Cancelled -> return! afterParkNotResumed ctx mainSessionId sessionKey caughtUpReason
         }
 
     /// Evidence → Decision: catch-up refresh None → seal or park until a physical boundary.
@@ -1123,8 +1118,7 @@ module EnforcerContinuation =
                   Project = project
                   Stop = stop
                   RefreshMainContext = BloggerMainContext.fromJournal scope durable
-                  IsEmptyTextCycleFailure = isEmptyTextCycleFailure
-                  ParkedTransformLifetime = EnforcerHost.ParkedTransformLifetime }
+                  IsEmptyTextCycleFailure = isEmptyTextCycleFailure }
 
             let chronicleCallCount = EnforcerRepair.chronicleCallCount rawMessages
 

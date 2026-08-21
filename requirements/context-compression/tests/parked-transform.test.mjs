@@ -1,184 +1,139 @@
-// Moved from tests/unit/enforcer/parked-transform.test.mjs (cutover Wave 2a); owner: context-compression.
-//
-// ENFORCER-047/050/160/161/162 — typed offer context + park primitive.
-// Blogger parking / PendingOffer / physical flight ownership (convergence lifecycle).
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import * as owner from '../../../dist/Context/Companion/RuntimeSurface.js'
-const ctx = owner
-const parkedTransform = owner
+import { readFileSync } from 'node:fs'
+import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 
-const SHORT_LIFETIME_MS = 200
-const main = (toml = 'delta-1') => ctx.main({ toml })
+const ROOT = new URL('../../../', import.meta.url).pathname
+const main = (toml = 'delta-1') => runtime.main({ toml })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_park_resolves_true_on_resume_and_removes_the_entry', async () => {
-  const scope = parkedTransform.scope()
-  const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), true)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_material_event_resumes_park_with_typed_context', async () => {
+  const scope = runtime.scope()
+  const waiter = runtime.park(scope, 'ses-blogger')
 
-  const resumed = parkedTransform.resumeParked(scope, 'ses-blogger')
-  assert.equal(resumed, true)
-  assert.equal(await waiter, true)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
+  assert.equal(runtime.hasParked(scope, 'ses-blogger'), true)
+  assert.equal(runtime.offerParked(scope, 'ses-blogger', main('delta-1')), 'Delivered')
+
+  const wake = await waiter
+  assert.equal(wake.kind, 'MaterialAvailable')
+  assert.equal(wake.context.kind, 'Main')
+  assert.equal(wake.context.toml, 'delta-1')
+  assert.equal(runtime.hasParked(scope, 'ses-blogger'), false)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_resolves_false_and_releases_the_waiter', async () => {
-  const scope = parkedTransform.scope()
-  const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_is_an_explicit_event', async () => {
+  const scope = runtime.scope()
+  const waiter = runtime.park(scope, 'ses-blogger')
 
-  parkedTransform.cancelParked(scope, 'ses-blogger')
-  assert.equal(await waiter, false)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
+  runtime.cancelParked(scope, 'ses-blogger')
+
+  assert.deepEqual(await waiter, { kind: 'Cancelled', context: null })
+  assert.equal(runtime.hasParked(scope, 'ses-blogger'), false)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_a_timed_out_park_resolves_false_fail_closed', async () => {
-  const scope = parkedTransform.scope()
-  const waiter = parkedTransform.park(scope, 'ses-blogger', SHORT_LIFETIME_MS)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_offer_first_is_delivered_by_the_next_await', async () => {
+  const scope = runtime.scope()
 
-  assert.equal(await waiter, false)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
+  assert.equal(runtime.offerParked(scope, 'ses-blogger', main('staged')), 'Staged')
+  assert.equal(runtime.hasParked(scope, 'ses-blogger'), false)
+
+  const wake = await runtime.park(scope, 'ses-blogger')
+  assert.equal(wake.kind, 'MaterialAvailable')
+  assert.equal(wake.context.toml, 'staged')
+  assert.equal(runtime.consumeStaged(scope, 'ses-blogger'), null)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_an_offer_staged_before_the_park_is_consumed_by_the_park', async () => {
-  const scope = parkedTransform.scope()
-  const resumed = parkedTransform.offerParked(scope, 'ses-blogger', main('delta-1'))
-  assert.equal(resumed, false)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_two_awaits_share_one_material_event', async () => {
+  const scope = runtime.scope()
+  const first = runtime.park(scope, 'ses-blogger')
+  const second = runtime.park(scope, 'ses-blogger')
 
-  const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
-  assert.equal(await waiter, true)
-  const staged = parkedTransform.consumeStaged(scope, 'ses-blogger')
-  assert.equal(staged.kind, 'Main')
-  assert.equal(staged.toml, 'delta-1')
-  assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), null)
+  assert.equal(runtime.offerParked(scope, 'ses-blogger', main('one-event')), 'Delivered')
+
+  const [a, b] = await Promise.all([first, second])
+  assert.equal(a.kind, 'MaterialAvailable')
+  assert.equal(a.context.toml, 'one-event')
+  assert.deepEqual(b, a)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_an_offer_to_a_parked_transform_resumes_it_with_the_context', async () => {
-  const scope = parkedTransform.scope()
-  const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_dispose_cancels_every_material_wait', async () => {
+  const scope = runtime.scope()
+  const a = runtime.park(scope, 'ses-a')
+  const b = runtime.park(scope, 'ses-b')
 
-  const resumed = parkedTransform.offerParked(scope, 'ses-blogger', main('delta-2'))
-  assert.equal(resumed, true)
-  assert.equal(await waiter, true)
-  const staged = parkedTransform.consumeStaged(scope, 'ses-blogger')
-  assert.equal(staged.kind, 'Main')
-  assert.equal(staged.toml, 'delta-2')
+  runtime.dispose(scope)
+
+  assert.equal((await a).kind, 'Cancelled')
+  assert.equal((await b).kind, 'Cancelled')
+  assert.equal(runtime.hasParked(scope, 'ses-a'), false)
+  assert.equal(runtime.hasParked(scope, 'ses-b'), false)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_050_staged_context_is_consumed_only_once', async () => {
-  const scope = parkedTransform.scope()
-  parkedTransform.offerParked(scope, 'ses-blogger', main('once'))
-  const first = parkedTransform.consumeStaged(scope, 'ses-blogger')
-  const second = parkedTransform.consumeStaged(scope, 'ses-blogger')
-  assert.equal(first.toml, 'once')
-  assert.equal(second, null)
-})
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_160_two_parks_for_one_session_share_one_waiter', async () => {
-  const scope = parkedTransform.scope()
-  const first = parkedTransform.park(scope, 'ses-blogger', 60_000)
-  const second = parkedTransform.park(scope, 'ses-blogger', 60_000)
-
-  assert.equal(parkedTransform.resumeParked(scope, 'ses-blogger'), true)
-  assert.equal(await first, true)
-  assert.equal(await second, true)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-blogger'), false)
-})
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_dispose_cancels_every_parked_waiter', async () => {
-  const scope = parkedTransform.scope()
-  const a = parkedTransform.park(scope, 'ses-a', 60_000)
-  const b = parkedTransform.park(scope, 'ses-b', 60_000)
-
-  parkedTransform.dispose(scope)
-  assert.equal(await a, false)
-  assert.equal(await b, false)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-a'), false)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-b'), false)
-})
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_clears_staged_context_with_or_without_waiter', async () => {
-  const scope = parkedTransform.scope()
-
-  // Staged only (offer-first, no park yet).
-  parkedTransform.offerParked(scope, 'ses-x', main('staged'))
-  parkedTransform.cancelParked(scope, 'ses-x')
-  assert.equal(parkedTransform.consumeStaged(scope, 'ses-x'), null)
-
-  // Parked + staged: cancel releases waiter and drops the offer.
-  const waiter = parkedTransform.park(scope, 'ses-blogger', 60_000)
-  parkedTransform.offerParked(scope, 'ses-blogger', main('gone'))
-  // offer already resumed the waiter; a second stage then cancel:
-  parkedTransform.offerParked(scope, 'ses-blogger', main('again'))
-  parkedTransform.cancelParked(scope, 'ses-blogger')
-  assert.equal(parkedTransform.consumeStaged(scope, 'ses-blogger'), null)
-  assert.equal(await waiter, true)
-})
-
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_park_does_not_revoke_an_existing_physical_flight', () => {
-  const scope = parkedTransform.scope()
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_162_cancel_drops_staged_material_without_touching_flight', async () => {
+  const scope = runtime.scope()
   const key = 'ses-blogger'
-  parkedTransform.setCurrentRequest(scope, key, main('already-flying'))
 
-  parkedTransform.cancelParked(scope, key)
+  runtime.offerParked(scope, key, main('staged'))
+  runtime.setCurrentRequest(scope, key, main('already-flying'))
+  runtime.cancelParked(scope, key)
 
-  assert.equal(parkedTransform.hasFlight(scope, key), true)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key)?.toml, 'already-flying')
-  parkedTransform.clearCurrentRequest(scope, key)
+  assert.equal(runtime.consumeStaged(scope, key), null)
+  assert.equal(runtime.hasFlight(scope, key), true)
+  assert.equal(runtime.peekCurrentRequest(scope, key)?.toml, 'already-flying')
+  runtime.clearCurrentRequest(scope, key)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_closes_drain_without_revoking_an_existing_physical_flight', () => {
-  const scope = parkedTransform.scope()
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_seal_cancels_wait_without_revoking_existing_flight', async () => {
+  const scope = runtime.scope()
   const key = 'ses-blogger'
-  parkedTransform.setCurrentRequest(scope, key, main('seal-in-flight'))
-  parkedTransform.setDrainWindow(scope, key, parkedTransform.openDrain('root-1'))
+  const waiter = runtime.park(scope, key)
 
-  parkedTransform.sealRuntime(scope, key)
+  runtime.setCurrentRequest(scope, key, main('seal-in-flight'))
+  runtime.setDrainWindow(scope, key, runtime.openDrain('root-1'))
+  runtime.sealRuntime(scope, key)
 
-  assert.equal(parkedTransform.isDrainOpen(scope, key), false)
-  assert.equal(parkedTransform.hasFlight(scope, key), true)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key)?.toml, 'seal-in-flight')
-  parkedTransform.clearCurrentRequest(scope, key)
+  assert.equal((await waiter).kind, 'Cancelled')
+  assert.equal(runtime.isDrainOpen(scope, key), false)
+  assert.equal(runtime.hasFlight(scope, key), true)
+  assert.equal(runtime.peekCurrentRequest(scope, key)?.toml, 'seal-in-flight')
+  runtime.clearCurrentRequest(scope, key)
 })
 
-test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent_under_the_same_scope', async () => {
-  const scope = parkedTransform.scope()
-  const a = parkedTransform.park(scope, 'ses-a', 60_000)
+test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_161_sessions_are_independent', async () => {
+  const scope = runtime.scope()
+  const a = runtime.park(scope, 'ses-a')
+  const b = runtime.park(scope, 'ses-b')
 
-  const b = parkedTransform.park(scope, 'ses-b', 60_000)
-  parkedTransform.resumeParked(scope, 'ses-b')
-  assert.equal(await b, true)
-  assert.equal(parkedTransform.hasParked(scope, 'ses-a'), true)
+  runtime.offerParked(scope, 'ses-b', main('b'))
+  assert.equal((await b).context.toml, 'b')
+  assert.equal(runtime.hasParked(scope, 'ses-a'), true)
 
-  parkedTransform.cancelParked(scope, 'ses-a')
-  assert.equal(await a, false)
+  runtime.cancelParked(scope, 'ses-a')
+  assert.equal((await a).kind, 'Cancelled')
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_047_CurrentRequest_is_physical_flight_ownership', () => {
-  // PR7 D6: flight registry is the sole ownership authority (no State.InFlight shadow).
-  const scope = parkedTransform.scope()
+  const scope = runtime.scope()
   const key = 'ses-blogger'
-  const request = main('coverage-delta')
 
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key), null)
-  assert.equal(parkedTransform.hasFlight(scope, key), false)
+  assert.equal(runtime.hasFlight(scope, key), false)
+  runtime.setCurrentRequest(scope, key, main('coverage-delta'))
+  assert.equal(runtime.hasFlight(scope, key), true)
+  assert.equal(runtime.tryGetFlight(scope, key)?.toml, 'coverage-delta')
+  runtime.clearCurrentRequest(scope, key)
+  assert.equal(runtime.hasFlight(scope, key), false)
+})
 
-  parkedTransform.setCurrentRequest(scope, key, request)
-  const peeked = parkedTransform.peekCurrentRequest(scope, key)
-  assert.equal(peeked?.kind, 'Main')
-  assert.equal(peeked?.toml, 'coverage-delta')
-  assert.equal(parkedTransform.hasFlight(scope, key), true)
-  assert.equal(parkedTransform.tryGetFlight(scope, key)?.toml, 'coverage-delta')
+test('WHAT[CONTEXT-COMPRESSION-023] CTX_023_park_has_no_clock_or_timeout_dependency', () => {
+  const parked = readFileSync(
+    `${ROOT}src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs`,
+    'utf8',
+  )
+  const scope = readFileSync(
+    `${ROOT}src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs`,
+    'utf8',
+  )
 
-  // Commit success path: ClearCurrentRequest drops ownership.
-  parkedTransform.clearCurrentRequest(scope, key)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key), null)
-  assert.equal(parkedTransform.hasFlight(scope, key), false)
-
-  // Fail path: Clear while live removes flight (idempotent thereafter).
-  parkedTransform.setCurrentRequest(scope, key, main('fail-me'))
-  assert.equal(parkedTransform.hasFlight(scope, key), true)
-  parkedTransform.clearCurrentRequest(scope, key)
-  assert.equal(parkedTransform.peekCurrentRequest(scope, key), null)
-  assert.equal(parkedTransform.hasFlight(scope, key), false)
+  for (const [name, text] of [['ParkedTransform', parked], ['PluginScope', scope]]) {
+    assert.doesNotMatch(text, /TimeSpan|ITimerPort|nodeTimerPort|\.Delay\b|deadline|timeout/i, `${name} must be time-independent`)
+  }
 })

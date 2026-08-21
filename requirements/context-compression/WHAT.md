@@ -68,9 +68,9 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 真实 Opening 消息永久保持 raw 状态：不交给 Y 改写，不随 rebase 消失，在 compaction 与 recovery 中完整保留。Manager 是否已到 T1 不得改变压缩 floor；pre-T1 与 post-T1 普通工作历史一视同仁，Blogger 的 effectiveStart 始终取 `max(RecordCoverage, Life.WorkRecordStart)`，其中 `Life.WorkRecordStart` 仅表示真实 Opening 之后的首个 XTrace 位置，不再扩张到动态 XTrace head 或 BlindPlan T1 commitment 边界。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
 
-## CONTEXT-COMPRESSION-018: Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 在同一存活执行内必须 park 等未来 material
+## CONTEXT-COMPRESSION-018: Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 只等待事件
 
-一次唤醒可驱动多个 ≤200 KiB 的 Blogger cycle 直至追平当前 Current。每个已提交 cycle 后必须基于最新的 Blog coverage 与 XTrace Current 重新计算下一块，严禁冻结截断线。当前无可消费材料代表暂时 caught-up，在当前执行存活期内必须挂起等待未来材料到达，不得直接终止连续追平。进程死亡不跨进程自动恢复旧 continuation。
+一次唤醒可驱动多个 ≤200 KiB 的 Blogger cycle 直至追平当前 Current。每个已提交 cycle 后必须基于最新的 Blog coverage 与 XTrace Current 重新计算下一块，严禁冻结截断线。当前无可消费材料代表暂时 caught-up，在当前执行存活期内必须挂起等待 `MaterialAvailable typedContext | Cancelled` 事件；等待没有 lifetime、deadline 或 timeout。进程死亡不跨进程自动恢复旧 continuation。
 
 ## CONTEXT-COMPRESSION-019: X→Y 后旧辅助注入不跨 horizon 保留
 
@@ -87,3 +87,7 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 ## CONTEXT-COMPRESSION-022: BloggerMainContext 是唯一重建公式
 
 正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash/AABB refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest cursor、同一 200 KiB chunk 与同一 coverage digest 规则。严禁在 Coordinator、Enforcer 或 recovery workflow 中复制第二套 next-main 算法。
+
+## CONTEXT-COMPRESSION-023: recovery/park 全事件驱动且时间无关
+
+Context compression 与 provider recovery 的 correctness path 严禁读取 wall clock、构造 `TimeSpan`、调用 timer/deadline/Delay 或以超时作为状态转换。Blogger park 的完成值必须携带 typed event，而非 `bool` 再从第二个槽位取 material。WorkMain recovery 若需要等待正在生产的 Y，只能以 durable `BloggerRequestMaterialized` open request 证明 producer 存在，并订阅 `AgentJournal` 的已提交 change；每个 change 后重新读取 projection，直到出现严格更新的 coverage 或该 durable open request 被 commit/abandon 关闭。`HasFlight`、PendingOffer、进程内 waiter 与时间窗口均不得作为 recovery correctness 证明。

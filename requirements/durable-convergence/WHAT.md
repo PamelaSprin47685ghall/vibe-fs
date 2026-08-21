@@ -42,4 +42,4 @@
 
 ## DURABLE-CONVERGENCE-011: writer 以最后输出活动时间整体过期且不可被旧快照复活
 
-每个 writer 对应一次进程输出流。协议使用固定 24 小时 TTL，并定义 `Retain(now, W) = { w ∈ W | lastActivity(w) >= now - TTL }`。`lastActivity` 属于 writer blob 的物理派生元数据：origin append 更新本地文件活动时间；Git snapshot manifest 将 `(writer blob OID, lastActivity)` 原子固化；远端导入继承 manifest 时间而不得使用 fetch 时间刷新活动性。同步必须在统一截止时刻应用 `Retain(A ∪ B) = Retain(A) ∪ Retain(B)`，过期 writer 从本地文件集合和新发布的远端 snapshot 同时消失。snapshot/cache 命中不得跨越下一 writer expiry 时刻。
+每个 writer 对应一次进程输出流。协议使用固定 24 小时 TTL，并定义 `Retain(now, W) = { w ∈ W | lastActivity(w) >= now - TTL }`。`lastActivity` 属于 writer blob 的物理派生元数据：origin append 更新本地文件活动时间；Git snapshot manifest 将 `(writer blob OID, lastActivity)` 原子固化；远端导入继承 manifest 时间而不得使用 fetch 时间刷新活动性。同步必须在统一截止时刻应用 `Retain(A ∪ B) = Retain(A) ∪ Retain(B)`，过期 writer 从本地文件集合和新发布的远端 snapshot 同时消失。retained writer 中指向已退出 retention window 的 parent 被视为窗口外已满足因果边界；仅 retained 集合内部的缺失/成环依赖继续 fail-closed。snapshot/cache 命中不得跨越下一 writer expiry 时刻。

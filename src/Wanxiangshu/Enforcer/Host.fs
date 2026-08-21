@@ -89,12 +89,6 @@ open Wanxiangshu.Strength
 /// never create a PromptDispatcher side effect.
 module EnforcerHost =
 
-    /// ENFORCER-160: the parking lifetime for a continuation transform.
-    /// Owned by the Enforcer domain (GOV-003: no proposal-constant dependency
-    /// in the production graph; the proposal may reference this, never vice
-    /// versa).
-    let ParkedTransformLifetime = TimeSpan.FromMinutes 10.0
-
     /// C4: commit-path UTF-8 safety bounds.
     let MaxBlogTextBytes = 512 * 1024
     let MaxEvidenceBytes = 128 * 1024

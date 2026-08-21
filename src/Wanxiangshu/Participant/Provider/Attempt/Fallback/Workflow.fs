@@ -79,8 +79,8 @@ open Wanxiangshu.Strength
 /// recovery trigger.
 module ProviderRecoveryWorkflow =
 
-    let private sessionHasFreshCoverage (durable: AgentJournal) (sessionId: SessionId) =
-        let session = AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+    let private sessionHasFreshCoverage (projection: ProjectionSet) (sessionId: SessionId) =
+        let session = AgentProjection.tryFind sessionId projection.AgentProjections
 
         let committedCutoff =
             session
@@ -93,46 +93,66 @@ module ProviderRecoveryWorkflow =
         |> Option.bind (fun state -> state.Blog)
         |> Option.exists (fun blog -> blog.Coverage.CoverableTurnCutoffExclusive > committedCutoff)
 
-    let private bloggerOfMain (durable: AgentJournal) (sessionId: SessionId) =
-        SessionAssociationProjection.tryBloggerOf
-            sessionId
-            (AgentJournal.snapshot durable).AgentProjections.Associations
+    let private bloggerOfMain (projection: ProjectionSet) (sessionId: SessionId) =
+        SessionAssociationProjection.tryBloggerOf sessionId projection.AgentProjections.Associations
 
-    let private bloggerProducerActive (scope: IParkedTransformHost) (bloggerSessionId: SessionId) =
-        let key = SessionId.value bloggerSessionId
-        scope.HasFlight key || scope.HasPendingOffer key
+    let private hasOpenBloggerRequest
+        (projection: ProjectionSet)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        =
+        projection.AgentProjections.Sessions
+        |> Map.tryFind mainSessionId
+        |> Option.bind (fun session -> session.BloggerCycles)
+        |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
+        |> Option.isSome
 
-    /// CTX-006: causal wait, never a wall-clock guess. We wait only while the
-    /// linked Blogger demonstrably owns a flight or staged offer capable of
-    /// producing newer coverage. Every transition that can end that ownership
-    /// commits/abandons material in the journal, so the revision is the wakeup.
+    [<RequireQualifiedAccess>]
+    type private RecoveryMaterialState =
+        | Ready
+        | AwaitCommittedFact
+
+    let private recoveryMaterialState
+        (projection: ProjectionSet)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        =
+        if sessionHasFreshCoverage projection mainSessionId then
+            RecoveryMaterialState.Ready
+        elif bloggerOfMain projection mainSessionId <> Some bloggerSessionId then
+            RecoveryMaterialState.Ready
+        elif hasOpenBloggerRequest projection mainSessionId bloggerSessionId then
+            RecoveryMaterialState.AwaitCommittedFact
+        else
+            RecoveryMaterialState.Ready
+
+    /// CTX-023 / PAR-018: durable event wait. The open materialization is the
+    /// producer proof; commit/abandon facts close it and coverage facts may make
+    /// a probe available. No process-local flight state and no clock participate.
     let rec private awaitLinkedProducer
-        (scope: IParkedTransformHost)
         (durable: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)
         : Task =
         task {
-            let fromRevision = AgentJournal.revision durable
+            let projection, revision = AgentJournal.snapshotWithRevision durable
 
-            if
-                sessionHasFreshCoverage durable mainSessionId
-                || not (bloggerProducerActive scope bloggerSessionId)
-            then
-                return ()
-            else
-                let! _ = AgentJournal.awaitChangeFrom fromRevision durable
-                return! awaitLinkedProducer scope durable mainSessionId bloggerSessionId
+            match recoveryMaterialState projection mainSessionId bloggerSessionId with
+            | RecoveryMaterialState.Ready -> return ()
+            | RecoveryMaterialState.AwaitCommittedFact ->
+                let! _ = AgentJournal.awaitChangeFrom revision durable
+                return! awaitLinkedProducer durable mainSessionId bloggerSessionId
         }
 
     let awaitRecoveryMaterial
-        (scope: IParkedTransformHost)
         (durable: AgentJournal)
         (mainSessionId: SessionId)
         : Task =
-        match bloggerOfMain durable mainSessionId with
+        let projection = AgentJournal.snapshot durable
+
+        match bloggerOfMain projection mainSessionId with
         | None -> Task.FromResult(()) :> Task
-        | Some bloggerSessionId -> awaitLinkedProducer scope durable mainSessionId bloggerSessionId
+        | Some bloggerSessionId -> awaitLinkedProducer durable mainSessionId bloggerSessionId
 
     let private currentFallback (durable: AgentJournal) (sessionId: SessionId) =
         FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot durable)
@@ -329,7 +349,6 @@ module ProviderRecoveryWorkflow =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
-        (scope: IParkedTransformHost)
         (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
@@ -338,7 +357,7 @@ module ProviderRecoveryWorkflow =
         task {
             if opportunityAfterAdvance durable turn.SessionId = RecoveryOpportunity.RecoveryAttempt then
                 armRecovery turn.SessionId
-                do! awaitRecoveryMaterial scope durable turn.SessionId
+                do! awaitRecoveryMaterial durable turn.SessionId
 
             let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
             handleContinuation eventPort turn error continuation
@@ -402,7 +421,6 @@ module ProviderRecoveryWorkflow =
                                 sessionPort
                                 eventPort
                                 durable
-                                scope
                                 armRecovery
                                 turn
                                 continuationPrompt

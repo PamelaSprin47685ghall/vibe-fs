@@ -386,7 +386,7 @@ module CanonicalIntegrator =
     /// Business semantic failures never abort replay; they cut only that rule's
     /// tail until an in-order ProjectionCutTail reset fact is encountered.
     let private replay (streams: (string * EventEnvelope list) list) : Result<IntegratorState, string> =
-        EventKWayMerge.merge streams
+        EventKWayMerge.mergeRetained streams
         |> Result.mapError (sprintf "writer-stream replay invalid: %A")
         |> Result.bind (fun ordered ->
             // DSL-MUTABLE: algorithm-scratch — stack depth must not scale with history length.

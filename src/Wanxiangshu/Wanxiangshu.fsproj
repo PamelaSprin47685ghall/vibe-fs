@@ -182,6 +182,7 @@
     <Compile Include="Persistence/EventStore/GitObjectDatabase.fs"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fs"/>
     <Compile Include="Persistence/EventStore/WriterStreamSync.fs"/>
+    <Compile Include="Persistence/EventStore/RetentionSurface.fs"/>
     <Compile Include="OpenCode/Tools/ManagedAgent.fs"/>
     <Compile Include="Mission/Obligation/Todo/MagicTodoFactCodec.fs"/>
     <Compile Include="Persistence/Journal/FactCodec.fs"/>

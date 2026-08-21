@@ -208,27 +208,24 @@ module CompanionRuntimeSurface =
         Wanxiangshu.OpenCode.SharedState.clearBloggerFlightsForTests ()
         box (new Wanxiangshu.OpenCode.PluginRuntimeScope(None))
 
-    let createParked (sessionId: string) (lifetimeMs: int) : obj =
-        box (new ParkedTransform(sessionId, TimeSpan.FromMilliseconds(float lifetimeMs)))
+    let private parkWakeToJs (wake: ParkWake) : obj =
+        match wake with
+        | ParkWake.MaterialAvailable context -> box {| kind = "MaterialAvailable"; context = contextToJs context |}
+        | ParkWake.Cancelled -> box {| kind = "Cancelled"; context = null |}
 
-    let resume (value: obj) : unit =
-        unbox<ParkedTransform> value |> fun parked -> parked.TryResume()
-
-    let cancel (value: obj) : unit =
-        unbox<ParkedTransform> value |> fun parked -> parked.TryCancel()
-
-    let completion (value: obj) : Task<bool> =
-        unbox<ParkedTransform> value |> fun parked -> parked.Completion
+    let private offerDispositionName (disposition: MaterialOfferDisposition) =
+        match disposition with
+        | MaterialOfferDisposition.Delivered -> "Delivered"
+        | MaterialOfferDisposition.Staged -> "Staged"
 
     let dispose (scope: obj) : unit =
         (scopeOf scope :> IDisposable).Dispose()
 
-    let park (scope: obj) (sessionId: string) (lifetimeMs: int) : Task<bool> =
-        hostOf scope
-        |> fun host -> host.ParkTransform(sessionId, TimeSpan.FromMilliseconds(float lifetimeMs))
-
-    let resumeParked (scope: obj) (sessionId: string) : bool =
-        hostOf scope |> fun host -> host.ResumeParked sessionId
+    let park (scope: obj) (sessionId: string) : Task<obj> =
+        task {
+            let! wake = hostOf scope |> fun host -> host.ParkTransform sessionId
+            return parkWakeToJs wake
+        }
 
     let cancelParked (scope: obj) (sessionId: string) : unit =
         hostOf scope |> fun host -> host.CancelParked sessionId
@@ -236,8 +233,10 @@ module CompanionRuntimeSurface =
     let hasParked (scope: obj) (sessionId: string) : bool =
         hostOf scope |> fun host -> host.HasParked sessionId
 
-    let offerMaterial (scope: obj) (sessionId: string) (context: obj) : bool =
-        hostOf scope |> fun host -> host.SetPendingOffer(sessionId, contextOfJs context)
+    let offerMaterial (scope: obj) (sessionId: string) (context: obj) : string =
+        hostOf scope
+        |> fun host -> host.OfferMaterial(sessionId, contextOfJs context)
+        |> offerDispositionName
 
     let consumeStaged (scope: obj) (sessionId: string) : obj =
         match hostOf scope |> fun host -> host.TryTakePendingOffer sessionId with
@@ -261,9 +260,9 @@ module CompanionRuntimeSurface =
 
     let scope () : obj = createScope ()
 
-    let setPendingOffer (scope: obj) (sessionId: string) (context: obj) : bool = offerMaterial scope sessionId context
+    let setPendingOffer (scope: obj) (sessionId: string) (context: obj) : string = offerMaterial scope sessionId context
 
-    let offerParked (scope: obj) (sessionId: string) (context: obj) : bool = offerMaterial scope sessionId context
+    let offerParked (scope: obj) (sessionId: string) (context: obj) : string = offerMaterial scope sessionId context
 
     let tryGetFlight (scope: obj) (sessionId: string) : obj = currentRequest scope sessionId
 

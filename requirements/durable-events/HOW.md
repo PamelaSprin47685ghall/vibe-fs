@@ -11,13 +11,13 @@
 
 2. **Canonical Integrator 与状态折叠**：
    - 系统仅由唯一的 `CanonicalIntegrator` 消费事件历史。
-   - 启动或恢复时：通过 `EventKWayMerge` 聚合所有本地写者文件流，按确定性顺序输入 Integrator 计算当前 `Current` 投影。
+   - 启动或恢复时：先按统一 24h writer-retention predicate 仅枚举活跃本地写者文件，再通过 `EventKWayMerge` 按确定性顺序输入 Integrator 计算当前 `Current` 投影；过期 writer 不读取、不解码。
    - 运行时追加时：新事件经结构校验后直接输入 Integrator 推进 `Current` 状态。若业务规则判定语义不合法，则紧随写入 `ProjectionCutTail` 并在返回前触发进程安全退出。
 
 3. **独立 Git Hook 同步**：
    - 运行时完全不进行 Git 树或对象的读写。
    - 当用户触发 Git 远程操作时，安装的 `reference-transaction` 或 `pre-push` Hook 进程拉起同步脚本。
-   - Hook 进程读取本地与远端写者流完成全量 k-way merge，将每个本地完整写者文件封装为单个 Git blob，并发布远端快照，实现无损双向收敛。
+   - Hook 进程读取本地与远端写者流，在同一截止时刻先整体淘汰过期 writer，再完成 retained k-way merge；每个保留的本地完整写者文件封装为单个 Git blob，并发布带 writer activity manifest 的远端快照。
 
 ## 验证与测试落点
 

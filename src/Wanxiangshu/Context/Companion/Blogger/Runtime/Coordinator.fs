@@ -68,7 +68,7 @@ module BloggerCoordinator =
         | Started
         | StartedSquash
         | SkippedInFlight
-        | OfferedParked of resumed: bool
+        | OfferedParked
         | NoMaterial
         | Sealed
         | StartFailed of string
@@ -403,8 +403,8 @@ module BloggerCoordinator =
         match BloggerRuntime.decideMaterial (scope.HasParked key) (scope.HasFlight key) ctx with
         | BloggerRuntime.Decision.Start startCtx -> startFrozen scope host journal key startCtx
         | BloggerRuntime.Decision.Offer offerCtx ->
-            let resumed = scope.SetPendingOffer(key, offerCtx)
-            Task.FromResult(DecisionEffect.OfferedParked resumed)
+            scope.OfferMaterial(key, offerCtx) |> ignore
+            Task.FromResult DecisionEffect.OfferedParked
         | BloggerRuntime.Decision.Skip -> Task.FromResult DecisionEffect.SkippedInFlight
 
     let private startMainOrNone

@@ -13,8 +13,9 @@
 1. **已确认失败识别**：从完整快照与失败终态中提取确切的 `ProviderRunIdentity`。
 2. **Admission 裁决**：先写 `FallbackCursorAdvanced`；只有预算允许的 `RecoveryAdvanced` 才继续。WorkMain 在新 primed 槽获得一次 X opportunity；BloggerMain 在新 primed 槽且有 frames 时先发送 BloggerSquash。
 3. **Blogger retry 所有权**：失败 open request 先 abandon；下一 typed request 在物理发送前 materialize，并在 send 后绑定该次 PromptKey。Main→Main、Main→Squash、Squash→Main 共用同一规则。
-4. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
-5. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`，不改写 Persona、语言或 system prompt 字节。
+4. **事件解锁**：WorkMain recovery 只在 linked Blogger 存在 durable open request 时订阅 journal revision；`BlogObservationCommitted`、`BlogObservationsSquashed`、`BloggerRequestAbandoned` 等 committed fact 到达后重新求值。无 open producer 立即 retry，不读取 flight/pending，不存在 timeout/polling。
+5. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
+6. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`，不改写 Persona、语言或 system prompt 字节。
 
 ## 依赖关系
 
@@ -44,3 +45,4 @@ DEPENDS ON:
 | PAR-015 | `requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs` |
 | PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | PAR-017 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
+| PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |

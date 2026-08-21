@@ -14,10 +14,12 @@
 1. **Delta 分块**：依据 200 KiB 上限按语义 part 边界切分，cutoff 仅在完整 turn 推进。
 2. **唯一 Main 重建**：`BloggerMainContext` 是 normal catch-up、AABB/crash refresh、Squash 后 Main 与失败 retry 的唯一 next-main 公式，统一 Opening floor、current XTrace generation、cursor、chunk 与 digest。
 3. **失败本地 Squash**：BloggerMain 失败并 advance 到 primed 槽时，若 durable frames 可 squash，则 recovery workflow 当场关闭失败 request、materialize Squash、绑定新 PromptKey 并发送；不依赖未来主 X transform。
-4. **连续 catch-up**：每次 cycle 提交后直接从当前 canonical coverage 与 XTrace Current 重新派生下一块；暂时无材料时进入 park 等待，新材料到达后恢复追平，不设置冻结上限。
-5. **Host Compaction 收容**：观察到外部 compaction 时触发 `ContextReanchored`，推进 epoch 并将旧 horizon 的辅助注入可见性清空。
-6. **Opening floor**：Manager Life 只以真实 Opening 后的 `WorkRecordStart` 作为压缩下界；T1 commitment 仍可属于 WorkRecord 的 constitutive Opening，但不再获得 provider-context 的 raw 常驻权。
-7. **TodoWrite X 穿透**：X-wire 应用 synthetic prefix 时，在 `dropLeading` 范围内先收集 `todowrite` call id，再把含该 call 或对应 result 的原始 Host 消息穿透到 synthetic memory 与未覆盖 tail 之间；其余 dropped 历史继续由 Y replacement 取代。
+4. **typed park event**：caught-up 不启动 timer。`AwaitMaterial` 只返回 `MaterialAvailable BloggerRequestContext | Cancelled`；offer-first material 被下一次 await 直接消费，parked offer 直接完成当前 waiter。wake 自带 material，不再返回 bool 后访问第二份 pending 状态。
+5. **durable recovery event**：WorkMain recovery 只读取 `snapshotWithRevision`。若 linked Blogger 有 durable open request 且 coverage 尚未严格前进，则订阅 `AgentJournal.awaitChangeFrom revision`；commit/abandon/coverage fact 到达后重算。没有 open producer 立即 retry。process-local flight/pending 与 wall clock 不参与 correctness。
+6. **连续 catch-up**：每次 cycle 提交后直接从当前 canonical coverage 与 XTrace Current 重新派生下一块；暂时无材料时等待 typed material/cancel event，不设置冻结上限或超时。
+7. **Host Compaction 收容**：观察到外部 compaction 时触发 `ContextReanchored`，推进 epoch 并将旧 horizon 的辅助注入可见性清空。
+8. **Opening floor**：Manager Life 只以真实 Opening 后的 `WorkRecordStart` 作为压缩下界；T1 commitment 仍可属于 WorkRecord 的 constitutive Opening，但不再获得 provider-context 的 raw 常驻权。
+9. **TodoWrite X 穿透**：X-wire 应用 synthetic prefix 时，在 `dropLeading` 范围内先收集 `todowrite` call id，再把含该 call 或对应 result 的原始 Host 消息穿透到 synthetic memory 与未覆盖 tail 之间；其余 dropped 历史继续由 Y replacement 取代。
 
 ## 依赖关系
 
@@ -51,8 +53,10 @@ DEPENDS ON:
 | CONTEXT-COMPRESSION-020 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` + `requirements/provider-projection/tests/projection.test.mjs` |
 | CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
+| CONTEXT-COMPRESSION-023 | `requirements/context-compression/tests/parked-transform.test.mjs` + `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 
 ## GAP
 
 - CONTEXT-COMPRESSION-017/020：`ctx-opening-floor.test.mjs` 证明 pre/post-T1 floor 等价与 todo round retention 纯判定；`provider-projection/tests/projection.test.mjs` 证明真实 Y prefix write-back 越过 `todowrite` 时 call/result 仍以原始 X Host 消息存在。CLOSED。
 - CONTEXT-COMPRESSION-021/022：failure-local Y recovery 与唯一 `BloggerMainContext` 已进入 production graph；旧 recovery waiter / future-X squash 入口已删除。CLOSED。
+- CONTEXT-COMPRESSION-023：park 与 recovery wait 均只由 typed/durable event 推动；correctness path 无 timer/deadline/timeout。CLOSED。

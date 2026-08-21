@@ -12,7 +12,7 @@ const DAY = 24 * 60 * 60 * 1000
 const A = 'a'.repeat(40)
 const B = 'b'.repeat(40)
 
-const make = (id, stream) => ({ id, stream, type: 'JobRequested', parents: [], payload: {}, payloadRefs: [] })
+const make = (id, stream, parents = []) => ({ id, stream, type: 'JobRequested', parents, payload: {}, payloadRefs: [] })
 
 const withRepo = async (fn) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-retention-'))
@@ -40,9 +40,9 @@ test('WHAT[DURABLE-CONVERGENCE-011] reverse tail read is exact across block boun
   const root = mkdtempSync(join(tmpdir(), 'wxs-writer-tail-'))
   const path = join(root, 'writer.ndjson')
   try {
-    const huge = JSON.stringify({ text: 'x'.repeat(9000) })
-    const tail = JSON.stringify({ marker: 'last' })
-    writeFileSync(path, `${huge}\n${tail}\n`)
+    const first = JSON.stringify({ marker: 'first' })
+    const tail = JSON.stringify({ marker: 'last', text: 'x'.repeat(9000) })
+    writeFileSync(path, `${first}\n${tail}\n`)
     assert.equal(retention.readLastCompleteLine(path), tail)
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -53,9 +53,12 @@ test('WHAT[DURABLE-CONVERGENCE-011] 24h expiry removes local writer and remote m
   await withRepo(async (repo, commonDir) => {
     const now = Date.parse('2026-08-21T00:00:00Z')
     const oldPath = await writeEvent(commonDir, 'writer-old', make(A, 'retention/old'))
-    const freshPath = await writeEvent(commonDir, 'writer-fresh', make(B, 'retention/fresh'))
+    const freshPath = await writeEvent(commonDir, 'writer-fresh', make(B, 'retention/fresh', [A]))
     utimesSync(oldPath, (now - 2 * DAY) / 1000, (now - 2 * DAY) / 1000)
     utimesSync(freshPath, (now - 60_000) / 1000, (now - 60_000) / 1000)
+
+    assert.deepEqual(retention.retainedWriterIdsAt(commonDir, now), ['writer-fresh'],
+      'activation/replay must not read an expired writer even before physical GC')
 
     const result = await retention.syncAt(repo, commonDir, null, now)
     assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))

@@ -1,8 +1,8 @@
 # durable-events — WHAT
 
-## DURABLE-EVENTS-001: Event 是唯一 durable truth 与 append-only
+## DURABLE-EVENTS-001: retained writer 内 Event 是唯一 durable truth 与 append-only
 
-所有动态业务状态必须且仅能由不可变的事件（Event）表达。业务状态变更改为追加新事件，状态撤销改为追加 tombstone/retirement 事件。已提交的事件永远不得被修改、覆盖、删除或重新解释。投影（Projection）仅为衍生状态，严禁先修改内存投影后补盘。
+所有动态业务状态必须且仅能由不可变的事件（Event）表达。业务状态变更改为追加新事件，状态撤销改为追加 tombstone/retirement 事件。在 DURABLE-CONVERGENCE-011 的 writer retention 窗口内，已提交事件不得被单独修改、覆盖、删除或重新解释；超过固定 TTL 的进程 writer 允许作为完整物理流整体退出 retained history。投影（Projection）仅为衍生状态，严禁先修改内存投影后补盘。
 
 ## DURABLE-EVENTS-002: EventEnvelope 无版本与 additive vocabulary
 
@@ -16,9 +16,9 @@
 
 本地事件持久化的唯一见证是在当前进程的 writer 文件末尾写入完整的 canonical 行（`JSON + LF`）。成功返回前必须完成物理落盘并同步释放存储门禁锁。运行时追加事件严禁创建 Git blob、Git tree、Git ref 或执行 Git CAS。任何半行、截断行或原地覆写均属非法。
 
-## DURABLE-EVENTS-005: Process 对应 single writer 与单个永久增长文件
+## DURABLE-EVENTS-005: Process 对应 single writer 与单个不分段文件
 
-每个进程实例分配全局唯一的 `WriterId`，且仅独占追加 `.git/wanxiang/events/<WriterId>.ndjson` 文件。该文件不按体积、事件数或时间进行分段切片。进程退出后该文件永久封存，新启动进程必须创建新的 `WriterId`，禁止接管旧文件。业务流标识、机器标识与角色均不得作为物理写者划分依据。
+每个进程实例分配全局唯一的 `WriterId`，且仅独占追加 `.git/wanxiang/events/<WriterId>.ndjson` 文件。该文件不按体积、事件数或时间进行分段切片。进程退出后该文件封存且不得被新进程接管；超过统一 writer-retention TTL 后允许整文件删除。新启动进程必须创建新的 `WriterId`。业务流标识、机器标识与角色均不得作为物理写者划分依据。
 
 ## DURABLE-EVENTS-006: commit outcome 只由本地事实存在性判定
 
@@ -26,7 +26,7 @@
 
 ## DURABLE-EVENTS-007: StorageInvalid 全局 fail-closed
 
-遇到格式损坏、非规范化 JSON、标识碰撞、缺失父事件、成环依赖、载荷缺失/哈希失配或未知的权威 `event_type` 时，必须彻底拒绝以此快照构建投影或启动运行时，直接进入 fail-closed 状态。绝对禁止跳过损坏事件继续折叠。
+遇到格式损坏、非规范化 JSON、标识碰撞、retained writer 集合内部缺失父事件、成环依赖、载荷缺失/哈希失配或未知的权威 `event_type` 时，必须彻底拒绝以此快照构建投影或启动运行时，直接进入 fail-closed 状态。DURABLE-CONVERGENCE-011 已整体淘汰 writer 中的 parent 属于 retention boundary，不构成缺失父事件。绝对禁止跳过 retained writer 内的损坏事件继续折叠。
 
 ## DURABLE-EVENTS-008: 并发 fork 不升级为全局 corruption
 
@@ -54,7 +54,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-014: k-way 输入顺序与确定性积分
 
-每个 writer 文件内部按自然追加顺序排列；多写者历史通过确定的 k-way merge 算法产生全局一致的规范序列。Integrator 按此顺序确定性消费事件，相同的写者事件集合在任何环境中必须计算出完全一致的 `Current`。
+每个 writer 文件内部按自然追加顺序排列；先按 DURABLE-CONVERGENCE-011 的统一截止时刻过滤整条过期 writer，再通过确定的 k-way merge 算法产生全局一致的规范序列。Integrator 按此顺序确定性消费事件，相同截止时刻与相同 writer 集合在任何环境中必须计算出完全一致的 `Current`。
 
 ## DURABLE-EVENTS-015: business fold 不变量与失败拒绝
 
@@ -70,7 +70,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-018: remote 操作才同步且全量替换快照
 
-远程同步仅在用户执行 Git 操作时由独立 Hook 进程拉起执行。Hook 读取本地 writer 文件与远端 writer blob 进行 k-way merge 校验，全量替换本地同步快照并发布远端快照。万象术主进程不运行常驻同步定时器或后台上传器。
+远程同步仅在用户执行 Git 操作时由独立 Hook 进程拉起执行。Hook 对本地 writer 文件与远端 writer blob 应用统一 writer-retention 后进行 k-way merge 校验，物理删除过期本地 writer，并发布不再包含过期 writer 的远端快照。万象术主进程不运行常驻同步定时器或后台上传器。
 
 ## DURABLE-EVENTS-019: 唯一 canonical Integrator 与业务注册 integration oracle
 
@@ -78,7 +78,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## DURABLE-EVENTS-020: plugin load 仅验证物理可读性且延迟业务激活
 
-插件加载阶段仅验证存储文件的物理可读性，绝对不执行业务重放、崩溃修复或新事实写入。业务积分与水印追加必须延迟至首次实际消费持久化能力时触发。
+插件加载阶段仅验证存储文件的物理可读性，绝对不执行业务重放、崩溃修复或新事实写入。业务积分与水印追加必须延迟至首次实际消费持久化能力时触发；激活重放只枚举当前 retention 窗口内的 writer，过期文件无需读取或解码。
 
 ## DURABLE-EVENTS-021: semantic failure 写入 durable cut-tail 且当前进程 fatal
 
