@@ -6,7 +6,6 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
-
 /// JS-native boundary for reconciliation's classifiers, evidence, wakes and
 /// publish seals. Maps remain opaque; turns, decisions and observations cross
 /// as plain objects or stable strings.
@@ -136,22 +135,20 @@ module ReconcileSurface =
 
     let isSnapshotObservation (observationName: string) : bool = observationName = "TurnUnknown"
 
+    let private resolveCanonicalName (outcomeName: string) (outcome: ReconcileProgram.TurnOutcome) =
+        match outcomeName with
+        | "TurnInProgress"
+        | "TurnNeedsContinuation"
+        | "TurnCompleted"
+        | "TurnAborted"
+        | "TurnFailed" -> outcomeName
+        | _ when ReconcileProgram.isTerminalOutcome outcome -> "TurnFailed"
+        | _ -> "TurnInProgress"
+
     let tryOutcome (outcomeName: string) : obj =
         try
             let outcome = ReconcileProgram.outcomeOf outcomeName
-
-            let canonicalName =
-                match outcomeName with
-                | "TurnInProgress"
-                | "TurnNeedsContinuation"
-                | "TurnCompleted"
-                | "TurnAborted"
-                | "TurnFailed" -> outcomeName
-                | _ ->
-                    if ReconcileProgram.isTerminalOutcome outcome then
-                        "TurnFailed"
-                    else
-                        "TurnInProgress"
+            let canonicalName = resolveCanonicalName outcomeName outcome
 
             box
                 {| accepted = true
@@ -365,6 +362,35 @@ module ReconcileSurface =
 
     let failureProjectionEdgeScenario () : Task<obj> = projectionEdgeScenario true
 
+    let private outcomeAndReason (context: ReconciledTurnContext) =
+        match context.Turn.Outcome with
+        | ReconcileProgram.TurnFailed reason -> "TurnFailed", reason
+        | ReconcileProgram.TurnCompleted -> "TurnCompleted", ""
+        | ReconcileProgram.TurnAborted reason -> "TurnAborted", reason
+        | ReconcileProgram.TurnInProgress -> "TurnInProgress", ""
+        | ReconcileProgram.TurnNeedsContinuation reason -> "TurnNeedsContinuation", reason
+
+    let private formatObserved (snapshotReads: int) (observed: ReconciledTurnContext option) : obj =
+        match observed with
+        | None ->
+            box
+                {| snapshotReads = snapshotReads
+                   observed = false
+                   providerRun = ""
+                   outcome = ""
+                   reason = ""
+                   hasQuiescence = false |}
+        | Some context ->
+            let outcome, reason = outcomeAndReason context
+
+            box
+                {| snapshotReads = snapshotReads
+                   observed = true
+                   providerRun = ProviderRunIdentity.value context.Turn.ProviderRun
+                   outcome = outcome
+                   reason = reason
+                   hasQuiescence = Option.isSome context.Quiescence |}
+
     let failureWitnessCurrentAssistantScenario () : Task<obj> =
         task {
             let sessionId = SessionId.create "failure-witness-session"
@@ -405,30 +431,5 @@ module ReconcileSurface =
             scheduler.Signal(ProviderFailure(sessionId, "Bad Request: input_invalid"))
             do! scheduler.StopAndDrain()
 
-            return
-                match observed with
-                | None ->
-                    box
-                        {| snapshotReads = snapshotReads
-                           observed = false
-                           providerRun = ""
-                           outcome = ""
-                           reason = ""
-                           hasQuiescence = false |}
-                | Some context ->
-                    let outcome, reason =
-                        match context.Turn.Outcome with
-                        | ReconcileProgram.TurnFailed reason -> "TurnFailed", reason
-                        | ReconcileProgram.TurnCompleted -> "TurnCompleted", ""
-                        | ReconcileProgram.TurnAborted reason -> "TurnAborted", reason
-                        | ReconcileProgram.TurnInProgress -> "TurnInProgress", ""
-                        | ReconcileProgram.TurnNeedsContinuation reason -> "TurnNeedsContinuation", reason
-
-                    box
-                        {| snapshotReads = snapshotReads
-                           observed = true
-                           providerRun = ProviderRunIdentity.value context.Turn.ProviderRun
-                           outcome = outcome
-                           reason = reason
-                           hasQuiescence = Option.isSome context.Quiescence |}
+            return formatObserved snapshotReads observed
         }

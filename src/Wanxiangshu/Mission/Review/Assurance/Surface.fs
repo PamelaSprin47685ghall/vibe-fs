@@ -345,42 +345,18 @@ module ReviewAssuranceSurface =
         let typed = confirmedReviewWitnessOf witness
         ReviewCandidate.isWitnessValidForTree (treeOf (box tree)) typed
 
-    let grantBlessing (currentTree: string) (witness: obj) : obj =
-        let typed = confirmedReviewWitnessOf witness
-
-        match FinalityAdmission.grantBlessing (treeOf (box currentTree)) typed with
-        | Ok permit ->
-            box
-                {| ok = true
-                   permit =
-                    box
-                        {| tree = GitTreeHash.value (FinalityAdmission.permitTree permit)
-                           lifeId = ManagerLifeId.value (FinalityAdmission.permitLifeId permit)
-                           requestId = FinalityRequestId.value (FinalityAdmission.permitRequestId permit) |} |}
-        | Error(BlessingAdmissionFailure.StaleWitness(curr, expected)) ->
-            box
-                {| ok = false
-                   error = "StaleWitness"
-                   currentTree = GitTreeHash.value curr
-                   witnessTree = GitTreeHash.value expected |}
-        | Error(BlessingAdmissionFailure.IncompleteCohort reason) ->
-            box
-                {| ok = false
-                   error = "IncompleteCohort"
-                   reason = reason |}
-
     let verifyCandidate (candidateTree: string) (witness: obj) : obj =
         let typed = confirmedReviewWitnessOf witness
 
         match ReviewCandidate.verifyCandidate (treeOf (box candidateTree)) typed with
         | Ok() -> box {| ok = true |}
-        | Error(BlessingAdmissionFailure.StaleWitness(curr, expected)) ->
+        | Error(CandidateVerificationFailure.StaleWitness(curr, expected)) ->
             box
                 {| ok = false
                    error = "StaleWitness"
                    candidateTree = GitTreeHash.value curr
                    witnessTree = GitTreeHash.value expected |}
-        | Error(BlessingAdmissionFailure.IncompleteCohort reason) ->
+        | Error(CandidateVerificationFailure.IncompleteCohort reason) ->
             box
                 {| ok = false
                    error = "IncompleteCohort"

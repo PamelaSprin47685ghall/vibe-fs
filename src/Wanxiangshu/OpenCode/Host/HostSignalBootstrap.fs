@@ -290,7 +290,6 @@ module HostSignalBootstrap =
                             |> AgentRoleIdentity.roleOfString)
 
                     reconciler.BindUserMessage(sid, physical, ?agentRole = agentRole)
-                    scope.Sessions.AbortedSessions.Remove sessionId |> ignore
                     registerOwned sessionId
 
             let bindContinuationMessage (sessionId: string) (messageId: string) =

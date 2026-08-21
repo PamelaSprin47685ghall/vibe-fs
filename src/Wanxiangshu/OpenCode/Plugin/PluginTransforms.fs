@@ -22,7 +22,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
@@ -58,7 +57,6 @@ open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
 open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
-open Wanxiangshu.Mission.Finality.OpenCode
 open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.Mission.Obligation.Todo.OpenCode
 open Wanxiangshu.Mission.Review.OpenCode

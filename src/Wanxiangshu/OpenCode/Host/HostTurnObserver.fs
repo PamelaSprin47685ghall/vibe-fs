@@ -206,13 +206,12 @@ module HostTurnObserver =
                         eventPort
                         journal
                         scope.BloggerRuntimeHost
-                        scope.ArmRecovery
+                        (fun s -> scope.ArmRecovery s)
                         scope.SyncDelegateRuntime
                         reviewerContinuationPort
                         scope.Sessions.NudgeSent
                         scope.Sessions.JoinGuardNudges
-                        scope.HasLivePty
-                        scope.Sessions.AbortedSessions
+                        (fun s -> scope.HasLivePty s)
                         abortCause
                         scope.Sessions.Quiescence
                         context

@@ -33,7 +33,7 @@ DEPENDS ON: obligation-ledger, review-assurance, participant-horizon
 | 命题 | 落点测试 |
 |---|---|
 | FINALITY-001 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-002 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
+| FINALITY-002 | `requirements/finality/tests/manager-finality-disposition.test.mjs`, `requirements/finality/tests/blessing-admission.test.mjs` |
 | FINALITY-003 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
 | FINALITY-004 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
 | FINALITY-005 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
@@ -47,7 +47,7 @@ DEPENDS ON: obligation-ledger, review-assurance, participant-horizon
 | FINALITY-013 | `requirements/finality/tests/lifecycle.test.mjs` |
 | FINALITY-014 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
 | FINALITY-015 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
-| FINALITY-016 | `requirements/finality/tests/lifecycle.test.mjs` |
+| FINALITY-016 | `requirements/finality/tests/lifecycle.test.mjs`, `requirements/finality/tests/blessing-admission.test.mjs` |
 | FINALITY-017 | `requirements/finality/tests/lifecycle.test.mjs` |
 | FINALITY-018 | `requirements/finality/tests/manager-finality-disposition.test.mjs` |
 | FINALITY-019 | `requirements/finality/tests/lifecycle.test.mjs` |

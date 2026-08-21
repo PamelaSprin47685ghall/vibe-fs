@@ -4,7 +4,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
-
 /// Pure `snapshot + binding -> ReconciledTurn option`. Unknown origin is None.
 ///
 /// Works in raw wire addresses and constructs typed identities only where the

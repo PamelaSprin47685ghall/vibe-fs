@@ -514,7 +514,6 @@
     <Compile Include="Mission/Manager/JobHandoff.fs"/>
     <Compile Include="Mission/Manager/Life/Workflow.fs"/>
     <Compile Include="Mission/Manager/Finality.fs"/>
-    <Compile Include="Mission/Manager/FinalitySurface.fs"/>
     <Compile Include="Mission/Manager/Workflow.fs"/>
     <Compile Include="Mission/Manager/OpenCode/NarrativeTransform.fs"/>
     <Compile Include="Mission/Finality/Types.fs"/>
@@ -530,6 +529,7 @@
     <Compile Include="Mission/Finality/Revision.fs"/>
     <Compile Include="Mission/Finality/Blessing.fs"/>
     <Compile Include="Mission/Finality/Workflow.fs"/>
+    <Compile Include="Mission/Manager/FinalitySurface.fs"/>
     <Compile Include="Composition/Turn/Workflow.fs"/>
     <Compile Include="OpenCode/Host/GitTree.fs"/>
     <Compile Include="OpenCode/Host/HostCompactionGate.fs"/>

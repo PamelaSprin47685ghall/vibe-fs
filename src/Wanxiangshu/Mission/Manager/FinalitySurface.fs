@@ -15,6 +15,8 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Barrier
+open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Persistence.Journal
 
 /// JS-native semantic surface for Finality laws (PR 6 exemplar).
@@ -963,3 +965,123 @@ module FinalitySurface =
                 {| ok = true
                    jobs = jobs
                    activeJobs = activeJobs |}
+
+    // ── ConfirmedReviewWitness & Blessing admission (FINALITY-002 / FINALITY-016) ──
+
+    type private ConfirmedReviewWitnessHandle(witness: ConfirmedReviewWitness) =
+        member _.Witness = witness
+
+        static member Create(witness: ConfirmedReviewWitness) = ConfirmedReviewWitnessHandle(witness)
+
+    let private confirmedReviewWitnessOf (value: obj) : ConfirmedReviewWitness =
+        match value with
+        | :? ConfirmedReviewWitnessHandle as handle -> handle.Witness
+        | _ -> invalidArg "value" "FinalitySurface: expected a confirmed review witness handle"
+
+    let private field (value: obj) (name: string) : obj =
+        if isNull value then
+            null
+        else
+            emitJsExpr (value, name) "$0[$1]"
+
+    let private firstField (value: obj) (names: string array) : obj =
+        names
+        |> Array.tryPick (fun name ->
+            let candidate = field value name
+            if isNull candidate then None else Some candidate)
+        |> Option.defaultValue null
+
+    let private treeOf (value: obj) = GitTreeHash.create (str value)
+    let private sessionOf (value: obj) = SessionId.create (str value)
+    let private barrierOf (value: obj) = ReviewBarrierId.create (str value)
+    let private physicalOf (value: obj) = PhysicalUserMessageId.create (str value)
+    let private runOf (value: obj) = ProviderRunIdentity.create (str value)
+    let private callOf (value: obj) = ToolCallId.create (str value)
+
+    let private witnessOf (value: obj) : VerdictWitness =
+        { ProviderRun = runOf (firstField value [| "ProviderRun"; "run" |])
+          ToolCallId = callOf (firstField value [| "ToolCallId"; "call" |])
+          GitTreeHash = treeOf (firstField value [| "GitTreeHash"; "tree" |])
+          ReviewerSessionId = sessionOf (firstField value [| "ReviewerSessionId"; "reviewer" |]) }
+
+    let private reviewWitnessOf (value: obj) : ReviewWitness =
+        if isNull value then
+            ReviewWitness.NoReview
+        else
+            match str (field value "state") with
+            | "RevisionWitness" ->
+                ReviewWitness.RevisionWitness
+                    {| Report = str (field value "report")
+                       GitTreeHash = treeOf (field value "tree") |}
+            | "Confirmed" ->
+                ReviewWitness.Confirmed
+                    {| BarrierId = barrierOf (field value "barrier")
+                       First = witnessOf (field value "first")
+                       Second = witnessOf (field value "second")
+                       GitTreeHash = treeOf (field value "tree")
+                       FirstPhysicalUserMessageId =
+                        physicalOf (firstField value [| "FirstPhysicalUserMessageId"; "firstPhysical" |])
+                       SecondPhysicalUserMessageId =
+                        physicalOf (firstField value [| "SecondPhysicalUserMessageId"; "secondPhysical" |]) |}
+            | _ -> ReviewWitness.NoReview
+
+    /// FINALITY-002: Project a ConfirmedReviewWitness from cohort member witnesses.
+    let projectConfirmedReview (lifeId: string) (requestId: string) (tree: string) (memberWitnesses: obj array) : obj =
+        let members =
+            if isNull memberWitnesses then
+                []
+            else
+                memberWitnesses
+                |> Array.toList
+                |> List.map (fun item ->
+                    let reviewer = sessionOf (firstField item [| "reviewer"; "ReviewerSessionId" |])
+                    let barrier = barrierOf (firstField item [| "barrier"; "BarrierId" |])
+                    let witness = reviewWitnessOf (firstField item [| "witness"; "Witness" |])
+                    (reviewer, barrier, witness))
+
+        match
+            ConfirmedReviewWitness.create
+                (ManagerLifeId.create lifeId)
+                (FinalityRequestId.create requestId)
+                (treeOf (box tree))
+                members
+        with
+        | Ok witness ->
+            box
+                {| ok = true
+                   witness = ConfirmedReviewWitnessHandle.Create witness :> obj |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = error |}
+
+    let confirmedReviewWitnessTree (witness: obj) : string =
+        let typed = confirmedReviewWitnessOf witness
+        GitTreeHash.value (ConfirmedReviewWitness.gitTreeHash typed)
+
+    /// FINALITY-002 / FINALITY-016: Blessing authorization gate.
+    /// Evaluates currentTree against ConfirmedReviewWitness.
+    /// Grants BlessingPermit on match; rejects with StaleWitness on mismatch.
+    let grantBlessing (currentTree: string) (witness: obj) : obj =
+        let typed = confirmedReviewWitnessOf witness
+
+        match FinalityAdmission.grantBlessing (treeOf (box currentTree)) typed with
+        | Ok permit ->
+            box
+                {| ok = true
+                   permit =
+                    box
+                        {| tree = GitTreeHash.value (FinalityAdmission.permitTree permit)
+                           lifeId = ManagerLifeId.value (FinalityAdmission.permitLifeId permit)
+                           requestId = FinalityRequestId.value (FinalityAdmission.permitRequestId permit) |} |}
+        | Error(BlessingAdmissionFailure.StaleWitness(curr, expected)) ->
+            box
+                {| ok = false
+                   error = "StaleWitness"
+                   currentTree = GitTreeHash.value curr
+                   witnessTree = GitTreeHash.value expected |}
+        | Error(BlessingAdmissionFailure.IncompleteCohort reason) ->
+            box
+                {| ok = false
+                   error = "IncompleteCohort"
+                   reason = reason |}

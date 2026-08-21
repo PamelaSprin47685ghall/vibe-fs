@@ -1,74 +1,24 @@
 namespace Wanxiangshu.Mission.Manager
 
-open Wanxiangshu.OpenCode
-open Wanxiangshu.Change
-open Wanxiangshu.Mission.Obligation
-open Wanxiangshu.Mission.Review.Barrier
-open Wanxiangshu.Strength.Persistence
-
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Host
+open Wanxiangshu.Change
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Host
+open Wanxiangshu.Host.Contract
+open Wanxiangshu.Mission.Manager.Life
+open Wanxiangshu.Mission.Obligation
+open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Judgement
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Persistence.Journal
 
-/// Manager terminal business story: handoff → background → activation → idle labor.
+/// Manager terminal business story: handoff → background → idle labor.
 module ManagerWorkflow =
 
     let private currentLife journal sessionId =
@@ -102,59 +52,27 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         let turn = context.Turn
-        let lifeOpt = currentLife journal turn.SessionId
 
-        match turn.Outcome, mayEncourageLabor journal hasLivePty turn.Role turn.SessionId, lifeOpt with
-        | ReconcileProgram.TurnCompleted, true, Some life when
-            ManagerFinality.admitLabor life = ManagerFinality.LaborAdmission.LaborMayContinue
-            ->
+        match currentLife journal turn.SessionId with
+        | Some life when mayEncourageLabor journal hasLivePty turn.Role turn.SessionId ->
             ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
         | _ -> AsyncSupport.completedTask ()
-
-    let private handleLaborContinuation
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (nudgeSent: HashSet<string>)
-        (quiescence: SessionQuiescenceGate)
-        (context: ReconciledTurnContext)
-        (life: LifeProjection)
-        : Task =
-        match ManagerFinality.admitLabor life with
-        | ManagerFinality.LaborAdmission.FinalityOwnsLife -> AsyncSupport.completedTask ()
-        | ManagerFinality.LaborAdmission.LaborMayContinue ->
-            ManagerIdle.encourageLabor sessionPort eventPort journal nudgeSent quiescence context life
-
-    let private handleSettledManager
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (nudgeSent: HashSet<string>)
-        (quiescence: SessionQuiescenceGate)
-        (context: ReconciledTurnContext)
-        (turn: ReconciledTurn)
-        : Task =
-        match currentLife journal turn.SessionId with
-        | Some life -> handleLaborContinuation sessionPort eventPort journal nudgeSent quiescence context life
-        | None -> AsyncSupport.completedTask ()
 
     let private handleBackgroundSettlement
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (nudgeSent: HashSet<string>)
+        (hasLivePty: string -> bool)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (turn: ReconciledTurn)
         (settled: ManagerBackground.BackgroundSettlement)
-        =
-        task {
-            match settled with
-            | ManagerBackground.BackgroundSettlement.Deferred -> return ()
-            | ManagerBackground.BackgroundSettlement.Settled ->
-                let! _ = handleSettledManager sessionPort eventPort journal nudgeSent quiescence context turn
-                return ()
-        }
+        : Task =
+        match settled with
+        | ManagerBackground.BackgroundSettlement.Deferred -> AsyncSupport.completedTask ()
+        | ManagerBackground.BackgroundSettlement.Settled ->
+            observeIdle sessionPort eventPort journal nudgeSent hasLivePty quiescence context
 
     let private handleCompletedManager
         (sessionPort: ISessionHostPort)
@@ -163,16 +81,11 @@ module ManagerWorkflow =
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (abortedSessions: HashSet<string>)
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
         (turn: ReconciledTurn)
         : Task =
-        let sessionKey = SessionId.value turn.SessionId
-        let wasAborted = abortedSessions.Contains sessionKey
-        abortedSessions.Remove sessionKey |> ignore
-
-        if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
+        if TerminalPolicy.sessionDead journal turn.SessionId then
             AsyncSupport.completedTask ()
         else
             task {
@@ -180,7 +93,16 @@ module ManagerWorkflow =
                     ManagerBackground.ensureSettled sessionPort eventPort journal joinGuardNudges hasLivePty turn
 
                 return!
-                    handleBackgroundSettlement sessionPort eventPort journal nudgeSent quiescence context turn settled
+                    handleBackgroundSettlement
+                        sessionPort
+                        eventPort
+                        journal
+                        nudgeSent
+                        hasLivePty
+                        quiescence
+                        context
+                        turn
+                        settled
             }
             :> Task
 
@@ -197,14 +119,13 @@ module ManagerWorkflow =
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (abortedSessions: HashSet<string>)
         (quiescence: SessionQuiescenceGate)
         (observeOrdinary: ReconciledTurnContext -> Task)
         (context: ReconciledTurnContext)
         : Task =
         task {
             let turn = context.Turn
-            let! handoff = ManagerJobHandoff.completeIfTransferred eventPort journal abortedSessions turn
+            let! handoff = ManagerJobHandoff.completeIfTransferred eventPort journal turn
 
             match handoff with
             | ManagerJobHandoff.HandoffOutcome.Transferred -> return ()
@@ -217,7 +138,6 @@ module ManagerWorkflow =
                         nudgeSent
                         joinGuardNudges
                         hasLivePty
-                        abortedSessions
                         quiescence
                         context
                         turn
@@ -237,7 +157,6 @@ module ManagerWorkflow =
         (nudgeSent: HashSet<string>)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (abortedSessions: HashSet<string>)
         (quiescence: SessionQuiescenceGate)
         (observeOrdinary: ReconciledTurnContext -> Task)
         (context: ReconciledTurnContext)
@@ -252,7 +171,6 @@ module ManagerWorkflow =
                 nudgeSent
                 joinGuardNudges
                 hasLivePty
-                abortedSessions
                 quiescence
                 observeOrdinary
                 context

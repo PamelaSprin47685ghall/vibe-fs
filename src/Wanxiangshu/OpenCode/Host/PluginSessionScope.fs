@@ -95,7 +95,6 @@ type PluginSessionScope() =
     // DSL-MUTABLE: single-flight — per-instance join guard nudge set.
     member val JoinGuardNudges = HashSet<string>()
     // DSL-MUTABLE: resource — per-instance aborted session set.
-    member val AbortedSessions = HashSet<string>()
     // HOST-004: process-local idle-derived continuation admission. Per plugin
     // instance like NudgeSent / LoopSensor; never journalled (HOST-007). A
     // worktree owner transfer starts a fresh gate — no old permit survives.
@@ -151,7 +150,6 @@ type PluginSessionScope() =
         |> Seq.toArray
         |> Array.iter (fun request -> this.VerdictSubmissions.Remove request |> ignore)
 
-        this.AbortedSessions.Remove sessionId |> ignore
 
         if preserveIdentity then
             retainedSessionIdentities.Add sessionId |> ignore

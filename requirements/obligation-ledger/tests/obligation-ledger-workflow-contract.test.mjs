@@ -55,3 +55,32 @@ test('WHAT[OBLIGATION-LEDGER-018] recovery contract is fact reentry, not a resum
   assert.match(projection, /foldPrepared/)
   assert.match(projection, /foldAccepted/)
 })
+
+test('WHAT[OBLIGATION-LEDGER-018] Manager authority root on blessed life completion is derived from durable LifeOpening facts, not transient PromptAuthority profiles', () => {
+  const workflow = read('src/Wanxiangshu/Mission/Manager/Life/Workflow.fs')
+  const completeFreshBlessedLifeMatch = workflow.match(
+    /let\s+private\s+completeFreshBlessedLife[\s\S]*?BlessedLifeCompletion\.Completed[\s\S]*?\n\s*\}/,
+  )
+  assert.ok(completeFreshBlessedLifeMatch, 'completeFreshBlessedLife function body must be found in Workflow.fs')
+  const completeFreshBlessedLife = completeFreshBlessedLifeMatch[0]
+
+  assert.match(
+    completeFreshBlessedLife,
+    /PhysicalUserMessageId\.promoteToAuthorityRoot\s+life\.OpeningUserMessageId/,
+    'AuthorityRoot on BlessedLifeCompletion must be derived from durable life.OpeningUserMessageId',
+  )
+  assert.doesNotMatch(
+    completeFreshBlessedLife,
+    /PromptAuthorityLedger/,
+    'completeFreshBlessedLife must not reconstruct authority root from transient PromptAuthorityLedger profile',
+  )
+})
+
+test('WHAT[OBLIGATION-LEDGER-018] ObligationLedgerWorkflow is isolated from foreign domain dependencies', () => {
+  const workflow = read('src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs')
+  assert.doesNotMatch(
+    workflow,
+    /open\s+Wanxiangshu\.(Change|Interaction|Mission\.Finality|Mission\.Manager|Mission\.Review|Mission\.WorkRecord|Participant|Strength)/,
+    'ObligationLedgerWorkflow must not import foreign domains',
+  )
+})

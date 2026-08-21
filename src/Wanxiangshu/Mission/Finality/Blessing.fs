@@ -48,6 +48,32 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 
+/// FinalityAdmission gate: verifies that the current manager tree matches the witness tree,
+/// preventing stale witnesses from authorizing a current blessing (AGENTS.md §63).
+module FinalityAdmission =
+
+    let grantBlessing
+        (currentTree: GitTreeHash)
+        (witness: ConfirmedReviewWitness)
+        : Result<BlessingPermit, BlessingAdmissionFailure> =
+        let witnessTree = ConfirmedReviewWitness.gitTreeHash witness
+
+        if currentTree = witnessTree then
+            Ok(
+                BlessingPermit
+                    {| LifeId = ConfirmedReviewWitness.lifeId witness
+                       RequestId = ConfirmedReviewWitness.requestId witness
+                       GitTreeHash = witnessTree |}
+            )
+        else
+            Error(BlessingAdmissionFailure.StaleWitness(currentTree, witnessTree))
+
+    let permitTree (BlessingPermit payload) : GitTreeHash = payload.GitTreeHash
+
+    let permitLifeId (BlessingPermit payload) : ManagerLifeId = payload.LifeId
+
+    let permitRequestId (BlessingPermit payload) : FinalityRequestId = payload.RequestId
+
 /// All-confirmed convergence: canonical records + stable tree → blessing.
 module BlessingWorkflow =
 

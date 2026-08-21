@@ -57,3 +57,15 @@ type FinalityReviewerRequest =
       ReviewerSessionId: SessionId option
       ReviewerOrdinal: int
       IsNew: bool }
+
+/// Failure to admit a blessing for finality.
+type BlessingAdmissionFailure =
+    | StaleWitness of currentTree: GitTreeHash * witnessTree: GitTreeHash
+    | IncompleteCohort of reason: string
+
+/// One-shot process capability / permit granting authority to record finality blessing.
+type BlessingPermit =
+    private BlessingPermit of
+        {| LifeId: ManagerLifeId
+           RequestId: FinalityRequestId
+           GitTreeHash: GitTreeHash |}

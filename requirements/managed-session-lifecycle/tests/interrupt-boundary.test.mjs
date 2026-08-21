@@ -65,3 +65,14 @@ test('WHAT[MANAGED-SESSION-018] TurnAborted has no logical child-cancel authorit
     /eventPort\.NotifyTerminal\s+turn\.SessionId\s+\(TerminalOutcome\.Aborted\(TerminalStop\.forAuthority turn\.AuthorityRootUserMessageId reason\)\)/,
   )
 })
+
+test('WHAT[MANAGED-SESSION-016] Turn orchestration consumes typed outcome without cross-callback aborted registry PC', () => {
+  const ordinary = read('src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs')
+  const workflow = read('src/Wanxiangshu/Composition/Turn/Workflow.fs')
+  const observer = read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
+
+  // OrdinaryTurnWorkflow and TurnWorkflow must not receive or use abortedSessions mutable HashSet
+  assert.doesNotMatch(ordinary, /abortedSessions/)
+  assert.doesNotMatch(workflow, /abortedSessions/)
+  assert.doesNotMatch(observer, /scope\.Sessions\.AbortedSessions/)
+})

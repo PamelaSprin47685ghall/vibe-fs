@@ -431,6 +431,324 @@
       "state": "DONE",
       "result": "CUTOVER",
       "closure_evidence": "proof: requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；HostSignalBootstrap 削减为纯基础设施 wiring/subscribe/route/dispose/drain，清除领域决策与隐式 PC"
+    },
+    {
+      "id": "mission-finality-cutover",
+      "primary_owner": "finality",
+      "intent": "Finality domain slice: candidate review blessing, cohort validation, and finality admission",
+      "files": [
+        "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+        "src/Wanxiangshu/Mission/Finality/Cohort.fs",
+        "src/Wanxiangshu/Mission/Finality/Ports.fs",
+        "src/Wanxiangshu/Mission/Finality/Workflow.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Finality.Contract",
+        "Finality.Witness"
+      ],
+      "consumes": [
+        "Review.Witness",
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "review-assurance-witness-contract",
+          "kind": "contract"
+        },
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/finality/tests/lifecycle.test.mjs",
+        "requirements/finality/tests/blessing-admission.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Finality/Workflow.fs"
+      ],
+      "coverage_tags": [
+        "CoverageC"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿"
+    },
+    {
+      "id": "mission-authority-cutover",
+      "primary_owner": "obligation-ledger",
+      "intent": "Mission obligation & todo ledger slice: single-writer authority root, obligation admission, and membrane protection",
+      "files": [
+        "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Mission.Authority",
+        "Obligation.LedgerContract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Mission/Review/TodoProcess.fs"
+      ],
+      "proofs": [
+        "requirements/obligation-ledger/tests/magic-todo.test.mjs",
+        "requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs"
+      ],
+      "coverage_tags": [
+        "CoverageC"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿"
+    },
+    {
+      "id": "composition-turn-cutover",
+      "primary_owner": "managed-session-lifecycle",
+      "intent": "Turn orchestration slice: binding, observation, and turn reconciliation without execution position leaking",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Binding.fs",
+        "src/Wanxiangshu/Composition/Turn/Observation.fs",
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+        "src/Wanxiangshu/Composition/Turn/Program.fs"
+      ],
+      "classification": "COMPOSITION-ROOT",
+      "publishes": [
+        "Composition.Turn"
+      ],
+      "consumes": [
+        "Session.Lifecycle",
+        "Session.Quiescence"
+      ],
+      "depends_on": [
+        {
+          "id": "session-lifecycle-recovery-contract",
+          "kind": "contract"
+        },
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs"
+      ],
+      "proofs": [
+        "requirements/managed-session-lifecycle/tests/attached-session-runtime.test.mjs"
+      ],
+      "architecture_gates": [
+        "composition-root-invariant.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs"
+      ],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿"
+    },
+    {
+      "id": "delegation-outcome-cutover",
+      "primary_owner": "delegation",
+      "intent": "Delegation outcome slice: child run lifecycle, typed handle join drain, and clean-break outcome isolation",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/Fork/ChildRun.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/ChildRunProjection.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs",
+        "src/Wanxiangshu/Execution/Delegation/Join.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "Delegation.ChildOutcome",
+        "Delegation.Contract"
+      ],
+      "consumes": [
+        "Session.Quiescence",
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        },
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/join-completion.test.mjs"
+      ],
+      "architecture_gates": [
+        "cross-callback-pc.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Delegation/Join.fs"
+      ],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "READY",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "context-trace-companion-contract",
+      "primary_owner": "context-compression",
+      "intent": "Context trace & companion slice: companion materialization, projection program, and transform pipeline",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/Builder.fs",
+        "src/Wanxiangshu/Context/Companion/Model.fs",
+        "src/Wanxiangshu/Context/Companion/Program.fs",
+        "src/Wanxiangshu/Context/Companion/Transform.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Context.CompanionContract",
+        "Context.TraceContract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/companion-projection.test.mjs"
+      ],
+      "architecture_gates": [
+        "plugin-transforms-invariant.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Companion/Transform.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "READY",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "strength-prediction-replica-cutover",
+      "primary_owner": "strength",
+      "intent": "Strength prediction & replica slice: budget allocation, prediction models, and speculation transform without foreign leaks",
+      "files": [
+        "src/Wanxiangshu/Strength/Budget.fs",
+        "src/Wanxiangshu/Strength/Events.fs",
+        "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
+        "src/Wanxiangshu/Strength/Replica/Transform.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Strength.Contract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "ModelRouting.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "model-routing-capacity",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/speculative-investigation/tests/replica-transform.test.mjs"
+      ],
+      "architecture_gates": [
+        "plugin-transforms-invariant.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Strength/Replica/Transform.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "READY",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "enforcer-guidance-continuation-contract",
+      "primary_owner": "behavior-diagnosis",
+      "intent": "Enforcer guidance & continuation slice: tip projection, rulebook evaluation, and continuation contract",
+      "files": [
+        "src/Wanxiangshu/Enforcer/Continuation.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/Tip.fs",
+        "src/Wanxiangshu/Enforcer/Rulebook.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Enforcer.ContinuationContract",
+        "PairGuidance.Contract"
+      ],
+      "consumes": [
+        "Context.CompanionContract",
+        "Context.TraceContract"
+      ],
+      "depends_on": [
+        {
+          "id": "context-trace-companion-contract",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs"
+      ],
+      "architecture_gates": [
+        "plugin-transforms-invariant.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Enforcer/Continuation.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING"
     }
   ],
   "debt_face": {
@@ -609,17 +927,13 @@
       "src/Wanxiangshu/Interaction/Repair/Port.fs"
     ],
     "CoverageC": [
-      "src/Wanxiangshu/Mission/Finality/Blessing.fs",
-      "src/Wanxiangshu/Mission/Finality/Cohort.fs",
       "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
       "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
-      "src/Wanxiangshu/Mission/Finality/Ports.fs",
       "src/Wanxiangshu/Mission/Finality/Prompt.fs",
       "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
       "src/Wanxiangshu/Mission/Finality/Record.fs",
       "src/Wanxiangshu/Mission/Finality/Revision.fs",
       "src/Wanxiangshu/Mission/Finality/Types.fs",
-      "src/Wanxiangshu/Mission/Finality/Workflow.fs",
       "src/Wanxiangshu/Mission/Manager/Background.fs",
       "src/Wanxiangshu/Mission/Manager/Finality.fs",
       "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
@@ -634,10 +948,7 @@
       "src/Wanxiangshu/Mission/Manager/Narrative.fs",
       "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
       "src/Wanxiangshu/Mission/Manager/Workflow.fs",
-      "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/After.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
@@ -648,7 +959,6 @@
       "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
       "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
@@ -680,10 +990,6 @@
     ],
     "CoverageD": [
       "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
-      "src/Wanxiangshu/Composition/Turn/Binding.fs",
-      "src/Wanxiangshu/Composition/Turn/Observation.fs",
-      "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
-      "src/Wanxiangshu/Composition/Turn/Program.fs",
       "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
       "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
       "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
@@ -699,8 +1005,6 @@
       "src/Wanxiangshu/Execution/Delegation/Facts.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs",
-      "src/Wanxiangshu/Execution/Delegation/Fork/ChildRun.fs",
-      "src/Wanxiangshu/Execution/Delegation/Fork/ChildRunProjection.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs",
       "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
@@ -729,7 +1033,6 @@
       "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
-      "src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
       "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
@@ -739,7 +1042,6 @@
       "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
       "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
       "src/Wanxiangshu/Execution/Delegation/HostTurnObservedSurface.fs",
-      "src/Wanxiangshu/Execution/Delegation/Join.fs",
       "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
       "src/Wanxiangshu/Execution/Delegation/OpenCode/DelegatedToolEstimate.fs",
       "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs",
@@ -795,7 +1097,6 @@
       "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
       "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
       "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Builder.fs",
       "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
       "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
       "src/Wanxiangshu/Context/Companion/Errors.fs",
@@ -806,14 +1107,11 @@
       "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
       "src/Wanxiangshu/Context/Companion/Identity.fs",
       "src/Wanxiangshu/Context/Companion/JournalPort.fs",
-      "src/Wanxiangshu/Context/Companion/Model.fs",
-      "src/Wanxiangshu/Context/Companion/Program.fs",
       "src/Wanxiangshu/Context/Companion/Projection.fs",
       "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
       "src/Wanxiangshu/Context/Companion/Prompt.fs",
       "src/Wanxiangshu/Context/Companion/Runtime.fs",
       "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Transform.fs",
       "src/Wanxiangshu/Context/Prefix/Candidate.fs",
       "src/Wanxiangshu/Context/Prefix/Epoch.fs",
       "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
@@ -833,15 +1131,12 @@
       "src/Wanxiangshu/Enforcer/Catalog.fs",
       "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",
       "src/Wanxiangshu/Enforcer/Codec.fs",
-      "src/Wanxiangshu/Enforcer/Continuation.fs",
       "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs",
       "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
       "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
       "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
       "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
-      "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
       "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs",
-      "src/Wanxiangshu/Enforcer/Guidance/Tip.fs",
       "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs",
       "src/Wanxiangshu/Enforcer/Host.fs",
       "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
@@ -855,7 +1150,6 @@
       "src/Wanxiangshu/Enforcer/Projection.fs",
       "src/Wanxiangshu/Enforcer/Repair.fs",
       "src/Wanxiangshu/Enforcer/RepairSurface.fs",
-      "src/Wanxiangshu/Enforcer/Rulebook.fs",
       "src/Wanxiangshu/Enforcer/Surface.fs",
       "src/Wanxiangshu/Participant/Persona/Catalog.fs",
       "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
@@ -887,8 +1181,6 @@
       "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
       "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
-      "src/Wanxiangshu/Strength/Budget.fs",
-      "src/Wanxiangshu/Strength/Events.fs",
       "src/Wanxiangshu/Strength/Frame.fs",
       "src/Wanxiangshu/Strength/Lifecycle.fs",
       "src/Wanxiangshu/Strength/OpenCode/PluginScope.fs",
@@ -897,13 +1189,11 @@
       "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
       "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
       "src/Wanxiangshu/Strength/Prediction/CostModel.fs",
-      "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
       "src/Wanxiangshu/Strength/Projection/Model.fs",
       "src/Wanxiangshu/Strength/Replica/Commit.fs",
       "src/Wanxiangshu/Strength/Replica/Promotion.fs",
       "src/Wanxiangshu/Strength/Replica/Runtime.fs",
       "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
-      "src/Wanxiangshu/Strength/Replica/Transform.fs",
       "src/Wanxiangshu/Strength/Rollout.fs",
       "src/Wanxiangshu/Strength/Runtime.fs",
       "src/Wanxiangshu/Strength/Surface.fs",

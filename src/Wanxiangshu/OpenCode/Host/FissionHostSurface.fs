@@ -200,10 +200,9 @@ module FissionHostSurface =
                     eventPort
                     None
                     (PluginBloggerScope() :> IBloggerRuntimeHost)
-                    ignore
+                    (fun _ -> ())
                     (HashSet<string>())
                     (fun _ -> false)
-                    (HashSet<string>())
                     AbortCause.External
                     (SessionQuiescenceGate())
                     context

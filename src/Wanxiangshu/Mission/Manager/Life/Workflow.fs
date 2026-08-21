@@ -255,11 +255,7 @@ module ManagerLifeWorkflow =
                 | Ok() ->
                     do! captureLastWordsIfPresent journal sessionId lastWords providerRun blob
 
-                    let authorityRoot =
-                        PromptAuthorityLedger.activeProfile sessionId (AgentJournal.snapshot journal).AgentProjections
-                        |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
-                        |> Option.defaultValue (AuthorityRootUserMessageId.create "")
-
+                    let authorityRoot = PhysicalUserMessageId.promoteToAuthorityRoot life.OpeningUserMessageId
                     return Ok(BlessedLifeCompletion.Completed authorityRoot)
         }
 

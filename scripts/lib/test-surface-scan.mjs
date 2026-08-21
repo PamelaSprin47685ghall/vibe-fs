@@ -382,6 +382,7 @@ export const SURFACE_MANIFEST = [
       'FINALITY-005',
       'FINALITY-006',
       'FINALITY-009',
+      'FINALITY-016',
       'FINALITY-017',
       'FINALITY-019',
       'FINALITY-022',

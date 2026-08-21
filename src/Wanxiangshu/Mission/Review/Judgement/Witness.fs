@@ -147,17 +147,10 @@ type ConfirmedReviewWitness =
            GitTreeHash: GitTreeHash
            Witnesses: (SessionId * ReviewBarrierId * ReviewWitness) list |}
 
-/// Failure to admit a blessing for finality.
-type BlessingAdmissionFailure =
-    | StaleWitness of currentTree: GitTreeHash * witnessTree: GitTreeHash
+/// Failure to verify candidate tree against confirmed review witness.
+type CandidateVerificationFailure =
+    | StaleWitness of candidateTree: GitTreeHash * witnessTree: GitTreeHash
     | IncompleteCohort of reason: string
-
-/// One-shot process capability / permit granting authority to record finality blessing.
-type BlessingPermit =
-    private BlessingPermit of
-        {| LifeId: ManagerLifeId
-           RequestId: FinalityRequestId
-           GitTreeHash: GitTreeHash |}
 
 module ConfirmedReviewWitness =
 
@@ -206,42 +199,16 @@ module ConfirmedReviewWitness =
                        Witnesses = memberWitnesses |}
             )
 
-/// FinalityAdmission gate: verifies that the current manager tree matches the witness tree,
-/// preventing stale witnesses from authorizing a current blessing (AGENTS.md §63).
-module FinalityAdmission =
-
-    let grantBlessing
-        (currentTree: GitTreeHash)
-        (witness: ConfirmedReviewWitness)
-        : Result<BlessingPermit, BlessingAdmissionFailure> =
-        let witnessTree = ConfirmedReviewWitness.gitTreeHash witness
-
-        if currentTree = witnessTree then
-            Ok(
-                BlessingPermit
-                    {| LifeId = ConfirmedReviewWitness.lifeId witness
-                       RequestId = ConfirmedReviewWitness.requestId witness
-                       GitTreeHash = witnessTree |}
-            )
-        else
-            Error(BlessingAdmissionFailure.StaleWitness(currentTree, witnessTree))
-
-    let permitTree (BlessingPermit payload) : GitTreeHash = payload.GitTreeHash
-
-    let permitLifeId (BlessingPermit payload) : ManagerLifeId = payload.LifeId
-
-    let permitRequestId (BlessingPermit payload) : FinalityRequestId = payload.RequestId
-
 /// Review.CandidateContract: candidate tree verification against confirmed review witness.
 module ReviewCandidate =
 
-    let verifyCandidate (candidateTree: GitTreeHash) (witness: ConfirmedReviewWitness) : Result<unit, BlessingAdmissionFailure> =
+    let verifyCandidate (candidateTree: GitTreeHash) (witness: ConfirmedReviewWitness) : Result<unit, CandidateVerificationFailure> =
         let witnessTree = ConfirmedReviewWitness.gitTreeHash witness
 
         if candidateTree = witnessTree then
             Ok()
         else
-            Error(BlessingAdmissionFailure.StaleWitness(candidateTree, witnessTree))
+            Error(CandidateVerificationFailure.StaleWitness(candidateTree, witnessTree))
 
     let isWitnessValidForTree (candidateTree: GitTreeHash) (witness: ConfirmedReviewWitness) : bool =
         ConfirmedReviewWitness.gitTreeHash witness = candidateTree

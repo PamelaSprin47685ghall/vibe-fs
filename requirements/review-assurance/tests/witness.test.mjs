@@ -176,7 +176,7 @@ test('WHAT[REVIEW-ASSURANCE-005] confirmed_review_witness_binds_tree_and_contain
   assert.equal(review.isConfirmedReviewValidForTree(OTHER_TREE, projected.witness), false)
 })
 
-test('WHAT[REVIEW-ASSURANCE-006] finality_admission_grants_blessing_for_matching_tree_and_rejects_stale_witness', () => {
+test('WHAT[REVIEW-ASSURANCE-006] candidate_verification_verifies_candidate_tree_and_rejects_stale_witness', () => {
   const memberWitnesses = [
     { reviewer: 'ses_rev_1', barrier: 'bar_1', witness: confirmed({ first: review.verdictWitness({ run: 'r1', call: 'c1', tree: TREE, reviewer: 'ses_rev_1' }), second: review.verdictWitness({ run: 'r2', call: 'c2', tree: TREE, reviewer: 'ses_rev_1' }) }) },
     { reviewer: 'ses_rev_2', barrier: 'bar_2', witness: review.confirmWitness('bar_2', REVIEW_PHYSICAL, REVIEW_PHYSICAL, review.verdictWitness({ run: 'r3', call: 'c3', tree: TREE, reviewer: 'ses_rev_2' }), review.verdictWitness({ run: 'r4', call: 'c4', tree: TREE, reviewer: 'ses_rev_2' })) },
@@ -184,21 +184,11 @@ test('WHAT[REVIEW-ASSURANCE-006] finality_admission_grants_blessing_for_matching
   const projected = review.projectConfirmedReview('life_1', 'req_1', TREE, memberWitnesses)
   assert.equal(projected.ok, true)
 
-  const admitted = review.grantBlessing(TREE, projected.witness)
-  assert.equal(admitted.ok, true)
-  assert.equal(admitted.permit.tree, TREE)
-  assert.equal(admitted.permit.lifeId, 'life_1')
-  assert.equal(admitted.permit.requestId, 'req_1')
-
-  const stale = review.grantBlessing(OTHER_TREE, projected.witness)
-  assert.equal(stale.ok, false)
-  assert.equal(stale.error, 'StaleWitness')
-  assert.equal(stale.currentTree, OTHER_TREE)
-  assert.equal(stale.witnessTree, TREE)
-
   const candidateOk = review.verifyCandidate(TREE, projected.witness)
   assert.equal(candidateOk.ok, true)
   const candidateStale = review.verifyCandidate(OTHER_TREE, projected.witness)
   assert.equal(candidateStale.ok, false)
   assert.equal(candidateStale.error, 'StaleWitness')
+  assert.equal(candidateStale.candidateTree, OTHER_TREE)
+  assert.equal(candidateStale.witnessTree, TREE)
 })
