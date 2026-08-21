@@ -119,8 +119,11 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
   assert.match(duplicate[1], /return alreadyJudged context/)
   assert.doesNotMatch(duplicate[1], /InterruptAttempt|abortSession/, 'second judge must not own physical termination')
 
-  assert.match(judgeTool, /let interruptAfterSubmittedJudgement[\s\S]*?currentPhysicalUserMessage[\s\S]*?SharedState\.VerdictSubmissions\.Contains[\s\S]*?sessionPort\.InterruptAttempt/)
+  assert.match(judgeTool, /let private decideSubmittedInterrupt[\s\S]*?currentPhysicalUserMessage[\s\S]*?SharedState\.VerdictSubmissions\.Contains/)
+  assert.match(judgeTool, /let private interruptClosedSubmittedJudgement[\s\S]*?ensureSubmittedAttemptClosed[\s\S]*?sessionPort\.InterruptAttempt/)
+  assert.match(judgeTool, /let interruptAfterSubmittedJudgement[\s\S]*?decideSubmittedInterrupt[\s\S]*?interruptClosedSubmittedJudgement/)
   assert.match(transforms, /InterruptAfterSubmittedJudgement:\s*string option -> Task<unit>/)
-  assert.match(transforms, /JudgeTool\.interruptAfterSubmittedJudgement wired\.CurrentPhysicalUserMessage sessionPort/)
+  assert.match(transforms, /JudgeTool\.interruptAfterSubmittedJudgement[\s\S]*?journal[\s\S]*?wired\.CurrentPhysicalUserMessage[\s\S]*?sessionPort/)
   assert.match(transforms, /caps\.SanitizeMessages outObj[\s\S]*?do! caps\.InterruptAfterSubmittedJudgement projectionSessionIdOpt/)
+  assert.match(judgeTool, /ensureSubmittedAttemptClosed[\s\S]*?sessionPort\.InterruptAttempt/, 'durable closure must precede the physical interrupt')
 })

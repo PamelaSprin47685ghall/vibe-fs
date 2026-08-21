@@ -260,7 +260,7 @@ module PluginTransforms =
                     outObj
           SanitizeMessages = HostMessageProjection.sanitizeOutputMessages
           InterruptAfterSubmittedJudgement =
-            JudgeTool.interruptAfterSubmittedJudgement wired.CurrentPhysicalUserMessage sessionPort }
+            JudgeTool.interruptAfterSubmittedJudgement journal wired.CurrentPhysicalUserMessage sessionPort }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope

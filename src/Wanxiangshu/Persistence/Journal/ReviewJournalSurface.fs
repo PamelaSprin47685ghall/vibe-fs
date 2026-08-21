@@ -12,6 +12,7 @@ open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Context.Companion
 
 /// Review-owned journal adapter. JournalHandle remains the only durable
 /// capability; facts cross this boundary as plain family/case/payload values.
@@ -166,11 +167,31 @@ module ReviewJournalSurface =
                    Handle = handle |}
         | other -> failwith $"ReviewJournalSurface: unknown Execution fact '{other}'"
 
+    let private companionFactOf (caseName: string) (payload: obj) : AgentFact =
+        match caseName with
+        | "XTracePartAppended" ->
+            CompanionFact.XTracePartAppended
+                {| SessionId = SessionId.create (strField payload "SessionId")
+                   CursorSequence = int64 (unbox<int> (field payload "CursorSequence"))
+                   Role = strField payload "Role"
+                   Turn = unbox<int> (field payload "Turn")
+                   PartIndex = unbox<int> (field payload "PartIndex")
+                   Kind = strField payload "Kind"
+                   ToolName = optionalText payload "ToolName"
+                   TextRef = BlobRef.create (strField payload "TextRef")
+                   TextDigest = BlobDigest.create (strField payload "TextDigest")
+                   Provenance = strField payload "Provenance"
+                   ProviderRun = optionalText payload "ProviderRun" |> Option.map ProviderRunIdentity.create
+                   ToolCallId = optionalText payload "ToolCallId" |> Option.map ToolCallId.create
+                   HostToolPartId = optionalText payload "HostToolPartId" |> Option.map HostToolPartId.create |}
+        | other -> failwith $"ReviewJournalSurface: unknown Companion fact '{other}'"
+
     let private factOf (family: string) (caseName: string) (payload: obj) : AgentFact =
         match family with
         | "Review" -> reviewFactOf caseName payload
         | "Prompt" -> promptFactOf caseName payload
         | "Execution" -> executionFactOf caseName payload
+        | "Companion" -> companionFactOf caseName payload
         | other -> failwith $"ReviewJournalSurface: unsupported fact family '{other}'"
 
     let private appendResult result =
@@ -255,10 +276,23 @@ module ReviewJournalSurface =
                     |> List.toArray)
                 |> Option.defaultValue [||]
 
+            let closedAttempts =
+                session.ReviewGuard
+                |> Option.map (fun guard ->
+                    guard.ClosedAttempts
+                    |> List.map (fun closed ->
+                        box
+                            {| providerRun = ProviderRunIdentity.value closed.Attempt.ProviderRun
+                               toolCallId = ToolCallId.value closed.Attempt.ToolCallId
+                               frontier = closed.FrozenFrontier.Sequence |})
+                    |> List.toArray)
+                |> Option.defaultValue [||]
+
             box
                 {| witness = witnessName
                    xTraceHead = xTraceHead
-                   xTracePartKinds = xTracePartKinds |}
+                   xTracePartKinds = xTracePartKinds
+                   closedAttempts = closedAttempts |}
 
     let sessionViewRaw (handle: JournalHandle) (sessionId: string) : obj =
         let projection = AgentJournal.snapshot handle.Journal

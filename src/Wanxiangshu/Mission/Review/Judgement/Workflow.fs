@@ -80,6 +80,104 @@ open Wanxiangshu.Host
 /// injected Review port. There is no stored State/Stage counter.
 module ReviewerWorkflow =
 
+    [<RequireQualifiedAccess>]
+    type private SubmittedClosureEvidence =
+        | NoAttempt
+        | AlreadyClosed
+        | ToolResultMissing
+        | ToolResultReady of attempt: ReviewAttemptIdentity * frontier: int64
+
+    let private matchingToolResultFrontier
+        (attempt: ReviewAttemptIdentity)
+        (xTrace: XTraceProjectionState)
+        : int64 option =
+        XTraceProjection.parts xTrace
+        |> List.tryFind (fun part ->
+            part.Kind = "tool_result"
+            && part.ProviderRun = Some attempt.ProviderRun
+            && part.ToolCallId = Some attempt.ToolCallId)
+        |> Option.map (fun part -> part.Cursor.Sequence + 1L)
+
+    let private appendSubmittedAttemptClosed
+        (journal: AgentJournal)
+        (attempt: ReviewAttemptIdentity)
+        (frontier: int64)
+        : Task<Result<unit, string>> =
+        task {
+            let closed =
+                ReviewFact.ReviewAttemptClosed
+                    {| ReviewerSessionId = attempt.ReviewerSessionId
+                       BarrierId = attempt.ReviewBarrierId
+                       GitTreeHash = attempt.GitTreeHash
+                       ProviderRun = attempt.ProviderRun
+                       ToolCallId = attempt.ToolCallId
+                       FrozenFrontierSequence = frontier |}
+
+            match!
+                AgentJournal.appendAgent
+                    (StreamId.Session attempt.ReviewerSessionId)
+                    (Some attempt.ProviderRun)
+                    closed
+                    journal
+            with
+            | Ok _ -> return Ok()
+            | Error failure -> return Error(JournalAppendFailure.describe failure)
+        }
+
+    let private classifySubmittedClosure
+        (reviewerSessionId: SessionId)
+        (snapshot: ProjectionSet)
+        : SubmittedClosureEvidence =
+        let evidence =
+            AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
+            |> Option.bind (fun session ->
+                session.ReviewGuard
+                |> Option.bind ReviewProjection.latestObservedAttempt
+                |> Option.map (fun attempt -> session, attempt))
+
+        let closed =
+            evidence
+            |> Option.bind (fun (session, attempt) ->
+                session.ReviewGuard
+                |> Option.bind (ReviewProjection.closedAttemptOf attempt))
+
+        let ready =
+            evidence
+            |> Option.bind (fun (session, attempt) ->
+                session.XTrace
+                |> Option.bind (matchingToolResultFrontier attempt)
+                |> Option.map (fun frontier -> attempt, frontier))
+
+        match evidence, closed, ready with
+        | None, _, _ -> SubmittedClosureEvidence.NoAttempt
+        | Some _, Some _, _ -> SubmittedClosureEvidence.AlreadyClosed
+        | Some _, None, None -> SubmittedClosureEvidence.ToolResultMissing
+        | Some _, None, Some(attempt, frontier) -> SubmittedClosureEvidence.ToolResultReady(attempt, frontier)
+
+    /// REVIEW-013/017: process-review terminality may stop the provider before
+    /// the generic turn-completion observer runs. Once the exact judge tool
+    /// result is already durable in XTrace, that result is the last legitimate
+    /// part of this tool-only work unit. Freeze the closure at its exclusive
+    /// frontier before interrupting, or recover the same fact after a crash.
+    ///
+    /// Ok true  = closure already existed or was durably appended.
+    /// Ok false = the matching durable tool_result is not present yet.
+    let ensureSubmittedAttemptClosed
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        : Task<Result<bool, string>> =
+        let evidence = classifySubmittedClosure reviewerSessionId (AgentJournal.snapshot journal)
+
+        match evidence with
+        | SubmittedClosureEvidence.NoAttempt
+        | SubmittedClosureEvidence.ToolResultMissing -> Task.FromResult(Ok false)
+        | SubmittedClosureEvidence.AlreadyClosed -> Task.FromResult(Ok true)
+        | SubmittedClosureEvidence.ToolResultReady(attempt, frontier) ->
+            taskResult {
+                do! appendSubmittedAttemptClosed journal attempt frontier
+                return true
+            }
+
     /// REVIEW-013/017: the latest verdict attempt this turn carried plus the
     /// XTrace head at closure time. `None` when the turn produced no verdict.
     let private closedAttemptEvidence (journal: AgentJournal option) (turn: ReconciledTurn) =

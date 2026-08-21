@@ -14,6 +14,7 @@
 4. **PERFECT 被误读为全知或字面无瑕**：Reviewer 因担心破坏 PERFECT 结论而隐瞒真实且非阻断的工艺观察，或者反之因微小拼写错误而机械 REVISE。
 5. **过程与终结回执语义混淆**：过程评审单次判断即已完成本轮请求，回执应指示结束；终审首个 PERFECT 仅为确认协议的前半段，须要求再次评估。若混淆两类回执，将导致 Reviewer 收到相互冲突的控制指令。
 6. **终止只靠文案劝告**：若过程 Reviewer 第一次 `judge` 后仅收到「请结束对话」文本，而 Host 直到第二次 `judge` 才中断物理 attempt，模型仍可在同一请求内继续生成、调用其它工具或重复判断。terminal 语义必须在成功回执进入下一次 Host→LLM transform 时由物理 interrupt 强制兑现，而不是等待模型自觉服从。
+7. **interrupt 截断 durable closure**：若 transform 在 judge tool result 已形成后直接中断 reviewer，而 `ReviewAttemptClosed` 仍依赖稍后的通用 turn-completion observer，则 verdict 会永久停在 `VerdictKnown`；Main 下一次 `todowrite` 只能再次发起 review 或无限等待。强制终止必须先冻结 exact tool-result frontier，再执行 interrupt。
 
 `review-judgement` 保证：**PERFECT 与 REVISE 必须由 discrimination 挣得**。Acceptance 需要证据挣得，Rejection 同样需要证据挣得；唯有 material defect 才能扣留 acceptance；非阻断工艺观察可与 acceptance 共存；PERFECT 不代表全知；REVISE 必须购买实质上更好、更真实的结果。
 

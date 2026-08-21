@@ -30,7 +30,7 @@ Reviewer 依据 Examiner's Ledger 的判断方向建立审查视角，仅在存�
 
 ## REVIEW-JUDGEMENT-008: 过程评审一次 durable judge 即 terminal
 
-TodoProcessReview（过程评审）是针对当前 checkpoint 的单次真实判断，单次持久化 `judge` 即为 terminal。防重机制绑定于当前物理请求，同一物理请求内的重复调用予以收束，不同请求复用同一 dedicated 会话时重新具备单次 `judge` 资格。过程评审成功回执文本保持不变并明确指示结束；当 Host 准备把该 terminal tool result 送入同一物理请求的下一次 LLM continuation 时，provider transform 必须在 hook 内中断当前 managed attempt，同时让 transform 正常完成。interrupt 由首次成功提交建立的 request-scoped 标记触发，不得等待第二次 `judge` 才触发。Finality 首次 PERFECT 严禁复用过程评审的 terminal received 回执，必须返回 skeptical challenge 并要求再次评估；只有 terminal judgement 被标记后才适用 transform interrupt。无实质文本记录的过程 PERFECT 无效。
+TodoProcessReview（过程评审）是针对当前 checkpoint 的单次真实判断，单次持久化 `judge` 即为 terminal。防重机制绑定于当前物理请求，同一物理请求内的重复调用予以收束，不同请求复用同一 dedicated 会话时重新具备单次 `judge` 资格。过程评审成功回执文本保持不变并明确指示结束；当 Host 准备把该 terminal tool result 送入同一物理请求的下一次 LLM continuation 时，provider transform 必须先确认该 judgement 对应的 exact `tool_result` 已进入 durable XTrace，并以该 part 的 `cursor+1` 持久化 `ReviewAttemptClosed`，随后才可在 hook 内中断当前 managed attempt，同时让 transform 正常完成。interrupt 由首次成功提交建立的 request-scoped 标记触发，不得等待第二次 `judge` 才触发，也不得把 durable closure 留给已被 interrupt 截断的通用 turn-completion observer。崩溃或旧版本已经留下 `VerdictKnown` 但未 closure 时，只允许从同一 `(ProviderRun, ToolCallId)` 的 durable `tool_result` 恢复同一排他 frontier，严禁拿当前 session head 扩大审查记录。Finality 首次 PERFECT 严禁复用过程评审的 terminal received 回执，必须返回 skeptical challenge 并要求再次评估；只有 terminal judgement 被标记后才适用 transform interrupt。无实质文本记录的过程 PERFECT 无效。
 
 ## REVIEW-JUDGEMENT-009: 拒绝必须把伤口说清且不发明 obligation
 

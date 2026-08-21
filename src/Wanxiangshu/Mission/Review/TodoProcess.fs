@@ -260,16 +260,59 @@ module TodoProcessReviewProgram =
         | ConcludePrerequisite.Assigned(checkpoint, assignment) ->
             concludeAssigned journal snapshot lifeId writeId checkpoint assignment
 
+    let private reviewerForRecovery
+        (snapshot: ProjectionSet)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        : SessionId option =
+        MagicTodoProjection.tryLife lifeId snapshot.AgentProjections.MagicTodo
+        |> Option.bind (fun life ->
+            match concludePrerequisite life writeId with
+            | ConcludePrerequisite.Assigned(_, assignment) -> Some assignment.ReviewerSessionId
+            | _ -> None)
+
+    let private recoverSubmittedClosure
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId option)
+        : Task<Result<unit, string>> =
+        match reviewerSessionId with
+        | None -> Task.FromResult(Ok())
+        | Some reviewer ->
+            taskResult {
+                let! _ = ReviewerWorkflow.ensureSubmittedAttemptClosed journal reviewer
+                return ()
+            }
+
+    let private concludeFreshSnapshot
+        (journal: AgentJournal)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        : Task<ConcludeOutcome> =
+        let snapshot = AgentJournal.snapshot journal
+
+        match MagicTodoProjection.tryLife lifeId snapshot.AgentProjections.MagicTodo with
+        | None -> Task.FromResult(ConcludeOutcome.Pending "life missing")
+        | Some life -> concludeForLife journal snapshot lifeId writeId life
+
+    let private concludeCurrentSnapshot
+        (journal: AgentJournal)
+        (lifeId: ManagerLifeId)
+        (writeId: TodoWriteId)
+        (recovery: Result<unit, string>)
+        : Task<ConcludeOutcome> =
+        match recovery with
+        | Error reason -> Task.FromResult(ConcludeOutcome.Failed reason)
+        | Ok() -> concludeFreshSnapshot journal lifeId writeId
+
     /// Append TodoReviewConcluded when VerdictKnown ∧ matching ReviewAttemptClosed
     /// ∧ ProcessReviewLWR record-ready share this snapshot. Pending is a wait
     /// signal, not a provider-visible reject.
     let tryConclude (journal: AgentJournal) (lifeId: ManagerLifeId) (writeId: TodoWriteId) : Task<ConcludeOutcome> =
         task {
             let snapshot = AgentJournal.snapshot journal
-
-            match MagicTodoProjection.tryLife lifeId snapshot.AgentProjections.MagicTodo with
-            | None -> return ConcludeOutcome.Pending "life missing"
-            | Some life -> return! concludeForLife journal snapshot lifeId writeId life
+            let reviewer = reviewerForRecovery snapshot lifeId writeId
+            let! recovered = recoverSubmittedClosure journal reviewer
+            return! concludeCurrentSnapshot journal lifeId writeId recovered
         }
 
     [<RequireQualifiedAccess>]

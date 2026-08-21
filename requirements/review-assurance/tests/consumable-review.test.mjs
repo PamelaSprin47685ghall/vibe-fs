@@ -193,6 +193,75 @@ test('WHAT[REVIEW-ASSURANCE-009] REVIEW_013_verdict_requires_closed_reviewer_tur
   } finally { cleanup() }
 })
 
+test('WHAT[REVIEW-ASSURANCE-009] REVIEW_013_stranded_terminal_verdict_recovers_closure_from_durable_tool_result', async () => {
+  const { opened, cleanup } = await open('recover-closure')
+  try {
+    await appendReviewFacts(opened, reviewerSession)
+    await reviewJournal.appendReview(opened.journal, reviewerSession, null, 'ReviewBarrierStarted', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1' })
+    await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-1', 'ReviewVerdictRecorded', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1', ProviderRun: 'run-1', ToolCallId: 'call-1', Verdict: 'PERFECT' })
+    const traced = await reviewJournal.appendAgent(opened.journal, reviewerSession, 'run-1', 'Companion', 'XTracePartAppended', {
+      SessionId: reviewerSession,
+      CursorSequence: 5,
+      Role: 'assistant',
+      Turn: 1,
+      PartIndex: 0,
+      Kind: 'tool_result',
+      ToolName: null,
+      TextRef: 'blob-judge-result',
+      TextDigest: 'digest-judge-result',
+      Provenance: 'g:0/msg:review-run/host-part:judge-result',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      HostToolPartId: 'prt-judge-result',
+    })
+    assert.equal(traced.ok, true, JSON.stringify(traced))
+
+    await todo.tryConclude(opened.journal, life, write)
+
+    const view = reviewJournal.sessionView(opened.journal, reviewerSession)
+    assert.equal(view.closedAttempts.length, 1)
+    assert.deepEqual(view.closedAttempts[0], { providerRun: 'run-1', toolCallId: 'call-1', frontier: 6n })
+  } finally { cleanup() }
+})
+
+test('WHAT[REVIEW-ASSURANCE-009] REVIEW_013_recovery_uses_latest_exact_tool_result_not_current_xtrace_head', async () => {
+  const { opened, cleanup } = await open('recover-exact-frontier')
+  try {
+    await appendReviewFacts(opened, reviewerSession)
+    await reviewJournal.appendReview(opened.journal, reviewerSession, null, 'ReviewBarrierStarted', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1' })
+    await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-1', 'ReviewVerdictRecorded', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1', ProviderRun: 'run-1', ToolCallId: 'call-1', Verdict: 'PERFECT' })
+
+    const appendPart = (run, call, sequence, kind) => reviewJournal.appendAgent(opened.journal, reviewerSession, run, 'Companion', 'XTracePartAppended', {
+      SessionId: reviewerSession,
+      CursorSequence: sequence,
+      Role: kind === 'user' ? 'user' : 'assistant',
+      Turn: sequence,
+      PartIndex: 0,
+      Kind: kind,
+      ToolName: null,
+      TextRef: `blob-${sequence}`,
+      TextDigest: `digest-${sequence}`,
+      Provenance: `g:0/msg:${run}/host-part:${sequence}`,
+      ProviderRun: kind === 'user' ? null : run,
+      ToolCallId: kind === 'tool_result' ? call : null,
+      HostToolPartId: `prt-${sequence}`,
+    })
+
+    assert.equal((await appendPart('run-1', 'call-1', 5, 'tool_result')).ok, true)
+    assert.equal((await appendPart('retry-root', null, 6, 'user')).ok, true)
+    await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-2', 'ReviewVerdictRecorded', { ReviewerSessionId: reviewerSession, ManagerSessionId: managerSession, BarrierId: 'bar-process', GitTreeHash: 'tree-1', ProviderRun: 'run-2', ToolCallId: 'call-2', Verdict: 'PERFECT' })
+    assert.equal((await appendPart('run-2', 'call-2', 9, 'tool_result')).ok, true)
+    assert.equal((await appendPart('late-run', null, 10, 'reasoning')).ok, true)
+
+    await todo.tryConclude(opened.journal, life, write)
+
+    const view = reviewJournal.sessionView(opened.journal, reviewerSession)
+    assert.equal(view.closedAttempts.length, 1)
+    assert.deepEqual(view.closedAttempts[0], { providerRun: 'run-2', toolCallId: 'call-2', frontier: 10n })
+    assert.equal(view.xTraceHead, 11n, 'later durable history must not widen the recovered review frontier')
+  } finally { cleanup() }
+})
+
 test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_absent_reviewer_fails_closed_without_fabricated_conclusion', async () => {
   const { opened, cleanup } = await open('absent')
   try {

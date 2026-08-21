@@ -203,28 +203,62 @@ module JudgeTool =
                   ToolCallId = toolCallId
                   Verdict = value }
 
+    [<RequireQualifiedAccess>]
+    type private SubmittedInterruptDecision =
+        | NoInterrupt
+        | JournalMissing
+        | Ready of journal: AgentJournal * reviewerSessionId: SessionId
+
+    let private decideSubmittedInterrupt
+        (journal: AgentJournal option)
+        (currentPhysicalUserMessage: string -> string option)
+        (projectionSessionIdOpt: string option)
+        : SubmittedInterruptDecision =
+        let currentRequest =
+            projectionSessionIdOpt
+            |> Option.bind (fun sessionId ->
+                currentPhysicalUserMessage sessionId
+                |> Option.map (fun physicalUserMessageId -> SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId))
+
+        let submitted =
+            currentRequest
+            |> Option.filter (fun (sessionId, physicalUserMessageId) ->
+                JudgementRequestIdentity.key sessionId physicalUserMessageId
+                |> SharedState.VerdictSubmissions.Contains)
+
+        match submitted, journal with
+        | None, _ -> SubmittedInterruptDecision.NoInterrupt
+        | Some _, None -> SubmittedInterruptDecision.JournalMissing
+        | Some(sessionId, _), Some durable -> SubmittedInterruptDecision.Ready(durable, sessionId)
+
+    let private interruptClosedSubmittedJudgement
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        : Task<unit> =
+        task {
+            match! ReviewerWorkflow.ensureSubmittedAttemptClosed journal reviewerSessionId with
+            | Ok true ->
+                let! _ = sessionPort.InterruptAttempt reviewerSessionId
+                return ()
+            | Ok false ->
+                return invalidOp "REVIEW_013_TERMINAL_CLOSURE_MISSING"
+            | Error reason ->
+                return invalidOp ("REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason)
+        }
+
     let interruptAfterSubmittedJudgement
+        (journal: AgentJournal option)
         (currentPhysicalUserMessage: string -> string option)
         (sessionPort: ISessionHostPort)
         (projectionSessionIdOpt: string option)
         : Task<unit> =
-        task {
-            let currentRequest =
-                projectionSessionIdOpt
-                |> Option.bind (fun sessionId ->
-                    currentPhysicalUserMessage sessionId
-                    |> Option.map (fun physicalUserMessageId -> sessionId, physicalUserMessageId))
-
-            match currentRequest with
-            | Some(sessionId, physicalUserMessageId)
-                when JudgementRequestIdentity.key
-                         (SessionId.create sessionId)
-                         (PhysicalUserMessageId.create physicalUserMessageId)
-                     |> SharedState.VerdictSubmissions.Contains ->
-                let! _ = sessionPort.InterruptAttempt(SessionId.create sessionId)
-                return ()
-            | _ -> return ()
-        }
+        match decideSubmittedInterrupt journal currentPhysicalUserMessage projectionSessionIdOpt with
+        | SubmittedInterruptDecision.NoInterrupt -> Task.FromResult()
+        | SubmittedInterruptDecision.JournalMissing ->
+            task { return invalidOp "REVIEW_013_TERMINAL_JOURNAL_MISSING" }
+        | SubmittedInterruptDecision.Ready(durable, reviewerSessionId) ->
+            interruptClosedSubmittedJudgement sessionPort durable reviewerSessionId
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {

@@ -34,7 +34,7 @@ Reviewer 生成针对当前过程评审的持久化裁决即达到 `VerdictKnown
 
 ## REVIEW-ASSURANCE-009: record-ready 同 snapshot、排他 frontier 且事件驱动
 
-record-ready 判定标准为「能否在同一 Journal snapshot 下物化出有效的规范 LWR」，frontier 采用排他边界（lastPart+1）。等待机制严格依赖事件驱动唤醒，禁止使用定时器、休眠或轮询。工作流必须先采样 revision，再执行就绪判定，最后发起带 revision 锚点的因果等待。等待器中断或崩溃后，基于持久事实与冻结 frontier 幂等重建并继续等待。
+record-ready 判定标准为「能否在同一 Journal snapshot 下物化出有效的规范 LWR」，frontier 采用排他边界（lastPart+1）。普通 reviewer turn 由 turn completion 冻结 frontier；对明确 judge-only 且由 Host 强制 interrupt 的 process-review terminal，matching `(ProviderRun, ToolCallId)` 的 durable `tool_result` 即为该 work unit 的最后合法 part，必须在 interrupt 前以其 `cursor+1` 幂等冻结 closure。旧版本或崩溃留下的 VerdictKnown-but-unclosed 仅可由同一 durable tool-result 恢复此 frontier，严禁使用当前 session head。等待机制严格依赖事件驱动唤醒，禁止使用定时器、休眠或轮询。工作流必须先采样 revision，再执行就绪判定，最后发起带 revision 锚点的因果等待。等待器中断或崩溃后，基于持久事实与冻结 frontier 幂等重建并继续等待。
 
 ## REVIEW-ASSURANCE-010: 基础设施失败永远不是 PERFECT 或 REVISE
 
