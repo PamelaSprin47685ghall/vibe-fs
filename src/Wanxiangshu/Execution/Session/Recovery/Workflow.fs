@@ -3,32 +3,18 @@ namespace Wanxiangshu.Execution.Session.Recovery
 #nowarn "0035"
 
 open System.Threading.Tasks
-open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Change
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Interaction.Dispatch
+open Wanxiangshu.Persistence.Journal
 
 /// Direct-CE family recovery (FLOW-001 / P0-2).
 /// GREEN-4: all ports are mandatory capabilities. Missing work is a query result

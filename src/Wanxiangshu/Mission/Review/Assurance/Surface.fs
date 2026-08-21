@@ -298,6 +298,94 @@ module ReviewAssuranceSurface =
     let isValidForTree (tree: string) (witness: obj) =
         ReviewWitness.isValidForTree (treeOf (box tree)) (extractWitness witness)
 
+    type private ConfirmedReviewWitnessHandle(witness: ConfirmedReviewWitness) =
+        member _.Witness = witness
+
+        static member Create(witness: ConfirmedReviewWitness) = ConfirmedReviewWitnessHandle(witness)
+
+    let private confirmedReviewWitnessOf (value: obj) : ConfirmedReviewWitness =
+        match value with
+        | :? ConfirmedReviewWitnessHandle as handle -> handle.Witness
+        | _ -> invalidArg "value" "ReviewAssuranceSurface: expected a confirmed review witness handle"
+
+    let projectConfirmedReview (lifeId: string) (requestId: string) (tree: string) (memberWitnesses: obj array) : obj =
+        let members =
+            if isNull memberWitnesses then
+                []
+            else
+                memberWitnesses
+                |> Array.toList
+                |> List.map (fun item ->
+                    let reviewer = sessionOf (firstField item [| "reviewer"; "ReviewerSessionId" |])
+                    let barrier = barrierOf (firstField item [| "barrier"; "BarrierId" |])
+                    let witness = extractWitness (firstField item [| "witness"; "Witness" |])
+                    (reviewer, barrier, witness))
+
+        match
+            ConfirmedReviewWitness.create
+                (ManagerLifeId.create lifeId)
+                (FinalityRequestId.create requestId)
+                (treeOf (box tree))
+                members
+        with
+        | Ok witness ->
+            box
+                {| ok = true
+                   witness = ConfirmedReviewWitnessHandle.Create witness :> obj |}
+        | Error error ->
+            box
+                {| ok = false
+                   error = error |}
+
+    let confirmedReviewWitnessTree (witness: obj) : string =
+        let typed = confirmedReviewWitnessOf witness
+        GitTreeHash.value (ConfirmedReviewWitness.gitTreeHash typed)
+
+    let isConfirmedReviewValidForTree (tree: string) (witness: obj) : bool =
+        let typed = confirmedReviewWitnessOf witness
+        ReviewCandidate.isWitnessValidForTree (treeOf (box tree)) typed
+
+    let grantBlessing (currentTree: string) (witness: obj) : obj =
+        let typed = confirmedReviewWitnessOf witness
+
+        match FinalityAdmission.grantBlessing (treeOf (box currentTree)) typed with
+        | Ok permit ->
+            box
+                {| ok = true
+                   permit =
+                    box
+                        {| tree = GitTreeHash.value (FinalityAdmission.permitTree permit)
+                           lifeId = ManagerLifeId.value (FinalityAdmission.permitLifeId permit)
+                           requestId = FinalityRequestId.value (FinalityAdmission.permitRequestId permit) |} |}
+        | Error(BlessingAdmissionFailure.StaleWitness(curr, expected)) ->
+            box
+                {| ok = false
+                   error = "StaleWitness"
+                   currentTree = GitTreeHash.value curr
+                   witnessTree = GitTreeHash.value expected |}
+        | Error(BlessingAdmissionFailure.IncompleteCohort reason) ->
+            box
+                {| ok = false
+                   error = "IncompleteCohort"
+                   reason = reason |}
+
+    let verifyCandidate (candidateTree: string) (witness: obj) : obj =
+        let typed = confirmedReviewWitnessOf witness
+
+        match ReviewCandidate.verifyCandidate (treeOf (box candidateTree)) typed with
+        | Ok() -> box {| ok = true |}
+        | Error(BlessingAdmissionFailure.StaleWitness(curr, expected)) ->
+            box
+                {| ok = false
+                   error = "StaleWitness"
+                   candidateTree = GitTreeHash.value curr
+                   witnessTree = GitTreeHash.value expected |}
+        | Error(BlessingAdmissionFailure.IncompleteCohort reason) ->
+            box
+                {| ok = false
+                   error = "IncompleteCohort"
+                   reason = reason |}
+
     let emptyGuard () : obj =
         GuardHandle.Create ReviewProjection.empty :> obj
 

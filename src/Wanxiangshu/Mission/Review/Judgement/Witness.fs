@@ -135,3 +135,113 @@ module ReviewWitness =
                        FirstPhysicalUserMessageId = firstPhysicalUserMessageId
                        SecondPhysicalUserMessageId = secondPhysicalUserMessageId |}
             )
+
+/// A witnessed confirmation for an entire review cohort (two legitimate reviewers on the same tree,
+/// in the same review cohort, both giving dual-PERFECT satisfying finality law).
+///
+/// Established purely by projection from durable facts (never a separate persistent event, AGENTS.md §2.3/§22).
+type ConfirmedReviewWitness =
+    private ConfirmedReviewWitness of
+        {| LifeId: ManagerLifeId
+           RequestId: FinalityRequestId
+           GitTreeHash: GitTreeHash
+           Witnesses: (SessionId * ReviewBarrierId * ReviewWitness) list |}
+
+/// Failure to admit a blessing for finality.
+type BlessingAdmissionFailure =
+    | StaleWitness of currentTree: GitTreeHash * witnessTree: GitTreeHash
+    | IncompleteCohort of reason: string
+
+/// One-shot process capability / permit granting authority to record finality blessing.
+type BlessingPermit =
+    private BlessingPermit of
+        {| LifeId: ManagerLifeId
+           RequestId: FinalityRequestId
+           GitTreeHash: GitTreeHash |}
+
+module ConfirmedReviewWitness =
+
+    let gitTreeHash (ConfirmedReviewWitness payload) : GitTreeHash =
+        payload.GitTreeHash
+
+    let lifeId (ConfirmedReviewWitness payload) : ManagerLifeId =
+        payload.LifeId
+
+    let requestId (ConfirmedReviewWitness payload) : FinalityRequestId =
+        payload.RequestId
+
+    let witnesses (ConfirmedReviewWitness payload) =
+        payload.Witnesses
+
+    /// Build a ConfirmedReviewWitness from two or more legitimate cohort members' confirmed review witnesses
+    /// on the exact same tree.
+    let private isConfirmedOnTree (expectedTree: GitTreeHash) (_, barrierId: ReviewBarrierId, witness: ReviewWitness) : bool =
+        match witness with
+        | ReviewWitness.Confirmed confirmed ->
+            confirmed.BarrierId = barrierId
+            && confirmed.GitTreeHash = expectedTree
+        | ReviewWitness.NoReview
+        | ReviewWitness.RevisionWitness _ -> false
+
+    /// Build a ConfirmedReviewWitness from two or more legitimate cohort members' confirmed review witnesses
+    /// on the exact same tree.
+    let create
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (gitTreeHash: GitTreeHash)
+        (memberWitnesses: (SessionId * ReviewBarrierId * ReviewWitness) list)
+        : Result<ConfirmedReviewWitness, string> =
+        if List.isEmpty memberWitnesses then
+            Error "cohort has no members"
+        elif List.length memberWitnesses < 2 then
+            Error "cohort requires at least two legitimate reviewers"
+        elif not (List.forall (isConfirmedOnTree gitTreeHash) memberWitnesses) then
+            Error "not all cohort reviewers have confirmed dual-PERFECT on the request tree"
+        else
+            Ok(
+                ConfirmedReviewWitness
+                    {| LifeId = lifeId
+                       RequestId = requestId
+                       GitTreeHash = gitTreeHash
+                       Witnesses = memberWitnesses |}
+            )
+
+/// FinalityAdmission gate: verifies that the current manager tree matches the witness tree,
+/// preventing stale witnesses from authorizing a current blessing (AGENTS.md §63).
+module FinalityAdmission =
+
+    let grantBlessing
+        (currentTree: GitTreeHash)
+        (witness: ConfirmedReviewWitness)
+        : Result<BlessingPermit, BlessingAdmissionFailure> =
+        let witnessTree = ConfirmedReviewWitness.gitTreeHash witness
+
+        if currentTree = witnessTree then
+            Ok(
+                BlessingPermit
+                    {| LifeId = ConfirmedReviewWitness.lifeId witness
+                       RequestId = ConfirmedReviewWitness.requestId witness
+                       GitTreeHash = witnessTree |}
+            )
+        else
+            Error(BlessingAdmissionFailure.StaleWitness(currentTree, witnessTree))
+
+    let permitTree (BlessingPermit payload) : GitTreeHash = payload.GitTreeHash
+
+    let permitLifeId (BlessingPermit payload) : ManagerLifeId = payload.LifeId
+
+    let permitRequestId (BlessingPermit payload) : FinalityRequestId = payload.RequestId
+
+/// Review.CandidateContract: candidate tree verification against confirmed review witness.
+module ReviewCandidate =
+
+    let verifyCandidate (candidateTree: GitTreeHash) (witness: ConfirmedReviewWitness) : Result<unit, BlessingAdmissionFailure> =
+        let witnessTree = ConfirmedReviewWitness.gitTreeHash witness
+
+        if candidateTree = witnessTree then
+            Ok()
+        else
+            Error(BlessingAdmissionFailure.StaleWitness(candidateTree, witnessTree))
+
+    let isWitnessValidForTree (candidateTree: GitTreeHash) (witness: ConfirmedReviewWitness) : bool =
+        ConfirmedReviewWitness.gitTreeHash witness = candidateTree

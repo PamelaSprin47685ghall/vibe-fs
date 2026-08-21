@@ -193,7 +193,7 @@ module RecoverySurface =
             box
                 {| state = "FamilyReady"
                    root = SessionId.value (SessionRecovery.FamilyRecoveryPermit.root permit)
-                   sequence = SessionRecovery.FamilyRecoveryPermit.journalSequence permit
+                   sequence = int (SessionRecovery.FamilyRecoveryPermit.journalSequence permit)
                    members = SessionRecovery.FamilyRecoveryPermit.closureMembers permit |> Set.toArray |}
         | SessionRecovery.FamilyRecovery.FamilyWaiting _ -> box {| state = "FamilyWaiting" |}
         | SessionRecovery.FamilyRecovery.FamilyBlocked _ -> box {| state = "FamilyBlocked" |}
@@ -203,7 +203,7 @@ module RecoverySurface =
 
         box
             {| session = SessionId.value (SessionRecovery.RecoveryReceipt.sessionId value)
-               sequence = SessionRecovery.RecoveryReceipt.journalSequence value
+               sequence = int (SessionRecovery.RecoveryReceipt.journalSequence value)
                snapshotDigest = null
                resolvedClaims = [||]
                restoredHandles = [||] |}

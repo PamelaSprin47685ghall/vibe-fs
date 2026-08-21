@@ -13,6 +13,7 @@ const checks = [
   join(root, 'checks/dsl-ownership.mjs'),
   join(root, 'checks/fsharp-control-pyramid.mjs'),
   join(root, 'checks/semantic-owners.mjs'),
+  join(root, 'checks/migration-ledger.mjs'),
   join(root, 'checks/plugin-transforms-invariant.mjs'),
   join(root, 'checks/assistance-host-invariant.mjs'),
   join(root, 'checks/interaction-repair-invariant.mjs'),

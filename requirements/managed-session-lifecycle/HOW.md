@@ -33,7 +33,7 @@
 |---|---|
 | MANAGED-SESSION-001 | `requirements/managed-session-lifecycle/tests/attached-session-runtime.test.mjs` |
 | MANAGED-SESSION-002 | `requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs` |
-| MANAGED-SESSION-003 | `requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs` |
+| MANAGED-SESSION-003 | `requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs` + `requirements/managed-session-lifecycle/tests/session-recovery.test.mjs` |
 | MANAGED-SESSION-004 | `requirements/managed-session-lifecycle/tests/host-fork-agent.test.mjs` |
 | MANAGED-SESSION-005 | `requirements/managed-session-lifecycle/tests/attached-session-runtime.test.mjs` |
 | MANAGED-SESSION-006 | `requirements/managed-session-lifecycle/tests/handle.test.mjs` |
@@ -43,7 +43,7 @@
 | MANAGED-SESSION-010 | `requirements/managed-session-lifecycle/tests/distiller-ownership.test.mjs` |
 | MANAGED-SESSION-011 | `requirements/managed-session-lifecycle/tests/satellite-runtime.test.mjs` |
 | MANAGED-SESSION-012 | `requirements/managed-session-lifecycle/tests/child-run-projection.test.mjs` |
-| MANAGED-SESSION-013 | `requirements/managed-session-lifecycle/tests/host-fork-restart-lifecycle.test.mjs` |
+| MANAGED-SESSION-013 | `requirements/managed-session-lifecycle/tests/host-fork-restart-lifecycle.test.mjs` + `requirements/managed-session-lifecycle/tests/session-recovery.test.mjs` |
 | MANAGED-SESSION-014 | `requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs` |
 | MANAGED-SESSION-015 | `requirements/managed-session-lifecycle/tests/handle.test.mjs` |
 | MANAGED-SESSION-016 | `requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` |

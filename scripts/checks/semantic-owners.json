@@ -1,5 +1,5 @@
 {
-  "total": 674,
+  "total": 678,
   "owners": [
     "action-affordance",
     "behavior-diagnosis",
@@ -216,6 +216,10 @@
       "owner": "context-compression"
     },
     {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
+      "owner": "context-compression"
+    },
+    {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
       "owner": "context-compression"
     },
@@ -261,10 +265,6 @@
     },
     {
       "path": "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
-      "owner": "context-compression"
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
       "owner": "context-compression"
     },
     {
@@ -380,11 +380,11 @@
       "owner": "semantic-trace"
     },
     {
-      "path": "src/Wanxiangshu/Context/Trace/Materialization.fs",
+      "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
       "owner": "semantic-trace"
     },
     {
-      "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
+      "path": "src/Wanxiangshu/Context/Trace/Materialization.fs",
       "owner": "semantic-trace"
     },
     {
@@ -464,6 +464,10 @@
       "owner": "guidance-delivery"
     },
     {
+      "path": "src/Wanxiangshu/Enforcer/Host.fs",
+      "owner": "behavior-diagnosis"
+    },
+    {
       "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
       "owner": "institutional-learning"
     },
@@ -482,10 +486,6 @@
     {
       "path": "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
       "owner": "institutional-learning"
-    },
-    {
-      "path": "src/Wanxiangshu/Enforcer/Host.fs",
-      "owner": "behavior-diagnosis"
     },
     {
       "path": "src/Wanxiangshu/Enforcer/Observation.fs",
@@ -557,22 +557,6 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/Facts.fs",
-      "owner": "delegation"
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
-      "owner": "delegation"
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
-      "owner": "delegation"
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
-      "owner": "delegation"
-    },
-    {
-      "path": "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
       "owner": "delegation"
     },
     {
@@ -721,6 +705,22 @@
     },
     {
       "path": "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
+      "owner": "delegation"
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
       "owner": "delegation"
     },
     {
@@ -936,6 +936,10 @@
       "owner": "dispatch-protocol"
     },
     {
+      "path": "src/Wanxiangshu/Foundation/LlmFacing.fs",
+      "owner": "provider-projection"
+    },
+    {
       "path": "src/Wanxiangshu/Foundation/McpLaunch.fs",
       "owner": "host-boundary"
     },
@@ -965,10 +969,6 @@
     },
     {
       "path": "src/Wanxiangshu/Foundation/SyntheticToml.fs",
-      "owner": "provider-projection"
-    },
-    {
-      "path": "src/Wanxiangshu/Foundation/LlmFacing.fs",
       "owner": "provider-projection"
     },
     {
@@ -1032,6 +1032,14 @@
       "owner": "host-boundary"
     },
     {
+      "path": "src/Wanxiangshu/Host/Fact.fs",
+      "owner": "requirement-grounding"
+    },
+    {
+      "path": "src/Wanxiangshu/Host/Facts.fs",
+      "owner": "requirement-grounding"
+    },
+    {
       "path": "src/Wanxiangshu/Interaction/Attention/Facts.fs",
       "owner": "attention-regulation"
     },
@@ -1046,6 +1054,10 @@
     {
       "path": "src/Wanxiangshu/Interaction/Attention/Surface.fs",
       "owner": "attention-regulation"
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Authority/Assistance.fs",
+      "owner": "interaction-authority"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Authority/Child.fs",
@@ -1566,14 +1578,6 @@
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs",
       "owner": "host-boundary"
-    },
-    {
-      "path": "src/Wanxiangshu/Host/Fact.fs",
-      "owner": "requirement-grounding"
-    },
-    {
-      "path": "src/Wanxiangshu/Host/Facts.fs",
-      "owner": "requirement-grounding"
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",

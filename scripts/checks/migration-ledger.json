@@ -1,4755 +1,1071 @@
 {
-  "version": 1,
-  "description": "Temporary Wave 0 architecture migration ledger. Delete after Wave 11 release closure.",
-  "total": 673,
-  "entries": [
-    {
-      "path": "AssemblyInfo.fs",
-      "owner": "distribution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Fact.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Facts.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Fold.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/GitAdapter.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/Host.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/ReviewRunner.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/SessionDirectories.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/Surface.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/Types.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Host/WorktreeCleanup.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Job.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Program.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Projection.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Prompts.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Recovery.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Runtime.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Surface.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Change/Types.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/Fact.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/Fold.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/FoldRejection.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/HostFactFold.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/Projection.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/ProjectionState.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Durable/ProjectionUpdate.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/Binding.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/Observation.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/OrdinaryTurnWorkflow.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/Program.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/ReconcilePass.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/ReconcileSurface.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/Scheduler.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/TurnReconcile.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Composition/Turn/Workflow.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/BloggerCrashRecovery.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/BloggerCrashSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/ContextFactFold.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Delta.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/DeltaSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/FrameSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/OpenCode/PluginScope.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Projection.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Request.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/Abandon.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/Coordinator.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/CycleProjection.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/CycleSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/Host.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/ParkedTransform.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Runtime/State.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/Toml.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Blogger/TomlSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Builder.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/CompanionFactFold.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/CompressionSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Errors.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Fact.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Facts.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/FoldSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Host.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/HostBlogger.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Identity.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/JournalPort.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Model.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Program.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Projection.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/ProjectionSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Prompt.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Runtime.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/RuntimeSurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Companion/Transform.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/Candidate.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/Epoch.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/ProbeSelection.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/Projection.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/Surface.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/Wire.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Prefix/XWireSurface.fs",
-      "owner": "prefix-stability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/Capture.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/Cursor.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/Model.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/Projection.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/TerminalReporter.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/XTracePipeline.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Context/Trace/XTraceSurface.fs",
-      "owner": "semantic-trace",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/BlogSurface.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Catalog.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/ChronicleExecution.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Codec.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Continuation.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Cycle/BloggerProbe.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Cycle/Commit.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Cycle/Decode.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Cycle/Model.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Cycle/Recovery.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Guidance/DeliveryProjection.fs",
-      "owner": "guidance-delivery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Guidance/DeliverySurface.fs",
-      "owner": "guidance-delivery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Guidance/Tip.fs",
-      "owner": "guidance-delivery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Guidance/TipSurface.fs",
-      "owner": "guidance-delivery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Host.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/InstitutionalLearning/Enhancer.fs",
-      "owner": "institutional-learning",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/InstitutionalLearning/Facts.fs",
-      "owner": "institutional-learning",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/InstitutionalLearning/Fold.fs",
-      "owner": "institutional-learning",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/InstitutionalLearning/Projection.fs",
-      "owner": "institutional-learning",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/InstitutionalLearning/Surface.fs",
-      "owner": "institutional-learning",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Observation.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/ObservationCollector.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/ObservationSurface.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Projection.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Repair.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/RepairSurface.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Rulebook.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Enforcer/Surface.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Agent/Errors.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Agent/Program.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/ChildRecoveryWorkflow.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/DelegatedToolEstimateLedger.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/DelegatedToolEstimateProjection.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/DelegatedToolEstimateSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/DelegationFactFold.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/ExecutionFactFold.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fact.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Facts.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/ChildRecovery.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/ChildRecoverySurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/ChildRun.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/ChildRunProjection.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/CleanBreakSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/Agent.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/AgentOwner.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/BusyNudge.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/ChildDispatch.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/Join.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/JoinSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/PendingRun.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/Pty.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/Restart.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/RunLifecycle.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Host/Runtime.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/LifecycleSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Model.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/OpenCode/JoinGuard.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/OpenCode/JoinTool.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/OpenCode/Tool.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Payload.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Recovery.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Runtime.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Fork/Surface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/CompletionCodec.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/Controller.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/FoldSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/JoinDrain.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/JoinInterruptRegistry.fs",
-      "owner": "delegation",
+  "protocol": {
+    "execution_loop": "每节点八步闭环=读 WHY/WHAT/HOW→先补最低层 proof（旧败新胜）→迁 ownership/contract→迁全部 production callers→删旧路径→owner proof+受影响 gate+node scripts/check.mjs+node scripts/build.mjs 绿→提交置 DONE 释放后继",
+    "roles": {
+      "Coder": "拥有 mutation 与测试实现",
+      "Technician": "拥有运行证据、门禁与构建验证",
+      "Analyst": "拥有 owner 争议与架构边裁决"
+    },
+    "concurrency_policy": "同文件冲突=edit mutex 不造永久边；READY 节点 touched_paths 正交即可并行",
+    "acyclic_invariant": "新节点/边入账即查环，Kahn 拓扑排序校验",
+    "legal_edge_kinds": [
+      "contract",
+      "ownership",
+      "compile",
+      "closure"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "canonical-spine",
+      "primary_owner": "durable-events",
+      "intent": "Canonical EventStore spine & CanonicalIntegrator: single immutable history substrate, zero feature history reader, unified-store-gate enforced",
+      "files": [
+        "src/Wanxiangshu/Composition/Durable/Fact.fs",
+        "src/Wanxiangshu/Composition/Durable/Fold.fs",
+        "src/Wanxiangshu/Composition/Durable/FoldRejection.fs",
+        "src/Wanxiangshu/Composition/Durable/HostFactFold.fs",
+        "src/Wanxiangshu/Composition/Durable/Projection.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionState.fs",
+        "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+        "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs",
+        "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStoreSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs",
+        "src/Wanxiangshu/Persistence/EventStore/CodecSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/EventStoreHandle.fs",
+        "src/Wanxiangshu/Persistence/EventStore/EventVocabulary.fs",
+        "src/Wanxiangshu/Persistence/EventStore/GitObjectDatabase.fs",
+        "src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+        "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
+        "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+        "src/Wanxiangshu/Persistence/EventStore/StrengthSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Surface.fs",
+        "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+        "src/Wanxiangshu/Persistence/Journal/CodecSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/Envelope.fs",
+        "src/Wanxiangshu/Persistence/Journal/EventStoreJournalCodec.fs",
+        "src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs",
+        "src/Wanxiangshu/Persistence/Journal/FactCodec.fs",
+        "src/Wanxiangshu/Persistence/Journal/FactCodecSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/JournalEventStoreBoot.fs",
+        "src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/ReviewJournalSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/RevisionSurface.fs",
+        "src/Wanxiangshu/Persistence/Journal/RuntimePath.fs",
+        "src/Wanxiangshu/Persistence/Journal/SharedAgentJournal.fs",
+        "src/Wanxiangshu/Persistence/Journal/Surface.fs",
+        "src/Wanxiangshu/Persistence/Journal/Writer.fs",
+        "src/Wanxiangshu/Strength/Persistence/Durability.fs",
+        "src/Wanxiangshu/Strength/Persistence/DurabilityPort.fs",
+        "src/Wanxiangshu/Strength/Persistence/Store.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "DurableEvents.Contract",
+        "EventStore.CanonicalIntegrator"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/durable-events/tests/canonical-integrator.test.mjs"
+      ],
+      "architecture_gates": [
+        "unified-store-gate.mjs"
+      ],
+      "evidence": "unified-store-gate",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageF"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "model-routing-capacity",
+      "primary_owner": "execution-model-routing",
+      "intent": "ModelRouting & ModelCapacity: single authority capacity ledger, BorrowingCapacity capability transformer, no cross-provider credit leak",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/PlannerSurface.fs",
+        "src/Wanxiangshu/Strength/Policy.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ModelRouting.Contract",
+        "ModelCapacity.BorrowingCapacity"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/execution-model-routing/tests/model-routing.test.mjs"
+      ],
+      "architecture_gates": [
+        "cross-callback-pc.mjs",
+        "composition-root-invariant.mjs"
+      ],
+      "evidence": "cross-callback-pc",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "execution-quiescence",
+      "primary_owner": "causal-wait",
+      "intent": "QuiescencePermit & CausalWait: process-local opaque capability, freshness serial validation, single-flight causal wait",
+      "files": [
+        "src/Wanxiangshu/Execution/Session/Wait/Await.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/Bridge.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/Registry.fs",
+        "src/Wanxiangshu/Execution/Session/Wait/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Session.Quiescence",
+        "CausalWait.Contract"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/causal-wait/tests/causal-wait.test.mjs"
+      ],
+      "architecture_gates": [
+        "cross-callback-pc.mjs",
+        "causal-wait-boundary.mjs"
+      ],
+      "evidence": "cross-callback-pc",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "plugin-transforms-composition",
+      "primary_owner": "host-boundary",
+      "intent": "Provider Transform Composition Root: 13-step static score, no dynamic middleware list, no foreign domain policy decisions",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "classification": "COMPOSITION-ROOT",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/OpenCode/JoinWake.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handle/Surface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Handoff.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/HandoffIdentity.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/HandoffLedger.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/HandoffSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/HostTurnObservedSurface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/Join.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/LinkageProjection.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/OpenCode/DelegatedToolEstimate.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Model.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Prompt.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Runtime.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Store.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Surface.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Wait.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Delegation/SyncDelegate/Workflow.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Admission.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Fact.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Facts.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Fold.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Model.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/OpenCode/Host.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/OpenCode/Tool.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Projection.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Runtime.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Fission/Surface.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/AgentCompletion.fs",
-      "owner": "delegation",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Association.fs",
-      "owner": "session-ontology",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/AssociationSurface.fs",
-      "owner": "session-ontology",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Attachment/AttachedRuntime.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Attachment/AttachmentSurface.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Attachment/ReuseScope.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Attachment/SatelliteRuntime.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/LoopDetector.fs",
-      "owner": "degeneration-guard",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/LoopDetectorSurface.fs",
-      "owner": "degeneration-guard",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/OpenCode/HorizonSurface.fs",
-      "owner": "participant-horizon",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/OpenCode/HorizonTool.fs",
-      "owner": "participant-horizon",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Ownership.fs",
-      "owner": "session-ontology",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Recovery/Coordinator.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Recovery/Model.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Recovery/Surface.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Recovery/Workflow.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/RecoveryClosureProjection.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/SessionStartedAtLedger.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/SessionStartedAtProjection.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Wait/Await.fs",
-      "owner": "causal-wait",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Wait/Bridge.fs",
-      "owner": "causal-wait",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Wait/CausalWait.fs",
-      "owner": "causal-wait",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Wait/CompletionMailbox.fs",
-      "owner": "causal-wait",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Wait/Registry.fs",
-      "owner": "causal-wait",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "Execution/Session/Wait/Surface.fs",
-      "owner": "causal-wait",
-      "classification": "KEEP",
-      "wave": 4,
-      "status": "PENDING"
-    },
-    {
-      "path": "FableBarrier.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/AsyncSupport.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/FatalProcess.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/FsToolkitFableCompat.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/Identity.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/McpLaunch.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/Outcome.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/OutcomeSurface.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/Parallel.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/ParallelSurface.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/Roles.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/RolesSurface.fs",
-      "owner": "office-capability",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/SyntheticToml.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/SyntheticTomlSurface.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/TaskResult.fs",
-      "owner": "intra-participant-parallelism",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Foundation/Temporal.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/Gateway.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/Hook/Dispatcher.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/Hook/Surface.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/Hook/Sync.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/IntegrationGate.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/Operations.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/Subject.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Git/WorktreeResource.fs",
-      "owner": "change-integration",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Host/CompactionPolicy.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Host/Contract/CompactionPolicySurface.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Host/Contract/ToolResultBound.fs",
-      "owner": "output-distillation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Host/Digest.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Attention/Facts.fs",
-      "owner": "attention-regulation",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Attention/Fold.fs",
-      "owner": "attention-regulation",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Attention/Projection.fs",
-      "owner": "attention-regulation",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Attention/Surface.fs",
-      "owner": "attention-regulation",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Child.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Fact.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Facts.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Fold.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Ledger.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Model.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Run.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/RuntimeSurface.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Authority/Surface.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Concern/Facts.fs",
-      "owner": "concern-routing",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Concern/Fold.fs",
-      "owner": "concern-routing",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Concern/Projection.fs",
-      "owner": "concern-routing",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Concern/Surface.fs",
-      "owner": "concern-routing",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/AssistancePrompt.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/Dispatcher.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/DispatchSurface.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/Ingress.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/JoinGuardSurface.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/Nudge.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/AssistanceHost.fs",
-      "owner": "dispatch-protocol",
+      "publishes": [
+        "OpenCode.PluginTransforms"
+      ],
+      "consumes": [
+        "Context.TraceContract",
+        "Context.CompanionContract",
+        "Strength.Contract",
+        "Enforcer.ContinuationContract",
+        "PairGuidance.Contract",
+        "RequirementGrounding.Contract",
+        "Participant.ProviderProjection"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/host-boundary/tests/plugin-transforms.test.mjs"
+      ],
+      "architecture_gates": [
+        "plugin-transforms-invariant.mjs",
+        "composition-root-invariant.mjs"
+      ],
+      "evidence": "plugin-transforms-invariant",
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "interaction-assistance-workflow-cutover",
+      "primary_owner": "interaction-authority",
+      "intent": "Liberate AssistanceHost into pure Capability-Passing CE workflow: exact AssistanceAbortClaim one-shot consumption after fresh idle, no foreign internal imports",
+      "files": [
+        "src/Wanxiangshu/Interaction/Authority/Assistance.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"
+      ],
+      "classification": "SPLIT",
+      "publishes": [
+        "Assistance.Workflow",
+        "Assistance.Contract"
+      ],
+      "consumes": [
+        "Session.Quiescence",
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        },
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/interaction-authority/tests/assistance-capability-boundary.test.mjs"
+      ],
+      "architecture_gates": [
+        "assistance-host-invariant.mjs"
+      ],
+      "closure_evidence": "proof: requirements/interaction-authority/tests/assistance-capability-boundary.test.mjs; 关联 gate: assistance-host-invariant, fsharp-control-pyramid, session-ownership-ratchet, semantic-owners; fsharp-control-pyramid 5→0 修复事实（Assistance.fs 3 处控制流嵌套已拉平为纯 Decision/Result 组合子）",
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"
+      ],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "review-assurance-witness-contract",
+      "primary_owner": "review-assurance",
+      "intent": "Publish ConfirmedReviewWitness pure projection and candidate verification contract, decouple Reviewer internal state from consumers",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs",
+        "src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderRunBindingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SharedState.fs"
+      ],
       "classification": "MOVE",
-      "wave": 2,
-      "status": "PENDING",
-      "pinningProofs": [
-        "scripts/checks/assistance-host-invariant.mjs",
-        "requirements/interaction-authority/tests/assistance-abort-fence.test.mjs",
-        "requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs",
-        "requirements/interaction-authority/tests/assistance-host.test.mjs"
-      ]
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/IngressCodec.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/MetadataCodec.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/NeedHelpEventCodec.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/NeedHelpSensor.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING",
-      "pinningProofs": [
-        "scripts/checks/cross-callback-pc.mjs",
-        "requirements/host-boundary/tests/needhelp-sensor.test.mjs",
-        "requirements/interaction-authority/tests/assistance-abort-fence.test.mjs",
-        "requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs"
-      ]
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/NeedHelpSurface.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/OpenCode/SessionNudge.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/PhysicalAcceptance.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/Recovery.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/RecoverySurface.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Dispatch/Send.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Repair/CompletedTurn.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Repair/CompletedTurnSurface.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Repair/InteractionRepair.fs",
-      "owner": "behavior-diagnosis",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Interaction/Repair/Port.fs",
-      "owner": "dispatch-protocol",
-      "classification": "KEEP",
-      "wave": 2,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Blessing.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Cohort.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/OpenCode/HostPort.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/OpenCode/Tool.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Ports.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Prompt.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/PromptSurface.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Record.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Revision.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Types.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Finality/Workflow.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Background.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Finality.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/FinalitySurface.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Idle.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/JobHandoff.fs",
-      "owner": "work-record",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Life/Admission.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Life/Facts.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Life/OpeningFloor.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Life/Projection.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Life/Prompt.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Life/Workflow.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Narrative.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/OpenCode/NarrativeTransform.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Manager/Workflow.fs",
-      "owner": "finality",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/LedgerWorkflow.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/Admission.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/After.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/Facts.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/FinalityCohort.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/Lwr.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoFactCodec.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoLocality.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoMembrane.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/Model.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/ObligationCodec.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/OpenCode/HostCodec.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/PrefixEpoch.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/ProcessReview.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/Projection.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Obligation/Todo/Surface.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Assurance/Surface.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Barrier/Projection.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Barrier/Reverify.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Barrier/Workflow.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/DedicatedTodoRuntime.fs",
-      "owner": "obligation-ledger",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Fact.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Facts.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/Challenge.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/Continuation.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/Evidence.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/RequestIdentity.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/Verdict.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/Witness.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Judgement/Workflow.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/OpenCode/HostGuard.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/OpenCode/JudgementInbox.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/OpenCode/JudgeSurface.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/OpenCode/JudgeTool.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/OpenCode/ReviewHostSurface.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Ports.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/Prompt.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/ReviewFactFold.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/ReviewTodoSurface.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/Review/TodoProcess.fs",
-      "owner": "review-judgement",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/WorkRecord/Materialize.fs",
-      "owner": "work-record",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/WorkRecord/Model.fs",
-      "owner": "work-record",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/WorkRecord/OpeningSemanticSurface.fs",
-      "owner": "work-record",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "Mission/WorkRecord/Surface.fs",
-      "owner": "work-record",
-      "classification": "KEEP",
-      "wave": 3,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/CanonicalJson.fs",
-      "owner": "host-boundary",
+      "publishes": [
+        "Review.Witness",
+        "Review.CandidateContract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Mission/Finality/Blessing.fs"
+      ],
+      "proofs": [
+        "requirements/review-assurance/tests/consumable-review.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "closure_evidence": "proof: requirements/review-assurance/tests/consumable-review.test.mjs; 关联 gate: assistance-host-invariant, fsharp-control-pyramid, session-ownership-ratchet, semantic-owners; fsharp-control-pyramid 5→0 修复事实（Witness.fs 2 处控制流嵌套已拉平为顶层决策链与纯谓词提取）",
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageC",
+        "CoverageD",
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "session-lifecycle-recovery-contract",
+      "primary_owner": "managed-session-lifecycle",
+      "intent": "Establish Session association/attachment/recovery pure contract, prevent physical handle leaks to business domain",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/Scheduler.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/AttachedRuntime.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/AttachmentSurface.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/ReuseScope.fs",
+        "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Surface.fs",
+        "src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs",
+        "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs",
+        "src/Wanxiangshu/OpenCode/Host/TurnRuntimePreparation.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Session.Lifecycle",
+        "Session.RecoveryContract"
+      ],
+      "consumes": [
+        "Session.Quiescence"
+      ],
+      "depends_on": [
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/managed-session-lifecycle/tests/session-recovery.test.mjs"
+      ],
+      "architecture_gates": [
+        "session-ownership-ratchet.mjs"
+      ],
+      "closure_evidence": "proof: requirements/managed-session-lifecycle/tests/session-recovery.test.mjs; 关联 gate: assistance-host-invariant, fsharp-control-pyramid, session-ownership-ratchet, semantic-owners; fsharp-control-pyramid 5→0 修复事实（全仓控制流嵌套清零）",
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Session/Recovery/Coordinator.fs"
+      ],
+      "coverage_tags": [
+        "CoverageD",
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
+    },
+    {
+      "id": "opencode-tool-spec-contracts",
+      "primary_owner": "action-affordance",
+      "intent": "Publish ToolSpec & admission contract for individual tools, decoupling ToolRegistry from tool domain logic",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/CoderTool.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/FileTools.fs",
+        "src/Wanxiangshu/OpenCode/Tools/FileToolsSurface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs",
+        "src/Wanxiangshu/OpenCode/Tools/StaticTools.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolContext.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolSurface.fs"
+      ],
       "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
+      "publishes": [
+        "ToolOwner.ToolSpec"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs"
+      ],
+      "proofs": [
+        "requirements/action-affordance/tests/tool-specs.test.mjs"
+      ],
+      "architecture_gates": [
+        "tool-referential-integrity.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/ToolSurface.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "READY",
+      "result": "PENDING"
     },
     {
-      "path": "OpenCode/Codec/CanonicalJsonSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/HostEventCodec.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/HostMessageCodec.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/LoopEventCodec.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/OpencodeTypes.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/ProjectionMessageEdit.fs",
-      "owner": "provider-projection",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/ProviderProjectionSurface.fs",
-      "owner": "provider-projection",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/ProviderWireCapture.fs",
-      "owner": "provider-projection",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/ProviderWireDecode.fs",
-      "owner": "provider-projection",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/ToolHostCodec.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Codec/ToolHostSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/BloggerChronicleText.fs",
-      "owner": "cognitive-environment",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ChatParamsHook.fs",
-      "owner": "execution-model-routing",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ChatParamsSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/Diagnostic.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/Events.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/EventsSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ExplicitResumeSuppression.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ExplicitResumeSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ExplicitSessionResume.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/Fact.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/Facts.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/FissionHostSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/GitTree.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostBoundarySurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostCompactionGate.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostCompactionObserver.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostMessageProjection.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostSessionContext.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostSessionContextSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostSessionDeletion.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostSignalBootstrap.fs",
-      "owner": "host-boundary",
+      "id": "opencode-host-signal-bootstrap-cutover",
+      "primary_owner": "host-boundary",
+      "intent": "HostSignalBootstrap composition root: reduce to pure wire/construct/subscribe/route, no domain policy decisions",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
       "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING",
-      "pinningProofs": [
-        "scripts/checks/composition-root-invariant.mjs",
-        "requirements/host-boundary/tests/plugin-load-purity.test.mjs",
-        "requirements/managed-session-lifecycle/tests/shutdown-drain-contract.test.mjs"
-      ]
-    },
-    {
-      "path": "OpenCode/Host/HostSignalSubscribeSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostSignalSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/HostTurnObserver.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/LoopSensor.fs",
-      "owner": "degeneration-guard",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/LoopSensorSurface.fs",
-      "owner": "degeneration-guard",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ManagedAgentConfig.fs",
-      "owner": "capability-enforcement",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ManagedAgentConfigSurface.fs",
-      "owner": "capability-enforcement",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ManagerConfig.fs",
-      "owner": "capability-enforcement",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/MessageVisibility.fs",
-      "owner": "participant-horizon",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/MessageVisibilitySurface.fs",
-      "owner": "participant-horizon",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ModelCapacity.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING",
-      "pinningProofs": [
-        "requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs",
-        "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs"
-      ]
-    },
-    {
-      "path": "OpenCode/Host/ModelRouting.fs",
-      "owner": "execution-model-routing",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ModelRoutingSurface.fs",
-      "owner": "execution-model-routing",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/OpenCodePort.fs",
-      "owner": "execution-model-routing",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PairProgramming/GuidelineProjection.fs",
-      "owner": "guidance-delivery",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PairProgramming/GuidelineSurface.fs",
-      "owner": "guidance-delivery",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PairProgrammingCalibration.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PairProgrammingCalibrationSurface.fs",
-      "owner": "time-capability",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PairProgrammingThoughtSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PairProgrammingThoughtTransform.fs",
-      "owner": "guidance-delivery",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PersonaBinding.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PluginHooksSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PluginHost.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PluginHostInterop.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PluginRecoveryScope.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PluginRuntimeScope.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/PluginSessionScope.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ProviderLanguageBinding.fs",
-      "owner": "provider-language",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ProviderRunBinding.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ProviderRunBindingSurface.fs",
-      "owner": "review-assurance",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/ProviderSystemTransform.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/QuiescenceSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGrounding/Gate.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGrounding/Model.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGrounding/Projection.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGrounding/Runtime.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGrounding/Transform.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGroundingRepositorySurface.fs",
-      "owner": "requirement-grounding",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/RequirementGroundingSurface.fs",
-      "owner": "requirement-grounding",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SessionBindingSurface.fs",
-      "owner": "session-ontology",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SessionExecutionBinding.fs",
-      "owner": "cognitive-environment",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SessionQuiescenceGate.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/Sessions.fs",
-      "owner": "session-ontology",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SessionSnapshotPort.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SessionSnapshotSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SessionsSurface.fs",
-      "owner": "session-ontology",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SharedState.fs",
-      "owner": "review-assurance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SharedStateSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SharedTerminalBus.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SphinxMcpConfig.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/SphinxMcpConfigSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/StealthBrowserMcp.fs",
-      "owner": "external-investigation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/StealthBrowserMcpConfig.fs",
-      "owner": "external-investigation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/StealthBrowserMcpConfigSurface.fs",
-      "owner": "external-investigation",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/TerminalPolicy.fs",
-      "owner": "interaction-authority",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/TurnRuntimePreparation.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/WorkspaceEventStore.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Host/WorkspaceEventStoreSurface.fs",
-      "owner": "durable-events",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/JoinResultRendererSurface.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/Plugin.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/PluginBoot.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/PluginHooks.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/PluginHostWiring.fs",
-      "owner": "host-boundary",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/PluginRecoveryWiring.fs",
-      "owner": "host-boundary",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/PluginSessionWiring.fs",
-      "owner": "host-boundary",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Plugin/PluginTransforms.fs",
-      "owner": "host-boundary",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "CUTOVER",
-      "pinningProofs": [
-        "scripts/checks/plugin-transforms-invariant.mjs",
-        "requirements/host-boundary/tests/ordered-transform.test.mjs"
-      ]
-    },
-    {
-      "path": "OpenCode/Plugin/SpikePlugin.fs",
-      "owner": "host-boundary",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Signals/HostSignal.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Signals/HostSignalAdapter.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Signals/HostSignalSubscribe.fs",
-      "owner": "host-boundary",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/AssumeTool.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/AttentionTools.fs",
-      "owner": "attention-regulation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/BashHoneypotTool.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ChronicleTool.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/CoderTool.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ConcernTools.fs",
-      "owner": "concern-routing",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/Distillation.fs",
-      "owner": "output-distillation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/DistillationRuntime.fs",
-      "owner": "output-distillation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/DistillationSurface.fs",
-      "owner": "output-distillation",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ExecutorTool.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ExecutorToolSurface.fs",
-      "owner": "action-affordance",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/FetchTool.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/FileMutationSurface.fs",
-      "owner": "repository-programming",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/FileMutationTools.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/FileTools.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/FileToolsSurface.fs",
-      "owner": "action-affordance",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/InspectorTool.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/InstitutionalLearningTools.fs",
-      "owner": "institutional-learning",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ManagedAgent.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/PtyTool.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/StaticTools.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ToolContext.fs",
-      "owner": "action-affordance",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ToolRegistry.fs",
-      "owner": "capability-enforcement",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING",
-      "pinningProofs": [
-        "scripts/checks/composition-root-invariant.mjs",
-        "scripts/checks/capability-isomorphism-gate.mjs",
-        "scripts/checks/tool-referential-integrity.mjs",
-        "requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs",
-        "requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs"
-      ]
-    },
-    {
-      "path": "OpenCode/Tools/ToolRegistrySurface.fs",
-      "owner": "capability-enforcement",
-      "classification": "COMPOSITION-ROOT",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ToolRuntimeScope.fs",
-      "owner": "managed-session-lifecycle",
-      "classification": "KEEP",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "OpenCode/Tools/ToolSurface.fs",
-      "owner": "action-affordance",
-      "classification": "ADAPTER",
-      "wave": 1,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/Catalog.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/ManagedCatalog.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/OfficeCapabilitySurface.fs",
-      "owner": "office-capability",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/RoleIdentity.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/SessionPersona.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/SessionSurface.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Persona/Surface.fs",
-      "owner": "participant-identity",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Cursor.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/CursorSurface.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Evidence.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Fact.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Facts.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/HandleSurface.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Ledger.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Projection.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Surface.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Fallback/Workflow.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/Planner.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/PlannerSurface.fs",
-      "owner": "execution-model-routing",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/RecoverySlot.fs",
-      "owner": "provider-attempt-recovery",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Attempt/TerminalValidity.fs",
-      "owner": "context-compression",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Language.fs",
-      "owner": "provider-language",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/LanguageSurface.fs",
-      "owner": "provider-language",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Projection/Intent.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Projection/Model.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Projection/Planner.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Projection/Renderer.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/Projection/Surface.fs",
-      "owner": "provider-projection",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Participant/Provider/SessionLanguage.fs",
-      "owner": "provider-language",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/CanonicalEventCodec.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/CanonicalIntegrator.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING",
-      "pinningProofs": [
-        "requirements/durable-events/tests/canonical-integrator.test.mjs",
-        "requirements/durable-events/tests/event-store-journal-boot.test.mjs",
-        "requirements/durable-convergence/tests/event-store-converge.test.mjs"
-      ]
-    },
-    {
-      "path": "Persistence/EventStore/CodecSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/EventKWayMerge.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/EventStoreHandle.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/EventVocabulary.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/GitObjectDatabase.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/IntegrationKernel.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/MergeSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/Model.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/ProcessEventLog.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/ProcessGitRawStore.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/Store.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/StoreTypes.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/StrengthSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/Surface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/EventStore/WriterStreamSync.fs",
-      "owner": "durable-convergence",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/AgentJournal.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/CodecSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/Envelope.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/EventStoreJournalCodec.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/EventStoreJournalWriter.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/FactCodec.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/FactCodecSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/JournalEventStoreBoot.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/ObligationEnvelopeSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/ObligationJournalSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/ReviewJournalSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/RevisionSurface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/RuntimePath.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/SharedAgentJournal.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/Surface.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Persistence/Journal/Writer.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 6,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/Deadline.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/DeadlineSurface.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/JsSandbox.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/LargeGate.fs",
-      "owner": "output-distillation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/LargeGateSurface.fs",
-      "owner": "output-distillation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/NodeProcessHost.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/NodeProcessWait.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/ProcessOutput.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/ProcessRequest.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/ProcessRunner.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/Pty.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/PtyApi.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/PtyBackend.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/PtySession.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/PtySupervisor.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/PtyTiming.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/PtyTypes.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/Spool.fs",
-      "owner": "process-execution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Process/Surface.fs",
-      "owner": "time-capability",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/Semble/Client.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/Semble/Mcp.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/Semble/SearchCodec.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/Semble/Stdio.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/SembleSurface.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/WarmStart/Prompt.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/WarmStart/Runtime.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Investigation/WarmStartSurface.fs",
-      "owner": "repository-investigation",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Bookkeeper.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/BookkeeperStaging.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/BookkeeperSurface.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Capture.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/FetchSurface.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Index.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/IndexSurface.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Lifecycle.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/LifecycleSurface.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Model.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/OpenCode/Tools.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Replay.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/SessionDraft.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Store.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Surface.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Knowledge/Casebook/Workflow.fs",
-      "owner": "knowledge-reuse",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Anchor.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/AnchorFs.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Capability.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Description.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Failure.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/FilesystemSurface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/GeneratorSurface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/GlobFs.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/MutationFs.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/OpenCode/BookkeeperTool.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/OpenCode/ToolHost.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/OpenCode/ToolWorkflow.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/RuntimeSurface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Surface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/ToolsBindings.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Transaction.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/TransactionStore.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/TransactionSurface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/Utf8Fs.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Repository/Programming/Js/WorkflowSurface.fs",
-      "owner": "repository-programming",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Requirement/Grounding/Catalog.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Requirement/Grounding/Model.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Requirement/Grounding/Surface.fs",
-      "owner": "requirement-grounding",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/EnforcerCatalogResource.fs",
-      "owner": "distribution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/ModelRoutingResource.fs",
-      "owner": "distribution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/PackageMetadata.fs",
-      "owner": "distribution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/PackageResources.fs",
-      "owner": "distribution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/PromptResources.fs",
-      "owner": "cognitive-environment",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/PromptSurface.fs",
-      "owner": "cognitive-environment",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/ProviderProse.fs",
-      "owner": "provider-language",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/ProviderResources.fs",
-      "owner": "provider-language",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Resources/RuntimeResources.fs",
-      "owner": "distribution",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Absorb.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Bayes.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Closure.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Codec.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/DecodePrimitives.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Mcp.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/McpContract.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/McpServer.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Methodology.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/MonteCarlo.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/ObservationCodec.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Policy.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Representation.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/RuntimeTypes.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Search.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Session.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/State.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Surface.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Types.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/Value.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Sphinx/WireEncode.fs",
-      "owner": "epistemic-reasoning",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Budget.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Events.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Frame.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Lifecycle.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/OpenCode/PluginScope.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/OpenCode/Replay.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/OpenCode/Settings.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/OpenCode/Speculate.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Persistence/Durability.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Persistence/DurabilityPort.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Persistence/Store.fs",
-      "owner": "durable-events",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Policy.fs",
-      "owner": "execution-model-routing",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Prediction/BatchCollector.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Prediction/CostModel.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Prediction/Predictor.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Projection/Model.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Replica/Commit.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Replica/Promotion.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Replica/Runtime.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Replica/TraceRecovery.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Replica/Transform.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Rollout.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Runtime.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/Surface.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Strength/TurnEvidence.fs",
-      "owner": "speculative-investigation",
-      "classification": "KEEP",
-      "wave": 5,
-      "status": "PENDING"
-    },
-    {
-      "path": "Verification/EventStoreWriterSurface.fs",
-      "owner": "verification-system",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
-    },
-    {
-      "path": "Verification/TemporalSurface.fs",
-      "owner": "verification-system",
-      "classification": "KEEP",
-      "wave": 7,
-      "status": "PENDING"
+      "publishes": [
+        "OpenCode.HostSignalBootstrap"
+      ],
+      "consumes": [
+        "ModelRouting.Contract",
+        "Session.Quiescence"
+      ],
+      "depends_on": [
+        {
+          "id": "model-routing-capacity",
+          "kind": "contract"
+        },
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/host-signals.test.mjs"
+      ],
+      "architecture_gates": [
+        "composition-root-invariant.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "READY",
+      "result": "CUTOVER"
     }
-  ]
+  ],
+  "debt_face": {
+    "cross_callback_pc_exemptions": {
+      "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed": {
+        "category": "physical",
+        "kind": "quiescence/waiter 类物理能力豁免",
+        "disposition": "owner-local closure 阶段裁决去留"
+      },
+      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs::armed": {
+        "category": "physical",
+        "kind": "quiescence/waiter 类物理能力豁免",
+        "disposition": "owner-local closure 阶段裁决去留"
+      }
+    },
+    "missing_baseline_reconciliation": [
+      {
+        "gate": "provider-prose-ownership",
+        "task": "默认基线文件当前不存在，需在对应 owner closure 时用 gate 的 --generate 模式运行确认当前债务为零并记录"
+      },
+      {
+        "gate": "js-boundary-gate",
+        "task": "默认基线文件当前不存在，需在对应 owner closure 时用 gate 的 --generate 模式运行确认当前债务为零并记录"
+      },
+      {
+        "gate": "provider-leak-gate",
+        "task": "默认基线文件当前不存在，需在对应 owner closure 时用 gate 的 --generate 模式运行确认当前债务为零并记录"
+      }
+    ],
+    "prompt_depth_baseline": {
+      "count": 22,
+      "scale": "11 角色 × 2 语言",
+      "kind": "change-control-baseline",
+      "note": "变更控制基准，非债务，release 不要求归零",
+      "path": "resources/provider/prompt-depth-baseline.json"
+    }
+  },
+  "coverage_backlog": {
+    "CoverageA": [
+      "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
+      "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
+      "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
+      "src/Wanxiangshu/OpenCode/Codec/HostMessageCodec.fs",
+      "src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs",
+      "src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs",
+      "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
+      "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+      "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
+      "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
+      "src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs",
+      "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
+      "src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/Diagnostic.fs",
+      "src/Wanxiangshu/OpenCode/Host/Events.fs",
+      "src/Wanxiangshu/OpenCode/Host/EventsSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/ExplicitResumeSuppression.fs",
+      "src/Wanxiangshu/OpenCode/Host/ExplicitResumeSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/ExplicitSessionResume.fs",
+      "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/GitTree.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostSessionContext.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostSignalSubscribeSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/HostSignalSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs",
+      "src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs",
+      "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs",
+      "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
+      "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs",
+      "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs",
+      "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs",
+      "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs",
+      "src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs",
+      "src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/PluginHost.fs",
+      "src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs",
+      "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
+      "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs",
+      "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+      "src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs",
+      "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
+      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
+      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
+      "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
+      "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+      "src/Wanxiangshu/OpenCode/Host/SessionQuiescenceGate.fs",
+      "src/Wanxiangshu/OpenCode/Host/SessionSnapshotPort.fs",
+      "src/Wanxiangshu/OpenCode/Host/SessionSnapshotSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+      "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs",
+      "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs",
+      "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs",
+      "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs",
+      "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs",
+      "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
+      "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs",
+      "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
+      "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs",
+      "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
+      "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs",
+      "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs",
+      "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs",
+      "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
+      "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
+      "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
+      "src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs",
+      "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
+      "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
+      "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
+      "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
+      "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs",
+      "src/Wanxiangshu/OpenCode/Tools/PtyTool.fs",
+      "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs",
+      "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
+    ],
+    "CoverageB": [
+      "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+      "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+      "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+      "src/Wanxiangshu/Interaction/Attention/Surface.fs",
+      "src/Wanxiangshu/Interaction/Authority/Child.fs",
+      "src/Wanxiangshu/Interaction/Authority/Fact.fs",
+      "src/Wanxiangshu/Interaction/Authority/Facts.fs",
+      "src/Wanxiangshu/Interaction/Authority/Fold.fs",
+      "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
+      "src/Wanxiangshu/Interaction/Authority/Model.fs",
+      "src/Wanxiangshu/Interaction/Authority/Run.fs",
+      "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+      "src/Wanxiangshu/Interaction/Authority/Surface.fs",
+      "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+      "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+      "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+      "src/Wanxiangshu/Interaction/Concern/Surface.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/AssistancePrompt.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpEventCodec.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSurface.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
+      "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
+      "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
+      "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+      "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
+      "src/Wanxiangshu/Interaction/Repair/Port.fs"
+    ],
+    "CoverageC": [
+      "src/Wanxiangshu/Mission/Finality/Blessing.fs",
+      "src/Wanxiangshu/Mission/Finality/Cohort.fs",
+      "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
+      "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
+      "src/Wanxiangshu/Mission/Finality/Ports.fs",
+      "src/Wanxiangshu/Mission/Finality/Prompt.fs",
+      "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
+      "src/Wanxiangshu/Mission/Finality/Record.fs",
+      "src/Wanxiangshu/Mission/Finality/Revision.fs",
+      "src/Wanxiangshu/Mission/Finality/Types.fs",
+      "src/Wanxiangshu/Mission/Finality/Workflow.fs",
+      "src/Wanxiangshu/Mission/Manager/Background.fs",
+      "src/Wanxiangshu/Mission/Manager/Finality.fs",
+      "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+      "src/Wanxiangshu/Mission/Manager/Idle.fs",
+      "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
+      "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
+      "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
+      "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
+      "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+      "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
+      "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
+      "src/Wanxiangshu/Mission/Manager/Narrative.fs",
+      "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
+      "src/Wanxiangshu/Mission/Manager/Workflow.fs",
+      "src/Wanxiangshu/Mission/Obligation/LedgerWorkflow.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/Admission.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/After.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+      "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs",
+      "src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs",
+      "src/Wanxiangshu/Mission/Review/Fact.fs",
+      "src/Wanxiangshu/Mission/Review/Facts.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+      "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
+      "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
+      "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+      "src/Wanxiangshu/Mission/Review/Ports.fs",
+      "src/Wanxiangshu/Mission/Review/Prompt.fs",
+      "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+      "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
+      "src/Wanxiangshu/Mission/Review/TodoProcess.fs",
+      "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
+      "src/Wanxiangshu/Mission/WorkRecord/Model.fs",
+      "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
+      "src/Wanxiangshu/Mission/WorkRecord/Surface.fs"
+    ],
+    "CoverageD": [
+      "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
+      "src/Wanxiangshu/Composition/Turn/Binding.fs",
+      "src/Wanxiangshu/Composition/Turn/Observation.fs",
+      "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+      "src/Wanxiangshu/Composition/Turn/Program.fs",
+      "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
+      "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
+      "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
+      "src/Wanxiangshu/Execution/Agent/Errors.fs",
+      "src/Wanxiangshu/Execution/Agent/Program.fs",
+      "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
+      "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateLedger.fs",
+      "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
+      "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/DelegationFactFold.fs",
+      "src/Wanxiangshu/Execution/Delegation/ExecutionFactFold.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fact.fs",
+      "src/Wanxiangshu/Execution/Delegation/Facts.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/ChildRun.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/ChildRunProjection.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/LifecycleSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Model.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
+      "src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/JoinDrain.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+      "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
+      "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
+      "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/HostTurnObservedSurface.fs",
+      "src/Wanxiangshu/Execution/Delegation/Join.fs",
+      "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
+      "src/Wanxiangshu/Execution/Delegation/OpenCode/DelegatedToolEstimate.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
+      "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
+      "src/Wanxiangshu/Execution/Fission/Admission.fs",
+      "src/Wanxiangshu/Execution/Fission/Fact.fs",
+      "src/Wanxiangshu/Execution/Fission/Facts.fs",
+      "src/Wanxiangshu/Execution/Fission/Fold.fs",
+      "src/Wanxiangshu/Execution/Fission/Model.fs",
+      "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+      "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+      "src/Wanxiangshu/Execution/Fission/Projection.fs",
+      "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+      "src/Wanxiangshu/Execution/Fission/Surface.fs",
+      "src/Wanxiangshu/Execution/Session/AgentCompletion.fs",
+      "src/Wanxiangshu/Execution/Session/Association.fs",
+      "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
+      "src/Wanxiangshu/Execution/Session/LoopDetector.fs",
+      "src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs",
+      "src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs",
+      "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs",
+      "src/Wanxiangshu/Execution/Session/Ownership.fs",
+      "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+      "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
+      "src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs",
+      "src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs"
+    ],
+    "CoverageE": [
+      "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Projection.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Request.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Abandon.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
+      "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Builder.fs",
+      "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+      "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Errors.fs",
+      "src/Wanxiangshu/Context/Companion/Fact.fs",
+      "src/Wanxiangshu/Context/Companion/Facts.fs",
+      "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Host.fs",
+      "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+      "src/Wanxiangshu/Context/Companion/Identity.fs",
+      "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+      "src/Wanxiangshu/Context/Companion/Model.fs",
+      "src/Wanxiangshu/Context/Companion/Program.fs",
+      "src/Wanxiangshu/Context/Companion/Projection.fs",
+      "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Prompt.fs",
+      "src/Wanxiangshu/Context/Companion/Runtime.fs",
+      "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
+      "src/Wanxiangshu/Context/Companion/Transform.fs",
+      "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+      "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+      "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+      "src/Wanxiangshu/Context/Prefix/Projection.fs",
+      "src/Wanxiangshu/Context/Prefix/Surface.fs",
+      "src/Wanxiangshu/Context/Prefix/Wire.fs",
+      "src/Wanxiangshu/Context/Prefix/XWireSurface.fs",
+      "src/Wanxiangshu/Context/Trace/Capture.fs",
+      "src/Wanxiangshu/Context/Trace/Cursor.fs",
+      "src/Wanxiangshu/Context/Trace/Materialization.fs",
+      "src/Wanxiangshu/Context/Trace/Model.fs",
+      "src/Wanxiangshu/Context/Trace/Projection.fs",
+      "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+      "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
+      "src/Wanxiangshu/Context/Trace/XTraceSurface.fs",
+      "src/Wanxiangshu/Enforcer/BlogSurface.fs",
+      "src/Wanxiangshu/Enforcer/Catalog.fs",
+      "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",
+      "src/Wanxiangshu/Enforcer/Codec.fs",
+      "src/Wanxiangshu/Enforcer/Continuation.fs",
+      "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs",
+      "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
+      "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
+      "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
+      "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
+      "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
+      "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs",
+      "src/Wanxiangshu/Enforcer/Guidance/Tip.fs",
+      "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs",
+      "src/Wanxiangshu/Enforcer/Host.fs",
+      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
+      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
+      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
+      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+      "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
+      "src/Wanxiangshu/Enforcer/Observation.fs",
+      "src/Wanxiangshu/Enforcer/ObservationCollector.fs",
+      "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
+      "src/Wanxiangshu/Enforcer/Projection.fs",
+      "src/Wanxiangshu/Enforcer/Repair.fs",
+      "src/Wanxiangshu/Enforcer/RepairSurface.fs",
+      "src/Wanxiangshu/Enforcer/Rulebook.fs",
+      "src/Wanxiangshu/Enforcer/Surface.fs",
+      "src/Wanxiangshu/Participant/Persona/Catalog.fs",
+      "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
+      "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
+      "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
+      "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
+      "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
+      "src/Wanxiangshu/Participant/Persona/Surface.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+      "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",
+      "src/Wanxiangshu/Participant/Provider/Language.fs",
+      "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+      "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
+      "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
+      "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
+      "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
+      "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
+      "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+      "src/Wanxiangshu/Strength/Budget.fs",
+      "src/Wanxiangshu/Strength/Events.fs",
+      "src/Wanxiangshu/Strength/Frame.fs",
+      "src/Wanxiangshu/Strength/Lifecycle.fs",
+      "src/Wanxiangshu/Strength/OpenCode/PluginScope.fs",
+      "src/Wanxiangshu/Strength/OpenCode/Replay.fs",
+      "src/Wanxiangshu/Strength/OpenCode/Settings.fs",
+      "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+      "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
+      "src/Wanxiangshu/Strength/Prediction/CostModel.fs",
+      "src/Wanxiangshu/Strength/Prediction/Predictor.fs",
+      "src/Wanxiangshu/Strength/Projection/Model.fs",
+      "src/Wanxiangshu/Strength/Replica/Commit.fs",
+      "src/Wanxiangshu/Strength/Replica/Promotion.fs",
+      "src/Wanxiangshu/Strength/Replica/Runtime.fs",
+      "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
+      "src/Wanxiangshu/Strength/Replica/Transform.fs",
+      "src/Wanxiangshu/Strength/Rollout.fs",
+      "src/Wanxiangshu/Strength/Runtime.fs",
+      "src/Wanxiangshu/Strength/Surface.fs",
+      "src/Wanxiangshu/Strength/TurnEvidence.fs"
+    ],
+    "CoverageF": [
+      "src/Wanxiangshu/Change/Fact.fs",
+      "src/Wanxiangshu/Change/Facts.fs",
+      "src/Wanxiangshu/Change/Fold.fs",
+      "src/Wanxiangshu/Change/Host/GitAdapter.fs",
+      "src/Wanxiangshu/Change/Host/Host.fs",
+      "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
+      "src/Wanxiangshu/Change/Host/SessionDirectories.fs",
+      "src/Wanxiangshu/Change/Host/Surface.fs",
+      "src/Wanxiangshu/Change/Host/Types.fs",
+      "src/Wanxiangshu/Change/Host/WorktreeCleanup.fs",
+      "src/Wanxiangshu/Change/Job.fs",
+      "src/Wanxiangshu/Change/Program.fs",
+      "src/Wanxiangshu/Change/Projection.fs",
+      "src/Wanxiangshu/Change/Prompts.fs",
+      "src/Wanxiangshu/Change/Recovery.fs",
+      "src/Wanxiangshu/Change/Runtime.fs",
+      "src/Wanxiangshu/Change/Surface.fs",
+      "src/Wanxiangshu/Change/Types.fs",
+      "src/Wanxiangshu/Git/Gateway.fs",
+      "src/Wanxiangshu/Git/Hook/Dispatcher.fs",
+      "src/Wanxiangshu/Git/Hook/Surface.fs",
+      "src/Wanxiangshu/Git/Hook/Sync.fs",
+      "src/Wanxiangshu/Git/IntegrationGate.fs",
+      "src/Wanxiangshu/Git/Operations.fs",
+      "src/Wanxiangshu/Git/Subject.fs",
+      "src/Wanxiangshu/Git/WorktreeResource.fs",
+      "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs",
+      "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs",
+      "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
+      "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
+      "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
+      "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+      "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs"
+    ],
+    "CoverageG": [
+      "src/Wanxiangshu/AssemblyInfo.fs",
+      "src/Wanxiangshu/FableBarrier.fs",
+      "src/Wanxiangshu/Foundation/AsyncSupport.fs",
+      "src/Wanxiangshu/Foundation/FatalProcess.fs",
+      "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
+      "src/Wanxiangshu/Foundation/Identity.fs",
+      "src/Wanxiangshu/Foundation/LlmFacing.fs",
+      "src/Wanxiangshu/Foundation/McpLaunch.fs",
+      "src/Wanxiangshu/Foundation/Outcome.fs",
+      "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
+      "src/Wanxiangshu/Foundation/Parallel.fs",
+      "src/Wanxiangshu/Foundation/ParallelSurface.fs",
+      "src/Wanxiangshu/Foundation/Roles.fs",
+      "src/Wanxiangshu/Foundation/RolesSurface.fs",
+      "src/Wanxiangshu/Foundation/SyntheticToml.fs",
+      "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
+      "src/Wanxiangshu/Foundation/TaskResult.fs",
+      "src/Wanxiangshu/Foundation/Temporal.fs",
+      "src/Wanxiangshu/Host/CompactionPolicy.fs",
+      "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
+      "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
+      "src/Wanxiangshu/Host/Digest.fs",
+      "src/Wanxiangshu/Host/Fact.fs",
+      "src/Wanxiangshu/Host/Facts.fs",
+      "src/Wanxiangshu/Process/Deadline.fs",
+      "src/Wanxiangshu/Process/DeadlineSurface.fs",
+      "src/Wanxiangshu/Process/JsSandbox.fs",
+      "src/Wanxiangshu/Process/LargeGate.fs",
+      "src/Wanxiangshu/Process/LargeGateSurface.fs",
+      "src/Wanxiangshu/Process/NodeProcessHost.fs",
+      "src/Wanxiangshu/Process/NodeProcessWait.fs",
+      "src/Wanxiangshu/Process/ProcessOutput.fs",
+      "src/Wanxiangshu/Process/ProcessRequest.fs",
+      "src/Wanxiangshu/Process/ProcessRunner.fs",
+      "src/Wanxiangshu/Process/Pty.fs",
+      "src/Wanxiangshu/Process/PtyApi.fs",
+      "src/Wanxiangshu/Process/PtyBackend.fs",
+      "src/Wanxiangshu/Process/PtySession.fs",
+      "src/Wanxiangshu/Process/PtySupervisor.fs",
+      "src/Wanxiangshu/Process/PtyTiming.fs",
+      "src/Wanxiangshu/Process/PtyTypes.fs",
+      "src/Wanxiangshu/Process/Spool.fs",
+      "src/Wanxiangshu/Process/Surface.fs",
+      "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
+      "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
+      "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
+      "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
+      "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
+      "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
+      "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+      "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperStaging.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Capture.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Model.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Replay.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs",
+      "src/Wanxiangshu/Repository/Knowledge/Casebook/Workflow.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Anchor.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/AnchorFs.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Capability.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Description.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Failure.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/FilesystemSurface.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/GlobFs.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Surface.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Transaction.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/Utf8Fs.fs",
+      "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs",
+      "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
+      "src/Wanxiangshu/Requirement/Grounding/Model.fs",
+      "src/Wanxiangshu/Requirement/Grounding/Surface.fs",
+      "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
+      "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
+      "src/Wanxiangshu/Resources/PackageMetadata.fs",
+      "src/Wanxiangshu/Resources/PackageResources.fs",
+      "src/Wanxiangshu/Resources/PromptResources.fs",
+      "src/Wanxiangshu/Resources/PromptSurface.fs",
+      "src/Wanxiangshu/Resources/ProviderProse.fs",
+      "src/Wanxiangshu/Resources/ProviderResources.fs",
+      "src/Wanxiangshu/Resources/RuntimeResources.fs",
+      "src/Wanxiangshu/Sphinx/Absorb.fs",
+      "src/Wanxiangshu/Sphinx/Bayes.fs",
+      "src/Wanxiangshu/Sphinx/Closure.fs",
+      "src/Wanxiangshu/Sphinx/Codec.fs",
+      "src/Wanxiangshu/Sphinx/DecodePrimitives.fs",
+      "src/Wanxiangshu/Sphinx/Mcp.fs",
+      "src/Wanxiangshu/Sphinx/McpContract.fs",
+      "src/Wanxiangshu/Sphinx/McpServer.fs",
+      "src/Wanxiangshu/Sphinx/Methodology.fs",
+      "src/Wanxiangshu/Sphinx/MonteCarlo.fs",
+      "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
+      "src/Wanxiangshu/Sphinx/Policy.fs",
+      "src/Wanxiangshu/Sphinx/Representation.fs",
+      "src/Wanxiangshu/Sphinx/RuntimeTypes.fs",
+      "src/Wanxiangshu/Sphinx/Search.fs",
+      "src/Wanxiangshu/Sphinx/Session.fs",
+      "src/Wanxiangshu/Sphinx/State.fs",
+      "src/Wanxiangshu/Sphinx/Surface.fs",
+      "src/Wanxiangshu/Sphinx/Types.fs",
+      "src/Wanxiangshu/Sphinx/Value.fs",
+      "src/Wanxiangshu/Sphinx/WireEncode.fs",
+      "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs",
+      "src/Wanxiangshu/Verification/TemporalSurface.fs"
+    ]
+  }
 }

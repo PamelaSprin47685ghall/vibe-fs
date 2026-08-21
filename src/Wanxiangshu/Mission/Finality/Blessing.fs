@@ -59,20 +59,32 @@ module BlessingWorkflow =
                 Map.empty)
             logs
 
-    let private treeUnchanged (treePort: FinalityTreePort) (managerSessionId: SessionId) (expected: GitTreeHash) =
-        match treePort.ReadManagerTree managerSessionId with
-        | Error error -> Error("Manager tree read failed: " + error)
-        | Ok current when current = expected -> Ok()
-        | Ok _ -> Error "Manager tree changed during Finality blessing"
+    let private checkAdmission
+        (treePort: FinalityTreePort)
+        (managerSessionId: SessionId)
+        (witness: ConfirmedReviewWitness)
+        : Result<BlessingPermit, string> =
+        treePort.ReadManagerTree managerSessionId
+        |> Result.mapError (fun error -> "Manager tree read failed: " + error)
+        |> Result.bind (fun currentTree ->
+            FinalityAdmission.grantBlessing currentTree witness
+            |> Result.mapError (function
+                | BlessingAdmissionFailure.StaleWitness(curr, expected) ->
+                    sprintf
+                        "Stale witness: current tree %s <> witness tree %s"
+                        (GitTreeHash.value curr)
+                        (GitTreeHash.value expected)
+                | BlessingAdmissionFailure.IncompleteCohort reason -> "Incomplete cohort: " + reason))
 
     let private prepareBlessing
         (treePort: FinalityTreePort)
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (members: EnlistedMember list)
-        (requestTree: GitTreeHash)
+        (witness: ConfirmedReviewWitness)
         =
         taskResult {
+            let! permit = checkAdmission treePort managerSessionId witness
             let! orderedRecords = RecordWorkflow.awaitCanonicalCohortRecords journal members
 
             let! orderedRecords =
@@ -81,7 +93,7 @@ module BlessingWorkflow =
                 else
                     Error "Finality cohort record count changed"
 
-            do! treeUnchanged treePort managerSessionId requestTree
+            let! permit = checkAdmission treePort managerSessionId witness
 
             let logs =
                 orderedRecords
@@ -89,35 +101,25 @@ module BlessingWorkflow =
 
             let material = logs |> List.map snd |> String.concat "\n\n"
             let! blob = journal.WriteBlob material
-            return logs, blob
+            return logs, blob, permit
         }
 
-    let private prepareBlessingIfTreeStable
-        (treePort: FinalityTreePort)
-        (journal: AgentJournal)
-        (managerSessionId: SessionId)
-        (members: EnlistedMember list)
-        (requestTree: GitTreeHash)
-        =
-        taskResult {
-            do! treeUnchanged treePort managerSessionId requestTree
-            return! prepareBlessing treePort journal managerSessionId members requestTree
-        }
-
-    let blessIfTreeUnchanged
+    let blessIfAdmitted
         (reviewerPort: FinalityReviewerPort)
         (treePort: FinalityTreePort)
         (journal: AgentJournal)
         (managerSessionId: SessionId)
-        (lifeId: ManagerLifeId)
-        (requestId: FinalityRequestId)
+        (witness: ConfirmedReviewWitness)
         (members: EnlistedMember list)
-        (requestTree: GitTreeHash)
         : Task<FinalityOutcome> =
         task {
-            match! prepareBlessingIfTreeStable treePort journal managerSessionId members requestTree with
+            match! prepareBlessing treePort journal managerSessionId members witness with
             | Error error -> return raise (InvalidOperationException("Finality blessing preparation failed: " + error))
-            | Ok(logs, blob) ->
+            | Ok(logs, blob, permit) ->
+                let lifeId = FinalityAdmission.permitLifeId permit
+                let requestId = FinalityAdmission.permitRequestId permit
+                let requestTree = FinalityAdmission.permitTree permit
+
                 do!
                     FinalityJournal.appendLifecycle
                         journal
@@ -133,3 +135,29 @@ module BlessingWorkflow =
 
                 return FinalityOutcome.Blessed(blessedPrompt managerSessionId logs)
         }
+
+    let blessIfTreeUnchanged
+        (reviewerPort: FinalityReviewerPort)
+        (treePort: FinalityTreePort)
+        (journal: AgentJournal)
+        (managerSessionId: SessionId)
+        (lifeId: ManagerLifeId)
+        (requestId: FinalityRequestId)
+        (members: EnlistedMember list)
+        (requestTree: GitTreeHash)
+        : Task<FinalityOutcome> =
+        let memberWitnesses =
+            members
+            |> List.map (fun m ->
+                let witness =
+                    AgentProjection.tryFind m.ReviewerSessionId (AgentJournal.snapshot journal).AgentProjections
+                    |> Option.bind (fun s -> s.ReviewGuard)
+                    |> Option.map (fun g -> g.Witness)
+                    |> Option.defaultValue ReviewWitness.NoReview
+
+                (m.ReviewerSessionId, m.BarrierId, witness))
+
+        match ConfirmedReviewWitness.create lifeId requestId requestTree memberWitnesses with
+        | Error error ->
+            raise (InvalidOperationException("Finality confirmed review witness projection failed: " + error))
+        | Ok witness -> blessIfAdmitted reviewerPort treePort journal managerSessionId witness members

@@ -1603,6 +1603,7 @@ export const SURFACE_CONSUMERS = {
   'Execution/Delegation/Handle/Surface.js': ['context-compression', 'crash-reconciliation', 'delegation', 'effect-accounting'],
   'Execution/Delegation/SyncDelegate/Surface.js': ['knowledge-reuse', 'prefix-stability'],
   'Execution/Session/AssociationSurface.js': ['session-ontology'],
+  'Execution/Session/Recovery/Surface.js': ['managed-session-lifecycle'],
   'Execution/Session/Wait/Surface.js': ['time-capability'],
   'Foundation/RolesSurface.js': ['capability-enforcement', 'cognitive-environment', 'repository-programming'],
   'Git/Hook/Surface.js': ['durable-convergence'],
