@@ -637,8 +637,7 @@ type AssistanceHost
         requestingAgent
         =
         match AssistanceDecision.decide profile requestingAgent with
-        | AssistanceDecision.RejectOrUnresolved ->
-            Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
+        | AssistanceDecision.RejectOrUnresolved -> Task.FromResult AssistanceTurnDisposition.ClaimedButUnresolved
         | AssistanceDecision.EscalateFast(p, role) ->
             // AgentTier.Fast
             escalateFastOwnerRequest context assistanceClaim turn p role

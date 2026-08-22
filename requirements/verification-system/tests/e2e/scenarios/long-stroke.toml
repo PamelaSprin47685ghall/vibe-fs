@@ -631,8 +631,9 @@ tools = ["glob", "grep", "read", "judge"]
   [[turn.step]]
   respond = { type = "tool-call", tool = "judge", args = { verdict = "PERFECT" } }
 
-  # First adversity request terminates here after REVISE. The causal binder changes
-  # this step to the second PERFECT judge for every later request.
+  # First adversity request terminates at step 0 after REVISE, so this step is never
+  # consumed by that request. The causal binder changes it to the second PERFECT judge
+  # for every later request.
   [[turn.step]]
   respond = { type = "text", text = "Reviewer submitted the revision verdict." }
 

@@ -66,3 +66,18 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_K2_allows_request_2_then_aborts_before_req
   assert.equal(retired.batches.length, 2)
   assert.deepEqual(retired.aborted, ['replica-k2'])
 })
+
+test('WHAT[SPEC-INV-003] STRENGTH_003_speculation_completion_is_aligned_to_provider_step_boundary_without_wall_clock_inference', async () => {
+  const runtime = registered('replica-step-bound', 'K1')
+  const output = {
+    messages: [
+      user('u1', 'replica-step-bound', [hostText('Continue.')]),
+      assistant('a1', 'replica-step-bound', [hostResult('c1', 'read', { filePath: 'src/file.fs' }, 'content')]),
+    ]
+  }
+  const outcome = await apply(runtime, output)
+  assert.equal(outcome.kind, 'Retired')
+  assert.equal(outcome.reason, 'provider-request-budget-reached')
+  assert.equal(outcome.batches.length, 1)
+  assert.deepEqual(outcome.aborted, ['replica-step-bound'])
+})

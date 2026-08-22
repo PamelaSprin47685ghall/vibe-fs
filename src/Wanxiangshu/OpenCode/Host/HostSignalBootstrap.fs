@@ -398,7 +398,11 @@ module HostSignalBootstrap =
 
             let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =
                 task {
-                    let tryPendingClaim (j: AgentJournal option) (sid: SessionId) (key: PromptKey) : PromptAuthority.PromptClaim option =
+                    let tryPendingClaim
+                        (j: AgentJournal option)
+                        (sid: SessionId)
+                        (key: PromptKey)
+                        : PromptAuthority.PromptClaim option =
                         j
                         |> Option.bind (fun durable -> (PromptDispatcher.forJournal durable).PendingClaim(sid, key))
 

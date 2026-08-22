@@ -255,7 +255,9 @@ module ManagerLifeWorkflow =
                 | Ok() ->
                     do! captureLastWordsIfPresent journal sessionId lastWords providerRun blob
 
-                    let authorityRoot = PhysicalUserMessageId.promoteToAuthorityRoot life.OpeningUserMessageId
+                    let authorityRoot =
+                        PhysicalUserMessageId.promoteToAuthorityRoot life.OpeningUserMessageId
+
                     return Ok(BlessedLifeCompletion.Completed authorityRoot)
         }
 

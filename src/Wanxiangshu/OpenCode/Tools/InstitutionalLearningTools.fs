@@ -141,7 +141,8 @@ module InstitutionalLearningTools =
             | _ -> return instructionResult language Path.DurableUnavailable Map.empty
         }
 
-    let admission: ToolAdmission = fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
+    let admission: ToolAdmission =
+        fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
 
     let specs factory journal =
         let language = ProviderLanguageBinding.readGlobalPreference ()

@@ -231,39 +231,30 @@ module ProjectionRenderer =
           HostMessageIds = headId :: List.skip drop acc.HostMessageIds
           HostIsPhysical = headPhysical :: List.skip drop acc.HostIsPhysical }
 
-    let private suppressTransport (budget: int) (acc: RenderedMessages) : RenderedMessages =
-        let rec loop
-            (remaining: (ProviderProjection.WireMessage * string option * bool) list)
-            (toDrop: int)
-            (accMsgs: ProviderProjection.WireMessage list)
-            (accIds: string option list)
-            (accPhys: bool list)
-            =
-            match remaining, toDrop with
-            | [], _ ->
-                { Messages = List.rev accMsgs
-                  HostMessageIds = List.rev accIds
-                  HostIsPhysical = List.rev accPhys }
-            | _, 0 ->
-                let restMsgs, restIds, restPhys =
-                    remaining
-                    |> List.fold (fun (ms, is, ps) (m, i, p) -> m :: ms, i :: is, p :: ps) ([], [], [])
-
-                { Messages = List.rev accMsgs @ List.rev restMsgs
-                  HostMessageIds = List.rev accIds @ List.rev restIds
-                  HostIsPhysical = List.rev accPhys @ List.rev restPhys }
-            | (msg, _, _) :: tail, n when msg.Role = "assistant" -> loop tail (n - 1) accMsgs accIds accPhys
-            | (msg, id, phys) :: tail, n -> loop tail n (msg :: accMsgs) (id :: accIds) (phys :: accPhys)
-
-        List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
-        |> fun zipped -> loop zipped budget [] [] []
-
-    /// Suppress：与 wire 同步裁剪侧信道（按同样 assistant 丢弃规则）。
+    /// Suppress only where the renderer actually carries a matching stable Host
+    /// identity. The old implementation converted `Set.count TransportMessages`
+    /// into "drop N assistant rows", which could delete unrelated semantics and
+    /// could not possibly implement an ID-addressed contract.
     let private applySuppressWithIds (snapshot: ProjectionSnapshot) (acc: RenderedMessages) : RenderedMessages =
         if Set.isEmpty snapshot.TransportMessages then
             acc
         else
-            suppressTransport (Set.count snapshot.TransportMessages) acc
+            List.zip3 acc.Messages acc.HostMessageIds acc.HostIsPhysical
+            |> List.filter (fun (_, hostId, _) ->
+                hostId
+                |> Option.forall (fun messageId -> not (Set.contains messageId snapshot.TransportMessages)))
+            |> List.fold
+                (fun state (message, hostId, isPhysical) ->
+                    { Messages = message :: state.Messages
+                      HostMessageIds = hostId :: state.HostMessageIds
+                      HostIsPhysical = isPhysical :: state.HostIsPhysical })
+                { Messages = []
+                  HostMessageIds = []
+                  HostIsPhysical = [] }
+            |> fun reversed ->
+                { Messages = List.rev reversed.Messages
+                  HostMessageIds = List.rev reversed.HostMessageIds
+                  HostIsPhysical = List.rev reversed.HostIsPhysical }
 
     /// STRENGTH-009: replace base messages with frozen owner wire messages.
     /// Host identity/physical channels reset — mirror bytes are not Host-owned.

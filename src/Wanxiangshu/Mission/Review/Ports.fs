@@ -47,6 +47,15 @@ type ReviewJudgementChannel =
     { AwaitJudgement: unit -> Task<Result<ReviewJudgementDelivery, string>>
       Dispose: unit -> unit }
 
+/// One physical review occasion whose Host terminal is being awaited.
+/// Reviewer sessions are intentionally reusable, so a session id alone cannot
+/// authorize an Abort as the clean terminal of whichever barrier happens to be
+/// current later. The barrier identity travels with the physical wait.
+[<Struct>]
+type ReviewerTerminalOccasion =
+    { ReviewerSessionId: SessionId
+      BarrierId: ReviewBarrierId }
+
 type ReviewHostPort =
     { StartReview: unit -> Task<Result<unit, string>>
       AwaitJudgement: unit -> Task<Result<ReviewJudgementDelivery, string>>

@@ -978,6 +978,7 @@
       "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
       "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
       "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+      "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
       "src/Wanxiangshu/Mission/Review/Ports.fs",
       "src/Wanxiangshu/Mission/Review/Prompt.fs",
       "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",

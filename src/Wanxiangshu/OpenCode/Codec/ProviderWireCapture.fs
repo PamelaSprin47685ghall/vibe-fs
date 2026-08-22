@@ -165,6 +165,16 @@ module ProviderWireCapture =
             | _ -> None)
         |> List.tryLast
 
+    /// Host semantic-turn coordinate of one physical message in the same decoded
+    /// message universe used by XTrace capture. Unlike a raw array index, rows the
+    /// codec cannot decode do not shift this coordinate.
+    let trySemanticTurnOfHostMessageId (messageId: string) (rawMessages: obj list) : int option =
+        rawMessages
+        |> List.choose (fun raw ->
+            decodeCapturedMessage raw
+            |> Option.map (fun _ -> ProviderWireDecode.hostMessageId raw))
+        |> List.tryFindIndex (fun hostId -> hostId = Some messageId)
+
     /// Execution binding follows the latest physical user turn, not the most recent
     /// PromptKey anywhere in history. If the latest user turn is external/keyless,
     /// an older plugin PromptKey must not leak into the new provider attempt.

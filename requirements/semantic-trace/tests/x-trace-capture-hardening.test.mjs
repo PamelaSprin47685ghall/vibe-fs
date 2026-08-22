@@ -7,9 +7,10 @@
 
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { resolve } from 'node:path'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as xTrace from '../../../dist/Context/Trace/XTraceSurface.js'
 
@@ -27,6 +28,22 @@ const withJournal = async (fn) => {
 
 const SEM = 'ses_cap'
 const parts = (projection) => xTrace.parts(projection)
+
+test('WHAT[SEMANTIC-TRACE-002] ProviderRetryAttempt_is_transport_control_not_durable_X_semantics', () => {
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Trace/XTracePipeline.fs'),
+    'utf8',
+  )
+
+  assert.match(source, /PromptAuthority\.ProviderRetryAttempt/)
+  assert.match(source, /ProviderWireDecode\.promptOriginOfMessage/)
+  assert.match(source, /if isProviderRetryAttempt rawMessage then[\s\S]*?\{ message with Parts = \[\] \}[\s\S]*?else/)
+  assert.match(
+    source,
+    /tryStableHostMessageIds[\s\S]{0,500}ProviderWireCapture\.decodeCapturedMessage/,
+    'stable identity and semantic capture must enumerate the same decodable Host message universe',
+  )
+})
 
 test('WHAT[SEMANTIC-TRACE-007] COMPANION_007_capture_projection_is_idempotent_across_transforms', async () => {
   await withJournal(async (handle) => {

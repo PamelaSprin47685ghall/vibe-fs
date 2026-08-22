@@ -5,6 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.OpenCode
+
 /// DSL-state-combination: domain — this is a single reconciled provider-turn
 /// observation; optional metadata fields preserve evidence absence and never
 /// encode a next-step cursor.

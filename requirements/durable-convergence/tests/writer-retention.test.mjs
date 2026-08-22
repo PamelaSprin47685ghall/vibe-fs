@@ -116,7 +116,10 @@ test('WHAT[DURABLE-CONVERGENCE-011] durable Journal ObservedAt outranks refreshe
 
 test('WHAT[DURABLE-CONVERGENCE-011] 24h expiry removes local writer and remote materialization', async () => {
   await withRepo(async (repo, commonDir) => {
-    const now = Date.parse('2026-08-21T00:00:00Z')
+    // EventStore boot deliberately applies retention against its physical current
+    // time. Keep this proof relative to the same captured instant instead of
+    // freezing a calendar date that eventually makes the "fresh" writer expire.
+    const now = Date.now()
     const oldPath = await writeEvent(commonDir, 'writer-old', make(A, 'retention/old'))
     const freshPath = await writeEvent(commonDir, 'writer-fresh', make(B, 'retention/fresh', [A]))
     utimesSync(oldPath, (now - 2 * DAY) / 1000, (now - 2 * DAY) / 1000)

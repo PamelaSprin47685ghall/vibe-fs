@@ -46,14 +46,14 @@ test('WHAT[CRASH-013] MISC_recovery_authorize_aggregates_blocks_waits_ready', ()
   const ready = recovery.authorize('root1', 9, [{ session: 'child1', state: 'Recovered' }])
   assert.equal(ready.state, 'FamilyReady')
   assert.equal(ready.root, 'root1')
-  assert.equal(ready.sequence, 9n)
+  assert.equal(ready.sequence, 9)
   assert.deepEqual(ready.members, [])
 })
 
 test('WHAT[CRASH-002] MISC_recovery_receipt_accessors_and_nonempty_helpers', () => {
   assert.deepEqual(recovery.receiptView('s1', 42), {
     session: 's1',
-    sequence: 42n,
+    sequence: 42,
     snapshotDigest: null,
     resolvedClaims: [],
     restoredHandles: [],

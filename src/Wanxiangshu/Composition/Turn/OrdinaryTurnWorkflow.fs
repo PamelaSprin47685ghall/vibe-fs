@@ -203,8 +203,7 @@ module OrdinaryTurnWorkflow =
             // not completable, then ask for the missing report. Still not fallback.
             // (The XTrace parts are captured at the transform boundary.)
             InteractionRepairWorkflow.repairMissingFinalReport quiescence context sessionPort eventPort journal
-        | ReconcileProgram.TurnAborted reason ->
-            handleAborted eventPort abortCause turn reason
+        | ReconcileProgram.TurnAborted reason -> handleAborted eventPort abortCause turn reason
         | ReconcileProgram.TurnFailed error ->
             ProviderRecoveryWorkflow.continueAfterConfirmedFailure
                 sessionPort
@@ -216,14 +215,7 @@ module OrdinaryTurnWorkflow =
                 error
                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
         | ReconcileProgram.TurnCompleted ->
-            handleCompleted
-                sessionPort
-                eventPort
-                journal
-                joinGuardNudges
-                hasLivePty
-                turn
-                completeAgent
+            handleCompleted sessionPort eventPort journal joinGuardNudges hasLivePty turn completeAgent
 
     let observe
         (sessionPort: ISessionHostPort)

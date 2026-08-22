@@ -65,3 +65,38 @@ test('WHAT[SPEC-INV-002] STRENGTH_002_010_policy_is_fail_closed_and_only_treats_
   assert.equal(Strength.policyDecide(base, true, false, prediction, values, config).kind, 'ControlHoldout')
   assert.equal(Strength.policyDecide(base, false, true, prediction, values, config).kind, 'Skip')
 })
+
+test('WHAT[SPEC-INV-010] STRENGTH_010_prediction_budget_derivation_is_monotonic_under_single_policy_formula', () => {
+  // Single formula owner StrengthPolicy.decideFromFacts
+  // 1. Non-positive value estimate -> budget K0 (Skip)
+  const lowV1 = { V0: 0, V1: 0.5, V2: 1.0 }
+  const decLow = Strength.policyDecide(base, false, false, prediction, lowV1, config)
+  assert.equal(decLow.kind, 'Skip')
+  assert.equal(decLow.budget, 'K0')
+
+  // 2. V1 > K1Margin, but V2 not high enough -> budget K1 (Speculate K1)
+  const medV = { V0: 0, V1: 3.0, V2: 4.0 }
+  const decMed = Strength.policyDecide(base, false, false, prediction, medV, config)
+  assert.equal(decMed.kind, 'Speculate')
+  assert.equal(decMed.budget, 'K1')
+
+  // 3. V1 > K1Margin and V2 > V1 + K2Margin with enough evidence -> budget K2 (Speculate K2)
+  const highV = { V0: 0, V1: 3.0, V2: 6.0 }
+  const decHigh = Strength.policyDecide(base, false, false, prediction, highV, config)
+  assert.equal(decHigh.kind, 'Speculate')
+  assert.equal(decHigh.budget, 'K2')
+
+  // 4. Monotonicity: K2 condition cannot activate if K1 is not worthwhile
+  const invV = { V0: 0, V1: 0.5, V2: 10.0 }
+  const decInv = Strength.policyDecide(base, false, false, prediction, invV, config)
+  assert.equal(decInv.kind, 'Skip')
+  assert.equal(decInv.budget, 'K0')
+})
+
+test('WHAT[SPEC-INV-002] STRENGTH_002_speculation_opportunity_eligibility_is_pure_frozen_evidence_without_wall_clock_state', () => {
+  const dec1 = Strength.policyDecide(base, false, false, prediction, values, config)
+  const dec2 = Strength.policyDecide(base, false, false, prediction, values, config)
+  assert.deepEqual(dec1, dec2)
+  assert.equal(dec1.kind, 'Speculate')
+  assert.equal(dec1.budget, 'K2')
+})

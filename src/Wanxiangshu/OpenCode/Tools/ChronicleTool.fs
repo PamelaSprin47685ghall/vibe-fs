@@ -166,8 +166,13 @@ module ChronicleTool =
                 return execution
         }
 
-    let admission (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission =
-        fun ctx r -> r = Role.Blogger && hasLiveCycle bloggerHost ctx.SessionId
+    let admission (_bloggerHost: IBloggerRuntimeHost option) : ToolAdmission =
+        // Admission owns office authority only. A stale physical chronicle call
+        // with no live cycle is still a valid Blogger-originated invocation that
+        // must reach executeChronicle so the Chronicle owner can produce the
+        // typed NoLiveCycle result, terminate the stale session, and let only the
+        // outer Host adapter encode that result as an SDK exception (BD-006).
+        fun _ role -> role = Role.Blogger
 
     let spec
         (factory: HostToolFactory)

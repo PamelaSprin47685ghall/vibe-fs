@@ -74,7 +74,9 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## CONTEXT-COMPRESSION-019: X→Y 后旧辅助注入不跨 horizon 保留
 
-任何代表 X→Y 冷边界的重锚操作，必须将旧 provider horizon 中的辅助注入（如 pair guideline、tip、grounding read）可见性彻底归零。持久化事件保留作为审计事实，但新 horizon 的初始消息不再回放旧辅助材料，仅在后续各自正常触发时逐步重新生成。
+任何代表 X→Y 冷边界的操作，必须将旧 provider horizon 中的辅助注入（如 pair guideline、tip、grounding read）可见性彻底归零。`ContextReanchored` 与成功的 `PrefixRebaseCommitted` 都属于该边界；后者必须与 PrefixEpoch 提升在同一个 projection fold 中原子退休 auxiliary visibility，避免被刻意保留的 raw Host 回合把旧 presentation 穿透到新 Y。持久化事件保留作为审计事实，但新 horizon 的初始消息不再回放旧辅助材料，仅在后续各自正常触发时逐步重新生成。
+
+候选 probe 尚未成功提交时也不得形成“必须先成功才能变小”的死锁：当当前物理 WorkMain 已选择 `UsePrefixProbe`，XWire 必须把该 attempt 标记为 typed tentative cold horizon，并让同一 `messages.transform` 中位于 XWire 之后的 historical auxiliary projectors（Strength speculation、pair guideline、requirement grounding）跳过本次注入。该状态只能作为当前调用的返回值顺序消费，严禁写入跨 callback 的 process-local marker；只有 probe 成功后，`PrefixRebaseCommitted` 才成为跨请求 durable horizon 事实。
 
 ## CONTEXT-COMPRESSION-020: `todowrite` 所在回合永远保留 X 原文
 

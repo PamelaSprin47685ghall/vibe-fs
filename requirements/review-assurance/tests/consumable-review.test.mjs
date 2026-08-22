@@ -262,6 +262,76 @@ test('WHAT[REVIEW-ASSURANCE-009] REVIEW_013_recovery_uses_latest_exact_tool_resu
   } finally { cleanup() }
 })
 
+test('WHAT[REVIEW-ASSURANCE-009] judge_only_closure_projects_the_exact_tool_result_as_terminal_frontier', async () => {
+  const { opened, cleanup } = await open('judge-only-terminal-frontier')
+  try {
+    await appendReviewFacts(opened, reviewerSession)
+    await reviewJournal.appendReview(opened.journal, reviewerSession, null, 'ReviewBarrierStarted', {
+      ReviewerSessionId: reviewerSession,
+      ManagerSessionId: managerSession,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+    })
+    await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-1', 'ReviewVerdictRecorded', {
+      ReviewerSessionId: reviewerSession,
+      ManagerSessionId: managerSession,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      Verdict: 'REVISE',
+    })
+    assert.equal((await reviewJournal.appendAgent(opened.journal, reviewerSession, 'run-1', 'Companion', 'XTracePartAppended', {
+      SessionId: reviewerSession,
+      CursorSequence: 5,
+      Role: 'assistant',
+      Turn: 1,
+      PartIndex: 0,
+      Kind: 'tool_result',
+      ToolName: null,
+      TextRef: 'blob-judge-result',
+      TextDigest: 'digest-judge-result',
+      Provenance: 'g:0/msg:review-run/host-part:judge-result',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      HostToolPartId: 'prt-judge-result',
+    })).ok, true)
+    assert.equal((await reviewJournal.appendAgent(opened.journal, reviewerSession, 'late-run', 'Companion', 'XTracePartAppended', {
+      SessionId: reviewerSession,
+      CursorSequence: 6,
+      Role: 'assistant',
+      Turn: 2,
+      PartIndex: 0,
+      Kind: 'reasoning',
+      ToolName: null,
+      TextRef: 'blob-late-tail',
+      TextDigest: 'digest-late-tail',
+      Provenance: 'g:0/msg:late-run/host-part:late-tail',
+      ProviderRun: 'late-run',
+      ToolCallId: null,
+      HostToolPartId: 'prt-late-tail',
+    })).ok, true)
+    const closed = await reviewJournal.appendReview(opened.journal, reviewerSession, 'run-1', 'ReviewAttemptClosed', {
+      ReviewerSessionId: reviewerSession,
+      BarrierId: 'bar-process',
+      GitTreeHash: 'tree-1',
+      ProviderRun: 'run-1',
+      ToolCallId: 'call-1',
+      FrozenFrontierSequence: 6,
+    })
+    assert.equal(closed.ok, true, JSON.stringify(closed))
+
+    const view = reviewJournal.sessionView(opened.journal, reviewerSession)
+    assert.equal(view.xTraceHead, 7n, 'late XTrace tail proves current head is wider than the frozen judge frontier')
+    assert.deepEqual(view.terminalFrontier, {
+      barrier: 'bar-process',
+      sequence: 6n,
+      evidenceRef: 'blob-judge-result',
+      evidenceDigest: 'digest-judge-result',
+    })
+  } finally { cleanup() }
+})
+
 test('WHAT[REVIEW-ASSURANCE-010] REVIEW_018_absent_reviewer_fails_closed_without_fabricated_conclusion', async () => {
   const { opened, cleanup } = await open('absent')
   try {

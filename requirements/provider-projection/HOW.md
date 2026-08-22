@@ -10,6 +10,7 @@
 2. **语义视图与 Wire 视图分离**：
    - `ProviderSemanticProjection` 剥离易失传输元数据，提供跨会话一致的语义等价视图，作为 `CanonicalDigest` 计算的唯一输入。
    - `ProviderWireProjection` 在语义视图之上补充合成 ID 与本地时间线标记，服务于前缀缓存与物理传输。
+   - transport-only suppression 通过与消息平行的 stable Host identity channel 选择精确目标；identity 未命中即保留，绝不退化为按数量或角色删除。
 
 3. **LlmFacing 语义边界 + SyntheticToml 字节 writer**：
    - `Foundation/LlmFacing.fs` 是所有 LLM-facing 合成内容的唯一 production API。调用方只构造 `LlmFacing.Document`，显式把内容归为 instruction 或 reference data，并在最后一次性 render。

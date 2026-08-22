@@ -17,7 +17,7 @@
 4. **typed park event**：caught-up 不启动 timer。`AwaitMaterial` 只返回 `MaterialAvailable BloggerRequestContext | Cancelled`；offer-first material 被下一次 await 直接消费，parked offer 直接完成当前 waiter。wake 自带 material，不再返回 bool 后访问第二份 pending 状态。
 5. **durable recovery event**：WorkMain recovery 只读取 `snapshotWithRevision`。若 linked Blogger 有 durable open request 且 coverage 尚未严格前进，则通过 `AgentJournal.awaitChangeFromOrCancel` 订阅下一 committed fact；commit/abandon/coverage fact 到达后重算，plugin shutdown 则注销订阅并结束等待。没有 open producer 立即 retry。process-local flight/pending 与 wall clock 不参与 correctness。
 6. **连续 catch-up**：每次 cycle 提交后直接从当前 canonical coverage 与 XTrace Current 重新派生下一块；暂时无材料时等待 typed material/cancel event，不设置冻结上限或超时。
-7. **Host Compaction 收容**：观察到外部 compaction 时触发 `ContextReanchored`，推进 epoch 并将旧 horizon 的辅助注入可见性清空。
+7. **Cold-horizon auxiliary retirement**：观察到外部 compaction 时，`ContextReanchored` 推进 epoch 并清空旧 auxiliary visibility；成功 prefix probe 的 `PrefixRebaseCommitted` 在同一个 projection fold 内完成 PrefixEpoch 提升与同样的 visibility retirement。probe 尚未提交时，XWire 以 `PrefixPresentationHorizon.TentativeCold` 作为当前 transform 的 typed 返回值，使 composition root 跳过后置 historical auxiliary projectors，避免旧 horizon 先把 probe 请求重新灌胖。
 8. **Opening floor**：Manager Life 只以真实 Opening 后的 `WorkRecordStart` 作为压缩下界；T1 commitment 仍可属于 WorkRecord 的 constitutive Opening，但不再获得 provider-context 的 raw 常驻权。
 9. **Stable-identity X 穿透**：X-wire 的 cutoff 是 canonical XTrace semantic-turn boundary，不是本次 provider 数组下标。写回时由 XTrace provenance 解析被 coverage 证明覆盖的 Host message id，明确排除 raw Opening，并在这些覆盖消息中保留 `todowrite` call/result 原始回合；request-local synthetic/presentation row 不在 covered id set 中，因此不会移动 cutoff 或被误删。
 10. **Blogger materialization admission**：同一 Blogger 的 materialize / PromptKey bind / abandon 先取得 process-wide、跨 plugin instance 的 keyed admission；取得后再读 durable projection 并执行 open-request 转换。normal start 持有 admission 直到 durable materialize、原子 flight claim 与 send/bind 完成，provider retry 的 stage/bind/abandon 也复用同一 admission。flight claim 只允许空槽建立或同 RequestId 刷新；不同 RequestId 返回 conflict，不覆盖 owner。该 admission/flight 都是物理资源，不参与 recovery correctness proof。
@@ -50,7 +50,7 @@ DEPENDS ON:
 | CONTEXT-COMPRESSION-016 | `requirements/context-compression/tests/probe-selection.test.mjs` |
 | CONTEXT-COMPRESSION-017 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` |
 | CONTEXT-COMPRESSION-018 | `requirements/context-compression/tests/blogger-delta.test.mjs`, `requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs` |
-| CONTEXT-COMPRESSION-019 | `requirements/context-compression/tests/injected-context-reanchor.test.mjs` |
+| CONTEXT-COMPRESSION-019 | `requirements/context-compression/tests/injected-context-reanchor.test.mjs`, `requirements/host-boundary/tests/ordered-transform.test.mjs` |
 | CONTEXT-COMPRESSION-020 | `requirements/context-compression/tests/ctx-opening-floor.test.mjs` + `requirements/provider-projection/tests/projection.test.mjs` |
 | CONTEXT-COMPRESSION-021 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |
 | CONTEXT-COMPRESSION-022 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs` |

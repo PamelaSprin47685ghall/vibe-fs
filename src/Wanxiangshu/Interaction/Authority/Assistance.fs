@@ -29,12 +29,9 @@ module AssistanceDecision =
     let decide (profile: PromptAuthority.AuthorityExecutionProfile) (requestingAgent: string) : AssistanceDecision =
         match PromptAuthority.parseAgentName requestingAgent with
         | Error _ -> AssistanceDecision.RejectOrUnresolved
-        | Ok(_, role, _, _) when role <> profile.CanonicalRole ->
-            AssistanceDecision.RejectOrUnresolved
-        | Ok(_, role, AgentTier.Fast, _) ->
-            AssistanceDecision.EscalateFast(profile, role)
-        | Ok(requester, _, AgentTier.Deep, _) ->
-            AssistanceDecision.ConsultDeep(profile, requester)
+        | Ok(_, role, _, _) when role <> profile.CanonicalRole -> AssistanceDecision.RejectOrUnresolved
+        | Ok(_, role, AgentTier.Fast, _) -> AssistanceDecision.EscalateFast(profile, role)
+        | Ok(requester, _, AgentTier.Deep, _) -> AssistanceDecision.ConsultDeep(profile, requester)
 
 /// Pure witness established from durable handle and terminal evidence without new events.
 [<RequireQualifiedAccess>]
@@ -100,8 +97,7 @@ module AssistanceWorkflow =
         : Task<AssistanceTurnDisposition> =
         task {
             match decision with
-            | AssistanceDecision.RejectOrUnresolved ->
-                return AssistanceTurnDisposition.ClaimedButUnresolved
+            | AssistanceDecision.RejectOrUnresolved -> return AssistanceTurnDisposition.ClaimedButUnresolved
             | AssistanceDecision.EscalateFast(profile, role) ->
                 let deepAgent = ManagedAgentCatalog.nameOf AgentTier.Deep role
                 let! outcome = ports.DeliverAdvice sessionId profile.LogicalRunId deepAgent escalationPrompt directory

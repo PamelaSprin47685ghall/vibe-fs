@@ -14,6 +14,7 @@
 ### 捕获管线与重锚持久化
 
 - **幂等捕获与 Provenance 分段**：`XTraceCapture` 以物理 `host-part-id` 结合消息与运行标识构造溯源标识 `g:N/msg:<id>/host-part:<id>`，防止数组下标偏移造成重复录入。
+- **Retry transport membrane**：`XTracePipeline` 从 Host metadata 读取 `ProviderRetryAttempt` origin。该物理 row 继续参与 decodable-message / stable-id 坐标枚举，但捕获时写入空 semantic parts；因此后续真实 Host message 的 canonical turn 不会因过滤而重编号，同时 retry 控制文本不会进入 durable X。
 - **Compaction 隔离**：宿主触发 `ContextReanchored` 时仅重置物理前缀纪元，XTrace 的已持久化部件、Opening 记录与 `RecordCoverage` 保持完全存活，保证因果历史不发生丢失。
 
 ## 验证与测试落点
@@ -21,7 +22,7 @@
 | 命题 | 落点测试 |
 |---|---|
 | SEMANTIC-TRACE-001 | `requirements/semantic-trace/tests/x-trace-fold.test.mjs` |
-| SEMANTIC-TRACE-002 | `requirements/semantic-trace/tests/x-trace-capture.test.mjs` |
+| SEMANTIC-TRACE-002 | `requirements/semantic-trace/tests/x-trace-capture.test.mjs`, `requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs` |
 | SEMANTIC-TRACE-003 | `requirements/semantic-trace/tests/x-trace.test.mjs` |
 | SEMANTIC-TRACE-004 | `requirements/semantic-trace/tests/x-trace-provider-run-provenance.test.mjs` |
 | SEMANTIC-TRACE-005 | `requirements/semantic-trace/tests/x-trace.test.mjs` |

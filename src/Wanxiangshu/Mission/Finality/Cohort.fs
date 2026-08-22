@@ -118,7 +118,11 @@ module CohortWorkflow =
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
         let awaitOrCancel () =
             task {
-                let! outcome = raceWithCancel cancel (reviewerPort.AwaitTerminal memberInfo.ReviewerSessionId)
+                let occasion =
+                    { ReviewerSessionId = memberInfo.ReviewerSessionId
+                      BarrierId = memberInfo.BarrierId }
+
+                let! outcome = raceWithCancel cancel (reviewerPort.AwaitTerminal occasion)
                 return outcome |> Option.defaultValue (Error "review attempt cancelled")
             }
 

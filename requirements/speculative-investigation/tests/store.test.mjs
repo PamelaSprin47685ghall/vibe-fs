@@ -104,3 +104,18 @@ test('WHAT[SPEC-INV-008] STRENGTH_008_integrator_Current_reflects_Traced_range_w
     assert.deepEqual(Strength.projectionTraceRange('d1', projection), { startInclusive: 10n, endExclusive: 12n })
   } finally { local.close() }
 })
+
+test('WHAT[SPEC-INV-006] STRENGTH_006_prepared_event_persists_nominal_budget_without_duplicate_derived_value_estimates', () => {
+  const envelope = Strength.storeToEnvelope(H, prepared({ digest: 'frame-exact' }))
+  const decoded = Strength.storeTryDecodeEnvelope(envelope)
+  assert.equal(decoded.ok, true)
+  const payload = decoded.value
+  assert.equal(payload.budget, 'K1')
+  assert.equal('V0' in payload, false)
+  assert.equal('V1' in payload, false)
+  assert.equal('V2' in payload, false)
+  assert.equal('P1' in payload, false)
+  assert.equal('P2' in payload, false)
+  assert.equal('estimate' in payload, false)
+  assert.equal('prediction' in payload, false)
+})

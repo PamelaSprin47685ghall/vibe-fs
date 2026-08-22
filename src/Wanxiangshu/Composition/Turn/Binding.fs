@@ -7,6 +7,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
+
 /// Root / physical / continuation bindings for a logical run.
 ///
 /// No Host payload reading. Bindings are explicit in-memory facts or recovered

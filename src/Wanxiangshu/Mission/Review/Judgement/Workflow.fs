@@ -6,10 +6,12 @@ open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Strength.Persistence
 
 open System
+open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Enforcer
@@ -80,6 +82,84 @@ open Wanxiangshu.Host
 /// injected Review port. There is no stored State/Stage counter.
 module ReviewerWorkflow =
 
+    let private reviewerHasChronicle (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
+        AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
+        |> Option.bind (fun session -> session.Blog)
+        |> Option.map BlogProjection.frames
+        |> Option.exists (List.isEmpty >> not)
+
+    let private reviewerHasLinkedBlogger (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
+        SessionAssociationProjection.tryBloggerOf reviewerSessionId snapshot.AgentProjections.Associations
+        |> Option.isSome
+
+    let private requireChronicleAfterSettlement (journal: AgentJournal) (reviewerSessionId: SessionId) =
+        if reviewerHasChronicle (AgentJournal.snapshot journal) reviewerSessionId then
+            Ok()
+        else
+            Error "reviewer Blogger producer settled without a durable Chronicle frame"
+
+    [<RequireQualifiedAccess>]
+    type private SubmittedRecordCaptureDecision =
+        | AlreadyCaptured
+        | NoBloggerRequired
+        | AwaitFirstChronicle
+
+    let private decideSubmittedRecordCapture (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
+        if reviewerHasChronicle snapshot reviewerSessionId then
+            SubmittedRecordCaptureDecision.AlreadyCaptured
+        elif not (reviewerHasLinkedBlogger snapshot reviewerSessionId) then
+            SubmittedRecordCaptureDecision.NoBloggerRequired
+        else
+            SubmittedRecordCaptureDecision.AwaitFirstChronicle
+
+    let private resultAfterProducerSettlement
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        (settlement: BloggerRuntimeHost.ProducerSettlement)
+        =
+        let hasChronicle =
+            reviewerHasChronicle (AgentJournal.snapshot journal) reviewerSessionId
+
+        match settlement, hasChronicle with
+        | BloggerRuntimeHost.ProducerSettlement.Committed, _ ->
+            requireChronicleAfterSettlement journal reviewerSessionId
+        | BloggerRuntimeHost.ProducerSettlement.NoOpenProducer, true -> Ok()
+        | BloggerRuntimeHost.ProducerSettlement.NoOpenProducer, false ->
+            Error "linked Reviewer has no durable Chronicle and no open Blogger producer"
+        | BloggerRuntimeHost.ProducerSettlement.Abandoned, _ ->
+            Error "Reviewer Blogger producer was abandoned before Chronicle capture"
+        | BloggerRuntimeHost.ProducerSettlement.Cancelled, _ ->
+            Error "Reviewer Blogger producer wait was cancelled before Chronicle capture"
+
+    let private awaitFirstChronicle
+        (cancellation: CancellationToken)
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        : Task<Result<unit, string>> =
+        task {
+            let! settlement = BloggerRuntimeHost.awaitOpenProducerSettlement cancellation journal reviewerSessionId
+            return resultAfterProducerSettlement journal reviewerSessionId settlement
+        }
+
+    /// REVIEW-013 / FINALITY-011 race closure: a terminal judge may only abort
+    /// the managed Reviewer after the Blogger producer that was already
+    /// durable-open for that Reviewer has settled. Otherwise AbortSession can
+    /// win the physical race against the Blogger's next transform and starve the
+    /// record-ready Chronicle forever. The verdict remains durable immediately;
+    /// this barrier owns only physical interrupt ordering.
+    let awaitSubmittedRecordCapture
+        (cancellation: CancellationToken)
+        (journal: AgentJournal)
+        (reviewerSessionId: SessionId)
+        : Task<Result<unit, string>> =
+        let initial = AgentJournal.snapshot journal
+
+        match decideSubmittedRecordCapture initial reviewerSessionId with
+        | SubmittedRecordCaptureDecision.AlreadyCaptured
+        | SubmittedRecordCaptureDecision.NoBloggerRequired -> Task.FromResult(Ok())
+        | SubmittedRecordCaptureDecision.AwaitFirstChronicle ->
+            awaitFirstChronicle cancellation journal reviewerSessionId
+
     [<RequireQualifiedAccess>]
     type private SubmittedClosureEvidence =
         | NoAttempt
@@ -108,7 +188,13 @@ module ReviewerWorkflow =
             try
                 return! AgentJournal.appendAgent stream providerRun fact journal
             with ex ->
-                return Error(JournalAppendFailure.WriteUnknown(EventId.create "err", Outcome.JournalFailure.WriteFailed ex.Message))
+                return
+                    Error(
+                        JournalAppendFailure.WriteUnknown(
+                            EventId.create "err",
+                            Outcome.JournalFailure.WriteFailed ex.Message
+                        )
+                    )
         }
 
     let private appendSubmittedAttemptClosed
@@ -127,11 +213,7 @@ module ReviewerWorkflow =
                        FrozenFrontierSequence = frontier |}
 
             match!
-                tryAppendAgent
-                    (StreamId.Session attempt.ReviewerSessionId)
-                    (Some attempt.ProviderRun)
-                    closed
-                    journal
+                tryAppendAgent (StreamId.Session attempt.ReviewerSessionId) (Some attempt.ProviderRun) closed journal
             with
             | Ok _ -> return Ok()
             | Error failure -> return Error(JournalAppendFailure.describe failure)
@@ -151,8 +233,7 @@ module ReviewerWorkflow =
         let closed =
             evidence
             |> Option.bind (fun (session, attempt) ->
-                session.ReviewGuard
-                |> Option.bind (ReviewProjection.closedAttemptOf attempt))
+                session.ReviewGuard |> Option.bind (ReviewProjection.closedAttemptOf attempt))
 
         let ready =
             evidence
@@ -179,7 +260,8 @@ module ReviewerWorkflow =
         (journal: AgentJournal)
         (reviewerSessionId: SessionId)
         : Task<Result<bool, string>> =
-        let evidence = classifySubmittedClosure reviewerSessionId (AgentJournal.snapshot journal)
+        let evidence =
+            classifySubmittedClosure reviewerSessionId (AgentJournal.snapshot journal)
 
         match evidence with
         | SubmittedClosureEvidence.NoAttempt

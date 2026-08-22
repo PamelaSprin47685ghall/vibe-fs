@@ -256,7 +256,8 @@ module CoderTool =
                 return renderResult context surface result
         }
 
-    let behaviorAdmission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.Behavior
+    let behaviorAdmission: ToolAdmission =
+        fun _ r -> Roles.isAllowed r ToolPermission.Behavior
 
     let private behaviorSpec
         (name: string)

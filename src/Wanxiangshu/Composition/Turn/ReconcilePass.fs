@@ -5,6 +5,7 @@ open Fable.Core
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+
 module ReconcilePass =
 
     [<Emit("console.error($0, $1)")>]

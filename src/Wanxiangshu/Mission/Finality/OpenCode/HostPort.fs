@@ -43,6 +43,7 @@ open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
+open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
@@ -186,44 +187,8 @@ module FinalityHostPort =
                     | Ok _ -> return Ok()
             }
 
-        let awaitTerminal reviewerSessionId =
-            task {
-                let completed =
-                    TaskCompletionSource<TerminalOutcome>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-                // DSL-MUTABLE: cancellation — subscription acceptance flag.
-                let accepting = ref false
-
-                use subscription =
-                    // Finality arms this wait before StartReview sends the current
-                    // physical request, so only a future terminal can belong to
-                    // this review occasion. Replaying the session's sticky terminal
-                    // would let a previous Finality request terminate a reused
-                    // Reviewer and break the same-prompt dual-PERFECT challenge.
-                    scope.Sessions.SubscribeFutureTerminal(
-                        reviewerSessionId,
-                        fun _ outcome ->
-                            if accepting.Value then
-                                AsyncSupport.trySetResult completed outcome |> ignore
-                    )
-
-                accepting.Value <- true
-
-                let finished =
-                    task {
-                        match! completed.Task with
-                        | TerminalOutcome.Completed _ -> return Ok()
-                        | TerminalOutcome.Failed error -> return Error error
-                        | TerminalOutcome.Aborted reason -> return Error reason
-                    }
-
-                let timedOut: Task<Result<unit, string>> =
-                    emitJsExpr
-                        reviewerTimeoutMs
-                        "new Promise(function (resolve) { var t = setTimeout(function () { resolve({ tag: 1, fields: ['await reviewer timed out'] }); }, $0); if (t && typeof t.unref === 'function') t.unref(); })"
-
-                return! (emitJsExpr (finished, timedOut) "Promise.race([$0, $1])": Task<Result<unit, string>>)
-            }
+        let awaitTerminal (occasion: ReviewerTerminalOccasion) =
+            ReviewerTerminalAwait.awaitFuture scope.Journal scope.Sessions occasion reviewerTimeoutMs
 
         let sendMissingJudgementNudge (durable: AgentJournal) reviewerSessionId =
             task {

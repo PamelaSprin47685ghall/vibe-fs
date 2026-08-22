@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
 
 open System
+open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
@@ -218,7 +219,8 @@ module JudgeTool =
             projectionSessionIdOpt
             |> Option.bind (fun sessionId ->
                 currentPhysicalUserMessage sessionId
-                |> Option.map (fun physicalUserMessageId -> SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId))
+                |> Option.map (fun physicalUserMessageId ->
+                    SessionId.create sessionId, PhysicalUserMessageId.create physicalUserMessageId))
 
         let submitted =
             currentRequest
@@ -232,33 +234,65 @@ module JudgeTool =
         | Some(sessionId, _), Some durable -> SubmittedInterruptDecision.Ready(durable, sessionId)
 
     let private interruptClosedSubmittedJudgement
+        (cancellation: CancellationToken)
+        (runBackground: (unit -> Task) -> unit)
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal)
         (reviewerSessionId: SessionId)
         : Task<unit> =
+        let scheduleInterrupt () =
+            runBackground (fun () ->
+                task {
+                    match! sessionPort.InterruptAttempt reviewerSessionId with
+                    | Ok() -> return ()
+                    | Error reason ->
+                        return raise (InvalidOperationException("REVIEW_013_TERMINAL_INTERRUPT_FAILED:" + reason))
+                }
+                :> Task)
+
+        let terminalReadiness () =
+            taskResult {
+                let! closed =
+                    ReviewerWorkflow.ensureSubmittedAttemptClosed journal reviewerSessionId
+                    |> TaskResult.mapError (fun reason -> "REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason)
+
+                if not closed then
+                    return false
+                else
+                    do!
+                        ReviewerWorkflow.awaitSubmittedRecordCapture cancellation journal reviewerSessionId
+                        |> TaskResult.mapError (fun reason -> "REVIEW_013_RECORD_CAPTURE_FAILED:" + reason)
+
+                    return true
+            }
+
         task {
-            match! ReviewerWorkflow.ensureSubmittedAttemptClosed journal reviewerSessionId with
+            match! terminalReadiness () with
             | Ok true ->
-                let! _ = sessionPort.InterruptAttempt reviewerSessionId
+                // This hook runs inside the provider request being retired.
+                // Awaiting the Host abort here self-locks: the abort endpoint
+                // cannot finish until messages.transform returns. Schedule the
+                // already-proved physical cleanup under the runtime owner and
+                // let this transform return immediately.
+                scheduleInterrupt ()
                 return ()
-            | Ok false ->
-                return ()
-            | Error reason ->
-                return invalidOp ("REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason)
+            | Ok false -> return ()
+            | Error reason -> return invalidOp reason
         }
 
     let interruptAfterSubmittedJudgement
         (journal: AgentJournal option)
+        (cancellation: CancellationToken)
         (currentPhysicalUserMessage: string -> string option)
+        (runBackground: (unit -> Task) -> unit)
         (sessionPort: ISessionHostPort)
         (projectionSessionIdOpt: string option)
         : Task<unit> =
         match decideSubmittedInterrupt journal currentPhysicalUserMessage projectionSessionIdOpt with
         | SubmittedInterruptDecision.NoInterrupt -> Task.FromResult()
-        | SubmittedInterruptDecision.JournalMissing ->
-            task { return invalidOp "REVIEW_013_TERMINAL_JOURNAL_MISSING" }
+        | SubmittedInterruptDecision.JournalMissing -> task { return invalidOp "REVIEW_013_TERMINAL_JOURNAL_MISSING" }
         | SubmittedInterruptDecision.Ready(durable, reviewerSessionId) ->
-            interruptClosedSubmittedJudgement sessionPort durable reviewerSessionId
+            interruptClosedSubmittedJudgement cancellation runBackground sessionPort durable reviewerSessionId
 
     let private execute (scope: ToolRuntimeScope) (args: HostToolArguments) (context: HostToolContext) =
         task {

@@ -112,7 +112,7 @@ module PluginTransforms =
           ApplyStrengthReplay: string option -> obj -> Task<StrengthReplayPlan list>
           ApplyXTracePipeline: string option -> obj -> StrengthReplayPlan list -> Task<unit>
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
-          ApplyXWire: obj -> Task<unit>
+          ApplyXWire: obj -> Task<PrefixPresentationHorizon>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyStrengthSpeculate: obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
@@ -258,7 +258,12 @@ module PluginTransforms =
                     outObj
           SanitizeMessages = HostMessageProjection.sanitizeOutputMessages
           InterruptAfterSubmittedJudgement =
-            JudgeTool.interruptAfterSubmittedJudgement journal wired.CurrentPhysicalUserMessage sessionPort }
+            JudgeTool.interruptAfterSubmittedJudgement
+                journal
+                scope.BloggerRuntimeHost.Cancellation
+                wired.CurrentPhysicalUserMessage
+                scope.RunBackground
+                sessionPort }
 
     let defaultBranchCapabilities (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) : TransformBranchCapabilities =
         let scope = boot.Scope
@@ -276,7 +281,12 @@ module PluginTransforms =
                 match projectionSessionIdOpt, scope.Strength.StrengthReplicaRuntime with
                 | Some sessionId, Some runtime when runtime.IsReplica(SessionId.create sessionId) -> Some runtime
                 | _ -> None
-          ReplicaXWire = XWire.applyTransform snapshotOpt journal scope
+          ReplicaXWire =
+            fun outObj ->
+                task {
+                    let! _ = XWire.applyTransform snapshotOpt journal scope outObj
+                    return ()
+                }
           ReplicaSanitize = HostMessageProjection.sanitizeOutputMessages
           ExplicitResumeSanitize = HostMessageProjection.sanitizeOutputMessages }
 
@@ -302,20 +312,23 @@ module PluginTransforms =
             // 5. applyCompanionForOrdinaryMaterial
             do! caps.ApplyCompanion projectionSessionIdOpt inObj outObj
 
-            // 6. XWire.applyTransform
-            do! caps.ApplyXWire outObj
+            // 6. XWire.applyTransform. A selected prefix probe creates a
+            // tentative cold horizon for this physical request; downstream
+            // historical auxiliaries must not replay the old horizon into it.
+            let! prefixHorizon = caps.ApplyXWire outObj
 
             // 7. EnforcerContinuation.applyContinuation
             do! caps.ApplyEnforcerContinuation projectionSessionIdOpt outObj
 
-            // 8. StrengthSpeculate.tryApply
-            do! caps.ApplyStrengthSpeculate outObj
+            if prefixHorizon = PrefixPresentationHorizon.Current then
+                // 8. StrengthSpeculate.tryApply
+                do! caps.ApplyStrengthSpeculate outObj
 
-            // 9. PairProgrammingThoughtTransform.maybeInjectGuideline
-            do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
+                // 9. PairProgrammingThoughtTransform.maybeInjectGuideline
+                do! caps.InjectPairGuideline projectionSessionIdOpt sessionStartedAt outObj
 
-            // 10. RequirementGroundingTransform.projectOrTerminate
-            do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
+                // 10. RequirementGroundingTransform.projectOrTerminate
+                do! caps.ProjectRequirementGrounding projectionSessionIdOpt outObj
 
             // 11. BloggerChronicleText.maybeInject
             caps.InjectBloggerChronicle projectionSessionIdOpt outObj

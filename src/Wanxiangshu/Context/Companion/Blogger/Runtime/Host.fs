@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Context.Companion.Blogger.Runtime
 
+open System.Threading
 open Wanxiangshu.Context.Companion
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Enforcer
@@ -29,6 +30,92 @@ open Wanxiangshu.Foundation.Identity
 /// Pure routing stays in BloggerRuntime; material CE stays in BloggerCoordinator;
 /// continuation CE stays in EnforcerHost. Seal/block recipes are not duplicated.
 module BloggerRuntimeHost =
+
+    [<RequireQualifiedAccess>]
+    type ProducerSettlement =
+        | NoOpenProducer
+        | Committed
+        | Abandoned
+        | Cancelled
+
+    let private bloggerOfMain (snapshot: ProjectionSet) (mainSessionId: SessionId) =
+        SessionAssociationProjection.tryBloggerOf mainSessionId snapshot.AgentProjections.Associations
+
+    let private cycleStateOfMain (snapshot: ProjectionSet) (mainSessionId: SessionId) =
+        AgentProjection.tryFind mainSessionId snapshot.AgentProjections
+        |> Option.bind (fun session -> session.BloggerCycles)
+
+    let private tryOpenProducer
+        (snapshot: ProjectionSet)
+        (mainSessionId: SessionId)
+        : (SessionId * BloggerRequestId) option =
+        bloggerOfMain snapshot mainSessionId
+        |> Option.bind (fun bloggerSessionId ->
+            cycleStateOfMain snapshot mainSessionId
+            |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
+            |> Option.map (fun request -> bloggerSessionId, request.RequestId))
+
+    let private producerSettlement
+        (snapshot: ProjectionSet)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (requestId: BloggerRequestId)
+        : ProducerSettlement option =
+        match cycleStateOfMain snapshot mainSessionId with
+        | Some cycles when Map.containsKey requestId cycles.ProviderRunByRequestId -> Some ProducerSettlement.Committed
+        | Some cycles when
+            BloggerCycleProjection.tryOpenByBlogger bloggerSessionId cycles
+            |> Option.exists (fun request -> request.RequestId = requestId)
+            ->
+            None
+        | _ -> Some ProducerSettlement.Abandoned
+
+    let private awaitProducerChange
+        (cancellation: CancellationToken)
+        (journal: AgentJournal)
+        revision
+        (continueWaiting: unit -> System.Threading.Tasks.Task<ProducerSettlement>)
+        : System.Threading.Tasks.Task<ProducerSettlement> =
+        task {
+            match! AgentJournal.awaitChangeFromOrCancel revision cancellation journal with
+            | None -> return ProducerSettlement.Cancelled
+            | Some _ -> return! continueWaiting ()
+        }
+
+    let rec private awaitProducerSettlement
+        (cancellation: CancellationToken)
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (bloggerSessionId: SessionId)
+        (requestId: BloggerRequestId)
+        : System.Threading.Tasks.Task<ProducerSettlement> =
+        task {
+            let snapshot, revision = AgentJournal.snapshotWithRevision journal
+
+            match producerSettlement snapshot mainSessionId bloggerSessionId requestId with
+            | Some settlement -> return settlement
+            | None ->
+                return!
+                    awaitProducerChange cancellation journal revision (fun () ->
+                        awaitProducerSettlement cancellation journal mainSessionId bloggerSessionId requestId)
+        }
+
+    /// Await only a producer that is already durable-open at the observation
+    /// point. The request id is frozen before waiting, so a later Blogger request
+    /// cannot accidentally satisfy this barrier. Journal revision is the sole
+    /// wake source; no clock, polling, flight map, or pending-offer state proves
+    /// settlement.
+    let awaitOpenProducerSettlement
+        (cancellation: CancellationToken)
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        : System.Threading.Tasks.Task<ProducerSettlement> =
+        let snapshot = AgentJournal.snapshot journal
+
+        match tryOpenProducer snapshot mainSessionId with
+        | None -> System.Threading.Tasks.Task.FromResult ProducerSettlement.NoOpenProducer
+        | Some(bloggerSessionId, requestId) ->
+            awaitProducerSettlement cancellation journal mainSessionId bloggerSessionId requestId
 
     let claimCurrentRequest
         (scope: IBloggerRuntimeHost)

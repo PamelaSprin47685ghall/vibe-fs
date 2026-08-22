@@ -33,7 +33,8 @@ module BashHoneypotTool =
             return tomlObjectWithInstructions (ProviderProse.instructionLines (languageOf ctx) Path.Denial Map.empty) []
         }
 
-    let admission: ToolAdmission = fun _ r -> Roles.isAllowed r ToolPermission.BashHoneypot
+    let admission: ToolAdmission =
+        fun _ r -> Roles.isAllowed r ToolPermission.BashHoneypot
 
     let spec: ToolSpec =
         { Name = "bash-honeypot"

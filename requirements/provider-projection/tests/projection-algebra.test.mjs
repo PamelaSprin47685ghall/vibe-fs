@@ -379,8 +379,10 @@ test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_
   ]
   // The wire message has no id — Suppress removes by the parallel identity carried in
   // Snapshot.TransportMessages; the surface keeps this distinction explicit.
-  // Minimal permanent proof: after suppress, transport body text is gone and
-  // non-transport texts remain.
+  // The pure wire view does not carry the raw Host identity side-channel for its
+  // base messages. It therefore must never guess which row an ID names. Exact
+  // suppression is owned by the Host write-back adapter and is covered in
+  // provider-projection/tests/projection.test.mjs.
   const snapshot = stage3Snapshot(raw, { transportMessages: ['drop-me'] })
   const intent = projectionIntent.suppressTransportOnly
 
@@ -394,12 +396,14 @@ test('WHAT[PROVIDER-PROJECTION-005] PROJ_008_step3a_SuppressTransportOnly_smoke_
     ['keep', 'transport', 'also keep'],
   )
 
-  // Non-empty TransportMessages must change the view (permanent fail until green).
+  // Non-empty TransportMessages without an aligned Host identity channel is a
+  // safe no-op here; the previous role/count heuristic could delete unrelated
+  // assistant semantics merely because one transport ID existed.
   const suppressed = projectionAlgebra.renderMessagesWithIntents(snapshot, wireOf(raw), [intent])
-  assert.notDeepEqual(
+  assert.deepEqual(
     suppressed.map((m) => m.parts[0]?.text),
     ['keep', 'transport', 'also keep'],
-    'non-empty TransportMessages must suppress at least one message',
+    'the semantic renderer must not guess an ID-to-row mapping it does not possess',
   )
 })
 

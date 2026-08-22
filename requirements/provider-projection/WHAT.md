@@ -23,7 +23,7 @@ Provider 消息投影必须通过类型化组合子与直接执行的计算管�
 
 ## PROVIDER-PROJECTION-005: 功能模块仅声明 ProjectionIntent
 
-功能模块与渲染器之间的交互仅限于预定义的封闭意图集合（如保持物理前缀、激活前缀纪元、插入博客帧、插入修复指令等）。严禁功能模块直接拦截或修改原始消息流。
+功能模块与渲染器之间的交互仅限于预定义的封闭意图集合（如保持物理前缀、激活前缀纪元、插入博客帧、插入修复指令、抑制 transport-only rows 等）。严禁功能模块直接拦截或修改原始消息流。`SuppressTransportOnly` 的删除语义必须由 stable Host message identity 精确决定；严禁把 transport id 的数量解释成“删除前 N 条 assistant”，也严禁用 role heuristic 猜测目标消息。
 
 ## PROVIDER-PROJECTION-006: 规范排序与显式合并冲突，禁止注册顺序依赖
 

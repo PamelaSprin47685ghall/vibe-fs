@@ -205,6 +205,45 @@ test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_host_message_id', () => {
   assert.equal(wire.hostMessageId({}), null)
 })
 
+test('WHAT[PROVIDER-PROJECTION-003] retry continuation origin stays in Host metadata, outside provider semantics', () => {
+  const retry = {
+    info: { id: 'retry-1', role: 'user' },
+    parts: [{
+      type: 'text',
+      text: 'continue',
+      metadata: { wanxiangshu_origin: 'ProviderRetryAttempt' },
+    }],
+  }
+  assert.equal(wire.promptOriginOfMessage(retry), 'ProviderRetryAttempt')
+  assert.equal(wire.semanticTurnOfHostMessageId('retry-1', [
+    { info: { id: 'root', role: 'user' }, parts: [{ type: 'text', text: 'root' }] },
+    retry,
+  ]), 1)
+  assert.equal(wire.decodeMessageView([retry]).messages[0].parts[0].text, 'continue')
+})
+
+test('WHAT[PROVIDER-PROJECTION-004] transport membrane suppresses exact stale Host ids without role heuristics', () => {
+  const message = (id, role, text, origin = null) => ({
+    info: { id, role },
+    parts: [{
+      type: 'text',
+      text,
+      ...(origin ? { metadata: { wanxiangshu_origin: origin } } : {}),
+    }],
+  })
+  const raw = [
+    message('root', 'user', 'root'),
+    message('retry-old', 'user', 'retry old', 'ProviderRetryAttempt'),
+    message('business-assistant', 'assistant', 'must survive'),
+    message('retry-current', 'user', 'retry current', 'ProviderRetryAttempt'),
+  ]
+
+  const projected = wire.suppressHostMessagesByIds(raw, ['retry-old'])
+  assert.deepEqual(projected.map(item => item.info.id), ['root', 'business-assistant', 'retry-current'])
+  assert.equal(projected[1], raw[2], 'unaddressed assistant semantics must never be deleted by transport suppression')
+  assert.equal(projected[2], raw[3], 'the current physical retry continuation remains provider-visible')
+})
+
 test('WHAT[PROVIDER-PROJECTION-003] MISC_projection_session_id_from_messages', () => {
   assert.equal(wire.projectionSessionIdFromMessages(null), null)
   assert.equal(wire.projectionSessionIdFromMessages({}), null)

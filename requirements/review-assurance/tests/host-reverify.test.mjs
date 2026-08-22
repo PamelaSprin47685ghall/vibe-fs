@@ -53,8 +53,9 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_durably_opens_barrier_before_firs
     assert.equal(barrierVisibleAtSend, true, 'reviewer provider lane must not start before ReviewBarrierStarted is durable')
     assert.match(reviewPrompt, /judge tool/, 'orchestrator review must use the shared Reviewer opening resource')
     assert.doesNotMatch(reviewPrompt, /verdict tool/, 'orchestrator review must not retain the removed hard-coded tool name')
+    assert.equal(live.sessions.activeFutureTerminalSubscriptions(), 0, 'completed review must release its terminal wait')
   } finally {
-    live.cleanup()
+    await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })
@@ -147,8 +148,9 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_accepts_second_PERFECT_after_type
     )
     assert.notEqual(delivered[0].run, delivered[1].run)
     assert.notEqual(delivered[0].call, delivered[1].call)
+    assert.equal(live.sessions.activeFutureTerminalSubscriptions(), 0, 'confirmed review must release its terminal wait')
   } finally {
-    live.cleanup()
+    await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })
@@ -219,8 +221,9 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_first_judg
     assert.equal(result.ok, false)
     assert.match(result.error, /Reviewer requested revision/)
     assert.equal(sends, 2)
+    assert.equal(live.sessions.activeFutureTerminalSubscriptions(), 0, 'nudged revision must release every terminal wait')
   } finally {
-    live.cleanup()
+    await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })
@@ -305,8 +308,9 @@ test('WHAT[REVIEW-ASSURANCE-002] HOST_reverify_normal_terminal_before_second_jud
     assert.equal(result.ok, true, result.ok ? '' : result.error)
     assert.equal(sends, 2)
     assert.notEqual(firstPhysical, secondPhysical)
+    assert.equal(live.sessions.activeFutureTerminalSubscriptions(), 0, 'nudged confirmation must release every terminal wait')
   } finally {
-    live.cleanup()
+    await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })
@@ -341,8 +345,9 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_rejects_completed_terminal_with_u
     )
     assert.equal(result.ok, false)
     assert.match(result.error, /invalid role/)
+    assert.equal(live.sessions.activeFutureTerminalSubscriptions(), 0, 'invalid terminal must release its terminal wait')
   } finally {
-    live.cleanup()
+    await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })
@@ -369,7 +374,7 @@ test('WHAT[REVIEW-ASSURANCE-006] HOST_reverify_forks_a_deep_reviewer_and_fails_c
     assert.equal(live.sessions.calls.filter(([name]) => name === 'SendPrompt').length, 0, 'no reviewer prompt is sent without a durable barrier')
     assert.equal(hostSurface.hasChild(live.host, 'hostfw14-reviewer-bar_14'), false)
   } finally {
-    live.cleanup()
+    await live.cleanup()
     rmSync(worktree, { recursive: true, force: true })
   }
 })

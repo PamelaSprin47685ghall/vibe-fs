@@ -54,9 +54,9 @@ Join 机制从所有者的完成信箱中按稳定排序逐项 CAS 消费可用�
 | DELEG-010 | `requirements/delegation/tests/sync-delegate.test.mjs` |
 | DELEG-011 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
 | DELEG-012 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
-| DELEG-013 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` |
+| DELEG-013 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` + `requirements/delegation/tests/join-completion.test.mjs` |
 | DELEG-014 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` |
-| DELEG-015 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` |
+| DELEG-015 | `requirements/delegation/tests/join-v2-mailbox.test.mjs` + `requirements/delegation/tests/join-completion.test.mjs` |
 | DELEG-016 | `requirements/delegation/tests/join-v2-wire.test.mjs` |
 | DELEG-017 | `requirements/delegation/tests/sync-delegate-runtime.test.mjs` |
 | DELEG-018 | `requirements/delegation/tests/assistance-host.test.mjs` |

@@ -53,6 +53,8 @@ export const fakeSessions = (behaviour = {}) => {
   return {
     calls,
     notifyTerminal,
+    activeFutureTerminalSubscriptions: () =>
+      [...futureTerminalListeners.values()].reduce((count, listeners) => count + listeners.size, 0),
     CreateChildSession: async (parentId, options) => {
       childSeq += 1
       calls.push(['CreateChildSession', options])
@@ -173,7 +175,10 @@ export const liveOrchestrator = async (options = {}) => {
     host,
     sessions,
     journal: opened?.journal,
-    cleanup: () => {
+    cleanup: async () => {
+      try {
+        await hostSurface.detachAndDrain(host)
+      } catch {}
       try {
         if (opened?.journal) journalSurface.JournalSurface_dispose(opened.journal)
       } catch {}

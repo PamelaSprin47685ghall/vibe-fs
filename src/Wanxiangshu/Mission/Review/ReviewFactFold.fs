@@ -53,6 +53,30 @@ module ReviewFactFold =
         | Error NotDistinctAttempt ->
             reject factName "confirmed witness violates REVIEW-003 (same provider run or same tool call)"
 
+    let private exactClosedToolResult (closed: ClosedAttempt) (session: SessionAgentProjection) =
+        session.XTrace
+        |> Option.bind (fun xTrace ->
+            XTraceProjection.parts xTrace
+            |> List.tryFind (fun part ->
+                part.Kind = "tool_result"
+                && part.ProviderRun = Some closed.Attempt.ProviderRun
+                && part.ToolCallId = Some closed.Attempt.ToolCallId
+                && part.Cursor.Sequence + 1L = closed.FrozenFrontier.Sequence))
+
+    let private applyAttemptClosure (closed: ClosedAttempt) (session: SessionAgentProjection) =
+        let closedGuard =
+            Option.defaultValue ReviewProjection.empty session.ReviewGuard
+            |> ReviewProjection.applyAttemptClosed closed
+
+        let guard =
+            exactClosedToolResult closed session
+            |> Option.map (fun part ->
+                ReviewProjection.recordClosedAttemptFrontier part.TextRef part.TextDigest closed closedGuard)
+            |> Option.defaultValue closedGuard
+
+        { session with
+            ReviewGuard = Some guard }
+
     let fold (projection: AgentProjectionSet) (fact: ReviewFactCases) : Result<AgentProjectionSet, FoldRejection> =
         // ── review ──────────────────────────────────────────────────────────
         match fact with
@@ -96,7 +120,10 @@ module ReviewFactFold =
                       ToolCallId = payload.ToolCallId }
                   FrozenFrontier = { Sequence = payload.FrozenFrontierSequence } }
 
-            Ok(updateReviewGuard payload.ReviewerSessionId (ReviewProjection.applyAttemptClosed closed) projection)
+            AgentProjection.tryUpdate payload.ReviewerSessionId (applyAttemptClosure closed >> Ok) projection
+            |> function
+                | Ok updated -> Ok updated
+                | Error error -> reject "ReviewAttemptClosed" error
 
         | ReviewFactCases.ConfirmedReviewWitness payload ->
             // The witness lands on the reviewer session, where the rest of the

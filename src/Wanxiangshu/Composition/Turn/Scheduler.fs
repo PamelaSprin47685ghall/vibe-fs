@@ -11,6 +11,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.OpenCode
+
 /// Direct-CE reconcile scheduler (FLOW-001 / PR4).
 /// Owns queue / generation / single-flight / clear-session runtime state.
 /// Pass body lives in ReconcilePass — Scheduler only drains and dispatches.

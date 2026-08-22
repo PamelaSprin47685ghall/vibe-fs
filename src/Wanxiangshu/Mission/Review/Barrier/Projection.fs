@@ -197,6 +197,21 @@ module ReviewProjection =
         | None -> current
         | Some barrierId -> recordFrontierIfOpen barrierId terminalRef terminalDigest sequence current
 
+    /// REVIEW-ASSURANCE-009: a judge-only terminal has no later natural
+    /// TerminalOutputCaptured fact. Its exact judge tool_result is therefore
+    /// the terminal evidence, but only for the barrier owned by the closed
+    /// attempt and only at that attempt's already-frozen exclusive frontier.
+    let recordClosedAttemptFrontier
+        (terminalRef: BlobRef)
+        (terminalDigest: BlobDigest)
+        (closed: ClosedAttempt)
+        (current: ReviewGuardProjection)
+        =
+        match current.CurrentBarrierId with
+        | Some barrierId when barrierId = closed.Attempt.ReviewBarrierId ->
+            recordFrontierIfOpen barrierId terminalRef terminalDigest closed.FrozenFrontier.Sequence current
+        | _ -> current
+
     /// REVIEW-002: any REVISE clears an unfinished PERFECT confirmation.
     let private applyRevise (gitTreeHash: GitTreeHash) (current: ReviewGuardProjection) =
         { current with

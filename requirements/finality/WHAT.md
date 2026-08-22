@@ -47,7 +47,7 @@
 
 ## FINALITY-011: REVISE 立即关闭 cohort 且 FinalityRejected 另行 record-ready
 
-REVISE 是合法业务结果。当 REVISE 事实持久化后，当前请求的审查能力与整个 cohort 立即关闭：停止发送确认提示与 challenge，废除未完成的确认链。该关闭由 REVISE 事实直接派生，不等待 `FinalityRejected`；`FinalityRejected` 仅在拒绝审查员的记录达成 record-ready 后独立落盘。
+REVISE 是合法业务结果。当 REVISE 事实持久化后，当前请求的审查能力与整个 cohort 立即关闭：停止发送确认提示与 challenge，废除未完成的确认链。该关闭由 REVISE 事实直接派生，不等待 `FinalityRejected`；`FinalityRejected` 仅在拒绝审查员的记录达成 record-ready 后独立落盘。Reviewer terminal 的物理收束不得反过来饿死这条 record-ready 路径：尚无 canonical Chronicle 时才允许等待已经 durable-open、能够建立首次记录的 Blogger producer；已有 Chronicle 时不得等待 terminal transform 自己后续生成的 producer。随后由 runtime-owned background interrupt 退休 Reviewer 当前物理 attempt。Finality 不拥有私有 Abort 解释规则，而与 Change review 共用 barrier-scoped `ReviewerTerminalAwait`；只有当前 `(ReviewerSessionId, ReviewBarrierId)` occasion 已具有 durable `ReviewAttemptClosed` 时，该主动 Abort 才是 clean terminal，无 closure、旧 barrier closure 或真实 failure 都是基础设施失败。
 
 ## FINALITY-012: 双轨交付 sibling steer
 

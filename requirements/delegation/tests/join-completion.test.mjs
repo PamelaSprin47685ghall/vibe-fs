@@ -13,3 +13,29 @@ test('WHAT[DELEG-015] JOIN_COMPLETION_terminal_projection_is_joinable_until_reti
   assert.equal(handles.crashScenario('completed').joinable, 1)
   assert.equal(handles.crashScenario('retired').joinable, 0)
 })
+test('WHAT[DELEG-013] JOIN_COMPLETION_completed_is_rendered_as_entry_local_work_record', () => {
+  const wire = join.renderBatch('english', [
+    {
+      kind: 'completed',
+      agentId: 'a1',
+      agentName: 'Ada',
+      role: 'Coder',
+      runId: 'run-a1',
+      workRecord: 'Task completed with verifiable evidence.'
+    }
+  ])
+  assert.match(wire, /Task completed with verifiable evidence/)
+  assert.match(wire, /has returned/)
+})
+test('WHAT[DELEG-013] JOIN_COMPLETION_abandoned_is_rendered_as_agent_did_not_return', () => {
+  const wire = join.renderBatch('english', [
+    {
+      kind: 'abandoned',
+      agentId: 'a2',
+      agentName: 'Bob',
+      role: 'DevOps',
+      reason: 'ParentCancelled'
+    }
+  ])
+  assert.match(wire, /did not return/)
+})

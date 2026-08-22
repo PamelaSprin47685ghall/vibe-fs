@@ -87,3 +87,27 @@ test('WHAT[PREFIX-STABILITY-009] prefix_proof_and_writeback_use_canonical_XTrace
     'step-5 proof must not hash the mutable request presentation',
   )
 })
+
+test('WHAT[PREFIX-STABILITY-009] retry_transport_rows_retire_only_at_a_real_cold_horizon', () => {
+  const wireSource = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Context/Prefix/Wire.fs'),
+    'utf8',
+  )
+
+  assert.match(wireSource, /let private staleProviderRetryMessageIds/)
+  assert.match(wireSource, /Some messageId <> currentPhysical/)
+  assert.match(wireSource, /let private retryTransportRetirement/)
+  assert.match(
+    wireSource,
+    /PrefixPresentationHorizon\.Current\s*->\s*Set\.empty[\s\S]*?PrefixPresentationHorizon\.TentativeCold\s*->\s*staleProviderRetryMessageIds rawMessages/,
+    'same-horizon retry rows must remain byte-stable; only a real cold presentation may retire them',
+  )
+  assert.match(wireSource, /ProjectionIntent\.SuppressTransportOnly :: intents/)
+  assert.match(
+    wireSource,
+    /renderPrefixMessages state rawMessages intents PrefixPresentationHorizon\.Current/,
+    'ordinary presentation must preserve the current physical prefix',
+  )
+  assert.match(wireSource, /renderPrefixMessages state rawMessages intents presentationHorizon/)
+  assert.match(wireSource, /ProjectionMessageEdit\.suppressHostMessagesByIds prefixed staleTransport/)
+})

@@ -11,6 +11,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
+open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager.OpenCode
 open Wanxiangshu.OpenCode
@@ -38,15 +39,33 @@ module XTracePipeline =
         | WireToolResult _
         | WireMedia _ -> part
 
+    let private providerRetryOrigin =
+        PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ProviderRetryAttempt)
+
+    let private isProviderRetryAttempt (rawMessage: obj) =
+        ProviderWireDecode.promptOriginOfMessage rawMessage = Some providerRetryOrigin
+
     let private capturedMessagesStripped (rawMessages: obj list) =
-        ProviderWireCapture.decodeCapturedMessageView rawMessages
-        |> List.map (fun message ->
-            { message with
-                Parts = message.Parts |> List.map stripReasoningSentinel })
+        rawMessages
+        |> List.choose (fun rawMessage ->
+            ProviderWireCapture.decodeCapturedMessage rawMessage
+            |> Option.map (fun message ->
+                if isProviderRetryAttempt rawMessage then
+                    // Recovery continuation is transport control-plane. Keep its
+                    // positional row in the capture universe so later Host turn
+                    // coordinates do not renumber, but persist no semantic parts.
+                    { message with Parts = [] }
+                else
+                    { message with
+                        Parts = message.Parts |> List.map stripReasoningSentinel }))
 
     /// Evidence -> Decision: all Host message ids present -> stable id list.
     let private tryStableHostMessageIds (rawMessages: obj list) : string list option =
-        let ids = rawMessages |> List.map ProviderWireDecode.hostMessageId
+        let ids =
+            rawMessages
+            |> List.choose (fun rawMessage ->
+                ProviderWireCapture.decodeCapturedMessage rawMessage
+                |> Option.map (fun _ -> ProviderWireDecode.hostMessageId rawMessage))
 
         if ids |> List.forall Option.isSome then
             Some(ids |> List.map Option.get)

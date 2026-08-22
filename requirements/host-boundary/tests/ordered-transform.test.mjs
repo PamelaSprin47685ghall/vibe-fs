@@ -21,7 +21,7 @@ test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilit
   assert.match(text, /ApplyStrengthReplay:\s*string option -> obj -> Task<StrengthReplayPlan list>/)
   assert.match(text, /ApplyXTracePipeline:\s*string option -> obj -> StrengthReplayPlan list -> Task<unit>/)
   assert.match(text, /ApplyCompanion:\s*string option -> obj -> obj -> Task<unit>/)
-  assert.match(text, /ApplyXWire:\s*obj -> Task<unit>/)
+  assert.match(text, /ApplyXWire:\s*obj -> Task<PrefixPresentationHorizon>/)
   assert.match(text, /ApplyEnforcerContinuation:\s*string option -> obj -> Task<unit>/)
   assert.match(text, /ApplyStrengthSpeculate:\s*obj -> Task<unit>/)
   assert.match(text, /InjectPairGuideline:\s*string option -> DateTimeOffset option -> obj -> Task<unit>/)
@@ -29,6 +29,26 @@ test('WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilit
   assert.match(text, /InjectBloggerChronicle:\s*string option -> obj -> unit/)
   assert.match(text, /SanitizeMessages:\s*obj -> unit/)
   assert.match(text, /InterruptAfterSubmittedJudgement:\s*string option -> Task<unit>/)
+})
+
+test('WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request', () => {
+  const text = read('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
+  const start = text.indexOf('let normalTransform')
+  assert.ok(start >= 0)
+  const end = text.indexOf('let createWithCaps', start)
+  const body = text.slice(start, end)
+
+  assert.match(body, /let!\s+prefixHorizon\s*=\s*caps\.ApplyXWire\s+outObj/)
+  assert.match(body, /if\s+prefixHorizon\s*=\s*PrefixPresentationHorizon\.Current\s+then/)
+
+  const guardAt = body.indexOf('if prefixHorizon = PrefixPresentationHorizon.Current then')
+  const speculateAt = body.indexOf('caps.ApplyStrengthSpeculate')
+  const pairAt = body.indexOf('caps.InjectPairGuideline')
+  const groundingAt = body.indexOf('caps.ProjectRequirementGrounding')
+  const chronicleAt = body.indexOf('caps.InjectBloggerChronicle')
+
+  assert.ok(guardAt < speculateAt && speculateAt < pairAt && pairAt < groundingAt)
+  assert.ok(groundingAt < chronicleAt, 'Blogger-only chronicle projection remains outside the WorkMain auxiliary guard')
 })
 
 test('WHAT[HOST-BOUNDARY-019] normalTransform executes exact 13-step static score in order', () => {

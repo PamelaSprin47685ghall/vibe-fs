@@ -288,11 +288,23 @@ module ReviewJournalSurface =
                     |> List.toArray)
                 |> Option.defaultValue [||]
 
+            let terminalFrontier =
+                session.ReviewGuard
+                |> Option.bind (fun guard -> guard.TerminalFrontier)
+                |> Option.map (fun frontier ->
+                    box
+                        {| barrier = ReviewBarrierId.value frontier.BarrierId
+                           sequence = frontier.Sequence
+                           evidenceRef = BlobRef.value frontier.TerminalRef
+                           evidenceDigest = BlobDigest.value frontier.TerminalDigest |})
+                |> Option.toObj
+
             box
                 {| witness = witnessName
                    xTraceHead = xTraceHead
                    xTracePartKinds = xTracePartKinds
-                   closedAttempts = closedAttempts |}
+                   closedAttempts = closedAttempts
+                   terminalFrontier = terminalFrontier |}
 
     let sessionViewRaw (handle: JournalHandle) (sessionId: string) : obj =
         let projection = AgentJournal.snapshot handle.Journal

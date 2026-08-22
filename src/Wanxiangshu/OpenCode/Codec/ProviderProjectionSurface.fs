@@ -353,6 +353,25 @@ module ProviderProjectionSurface =
                  Some insertAfterHostMessageId)
         |> List.toArray
 
+    let suppressHostMessagesByIds (raw: obj array) (hostMessageIds: string array) : obj array =
+        ProjectionMessageEdit.suppressHostMessagesByIds
+            (if isNull raw then [] else Array.toList raw)
+            (if isNull hostMessageIds then
+                 Set.empty
+             else
+                 Set.ofArray hostMessageIds)
+        |> List.toArray
+
+    let promptOriginOfMessage (raw: obj) : obj =
+        ProviderWireDecode.promptOriginOfMessage raw
+        |> Option.map box
+        |> Option.defaultValue null
+
+    let semanticTurnOfHostMessageId (messageId: string) (raw: obj array) : obj =
+        ProviderWireCapture.trySemanticTurnOfHostMessageId messageId (if isNull raw then [] else Array.toList raw)
+        |> Option.map box
+        |> Option.defaultValue null
+
     let private wireMessageOf value : ProviderProjection.WireMessage =
         { Role = string value?role
           Parts =

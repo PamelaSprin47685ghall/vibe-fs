@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+
 /// JS-native boundary for reconciliation's classifiers, evidence, wakes and
 /// publish seals. Maps remain opaque; turns, decisions and observations cross
 /// as plain objects or stable strings.

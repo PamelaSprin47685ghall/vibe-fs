@@ -132,7 +132,7 @@ module ToolRegistry =
               AttachAbort = fun _ -> id }
 
         match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
-        | Some (_, admission) -> admission ctx
+        | Some(_, admission) -> admission ctx
         | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
             JsToolSpec.admissionFor (specName.Substring 3) ctx
         | None -> fun _ -> false

@@ -2,6 +2,8 @@
 // Context Companion owner surfaces. Context values are plain JSON at the
 // boundary; opaque Journal/Host implementations remain behind owners.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
 import * as runtime from '../../../dist/Context/Companion/RuntimeSurface.js'
 import * as frames from '../../../dist/Context/Companion/Blogger/FrameSurface.js'
@@ -112,8 +114,21 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_epoch_mismatch_abandon
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_frame_digests_mismatch_abandons', () => {
-  const result = frames.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 1, frame: frames.frame({ kind: 'Squash', digest: '', ref: 'blob-s' }) }, oneFrame())
-  assert.equal(result.ok, false)
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Enforcer/Cycle/Commit.fs'),
+    'utf8',
+  )
+  const start = source.indexOf('let private validateSquashFrames')
+  const end = source.indexOf('let private decideSquashLink', start)
+  assert.ok(start >= 0 && end > start, 'production squash admission validator must exist')
+  const validator = source.slice(start, end)
+  assert.match(validator, /let digests = selected \|> List\.map \(fun f -> f\.Digest\)/)
+  assert.match(validator, /elif digests <> squash\.FrameDigests then/)
+  assert.match(validator, /SquashAdmission\.Rejected "BlogObservationsSquashed frame digests mismatch"/)
+  assert.ok(
+    validator.indexOf('digests <> squash.FrameDigests') < validator.indexOf('SquashAdmission.Ready'),
+    'digest-list mismatch must reject before the squash is admitted',
+  )
 })
 
 test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_squash_other_blogger_session_abandons', () => {

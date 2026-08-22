@@ -104,7 +104,7 @@ module OrchestratorHostReview =
         (journal: AgentJournal option)
         (forkReviewer: ManagerJobId -> WorktreePath -> string -> Task<Result<SessionId, string>>)
         (startReviewer: ManagerJobId -> Task<Result<unit, string>>)
-        (awaitReviewer: ManagerJobId -> Task<Result<unit, string>>)
+        (awaitReviewer: ReviewerTerminalOccasion -> Task<Result<unit, string>>)
         (nudgeReviewer: SessionId -> Task<Result<PhysicalUserMessageId, string>>)
         (jobId: ManagerJobId)
         (managerSessionId: SessionId)
@@ -126,9 +126,13 @@ module OrchestratorHostReview =
                 |> Result.mapError (sprintf "Cannot await reviewer judgement: %s")
 
             let host: ReviewHostPort =
+                let terminalOccasion =
+                    { ReviewerSessionId = reviewerSessionId
+                      BarrierId = barrierId }
+
                 { StartReview = fun () -> startReviewer jobId
                   AwaitJudgement = channel.AwaitJudgement
-                  AwaitReviewer = fun () -> awaitReviewer jobId
+                  AwaitReviewer = fun () -> awaitReviewer terminalOccasion
                   NudgeMissingJudgement = fun () -> nudgeReviewer reviewerSessionId }
 
             let request =

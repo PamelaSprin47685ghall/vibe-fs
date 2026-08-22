@@ -994,7 +994,10 @@ module FinalitySurface =
     let private treeOf (value: obj) = GitTreeHash.create (str value)
     let private sessionOf (value: obj) = SessionId.create (str value)
     let private barrierOf (value: obj) = ReviewBarrierId.create (str value)
-    let private physicalOf (value: obj) = PhysicalUserMessageId.create (str value)
+
+    let private physicalOf (value: obj) =
+        PhysicalUserMessageId.create (str value)
+
     let private runOf (value: obj) = ProviderRunIdentity.create (str value)
     let private callOf (value: obj) = ToolCallId.create (str value)
 
@@ -1050,10 +1053,7 @@ module FinalitySurface =
             box
                 {| ok = true
                    witness = ConfirmedReviewWitnessHandle.Create witness :> obj |}
-        | Error error ->
-            box
-                {| ok = false
-                   error = error |}
+        | Error error -> box {| ok = false; error = error |}
 
     let confirmedReviewWitnessTree (witness: obj) : string =
         let typed = confirmedReviewWitnessOf witness

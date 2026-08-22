@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Mission.Review.OpenCode
 
+open System.Threading
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
@@ -99,10 +100,8 @@ module JudgeSurface =
                 | Ok journal -> ReviewerWorkflow.ensureSubmittedAttemptClosed journal (SessionId.create sessionId)
 
             match result with
-            | Ok closed ->
-                return box {| ok = true; closed = closed |}
-            | Error reason ->
-                return box {| ok = false; error = reason |}
+            | Ok closed -> return box {| ok = true; closed = closed |}
+            | Error reason -> return box {| ok = false; error = reason |}
         }
 
     let interruptAfterSubmittedJudgement
@@ -113,6 +112,7 @@ module JudgeSurface =
         : Task<obj> =
         task {
             let reviewer = SessionId.create sessionId
+
             let isSubmitted =
                 JudgementRequestIdentity.key reviewer (PhysicalUserMessageId.create physicalUserMessageId)
                 |> SharedState.VerdictSubmissions.Contains
@@ -125,13 +125,28 @@ module JudgeSurface =
 
             match closedResult with
             | Ok true ->
-                let fn = Fable.Core.JsInterop.emitJsExpr (sessionPort, "InterruptAttempt") "$0[$1]"
-                let! _ =
-                    if isNull fn then Task.FromResult(Ok())
-                    else Fable.Core.JsInterop.emitJsExpr (sessionPort, sessionId) "$0.InterruptAttempt($1)"
-                return box {| ok = true; interrupted = true |}
-            | Ok false ->
-                return box {| ok = true; interrupted = false |}
+                match! ReviewerWorkflow.awaitSubmittedRecordCapture CancellationToken.None handle.Journal reviewer with
+                | Error reason ->
+                    return
+                        box
+                            {| ok = false
+                               error = "REVIEW_013_RECORD_CAPTURE_FAILED:" + reason
+                               interrupted = false |}
+                | Ok() ->
+                    let fn = Fable.Core.JsInterop.emitJsExpr (sessionPort, "InterruptAttempt") "$0[$1]"
+
+                    let! _ =
+                        if isNull fn then
+                            Task.FromResult(Ok())
+                        else
+                            Fable.Core.JsInterop.emitJsExpr (sessionPort, sessionId) "$0.InterruptAttempt($1)"
+
+                    return box {| ok = true; interrupted = true |}
+            | Ok false -> return box {| ok = true; interrupted = false |}
             | Error reason ->
-                return box {| ok = false; error = "REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason; interrupted = false |}
+                return
+                    box
+                        {| ok = false
+                           error = "REVIEW_013_TERMINAL_CLOSURE_FAILED:" + reason
+                           interrupted = false |}
         }

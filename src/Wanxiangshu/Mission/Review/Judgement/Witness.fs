@@ -141,7 +141,7 @@ module ReviewWitness =
 ///
 /// Established purely by projection from durable facts (never a separate persistent event, AGENTS.md §2.3/§22).
 type ConfirmedReviewWitness =
-    private ConfirmedReviewWitness of
+    private | ConfirmedReviewWitness of
         {| LifeId: ManagerLifeId
            RequestId: FinalityRequestId
            GitTreeHash: GitTreeHash
@@ -154,25 +154,22 @@ type CandidateVerificationFailure =
 
 module ConfirmedReviewWitness =
 
-    let gitTreeHash (ConfirmedReviewWitness payload) : GitTreeHash =
-        payload.GitTreeHash
+    let gitTreeHash (ConfirmedReviewWitness payload) : GitTreeHash = payload.GitTreeHash
 
-    let lifeId (ConfirmedReviewWitness payload) : ManagerLifeId =
-        payload.LifeId
+    let lifeId (ConfirmedReviewWitness payload) : ManagerLifeId = payload.LifeId
 
-    let requestId (ConfirmedReviewWitness payload) : FinalityRequestId =
-        payload.RequestId
+    let requestId (ConfirmedReviewWitness payload) : FinalityRequestId = payload.RequestId
 
-    let witnesses (ConfirmedReviewWitness payload) =
-        payload.Witnesses
+    let witnesses (ConfirmedReviewWitness payload) = payload.Witnesses
 
     /// Build a ConfirmedReviewWitness from two or more legitimate cohort members' confirmed review witnesses
     /// on the exact same tree.
-    let private isConfirmedOnTree (expectedTree: GitTreeHash) (_, barrierId: ReviewBarrierId, witness: ReviewWitness) : bool =
+    let private isConfirmedOnTree
+        (expectedTree: GitTreeHash)
+        (_, barrierId: ReviewBarrierId, witness: ReviewWitness)
+        : bool =
         match witness with
-        | ReviewWitness.Confirmed confirmed ->
-            confirmed.BarrierId = barrierId
-            && confirmed.GitTreeHash = expectedTree
+        | ReviewWitness.Confirmed confirmed -> confirmed.BarrierId = barrierId && confirmed.GitTreeHash = expectedTree
         | ReviewWitness.NoReview
         | ReviewWitness.RevisionWitness _ -> false
 
@@ -202,7 +199,10 @@ module ConfirmedReviewWitness =
 /// Review.CandidateContract: candidate tree verification against confirmed review witness.
 module ReviewCandidate =
 
-    let verifyCandidate (candidateTree: GitTreeHash) (witness: ConfirmedReviewWitness) : Result<unit, CandidateVerificationFailure> =
+    let verifyCandidate
+        (candidateTree: GitTreeHash)
+        (witness: ConfirmedReviewWitness)
+        : Result<unit, CandidateVerificationFailure> =
         let witnessTree = ConfirmedReviewWitness.gitTreeHash witness
 
         if candidateTree = witnessTree then

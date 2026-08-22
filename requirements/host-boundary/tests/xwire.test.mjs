@@ -204,7 +204,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_ordinary_request_keeps_committed_prefi
   )
 
   assert.match(ordinary, /settleVisibleToolContinuations/)
-  assert.match(ordinary, /\| None, _, _ ->[^\n]*applyOrdinaryCommittedPrefix/)
+  assert.match(ordinary, /\| None, _, _ ->[\s\S]*?applyOrdinaryCommittedPrefix/)
   assert.doesNotMatch(ordinary, /\| None, _, _ ->\s*return \(\)/)
   assert.match(committed, /applyCommittedPrefix durable sessionId state rawMessages output/)
 })

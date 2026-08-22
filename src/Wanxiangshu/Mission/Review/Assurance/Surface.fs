@@ -332,10 +332,7 @@ module ReviewAssuranceSurface =
             box
                 {| ok = true
                    witness = ConfirmedReviewWitnessHandle.Create witness :> obj |}
-        | Error error ->
-            box
-                {| ok = false
-                   error = error |}
+        | Error error -> box {| ok = false; error = error |}
 
     let confirmedReviewWitnessTree (witness: obj) : string =
         let typed = confirmedReviewWitnessOf witness

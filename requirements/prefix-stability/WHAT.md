@@ -38,7 +38,7 @@ FrozenRecordPrefix 以明确标记的 low-trust context block 注入上下文，
 
 ## PREFIX-STABILITY-009: cutoff 只在 canonical XTrace 完整语义 turn 边界，digest 失配 fail closed
 
-Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic turn 边界。`CoveredPrefixDigest` 的生产与 probe step-5 重算必须对同一个 `XTraceMaterialization.currentProjection` 做截断；请求级 provider presentation 的合法变化不得制造假 `CutoffProofFailed`。写回 Host 时必须把 semantic-turn cutoff 映射为 stable XTrace Host message identity，严禁把 cutoff 当作本次 provider message 数组下标。真实 canonical X 历史发生变化时 digest 仍必须失配并 fail-closed 拒绝执行。
+Cutoff 游标只能位于 current-generation canonical XTrace 的完整 semantic turn 边界。`CoveredPrefixDigest` 的生产与 probe step-5 重算必须对同一个 `XTraceMaterialization.currentProjection` 做截断；请求级 provider presentation 的合法变化不得制造假 `CutoffProofFailed`。写回 Host 时必须把 semantic-turn cutoff 映射为 stable XTrace Host message identity，严禁把 cutoff 当作本次 provider message 数组下标。`ProviderRetryAttempt` 不具有 X semantic part，因此当前 retry 的 request-start cutoff 可以从与 XTrace capture 相同的 decodable Host message universe 取得 semantic-turn 坐标；这只用于定位 live request，不得把 retry 文本重新引入 canonical X。retry transport row 的退休同样受 prefix horizon 约束：`Current` presentation 必须保留已经进入当前 provider prefix 的所有 retry rows；只有新的 `TentativeCold` presentation 才可按 stable Host id 精确退休此前 horizon 的 retry rows，同时保留触发本次 cold presentation 的 current physical retry。由此 retry 控制文本可以不进入 X/Y/digest，而同一 horizon 的 provider wire 仍保持 append-only。真实 canonical X 历史发生变化时 digest 仍必须失配并 fail-closed 拒绝执行。
 
 ## PREFIX-STABILITY-010: 同一 horizon 的 historical synthetic pair 原位 replay；reanchor 退休旧 replay set
 

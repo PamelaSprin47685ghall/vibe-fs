@@ -394,7 +394,9 @@ module JsBookkeeperTool =
         }
 
     let admission: ToolAdmission =
-        fun ctx _ -> not (String.IsNullOrWhiteSpace ctx.SessionId) && BookkeeperRuntime.isAttached ctx.SessionId
+        fun ctx _ ->
+            not (String.IsNullOrWhiteSpace ctx.SessionId)
+            && BookkeeperRuntime.isAttached ctx.SessionId
 
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()

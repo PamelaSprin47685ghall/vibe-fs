@@ -461,9 +461,10 @@ export async function holdChildC1UntilLabor(scenario) {
 /**
  * One Reviewer protocol owns Finality and publish review. The Long Stroke injects
  * exactly one adversity verdict into that protocol: the first barrier judge is
- * REVISE; after its terminal text, every later barrier request returns two distinct
- * PERFECT judge calls under the same physical prompt, then terminal text. No alternate
- * prompt/tool surface is manufactured for Finality.
+ * REVISE; once that terminal judge call has been consumed, every later barrier
+ * request returns two distinct PERFECT judge calls under the same physical prompt.
+ * Judge-only terminality intentionally has no trailing provider text continuation.
+ * No alternate prompt/tool surface is manufactured for Finality.
  */
 export async function bindFinalityReviseThenPerfect(scenario) {
   const runtime = scenario.provider?._scenario;
@@ -485,13 +486,13 @@ export async function bindFinalityReviseThenPerfect(scenario) {
 
   setVerdict('REVISE');
 
-  let firstBarrierTerminalSeen = false;
+  let firstBarrierVerdictSeen = false;
   const consume = runtime.consume;
   const originalConsume = (body, selection, context) => consume.call(runtime, body, selection, context);
   runtime.consume = (body, selection, context) => {
     originalConsume(body, selection, context);
-    if (!firstBarrierTerminalSeen && selection?.entry?.id === 'barrier-reviewer.1') {
-      firstBarrierTerminalSeen = true;
+    if (!firstBarrierVerdictSeen && selection?.entry?.id === 'barrier-reviewer.0') {
+      firstBarrierVerdictSeen = true;
       queueMicrotask(() => {
         setVerdict('PERFECT');
         confirmationEntry.respond = perfectJudge;

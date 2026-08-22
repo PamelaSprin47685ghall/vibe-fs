@@ -401,7 +401,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             (fun _ path prompt ->
                 forkChild reviewerAgentId Role.Reviewer OrchestratorHostReview.DeepReviewerAgent path prompt true None)
             (fun _ -> runtime.SendDeferredFirstPrompt reviewerAgentId)
-            (fun _ -> awaitChild reviewerAgentId)
+            (fun (occasion: ReviewerTerminalOccasion) ->
+                ReviewerTerminalAwait.awaitFuture deps.Journal deps.Sessions occasion Distillation.AwaitAgentTimeoutMs)
             nudgeReviewer
             jobId
             managerSessionId

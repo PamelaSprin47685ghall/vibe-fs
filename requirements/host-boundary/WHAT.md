@@ -74,7 +74,7 @@
 
 ## HOST-BOUNDARY-019: Host 物理能力缺口必有 Canary 与 Contract 证明
 
-业务所依赖的全部宿主物理能力（包括时序、快照解析、模型路由等）必须具备严格的契约测试与金丝雀（canary）测试验证，缺少证明则判定环境不支持。
+业务所依赖的全部宿主物理能力（包括时序、快照解析、模型路由等）必须具备严格的契约测试与金丝雀（canary）测试验证，缺少证明则判定环境不支持。一次 provider transform 内若 XWire 选择未提交的 prefix probe，必须以 typed `PrefixPresentationHorizon.TentativeCold` 直接返回给同一静态组合根；组合根据此在当前调用中抑制会重放旧历史 horizon 的后置 auxiliary projectors。该事实不得通过跨 callback mutable registry/flag 传播。
 
 ## HOST-BOUNDARY-020: 观测不足或多解严格 Fail-Closed
 

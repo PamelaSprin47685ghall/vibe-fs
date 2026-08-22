@@ -63,6 +63,33 @@ test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_pair_wire_but_k
   }
 })
 
+test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_prefix_rebase_is_the_same_auxiliary_cold_boundary_as_host_reanchor', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wanxiang-pair-prefix-rebase-'))
+  const opened = await pair.createJournal(dir)
+  assert.equal(opened.ok, true)
+  try {
+    const session = 'ctx-019-prefix-rebase-pair'
+    const raw = [{ info: { id: 'todo-anchor', role: 'assistant', providerID: 'anthropic' }, parts: [{ type: 'text', text: 'retained raw anchor' }] }]
+    const first = await pair.tryInjectWithJournal(opened.journal, session, pair.text, raw)
+    assert.equal(first.ok, true)
+    const firstIds = pairCallIds(first.value)
+    assert.equal(firstIds.length, 1)
+
+    const rebased = await pair.appendPrefixRebaseCommitted(opened.journal, session, 0n, 1n, 1)
+    assert.equal(rebased.ok, true, rebased.error)
+
+    const next = await pair.tryInjectWithJournal(opened.journal, session, pair.text, first.value)
+    assert.equal(next.ok, true, next.error)
+    const nextIds = pairCallIds(next.value)
+    assert.equal(nextIds.length, 1, 'a retained raw Host anchor must not tunnel the old pair across a Y prefix rebase')
+    assert.notEqual(nextIds[0], firstIds[0], 'the new Y horizon must mint a fresh pair identity')
+    assert.equal(pair.pairCount(opened.journal, session), 2, 'durable pair history remains audit-visible after retirement')
+  } finally {
+    pair.disposeJournal(opened.journal)
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[CONTEXT-COMPRESSION-019] CTX_019_reanchor_retires_old_requirement_reads_then_same_digest_regrounds_on_the_next_real_trigger', async () => {
   const { dir, source, cleanup } = sandbox()
   const opened = await grounding.createJournal(dir)

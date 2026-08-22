@@ -6,7 +6,7 @@
 
 ## SEMANTIC-TRACE-002: typed capture 边界
 
-XTrace 仅捕获具有语义约束力的实体：宿主可见 prompt、助手正文、推理过程、工具调用及工具返回结果，以及必要的省略标记。严禁记录 UI 增量、用量统计、成本、时间戳、目录路径或传输状态标识。以物理部件身份结合消息与运行标识作为幂等凭据，防止由于数组索引漂移导致重复记录。
+XTrace 仅捕获具有语义约束力的实体：宿主可见的任务/续接 prompt、助手正文、推理过程、工具调用及工具返回结果，以及必要的省略标记。严禁记录 UI 增量、用量统计、成本、时间戳、目录路径或传输状态标识。`ProviderRetryAttempt` 是 Host transport/control-plane continuation：其物理消息身份可以保留在 capture 坐标宇宙中以避免后续 turn 重编号，但其“上一物理尝试失败，请继续”正文不得形成 durable X semantic part，也不得进入 Y、WorkRecord 或 prefix digest。该裁决必须读取 Host metadata 的 typed origin，严禁匹配提示词文本。以物理部件身份结合消息与运行标识作为幂等凭据，防止由于数组索引漂移导致重复记录。
 
 ## SEMANTIC-TRACE-003: cursor 严格单调、独立于 Host 坐标
 

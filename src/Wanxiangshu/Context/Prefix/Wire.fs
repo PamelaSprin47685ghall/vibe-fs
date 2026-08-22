@@ -71,6 +71,11 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 open FsToolkit.ErrorHandling
 
+[<RequireQualifiedAccess>]
+type PrefixPresentationHorizon =
+    | Current
+    | TentativeCold
+
 module XWire =
 
     let private sessionIdOfOutput (output: obj) : SessionId option =
@@ -118,13 +123,56 @@ module XWire =
     /// Prefix coverage is expressed only in canonical XTrace semantic-turn
     /// coordinates. A positional legacy trace is insufficient proof and fails
     /// closed instead of silently interpreting a provider-array index as history.
-    let private requestStartCutoff (physical: PhysicalUserMessageId) (xTrace: XTraceProjectionState) =
-        XTraceProjection.tryTurnOfHostMessageId (PhysicalUserMessageId.value physical) xTrace
-        |> Option.defaultWith (fun () ->
+    let private providerRetryOrigin =
+        PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ProviderRetryAttempt)
+
+    let private isProviderRetryAttempt (rawMessage: obj) =
+        ProviderWireDecode.promptOriginOfMessage rawMessage = Some providerRetryOrigin
+
+    let private isProviderRetryMessageId (messageId: string) (rawMessages: obj list) =
+        rawMessages
+        |> List.exists (fun message ->
+            ProviderWireDecode.hostMessageId message = Some messageId
+            && isProviderRetryAttempt message)
+
+    let private requestStartCutoff
+        (physical: PhysicalUserMessageId)
+        (rawMessages: obj list)
+        (xTrace: XTraceProjectionState)
+        =
+        let physicalId = PhysicalUserMessageId.value physical
+
+        match XTraceProjection.tryTurnOfHostMessageId physicalId xTrace with
+        | Some cutoff -> cutoff
+        | None when isProviderRetryMessageId physicalId rawMessages ->
+            ProviderWireCapture.trySemanticTurnOfHostMessageId physicalId rawMessages
+            |> Option.defaultWith (fun () ->
+                raise (
+                    InvalidOperationException
+                        "X-wire cannot bind the retry user message to the Host semantic-turn coordinate"
+                ))
+        | None ->
             raise (
                 InvalidOperationException
                     "X-wire cannot bind the physical user message to stable canonical XTrace provenance"
-            ))
+            )
+
+    let private staleProviderRetryMessageIds (rawMessages: obj list) =
+        let currentPhysical =
+            ProviderWireCapture.lastUserMessageId rawMessages
+            |> Option.map PhysicalUserMessageId.value
+
+        rawMessages
+        |> List.choose (fun message ->
+            match ProviderWireDecode.hostMessageId message with
+            | Some messageId when isProviderRetryAttempt message && Some messageId <> currentPhysical -> Some messageId
+            | _ -> None)
+        |> Set.ofList
+
+    let private retryTransportRetirement (horizon: PrefixPresentationHorizon) (rawMessages: obj list) =
+        match horizon with
+        | PrefixPresentationHorizon.Current -> Set.empty
+        | PrefixPresentationHorizon.TentativeCold -> staleProviderRetryMessageIds rawMessages
 
     /// COMPANION-009 / CTX-011: FrozenRecordPrefix = Opening + coverable Y frame
     /// prefix. RawGap never participates — it has no Y coverage proof.
@@ -349,10 +397,26 @@ module XWire =
         (state: SessionAgentProjection)
         (rawMessages: obj list)
         (intents: ProjectionIntent list)
+        (horizon: PrefixPresentationHorizon)
         =
+        // A retry row that was visible in a tentative-cold provider request is
+        // now part of that new horizon's physical prefix even though it is not X
+        // semantics. Retiring it on the very next ordinary request would shrink
+        // the provider wire. Historical retry rows may therefore retire only as
+        // part of a later real cold presentation; Current must be byte-preserving.
+        let staleTransport = retryTransportRetirement horizon rawMessages
+
+        let intents =
+            if Set.isEmpty staleTransport then
+                intents
+            else
+                ProjectionIntent.SuppressTransportOnly :: intents
+
         match ProjectionPlanner.plan intents with
         | Error conflict -> raise (InvalidOperationException(sprintf "X-wire projection conflict: %A" conflict))
-        | Ok ordered -> applyPlannedPrefix state rawMessages ordered
+        | Ok ordered ->
+            applyPlannedPrefix state rawMessages ordered
+            |> fun prefixed -> ProjectionMessageEdit.suppressHostMessagesByIds prefixed staleTransport
 
     let private commitPromotablePrefixRebase
         (durable: AgentJournal)
@@ -487,7 +551,18 @@ module XWire =
             let prefix = state.PrefixEpoch |> Option.defaultValue PrefixEpochProjection.empty
 
             match prefix.Snapshot with
-            | None -> return ()
+            | None ->
+                // Even before the first Y epoch exists, XWire still owns the Host
+                // transport membrane. Otherwise every ordinary A/B slot between
+                // failed probes would accumulate all prior ProviderRetryAttempt
+                // rows and undo the recovery slot's cleanup.
+                let intents =
+                    intentsForHostReanchor (observeHostReanchor prefix) ProjectionIntent.KeepPhysicalPrefix
+
+                let transformed =
+                    renderPrefixMessages state rawMessages intents PrefixPresentationHorizon.Current
+
+                Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
             | Some committed ->
                 let choice = XProjectionChoice.UseCommittedEpoch
                 let! frozenRecordPrefixBody = readFrozenRecordPrefixBody durable choice (Some committed)
@@ -499,7 +574,10 @@ module XWire =
                     XPrefixProjection.forChoice choice (Some committed) memoryPreamble frozenRecordPrefixBody
 
                 let intents = intentsForHostReanchor (observeHostReanchor prefix) prefixIntent
-                let transformed = renderPrefixMessages state rawMessages intents
+
+                let transformed =
+                    renderPrefixMessages state rawMessages intents PrefixPresentationHorizon.Current
+
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
         }
 
@@ -560,7 +638,7 @@ module XWire =
         (physical: PhysicalUserMessageId)
         (output: obj)
         (rawMessages: obj list)
-        : Task<unit> =
+        : Task<PrefixPresentationHorizon> =
         task {
             let! assistant =
                 bindProviderRunAfterProjectionCatchup scope.MessageVisibility snapshotPort sessionId physical
@@ -581,7 +659,7 @@ module XWire =
                 let! currentResult = XTraceMaterialization.currentProjection durable xTrace
                 let current = requireOk currentResult
 
-                let cutoff = requestStartCutoff physical xTrace
+                let cutoff = requestStartCutoff physical rawMessages xTrace
                 // Reuse the arming bound before the snapshot await: a session
                 // deleted inside that window would otherwise make a second
                 // TryRecoveryArming return None and Option.get throw (TOCTOU).
@@ -616,6 +694,11 @@ module XWire =
                         opportunity
                         selectProbe
 
+                let presentationHorizon =
+                    match AttemptPlanner.probeOf plan with
+                    | Some _ -> PrefixPresentationHorizon.TentativeCold
+                    | None -> PrefixPresentationHorizon.Current
+
                 // `requiredBlob` is the single answer to "which blob does this choice
                 // need" — the adapter reads, never guesses (CTX-010: reading the
                 // COMMITTED blob for a probe attempt would inject the old prefix under
@@ -634,17 +717,19 @@ module XWire =
                         frozenRecordPrefixBody
 
                 let intents = intentsForHostReanchor hostReanchor prefixIntent
-                let transformed = renderPrefixMessages state rawMessages intents
+                let transformed = renderPrefixMessages state rawMessages intents presentationHorizon
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
 
                 scope.RecordAttemptPlan sessionId providerRun plan
+                return presentationHorizon
 
             | _ ->
-                raise (
-                    InvalidOperationException
-                        "X-wire cannot plan a retry without authority, fallback, and session projections"
-                )
+                return
+                    raise (
+                        InvalidOperationException
+                            "X-wire cannot plan a retry without authority, fallback, and session projections"
+                    )
         }
 
     let private applyNonReplicaTransform
@@ -653,7 +738,7 @@ module XWire =
         (sessionId: SessionId)
         (snapshot: ISessionSnapshotPort option)
         (output: obj)
-        : Task<unit> =
+        : Task<PrefixPresentationHorizon> =
         task {
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
             let physical = ProviderWireCapture.lastUserMessageId rawMessages
@@ -667,13 +752,16 @@ module XWire =
             // Host callback is only rendezvous/observation; presence no longer drives business branching
             // outside the owning CE.
             match scope.TryTakeRecoveryPermit sessionId, physical, snapshot with
-            | None, _, _ -> return! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
+            | None, _, _ ->
+                do! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
+                return PrefixPresentationHorizon.Current
             | Some _, None, _ ->
-                raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
+                return raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
             | Some _, _, None ->
-                raise (InvalidOperationException "X-wire cannot plan a retry without the public session snapshot")
+                return
+                    raise (InvalidOperationException "X-wire cannot plan a retry without the public session snapshot")
             | Some arming, Some physical, Some snapshotPort ->
-                do! planArmedWorkMainRetry snapshotPort durable scope sessionId arming physical output rawMessages
+                return! planArmedWorkMainRetry snapshotPort durable scope sessionId arming physical output rawMessages
         }
 
     let private applySessionTransform
@@ -682,14 +770,16 @@ module XWire =
         (sessionId: SessionId)
         (snapshot: ISessionSnapshotPort option)
         (output: obj)
-        : Task<unit> =
+        : Task<PrefixPresentationHorizon> =
         task {
             match scope.Strength.StrengthRuntime.TryFindByReplica sessionId, snapshot with
             | Some binding, Some snapshotPort ->
                 do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
+                return PrefixPresentationHorizon.Current
             | Some _, None ->
-                raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
-            | None, _ -> do! applyNonReplicaTransform durable scope sessionId snapshot output
+                return
+                    raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
+            | None, _ -> return! applyNonReplicaTransform durable scope sessionId snapshot output
         }
 
     let applyTransform
@@ -697,12 +787,12 @@ module XWire =
         (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
         (output: obj)
-        : Task<unit> =
+        : Task<PrefixPresentationHorizon> =
         task {
             match journal, sessionIdOfOutput output with
             | Some durable, Some sessionId when not (isCompanionSession durable sessionId) ->
-                do! applySessionTransform durable scope sessionId snapshot output
-            | _ -> return ()
+                return! applySessionTransform durable scope sessionId snapshot output
+            | _ -> return PrefixPresentationHorizon.Current
         }
 
     let private attemptOutcomeOfTurn (turn: ReconciledTurn) : AttemptOutcome option =

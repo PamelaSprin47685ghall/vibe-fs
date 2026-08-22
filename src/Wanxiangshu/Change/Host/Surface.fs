@@ -354,5 +354,8 @@ module OrchestratorHostSurface =
 
     let managerPort (handle: obj) : obj = (handle :?> HostHandle).Manager
 
+    let detachAndDrain (handle: obj) : Task =
+        (handle :?> HostHandle).Host.DetachAndDrain()
+
     let hasChild (handle: obj) (agentId: string) : bool =
         hasChildInRuntime (handle :?> HostHandle).Host agentId

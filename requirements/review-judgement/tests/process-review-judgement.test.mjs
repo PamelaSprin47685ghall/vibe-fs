@@ -118,6 +118,12 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_a_process_verdict_never_becomes_a_co
 test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically_enforced_at_provider_transform', () => {
   const judgeTool = source('src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs')
   const transforms = source('src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs')
+  const finalityHost = source('src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs')
+  const reviewerWorkflow = source('src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs')
+  const reviewPorts = source('src/Wanxiangshu/Mission/Review/Ports.fs')
+  const terminalAwait = source('src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs')
+  const changeReview = source('src/Wanxiangshu/Change/Host/ReviewRunner.fs')
+  const changeHost = source('src/Wanxiangshu/Change/Host/Host.fs')
 
   const duplicate = judgeTool.match(/\| ExecutionDecision\.AlreadyJudged ->([\s\S]*?)\| ExecutionDecision\.Proceed judgement/)
   assert.ok(duplicate, 'duplicate judgement branch must remain explicit')
@@ -125,12 +131,66 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
   assert.doesNotMatch(duplicate[1], /InterruptAttempt|abortSession/, 'second judge must not own physical termination')
 
   assert.match(judgeTool, /let private decideSubmittedInterrupt[\s\S]*?currentPhysicalUserMessage[\s\S]*?SharedState\.VerdictSubmissions\.Contains/)
-  assert.match(judgeTool, /let private interruptClosedSubmittedJudgement[\s\S]*?ensureSubmittedAttemptClosed[\s\S]*?sessionPort\.InterruptAttempt/)
+  assert.match(
+    judgeTool,
+    /let private interruptClosedSubmittedJudgement[\s\S]*?ensureSubmittedAttemptClosed[\s\S]*?awaitSubmittedRecordCapture[\s\S]*?scheduleInterrupt \(\)/,
+    'closure and already-open Blogger producer settlement must precede scheduling the physical interrupt',
+  )
   assert.match(judgeTool, /let interruptAfterSubmittedJudgement[\s\S]*?decideSubmittedInterrupt[\s\S]*?interruptClosedSubmittedJudgement/)
   assert.match(transforms, /InterruptAfterSubmittedJudgement:\s*string option -> Task<unit>/)
-  assert.match(transforms, /JudgeTool\.interruptAfterSubmittedJudgement[\s\S]*?journal[\s\S]*?wired\.CurrentPhysicalUserMessage[\s\S]*?sessionPort/)
+  assert.doesNotMatch(
+    transforms,
+    /\.InterruptAttempt\(/,
+    'the transform composition root must not own raw reviewer attempt termination',
+  )
+  assert.match(
+    judgeTool,
+    /let private interruptClosedSubmittedJudgement[\s\S]*?runBackground[\s\S]*?sessionPort\.InterruptAttempt reviewerSessionId[\s\S]*?terminalReadiness/,
+    'JudgeTool owns the raw physical interrupt only beside its durable closure successor proof',
+  )
+  assert.match(
+    transforms,
+    /JudgeTool\.interruptAfterSubmittedJudgement[\s\S]*?journal[\s\S]*?wired\.CurrentPhysicalUserMessage[\s\S]*?scope\.RunBackground[\s\S]*?sessionPort/,
+  )
   assert.match(transforms, /caps\.SanitizeMessages outObj[\s\S]*?do! caps\.InterruptAfterSubmittedJudgement projectionSessionIdOpt/)
-  assert.match(judgeTool, /ensureSubmittedAttemptClosed[\s\S]*?sessionPort\.InterruptAttempt/, 'durable closure must precede the physical interrupt')
+  assert.doesNotMatch(
+    judgeTool,
+    /let private interruptClosedSubmittedJudgement[\s\S]*?do!\s+sessionPort\.InterruptAttempt/,
+    'messages.transform must never synchronously await the Host abort it is waiting to unblock',
+  )
+  assert.match(
+    reviewerWorkflow,
+    /let private decideSubmittedRecordCapture[\s\S]*?reviewerHasChronicle snapshot reviewerSessionId[\s\S]*?SubmittedRecordCaptureDecision\.AlreadyCaptured[\s\S]*?reviewerHasLinkedBlogger snapshot reviewerSessionId[\s\S]*?SubmittedRecordCaptureDecision\.NoBloggerRequired[\s\S]*?SubmittedRecordCaptureDecision\.AwaitFirstChronicle/,
+    'record capture must decide from canonical Chronicle coverage before admitting a producer wait',
+  )
+  assert.match(
+    reviewerWorkflow,
+    /let private awaitFirstChronicle[\s\S]*?BloggerRuntimeHost\.awaitOpenProducerSettlement[\s\S]*?let awaitSubmittedRecordCapture[\s\S]*?SubmittedRecordCaptureDecision\.AwaitFirstChronicle[\s\S]*?awaitFirstChronicle/,
+    'only the named first-Chronicle decision may wait an already-open Blogger producer',
+  )
+  assert.match(
+    reviewPorts,
+    /type ReviewerTerminalOccasion\s*=\s*\{ ReviewerSessionId: SessionId\s*BarrierId: ReviewBarrierId \}/,
+    'reviewer terminal authority must carry the reusable session and exact barrier as one typed occasion',
+  )
+  assert.match(
+    terminalAwait,
+    /let hasDurablyClosedJudgement[\s\S]*?barrierId: ReviewBarrierId[\s\S]*?guard\.CurrentBarrierId = Some barrierId[\s\S]*?attempt\.ReviewBarrierId = barrierId/,
+    'clean-abort evidence must be scoped to the exact current review barrier',
+  )
+  assert.match(
+    terminalAwait,
+    /let private terminalResult[\s\S]*?TerminalOutcome\.Aborted _ when hasDurablyClosedJudgement journal reviewerSessionId barrierId[\s\S]*?return Ok\(\)/,
+    'the shared terminal interpreter must authorize Abort only from durable barrier-scoped closure',
+  )
+  assert.match(
+    terminalAwait,
+    /occasion: ReviewerTerminalOccasion[\s\S]*?let reviewerSessionId = occasion\.ReviewerSessionId[\s\S]*?let barrierId = occasion\.BarrierId[\s\S]*?SubscribeFutureTerminal/,
+    'the physical wait must subscribe using the typed review occasion',
+  )
+  assert.match(finalityHost, /let awaitTerminal \(occasion: ReviewerTerminalOccasion\)[\s\S]*?ReviewerTerminalAwait\.awaitFuture scope\.Journal scope\.Sessions occasion reviewerTimeoutMs/)
+  assert.match(changeReview, /awaitReviewer: ReviewerTerminalOccasion -> Task<Result<unit, string>>[\s\S]*?let terminalOccasion =[\s\S]*?ReviewerSessionId = reviewerSessionId[\s\S]*?BarrierId = barrierId[\s\S]*?AwaitReviewer = fun \(\) -> awaitReviewer terminalOccasion/)
+  assert.match(changeHost, /fun \(occasion: ReviewerTerminalOccasion\) ->[\s\S]*?ReviewerTerminalAwait\.awaitFuture[\s\S]*?deps\.Journal[\s\S]*?deps\.Sessions[\s\S]*?occasion/)
 })
 
 test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_ensure_submitted_attempt_closed_returns_ok_false_when_tool_result_missing_and_does_not_interrupt', async () => {

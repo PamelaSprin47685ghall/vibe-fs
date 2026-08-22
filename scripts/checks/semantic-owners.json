@@ -1456,6 +1456,10 @@
       "owner": "review-judgement"
     },
     {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
+      "owner": "review-judgement"
+    },
+    {
       "path": "src/Wanxiangshu/Mission/Review/OpenCode/ReviewHostSurface.fs",
       "owner": "review-assurance"
     },

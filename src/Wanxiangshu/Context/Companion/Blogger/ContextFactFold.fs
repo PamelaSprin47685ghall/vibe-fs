@@ -210,17 +210,30 @@ module ContextFactFold =
                 |> blogOutcome "BlogObservationsSquashed")
 
         | ContextFactCases.PrefixRebaseCommitted payload ->
-            tryUpdatePrefix
+            // CTX-019: a successful Y prefix rebase is itself a provider-horizon
+            // cold boundary. PrefixEpoch and auxiliary visibility must therefore
+            // move atomically: retaining an old guideline/tip/grounding visibility
+            // floor while the raw X prefix is replaced lets request-local prose
+            // tunnel through any covered Host rows that intentionally survive the
+            // replacement (notably retained todowrite rounds).
+            AgentProjection.tryUpdate
                 payload.SessionId
-                (PrefixEpochProjection.applyRebase
-                    payload.PreviousEpochId
-                    payload.NextEpochId
-                    { FrozenRecordPrefixRef = payload.FrozenRecordPrefixRef
-                      FrozenRecordPrefixDigest = payload.FrozenRecordPrefixDigest
-                      CutoffExclusive = payload.CutoffExclusive
-                      CoveredPrefixDigest = payload.CoveredPrefixDigest
-                      SealRoot = payload.SealRoot
-                      SyntheticMessageId = payload.SyntheticMessageId })
+                (fun session ->
+                    session.PrefixEpoch
+                    |> Option.defaultValue PrefixEpochProjection.empty
+                    |> PrefixEpochProjection.applyRebase
+                        payload.PreviousEpochId
+                        payload.NextEpochId
+                        { FrozenRecordPrefixRef = payload.FrozenRecordPrefixRef
+                          FrozenRecordPrefixDigest = payload.FrozenRecordPrefixDigest
+                          CutoffExclusive = payload.CutoffExclusive
+                          CoveredPrefixDigest = payload.CoveredPrefixDigest
+                          SealRoot = payload.SealRoot
+                          SyntheticMessageId = payload.SyntheticMessageId }
+                    |> Result.map (fun rebased ->
+                        { session with
+                            PrefixEpoch = Some rebased }
+                        |> ProjectionUpdate.retireAuxiliaryInjectionVisibility))
                 projection
             |> prefixOutcome "PrefixRebaseCommitted" projection
 

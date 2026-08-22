@@ -98,6 +98,18 @@ module ProjectionMessageEdit =
         let before, after = List.splitAt (insertionIndex + 1) surviving
         before @ (head :: after)
 
+    /// Host transport membrane: remove exactly the addressed physical rows.
+    /// No role/count heuristic is permitted here — transport metadata identifies
+    /// Host messages, so write-back must consume the same stable identity universe.
+    let suppressHostMessagesByIds (rawMessages: obj list) (messageIds: Set<string>) : obj list =
+        if Set.isEmpty messageIds then
+            rawMessages
+        else
+            rawMessages
+            |> List.filter (fun message ->
+                ProviderWireDecode.hostMessageId message
+                |> Option.forall (fun messageId -> not (Set.contains messageId messageIds)))
+
     let private canonicalValue (canonical: string) : obj =
         try
             emitJsExpr canonical "JSON.parse($0)"

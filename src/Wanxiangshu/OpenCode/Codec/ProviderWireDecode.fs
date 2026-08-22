@@ -171,14 +171,19 @@ module ProviderWireDecode =
     /// The `PromptKey` a Host message carries in its metadata (PROMPT-011).
     /// Reads the field PromptMetadataCodec wrote; single-message variant of
     /// PromptIngressCodec's input/output pair reader.
-    let promptKeyOfMessage (rawObj: obj) : PromptKey option =
+    let private nonBlankMetadataText (value: obj) : string option =
+        if isNull value then
+            None
+        else
+            let text = unbox<string> value
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private metadataStringOfMessage (field: string) (rawObj: obj) : string option =
         let fromMetadata (source: obj) =
             if isNull source || isNull source?metadata then
                 None
             else
-                let value = source?metadata?(PromptMetadataCodec.PromptKeyField)
-
-                if isNull value then None else Some(unbox<string> value)
+                source?metadata?(field) |> nonBlankMetadataText
 
         let info = infoObject rawObj
 
@@ -186,9 +191,18 @@ module ProviderWireDecode =
             rawArray (if isNull rawObj then null else rawObj?parts)
             |> List.tryPick (fun part -> if isNull part then None else fromMetadata part)
 
-        [ fromMetadata info; fromMetadata rawObj; fromParts () ]
-        |> List.tryPick id
+        [ fromMetadata info; fromMetadata rawObj; fromParts () ] |> List.tryPick id
+
+    let promptKeyOfMessage (rawObj: obj) : PromptKey option =
+        metadataStringOfMessage PromptMetadataCodec.PromptKeyField rawObj
         |> Option.map PromptKey.create
+
+    /// Typed Host continuation origin carried out-of-band from provider semantic
+    /// content. Consumers use this only at the Host membrane (for example to keep
+    /// ProviderRetryAttempt transport rows out of durable X); it never enters the
+    /// semantic/wire projection itself (COMPANION-012).
+    let promptOriginOfMessage (rawObj: obj) : string option =
+        metadataStringOfMessage PromptMetadataCodec.OriginField rawObj
 
     /// Extract the single, unambiguous session id from a transform output's
     /// `messages` array. Used by hooks that need to identify the managed session

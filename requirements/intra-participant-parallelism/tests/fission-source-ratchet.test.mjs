@@ -106,7 +106,9 @@ test('WHAT[INTRA-PARTICIPANT-PARALLELISM-014] Assistance and degeneration guard 
 test('WHAT[INTRA-PARTICIPANT-PARALLELISM-012] Fission role eligibility comes from ToolPermission.Fission for current office vocabulary', () => {
   const roles = read('src/Wanxiangshu/Foundation/Roles.fs')
   const registry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
-  assert.match(registry, /"fission"\s*->\s*fun r -> Roles\.isAllowed r ToolPermission\.Fission/)
+  const owner = read('src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs')
+  assert.match(registry, /"fission",\s*FissionTool\.admission/)
+  assert.match(owner, /let\s+admission:\s*ToolAdmission\s*=\s*fun\s+_\s+r\s*->\s*Roles\.isAllowed\s+r\s+ToolPermission\.Fission/)
 
   for (const role of ['Manager', 'Coder', 'Inspector', 'Browser', 'Inquiry']) {
     const block = new RegExp(`\\| Role\\.${role} ->[\\s\\S]{0,900}?ToolPermission\\.Fission`)

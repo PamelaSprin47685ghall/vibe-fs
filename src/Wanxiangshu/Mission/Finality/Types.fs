@@ -65,7 +65,7 @@ type BlessingAdmissionFailure =
 
 /// One-shot process capability / permit granting authority to record finality blessing.
 type BlessingPermit =
-    private BlessingPermit of
+    private | BlessingPermit of
         {| LifeId: ManagerLifeId
            RequestId: FinalityRequestId
            GitTreeHash: GitTreeHash |}

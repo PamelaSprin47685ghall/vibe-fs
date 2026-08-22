@@ -13,6 +13,7 @@
 1. **Probe 提升**：Probe 成功后触发 `PrefixRebaseCommitted(EvidenceKind=Probe)`，提升 Epoch 并激活新快照。
 2. **TodoCheckpoint Rebase**：基于 committed Accepted 链计算 lag-1 cutoff，在 seal 前提交 `PrefixRebaseCommitted(EvidenceKind=TodoCheckpoint)`。
 3. **Compaction 重锚**：收容外部 compaction 事实，生成 `ContextReanchored`，清空快照并使 PrefixCoverage 归零。
+4. **Retry transport cleanup**：XWire 从 Host metadata 分类 `ProviderRetryAttempt`，但 cleanup 服从 typed `PrefixPresentationHorizon`。`Current` 不删除任何已经进入当前 provider prefix 的 retry row；`TentativeCold` 才按 stable Host id 删除此前 horizon 的 retry rows并保留 current physical retry。这样 retry 文本不写入 canonical X，却也不会在一次 cold presentation 之后立刻从同一 horizon 消失、制造 provider-prefix shrink。当前 retry 的 cutoff 定位仍复用 XTrace capture 的 decodable Host semantic-turn 坐标。
 
 ## 依赖关系
 
