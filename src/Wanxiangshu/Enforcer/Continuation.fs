@@ -336,7 +336,9 @@ module EnforcerContinuation =
         Diagnostic.emit
             "enforcer-cycle-superseded"
             [ "session_id", sessionKey
-              "result", "terminal belongs to an older Blogger request: " + ProviderRunIdentity.value providerRun ]
+              "result",
+              "terminal belongs to an older Blogger request: "
+              + ProviderRunIdentity.value providerRun ]
 
         Task.FromResult(ctx.Project ctx.RawMessages)
 

@@ -6,7 +6,7 @@ import test from 'node:test'
 const root = resolve(import.meta.dirname, '../../..')
 const read = (path) => readFileSync(resolve(root, path), 'utf8')
 
-test('WHAT[DG-002] LoopSensor owns its physical child interruptibility predicate', () => {
+test('WHAT[HOST-BOUNDARY-013] LoopSensor owns its physical child interruptibility predicate', () => {
   const owner = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
   const host = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
 
@@ -14,5 +14,4 @@ test('WHAT[DG-002] LoopSensor owns its physical child interruptibility predicate
   assert.match(owner, /ownedSessions\.Contains key && sessionParents\.ContainsKey key/)
   assert.match(owner, /let create/)
   assert.match(host, /LoopSensor\.create/)
-  assert.doesNotMatch(host, /NeedHelpSensor\.createInterruptiblePredicate/)
 })

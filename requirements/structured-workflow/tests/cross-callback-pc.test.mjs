@@ -157,8 +157,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_plain_resource_without_pat
 
 test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_baseline_covers_known_debt', () => {
   assert.ok(KNOWN_DEBT_BASELINE.has('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed'))
-  assert.ok(KNOWN_DEBT_BASELINE.has('src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs::armed'))
-  assert.equal(KNOWN_DEBT_BASELINE.size, 2, 'baseline must contain exactly 2 known debt entries')
+  assert.equal(KNOWN_DEBT_BASELINE.size, 1, 'baseline must contain exactly 1 known debt entry')
   assert.ok(KNOWN_DEBT_BASELINE.size <= BASELINE_MAX_SIZE, 'baseline size must not exceed BASELINE_MAX_SIZE (ratchet)')
 })
 

@@ -28,17 +28,6 @@ module XTracePipeline =
         fuse reason
         raise (InvalidOperationException reason)
 
-    /// Strip AssistancePrompt sentinel from reasoning wire parts only.
-    let private stripReasoningSentinel (part: ProviderWireCapture.CapturedWirePart) =
-        match part.WirePart with
-        | WireReasoning text ->
-            { part with
-                WirePart = WireReasoning(AssistancePrompt.stripSentinel text) }
-        | WireText _
-        | WireToolCall _
-        | WireToolResult _
-        | WireMedia _ -> part
-
     let private providerRetryOrigin =
         PromptAuthority.originLabel (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ProviderRetryAttempt)
 
@@ -56,8 +45,7 @@ module XTracePipeline =
                     // coordinates do not renumber, but persist no semantic parts.
                     { message with Parts = [] }
                 else
-                    { message with
-                        Parts = message.Parts |> List.map stripReasoningSentinel }))
+                    message))
 
     /// Evidence -> Decision: all Host message ids present -> stable id list.
     let private tryStableHostMessageIds (rawMessages: obj list) : string list option =

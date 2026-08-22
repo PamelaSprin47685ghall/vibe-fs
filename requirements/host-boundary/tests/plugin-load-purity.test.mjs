@@ -25,11 +25,9 @@ test('WHAT[HOST-BOUNDARY-021] HOST_021_plugin_load_graph_has_no_semantic_recover
 })
 
 test('WHAT[HOST-BOUNDARY-021] HOST_021_broken_tool_recovery_APIs_do_not_exist', () => {
-  const assistance = read('src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs')
   const fission = read('src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs')
   const jsStore = read('src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs')
 
-  assert.doesNotMatch(assistance, /member\s+_\.Recover\s*\(/)
   assert.doesNotMatch(fission, /let\s+recoverGroups\b/)
   assert.doesNotMatch(jsStore, /let\s+recoverCurrent\b/)
 })

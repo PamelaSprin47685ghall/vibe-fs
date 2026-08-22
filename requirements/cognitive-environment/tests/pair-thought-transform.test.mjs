@@ -1,6 +1,6 @@
 // Split from tests/unit/host/pair-thought-transform.test.mjs (cutover Wave 2a);
 // owner: cognitive-environment. CE_013: PAIR_HINT marker 正文 craft ——
-// canonical pair-thought text 鼓励 NEEDHELP 与持续 ready-frontier 并发，且不含全局并发数字。
+// canonical pair-thought text 鼓励持续 ready-frontier 并发，且不含全局并发数字。
 // anchor/replay 机制断言归 prefix-stability；Cursor wire 渲染归 provider-projection。
 
 import assert from 'node:assert/strict'
@@ -18,8 +18,7 @@ const text = readFileSync(
   'utf8',
 )
 
-test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_needhelp_and_continuous_ready_frontier_without_global_N', () => {
-  assert.match(text, /\[NEEDHELP\]/)
+test('WHAT[COGNITIVE-ENVIRONMENT-013] PAIR_HINT_canonical_text_encourages_continuous_ready_frontier_without_global_N', () => {
   assert.match(text, /parallel|concurr|并行|并发/i)
   assert.match(text, /ready frontier/i)
   assert.match(text, /A1/)

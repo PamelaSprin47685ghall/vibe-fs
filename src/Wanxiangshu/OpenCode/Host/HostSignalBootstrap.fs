@@ -112,10 +112,6 @@ module HostSignalBootstrap =
             do scope.TrackReconcileShutdown(fun () -> reconciler.StopAndDrain())
 
             let handleOrdinaryAbort sessionId signal =
-                // SW-017 ②: do not probe NeedHelpSensor armed presence to branch.
-                // The typed AssistanceAbortClaim is consumed once by the owning CE (AssistanceHost)
-                // behind the fresh SessionIdle fence. Revoke current attempt unconditionally here;
-                // the fresh idle wake mints a new QuiescencePermit for any idle-derived successor.
                 scope.Sessions.Quiescence.RevokeCurrentAttempt sessionId
 
                 scope.Strength.StrengthReplicaRuntime
@@ -201,25 +197,11 @@ module HostSignalBootstrap =
 
             do scope.AttachLoopSensor loopSensor
 
-            let needHelpSensor =
-                NeedHelpSensor(
-                    NeedHelpSensor.createEligibilityPredicate
-                        scope.Sessions.OwnedSessions
-                        scope.Sessions.SessionParents
-                        journal
-                        scope.Strength.StrengthRuntime,
-                    (fun sessionId -> sessionPort.InterruptAttempt sessionId)
-                )
-
-            let needHelpSensor =
-                AssistanceHostWiring.install needHelpSensor sessionPort journal snapshot scope
-
             let signalRouter =
                 HostSignalRouter(
                     scope.Sessions.OwnedSessions,
                     onSignal,
                     onLoopEvent = loopSensor.Observe,
-                    onNeedHelpEvent = needHelpSensor.Observe,
                     onProviderStepEnd =
                         (fun sessionId physicalUserMessageId providerRun ->
                             ModelRouting.endProviderStep sessionId physicalUserMessageId providerRun),
@@ -490,8 +472,6 @@ module HostSignalBootstrap =
                 ids
                 |> Seq.iter (fun id ->
                     scope.LoopSensor.DropSession id
-                    scope.NeedHelpSensor.DropSession id
-                    scope.DropAssistanceSignals id
                     signalRouter.UnregisterOwned id)
 
             return

@@ -68,10 +68,6 @@ Join 等待遇外部用户输入、操作员取消或超时终止时，产生 `I
 
 委托返回的 WorkRecord 或建议仅作为调用方决策的证据输入，不自动改变全局请求的推进方向，不授予调用方额外权能，亦不免除其既定义务。
 
-## DELEG-018: NEEDHELP consultation 是真实独立 child 委托
-
-遇到 NEEDHELP 触发求助时，系统创建真实且独立的 consultation child。求助请求冻结当前父上下文并物化为背景，咨询结果以只读建议形式返回原绑定，不继承 owner persona 亦不转移使命所有权。
-
 ## DELEG-019: fork child 首 prompt 是 typed 语义载荷，不是自由文本
 
 fork child 的初始提示词是类型化渲染的结构载荷，严格区分 Assignment（指令任务）与 CommissionerRecord/Attachment（只读上下文数据）。父到子方向的上下文必须作为 TOML 数据字段包裹，子到父方向的完成项必须作为注释式 WorkRecord，严禁方向混淆。

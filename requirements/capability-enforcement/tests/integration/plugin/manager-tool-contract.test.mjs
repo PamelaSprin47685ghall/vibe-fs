@@ -221,7 +221,6 @@ test('WHAT[ENF-006] MANAGER_pair_marker_borrows_host_skill_with_empty_name_and_k
     assert.match(markerOutput, /^# /)
     assert.doesNotMatch(markerOutput, /<skill_content|<\/skill_content>/)
     assert.equal(markerOutput.split('\n').filter(Boolean).every((line) => line.startsWith('#')), true)
-    assert.match(markerOutput, /\[NEEDHELP\]/)
     assert.match(markerOutput, /todowrite/i)
     assert.match(markerOutput, /ready frontier/i)
     assert.equal(hooks.tool[markerToolName], undefined, 'wire marker borrows the Host-owned skill name without plugin registration')

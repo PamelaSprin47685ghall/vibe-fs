@@ -57,8 +57,6 @@ test('WHAT[INTERACTION-AUTHORITY-005] IA_005_every_continuation_kind_is_parseabl
     'BusyAgentNudge',
     'ProviderRetryAttempt',
     'DegenerationGuard',
-    'NeedHelpEscalation',
-    'NeedHelpAdvice',
     'ManagerIdleEncouragement',
     'FinalityRejected',
     'FinalitySteer',

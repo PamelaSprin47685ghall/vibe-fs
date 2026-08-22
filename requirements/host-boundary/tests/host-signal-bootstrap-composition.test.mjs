@@ -63,9 +63,6 @@ test('WHAT[HOST-BOUNDARY-021] HostSignalBootstrap delegates policy to published 
   assert.match(bootstrapSource, /FissionHost\.routeAttemptAborted/)
   assert.match(bootstrapSource, /FissionHost\.observePhysicalExecutionEnd/)
 
-  // Assistance wiring delegated to AssistanceHostWiring owner
-  assert.match(bootstrapSource, /AssistanceHostWiring\.install/)
-
   // Session deletion delegated to HostSessionDeletion owner
   assert.match(bootstrapSource, /HostSessionDeletion\.handle/)
 })

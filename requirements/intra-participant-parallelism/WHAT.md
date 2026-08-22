@@ -36,7 +36,7 @@ Fission 准入必须原子地建立全部 N 条 lanes。任一 lane 的创建、
 
 仅在所有 lane 的自有工作记录、裂变前广播债权与各 lane 亲和任务均完成结算后，group 方可收敛。一个 Fission group 最终仅向逻辑父级交付一次普通的 terminal completion，并将结果写回原 logical participant 的 completion cell。
 
-收敛后的最终接管属于同一个 logical lane 生命周期，而不是某一条固定的 physical user message。最终接管期间若发生 nudge、assistance、provider recovery/AABB 或 degeneration-guard interruption，其后继 continuation 仍由该接管 lane 拥有；只有后继链最终产生普通 `TurnCompleted` 后才允许写入 `FissionConverged` 并发布 logical completion。
+收敛后的最终接管属于同一个 logical lane 生命周期，而不是某一条固定的 physical user message。最终接管期间若发生 nudge、provider recovery/AABB 或 degeneration-guard interruption，其后继 continuation 仍由该接管 lane 拥有；只有后继链最终产生普通 `TurnCompleted` 后才允许写入 `FissionConverged` 并发布 logical completion。
 
 ## INTRA-PARTICIPANT-PARALLELISM-010: durable replay，不猜 lane
 
@@ -56,7 +56,7 @@ Fission 的角色权能准入必须从 office consequence 的单一源头投影�
 
 ## INTRA-PARTICIPANT-PARALLELISM-014: control-plane successor precedes lane settlement
 
-Fission 不拥有 nudge、`[NEEDHELP]` assistance、provider fallback/AABB 或 degeneration-guard 的恢复语义。对 Fission lane 的 reconciled turn：`TurnInProgress`、`TurnNeedsContinuation`、`TurnFailed` 与由 `DegenerationGuard` 导致的 `TurnAborted` 必须让渡给普通 Turn/Application owner；成功建立的 assistance continuation 同样先于 Fission settlement。上述路径不得 materialize lane、不得失败 group、不得发布 logical completion。仅稳定 `TurnCompleted` 可进入 lane materialization / final takeover completion；真正的外部 abort 才可终止 group。若 Assistance 已认领该 physical abort、但 successor 无法建立，则错误必须交还 Fission owner 对整个 logical group fail-closed，不能只终止物理 lane 而遗留 active group。
+Fission 不拥有 nudge、provider fallback/AABB 或 degeneration-guard 的恢复语义。对 Fission lane 的 reconciled turn：`TurnInProgress`、`TurnNeedsContinuation`、`TurnFailed` 与由 `DegenerationGuard` 导致的 `TurnAborted` 必须让渡给普通 Turn/Application owner。上述路径不得 materialize lane、不得失败 group、不得发布 logical completion。仅稳定 `TurnCompleted` 可进入 lane materialization / final takeover completion；真正的外部 abort 才可终止 group。
 
 ## INTRA-PARTICIPANT-PARALLELISM-015: deterministic ring convergence
 

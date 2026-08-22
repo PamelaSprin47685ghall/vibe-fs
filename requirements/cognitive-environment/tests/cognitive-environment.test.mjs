@@ -6,8 +6,8 @@
 //   2. Role Law is the enduring self-model layer; one Role Law per office (no
 //      fast/deep split, no tool inventory, no hidden orchestration).
 //   3. Office Library = inherited craft; knowledge ≠ authority (PROMPT-016).
-//   4. Pair Hint craft payload: NEEDHELP is normal collaboration, parallel wave
-//      default, no scarcity language, no machine identity (AGENT-031, HOST-013).
+//   4. Pair Hint craft payload: continuous ready-frontier parallel default,
+//      no scarcity language, no machine identity (HOST-013).
 //   5. Role Law cognition anchors are present in both locales (ROLE_SEMANTIC_ANCHORS).
 
 import assert from 'node:assert/strict'
@@ -145,15 +145,6 @@ test('WHAT[COGNITIVE-ENVIRONMENT-005] CE_role_law_is_enduring_self_model_without
         `${role}/${locale}.md must not teach hidden review orchestration`,
       )
     }
-  }
-})
-
-test('WHAT[COGNITIVE-ENVIRONMENT-013] CE_agent_031_pair_hint_teaches_needhelp_as_normal_collaboration', () => {
-  for (const locale of ['en', 'zh-CN']) {
-    const text = read(`resources/provider/host/pair-programming-guideline/${locale}.md`)
-    assert.match(text, /\[NEEDHELP\]/)
-    assert.match(text, /not failure|不是失败|正常协作|normal collaboration|normal/i)
-    assert.doesNotMatch(text, /only (?:when|if) truly blocked|只在确实卡住|普通情况下不要使用/i)
   }
 })
 

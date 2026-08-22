@@ -22,7 +22,6 @@ export const PROVIDER_PROSE_SCAN_ROOTS = Object.freeze([
   'src/Wanxiangshu/Mission/Manager/Narrative.fs',
   'src/Wanxiangshu/Mission/Manager/Life/Prompt.fs',
   'src/Wanxiangshu/Mission/Finality/Prompt.fs',
-  'src/Wanxiangshu/Interaction/Dispatch/AssistancePrompt.fs',
   'src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs',
   'src/Wanxiangshu/Context/Companion/Prompt.fs',
   'src/Wanxiangshu/Mission/Review/Prompt.fs',

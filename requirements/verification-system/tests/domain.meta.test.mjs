@@ -221,7 +221,7 @@ test('WHAT[VERIFICATION-SYSTEM-008] Fallback_owner_exposes_cursor_and_dedupe_sta
     exhausted: false,
   })
   assert.deepEqual(fallback.recordSuccess(), {
-    offset: 1,
+    offset: 0,
     failures: 0,
     dedupeKeys: 0,
     exhausted: false,

@@ -146,22 +146,10 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     let mutable loopSensor: LoopSensor option = None
     // DSL-MUTABLE: resource — message-visibility hub attachment slot
     let mutable messageVisibility: MessageVisibilityHub option = None
-    // DSL-MUTABLE: resource — NEEDHELP reasoning sensor attachment slot
-    let mutable needHelpSensor: NeedHelpSensor option = None
     // DSL-MUTABLE: resource — satellite runtime attachment slot
     let mutable satelliteRuntime: SatelliteRuntime option = None
     // DSL-MUTABLE: resource — sync-delegate runtime attachment slot
     let mutable syncDelegateRuntime: SyncDelegateRuntime option = None
-    // Assistance workflow callbacks attach after LifecycleWorkRecord composition,
-    // without reversing compile-layer ownership.
-    // DSL-MUTABLE: resource — assistance reconciled-turn handler attachment slot
-    let mutable assistanceTurnHandler: (ReconciledTurnContext -> Task<AssistanceTurnDisposition>) option =
-        None
-
-    // DSL-MUTABLE: resource — assistance synchronous signal-drop attachment slot
-    let mutable assistanceDropSignals: (SessionId -> unit) option = None
-    // DSL-MUTABLE: resource — assistance durable session-drop handler attachment slot
-    let mutable assistanceDropSession: (SessionId -> Task) option = None
 
     let disposeRuntimeOwner (owner: ISessionRuntimeOwner option) =
         task {
@@ -238,29 +226,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
 
     member _.SyncDelegateRuntime = syncDelegateRuntime
 
-    member _.AttachAssistance
-        (
-            handleTurn: ReconciledTurnContext -> Task<AssistanceTurnDisposition>,
-            dropSignals: SessionId -> unit,
-            dropSession: SessionId -> Task
-        ) =
-        assistanceTurnHandler <- Some handleTurn
-        assistanceDropSignals <- Some dropSignals
-        assistanceDropSession <- Some dropSession
-
-    member _.HandleAssistanceTurn(context: ReconciledTurnContext) =
-        match assistanceTurnHandler with
-        | Some handle -> handle context
-        | None -> Task.FromResult AssistanceTurnDisposition.NotAssistance
-
-    member _.DropAssistanceSignals(sessionId: SessionId) =
-        assistanceDropSignals |> Option.iter (fun drop -> drop sessionId)
-
-    member _.DropAssistanceSession(sessionId: SessionId) : Task =
-        match assistanceDropSession with
-        | Some drop -> drop sessionId
-        | None -> Task.FromResult()
-
     member _.AttachLoopSensor(sensor: LoopSensor) = loopSensor <- Some sensor
 
     member _.AttachMessageVisibility(hub: MessageVisibilityHub) = messageVisibility <- Some hub
@@ -268,18 +233,6 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// None until the signal stack wires the hub; the catch-up re-read then
     /// falls back to its bounded immediate form.
     member _.MessageVisibility = messageVisibility
-
-    member _.AttachNeedHelpSensor(sensor: NeedHelpSensor) = needHelpSensor <- Some sensor
-
-    member _.NeedHelpSensor =
-        match needHelpSensor with
-        | Some sensor -> sensor
-        | None ->
-            // Journal/unit-only scopes have no streaming source. Keep a no-op
-            // sensor so turn classification can still ask exact attempt identity.
-            let empty = NeedHelpSensor((fun _ -> false), (fun _ -> Task.FromResult(Ok())))
-            needHelpSensor <- Some empty
-            empty
 
     member _.LoopSensor =
         match loopSensor with

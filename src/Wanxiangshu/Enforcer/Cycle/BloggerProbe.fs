@@ -104,10 +104,7 @@ module BloggerRecoveryProbe =
             |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
 
         let parent =
-            PromptAuthorityLedger.acceptedDispatchForPhysicalMessage
-                bloggerSessionId
-                physicalUserMessageId
-                projections
+            PromptAuthorityLedger.acceptedDispatchForPhysicalMessage bloggerSessionId physicalUserMessageId projections
             |> Option.map (fun dispatch ->
                 { PromptKey = dispatch.PromptKey
                   IsRequestScopedRepair =

@@ -86,20 +86,10 @@
    - `scripts/checks/tool-referential-integrity.mjs` (L0 工具引用完整性门禁)
    - `requirements/capability-enforcement/tests/capability-isomorphism-gate.test.mjs` (L1 权限同构测试)
    - `requirements/capability-enforcement/tests/tool-referential-integrity.test.mjs` (L1 引用完整性测试)
-4. **`Interaction/Dispatch/OpenCode/AssistanceHost.fs`**:
-   - `scripts/checks/assistance-host-invariant.mjs` (L0 AssistanceHost 架构门禁)
-   - `requirements/interaction-authority/tests/assistance-abort-fence.test.mjs` (L2 Abort Fence 时序测试)
-   - `requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs` (L2 Successor Trace 时序测试)
-   - `requirements/interaction-authority/tests/assistance-host.test.mjs` (L3 AssistanceHost 适配测试)
-5. **`Interaction/Dispatch/OpenCode/NeedHelpSensor.fs`**:
-   - `scripts/checks/cross-callback-pc.mjs` (L0 跨回调状态机拦截门禁)
-   - `requirements/host-boundary/tests/needhelp-sensor.test.mjs` (L1 NeedHelp 传感器识别测试)
-   - `requirements/interaction-authority/tests/assistance-abort-fence.test.mjs` (L2 权限围栏测试)
-   - `requirements/interaction-authority/tests/assistance-abort-successor-trace.test.mjs` (L2 连续性测试)
-6. **`OpenCode/Host/ModelCapacity.fs`**:
+4. **`OpenCode/Host/ModelCapacity.fs`**:
    - `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` (L1 路由与容量权威边界测试)
    - `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` (L2 模型路由运行时租约与容量测试)
-7. **`Persistence/EventStore/CanonicalIntegrator.fs`**:
+5. **`Persistence/EventStore/CanonicalIntegrator.fs`**:
    - `requirements/durable-events/tests/canonical-integrator.test.mjs` (L1 规范积分器单信封与重放测试)
    - `requirements/durable-events/tests/event-store-journal-boot.test.mjs` (L2 启动重放与切尾测试)
    - `requirements/durable-convergence/tests/event-store-converge.test.mjs` (L3 多流合并与收敛测试)

@@ -75,14 +75,6 @@ open Wanxiangshu.Strength
 /// Turn observation policy for one reconciled turn (STRENGTH / RECOVERY-FAMILY / TurnWorkflow).
 module HostTurnObserver =
 
-    let private dropNeedHelpIfTerminal (scope: PluginRuntimeScope) (turn: ReconciledTurn) =
-        match turn.Outcome with
-        | ReconcileProgram.TurnCompleted
-        | ReconcileProgram.TurnFailed _
-        | ReconcileProgram.TurnAborted _ -> scope.NeedHelpSensor.DropAttempt(turn.SessionId, turn.ProviderRun)
-        | ReconcileProgram.TurnNeedsContinuation _
-        | ReconcileProgram.TurnInProgress -> ()
-
     let private failStrengthProjection (scope: PluginRuntimeScope) (error: string) =
         let reason = "Strength promotion projection failed: " + error
         scope.Strength.TripStrengthFuse reason
@@ -267,27 +259,6 @@ module HostTurnObserver =
                     observeFamilyReady sessionPort eventPort journal scope reviewerContinuationPort abortCause context
         }
 
-    let private closeUnresolvedAssistance
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (scope: PluginRuntimeScope)
-        (turn: ReconciledTurn)
-        : Task =
-        task {
-            do! XWire.reconcileAttempt journal scope turn
-
-            let reason = "assistance escalation could not continue"
-            let! fissionOwned = FissionHost.failLaneIfActive sessionPort eventPort journal turn.SessionId reason
-
-            if not fissionOwned then
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
-                |> ignore
-        }
-        :> Task
-
     let private observeBusinessTurn
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
@@ -301,62 +272,36 @@ module HostTurnObserver =
             let turn = context.Turn
             let abortCause = abortCauseOfTurn scope context
 
-            let observeWithoutAssistance () =
-                task {
-                    let strengthHandled =
-                        scope.Strength.StrengthReplicaRuntime
-                        |> Option.exists (fun runtime -> runtime.HandleTurn turn)
+            let strengthHandled =
+                scope.Strength.StrengthReplicaRuntime
+                |> Option.exists (fun runtime -> runtime.HandleTurn turn)
 
-                    if strengthHandled then
-                        // STRENGTH-004/011: Replica observations are leaf-local. They
-                        // only reconcile the request plan for cleanup; family recovery,
-                        // owner fallback, Companion, Review and ordinary TurnWorkflow
-                        // must never observe them.
-                        do! XWire.reconcileAttempt journal scope turn
-                        return ()
-                    else
-                        // STRENGTH-010: only primary (non-Replica) turns feed the
-                        // counterfactual predictor. Pending shadow/control labels
-                        // are target-bound inside the scope.
-                        let _ =
-                            scope.Strength.ObserveStrengthPrimary(
-                                turn.SessionId,
-                                turn.ProviderRun,
-                                StrengthTurnEvidence.primarySymbol turn.Parts
-                            )
-
-                        // STRENGTH-007: consumption proof closes before any later
-                        // continuation can be admitted. This writer is independent
-                        // of rollout/fuse state because a provider may already have
-                        // consumed a durable Candidate.
-                        do! observeStrengthDurability strengthDurability scope turn
-
-                        return!
-                            observeAfterStrength
-                                sessionPort
-                                eventPort
-                                journal
-                                scope
-                                reviewerContinuationPort
-                                abortCause
-                                context
-                }
-
-            // HOST-027: assistance is classified from the exact armed ProviderRun
-            // before Strength, family recovery, SyncDelegate, fallback, or ordinary
-            // abort handling can interpret the physical abort as business failure.
-            match! scope.HandleAssistanceTurn context with
-            | AssistanceTurnDisposition.Handled ->
-                // Assistance outranks Loop when both sensors observed the same
-                // physical attempt. abortCauseOfTurn already consumed Loop's
-                // one-shot cause, so nothing can leak into the next attempt.
+            if strengthHandled then
+                // STRENGTH-004/011: Replica observations are leaf-local. They
+                // only reconcile the request plan for cleanup; family recovery,
+                // owner fallback, Companion, Review and ordinary TurnWorkflow
+                // must never observe them.
                 do! XWire.reconcileAttempt journal scope turn
                 return ()
-            | AssistanceTurnDisposition.ClaimedButUnresolved ->
-                return! closeUnresolvedAssistance sessionPort eventPort journal scope turn
-            | AssistanceTurnDisposition.NotAssistance ->
-                dropNeedHelpIfTerminal scope turn
-                return! observeWithoutAssistance ()
+            else
+                // STRENGTH-010: only primary (non-Replica) turns feed the
+                // counterfactual predictor. Pending shadow/control labels
+                // are target-bound inside the scope.
+                let _ =
+                    scope.Strength.ObserveStrengthPrimary(
+                        turn.SessionId,
+                        turn.ProviderRun,
+                        StrengthTurnEvidence.primarySymbol turn.Parts
+                    )
+
+                // STRENGTH-007: consumption proof closes before any later
+                // continuation can be admitted. This writer is independent
+                // of rollout/fuse state because a provider may already have
+                // consumed a durable Candidate.
+                do! observeStrengthDurability strengthDurability scope turn
+
+                return!
+                    observeAfterStrength sessionPort eventPort journal scope reviewerContinuationPort abortCause context
         }
 
     let observe

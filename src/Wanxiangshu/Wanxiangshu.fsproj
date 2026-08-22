@@ -111,7 +111,6 @@
     <Compile Include="Mission/Obligation/Todo/ProcessReview.fs"/>
     <Compile Include="Execution/Delegation/Handoff.fs"/>
     <Compile Include="Foundation/SyntheticTomlSurface.fs"/>
-    <Compile Include="Interaction/Dispatch/AssistancePrompt.fs"/>
     <Compile Include="Repository/Investigation/WarmStart/Prompt.fs"/>
     <Compile Include="Mission/Manager/Narrative.fs"/>
     <Compile Include="Mission/Manager/Life/Prompt.fs"/>
@@ -371,8 +370,6 @@
     <Compile Include="OpenCode/Codec/HostEventCodec.fs"/>
     <Compile Include="OpenCode/Codec/LoopEventCodec.fs"/>
     <Compile Include="Execution/Session/LoopDetectorSurface.fs"/>
-    <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpEventCodec.fs"/>
-    <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpSurface.fs"/>
     <Compile Include="OpenCode/Codec/HostMessageCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/OpenCode/HostCodec.fs"/>
     <Compile Include="Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs"/>
@@ -481,8 +478,6 @@
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
-    <Compile Include="Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"/>
-    <Compile Include="Interaction/Authority/Assistance.fs"/>
     <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
@@ -524,7 +519,6 @@
     <Compile Include="Mission/WorkRecord/OpeningSemanticSurface.fs"/>
     <Compile Include="Mission/Review/TodoProcess.fs"/>
     <Compile Include="Mission/Review/DedicatedTodoRuntime.fs"/>
-    <Compile Include="Interaction/Dispatch/OpenCode/AssistanceHost.fs"/>
     <Compile Include="Mission/Finality/Record.fs"/>
     <Compile Include="Mission/Finality/Cohort.fs"/>
     <Compile Include="Mission/Finality/Revision.fs"/>

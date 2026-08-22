@@ -289,9 +289,6 @@ export function deriveRequests(scenario) {
     const requestKindSwitch = group.entries.some(
       (entry) => boundaryAt(scenario, entry)?.kind === 'request-kind-switch',
     );
-    const assistanceSwitch = group.entries.some(
-      (entry) => boundaryAt(scenario, entry)?.kind === 'assistance-side',
-    );
     const tools = continued && previousTools !== null && !requestKindSwitch ? previousTools : declaredTools;
     previousTools = tools;
 
@@ -306,15 +303,13 @@ export function deriveRequests(scenario) {
     // sequence must carry one too, or every probe-declared entry would look like it
     // rewrote the fixed parts. Title requests keep their marker shape (the seal does
     // not compare them).
-    const model = assistanceSwitch ? 'forest-lib-model-b' : 'forest-lib-model';
+    const model = 'forest-lib-model';
     const messages =
       requestKindSwitch && previousMessages !== null
         ? [...previousMessages, user(text)]
-        : assistanceSwitch && previousMessages !== null
-          ? [systemMessage(model), ...previousMessages.slice(1), user(text)]
-          : first.kind === 'title'
-            ? [user(TITLE_MARKER), user(text)]
-            : [systemMessage(model), user(text)];
+        : first.kind === 'title'
+          ? [user(TITLE_MARKER), user(text)]
+          : [systemMessage(model), user(text)];
 
     let derivedStep = 0;
     for (const entry of entries) {

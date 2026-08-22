@@ -174,36 +174,4 @@ const systemHead = (wire) => {
   return { text: parts[0].text ?? '', tail: messages.slice(1) };
 };
 
-const normalizeModelIdentity = (text, modelId) =>
-  typeof modelId === 'string' && modelId.length > 0
-    ? text.split(modelId).join('<execution-model>')
-    : text;
-
-/** Admit only the measured fast→deep model substitution plus append-only growth. */
-export function assistanceBindingPrefixHolds(previousWire, nextBody) {
-  const nextWire = wireOf(nextBody);
-  if (previousWire.modelId === nextWire.modelId) return false;
-
-  const previousHead = systemHead(previousWire);
-  const nextHead = systemHead(nextWire);
-  if (previousHead === null || nextHead === null) return false;
-
-  if (
-    !previousHead.text.includes(previousWire.modelId)
-    || !nextHead.text.includes(nextWire.modelId)
-    || normalizeModelIdentity(previousHead.text, previousWire.modelId)
-      !== normalizeModelIdentity(nextHead.text, nextWire.modelId)
-  ) return false;
-
-  const previousTail = {
-    ...previousWire,
-    modelId: nextWire.modelId,
-    messages: previousHead.tail,
-  };
-  const nextTail = {
-    ...nextWire,
-    messages: nextHead.tail,
-  };
-
-  return isAppendOnlyPrefix(previousTail, nextTail);
-}
+// end of module

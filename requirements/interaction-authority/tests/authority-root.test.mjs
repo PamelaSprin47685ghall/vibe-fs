@@ -160,11 +160,17 @@ test('WHAT[INTERACTION-AUTHORITY-011] PROMPT_011_logical_run_id_is_stable_and_in
   assert.notEqual(id('rt_1', 'ses_a', 'msg_u2'), base)
 })
 
-test('WHAT[INTERACTION-AUTHORITY-012] IA_005_needhelp_kinds_are_continuations', () => {
-  for (const kind of ['NeedHelpEscalation', 'NeedHelpAdvice']) {
+test('WHAT[INTERACTION-AUTHORITY-012] IA_005_degeneration_guard_is_continuation', () => {
+  for (const kind of ['DegenerationGuard', 'ManagerIdleEncouragement']) {
     assert.deepEqual(authority.originForContinuation(kind), { kind: 'Continuation', label: kind })
   }
   assert.equal(authority.tryParseContinuationKind('HumanRoot'), null)
+})
+
+test('WHAT[INTERACTION-AUTHORITY-013] continuation preserves logical run and root authority profile', () => {
+  const root = rootFor()
+  const state = authority.registerClaim(continuation('pk_c', root, 'DegenerationGuard', 'deep-coder', 'pd-n'), register(root))
+  assert.deepEqual(profile(state.activeLogicalRun), profile(root))
 })
 
 test('WHAT[INTERACTION-AUTHORITY-003] IA_003_root_remains_the_source_for_continuations', () => {

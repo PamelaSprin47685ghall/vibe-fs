@@ -269,7 +269,7 @@ test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_terminal_only_completion_projects_i
     )
     const beforeCount = parts(before).length
 
-    const terminal = 'Independent NEEDHELP perspective: preserve the original charge.'
+    const terminal = 'Independent consultation perspective: preserve the original charge.'
     await xTrace.captureTerminalText(handle, SEM, terminal, 'msg_terminal_only')
 
     const after = await xTrace.captureProjection(
@@ -286,7 +286,7 @@ test('WHAT[SEMANTIC-TRACE-001] COMPANION_003_terminal_only_completion_projects_i
     const record = await xTrace.lifecycleWorkRecord(handle, SEM, false)
     assert.equal(typeof record, 'string')
     assert.match(record, /Recent work/)
-    assert.match(record, /Independent NEEDHELP perspective/)
+    assert.match(record, /Independent consultation perspective/)
     assert.equal(record.includes('Opening\nconsult independently'), false)
   })
 })

@@ -88,7 +88,8 @@ module BloggerRequestOwnership =
         | Some openRequestId, _ when openRequestId <> currentRequestId -> BloggerTerminalRequestOwnership.Superseded
         | None, _
         | Some _, None -> BloggerTerminalRequestOwnership.Unproven
-        | Some _, Some evidence when durableOpenPromptKey = Some evidence.PromptKey -> BloggerTerminalRequestOwnership.Current
+        | Some _, Some evidence when durableOpenPromptKey = Some evidence.PromptKey ->
+            BloggerTerminalRequestOwnership.Current
         | Some _, Some evidence when evidence.IsRequestScopedRepair -> BloggerTerminalRequestOwnership.Current
         | Some _, Some _ -> BloggerTerminalRequestOwnership.Superseded
 

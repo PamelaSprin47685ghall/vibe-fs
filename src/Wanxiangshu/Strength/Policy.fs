@@ -9,7 +9,6 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Finality
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Manager.Life

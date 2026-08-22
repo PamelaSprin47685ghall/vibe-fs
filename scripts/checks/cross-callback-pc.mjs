@@ -55,8 +55,6 @@ const norm = (p) => p.replace(/\\/g, '/')
 export const KNOWN_DEBT_BASELINE = new Set([
   // LoopSensor — armed
   'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed',
-  // NeedHelpSensor — armed
-  'src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs::armed',
 ])
 
 /**
@@ -83,7 +81,7 @@ export const EXEMPTION_CATEGORIES = new Set([
  * BASELINE_MAX_SIZE by 1. Increasing BASELINE_MAX_SIZE is a ratchet violation
  * (VERIFICATION-SYSTEM-010: acceptance criteria only tighten).
  */
-export const BASELINE_MAX_SIZE = 2
+export const BASELINE_MAX_SIZE = 1
 
 /**
  * Pattern 1: TryTake continuation consumption.

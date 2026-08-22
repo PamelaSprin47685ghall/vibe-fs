@@ -88,10 +88,7 @@ module StrengthPredictor =
 
         StrengthPredictorState(state |> Map.add feature next)
 
-    let predict
-        (feature: StrengthFeatureKey)
-        (StrengthPredictorState state)
-        : Wanxiangshu.Strength.StrengthPrediction =
+    let predict (feature: StrengthFeatureKey) (StrengthPredictorState state) : Wanxiangshu.Strength.StrengthPrediction =
         let b = state |> Map.tryFind feature |> Option.defaultValue emptyBucket
 
         let p1 =

@@ -36,11 +36,10 @@ type HostSignalRouter
     (
         ownedSessions: HashSet<string>,
         onSignal: HostSignal -> unit,
-        // LOOP-009 / HOST-027 edge callbacks. Typed as `obj -> unit` so this
+        // LOOP-009 edge callback. Typed as `obj -> unit` so this
         // adapter routes raw Host events without owning sensor business state.
         // Drop-session cleanup is the composition root's job.
         ?onLoopEvent: obj -> unit,
-        ?onNeedHelpEvent: obj -> unit,
         ?onProviderStepEnd: SessionId -> PhysicalUserMessageId -> ProviderRunIdentity -> unit,
         ?onPhysicalExecutionEnd: SessionId -> PhysicalUserMessageId -> unit
     ) =
@@ -72,18 +71,12 @@ type HostSignalRouter
         let key = SessionId.value sessionId
         ownedSessions.Remove key |> ignore
 
-    /// HOST-027 part classification and LOOP-009 text detection both observe the
-    /// same raw stream events. NeedHelp records part.updated before the matching
-    /// delta. LoopSensor observes all textual and reasoning stream deltas. Model
-    /// routing also observes exact terminal assistant identity; none of these
-    /// callbacks turns a fragment into a business HostSignal.
+    /// LOOP-009 text detection observes textual stream deltas.
+    /// Model routing also observes exact terminal assistant identity;
+    /// none of these callbacks turns a fragment into a business HostSignal.
     member _.Observe(raw: obj) =
         observeProviderStepEnd raw
         observePhysicalExecutionEnd raw
-
-        match onNeedHelpEvent with
-        | Some observe when NeedHelpEventCodec.isNeedHelpRelevantEvent raw -> observe raw
-        | _ -> ()
 
         match onLoopEvent with
         | Some observe when LoopEventCodec.isLoopTextDelta raw -> observe raw

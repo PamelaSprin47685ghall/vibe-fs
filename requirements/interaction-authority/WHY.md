@@ -5,7 +5,7 @@
 物理传输层上的 `role=user` 文本极其廉价且极易伪造。如果将物理用户消息形态直接等同于权威交互（Authority Turn），系统会出现以下破坏：
 1. **权限自我抬升**：内部合成的 continuation、repair 提示或诊断重试在经过传输层后被重新误判为真人发起的根指令（HumanRoot）。
 2. **状态与预算被异常重置**：每次伪造的 Root 都会错误地创建新的 Logical Run、重置 Fallback/Repair 预算或修改已锁定的 Agent 绑定。
-3. **取消与求助破坏恢复流程**：将辅助介入（assistance abort）误判为主流程崩溃，导致不当推进重试游标。
+3. **中断与自恢复破坏恢复流程**：将 degeneration-guard 等自恢复介入误判为主流程崩溃，导致不当推进重试游标。
 
 `interaction-authority` 确立唯一权威来源边界：
 - 严格区分 **Root**（创建 Logical Run 并确立权威）与 **Continuation**（仅延续既有 Run，禁止抬权）；

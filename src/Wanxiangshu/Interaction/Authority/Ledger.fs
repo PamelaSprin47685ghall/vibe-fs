@@ -281,7 +281,10 @@ module PromptAuthorityLedger =
         |> Option.bind (fun authority ->
             authority.AcceptedDispatches
             |> Seq.tryPick (fun (KeyValue(_, dispatch)) ->
-                if dispatch.PhysicalUserMessageId = physicalUserMessageId then Some dispatch else None))
+                if dispatch.PhysicalUserMessageId = physicalUserMessageId then
+                    Some dispatch
+                else
+                    None))
 
     let dispatchStatusFor
         (sessionId: SessionId)

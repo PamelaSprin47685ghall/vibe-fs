@@ -76,9 +76,8 @@ test('WHAT[MANAGED-SESSION-017] raw InterruptAttempt callers are restricted to w
   assert.deepEqual(new Set(callers), allowed)
 })
 
-test('WHAT[MANAGED-SESSION-017] failed Host abort rolls back Loop and NeedHelp one-shot causes', () => {
+test('WHAT[MANAGED-SESSION-017] failed Host abort rolls back Loop one-shot causes', () => {
   const loop = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
-  const needHelp = read('src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs')
 
   const loopOutcome = loop.match(/member private this\.ApplyInterruptOutcome([\s\S]*?)member private this\.RunInterrupt/)
   assert.ok(loopOutcome, 'Loop abort outcome classifier must be inspectable')
@@ -88,15 +87,6 @@ test('WHAT[MANAGED-SESSION-017] failed Host abort rolls back Loop and NeedHelp o
   assert.ok(loopAbort, 'Loop abort observation must be inspectable')
   assert.match(loopAbort[1], /this\.ApplyInterruptOutcome/)
   assert.match(loopAbort[1], /with ex ->[\s\S]*?this\.RollbackArm sessionId/)
-
-  const needHelpOutcome = needHelp.match(/member private this\.ApplyAbortOutcome([\s\S]*?)member private this\.AbortAndReport/)
-  assert.ok(needHelpOutcome, 'NeedHelp abort outcome classifier must be inspectable')
-  assert.match(needHelpOutcome[1], /\| Error reason ->[\s\S]*?RollbackArm/)
-
-  const needHelpAbort = needHelp.match(/member private this\.AbortAndReport([\s\S]*?)member private this\.RequestAbort/)
-  assert.ok(needHelpAbort, 'NeedHelp abort observation must be inspectable')
-  assert.match(needHelpAbort[1], /this\.RollbackArm\(sessionId, providerRun\)/)
-  assert.match(needHelpAbort[1], /with ex ->[\s\S]*?RollbackArm/)
 })
 
 test('WHAT[MANAGED-SESSION-017] fatal termination never stores cross-callback cause state', () => {

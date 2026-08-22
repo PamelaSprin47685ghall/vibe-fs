@@ -55,10 +55,6 @@ module PromptAuthority =
         | ProviderRetryAttempt
         /// DG-011: same-run continuation owned by degeneration-guard after its own interrupt.
         | DegenerationGuard
-        /// AGENT-031/PROMPT-018: same-run collaboration, never fallback retry.
-        | NeedHelpEscalation
-        /// AGENT-031/PROMPT-018: independent consultation returned to requester.
-        | NeedHelpAdvice
         /// Same-run Fission delivery: predecessor work or a pre-Fission shared
         /// external completion enters a lane only at a safe provider boundary.
         | FissionHandoff
@@ -254,8 +250,6 @@ module PromptAuthority =
         | Continuation BusyAgentNudge -> "BusyAgentNudge"
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation DegenerationGuard -> "DegenerationGuard"
-        | Continuation NeedHelpEscalation -> "NeedHelpEscalation"
-        | Continuation NeedHelpAdvice -> "NeedHelpAdvice"
         | Continuation ManagerIdleEncouragement -> "ManagerIdleEncouragement"
         | Continuation FinalityRejected -> "FinalityRejected"
         | Continuation FinalitySteer -> "FinalitySteer"
@@ -272,8 +266,6 @@ module PromptAuthority =
         | "BusyAgentNudge" -> Some BusyAgentNudge
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "DegenerationGuard" -> Some DegenerationGuard
-        | "NeedHelpEscalation" -> Some NeedHelpEscalation
-        | "NeedHelpAdvice" -> Some NeedHelpAdvice
         | "ManagerIdleEncouragement" -> Some ManagerIdleEncouragement
         | "FinalityRejected" -> Some FinalityRejected
         | "FinalitySteer" -> Some FinalitySteer

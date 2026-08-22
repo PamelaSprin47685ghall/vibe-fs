@@ -48,9 +48,9 @@
 
 依据 `SessionID + CallID` 在完整快照中解析原始调用分段时，必须证明其能唯一确定对应的运行上下文与追踪范围；若匹配出现歧义或无法定位，必须安全失败。
 
-## HOST-BOUNDARY-013: Reasoning Sensor 专属识别与单 Run 触发限制
+## HOST-BOUNDARY-013: Stream Sensor 专属识别与单 Run 触发限制
 
-求助传感器仅识别推理分段中的专属标识符，普通正文与工具输出均不触发；每个运行周期内至多触发一次，且仅限中断当前子会话的物理尝试。
+流式传感器（如 LoopSensor）仅识别对应分段中的专属标识与模式，普通正文与工具输出均不触发；每个运行周期内至多触发一次，且仅限中断当前子会话的物理尝试。
 
 ## HOST-BOUNDARY-014: 零 Host 源码修改与 Hook Fatal Membrane
 

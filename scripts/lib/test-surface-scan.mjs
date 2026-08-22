@@ -1346,14 +1346,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Interaction/Dispatch/OpenCode/NeedHelpSurface.js',
-    owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-013'],
-    source: 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSurface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
     module: 'Execution/Delegation/Handle/Surface.js',
     owner: 'managed-session-lifecycle',
     laws: ['MANAGED-SESSION-006', 'MANAGED-SESSION-007', 'MANAGED-SESSION-008', 'MANAGED-SESSION-009', 'MANAGED-SESSION-013', 'MANAGED-SESSION-015'],

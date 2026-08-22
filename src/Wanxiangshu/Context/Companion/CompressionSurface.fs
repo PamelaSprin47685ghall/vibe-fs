@@ -515,7 +515,10 @@ module CompressionSurface =
 
     let terminalRequestOwnership (value: obj) : string =
         let requestId = BloggerRequestId.create (text value?requestId)
-        let openRequestId = optionalText value?openRequestId |> Option.map BloggerRequestId.create
+
+        let openRequestId =
+            optionalText value?openRequestId |> Option.map BloggerRequestId.create
+
         let openPromptKey = optionalText value?openPromptKey |> Option.map PromptKey.create
 
         let parent: BloggerTerminalParentEvidence option =

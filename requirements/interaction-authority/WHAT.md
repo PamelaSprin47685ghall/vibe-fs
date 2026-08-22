@@ -51,13 +51,13 @@
 
 单次执行的权威身份必须封装在不可变的 `AttemptExecutionProfile` 内原子携带，包含 SessionId、LogicalRunId、AuthorityRootId、SelectedAgent 及关联角色，在整个 Logical Run 期间保持不可变。禁止从会话缓存或分散的消息碎片中临时拼接权威状态。
 
-## INTERACTION-AUTHORITY-012: assistance 是 continuation 而非 fallback 失败
+## INTERACTION-AUTHORITY-012: degeneration-guard 是 continuation 而非 fallback 失败
 
-求助与升级消息（`NeedHelpEscalation` 与 `NeedHelpAdvice`）以及 degeneration-guard 自恢复消息（`DegenerationGuard`）属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得重置 Fallback 游标、亦不得计入模型重试失败次数。`DegenerationGuard` 不得伪装成 `ProviderRetryAttempt`。
+degeneration-guard 自恢复消息（`DegenerationGuard`）等属于强类型 Continuation。它们延续当前 LogicalRun，复用既有 Root 与 Profile，不得建立新 Root、不得重置 Fallback 游标、亦不得计入模型重试失败次数。`DegenerationGuard` 不得伪装成 `ProviderRetryAttempt`。
 
-## INTERACTION-AUTHORITY-013: fast→deep escalation 是 authority continuity
+## INTERACTION-AUTHORITY-013: 显式 continuation 绑定保持 authority continuity
 
-同会话与同一 LogicalRun 下的 fast 到 deep 升级属于权限连续演进：仅执行绑定的 EffectiveAgent 发生改变，其余 Root、Profile 与游标位置全部保持不变。
+同会话与同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅执行绑定的 EffectiveAgent 发生必要变更，其余 Root、Profile 与游标位置全部保持不变。
 
 ## INTERACTION-AUTHORITY-014: Nudge 与 JoinGuard 是 Continuation
 

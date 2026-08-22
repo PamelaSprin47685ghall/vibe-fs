@@ -29,21 +29,19 @@ test('WHAT[MANAGED-SESSION-016] internal attempt interrupt is sub-session-only a
 
 test('WHAT[MANAGED-SESSION-016] automatic sensors cannot interrupt user-facing root and use attempt-only port', () => {
   const bootstrap = read('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
-  const sensor = read('src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs')
+  const loopSensor = read('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
 
-  assert.match(sensor, /let hasPhysicalParent sessionId =\s*sessionParents\.ContainsKey/)
-  assert.match(sensor, /isOwned sessionId && hasPhysicalParent sessionId/)
   assert.match(
     bootstrap,
     /LoopSensor\.create[\s\S]*?\(fun sessionId ->\s+sessionPort\.InterruptAttempt sessionId\)/,
   )
   assert.match(
-    bootstrap,
-    /NeedHelpSensor\(\s*NeedHelpSensor\.createEligibilityPredicate[\s\S]*?\(fun sessionId -> sessionPort\.InterruptAttempt sessionId\)\s*\)/,
+    loopSensor,
+    /ownedSessions\.Contains key && sessionParents\.ContainsKey key/,
   )
   assert.match(
-    sensor,
-    /let isEligibleRole[\s\S]*?Role\.Blogger[\s\S]*?Role\.Distiller[\s\S]*?false/,
+    loopSensor,
+    /member\s+private\s+this\.RunInterrupt[\s\S]*?abortSession/,
   )
 })
 

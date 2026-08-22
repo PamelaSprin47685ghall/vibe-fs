@@ -1056,10 +1056,6 @@
       "owner": "attention-regulation"
     },
     {
-      "path": "src/Wanxiangshu/Interaction/Authority/Assistance.fs",
-      "owner": "interaction-authority"
-    },
-    {
       "path": "src/Wanxiangshu/Interaction/Authority/Child.fs",
       "owner": "interaction-authority"
     },
@@ -1112,10 +1108,6 @@
       "owner": "concern-routing"
     },
     {
-      "path": "src/Wanxiangshu/Interaction/Dispatch/AssistancePrompt.fs",
-      "owner": "dispatch-protocol"
-    },
-    {
       "path": "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
       "owner": "dispatch-protocol"
     },
@@ -1136,27 +1128,11 @@
       "owner": "dispatch-protocol"
     },
     {
-      "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
-      "owner": "interaction-authority"
-    },
-    {
       "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
       "owner": "dispatch-protocol"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
-      "owner": "dispatch-protocol"
-    },
-    {
-      "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpEventCodec.fs",
-      "owner": "dispatch-protocol"
-    },
-    {
-      "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs",
-      "owner": "host-boundary"
-    },
-    {
-      "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSurface.fs",
       "owner": "dispatch-protocol"
     },
     {

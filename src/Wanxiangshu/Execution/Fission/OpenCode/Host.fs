@@ -765,32 +765,6 @@ module FissionHost =
             | _ -> ()
         }
 
-    /// Assistance may own a physical abort before Fission sees the turn. If the
-    /// assistance successor cannot be established, return that terminal error to
-    /// the Fission owner instead of killing only one physical lane and leaking an
-    /// active logical group.
-    let failLaneIfActive
-        (sessionPort: ISessionHostPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (laneSessionId: SessionId)
-        reason
-        : Task<bool> =
-        task {
-            match journal with
-            | None -> return false
-            | Some durable ->
-                match
-                    FissionProjection.tryMembershipOfLane
-                        laneSessionId
-                        (AgentJournal.snapshot durable).AgentProjections.Fission
-                with
-                | None -> return false
-                | Some(group, _) ->
-                    do! failGroup sessionPort eventPort durable group reason
-                    return true
-        }
-
     let private validateOwnerRunResult (result: AgentRunResult) =
         if result.IsValid then
             Ok result

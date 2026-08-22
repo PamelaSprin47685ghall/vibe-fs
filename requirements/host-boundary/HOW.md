@@ -43,7 +43,7 @@
 | HOST-BOUNDARY-010 | `requirements/host-boundary/tests/shared-state.test.mjs` |
 | HOST-BOUNDARY-011 | `requirements/host-boundary/tests/host-message-projection.test.mjs`, `requirements/host-boundary/tests/host-message-sanitize-surface.test.mjs` |
 | HOST-BOUNDARY-012 | `requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
-| HOST-BOUNDARY-013 | `requirements/host-boundary/tests/needhelp-sensor.test.mjs` |
+| HOST-BOUNDARY-013 | `requirements/host-boundary/tests/loop-sensor-wiring-owner.test.mjs` |
 | HOST-BOUNDARY-014 | `requirements/host-boundary/tests/host-hooks.test.mjs` |
 | HOST-BOUNDARY-015 | `requirements/host-boundary/tests/tool-result-bound.test.mjs` |
 | HOST-BOUNDARY-016 | `requirements/host-boundary/tests/events-port.test.mjs` |

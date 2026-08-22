@@ -195,50 +195,22 @@
     {
       "id": "interaction-assistance-workflow-cutover",
       "primary_owner": "interaction-authority",
-      "intent": "Liberate AssistanceHost into pure Capability-Passing CE workflow: exact AssistanceAbortClaim one-shot consumption after fresh idle, no foreign internal imports",
-      "files": [
-        "src/Wanxiangshu/Interaction/Authority/Assistance.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"
-      ],
-      "classification": "SPLIT",
-      "publishes": [
-        "Assistance.Workflow",
-        "Assistance.Contract"
-      ],
-      "consumes": [
-        "Session.Quiescence",
-        "DurableEvents.Contract"
-      ],
-      "depends_on": [
-        {
-          "id": "execution-quiescence",
-          "kind": "contract"
-        },
-        {
-          "id": "canonical-spine",
-          "kind": "contract"
-        }
-      ],
-      "production_callers_to_migrate": [
-        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
-      ],
-      "proofs": [
-        "requirements/interaction-authority/tests/assistance-capability-boundary.test.mjs"
-      ],
-      "architecture_gates": [
-        "assistance-host-invariant.mjs"
-      ],
-      "closure_evidence": "proof: requirements/interaction-authority/tests/assistance-capability-boundary.test.mjs; 关联 gate: assistance-host-invariant, fsharp-control-pyramid, session-ownership-ratchet, semantic-owners; fsharp-control-pyramid 5→0 修复事实（Assistance.fs 3 处控制流嵌套已拉平为纯 Decision/Result 组合子）",
-      "touched_paths": [
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs"
-      ],
+      "intent": "Remove AssistanceHost and NeedHelp completely: uproot NEEDHELP capability and sensor",
+      "files": [],
+      "classification": "DELETE",
+      "publishes": [],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [],
+      "architecture_gates": [],
+      "closure_evidence": "complete removal of NEEDHELP feature, code, tests, and requirements",
+      "touched_paths": [],
       "coverage_tags": [
         "CoverageB"
       ],
       "state": "DONE",
-      "result": "CUTOVER"
+      "result": "DELETED"
     },
     {
       "id": "review-assurance-witness-contract",
@@ -1072,11 +1044,6 @@
         "category": "physical",
         "kind": "quiescence/waiter 类物理能力豁免",
         "disposition": "owner-local closure 阶段裁决去留"
-      },
-      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs::armed": {
-        "category": "physical",
-        "kind": "quiescence/waiter 类物理能力豁免",
-        "disposition": "owner-local closure 阶段裁决去留"
       }
     },
     "missing_baseline_reconciliation": [
@@ -1221,7 +1188,6 @@
       "src/Wanxiangshu/Interaction/Concern/Fold.fs",
       "src/Wanxiangshu/Interaction/Concern/Projection.fs",
       "src/Wanxiangshu/Interaction/Concern/Surface.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/AssistancePrompt.fs",
       "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
@@ -1229,8 +1195,6 @@
       "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
       "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
       "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpEventCodec.fs",
-      "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSurface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs",
       "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",

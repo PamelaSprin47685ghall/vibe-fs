@@ -41,9 +41,6 @@ import {
   G2_BATCH_CANARY_PROMPT,
   G6_CANONICAL_A,
   G6_CANONICAL_Q,
-  NEEDHELP_CANARY_PROMPT,
-  armNeedHelpCausalHolds,
-  assertNeedHelpAssistance,
   retireCompanionForDeletion,
   assertG2InspectorBatchCoalescing,
   assertG2InspectorPrefixLaw,
@@ -81,8 +78,6 @@ assert.ok(
   '§21 ADVERSITY_CHECKLIST must mark every adversity class covered with injection+oracle',
 );
 assert.equal(typeof assertMagicTodoHostCanariesAEGH, 'function');
-assert.equal(typeof armNeedHelpCausalHolds, 'function');
-assert.equal(typeof assertNeedHelpAssistance, 'function');
 
 if (!runStaticGate([fileURLToPath(import.meta.url)]).passed) {
   throw new Error('long-stroke entry static gate failed');
@@ -107,38 +102,6 @@ const runPreFlowPrompt = async (scenario, lane, prompt, agent) => {
   });
   assert.ok(response.ok, `${lane} prompt failed: ${JSON.stringify(response.data)}`);
   await turn.awaitTerminal();
-};
-
-const runNeedHelpPreFlow = async (scenario) => {
-  const holds = armNeedHelpCausalHolds(scenario);
-  const root = await scenario.client.createSession({ agent: 'fast-orchestrator' });
-  const rootId = getSessionId(root);
-  assert.ok(rootId, `needhelp root session creation failed: ${JSON.stringify(root)}`);
-  if (!scenario.sessionIds.includes(rootId)) scenario.sessionIds.push(rootId);
-
-  const created = await scenario.client.createSession({ parentID: rootId, agent: 'fast-coder' });
-  const sessionID = getSessionId(created);
-  assert.ok(sessionID, `needhelp-owner session creation failed: ${JSON.stringify(created)}`);
-  if (!scenario.sessionIds.includes(sessionID)) scenario.sessionIds.push(sessionID);
-  bindLaneSession(scenario.provider, sessionID, 'needhelp-owner');
-
-  const response = await scenario.client.request('POST', `/session/${sessionID}/prompt_async`, {
-    body: {
-      parts: [{ type: 'text', text: NEEDHELP_CANARY_PROMPT }],
-      agent: 'fast-coder',
-    },
-  });
-  assert.ok(response.ok, `NEEDHELP pre-flow prompt failed: ${JSON.stringify(response.data)}`);
-
-  // The final advice response is causally held before token #1. Its expectation
-  // therefore proves both earlier abort/reconcile transitions happened, while
-  // still letting us arm a turn-scoped terminal oracle without racing the mock.
-  await scenario.provider.waitForExpectation('needhelp-owner-advice.0');
-  await scenario.provider.waitForExpectation('needhelp-consult-replica.1');
-  const finalTurn = scenario.turn.start(sessionID);
-  holds.releaseFinal();
-  await finalTurn.awaitTerminal();
-  assertNeedHelpAssistance(scenario);
 };
 
 const waitCaptured = async (scenario) => {
@@ -168,8 +131,6 @@ const preFlowCanaries = async (scenario) => {
     2,
     'Strength K2 dry-run must stop physically after provider request #2; request #3 is undeclared and fatal',
   );
-
-  await runNeedHelpPreFlow(scenario);
 
   scenario.provider._state.rewriteToolArgs = (entry, args) => {
     if (entry?.turnId === 'coder' && args?.shelfmark === '$inspector-case') {
