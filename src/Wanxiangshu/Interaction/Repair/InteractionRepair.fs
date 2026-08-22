@@ -440,7 +440,23 @@ module InteractionRepairWorkflow =
 
             AsyncSupport.completedTask ()
         | Some durable, Some request ->
-            repairOwnedBloggerProtocol host quiescence context sessionPort eventPort durable request
+            match
+                BloggerRecoveryProbe.terminalRequestOwnershipForPhysicalMessage
+                    durable
+                    context.Turn.SessionId
+                    request
+                    context.Turn.PhysicalUserMessageId
+            with
+            | BloggerTerminalRequestOwnership.Superseded ->
+                Diagnostic.emit
+                    "blogger-protocol-repair-superseded"
+                    [ "session_id", SessionId.value context.Turn.SessionId
+                      "result", "terminal belongs to an older Blogger request" ]
+
+                AsyncSupport.completedTask ()
+            | BloggerTerminalRequestOwnership.Current
+            | BloggerTerminalRequestOwnership.Unproven ->
+                repairOwnedBloggerProtocol host quiescence context sessionPort eventPort durable request
 
     /// CTX-010 recovery continue owns the physical run until its own terminal is
     /// published. Missing-final-report / interaction-repair on that run hijacks the

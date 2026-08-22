@@ -460,3 +460,41 @@ test('WHAT[CONTEXT-COMPRESSION-012] COMPANION_007_canonical_digest_uses_semantic
   assert.equal(seal, '«ses_y|2|5|prefix-5|frozen-5»')
   assert.doesNotMatch(seal, /toml|\[\[item\]\]/i)
 })
+
+test('WHAT[CONTEXT-COMPRESSION-018] COMPANION_018_first_turn_shape_is_false_when_historic_frames_or_tips_present', () => {
+  const withFrame = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: frames(1),
+    delta: { messageId: 'msg_d', items: dataItems },
+  })
+  assert.equal(withFrame.isFirstTurnShape, false)
+
+  const withTip = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 0,
+    kind: proj.normal,
+    frames: [],
+    delta: { messageId: 'msg_d', items: dataItems },
+    previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
+  })
+  assert.equal(withTip.isFirstTurnShape, false)
+})
+
+test('WHAT[CONTEXT-COMPRESSION-014] CTX_012_squash_plan_has_zero_physical_messages_and_not_first_turn', () => {
+  const squashPlan = proj.build(spy, {
+    blogger: 'ses_y',
+    epoch: 1,
+    kind: proj.squash(2),
+    frames: frames(3),
+    delta: { messageId: 'msg_should_not_appear', items: dataItems },
+    previousTips: [{ field: 'ignored-tdd', cycleId: 'c1' }],
+  })
+
+  assert.equal(squashPlan.isFirstTurnShape, false)
+  assert.equal(squashPlan.physicalFlags.some((f) => f === true), false)
+  assert.equal(squashPlan.messages.some((m) => m.physical), false)
+  assert.equal(squashPlan.messages.at(-1).role, 'user')
+  assert.equal(squashPlan.messages.at(-1).text, prompt.squashInstruction)
+})

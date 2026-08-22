@@ -97,3 +97,51 @@ test('WHAT[CONTEXT-COMPRESSION-018] ENFORCER_resolveCycleContext_prefers_live_in
   assert.equal(runtime.hasFlight(scope, 'ses-blog'), true)
   runtime.dispose(scope)
 })
+
+test('WHAT[CONTEXT-COMPRESSION-024] stale_terminal_cannot_reclaim_a_new_Blogger_request', () => {
+  const base = {
+    requestId: 'req-new',
+    openRequestId: 'req-new',
+    openPromptKey: 'prompt-new',
+  }
+
+  assert.equal(
+    compression.terminalRequestOwnership({
+      ...base,
+      parentPromptKey: 'prompt-old',
+      parentOrigin: 'AgentOwnerRoot',
+      parentPayloadDigest: 'old-payload',
+    }),
+    'Superseded',
+  )
+
+  assert.equal(
+    compression.terminalRequestOwnership({
+      ...base,
+      parentPromptKey: 'prompt-new',
+      parentOrigin: 'ProviderRetryAttempt',
+      parentPayloadDigest: 'retry-payload',
+    }),
+    'Current',
+  )
+
+  assert.equal(
+    compression.terminalRequestOwnership({
+      ...base,
+      parentPromptKey: 'prompt-repair',
+      parentOrigin: 'InteractionRepair',
+      parentPayloadDigest: 'req-new\u001fmsg-old\u001fblogger-missing-tool',
+    }),
+    'Current',
+  )
+
+  assert.equal(
+    compression.terminalRequestOwnership({
+      ...base,
+      parentPromptKey: 'prompt-repair-old',
+      parentOrigin: 'InteractionRepair',
+      parentPayloadDigest: 'req-old\u001fmsg-old\u001fblogger-missing-tool',
+    }),
+    'Superseded',
+  )
+})

@@ -272,6 +272,17 @@ module PromptAuthorityLedger =
                 else
                     None))
 
+    let acceptedDispatchForPhysicalMessage
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (agentProjections: AgentProjectionSet)
+        : PromptAuthority.AcceptedDispatch option =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority ->
+            authority.AcceptedDispatches
+            |> Seq.tryPick (fun (KeyValue(_, dispatch)) ->
+                if dispatch.PhysicalUserMessageId = physicalUserMessageId then Some dispatch else None))
+
     let dispatchStatusFor
         (sessionId: SessionId)
         (payloadDigest: string)

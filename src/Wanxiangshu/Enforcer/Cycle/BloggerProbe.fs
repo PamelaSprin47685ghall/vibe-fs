@@ -87,6 +87,52 @@ module BloggerRecoveryProbe =
         | InteractionNudgeIssued of ProviderRunIdentity
         | AabbRepairIssued of ProviderRunIdentity
 
+    let terminalRequestOwnershipForPhysicalMessage
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (request: BloggerRequestContext)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        : BloggerTerminalRequestOwnership =
+        let projections = (AgentJournal.snapshot journal).AgentProjections
+        let mainSessionId = BloggerRequestContext.mainSessionId request
+        let requestId = BloggerRequestContext.requestId request
+
+        let openRequest =
+            projections.Sessions
+            |> Map.tryFind mainSessionId
+            |> Option.bind (fun session -> session.BloggerCycles)
+            |> Option.bind (BloggerCycleProjection.tryOpenByBlogger bloggerSessionId)
+
+        let parent =
+            PromptAuthorityLedger.acceptedDispatchForPhysicalMessage
+                bloggerSessionId
+                physicalUserMessageId
+                projections
+            |> Option.map (fun dispatch ->
+                { PromptKey = dispatch.PromptKey
+                  IsRequestScopedRepair =
+                    match dispatch.Origin with
+                    | PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.InteractionRepair ->
+                        PromptAuthority.repairPayloadBelongsToRequest requestId dispatch.PayloadDigest
+                    | _ -> false })
+
+        BloggerRequestOwnership.decide
+            requestId
+            (openRequest |> Option.map (fun current -> current.RequestId))
+            (openRequest |> Option.bind (fun current -> current.PromptKey))
+            parent
+
+    let terminalRequestOwnershipForProviderRun
+        (journal: AgentJournal)
+        (bloggerSessionId: SessionId)
+        (request: BloggerRequestContext)
+        (providerRun: ProviderRunIdentity)
+        (rawMessages: obj list)
+        : BloggerTerminalRequestOwnership =
+        ProviderWireCapture.tryPhysicalParentOfProviderRun providerRun rawMessages
+        |> Option.map (terminalRequestOwnershipForPhysicalMessage journal bloggerSessionId request)
+        |> Option.defaultValue BloggerTerminalRequestOwnership.Unproven
+
     /// ENFORCER-153 pure rejudge from already-resolved evidence.
     ///
     /// `claimedTerminalRun`: durable InteractionRepair claim for blogger-missing-tool

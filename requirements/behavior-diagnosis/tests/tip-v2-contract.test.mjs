@@ -110,3 +110,45 @@ test('WHAT[BD-016] ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
   assert.deepEqual(observation.recentTips(observation.applyEnforcementSquash(5, state)), [])
   assert.deepEqual(observation.recentTips(observation.applyEnforcementSquash(0, state)).map((t) => t.cycleId), ['msg_tip_1', 'msg_tip_2'])
 })
+
+test('WHAT[BD-015] ENFORCER_TIP_13_pairing_observation_units_preserves_discrete_identity', () => {
+  const units = observation.pairTipsAndFrames(['tip-1', 'tip-2'], [{ digest: 'd1', body: 'b1' }])
+  assert.equal(units.length, 2)
+  assert.deepEqual(units[0], { tipName: 'tip-1', frameDigest: 'd1', frameBody: 'b1' })
+  assert.deepEqual(units[1], { tipName: 'tip-2', frameDigest: null, frameBody: null })
+})
+
+test('WHAT[BD-015] ENFORCER_TIP_14_work_log_observations_drop_unpaired_frames_and_anchor_on_tips', () => {
+  const obs = observation.ofTipsAndFrames(
+    [{ tipName: 'tip-1', cycleId: 'c1' }],
+    ['d1', 'd2', 'd3'],
+  )
+  assert.equal(obs.length, 1)
+  assert.deepEqual(obs[0], { tipName: 'tip-1', cycleId: 'c1', frameDigest: 'd1' })
+})
+
+test('WHAT[BD-009] ENFORCER_TIP_15_assistant_step_classification_protocol', () => {
+  const single = enforcer.classifyAssistantStep({
+    messageId: 'msg-1',
+    parts: [{ tool: 'chronicle', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'work' } } }],
+  })
+  assert.equal(single.acceptedCalls, 1)
+  assert.equal(single.protocol, 'CommitCandidate')
+
+  const zero = enforcer.classifyAssistantStep({
+    messageId: 'msg-0',
+    parts: [{ type: 'text', text: 'no tool' }],
+  })
+  assert.equal(zero.acceptedCalls, 0)
+  assert.equal(zero.protocol, 'ProjectMessages')
+
+  const multiple = enforcer.classifyAssistantStep({
+    messageId: 'msg-2',
+    parts: [
+      { tool: 'chronicle', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'work1' } } },
+      { tool: 'chronicle', state: { status: 'completed', input: { tip: 'primitive-obsession', text: 'work2' } } },
+    ],
+  })
+  assert.equal(multiple.acceptedCalls, 2)
+  assert.equal(multiple.protocol, 'ProtocolRepair')
+})

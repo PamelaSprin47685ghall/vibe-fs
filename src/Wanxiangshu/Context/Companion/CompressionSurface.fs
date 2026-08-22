@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Companion
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
@@ -511,6 +512,26 @@ module CompressionSurface =
                     match rejection with
                     | TerminalValidity.Rejection.Empty -> "Empty"
                     | TerminalValidity.Rejection.XmlOnly -> "XmlOnly" |}
+
+    let terminalRequestOwnership (value: obj) : string =
+        let requestId = BloggerRequestId.create (text value?requestId)
+        let openRequestId = optionalText value?openRequestId |> Option.map BloggerRequestId.create
+        let openPromptKey = optionalText value?openPromptKey |> Option.map PromptKey.create
+
+        let parent: BloggerTerminalParentEvidence option =
+            optionalText value?parentPromptKey
+            |> Option.map (fun promptKey ->
+                let isInteractionRepair = optionalText value?parentOrigin = Some "InteractionRepair"
+
+                { PromptKey = PromptKey.create promptKey
+                  IsRequestScopedRepair =
+                    isInteractionRepair
+                    && PromptAuthority.repairPayloadBelongsToRequest requestId (text value?parentPayloadDigest) })
+
+        match BloggerRequestOwnership.decide requestId openRequestId openPromptKey parent with
+        | BloggerTerminalRequestOwnership.Current -> "Current"
+        | BloggerTerminalRequestOwnership.Superseded -> "Superseded"
+        | BloggerTerminalRequestOwnership.Unproven -> "Unproven"
 
     let compactionSettingPaths: string array =
         HostCompactionPolicy.requiredSettings

@@ -30,6 +30,15 @@ test('WHAT[SPEC-INV-009] STRENGTH_003_004_replica_initial_transform_replaces_boo
   assert.equal(decoded.messages[0].parts[0].text, 'owner mirror')
 })
 
+test('WHAT[SPEC-INV-004] STRENGTH_004_non_replica_session_returns_not_replica', async () => {
+  const runtime = registered('replica-known', 'K1')
+  const output = { messages: [user('u1', 'unknown-session', [hostText('Continue.')])] }
+  const outcome = await apply(runtime, output)
+  assert.equal(outcome.kind, 'NotReplica')
+  assert.deepEqual(outcome.batches, [])
+  assert.deepEqual(outcome.aborted, [])
+})
+
 test('WHAT[SPEC-INV-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_one_complete_batch', async () => {
   const runtime = registered('replica-k1', 'K1')
   const output = { messages: [user('u1', 'replica-k1', [hostText('Continue.')]), assistant('a1', 'replica-k1', [hostCall('c1', 'read', { filePath: 'a' })]), tool('t1', 'replica-k1', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] }
@@ -40,6 +49,27 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_
   assert.deepEqual(outcome.aborted, ['replica-k1'])
   assert.equal(Strength.runtimeFindByReplica(runtime, 'replica-k1'), null)
   assert.equal((await apply(runtime, output)).kind, 'NotReplica')
+})
+
+test('WHAT[SPEC-INV-003] STRENGTH_003_multiple_parallel_tool_calls_in_one_request_form_single_batch', async () => {
+  const runtime = registered('replica-multi-tool', 'K1')
+  const output = {
+    messages: [
+      user('u1', 'replica-multi-tool', [hostText('Continue.')]),
+      assistant('a1', 'replica-multi-tool', [
+        hostResult('c1', 'read', { filePath: 'a' }, 'alpha'),
+        hostResult('c2', 'grep', { pattern: 'x' }, 'beta'),
+      ]),
+    ]
+  }
+  const outcome = await apply(runtime, output)
+  assert.equal(outcome.kind, 'Retired')
+  assert.equal(outcome.reason, 'provider-request-budget-reached')
+  assert.equal(outcome.batches.length, 1)
+  assert.equal(outcome.batches[0].exchanges.length, 2)
+  assert.equal(outcome.batches[0].exchanges[0].toolName, 'read')
+  assert.equal(outcome.batches[0].exchanges[1].toolName, 'grep')
+  assert.deepEqual(outcome.aborted, ['replica-multi-tool'])
 })
 
 test('WHAT[SPEC-INV-003] STRENGTH_003_K1_counts_OpenCode_completed_tool_part_as_one_real_request', async () => {

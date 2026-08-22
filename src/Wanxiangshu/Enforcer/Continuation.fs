@@ -1,73 +1,23 @@
 namespace Wanxiangshu.Enforcer
 
-open Wanxiangshu.OpenCode
-
 open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Foundation
-open Wanxiangshu.Host
-open Wanxiangshu.Host.Contract
-open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.Review.Judgement
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Persistence.EventStore
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Prediction
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Foundation
-open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Enforcer.Cycle
+open Wanxiangshu.Execution.Session
+open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.Fork.Host
-open Wanxiangshu.Execution.Delegation.Handle
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Execution.Session
-open Wanxiangshu.Execution.Session.Attachment
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Execution.Session.Wait
-open Wanxiangshu.Interaction.Repair
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Host
+open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+open Wanxiangshu.Persistence.Journal
 
 /// Session termination capability — same signature as PluginTransforms.fs private type.
 type SessionTermination = SessionId -> string -> Task<Result<unit, string>>
@@ -365,6 +315,51 @@ module EnforcerContinuation =
         | None -> Task.FromResult(ctx.Stop "unowned-invalid-blog-cycle-without-CurrentRequest")
         | Some live -> decideProtocolRecovery ctx sessionKey currentCtx live terminalRun reason
 
+    let private terminalWasSuperseded
+        (ctx: Context)
+        (providerRun: ProviderRunIdentity)
+        (liveCtx: BloggerRequestContext option)
+        =
+        liveCtx
+        |> Option.exists (fun live ->
+            let ownership =
+                BloggerRecoveryProbe.terminalRequestOwnershipForProviderRun
+                    ctx.Durable
+                    ctx.BloggerSessionId
+                    live
+                    providerRun
+                    ctx.RawMessages
+
+            ownership = BloggerTerminalRequestOwnership.Superseded)
+
+    let private projectSupersededTerminal (ctx: Context) (sessionKey: string) (providerRun: ProviderRunIdentity) =
+        Diagnostic.emit
+            "enforcer-cycle-superseded"
+            [ "session_id", sessionKey
+              "result", "terminal belongs to an older Blogger request: " + ProviderRunIdentity.value providerRun ]
+
+        Task.FromResult(ctx.Project ctx.RawMessages)
+
+    let private decideCompletedInvalidCardinality
+        (ctx: Context)
+        (sessionKey: string)
+        (currentCtx: BloggerRequestContext option)
+        (providerRun: ProviderRunIdentity)
+        (callCount: int)
+        : Task<ContinuationOutcome> =
+        let liveCtx =
+            EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
+
+        if terminalWasSuperseded ctx providerRun liveCtx then
+            projectSupersededTerminal ctx sessionKey providerRun
+        else
+            decideInvalidTerminal
+                ctx
+                sessionKey
+                currentCtx
+                liveCtx
+                (sprintf "chronicle call count = %d; expected exactly one (ENFORCER-042)" callCount)
+
     let invalidCardinalityBranch
         (ctx: Context)
         (messageId: string)
@@ -382,16 +377,8 @@ module EnforcerContinuation =
                 return!
                     fatalProjectRaw ctx sessionKey currentCtx "blog cycle has no provable provider run (ENFORCER-043)"
             else
-                let liveCtx =
-                    EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
-
-                return!
-                    decideInvalidTerminal
-                        ctx
-                        sessionKey
-                        currentCtx
-                        liveCtx
-                        (sprintf "chronicle call count = %d; expected exactly one (ENFORCER-042)" callCount)
+                let providerRun = ProviderRunIdentity.create messageId
+                return! decideCompletedInvalidCardinality ctx sessionKey currentCtx providerRun callCount
         }
 
     /// Branch 1 — empty completed-blog list. Host transform msgs do NOT include
@@ -412,7 +399,11 @@ module EnforcerContinuation =
             let liveCtx =
                 EnforcerFrameRecovery.tryLiveCycleContext ctx.Scope ctx.BloggerSessionId
 
-            if EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages then
+            let terminalRun = providerRunFromLastAssistant ctx.RawMessages "unknown-prose-run"
+
+            if terminalWasSuperseded ctx terminalRun liveCtx then
+                return! projectSupersededTerminal ctx sessionKey terminalRun
+            elif EnforcerRepair.hasIncompleteBlogTool ctx.RawMessages then
                 return ctx.Project ctx.RawMessages
             elif EnforcerRepair.hasAbortedBlogAttempt ctx.RawMessages then
                 return! decideInterruptedBlog ctx sessionKey currentCtx liveCtx
@@ -1028,6 +1019,8 @@ module EnforcerContinuation =
                 return! resumeCatchUp ctx mainSessionId sessionKey "idempotent-receipt-catch-up-complete"
             elif liveCtx.IsNone then
                 return unownedLiveBlogOutcome ctx mainSessionId sessionKey assistantCompleted
+            elif terminalWasSuperseded ctx providerRun liveCtx then
+                return! projectSupersededTerminal ctx sessionKey providerRun
             else
                 let! disposition = runOwnedCycleBody ctx mainSessionId sessionKey messageId calls liveCtx providerRun
 

@@ -9,7 +9,6 @@ open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

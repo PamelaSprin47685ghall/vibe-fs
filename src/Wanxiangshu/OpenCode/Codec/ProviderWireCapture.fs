@@ -165,6 +165,18 @@ module ProviderWireCapture =
             | _ -> None)
         |> List.tryLast
 
+    let tryPhysicalParentOfProviderRun
+        (providerRun: ProviderRunIdentity)
+        (rawMessages: obj list)
+        : PhysicalUserMessageId option =
+        rawMessages
+        |> List.tryPick (fun raw ->
+            match decodeCapturedMessage raw with
+            | Some message when message.ProviderRun = Some providerRun ->
+                ProviderWireDecode.firstString (ProviderWireDecode.infoObject raw) [ "parentID" ]
+                |> Option.map PhysicalUserMessageId.create
+            | _ -> None)
+
     /// Host semantic-turn coordinate of one physical message in the same decoded
     /// message universe used by XTrace capture. Unlike a raw array index, rows the
     /// codec cannot decode do not shift this coordinate.

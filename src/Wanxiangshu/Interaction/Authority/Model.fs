@@ -479,6 +479,9 @@ module PromptAuthority =
                repairKind |]
         )
 
+    let repairPayloadBelongsToRequest (requestId: BloggerRequestId) (payloadDigest: string) =
+        payloadDigest.StartsWith(BloggerRequestId.value requestId + "\u001f", System.StringComparison.Ordinal)
+
     /// Ordinary interaction-repair budget identity. The LogicalRunId is already
     /// part of claimScopeDigest, so the repair family name alone makes the budget
     /// one-per-logical-run instead of one-per-terminal. This prevents a repair

@@ -1,29 +1,8 @@
 namespace Wanxiangshu.Strength.Prediction
 
-open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Prefix
-open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Execution.Delegation.Fork
-open Wanxiangshu.Execution.Delegation.SyncDelegate
-open Wanxiangshu.Execution.Session.Recovery
-open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Mission.Manager
-open Wanxiangshu.Mission.Manager.Life
-open Wanxiangshu.Mission.Obligation.Todo
-open Wanxiangshu.Mission.Review
-open Wanxiangshu.Mission.WorkRecord
-open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Participant.Provider.Attempt
-open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Strength
-
 open Wanxiangshu.Foundation
+open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Strength
 
 [<RequireQualifiedAccess>]
 type StrengthPrimarySymbol =
@@ -47,81 +26,86 @@ type StrengthPredictorBucket =
 
 type StrengthPredictorState = private StrengthPredictorState of Map<StrengthFeatureKey, StrengthPredictorBucket>
 
-[<RequireQualifiedAccess>]
 module StrengthPredictor =
 
-    let empty = StrengthPredictorState Map.empty
+    let empty: StrengthPredictorState = StrengthPredictorState Map.empty
 
-    let byteBucket visibleBytes =
+    let private emptyBucket =
+        { Opportunities = 0
+          ReadonlyFirst = 0
+          SecondObservations = 0
+          ReadonlySecond = 0 }
+
+    let private byteBucket visibleBytes =
         if visibleBytes <= 0 then 0
         elif visibleBytes <= 4096 then 1
         elif visibleBytes <= 16384 then 2
         elif visibleBytes <= 65536 then 3
         else 4
 
-    let feature role recentPrimary visibleBytes =
+    let feature (role: Role) (recent: StrengthPrimarySymbol list) (visibleBytes: int) : StrengthFeatureKey =
         { CanonicalRole = role
-          RecentPrimary = recentPrimary |> List.truncate 3
+          RecentPrimary = recent |> List.truncate 3
           VisibleByteBucket = byteBucket visibleBytes }
 
-    let private bucketOf key (StrengthPredictorState buckets) =
-        Map.tryFind key buckets
-        |> Option.defaultValue
-            { Opportunities = 0
-              ReadonlyFirst = 0
-              SecondObservations = 0
-              ReadonlySecond = 0 }
+    let bucket (feature: StrengthFeatureKey) (StrengthPredictorState state) : StrengthPredictorBucket =
+        state |> Map.tryFind feature |> Option.defaultValue emptyBucket
 
-    let private put key value (StrengthPredictorState buckets) =
-        StrengthPredictorState(Map.add key value buckets)
-
-    /// Counterfactual first-request label. Callers must invoke this only for
-    /// shadow/control primary observations; treatment interventions are excluded
-    /// by construction at the coordinator boundary.
-    let observeFirst key symbol state =
-        let current = bucketOf key state
-        let readonly = symbol = StrengthPrimarySymbol.ReadonlyBatch
+    let observeFirst
+        (feature: StrengthFeatureKey)
+        (first: StrengthPrimarySymbol)
+        (StrengthPredictorState state)
+        : StrengthPredictorState * bool =
+        let current = state |> Map.tryFind feature |> Option.defaultValue emptyBucket
+        let isReadonly = first = StrengthPrimarySymbol.ReadonlyBatch
 
         let next =
             { current with
                 Opportunities = current.Opportunities + 1
-                ReadonlyFirst = current.ReadonlyFirst + (if readonly then 1 else 0) }
+                ReadonlyFirst =
+                    if isReadonly then
+                        current.ReadonlyFirst + 1
+                    else
+                        current.ReadonlyFirst }
 
-        put key next state, readonly
+        StrengthPredictorState(state |> Map.add feature next), isReadonly
 
-    /// Conditional R2 label, only after an observed readonly R1.
-    let observeSecond key symbol state =
-        let current = bucketOf key state
+    let observeSecond
+        (feature: StrengthFeatureKey)
+        (second: StrengthPrimarySymbol)
+        (StrengthPredictorState state)
+        : StrengthPredictorState =
+        let current = state |> Map.tryFind feature |> Option.defaultValue emptyBucket
 
         let next =
             { current with
                 SecondObservations = current.SecondObservations + 1
                 ReadonlySecond =
-                    current.ReadonlySecond
-                    + (if symbol = StrengthPrimarySymbol.ReadonlyBatch then
-                           1
-                       else
-                           0) }
+                    if second = StrengthPrimarySymbol.ReadonlyBatch then
+                        current.ReadonlySecond + 1
+                    else
+                        current.ReadonlySecond }
 
-        put key next state
+        StrengthPredictorState(state |> Map.add feature next)
 
-    let predict key state : StrengthPrediction =
-        let bucket = bucketOf key state
+    let predict
+        (feature: StrengthFeatureKey)
+        (StrengthPredictorState state)
+        : Wanxiangshu.Strength.StrengthPrediction =
+        let b = state |> Map.tryFind feature |> Option.defaultValue emptyBucket
 
         let p1 =
-            if bucket.Opportunities <= 0 then
+            if b.Opportunities = 0 then
                 0.0
             else
-                float bucket.ReadonlyFirst / float bucket.Opportunities
+                float b.ReadonlyFirst / float b.Opportunities
 
         let p2 =
-            if bucket.SecondObservations <= 0 then
+            if b.SecondObservations = 0 then
                 0.0
             else
-                float bucket.ReadonlySecond / float bucket.SecondObservations
+                float b.ReadonlySecond / float b.SecondObservations
 
         { P1 = p1
           P2 = p2
-          EvidenceCount = min bucket.Opportunities bucket.SecondObservations }
-
-    let bucket key state = bucketOf key state
+          EvidenceCount = min b.Opportunities b.SecondObservations }

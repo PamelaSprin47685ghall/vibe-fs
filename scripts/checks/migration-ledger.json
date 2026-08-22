@@ -616,7 +616,7 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "READY",
+      "state": "DONE",
       "result": "CUTOVER"
     },
     {
@@ -658,7 +658,7 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "READY",
+      "state": "DONE",
       "result": "CUTOVER"
     },
     {
@@ -704,7 +704,7 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "READY",
+      "state": "DONE",
       "result": "CUTOVER"
     },
     {
@@ -747,8 +747,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING"
+      "state": "DONE",
+      "result": "CUTOVER",
+      "closure_evidence": "proof: requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs; 关联 gate: plugin-transforms-invariant, fsharp-control-pyramid, semantic-owners; Enforcer guidance & continuation 切片归一至 behavior-diagnosis 唯一 owner，清理无用跨层 imports，PluginTransforms 静态乐谱接线保持显式"
     }
   ],
   "debt_face": {

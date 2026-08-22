@@ -66,6 +66,33 @@ type BloggerRequestContext =
     | Squash of BloggerSquashRequestContext
 
 [<RequireQualifiedAccess>]
+type BloggerTerminalRequestOwnership =
+    | Current
+    | Superseded
+    | Unproven
+
+type BloggerTerminalParentEvidence =
+    { PromptKey: PromptKey
+      IsRequestScopedRepair: bool }
+
+[<RequireQualifiedAccess>]
+module BloggerRequestOwnership =
+
+    let decide
+        (currentRequestId: BloggerRequestId)
+        (durableOpenRequestId: BloggerRequestId option)
+        (durableOpenPromptKey: PromptKey option)
+        (parent: BloggerTerminalParentEvidence option)
+        : BloggerTerminalRequestOwnership =
+        match durableOpenRequestId, parent with
+        | Some openRequestId, _ when openRequestId <> currentRequestId -> BloggerTerminalRequestOwnership.Superseded
+        | None, _
+        | Some _, None -> BloggerTerminalRequestOwnership.Unproven
+        | Some _, Some evidence when durableOpenPromptKey = Some evidence.PromptKey -> BloggerTerminalRequestOwnership.Current
+        | Some _, Some evidence when evidence.IsRequestScopedRepair -> BloggerTerminalRequestOwnership.Current
+        | Some _, Some _ -> BloggerTerminalRequestOwnership.Superseded
+
+[<RequireQualifiedAccess>]
 module BloggerRequestContext =
 
     let toml (ctx: BloggerRequestContext) =
