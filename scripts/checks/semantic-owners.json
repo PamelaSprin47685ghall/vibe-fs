@@ -1257,7 +1257,7 @@
     },
     {
       "path": "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
-      "owner": "work-record"
+      "owner": "finality"
     },
     {
       "path": "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
@@ -1481,7 +1481,7 @@
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/TodoProcess.fs",
-      "owner": "review-judgement"
+      "owner": "obligation-ledger"
     },
     {
       "path": "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",

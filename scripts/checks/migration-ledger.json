@@ -860,6 +860,210 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "mission-finality-keep",
+      "primary_owner": "finality",
+      "intent": "Finality domain remaining slice: manager life orchestration, finality background/idle/narrative and prompt surfaces",
+      "files": [
+        "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
+        "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Mission/Finality/Prompt.fs",
+        "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
+        "src/Wanxiangshu/Mission/Finality/Record.fs",
+        "src/Wanxiangshu/Mission/Finality/Revision.fs",
+        "src/Wanxiangshu/Mission/Finality/Types.fs",
+        "src/Wanxiangshu/Mission/Manager/Background.fs",
+        "src/Wanxiangshu/Mission/Manager/Finality.fs",
+        "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+        "src/Wanxiangshu/Mission/Manager/Idle.fs",
+        "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
+        "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
+        "src/Wanxiangshu/Mission/Manager/Narrative.fs",
+        "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
+        "src/Wanxiangshu/Mission/Manager/Workflow.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Finality.Contract",
+        "Mission.Manager.Life"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/finality/tests/blessing-admission.test.mjs",
+        "requirements/finality/tests/lifecycle.test.mjs",
+        "requirements/finality/tests/manager-finality-disposition.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageC"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "mission-obligation-keep",
+      "primary_owner": "obligation-ledger",
+      "intent": "Obligation ledger remaining slice: magic todo membrane/locality/projection/codec surfaces, process review and todo process",
+      "files": [
+        "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/After.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+        "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs",
+        "src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs",
+        "src/Wanxiangshu/Mission/Review/TodoProcess.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Obligation.LedgerContract",
+        "MagicTodo.Surface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/obligation-ledger/tests/magic-todo.test.mjs",
+        "requirements/obligation-ledger/tests/obligation-ledger-workflow-contract.test.mjs",
+        "requirements/obligation-ledger/tests/magic-todo-membrane.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageC"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "mission-review-judgement-keep",
+      "primary_owner": "review-judgement",
+      "intent": "Review judgement remaining slice: judgement challenge/continuation/verdict/witness workflows, ports, prompt and judge surfaces",
+      "files": [
+        "src/Wanxiangshu/Mission/Review/Fact.fs",
+        "src/Wanxiangshu/Mission/Review/Facts.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+        "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+        "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
+        "src/Wanxiangshu/Mission/Review/Ports.fs",
+        "src/Wanxiangshu/Mission/Review/Prompt.fs",
+        "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+        "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Review.Judgement.Workflow",
+        "Review.JudgeTool"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/review-judgement/tests/process-review-judgement.test.mjs",
+        "requirements/review-judgement/tests/judge-tool-contract.test.mjs",
+        "requirements/review-judgement/tests/verdict-tool.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageC"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "mission-work-record-keep",
+      "primary_owner": "work-record",
+      "intent": "Work record slice: materialization, model, opening and record semantic surfaces",
+      "files": [
+        "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Model.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
+        "src/Wanxiangshu/Mission/WorkRecord/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "WorkRecord.Surface",
+        "WorkRecord.Model"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/work-record/tests/lifecycle-work-record.test.mjs",
+        "requirements/work-record/tests/work-record-sections.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageC"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
     }
   ],
   "debt_face": {
@@ -1036,69 +1240,6 @@
       "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
       "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs",
       "src/Wanxiangshu/Interaction/Repair/Port.fs"
-    ],
-    "CoverageC": [
-      "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs",
-      "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
-      "src/Wanxiangshu/Mission/Finality/Prompt.fs",
-      "src/Wanxiangshu/Mission/Finality/PromptSurface.fs",
-      "src/Wanxiangshu/Mission/Finality/Record.fs",
-      "src/Wanxiangshu/Mission/Finality/Revision.fs",
-      "src/Wanxiangshu/Mission/Finality/Types.fs",
-      "src/Wanxiangshu/Mission/Manager/Background.fs",
-      "src/Wanxiangshu/Mission/Manager/Finality.fs",
-      "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
-      "src/Wanxiangshu/Mission/Manager/Idle.fs",
-      "src/Wanxiangshu/Mission/Manager/JobHandoff.fs",
-      "src/Wanxiangshu/Mission/Manager/Life/Admission.fs",
-      "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
-      "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
-      "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
-      "src/Wanxiangshu/Mission/Manager/Life/Prompt.fs",
-      "src/Wanxiangshu/Mission/Manager/Life/Workflow.fs",
-      "src/Wanxiangshu/Mission/Manager/Narrative.fs",
-      "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
-      "src/Wanxiangshu/Mission/Manager/Workflow.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/After.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocalitySurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembraneSurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionCodecSurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoSemanticSurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/ObligationCodec.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
-      "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs",
-      "src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs",
-      "src/Wanxiangshu/Mission/Review/Fact.fs",
-      "src/Wanxiangshu/Mission/Review/Facts.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/Continuation.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/Evidence.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
-      "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
-      "src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs",
-      "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
-      "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
-      "src/Wanxiangshu/Mission/Review/Ports.fs",
-      "src/Wanxiangshu/Mission/Review/Prompt.fs",
-      "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
-      "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
-      "src/Wanxiangshu/Mission/Review/TodoProcess.fs",
-      "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
-      "src/Wanxiangshu/Mission/WorkRecord/Model.fs",
-      "src/Wanxiangshu/Mission/WorkRecord/OpeningSemanticSurface.fs",
-      "src/Wanxiangshu/Mission/WorkRecord/Surface.fs"
     ],
     "CoverageD": [
       "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
