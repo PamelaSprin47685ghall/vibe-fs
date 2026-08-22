@@ -62,14 +62,7 @@ type ReviewHostPort =
       AwaitReviewer: unit -> Task<Result<unit, string>>
       NudgeMissingJudgement: unit -> Task<Result<PhysicalUserMessageId, string>> }
 
-/// Physical continuation capability retained for process-review missing-judge
-/// repair. Finality challenge sequencing belongs exclusively to ReviewBarrierWorkflow.
+/// Physical continuation capability retained for missing-judge repair.
+/// Finality challenge sequencing belongs exclusively to ReviewBarrierWorkflow.
 type ReviewerContinuationPort =
     { NudgeMissingVerdict: SessionId -> Task<Result<unit, string>> }
-
-/// HOST-021 / TODO-006: Host-owned process-review ensure and lag-1 wait.
-/// After starts EnsureReview without waiting for ConsumableReview; T(k+1) /
-/// suicide drain uses AwaitConsumableReview (Journal change, no wall-clock poll).
-type ProcessReviewPort =
-    { EnsureReview: AgentJournal -> SessionId -> ManagerLifeId -> TodoWriteId -> Task<Result<unit, string>>
-      AwaitConsumableReview: AgentJournal -> SessionId -> ManagerLifeId -> TodoWriteId -> Task<Result<unit, string>> }

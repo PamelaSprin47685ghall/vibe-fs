@@ -2,7 +2,7 @@
 
 ## 1. 存在理由与核心矛盾
 
-万象术质量门的核心在于 Reviewer 对交付工作的判断，并最终汇入 mission 的终局（Finality）与过程节拍（TodoProcessReview）。该链条最关键的语义前提在于：
+万象术质量门的核心在于 Reviewer 对交付工作的判断，并最终汇入 mission 的终局（Finality）。该链条最关键的语义前提在于：
 
 > Reviewer 输出的 `PERFECT` 或 `REVISE` 在被系统消费之前，必须具有明确且不可替代的领域意义。
 

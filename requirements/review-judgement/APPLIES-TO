@@ -5,7 +5,6 @@
 /src/Wanxiangshu/Mission/Review/Judgement/**
 /src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs
 /src/Wanxiangshu/Mission/Review/OpenCode/JudgeSurface.fs
-/src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs
 /resources/provider/role/reviewer/**
 /resources/provider/tool/judge/**
 /resources/provider/library/reviewer/**

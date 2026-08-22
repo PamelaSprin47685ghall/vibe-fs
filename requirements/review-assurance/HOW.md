@@ -13,11 +13,10 @@
 3. 审查者在同一物理交互或经由 nudge 续接后发起第二次判断；工作流校验两次调用的独立性（不同 ProviderRun/ToolCall）与物理提示一致性，校验通过后一次性写入 `ConfirmedReviewWitness` 并完成调用。
 4. 任一阶段收到 REVISE 或发生代码树漂移立即以失败关闭，不持久化半程位置。
 
-## 3. 过程评审与就绪判定机制
+## 3. 终审裁决与闭环机制
 
-- **两段式事实收束**：过程评审首先将 durable `judge` 记录为 `VerdictKnown` 并触发 turn 结束；随后在同一 Snapshot 下执行 record-ready 判定与 `ProcessReviewLWR` 物化，就绪后写入 `TodoReviewConcluded`。
-- **事件驱动等待**：下游消费方通过 `AgentJournal.awaitChangeFrom` 订阅事件，严格避免轮询；等待器被中断后直接基于持久事实重新构建。
-- **物理发送 fence**：过程 `judge` 成功持久化时按 Reviewer Session arm process-local interrupt fence。下一 checkpoint 可继续建立 durable assignment，但 continuation 在调用 Host `SendPrompt` 前必须等待 fence；`InterruptAttempt` 成功后 release，失败则 fail closed。由此新 review 请求不会与上一轮 tool result 一起进入 Host 队列。
+- **Direct CE 独占驱动**：终审判断由 `ReviewBarrierWorkflow` 直接管理，单次或双重判断通过强类型 `ReviewJudgementInbox` 交互完成。
+- **排他 Frontier 与中断**：Reviewer 完成裁决后，通过排他 frontier 冻结闭环，并以事件驱动等待下游消费。
 
 ## 4. 依赖声明
 

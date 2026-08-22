@@ -35,7 +35,7 @@ test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_tool_spec_exposes_judge_with_a_singl
 })
 
 test('WHAT[REVIEW-JUDGEMENT-001] REVIEW_001_reviewer_provider_instructions_name_judge_never_the_removed_verdict_tool', () => {
-  const paths = ['runtime/reviewer-verdict-required', 'lifecycle/magic-todo/process-reviewer-preamble', 'lifecycle/host-review/opening']
+  const paths = ['runtime/reviewer-verdict-required', 'lifecycle/host-review/opening']
   for (const language of ['English', 'SimplifiedChinese']) {
     for (const path of paths) {
       const text = provider.readText(language, path)

@@ -86,22 +86,6 @@ module JudgeSurface =
 
     let clearVerdictSubmissions () : unit = SharedState.VerdictSubmissions.Clear()
 
-    let armProcessReviewInterruptFence (sessionId: string) : unit =
-        ReviewerWorkflow.ProcessReviewInterruptFence.arm (SessionId.create sessionId)
-
-    let processReviewInterruptFenceBlocked (sessionId: string) : bool =
-        ReviewerWorkflow.ProcessReviewInterruptFence.isBlocked (SessionId.create sessionId)
-
-    let awaitProcessReviewInterruptFence (sessionId: string) : Task<obj> =
-        task {
-            match! ReviewerWorkflow.ProcessReviewInterruptFence.awaitRelease (SessionId.create sessionId) with
-            | Ok() -> return box {| ok = true |}
-            | Error reason -> return box {| ok = false; error = reason |}
-        }
-
-    let releaseProcessReviewInterruptFence (sessionId: string) : unit =
-        ReviewerWorkflow.ProcessReviewInterruptFence.release (SessionId.create sessionId)
-
     let private tryGetJournal (handle: JournalHandle) : Result<AgentJournal, string> =
         try
             Ok handle.Journal

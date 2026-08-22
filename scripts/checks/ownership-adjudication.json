@@ -1003,13 +1003,6 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs",
-        "owners": [
-          "obligation-ledger",
-          "review-judgement"
-        ]
-      },
-      {
         "path": "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
         "owners": [
           "review-assurance",
@@ -1042,13 +1035,6 @@
         "owners": [
           "review-assurance",
           "review-judgement"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/Mission/Review/TodoProcess.fs",
-        "owners": [
-          "obligation-ledger",
-          "work-record"
         ]
       },
       {

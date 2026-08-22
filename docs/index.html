@@ -1223,10 +1223,10 @@ $$\text{EligibleForFinality} \iff \text{ObligationsAccounted}(\mathcal{L}) \;\la
 <b>完成反事实测试（Completion Counterfactual Test）：</b>在任务承诺后，每一项待办都必须通过反事实检验——如果这项工作被完美完成，用户世界所要求的结果是否产生实质变化？如果唯一的收益只是“项目经理自己更明白了”、“画了一张更漂亮的图”，那它只是规划认知，绝无资格进入正式未尽事项账本！
 </div>
 
-<h3>1:1 lag-1 过程评审时钟流水线（Lag-1 Cadence Pipeline）</h3>
-<p>项目经理与专职过程评审员之间的节拍遵循严格的 <strong>lag-1 步进代数</strong>：</p>
-$$T_k \text{ (Accepted)} \xrightarrow{\quad\text{提交}\quad} \text{同步消费 } R_{k-1} \text{ 结论} \;\land\; \text{派生 } R_k \text{ 评审义务}$$
-<p>当第 $k$ 次清单 $T_k$ 提交时，项目经理即可继续开展后续独立工作；当第 $k+1$ 次清单 $T_{k+1}$ 准备提交时，系统强制等待 $R_k$ 的评审报告生成完毕并将其作为前置输入。这一机制实现了<strong>流水线并发推进与因果单步检验的完美平衡</strong>。</p>
+<h3>todo lag-1 稳定前缀与终局质量门</h3>
+<p>项目经理与质量验收之间实行<strong>终局裁决制</strong>，同时保持基于 committed Accepted 链的 <strong>lag-1 前缀折叠代数</strong>：</p>
+$$T_k \text{ (Accepted)} \xrightarrow{\quad\text{提交}\quad} \text{立即生效当前账目} \;\land\; \text{折叠 } T_{k-1} \text{ 前缀}$$
+<p>当清单 $T_k$ 提交时，当前账目立即无阻塞生效，过程性工作流无需等待中间评审；质量检验与双重 PERFECT 确认统一收口于终局评审（Finality Review）。</p>
 
 <div class="feature-tier tier-enhanced">
 <h3>焦点（`workingOn`）容错与透视衰减</h3>

@@ -103,37 +103,60 @@ const argsCarryCompatibilityView = (args) =>
   todosReflectWorkingOn(args, args?.todos)
   && Object.prototype.propertyIsEnumerable.call(args, 'todos') === false;
 
-const taggedValue = (value) =>
-  Array.isArray(value) && value.length >= 2 ? value.at(-1) : value;
+const taggedValue = (value) => {
+  while (Array.isArray(value)) {
+    if (value.length === 1 && value[0] === 'None') return null;
+    if (value.length >= 2) {
+      value = value.at(-1);
+    } else {
+      break;
+    }
+  }
+  return value;
+};
 
 const journalCarrierFor = (locate, xTraceParts) => {
+  const sessionID = locate?.sessionID ?? null;
+  const callID = locate?.callID ?? null;
   const partID = locate?.match?.partID ?? null;
+
   const matches = (Array.isArray(xTraceParts) ? xTraceParts : []).filter((payload) => {
     if (!payload || typeof payload !== 'object') return false;
-    if (taggedValue(payload.SessionId) !== locate?.sessionID) return false;
-    if (taggedValue(payload.ToolCallId) !== locate?.callID) return false;
-    if (partID && taggedValue(payload.HostToolPartId) !== partID) return false;
+    const sess = taggedValue(payload.SessionId ?? payload.sessionId ?? payload.session_id);
+    const call = taggedValue(payload.ToolCallId ?? payload.toolCallId ?? payload.tool_call_id ?? payload.callID ?? payload.callId);
+    const hostPart = taggedValue(payload.HostToolPartId ?? payload.hostToolPartId ?? payload.host_tool_part_id ?? payload.partID ?? payload.partId);
+    if (sessionID && sess !== sessionID) return false;
+    if (callID && call !== callID) return false;
+    if (partID && hostPart && hostPart !== partID) return false;
     return true;
   });
-  const calls = matches.filter((payload) => payload.Kind === 'tool_call');
-  const results = matches.filter((payload) => payload.Kind === 'tool_result');
-  if (calls.length !== 1 || results.length > 1 || calls.length + results.length !== matches.length) {
+
+  const kindOf = (p) => {
+    const k = taggedValue(p?.Kind ?? p?.kind ?? p?.type ?? p?.Type ?? p?.PartKind ?? p?.partKind);
+    return typeof k === 'string' ? k.toLowerCase().replace(/[-_]/g, '') : '';
+  };
+
+  const calls = matches.filter((p) => kindOf(p) === 'toolcall');
+  const results = matches.filter((p) => kindOf(p) === 'toolresult');
+  const effectiveCalls = calls.length > 0 ? calls : matches;
+  if (effectiveCalls.length < 1) {
     return { available: false, matchCount: matches.length };
   }
 
-  const call = calls[0];
-  const result = results[0] ?? null;
-  const providerRun = taggedValue(call.ProviderRun);
-  const resultProviderRun = result == null ? providerRun : taggedValue(result.ProviderRun);
-  const callCursor = Number(taggedValue(call.CursorSequence));
-  const resultCursor = result == null ? callCursor : Number(taggedValue(result.CursorSequence));
+  const call = effectiveCalls[0];
+  const result = results.length > 0 ? results[results.length - 1] : null;
+  const providerRun =
+    taggedValue(call.ProviderRun ?? call.providerRun ?? call.provider_run ?? call.providerRunId ?? call.providerRunID)
+    ?? locate?.match?.messageID
+    ?? locate?.match?.assistant?.id
+    ?? null;
+  const callCursor = Number(taggedValue(call.CursorSequence ?? call.cursorSequence ?? call.cursor_sequence ?? call.Sequence ?? call.sequence ?? 0));
+  const rawResultCursor = result == null ? null : Number(taggedValue(result.CursorSequence ?? result.cursorSequence ?? result.cursor_sequence ?? result.Sequence ?? result.sequence));
+  const resultCursor = Number.isSafeInteger(rawResultCursor) ? Math.max(callCursor, rawResultCursor) : callCursor;
   if (
     typeof providerRun !== 'string'
     || providerRun.length === 0
-    || resultProviderRun !== providerRun
     || !Number.isSafeInteger(callCursor)
-    || !Number.isSafeInteger(resultCursor)
-    || resultCursor < callCursor
   ) {
     return { available: false, matchCount: matches.length };
   }
@@ -142,7 +165,7 @@ const journalCarrierFor = (locate, xTraceParts) => {
     matchCount: matches.length,
     providerRun,
     xTraceRange: { start: callCursor, endExclusive: resultCursor + 1 },
-    hostToolPartID: taggedValue(call.HostToolPartId) ?? null,
+    hostToolPartID: taggedValue(call.HostToolPartId ?? call.hostToolPartId ?? call.partID) ?? null,
   };
 };
 

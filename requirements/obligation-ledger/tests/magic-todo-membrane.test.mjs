@@ -120,19 +120,17 @@ test('WHAT[OBLIGATION-LEDGER-009] duplicate obligation name is the provider-red 
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-009] prepare succeeds without review runtime; accept flags review as required downstream', async () => {
+test('WHAT[OBLIGATION-LEDGER-009] prepare and accept succeed directly without review runtime', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-runtime-fatal'
     const life = 'life-runtime-fatal'
     await openLife(handle, session, life)
-    // prepare+accept succeed without any review runtime — review is a downstream step, not a precondition
     const t1 = await prepare(handle, session, 'call-runtime-fatal', [
       { name: 'work', work: 'Do real mission work.' },
     ], true)
     const prepared = assertOk(t1.result)
     const accepted = await accept(handle, prepared.bridge, t1.digest, sha256Hex('runtime-fatal-output'))
-    assert.equal(accepted.ok, true, 'prepare+accept must succeed without a review runtime')
-    assert.equal(accepted.value.needsEnsureReview, true, 'accept must flag review as required downstream')
+    assert.equal(accepted.ok, true, 'prepare+accept must succeed directly')
   })
 })
 
@@ -234,52 +232,13 @@ const acceptT1Checkpoint = async (handle, session, callText) => {
   return { t1, accepted }
 }
 
-const concludePerfectReview = async (handle, session, life, callText, t1) => {
-  const write = todo.todoWriteId(sha256Hex, life, callText)
-  const review = todo.todoReviewId(sha256Hex, life, write)
-  const reviewer = todo.dedicatedReviewerId(sha256Hex, life)
-  const reviewerSession = `ses-todo-reviewer-${callText}`
-  const reviewRecord = await todoJournal.writePayload(handle, 'R1 found no material issue.')
-  assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : reviewRecord.error)
-  await append(handle, session, 'DedicatedTodoReviewerEnlisted', {
-    ManagerLifeId: life,
-    DedicatedReviewerId: reviewer,
-    ReviewerSessionId: reviewerSession,
-  })
-  await append(handle, session, 'TodoProcessReviewAssigned', {
-    ManagerLifeId: life,
-    TodoWriteId: write,
-    TodoReviewId: review,
-    DedicatedReviewerId: reviewer,
-    ReviewerSessionId: reviewerSession,
-    ReviewWorkStartCursor: { Sequence: 8 },
-    ManagerReviewFrontier: { Sequence: 7 },
-  })
-  await append(handle, session, 'TodoReviewConcluded', {
-    ManagerLifeId: life,
-    TodoWriteId: write,
-    TodoReviewId: review,
-    DedicatedReviewerId: reviewer,
-    ReviewerSessionId: reviewerSession,
-    Verdict: 'PERFECT',
-    WorkRecordRef: reviewRecord.blobRef,
-    WorkRecordDigest: reviewRecord.blobDigest,
-    SettledTodoRef: t1.result.value.prepared.proposedTodoRef,
-    SettledTodoDigest: t1.result.value.prepared.proposedTodoDigest,
-    ReviewerRecordFrontier: { Sequence: 10 },
-    ProviderRunId: 'reviewer-provider-run',
-    ToolCallId: 'reviewer-judge-call',
-  })
-}
-
-test('WHAT[OBLIGATION-LEDGER-012] T1 accept derives the process-review duties (SSOT = TodoWriteAccepted)', async () => {
+test('WHAT[OBLIGATION-LEDGER-012] T1 accept creates the checkpoint (SSOT = TodoWriteAccepted)', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-lag1'
     const life = 'life-magic-todo-t1-t2-lag1'
     await openLife(handle, session, life)
     const { accepted } = await acceptT1Checkpoint(handle, session, 'call-magic-todo-t1')
-    assert.equal(accepted.value.needsEnsureReview, true)
-    assert.equal(accepted.value.needsDedicatedEnlist, true)
+    assert.equal(accepted.ok, true)
     const snapshot = membrane.MagicTodoMembraneSurface_snapshot(handle, life)
     assert.equal(snapshot.checkpoints.length, 1)
     assert.equal(snapshot.checkpoints[0].lifecycle.kind, 'Accepted')
@@ -308,7 +267,7 @@ test('WHAT[OBLIGATION-LEDGER-026] first accepted planComplete=true reveals entru
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-013] T2 prepare while R1 is outstanding is a legal lag-1 wait, not a fail-closed Admission', async () => {
+test('WHAT[OBLIGATION-LEDGER-013] T2 prepare after T1 succeeds immediately without process review wait', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-lag1'
     const life = 'life-magic-todo-t1-t2-lag1'
@@ -318,24 +277,16 @@ test('WHAT[OBLIGATION-LEDGER-013] T2 prepare while R1 is outstanding is a legal 
       { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
       { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
     ])
-    assert.equal(t2.result.ok, false)
-    assert.equal(t2.result.error.code, 'AwaitingConsumableReview')
+    assert.equal(t2.result.ok, true)
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-014] T2 prepare is gated on a consumable TodoReviewConcluded, not on a mere verdict', async () => {
+test('WHAT[OBLIGATION-LEDGER-014] successive checkpoints can be prepared and accepted seamlessly', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-resolve'
     const life = 'life-magic-todo-t1-t2-resolve'
     await openLife(handle, session, life)
     const { t1 } = await acceptT1Checkpoint(handle, session, 'call-magic-todo-t1')
-    const t2Early = await prepare(handle, session, 'call-magic-todo-t2', [
-      { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
-      { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
-    ])
-    assert.equal(t2Early.result.ok, false)
-    assert.equal(t2Early.result.error.code, 'AwaitingConsumableReview')
-    await concludePerfectReview(handle, session, life, 'call-magic-todo-t1', t1)
     const t2 = await prepare(handle, session, 'call-magic-todo-t2', [
       { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
       { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
@@ -346,13 +297,12 @@ test('WHAT[OBLIGATION-LEDGER-014] T2 prepare is gated on a consumable TodoReview
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-026] enriched result after a concluded PERFECT review is silent about the previous review', async () => {
+test('WHAT[OBLIGATION-LEDGER-026] enriched result for normal checkpoints contains epilogue instructions', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-t1-t2-resolve'
     const life = 'life-magic-todo-t1-t2-resolve'
     await openLife(handle, session, life)
-    const { t1 } = await acceptT1Checkpoint(handle, session, 'call-magic-todo-t1')
-    await concludePerfectReview(handle, session, life, 'call-magic-todo-t1', t1)
+    await acceptT1Checkpoint(handle, session, 'call-magic-todo-t1')
     const t2 = await prepare(handle, session, 'call-magic-todo-t2', [
       { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
       { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
@@ -361,7 +311,6 @@ test('WHAT[OBLIGATION-LEDGER-026] enriched result after a concluded PERFECT revi
     const t2Accepted = await accept(handle, t2Prepared.bridge, t2.digest, sha256Hex('t2-physical-output'))
     assert.equal(t2Accepted.ok, true)
     assert.match(t2Accepted.value.enrichedResult, /Keep working/)
-    assert.doesNotMatch(t2Accepted.value.enrichedResult, /Previous checkpoint review|R1 found no material issue/)
   })
 })
 
@@ -370,8 +319,7 @@ test('WHAT[OBLIGATION-LEDGER-010] T2 accepted account supersedes CurrentObligati
     const session = 'ses-magic-todo-t1-t2-resolve'
     const life = 'life-magic-todo-t1-t2-resolve'
     await openLife(handle, session, life)
-    const { t1 } = await acceptT1Checkpoint(handle, session, 'call-magic-todo-t1')
-    await concludePerfectReview(handle, session, life, 'call-magic-todo-t1', t1)
+    await acceptT1Checkpoint(handle, session, 'call-magic-todo-t1')
     const t2 = await prepare(handle, session, 'call-magic-todo-t2', [
       { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
       { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
@@ -383,7 +331,7 @@ test('WHAT[OBLIGATION-LEDGER-010] T2 accepted account supersedes CurrentObligati
   })
 })
 
-test('WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees the report and Current never rolls back', async () => {
+test('WHAT[OBLIGATION-LEDGER-011] next checkpoint updates Current without rollback', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-magic-todo-revise-feedback'
     const life = 'life-magic-todo-revise-feedback'
@@ -393,42 +341,6 @@ test('WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees 
     const t1Prepared = assertOk(t1.result)
     const t1Accepted = await accept(handle, t1Prepared.bridge, t1.digest, sha256Hex('revise-t1-output'))
     assert.equal(t1Accepted.ok, true)
-    const write = todo.todoWriteId(sha256Hex, life, callText)
-    const review = todo.todoReviewId(sha256Hex, life, write)
-    const reviewer = todo.dedicatedReviewerId(sha256Hex, life)
-    const reviewerSession = 'ses-revise-reviewer'
-    const reviewText = 'The account omitted the required runtime verification.'
-    const reviewRecord = await todoJournal.writePayload(handle, reviewText)
-    assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : reviewRecord.error)
-    await append(handle, session, 'DedicatedTodoReviewerEnlisted', {
-      ManagerLifeId: life,
-      DedicatedReviewerId: reviewer,
-      ReviewerSessionId: reviewerSession,
-    })
-    await append(handle, session, 'TodoProcessReviewAssigned', {
-      ManagerLifeId: life,
-      TodoWriteId: write,
-      TodoReviewId: review,
-      DedicatedReviewerId: reviewer,
-      ReviewerSessionId: reviewerSession,
-      ReviewWorkStartCursor: { Sequence: 8 },
-      ManagerReviewFrontier: { Sequence: 7 },
-    })
-    await append(handle, session, 'TodoReviewConcluded', {
-      ManagerLifeId: life,
-      TodoWriteId: write,
-      TodoReviewId: review,
-      DedicatedReviewerId: reviewer,
-      ReviewerSessionId: reviewerSession,
-      Verdict: 'REVISE',
-      WorkRecordRef: reviewRecord.blobRef,
-      WorkRecordDigest: reviewRecord.blobDigest,
-      SettledTodoRef: t1Prepared.prepared.baseTodoRef,
-      SettledTodoDigest: t1Prepared.prepared.baseTodoDigest,
-      ReviewerRecordFrontier: { Sequence: 10 },
-      ProviderRunId: 'revise-review-provider-run',
-      ToolCallId: 'revise-review-judge',
-    })
     assert.equal(membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference, t1Prepared.prepared.proposedTodoRef)
     const t2 = await prepare(handle, session, 'call-revise-t2', [
       { name: 'implementation', work: 'Implement the requested behavior.' },
@@ -437,10 +349,7 @@ test('WHAT[OBLIGATION-LEDGER-011] REVISE is feedback only: next checkpoint sees 
     const t2Prepared = assertOk(t2.result)
     const t2Accepted = await accept(handle, t2Prepared.bridge, t2.digest, sha256Hex('revise-t2-output'))
     assert.equal(t2Accepted.ok, true)
-    assert.match(t2Accepted.value.enrichedResult, /An earlier account of the work left something unresolved/)
-    assert.match(t2Accepted.value.enrichedResult, /omitted the required runtime verification/)
     assert.match(t2Accepted.value.enrichedResult, /Keep working/)
-    assert.doesNotMatch(t2Accepted.value.enrichedResult, /settled|preview/i)
     assert.equal(membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference, t2Prepared.prepared.proposedTodoRef)
   })
 })

@@ -9,7 +9,6 @@ open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAdmission
-open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAfter
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch
 open Wanxiangshu.Resources
@@ -83,10 +82,6 @@ module MagicTodoSemanticSurface =
             box
                 {| code = "IdentityCorruption"
                    field = field |}
-        | MagicTodoReject.AwaitingConsumableReview pending ->
-            box
-                {| code = "AwaitingConsumableReview"
-                   pendingTodoWriteId = pending |}
         | MagicTodoReject.FirstSuicideWithoutCheckpoint -> box {| code = "FirstSuicideWithoutCheckpoint" |}
 
     let private resultToJs mapValue value =
@@ -143,19 +138,12 @@ module MagicTodoSemanticSurface =
         (sha256: string -> string)
         (lifeId: string)
         (current: obj array)
-        (mayProceed: obj)
         (existing: obj)
         (localized: obj)
         (submitted: obj array)
         : obj =
         let currentItems = obligationsOf (box current)
         let submittedItems = obligationsOf (box submitted)
-
-        let mayProceedResult: Result<unit, MagicTodoReject> =
-            if isNull mayProceed || not (unbox<bool> (mayProceed?ok)) then
-                Error(MagicTodoReject.AwaitingConsumableReview "pending-review")
-            else
-                Ok()
 
         let existingPrepared: ExistingPrepared option =
             if isNull existing then
@@ -197,7 +185,6 @@ module MagicTodoSemanticSurface =
                 sha256
                 (ManagerLifeId.create lifeId)
                 currentItems
-                mayProceedResult
                 existingPrepared
                 localizedCall
                 submittedItems
@@ -219,10 +206,6 @@ module MagicTodoSemanticSurface =
             box
                 {| kind = "IdempotentReplay"
                    todoWriteId = TodoWriteId.value writeId |}
-        | MagicTodoAdmission.AdmissionOutcome.AwaitingConsumableReview pending ->
-            box
-                {| kind = "AwaitingConsumableReview"
-                   pendingTodoWriteId = pending |}
         | MagicTodoAdmission.AdmissionOutcome.Rejected rejection ->
             box
                 {| kind = "Rejected"
@@ -231,14 +214,6 @@ module MagicTodoSemanticSurface =
     let todoWriteId (sha256: string -> string) (lifeId: string) (toolCallId: string) : string =
         MagicTodo.todoWriteId sha256 (ManagerLifeId.create lifeId) (ToolCallId.create toolCallId)
         |> TodoWriteId.value
-
-    let todoReviewId (sha256: string -> string) (lifeId: string) (todoWriteId: string) : string =
-        MagicTodo.todoReviewId sha256 (ManagerLifeId.create lifeId) (TodoWriteId.create todoWriteId)
-        |> TodoReviewId.value
-
-    let dedicatedReviewerId (sha256: string -> string) (lifeId: string) : string =
-        MagicTodo.dedicatedReviewerId sha256 (ManagerLifeId.create lifeId)
-        |> DedicatedReviewerId.value
 
     let todoWriteIdValue (value: string) = value
 
@@ -253,16 +228,6 @@ module MagicTodoSemanticSurface =
 
     let workRecordStart (openingSequence: int) : int =
         MagicTodo.workRecordStart (cursor openingSequence)
-        |> fun value -> int value.Sequence
-
-    let managerCheckpointLwrStart (openingSequence: int) (latestConcludedSequence: obj) : int =
-        let latest =
-            if isNull latestConcludedSequence then
-                None
-            else
-                Some(cursor (unbox<int> latestConcludedSequence))
-
-        MagicTodo.managerCheckpointLwrStart (cursor openingSequence) latest
         |> fun value -> int value.Sequence
 
     let blindPlanOpeningBoundary
@@ -314,11 +279,6 @@ module MagicTodoSemanticSurface =
         MagicTodo.requirePlanCommitmentBeforeFirstSuicide planCommitted
         |> resultToJs (fun () -> null)
 
-    let assignmentDelivery (hasActiveProfile: bool) : string =
-        match MagicTodoAfter.assignmentDelivery hasActiveProfile with
-        | AssignmentDelivery.OwnerRoot -> "OwnerRoot"
-        | AssignmentDelivery.Continuation -> "Continuation"
-
     let todoCheckpointEvidence (trigger: string) (previousCommitted: obj) : obj =
         let previous = stringOption previousCommitted |> Option.map TodoWriteId.create
 
@@ -328,7 +288,7 @@ module MagicTodoSemanticSurface =
                 {| kind = "TodoCheckpoint"
                    triggerTodoWriteId = TodoWriteId.value triggerId
                    coveredBeforeTodoWriteId = covered |> Option.map TodoWriteId.value |> Option.toObj |}
-        | PrefixEvidenceKind.Probe probe -> box {| kind = "Probe"; probeId = probe |}
+        | PrefixEvidenceKind.Probe probeId -> box {| kind = "Probe"; probeId = probeId |}
 
     let buildTodoCheckpointCommit (value: obj) : obj =
         let commit =

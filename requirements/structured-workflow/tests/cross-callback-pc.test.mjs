@@ -14,7 +14,7 @@ const readFixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.
 
 // ── Pattern 1: DU await state (CounterfactualAwait shape) ──────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_du_await_state_without_proof_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_du_await_state_without_proof_is_RED', () => {
   const source = readFixture('cross-callback-pc-illegal.fs')
   const hits = scanText(source, 'src/Wanxiangshu/New/CounterfactualCollector.fs')
   const { regressions, ok } = evaluateViolations(hits)
@@ -25,7 +25,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_du_await_state_without_pro
   )
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_private_du_await_state_is_detected', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_private_du_await_state_is_detected', () => {
   const source = [
     'module Sample',
     'type private AwaitState =',
@@ -39,7 +39,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_private_du_await_state_is_
 
 // ── Pattern 2: TryTake continuation consumption ─────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_trytake_without_proof_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_trytake_without_proof_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — recovery arming',
@@ -60,7 +60,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_trytake_without_proof_is_R
   assert.ok(regressions.some((v) => v.name === 'recoveryArming'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_trytake_not_in_baseline_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_trytake_not_in_baseline_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — new continuation',
@@ -77,7 +77,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_trytake_not_in_baselin
   assert.ok(regressions.some((v) => v.name === 'newContinuation'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_trytake_only_marks_the_registry_it_consumes', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_trytake_only_marks_the_registry_it_consumes', () => {
   const source = [
     'module Sample',
     'let continuation = Dictionary<string, string>()',
@@ -95,7 +95,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_trytake_only_marks_the_reg
 
 // ── Pattern 3: Armed presence probe ─────────────────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_armed_probe_without_proof_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_armed_probe_without_proof_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — one-shot armed mark',
@@ -110,7 +110,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_armed_probe_without_proof_
   assert.ok(hits.every((v) => v.knownDebt === true), 'LoopSensor.armed must be recognized as known debt')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_armed_not_in_baseline_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_armed_not_in_baseline_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — new armed mark',
@@ -124,7 +124,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_armed_not_in_baseline_
   assert.ok(regressions.some((v) => v.name === 'newArmed'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_armed_probe_only_marks_the_registry_it_reads', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_armed_probe_only_marks_the_registry_it_reads', () => {
   const source = [
     'module Sample',
     'let armed = HashSet<string>()',
@@ -139,7 +139,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_armed_probe_only_marks_the
 
 // ── Green: physical proof annotation whitelists ─────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_physical_proof_annotation_stays_green', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_physical_proof_annotation_stays_green', () => {
   const source = readFixture('cross-callback-pc-physical.fs')
   const hits = scanText(source, 'src/Wanxiangshu/Process/PtyManager.fs')
   assert.deepEqual(hits, [], 'physical proof annotation must whitelist the pattern')
@@ -147,7 +147,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_physical_proof_annotation_
 
 // ── Green: no pattern (plain resource without TryTake/IsArmed/DU-await) ─────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_plain_resource_without_pattern_stays_green', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_plain_resource_without_pattern_stays_green', () => {
   const source = readFixture('cross-callback-pc-clean.fs')
   const hits = scanText(source, 'src/Wanxiangshu/OpenCode/Host/LoopSensor.fs')
   assert.deepEqual(hits, [], 'plain resource without TryTake/IsArmed/DU-await must stay green')
@@ -155,7 +155,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_plain_resource_without_pat
 
 // ── Baseline completeness ───────────────────────────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_baseline_covers_known_debt', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_baseline_covers_known_debt', () => {
   assert.ok(KNOWN_DEBT_BASELINE.has('src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed'))
   assert.equal(KNOWN_DEBT_BASELINE.size, 1, 'baseline must contain exactly 1 known debt entry')
   assert.ok(KNOWN_DEBT_BASELINE.size <= BASELINE_MAX_SIZE, 'baseline size must not exceed BASELINE_MAX_SIZE (ratchet)')
@@ -163,7 +163,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_baseline_covers_known_debt
 
 // ── scanFiles aggregates ────────────────────────────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_scanFiles_aggregates_entries', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_scanFiles_aggregates_entries', () => {
   const illegal = readFixture('cross-callback-pc-illegal.fs')
   const clean = readFixture('cross-callback-pc-clean.fs')
   const hits = scanFiles([
@@ -178,7 +178,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_scanFiles_aggregates_entri
 
 // ── Pattern 4: Clear/Drop presence-clearing probe ───────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_clear_presence_without_proof_is_detected', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_clear_presence_without_proof_is_detected', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — armed mark',
@@ -193,7 +193,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_clear_presence_without_pro
   assert.ok(hits.every((v) => v.knownDebt === true), 'LoopSensor.armed must be recognized as known debt')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_clear_presence_not_in_baseline_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_new_clear_presence_not_in_baseline_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — new clear mark',
@@ -207,7 +207,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_new_clear_presence_not_in_
   assert.ok(regressions.some((v) => v.name === 'newArmed' && v.pattern === 'clear-presence-probe'))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_drop_attempt_presence_without_proof_is_RED', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_drop_attempt_presence_without_proof_is_RED', () => {
   const source = [
     'module Sample',
     '// DSL-MUTABLE: single-flight — attempt tracking',
@@ -223,7 +223,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_drop_attempt_presence_with
 
 // ── EXEMPTION_CATEGORIES completeness ───────────────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_exemption_categories_contains_physical_capability_types', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_exemption_categories_contains_physical_capability_types', () => {
   for (const category of [
     'pty', 'timer', 'waiter', 'single-flight', 'quiescence-permit',
     'process-handle', 'socket', 'cancellation-token', 'resource',
@@ -235,7 +235,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_exemption_categories_conta
 
 // ── BASELINE_MAX_SIZE ratchet ───────────────────────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_baseline_max_size_is_a_ratchet_ceiling', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_baseline_max_size_is_a_ratchet_ceiling', () => {
   assert.equal(typeof BASELINE_MAX_SIZE, 'number')
   assert.ok(BASELINE_MAX_SIZE >= 0, 'BASELINE_MAX_SIZE must be a non-negative integer')
   assert.ok(KNOWN_DEBT_BASELINE.size <= BASELINE_MAX_SIZE,
@@ -244,7 +244,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_baseline_max_size_is_a_rat
 
 // ── SessionQuiescenceGate as legal reference (green) ────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] CROSS_CALLBACK_PC_session_quiescence_gate_stays_green', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] CROSS_CALLBACK_PC_session_quiescence_gate_stays_green', () => {
   // SessionQuiescenceGate is the legal reference for quiescence-permit exemption.
   // It uses mutable Map (not Dictionary/HashSet), so it does not match the
   // REGISTRY_DECLARATION pattern. This is correct: the gate's TryConsume

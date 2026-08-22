@@ -82,33 +82,6 @@ const append = async (handle, session, caseName, payload) => {
   return result
 }
 
-const concludePerfectReview = async (handle, session, life, callText, t1) => {
-  const write = todo.todoWriteId(sha256Hex, life, callText)
-  const review = todo.todoReviewId(sha256Hex, life, write)
-  const reviewer = todo.dedicatedReviewerId(sha256Hex, life)
-  const reviewerSession = `ses-todo-reviewer-${callText}`
-  const reviewRecord = await todoJournal.writePayload(handle, 'R1 found no material issue.')
-  assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : reviewRecord.error)
-  await append(handle, session, 'DedicatedTodoReviewerEnlisted', {
-    ManagerLifeId: life, DedicatedReviewerId: reviewer, ReviewerSessionId: reviewerSession,
-  })
-  await append(handle, session, 'TodoProcessReviewAssigned', {
-    ManagerLifeId: life, TodoWriteId: write, TodoReviewId: review,
-    DedicatedReviewerId: reviewer, ReviewerSessionId: reviewerSession,
-    ReviewWorkStartCursor: { Sequence: 8 }, ManagerReviewFrontier: { Sequence: 7 },
-  })
-  await append(handle, session, 'TodoReviewConcluded', {
-    ManagerLifeId: life, TodoWriteId: write, TodoReviewId: review,
-    DedicatedReviewerId: reviewer, ReviewerSessionId: reviewerSession,
-    Verdict: 'PERFECT', WorkRecordRef: reviewRecord.blobRef,
-    WorkRecordDigest: reviewRecord.blobDigest,
-    SettledTodoRef: t1.result.value.prepared.proposedTodoRef,
-    SettledTodoDigest: t1.result.value.prepared.proposedTodoDigest,
-    ReviewerRecordFrontier: { Sequence: 10 },
-    ProviderRunId: 'reviewer-provider-run', ToolCallId: 'reviewer-judge-call',
-  })
-}
-
 // ── Canary A: deferred materialization + before in-place mutation ────────
 
 test('WHAT[HOST-BOUNDARY-019] CANARY_A openLife and compatibility injection do not wait for snapshot IO', async () => {
@@ -265,7 +238,6 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_G live after success and recovered complete
     assert.equal(liveAccepted.ok, true, 'LiveAfterSuccess must be admissible')
 
     // G: RecoveredCompletedToolPart path (recovery without after hook)
-    await concludePerfectReview(handle, session, life, 'call-canary-g-live', t1)
     const t2 = await prepare(handle, session, 'call-canary-g-recovered', [
       { name: 'diagnose', work: 'Establish why the first todowrite succeeds.' },
       { name: 'fix', work: 'Keep later todowrite calls from failing red.' },
@@ -334,9 +306,6 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_J live accept creates TodoWriteAccepted wit
     const prepared = assertOk(t1.result)
     const accepted = await accept(handle, prepared.bridge, t1.digest, sha256Hex('canary-j-output'))
     assert.equal(accepted.ok, true)
-    // J: accept derives process-review duties (SSOT = TodoWriteAccepted)
-    assert.equal(accepted.value.needsEnsureReview, true)
-    assert.equal(accepted.value.needsDedicatedEnlist, true)
     // J: checkpoint is accepted in the snapshot
     const snapshot = membrane.MagicTodoMembraneSurface_snapshot(handle, life)
     assert.equal(snapshot.checkpoints.length, 1)
@@ -398,7 +367,6 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_L prepare without accept does not create an
     const snapshot = membrane.MagicTodoMembraneSurface_snapshot(handle, life)
     assert.equal(snapshot.checkpoints.length, 1)
     assert.equal(snapshot.checkpoints[0].accepted, false)
-    assert.equal(snapshot.checkpoints[0].concluded, null)
     // L: current obligations did not roll forward to proposed
     assert.equal(snapshot.currentObligations, null)
   })
@@ -428,7 +396,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_L sink optimistic Pk does not constitute ch
 
 // ── Canary M: REVISE consumed after reconcile ────────────────────────────
 
-test('WHAT[HOST-BOUNDARY-019] CANARY_M REVISE is feedback only: Current never rolls back, next checkpoint sees report', async () => {
+test('WHAT[HOST-BOUNDARY-019] CANARY_M next checkpoint advances CurrentObligations cleanly without rollback', async () => {
   await withJournal(async (handle) => {
     const session = 'ses-canary-m'
     const life = 'life-canary-m'
@@ -441,41 +409,13 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_M REVISE is feedback only: Current never ro
     const t1Accepted = await accept(handle, t1Prepared.bridge, t1.digest, sha256Hex('canary-m-t1-output'))
     assert.equal(t1Accepted.ok, true)
 
-    // M: REVISE verdict
-    const write = todo.todoWriteId(sha256Hex, life, callText)
-    const review = todo.todoReviewId(sha256Hex, life, write)
-    const reviewer = todo.dedicatedReviewerId(sha256Hex, life)
-    const reviewerSession = 'ses-canary-m-reviewer'
-    const reviewText = 'The account omitted the required runtime verification.'
-    const reviewRecord = await todoJournal.writePayload(handle, reviewText)
-    assert.equal(reviewRecord.ok, true, reviewRecord.ok ? '' : reviewRecord.error)
-    await append(handle, session, 'DedicatedTodoReviewerEnlisted', {
-      ManagerLifeId: life, DedicatedReviewerId: reviewer, ReviewerSessionId: reviewerSession,
-    })
-    await append(handle, session, 'TodoProcessReviewAssigned', {
-      ManagerLifeId: life, TodoWriteId: write, TodoReviewId: review,
-      DedicatedReviewerId: reviewer, ReviewerSessionId: reviewerSession,
-      ReviewWorkStartCursor: { Sequence: 8 }, ManagerReviewFrontier: { Sequence: 7 },
-    })
-    await append(handle, session, 'TodoReviewConcluded', {
-      ManagerLifeId: life, TodoWriteId: write, TodoReviewId: review,
-      DedicatedReviewerId: reviewer, ReviewerSessionId: reviewerSession,
-      Verdict: 'REVISE', WorkRecordRef: reviewRecord.blobRef,
-      WorkRecordDigest: reviewRecord.blobDigest,
-      SettledTodoRef: t1Prepared.prepared.baseTodoRef,
-      SettledTodoDigest: t1Prepared.prepared.baseTodoDigest,
-      ReviewerRecordFrontier: { Sequence: 10 },
-      ProviderRunId: 'canary-m-review-run', ToolCallId: 'canary-m-review-judge',
-    })
-
-    // M: Current never rolls back after REVISE
     assert.equal(
       membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference,
       t1Prepared.prepared.proposedTodoRef,
-      'Current must stay at the accepted proposed account after REVISE',
+      'Current must stay at the accepted proposed account',
     )
 
-    // M: next checkpoint sees the REVISE report
+    // M: next checkpoint advances obligations
     const t2 = await prepare(handle, session, 'call-canary-m-t2', [
       { name: 'implementation', work: 'Implement the requested behavior.' },
       { name: 'verification', work: 'Run the required runtime verification and preserve evidence.' },
@@ -483,9 +423,7 @@ test('WHAT[HOST-BOUNDARY-019] CANARY_M REVISE is feedback only: Current never ro
     const t2Prepared = assertOk(t2.result)
     const t2Accepted = await accept(handle, t2Prepared.bridge, t2.digest, sha256Hex('canary-m-t2-output'))
     assert.equal(t2Accepted.ok, true)
-    assert.match(t2Accepted.value.enrichedResult, /An earlier account of the work left something unresolved/)
-    assert.match(t2Accepted.value.enrichedResult, /omitted the required runtime verification/)
-    // M: zero new checkpoint/review facts from the REVISE itself — Current rolled forward only on T2 accept
+    assert.match(t2Accepted.value.enrichedResult, /Keep working/)
     assert.equal(
       membrane.MagicTodoMembraneSurface_snapshot(handle, life).currentObligations.reference,
       t2Prepared.prepared.proposedTodoRef,

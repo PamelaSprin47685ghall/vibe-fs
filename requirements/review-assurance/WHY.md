@@ -27,13 +27,11 @@
 
 系统在以下任一情况发生时判定为 RED：
 
-- 系统消费了针对旧 Git tree、错误 frontier、未消费 challenge 或缺失报告的 judgement。
+- 针对旧 Git tree、错误 frontier、未消费 challenge 或缺失报告的 judgement 被系统错误消费。
 - 确认判定依赖 AuthorityRoot 或文本猜测，而非基于强类型物理执行标识建立因果。
 - 确认依据依赖外围 Map 或存储的布尔标志，而非自包含 witness 的派生谓词。
-- 在报告未达成 record-ready 时提前持久化 `TodoReviewConcluded`。
-- record-ready 判定使用较晚的 XTrace head、分步读取不一致 snapshot，或采用 wall-clock 轮询。
 - 基础设施异常（如物化失败、传输超时）被折叠为业务 PERFECT 或 REVISE。
-- 过程评审 verdict 计入终审 dual-PERFECT 代数，或过程 REVISE 被视作终审拒绝事实。
+- 历史未界定的过程记录被计入终审 dual-PERFECT 代数。
 
 ## 4. 依赖边界
 

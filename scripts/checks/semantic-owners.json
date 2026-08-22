@@ -1280,10 +1280,6 @@
       "owner": "obligation-ledger"
     },
     {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/After.fs",
-      "owner": "obligation-ledger"
-    },
-    {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
       "owner": "obligation-ledger"
     },
@@ -1345,11 +1341,7 @@
     },
     {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
-      "owner": "obligation-ledger"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs",
-      "owner": "obligation-ledger"
+      "owner": "prefix-stability"
     },
     {
       "path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
@@ -1374,10 +1366,6 @@
     {
       "path": "src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs",
       "owner": "review-assurance"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs",
-      "owner": "obligation-ledger"
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/Fact.fs",
@@ -1454,10 +1442,6 @@
     {
       "path": "src/Wanxiangshu/Mission/Review/ReviewTodoSurface.fs",
       "owner": "review-judgement"
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/TodoProcess.fs",
-      "owner": "obligation-ledger"
     },
     {
       "path": "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",

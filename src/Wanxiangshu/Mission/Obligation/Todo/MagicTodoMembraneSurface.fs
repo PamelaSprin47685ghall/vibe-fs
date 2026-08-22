@@ -105,11 +105,8 @@ module MagicTodoMembraneSurface =
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.DuplicateObligationName _) ->
                 "DuplicateObligationName"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.IdentityCorruption _) -> "IdentityCorruption"
-            | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.AwaitingConsumableReview _) ->
-                "AwaitingConsumableReview"
             | MagicTodoMembrane.PrepareRejection.Admission(MagicTodoReject.FirstSuicideWithoutCheckpoint) ->
                 "FirstSuicideWithoutCheckpoint"
-            | MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _ -> "AwaitingConsumableReview"
             | MagicTodoMembrane.PrepareRejection.BlobRead _ -> "BlobRead"
             | MagicTodoMembrane.PrepareRejection.BlobWrite _ -> "BlobWrite"
             | MagicTodoMembrane.PrepareRejection.BlobDigestMismatch _ -> "BlobDigestMismatch"
@@ -234,11 +231,7 @@ module MagicTodoMembraneSurface =
                     | Ok outcome ->
                         box
                             {| ok = true
-                               value =
-                                box
-                                    {| enrichedResult = outcome.EnrichedResult
-                                       needsDedicatedEnlist = outcome.NeedsDedicatedEnlist
-                                       needsEnsureReview = outcome.NeedsEnsureReview |} |}
+                               value = box {| enrichedResult = outcome.EnrichedResult |} |}
             }
 
     let appendFact (handle: JournalHandle) (sessionId: string) (factJson: string) : Task<obj> =

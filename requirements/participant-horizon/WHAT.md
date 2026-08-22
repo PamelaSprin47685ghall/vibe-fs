@@ -37,7 +37,7 @@ Blogger、Distiller、Bookkeeper 等内部辅助角色严禁出现在模型可�
 ## PARTICIPANT-HORIZON-008: 隐藏 review 编排不进 Manager horizon
 
 面向 Manager 的所有固定界面（system prompt、continuation、schema、错误提示、tool description 及 result）严禁暴露 Reviewer 身份、专用 review session、确认屏障（barrier）或双重检查机制。
-唯一例外为 Todo Checkpoint 产生的审查结论（PERFECT/REVISE）与具体改进报告（canonical ProcessReviewLWR），该例外严禁扩大为泄露审查者的存在。
+唯一例外为终局评审产生的 REVISE 结论与具体改进报告（canonical ProcessReviewLWR），该例外严禁扩大为泄露审查者的存在。
 
 ## PARTICIPANT-HORIZON-009: 隐藏 target 只返回 generic unavailable
 

@@ -23,24 +23,20 @@ test('WHAT[OBLIGATION-LEDGER-018] hot-path queries use incremental projection fa
   for (const field of [
     'FirstAcceptedCheckpoint',
     'LatestAcceptedCheckpoint',
-    'PendingReviewCheckpoint',
     'FirstPlanCommitment',
     'LatestCommittedCheckpoint',
     'PreviousCommittedCheckpoint',
-    'ReviewerLifeBySession',
   ]) {
     assert.match(projection, new RegExp(`\\b${field}\\b`), `projection must incrementally carry ${field}`)
   }
 
   assert.doesNotMatch(projection, /\bAcceptedOrder\b|\bAcceptedIds\b|\bacceptedOrder\b/, 'production projection no longer stores an accepted-history query chain')
-  assert.doesNotMatch(projection, /ByLife\s*\|>\s*Map\.tryPick|Map\.tryPick/, 'reviewer authority lookup must use ReviewerLifeBySession rather than scan every Life')
 
   for (const path of [
     'src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs',
     'src/Wanxiangshu/Mission/Manager/Idle.fs',
     'src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs',
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-    'src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs',
   ]) {
     assert.doesNotMatch(read(path), /\.AcceptedOrder\b|acceptedOrder\s+/, `${path} must consume O(1) projection queries`)
   }

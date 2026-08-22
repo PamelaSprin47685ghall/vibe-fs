@@ -11,32 +11,17 @@ open Wanxiangshu.Foundation.Identity
 ///
 /// Provider truth is one complete `{name, work}` obligation account plus a
 /// `WorkingOn` focus pointer. Accepted checkpoints own CurrentObligations
-/// immediately; process review owns only lag-1 semantic feedback. No Todo
-/// status/id/progress/settlement machine exists in this module.
+/// immediately. No Todo status/id/progress/settlement machine exists in this module.
 module MagicTodo =
 
-    // ── Checkpoint / review identity ────────────────────────────────────────
+    // ── Checkpoint identity ─────────────────────────────────────────────────
 
     /// Digest(ManagerLifeId + ToolCallId). Same ToolCallId replay → same id.
     type TodoWriteId = private TodoWriteId of string
 
-    /// Digest(ManagerLifeId + TodoWriteId). One review obligation per Accepted checkpoint.
-    type TodoReviewId = private TodoReviewId of string
-
-    /// Logical dedicated process-reviewer identity for one Manager Life.
-    type DedicatedReviewerId = private DedicatedReviewerId of string
-
     module TodoWriteId =
         let create (value: string) = TodoWriteId value
         let value (TodoWriteId value) = value
-
-    module TodoReviewId =
-        let create (value: string) = TodoReviewId value
-        let value (TodoReviewId value) = value
-
-    module DedicatedReviewerId =
-        let create (value: string) = DedicatedReviewerId value
-        let value (DedicatedReviewerId value) = value
 
     /// Semantic version frozen into Prepared / Accepted facts.
     [<Literal>]
@@ -128,46 +113,22 @@ module MagicTodo =
             |> Option.map (fun (_, _, name) -> name)
             |> Option.defaultValue ""
 
-    [<RequireQualifiedAccess>]
-    type ProcessReviewVerdict =
-        | Perfect
-        | Revise
-
-    module ProcessReviewVerdict =
-
-        let wire (verdict: ProcessReviewVerdict) : string =
-            match verdict with
-            | ProcessReviewVerdict.Perfect -> "PERFECT"
-            | ProcessReviewVerdict.Revise -> "REVISE"
-
     // ── Admission / recovery decisions ─────────────────────────────────────
 
     /// Pure decision taxonomy. Host classification is stricter:
     /// - call-shape cases may become provider red text;
-    /// - IdentityCorruption is an infrastructure invariant break → process fatal;
-    /// - AwaitingConsumableReview is a legal causal wait, never a rejection.
+    /// - IdentityCorruption is an infrastructure invariant break → process fatal.
     [<RequireQualifiedAccess>]
     type MagicTodoReject =
         | MultipleTodowriteInMessage of callIds: string list
         | EmptyObligationName of ordinal: int
         | DuplicateObligationName of name: string
         | IdentityCorruption of field: string
-        | AwaitingConsumableReview of pendingTodoWriteId: string
         | FirstSuicideWithoutCheckpoint
 
     let todoWriteId (sha256: string -> string) (lifeId: ManagerLifeId) (toolCallId: ToolCallId) : TodoWriteId =
         TodoWriteId.create (
             sha256 (String.concat "|" [ ManagerLifeId.value lifeId; ToolCallId.value toolCallId; "todo-write" ])
-        )
-
-    let todoReviewId (sha256: string -> string) (lifeId: ManagerLifeId) (writeId: TodoWriteId) : TodoReviewId =
-        TodoReviewId.create (
-            sha256 (String.concat "|" [ ManagerLifeId.value lifeId; TodoWriteId.value writeId; "todo-review" ])
-        )
-
-    let dedicatedReviewerId (sha256: string -> string) (lifeId: ManagerLifeId) : DedicatedReviewerId =
-        DedicatedReviewerId.create (
-            sha256 (String.concat "|" [ ManagerLifeId.value lifeId; "dedicated-todo-reviewer" ])
         )
 
     let private escapedJsonCharacter character =
@@ -265,19 +226,6 @@ module MagicTodo =
         | items -> items |> List.rev |> List.skip 1 |> List.tryHead
 
     let workRecordStart (openingCursor: XTraceCursor) : XTraceCursor = XTraceCursor.nextCursor openingCursor
-
-    /// Process-review consumption is a reviewer-knowledge frontier, not the
-    /// Manager's current compression/opening floor. The first checkpoint starts
-    /// immediately after the Life opening; later checkpoints continue from the
-    /// exact Manager frontier durably assigned to the last concluded review.
-    /// In particular, accepting the current checkpoint as T1 must not
-    /// retroactively move this request's start past Before(T1).
-    let managerCheckpointLwrStart
-        (openingCursor: XTraceCursor)
-        (latestConcludedManagerReviewFrontier: XTraceCursor option)
-        : XTraceCursor =
-        latestConcludedManagerReviewFrontier
-        |> Option.defaultValue (workRecordStart openingCursor)
 
     type TracePartAnchor =
         { Cursor: XTraceCursor

@@ -20,7 +20,7 @@ Manager 作为长期 mission 的执行者，系统必须随时回答核心问题
 
 若重写 `todowrite` 的 UI、schema 或工具名，只要保持「canonical account + checkpoint + supersession」语义不变，`finality`、`review-assurance` 与 `prefix-stability` 的规范定义无需改动。
 
-反之，若破坏「Accepted 立即 supersede CurrentObligations」、引入评审者写权或加入 `status` 冷状态机，`finality` 的 drain 逻辑、崩溃恢复与过程评审节拍将同时失效。这是一个独立的失败域。
+反之，若破坏「Accepted 立即 supersede CurrentObligations」、引入评审者写权或加入 `status` 冷状态机，`finality` 的判定、崩溃恢复与义务账本将同时失效。这是一个独立的失败域。
 
 ## 3. 核心不变量与失败判定
 
@@ -28,7 +28,6 @@ Manager 作为长期 mission 的执行者，系统必须随时回答核心问题
 
 - 当前 mission debt 失去单一真相源（Host 表、reviewer 或内存状态可充当 current）。
 - `planComplete=false` 时 planning work 被迫伪装为 mission debt，或 commitment 后仍将 planning placeholder 记为 mission debt。
-- REVISE 能够静默回滚或改写已 accepted 的 account。
 - 崩溃恢复不重放 Accepted 链，而是依赖 Stage、布尔标志或时间推算。
 - 同一 message 中多个已 materialize 的 todowrite 存在 winner 仲裁，或基础设施故障被降格为工具红字。
 - 当前执行前沿缺少可闭环的细粒度义务，或遥远债务被迫以细粒度提前展开；`near/mid/far` 被误作生命周期状态机。

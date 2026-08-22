@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 const ROOT = new URL('../../../', import.meta.url).pathname
 const readSrc = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
-test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_reconcile_domain_is_observation_stabilization_not_a_program', () => {
   // The registered ReconcileSurface is the owner contract: callers observe
   // bounded reread + publish decisions, never emitted union metadata.
   for (const n of [
@@ -56,7 +56,7 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_reconcile_domain_is_observation_stabi
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_recovery_surface_drives_ordinary_workflow_entrypoints', () => {
   // Recovery is a permit-gated re-entry into the same named workflows the
   // live path uses (ARCH-005 / ce-temporal-ownership §15–17): the
   // SessionRecoveryWorkflow entry, the provider recovery vocabulary, and the
@@ -85,7 +85,7 @@ test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_recovery_surface_drives_ordinary_work
   assert.deepEqual(missing, [], `recovery workflow entrypoints must exist in production source: ${missing.join('; ')}`)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-009] SW_009_change_seam_has_no_recovery_control_token_dispatcher', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] SW_009_change_seam_has_no_recovery_control_token_dispatcher', () => {
   // OBL-002: the Change seam must not re-introduce a JobRecoveryAction
   // control-token type, a recoveryAction producer, a resumeFromDurableFacts
   // interpreter, or any equivalent NextAction dispatcher. Recovery re-enters

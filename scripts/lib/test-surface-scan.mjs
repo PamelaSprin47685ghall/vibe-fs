@@ -1128,14 +1128,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'Mission/Obligation/Todo/Surface.js',
-    owner: 'review-judgement',
-    laws: ['REVIEW-JUDGEMENT-008'],
-    source: 'src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
     module: 'Enforcer/Surface.js',
     owner: 'behavior-diagnosis',
     laws: [

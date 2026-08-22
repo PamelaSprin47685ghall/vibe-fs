@@ -20,7 +20,7 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 ## OBLIGATION-LEDGER-003: 禁止用 status 枚举伪装进度
 
-禁止把任务进度伪装为 provider-visible 的 status 枚举机。真实进度由 process review 与下一轮 truthful account 判断。Host UI 或兼容层中的 status 字段仅为单向投影（`workingOn` 命中的行投影为 `in_progress`，其余为 `pending`），不得反推 canonical obligation truth。
+禁止把任务进度伪装为 provider-visible 的 status 枚举机。真实进度由工作闭环与下一轮 truthful account 判断。Host UI 或兼容层中的 status 字段仅为单向投影（`workingOn` 命中的行投影为 `in_progress`，其余为 `pending`），不得反推 canonical obligation truth。
 
 ## OBLIGATION-LEDGER-004: planning work 只在 commitment 前合法
 
@@ -42,32 +42,31 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 相同 `ToolCallId` 的重放必须幂等收敛至同一 checkpoint identity 与同一 obligation account。其 input digest、Life、BaseObligations 及 ordinal 契约必须与既有 Prepared 一致；若发生冲突，属于基础设施不变量破坏，必须立即 fatal，不得降格为工具红字。
 
-## OBLIGATION-LEDGER-009: 失败分型（语法红字、评审反馈、系统故障）
+## OBLIGATION-LEDGER-009: 失败分型（语法红字与系统故障）
 
-系统严格区分三类失败：
+系统严格区分两类失败：
 1. **调用语法与形态失败**：只拒绝当前 `todowrite`，向 provider 返回工具红字。
-2. **语义评审反馈（REVISE）**：属于正常业务路径，返回自然语言反馈与 WorkRecord，绝不触发工具红字。
-3. **基础设施故障**：包括 Snapshot、Journal、digest 校验、Projection 不一致或 Reviewer 运行时异常，必须立即输出诊断并终止进程，绝不向模型返回工具错误。
+2. **基础设施故障**：包括 Snapshot、Journal、digest 校验或 Projection 不一致，必须立即输出诊断并终止进程，绝不向模型返回工具错误。
 
 ## OBLIGATION-LEDGER-010: Accepted 立即 supersede CurrentObligations
 
 `TodoWritePrepared` 仅冻结调用发生前的 `BaseObligations` 与本次提交的 `Submitted`，不改变 Current。`TodoWriteAccepted` 一旦 durable，提交的 account 立即 supersede 原 `CurrentObligations`。不存在「已 accepted 但尚未生效」的中间态，崩溃恢复仅重放 Accepted 事实链。
 
-## OBLIGATION-LEDGER-011: REVISE 不拥有 obligation state
+## OBLIGATION-LEDGER-011: 账本变更完全由 Accepted 事实驱动
 
-过程评审产生的 `PERFECT` 或 `REVISE` 结论均不回滚已 accepted 的 checkpoint，不重写 `CurrentObligations`，亦不执行自动 merge。Manager 在收到 REVISE 反馈后，通过后续 `todowrite` 提交新的完整 account，由新的 Accepted 自然 supersede 当前账目。
+`CurrentObligations` 的演进完全由 `TodoWriteAccepted` 事实链驱动，不存在未决过程评审的回滚或自动 merge。Manager 在推进工作后，通过后续 `todowrite` 提交新的完整 account，由新的 Accepted 自然 supersede 当前账目。
 
-## OBLIGATION-LEDGER-012: checkpoint 与 review obligation 的 SSOT 为 TodoWriteAccepted
+## OBLIGATION-LEDGER-012: checkpoint 的 SSOT 为 TodoWriteAccepted
 
-`TodoWriteAccepted` 是 checkpoint 与过程评审义务（$R_k$）的唯一事实源。$R_k$ 与 Accepted 一一对应，未被 accepted 的调用不派生评审义务。每次 $R_k$ 分配必须显式携带当前 checkpoint 的 effective plan commitment 关系，使 Reviewer 能区分 planning-account 与 committed mission-debt。
+`TodoWriteAccepted` 是 checkpoint 事实的唯一真相源。每个 Accepted checkpoint 拥有独立的 `TodoWriteId` 并记录当前账目快照。
 
-## OBLIGATION-LEDGER-013: 1:1 lag-1 过程评审节拍
+## OBLIGATION-LEDGER-013: 无过程评审阻塞与保留 todo lag-1 折叠
 
-每个 $T_k$ 派生第 $k$ 次过程评审义务 $R_k$。$R_k$ 的派生不阻塞 $T_k$ 的成功返回，Manager 可继续执行独立工作。后续 $T_{k+1}$ 到来时，若 $R_k$ 尚未形成 `ConsumableReview`，必须作为合法因果等待至结论 durable，不得将该因果等待渲染为工具错误。若复用 Reviewer 的上一轮 process judgement 已提交但物理 interrupt 尚未完成，$R_{k+1}$ 可先 durable 建立 assignment，但不得把 prompt 排入 Host 队列；实际 continuation send 必须等待 review-assurance 的 interrupt fence 解除。
+移除过程性评审，$T_k$ 的 Accepted 立即生效，不派生过程评审义务，亦不阻塞后续 $T_{k+1}$ 的提交与执行。同时严格保留基于 committed Accepted 链的 desired lag-1 cutoff 与 prefix rebase 折叠行为。
 
-## OBLIGATION-LEDGER-014: 可消费结论为 ConsumableReview（VerdictKnown 不足）
+## OBLIGATION-LEDGER-014: 移除中间过程评审，终结资格直达 Finality
 
-Reviewer 生成 durable verdict 即达到 `VerdictKnown`，决定业务 outcome；但只有当该 verdict 对应的规范 `ProcessReviewLWR` 达成 record-ready 并在同 snapshot 产生 `TodoReviewConcluded` 时，才构成 `ConsumableReview`。下一 `todowrite` 或终结 tail drain 仅可消费 `ConsumableReview`。禁止使用同一事实表达「有 verdict 但无 report」的中间半态。
+各 checkpoint 之间无过程性评审门禁，Manager 可无缝推进工作。质量验收与终结裁决完全由终局评审（Finality Review）在 mission 结束时统一执行。
 
 ## OBLIGATION-LEDGER-015: canonical 单真相源 vs Host compatibility sink
 
@@ -83,23 +82,23 @@ Manager 采用 BlindPlan 开启策略。Pre-T1 处于 Planning Table：为后续
 
 ## OBLIGATION-LEDGER-018: 恢复只从 durable facts
 
-系统状态恢复仅依赖 durable facts 经 Boot Fold 重建增量 projection facts，随后重入普通 workflow。禁止在业务热路径全表扫描或重放完整 Journal。`planComplete` 单调性与 dedicated reviewer 的反向定位均通过增量 locator 在 $O(1)$ 复杂度内查询。升级解码旧版本缺失的 `PlanCompleteDeclared` 字段时，严格解码为 `true` 以保持历史承诺。
+系统状态恢复仅依赖 durable facts 经 Boot Fold 重建增量 projection facts，随后重入普通 workflow。禁止在业务热路径全表扫描或重放完整 Journal。`planComplete` 单调性均通过增量 locator 在 $O(1)$ 复杂度内查询。升级解码旧版本缺失的 `PlanCompleteDeclared` 字段时，严格解码为 `true` 以保持历史承诺。
 
 ## OBLIGATION-LEDGER-019: 新 Life 账本为空
 
 新开启的 Life 其 `CurrentObligations` 初始严格为空，绝不从 Host TodoTable 自动继承上一 Life 的遗留条目。升级瞬间的历史开放 Life 仅允许执行一次受控的 legacy seed，且必须在首次 provider request 之前完成。
 
-## OBLIGATION-LEDGER-020: Dedicated 过程 Reviewer 每 Life 一个 logical
+## OBLIGATION-LEDGER-020: 质量验收统一归于 Finality Review
 
-每个 Manager Life 复用唯一一个 logical `DedicatedTodoReviewer`。首次 `TodoWriteAccepted` 时创建并 durable enlist；后续 checkpoint 优先复用同一 physical session。Dedicated Reviewer 已消费的历史 Manager 工作记录不重复发送，首轮从 checkpoint 时的 review floor 起算，后续各轮严格从上一 concluded frontier 推进。Finality 毕业不注销该 reviewer 的 process-review duty，其会话至少保留至 `LifeCompleted`。
+每个 checkpoint 不再创建或注册专职过程 Reviewer，全生命周期的质量保障与双重 PERFECT 裁决统一收口于 Finality Review。
 
 ## OBLIGATION-LEDGER-021: desired lag-1 cutoff 仅由 committed Accepted 子链推导
 
 Pre-T1 的 `planComplete=false` checkpoints 属于开放的 Opening，不派生 Prefix rebase。只有 commitment 之后的 Accepted 子链（$E_k=true$）才使 desired lag-1 cutoff 可推导。首个 committed checkpoint（T1）无 prior cutoff，后续 committed checkpoint 使用上一 committed checkpoint 的调用前位置。
 
-## OBLIGATION-LEDGER-022: 评审义务产生与 tail drain 规则
+## OBLIGATION-LEDGER-022: checkpoint 无过程评审阻塞，tail 直接进入 Finality
 
-每个 Accepted 派生的评审义务 $R_k$ 必须被下一 $T_{k+1}$ 或 `suicide` drain 消费，未被消费前不得被后续 checkpoint 越过。`suicide` 是尚未被消费过程评审的唯一 tail drain 途径，禁止通过额外的 `todowrite` 尝试清空评审义务。
+checkpoint 提交不产生未决过程评审负担，Manager 工作就绪后可直接调用 `suicide` 进入 Finality Review，无需等待或抽干中间过程评审。
 
 ## OBLIGATION-LEDGER-023: MagicTodoManagerGuideline 的 Manager-only 语义
 
@@ -113,9 +112,9 @@ Pre-T1 的 `planComplete=false` checkpoints 属于开放的 Opening，不派生 
 
 `tool.execute.before` 同步阶段仅执行 provider 参数解码与内存兼容投影，并发起延迟 prepare，不等待 I/O 或启动评审。延迟 prepare 在完整 Snapshot 中唯一定位当前调用，将调用前的 transcript 前缀同步至 XTrace，固化 exact `ReviewFrontier` 并 durable `TodoWritePrepared`。
 
-## OBLIGATION-LEDGER-026: after 合同（Accepted、ensureReview 与富化 result）
+## OBLIGATION-LEDGER-026: after 合同（Accepted 与富化 T1 result）
 
-`after` 仅在物理执行成功返回后触发：幂等写入 `TodoWriteAccepted`，确保 dedicated reviewer 实例与评审义务，推导 desired lag-1 cutoff，并在 tool result 中富化返回上一 ConsumableReview 的评审报告。`ensureReview` 允许先持久化下一 assignment，但复用 Reviewer 的 continuation 必须在物理 `SendPrompt` 边界等待上一 process judgement 的 interrupt fence，不能借 Host `prompt_async` 队列实现等待。首次 T1 确认时在富化结果中揭示交托确认。
+`after` 仅在物理执行成功返回后触发：幂等写入 `TodoWriteAccepted`，推导 desired lag-1 cutoff。首次 T1 确认时在富化结果中揭示交托确认。
 
 ## OBLIGATION-LEDGER-027: 透视粒度（complete coverage 而非 uniform decomposition）
 

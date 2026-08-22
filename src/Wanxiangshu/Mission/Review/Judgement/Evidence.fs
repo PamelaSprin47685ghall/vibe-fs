@@ -49,12 +49,7 @@ open Wanxiangshu.Persistence.Journal
 
 /// Reviewer-side reads of the durable review guard.
 ///
-/// Keyed by reviewer session, which is where REVIEW-003's facts land. The
-/// previous version took the reviewer's parent from `sessionParents`, and on a
-/// miss scanned every session's linkage to discover it — a full scan
-/// (PERSIST-008) that also silently accepted a hit under the wrong parent. The
-/// review conversation happens in the reviewer's session, so that is where its
-/// state is read.
+/// Keyed by reviewer session, which is where REVIEW-003's facts land.
 module ReviewerEvidence =
 
     let private guard (journal: AgentJournal option) (reviewerKey: string) =
@@ -109,44 +104,3 @@ module ReviewerEvidence =
         match journal, guard journal reviewerKey with
         | Some durable, Some reviewGuard -> reviewerFinality durable reviewGuard reviewerKey |> Option.defaultValue true
         | _ -> true
-
-    /// Process-review-only terminal classification. Finality is owned by the
-    /// active ReviewBarrierWorkflow CE and never enters this projection-driven path.
-    [<RequireQualifiedAccess>]
-    type Need =
-        | NotProcessReview
-        | EnsureVerdictSubmitted
-        | CompleteProcessReview
-
-    [<RequireQualifiedAccess>]
-    type ProcessIdleDisposition =
-        | OrdinaryRepair
-        | CompleteToolOnlyProcessReview
-
-    let classifyNeed journal reviewerKey =
-        let reviewerId = SessionId.create reviewerKey
-
-        let processReviewEvidence =
-            match journal with
-            | None -> None
-            | Some durable ->
-                MagicTodoProjection.pendingProcessReviewForReviewer
-                    reviewerId
-                    (AgentJournal.snapshot durable).AgentProjections.MagicTodo
-
-        match processReviewEvidence, guard journal reviewerKey with
-        | None, _ -> Need.NotProcessReview
-        | Some _, None -> Need.EnsureVerdictSubmitted
-        | Some _, Some reviewGuard when List.isEmpty reviewGuard.ObservedAttempts -> Need.EnsureVerdictSubmitted
-        | Some _, Some _ -> Need.CompleteProcessReview
-
-    /// Process reviewers are explicitly instructed to answer with one `judge`
-    /// tool call. Once that judgement is durable, a stable Host idle is the
-    /// physical closure boundary for that tool-only turn; asking for an ordinary
-    /// missing-final-report would contradict the process-review protocol and can
-    /// strand ReviewAttemptClosed behind an abandoned synthetic repair.
-    let processIdleDisposition journal reviewerKey =
-        match classifyNeed journal reviewerKey with
-        | Need.CompleteProcessReview -> ProcessIdleDisposition.CompleteToolOnlyProcessReview
-        | Need.NotProcessReview
-        | Need.EnsureVerdictSubmitted -> ProcessIdleDisposition.OrdinaryRepair

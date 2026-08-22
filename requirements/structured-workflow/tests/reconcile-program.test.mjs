@@ -33,7 +33,7 @@ const name = (remaining, observation, signal = wake.retry()) =>
 
 // ── pure classifiers ─────────────────────────────────────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', () => {
+test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_001: isTerminalOutcome classifies terminal vs provisional', () => {
   assert.equal(typeof reconcileSurface.isTerminalOutcome, 'function')
   assert.equal(typeof reconcileSurface.classifyTurn, 'function')
 
@@ -65,7 +65,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_001: isTerminalOutcome cla
 
 // ── decideStep: bounded causal reread → next pure decision ───────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_003: decideStep produces one decision per causal edge (HOST-BOUNDARY-005)', () => {
+test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_003: decideStep produces one decision per causal edge (HOST-BOUNDARY-005)', () => {
   assert.equal(typeof reconcileSurface.decideStep, 'function')
   assert.equal(typeof reconcileSurface.decisionName, 'function')
   assert.equal(typeof reconcileSurface.clearsContinuationCandidate, 'function')
@@ -116,7 +116,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_003: decideStep produces o
 
 // ── publishDecision: consumed (terminal) vs provisional maps ─────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_004: publishDecision gates already-published terminal and provisional', () => {
+test('WHAT[STRUCTURED-WORKFLOW-004] RECONCILE_PROGRAM_004: publishDecision gates already-published terminal and provisional', () => {
   assert.equal(typeof reconcileSurface.publishDecision, 'function')
   assert.equal(typeof reconcileSurface.consumeKey, 'function')
   assert.deepEqual(reconcileSurface.acceptedTurnFields(), ['session', 'physical', 'providerRun', 'outcome'])
@@ -168,7 +168,7 @@ test('WHAT[STRUCTURED-WORKFLOW-007] RECONCILE_PROGRAM_004: publishDecision gates
   assert.equal(reconcileSurface.provisionalHas(cleared, provisional), false)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-009] RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] RECONCILE_PROGRAM_005: TurnUnknown never crosses the stable business-turn boundary', () => {
   // HOST-004 / rabbit §7: TurnUnknown is type-unreachable for publishDecision
   // (not a TurnOutcome). IdleWake + exhausted Unknown → Publish (observation
   // handoff only); business repair lives in TurnWorkflow / InteractionRepair.
@@ -192,7 +192,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] RECONCILE_PROGRAM_006: Domain surface has no
   assert.equal(typeof reconcileSurface.acceptedTurnFields, 'function')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-009] RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', () => {
+test('WHAT[STRUCTURED-WORKFLOW-003] RECONCILE_PROGRAM_007: TurnUnknown is SnapshotObservation, not TurnOutcome', () => {
   // The five accepted JS outcome names are checked through the owner’s stable
   // acceptance result, never through DU case metadata.
   for (const outcome of [
@@ -216,8 +216,8 @@ test('WHAT[STRUCTURED-WORKFLOW-009] RECONCILE_PROGRAM_007: TurnUnknown is Snapsh
   assert.equal(reconcileSurface.isPublishableOutcome('TurnFailed'), true)
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-015] operator abort is a control-plane wake, never a business outcome', () => {
-  // EXEC-020 / STRUCTURED-WORKFLOW-015: cancellation/interruption are control
+test('WHAT[STRUCTURED-WORKFLOW-009] operator abort is a control-plane wake, never a business outcome', () => {
+  // EXEC-020 / STRUCTURED-WORKFLOW-009: cancellation/interruption are control
   // events, not business result data. The abort signal lives in ReconcileWake
   // (a typed control-plane channel) and must never be minted as a TurnOutcome.
   const wakes = [wake.idle('ses-a', 1), wake.retry(), wake.failure(), wake.abort()]

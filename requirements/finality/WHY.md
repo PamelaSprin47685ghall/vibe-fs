@@ -4,13 +4,13 @@
 
 Manager 自行宣告「工作已完成」仅属于参与者的单方主张。在允许 mission 不可逆结束（LifeCompleted、会话终结及资源释放）之前，系统必须严格检验三个独立维度的条件：
 
-1. **当前义务**：Manager 是否已进入并遵守 checkpoint 协议，并彻底抽干（drain）所有未消费的过程评审？（`obligation-ledger`）
+1. **当前义务**：Manager 是否已进入并遵守 checkpoint 协议，并确立 plan commitment？（`obligation-ledger`）
 2. **当前被审对象**：终审结论是否切实针对当前 Git 代码树与当前请求，而非历史失效证据？（`review-assurance`）
 3. **合格证据**：是否存在针对当前代码状态的合格终审确认见证（fresh barrier + dual-PERFECT witness）？
 
 若缺乏严格的终结协议，系统将退化为以下失败形态：
 
-- **自宣即完成**：Manager 调用终结工具即可直接退出，零 checkpoint、零评审亦能通过，终局质量门退化为形式化步骤。
+- **自宣即完成**：Manager 调用终结工具即可直接退出，零 checkpoint、零终审亦能通过，终局质量门退化为形式化步骤。
 - **终态语义含混**：未获接受被误作安息，或已获接受却被禁止收尾；Manager 无法区分「被拒后继续工作」、「已获接受但需处理 minor 观察」与「真正安息」。
 - **已接受成果被后续轻微观察推翻**：已经获得的 acceptance 因后续 non-blocking 观察被撤销，缺乏稳定性保护。
 - **隐藏审查编排泄漏**：Manager 获悉 Reviewer、barrier、witness 及 2N 机制，将终局质量门重新当成可预谋的最后一步，在工作未收敛时抢先触发。
@@ -28,7 +28,7 @@ Manager 自行宣告「工作已完成」仅属于参与者的单方主张。在
 
 系统在以下任一情况发生时判定为 RED：
 
-- 参与者绕过未清偿义务或评审证据直接结束（零 checkpoint 终结、未抽干悬挂过程评审、无新鲜 barrier/tree 即可获得 blessing）。
+- 参与者绕过未清偿义务或评审证据直接结束（零 checkpoint 终结、无新鲜 barrier/tree 即可获得 blessing）。
 - acceptance、rejection 与 rest 被压缩为单一含混状态。
 - Manager 视野内暴露隐藏 Reviewer、barrier、witness 或 cohort 编排细节。
 - 状态推导依赖故事文本匹配而非强类型事实。

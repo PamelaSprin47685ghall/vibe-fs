@@ -59,14 +59,10 @@ module MagicTodoAdmission =
     /// Result of Magic before admission prior to mutating Host args / appending Prepared.
     /// The control algebra is identical for historical and clean-break plans; only
     /// the successful prepare payload differs.
-    ///
-    /// `AwaitingConsumableReview` is a legal lag-1 wait (TODO-006 / HOST-019 deferred
-    /// prepare), not a fail-closed reject.
     [<RequireQualifiedAccess>]
     type AdmissionOutcome<'Prepare> =
         | FreshPrepare of 'Prepare
         | IdempotentReplay of TodoWriteId
-        | AwaitingConsumableReview of pendingTodoWriteId: string
         | Rejected of MagicTodoReject
 
     let private decideReplay
@@ -110,16 +106,11 @@ module MagicTodoAdmission =
     let private decideFresh
         (sha256: string -> string)
         (settledCurrent: ObligationList)
-        (mayProceedPastLag1: Result<unit, MagicTodoReject>)
         (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
         (writeId: TodoWriteId)
         : AdmissionOutcome<ObligationPrepareSuccess> =
-        match
-            mayProceedPastLag1
-            |> Result.bind (fun () -> MagicTodo.validateObligations submitted)
-        with
-        | Error(MagicTodoReject.AwaitingConsumableReview pending) -> AdmissionOutcome.AwaitingConsumableReview pending
+        match MagicTodo.validateObligations submitted with
         | Error e -> AdmissionOutcome.Rejected e
         | Ok proposed ->
             AdmissionOutcome.FreshPrepare
@@ -136,7 +127,6 @@ module MagicTodoAdmission =
         (sha256: string -> string)
         (lifeId: ManagerLifeId)
         (settledCurrent: ObligationList)
-        (mayProceedPastLag1: Result<unit, MagicTodoReject>)
         (existingPrepared: ExistingPrepared option)
         (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
@@ -147,7 +137,7 @@ module MagicTodoAdmission =
         | Some existing when TodoWriteId.value existing.TodoWriteId = TodoWriteId.value writeId ->
             decideReplay sha256 lifeId settledCurrent localized existing writeId
         | Some _ -> AdmissionOutcome.Rejected(MagicTodoReject.IdentityCorruption "TodoWriteId")
-        | None -> decideFresh sha256 settledCurrent mayProceedPastLag1 localized submitted writeId
+        | None -> decideFresh sha256 settledCurrent localized submitted writeId
 
     /// GrandRewrite admission: same durable identity / lag-1 law, but no
     /// provider-visible item ids or status machine. Duplicate names fail closed.
@@ -155,11 +145,10 @@ module MagicTodoAdmission =
         (sha256: string -> string)
         (lifeId: ManagerLifeId)
         (settledCurrent: ObligationList)
-        (mayProceedPastLag1: Result<unit, MagicTodoReject>)
         (existingPrepared: ExistingPrepared option)
         (localized: AdmissionLocalizedToolCall)
         (submitted: ObligationList)
         : AdmissionOutcome<ObligationPrepareSuccess> =
         match MagicTodo.admitTodowriteBatch localized.TodowriteCallIdsInMessage with
         | Error e -> AdmissionOutcome.Rejected e
-        | Ok() -> admitAfterBatch sha256 lifeId settledCurrent mayProceedPastLag1 existingPrepared localized submitted
+        | Ok() -> admitAfterBatch sha256 lifeId settledCurrent existingPrepared localized submitted

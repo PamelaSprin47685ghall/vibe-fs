@@ -10,7 +10,7 @@
 
 ## 2. 审查编排与收束机制
 
-- **Cohort 组装与毕业推导**：每次终审请求由纯函数 `rosterOf` 组装花名册，包含一名新审查员与历史未毕业审查员。Dedicated Reviewer 首次入组后按普通规则随合格 witness 毕业。
+- **Cohort 组装与毕业推导**：每次终审请求由纯函数 `rosterOf` 组装花名册，包含一名新审查员与历史未毕业审查员。审查员按普通规则随合格 witness 毕业。
 - **REVISE 双轨收束**：任一审查员给出 REVISE 后，工作流立即关闭该 cohort；首个 REVISE 作为工具结果返回，后续到达的 REVISE 物化为独立 steer continuation 交付。
 - **Blessing 与 Rest 路径**：全员达成双重 PERFECT 且代码树一致后，物化规范 LWR bundle 并写入 `FinalityBlessed`；二次调用 `suicide` 时在排查阻塞 REVISE 后直接落盘 `LifeCompleted`，输出逐字等于 `last_words`。
 

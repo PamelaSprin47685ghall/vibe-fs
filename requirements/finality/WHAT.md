@@ -7,43 +7,43 @@
 ## FINALITY-002: 终结资格建立在 obligations、current tree 与合格 review evidence 上
 
 参与者单方宣告完成不构成不可逆结束的许可。终结资格必须同时满足三重条件：
-1. **当前义务**：遵守 checkpoint 协议，零 checkpoint 严格 fail closed，并抽干所有未消费的 ConsumableReview。
+1. **当前义务**：遵守 checkpoint 协议，具备 plan commitment 且零 checkpoint 严格 fail closed。
 2. **当前被审对象**：具备绑定当前请求、barrier 与 Git tree 的合格 witness。
 3. **经验分型**：严格按 rejection、blessed 与 rest 分流处理。
 
 ## FINALITY-003: 受理前置条件按序验证且失败零创建
 
-终结受理严格按序验证前置条件：Manager 身份、Journal 在场、已接受权威、处于 open Life、非空 last_words、有效 ToolCallId 与 ProviderRun、无在途或等待合并的子任务、无存活 PTY、正确的 worktree 归属、活跃 ManagerJob，并满足 T1 承诺与 drain 要求。任一前置检查未通过，绝对不得创建 Reviewer 会话、barrier 或终结请求对象。`EndingDisposition` 是纯领域分类，不是 program counter。Tool adapter 不 match disposition case 并分发不同业务效果，而是统一调用 `handleEnding` 并接收 `FinalityEndingOutcome` 边界结果进行渲染。
+终结受理严格按序验证前置条件：Manager 身份、Journal 在场、已接受权威、处于 open Life、非空 last_words、有效 ToolCallId 与 ProviderRun、无在途或等待合并的子任务、无存活 PTY、正确的 worktree 归属、活跃 ManagerJob，并满足 T1 承诺要求。任一前置检查未通过，绝对不得创建 Reviewer 会话、barrier 或终结请求对象。`EndingDisposition` 是纯领域分类，不是 program counter。Tool adapter 不 match disposition case 并分发不同业务效果，而是统一调用 `handleEnding` 并接收 `FinalityEndingOutcome` 边界结果进行渲染。
 
 ## FINALITY-004: 无 plan commitment 时不得进入 Finality
 
 未获得 blessing 的首次 `suicide` 在当前 Life 尚未形成 accepted `planComplete=true` 事实时，必须 fail closed 并分派为 `ContinuePlanning`。Pre-T1 阶段的 planning checkpoint 不赋予终结资格。
 
-## FINALITY-005: suicide 是唯一 tail drain
+## FINALITY-005: suicide 驱动 Finality Review
 
-`suicide` 是消费最后一轮未决过程评审的唯一 tail drain 途径，禁止通过调用额外的 `todowrite` 尝试清空义务。获得 blessing 后的再次 `suicide` 同样必须首先执行过程评审的 tail drain。
+`suicide` 是进入终局评审（Finality Review）的唯一途径。获得 blessing 后的再次 `suicide` 直接触发生命周期完结。
 
-## FINALITY-006: drain 结果分型（REVISE 回灌与 PERFECT 受理）
+## FINALITY-006: 终审结果分型（REVISE 回灌与 BLESSING 授予）
 
-存在 checkpoint 时，drain 必须等待最新的 `ConsumableReview`：
-- 若结论为 **REVISE**：回灌规范的 `ProcessReviewLWR` 报告，不创建 FinalityRequest，当前 Life 继续运行，由 Manager 通过后续 checkpoint 修正账目。
-- 若结论为 **PERFECT**：方获准进入后续的终审前置流程。
+终审裁决严格分为两种业务结果：
+- 若结论为 **REVISE**：回灌规范的 `ProcessReviewLWR` 报告，当前 Life 继续运行，由 Manager 修正代码与账目。
+- 若全部确认：授予 Blessing 并准入完成。
 
 ## FINALITY-007: 无机械 terminal-todo completeness gate
 
-存在 plan commitment 不等同于机械要求 obligations 列表必须为空。未完成项的真实性与合规性完全交由过程评审的 PERFECT 或 REVISE 裁决，系统不设立死板的任务清空拦截门。
+存在 plan commitment 不等同于机械要求 obligations 列表必须为空。未完成项的真实性与合规性完全交由终局评审的 PERFECT 或 REVISE 裁决，系统不设立死板的任务清空拦截门。
 
 ## FINALITY-008: 受理顺序必须 durable
 
 合法受理（未获 Blessing 状态下）严格按序执行：校验全部前置条件 → 读取当前代码树 → 持久化 last_words → 写入 `FinalityRequested` 事实 → 递归驱动 cohort 工作流。每个审查成员的因果顺序恒为：创建隐藏会话 → 持久化 enlist 事实 → 打开 barrier → 分配审查任务。首个提示词发送不得早于 barrier 建立。
 
-## FINALITY-009: roster 与 Dedicated 毕业
+## FINALITY-009: roster 与 Reviewer 毕业
 
-每次 FinalityRequest 包含恰好一名新 Reviewer，以及当前 Life 中尚未毕业的历史 Reviewer；Dedicated Reviewer 在首次进入终审时作为普通 cohort 成员登记，随后完全遵循普通毕业规则。裁决为 REVISE 的 Reviewer 保留会话与历史记录，在后续请求中以新 barrier 重新入组。
+每次 FinalityRequest 包含恰好一名新 Reviewer，以及当前 Life 中尚未毕业的历史 Reviewer。裁决为 REVISE 的 Reviewer 保留会话与历史记录，在后续请求中以新 barrier 重新入组。
 
 ## FINALITY-010: graduate 只由 enlistment 与合法 confirmed witness 推导
 
-审查员的毕业资格仅由当前 Life 的登记事实与合法的 confirmed witness 严格推导。过程评审的 PERFECT 不计入终审的 dual-PERFECT；登记进入终审后，必须针对当前请求、当前代码树与新 barrier 重新完成完整的双重确认链。
+审查员的毕业资格仅由当前 Life 的登记事实与合法的 confirmed witness 严格推导。登记进入终审后，必须针对当前请求、当前代码树与新 barrier 重新完成完整的双重确认链。
 
 ## FINALITY-011: REVISE 立即关闭 cohort 且 FinalityRejected 另行 record-ready
 

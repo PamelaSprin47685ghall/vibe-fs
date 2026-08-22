@@ -38,12 +38,12 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
 // ── 1. Sphinx nextTool protocol-boundary exemption ──────────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] McpContract_fs_carries_not_a_scheduler_comment', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] McpContract_fs_carries_not_a_scheduler_comment', () => {
   const source = read('src/Wanxiangshu/Sphinx/McpContract.fs')
   assert.match(source, /Not a scheduler/i, 'McpContract.fs must retain the "Not a scheduler" comment on nextTool')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] EPI_013_WHT_records_protocol_boundary_exemption', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] EPI_013_WHT_records_protocol_boundary_exemption', () => {
   const what = read('requirements/epistemic-reasoning/WHAT.md')
   assert.match(what, /Protocol-boundary exemption.*STRUCTURED-WORKFLOW-017/s, 'EPI-013 must record the protocol-boundary exemption citing SW-017')
   assert.match(what, /Kernel 唯一拥有 continuation/, 'EPI-013 exemption must cite condition (1): Kernel owns continuation')
@@ -51,7 +51,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] EPI_013_WHT_records_protocol_boundary_exempt
   assert.match(what, /yield\/observe 循环是协议语义/, 'EPI-013 exemption must cite condition (3): yield/observe is protocol semantics')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] SW_017_WHT_records_protocol_boundary_exemption_conditions', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] SW_017_WHT_records_protocol_boundary_exemption_conditions', () => {
   const what = read('requirements/structured-workflow/WHAT.md')
   assert.match(what, /protocol-boundary exemption/i, 'SW-017 must record the protocol-boundary exemption')
   assert.match(what, /kernel 唯一拥有 continuation\/closure\/停止/, 'SW-017 exemption condition (1) must be present')
@@ -88,7 +88,7 @@ test('WHAT[STRUCTURED-WORKFLOW-003] production_source_has_no_ResumeAtXxx_durable
 
 // ── 3. ManagerFinality handleEnding dispatch ownership ──────────────────────
 
-test('WHAT[STRUCTURED-WORKFLOW-017] Finality_fs_defines_handleEnding_and_boundary_types', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] Finality_fs_defines_handleEnding_and_boundary_types', () => {
   const source = read('src/Wanxiangshu/Mission/Manager/Finality.fs')
   assert.match(source, /let handleEnding/, 'Finality.fs must define handleEnding')
   assert.match(source, /type FinalityEndingOutcome/, 'Finality.fs must define FinalityEndingOutcome')
@@ -97,7 +97,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] Finality_fs_defines_handleEnding_and_boundar
   assert.match(source, /type FinalityEndingExecution/, 'Finality.fs must define FinalityEndingExecution capability record')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] Tool_fs_calls_handleEnding_and_matches_FinalityEndingOutcome_only', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] Tool_fs_calls_handleEnding_and_matches_FinalityEndingOutcome_only', () => {
   const source = read('src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs')
   assert.match(source, /ManagerFinality\.handleEnding/, 'Tool.fs must call ManagerFinality.handleEnding')
   assert.match(source, /FinalityEndingOutcome\.Refused/, 'Tool.fs must match FinalityEndingOutcome.Refused')
@@ -112,7 +112,7 @@ test('WHAT[STRUCTURED-WORKFLOW-017] Tool_fs_calls_handleEnding_and_matches_Final
   )
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] FINALITY_003_WHT_documents_handleEnding_and_FinalityEndingOutcome', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] FINALITY_003_WHT_documents_handleEnding_and_FinalityEndingOutcome', () => {
   const what = read('requirements/finality/WHAT.md')
   assert.match(what, /handleEnding/, 'FINALITY-003 WHAT must mention handleEnding')
   assert.match(what, /FinalityEndingOutcome/, 'FINALITY-003 WHAT must mention FinalityEndingOutcome')

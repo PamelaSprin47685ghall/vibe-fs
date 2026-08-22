@@ -5,7 +5,6 @@
 /src/Wanxiangshu/Mission/WorkRecord/**
 /src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs
 /src/Wanxiangshu/Mission/Manager/JobHandoff.fs
-/src/Wanxiangshu/Mission/Review/TodoProcess.fs
 /src/Wanxiangshu/Mission/Finality/Record.fs
 /src/Wanxiangshu/Context/Trace/**
 /scripts/checks/semantic-anchors.mjs

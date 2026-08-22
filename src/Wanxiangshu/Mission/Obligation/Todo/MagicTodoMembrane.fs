@@ -94,13 +94,9 @@ module MagicTodoMembrane =
           PreparedFactRef: EventId
           BaseObligations: ObligationList
           SubmittedObligations: ObligationList
-          PreviousReview: PreviousReviewView option
           Acceptance: PreparedBridgeAcceptance }
 
-    type AcceptOutcome =
-        { EnrichedResult: string
-          NeedsDedicatedEnlist: bool
-          NeedsEnsureReview: bool }
+    type AcceptOutcome = { EnrichedResult: string }
 
     /// DSL-class: Decision
     [<RequireQualifiedAccess>]
@@ -109,9 +105,6 @@ module MagicTodoMembrane =
         | UnexpectedToolName of actual: string
         | SnapshotInputMismatch
         | Admission of MagicTodoReject
-        /// TODO-006 lag-1 wait: T(k+1) blocks until ConsumableReview is durable.
-        /// Host deferred prepare awaits this; it is not invalidOp red text.
-        | AwaitingConsumableReview of pendingTodoWriteId: string
         | BlobRead of reason: string
         | BlobWrite of reason: string
         | BlobDigestMismatch of label: string
@@ -149,25 +142,6 @@ module MagicTodoMembrane =
             return!
                 MagicTodoObligationCodec.tryDecode body
                 |> Result.mapError PrepareRejection.BlobDecode
-        }
-
-    let private readText
-        (journal: AgentJournal)
-        (label: string)
-        (blobRef: BlobRef)
-        (expectedDigest: BlobDigest)
-        : Task<Result<string, PrepareRejection>> =
-        taskResult {
-            let! body =
-                journal.Writer.BlobWriter.Read blobRef
-                |> TaskResult.mapError PrepareRejection.BlobRead
-
-            do!
-                Result.requireTrue
-                    (PrepareRejection.BlobDigestMismatch label)
-                    (HostDigest.sha256Hex body = BlobDigest.value expectedDigest)
-
-            return body
         }
 
     let private writeList
@@ -232,7 +206,6 @@ module MagicTodoMembrane =
         (preparedFactRef: EventId)
         (baseObligations: ObligationList)
         (proposal: ObligationList)
-        (previousReview: PreviousReviewView option)
         (acceptance: PreparedBridgeAcceptance)
         =
         { ManagerSessionId = managerSessionId
@@ -241,7 +214,6 @@ module MagicTodoMembrane =
           PreparedFactRef = preparedFactRef
           BaseObligations = baseObligations
           SubmittedObligations = proposal
-          PreviousReview = previousReview
           Acceptance = acceptance }
 
     let private bridgeAcceptance (checkpoint: MagicTodoProjection.CheckpointRecord) : PreparedBridgeAcceptance =
@@ -265,26 +237,12 @@ module MagicTodoMembrane =
         | None -> Task.FromResult(Ok [])
         | Some(blobRef, digest) -> readList journal "CurrentObligations" blobRef digest
 
-    let private readPreviousReviewView (journal: AgentJournal) (life: MagicTodoProjection.LifeMagicTodoState) =
-        match MagicTodoProjection.consumablePreviousReview life with
-        | None -> Task.FromResult(Ok None)
-        | Some concluded ->
-            taskResult {
-                let! report = readText journal "ProcessReviewLWR" concluded.WorkRecordRef concluded.WorkRecordDigest
-
-                return
-                    Some
-                        { Verdict = concluded.Verdict
-                          ReportText = report }
-            }
-
     let private replayPreparedBridge
         (journal: AgentJournal)
         (managerSessionId: SessionId)
         (lifeId: ManagerLifeId)
         (life: MagicTodoProjection.LifeMagicTodoState)
         (currentObligations: ObligationList)
-        (previousReview: PreviousReviewView option)
         (replayWriteId: TodoWriteId)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         taskResult {
@@ -302,7 +260,6 @@ module MagicTodoMembrane =
                     checkpoint.PreparedFactRef
                     currentObligations
                     proposal
-                    previousReview
                     (bridgeAcceptance checkpoint)
         }
 
@@ -313,7 +270,6 @@ module MagicTodoMembrane =
         (locality: MagicTodoLocality.LocalizedToolCall)
         (planCompleteDeclared: bool)
         (currentObligations: ObligationList)
-        (previousReview: PreviousReviewView option)
         (preparedPlan: MagicTodoAdmission.ObligationPrepareSuccess)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         taskResult {
@@ -352,7 +308,6 @@ module MagicTodoMembrane =
                     receipt.EventId
                     currentObligations
                     preparedPlan.Proposed
-                    previousReview
                     PreparedBridgeAcceptance.AwaitingAcceptance
         }
 
@@ -364,15 +319,12 @@ module MagicTodoMembrane =
         (locality: MagicTodoLocality.LocalizedToolCall)
         (planCompleteDeclared: bool)
         (currentObligations: ObligationList)
-        (previousReview: PreviousReviewView option)
         (admission: MagicTodoAdmission.AdmissionOutcome<MagicTodoAdmission.ObligationPrepareSuccess>)
         : Task<Result<PreparedBridge, PrepareRejection>> =
         match admission with
-        | AdmissionOutcome.AwaitingConsumableReview pending ->
-            Task.FromResult(Error(PrepareRejection.AwaitingConsumableReview pending))
         | AdmissionOutcome.Rejected rejection -> Task.FromResult(Error(PrepareRejection.Admission rejection))
         | AdmissionOutcome.IdempotentReplay replayWriteId ->
-            replayPreparedBridge journal managerSessionId lifeId life currentObligations previousReview replayWriteId
+            replayPreparedBridge journal managerSessionId lifeId life currentObligations replayWriteId
         | AdmissionOutcome.FreshPrepare preparedPlan ->
             freshPrepareBridge
                 journal
@@ -381,7 +333,6 @@ module MagicTodoMembrane =
                 locality
                 planCompleteDeclared
                 currentObligations
-                previousReview
                 preparedPlan
 
     let private prepareForOpenLife
@@ -402,7 +353,6 @@ module MagicTodoMembrane =
                 |> Option.defaultValue (MagicTodoProjection.emptyLife lifeId)
 
             let! currentObligations = readCurrentObligations journal life
-            let! previousReview = readPreviousReviewView journal life
             let writeId = MagicTodo.todoWriteId HostDigest.sha256Hex lifeId locality.ToolCallId
             let prior = existingPrepared lifeId writeId life
 
@@ -411,7 +361,6 @@ module MagicTodoMembrane =
                     HostDigest.sha256Hex
                     lifeId
                     currentObligations
-                    (MagicTodoProjection.mayAdmitNewCheckpoint life)
                     prior
                     { ToolCallId = locality.ToolCallId
                       ToolPartOrdinal = locality.ToolPartOrdinal
@@ -429,7 +378,6 @@ module MagicTodoMembrane =
                     locality
                     planCompleteDeclared
                     currentObligations
-                    previousReview
                     admission
         }
 
@@ -467,21 +415,9 @@ module MagicTodoMembrane =
         (observedOutputDigest: string)
         : Result<AcceptOutcome, AcceptRejection> =
         if acceptedOutputDigest = observedOutputDigest then
-            Ok
-                { EnrichedResult = ""
-                  NeedsDedicatedEnlist = false
-                  NeedsEnsureReview = false }
+            Ok { EnrichedResult = "" }
         else
             Error AcceptRejection.OutputDigestMismatch
-
-    let private previousReviewInstructions (lang: ProviderLanguage) (previousReview: PreviousReviewView option) =
-        match previousReview with
-        | Some previous when previous.Verdict = ProcessReviewVerdict.Revise ->
-            ProviderProse.instructionLines
-                lang
-                MagicTodoSurface.Path.PreviousReviewBody
-                (MagicTodoSurface.previousReviewSubs (ProcessReviewVerdict.wire previous.Verdict) previous.ReportText)
-        | _ -> []
 
     let private enrichAcceptedResult
         (managerSessionId: SessionId)
@@ -517,9 +453,6 @@ module MagicTodoMembrane =
                 Map.tryFind (ManagerLifeId.value bridge.ManagerLifeId) projection.AgentProjections.MagicTodo.ByLife
                 |> Option.defaultValue (MagicTodoProjection.emptyLife bridge.ManagerLifeId)
 
-            let checkpoint =
-                Map.tryFind (TodoWriteId.value bridge.Prepared.TodoWriteId) life.Checkpoints
-
             let isT1Commitment =
                 life.FirstPlanCommitment.IsNone && bridge.Prepared.PlanCompleteDeclared
 
@@ -537,8 +470,7 @@ module MagicTodoMembrane =
 
             let rendered =
                 LlmFacing.instructions (
-                    previousReviewInstructions lang bridge.PreviousReview
-                    @ ProviderProse.instructionLines lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
+                    ProviderProse.instructionLines lang MagicTodoSurface.Path.ObligationAcceptedEpilogue Map.empty
                 )
 
             let enrichedResult =
@@ -553,10 +485,7 @@ module MagicTodoMembrane =
                 |> TaskResult.mapError (fun failure ->
                     AcceptRejection.JournalAppend(JournalAppendFailure.describe failure))
 
-            return
-                { EnrichedResult = enrichedResult
-                  NeedsDedicatedEnlist = life.Dedicated.IsNone
-                  NeedsEnsureReview = checkpoint |> Option.bind MagicTodoProjection.conclusion |> Option.isNone }
+            return { EnrichedResult = enrichedResult }
         }
 
     let accept
@@ -666,8 +595,6 @@ module MagicTodoHostHooks =
                 MagicTodoMembrane.prepare durable sessionId locality providerInputDigest planComplete obligations
             with
             | Ok value -> return ObligationLedgerWorkflow.PreparationAttempt.Prepared value
-            | Error(MagicTodoMembrane.PrepareRejection.AwaitingConsumableReview _) ->
-                return ObligationLedgerWorkflow.PreparationAttempt.AwaitPreviousReview
             | Error reason -> return preparationFailure sessionText reason
         }
 
@@ -695,19 +622,10 @@ module MagicTodoHostHooks =
     let private resolvePreparationFailure sessionText failure : Result<MagicTodoMembrane.PreparedBridge, string> =
         match failure with
         | ObligationLedgerWorkflow.PreparationFailure.AttemptFailed syntax -> Error syntax
-        | ObligationLedgerWorkflow.PreparationFailure.ReviewWaitFailed reason ->
-            fatalInfrastructure sessionText ("await ConsumableReview failed: " + reason)
-        | ObligationLedgerWorkflow.PreparationFailure.MissingPendingReview ->
-            fatalInfrastructure sessionText "lag-1 wait without pending ConsumableReview (projection inconsistent)"
-        | ObligationLedgerWorkflow.PreparationFailure.ReviewDidNotConverge ->
-            fatalInfrastructure
-                sessionText
-                "ConsumableReview wait completed but checkpoint admission still reports the same pending review"
 
     let private prepareDeferredBridge
         (durable: AgentJournal)
         (snapshots: ISessionSnapshotPort)
-        (reviews: ProcessReviewPort)
         (sessionId: SessionId)
         (sessionText: string)
         (callId: ToolCallId)
@@ -757,21 +675,7 @@ module MagicTodoHostHooks =
                     planComplete
                     obligations
 
-            let currentPendingReview () =
-                let snapshotNow = AgentJournal.snapshot durable
-
-                AgentProjection.tryFind sessionId snapshotNow.AgentProjections
-                |> Option.bind (fun session -> session.ManagerLife)
-                |> Option.bind (fun lifecycle -> lifecycle.CurrentLife)
-                |> Option.bind (fun mlife ->
-                    MagicTodoProjection.tryLife mlife.LifeId snapshotNow.AgentProjections.MagicTodo
-                    |> Option.bind MagicTodoProjection.pendingReviewObligation
-                    |> Option.map (fun cp -> mlife.LifeId, cp.TodoWriteId))
-
-            let awaitReview (lifeId, writeId) =
-                reviews.AwaitConsumableReview durable sessionId lifeId writeId
-
-            let! outcome = ObligationLedgerWorkflow.prepareCheckpoint admitNow currentPendingReview awaitReview
+            let! outcome = ObligationLedgerWorkflow.prepareCheckpoint admitNow
 
             match outcome with
             | Ok value -> return Ok value
@@ -785,16 +689,6 @@ module MagicTodoHostHooks =
         | Ok value -> value
         | Error syntaxReason -> invalidOp syntaxReason
 
-    let private ensureReviewPort
-        (processReview: ProcessReviewPort option)
-        (durable: AgentJournal)
-        (prepared: MagicTodoMembrane.PreparedBridge)
-        =
-        match processReview with
-        | None -> Task.FromResult(Error "Magic Todo process review runtime disappeared after before")
-        | Some port ->
-            port.EnsureReview durable prepared.ManagerSessionId prepared.ManagerLifeId prepared.Prepared.TodoWriteId
-
     let private applyEnrichedResult (output: obj) (accepted: MagicTodoMembrane.AcceptOutcome) =
         if not (String.IsNullOrEmpty accepted.EnrichedResult) then
             MagicTodoHostCodec.replaceEnrichedResult output accepted.EnrichedResult
@@ -803,13 +697,10 @@ module MagicTodoHostHooks =
         match outcome with
         | Error(ObligationLedgerWorkflow.AcceptanceFailure.AcceptFailed reason) ->
             fatalInfrastructure sessionText (sprintf "Magic Todo accept invariant failed: %A" reason)
-        | Error(ObligationLedgerWorkflow.AcceptanceFailure.ReviewFailed reason) ->
-            fatalInfrastructure sessionText ("Magic Todo ensureReview infrastructure failed: " + reason)
         | Ok accepted -> applyEnrichedResult output accepted
 
     let private acceptAfterPrepare
         (durable: AgentJournal)
-        (processReview: ProcessReviewPort option)
         (sessionText: string)
         (preparedTask: Task<Result<MagicTodoMembrane.PreparedBridge, string>>)
         (output: obj)
@@ -827,20 +718,13 @@ module MagicTodoHostHooks =
                     prepared.Prepared.ProviderInputDigest
                     outputDigest
 
-            let shouldEnsureReview (accepted: MagicTodoMembrane.AcceptOutcome) =
-                accepted.NeedsEnsureReview || accepted.NeedsDedicatedEnlist
-
-            let ensureReview (_accepted: MagicTodoMembrane.AcceptOutcome) =
-                ensureReviewPort processReview durable prepared
-
-            let! outcome = ObligationLedgerWorkflow.acceptCheckpoint acceptDurably shouldEnsureReview ensureReview
+            let! outcome = ObligationLedgerWorkflow.acceptCheckpoint acceptDurably
 
             acceptResolvedCheckpoint sessionText outcome output
         }
 
     let private runAfterTodo
         (journal: AgentJournal option)
-        (processReview: ProcessReviewPort option)
         (bridges: Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>)
         (input: obj)
         (output: obj)
@@ -857,7 +741,7 @@ module MagicTodoHostHooks =
                 | true, value -> value
 
             try
-                do! acceptAfterPrepare durable processReview sessionText preparedTask output
+                do! acceptAfterPrepare durable sessionText preparedTask output
             finally
                 bridges.Remove key |> ignore
         }
@@ -865,7 +749,6 @@ module MagicTodoHostHooks =
     let private runBeforeTodo
         (journal: AgentJournal option)
         (snapshot: ISessionSnapshotPort option)
-        (processReview: ProcessReviewPort option)
         (bridges: Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>)
         (input: obj)
         (output: obj)
@@ -875,9 +758,6 @@ module MagicTodoHostHooks =
 
             let snapshots =
                 requirePort "Magic Todo requires the full session snapshot port" snapshot
-
-            let reviews =
-                requirePort "Magic Todo requires the process review runtime" processReview
 
             let sessionText = requiredText input "sessionID"
             let callText = requiredText input "callID"
@@ -899,7 +779,6 @@ module MagicTodoHostHooks =
                     prepareDeferredBridge
                         durable
                         snapshots
-                        reviews
                         sessionId
                         sessionText
                         callId
@@ -908,11 +787,7 @@ module MagicTodoHostHooks =
                         obligations
         }
 
-    let create
-        (journal: AgentJournal option)
-        (snapshot: ISessionSnapshotPort option)
-        (processReview: ProcessReviewPort option)
-        : HookSet =
+    let create (journal: AgentJournal option) (snapshot: ISessionSnapshotPort option) : HookSet =
         let bridges =
             Dictionary<string, Task<Result<MagicTodoMembrane.PreparedBridge, string>>>()
 
@@ -925,13 +800,13 @@ module MagicTodoHostHooks =
         let before (input: obj) (output: obj) : Task<unit> =
             task {
                 if isTodoTool input "tool" then
-                    do! runBeforeTodo journal snapshot processReview bridges input output
+                    do! runBeforeTodo journal snapshot bridges input output
             }
 
         let after (input: obj) (output: obj) : Task<unit> =
             task {
                 if isTodoTool input "tool" then
-                    do! runAfterTodo journal processReview bridges input output
+                    do! runAfterTodo journal bridges input output
             }
 
         { Definition = definition

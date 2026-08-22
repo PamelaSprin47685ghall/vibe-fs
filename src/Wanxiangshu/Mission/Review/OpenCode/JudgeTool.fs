@@ -71,63 +71,6 @@ module JudgeTool =
     let private notReceived ctx reasonPath =
         ToolHostCodec.tomlObjectWithInstructions [ line ctx Path.NotReceived; line ctx reasonPath ] []
 
-    let private processSubmission (journal: AgentJournal) (judgement: ReviewJudgement) : VerdictSubmission option =
-        let snapshot = AgentJournal.snapshot journal
-
-        MagicTodoProjection.pendingProcessReviewForReviewer
-            judgement.ReviewerSessionId
-            snapshot.AgentProjections.MagicTodo
-        |> Option.bind (fun checkpoint ->
-            MagicTodoProjection.assignment checkpoint
-            |> Option.bind (fun assignment ->
-                AgentProjection.tryFind judgement.ReviewerSessionId snapshot.AgentProjections
-                |> Option.bind (fun session -> session.ReviewGuard)
-                |> Option.bind (fun guard ->
-                    guard.LastGitTreeHash
-                    |> Option.map (fun tree ->
-                        { BarrierId = ReviewBarrierId.create (MagicTodo.TodoReviewId.value assignment.TodoReviewId)
-                          GitTreeHash = tree
-                          ManagerSessionId = checkpoint.ManagerSessionId
-                          ReviewerSessionId = judgement.ReviewerSessionId
-                          ProviderRun = judgement.ProviderRun
-                          ToolCallId = judgement.ToolCallId
-                          Verdict = judgement.Verdict }))))
-
-    let private recordSubmittedJudgement
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (journal: AgentJournal)
-        (physicalUserMessageId: PhysicalUserMessageId)
-        (submission: VerdictSubmission)
-        =
-        task {
-            match! VerdictWorkflow.recordJudgement journal submission with
-            | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
-            | Ok() ->
-                ReviewerWorkflow.ProcessReviewInterruptFence.arm submission.ReviewerSessionId
-                scope.MarkVerdictSubmitted(context.SessionId, physicalUserMessageId)
-                return received context
-        }
-
-    let private recordJournalJudgement
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (journal: AgentJournal)
-        (judgement: ReviewJudgement)
-        =
-        match processSubmission journal judgement with
-        | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
-        | Some submission -> recordSubmittedJudgement scope context journal judgement.PhysicalUserMessageId submission
-
-    let private recordProcessJudgement
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (judgement: ReviewJudgement)
-        =
-        match scope.Journal with
-        | None -> Task.FromResult(notReceived context Path.ContextIncomplete)
-        | Some journal -> recordJournalJudgement scope context journal judgement
-
     let private deliverFinalityJudgement
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
@@ -158,7 +101,7 @@ module JudgeTool =
         if ReviewJudgementInbox.isOwned judgement.ReviewerSessionId then
             deliverFinalityJudgement scope context judgement
         else
-            recordProcessJudgement scope context judgement
+            Task.FromResult(notReceived context Path.CouldNotBind)
 
     [<RequireQualifiedAccess>]
     type private ExecutionDecision =
@@ -244,7 +187,7 @@ module JudgeTool =
         let scheduleInterrupt () =
             runBackground (fun () ->
                 task {
-                    let! interruptOutcome =
+                    let! _ =
                         task {
                             try
                                 return! sessionPort.InterruptAttempt reviewerSessionId
@@ -252,14 +195,7 @@ module JudgeTool =
                                 return Error ex.Message
                         }
 
-                    match interruptOutcome with
-                    | Ok() ->
-                        ReviewerWorkflow.ProcessReviewInterruptFence.release reviewerSessionId
-                        return ()
-                    | Error reason ->
-                        let failure = "REVIEW_013_TERMINAL_INTERRUPT_FAILED:" + reason
-                        ReviewerWorkflow.ProcessReviewInterruptFence.fail reviewerSessionId failure
-                        return raise (InvalidOperationException failure)
+                    return ()
                 }
                 :> Task)
 
@@ -282,11 +218,6 @@ module JudgeTool =
         task {
             match! terminalReadiness () with
             | Ok true ->
-                // This hook runs inside the provider request being retired.
-                // Awaiting the Host abort here self-locks: the abort endpoint
-                // cannot finish until messages.transform returns. Schedule the
-                // already-proved physical cleanup under the runtime owner and
-                // let this transform return immediately.
                 scheduleInterrupt ()
                 return ()
             | Ok false -> return ()

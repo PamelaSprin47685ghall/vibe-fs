@@ -79,49 +79,8 @@ open Wanxiangshu.Host
 /// (REVIEW-002/007).
 ///
 /// `observe` is the story: durable `ReviewerEvidence` facts choose the branch;
-/// `ReviewerContinuation` owns the named send promises; physical delivery is an
-/// injected Review port. There is no stored State/Stage counter.
+/// physical delivery is an injected Review port. There is no stored State/Stage counter.
 module ReviewerWorkflow =
-
-    module ProcessReviewInterruptFence =
-
-        let private gate = obj ()
-
-        let private pending =
-            Dictionary<SessionId, TaskCompletionSource<Result<unit, string>>>()
-
-        let arm (reviewerSessionId: SessionId) =
-            lock gate (fun () ->
-                match pending.TryGetValue reviewerSessionId with
-                | true, _ -> invalidOp "PROCESS_REVIEW_INTERRUPT_FENCE_ALREADY_ARMED"
-                | false, _ ->
-                    pending.[reviewerSessionId] <-
-                        TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously))
-
-        let awaitRelease (reviewerSessionId: SessionId) : Task<Result<unit, string>> =
-            lock gate (fun () ->
-                match pending.TryGetValue reviewerSessionId with
-                | true, waiter -> waiter.Task
-                | false, _ -> Task.FromResult(Ok()))
-
-        let private settle (reviewerSessionId: SessionId) outcome =
-            let waiter =
-                lock gate (fun () ->
-                    match pending.TryGetValue reviewerSessionId with
-                    | true, current ->
-                        pending.Remove reviewerSessionId |> ignore
-                        Some current
-                    | false, _ -> None)
-
-            waiter
-            |> Option.iter (fun current -> AsyncSupport.trySetResult current outcome |> ignore)
-
-        let release (reviewerSessionId: SessionId) = settle reviewerSessionId (Ok())
-
-        let fail (reviewerSessionId: SessionId) (reason: string) = settle reviewerSessionId (Error reason)
-
-        let isBlocked (reviewerSessionId: SessionId) =
-            lock gate (fun () -> pending.ContainsKey reviewerSessionId)
 
     let private reviewerHasChronicle (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
         AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
@@ -289,11 +248,8 @@ module ReviewerWorkflow =
         | Some _, None, None -> SubmittedClosureEvidence.ToolResultMissing
         | Some _, None, Some(attempt, frontier) -> SubmittedClosureEvidence.ToolResultReady(attempt, frontier)
 
-    /// REVIEW-013/017: process-review terminality may stop the provider before
-    /// the generic turn-completion observer runs. Once the exact judge tool
-    /// result is already durable in XTrace, that result is the last legitimate
-    /// part of this tool-only work unit. Freeze the closure at its exclusive
-    /// frontier before interrupting, or recover the same fact after a crash.
+    /// Freeze the closure at its exclusive frontier before interrupting,
+    /// or recover the same fact after a crash.
     ///
     /// Ok true  = closure already existed or was durably appended.
     /// Ok false = the matching durable tool_result is not present yet.
@@ -314,7 +270,7 @@ module ReviewerWorkflow =
                 return true
             }
 
-    /// REVIEW-013/017: the latest verdict attempt this turn carried plus the
+    /// The latest verdict attempt this turn carried plus the
     /// XTrace head at closure time. `None` when the turn produced no verdict.
     let private closedAttemptEvidence (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
@@ -349,11 +305,6 @@ module ReviewerWorkflow =
                        ToolCallId = attempt.ToolCallId
                        FrozenFrontierSequence = frontier |}
 
-            // REVIEW-013/017: `ReviewVerdictRecorded` only proves the judge
-            // executed; the attempt closes only once this reconciled turn has
-            // fully completed and its XTrace converged. Append failures leave
-            // it unclosed — the conclusion stays Pending and an idle revisit
-            // re-runs this path, with the fold deduping by attempt identity.
             let! appended =
                 AgentJournal.appendAgent (StreamId.Session turn.SessionId) (Some attempt.ProviderRun) closed journal
 
@@ -362,7 +313,7 @@ module ReviewerWorkflow =
             | Error _ -> ()
         }
 
-    /// REVIEW-013/017: append the closure fact at turn completion. Flat by
+    /// Append the closure fact at turn completion. Flat by
     /// construction — each decision is a single top-level match.
     let private appendAttemptClosed (journal: AgentJournal option) (turn: ReconciledTurn) : Task =
         match closedAttemptEvidence journal turn with
@@ -395,9 +346,6 @@ module ReviewerWorkflow =
 
     /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
     /// XTrace terminal segment, close the carried attempt, and report.
-    /// `allowToolOnlyFallback` lets a review protocol whose physical contract is
-    /// one typed `judge` call report a tool-only judgement terminal without
-    /// inventing an extra prose round.
     let private completeReviewer
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
@@ -405,25 +353,16 @@ module ReviewerWorkflow =
         (allowToolOnlyFallback: bool)
         : Task =
         task {
-            // COMPANION-003: the terminal text is this turn's formal text plus
-            // host-visible reasoning — the XTrace terminal segment.
             let sessionWide = CompletedTurnClassifier.partsSessionText turn.Parts
 
             let sessionWideText =
                 if not (String.IsNullOrWhiteSpace sessionWide) then
                     sessionWide
                 elif allowToolOnlyFallback then
-                    // The typed judge delivery is already durable review evidence;
-                    // terminal reporting only needs a non-empty physical completion
-                    // value. This does not mint a verdict or a Finality witness.
                     "Review judgement submitted."
                 else
                     sessionWide
 
-            // REVIEW-006: nothing is inferred here. Completed confirmation is
-            // written only by the direct Finality CE; this path reports the turn.
-            // PROMPT-008: the Role comes from the reconciled turn, and there is no
-            // default.
             match turn.Role with
             | None ->
                 eventPort.NotifyTerminal
@@ -445,73 +384,13 @@ module ReviewerWorkflow =
                 return! reportResolvedReviewerRun eventPort journal turn runResult
         }
 
-    let private reportContinuationFailure
-        (eventPort: IEventObservationPort)
-        (turn: ReconciledTurn)
-        (outcome: Result<unit, string>)
-        =
-        match outcome with
-        | Error reason ->
-            eventPort.NotifyTerminal
-                turn.SessionId
-                (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
-            |> ignore
-        | Ok() -> ()
-
-    let private observeProcessReview
-        (continuationPort: ReviewerContinuationPort)
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        (reviewerKey: string)
-        : Task =
-        match ReviewerEvidence.classifyNeed journal reviewerKey with
-        | ReviewerEvidence.Need.NotProcessReview -> AsyncSupport.completedTask ()
-        | ReviewerEvidence.Need.EnsureVerdictSubmitted ->
-            task {
-                let! outcome =
-                    ReviewerContinuation.ensureVerdictSubmitted continuationPort journal turn.SessionId reviewerKey
-
-                reportContinuationFailure eventPort turn outcome
-            }
-            :> Task
-        | ReviewerEvidence.Need.CompleteProcessReview -> completeReviewer eventPort journal turn true
-
-    /// REVIEW-ASSURANCE-009: process review is explicitly judge-only. If stable
-    /// idle arrives after its verdict is durable, close that physical turn here
-    /// instead of entering generic missing-final-report repair. `false` leaves
-    /// ordinary routing in ownership of every other idle occasion.
-    let tryCompleteProcessReviewAtIdle
-        (eventPort: IEventObservationPort)
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        (reviewerKey: string)
-        : Task<bool> =
-        let resolveIdleDisposition () =
-            match ReviewerEvidence.processIdleDisposition journal reviewerKey with
-            | ReviewerEvidence.ProcessIdleDisposition.OrdinaryRepair -> Task.FromResult false
-            | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview ->
-                task {
-                    do! completeReviewer eventPort journal turn true
-                    return true
-                }
-
-        if ReviewJudgementInbox.isOwned turn.SessionId then
-            Task.FromResult false
-        else
-            resolveIdleDisposition ()
-
     /// Physical terminal observer. Active Finality reviewers are owned by the
-    /// direct ReviewBarrierWorkflow CE, so this function only reports their turn;
-    /// it never selects challenge/confirmation work from durable state.
+    /// direct ReviewBarrierWorkflow CE, so this function reports their turn.
     let observe
-        (continuationPort: ReviewerContinuationPort)
+        (_continuationPort: ReviewerContinuationPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
-        (reviewerKey: string)
+        (_reviewerKey: string)
         : Task =
-        if ReviewJudgementInbox.isOwned turn.SessionId then
-            completeReviewer eventPort journal turn true
-        else
-            observeProcessReview continuationPort eventPort journal turn reviewerKey
+        completeReviewer eventPort journal turn true

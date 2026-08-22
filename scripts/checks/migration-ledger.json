@@ -478,7 +478,7 @@
         }
       ],
       "production_callers_to_migrate": [
-        "src/Wanxiangshu/Mission/Review/TodoProcess.fs"
+        "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs"
       ],
       "proofs": [
         "requirements/obligation-ledger/tests/magic-todo.test.mjs",
@@ -892,10 +892,9 @@
     {
       "id": "mission-obligation-keep",
       "primary_owner": "obligation-ledger",
-      "intent": "Obligation ledger remaining slice: magic todo membrane/locality/projection/codec surfaces, process review and todo process",
+      "intent": "Obligation ledger remaining slice: magic todo membrane/locality/projection/codec surfaces",
       "files": [
         "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/After.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/FinalityCohort.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
@@ -910,11 +909,8 @@
         "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/MagicTodoHostSurface.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs",
         "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
-        "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs",
-        "src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs",
-        "src/Wanxiangshu/Mission/Review/TodoProcess.fs"
+        "src/Wanxiangshu/Mission/Obligation/Todo/Surface.fs"
       ],
       "classification": "KEEP",
       "publishes": [
@@ -1039,27 +1035,8 @@
     }
   ],
   "debt_face": {
-    "cross_callback_pc_exemptions": {
-      "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs::armed": {
-        "category": "physical",
-        "kind": "quiescence/waiter 类物理能力豁免",
-        "disposition": "owner-local closure 阶段裁决去留"
-      }
-    },
-    "missing_baseline_reconciliation": [
-      {
-        "gate": "provider-prose-ownership",
-        "task": "默认基线文件当前不存在，需在对应 owner closure 时用 gate 的 --generate 模式运行确认当前债务为零并记录"
-      },
-      {
-        "gate": "js-boundary-gate",
-        "task": "默认基线文件当前不存在，需在对应 owner closure 时用 gate 的 --generate 模式运行确认当前债务为零并记录"
-      },
-      {
-        "gate": "provider-leak-gate",
-        "task": "默认基线文件当前不存在，需在对应 owner closure 时用 gate 的 --generate 模式运行确认当前债务为零并记录"
-      }
-    ],
+    "cross_callback_pc_exemptions": {},
+    "missing_baseline_reconciliation": [],
     "prompt_depth_baseline": {
       "count": 22,
       "scale": "11 角色 × 2 语言",

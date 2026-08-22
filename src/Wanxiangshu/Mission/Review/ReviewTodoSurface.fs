@@ -9,12 +9,9 @@ open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection
-open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.Persistence.Journal
 
-/// Review-owned process-review membrane. Magic Todo's typed fact codec and
-/// TodoProcessReviewProgram remain internal; tests use JSON-shaped fact payloads
-/// and receive named outcomes, never Fable unions or maps.
+/// Review-owned Magic Todo surface for integration tests.
 [<RequireQualifiedAccess>]
 module ReviewTodoSurface =
 
@@ -46,30 +43,14 @@ module ReviewTodoSurface =
     let private blobDigestOf value = BlobDigest.create (text value)
     let private lifeOf value = ManagerLifeId.create (text value)
     let private writeOf value = TodoWriteId.create (text value)
-    let private reviewOf value = TodoReviewId.create (text value)
-    let private dedicatedOf value = DedicatedReviewerId.create (text value)
     let private sessionOf value = SessionId.create (text value)
     let private callOf value = ToolCallId.create (text value)
-    let private runOf value = ProviderRunIdentity.create (text value)
-
-    let private verdictResult value : Result<ProcessReviewVerdict, string> =
-        match text value with
-        | "PERFECT"
-        | "Perfect" -> Ok ProcessReviewVerdict.Perfect
-        | "REVISE"
-        | "Revise" -> Ok ProcessReviewVerdict.Revise
-        | unknown -> Error(sprintf "unknown review verdict: %s" unknown)
 
     let private physicalEvidenceResult value : Result<PhysicalSuccessEvidence, string> =
         match text value with
         | "RecoveredCompletedToolPart" -> Ok PhysicalSuccessEvidence.RecoveredCompletedToolPart
         | "LiveAfterSuccess" -> Ok PhysicalSuccessEvidence.LiveAfterSuccess
         | unknown -> Error(sprintf "unknown physical success evidence: %s" unknown)
-
-    let private verdictOf value =
-        match verdictResult value with
-        | Ok verdict -> verdict
-        | Error error -> invalidArg "Verdict" error
 
     let private physicalEvidenceOf value =
         match physicalEvidenceResult value with
@@ -107,41 +88,6 @@ module ReviewTodoSurface =
                   SemanticVersion = strField payload "SemanticVersion" }
 
             MagicTodoFact.TodoWriteAccepted accepted
-        | "DedicatedTodoReviewerEnlisted" ->
-            let enlisted: DedicatedTodoReviewerEnlisted =
-                { ManagerLifeId = lifeOf (field payload "ManagerLifeId")
-                  DedicatedReviewerId = dedicatedOf (field payload "DedicatedReviewerId")
-                  ReviewerSessionId = sessionOf (field payload "ReviewerSessionId") }
-
-            MagicTodoFact.DedicatedTodoReviewerEnlisted enlisted
-        | "TodoProcessReviewAssigned" ->
-            let assigned: TodoProcessReviewAssigned =
-                { ManagerLifeId = lifeOf (field payload "ManagerLifeId")
-                  TodoWriteId = writeOf (field payload "TodoWriteId")
-                  TodoReviewId = reviewOf (field payload "TodoReviewId")
-                  DedicatedReviewerId = dedicatedOf (field payload "DedicatedReviewerId")
-                  ReviewerSessionId = sessionOf (field payload "ReviewerSessionId")
-                  ReviewWorkStartCursor = cursorOf (field payload "ReviewWorkStartCursor")
-                  ManagerReviewFrontier = cursorOf (field payload "ManagerReviewFrontier") }
-
-            MagicTodoFact.TodoProcessReviewAssigned assigned
-        | "TodoReviewConcluded" ->
-            let concluded: TodoReviewConcluded =
-                { ManagerLifeId = lifeOf (field payload "ManagerLifeId")
-                  TodoWriteId = writeOf (field payload "TodoWriteId")
-                  TodoReviewId = reviewOf (field payload "TodoReviewId")
-                  DedicatedReviewerId = dedicatedOf (field payload "DedicatedReviewerId")
-                  ReviewerSessionId = sessionOf (field payload "ReviewerSessionId")
-                  Verdict = verdictOf (field payload "Verdict")
-                  WorkRecordRef = blobRefOf (field payload "WorkRecordRef")
-                  WorkRecordDigest = blobDigestOf (field payload "WorkRecordDigest")
-                  SettledTodoRef = blobRefOf (field payload "SettledTodoRef")
-                  SettledTodoDigest = blobDigestOf (field payload "SettledTodoDigest")
-                  ReviewerRecordFrontier = cursorOf (field payload "ReviewerRecordFrontier")
-                  ProviderRunId = runOf (field payload "ProviderRunId")
-                  ToolCallId = callOf (field payload "ToolCallId") }
-
-            MagicTodoFact.TodoReviewConcluded concluded
         | other -> failwith $"ReviewTodoSurface: unknown Magic Todo fact '{other}'"
 
     let private factValidation (caseName: string) (payload: obj) : Result<unit, string> =
@@ -149,7 +95,6 @@ module ReviewTodoSurface =
         | "TodoWriteAccepted" ->
             physicalEvidenceResult (field payload "PhysicalSuccessEvidence")
             |> Result.map (fun _ -> ())
-        | "TodoReviewConcluded" -> verdictResult (field payload "Verdict") |> Result.map (fun _ -> ())
         | _ -> Ok()
 
     let private encodedFact (caseName: string) (payload: obj) : string =
@@ -167,13 +112,8 @@ module ReviewTodoSurface =
         let life = ManagerLifeId.create lifeId
         let call = ToolCallId.create callId
         let write = MagicTodo.todoWriteId hash life call
-        let review = MagicTodo.todoReviewId hash life write
-        let dedicated = MagicTodo.dedicatedReviewerId hash life
 
-        box
-            {| todoWriteId = TodoWriteId.value write
-               todoReviewId = TodoReviewId.value review
-               dedicatedReviewerId = DedicatedReviewerId.value dedicated |}
+        box {| todoWriteId = TodoWriteId.value write |}
 
     let newProjection () = MagicTodoProjectionSurface.create ()
 
@@ -182,99 +122,3 @@ module ReviewTodoSurface =
 
     let view (projection: MagicTodoProjectionHandle) (lifeId: string) : obj =
         MagicTodoProjectionSurface.view projection lifeId
-
-    let appendFact
-        (handle: JournalHandle)
-        (sessionId: string)
-        (providerRun: obj)
-        (caseName: string)
-        (payload: obj)
-        : Task<obj> =
-        ObligationJournalSurface.appendMagicTodo handle sessionId providerRun (encodedFact caseName payload)
-
-    let tryConclude (handle: JournalHandle) (lifeId: string) (writeId: string) : Task<obj> =
-        task {
-            let! outcome =
-                TodoProcessReviewProgram.tryConclude
-                    handle.Journal
-                    (ManagerLifeId.create lifeId)
-                    (TodoWriteId.create writeId)
-
-            return
-                match outcome with
-                | TodoProcessReviewProgram.ConcludeOutcome.Concluded -> box {| status = "Concluded" |}
-                | TodoProcessReviewProgram.ConcludeOutcome.Pending reason ->
-                    box
-                        {| status = "Pending"
-                           reason = reason |}
-                | TodoProcessReviewProgram.ConcludeOutcome.Failed reason -> box {| status = "Failed"; reason = reason |}
-        }
-
-    let producerPresence (handle: JournalHandle) (lifeId: string) (writeId: string) : obj =
-        match
-            TodoProcessReviewProgram.producerPresence
-                handle.Journal
-                (ManagerLifeId.create lifeId)
-                (TodoWriteId.create writeId)
-        with
-        | TodoProcessReviewProgram.ProducerPresence.Present -> box {| status = "Present" |}
-        | TodoProcessReviewProgram.ProducerPresence.Absent reason -> box {| status = "Absent"; reason = reason |}
-
-    let processIdleDisposition (handle: JournalHandle) (reviewerSessionId: string) : string =
-        match ReviewerEvidence.processIdleDisposition (Some handle.Journal) reviewerSessionId with
-        | ReviewerEvidence.ProcessIdleDisposition.OrdinaryRepair -> "OrdinaryRepair"
-        | ReviewerEvidence.ProcessIdleDisposition.CompleteToolOnlyProcessReview -> "CompleteToolOnlyProcessReview"
-
-    let requestKindNames () = [| "TodoProcess"; "FinalityTerminal" |]
-
-    let needsEnsureReview (accepted: bool) (concluded: bool) =
-        MagicTodoProcessReview.needsEnsureReview accepted concluded
-
-    let renderAssignmentUserMessage (preamble: string) (request: obj) : string =
-        let obligations value =
-            if isNull value then
-                []
-            else
-                let values: obj array = unbox<obj array> value
-
-                values
-                |> Array.toList
-                |> List.map (fun item ->
-                    let horizonText = strField item "horizon"
-
-                    let horizon =
-                        if String.IsNullOrWhiteSpace horizonText then
-                            MagicTodo.ObligationHorizon.Near
-                        else
-                            horizonText
-                            |> MagicTodo.ObligationHorizon.tryParse
-                            |> Option.defaultWith (fun () -> invalidArg "horizon" "expected near, mid, or far")
-
-                    { Name = strField item "name"
-                      Horizon = horizon
-                      Work = strField item "work" })
-
-        MagicTodoProcessReview.renderAssignmentUserMessage
-            preamble
-            { TodoReviewId = TodoReviewId.create (strField request "TodoReviewId")
-              TodoWriteId = TodoWriteId.create (strField request "TodoWriteId")
-              ManagerLifeId = ManagerLifeId.create (strField request "ManagerLifeId")
-              OpeningRaw = strField request "OpeningRaw"
-              ManagerCheckpointLwr = strField request "ManagerCheckpointLwr"
-              EffectivePlanComplete = boolField request "EffectivePlanComplete"
-              OldTodo = obligations (field request "OldTodo")
-              ProposedTodo = obligations (field request "ProposedTodo") }
-
-    let awaitConsumableReview (handle: JournalHandle) (lifeId: string) (writeId: string) : Task<obj> =
-        task {
-            let! result =
-                TodoProcessReviewProgram.awaitConsumableReview
-                    handle.Journal
-                    (ManagerLifeId.create lifeId)
-                    (TodoWriteId.create writeId)
-
-            return
-                match result with
-                | Ok() -> box {| ok = true |}
-                | Error error -> box {| ok = false; error = error |}
-        }

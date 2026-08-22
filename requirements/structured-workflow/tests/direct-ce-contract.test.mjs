@@ -32,7 +32,7 @@ test('WHAT[STRUCTURED-WORKFLOW-002] FLOW_006_second_runtime_patterns_are_rejecte
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-017] FLOW_017_composition_keeps_domain_results_and_rejects_child_program_counters', () => {
+test('WHAT[STRUCTURED-WORKFLOW-006] FLOW_017_composition_keeps_domain_results_and_rejects_child_program_counters', () => {
   const composed = [
     'module ParentWorkflow',
     'let run child = task {',

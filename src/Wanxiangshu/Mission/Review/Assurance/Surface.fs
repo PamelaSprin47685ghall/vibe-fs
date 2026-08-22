@@ -24,15 +24,20 @@ open Wanxiangshu.OpenCode
 [<RequireQualifiedAccess>]
 module ReviewAssuranceSurface =
 
-    type private GuardHandle(current: ReviewGuardProjection) =
+    type GuardHandle(current: ReviewGuardProjection) =
         member _.Current = current
 
         static member Create(current: ReviewGuardProjection) = GuardHandle(current)
 
-    type private RequirementsHandle(current: ReviewRequirementProjection) =
+    type RequirementsHandle(current: ReviewRequirementProjection) =
         member _.Current = current
 
         static member Create(current: ReviewRequirementProjection) = RequirementsHandle(current)
+
+    type ConfirmedReviewWitnessHandle(witness: ConfirmedReviewWitness) =
+        member _.Witness = witness
+
+        static member Create(witness: ConfirmedReviewWitness) = ConfirmedReviewWitnessHandle(witness)
 
     let private text (value: obj) =
         if isNull value then "" else string value
@@ -133,11 +138,6 @@ module ReviewAssuranceSurface =
           ProviderRun = runOf (firstField value [| "ProviderRun"; "run" |])
           ToolCallId = callOf (firstField value [| "ToolCallId"; "call" |]) }
 
-    let private guardOf (value: obj) =
-        match value with
-        | :? GuardHandle as handle -> handle.Current
-        | _ -> invalidArg "value" "ReviewAssuranceSurface: expected a review guard handle"
-
     let private guardProjectionView (guard: ReviewGuardProjection) : obj =
         let barrier =
             guard.CurrentBarrierId |> Option.map ReviewBarrierId.value |> Option.toObj
@@ -216,27 +216,15 @@ module ReviewAssuranceSurface =
         | None -> null
         | Some witness -> witnessStateView witness
 
-    let private extractWitness (value: obj) : ReviewWitness =
-        if isNull value then
-            ReviewWitness.NoReview
-        elif value :? GuardHandle then
-            (value :?> GuardHandle).Current.Witness
-        else
-            let inner = field value "Witness"
+    let isConfirmed (witness: obj) : bool =
+        match witness with
+        | :? GuardHandle as guard -> ReviewWitness.isConfirmed guard.Current.Witness
+        | _ -> reviewWitnessOf witness |> ReviewWitness.isConfirmed
 
-            if not (isNull inner) then
-                if inner :? GuardHandle then
-                    (inner :?> GuardHandle).Current.Witness
-                else
-                    reviewWitnessOf inner
-            else
-                reviewWitnessOf value
-
-    let isConfirmed (witness: obj) =
-        extractWitness witness |> ReviewWitness.isConfirmed
-
-    let isRevision (witness: obj) =
-        extractWitness witness |> ReviewWitness.isRevision
+    let isRevision (witness: obj) : bool =
+        match witness with
+        | :? GuardHandle as guard -> ReviewWitness.isRevision guard.Current.Witness
+        | _ -> reviewWitnessOf witness |> ReviewWitness.isRevision
 
     let private witnessPublicView (witness: ReviewWitness) : obj =
         match witness with
@@ -266,11 +254,11 @@ module ReviewAssuranceSurface =
                    firstPhysical = PhysicalUserMessageId.value confirmed.FirstPhysicalUserMessageId
                    secondPhysical = PhysicalUserMessageId.value confirmed.SecondPhysicalUserMessageId |}
 
-    let readWitness (witness: obj) =
-        extractWitness witness |> witnessPublicView
+    let readWitness (witness: obj) : obj =
+        reviewWitnessOf witness |> witnessPublicView
 
-    let confirmedWitnessRecord (witness: obj) =
-        match extractWitness witness with
+    let confirmedWitnessRecord (witness: obj) : obj =
+        match reviewWitnessOf witness with
         | ReviewWitness.Confirmed confirmed ->
             box
                 {| BarrierId = ReviewBarrierId.value confirmed.BarrierId
@@ -283,30 +271,20 @@ module ReviewAssuranceSurface =
 
     let noReview: obj = box {| state = "NoReview" |}
 
-    let gitTreeHash (witness: obj) =
-        extractWitness witness
+    let gitTreeHash (witness: obj) : string =
+        reviewWitnessOf witness
         |> ReviewWitness.gitTreeHash
         |> Option.map GitTreeHash.value
         |> Option.toObj
 
-    let confirmedReviewer (witness: obj) =
-        extractWitness witness
+    let confirmedReviewer (witness: obj) : string =
+        reviewWitnessOf witness
         |> ReviewWitness.confirmedReviewer
         |> Option.map SessionId.value
         |> Option.toObj
 
-    let isValidForTree (tree: string) (witness: obj) =
-        ReviewWitness.isValidForTree (treeOf (box tree)) (extractWitness witness)
-
-    type private ConfirmedReviewWitnessHandle(witness: ConfirmedReviewWitness) =
-        member _.Witness = witness
-
-        static member Create(witness: ConfirmedReviewWitness) = ConfirmedReviewWitnessHandle(witness)
-
-    let private confirmedReviewWitnessOf (value: obj) : ConfirmedReviewWitness =
-        match value with
-        | :? ConfirmedReviewWitnessHandle as handle -> handle.Witness
-        | _ -> invalidArg "value" "ReviewAssuranceSurface: expected a confirmed review witness handle"
+    let isValidForTree (tree: string) (witness: obj) : bool =
+        ReviewWitness.isValidForTree (treeOf (box tree)) (reviewWitnessOf witness)
 
     let projectConfirmedReview (lifeId: string) (requestId: string) (tree: string) (memberWitnesses: obj array) : obj =
         let members =
@@ -318,7 +296,7 @@ module ReviewAssuranceSurface =
                 |> List.map (fun item ->
                     let reviewer = sessionOf (firstField item [| "reviewer"; "ReviewerSessionId" |])
                     let barrier = barrierOf (firstField item [| "barrier"; "BarrierId" |])
-                    let witness = extractWitness (firstField item [| "witness"; "Witness" |])
+                    let witness = reviewWitnessOf (firstField item [| "witness"; "Witness" |])
                     (reviewer, barrier, witness))
 
         match
@@ -331,21 +309,17 @@ module ReviewAssuranceSurface =
         | Ok witness ->
             box
                 {| ok = true
-                   witness = ConfirmedReviewWitnessHandle.Create witness :> obj |}
+                   witness = ConfirmedReviewWitnessHandle.Create witness |}
         | Error error -> box {| ok = false; error = error |}
 
-    let confirmedReviewWitnessTree (witness: obj) : string =
-        let typed = confirmedReviewWitnessOf witness
-        GitTreeHash.value (ConfirmedReviewWitness.gitTreeHash typed)
+    let confirmedReviewWitnessTree (witness: ConfirmedReviewWitnessHandle) : string =
+        GitTreeHash.value (ConfirmedReviewWitness.gitTreeHash witness.Witness)
 
-    let isConfirmedReviewValidForTree (tree: string) (witness: obj) : bool =
-        let typed = confirmedReviewWitnessOf witness
-        ReviewCandidate.isWitnessValidForTree (treeOf (box tree)) typed
+    let isConfirmedReviewValidForTree (tree: string) (witness: ConfirmedReviewWitnessHandle) : bool =
+        ReviewCandidate.isWitnessValidForTree (treeOf (box tree)) witness.Witness
 
-    let verifyCandidate (candidateTree: string) (witness: obj) : obj =
-        let typed = confirmedReviewWitnessOf witness
-
-        match ReviewCandidate.verifyCandidate (treeOf (box candidateTree)) typed with
+    let verifyCandidate (candidateTree: string) (witness: ConfirmedReviewWitnessHandle) : obj =
+        match ReviewCandidate.verifyCandidate (treeOf (box candidateTree)) witness.Witness with
         | Ok() -> box {| ok = true |}
         | Error(CandidateVerificationFailure.StaleWitness(curr, expected)) ->
             box
@@ -359,25 +333,25 @@ module ReviewAssuranceSurface =
                    error = "IncompleteCohort"
                    reason = reason |}
 
-    let emptyGuard () : obj =
-        GuardHandle.Create ReviewProjection.empty :> obj
+    let emptyGuard () : GuardHandle =
+        GuardHandle.Create ReviewProjection.empty
 
-    let startBarrier (manager: string) (barrier: string) (tree: string) (current: obj) : obj =
+    let startBarrier (manager: string) (barrier: string) (tree: string) (current: GuardHandle) : GuardHandle =
         let next =
             ReviewProjection.startBarrier
                 (sessionOf (box manager))
                 (barrierOf (box barrier))
                 (treeOf (box tree))
-                (guardOf current)
+                current.Current
 
-        GuardHandle.Create next :> obj
+        GuardHandle.Create next
 
-    let applyVerdict (attempt: obj) (verdict: string) (current: obj) : obj =
-        match ReviewProjection.applyVerdict (attemptOf attempt) (verdictOf (box verdict)) (guardOf current) with
+    let applyVerdict (attempt: obj) (verdict: string) (current: GuardHandle) : obj =
+        match ReviewProjection.applyVerdict (attemptOf attempt) (verdictOf (box verdict)) current.Current with
         | Ok next ->
             box
                 {| ok = true
-                   value = GuardHandle.Create next :> obj |}
+                   value = GuardHandle.Create next |}
         | Error rejection ->
             box
                 {| ok = false
@@ -389,7 +363,7 @@ module ReviewAssuranceSurface =
         (secondPhysical: string)
         (first: obj)
         (second: obj)
-        (current: obj)
+        (current: GuardHandle)
         : obj =
         match
             ReviewProjection.applyConfirmedWitness
@@ -398,51 +372,44 @@ module ReviewAssuranceSurface =
                 (physicalOf (box secondPhysical))
                 (witnessOf first)
                 (witnessOf second)
-                (guardOf current)
+                current.Current
         with
         | Ok next ->
             box
                 {| ok = true
-                   value = GuardHandle.Create next :> obj |}
+                   value = GuardHandle.Create next |}
         | Error rejection ->
             box
                 {| ok = false
                    error = rejectionName rejection |}
 
-    let guardView (current: obj) = guardProjectionView (guardOf current)
+    let guardView (current: GuardHandle) : obj = guardProjectionView current.Current
 
-    let guardWitness (current: obj) =
-        guardOf current |> fun guard -> witnessPublicView guard.Witness
+    let guardWitness (current: GuardHandle) : obj =
+        witnessPublicView current.Current.Witness
 
-    let hasObservedAttempt (attempt: obj) (current: obj) =
-        ReviewProjection.hasObservedAttempt (attemptOf attempt) (guardOf current)
+    let hasObservedAttempt (attempt: obj) (current: GuardHandle) : bool =
+        ReviewProjection.hasObservedAttempt (attemptOf attempt) current.Current
 
-    let satisfiesGuard (tree: string) (current: obj) =
-        ReviewProjection.satisfiesGuard (treeOf (box tree)) (guardOf current)
+    let satisfiesGuard (tree: string) (current: GuardHandle) : bool =
+        ReviewProjection.satisfiesGuard (treeOf (box tree)) current.Current
 
-    let requirementsEmpty () : obj =
-        RequirementsHandle.Create ReviewRequirementProjection.empty :> obj
+    let requirementsEmpty () : RequirementsHandle =
+        RequirementsHandle.Create ReviewRequirementProjection.empty
 
-    let requirementsOf (value: obj) =
-        match value with
-        | :? RequirementsHandle as handle -> handle.Current
-        | _ -> invalidArg "value" "ReviewAssuranceSurface: expected a requirements handle"
-
-    let addRequirement (session: string) (authorityRoot: string) (current: obj) : obj =
+    let addRequirement (session: string) (authorityRoot: string) (current: RequirementsHandle) : RequirementsHandle =
         ReviewRequirementProjection.addRequirement
             (sessionOf (box session))
             (AuthorityRootUserMessageId.create (box authorityRoot |> text))
-            (requirementsOf current)
+            current.Current
         |> RequirementsHandle.Create
-        |> fun handle -> handle :> obj
 
-    let clearRequirements (providerRun: string) (current: obj) : obj =
-        ReviewRequirementProjection.clearOnConfirmation (runOf (box providerRun)) (requirementsOf current)
+    let clearRequirements (providerRun: string) (current: RequirementsHandle) : RequirementsHandle =
+        ReviewRequirementProjection.clearOnConfirmation (runOf (box providerRun)) current.Current
         |> RequirementsHandle.Create
-        |> fun handle -> handle :> obj
 
-    let requirementsView (current: obj) : obj =
-        let value = requirementsOf current
+    let requirementsView (current: RequirementsHandle) : obj =
+        let value = current.Current
 
         box
             {| humanPromptInputs =

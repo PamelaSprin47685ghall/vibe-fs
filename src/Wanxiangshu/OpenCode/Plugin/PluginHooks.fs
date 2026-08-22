@@ -144,17 +144,7 @@ module PluginHooks =
             // TODO-002 / HOST-017..025: the builtin todowrite stays the physical
             // executor while this three-hook membrane owns provider schema,
             // durable checkpoint admission, and accepted-result enrichment.
-            let magicTodo =
-                MagicTodoHostHooks.create
-                    journal
-                    snapshotOpt
-                    (Some(
-                        DedicatedTodoReviewerRuntime.port
-                            (PtyTiming.nodeTimerPort ())
-                            sessionPort
-                            snapshotOpt
-                            gitTreePort
-                    ))
+            let magicTodo = MagicTodoHostHooks.create journal snapshotOpt
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                 magicTodo.Definition toolInput toolOutput

@@ -31,14 +31,14 @@ const VOCABULARY_SURFACES = {
   'Mission/Manager/Idle': ['encourageLabor'],
   'Mission/Manager/JobHandoff': ['completeIfTransferred'],
   'Mission/Review/Judgement/Continuation': ['ensurePerfectConfirmed', 'ensureVerdictSubmitted'],
-  'Mission/Review/Judgement/Evidence': ['classifyNeed'],
+  'Mission/Review/Judgement/Evidence': ['continuationOpen'],
   'Participant/Provider/Attempt/Fallback/Workflow': ['continueAfterConfirmedFailure'],
 }
 
 /** DSL-013 rejected shapes: implementation-action names, not business promises. */
 const REJECTED_PREFIX = /^(execute|process|handle|do|retry|run|perform|with)[A-Z]/
 
-test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_named_vocabulary_surface_exists_in_Application', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] SW_011_named_vocabulary_surface_exists_in_Application', () => {
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
     const source = readSrc(`src/Wanxiangshu/${modulePath}.fs`)
     for (const name of names) {
@@ -51,7 +51,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_named_vocabulary_surface_exists_in_Ap
   }
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', () => {
+test('WHAT[STRUCTURED-WORKFLOW-007] SW_011_vocabulary_names_declare_business_promises_not_implementation_actions', () => {
   const bad = []
   for (const [modulePath, names] of Object.entries(VOCABULARY_SURFACES)) {
     for (const name of names) {
@@ -61,7 +61,7 @@ test('WHAT[STRUCTURED-WORKFLOW-011] SW_011_vocabulary_names_declare_business_pro
   assert.deepEqual(bad, [], 'vocabulary names must not be implementation-action labels')
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-013] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', () => {
+test('WHAT[STRUCTURED-WORKFLOW-008] SW_015_no_anonymous_middleware_framework_in_workflow_vocabulary', () => {
   // DSL-015: semantic decorators must be named Vocabulary or a named call
   // site. A global DecoratorBase / MiddlewarePipeline / IWorkflowDecorator
   // framework is banned. Assert the production vocabulary modules define no
@@ -79,8 +79,8 @@ test('WHAT[STRUCTURED-WORKFLOW-013] SW_015_no_anonymous_middleware_framework_in_
   assert.deepEqual(bad, [], bad.join('; '))
 })
 
-test('WHAT[STRUCTURED-WORKFLOW-012] every obligation-table vocabulary is a real production definition', () => {
-  // DSL-014 / STRUCTURED-WORKFLOW-012: compressed Semantic Vocabulary must be
+test('WHAT[STRUCTURED-WORKFLOW-007] every obligation-table vocabulary is a real production definition', () => {
+  // DSL-014 / STRUCTURED-WORKFLOW-007: compressed Semantic Vocabulary must be
   // backed by its own temporal/behavioral proof. The proof obligation table
   // (HOW §3.4) is that registration: each row names a compressed vocabulary
   // and what it must prove. The machine floor is that the table is not a

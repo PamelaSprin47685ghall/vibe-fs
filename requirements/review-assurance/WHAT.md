@@ -28,25 +28,25 @@ Finality 确认必须由单一工作流的调用顺序严格证明：在同一 R
 
 `judge` 工具投递必须携带当前物理执行绑定的 exact `PhysicalUserMessageId`；两次判断必须源于同一物理审查交互。缺少物理标识、来源不一致或调用未刷新均立即 fail closed。严禁使用 provider-input 文本摘要或扫描 transcript 来弥补因果标识缺失。
 
-## REVIEW-ASSURANCE-008: VerdictKnown 与 ConsumableReview 两段式
+## REVIEW-ASSURANCE-008: 终审裁决由 ReviewBarrierWorkflow Direct CE 独占驱动
 
-Reviewer 生成针对当前过程评审的持久化裁决即达到 `VerdictKnown`，立即决定业务 outcome，但不携带 WorkRecordRef，亦不单独构成可消费报告。当且仅当该裁决对应 frontier 的规范 `ProcessReviewLWR` 达成 record-ready，且在同一 Snapshot 内持久化 `TodoReviewConcluded` 时，才形成 `ConsumableReview`。下游 checkpoint 或终结 drain 仅可消费 `ConsumableReview`，严禁提前写入未完成的空壳结论。
+移除过程性评审后，审查裁决的生命周期与因果流转由 `ReviewBarrierWorkflow` 直接通过宿主语言 Direct CE 独占编排，不存在中间过程评审的排队或持久化过渡状态。下游终局流程仅消费已完成的双重确认证人。
 
-## REVIEW-ASSURANCE-009: record-ready 同 snapshot、排他 frontier、事件驱动与 interrupt fence
+## REVIEW-ASSURANCE-009: 审查尝试的排他 frontier 与中断收束
 
-record-ready 判定标准为「能否在同一 Journal snapshot 下物化出有效的规范 LWR」，frontier 采用排他边界（lastPart+1）。普通 reviewer turn 由 turn completion 冻结 frontier；对明确 judge-only 且由 Host 强制 interrupt 的 process-review terminal，matching `(ProviderRun, ToolCallId)` 的 durable `tool_result` 即为该 work unit 的最后合法 part，必须在 interrupt 前以其 `cursor+1` 幂等冻结 closure。该 judgement 一旦 durable 提交，当前 Reviewer Session 必须建立 process-local interrupt fence；后续 process-review assignment 可以 durable 建立，但其物理 `SendPrompt` 必须等待该 fence，严禁提前进入 Host `prompt_async` 队列。只有 `InterruptAttempt` 成功返回后 fence 才解除并主动发出后续 assignment；interrupt 失败则 fence fail closed。旧版本或崩溃留下的 VerdictKnown-but-unclosed 仅可由同一 durable tool-result 恢复 frontier，严禁使用当前 session head。等待机制严格依赖事件驱动唤醒，禁止使用定时器、休眠或轮询。工作流必须先采样 revision，再执行就绪判定，最后发起带 revision 锚点的因果等待。等待器中断或崩溃后，基于持久事实与冻结 frontier 幂等重建并继续等待。
+record-ready 判定标准为「能否在同一 Journal snapshot 下物化出有效的规范 LWR」，frontier 采用排他边界（lastPart+1）。Reviewer turn 由 turn completion 冻结 frontier；对明确 judge-only 且由 Host 强制 interrupt 的 terminal 裁决，matching `(ProviderRun, ToolCallId)` 的 durable `tool_result` 即为该 work unit 的最后合法 part，必须在 interrupt 前以其 `cursor+1` 幂等冻结 closure。崩溃留下的 VerdictKnown-but-unclosed 仅可由同一 durable tool-result 恢复 frontier，严禁使用当前 session head。等待机制严格依赖事件驱动唤醒，禁止使用定时器、休眠或轮询。工作流基于持久事实与冻结 frontier 幂等重建并继续等待。
 
 ## REVIEW-ASSURANCE-010: 基础设施失败永远不是 PERFECT 或 REVISE
 
-Reviewer 创建失败、分配异常、报告物化失败、协议破坏及超时等故障属于基础设施异常，绝对不得被折叠或记录为业务 PERFECT 或 REVISE。发生此类故障时，已派生的评审义务保持未决状态，系统按故障类别执行重试或立即输出诊断并终止进程，严禁制造虚假的评审结算。
+Reviewer 创建失败、分配异常、报告物化失败、协议破坏及超时等故障属于基础设施异常，绝对不得被折叠或记录为业务 PERFECT 或 REVISE。发生此类故障时，系统按故障类别执行重试或立即输出诊断并终止进程，严禁制造虚假的评审结算。
 
-## REVIEW-ASSURANCE-011: process verdict 与 terminal witness 代数分离
+## REVIEW-ASSURANCE-011: 终审 dual-PERFECT 证据链独立自包含
 
-过程评审的裁决与终审 dual-PERFECT witness 在代数上严格分离，互不计数：过程 PERFECT 不计入终审的两次 PERFECT，过程 REVISE 亦不构成终审拒绝事实。即使同一 Dedicated Reviewer 会话被纳入终局审查，也必须在新的 barrier 下重新建立完整的 dual-PERFECT 证据链。
+终局审查的 dual-PERFECT witness 在代数上严格自包含。每个 Reviewer 会话在对应 barrier 下独立建立完整的 dual-PERFECT 证据链，不依赖任何外部过程状态。
 
 ## REVIEW-ASSURANCE-012: 可消费证据 request-range bounded
 
-可消费审查证据的唯一合法形式为 request-range bounded 的规范 LWR。每个用途均绑定冻结的区间范围，严禁抓取当前会话的最新 head 冒充有界记录，亦禁止将历史各轮过程记录未经界定地塞入终审报告。
+可消费审查证据的唯一合法形式为 request-range bounded 的规范 LWR。每个用途均绑定冻结的区间范围，严禁抓取当前会话的最新 head 冒充有界记录，亦禁止将未界定的历史记录塞入终审报告。
 
 ## REVIEW-ASSURANCE-013: review requirement 以 Authority Root 标识
 

@@ -30,30 +30,6 @@ module MagicTodoProjectionCodecSurface =
                    case = "TodoWriteAccepted"
                    planCompleteDeclared = null
                    normalized = MagicTodoFactCodec.encode (MagicTodoFact.TodoWriteAccepted accepted) |}
-        | Ok(MagicTodoFact.DedicatedTodoReviewerEnlisted fact) ->
-            box
-                {| ok = true
-                   case = "DedicatedTodoReviewerEnlisted"
-                   planCompleteDeclared = null
-                   normalized = MagicTodoFactCodec.encode (MagicTodoFact.DedicatedTodoReviewerEnlisted fact) |}
-        | Ok(MagicTodoFact.DedicatedTodoReviewerReplaced fact) ->
-            box
-                {| ok = true
-                   case = "DedicatedTodoReviewerReplaced"
-                   planCompleteDeclared = null
-                   normalized = MagicTodoFactCodec.encode (MagicTodoFact.DedicatedTodoReviewerReplaced fact) |}
-        | Ok(MagicTodoFact.TodoProcessReviewAssigned fact) ->
-            box
-                {| ok = true
-                   case = "TodoProcessReviewAssigned"
-                   planCompleteDeclared = null
-                   normalized = MagicTodoFactCodec.encode (MagicTodoFact.TodoProcessReviewAssigned fact) |}
-        | Ok(MagicTodoFact.TodoReviewConcluded fact) ->
-            box
-                {| ok = true
-                   case = "TodoReviewConcluded"
-                   planCompleteDeclared = null
-                   normalized = MagicTodoFactCodec.encode (MagicTodoFact.TodoReviewConcluded fact) |}
         | Ok(MagicTodoFact.LegacyTodoSeedAdopted fact) ->
             box
                 {| ok = true

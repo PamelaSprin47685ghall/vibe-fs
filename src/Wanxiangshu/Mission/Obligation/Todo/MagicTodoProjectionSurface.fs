@@ -23,25 +23,11 @@ module private MagicTodoProjectionEncoding =
             box
                 {| code = "PreparedMissingForAccept"
                    todoWriteId = writeId |}
-        | MagicTodoFoldRejection.OutstandingReviewBeforePrepare writeId ->
-            box
-                {| code = "OutstandingReviewBeforePrepare"
-                   todoWriteId = writeId |}
         | MagicTodoFoldRejection.IdentityCorruption field ->
             box
                 {| code = "IdentityCorruption"
                    field = field |}
-        | MagicTodoFoldRejection.AssignmentWithoutAccepted writeId ->
-            box
-                {| code = "AssignmentWithoutAccepted"
-                   todoWriteId = writeId |}
-        | MagicTodoFoldRejection.ConcludedWithoutAccepted writeId ->
-            box
-                {| code = "ConcludedWithoutAccepted"
-                   todoWriteId = writeId |}
         | MagicTodoFoldRejection.LegacySeedAfterCheckpoint -> box {| code = "LegacySeedAfterCheckpoint" |}
-        | MagicTodoFoldRejection.DedicatedMissingForAssign -> box {| code = "DedicatedMissingForAssign" |}
-        | MagicTodoFoldRejection.DedicatedMissingForReplace -> box {| code = "DedicatedMissingForReplace" |}
 
 type MagicTodoProjectionHandle private (state: MagicTodoProjection.MagicTodoProjectionState) =
     // DSL-MUTABLE: resource — opaque projection handle current state
@@ -82,23 +68,6 @@ module MagicTodoProjectionSurface =
                 {| reference = BlobRef.value reference
                    digest = BlobDigest.value digest |}
 
-    let private assignmentView (value: TodoProcessReviewAssigned) : obj =
-        box
-            {| todoReviewId = TodoReviewId.value value.TodoReviewId
-               dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
-               reviewerSessionId = SessionId.value value.ReviewerSessionId
-               reviewWorkStart = int value.ReviewWorkStartCursor.Sequence
-               managerReviewFrontier = int value.ManagerReviewFrontier.Sequence |}
-
-    let private conclusionView (value: TodoReviewConcluded) : obj =
-        box
-            {| todoReviewId = TodoReviewId.value value.TodoReviewId
-               dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
-               reviewerSessionId = SessionId.value value.ReviewerSessionId
-               verdict = ProcessReviewVerdict.wire value.Verdict
-               workRecordRef = BlobRef.value value.WorkRecordRef
-               workRecordDigest = BlobDigest.value value.WorkRecordDigest |}
-
     let private lifecycleView (lifecycle: MagicTodoProjection.CheckpointLifecycle) : obj =
         match lifecycle with
         | CheckpointLifecycle.Prepared -> box {| kind = "Prepared" |}
@@ -107,19 +76,6 @@ module MagicTodoProjectionSurface =
                 {| kind = "Accepted"
                    inputDigest = accepted.InputDigest
                    outputDigest = accepted.OutputDigest |}
-        | CheckpointLifecycle.Assigned(accepted, assignment) ->
-            box
-                {| kind = "Assigned"
-                   inputDigest = accepted.InputDigest
-                   outputDigest = accepted.OutputDigest
-                   assignment = assignmentView assignment |}
-        | CheckpointLifecycle.Concluded(accepted, assignment, concluded) ->
-            box
-                {| kind = "Concluded"
-                   inputDigest = accepted.InputDigest
-                   outputDigest = accepted.OutputDigest
-                   assignment = assignmentView assignment
-                   concluded = conclusionView concluded |}
 
     let private checkpointView (checkpoint: MagicTodoProjection.CheckpointRecord) : obj =
 
@@ -147,14 +103,6 @@ module MagicTodoProjectionSurface =
                accepted = MagicTodoProjection.isAccepted checkpoint
                inputDigest = inputDigest
                outputDigest = outputDigest
-               assignment =
-                MagicTodoProjection.assignment checkpoint
-                |> Option.map assignmentView
-                |> Option.toObj
-               concluded =
-                MagicTodoProjection.conclusion checkpoint
-                |> Option.map conclusionView
-                |> Option.toObj
                lifecycle = lifecycleView checkpoint.Lifecycle |}
 
     let internal rejectionView rejection : obj =
@@ -176,37 +124,18 @@ module MagicTodoProjectionSurface =
                     life.FirstAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
                    latestAcceptedCheckpoint =
                     life.LatestAcceptedCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   pendingReviewCheckpoint =
-                    life.PendingReviewCheckpoint |> Option.map TodoWriteId.value |> optionString
-                   latestConcludedManagerReviewFrontier =
-                    life.LatestConcludedManagerReviewFrontier
-                    |> Option.map (fun value -> box (int value.Sequence))
-                    |> Option.toObj
                    firstPlanCommitment = life.FirstPlanCommitment |> Option.map TodoWriteId.value |> optionString
                    latestCommittedCheckpoint =
                     life.LatestCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
                    previousCommittedCheckpoint =
                     life.PreviousCommittedCheckpoint |> Option.map TodoWriteId.value |> optionString
                    checkpoints = checkpoints
-                   dedicated =
-                    life.Dedicated
-                    |> Option.map (fun value ->
-                        box
-                            {| dedicatedReviewerId = DedicatedReviewerId.value value.DedicatedReviewerId
-                               reviewerSessionId = SessionId.value value.ReviewerSessionId |})
-                    |> Option.toObj
                    legacySeed = refView life.LegacySeed |}
 
     let create () = MagicTodoProjectionHandle.Create()
 
     let fold (handle: MagicTodoProjectionHandle) (eventId: string) (factJson: string) : obj =
         handle.Fold(eventId, factJson)
-
-    let reviewerLife (handle: MagicTodoProjectionHandle) (reviewerSessionId: string) : obj =
-        MagicTodoProjection.tryReviewerLife (SessionId.create reviewerSessionId) handle.State
-        |> Option.map ManagerLifeId.value
-        |> Option.defaultValue null
-        |> box
 
     let view (handle: MagicTodoProjectionHandle) (lifeId: string) : obj =
         lifeView handle.State (ManagerLifeId.create lifeId)

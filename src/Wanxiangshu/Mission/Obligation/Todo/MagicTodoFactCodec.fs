@@ -25,27 +25,6 @@ module MagicTodoFactCodec =
     let private todoWriteIdDecoder: Decoder<TodoWriteId> =
         Decode.string |> Decode.map TodoWriteId.create
 
-    let private todoReviewIdEncoder (id: TodoReviewId) = Encode.string (TodoReviewId.value id)
-
-    let private todoReviewIdDecoder: Decoder<TodoReviewId> =
-        Decode.string |> Decode.map TodoReviewId.create
-
-    let private dedicatedIdEncoder (id: DedicatedReviewerId) =
-        Encode.string (DedicatedReviewerId.value id)
-
-    let private dedicatedIdDecoder: Decoder<DedicatedReviewerId> =
-        Decode.string |> Decode.map DedicatedReviewerId.create
-
-    let private verdictEncoder (v: ProcessReviewVerdict) =
-        Encode.string (ProcessReviewVerdict.wire v)
-
-    let private verdictDecoder: Decoder<ProcessReviewVerdict> =
-        Decode.string
-        |> Decode.andThen (function
-            | "PERFECT" -> Decode.succeed ProcessReviewVerdict.Perfect
-            | "REVISE" -> Decode.succeed ProcessReviewVerdict.Revise
-            | other -> Decode.fail ("unknown ProcessReviewVerdict: " + other))
-
     let private physicalEvidenceEncoder (e: PhysicalSuccessEvidence) =
         match e with
         | PhysicalSuccessEvidence.LiveAfterSuccess -> Encode.string "LiveAfterSuccess"
@@ -122,14 +101,6 @@ module MagicTodoFactCodec =
                   payloadRefOfBlobDigest p.BaseTodoDigest
                   payloadRefOfBlobRef p.ProposedTodoRef
                   payloadRefOfBlobDigest p.ProposedTodoDigest ]
-        | MagicTodoFact.TodoReviewConcluded p ->
-            List.choose
-                id
-                [ payloadRefOfBlobRef p.WorkRecordRef
-                  payloadRefOfBlobDigest p.WorkRecordDigest
-                  payloadRefOfBlobRef p.SettledTodoRef
-                  payloadRefOfBlobDigest p.SettledTodoDigest ]
-        | MagicTodoFact.DedicatedTodoReviewerReplaced p -> List.choose id [ payloadRefOfBlobRef p.EvidenceRef ]
         | MagicTodoFact.LegacyTodoSeedAdopted p ->
             List.choose id [ payloadRefOfBlobRef p.SeedTodoRef; payloadRefOfBlobDigest p.SeedTodoDigest ]
         | MagicTodoFact.PrefixRebaseCommittedV2 p ->
@@ -172,46 +143,6 @@ module MagicTodoFactCodec =
                       "OutputDigest", Encode.string p.OutputDigest
                       "PhysicalSuccessEvidence", physicalEvidenceEncoder p.PhysicalSuccessEvidence
                       "SemanticVersion", Encode.string p.SemanticVersion ]
-            | MagicTodoFact.TodoProcessReviewAssigned p ->
-                Encode.object
-                    [ "case", Encode.string "TodoProcessReviewAssigned"
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
-                      "TodoWriteId", todoWriteIdEncoder p.TodoWriteId
-                      "TodoReviewId", todoReviewIdEncoder p.TodoReviewId
-                      "DedicatedReviewerId", dedicatedIdEncoder p.DedicatedReviewerId
-                      "ReviewerSessionId", Encode.string (SessionId.value p.ReviewerSessionId)
-                      "ReviewWorkStartCursor", cursorEncoder p.ReviewWorkStartCursor
-                      "ManagerReviewFrontier", cursorEncoder p.ManagerReviewFrontier ]
-            | MagicTodoFact.TodoReviewConcluded p ->
-                Encode.object
-                    [ "case", Encode.string "TodoReviewConcluded"
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
-                      "TodoWriteId", todoWriteIdEncoder p.TodoWriteId
-                      "TodoReviewId", todoReviewIdEncoder p.TodoReviewId
-                      "DedicatedReviewerId", dedicatedIdEncoder p.DedicatedReviewerId
-                      "ReviewerSessionId", Encode.string (SessionId.value p.ReviewerSessionId)
-                      "Verdict", verdictEncoder p.Verdict
-                      "WorkRecordRef", Encode.string (BlobRef.value p.WorkRecordRef)
-                      "WorkRecordDigest", Encode.string (BlobDigest.value p.WorkRecordDigest)
-                      "SettledTodoRef", Encode.string (BlobRef.value p.SettledTodoRef)
-                      "SettledTodoDigest", Encode.string (BlobDigest.value p.SettledTodoDigest)
-                      "ReviewerRecordFrontier", cursorEncoder p.ReviewerRecordFrontier
-                      "ProviderRunId", Encode.string (ProviderRunIdentity.value p.ProviderRunId)
-                      "ToolCallId", Encode.string (ToolCallId.value p.ToolCallId) ]
-            | MagicTodoFact.DedicatedTodoReviewerEnlisted p ->
-                Encode.object
-                    [ "case", Encode.string "DedicatedTodoReviewerEnlisted"
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
-                      "DedicatedReviewerId", dedicatedIdEncoder p.DedicatedReviewerId
-                      "ReviewerSessionId", Encode.string (SessionId.value p.ReviewerSessionId) ]
-            | MagicTodoFact.DedicatedTodoReviewerReplaced p ->
-                Encode.object
-                    [ "case", Encode.string "DedicatedTodoReviewerReplaced"
-                      "ManagerLifeId", Encode.string (ManagerLifeId.value p.ManagerLifeId)
-                      "DedicatedReviewerId", dedicatedIdEncoder p.DedicatedReviewerId
-                      "OldSessionId", Encode.string (SessionId.value p.OldSessionId)
-                      "NewSessionId", Encode.string (SessionId.value p.NewSessionId)
-                      "EvidenceRef", Encode.string (BlobRef.value p.EvidenceRef) ]
             | MagicTodoFact.LegacyTodoSeedAdopted p ->
                 Encode.object
                     [ "case", Encode.string "LegacyTodoSeedAdopted"
@@ -278,42 +209,6 @@ module MagicTodoFactCodec =
                           PhysicalSuccessEvidence =
                             get.Required.Field "PhysicalSuccessEvidence" physicalEvidenceDecoder
                           SemanticVersion = get.Required.Field "SemanticVersion" Decode.string }
-                | "TodoProcessReviewAssigned" ->
-                    MagicTodoFact.TodoProcessReviewAssigned
-                        { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
-                          TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
-                          TodoReviewId = get.Required.Field "TodoReviewId" todoReviewIdDecoder
-                          DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          ReviewerSessionId = SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string)
-                          ReviewWorkStartCursor = get.Required.Field "ReviewWorkStartCursor" cursorDecoder
-                          ManagerReviewFrontier = get.Required.Field "ManagerReviewFrontier" cursorDecoder }
-                | "TodoReviewConcluded" ->
-                    MagicTodoFact.TodoReviewConcluded
-                        { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
-                          TodoWriteId = get.Required.Field "TodoWriteId" todoWriteIdDecoder
-                          TodoReviewId = get.Required.Field "TodoReviewId" todoReviewIdDecoder
-                          DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          ReviewerSessionId = SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string)
-                          Verdict = get.Required.Field "Verdict" verdictDecoder
-                          WorkRecordRef = BlobRef.create (get.Required.Field "WorkRecordRef" Decode.string)
-                          WorkRecordDigest = BlobDigest.create (get.Required.Field "WorkRecordDigest" Decode.string)
-                          SettledTodoRef = BlobRef.create (get.Required.Field "SettledTodoRef" Decode.string)
-                          SettledTodoDigest = BlobDigest.create (get.Required.Field "SettledTodoDigest" Decode.string)
-                          ReviewerRecordFrontier = get.Required.Field "ReviewerRecordFrontier" cursorDecoder
-                          ProviderRunId = ProviderRunIdentity.create (get.Required.Field "ProviderRunId" Decode.string)
-                          ToolCallId = ToolCallId.create (get.Required.Field "ToolCallId" Decode.string) }
-                | "DedicatedTodoReviewerEnlisted" ->
-                    MagicTodoFact.DedicatedTodoReviewerEnlisted
-                        { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
-                          DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          ReviewerSessionId = SessionId.create (get.Required.Field "ReviewerSessionId" Decode.string) }
-                | "DedicatedTodoReviewerReplaced" ->
-                    MagicTodoFact.DedicatedTodoReviewerReplaced
-                        { ManagerLifeId = ManagerLifeId.create (get.Required.Field "ManagerLifeId" Decode.string)
-                          DedicatedReviewerId = get.Required.Field "DedicatedReviewerId" dedicatedIdDecoder
-                          OldSessionId = SessionId.create (get.Required.Field "OldSessionId" Decode.string)
-                          NewSessionId = SessionId.create (get.Required.Field "NewSessionId" Decode.string)
-                          EvidenceRef = BlobRef.create (get.Required.Field "EvidenceRef" Decode.string) }
                 | "LegacyTodoSeedAdopted" ->
                     MagicTodoFact.LegacyTodoSeedAdopted
                         { ManagerSessionId = SessionId.create (get.Required.Field "ManagerSessionId" Decode.string)

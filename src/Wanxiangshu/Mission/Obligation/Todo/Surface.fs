@@ -46,12 +46,6 @@ module MagicTodoSurface =
         let ObligationWorkDescription = "lifecycle/magic-todo/obligation-work-description"
 
         [<Literal>]
-        let ProcessReviewerPreamble = "lifecycle/magic-todo/process-reviewer-preamble"
-
-        [<Literal>]
-        let PreviousReviewBody = "lifecycle/magic-todo/previous-review-body"
-
-        [<Literal>]
         let ObligationWriteResult = "lifecycle/magic-todo/obligation-write-result"
 
         [<Literal>]
@@ -109,17 +103,5 @@ module MagicTodoSurface =
     let renderObligationListWire (items: ObligationList) : string =
         MagicTodo.canonicalObligationListWire items
 
-    type PreviousReviewView =
-        { Verdict: ProcessReviewVerdict
-          ReportText: string }
-
-    let previousReviewSubs (verdictWire: string) (reportText: string) : Map<string, string> =
-        Map [ "verdict", verdictWire; "report", reportText ]
-
-    let obligationWriteSubs (previousBody: string) (acceptedEpilogue: string) : Map<string, string> =
-        Map [ "previous_body", previousBody; "accepted_epilogue", acceptedEpilogue ]
-
-    /// GLORY-030 relaxation boundary: Manager may see process PERFECT/REVISE
-    /// outcome + concrete ProcessReviewLWR report; never reviewer identity /
-    /// session / barrier / witness / 2N / confirmation mechanics.
-    let managerMaySeeProcessReviewOutcome = true
+    let obligationWriteSubs (acceptedEpilogue: string) : Map<string, string> =
+        Map [ "accepted_epilogue", acceptedEpilogue ]

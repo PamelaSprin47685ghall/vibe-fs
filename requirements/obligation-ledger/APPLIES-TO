@@ -6,8 +6,6 @@
 /src/Wanxiangshu/Mission/Manager/Idle.fs
 /src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs
 /src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs
-/src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs
-/src/Wanxiangshu/Mission/Review/TodoProcess.fs
 /src/Wanxiangshu/Context/Companion/Transform.fs
 /src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs
 /resources/provider/lifecycle/magic-todo/**

@@ -68,19 +68,9 @@ test('WHAT[OBLIGATION-LEDGER-004] committed mode rejects planning-only debt by c
   assert.doesNotMatch(host, /survey-startup-and-complexity|O\(N\^2\)|placeholder:\s*planning/, 'Host must not classify planning language')
 })
 
-test('WHAT[OBLIGATION-LEDGER-012] process reviewer is told the effective planning-vs-mission relation', () => {
-  for (const path of [
-    'resources/provider/lifecycle/magic-todo/process-reviewer-preamble/en.md',
-    'resources/provider/lifecycle/magic-todo/process-reviewer-preamble/zh-CN.md',
-  ]) {
-    const text = read(path)
-    assert.match(text, /planComplete|plan complete|计划.*完备|计划.*完整/i, `${path}: reviewer must understand the commitment relation`)
-    assert.match(text, /false/i, `${path}: reviewer must allow planning-account review before commitment`)
-    assert.match(text, /true/i, `${path}: reviewer must switch to mission-debt review after commitment`)
-  }
-
-  const request = read('src/Wanxiangshu/Mission/Obligation/Todo/ProcessReview.fs')
-  assert.match(request, /EffectivePlanComplete/, 'typed process-review request must carry the effective relation')
+test('WHAT[OBLIGATION-LEDGER-012] TodoWriteAccepted is the sole SSOT for checkpoints', () => {
+  const membrane = read('src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs')
+  assert.match(membrane, /TodoWriteAccepted accepted/, 'membrane appends TodoWriteAccepted')
 })
 
 test('WHAT[OBLIGATION-LEDGER-010] provider wording says Accepted becomes Current without reviewer settlement', () => {
@@ -153,10 +143,7 @@ test('WHAT[OBLIGATION-LEDGER-009] failure triage keeps red for syntax and kills 
   assert.match(membrane, /Diagnostic\.fatal "magic-todo-infrastructure-failed"/)
   assert.match(membrane, /\| Error reason -> invalidOp reason/, 'schema decode is allowed to reject the tool call')
   assert.match(membrane, /\| Error syntaxReason -> invalidOp syntaxReason/, 'deferred Error is syntax-only')
-  assert.match(membrane, /await ConsumableReview failed:[\s\S]*fatalInfrastructure/)
-  assert.match(membrane, /ensureReview infrastructure failed:/)
   assert.doesNotMatch(membrane, /Magic Todo deferred prepare failed/)
-  assert.doesNotMatch(membrane, /ensureReview failed:[^\n]*invalidOp/)
   assert.match(hostCodec, /output\.args is required[\s\S]*Diagnostic\.fatal|Diagnostic\.fatal[\s\S]*output\.args is required/)
 })
 
@@ -176,7 +163,6 @@ test('WHAT[OBLIGATION-LEDGER-003] clean break removes the legacy todo ontology f
 test('WHAT[OBLIGATION-LEDGER-011] production checkpoint path has no reviewer settlement owner', () => {
   for (const path of [
     'src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs',
-    'src/Wanxiangshu/Mission/Review/TodoProcess.fs',
     'src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs',
   ]) {
     const text = read(path)

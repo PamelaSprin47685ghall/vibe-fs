@@ -9,8 +9,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 /// Magic Todo durable fact algebra (TODO-004/006/012).
 ///
 /// Canonical codec bytes enter the top-level journal `Fact.MagicTodo` boundary;
-/// Boot decodes and folds them into the one MagicTodo projection. Illegal
-/// intermediate stages are absent: pending review is Accepted ∧ ¬Concluded.
+/// Boot decodes and folds them into the one MagicTodo projection.
 module MagicTodoFacts =
 
     /// Physical success evidence for TodoWriteAccepted (protocol §15 / §16.2).
@@ -22,7 +21,7 @@ module MagicTodoFacts =
         | RecoveredCompletedToolPart
 
     /// Prepared: Magic validation passed; Base/Proposed/ReviewFrontier frozen.
-    /// Not yet a checkpoint; does not derive review obligation.
+    /// Not yet a checkpoint.
     type TodoWritePrepared =
         {
             ManagerSessionId: SessionId
@@ -44,7 +43,7 @@ module MagicTodoFacts =
             SemanticVersion: string
         }
 
-    /// Accepted: checkpoint SSOT + process-review obligation SSOT.
+    /// Accepted: checkpoint SSOT.
     type TodoWriteAccepted =
         {
             ManagerLifeId: ManagerLifeId
@@ -57,57 +56,6 @@ module MagicTodoFacts =
             PhysicalSuccessEvidence: PhysicalSuccessEvidence
             SemanticVersion: string
         }
-
-    /// Assignment freezes reviewer request-range start (not session Opening).
-    type TodoProcessReviewAssigned =
-        {
-            ManagerLifeId: ManagerLifeId
-            TodoWriteId: TodoWriteId
-            TodoReviewId: TodoReviewId
-            DedicatedReviewerId: DedicatedReviewerId
-            ReviewerSessionId: SessionId
-            /// Reviewer frontier frozen BEFORE the assignment dispatch (HOST-021).
-            /// The LWR request range [ReviewWorkStartCursor, closure frontier)
-            /// therefore includes the assignment prompt itself and everything
-            /// the reviewer produces for this checkpoint.
-            ReviewWorkStartCursor: XTraceCursor
-            ManagerReviewFrontier: XTraceCursor
-        }
-
-    /// ConsumableReview ≡ TodoReviewConcluded.
-    /// Append ONLY when VerdictKnown ∧ ProcessReviewLWR record-ready in same snapshot.
-    type TodoReviewConcluded =
-        {
-            ManagerLifeId: ManagerLifeId
-            TodoWriteId: TodoWriteId
-            TodoReviewId: TodoReviewId
-            DedicatedReviewerId: DedicatedReviewerId
-            ReviewerSessionId: SessionId
-            Verdict: ProcessReviewVerdict
-            WorkRecordRef: BlobRef
-            WorkRecordDigest: BlobDigest
-            /// Legacy persisted-wire compatibility echo. New v2 writers copy the
-            /// reviewed checkpoint's ProposedTodo locator here; projection ignores
-            /// these fields as CurrentObligations writers (TODO-005).
-            SettledTodoRef: BlobRef
-            SettledTodoDigest: BlobDigest
-            ReviewerRecordFrontier: XTraceCursor
-            ProviderRunId: ProviderRunIdentity
-            ToolCallId: ToolCallId
-        }
-
-    type DedicatedTodoReviewerEnlisted =
-        { ManagerLifeId: ManagerLifeId
-          DedicatedReviewerId: DedicatedReviewerId
-          ReviewerSessionId: SessionId }
-
-    /// Only when Host proves the old physical session is permanently unrecoverable.
-    type DedicatedTodoReviewerReplaced =
-        { ManagerLifeId: ManagerLifeId
-          DedicatedReviewerId: DedicatedReviewerId
-          OldSessionId: SessionId
-          NewSessionId: SessionId
-          EvidenceRef: BlobRef }
 
     /// Upgrade-path only: seed one already-open Life with a canonical obligation
     /// account before its first Magic provider request. Historical facts may carry
@@ -156,10 +104,6 @@ module MagicTodoFacts =
     type MagicTodoFact =
         | TodoWritePrepared of TodoWritePrepared
         | TodoWriteAccepted of TodoWriteAccepted
-        | TodoProcessReviewAssigned of TodoProcessReviewAssigned
-        | TodoReviewConcluded of TodoReviewConcluded
-        | DedicatedTodoReviewerEnlisted of DedicatedTodoReviewerEnlisted
-        | DedicatedTodoReviewerReplaced of DedicatedTodoReviewerReplaced
         | LegacyTodoSeedAdopted of LegacyTodoSeedAdopted
         | PrefixRebaseCommittedV2 of PrefixRebaseCommittedV2
 
@@ -168,18 +112,6 @@ module MagicTodoFacts =
         let inline TodoWritePrepared (payload: TodoWritePrepared) = MagicTodoFact.TodoWritePrepared payload
 
         let inline TodoWriteAccepted (payload: TodoWriteAccepted) = MagicTodoFact.TodoWriteAccepted payload
-
-        let inline TodoProcessReviewAssigned (payload: TodoProcessReviewAssigned) =
-            MagicTodoFact.TodoProcessReviewAssigned payload
-
-        let inline TodoReviewConcluded (payload: TodoReviewConcluded) =
-            MagicTodoFact.TodoReviewConcluded payload
-
-        let inline DedicatedTodoReviewerEnlisted (payload: DedicatedTodoReviewerEnlisted) =
-            MagicTodoFact.DedicatedTodoReviewerEnlisted payload
-
-        let inline DedicatedTodoReviewerReplaced (payload: DedicatedTodoReviewerReplaced) =
-            MagicTodoFact.DedicatedTodoReviewerReplaced payload
 
         let inline LegacyTodoSeedAdopted (payload: LegacyTodoSeedAdopted) =
             MagicTodoFact.LegacyTodoSeedAdopted payload

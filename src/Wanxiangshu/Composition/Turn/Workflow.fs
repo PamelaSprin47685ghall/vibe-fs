@@ -57,17 +57,6 @@ module TurnWorkflow =
             let observeIdleOrdinary current =
                 OrdinaryTurnWorkflow.observeIdle quiescence sessionPort eventPort journal current
 
-            let tryCompleteProcessReviewerAtIdle () =
-                ReviewerWorkflow.tryCompleteProcessReviewAtIdle eventPort journal turn (SessionId.value turn.SessionId)
-
-            let completeReviewerOrObserve (observe: unit -> Task) : Task =
-                task {
-                    let! handled = tryCompleteProcessReviewerAtIdle ()
-
-                    if not handled then
-                        do! observe ()
-                }
-
             let observeIdleDelivery () : Task =
                 task {
                     match turn.Role, turn.Observation, turn.Outcome with
@@ -94,8 +83,7 @@ module TurnWorkflow =
                                 journal
                                 turn
                                 (SessionId.value turn.SessionId)
-                    | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ ->
-                        return! completeReviewerOrObserve (fun () -> observeIdleOrdinary context)
+                    | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ -> do! observeIdleOrdinary context
                     | Some Role.Reviewer, _, _ -> do! observeIdleOrdinary context
                     | _ -> do! observeIdleOrdinary context
                 }
@@ -120,8 +108,7 @@ module TurnWorkflow =
                     let! _ = ChildPromptAuthority.ensureForLinkedChild journal turn
 
                     match turn.Role, turn.Observation, turn.Outcome with
-                    | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ ->
-                        return! completeReviewerOrObserve (fun () -> observeOrdinary context)
+                    | Some Role.Reviewer, Some ReconcileProgram.TurnUnknown, _ -> do! observeOrdinary context
                     | Some Role.Reviewer, _, ReconcileProgram.TurnCompleted ->
                         do!
                             ReviewerWorkflow.observe
