@@ -15,12 +15,10 @@ open Wanxiangshu.Participant.Provider
 /// A local control-flow fact of one automatic recovery sequence.
 ///
 /// The type exists so the answer cannot be produced from a cursor alone. A `bool`
-/// parameter would let a caller pass `isOdd cursor.Offset`, which is exactly the
-/// parked-cursor bug: FALLBACK-004 does not reset Offset on success, so a run that
-/// failed once and then succeeded leaves the cursor on an odd Offset forever. Every
-/// later sequence would then arm its FIRST slot, squash half the frames every round,
-/// grind history to the output-budget floor, and never recover — while each
-/// individual squash looks correct.
+/// parameter would let a caller pass `isOdd cursor.Offset`. A crash can leave a
+/// durable primed Offset after the failure advance while process-local arming is
+/// lost, so parity alone would invent a recovery opportunity that never existed in
+/// the resumed process.
 [<RequireQualifiedAccess>]
 type SlotArming =
     /// The slot begins a sequence, or was reached without an intervening failure.
@@ -79,7 +77,7 @@ type SlotDecision =
 /// FALLBACK-011 / FALLBACK-012 / CTX-006 / CTX-007: the recovery slot's control flow.
 ///
 /// Pure. The journal writes and the provider calls live in the caller; what is here
-/// is the decision, so the parked-cursor rule and the three-outcome dispatch can be
+/// is the decision, so the parity-is-not-authority rule and the three-outcome dispatch can be
 /// tested without a Host (VERIFY-008).
 [<RequireQualifiedAccess>]
 module RecoverySlot =
@@ -87,7 +85,8 @@ module RecoverySlot =
     /// FALLBACK-012: a new automatic recovery sequence always starts unarmed.
     ///
     /// Even when the recovered Offset is odd. That is the whole clause: arming is a
-    /// property of what happened in THIS sequence, not of where the cursor parked.
+    /// property of what happened in THIS sequence, not of a durable position that
+    /// may have survived a crash.
     let beginSequence = SlotArming.NotArmed
 
     /// FALLBACK-012: the arming of the slot reached by a failure advance.
@@ -100,9 +99,8 @@ module RecoverySlot =
     /// FALLBACK-012: after a crash, arming is lost and the session resumes unarmed.
     ///
     /// The safe side: an unarmed slot sends a normal request, so the worst case is one
-    /// missed compression opportunity. Resuming armed would squash on the first slot
-    /// after every restart, which is the parked-cursor failure with a different
-    /// trigger.
+    /// missed compression opportunity. Resuming armed would invent authority from a
+    /// durable position after every restart.
     let afterRestart = SlotArming.NotArmed
 
     let isArmed (arming: SlotArming) =

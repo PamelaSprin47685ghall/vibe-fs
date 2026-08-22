@@ -19,6 +19,7 @@ Provider 会话历史可能超过模型的可用上下文窗口。如果压缩�
 - 压缩覆盖不完整证据（如将半 turn 冒充为完整 prefix 证明，或改写侵吞真实 Opening / `todowrite` 原始回合）。
 - 依据模型窗口大小或上下文比例主动触发改写。
 - 重锚后将已退休的辅助注入重新灌回 provider context。
+- recovery 主请求已经成功却把 fallback cursor 留在 A′/B′，使下一次真实 overflow 先跨到另一侧普通槽并再次 overflow，直到第二次失败才触发压缩。
 - 两个并发 materialize 都从旧 snapshot 推导“可开新 request”，随后第二个 durable fact 被 canonical fold 拒绝并触发 semantic cut；或不同 RequestId 静默覆盖 live flight，使 durable ownership 与物理执行分叉。
 
 ## DEPENDS ON

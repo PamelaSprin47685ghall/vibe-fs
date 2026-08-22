@@ -125,6 +125,7 @@ module CursorSurface =
                 { Offset = offsetOf (field value "offset")
                   ConsecutiveFailureCount = intValue (field value "failures") }
               RecentFailureKeys = []
+              LastTransitionWasSuccess = false
               Exhausted =
                 match field value "exhausted" with
                 | value when isNullish value -> false

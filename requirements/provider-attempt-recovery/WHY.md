@@ -15,7 +15,8 @@
 - provider 失败后系统重新选择 Authority、变更 Persona 或改写 system prompt。
 - 同一次失败被多个观察者重复记账，导致预算被超额消耗。
 - 预算耗尽后系统依然自动发出新的物理请求。
-- 成功停留在奇数 Offset 时被误判为 armed，导致每一轮都错误触发历史压缩。
+- primed recovery 的主请求已经成功，却把 cursor 永久停在 A′/B′；下一次真实失败因此先被推进到另一侧的普通槽，必须再失败一次才重新获得 recovery opportunity，表现为本可一次处理的 provider failure 成对出现。
+- 崩溃后仅凭持久化奇数 Offset 重新构造 armed，导致没有本次 failure advance 的请求错误触发历史压缩。
 
 ## DEPENDS ON
 

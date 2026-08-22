@@ -22,7 +22,8 @@ type FallbackFactCases =
            AuthorityRootUserMessageId: AuthorityRootUserMessageId
            FinalConsecutiveFailureCount: int
            FinalOffset: byte |}
-    /// A confirmed successful provider attempt cleared the failure budget (Offset unchanged).
+    /// A confirmed successful business-main attempt clears the failure budget and
+    /// closes A′/B′ to the ordinary slot on the same side.
     | FallbackSucceeded of
         {| SessionId: SessionId
            LogicalRunId: LogicalRunId

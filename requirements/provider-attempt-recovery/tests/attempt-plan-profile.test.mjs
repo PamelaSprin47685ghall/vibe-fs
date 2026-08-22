@@ -161,8 +161,8 @@ test('WHAT[PAR-011] PAR_011_recovery_requires_arming_a_primed_offset_and_materia
   // 无材料:发普通主请求(CTX-011 no-candidate),不是错误。
   assert.equal(slot.mayRecover(slot.afterFailureAdvance, 1, false), false)
 
-  // parked-cursor 陷阱:奇数 Offset + 材料,但没有 armed——成功可停在奇数 Offset,
-  // 此时 armedByFailure=false,禁止仅凭 Offset 判定 armed。
+  // stale-primed 陷阱:崩溃可留下奇数 Offset + 材料,但 process-local arming
+  // 已丢失。此时 armedByFailure=false,禁止仅凭 Offset 判定 armed。
   assert.equal(slot.mayRecover(slot.beginSequence, 1, true), false)
   assert.equal(slot.mayRecover(slot.beginSequence, 3, true), false)
 })

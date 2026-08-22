@@ -147,7 +147,7 @@ test('WHAT[PAR-006] FALLBACK_006_the_side_sequence_table_is_unbounded_by_constru
   assert.throws(() => cursor.sideSequence(-1), /non-negative/)
 })
 
-// ── FALLBACK-004: success clears the budget and leaves the offset alone ──────
+// ── FALLBACK-004: success closes the primed recovery phase ───────────────────
 
 test('WHAT[PAR-004] FALLBACK_004_failure_advances_the_offset_and_spends_one_unit_of_budget', () => {
   assert.deepEqual(cursor.read(cursor.recordFailure({ Offset: 0, ConsecutiveFailureCount: 0 })), {
@@ -163,28 +163,26 @@ test('WHAT[PAR-004] FALLBACK_004_failure_advances_the_offset_and_spends_one_unit
   })
 })
 
-test('WHAT[PAR-004] FALLBACK_004_success_resets_the_budget_but_NOT_the_offset', () => {
-  // The clause's own example: fail once, succeed once, and the cursor parks at
-  // offset 1. Resetting it would send the next failure back to the side that
-  // already failed — VERIFY-006 names this exact regression.
+test('WHAT[PAR-004] FALLBACK_004_success_resets_the_budget_and_normalizes_to_the_same_side_main_slot', () => {
   const afterFailure = cursor.recordFailure(cursor.initial)
   const afterSuccess = cursor.recordSuccess(afterFailure)
 
-  assert.deepEqual(cursor.read(afterSuccess), { offset: 1, failures: 0 })
+  assert.deepEqual(cursor.read(afterSuccess), { offset: 0, failures: 0 })
 
-  // And the next failure continues from there rather than from zero.
-  assert.deepEqual(cursor.read(cursor.recordFailure(afterSuccess)), { offset: 2, failures: 1 })
+  // The next real failure therefore reaches A′ immediately instead of burning B
+  // as a second ordinary overflow attempt.
+  assert.deepEqual(cursor.read(cursor.recordFailure(afterSuccess)), { offset: 1, failures: 1 })
 })
 
-test('WHAT[PAR-004] FALLBACK_004_success_leaves_a_parked_odd_offset_in_place', () => {
-  // Consequence worth pinning separately, because FALLBACK-012 depends on it: a
-  // parked cursor can sit on an odd offset, which is why arming may not be
-  // derived from parity alone.
-  for (const offset of [1, 3]) {
-    const parked = cursor.recordSuccess({ Offset: offset, ConsecutiveFailureCount: 5 })
-    assert.deepEqual(cursor.read(parked), { offset, failures: 0 })
-    assert.equal(cursor.isRecoverySlot(cursor.read(parked).offset), true)
-  }
+test('WHAT[PAR-004] FALLBACK_004_success_cannot_leave_a_live_cursor_parked_in_a_primed_slot', () => {
+  assert.deepEqual(cursor.read(cursor.recordSuccess({ Offset: 1, ConsecutiveFailureCount: 5 })), {
+    offset: 0,
+    failures: 0,
+  })
+  assert.deepEqual(cursor.read(cursor.recordSuccess({ Offset: 3, ConsecutiveFailureCount: 5 })), {
+    offset: 2,
+    failures: 0,
+  })
 })
 
 // ── FALLBACK-005: the budget is finite, and judged after the failure ─────────
@@ -379,20 +377,18 @@ test('WHAT[PAR-004] FALLBACK_004_recording_success_clears_the_dedupe_window_too'
   assert.deepEqual(fallbackProjection.read(afterSuccess), {
     logicalRun: 'run_L',
     authorityRoot: 'msg_u1',
-    offset: 1,
+    offset: 0,
     failures: 0,
     dedupeKeys: 0,
     exhausted: false,
   })
 
   // The same ProviderRunIdentity may now advance again — it is a new occasion.
-  const again = fallbackProjection.applyAdvance(identityFor('run_1'), 1, 2, 1, afterSuccess)
+  const again = fallbackProjection.applyAdvance(identityFor('run_1'), 0, 1, 1, afterSuccess)
   assert.equal(again.ok, true)
 })
 
-test('WHAT[PAR-004] ENFORCER_063_success_clears_failures_after_multiple_advances_without_touching_offset', () => {
-  // BlogObservationCommitted is BloggerMain business success: zero the budget, park the
-  // offset. Multi-failure path proves the clear is not a one-shot edge case.
+test('WHAT[PAR-004] ENFORCER_063_success_clears_failures_and_closes_the_recovery_subslot', () => {
   let current = fallbackProjection.forAuthority(RUN, ROOT)
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const applied = fallbackProjection.applyAdvance(
@@ -413,7 +409,7 @@ test('WHAT[PAR-004] ENFORCER_063_success_clears_failures_after_multiple_advances
   const after = fallbackProjection.recordSuccess(current)
   const state = fallbackProjection.read(after)
   assert.equal(state.failures, 0)
-  assert.equal(state.offset, before.offset)
+  assert.equal(state.offset, 2)
 })
 
 test('WHAT[PAR-005] FALLBACK_005_exhaustion_is_stored_rather_than_re_derived_from_the_count', () => {
@@ -551,6 +547,28 @@ test('WHAT[PAR-007] FALLBACK_007_a_replayed_journal_with_intervening_success_str
   assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 3, failures: 1 })
 })
 
+test('WHAT[PAR-004] FALLBACK_004_pre_fix_parked_success_journal_still_replays_without_changing_its_recorded_history', () => {
+  // Before PAR-004 closed A′/B′ on success, the durable sequence was:
+  // 0→1 fail, success (parked at 1), then 1→2 fail. The same immutable journal
+  // must remain readable after FallbackSucceeded starts normalizing 1→0.
+  const succeeded = fallbackSucceeded({
+    session: SESSION,
+    logicalRun: RUN,
+    authorityRoot: ROOT,
+    providerRun: 'run_success_legacy',
+  })
+  const folded = foldFacts([
+    rootFact(),
+    advanceFact({ run: 'run_1', previous: 0, next: 1, count: 1 }),
+    succeeded,
+    advanceFact({ run: 'run_2', previous: 1, next: 2, count: 1 }),
+  ])
+
+  assert.equal(folded.ok, true, folded.ok ? '' : JSON.stringify(folded.error))
+  const state = fallbackOf(folded.value)
+  assert.deepEqual({ offset: state.offset, failures: state.failures }, { offset: 2, failures: 1 })
+})
+
 test('WHAT[PAR-003] FALLBACK_003_a_duplicate_line_is_absorbed_because_replay_produces_it', () => {
   // Expected on replay, so the fold continues with the projection unchanged. This
   // is the one refusal class that must NOT stop startup.
@@ -652,8 +670,8 @@ test('WHAT[PAR-004] FALLBACK_004_success_is_a_durable_fact_that_zeroes_the_count
   assert.equal(foldedOnce.ok, true, foldedOnce.ok ? '' : JSON.stringify(foldedOnce.error))
   assert.deepEqual(
     { offset: fallbackOf(foldedOnce.value).offset, failures: fallbackOf(foldedOnce.value).failures },
-    { offset: 1, failures: 0 },
-    'success zeroes the count but parks the offset',
+    { offset: 0, failures: 0 },
+    'success zeroes the count and closes the A′ recovery phase',
   )
 
   const foldedDup = foldFacts([
@@ -665,7 +683,7 @@ test('WHAT[PAR-004] FALLBACK_004_success_is_a_durable_fact_that_zeroes_the_count
   assert.equal(foldedDup.ok, true, foldedDup.ok ? '' : JSON.stringify(foldedDup.error))
   assert.deepEqual(
     { offset: fallbackOf(foldedDup.value).offset, failures: fallbackOf(foldedDup.value).failures },
-    { offset: 1, failures: 0 },
+    { offset: 0, failures: 0 },
     'duplicate success is idempotent',
   )
 

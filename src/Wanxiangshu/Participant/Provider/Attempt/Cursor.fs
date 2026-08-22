@@ -117,9 +117,9 @@ module AgentPairCursor =
     /// attempt on their side and always send an ordinary request.
     ///
     /// Necessary but not sufficient on its own. FALLBACK-012 forbids arming from
-    /// parity alone — a success does not reset Offset, so a parked odd cursor would
-    /// otherwise arm the first slot of every later sequence. `RecoverySlot.mayRecover`
-    /// combines this with the control-flow arming fact.
+    /// parity alone — a crash can preserve a durable primed Offset while losing the
+    /// process-local recovery opportunity. `RecoverySlot.mayRecover` combines parity
+    /// with the control-flow arming fact.
     let isRecoverySlot (offset: FallbackOffset) : bool =
         match offset with
         | FallbackOffset.Fork1
@@ -132,15 +132,21 @@ module AgentPairCursor =
         { Offset = advance cursor.Offset
           ConsecutiveFailureCount = cursor.ConsecutiveFailureCount + 1 }
 
-    /// FALLBACK-004 on success: budget resets, Offset does NOT.
-    ///
-    /// Resetting Offset here would mean a Logical Run that fails once then
-    /// succeeds silently returns to SideA, so the next failure re-tries the same
-    /// side that already failed. VERIFY-006 lists resetting Offset on success as
-    /// a No-Go for exactly this reason.
+    let private ordinarySlotOfSameSide (offset: FallbackOffset) : FallbackOffset =
+        match offset with
+        | FallbackOffset.Fork0
+        | FallbackOffset.Fork1 -> FallbackOffset.Fork0
+        | FallbackOffset.Fork2
+        | FallbackOffset.Fork3 -> FallbackOffset.Fork2
+
+    /// FALLBACK-004 on business-main success: reset the failure budget and close
+    /// the primed recovery subslot without changing sides. A′ settles to A and B′
+    /// settles to B. Leaving a live cursor on A′/B′ makes the next failure advance
+    /// to the other side's ordinary slot, so recovery happens only after a second
+    /// failure — the paired-overflow regression PAR-004 forbids.
     let recordSuccess (cursor: FallbackCursor) : FallbackCursor =
-        { cursor with
-            ConsecutiveFailureCount = 0 }
+        { Offset = ordinarySlotOfSameSide cursor.Offset
+          ConsecutiveFailureCount = 0 }
 
     /// Judgement happens after the failure is recorded (FALLBACK-005), so the
     /// 12th consecutive failure lands on Offset=3 (SideB), advances to Offset=0,

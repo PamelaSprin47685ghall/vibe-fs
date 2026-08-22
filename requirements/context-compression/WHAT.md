@@ -22,7 +22,7 @@
 
 ## CONTEXT-COMPRESSION-006: 恢复机会一次性消费，恢复动作 = opportunity ∧ hasMaterial
 
-真实失败被 `FallbackLedger` 接受并推进 cursor 后，只有新 Offset 为奇数时才产生一次 `RecoveryOpportunity`；它是 `armedByFailure ∧ primed` 的类型化结果，不得与 `hasMaterial` 折叠成一个布尔值。X 在该机会中必须实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash。若本次物理 attempt 没有可用材料，则发送普通主请求并消费该机会，严禁把 arming 留给未来无关请求，也严禁通过进程内 waiter 等待未来 X material 再补做 recovery。
+真实失败被 `FallbackLedger` 接受并推进 cursor 后，只有新 Offset 为奇数时才产生一次 `RecoveryOpportunity`；它是 `armedByFailure ∧ primed` 的类型化结果，不得与 `hasMaterial` 折叠成一个布尔值。X 在该机会中必须实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash。若本次物理 attempt 没有可用材料，则发送普通主请求并消费该机会，严禁把 arming 留给未来无关请求，也严禁通过进程内 waiter 等待未来 X material 再补做 recovery。primed 槽中的业务主请求一旦成功，PAR-004 必须把 cursor 归一到同侧普通槽；因此下一次 live failure 会再次直接进入同侧 primed recovery，而不是先产生第二个无恢复动作的 context-overflow 请求。崩溃可在成功前留下 durable primed Offset，故 arming 仍不得由 parity 重建。
 
 ## CONTEXT-COMPRESSION-007: 按 RequestKind 分派结局
 

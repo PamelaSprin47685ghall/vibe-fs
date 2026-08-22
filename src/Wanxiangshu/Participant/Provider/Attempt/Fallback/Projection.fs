@@ -43,6 +43,9 @@ open Wanxiangshu.Foundation.Identity
 /// PERSIST-008: O(1) integrated state, never a scan. `RecentFailureKeys` is a
 /// bounded window, so dedupe stays constant-time and the projection cannot grow
 /// with history length.
+/// DSL-state-combination: domain — Exhausted is terminal fallback state, while
+/// LastTransitionWasSuccess is replay-derived transition provenance needed only
+/// to recognize one already-durable pre-PAR-004 successor shape.
 type FallbackProjection =
     {
         LogicalRunId: LogicalRunId
@@ -55,6 +58,10 @@ type FallbackProjection =
         /// count, so the fold can refuse a late advance without knowing the
         /// configured budget.
         Exhausted: bool
+        /// Replay-only discriminator for the one historical transition emitted by
+        /// the pre-PAR-004 writer after a successful primed attempt. This is derived
+        /// from durable facts, not process-local recovery authority.
+        LastTransitionWasSuccess: bool
     }
 
 /// Why a `FallbackCursorAdvanced` line was not applied.
@@ -99,10 +106,29 @@ module FallbackProjection =
           AuthorityRootUserMessageId = authorityRoot
           Cursor = AgentPairCursor.forNewAuthorityRoot
           RecentFailureKeys = []
-          Exhausted = false }
+          Exhausted = false
+          LastTransitionWasSuccess = false }
 
     let private remember key keys =
         key :: (keys |> List.filter ((<>) key)) |> List.truncate DedupeWindow
+
+    /// Historical journals written before PAR-004 closed primed slots on success
+    /// contain this exact shape: success parked at A′/B′, then the next failure
+    /// recorded A′→B or B′→A. Replaying the same FallbackSucceeded under the new
+    /// semantics normalizes the in-memory cursor to A/B first, so the old line's
+    /// PreviousOffset is one step ahead of the normalized cursor. Accept that one
+    /// already-durable transition; new writers never emit it.
+    let private isHistoricalPostSuccessAdvance
+        (current: FallbackProjection)
+        (previousOffset: AgentPairCursor.FallbackOffset)
+        (nextOffset: AgentPairCursor.FallbackOffset)
+        (consecutiveFailureCount: int)
+        =
+        current.LastTransitionWasSuccess
+        && current.Cursor.ConsecutiveFailureCount = 0
+        && AgentPairCursor.isRecoverySlot previousOffset
+        && previousOffset = AgentPairCursor.advance current.Cursor.Offset
+        && AgentPairCursor.isValidAdvance previousOffset nextOffset 0 consecutiveFailureCount
 
     /// Apply one advance.
     ///
@@ -128,7 +154,10 @@ module FallbackProjection =
             Error DifferentRun
         elif List.contains key current.RecentFailureKeys then
             Error AlreadyObserved
-        elif previousOffset <> current.Cursor.Offset then
+        elif
+            previousOffset <> current.Cursor.Offset
+            && not (isHistoricalPostSuccessAdvance current previousOffset nextOffset consecutiveFailureCount)
+        then
             Error InvalidTransition
         elif
             not (
@@ -146,12 +175,14 @@ module FallbackProjection =
                     Cursor =
                         { Offset = nextOffset
                           ConsecutiveFailureCount = consecutiveFailureCount }
-                    RecentFailureKeys = remember key current.RecentFailureKeys }
+                    RecentFailureKeys = remember key current.RecentFailureKeys
+                    LastTransitionWasSuccess = false }
 
     /// FALLBACK-005 terminal state.
     let applyExhausted (current: FallbackProjection) = { current with Exhausted = true }
 
-    /// FALLBACK-004: success clears the budget and leaves Offset alone.
+    /// FALLBACK-004: success clears the budget and closes the primed recovery
+    /// subslot while preserving the current A/B side.
     ///
     /// Applied from the durable FallbackSucceeded fact (owner-owned, single
     /// writer). The dedupe window clears too: a later failure is a new attempt,
@@ -159,7 +190,8 @@ module FallbackProjection =
     let recordSuccess (current: FallbackProjection) =
         { current with
             Cursor = AgentPairCursor.recordSuccess current.Cursor
-            RecentFailureKeys = [] }
+            RecentFailureKeys = []
+            LastTransitionWasSuccess = true }
 
     /// Whether the automatic recovery budget still permits an attempt.
     ///
