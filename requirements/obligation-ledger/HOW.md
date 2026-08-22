@@ -13,7 +13,7 @@
 `todowrite` 的执行生命周期严格划分为阶段钩子：
 
 1. **Before 阶段与延迟准备**：同步执行参数解码与内存兼容投影；后台启动延迟准备，在 Snapshot 中同步当前 ProviderRun 前的语义前缀，固化 `ReviewFrontier` 并持久化 `TodoWritePrepared`。
-2. **物理执行与 After 阶段**：物理返回成功后，幂等收敛 `TodoWriteAccepted`，派生过程评审义务并注册 Dedicated Reviewer，推导 committed lag-1 cutoff，并在返回结果中富化上一轮评审报告及 T1 交托确认。
+2. **物理执行与 After 阶段**：物理返回成功后，幂等收敛 `TodoWriteAccepted`，派生过程评审义务并注册 Dedicated Reviewer，推导 committed lag-1 cutoff，并在返回结果中富化上一轮评审报告及 T1 交托确认。复用 Dedicated Reviewer 时，assignment 可先 durable，但 continuation 的 Host 发送必须等待上一 process judgement 的 interrupt fence；Host 队列不承担跨 review 的等待语义。
 3. **因果节拍与消费门槛**：下一轮 `todowrite` 或终结 `suicide` 到来时，若上一轮 $R_k$ 尚未形成 `ConsumableReview`（即 VerdictKnown 且对应 ProcessReviewLWR 达成 record-ready 并在同 snapshot 产生 `TodoReviewConcluded`），则进入合法因果等待。
 
 ## 3. 依赖声明

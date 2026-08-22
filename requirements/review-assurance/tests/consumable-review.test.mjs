@@ -2,7 +2,7 @@
 // provider-visible verdict. Magic Todo and Review journal capabilities cross only
 // through their owner surfaces.
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
@@ -10,6 +10,8 @@ import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalSurface.js'
 import * as review from '../../../dist/Mission/Review/Assurance/Surface.js'
 import * as todo from '../../../dist/Mission/Review/ReviewTodoSurface.js'
+
+const source = (path) => readFileSync(path, 'utf8')
 
 const sha256 = (value) => `digest:${value}`
 const life = 'life-consumable'
@@ -69,6 +71,32 @@ const concluded = {
   ProviderRunId: 'reviewer-provider-run',
   ToolCallId: 'reviewer-call',
 }
+
+test('WHAT[REVIEW-ASSURANCE-009] next process review waits behind our interrupt fence instead of Host prompt_async queue', async () => {
+  const dedicated = source('src/Wanxiangshu/Mission/Review/DedicatedTodoRuntime.fs')
+  const judgeTool = source('src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs')
+
+  assert.match(
+    dedicated,
+    /let private sendAssignmentDelivery[\s\S]*?ReviewerWorkflow\.ProcessReviewInterruptFence\.awaitRelease enlisted\.ReviewerSessionId[\s\S]*?match delivery with/,
+    'every process-review delivery for a reused session must wait before either Host send path',
+  )
+  assert.match(
+    judgeTool,
+    /recordSubmittedJudgement[\s\S]*?ReviewerWorkflow\.ProcessReviewInterruptFence\.arm submission\.ReviewerSessionId[\s\S]*?scope\.MarkVerdictSubmitted/,
+    'durable process judgement must arm the fence before the terminal transform can expose closure',
+  )
+  assert.match(
+    judgeTool,
+    /sessionPort\.InterruptAttempt reviewerSessionId[\s\S]*?\| Ok\(\) ->[\s\S]*?ReviewerWorkflow\.ProcessReviewInterruptFence\.release reviewerSessionId/,
+    'only successful physical interrupt completion may release the next review send',
+  )
+  assert.match(
+    judgeTool,
+    /\| Error reason ->[\s\S]*?ReviewerWorkflow\.ProcessReviewInterruptFence\.fail reviewerSessionId failure/,
+    'interrupt failure must keep the physical send path fail closed',
+  )
+})
 
 const populated = () => {
   const projection = todo.newProjection()

@@ -467,25 +467,35 @@ module DedicatedTodoReviewerRuntime =
         (delivery: MagicTodoAfter.AssignmentDelivery)
         (assignmentText: string)
         : Task<Result<unit, string>> =
-        let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
+        taskResult {
+            do! ReviewerWorkflow.ProcessReviewInterruptFence.awaitRelease enlisted.ReviewerSessionId
 
-        let sendAgent =
-            runtime.BoundManagedAgent(handleId, enlisted.ReviewerSessionId)
-            |> Option.defaultValue agentName
+            let assignmentDirectory = directoryOf enlisted.ReviewerSessionId
 
-        match delivery with
-        | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
-            sendOwnerRootAssignment
-                sessions
-                journal
-                runtime
-                handleId
-                enlisted.ReviewerSessionId
-                sendAgent
-                assignmentDirectory
-                assignmentText
-        | MagicTodoAfter.AssignmentDelivery.Continuation ->
-            sendContinuationAssignment sessions journal enlisted.ReviewerSessionId assignmentDirectory assignmentText
+            let sendAgent =
+                runtime.BoundManagedAgent(handleId, enlisted.ReviewerSessionId)
+                |> Option.defaultValue agentName
+
+            return!
+                match delivery with
+                | MagicTodoAfter.AssignmentDelivery.OwnerRoot ->
+                    sendOwnerRootAssignment
+                        sessions
+                        journal
+                        runtime
+                        handleId
+                        enlisted.ReviewerSessionId
+                        sendAgent
+                        assignmentDirectory
+                        assignmentText
+                | MagicTodoAfter.AssignmentDelivery.Continuation ->
+                    sendContinuationAssignment
+                        sessions
+                        journal
+                        enlisted.ReviewerSessionId
+                        assignmentDirectory
+                        assignmentText
+        }
 
     type private AssignmentDispatchDecision =
         | AlreadyDispatched

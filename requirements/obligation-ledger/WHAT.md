@@ -63,7 +63,7 @@ effectivePlanComplete(k) = OR(planComplete of Accepted T1..Tk)
 
 ## OBLIGATION-LEDGER-013: 1:1 lag-1 过程评审节拍
 
-每个 $T_k$ 派生第 $k$ 次过程评审义务 $R_k$。$R_k$ 的派生不阻塞 $T_k$ 的成功返回，Manager 可继续执行独立工作。后续 $T_{k+1}$ 到来时，若 $R_k$ 尚未形成 `ConsumableReview`，必须作为合法因果等待至结论 durable，不得将该因果等待渲染为工具错误。
+每个 $T_k$ 派生第 $k$ 次过程评审义务 $R_k$。$R_k$ 的派生不阻塞 $T_k$ 的成功返回，Manager 可继续执行独立工作。后续 $T_{k+1}$ 到来时，若 $R_k$ 尚未形成 `ConsumableReview`，必须作为合法因果等待至结论 durable，不得将该因果等待渲染为工具错误。若复用 Reviewer 的上一轮 process judgement 已提交但物理 interrupt 尚未完成，$R_{k+1}$ 可先 durable 建立 assignment，但不得把 prompt 排入 Host 队列；实际 continuation send 必须等待 review-assurance 的 interrupt fence 解除。
 
 ## OBLIGATION-LEDGER-014: 可消费结论为 ConsumableReview（VerdictKnown 不足）
 
@@ -115,7 +115,7 @@ Pre-T1 的 `planComplete=false` checkpoints 属于开放的 Opening，不派生 
 
 ## OBLIGATION-LEDGER-026: after 合同（Accepted、ensureReview 与富化 result）
 
-`after` 仅在物理执行成功返回后触发：幂等写入 `TodoWriteAccepted`，确保 dedicated reviewer 实例与评审义务，推导 desired lag-1 cutoff，并在 tool result 中富化返回上一 ConsumableReview 的评审报告。首次 T1 确认时在富化结果中揭示交托确认。
+`after` 仅在物理执行成功返回后触发：幂等写入 `TodoWriteAccepted`，确保 dedicated reviewer 实例与评审义务，推导 desired lag-1 cutoff，并在 tool result 中富化返回上一 ConsumableReview 的评审报告。`ensureReview` 允许先持久化下一 assignment，但复用 Reviewer 的 continuation 必须在物理 `SendPrompt` 边界等待上一 process judgement 的 interrupt fence，不能借 Host `prompt_async` 队列实现等待。首次 T1 确认时在富化结果中揭示交托确认。
 
 ## OBLIGATION-LEDGER-027: 透视粒度（complete coverage 而非 uniform decomposition）
 

@@ -32,9 +32,9 @@ Finality 确认必须由单一工作流的调用顺序严格证明：在同一 R
 
 Reviewer 生成针对当前过程评审的持久化裁决即达到 `VerdictKnown`，立即决定业务 outcome，但不携带 WorkRecordRef，亦不单独构成可消费报告。当且仅当该裁决对应 frontier 的规范 `ProcessReviewLWR` 达成 record-ready，且在同一 Snapshot 内持久化 `TodoReviewConcluded` 时，才形成 `ConsumableReview`。下游 checkpoint 或终结 drain 仅可消费 `ConsumableReview`，严禁提前写入未完成的空壳结论。
 
-## REVIEW-ASSURANCE-009: record-ready 同 snapshot、排他 frontier 且事件驱动
+## REVIEW-ASSURANCE-009: record-ready 同 snapshot、排他 frontier、事件驱动与 interrupt fence
 
-record-ready 判定标准为「能否在同一 Journal snapshot 下物化出有效的规范 LWR」，frontier 采用排他边界（lastPart+1）。普通 reviewer turn 由 turn completion 冻结 frontier；对明确 judge-only 且由 Host 强制 interrupt 的 process-review terminal，matching `(ProviderRun, ToolCallId)` 的 durable `tool_result` 即为该 work unit 的最后合法 part，必须在 interrupt 前以其 `cursor+1` 幂等冻结 closure。旧版本或崩溃留下的 VerdictKnown-but-unclosed 仅可由同一 durable tool-result 恢复此 frontier，严禁使用当前 session head。等待机制严格依赖事件驱动唤醒，禁止使用定时器、休眠或轮询。工作流必须先采样 revision，再执行就绪判定，最后发起带 revision 锚点的因果等待。等待器中断或崩溃后，基于持久事实与冻结 frontier 幂等重建并继续等待。
+record-ready 判定标准为「能否在同一 Journal snapshot 下物化出有效的规范 LWR」，frontier 采用排他边界（lastPart+1）。普通 reviewer turn 由 turn completion 冻结 frontier；对明确 judge-only 且由 Host 强制 interrupt 的 process-review terminal，matching `(ProviderRun, ToolCallId)` 的 durable `tool_result` 即为该 work unit 的最后合法 part，必须在 interrupt 前以其 `cursor+1` 幂等冻结 closure。该 judgement 一旦 durable 提交，当前 Reviewer Session 必须建立 process-local interrupt fence；后续 process-review assignment 可以 durable 建立，但其物理 `SendPrompt` 必须等待该 fence，严禁提前进入 Host `prompt_async` 队列。只有 `InterruptAttempt` 成功返回后 fence 才解除并主动发出后续 assignment；interrupt 失败则 fence fail closed。旧版本或崩溃留下的 VerdictKnown-but-unclosed 仅可由同一 durable tool-result 恢复 frontier，严禁使用当前 session head。等待机制严格依赖事件驱动唤醒，禁止使用定时器、休眠或轮询。工作流必须先采样 revision，再执行就绪判定，最后发起带 revision 锚点的因果等待。等待器中断或崩溃后，基于持久事实与冻结 frontier 幂等重建并继续等待。
 
 ## REVIEW-ASSURANCE-010: 基础设施失败永远不是 PERFECT 或 REVISE
 

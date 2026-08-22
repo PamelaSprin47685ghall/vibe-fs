@@ -104,6 +104,7 @@ module JudgeTool =
             match! VerdictWorkflow.recordJudgement journal submission with
             | Error _ -> return notReceived context Path.JudgmentCouldNotBeRecorded
             | Ok() ->
+                ReviewerWorkflow.ProcessReviewInterruptFence.arm submission.ReviewerSessionId
                 scope.MarkVerdictSubmitted(context.SessionId, physicalUserMessageId)
                 return received context
         }
@@ -243,10 +244,22 @@ module JudgeTool =
         let scheduleInterrupt () =
             runBackground (fun () ->
                 task {
-                    match! sessionPort.InterruptAttempt reviewerSessionId with
-                    | Ok() -> return ()
+                    let! interruptOutcome =
+                        task {
+                            try
+                                return! sessionPort.InterruptAttempt reviewerSessionId
+                            with ex ->
+                                return Error ex.Message
+                        }
+
+                    match interruptOutcome with
+                    | Ok() ->
+                        ReviewerWorkflow.ProcessReviewInterruptFence.release reviewerSessionId
+                        return ()
                     | Error reason ->
-                        return raise (InvalidOperationException("REVIEW_013_TERMINAL_INTERRUPT_FAILED:" + reason))
+                        let failure = "REVIEW_013_TERMINAL_INTERRUPT_FAILED:" + reason
+                        ReviewerWorkflow.ProcessReviewInterruptFence.fail reviewerSessionId failure
+                        return raise (InvalidOperationException failure)
                 }
                 :> Task)
 

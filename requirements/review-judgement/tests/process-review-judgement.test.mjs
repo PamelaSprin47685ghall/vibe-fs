@@ -193,6 +193,30 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
   assert.match(changeHost, /fun \(occasion: ReviewerTerminalOccasion\) ->[\s\S]*?ReviewerTerminalAwait\.awaitFuture[\s\S]*?deps\.Journal[\s\S]*?deps\.Sessions[\s\S]*?occasion/)
 })
 
+test('WHAT[REVIEW-JUDGEMENT-008] process-review interrupt fence releases only after the owner says physical teardown completed', async () => {
+  const reviewer = 'ses-process-review-interrupt-fence'
+  judge.armProcessReviewInterruptFence(reviewer)
+
+  try {
+    assert.equal(judge.processReviewInterruptFenceBlocked(reviewer), true)
+
+    let released = false
+    const waiting = judge.awaitProcessReviewInterruptFence(reviewer).then((result) => {
+      released = true
+      return result
+    })
+
+    await Promise.resolve()
+    assert.equal(released, false, 'a pending fence must not release a later review dispatch')
+
+    judge.releaseProcessReviewInterruptFence(reviewer)
+    assert.deepEqual(await waiting, { ok: true })
+    assert.equal(judge.processReviewInterruptFenceBlocked(reviewer), false)
+  } finally {
+    judge.releaseProcessReviewInterruptFence(reviewer)
+  }
+})
+
 test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_ensure_submitted_attempt_closed_returns_ok_false_when_tool_result_missing_and_does_not_interrupt', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-review-missing-tool-result-'))
   const opened = await journal.JournalSurface_bootWithWriterId(directory, 'writer-missing-tool-result', 'rt-missing-tool-result', 4242, '2026-01-01T00:00:00Z')

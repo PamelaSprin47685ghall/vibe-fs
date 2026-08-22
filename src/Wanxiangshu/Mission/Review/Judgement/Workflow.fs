@@ -6,6 +6,7 @@ open Wanxiangshu.Mission.Review.Barrier
 open Wanxiangshu.Strength.Persistence
 
 open System
+open System.Collections.Generic
 open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
@@ -81,6 +82,46 @@ open Wanxiangshu.Host
 /// `ReviewerContinuation` owns the named send promises; physical delivery is an
 /// injected Review port. There is no stored State/Stage counter.
 module ReviewerWorkflow =
+
+    module ProcessReviewInterruptFence =
+
+        let private gate = obj ()
+
+        let private pending =
+            Dictionary<SessionId, TaskCompletionSource<Result<unit, string>>>()
+
+        let arm (reviewerSessionId: SessionId) =
+            lock gate (fun () ->
+                match pending.TryGetValue reviewerSessionId with
+                | true, _ -> invalidOp "PROCESS_REVIEW_INTERRUPT_FENCE_ALREADY_ARMED"
+                | false, _ ->
+                    pending.[reviewerSessionId] <-
+                        TaskCompletionSource<Result<unit, string>>(TaskCreationOptions.RunContinuationsAsynchronously))
+
+        let awaitRelease (reviewerSessionId: SessionId) : Task<Result<unit, string>> =
+            lock gate (fun () ->
+                match pending.TryGetValue reviewerSessionId with
+                | true, waiter -> waiter.Task
+                | false, _ -> Task.FromResult(Ok()))
+
+        let private settle (reviewerSessionId: SessionId) outcome =
+            let waiter =
+                lock gate (fun () ->
+                    match pending.TryGetValue reviewerSessionId with
+                    | true, current ->
+                        pending.Remove reviewerSessionId |> ignore
+                        Some current
+                    | false, _ -> None)
+
+            waiter
+            |> Option.iter (fun current -> AsyncSupport.trySetResult current outcome |> ignore)
+
+        let release (reviewerSessionId: SessionId) = settle reviewerSessionId (Ok())
+
+        let fail (reviewerSessionId: SessionId) (reason: string) = settle reviewerSessionId (Error reason)
+
+        let isBlocked (reviewerSessionId: SessionId) =
+            lock gate (fun () -> pending.ContainsKey reviewerSessionId)
 
     let private reviewerHasChronicle (snapshot: ProjectionSet) (reviewerSessionId: SessionId) =
         AgentProjection.tryFind reviewerSessionId snapshot.AgentProjections
