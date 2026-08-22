@@ -1613,6 +1613,12 @@
     ],
     "Interaction": [
       {
+        "path": "src/Wanxiangshu/Interaction/Authority/Assistance.fs",
+        "owners": [
+          "interaction-authority"
+        ]
+      },
+      {
         "path": "src/Wanxiangshu/Interaction/Authority/Child.fs",
         "owners": [
           "delegation",
@@ -1629,8 +1635,8 @@
       {
         "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
         "owners": [
-          "dispatch-protocol",
-          "host-boundary"
+          "host-boundary",
+          "interaction-authority"
         ]
       },
       {
@@ -1657,8 +1663,8 @@
       {
         "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs",
         "owners": [
-          "dispatch-protocol",
-          "host-boundary"
+          "host-boundary",
+          "interaction-authority"
         ]
       },
       {

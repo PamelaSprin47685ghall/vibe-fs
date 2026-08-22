@@ -1137,7 +1137,7 @@
     },
     {
       "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs",
-      "owner": "dispatch-protocol"
+      "owner": "interaction-authority"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
@@ -1153,7 +1153,7 @@
     },
     {
       "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSensor.fs",
-      "owner": "dispatch-protocol"
+      "owner": "host-boundary"
     },
     {
       "path": "src/Wanxiangshu/Interaction/Dispatch/OpenCode/NeedHelpSurface.fs",
