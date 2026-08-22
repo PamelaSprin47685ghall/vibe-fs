@@ -750,6 +750,116 @@
       "state": "DONE",
       "result": "CUTOVER",
       "closure_evidence": "proof: requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs; 关联 gate: plugin-transforms-invariant, fsharp-control-pyramid, semantic-owners; Enforcer guidance & continuation 切片归一至 behavior-diagnosis 唯一 owner，清理无用跨层 imports，PluginTransforms 静态乐谱接线保持显式"
+    },
+    {
+      "id": "change-integration-host-contracts",
+      "primary_owner": "change-integration",
+      "intent": "Change & Git integration contracts: change-set projection, review running, host worktree lifecycle and git operations (CHANGE-INTEGRATION-001~016)",
+      "files": [
+        "src/Wanxiangshu/Change/Fact.fs",
+        "src/Wanxiangshu/Change/Facts.fs",
+        "src/Wanxiangshu/Change/Fold.fs",
+        "src/Wanxiangshu/Change/Host/GitAdapter.fs",
+        "src/Wanxiangshu/Change/Host/Host.fs",
+        "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
+        "src/Wanxiangshu/Change/Host/SessionDirectories.fs",
+        "src/Wanxiangshu/Change/Host/Surface.fs",
+        "src/Wanxiangshu/Change/Host/Types.fs",
+        "src/Wanxiangshu/Change/Host/WorktreeCleanup.fs",
+        "src/Wanxiangshu/Change/Job.fs",
+        "src/Wanxiangshu/Change/Program.fs",
+        "src/Wanxiangshu/Change/Projection.fs",
+        "src/Wanxiangshu/Change/Prompts.fs",
+        "src/Wanxiangshu/Change/Recovery.fs",
+        "src/Wanxiangshu/Change/Runtime.fs",
+        "src/Wanxiangshu/Change/Surface.fs",
+        "src/Wanxiangshu/Change/Types.fs",
+        "src/Wanxiangshu/Git/Gateway.fs",
+        "src/Wanxiangshu/Git/IntegrationGate.fs",
+        "src/Wanxiangshu/Git/Operations.fs",
+        "src/Wanxiangshu/Git/Subject.fs",
+        "src/Wanxiangshu/Git/WorktreeResource.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Change.Host.Surface",
+        "Git.Gateway",
+        "Change.IntegrationContract"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/change-integration/tests/job.test.mjs",
+        "requirements/change-integration/tests/git-operations.test.mjs",
+        "requirements/change-integration/tests/integration-gate.test.mjs",
+        "requirements/change-integration/tests/worktree-resource.test.mjs",
+        "requirements/change-integration/tests/runtime.test.mjs"
+      ],
+      "architecture_gates": [
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageF"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "durable-convergence-store-contracts",
+      "primary_owner": "durable-convergence",
+      "intent": "Durable convergence & EventStore merge contracts: k-way event merge, process event log, retention surface, writer stream sync and git hook sync (DURABLE-CONVERGENCE-001~011)",
+      "files": [
+        "src/Wanxiangshu/Git/Hook/Dispatcher.fs",
+        "src/Wanxiangshu/Git/Hook/Surface.fs",
+        "src/Wanxiangshu/Git/Hook/Sync.fs",
+        "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs",
+        "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs",
+        "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
+        "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
+        "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
+        "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+        "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "DurableConvergence.Contract",
+        "EventStore.MergeSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/durable-convergence/tests/event-store-merge.test.mjs",
+        "requirements/durable-convergence/tests/writer-stream-sync.test.mjs",
+        "requirements/durable-convergence/tests/replica-merge-laws.test.mjs",
+        "requirements/durable-convergence/tests/event-store-converge.test.mjs"
+      ],
+      "architecture_gates": [
+        "unified-store-gate.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageF"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
     }
   ],
   "debt_face": {
@@ -1200,41 +1310,6 @@
       "src/Wanxiangshu/Strength/Runtime.fs",
       "src/Wanxiangshu/Strength/Surface.fs",
       "src/Wanxiangshu/Strength/TurnEvidence.fs"
-    ],
-    "CoverageF": [
-      "src/Wanxiangshu/Change/Fact.fs",
-      "src/Wanxiangshu/Change/Facts.fs",
-      "src/Wanxiangshu/Change/Fold.fs",
-      "src/Wanxiangshu/Change/Host/GitAdapter.fs",
-      "src/Wanxiangshu/Change/Host/Host.fs",
-      "src/Wanxiangshu/Change/Host/ReviewRunner.fs",
-      "src/Wanxiangshu/Change/Host/SessionDirectories.fs",
-      "src/Wanxiangshu/Change/Host/Surface.fs",
-      "src/Wanxiangshu/Change/Host/Types.fs",
-      "src/Wanxiangshu/Change/Host/WorktreeCleanup.fs",
-      "src/Wanxiangshu/Change/Job.fs",
-      "src/Wanxiangshu/Change/Program.fs",
-      "src/Wanxiangshu/Change/Projection.fs",
-      "src/Wanxiangshu/Change/Prompts.fs",
-      "src/Wanxiangshu/Change/Recovery.fs",
-      "src/Wanxiangshu/Change/Runtime.fs",
-      "src/Wanxiangshu/Change/Surface.fs",
-      "src/Wanxiangshu/Change/Types.fs",
-      "src/Wanxiangshu/Git/Gateway.fs",
-      "src/Wanxiangshu/Git/Hook/Dispatcher.fs",
-      "src/Wanxiangshu/Git/Hook/Surface.fs",
-      "src/Wanxiangshu/Git/Hook/Sync.fs",
-      "src/Wanxiangshu/Git/IntegrationGate.fs",
-      "src/Wanxiangshu/Git/Operations.fs",
-      "src/Wanxiangshu/Git/Subject.fs",
-      "src/Wanxiangshu/Git/WorktreeResource.fs",
-      "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs",
-      "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs",
-      "src/Wanxiangshu/Persistence/EventStore/IntegrationKernel.fs",
-      "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
-      "src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs",
-      "src/Wanxiangshu/Persistence/EventStore/Store.fs",
-      "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs"
     ],
     "CoverageG": [
       "src/Wanxiangshu/AssemblyInfo.fs",
