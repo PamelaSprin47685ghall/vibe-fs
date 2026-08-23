@@ -23,7 +23,7 @@
    - 完全没有 `writer-manifest` 或仍为 mtime 语义 `v1` 的旧 snapshot 采用 clean break：不导入其 writer tree。新协议 v2 snapshot 要求 manifest 与 `writers/` 一一覆盖并绑定精确 blob OID；结构不完整直接 `StorageInvalid`。没有 v2 activity 证据时禁止根据 fetch 时间、对象到达时间或本地新 mtime 猜测活跃性。
    - retention 后执行 k-way merge；过期 writer 文件从本地删除，新的远端 `writers/` tree 也不再包含它，因此旧 snapshot 再参与同步时仍会被相同 retention predicate 过滤而不能稳定复活。
    - 热路径利用文件元数据指纹与 materialization cache 跳过无变更文件的重复读取与编解码；writer 额外比较 `writer-manifest` 的 activity，因为同一 writer blob OID 仍可能携带不同 activity 证据。payload 是 content-addressed immutable：`cached stat identity = current stat identity ∧ cached OID = remote tree OID ∧ blob mode` 即足以跳过 remote blob read，绝不要求 writer manifest。materialization cache 同时记录“下一次 expiry”，跨过该时刻即使文件未变化也必须重新 materialize。
-   - Hook 自动安装时为当前 repo 的 SSH transport 安装短生命周期 multiplex（`ControlMaster=auto`, `ControlPersist=15s`, repo-scoped `ControlPath`），保留既有 `core.sshCommand` 的 identity/config 参数；若用户已有 `ControlMaster`/`ControlPath` 则完全尊重用户配置。这样外层用户 push 与 hook 内部 store-ref CAS push 可复用同一个 SSH master，不再支付第二次握手。
+   - Hook 自动安装时为当前 repo 的 SSH transport 安装短生命周期 multiplex（`ControlMaster=auto`, `ControlPersist=15s`, repo-scoped `ControlPath`），保留既有 `core.sshCommand` 的 identity/config 参数；若用户已有 `ControlMaster`/`ControlPath` 则完全尊重用户配置。Wanxiang 自有配置通过 `.git` common-dir 下的 owned SSH wrapper 承载：永久 `core.sshCommand` 只指向这个稳定 wrapper；wrapper 每次真正被 Git 调用时才 `mkdir -p` + `chmod 700` 当前 repo 的 `/tmp/wanxiang-ssh-<repo-key>`，随后执行原 SSH 命令与 multiplex 参数。这样 OS 清理 `/tmp` 不会让下一次 `git push` 在进入 `pre-push` 之前因缺失 ControlPath 父目录失败；安装器同时把历史长 repo-local path 与旧的易失 tmp-directory 直连配置迁移到 wrapper。
    - `pre-push` 先读取本地 Wanxiang tracking ref。若 materialization cache 的物理 fingerprint 仍精确命中、未跨 `NextExpiryMs`，且 cached root 与 tracking root 相同，则直接返回该 snapshot，不启动 Wanxiang 网络 transport。只有本地 truth/retention 变化或 tracking 已变化时才进入现有 merge + CAS publish；CAS reject 后再执行 remote discovery/fetch/retry。
    - NDJSON 尾记录读取使用从 EOF 反向按块 `pread` 查找裸 LF 的确定性算法；不猜测最后一行长度，也不解码整条 writer。
 
@@ -45,4 +45,4 @@
 
 ## GAP
 
-- DURABLE-CONVERGENCE-010：remote payload read 已与 writer activity manifest 判定分离；content-addressed payload 在 cache stat identity 与 remote OID 同时命中时不再读取历史 blob。真实 `git push` 从事故现场的 4+ 分钟 store-lock 占用恢复到首次收敛 17.2 秒、稳态 no-op 3.1 秒；durable-convergence 39/39、build、static gates 与 OpenCode warmup 全绿。CLOSED。
+- DURABLE-CONVERGENCE-010：remote payload read 已与 writer activity manifest 判定分离；content-addressed payload 在 cache stat identity 与 remote OID 同时命中时不再读取历史 blob。真实 `git push` 从事故现场的 4+ 分钟 store-lock 占用恢复到首次收敛 17.2 秒、稳态 no-op 3.1 秒。SSH multiplex 的永久配置也已从“直接指向安装时创建的 `/tmp` 子目录”切到 repo-local owned wrapper；旧长路径与旧 tmp-directory 配置均由 installer 迁移，wrapper 在每次 SSH invocation 前重建 private socket directory，因此 OS 清理 `/tmp` 后仍可直接启动下一次 Git SSH transport。CLOSED。

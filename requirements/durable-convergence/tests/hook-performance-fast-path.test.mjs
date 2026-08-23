@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -70,20 +71,27 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer enables repo-local SSH multip
 
   try {
     execFileSync('git', ['init', '--quiet', repo])
+    const commonDir = execFileSync('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim()
+    const wrapper = join(commonDir, 'wanxiang', 'ssh-command')
     const base = 'ssh -F /dev/null -i /tmp/wxs-test-key'
     execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', base])
 
     assert.equal(ensure(repo), true, 'hook ensure failed')
     const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
+    const wrapperBody = readFileSync(wrapper, 'utf8')
 
-    assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
-    assert.match(configured, /ControlMaster=auto/)
-    assert.match(configured, /ControlPersist=15s/)
-    assert.match(configured, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
+    assert.match(configured, /wanxiang\/ssh-command/)
+    assert.doesNotMatch(configured, /ControlMaster|ControlPath/)
+    assert.match(wrapperBody, /ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
+    assert.match(wrapperBody, /ControlMaster=auto/)
+    assert.match(wrapperBody, /ControlPersist=15s/)
+    assert.match(wrapperBody, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
+    assert.match(wrapperBody, /mkdir -p/)
 
     assert.equal(ensure(repo), true, 'second hook ensure failed')
     const configuredAgain = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
     assert.equal(configuredAgain, configured, 'repeated ensure must not stack SSH multiplex options')
+    assert.equal(readFileSync(wrapper, 'utf8'), wrapperBody, 'repeated ensure must keep the owned SSH wrapper stable')
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }
@@ -101,9 +109,50 @@ test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the obsolete long re
 
     assert.equal(ensure(repo), true, 'hook ensure failed')
     const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
-    assert.match(configured, /^ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
-    assert.match(configured, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
+    const wrapper = join(commonDir, 'wanxiang', 'ssh-command')
+    const wrapperBody = readFileSync(wrapper, 'utf8')
+    assert.match(configured, /wanxiang\/ssh-command/)
+    assert.match(wrapperBody, /^#!\/bin\/sh/m)
+    assert.match(wrapperBody, /ssh -F \/dev\/null -i \/tmp\/wxs-test-key\b/)
+    assert.match(wrapperBody, /ControlPath=.*wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
     assert.doesNotMatch(configured, new RegExp(`${commonDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/wanxiang/ssh-%C`))
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DURABLE-CONVERGENCE-010] hook installer migrates the ephemeral tmp-directory path and recreates it at SSH invocation', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wxs-hook-ssh-ephemeral-migrate-'))
+
+  try {
+    execFileSync('git', ['init', '--quiet', repo])
+    const commonDir = execFileSync('git', ['-C', repo, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim()
+    const repoKey = createHash('sha256').update(commonDir).digest('hex').slice(0, 12)
+    const socketDir = join(tmpdir(), `wanxiang-ssh-${repoKey}`)
+    const observedArgs = join(repo, 'ssh-args')
+    const fakeSsh = join(repo, 'fake-ssh')
+    writeFileSync(fakeSsh, `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(observedArgs)}\n`)
+    chmodSync(fakeSsh, 0o755)
+    const base = fakeSsh
+    const ephemeral = `${base} -o ControlMaster=auto -o ControlPersist=15s -o 'ControlPath=${join(tmpdir(), `wanxiang-ssh-${repoKey}`, 'ssh-%C')}'`
+    execFileSync('git', ['-C', repo, 'config', '--local', 'core.sshCommand', ephemeral])
+
+    assert.equal(ensure(repo), true, 'hook ensure failed')
+    const configured = execFileSync('git', ['-C', repo, 'config', '--local', '--get', 'core.sshCommand'], { encoding: 'utf8' }).trim()
+    const wrapper = join(commonDir, 'wanxiang', 'ssh-command')
+    assert.match(configured, /wanxiang\/ssh-command/)
+    assert.doesNotMatch(configured, /wanxiang-ssh-[0-9a-f]{12}\/ssh-%C/)
+
+    rmSync(socketDir, { recursive: true, force: true })
+    assert.equal(existsSync(socketDir), false)
+    const invoked = spawnSync(wrapper, ['example.test', 'git-receive-pack repo.git'], { encoding: 'utf8' })
+    assert.equal(invoked.status, 0, invoked.stderr || invoked.stdout)
+    assert.equal(existsSync(socketDir), true, 'SSH wrapper must recreate its private multiplex directory at invocation time')
+    const args = readFileSync(observedArgs, 'utf8')
+    assert.match(args, /ControlMaster=auto/)
+    assert.match(args, /ControlPersist=15s/)
+    assert.match(args, new RegExp(`ControlPath=${socketDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/ssh-%C`))
+    assert.match(args, /example\.test/)
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }

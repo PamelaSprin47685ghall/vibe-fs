@@ -232,44 +232,93 @@ module HookDispatcher =
     let private legacyManagedControlPath commonDir =
         joinPath (joinPath commonDir "wanxiang") "ssh-%C"
 
-    let private tryStripLegacyManagedCommand commonDir (command: string) =
-        let suffix = " " + multiplexSuffix (legacyManagedControlPath commonDir)
+    let private repoSshKey commonDir =
+        HostDigest.sha256Hex commonDir |> fun digest -> digest.Substring(0, 12)
 
-        if command.EndsWith(suffix, StringComparison.Ordinal) then
-            Some(command.Substring(0, command.Length - suffix.Length))
+    let private managedSocketDirectory commonDir =
+        joinPath (tempDirectory ()) ("wanxiang-ssh-" + repoSshKey commonDir)
+
+    let private managedControlPath commonDir =
+        joinPath (managedSocketDirectory commonDir) "ssh-%C"
+
+    let private managedSshWrapperPath commonDir =
+        joinPath (joinPath commonDir "wanxiang") "ssh-command"
+
+    let private managedSshWrapperCommand commonDir =
+        shellQuote (managedSshWrapperPath commonDir)
+
+    let private tryStripManagedCommand commonDir (command: string) =
+        [ legacyManagedControlPath commonDir; managedControlPath commonDir ]
+        |> List.tryPick (fun controlPath ->
+            let suffix = " " + multiplexSuffix controlPath
+
+            if command.EndsWith(suffix, StringComparison.Ordinal) then
+                Some(command.Substring(0, command.Length - suffix.Length))
+            else
+                None)
+
+    let private managedSshWrapperBody commonDir baseCommand =
+        let socketDirectory = managedSocketDirectory commonDir
+        let controlPath = managedControlPath commonDir
+
+        String.concat
+            "\n"
+            [ "#!/bin/sh"
+              sprintf "# %s ssh-command" OwnershipMarker
+              "set -eu"
+              "umask 077"
+              "mkdir -p " + shellQuote socketDirectory
+              "chmod 700 " + shellQuote socketDirectory
+              baseCommand + " " + multiplexSuffix controlPath + " \"$@\""
+              "" ]
+
+    let private installManagedSshWrapper commonDir baseCommand =
+        let wrapperPath = managedSshWrapperPath commonDir
+        mkdirSync (dirname wrapperPath) (createObj [ "recursive" ==> true; "mode" ==> 0o700 ])
+
+        writeFileSync
+            wrapperPath
+            (managedSshWrapperBody commonDir baseCommand)
+            (createObj [ "encoding" ==> "utf8"; "mode" ==> 0o700 ])
+
+        chmodSync wrapperPath 0o700
+
+    let private ownedSshWrapperExists commonDir =
+        let wrapperPath = managedSshWrapperPath commonDir
+
+        existsSync wrapperPath
+        && containsOwnershipMarker (readFileSync wrapperPath "utf8")
+
+    let private ensureOwnedSshWrapperStillPresent commonDir =
+        if not (ownedSshWrapperExists commonDir) then
+            failwithf
+                "%s: managed SSH wrapper is missing or not owned: %s"
+                IncompleteDiagnosis
+                (managedSshWrapperPath commonDir)
+
+    let private installManagedSshCommand workspace commonDir baseCommand =
+        installManagedSshWrapper commonDir baseCommand
+
+        GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managedSshWrapperCommand commonDir |]
+        |> ignore
+
+    let private oldManagedCommandBase commonDir current =
+        match tryStripManagedCommand commonDir current with
+        | Some baseCommand -> Some baseCommand
+        | None when hasUserSshMultiplex current -> None
+        | None -> Some current
+
+    let private ensureManagedSshCommand workspace commonDir current =
+        if current = managedSshWrapperCommand commonDir then
+            ensureOwnedSshWrapperStillPresent commonDir
         else
-            None
-
-    let private shortManagedControlPath commonDir =
-        let repoKey =
-            HostDigest.sha256Hex commonDir |> fun digest -> digest.Substring(0, 12)
-
-        let socketDir = joinPath (tempDirectory ()) ("wanxiang-ssh-" + repoKey)
-        mkdirSync socketDir (createObj [ "recursive" ==> true; "mode" ==> 0o700 ])
-
-        // A predictable tmp name is safe only if the directory remains private to
-        // this OS user. chmod also fails closed if another user pre-created it.
-        chmodSync socketDir 0o700
-        joinPath socketDir "ssh-%C"
+            oldManagedCommandBase commonDir current
+            |> Option.iter (installManagedSshCommand workspace commonDir)
 
     let private ensureUnixSshMultiplex workspace =
         let commonDir = gitCommonDir workspace
         let current = tryGitConfig workspace "core.sshCommand" |> Option.defaultValue "ssh"
-
-        let baseCommand =
-            match tryStripLegacyManagedCommand commonDir current with
-            | Some legacyBase -> Some legacyBase
-            | None when hasUserSshMultiplex current -> None
-            | None -> Some current
-
-        match baseCommand with
-        | None -> ()
-        | Some baseCommand ->
-            let controlPath = shortManagedControlPath commonDir
-            let managed = baseCommand + " " + multiplexSuffix controlPath
-
-            GitSubject.execIn workspace [| "config"; "--local"; "core.sshCommand"; managed |]
-            |> ignore
+        ensureManagedSshCommand workspace commonDir current
 
     let private ensureSshMultiplex workspace =
         if platform = "win32" then
