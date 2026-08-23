@@ -253,10 +253,25 @@ type PluginRuntimeScope(journal: AgentJournal option) =
     /// callers must match FamilyBlocked (P0-RECOVERY-JOIN-001: no collapse to unit).
     member this.EnsureRecoveryDone(root: SessionId) : Task<FamilyRecovery> = recovery.EnsureRecoveryDone root
 
-    member this.ArmRecovery(sessionId: SessionId) = recovery.ArmRecovery sessionId
+    member this.ArmRecovery(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) =
+        recovery.ArmRecovery(sessionId, physicalUserMessageId)
 
-    member this.TryTakeRecoveryPermit(sessionId: SessionId) =
-        recovery.TryTakeRecoveryPermit sessionId
+    member this.TryTakeRecoveryPermit(sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId) =
+        recovery.TryTakeRecoveryPermit(sessionId, physicalUserMessageId)
+
+    member this.RecordPendingAttemptPlan
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (plan: PendingAttemptPlan)
+        =
+        recovery.RecordPendingAttemptPlan sessionId physicalUserMessageId plan
+
+    member this.TryBindAttemptPlan
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId)
+        (providerRun: ProviderRunIdentity)
+        =
+        recovery.TryBindAttemptPlan sessionId physicalUserMessageId providerRun
 
     member this.RecordAttemptPlan (sessionId: SessionId) (providerRun: ProviderRunIdentity) (plan: AttemptPlan) =
         recovery.RecordAttemptPlan sessionId providerRun plan

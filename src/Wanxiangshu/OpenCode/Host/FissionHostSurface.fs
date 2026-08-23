@@ -200,7 +200,6 @@ module FissionHostSurface =
                     eventPort
                     None
                     (PluginBloggerScope() :> IBloggerRuntimeHost)
-                    (fun _ -> ())
                     (HashSet<string>())
                     (fun _ -> false)
                     AbortCause.External

@@ -13,6 +13,7 @@
 
 - **SessionSnapshotPort**：提供一致的消息结构投影，维护工具调用与执行结果的状态对齐。
 - **因果绑定**：通过严格的因果四条件（角色为助手、完成时间未设、父消息匹配最新用户消息、ID 为最大）解析 `ProviderRunIdentity`。若出现匹配缺失或歧义，一律安全失败。
+- **Pre-run transform 边界**：`experimental.chat.messages.transform` 发生在本次 provider inference 之前，禁止在这里等待本次 assistant child。Recovery transform 先按 exact physical user id 冻结 pending attempt plan；后续完整 Host turn / tool-continuation 观测提供 run identity 时才完成一次性绑定。
 - **两半边身份守门**：`ToolHostCodec` 必须在上下文内同时获取消息 ID 与调用 ID，否则拒绝执行。
 
 ### 3. 调和器调度与事件驱动收敛

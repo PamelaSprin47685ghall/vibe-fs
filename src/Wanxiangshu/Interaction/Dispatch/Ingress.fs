@@ -147,9 +147,11 @@ module PromptIngress =
         (runtime: PromptDispatcher.Runtime)
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
+        (onContinuationAccepted: ((SessionId * PhysicalUserMessageId * PromptAuthority.ContinuationKind) -> unit) option)
         (sessionId: SessionId)
         (physicalMessageId: PhysicalUserMessageId)
         (promptKey: PromptKey)
+        (continuationKind: PromptAuthority.ContinuationKind)
         =
         task {
             match! runtime.AcceptContinuation promptKey sessionId physicalMessageId with
@@ -159,6 +161,9 @@ module PromptIngress =
                 let messageKey = PhysicalUserMessageId.value physicalMessageId
                 bindContinuationMessage sessionKey messageKey
                 registerOwned sessionKey
+
+                onContinuationAccepted
+                |> Option.iter (fun accepted -> accepted (sessionId, physicalMessageId, continuationKind))
         }
 
     let private withPromptKey (promptKey: PromptKey option) (work: PromptKey -> Task<unit>) =
@@ -173,6 +178,7 @@ module PromptIngress =
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
         (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (onContinuationAccepted: ((SessionId * PhysicalUserMessageId * PromptAuthority.ContinuationKind) -> unit) option)
         (message: PromptIngressCodec.DecodedMessage)
         (sessionId: SessionId)
         (physicalMessageId: PhysicalUserMessageId)
@@ -199,9 +205,17 @@ module PromptIngress =
                     sessionId
                     physicalMessageId
                     key)
-        | PromptAuthority.PromptOrigin.Continuation _ ->
+        | PromptAuthority.PromptOrigin.Continuation continuationKind ->
             withPromptKey message.PromptKey (fun key ->
-                acceptContinuation runtime bindContinuationMessage registerOwned sessionId physicalMessageId key)
+                acceptContinuation
+                    runtime
+                    bindContinuationMessage
+                    registerOwned
+                    onContinuationAccepted
+                    sessionId
+                    physicalMessageId
+                    key
+                    continuationKind)
         | PromptAuthority.PromptOrigin.HostInternal
         | PromptAuthority.PromptOrigin.UnknownOrigin -> task { () }
 
@@ -211,6 +225,7 @@ module PromptIngress =
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
         (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (onContinuationAccepted: ((SessionId * PhysicalUserMessageId * PromptAuthority.ContinuationKind) -> unit) option)
         (message: PromptIngressCodec.DecodedMessage)
         =
         task {
@@ -231,6 +246,7 @@ module PromptIngress =
                         bindContinuationMessage
                         registerOwned
                         onAuthorityRoot
+                        onContinuationAccepted
                         message
                         sessionId
                         physicalMessageId
@@ -243,7 +259,14 @@ module PromptIngress =
         (bindContinuationMessage: string -> string -> unit)
         (registerOwned: string -> unit)
         (onAuthorityRoot: ((SessionId * AuthorityRootUserMessageId) -> unit) option)
+        (onContinuationAccepted: ((SessionId * PhysicalUserMessageId * PromptAuthority.ContinuationKind) -> unit) option)
         =
         fun (input: obj) (output: obj) ->
             PromptIngressCodec.decode input output
-            |> handle journal bindUserMessage bindContinuationMessage registerOwned onAuthorityRoot
+            |> handle
+                journal
+                bindUserMessage
+                bindContinuationMessage
+                registerOwned
+                onAuthorityRoot
+                onContinuationAccepted

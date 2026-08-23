@@ -225,10 +225,16 @@ module XWireSurface =
                        error = null
                        output = input?currentProjection |}
             else
-                // ── HOST-BOUNDARY-021: unarmed → no-op ──
+                // ── PAR-011: only the exact Host-accepted physical retry owns arming ──
                 let armed = not (isNullish input?armed) && (input?armed |> unbox<bool>)
+                let physicalUser = text input?physicalUser
+                let armedPhysicalUser = text input?armedPhysicalUser
 
-                if not armed then
+                if
+                    not armed
+                    || String.IsNullOrEmpty physicalUser
+                    || not (String.Equals(physicalUser, armedPhysicalUser, StringComparison.Ordinal))
+                then
                     box
                         {| ok = true
                            noop = true
@@ -240,10 +246,26 @@ module XWireSurface =
                            error = null
                            output = input?currentProjection |}
                 else
-                    // ── HOST-BOUNDARY-020: armed + missing physical user → fail-closed ──
-                    let physicalUser = text input?physicalUser
+                    // The transform is pre-inference: there is intentionally no
+                    // current assistant run/public-snapshot dependency here.
+                    let prefixEpoch =
+                        if isNullish input?prefixEpoch then
+                            None
+                        else
+                            match Int64.TryParse(text input?prefixEpoch) with
+                            | true, value -> Some(PrefixEpochId.create value)
+                            | false, _ -> None
 
-                    if String.IsNullOrEmpty physicalUser then
+                    let prefixEpochAvailable = Option.isSome prefixEpoch
+                    let frozenBodyAvailable = not (isNullish input?frozenRecordPrefixBody)
+
+                    if not prefixEpochAvailable || not frozenBodyAvailable then
+                        let error =
+                            if not prefixEpochAvailable then
+                                "X-wire cannot plan a retry without the current prefix epoch"
+                            else
+                                "X-wire cannot plan a retry without the frozen record prefix body"
+
                         box
                             {| ok = false
                                noop = false
@@ -252,33 +274,75 @@ module XWireSurface =
                                promoted = false
                                probe = null
                                noProbeReason = null
-                               error = "X-wire cannot plan a retry without a physical user message"
+                               error = error
                                output = null |}
                     else
-                        // ── HOST-BOUNDARY-020: armed + missing snapshot port → fail-closed ──
-                        let snapshotPort =
-                            not (isNullish input?snapshotPort) && (input?snapshotPort |> unbox<bool>)
-
-                        let prefixEpoch =
-                            if isNullish input?prefixEpoch then
-                                None
+                        // ── Recovery decision: failure-local slot opportunity (CTX-006) ──
+                        let offsetByte =
+                            if isNullish input?offset then
+                                0uy
                             else
-                                match Int64.TryParse(text input?prefixEpoch) with
-                                | true, value -> Some(PrefixEpochId.create value)
-                                | false, _ -> None
+                                byte (intValue input?offset)
 
-                        let prefixEpochAvailable = Option.isSome prefixEpoch
-                        let frozenBodyAvailable = not (isNullish input?frozenRecordPrefixBody)
+                        let offset =
+                            match AgentPairCursor.FallbackOffsetCodec.ofByte offsetByte with
+                            | Ok o -> o
+                            | Error _ -> AgentPairCursor.FallbackOffset.Fork0
 
-                        if not snapshotPort || not prefixEpochAvailable || not frozenBodyAvailable then
-                            let error =
-                                if not snapshotPort then
-                                    "X-wire cannot plan a retry without the public session snapshot"
-                                elif not prefixEpochAvailable then
-                                    "X-wire cannot plan a retry without the current prefix epoch"
-                                else
-                                    "X-wire cannot plan a retry without the frozen record prefix body"
+                        let coverableCutoff = intValue input?coverableCutoff
+                        let opportunity = RecoverySlot.opportunity SlotArming.ArmedByAdvance offset
 
+                        // ── Probe selection (CTX-011) ──
+                        let committedSnapshot = snapshotOptionOfJs input?committedSnapshot
+                        let committedEpoch = prefixEpoch |> Option.defaultValue PrefixEpochId.initial
+
+                        let coveredDigest = text input?coveredDigest
+                        let requestStartCutoff = intValue input?requestStartCutoff
+                        let frozenRef = BlobRef.create (text input?frozenRecordPrefixRef)
+                        let frozenDigest = BlobDigest.create (text input?frozenRecordPrefixDigest)
+
+                        let currentProjection = semanticProjectionOfJs input?currentProjection
+
+                        let recomputeDigest (cutoff: int) =
+                            let truncated =
+                                { currentProjection with
+                                    Messages = currentProjection.Messages |> List.truncate cutoff }
+
+                            HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
+
+                        let probeResult =
+                            match opportunity with
+                            | RecoveryOpportunity.RecoveryAttempt ->
+                                PrefixProbeSelection.select
+                                    sha256Hex
+                                    (SessionId.create sessionId)
+                                    committedEpoch
+                                    committedSnapshot
+                                    coverableCutoff
+                                    coveredDigest
+                                    requestStartCutoff
+                                    frozenRef
+                                    frozenDigest
+                                    recomputeDigest
+                            | RecoveryOpportunity.OrdinaryAttempt -> Error NoCandidateReason.NoCoverage
+
+                        // ── Prefix intent (CTX-010) ──
+                        let choice, noProbeReason =
+                            match probeResult with
+                            | Ok probe -> XProjectionChoice.UsePrefixProbe probe, None
+                            | Error reason -> XProjectionChoice.UseCommittedEpoch, Some reason
+
+                        let frozenBody = text input?frozenRecordPrefixBody
+                        let memoryPreamble = text input?memoryPreamble
+
+                        let prefixIntent =
+                            XPrefixProjection.forChoice choice committedSnapshot memoryPreamble frozenBody
+
+                        // ── Render decision (PROJ-004/006) ──
+                        let intents = [ prefixIntent ]
+
+                        match ProjectionPlanner.plan intents with
+                        | Error conflict ->
                             box
                                 {| ok = false
                                    noop = false
@@ -287,157 +351,79 @@ module XWireSurface =
                                    promoted = false
                                    probe = null
                                    noProbeReason = null
-                                   error = error
+                                   error = $"X-wire projection conflict: %A{conflict}"
                                    output = null |}
-                        else
-                            // ── Recovery decision: failure-local slot opportunity (CTX-006) ──
-                            let offsetByte =
-                                if isNullish input?offset then
-                                    0uy
+                        | Ok ordered ->
+                            let rendered = ProjectionRenderer.renderPrefix ordered
+
+                            let changed =
+                                match rendered with
+                                | RenderedPrefix.SyntheticPrefix _ -> true
+                                | RenderedPrefix.PhysicalPrefix -> false
+
+                            // The typed permit was consumed before this attempt was built.
+                            // No probe result can leak arming into a later physical request.
+                            let consumed = true
+
+                            // ── Reconcile: promotableProbe (CTX-012) ──
+                            // AttemptPlanner.promotableProbe reads only
+                            // `plan.Profile.ProjectionChoice` and the outcome.
+                            // We have the choice and probe result directly,
+                            // so the promote decision is: Completed + has probe.
+                            let outcome =
+                                if isNullish input?outcome then
+                                    None
                                 else
-                                    byte (intValue input?offset)
+                                    Some(text input?outcome)
 
-                            let offset =
-                                match AgentPairCursor.FallbackOffsetCodec.ofByte offsetByte with
-                                | Ok o -> o
-                                | Error _ -> AgentPairCursor.FallbackOffset.Fork0
-
-                            let coverableCutoff = intValue input?coverableCutoff
-                            let opportunity = RecoverySlot.opportunity SlotArming.ArmedByAdvance offset
-
-                            // ── Probe selection (CTX-011) ──
-                            let committedSnapshot = snapshotOptionOfJs input?committedSnapshot
-                            let committedEpoch = prefixEpoch |> Option.defaultValue PrefixEpochId.initial
-
-                            let coveredDigest = text input?coveredDigest
-                            let requestStartCutoff = intValue input?requestStartCutoff
-                            let frozenRef = BlobRef.create (text input?frozenRecordPrefixRef)
-                            let frozenDigest = BlobDigest.create (text input?frozenRecordPrefixDigest)
-
-                            let currentProjection = semanticProjectionOfJs input?currentProjection
-
-                            let recomputeDigest (cutoff: int) =
-                                let truncated =
-                                    { currentProjection with
-                                        Messages = currentProjection.Messages |> List.truncate cutoff }
-
-                                HostDigest.sha256Hex (ProviderProjection.renderSemantic truncated)
-
-                            let probeResult =
-                                match opportunity with
-                                | RecoveryOpportunity.RecoveryAttempt ->
-                                    PrefixProbeSelection.select
-                                        sha256Hex
-                                        (SessionId.create sessionId)
-                                        committedEpoch
-                                        committedSnapshot
-                                        coverableCutoff
-                                        coveredDigest
-                                        requestStartCutoff
-                                        frozenRef
-                                        frozenDigest
-                                        recomputeDigest
-                                | RecoveryOpportunity.OrdinaryAttempt -> Error NoCandidateReason.NoCoverage
-
-                            // ── Prefix intent (CTX-010) ──
-                            let choice, noProbeReason =
-                                match probeResult with
-                                | Ok probe -> XProjectionChoice.UsePrefixProbe probe, None
-                                | Error reason -> XProjectionChoice.UseCommittedEpoch, Some reason
-
-                            let frozenBody = text input?frozenRecordPrefixBody
-                            let memoryPreamble = text input?memoryPreamble
-
-                            let prefixIntent =
-                                XPrefixProjection.forChoice choice committedSnapshot memoryPreamble frozenBody
-
-                            // ── Render decision (PROJ-004/006) ──
-                            let intents = [ prefixIntent ]
-
-                            match ProjectionPlanner.plan intents with
-                            | Error conflict ->
-                                box
-                                    {| ok = false
-                                       noop = false
-                                       changed = false
-                                       consumed = false
-                                       promoted = false
-                                       probe = null
-                                       noProbeReason = null
-                                       error = $"X-wire projection conflict: %A{conflict}"
-                                       output = null |}
-                            | Ok ordered ->
-                                let rendered = ProjectionRenderer.renderPrefix ordered
-
-                                let changed =
-                                    match rendered with
-                                    | RenderedPrefix.SyntheticPrefix _ -> true
-                                    | RenderedPrefix.PhysicalPrefix -> false
-
-                                // The typed permit was consumed before this attempt was built.
-                                // No probe result can leak arming into a later physical request.
-                                let consumed = true
-
-                                // ── Reconcile: promotableProbe (CTX-012) ──
-                                // AttemptPlanner.promotableProbe reads only
-                                // `plan.Profile.ProjectionChoice` and the outcome.
-                                // We have the choice and probe result directly,
-                                // so the promote decision is: Completed + has probe.
-                                let outcome =
-                                    if isNullish input?outcome then
-                                        None
-                                    else
-                                        Some(text input?outcome)
-
-                                let promoted =
-                                    match outcome with
-                                    | Some "completed" ->
-                                        match probeResult with
-                                        | Ok _ -> true
-                                        | Error _ -> false
-                                    | _ -> false
-
-                                let probeJs =
+                            let promoted =
+                                match outcome with
+                                | Some "completed" ->
                                     match probeResult with
-                                    | Ok probe -> probeToJs probe
-                                    | Error _ -> null
+                                    | Ok _ -> true
+                                    | Error _ -> false
+                                | _ -> false
 
-                                let noProbeJs =
-                                    noProbeReason |> Option.map noCandidateReasonLabel |> Option.defaultValue null
+                            let probeJs =
+                                match probeResult with
+                                | Ok probe -> probeToJs probe
+                                | Error _ -> null
 
-                                // ── Output: the transformed projection ──
-                                let output =
-                                    if changed then
-                                        match rendered with
-                                        | RenderedPrefix.SyntheticPrefix activation ->
-                                            let head: SemanticMessage =
-                                                { Role = "user"
-                                                  Parts = [ SemanticText activation.Memory ] }
+                            let noProbeJs =
+                                noProbeReason |> Option.map noCandidateReasonLabel |> Option.defaultValue null
 
-                                            let tail =
-                                                currentProjection.Messages |> List.skip activation.CutoffExclusive
+                            // ── Output: the transformed projection ──
+                            let output =
+                                if changed then
+                                    match rendered with
+                                    | RenderedPrefix.SyntheticPrefix activation ->
+                                        let head: SemanticMessage =
+                                            { Role = "user"
+                                              Parts = [ SemanticText activation.Memory ] }
 
-                                            let transformed =
-                                                { currentProjection with
-                                                    Messages = head :: tail }
+                                        let tail = currentProjection.Messages |> List.skip activation.CutoffExclusive
 
-                                            box
-                                                {| messages =
-                                                    transformed.Messages |> List.map semanticMessageToJs |> List.toArray |}
-                                        | _ -> input?currentProjection
-                                    else
-                                        input?currentProjection
+                                        let transformed =
+                                            { currentProjection with
+                                                Messages = head :: tail }
 
-                                box
-                                    {| ok = true
-                                       noop = false
-                                       changed = changed
-                                       consumed = consumed
-                                       promoted = promoted
-                                       probe = probeJs
-                                       noProbeReason = noProbeJs
-                                       error = null
-                                       output = output |}
+                                        box
+                                            {| messages =
+                                                transformed.Messages |> List.map semanticMessageToJs |> List.toArray |}
+                                    | _ -> input?currentProjection
+                                else
+                                    input?currentProjection
+
+                            box
+                                {| ok = true
+                                   noop = false
+                                   changed = changed
+                                   consumed = consumed
+                                   promoted = promoted
+                                   probe = probeJs
+                                   noProbeReason = noProbeJs
+                                   error = null
+                                   output = output |}
 
     /// HOST-BOUNDARY-021: reconcile decision — does a completed attempt promote
     /// a prefix rebase, and does a failed/aborted attempt clear the plan?

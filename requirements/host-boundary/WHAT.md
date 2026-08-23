@@ -30,7 +30,7 @@
 
 ## HOST-BOUNDARY-008: Transform 到 ProviderRunIdentity 因果读与唯一性
 
-从快照提取运行身份必须基于严格的因果规则（角色、完成时间、父节点匹配与最大序列）；当且仅当命中唯一候选时方可确认绑定，命中 0 个或多个候选时一律安全失败。
+从快照提取运行身份必须基于严格的因果规则（角色、完成时间、父节点匹配与最大序列）；当且仅当命中唯一候选时方可确认绑定，命中 0 个或多个候选时一律安全失败。`experimental.chat.messages.transform` 属于 provider inference 之前的物理边界，因此该 hook 不得把“当前 assistant run 已经存在”作为业务前置条件，也不得通过 bounded wait 把未来 run 伪装成 projection lag；需要在该 hook 冻结的 recovery 决策必须先以 exact `PhysicalUserMessageId` 保存为未绑定 attempt plan，待后续完整 Host 观测出现 exact `ProviderRunIdentity` 后再一次性绑定。
 
 ## HOST-BOUNDARY-009: Tool 身份双半边与缺失 Fail-Closed
 

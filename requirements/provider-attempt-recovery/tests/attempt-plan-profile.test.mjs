@@ -190,3 +190,16 @@ test('WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_w
   assert.doesNotMatch(workflow, /opportunityAfterAdvance/)
   assert.doesNotMatch(workflow, /AgentPairCursor\.isRecoverySlot/)
 })
+
+test('WHAT[PAR-011] PAR_011_workmain_recovery_arms_only_after_exact_provider_retry_physical_acceptance', () => {
+  const fallback = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
+  const ingress = source('src/Wanxiangshu/Interaction/Dispatch/Ingress.fs')
+  const bootstrap = source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
+  const recoveryScope = source('src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs')
+
+  assert.doesNotMatch(fallback, /armRecovery turn\.SessionId/)
+  assert.match(bootstrap, /ProviderRetryAttempt[\s\S]*ArmRecovery/)
+  assert.match(ingress, /PhysicalUserMessageId[\s\S]*onContinuationAccepted/)
+  assert.match(recoveryScope, /PhysicalUserMessageId/)
+  assert.match(recoveryScope, /TryTakeRecoveryPermit[\s\S]*physicalUserMessageId/)
+})

@@ -317,6 +317,13 @@ module HostSignalBootstrap =
                 | None -> ()
                 | Some durable -> reactivateBlogger mainSessionId durable root
 
+            let onContinuationAccepted
+                (sessionId: SessionId, physicalUserMessageId: PhysicalUserMessageId, continuationKind)
+                =
+                match continuationKind with
+                | PromptAuthority.ProviderRetryAttempt -> scope.ArmRecovery(sessionId, physicalUserMessageId)
+                | _ -> ()
+
             let promptIngressHook =
                 PromptIngress.createHook
                     journal
@@ -324,6 +331,7 @@ module HostSignalBootstrap =
                     bindContinuationMessage
                     registerOwned
                     (Some onAuthorityRoot)
+                    (Some onContinuationAccepted)
 
             let durabilityActivation =
                 lazy

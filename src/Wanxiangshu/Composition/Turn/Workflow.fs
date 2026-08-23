@@ -31,7 +31,6 @@ module TurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (syncDelegate: SyncDelegateRuntime option)
         (reviewerContinuationPort: ReviewerContinuationPort)
         (nudgeSent: HashSet<string>)
@@ -94,7 +93,6 @@ module TurnWorkflow =
                     eventPort
                     journal
                     recoveryScope
-                    armRecovery
                     joinGuardNudges
                     hasLivePty
                     abortCause

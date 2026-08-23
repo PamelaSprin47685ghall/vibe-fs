@@ -456,7 +456,6 @@ module ProviderRecoveryWorkflow =
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
@@ -464,7 +463,6 @@ module ProviderRecoveryWorkflow =
         : Task =
         task {
             if opportunity = RecoveryOpportunity.RecoveryAttempt then
-                armRecovery turn.SessionId
                 do! awaitRecoveryMaterial scope durable turn.SessionId
 
             let! continuation = sendContinuation sessionPort turn (Some durable) continuationPrompt
@@ -476,7 +474,6 @@ module ProviderRecoveryWorkflow =
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
@@ -485,15 +482,13 @@ module ProviderRecoveryWorkflow =
         match mainSessionOfBlogger durable turn.SessionId with
         | Some mainSessionId ->
             continueBlogger sessionPort eventPort durable scope turn mainSessionId continuationPrompt error opportunity
-        | None ->
-            continueWorkMain sessionPort eventPort durable scope armRecovery turn continuationPrompt error opportunity
+        | None -> continueWorkMain sessionPort eventPort durable scope turn continuationPrompt error opportunity
 
     let private settleFailureAdmission
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
@@ -509,23 +504,13 @@ module ProviderRecoveryWorkflow =
         | Ok ConfirmedFailureOutcome.AlreadyRecorded
         | Ok ConfirmedFailureOutcome.NoActiveRun -> Task.FromResult(()) :> Task
         | Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity) ->
-            continueAdvancedFailure
-                sessionPort
-                eventPort
-                durable
-                scope
-                armRecovery
-                turn
-                continuationPrompt
-                error
-                opportunity
+            continueAdvancedFailure sessionPort eventPort durable scope turn continuationPrompt error opportunity
 
     let private continueDurableFailure
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (continuationPrompt: string)
         (error: string)
@@ -539,17 +524,7 @@ module ProviderRecoveryWorkflow =
                     turn.ProviderRun
                     error
 
-            return!
-                settleFailureAdmission
-                    sessionPort
-                    eventPort
-                    durable
-                    scope
-                    armRecovery
-                    turn
-                    continuationPrompt
-                    error
-                    admission
+            return! settleFailureAdmission sessionPort eventPort durable scope turn continuationPrompt error admission
         }
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.
@@ -566,7 +541,6 @@ module ProviderRecoveryWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (scope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (turn: ReconciledTurn)
         (error: string)
         (continuationPrompt: string)
@@ -575,7 +549,6 @@ module ProviderRecoveryWorkflow =
             match journal with
             | None -> notifyFailure eventPort turn error
             | Some durable ->
-                return!
-                    continueDurableFailure sessionPort eventPort durable scope armRecovery turn continuationPrompt error
+                return! continueDurableFailure sessionPort eventPort durable scope turn continuationPrompt error
         }
         :> Task

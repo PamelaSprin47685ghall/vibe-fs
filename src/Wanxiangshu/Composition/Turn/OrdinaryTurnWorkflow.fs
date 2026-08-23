@@ -184,7 +184,6 @@ module OrdinaryTurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortCause: AbortCause)
@@ -209,7 +208,6 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 recoveryScope
-                armRecovery
                 turn
                 error
                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
@@ -221,7 +219,6 @@ module OrdinaryTurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (recoveryScope: IBloggerRuntimeHost)
-        (armRecovery: SessionId -> unit)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
         (abortCause: AbortCause)
@@ -252,7 +249,6 @@ module OrdinaryTurnWorkflow =
                 eventPort
                 journal
                 recoveryScope
-                armRecovery
                 joinGuardNudges
                 hasLivePty
                 abortCause

@@ -40,9 +40,9 @@ Host 传输层的重试序号是宿主内部状态，不得写入领域连续失
 
 一个已确认失败先通过 `FallbackLedger` 推进到下一槽；若该新槽为 primed Blogger 槽且存在 durable frames，则该槽的第一物理请求必须是维护子请求 `BloggerSquash`，严禁先重发 BloggerMain。Squash 成功不清零失败计数，并在同槽继续 `BloggerMain`；Squash 失败即结束该槽、记录下一次 advance，严禁在同一槽继续 Main。没有 squash 材料的槽直接发送 Main。每个失败槽恰好产生一次 `FallbackCursorAdvanced`。
 
-## PAR-011: typed recovery opportunity 与 stale-primed 陷阱
+## PAR-011: typed recovery opportunity、精确物理绑定与 stale-primed 陷阱
 
-`RecoveryOpportunity` 仅由“本次已确认失败刚刚 advance”与“该次 advance 得到的新 Offset 为 primed”共同产生；`FallbackLedger` 必须把这一本次 advance 的 typed opportunity 作为 admission 结果向后传递，后继 workflow 严禁再次读取 durable cursor 奇偶来重建 opportunity。材料资格由后续候选/frames 证明，不得提前折叠进 opportunity。Opportunity 只属于紧随该 advance 的一个物理 attempt，发送普通请求也会消费它；新 Run 或崩溃重启后安全归零。正常成功会按 PAR-004 关闭 primed 子槽；但进程可能在 failure advance 后、成功结算前崩溃，因此 durable odd Offset 仍不能单独证明当前请求 armed。严禁仅凭持久化奇数 Offset 重新 arm，严禁 NoCoverage 后把许可跨 attempt re-arm。
+`RecoveryOpportunity` 仅由“本次已确认失败刚刚 advance”与“该次 advance 得到的新 Offset 为 primed”共同产生；`FallbackLedger` 必须把这一本次 advance 的 typed opportunity 作为 admission 结果向后传递，后继 workflow 严禁再次读取 durable cursor 奇偶来重建 opportunity。材料资格由后续候选/frames 证明，不得提前折叠进 opportunity。Opportunity 只属于紧随该 advance 的一个物理 attempt，发送普通请求也会消费它；新 Run 或崩溃重启后安全归零。WorkMain recovery 的 process-local permit 只能在 Host 已持久确认 `ProviderRetryAttempt` 的 `PhysicalUserMessageId` 后建立，并且消费时必须与当前 transform 的 exact physical user id 相等；仅凭 `SessionId` presence、发送意图或尚未被 Host 接受的 PromptKey 均不得领取该许可。正常成功会按 PAR-004 关闭 primed 子槽；但进程可能在 failure advance 后、成功结算前崩溃，因此 durable odd Offset 仍不能单独证明当前请求 armed。严禁仅凭持久化奇数 Offset 重新 arm，严禁 NoCoverage 后把许可跨 attempt re-arm。
 
 ## PAR-012: Host abort / cleanup 残留不计入推进
 

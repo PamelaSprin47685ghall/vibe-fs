@@ -198,7 +198,6 @@ module HostTurnObserver =
                         eventPort
                         journal
                         scope.BloggerRuntimeHost
-                        (fun s -> scope.ArmRecovery s)
                         scope.SyncDelegateRuntime
                         reviewerContinuationPort
                         scope.Sessions.NudgeSent

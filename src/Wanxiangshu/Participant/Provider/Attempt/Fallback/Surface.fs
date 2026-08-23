@@ -16,7 +16,7 @@ module FallbackSurface =
           AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "msg_u1"
           ProviderRun = ProviderRunIdentity.create run }
 
-    let private view projection =
+    let private view (projection: FallbackProjection) =
         box
             {| offset = AgentPairCursor.FallbackOffsetCodec.toByte projection.Cursor.Offset
                failures = projection.Cursor.ConsecutiveFailureCount

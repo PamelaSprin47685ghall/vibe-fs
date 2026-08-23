@@ -26,6 +26,7 @@ const armedInput = (overrides = {}) => ({
   prefixEpoch: 0,
   offset: 1, // Fork1 — a recovery slot
   physicalUser: 'user-1',
+  armedPhysicalUser: 'user-1',
   snapshotPort: true,
   currentProjection: baseProjection,
   committedSnapshot: null,
@@ -73,20 +74,47 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_unarmed_session_is_a_noop', () => {
   assert.equal(result.consumed, false)
 })
 
-// ── HOST-BOUNDARY-020: fail-closed on insufficient observation ──────────
+test('WHAT[PAR-011] XWIRE_recovery_permit_cannot_be_consumed_by_other_physical_material_in_the_same_session', () => {
+  const result = XWireSurface.transform(armedInput({
+    armedPhysicalUser: 'retry-user-1',
+    physicalUser: 'ordinary-user-2',
+  }))
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_physical_user_message_fail_closed', () => {
-  const result = XWireSurface.transform(armedInput({ physicalUser: '' }))
-  assert.equal(result.ok, false)
-  assert.equal(result.noop, false)
-  assert.match(result.error, /physical user/)
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
+  assert.equal(result.changed, false)
+  assert.equal(result.consumed, false)
 })
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_snapshot_port_fail_closed', () => {
+test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_transform_freezes_a_pending_plan_without_waiting_for_assistant_run', () => {
+  const production = readFileSync(
+    new URL('../../../src/Wanxiangshu/Context/Prefix/Wire.fs', import.meta.url),
+    'utf8',
+  )
+  const planning = production.slice(
+    production.indexOf('let private planArmedWorkMainRetry'),
+    production.indexOf('let private applyNonReplicaTransform'),
+  )
+
+  assert.doesNotMatch(planning, /bindProviderRunAfterProjectionCatchup/)
+  assert.doesNotMatch(planning, /ProviderRunBinding\.observeBindableRun/)
+  assert.match(planning, /RecordPendingAttemptPlan/)
+})
+
+// ── HOST-BOUNDARY-020: fail-closed only after exact physical ownership ──
+
+test('WHAT[PAR-011] XWIRE_missing_current_physical_user_cannot_consume_the_accepted_retry_permit', () => {
+  const result = XWireSurface.transform(armedInput({ physicalUser: '' }))
+  assert.equal(result.ok, true)
+  assert.equal(result.noop, true)
+  assert.equal(result.consumed, false)
+})
+
+test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_retry_does_not_require_a_public_session_snapshot', () => {
   const result = XWireSurface.transform(armedInput({ snapshotPort: false }))
-  assert.equal(result.ok, false)
+  assert.equal(result.ok, true)
   assert.equal(result.noop, false)
-  assert.match(result.error, /snapshot/)
+  assert.equal(result.consumed, true)
 })
 
 test('WHAT[HOST-BOUNDARY-020] XWIRE_missing_prefix_epoch_fail_closed', () => {
@@ -196,7 +224,7 @@ test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_ordinary_request_keeps_committed_prefi
   )
   const committed = source.slice(
     source.indexOf('let private applyOrdinaryCommittedPrefix'),
-    source.indexOf('let private awaitProjectionSignal'),
+    source.indexOf('let private planArmedWorkMainRetry'),
   )
   const ordinary = source.slice(
     source.indexOf('let private applyNonReplicaTransform'),
@@ -204,8 +232,8 @@ test('WHAT[CONTEXT-COMPRESSION-011] XWIRE_ordinary_request_keeps_committed_prefi
   )
 
   assert.match(ordinary, /settleVisibleToolContinuations/)
-  assert.match(ordinary, /\| None, _, _ ->[\s\S]*?applyOrdinaryCommittedPrefix/)
-  assert.doesNotMatch(ordinary, /\| None, _, _ ->\s*return \(\)/)
+  assert.match(ordinary, /TryTakeRecoveryPermit\(sessionId, physical\)/)
+  assert.match(ordinary, /\| None ->[\s\S]*?applyOrdinaryCommittedPrefix/)
   assert.match(committed, /applyCommittedPrefix durable sessionId state rawMessages output/)
 })
 
@@ -236,16 +264,16 @@ test('WHAT[HOST-BOUNDARY-021] XWIRE_reconcile_no_plan_is_inert', () => {
   assert.equal(result.keptPlan, false)
 })
 
-// ── Mutation sensitivity: wrong production transform must fail ───────────
+// ── Mutation sensitivity: wrong physical ownership must not consume ──────
 //
-// If the surface returned ok=true for a missing physical user (i.e. did NOT
-// fail-closed), this assertion would catch it. This proves the test is
-// mutation-sensitive to the production decision logic.
+// A session-scoped boolean arming regression would consume this permit even
+// though the current physical user is unrelated.
 
-test('WHAT[HOST-BOUNDARY-020] XWIRE_mutation_sensitive_missing_physical_user_must_fail_closed', () => {
-  // A correct production surface returns ok=false for missing physical user.
-  // If someone breaks the fail-closed gate, this test fails.
-  const result = XWireSurface.transform(armedInput({ physicalUser: '' }))
-  assert.equal(result.ok, false,
-    'mutation guard: missing physical user must fail-closed, not silently succeed')
+test('WHAT[PAR-011] XWIRE_mutation_sensitive_unrelated_physical_user_must_not_consume_recovery', () => {
+  const result = XWireSurface.transform(armedInput({
+    armedPhysicalUser: 'retry-user-1',
+    physicalUser: 'unrelated-user-9',
+  }))
+  assert.equal(result.consumed, false,
+    'mutation guard: session presence alone must never consume a physical recovery permit')
 })

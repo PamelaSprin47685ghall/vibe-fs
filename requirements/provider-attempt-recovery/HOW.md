@@ -13,10 +13,12 @@
 
 1. **已确认失败识别**：从完整快照与失败终态中提取确切的 `ProviderRunIdentity`。
 2. **Admission 裁决**：先写 `FallbackCursorAdvanced`；只有预算允许的 `RecoveryAdvanced` 才继续。WorkMain 在新 primed 槽获得一次 X opportunity；BloggerMain 在新 primed 槽且有 frames 时先发送 BloggerSquash。
-3. **Blogger retry 所有权**：失败 open request 先 abandon；下一 typed request 在物理发送前 materialize，并在 send 后绑定该次 PromptKey。Main→Main、Main→Squash、Squash→Main 共用同一规则。
-4. **事件解锁**：WorkMain recovery 只在 linked Blogger 存在 durable open request 时通过 `AgentJournal.awaitChangeFromOrCancel` 订阅 committed journal change；`BlogObservationCommitted`、`BlogObservationsSquashed`、`BloggerRequestAbandoned` 等 fact 到达后重新求值，plugin shutdown 显式注销订阅。无 open producer 立即 retry，不读取 flight/pending，不存在 timeout/polling。
-5. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
-6. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`，不改写 Persona、语言或 system prompt 字节。
+3. **WorkMain retry 物理所有权**：recovery continuation 先按正常 Prompt admission 发送；只有 `PromptIngress` 已把该 `ProviderRetryAttempt` 持久化为 `PhysicalAccepted` 后，才用 exact `PhysicalUserMessageId` 建立一次性 recovery permit。`messages.transform` 只允许消费 physical id 完全相等的 permit；同 session 的 tool continuation、旧 retry 或普通 user material 均不得误领。
+4. **ProviderRun 延迟绑定**：`messages.transform` 发生在 provider inference 之前，只冻结由 authority/cursor/physical id/request kind/prefix choice 构成的 pending attempt plan，不读取未来 assistant run。后续 tool-continuation 可见性或 reconciled turn 提供 `PhysicalUserMessageId + ProviderRunIdentity` 时，把 pending plan 一次性绑定成 `AttemptExecutionProfile`，再执行 prefix promotion / success accounting。
+5. **Blogger retry 所有权**：失败 open request 先 abandon；下一 typed request 在物理发送前 materialize，并在 send 后绑定该次 PromptKey。Main→Main、Main→Squash、Squash→Main 共用同一规则。
+6. **事件解锁**：WorkMain recovery 只在 linked Blogger 存在 durable open request 时通过 `AgentJournal.awaitChangeFromOrCancel` 订阅 committed journal change；`BlogObservationCommitted`、`BlogObservationsSquashed`、`BloggerRequestAbandoned` 等 fact 到达后重新求值，plugin shutdown 显式注销订阅。无 open producer 立即 retry，不读取 flight/pending，不存在 timeout/polling。
+7. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
+8. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`，不改写 Persona、语言或 system prompt 字节。
 
 ## 依赖关系
 

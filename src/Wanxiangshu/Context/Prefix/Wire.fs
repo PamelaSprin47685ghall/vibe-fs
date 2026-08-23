@@ -504,7 +504,9 @@ module XWire =
             scope.ConsumeAttemptPlan sessionId providerRun |> ignore
         }
 
-    let private toolContinuationRun (rawMessage: obj) : ProviderRunIdentity option =
+    let private toolContinuationBinding
+        (rawMessage: obj)
+        : (ProviderRunIdentity * PhysicalUserMessageId option) option =
         let info = ProviderWireDecode.infoObject rawMessage
 
         match
@@ -516,7 +518,11 @@ module XWire =
             role.Equals("assistant", StringComparison.OrdinalIgnoreCase)
             && finish.Equals("tool-calls", StringComparison.OrdinalIgnoreCase)
             ->
-            Some(ProviderRunIdentity.create providerRun)
+            let physical =
+                ProviderWireDecode.firstString info [ "parentID" ]
+                |> Option.map PhysicalUserMessageId.create
+
+            Some(ProviderRunIdentity.create providerRun, physical)
         | _ -> None
 
     let private settleVisibleToolContinuation
@@ -524,8 +530,16 @@ module XWire =
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
+        (physical: PhysicalUserMessageId option)
         : Task =
-        match scope.TryAttemptPlan sessionId providerRun with
+        let plan =
+            match scope.TryAttemptPlan sessionId providerRun with
+            | Some existing -> Some existing
+            | None ->
+                physical
+                |> Option.bind (fun parent -> scope.TryBindAttemptPlan sessionId parent providerRun)
+
+        match plan with
         | None -> Task.FromResult(())
         | Some plan -> settleAttemptPlan durable scope sessionId providerRun AttemptOutcome.Completed plan
 
@@ -536,8 +550,8 @@ module XWire =
         (rawMessages: obj list)
         : Task =
         task {
-            for providerRun in rawMessages |> List.choose toolContinuationRun |> List.distinct do
-                do! settleVisibleToolContinuation durable scope sessionId providerRun
+            for providerRun, physical in rawMessages |> List.choose toolContinuationBinding |> List.distinct do
+                do! settleVisibleToolContinuation durable scope sessionId providerRun physical
         }
 
     let private applyCommittedPrefix
@@ -591,46 +605,7 @@ module XWire =
         | None -> raise (InvalidOperationException "X-wire cannot apply a committed prefix without session projection")
         | Some state -> applyCommittedPrefix durable sessionId state rawMessages output
 
-    let private awaitProjectionSignal
-        (messageVisibility: MessageVisibilityHub option)
-        (sessionId: SessionId)
-        : Task<unit> =
-        match messageVisibility with
-        | Some hub -> hub.AwaitChange sessionId ProviderRunBinding.projectionCatchupDelayMilliseconds
-        | None -> Task.FromResult(())
-
-    let private bindProviderRunAfterProjectionCatchup
-        (messageVisibility: MessageVisibilityHub option)
-        (snapshotPort: ISessionSnapshotPort)
-        (sessionId: SessionId)
-        (physical: PhysicalUserMessageId)
-        : Task<SessionMessage> =
-        let physicalId = PhysicalUserMessageId.value physical
-
-        let rec read remainingReads =
-            task {
-                let! snapshotResult = snapshotPort.GetMessages sessionId
-                let messages = requireOk snapshotResult
-
-                match ProviderRunBinding.observeBindableRun physicalId messages with
-                | ProviderRunBinding.Observation.Bound assistant -> return assistant
-                | ProviderRunBinding.Observation.Rejected rejection ->
-                    return
-                        requireOkMapped (fun error -> sprintf "X-wire run binding failed: %A" error) (Error rejection)
-                | ProviderRunBinding.Observation.ProjectionNotVisibleYet when remainingReads > 1 ->
-                    do! awaitProjectionSignal messageVisibility sessionId
-                    return! read (remainingReads - 1)
-                | ProviderRunBinding.Observation.ProjectionNotVisibleYet ->
-                    return
-                        requireOkMapped
-                            (fun error -> sprintf "X-wire run binding failed: %A" error)
-                            (Error ProviderRunBinding.Rejection.NoBindableRun)
-            }
-
-        read ProviderRunBinding.projectionCatchupMaxReads
-
     let private planArmedWorkMainRetry
-        (snapshotPort: ISessionSnapshotPort)
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
@@ -640,10 +615,6 @@ module XWire =
         (rawMessages: obj list)
         : Task<PrefixPresentationHorizon> =
         task {
-            let! assistant =
-                bindProviderRunAfterProjectionCatchup scope.MessageVisibility snapshotPort sessionId physical
-
-            let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable
 
             match
@@ -683,19 +654,18 @@ module XWire =
 
                 let selectProbe () = candidateResult
 
-                let plan =
-                    AttemptPlanner.plan
+                let pendingPlan =
+                    AttemptPlanner.freezePreInference
                         authority
                         fallback.Cursor
                         physical
-                        providerRun
                         (PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt)
                         ProviderRequestKind.WorkMain
                         opportunity
                         selectProbe
 
                 let presentationHorizon =
-                    match AttemptPlanner.probeOf plan with
+                    match AttemptPlanner.pendingProbeOf pendingPlan with
                     | Some _ -> PrefixPresentationHorizon.TentativeCold
                     | None -> PrefixPresentationHorizon.Current
 
@@ -704,14 +674,14 @@ module XWire =
                 // COMMITTED blob for a probe attempt would inject the old prefix under
                 // the candidate's id).
                 let! frozenRecordPrefixBody =
-                    readFrozenRecordPrefixBody durable plan.Profile.ProjectionChoice snapshot.CommittedPrefix
+                    readFrozenRecordPrefixBody durable pendingPlan.ProjectionChoice snapshot.CommittedPrefix
 
                 let memoryPreamble =
                     ProviderProse.render (ProviderProse.languageOf sessionId) CompanionPrompt.MemoryPreamble Map.empty
 
                 let prefixIntent =
                     XPrefixProjection.forChoice
-                        plan.Profile.ProjectionChoice
+                        pendingPlan.ProjectionChoice
                         snapshot.CommittedPrefix
                         memoryPreamble
                         frozenRecordPrefixBody
@@ -721,7 +691,7 @@ module XWire =
 
                 Wanxiangshu.OpenCode.HostMessageProjection.replaceMessagesInPlace output transformed
 
-                scope.RecordAttemptPlan sessionId providerRun plan
+                scope.RecordPendingAttemptPlan sessionId physical pendingPlan
                 return presentationHorizon
 
             | _ ->
@@ -736,7 +706,7 @@ module XWire =
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
-        (snapshot: ISessionSnapshotPort option)
+        (_snapshot: ISessionSnapshotPort option)
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
@@ -751,17 +721,18 @@ module XWire =
             // Owning recovery CE consumes the typed arming permit exactly once (SW-017②, PAR-011).
             // Host callback is only rendezvous/observation; presence no longer drives business branching
             // outside the owning CE.
-            match scope.TryTakeRecoveryPermit sessionId, physical, snapshot with
-            | None, _, _ ->
+            let recoveryAttempt =
+                physical
+                |> Option.bind (fun physical ->
+                    scope.TryTakeRecoveryPermit(sessionId, physical)
+                    |> Option.map (fun arming -> physical, arming))
+
+            match recoveryAttempt with
+            | None ->
                 do! applyOrdinaryCommittedPrefix durable sessionId rawMessages output
                 return PrefixPresentationHorizon.Current
-            | Some _, None, _ ->
-                return raise (InvalidOperationException "X-wire cannot plan a retry without a physical user message")
-            | Some _, _, None ->
-                return
-                    raise (InvalidOperationException "X-wire cannot plan a retry without the public session snapshot")
-            | Some arming, Some physical, Some snapshotPort ->
-                return! planArmedWorkMainRetry snapshotPort durable scope sessionId arming physical output rawMessages
+            | Some(physical, arming) ->
+                return! planArmedWorkMainRetry durable scope sessionId arming physical output rawMessages
         }
 
     let private applySessionTransform
@@ -814,10 +785,23 @@ module XWire =
         | Some outcome -> settleAttemptPlan durable scope turn.SessionId turn.ProviderRun outcome plan
         | None -> Task.FromResult(())
 
+    let private attemptPlanForTurn (scope: PluginRuntimeScope) (turn: ReconciledTurn) =
+        scope.TryAttemptPlan turn.SessionId turn.ProviderRun
+        |> Option.orElseWith (fun () ->
+            scope.TryBindAttemptPlan turn.SessionId turn.PhysicalUserMessageId turn.ProviderRun)
+
+    let private plannedReconciliation
+        (journal: AgentJournal option)
+        (scope: PluginRuntimeScope)
+        (turn: ReconciledTurn)
+        =
+        journal
+        |> Option.bind (fun durable -> attemptPlanForTurn scope turn |> Option.map (fun plan -> durable, plan))
+
     /// Settle the physical provider attempt, not the larger Host turn.
     /// `finish=tool-calls` therefore closes a successful attempt plan while the
     /// Host tool loop continues; only a genuinely provisional snapshot keeps it.
     let reconcileAttempt (journal: AgentJournal option) (scope: PluginRuntimeScope) (turn: ReconciledTurn) : Task =
-        match journal, scope.TryAttemptPlan turn.SessionId turn.ProviderRun with
-        | Some durable, Some plan -> reconcilePlannedAttempt durable scope turn plan
-        | _ -> Task.FromResult(())
+        match plannedReconciliation journal scope turn with
+        | Some(durable, plan) -> reconcilePlannedAttempt durable scope turn plan
+        | None -> Task.FromResult(())
