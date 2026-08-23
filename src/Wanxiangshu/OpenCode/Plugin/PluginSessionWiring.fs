@@ -189,7 +189,6 @@ module PluginSessionWiring =
                 new StrengthReplicaRuntime(
                     sessionPort,
                     dispatcher,
-                    Wanxiangshu.Process.PtyTiming.nodeTimerPort (),
                     scope.Strength.StrengthRuntime,
                     registerStrengthReplica,
                     ?workspaceDirectory = workspaceDirectory,

@@ -102,7 +102,9 @@ module HostSessionDeletion =
         // decision before its best-effort physical abort, so no deleted
         // owner can keep a Replica eligible for later collection.
         scope.Strength.StrengthReplicaRuntime
-        |> Option.iter (fun runtime -> runtime.CancelOwner sessionId |> ignore)
+        |> Option.iter (fun runtime ->
+            runtime.CancelOwner sessionId |> ignore
+            runtime.HandleSessionDeleted sessionId)
 
         // OpenCode recursively emits child SessionDeleted before the owner
         // SessionDeleted. An attached Inspector child must retire its live

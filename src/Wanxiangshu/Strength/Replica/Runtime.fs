@@ -10,7 +10,6 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
@@ -74,7 +73,6 @@ type StrengthReplicaTerminal =
     | BudgetReached
     | TextCompleted
     | Failed of reason: string
-    | TimedOut
     | Cancelled
     | InvalidFrame of reason: string
 
@@ -88,10 +86,17 @@ type StrengthDryRunStart =
     { ReplicaSessionId: SessionId
       Completion: Task<StrengthReplicaOutcome> }
 
+[<RequireQualifiedAccess>]
+type private StrengthReplicaPurpose =
+    | Treatment
+    | DryRun
+
 type private StrengthReplicaDecisionState =
     { Owner: SessionId
       Replica: SessionId
       DecisionId: StrengthDecisionId
+      Purpose: StrengthReplicaPurpose
+      SemanticTerminal: StrengthReplicaTerminal option
       Completion: TaskCompletionSource<StrengthReplicaOutcome>
       RequestsAdmitted: int
       Batches: StrengthRequestBatch list }
@@ -207,12 +212,17 @@ module private StrengthReplicaRuntimeLogic =
 
     let applyBootstrapSendResult
         (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
         (state: StrengthReplicaDecisionState)
         (sent: Result<'ignored, string>)
-        =
-        match sent with
-        | Error error -> complete (StrengthReplicaTerminal.Failed error) state
-        | Ok _ -> ()
+        : Task<unit> =
+        task {
+            match sent with
+            | Error error ->
+                complete (StrengthReplicaTerminal.Failed error) state
+                do! abortReplica state
+            | Ok _ -> ()
+        }
 
     let bootstrapDetachedSend
         (dispatcher: PromptDispatcher.Runtime)
@@ -239,7 +249,7 @@ module private StrengthReplicaRuntimeLogic =
                         StrengthReplicaTools.exactReadonlyHostToolMap
                         promptModel
 
-                applyBootstrapSendResult complete state sent
+                do! applyBootstrapSendResult complete abortReplica state sent
             with ex ->
                 complete (StrengthReplicaTerminal.Failed ex.Message) state
                 do! abortReplica state
@@ -303,6 +313,12 @@ module private StrengthReplicaRuntimeLogic =
 
             match tryState replica with
             | None -> return false
+            | Some state when state.SemanticTerminal |> Option.isSome ->
+                // Semantic completion may precede physical Host terminal. Keep
+                // the Replica branch closed over this already-cancelled tail;
+                // the original abort owns physical interruption, so do not emit
+                // another abort or reinterpret the request as Ordinary work.
+                return true
             | Some state ->
                 let! transformed = StrengthReplicaTransform.apply HostDigest.sha256Hex liveRegistry sessions output
 
@@ -321,37 +337,34 @@ module private StrengthReplicaRuntimeLogic =
         | ReconcileProgram.TurnNeedsContinuation _
         | ReconcileProgram.TurnInProgress -> ()
 
+    let isReplicaPhysicalTerminal =
+        function
+        | ReconcileProgram.TurnCompleted
+        | ReconcileProgram.TurnFailed _
+        | ReconcileProgram.TurnAborted _ -> true
+        | ReconcileProgram.TurnNeedsContinuation _
+        | ReconcileProgram.TurnInProgress -> false
+
     let cancelReplicaBinding
         (tryState: SessionId -> StrengthReplicaDecisionState option)
-        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
+        (tryComplete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> bool)
         (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
         (liveRegistry: StrengthRuntime)
         (releaseModel: (SessionId -> unit) option)
         (binding: StrengthReplicaBinding)
         : Task<unit> =
+        let cancelOpenState state =
+            task {
+                if tryComplete StrengthReplicaTerminal.Cancelled state then
+                    do! abortReplica state
+            }
+
         task {
             match tryState binding.ReplicaSessionId with
             | None ->
                 liveRegistry.Retire binding.ReplicaSessionId |> ignore
                 releaseModel |> Option.iter (fun release -> release binding.ReplicaSessionId)
-            | Some state ->
-                complete StrengthReplicaTerminal.Cancelled state
-                do! abortReplica state
-        }
-
-    let settleCompletionRace
-        (completed: bool)
-        (deadline: IDeadlineHandle)
-        (current: StrengthReplicaDecisionState)
-        (complete: StrengthReplicaTerminal -> StrengthReplicaDecisionState -> unit)
-        (abortReplica: StrengthReplicaDecisionState -> Task<unit>)
-        : Task<unit> =
-        task {
-            if completed then
-                deadline.Cancel()
-            else
-                complete StrengthReplicaTerminal.TimedOut current
-                do! abortReplica current
+            | Some state -> do! cancelOpenState state
         }
 
 /// STRENGTH-003/004/009/011: physical coordinator for one decision-local leaf.
@@ -364,11 +377,9 @@ type StrengthReplicaRuntime
     (
         sessions: ISessionHostPort,
         dispatcher: PromptDispatcher.Runtime,
-        timer: ITimerPort,
         liveRegistry: StrengthRuntime,
         registerReplica: SessionId -> SessionId -> string -> unit,
         ?workspaceDirectory: string,
-        ?maxLatencyMs: int,
         ?maxFrameBytes: int,
         ?tryAcquireModel: (SessionId -> string -> OpencodeModel option),
         ?releaseModel: (SessionId -> unit)
@@ -378,7 +389,6 @@ type StrengthReplicaRuntime
     // DSL-MUTABLE: resource — replica decision state map
     let byReplica = Dictionary<string, StrengthReplicaDecisionState>()
     let directory = workspaceDirectory
-    let latencyMs = max 1 (defaultArg maxLatencyMs 2500)
     let frameByteLimit = max 1 (defaultArg maxFrameBytes 65536)
 
     let key (sessionId: SessionId) = SessionId.value sessionId
@@ -393,7 +403,10 @@ type StrengthReplicaRuntime
         lock gate (fun () ->
             match byReplica.TryGetValue(key previous.Replica) with
             | true, current when Object.ReferenceEquals(current.Completion, previous.Completion) ->
-                byReplica.[key previous.Replica] <- next
+                byReplica.[key previous.Replica] <-
+                    { next with
+                        SemanticTerminal = current.SemanticTerminal }
+
                 true
             | _ -> false)
 
@@ -408,23 +421,30 @@ type StrengthReplicaRuntime
           Batches = state.Batches
           Terminal = terminal }
 
-    let completionWins (completion: Task<StrengthReplicaOutcome>) (deadline: IDeadlineHandle) : Task<bool> =
-        let completed =
-            task {
-                let! _ = completion
-                return true
-            }
+    let terminalTransition terminal (state: StrengthReplicaDecisionState) =
+        match state.SemanticTerminal with
+        | Some _ -> None
+        | None ->
+            Some
+                { state with
+                    SemanticTerminal = Some terminal }
 
-        let timedOut =
-            task {
-                do! deadline.Delay
-                return false
-            }
+    let tryComplete terminal (state: StrengthReplicaDecisionState) =
+        let completedState =
+            lock gate (fun () ->
+                match byReplica.TryGetValue(key state.Replica) with
+                | true, current when Object.ReferenceEquals(current.Completion, state.Completion) ->
+                    terminalTransition terminal current
+                    |> Option.map (fun next ->
+                        byReplica.[key state.Replica] <- next
+                        next)
+                | _ -> None)
 
-        emitJsExpr (completed, timedOut) "Promise.race([$0, $1])"
+        match completedState with
+        | Some completed -> AsyncSupport.trySetResult completed.Completion (outcome terminal completed)
+        | None -> false
 
-    let complete terminal (state: StrengthReplicaDecisionState) =
-        AsyncSupport.trySetResult state.Completion (outcome terminal state) |> ignore
+    let complete terminal state = tryComplete terminal state |> ignore
 
     let abortReplica (state: StrengthReplicaDecisionState) =
         task {
@@ -444,6 +464,24 @@ type StrengthReplicaRuntime
 
         liveRegistry.Retire state.Replica |> ignore
         releaseModel |> Option.iter (fun release -> release state.Replica)
+
+    let cancelOpenState (state: StrengthReplicaDecisionState) =
+        task {
+            if tryComplete StrengthReplicaTerminal.Cancelled state then
+                do! abortReplica state
+        }
+
+    let dryRunStateAtTargetTerminal (turn: ReconciledTurn) =
+        liveRegistry.TryFindByOwner turn.SessionId
+        |> Option.filter (fun binding -> binding.TargetProviderRun = turn.ProviderRun)
+        |> Option.bind (fun binding -> tryState binding.ReplicaSessionId)
+        |> Option.filter (fun state -> state.Purpose = StrengthReplicaPurpose.DryRun)
+
+    let observeReplicaTurn state outcome =
+        StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state outcome
+
+        if StrengthReplicaRuntimeLogic.isReplicaPhysicalTerminal outcome then
+            removeState state
 
     member _.MaxFrameBytes = frameByteLimit
 
@@ -483,8 +521,13 @@ type StrengthReplicaRuntime
         match tryState turn.SessionId with
         | None -> false
         | Some state ->
-            StrengthReplicaRuntimeLogic.completeFromTurnOutcome complete state turn.Outcome
+            observeReplicaTurn state turn.Outcome
             true
+
+    member _.HandleSessionDeleted(sessionId: SessionId) =
+        match tryState sessionId with
+        | Some state -> removeState state
+        | None -> ()
 
     member _.CancelOwner(owner: SessionId) : Task =
         task {
@@ -494,35 +537,33 @@ type StrengthReplicaRuntime
                 do!
                     StrengthReplicaRuntimeLogic.cancelReplicaBinding
                         tryState
-                        complete
+                        tryComplete
                         abortReplica
                         liveRegistry
                         releaseModel
                         binding
         }
 
+    /// SPEC-INV-013: DryRun is observation-only. If its own K gate/terminal has
+    /// not already closed it by the time the exact owner target run terminates,
+    /// that causal owner terminal is the remaining reason to stop the leaf.
+    /// No elapsed-time arbitration participates in this decision.
+    member _.CloseDryRunAtTargetTerminal(turn: ReconciledTurn) : Task =
+        task {
+            match dryRunStateAtTargetTerminal turn with
+            | Some state -> do! cancelOpenState state
+            | None -> ()
+        }
+
     member private _.ObserveDryRun(state: StrengthReplicaDecisionState) =
         task {
             try
-                let deadline = timer.Delay latencyMs
-                let completionTask = state.Completion.Task
-                let! completed = completionWins completionTask deadline
-
-                do!
-                    StrengthReplicaRuntimeLogic.settleCompletionRace
-                        completed
-                        deadline
-                        (tryState state.Replica |> Option.defaultValue state)
-                        complete
-                        abortReplica
-
-                let! _ = completionTask
-                removeState state
+                let! _ = state.Completion.Task
+                return ()
             with ex ->
                 let current = tryState state.Replica |> Option.defaultValue state
                 complete (StrengthReplicaTerminal.Failed ex.Message) current
                 do! abortReplica current
-                removeState state
         }
 
     member this.StartDryRun
@@ -544,7 +585,8 @@ type StrengthReplicaRuntime
                     budget,
                     fastAgent,
                     localizedMirror,
-                    mirrorSemanticDigest
+                    mirrorSemanticDigest,
+                    StrengthReplicaPurpose.DryRun
                 )
             with
             | Error error -> return Error error
@@ -565,7 +607,8 @@ type StrengthReplicaRuntime
             budget: StrengthBudget,
             fastAgent: string,
             localizedMirror: WireMessage list,
-            mirrorSemanticDigest: string
+            mirrorSemanticDigest: string,
+            purpose: StrengthReplicaPurpose
         ) : Task<Result<StrengthReplicaDecisionState, string>> =
         taskResult {
             do! StrengthReplicaRuntimeLogic.requireNonEmptyBudget budget
@@ -604,6 +647,8 @@ type StrengthReplicaRuntime
                 { Owner = owner
                   Replica = replica
                   DecisionId = decisionId
+                  Purpose = purpose
+                  SemanticTerminal = None
                   Completion = TaskCompletionSource<StrengthReplicaOutcome>()
                   RequestsAdmitted = 0
                   Batches = [] }
@@ -657,33 +702,20 @@ type StrengthReplicaRuntime
                     budget,
                     fastAgent,
                     localizedMirror,
-                    mirrorSemanticDigest
+                    mirrorSemanticDigest,
+                    StrengthReplicaPurpose.Treatment
                 )
             with
             | Error error -> return Error error
             | Ok state ->
                 try
-                    let deadline = timer.Delay latencyMs
-                    let completionTask = state.Completion.Task
-                    let! completed = completionWins completionTask deadline
-
-                    do!
-                        StrengthReplicaRuntimeLogic.settleCompletionRace
-                            completed
-                            deadline
-                            (tryState state.Replica |> Option.defaultValue state)
-                            complete
-                            abortReplica
-
-                    let! result = completionTask
-                    removeState state
+                    let! result = state.Completion.Task
                     return Ok result
                 with ex ->
                     let current = tryState state.Replica |> Option.defaultValue state
                     complete (StrengthReplicaTerminal.Failed ex.Message) current
                     do! abortReplica current
                     let! result = state.Completion.Task
-                    removeState state
                     return Ok result
         }
 
@@ -696,7 +728,6 @@ type StrengthReplicaRuntime
 
         lock gate (fun () -> byReplica.Clear())
         liveRegistry.Clear()
-        timer.Dispose()
 
     interface IDisposable with
         member this.Dispose() = this.Dispose()

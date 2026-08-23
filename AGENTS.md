@@ -103,8 +103,9 @@
 - durable store 已统一到 canonical EventStore spine；feature-owned durable backend/private ref、dual-write migrator、业务层 Git bypass 由 `unified-store-gate` 拒绝。
 - provider/context recovery 已切到 failure-driven + durable-event-driven + time-independent；任何重新引入 timeout/polling/process-local recovery proof 的改动都是回归。
 - managed provider → tool handoff 已是显式 capacity step 边界：tool body、role/capability gate 与同步 descendant provider work 之前必须先按 exact `ProviderRunIdentity + PhysicalUserMessageId` 结束当前 provider step；严禁把 `InFlight` capacity 持到 tool 返回或用 timeout 解死锁。Distiller cleanup 对同一 owned child 的物理 cancel 至多一次。
+- Strength lifecycle 已时间无关：`StrengthReplicaRuntime` 不拥有 timer/deadline/elapsed-time terminal arbitration。Treatment 显式开启后等待 Replica 的真实因果终态；DryRun 启动后立即放行 Owner，只由 K gate、Replica terminal、exact Owner `TargetProviderRun` terminal 或 owner cancel/delete 收口。语义 completion 与物理 retirement 分离：K gate/取消可先阻止后续 provider admission，但 Replica 身份必须保留到 Host terminal/session deletion，以吸收在途 transform；严禁靠 sleep/timeout 或“DryRun 必须抢在 Owner 前跑满 K”证明正确性。
 - 子→父 run-bounded LWR 从本 invocation 首个 assistant part 起算；caller 已知的 user charge 不得伪装成 Chronicle/Recent work 回传。父→子普通 bounded delta 仍保留原语义。
-- Fable build 已收敛为跨进程 lock 下的一次真实 `Debug` compiler invocation；compiler 成功退出后才验 artifact/Surface Manifest，configuration 不得依赖 Fable 的 watch/one-shot 默认值。watch daemon、`FableBarrier.fs`、ack、source-touch barrier、artifact-exists fast path 均已删除；现存 `dist`、日志静默、mtime 与 wall-clock 不能证明构建成功。
+- Fable build 已收敛为跨进程 lock 下先清空上一轮 `dist/`，再执行一次真实 `Debug` compiler invocation；compiler 成功退出后才验 artifact/Surface Manifest，configuration 不得依赖 Fable 的 watch/one-shot 默认值。源码删除不得留下可被 package 收走的陈旧 JS；watch daemon、`FableBarrier.fs`、ack、source-touch barrier、artifact-exists fast path 均已删除；现存 `dist`、日志静默、mtime 与 wall-clock 不能证明构建成功。
 
 ## 交付门禁
 

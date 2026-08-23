@@ -72,3 +72,22 @@ test('WHAT[VERIFICATION-SYSTEM-008] Fable build compiles once and never accepts 
   assert.match(build, /child\.once\('exit',[\s\S]*result\.code !== 0/)
   assert.doesNotMatch(build, /FableBarrier|fable-daemon|fable-cycle-ack|['"]watch['"]/)
 })
+
+test('WHAT[VERIFICATION-SYSTEM-008] one-shot build removes the previous artifact tree before compiling', () => {
+  const build = readFileSync(new URL('../../../scripts/build.mjs', import.meta.url), 'utf8')
+  const compileStart = build.indexOf('async function compileFable()')
+  const spawnAt = build.indexOf('const child = spawn(', compileStart)
+  const compilePrefix = build.slice(compileStart, spawnAt)
+
+  assert.ok(compileStart >= 0 && spawnAt > compileStart, 'compileFable must own the one-shot compiler boundary')
+  assert.match(
+    compilePrefix,
+    /fs\.rmSync\(dist,\s*\{\s*recursive:\s*true,\s*force:\s*true\s*\}\)/,
+    'a removed F# source must not leave a stale JS module in the next package',
+  )
+  assert.match(compilePrefix, /fs\.mkdirSync\(dist,\s*\{\s*recursive:\s*true\s*\}\)/)
+  assert.ok(
+    compilePrefix.indexOf('fs.rmSync(dist') < compilePrefix.indexOf('fs.mkdirSync(dist'),
+    'artifact cleanup must precede recreating the compiler output directory',
+  )
+})

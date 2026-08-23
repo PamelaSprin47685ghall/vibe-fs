@@ -41,23 +41,44 @@ test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_runtime_creates_a_real_visible_atta
   assert.match(source, /Detached/)
   assert.match(source, /ObserveDryRun/)
 
-  // The returned start capability may await physical child creation/bootstrap, but not the 2500ms terminal race.
+  // The returned start capability may await physical child creation/bootstrap, but never a terminal race.
   const returnBoundary = dry.search(/return\s+Ok/)
   assert.ok(returnBoundary > 0, 'StartDryRun must return a start handle/result')
   const beforeReturn = dry.slice(0, returnBoundary)
   assert.doesNotMatch(beforeReturn, /completionWins|deadline\.Delay|let!\s+result\s*=\s*.*Completion\.Task/)
+
+  const observeStart = source.indexOf('member private _.ObserveDryRun')
+  const observeEnd = source.indexOf('member this.StartDryRun', observeStart)
+  const observe = source.slice(observeStart, observeEnd)
+  assert.match(observe, /let!\s+_\s*=\s*state\.Completion\.Task/)
+  assert.doesNotMatch(observe, /Delay|deadline|timeout|TimedOut/i)
 })
 
 test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_terminal_only_ends_observation_and_owner_cancel_still_cascades', async () => {
   const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
-  assert.match(runtime, /TimedOut/)
+  const observer = await read('src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs')
   assert.match(runtime, /CancelOwner/)
   assert.match(runtime, /AbortSession/)
+  assert.match(runtime, /CloseDryRunAtTargetTerminal/)
+  assert.match(runtime, /dryRunStateAtTargetTerminal[\s\S]*TargetProviderRun = turn\.ProviderRun[\s\S]*StrengthReplicaPurpose\.DryRun/)
+  assert.match(observer, /CloseDryRunAtTargetTerminal turn/)
 
   const host = await read('src/Wanxiangshu/Strength/OpenCode/Speculate.fs')
   const dry = branch(host, '| StrengthRolloutMode.DryRun ->', '| StrengthRolloutMode.Off ->')
   assert.doesNotMatch(dry, /HostMessageProjection\.replaceMessagesInPlace/)
   assert.doesNotMatch(dry, /TripStrengthFuse\([^)]*TimedOut/i)
+})
+
+test('WHAT[SPEC-INV-011] SPEC_INV_011_Strength_replica_lifecycle_has_no_wall_clock_terminal_arbitration', async () => {
+  const runtime = await read('src/Wanxiangshu/Strength/Replica/Runtime.fs')
+  assert.doesNotMatch(runtime, /ITimerPort|timer\.Delay|completionWins|settleCompletionRace|maxLatencyMs|TimedOut/)
+  assert.doesNotMatch(runtime, /\.IsCompleted|get_IsCompleted/)
+  assert.match(runtime, /SemanticTerminal:\s*StrengthReplicaTerminal option/)
+
+  const start = runtime.indexOf('member this.StartDecision')
+  assert.ok(start >= 0, 'Treatment must expose StartDecision')
+  const decision = runtime.slice(start, runtime.indexOf('member _.Dispose', start))
+  assert.match(decision, /let!\s+result\s*=\s*state\.Completion\.Task/)
 })
 
 test('WHAT[SPEC-INV-013] SPEC_INV_013_DryRun_visibility_is_not_a_fake_diagnostic_only_path', async () => {

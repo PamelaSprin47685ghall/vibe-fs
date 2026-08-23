@@ -159,7 +159,10 @@ module StrengthReplicaTransform =
         (batches: StrengthRequestBatch list)
         : Task<StrengthReplicaTransformOutcome> =
         task {
-            runtime.Retire replicaSessionId |> ignore
+            // Physical identity remains live until the Host reports the child
+            // terminal/deletion. This transform only closes semantic admission
+            // and aborts before K+1 can leave the process; retiring here races
+            // already-queued Host transforms into the Ordinary branch.
             let! _ = sessions.AbortSession replicaSessionId
             return StrengthReplicaTransformOutcome.Retired(reason, batches)
         }

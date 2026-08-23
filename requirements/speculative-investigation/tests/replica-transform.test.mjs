@@ -47,7 +47,12 @@ test('WHAT[SPEC-INV-003] STRENGTH_003_K1_aborts_before_provider_request_2_after_
   assert.equal(outcome.reason, 'provider-request-budget-reached')
   assert.equal(outcome.batches.length, 1)
   assert.deepEqual(outcome.aborted, ['replica-k1'])
-  assert.equal(Strength.runtimeFindByReplica(runtime, 'replica-k1'), null)
+  assert.notEqual(
+    Strength.runtimeFindByReplica(runtime, 'replica-k1'),
+    null,
+    'K gate closes semantic admission but physical Replica identity lives until Host terminal/deletion',
+  )
+  assert.notEqual(Strength.runtimeRetire(runtime, 'replica-k1'), null)
   assert.equal((await apply(runtime, output)).kind, 'NotReplica')
 })
 

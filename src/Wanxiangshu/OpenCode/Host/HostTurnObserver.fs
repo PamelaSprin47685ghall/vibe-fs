@@ -268,6 +268,11 @@ module HostTurnObserver =
         (reviewerContinuationPort: ReviewerContinuationPort)
         (context: ReconciledTurnContext)
         : Task =
+        let closeDryRunAtPrimaryTerminal (turn: ReconciledTurn) =
+            match scope.Strength.StrengthReplicaRuntime with
+            | Some runtime -> runtime.CloseDryRunAtTargetTerminal turn
+            | None -> AsyncSupport.completedTask ()
+
         task {
             let turn = context.Turn
             let abortCause = abortCauseOfTurn scope context
@@ -284,6 +289,11 @@ module HostTurnObserver =
                 do! XWire.reconcileAttempt journal scope turn
                 return ()
             else
+                // SPEC-INV-013: an observation-only Replica that did not finish
+                // first is closed by the exact owner target run terminal. This is
+                // a causal horizon boundary, not a wall-clock timeout.
+                do! closeDryRunAtPrimaryTerminal turn
+
                 // STRENGTH-010: only primary (non-Replica) turns feed the
                 // counterfactual predictor. Pending shadow/control labels
                 // are target-bound inside the scope.

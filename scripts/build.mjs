@@ -111,6 +111,7 @@ class CrossProcessMutex {
 // ── Fable Compile ─────────────────────────────────────────────────────────────
 
 async function compileFable() {
+  fs.rmSync(dist, { recursive: true, force: true })
   fs.mkdirSync(dist, { recursive: true })
   logInfo('Compiling F# with Fable...')
 

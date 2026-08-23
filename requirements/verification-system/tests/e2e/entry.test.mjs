@@ -117,20 +117,20 @@ const waitCaptured = async (scenario) => {
 
 const preFlowCanaries = async (scenario) => {
   await runPreFlowPrompt(scenario, 'strength-canary-owner', STRENGTH_HOST_CANARY_PROMPT, 'deep-coder');
-  await scenario.provider.waitForExpectation('strength-canary-replica.1');
 
-  for (const step of ['strength-canary-replica.0', 'strength-canary-replica.1']) {
-    assert.equal(
-      scenario.provider.matchCount(step),
-      1,
-      `Strength K2 dry-run must issue each physical Replica provider request exactly once (${step}). Host stderr tail:\n${scenario.host.stderrLog.slice(-4000)}`,
-    );
-  }
   assert.equal(
-    scenario.provider.matchCount('strength-canary-replica'),
-    2,
-    'Strength K2 dry-run must stop physically after provider request #2; request #3 is undeclared and fatal',
+    scenario.provider.matchCount('strength-canary-replica.0'),
+    1,
+    `Strength dry-run must physically start its Replica without blocking the owner. Host stderr tail:\n${scenario.host.stderrLog.slice(-4000)}`,
   );
+
+  // SPEC-INV-003/013: request #2 is a legitimate race tail. A nonblocking
+  // DryRun may reach it before the owner's exact target terminal, or the owner
+  // may causally close the observation horizon first. Do not wait for either
+  // ordering. The optional scripted step answers #2 if it races through; an
+  // undeclared request #3 remains fatal under strict scenario matching. The
+  // exact K2 "allow #2, block #3" state-machine law is proved without clocks in
+  // speculative-investigation/replica-transform.test.mjs.
 
   scenario.provider._state.rewriteToolArgs = (entry, args) => {
     if (entry?.turnId === 'coder' && args?.shelfmark === '$inspector-case') {
