@@ -27,10 +27,10 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
-/// Private mailbox surface: fork Distiller + permit-gated Join. Never Manager Join.
+/// Private mailbox surface: fork one Distiller + permit-gated Join. Never Manager Join.
 module DistillationRuntime =
 
-    /// Fresh FamilyRecoveryPermit per join (map/reduce mutates family → digest).
+    /// Fresh FamilyRecoveryPermit per join because the Distiller is a managed child.
     type RequirePermit = unit -> Task<Result<FamilyRecoveryPermit, string>>
 
     type IDistillationRuntime =
@@ -41,7 +41,7 @@ module DistillationRuntime =
         abstract CurrentJournalRevision: unit -> JournalRevision
         /// Check-subscribe-recheck wait for a journal advance from the sampled revision.
         abstract AwaitJournalChangeFrom: JournalRevision -> Task<JournalChange>
-        /// Cancel one owned map/reduce agent without tearing down the runtime.
+        /// Cancel the owned Distiller without tearing down the runtime.
         abstract CancelAgent: agentId: string -> unit
 
     /// AGENT-008: the Distiller is internal, so its managed name is fixed here

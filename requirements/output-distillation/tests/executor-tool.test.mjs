@@ -43,7 +43,7 @@ test('WHAT[DISTILL-013] RUN_spooled_output_runs_distillation_without_chunk_stati
   assert.equal(result.chunk_count, undefined, 'provider must not expose chunk_count')
   assert.equal(result.total_bytes, undefined, 'provider must not expose total_bytes')
   assert.equal(result.spool_path, undefined, 'provider must not expose spool_path')
-  // No journal → the distiller chunk fork fails closed; the account degrades to
+  // No journal → the one bounded-tail Distiller fails closed; the account degrades to
   // a partial report carried as instructions, never a thrown exception.
   assert.match(text, /Condensation|Most recent raw output/i)
 })

@@ -13,6 +13,7 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.Journal
 
@@ -93,6 +94,16 @@ module CompanionTransform =
             None
         else
             Some(tryMessageSessionId message, tryMessageRole message)
+
+    let private allowsBloggerCompanionForAgentName (agentName: string) =
+        match AgentRoleIdentity.roleOfString agentName with
+        | Some Role.Distiller -> false
+        | _ -> true
+
+    let private allowsBloggerCompanion (rawMessages: obj list) =
+        rawMessages
+        |> List.choose tryMessageRole
+        |> List.forall allowsBloggerCompanionForAgentName
 
     let private updateMaterializedBlogger
         (scope: PluginRuntimeScope)
@@ -232,6 +243,7 @@ module CompanionTransform =
                     && (unbox<string> message?info?id).StartsWith("companion-b-head"))
 
             let messageContext = rawMessages |> List.tryPick tryMessageContext
+            let companionEligible = allowsBloggerCompanion rawMessages
 
             match messageContext with
             | Some(Some messageSessionId, _) when not (isNull inObj) && isNull inObj?sessionID ->
@@ -246,6 +258,7 @@ module CompanionTransform =
 
             if
                 not alreadyHasBHead
+                && companionEligible
                 && not (String.IsNullOrWhiteSpace sessionId)
                 && not (isNull rawOutObj?messages)
             then

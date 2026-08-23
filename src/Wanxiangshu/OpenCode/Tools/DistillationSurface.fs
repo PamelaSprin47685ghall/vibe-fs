@@ -13,7 +13,7 @@ open Wanxiangshu.Persistence.Journal
 
 /// JS-native owner surface for the Distiller role contract.
 ///
-/// Distillation owns the distinction between its private map/reduce runtime and
+/// Distillation owns the distinction between its private fixed-cost runtime and
 /// the provider-visible execution verb. Role vocabulary and tool permission
 /// translation stay in their canonical owners; this surface publishes only the
 /// bounded facts that output-distillation promises to callers.
@@ -24,7 +24,7 @@ module DistillationSurface =
     /// The internal role label used by the Host-owned runtime.
     let roleLabel: string = Roles.roleLabel distillerRole
 
-    /// The fixed fast-tier managed identity used for map/reduce workers.
+    /// The fixed fast-tier managed identity used for bounded-tail distillation.
     let managedAgentName: string = Roles.managedAgentName AgentTier.Fast distillerRole
 
     /// Distiller is an internal Host-owned runtime.
@@ -134,10 +134,7 @@ module DistillationSurface =
     let distillFragmentPrompt (language: string) =
         Distillation.distillFragmentPrompt (languageOf language)
 
-    let mergeDistillationsPrompt (language: string) =
-        Distillation.mergeDistillationsPrompt (languageOf language)
-
-    /// Run map/reduce through a JSON-shaped callback runtime. The adapter keeps
+    /// Run fixed-cost tail distillation through a JSON-shaped callback runtime. The adapter keeps
     /// ForkResult, ForkError and RunCompletion representations inside this owner.
     let distillSpool (runtime: obj) (spoolPath: string) (language: string) : Task<string> =
         Distillation.distillSpool (runtimeOf runtime) spoolPath (languageOf language)

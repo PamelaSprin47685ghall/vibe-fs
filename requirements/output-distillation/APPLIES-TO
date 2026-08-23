@@ -5,6 +5,7 @@
 /src/Wanxiangshu/OpenCode/Tools/Distillation.fs
 /src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs
 /src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs
+/src/Wanxiangshu/Context/Companion/Transform.fs
 /src/Wanxiangshu/Host/Contract/ToolResultBound.fs
 /src/Wanxiangshu/Process/LargeGate.fs
 /src/Wanxiangshu/Process/LargeGateSurface.fs

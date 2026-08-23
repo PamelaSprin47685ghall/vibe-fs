@@ -1,40 +1,40 @@
 # output-distillation — WHAT
 
-## DISTILL-001: 大输出有损但诚实地压成 bounded observation
+## DISTILL-001: 大输出有损但诚实地压成固定成本 bounded observation
 
-当执行输出超过 participant horizon 的承载上限时，系统必须将其压缩为 bounded observation，严禁将其静默截断为虚假的空成功结果。压缩过程可以有损，但必须保留能够改变后续判断的核心事实，剔除冗余的进度噪声与装饰信息。
+当执行输出超过 participant horizon 的承载上限时，系统必须将其压缩为 bounded observation。蒸馏输入最多取 spool 最近 200 KiB；更早内容被丢弃时必须显式声明截断边界。输出规模不得提高模型并发度。
 
 ## DISTILL-002: 保留会改变后续 judgment 的事实
 
-压缩必须优先保留具体且具备区分度的关键印记：错误类型、带行号的文件路径、失败的断言信息、panic 或异常、互斥的矛盾行、以及携带上下文的原始错误尾部。严禁进行泛化的无差别粗暴抹除。
+在 bounded tail 内，压缩必须优先保留具体且具备区分度的关键印记：错误类型、带行号的文件路径、失败的断言信息、panic 或异常、互斥的矛盾行、以及携带上下文的原始错误尾部。对已截断的更早内容不得声称已观察或已验证。
 
-## DISTILL-003: fragment 谦逊——沉默的 fragment ≠ 整体成功
+## DISTILL-003: tail 谦逊——沉默的 tail ≠ 整体成功
 
-单个输出分块（fragment）中未包含失败文本不等于全局执行成功。当分块无法纵览整体时，必须在结果中明确承认分块的视野局限，保持边界可见，严禁将局部无异常升级为整体验收结论。
+最近 200 KiB tail 中未包含失败文本不等于全局执行成功。只要 spool 超过输入上限，结果必须明确承认更早字节已截断，严禁将局部无异常升级为整体验收结论。
 
-## DISTILL-004: 合并多个 fragments 不发明因果或成功率
+## DISTILL-004: 禁止按输出大小自动 fan-out / reduce
 
-多个分块结果的合并必须基于实质失败的并集展开，保留所有冲突与分歧。严禁依据安静分块的数量投票否决真实存在的个别失败，严禁推测因果关系或编造成功率统计。
+一次 spool 蒸馏恰好最多创建一个 Distiller。严禁按 chunk 数自动创建多个 map Distiller，严禁再创建 merge/reduce Distiller，严禁让输出字节数决定模型子会话数量。
 
 ## DISTILL-005: 蒸馏结果对未见过原始输出的 reader 仍可用
 
-蒸馏产出的摘要必须保持自包含与可定位性，使从未接触过原始大文本的读者能够仅凭摘要中的路径、行号与错误线索直接回到问题现场，严禁假装包含未观察到的上下文。
+蒸馏产出的摘要必须保持自包含与可定位性，使从未接触过原始大文本的读者能够仅凭摘要中的路径、行号、错误线索与截断声明理解当前可见现场，严禁假装包含未观察到的上下文。
 
-## DISTILL-006: 失败路径 = partial account + 最后 chunk 原始 tail
+## DISTILL-006: 唯一 Distiller 失败 = 明确失败 + bounded raw tail
 
-分块处理过程中任一代理发生超时或失败时，系统严禁伪造完整成功，必须产出部分已解析内容（partial account）并附带最后一个分块的原始字节（raw tail）作为最近未压缩证据；失败代理的工作记录不得作为成功摘要呈现。
+唯一 Distiller 发生超时或不可恢复失败时，系统严禁伪造完整成功，必须返回失败说明并附带同一 bounded raw tail 作为最近未压缩证据；失败代理的工作记录不得作为成功摘要呈现。对该 owned Distiller 的物理取消至多一次。
 
-## DISTILL-007: 蒸馏输入是 spool；chunked map + online reduce
+## DISTILL-007: 蒸馏输入是 spool；流式丢弃旧字节，只保留最后一个固定窗口
 
-蒸馏机制消费流式落盘的 spool 文件并进行固定大小的分块映射（map）。映射结果按分块索引顺序等待，并在线递进归并（reduce）为单一摘要。任一映射失败时，立即取消所有受控的关联代理，但已完成的同伴结果正常参与收尾。清理请求可由多个失败收敛路径重复触发，但对同一个 owned agent 的物理 `CancelAgent` 必须至多执行一次；不得把重复 cleanup 放大成重复 Host abort。
+蒸馏机制消费流式落盘的 spool 文件，但读取过程中只保留最后一个 `Spool.ChunkSizeBytes` 窗口；旧窗口立即丢弃，不累积 chunks，不建立 map task 数组，不执行 online reduce。非空 spool 最多启动一个 Distiller，并且只等待该 exact agent。
 
-## DISTILL-008: 每 chunk 定向 await 一次；permit 门分型
+## DISTILL-008: 单 Distiller 定向 await；permit 门分型
 
-每个分块的映射代理仅允许进行一次定向等待，且必须通过恢复准入门。遇到恢复等待状态时进入有限等待，遇到不可恢复故障时直接快速失败，严禁无凭证伪造就绪状态。
+唯一 Distiller 的等待必须通过恢复准入门并绑定 exact agent id。遇到 FamilyWaiting 时只等待 journal readiness 事件后重新取得 fresh permit；遇到不可恢复故障时直接失败，严禁无凭证伪造就绪状态或改等别的 agent。
 
-## DISTILL-009: Distiller 是私有 runtime，不进公开 fork/horizon
+## DISTILL-009: Distiller 是私有叶子 runtime，不进公开 fork/horizon，也不配 Blogger
 
-蒸馏执行所用的映射子会话属于宿主私有运行时，具备隐藏句柄所有权，不得向外部模型暴露为公开的 fork 或 horizon 目标，其分块与拓扑细节对业务调用方透明。
+蒸馏子会话属于宿主私有运行时，具备隐藏句柄所有权，不得向外部模型暴露为公开的 fork 或 horizon 目标。Distiller 是叶子 runtime：Companion attachment 对 Distiller 必须拒绝，严禁为 Distiller 创建 Blogger 子会话。
 
 ## DISTILL-010: Distiller 不执行、不改变世界、不裁决
 

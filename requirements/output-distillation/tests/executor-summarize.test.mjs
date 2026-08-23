@@ -1,14 +1,6 @@
-// tests/unit/Execution/executor-summarize.test.mjs — Distillation prompt constants
-// + EXEC-023/024 targeted AwaitAgentWithPermit contract for distillSpool.
-//
-// The prompt is the plain intent only; the chunk/combined content is carried
-// by the fork envelope's `content` field (FORK_CHILD_PAYLOAD_payload_renders_as_content).
-//
-// Proof plan #3: ordered/out-of-order agent completion only returns the target
-// agent; each chunk awaits once when Ready (no stash skip); FamilyWaiting
-// waits for a readiness signal before one fresh permit check; FamilyBlocked
-// (NotFound) hard fails the chunk and cancelOwned without corrupting sibling
-// targeted awaits.
+// requirements/output-distillation/tests/executor-summarize.test.mjs
+// Owner: output-distillation. Oversized spool input is a bounded tail consumed by
+// exactly one Distiller; no map/reduce fan-out exists.
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
@@ -18,28 +10,35 @@ import test from 'node:test'
 
 const {
   distillFragmentPrompt,
-  mergeDistillationsPrompt,
   distillSpool,
 } = await import('../../../dist/OpenCode/Tools/DistillationSurface.js')
 
-/** Spool.ChunkSizeBytes — multi-chunk files need size > n-1 full chunks. */
 const SPOOL_CHUNK_BYTES = 204_800
 
-function writeSpoolWithChunks(chunkCount) {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-await-'))
+function writeSpool(chunks) {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-tail-'))
   const spoolPath = join(dir, 'spool.bin')
-  const size = (chunkCount - 1) * SPOOL_CHUNK_BYTES + 64
-  writeFileSync(spoolPath, Buffer.alloc(size, 0x61))
+  writeFileSync(spoolPath, Buffer.concat(chunks))
   return { dir, spoolPath }
 }
 
 function fakeRuntime({ fork, awaitAgent, awaitRecoveryReadiness, cancel } = {}) {
+  const forked = []
+  const awaitCalls = []
   const cancelled = []
+  const payloads = new Map()
   const runtime = {
-    fork: (agentId, _prompt, _payload) =>
-      typeof fork === 'function' ? fork(agentId) : { ok: true, agentId },
-    awaitAgent: (agentId, timeoutMs) =>
-      typeof awaitAgent === 'function' ? awaitAgent(agentId, timeoutMs) : { ok: false, kind: 'not-found' },
+    fork: (agentId, prompt, payload) => {
+      forked.push(agentId)
+      payloads.set(agentId, payload)
+      return typeof fork === 'function' ? fork(agentId, prompt, payload) : { ok: true, agentId }
+    },
+    awaitAgent: (agentId, timeoutMs) => {
+      awaitCalls.push({ agentId, timeoutMs })
+      return typeof awaitAgent === 'function'
+        ? awaitAgent(agentId, timeoutMs, payloads.get(agentId))
+        : { ok: true, runId: `run-${agentId}`, workRecord: `summary-for-${agentId}` }
+    },
     awaitRecoveryReadiness: (agentId) =>
       typeof awaitRecoveryReadiness === 'function' ? awaitRecoveryReadiness(agentId) : undefined,
     cancel: (agentId) => {
@@ -47,263 +46,108 @@ function fakeRuntime({ fork, awaitAgent, awaitRecoveryReadiness, cancel } = {}) 
       if (typeof cancel === 'function') cancel(agentId)
     },
   }
-  return { runtime, cancelled }
+  return { runtime, forked, awaitCalls, cancelled, payloads }
 }
 
-const timedOut = () => ({ ok: false, kind: 'waiting' })
-const notFound = (agentId = 'missing') => ({ ok: false, kind: 'not-found', error: `blocked:${agentId}` })
+const completed = (agentId, workRecord = `summary-for-${agentId}`) => ({
+  ok: true,
+  runId: `run-${agentId}`,
+  workRecord,
+})
 
-function completedOk(agentId) {
-  return { ok: true, runId: `run-${agentId}`, agentId, workRecord: `summary-for-${agentId}` }
-}
-
-test('WHAT[DISTILL-001] DISTILLATION_distill_fragment_prompt_is_plain_intent', () => {
+test('WHAT[DISTILL-001] DISTILLATION_prompt_declares_bounded_tail_and_forbids_whole_run_inference', () => {
   assert.equal(
     distillFragmentPrompt('en'),
-    'Distill this fragment of command output. Preserve errors, decisions, paths, and exact numbers; omit raw code.',
+    'Distill this bounded tail of command output. Earlier output may be absent. Preserve errors, decisions, paths, and exact numbers; never infer whole-run success from this tail; omit raw code.',
   )
 })
 
-test('WHAT[DISTILL-004] DISTILLATION_merge_distillations_prompt_is_plain_intent', () => {
-  assert.equal(
-    mergeDistillationsPrompt('en'),
-    'Merge these command-output distillations into one dense account. Preserve failures and exact facts; do not include raw code.',
-  )
-})
+test('WHAT[DISTILL-004] EXEC_distill_spool_never_fans_out_or_reduces_when_spool_grows', async () => {
+  const chunks = Array.from({ length: 12 }, (_, index) => Buffer.alloc(SPOOL_CHUNK_BYTES, 0x61 + (index % 20)))
+  const { dir, spoolPath } = writeSpool(chunks)
+  const { runtime, forked, awaitCalls } = fakeRuntime()
 
-test('WHAT[DISTILL-013] DISTILLATION_prompts_carry_no_chunk_index_or_level', () => {
-  assert.ok(!/\bchunk\b/i.test(distillFragmentPrompt('en')))
-  assert.ok(!/\blevel-\d/i.test(mergeDistillationsPrompt('en')))
-})
-
-test('WHAT[DISTILL-007] EXEC_distill_spool_targeted_await_one_call_per_agent_no_stash', async () => {
-  const { dir, spoolPath } = writeSpoolWithChunks(3)
-  const forked = []
-  const awaitCalls = []
-
-  const { runtime } = fakeRuntime({
-    fork: (agentId) => {
-      forked.push(agentId)
-      return { ok: true, agentId }
-    },
-    awaitAgent: (agentId, timeoutMs) => {
-      awaitCalls.push({ agentId, timeoutMs })
-      return completedOk(agentId)
-    },
-  })
-
-  const summary = await distillSpool(runtime, spoolPath, 'en')
-
-  assert.ok(typeof summary === 'string' && summary.length > 0)
-  assert.ok(forked.length >= 3, `expected ≥3 forks (3 map ± reduce), got ${forked.length}`)
-  assert.equal(awaitCalls.length, forked.length, 'each fork gets exactly one AwaitAgentWithPermit (no stash skip)')
-
-  for (const id of forked) {
-    const hits = awaitCalls.filter((c) => c.agentId === id)
-    assert.equal(hits.length, 1, `agent ${id} awaited exactly once; hits=${hits.length}`)
+  try {
+    const summary = await distillSpool(runtime, spoolPath, 'en')
+    assert.ok(summary.length > 0)
+    assert.equal(forked.length, 1, 'spool size must not create map/reduce Distiller fan-out')
+    assert.equal(awaitCalls.length, 1, 'the single Distiller is the only awaited child')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
-
-  const awaitIds = awaitCalls.map((c) => c.agentId)
-  assert.deepEqual([...awaitIds].sort(), [...forked].sort(), 'await targets equal forked set (no cross-agent await)')
-
-  rmSync(dir, { recursive: true, force: true })
 })
 
-test('WHAT[DISTILL-007] EXEC_distill_spool_targeted_await_out_of_order_returns_own_agent', async () => {
-  const { dir, spoolPath } = writeSpoolWithChunks(3)
-  const forked = []
-  const awaitCalls = []
-  let mapSeq = 0
+test('WHAT[DISTILL-007] EXEC_distill_spool_keeps_only_latest_200kib_payload', async () => {
+  const earlyMarker = 'EARLY_BYTES_MUST_NOT_REACH_DISTILLER'
+  const retainedSuffixMarker = 'PREVIOUS_CHUNK_SUFFIX_MUST_SURVIVE_28bc'
+  const tailMarker = 'LATEST_FAILURE_MARKER_7f3a'
+  const first = Buffer.alloc(SPOOL_CHUNK_BYTES, 0x61)
+  first.write(earlyMarker, 0, 'utf8')
+  first.write(retainedSuffixMarker, SPOOL_CHUNK_BYTES - 96, 'utf8')
+  const last = Buffer.alloc(128, 0x62)
+  last.write(tailMarker, 0, 'utf8')
+  const { dir, spoolPath } = writeSpool([first, last])
+  const { runtime, forked, payloads } = fakeRuntime()
 
-  const { runtime } = fakeRuntime({
-    fork: (agentId) => {
-      forked.push(agentId)
-      return { ok: true, agentId }
-    },
-    awaitAgent: (agentId, timeoutMs) => {
-      const seq = mapSeq++
-      awaitCalls.push({ agentId, timeoutMs, seq })
-      // Later-started map agents resolve first → out-of-order completion.
-      const delayMs = Math.max(0, 30 - seq * 10)
-      return new Promise((resolve) => {
-        setTimeout(() => resolve(completedOk(agentId)), delayMs)
-      })
-    },
-  })
-
-  const summary = await distillSpool(runtime, spoolPath, 'en')
-
-  assert.ok(typeof summary === 'string' && summary.length > 0)
-  assert.ok(!/Condensation incomplete|Most recent raw output/i.test(summary), 'out-of-order success must not degrade to partial')
-  assert.ok(forked.length >= 3)
-  assert.equal(awaitCalls.length, forked.length, 'each fork awaited once under out-of-order resolve')
-
-  for (const id of forked) {
-    const hits = awaitCalls.filter((c) => c.agentId === id)
-    assert.equal(hits.length, 1, `targeted await for ${id} exactly once (no cross-agent / stash)`)
+  try {
+    await distillSpool(runtime, spoolPath, 'en')
+    assert.equal(forked.length, 1)
+    const payload = payloads.get(forked[0])
+    assert.equal(typeof payload, 'string')
+    assert.equal(Buffer.byteLength(payload, 'utf8'), SPOOL_CHUNK_BYTES)
+    assert.ok(payload.includes(retainedSuffixMarker), 'the rolling tail keeps the suffix of the previous stream chunk')
+    assert.ok(payload.includes(tailMarker), 'latest bytes are preserved')
+    assert.ok(!payload.includes(earlyMarker), 'earlier windows are discarded before distillation')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
-
-  rmSync(dir, { recursive: true, force: true })
 })
 
-test('WHAT[DISTILL-007] EXEC_distill_spool_await_timeout_fails_chunk_cancels_owned_siblings_still_await', async () => {
-  const { dir, spoolPath } = writeSpoolWithChunks(3)
-  const forked = []
-  const awaitCalls = []
-  let mapForkIndex = 0
-  /** Fail the second map agent only (index 1). */
-  let failAgentId = null
-
-  const { runtime, cancelled } = fakeRuntime({
-    fork: (agentId) => {
-      if (mapForkIndex < 3) {
-        if (mapForkIndex === 1) failAgentId = agentId
-        mapForkIndex += 1
-      }
-      forked.push(agentId)
-      return { ok: true, agentId }
+test('WHAT[DISTILL-008] EXEC_distill_spool_waiting_rechecks_same_exact_agent_after_readiness', async () => {
+  const { dir, spoolPath } = writeSpool([Buffer.from('tail')])
+  const order = []
+  let attempts = 0
+  const { runtime, forked } = fakeRuntime({
+    awaitAgent: (agentId) => {
+      order.push(`permit:${agentId}`)
+      attempts += 1
+      return attempts === 1 ? { ok: false, kind: 'waiting' } : completed(agentId)
     },
-    awaitAgent: (agentId, timeoutMs) => {
-      awaitCalls.push({ agentId, timeoutMs })
-      // Real join timeout / hard fail → NotFound (not TimedOut/Waiting retry).
-      if (agentId === failAgentId) return notFound(agentId)
-      return completedOk(agentId)
-    },
+    awaitRecoveryReadiness: (agentId) => order.push(`readiness:${agentId}`),
   })
 
-  const summary = await distillSpool(runtime, spoolPath, 'en')
-
-  assert.ok(typeof summary === 'string')
-  assert.match(summary, /Condensation incomplete|Most recent raw output/i, 'map failure yields partial account, not throw')
-
-  const mapAgentIds = forked.slice(0, 3)
-  assert.equal(mapAgentIds.length, 3)
-  for (const id of mapAgentIds) {
-    const hits = awaitCalls.filter((c) => c.agentId === id)
-    assert.equal(hits.length, 1, `map agent ${id} still gets one targeted await (siblings not skipped)`)
+  try {
+    const summary = await distillSpool(runtime, spoolPath, 'en')
+    const id = forked[0]
+    assert.ok(summary.includes('summary-for-'))
+    assert.deepEqual(order, [`permit:${id}`, `readiness:${id}`, `permit:${id}`])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
+})
 
-  assert.ok(failAgentId, 'second map agent identified')
-  assert.ok(cancelled.length >= 1, 'cancelOwned runs on map failure')
-  for (const id of forked) {
-    assert.ok(cancelled.includes(id), `owned agent ${id} cancelled after failure`)
+test('WHAT[DISTILL-006] EXEC_distill_spool_failure_returns_bounded_raw_tail_and_cancels_once', async () => {
+  const marker = 'LATEST_RAW_FAILURE_4d1c'
+  const first = Buffer.alloc(SPOOL_CHUNK_BYTES, 0x61)
+  const last = Buffer.from(marker)
+  const { dir, spoolPath } = writeSpool([first, last])
+  const { runtime, forked, cancelled } = fakeRuntime({
+    awaitAgent: (agentId) => ({ ok: false, kind: 'not-found', error: `blocked:${agentId}` }),
+  })
+
+  try {
+    const summary = await distillSpool(runtime, spoolPath, 'en')
+    assert.match(summary, /Condensation failed:/)
+    assert.match(summary, /Earlier command output was truncated before distillation/)
+    assert.ok(summary.includes(marker), 'failure exposes the same bounded raw tail')
+    assert.equal(forked.length, 1)
+    assert.deepEqual(cancelled, [forked[0]], 'owned Distiller is physically cancelled at most once')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
-
-  rmSync(dir, { recursive: true, force: true })
 })
 
-test('WHAT[DISTILL-006] EXEC_distill_spool_await_not_found_hard_fail_collects_failure', async () => {
-  const { dir, spoolPath } = writeSpoolWithChunks(2)
-  const forked = []
-  const awaitCalls = []
-  let firstMapId = null
-
-  const { runtime, cancelled } = fakeRuntime({
-    fork: (agentId) => {
-      if (firstMapId === null) firstMapId = agentId
-      forked.push(agentId)
-      return { ok: true, agentId }
-    },
-    awaitAgent: (agentId, timeoutMs) => {
-      awaitCalls.push({ agentId, timeoutMs })
-      // FamilyBlocked / hard fail → NotFound (requirePermit path).
-      if (agentId === firstMapId) return notFound(agentId)
-      return completedOk(agentId)
-    },
-  })
-
-  const summary = await distillSpool(runtime, spoolPath, 'en')
-
-  assert.ok(typeof summary === 'string')
-  assert.match(summary, /Condensation incomplete|Most recent raw output/i, 'NotFound hard fail collects failure, no throw-out')
-  assert.equal(
-    awaitCalls.filter((c) => c.agentId === firstMapId).length,
-    1,
-    'failed agent still awaited once',
-  )
-  assert.ok(cancelled.length >= 1, 'cancelOwned after hard fail')
-
-  rmSync(dir, { recursive: true, force: true })
-})
-
-test('WHAT[DISTILL-008] EXEC_distill_spool_family_waiting_waits_for_readiness_before_one_fresh_permit_check', async () => {
-  const { dir, spoolPath } = writeSpoolWithChunks(1)
-  const awaitCalls = []
-  const callOrder = []
-  const attemptsByAgent = new Map()
-  const readinessSignals = []
-
-  const { runtime } = fakeRuntime({
-    fork: (agentId) => ({ ok: true, agentId }),
-    awaitAgent: (agentId, timeoutMs) => {
-      callOrder.push(`permit:${agentId}`)
-      awaitCalls.push({ agentId, timeoutMs })
-      const n = (attemptsByAgent.get(agentId) ?? 0) + 1
-      attemptsByAgent.set(agentId, n)
-      if (n === 1) return timedOut()
-      return completedOk(agentId)
-    },
-    // Contract required from IDistillationRuntime: this resolves only when the
-    // recovery owner publishes a readiness signal for the waiting family.
-    awaitRecoveryReadiness: (agentId) => {
-      callOrder.push(`readiness:${agentId}`)
-      readinessSignals.push(agentId)
-    },
-  })
-
-  const summary = await distillSpool(runtime, spoolPath, 'en')
-
-  assert.ok(typeof summary === 'string' && summary.length > 0)
-  assert.ok(
-    !/Condensation incomplete|Most recent raw output|unavailable/i.test(summary),
-    'FamilyWaiting→Ready must yield full account, not partial',
-  )
-  assert.ok(
-    summary.includes('summary-for-'),
-    'Ready completion work record must appear in full account',
-  )
-  const targetId = awaitCalls[0]?.agentId
-  assert.ok(targetId, 'map agent id recorded')
-  assert.deepEqual(
-    readinessSignals,
-    [targetId],
-    'RECOVERY_WAITING waits for the family readiness signal',
-  )
-  assert.deepEqual(
-    callOrder,
-    [`permit:${targetId}`, `readiness:${targetId}`, `permit:${targetId}`],
-    'after readiness, exactly one fresh permit check/await occurs without timer-driven re-probes',
-  )
-
-  rmSync(dir, { recursive: true, force: true })
-})
-
-test('WHAT[DISTILL-006] EXEC_distill_spool_family_waiting_timed_out_not_reported_as_success', async () => {
-  const { dir, spoolPath } = writeSpoolWithChunks(2)
-  const awaitCalls = []
-
-  const { runtime, cancelled } = fakeRuntime({
-    fork: (agentId) => ({ ok: true, agentId }),
-    // FamilyBlocked hard fail → ForkError.NotFound (requirePermit path).
-    // Instant fail → partial + cancelOwned. Must not hang on Waiting retry budget
-    // (always-TimedOut would spin until AwaitAgentTimeoutMs once Waiting retries).
-    awaitAgent: (agentId, timeoutMs) => {
-      awaitCalls.push({ agentId, timeoutMs })
-      return notFound(agentId)
-    },
-  })
-
-  const summary = await distillSpool(runtime, spoolPath, 'en')
-
-  assert.ok(typeof summary === 'string')
-  assert.match(
-    summary,
-    /Condensation incomplete|Most recent raw output|unavailable/i,
-    'FamilyBlocked (NotFound) hard fail must not report full success',
-  )
-  assert.ok(!summary.includes('summary-for-'), 'no fabricated success work records')
-  assert.ok(awaitCalls.length >= 2, 'each map chunk still triggers AwaitAgentWithPermit')
-  assert.ok(cancelled.length >= 1, 'cancelOwned after hard fail')
-
-  rmSync(dir, { recursive: true, force: true })
+test('WHAT[DISTILL-013] DISTILLATION_prompt_has_no_chunk_or_reduce_instrumentation', () => {
+  const prompt = distillFragmentPrompt('en')
+  assert.ok(!/chunk index|level-\d|reduce fan-in|success percentage/i.test(prompt))
 })

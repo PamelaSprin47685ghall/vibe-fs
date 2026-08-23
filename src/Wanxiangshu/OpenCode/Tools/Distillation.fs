@@ -67,11 +67,8 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 
-/// Bounded hierarchical map/reduce distillation for spooled command output.
+/// Fixed-cost tail distillation for spooled command output.
 module Distillation =
-
-    [<Literal>]
-    let ReduceFanIn = 8
 
     [<RequireQualifiedAccess>]
     module Path =
@@ -79,13 +76,7 @@ module Distillation =
         let FragmentPrompt = "tool/distill/fragment-prompt"
 
         [<Literal>]
-        let MergePrompt = "tool/distill/merge-prompt"
-
-        [<Literal>]
-        let CondensationUnavailable = "tool/distill/condensation-unavailable"
-
-        [<Literal>]
-        let CondensationIncomplete = "tool/distill/condensation-incomplete"
+        let InputTruncated = "tool/distill/input-truncated"
 
         [<Literal>]
         let CondensationFailed = "tool/distill/condensation-failed"
@@ -98,11 +89,8 @@ module Distillation =
     let distillFragmentPrompt (lang: ProviderLanguage) =
         ProviderProse.render lang Path.FragmentPrompt Map.empty
 
-    let mergeDistillationsPrompt (lang: ProviderLanguage) =
-        ProviderProse.render lang Path.MergePrompt Map.empty
-
-    let private agentId (processId: string) (level: int) (startChunk: int) (endChunk: int) =
-        sprintf "exec-%s" (HostDigest.sha256Hex (sprintf "%s|%d|%d|%d" processId level startChunk endChunk))
+    let private agentId (processId: string) =
+        sprintf "exec-%s" (HostDigest.sha256Hex processId)
 
     let private completionText (completion: RunCompletion) =
         match completion.Outcome with
@@ -111,8 +99,7 @@ module Distillation =
         | AgentFailed payload -> raise (InvalidOperationException payload.Message)
         | AgentAbandoned(_, reason) -> raise (InvalidOperationException reason)
 
-    /// Per-chunk join budget. Prevents a single hung distiller from blocking the
-    /// whole map/reduce forever (Part 1: unblock; Part 2 owns richer partial text).
+    /// Join budget for the one bounded-tail Distiller.
     [<Literal>]
     let AwaitAgentTimeoutMs = 600_000
 
@@ -177,304 +164,125 @@ module Distillation =
 
         loop ()
 
-    let private runDistillerPrompt
+    type private DistillerFailure =
+        { OwnedAgentId: string option
+          Message: string }
+
+    type private TailInput =
+        { Bytes: byte[]
+          Truncated: bool }
+
+    let private retainLatestBytes (limit: int) (current: byte[]) (next: byte[]) =
+        let nextLength = min limit (current.Length + next.Length)
+        let nextBytes = min next.Length nextLength
+        let currentBytes = nextLength - nextBytes
+        let retained = Array.zeroCreate<byte> nextLength
+
+        if currentBytes > 0 then
+            Array.blit current (current.Length - currentBytes) retained 0 currentBytes
+
+        if nextBytes > 0 then
+            Array.blit next (next.Length - nextBytes) retained currentBytes nextBytes
+
+        retained
+
+    let private awaitForkedDistiller
         (runtime: IDistillationRuntime)
-        (forkedIds: ResizeArray<string>)
-        (processId: string)
-        (level: int)
-        (startChunk: int)
-        (endChunk: int)
-        (prompt: string)
-        (payload: string option)
-        =
-        task {
-            let id = agentId processId level startChunk endChunk
-            // Track before fork so sibling cancel covers in-flight map/reduce agents.
-            forkedIds.Add id
-            let! fork = runtime.Fork(id, Role.Distiller, prompt, payload)
-
-            match fork with
-            | Error error -> return raise (InvalidOperationException error)
-            | Ok result ->
-                let! completion = awaitAgentWithPermit runtime result.AgentId
-                return completionText completion
-        }
-
-    let distillFragment
-        (runtime: IDistillationRuntime)
-        (forkedIds: ResizeArray<string>)
-        (spoolPath: string)
-        (chunk: byte[])
-        (index: int)
-        (lang: ProviderLanguage)
-        =
-        let content = Encoding.UTF8.GetString chunk
-
-        let rootDigest = HostDigest.sha256Hex (sprintf "%s|%d" spoolPath index)
-
-        runDistillerPrompt runtime forkedIds rootDigest 0 index index (distillFragmentPrompt lang) (Some content)
-
-    let mergeDistillations
-        (runtime: IDistillationRuntime)
-        (forkedIds: ResizeArray<string>)
-        (lang: ProviderLanguage)
-        (level: int)
-        (batch: string list)
-        =
-        let combined = String.concat "\n" batch
-
-        let batchDigest = HostDigest.sha256Hex (String.concat "\n" batch)
-
-        runDistillerPrompt
-            runtime
-            forkedIds
-            batchDigest
-            level
-            0
-            (List.length batch - 1)
-            (mergeDistillationsPrompt lang)
-            (Some combined)
-
-    let private ensureRoot (levels: ResizeArray<ResizeArray<string>>) =
-        if levels.Count = 0 then
-            levels.Add(ResizeArray())
-
-    let private ensureLevel (levels: ResizeArray<ResizeArray<string>>) index =
-        if levels.Count <= index then
-            levels.Add(ResizeArray())
-
-    let private rippleInsert
-        (mergeDistillations: int -> string list -> Task<string>)
-        (levels: ResizeArray<ResizeArray<string>>)
-        (summary: string)
-        =
-        task {
-            ensureRoot levels
-            levels.[0].Add summary
-            // DSL-MUTABLE: algorithm-scratch — online reduce level index
-            let mutable lvl = 0
-
-            while levels.[lvl].Count >= ReduceFanIn do
-                let batch = levels.[lvl] |> Seq.toList
-                levels.[lvl].Clear()
-                let! reduced = mergeDistillations (lvl + 1) batch
-                ensureLevel levels (lvl + 1)
-                levels.[lvl + 1].Add reduced
-                lvl <- lvl + 1
-        }
-
-    let private reduceBatch
-        (mergeDistillations: int -> string list -> Task<string>)
-        (levelIndex: int)
-        (isLast: bool)
-        (batch: string list)
-        (carry: string list)
-        =
-        task {
-            match batch with
-            | [] -> return carry
-            | [ single ] when isLast -> return [ single ]
-            | _ ->
-                let! reduced = mergeDistillations (levelIndex + 1) batch
-                return [ reduced ]
-        }
-
-    let private foldLevel
-        (mergeDistillations: int -> string list -> Task<string>)
-        (levels: ResizeArray<ResizeArray<string>>)
-        (index: int)
-        (carry: string list)
-        =
-        let batch = carry @ (levels.[index] |> Seq.toList)
-        reduceBatch mergeDistillations index (index = levels.Count - 1) batch carry
-
-    let private foldCarry (carry: string list) =
-        match carry with
-        | [ single ] -> single
-        | _ -> ""
-
-    let private foldNonEmpty
-        (mergeDistillations: int -> string list -> Task<string>)
-        (levels: ResizeArray<ResizeArray<string>>)
-        =
-        task {
-            // DSL-MUTABLE: algorithm-scratch — online reduce carry list
-            let mutable carry: string list = []
-
-            for i in 0 .. levels.Count - 1 do
-                let! next = foldLevel mergeDistillations levels i carry
-                carry <- next
-
-            return foldCarry carry
-        }
-
-    let private foldLevels
-        (mergeDistillations: int -> string list -> Task<string>)
-        (levels: ResizeArray<ResizeArray<string>>)
-        =
-        task {
-            if levels.Count = 0 then
-                return ""
-            else
-                return! foldNonEmpty mergeDistillations levels
-        }
-
-    let reduceOnline (mergeDistillations: int -> string list -> Task<string>) (summaries: string list) : Task<string> =
-        task {
-            // DSL-MUTABLE: algorithm-scratch — distillation level accumulator
-            let levels = ResizeArray<ResizeArray<string>>()
-
-            for summary in summaries do
-                do! rippleInsert mergeDistillations levels summary
-
-            return! foldLevels mergeDistillations levels
-        }
-
-    let private rawTailText (chunks: ResizeArray<int * byte[]>) =
-        if chunks.Count = 0 then
-            ""
-        else
-            Encoding.UTF8.GetString(snd chunks.[chunks.Count - 1])
-
-    let private partialWithTail (lang: ProviderLanguage) (account: string) (rawTail: string) =
-        if String.IsNullOrWhiteSpace account then
-            ProviderProse.render lang Path.CondensationUnavailable (Map [ "raw_tail", rawTail ])
-        else
-            ProviderProse.render lang Path.CondensationIncomplete (Map [ "account", account; "raw_tail", rawTail ])
-
-    let private noteMapResult
-        (cancelOwned: unit -> unit)
-        (mapped: Choice<int * string, int * byte[] * string>[])
-        (index: int)
-        (result: Choice<int * string, int * byte[] * string>)
-        =
-        mapped.[index] <- result
-
-        match result with
-        | Choice2Of2 _ -> cancelOwned ()
-        | Choice1Of2 _ -> ()
-
-    let private awaitMapTasks
-        (cancelOwned: unit -> unit)
-        (mapTasks: Task<Choice<int * string, int * byte[] * string>>[])
-        =
-        task {
-            let mapped = Array.zeroCreate mapTasks.Length
-
-            for i in 0 .. mapTasks.Length - 1 do
-                let! result = mapTasks.[i]
-                noteMapResult cancelOwned mapped i result
-
-            return mapped
-        }
-
-    let private reduceMapped
-        (merge: int -> string list -> Task<string>)
-        (levels: ResizeArray<ResizeArray<string>>)
-        (successes: (int * string)[])
-        =
-        task {
-            for _, summary in successes do
-                do! rippleInsert merge levels summary
-
-            return! foldLevels merge levels
-        }
-
-    let private finishDistill
-        (cancelOwned: unit -> unit)
-        (lang: ProviderLanguage)
-        (reduced: string)
-        (rawTail: string)
-        (failureCount: int)
-        =
-        if failureCount = 0 then
-            reduced
-        else
-            cancelOwned ()
-            partialWithTail lang reduced rawTail
-
-    let private reduceOrPartial
-        (cancelOwned: unit -> unit)
-        (merge: int -> string list -> Task<string>)
-        (levels: ResizeArray<ResizeArray<string>>)
-        (successes: (int * string)[])
-        (failures: (int * byte[] * string)[])
-        (lang: ProviderLanguage)
-        (chunks: ResizeArray<int * byte[]>)
-        =
+        (result: ForkResult)
+        : Task<Result<string, DistillerFailure>> =
         task {
             try
-                let! reduced = reduceMapped merge levels successes
-                return finishDistill cancelOwned lang reduced (rawTailText chunks) failures.Length
+                let! completion = awaitAgentWithPermit runtime result.AgentId
+                return Ok(completionText completion)
             with ex ->
-                cancelOwned ()
-
                 return
-                    ProviderProse.render
-                        lang
-                        Path.CondensationFailed
-                        (Map [ "error", ex.Message; "raw_tail", rawTailText chunks ])
+                    Error
+                        { OwnedAgentId = Some result.AgentId
+                          Message = ex.Message }
         }
 
-    let private cancelOwnedAgentOnce (runtime: IDistillationRuntime) (cancelledIds: HashSet<string>) (agentId: string) =
-        if cancelledIds.Add agentId then
-            runtime.CancelAgent agentId
-
-    /// Maps bounded spool chunks concurrently (results sorted by chunk index),
-    /// then reduces online. Map/reduce failures yield partial account plus the
-    /// last 200KB raw tail instead of dropping ProcessResult.
-    /// Agent waits go through IDistillationRuntime.AwaitAgentWithPermit (fresh permit each wait).
-    let distillSpool (runtime: IDistillationRuntime) (spoolPath: string) (lang: ProviderLanguage) =
+    let private runDistillerPrompt
+        (runtime: IDistillationRuntime)
+        (id: string)
+        (prompt: string)
+        (payload: string)
+        : Task<Result<string, DistillerFailure>> =
         task {
-            // DSL-MUTABLE: cancellation — forked agent id list for cancel cleanup
-            let forkedIds = ResizeArray<string>()
-            // DSL-MUTABLE: cancellation — physical cancel is at-most-once per owned child
-            let cancelledIds = HashSet<string>()
+            let! forked = runtime.Fork(id, Role.Distiller, prompt, Some payload)
 
-            let cancelOwned () =
-                for id in forkedIds do
-                    cancelOwnedAgentOnce runtime cancelledIds id
+            match forked with
+            | Error error -> return Error { OwnedAgentId = None; Message = error }
+            | Ok result -> return! awaitForkedDistiller runtime result
+        }
 
-            // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
-            let chunks = ResizeArray<int * byte[]>()
-            // DSL-MUTABLE: algorithm-scratch — spool chunk index counter
-            let mutable index = 0
+    let private readLatestTail (spoolPath: string) : Task<TailInput> =
+        task {
+            // DSL-MUTABLE: algorithm-scratch — rolling bounded spool tail.
+            let mutable latest = [||]
+            // DSL-MUTABLE: algorithm-scratch — total observed bytes establish truncation honestly.
+            let mutable observedBytes = 0L
 
             do!
                 Spool.readChunks spoolPath (fun chunk ->
                     task {
-                        chunks.Add(index, Array.copy chunk)
-                        index <- index + 1
+                        observedBytes <- observedBytes + int64 chunk.Length
+                        latest <- retainLatestBytes Spool.ChunkSizeBytes latest chunk
                     })
 
-            // Start all map tasks first (concurrent), then await in index order.
-            let mapTasks =
-                [| for (chunkIndex, chunk) in chunks do
-                       task {
-                           try
-                               let! summary = distillFragment runtime forkedIds spoolPath chunk chunkIndex lang
-                               return Choice1Of2(chunkIndex, summary)
-                           with ex ->
-                               return Choice2Of2(chunkIndex, chunk, ex.Message)
-                       } |]
+            return
+                { Bytes = latest
+                  Truncated = observedBytes > int64 Spool.ChunkSizeBytes }
+        }
 
-            let! mapped = awaitMapTasks cancelOwned mapTasks
+    let private renderTruncationBoundary (lang: ProviderLanguage) (tail: TailInput) (account: string) =
+        if tail.Truncated then
+            ProviderProse.render lang Path.InputTruncated (Map [ "account", account ])
+        else
+            account
 
-            let successes =
-                mapped
-                |> Array.choose (function
-                    | Choice1Of2 value -> Some value
-                    | Choice2Of2 _ -> None)
-                |> Array.sortBy fst
+    let private renderFailure (lang: ProviderLanguage) (tail: TailInput) (message: string) =
+        let failed =
+            ProviderProse.render
+                lang
+                Path.CondensationFailed
+                (Map [ "error", message; "raw_tail", Encoding.UTF8.GetString tail.Bytes ])
 
-            let failures =
-                mapped
-                |> Array.choose (function
-                    | Choice2Of2 value -> Some value
-                    | Choice1Of2 _ -> None)
+        renderTruncationBoundary lang tail failed
 
-            // DSL-MUTABLE: algorithm-scratch — distillation level accumulator
-            let levels = ResizeArray<ResizeArray<string>>()
-            let merge = mergeDistillations runtime forkedIds lang
-            return! reduceOrPartial cancelOwned merge levels successes failures lang chunks
+    let private finishDistillation
+        (runtime: IDistillationRuntime)
+        (lang: ProviderLanguage)
+        (tail: TailInput)
+        (outcome: Result<string, DistillerFailure>)
+        =
+        match outcome with
+        | Ok account -> renderTruncationBoundary lang tail account
+        | Error failure ->
+            failure.OwnedAgentId |> Option.iter runtime.CancelAgent
+            renderFailure lang tail failure.Message
+
+    let private distillNonEmptyTail
+        (runtime: IDistillationRuntime)
+        (spoolPath: string)
+        (lang: ProviderLanguage)
+        (tail: TailInput)
+        =
+        task {
+            let payload = Encoding.UTF8.GetString tail.Bytes
+            let id = agentId (sprintf "%s|%s" spoolPath (HostDigest.sha256Hex payload))
+            let! outcome = runDistillerPrompt runtime id (distillFragmentPrompt lang) payload
+            return finishDistillation runtime lang tail outcome
+        }
+
+    /// Consume the spool with fixed model cost: retain only the latest 200 KiB
+    /// window and run at most one Distiller. Output growth never creates more
+    /// provider sessions or a reduce tree.
+    let distillSpool (runtime: IDistillationRuntime) (spoolPath: string) (lang: ProviderLanguage) =
+        task {
+            let! tail = readLatestTail spoolPath
+
+            if tail.Bytes.Length = 0 then
+                return ""
+            else
+                return! distillNonEmptyTail runtime spoolPath lang tail
         }

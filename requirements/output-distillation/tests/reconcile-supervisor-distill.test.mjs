@@ -1,7 +1,6 @@
 // Split from tests/unit/execution/reconcile-supervisor.test.mjs (cutover Wave 2a);
-// owner: output-distillation. DISTILL-007：任一 map 失败 → cancelOwned 取消全部
-// owned map agents，distillSpool 返回 partial text 不抛（reconcile machinery →
-// host-boundary）。
+// owner: output-distillation. DISTILL-006：唯一 Distiller 失败时，物理取消
+// 至多一次并返回 bounded raw tail，不把异常抛穿 host-boundary。
 
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
@@ -11,10 +10,10 @@ import test from 'node:test'
 
 const { distillSpool } = await import('../../../dist/OpenCode/Tools/DistillationSurface.js')
 
-test('WHAT[DISTILL-007] EXEC_distillation_cancel_owned_on_failure', async () => {
+test('WHAT[DISTILL-006] EXEC_distillation_cancel_single_owned_distiller_once_on_failure', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-sum-'))
   const spoolPath = join(dir, 'spool.bin')
-   // One small chunk → one map agent; Join NotFound → map failure → cancelOwned.
+  // One small spool → one Distiller; Join NotFound → failure → cancelOwned.
   writeFileSync(spoolPath, Buffer.from('chunk-body-for-summarize'))
 
   const forked = []
@@ -31,18 +30,8 @@ test('WHAT[DISTILL-007] EXEC_distillation_cancel_owned_on_failure', async () => 
 
   const summary = await distillSpool(runtime, spoolPath, 'en')
   assert.ok(typeof summary === 'string', 'distillSpool returns partial text, not throw')
-  assert.ok(forked.length >= 1, 'at least one map agent forked')
-  assert.ok(
-    cancelled.length >= 1,
-    `CancelAgent must run for owned forked ids on map failure; forked=${forked.join(',')} cancelled=${cancelled.join(',')}`,
-  )
-  for (const id of forked) {
-    assert.equal(
-      cancelled.filter((cancelledId) => cancelledId === id).length,
-      1,
-      `owned agent ${id} must be cancelled exactly once even when several failure paths request cleanup`,
-    )
-  }
+  assert.equal(forked.length, 1, 'exactly one Distiller is forked')
+  assert.deepEqual(cancelled, forked, 'the one owned Distiller is cancelled exactly once')
 
   rmSync(dir, { recursive: true, force: true })
 })
