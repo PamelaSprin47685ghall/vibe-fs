@@ -168,9 +168,7 @@ module Distillation =
         { OwnedAgentId: string option
           Message: string }
 
-    type private TailInput =
-        { Bytes: byte[]
-          Truncated: bool }
+    type private TailInput = { Bytes: byte[]; Truncated: bool }
 
     let private retainLatestBytes (limit: int) (current: byte[]) (next: byte[]) =
         let nextLength = min limit (current.Length + next.Length)

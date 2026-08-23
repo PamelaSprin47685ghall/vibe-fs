@@ -10,19 +10,15 @@
 // distillation internally.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import test from 'node:test'
 import { assertJsData } from '../../verification-system/tests/support/js-contract.mjs'
-
-const root = resolve(import.meta.dirname, '../../..')
-const companionTransform = readFileSync(resolve(root, 'src/Wanxiangshu/Context/Companion/Transform.fs'), 'utf8')
 
 const {
   roleLabel,
   managedAgentName,
   isInternalRuntime,
   canBeForkedOrHorizonTarget,
+  hasBloggerCompanion,
   permissionLabels,
   executionToolName,
   contract,
@@ -34,6 +30,7 @@ test('WHAT[DISTILL-009] distiller_is_private_leaf_runtime_without_public_target_
   assertJsData(managedAgentName, 'managedAgentName')
   assertJsData(isInternalRuntime, 'isInternalRuntime')
   assertJsData(canBeForkedOrHorizonTarget, 'canBeForkedOrHorizonTarget')
+  assertJsData(hasBloggerCompanion, 'hasBloggerCompanion')
   assertJsData(permissionLabels, 'permissionLabels')
   assertJsData(executionToolName, 'executionToolName')
 
@@ -44,14 +41,8 @@ test('WHAT[DISTILL-009] distiller_is_private_leaf_runtime_without_public_target_
   assert.equal(contract.internalRuntime, true)
   assert.equal(contract.publicTarget, false)
   assert.equal(contract.managedAgent, 'fast-distiller')
-  assert.match(
-    companionTransform,
-    /let private allowsBloggerCompanionForAgentName[\s\S]*AgentRoleIdentity\.roleOfString agentName[\s\S]*Some Role\.Distiller -> false[\s\S]*_ -> true/,
-    'the Companion attachment owner must reject Distiller while retaining ordinary roles',
-  )
-  assert.match(companionTransform, /List\.choose tryMessageRole[\s\S]*List\.forall allowsBloggerCompanionForAgentName/)
-  assert.match(companionTransform, /let companionEligible = allowsBloggerCompanion rawMessages/)
-  assert.match(companionTransform, /not alreadyHasBHead[\s\S]*&& companionEligible[\s\S]*processSession/)
+  assert.equal(hasBloggerCompanion, false)
+  assert.equal(contract.bloggerCompanion, false)
 })
 
 test('WHAT[DISTILL-010] distiller_carries_no_execution_or_judgement_permissions_and_run_is_the_only_execution_surface', () => {

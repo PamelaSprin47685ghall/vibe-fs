@@ -95,7 +95,7 @@ module CompanionTransform =
         else
             Some(tryMessageSessionId message, tryMessageRole message)
 
-    let private allowsBloggerCompanionForAgentName (agentName: string) =
+    let allowsBloggerCompanionForAgentName (agentName: string) =
         match AgentRoleIdentity.roleOfString agentName with
         | Some Role.Distiller -> false
         | _ -> true
