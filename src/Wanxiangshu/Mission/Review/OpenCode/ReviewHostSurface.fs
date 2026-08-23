@@ -129,10 +129,22 @@ module ReviewHostSurface =
                 | Error error -> box {| ok = false; error = error |}
         }
 
-    let nudgeReviewer (port: obj) (handle: JournalHandle option) (reviewerSession: string) : Task<obj> =
+    let nudgeReviewer
+        (port: obj)
+        (handle: JournalHandle option)
+        (reviewerSession: string)
+        (terminalProviderRun: string)
+        : Task<obj> =
         task {
             let journal = handle |> Option.map (fun value -> value.Journal)
-            let! outcome = HostReviewGuard.nudgeReviewer (sessionPort port) journal (SessionId.create reviewerSession)
+
+            let! outcome =
+                HostReviewGuard.nudgeReviewer
+                    (sessionPort port)
+                    journal
+                    (SessionId.create reviewerSession)
+                    (ProviderRunIdentity.create terminalProviderRun)
+
             return outcomeView outcome
         }
 

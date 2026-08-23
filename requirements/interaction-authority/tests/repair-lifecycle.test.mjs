@@ -10,8 +10,8 @@ test('WHAT[INTERACTION-AUTHORITY-019] repair claim does not turn an in-flight re
   assert.equal(turns.repairDefectDecision(true, false, 'tool-calls', []), 'AwaitRepairTerminal')
 })
 
-test('WHAT[INTERACTION-AUTHORITY-019] only the repair attempt own unusable terminal can exhaust repair', () => {
-  assert.equal(turns.repairDefectDecision(true, true, 'stop', []), 'RepairExhausted')
-  assert.equal(turns.repairDefectDecision(true, true, 'length', text('partial')), 'RepairExhausted')
+test('WHAT[INTERACTION-AUTHORITY-019] fresh invalid repair terminals re-open the gate reminder', () => {
+  assert.equal(turns.repairDefectDecision(true, true, 'stop', []), 'RequestRepair')
+  assert.equal(turns.repairDefectDecision(true, true, 'length', text('partial')), 'RequestRepair')
   assert.equal(turns.repairDefectDecision(true, true, 'stop', text('done')), 'NoRepair')
 })

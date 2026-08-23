@@ -81,6 +81,23 @@ test('WHAT[CRASH-006] Q05_new_physical_user_material_revokes_the_previous_idle_b
   assert.equal(quiescence.tryConsume(gate, newPermit), true, 'same physical message replay must be a no-op')
 })
 
+test('WHAT[CRASH-006] Q06_definitive_pre_acceptance_rejection_can_return_the_same_idle_permit', () => {
+  const gate = quiescence.create()
+  quiescence.beginAttempt(gate, S)
+  const permit = quiescence.observeIdle(gate, S)
+
+  assert.equal(quiescence.tryConsume(gate, permit), true)
+  assert.equal(quiescence.tryRelease(gate, permit), true, 'definite no-send may re-open the exact idle serial')
+  assert.equal(quiescence.tryConsume(gate, permit), true, 'the gate reminder may retry after a definite Host rejection')
+
+  quiescence.beginAttempt(gate, S)
+  assert.equal(
+    quiescence.tryRelease(gate, permit),
+    false,
+    'a fresher provider attempt prevents an old consumed permit from being resurrected',
+  )
+})
+
 test('WHAT[CRASH-001] Q07_restart_gate_holds_no_permit', () => {
   const before = quiescence.create()
   quiescence.beginAttempt(before, S)
@@ -155,5 +172,6 @@ test('WHAT[CRASH-006] P4_SURFACE_exports_exact_capability_names', () => {
     'observePhysicalMessage',
     'revoke',
     'tryConsume',
+    'tryRelease',
   ])
 })

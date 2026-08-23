@@ -31,6 +31,16 @@ module JoinGuardSurface =
                 {| outcome = "AlreadyOutstanding"
                    promptKey = null
                    reason = null |}
+        | HostJoinGuard.JoinGuardNudgeOutcome.Superseded ->
+            box
+                {| outcome = "Superseded"
+                   promptKey = null
+                   reason = null |}
+        | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
+            box
+                {| outcome = "NotSent"
+                   promptKey = null
+                   reason = null |}
         | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
             box
                 {| outcome = "Failed"
@@ -38,7 +48,14 @@ module JoinGuardSurface =
                    reason = reason |}
 
     /// Run the real JoinGuard reservation/send path and expose only its decision.
-    let nudge (port: obj) (handle: obj) (reservations: obj) (session: string) (directory: obj) : Task<obj> =
+    let nudge
+        (port: obj)
+        (handle: obj)
+        (reservations: obj)
+        (session: string)
+        (terminalProviderRun: string)
+        (directory: obj)
+        : Task<obj> =
         task {
             let journal =
                 if isNull handle then
@@ -47,13 +64,17 @@ module JoinGuardSurface =
                     Some((unbox<JournalHandle> handle).Journal)
 
             let keys = (unbox<ReservationCapability> reservations).Keys
+            let sessionId = SessionId.create session
 
             let! outcome =
                 HostJoinGuard.nudge
                     (DispatchSurface.sessionPort port)
                     journal
                     keys
-                    (SessionId.create session)
+                    (fun () -> true)
+                    ignore
+                    sessionId
+                    (ProviderRunIdentity.create terminalProviderRun)
                     (if isNull directory then None else Some(string directory))
 
             return outcomeView outcome

@@ -74,6 +74,11 @@ module PromptDispatcher =
     type internal SendAttemptOutcome =
         | Sent of PromptKey
         | Superseded
+        /// Host definitively rejected before physical acceptance. Idle gate
+        /// callers may safely re-open the same quiescence permit.
+        | NotSent of string
+        /// Acceptance may have happened or durable bookkeeping failed; never
+        /// retry automatically because doing so could duplicate physical input.
         | Failed of string
 
     /// The single PROMPT-005 sender.
@@ -310,14 +315,33 @@ module PromptDispatcher =
             | Some accepted when accepted.PromptKey = claim.PromptKey -> true
             | _ -> false
 
-        /// Ordinary missing-final/incomplete repair is bounded by the LogicalRun +
-        /// repair family, not by each terminal. Otherwise every repair response
-        /// would create a fresh terminal and legally mint the same nudge forever.
-        member this.RepairFamilyAdmission (profile: PromptAuthority.AuthorityExecutionProfile) (repairKind: string) =
-            PromptAuthority.repairFamilyAdmission
+        /// Has this exact gate + terminal occasion already admitted its reminder?
+        /// Fresh ProviderRun identities are deliberately unbounded.
+        member this.GateNudgeAlreadyAdmitted
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (continuation: PromptAuthority.ContinuationKind)
+            (gateKind: string)
+            (terminalProviderRun: ProviderRunIdentity)
+            : bool =
+            PromptAuthority.gateNudgeAlreadyAdmitted
                 profile.SessionId
                 profile.LogicalRunId
-                repairKind
+                continuation
+                gateKind
+                terminalProviderRun
+                (this.ProjectionFor profile.SessionId)
+
+        member this.GateNudgeAcceptedPhysical
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (continuation: PromptAuthority.ContinuationKind)
+            (gateKind: string)
+            (terminalProviderRun: ProviderRunIdentity)
+            =
+            PromptAuthority.gateNudgeAcceptedPhysical
+                profile.SessionId
+                continuation
+                gateKind
+                terminalProviderRun
                 (this.ProjectionFor profile.SessionId)
 
         /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one interaction repair.
@@ -344,13 +368,13 @@ module PromptDispatcher =
         /// GLORY-029: has this exact Manager terminal occasion already received
         /// its encouragement. Fresh ProviderRun identities are intentionally
         /// unbounded, even within the same Life/business condition.
-        member this.IdleAlreadyClaimed
+        member this.IdleAlreadyAdmitted
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (lifeId: ManagerLifeId)
             (conditionKey: string)
             (terminalProviderRun: ProviderRunIdentity)
             : bool =
-            PromptAuthority.idleAlreadyClaimed
+            PromptAuthority.idleAlreadyAdmitted
                 profile.SessionId
                 profile.LogicalRunId
                 lifeId

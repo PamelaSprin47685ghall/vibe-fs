@@ -90,7 +90,14 @@ module ManagerWorkflow =
         else
             task {
                 let! settled =
-                    ManagerBackground.ensureSettled sessionPort eventPort journal joinGuardNudges hasLivePty turn
+                    ManagerBackground.ensureSettled
+                        sessionPort
+                        eventPort
+                        journal
+                        joinGuardNudges
+                        hasLivePty
+                        quiescence
+                        context
 
                 return!
                     handleBackgroundSettlement

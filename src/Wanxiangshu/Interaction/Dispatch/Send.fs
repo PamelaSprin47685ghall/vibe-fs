@@ -121,14 +121,35 @@ module PromptDispatcherSend =
     let private publicResultOfAttempt =
         function
         | PromptDispatcher.SendAttemptOutcome.Sent key -> Ok key
+        | PromptDispatcher.SendAttemptOutcome.NotSent error -> Error error
         | PromptDispatcher.SendAttemptOutcome.Failed error -> Error error
         | PromptDispatcher.SendAttemptOutcome.Superseded ->
             Error "idle-derived send was superseded before physical dispatch"
 
-    let private attemptOfResult =
-        function
-        | Ok key -> PromptDispatcher.SendAttemptOutcome.Sent key
-        | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error
+    let private continuationAttemptOutcome (key: PromptKey) (outcome: SendOutcome) (result: Result<PromptKey, string>) =
+        match outcome, result with
+        | (Retryable _ | Fatal _), Error error ->
+            PromptPhysicalAcceptance.cancel key
+            PromptDispatcher.SendAttemptOutcome.NotSent error
+        | _, Ok sentKey -> PromptDispatcher.SendAttemptOutcome.Sent sentKey
+        | _, Error error ->
+            PromptPhysicalAcceptance.cancel key
+            PromptDispatcher.SendAttemptOutcome.Failed error
+
+    let private awaitPhysicalAwareContinuationAttempt
+        (key: PromptKey)
+        (sendTask: Task<SendOutcome>)
+        (record: SendOutcome -> Task<Result<PromptKey, string>>)
+        : Task<PromptDispatcher.SendAttemptOutcome> =
+        task {
+            try
+                let! outcome = sendTask
+                let! result = record outcome
+                return continuationAttemptOutcome key outcome result
+            with ex ->
+                PromptPhysicalAcceptance.cancel key
+                return raise ex
+        }
 
     let private physicalSendAdmitted (admission: (unit -> bool) option) =
         admission |> Option.map (fun admit -> admit ()) |> Option.defaultValue true
@@ -442,9 +463,8 @@ module PromptDispatcherSend =
                             match awaitMode with
                             | PromptDispatcher.AwaitMode.Detached -> detachedOutcome ()
                             | PromptDispatcher.AwaitMode.Await ->
-                                awaitPhysicalAwareSend key sendTask (fun outcome ->
+                                awaitPhysicalAwareContinuationAttempt key sendTask (fun outcome ->
                                     this.RecordSendOutcome key sessionId outcome acceptFn)
-                                |> TaskValue.map attemptOfResult
 
                         return! sendAfterAdmission ()
                     }
@@ -571,6 +591,35 @@ module PromptDispatcherSend =
                 onAccepted
                 None
 
+        /// Non-idle gate reminder with exact terminal occasion identity. Used by
+        /// terminal-subscriber gates (for example Reviewer verdict-required)
+        /// that do not derive authority from SessionIdle.
+        member this.SendGateNudge
+            (port: ISessionHostPort)
+            (sessionId: SessionId)
+            (text: string)
+            (continuation: PromptAuthority.ContinuationKind)
+            (gateKind: string)
+            (terminalProviderRun: ProviderRunIdentity)
+            (profile: PromptAuthority.AuthorityExecutionProfile)
+            (effectiveAgent: string)
+            (directory: string option)
+            (awaitMode: PromptDispatcher.AwaitMode)
+            (onAccepted: (PhysicalUserMessageId -> unit) option)
+            : Task<Result<PromptKey, string>> =
+            this.SendContinuationWithDigest
+                port
+                sessionId
+                text
+                (PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun)
+                continuation
+                profile
+                effectiveAgent
+                directory
+                awaitMode
+                onAccepted
+                None
+
         member this.SendContinuationWithTools
             (port: ISessionHostPort)
             (sessionId: SessionId)
@@ -595,33 +644,6 @@ module PromptDispatcherSend =
                 awaitMode
                 onAccepted
                 (Some tools)
-
-        /// Ordinary missing-final/incomplete repair: one prompt per LogicalRun +
-        /// repair family. A second unusable terminal produced by the repair itself
-        /// must terminate/fallback, not mint an unbounded chain of nudges.
-        member this.SendRepairFamily
-            (port: ISessionHostPort)
-            (sessionId: SessionId)
-            (text: string)
-            (repairKind: string)
-            (profile: PromptAuthority.AuthorityExecutionProfile)
-            (effectiveAgent: string)
-            (directory: string option)
-            (awaitMode: PromptDispatcher.AwaitMode)
-            (onAccepted: (PhysicalUserMessageId -> unit) option)
-            : Task<Result<PromptKey, string>> =
-            this.SendContinuationWithDigest
-                port
-                sessionId
-                text
-                (PromptAuthority.repairFamilyPayloadDigest repairKind)
-                PromptAuthority.ContinuationKind.InteractionRepair
-                profile
-                effectiveAgent
-                directory
-                awaitMode
-                onAccepted
-                None
 
         /// FALLBACK-008: the one Blogger-request + terminal-scoped interaction repair an unusable terminal earns.
         ///
@@ -718,11 +740,15 @@ module PromptDispatcherSend =
                 None
                 (Some physicalAdmission)
 
-        member internal this.SendIdleRepairFamily
+        /// Gate reminder: exactly-once for one terminal occasion, intentionally
+        /// unbounded across fresh terminals while the business gate remains open.
+        member internal this.SendIdleGateNudge
             (port: ISessionHostPort)
             (sessionId: SessionId)
             (text: string)
-            (repairKind: string)
+            (continuation: PromptAuthority.ContinuationKind)
+            (gateKind: string)
+            (terminalProviderRun: ProviderRunIdentity)
             (profile: PromptAuthority.AuthorityExecutionProfile)
             (effectiveAgent: string)
             (directory: string option)
@@ -733,8 +759,8 @@ module PromptDispatcherSend =
                 port
                 sessionId
                 text
-                (PromptAuthority.repairFamilyPayloadDigest repairKind)
-                PromptAuthority.ContinuationKind.InteractionRepair
+                (PromptAuthority.gateNudgePayloadDigest gateKind terminalProviderRun)
+                continuation
                 profile
                 effectiveAgent
                 directory

@@ -16,37 +16,45 @@ open Wanxiangshu.Persistence.Journal
 /// remains an error.
 module ReviewerTerminalAwait =
 
-    let hasDurablyClosedJudgement
+    let tryDurablyClosedJudgementRun
         (journal: AgentJournal option)
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         =
         match journal with
-        | None -> false
+        | None -> None
         | Some durable ->
             AgentProjection.tryFind reviewerSessionId (AgentJournal.snapshot durable).AgentProjections
             |> Option.bind (fun session -> session.ReviewGuard)
-            |> Option.exists (fun guard ->
-                guard.CurrentBarrierId = Some barrierId
-                && (guard
-                    |> ReviewProjection.latestObservedAttempt
-                    |> Option.filter (fun attempt -> attempt.ReviewBarrierId = barrierId)
-                    |> Option.bind (fun attempt -> ReviewProjection.closedAttemptOf attempt guard)
-                    |> Option.isSome))
+            |> Option.bind (fun guard ->
+                guard
+                |> ReviewProjection.latestObservedAttempt
+                |> Option.filter (fun attempt ->
+                    guard.CurrentBarrierId = Some barrierId && attempt.ReviewBarrierId = barrierId)
+                |> Option.bind (fun attempt ->
+                    ReviewProjection.closedAttemptOf attempt guard
+                    |> Option.map (fun _ -> attempt.ProviderRun)))
+
+    let hasDurablyClosedJudgement journal reviewerSessionId barrierId =
+        tryDurablyClosedJudgementRun journal reviewerSessionId barrierId
+        |> Option.isSome
+
+    let private closedJudgementRunResult journal reviewerSessionId barrierId =
+        tryDurablyClosedJudgementRun journal reviewerSessionId barrierId
+        |> Option.map Ok
+        |> Option.defaultValue (Error "reviewer attempt aborted without a durably closed judgement")
 
     let private terminalResult
         (journal: AgentJournal option)
         (reviewerSessionId: SessionId)
         (barrierId: ReviewBarrierId)
         (completed: TaskCompletionSource<TerminalOutcome>)
-        : Task<Result<unit, string>> =
+        : Task<Result<ProviderRunIdentity, string>> =
         task {
             match! completed.Task with
-            | TerminalOutcome.Completed _ -> return Ok()
+            | TerminalOutcome.Completed run -> return Ok run.ProviderRun
             | TerminalOutcome.Failed stop -> return Error stop.Reason
-            | TerminalOutcome.Aborted _ when hasDurablyClosedJudgement journal reviewerSessionId barrierId ->
-                return Ok()
-            | TerminalOutcome.Aborted stop -> return Error stop.Reason
+            | TerminalOutcome.Aborted _ -> return closedJudgementRunResult journal reviewerSessionId barrierId
         }
 
     let awaitFuture
@@ -54,7 +62,7 @@ module ReviewerTerminalAwait =
         (sessions: ISessionHostPort)
         (occasion: ReviewerTerminalOccasion)
         (timeoutMs: int)
-        : Task<Result<unit, string>> =
+        : Task<Result<ProviderRunIdentity, string>> =
         task {
             let reviewerSessionId = occasion.ReviewerSessionId
             let barrierId = occasion.BarrierId

@@ -369,32 +369,25 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         let reviewerAgentId =
             sprintf "%s-%s" (OrchestratorManagerJob.reviewerAgentId jobId) (ReviewBarrierId.value barrierId)
 
-        let sendReviewerNudge (durable: AgentJournal) reviewerSessionId =
-            task {
-                let acceptedPhysical = ref None
-                let dispatcher = PromptDispatcher.forJournal durable
+        let sendReviewerNudge
+            (durable: AgentJournal)
+            (reviewerSessionId: SessionId)
+            (terminalProviderRun: ProviderRunIdentity)
+            =
+            HostSessionNudge.trySendGateContinuationPhysical
+                deps.Sessions
+                reviewerSessionId
+                (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
+                PromptAuthority.ContinuationKind.ReviewerGuard
+                (Some(WorktreePath.value worktree))
+                (Some durable)
+                (RuntimeNudge.ReviewerVerdictRequired + ":" + ReviewBarrierId.value barrierId)
+                terminalProviderRun
 
-                let! sent =
-                    dispatcher.SendAgentOwnerRoot
-                        deps.Sessions
-                        reviewerSessionId
-                        (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-                        OrchestratorHostReview.DeepReviewerAgent
-                        (Some(WorktreePath.value worktree))
-                        PromptDispatcher.AwaitMode.Await
-                        (Some(fun physical -> acceptedPhysical.Value <- Some physical))
-
-                return
-                    match sent, acceptedPhysical.Value with
-                    | Error error, _ -> Error error
-                    | Ok _, Some physical -> Ok physical
-                    | Ok _, None -> Error "result-review nudge was admitted without a PhysicalUserMessageId"
-            }
-
-        let nudgeReviewer reviewerSessionId =
+        let nudgeReviewer reviewerSessionId terminalProviderRun =
             match deps.Journal with
             | None -> Task.FromResult(Error "No journal: a result-review nudge cannot be claimed")
-            | Some durable -> sendReviewerNudge durable reviewerSessionId
+            | Some durable -> sendReviewerNudge durable reviewerSessionId terminalProviderRun
 
         OrchestratorHostReview.reverify
             deps.Journal

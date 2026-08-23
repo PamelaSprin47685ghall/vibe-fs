@@ -133,7 +133,12 @@ module CohortWorkflow =
                 { StartReview = fun () -> reviewerPort.StartReview memberInfo
                   AwaitJudgement = channel.AwaitJudgement
                   AwaitReviewer = awaitOrCancel
-                  NudgeMissingJudgement = fun () -> reviewerPort.NudgeMissingJudgement memberInfo.ReviewerSessionId }
+                  NudgeMissingJudgement =
+                    fun terminalProviderRun ->
+                        reviewerPort.NudgeMissingJudgement
+                            memberInfo.ReviewerSessionId
+                            memberInfo.BarrierId
+                            terminalProviderRun }
 
             let request =
                 { ManagerSessionId = managerSessionId

@@ -24,12 +24,16 @@ const exhaustionOwners = [...source.entries()]
   .filter(([, text]) => text.includes('INTERACTION_REPAIR_EXHAUSTED'))
   .map(([path]) => path)
 
-if (exhaustionOwners.length !== 1 || exhaustionOwners[0] !== REPAIR) {
-  violations.push(`INTERACTION_REPAIR_EXHAUSTED must be owned only by ${REPAIR}; found ${exhaustionOwners.join(', ')}`)
+if (exhaustionOwners.length > 0) {
+  violations.push(`ordinary gate nudge must not expose INTERACTION_REPAIR_EXHAUSTED; found ${exhaustionOwners.join(', ')}`)
 }
 
 for (const legacy of [
   'BudgetExhausted',
+  'RepairFamilyAdmission',
+  'repairFamilyAdmission',
+  'SendRepairFamily',
+  'SendIdleRepairFamily',
   'RepairFamilyAlreadyClaimed',
   'repairFamilyAlreadyClaimed',
   'RepairFamilyAdmissionSpent',
@@ -59,4 +63,4 @@ if (violations.length > 0) {
   process.exit(1)
 }
 
-console.log('interaction-repair-invariant: OK — admission, in-flight, and exhaustion remain separate')
+console.log('interaction-repair-invariant: OK — gate nudges are exact-terminal, in-flight aware, and non-exhausting')

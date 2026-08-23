@@ -128,11 +128,11 @@ module ReviewBarrierWorkflow =
     let rec private awaitRequiredJudgement
         (host: ReviewHostPort)
         (judgement: Task<Result<ReviewJudgementDelivery, string>>)
-        (terminal: Task<Result<unit, string>>)
+        (terminal: Task<Result<ProviderRunIdentity, string>>)
         (expectedPhysical: PhysicalUserMessageId option)
         : Task<
               Result<
-                  ReviewJudgementDelivery * PhysicalUserMessageId option * Task<Result<unit, string>>,
+                  ReviewJudgementDelivery * PhysicalUserMessageId option * Task<Result<ProviderRunIdentity, string>>,
                   ReviewBarrierFailure
                >
            >
@@ -152,31 +152,35 @@ module ReviewBarrierWorkflow =
 
             let! winner = emitJsExpr (taggedJudgement, taggedTerminal) "Promise.race([$0, $1])": Task<obj>
 
-            match unbox<Choice<Result<ReviewJudgementDelivery, string>, Result<unit, string>>> winner with
+            match
+                unbox<Choice<Result<ReviewJudgementDelivery, string>, Result<ProviderRunIdentity, string>>> winner
+            with
             | Choice1Of2(Ok delivery) -> return Ok(delivery, expectedPhysical, terminal)
             | Choice1Of2(Error error) -> return Error(ReviewBarrierFailure.CannotAwaitJudgement error)
             | Choice2Of2(Error error) -> return Error(ReviewBarrierFailure.CannotAwaitReviewer error)
-            | Choice2Of2(Ok()) -> return! continueAfterCleanTerminal host judgement
+            | Choice2Of2(Ok terminalProviderRun) ->
+                return! continueAfterCleanTerminal host judgement terminalProviderRun
         }
 
     and private continueAfterCleanTerminal
         (host: ReviewHostPort)
         (judgement: Task<Result<ReviewJudgementDelivery, string>>)
+        (terminalProviderRun: ProviderRunIdentity)
         =
         task {
             let nextTerminal = host.AwaitReviewer()
 
-            match! host.NudgeMissingJudgement() with
+            match! host.NudgeMissingJudgement terminalProviderRun with
             | Error error -> return Error(ReviewBarrierFailure.CannotNudgeReviewer error)
             | Ok physical -> return! awaitRequiredJudgement host judgement nextTerminal (Some physical)
         }
 
     let private finishAfterTerminal
-        (finalTerminal: Task<Result<unit, string>>)
+        (finalTerminal: Task<Result<ProviderRunIdentity, string>>)
         (outcome: ReviewBarrierOutcome)
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
         taskResult {
-            do! finalTerminal |> TaskResult.mapError ReviewBarrierFailure.CannotAwaitReviewer
+            let! _ = finalTerminal |> TaskResult.mapError ReviewBarrierFailure.CannotAwaitReviewer
             return outcome
         }
 
@@ -212,7 +216,7 @@ module ReviewBarrierWorkflow =
     let private concludeSecondPerfect
         (journal: AgentJournal)
         (request: ReviewBarrierRequest)
-        (finalTerminal: Task<Result<unit, string>>)
+        (finalTerminal: Task<Result<ProviderRunIdentity, string>>)
         (expectedSecondPhysical: PhysicalUserMessageId)
         (first: ReviewJudgement)
         (secondDelivery: ReviewJudgementDelivery)
@@ -226,7 +230,7 @@ module ReviewBarrierWorkflow =
     let private concludeSecond
         (journal: AgentJournal)
         (request: ReviewBarrierRequest)
-        (finalTerminal: Task<Result<unit, string>>)
+        (finalTerminal: Task<Result<ProviderRunIdentity, string>>)
         (expectedSecondPhysical: PhysicalUserMessageId)
         (first: ReviewJudgement)
         (secondDelivery: ReviewJudgementDelivery)
@@ -256,7 +260,7 @@ module ReviewBarrierWorkflow =
         (journal: AgentJournal)
         (host: ReviewHostPort)
         (request: ReviewBarrierRequest)
-        (finalTerminal: Task<Result<unit, string>>)
+        (finalTerminal: Task<Result<ProviderRunIdentity, string>>)
         (firstDelivery: ReviewJudgementDelivery)
         (first: ReviewJudgement)
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =
@@ -274,7 +278,7 @@ module ReviewBarrierWorkflow =
         (journal: AgentJournal)
         (host: ReviewHostPort)
         (request: ReviewBarrierRequest)
-        (finalTerminal: Task<Result<unit, string>>)
+        (finalTerminal: Task<Result<ProviderRunIdentity, string>>)
         (firstDelivery: ReviewJudgementDelivery)
         (first: ReviewJudgement)
         : Task<Result<ReviewBarrierOutcome, ReviewBarrierFailure>> =

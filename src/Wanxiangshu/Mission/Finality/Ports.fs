@@ -25,8 +25,9 @@ type FinalityReviewerPort =
     { PrepareSession: FinalityReviewerRequest -> Task<Result<PreparedReviewer, string>>
       StartReview: EnlistedMember -> Task<Result<unit, string>>
       OpenJudgementChannel: SessionId -> Result<ReviewJudgementChannel, string>
-      AwaitTerminal: ReviewerTerminalOccasion -> Task<Result<unit, string>>
-      NudgeMissingJudgement: SessionId -> Task<Result<PhysicalUserMessageId, string>>
+      AwaitTerminal: ReviewerTerminalOccasion -> Task<Result<ProviderRunIdentity, string>>
+      NudgeMissingJudgement:
+          SessionId -> ReviewBarrierId -> ProviderRunIdentity -> Task<Result<PhysicalUserMessageId, string>>
       SendRevisionSteer: SessionId -> string -> Task<Result<unit, string>>
       AbortReviewer: SessionId -> Task }
 

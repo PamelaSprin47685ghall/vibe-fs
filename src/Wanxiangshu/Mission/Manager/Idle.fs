@@ -125,7 +125,7 @@ module ManagerIdle =
             conditionKey
             (ProviderRunIdentity.value terminalProviderRun)
 
-    let private idleClaimed
+    let private idleAlreadyAdmitted
         (journal: AgentJournal option)
         (turn: ReconciledTurn)
         (life: LifeProjection)
@@ -133,7 +133,7 @@ module ManagerIdle =
         =
         match journal, HostSessionNudge.tryActiveProfile journal turn.SessionId with
         | Some durable, Some profile ->
-            PromptDispatcher.forJournal(durable).IdleAlreadyClaimed profile life.LifeId kindKey turn.ProviderRun
+            PromptDispatcher.forJournal(durable).IdleAlreadyAdmitted profile life.LifeId kindKey turn.ProviderRun
         | _ -> false
 
     let private sendIdleEncouragement
@@ -141,6 +141,8 @@ module ManagerIdle =
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
+        (nudgeSent: HashSet<string>)
+        (processKey: string)
         (turn: ReconciledTurn)
         (journal: AgentJournal option)
         (life: LifeProjection)
@@ -165,6 +167,11 @@ module ManagerIdle =
             | HostSessionNudge.IdleContinuationOutcome.Superseded
             | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
             | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
+            | HostSessionNudge.IdleContinuationOutcome.NotSent _ ->
+                // Definite pre-acceptance rejection returned the quiescence permit;
+                // release the process reservation as well so this exact still-open
+                // gate can retry on the next observation.
+                nudgeSent.Remove processKey |> ignore
             | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                 eventPort.NotifyTerminal
                     turn.SessionId
@@ -187,11 +194,24 @@ module ManagerIdle =
         (kindKey: string)
         (processKey: string)
         =
-        if idleClaimed journal turn life kindKey then
+        if idleAlreadyAdmitted journal turn life kindKey then
             AsyncSupport.completedTask ()
         else
             nudgeSent.Add processKey |> ignore
-            sendIdleEncouragement quiescence permit sessionPort eventPort turn journal life kindKey kind :> Task
+
+            sendIdleEncouragement
+                quiescence
+                permit
+                sessionPort
+                eventPort
+                nudgeSent
+                processKey
+                turn
+                journal
+                life
+                kindKey
+                kind
+            :> Task
 
     let encourageLabor
         (sessionPort: ISessionHostPort)

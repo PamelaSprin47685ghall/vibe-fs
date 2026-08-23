@@ -130,6 +130,22 @@ module RuntimeSurface =
           Receipt = optionalString value?receipt |> Option.map TransportReceipt.create
           ClaimedAtRuntimeStartCount = 0 }
 
+    let private acceptedDispatchToJs (dispatch: PromptAuthority.AcceptedDispatch) : obj =
+        box
+            {| promptKey = PromptKey.value dispatch.PromptKey
+               session = SessionId.value dispatch.SessionId
+               origin = originName dispatch.Origin
+               originLabel = PromptAuthority.originLabel dispatch.Origin
+               payloadDigest = dispatch.PayloadDigest
+               physical = PhysicalUserMessageId.value dispatch.PhysicalUserMessageId |}
+
+    let private acceptedDispatchOf (value: obj) : PromptAuthority.AcceptedDispatch =
+        { PromptKey = PromptKey.create (text value?promptKey)
+          SessionId = SessionId.create (text value?session)
+          Origin = originOf (text value?origin) (text value?originLabel)
+          PayloadDigest = text value?payloadDigest
+          PhysicalUserMessageId = PhysicalUserMessageId.create (text value?physical) }
+
     let private profileOption (value: obj) =
         if isNull value then None else Some(profileOf value)
 
@@ -170,6 +186,18 @@ module RuntimeSurface =
                             current)
                     Map.empty
 
+            let acceptedDispatches =
+                arrayOf value?acceptedDispatches
+                |> Array.fold
+                    (fun current item ->
+                        let dispatch = acceptedDispatchOf item
+
+                        Map.add
+                            (PromptAuthority.acceptedDispatchKey dispatch.SessionId dispatch.PayloadDigest)
+                            dispatch
+                            current)
+                    Map.empty
+
             let sequences =
                 arrayOf value?claimSequences
                 |> Array.fold (fun current item -> Map.add (text item?scope) (int (text item?count)) current) Map.empty
@@ -177,7 +205,7 @@ module RuntimeSurface =
             { LastAuthorityProfile = profileOption value?lastAuthorityProfile
               ActiveLogicalRun = profileOption value?activeLogicalRun
               PendingClaims = pending
-              AcceptedDispatches = Map.empty
+              AcceptedDispatches = acceptedDispatches
               AcceptedContinuationIds = accepted
               ClaimSequences = sequences }
 
@@ -195,6 +223,11 @@ module RuntimeSurface =
                 projection.PendingClaims
                 |> Map.toList
                 |> List.map (snd >> claimToJs)
+                |> List.toArray
+               acceptedDispatches =
+                projection.AcceptedDispatches
+                |> Map.toList
+                |> List.map (snd >> acceptedDispatchToJs)
                 |> List.toArray
                acceptedContinuations =
                 projection.AcceptedContinuationIds
@@ -489,18 +522,26 @@ module RuntimeSurface =
             kind
             (projectionOf projection)
 
-    let repairFamilyAdmission (session: string) (logicalRun: string) (kind: string) (projection: obj) : string =
-        match
-            PromptAuthority.repairFamilyAdmission
-                (SessionId.create session)
-                (LogicalRunId.create logicalRun)
-                kind
-                (projectionOf projection)
-        with
-        | PromptAuthority.RepairFamilyAdmission.Available -> "Available"
-        | PromptAuthority.RepairFamilyAdmission.AlreadyAdmitted -> "AlreadyAdmitted"
+    let gateNudgePayloadDigest (kind: string) (providerRun: string) : string =
+        PromptAuthority.gateNudgePayloadDigest kind (ProviderRunIdentity.create providerRun)
 
-    let idleAlreadyClaimed
+    let gateNudgeAlreadyAdmitted
+        (session: string)
+        (logicalRun: string)
+        (continuation: string)
+        (kind: string)
+        (providerRun: string)
+        (projection: obj)
+        : bool =
+        PromptAuthority.gateNudgeAlreadyAdmitted
+            (SessionId.create session)
+            (LogicalRunId.create logicalRun)
+            (continuationKindOf continuation)
+            kind
+            (ProviderRunIdentity.create providerRun)
+            (projectionOf projection)
+
+    let idleAlreadyAdmitted
         (session: string)
         (logicalRun: string)
         (life: string)
@@ -508,7 +549,7 @@ module RuntimeSurface =
         (providerRun: string)
         (projection: obj)
         : bool =
-        PromptAuthority.idleAlreadyClaimed
+        PromptAuthority.idleAlreadyAdmitted
             (SessionId.create session)
             (LogicalRunId.create logicalRun)
             (ManagerLifeId.create life)

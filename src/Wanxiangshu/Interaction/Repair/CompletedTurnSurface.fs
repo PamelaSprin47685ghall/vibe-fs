@@ -89,7 +89,6 @@ module CompletedTurnSurface =
         function
         | CompletedTurnClassifier.RepairDefectDecision.RequestRepair -> "RequestRepair"
         | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal -> "AwaitRepairTerminal"
-        | CompletedTurnClassifier.RepairDefectDecision.RepairExhausted -> "RepairExhausted"
         | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> "NoRepair"
 
     let repairDefectDecision (currentAttemptIsRepair: bool) (completed: bool) (finish: string) (parts: obj) : string =

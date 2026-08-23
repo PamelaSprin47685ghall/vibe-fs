@@ -77,12 +77,12 @@ module HostReviewGuard =
         | NoLongerRequired
         | Failed of reason: string
 
-    /// Identity of one Reviewer guard continuation. Missing-verdict is scoped to
-    /// the durable review requirement (barrier), never to whichever provider run
-    /// happened to expose the missing judge. Confirmation is scoped to the first
-    /// PERFECT provider run whose challenge must be consumed.
+    /// Identity of one Reviewer guard reminder. The barrier names the still-open
+    /// business gate; ProviderRun names the exact terminal occasion. Duplicate
+    /// observation of one terminal is idempotent, while a fresh terminal may
+    /// remind again until the verdict gate closes.
     [<RequireQualifiedAccess>]
-    type private GuardNudgeOccasion = MissingVerdict of ReviewBarrierId
+    type private GuardNudgeOccasion = MissingVerdict of ReviewBarrierId * ProviderRunIdentity
 
     let private kindForOccasion =
         function
@@ -90,7 +90,17 @@ module HostReviewGuard =
 
     let private occasionIdentity =
         function
-        | GuardNudgeOccasion.MissingVerdict barrierId -> "barrier:" + ReviewBarrierId.value barrierId
+        | GuardNudgeOccasion.MissingVerdict(barrierId, providerRun) ->
+            sprintf "barrier:%s:run:%s" (ReviewBarrierId.value barrierId) (ProviderRunIdentity.value providerRun)
+
+    let private terminalOfOccasion =
+        function
+        | GuardNudgeOccasion.MissingVerdict(_, providerRun) -> providerRun
+
+    let private gateKindOfOccasion =
+        function
+        | GuardNudgeOccasion.MissingVerdict(barrierId, _) ->
+            RuntimeNudge.ReviewerVerdictRequired + ":" + ReviewBarrierId.value barrierId
 
     /// REVIEW-007: is a guard continuation for this session already outstanding.
     ///
@@ -101,18 +111,23 @@ module HostReviewGuard =
         (journal: AgentJournal)
         (targetSessionId: SessionId)
         (kind: PromptAuthority.ContinuationKind)
+        (occasion: GuardNudgeOccasion)
         =
+        let payloadDigest =
+            PromptAuthority.gateNudgePayloadDigest (gateKindOfOccasion occasion) (terminalOfOccasion occasion)
+
         AgentProjection.tryFind targetSessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.PromptAuthority)
         |> Option.map (fun authority ->
             authority.PendingClaims
-            |> Map.exists (fun _ claim -> claim.Origin = PromptAuthority.PromptOrigin.Continuation kind))
+            |> Map.exists (fun _ claim ->
+                claim.Origin = PromptAuthority.PromptOrigin.Continuation kind
+                && claim.PayloadDigest = payloadDigest))
         |> Option.defaultValue false
 
-    /// HOST-012: session-scoped reservation identity. Never RuntimeId and never
-    /// the provider run that merely observed a missing verdict. Root/worktree
-    /// instances can observe different provider runs for the same barrier; the
-    /// barrier is the durable review requirement and therefore the idempotency key.
+    /// HOST-012: exact-terminal reservation identity. Cross-instance duplicate
+    /// observers of the same terminal collapse; a later terminal under the same
+    /// still-open barrier is a fresh reminder occasion.
     let private guardNudgeKey (targetSessionId: SessionId) (occasion: GuardNudgeOccasion) =
         sprintf "review-guard:%s:%s" (SessionId.value targetSessionId) (occasionIdentity occasion)
 
@@ -131,10 +146,11 @@ module HostReviewGuard =
         (journal: AgentJournal)
         (targetSessionId: SessionId)
         (kind: PromptAuthority.ContinuationKind)
+        (occasion: GuardNudgeOccasion)
         =
         lock SharedState.ReviewGuardNudgeGate (fun () ->
             if
-                hasOutstandingGuardClaim journal targetSessionId kind
+                hasOutstandingGuardClaim journal targetSessionId kind occasion
                 || SharedState.ReviewGuardNudges.Contains nudgeKey
             then
                 false
@@ -145,10 +161,14 @@ module HostReviewGuard =
     let private releaseKey (nudgeKey: string) =
         lock SharedState.ReviewGuardNudgeGate (fun () -> SharedState.ReviewGuardNudges.Remove nudgeKey |> ignore)
 
-    let private guardOutcomeFromSend (nudgeKey: string) (sent: Result<PromptKey, string>) =
-        match sent with
-        | Ok key -> GuardNudgeOutcome.Sent key
-        | Error error ->
+    let private guardOutcomeFromGate nudgeKey =
+        function
+        | HostSessionNudge.GateContinuationOutcome.Sent key -> GuardNudgeOutcome.Sent key
+        | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> GuardNudgeOutcome.AlreadyOutstanding
+        | HostSessionNudge.GateContinuationOutcome.Retired ->
+            releaseKey nudgeKey
+            GuardNudgeOutcome.NoLongerRequired
+        | HostSessionNudge.GateContinuationOutcome.Failed error ->
             releaseKey nudgeKey
             GuardNudgeOutcome.Failed error
 
@@ -157,6 +177,7 @@ module HostReviewGuard =
         (durable: AgentJournal)
         (targetSessionId: SessionId)
         (continuationKind: PromptAuthority.ContinuationKind)
+        (occasion: GuardNudgeOccasion)
         (nudgeKey: string)
         (prompt: string)
         =
@@ -173,17 +194,17 @@ module HostReviewGuard =
                 return GuardNudgeOutcome.NoLongerRequired
             else
                 let! sent =
-                    HostSessionNudge.sendContinuationResult
+                    HostSessionNudge.trySendGateContinuation
                         sessionPort
                         targetSessionId
                         prompt
                         continuationKind
                         recordedDir
                         (Some durable)
-                        PromptDispatcher.AwaitMode.Await
-                        None
+                        (gateKindOfOccasion occasion)
+                        (terminalOfOccasion occasion)
 
-                return guardOutcomeFromSend nudgeKey sent
+                return guardOutcomeFromGate nudgeKey sent
         }
 
     let private sendGuardForDurable
@@ -196,10 +217,10 @@ module HostReviewGuard =
         let continuationKind = kindForOccasion occasion
         let nudgeKey = guardNudgeKey targetSessionId occasion
 
-        if not (tryReserve nudgeKey durable targetSessionId continuationKind) then
+        if not (tryReserve nudgeKey durable targetSessionId continuationKind occasion) then
             Task.FromResult GuardNudgeOutcome.AlreadyOutstanding
         else
-            sendReservedGuardNudge sessionPort durable targetSessionId continuationKind nudgeKey prompt
+            sendReservedGuardNudge sessionPort durable targetSessionId continuationKind occasion nudgeKey prompt
 
     let private sendGuardNudge
         (sessionPort: ISessionHostPort)
@@ -214,7 +235,12 @@ module HostReviewGuard =
             | Some durable -> return! sendGuardForDurable sessionPort durable targetSessionId occasion prompt
         }
 
-    let private nudgeDurableReviewer (sessionPort: ISessionHostPort) (journal: AgentJournal) (sessionId: SessionId) =
+    let private nudgeDurableReviewer
+        (sessionPort: ISessionHostPort)
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (terminalProviderRun: ProviderRunIdentity)
+        =
         task {
             match currentBarrier journal sessionId with
             | None -> return GuardNudgeOutcome.Failed "Review guard nudge requires an open review barrier"
@@ -224,7 +250,7 @@ module HostReviewGuard =
                         sessionPort
                         (Some journal)
                         sessionId
-                        (GuardNudgeOccasion.MissingVerdict barrierId)
+                        (GuardNudgeOccasion.MissingVerdict(barrierId, terminalProviderRun))
                         (ProviderProse.documentFor sessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
         }
 
@@ -232,18 +258,19 @@ module HostReviewGuard =
         (sessionPort: ISessionHostPort)
         (journal: AgentJournal option)
         (sessionId: SessionId)
+        (terminalProviderRun: ProviderRunIdentity)
         : Task<GuardNudgeOutcome> =
         match journal with
         | None -> Task.FromResult(GuardNudgeOutcome.Failed "Review guard nudge requires an AgentJournal")
-        | Some durable -> nudgeDurableReviewer sessionPort durable sessionId
+        | Some durable -> nudgeDurableReviewer sessionPort durable sessionId terminalProviderRun
 
     /// Infrastructure adapter only: expose Host delivery/dedupe as the typed
     /// ReviewerContinuationPort consumed by Application ReviewerWorkflow.
     let continuationPort (sessionPort: ISessionHostPort) (journal: AgentJournal option) : ReviewerContinuationPort =
         { NudgeMissingVerdict =
-            fun sessionId ->
+            fun sessionId terminalProviderRun ->
                 task {
-                    let! _ = nudgeReviewer sessionPort journal sessionId
+                    let! _ = nudgeReviewer sessionPort journal sessionId terminalProviderRun
                     // Preserve existing boundary: missing-verdict send failure was
                     // not terminal; the next durable observation may re-enter.
                     return Ok()

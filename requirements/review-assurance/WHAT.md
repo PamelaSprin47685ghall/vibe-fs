@@ -6,7 +6,7 @@ Finality 确认必须由单一工作流的调用顺序严格证明：在同一 R
 
 ## REVIEW-ASSURANCE-002: 单次 PERFECT 不足，challenge 因果只能由 typed physical identity 建立
 
-单次 PERFECT 不构成完成态 witness，不持久化中间半态。工作流在首次判断持久化后注册后续等待，并触发仅包含质疑提示的 tool result。若 Reviewer 在同一会话内继续，第二次判断沿用首次的 `PhysicalUserMessageId`；若 Reviewer 在第二判断前正常结束，工作流必须在保留判断等待器的前提下，先注册下一次终止观察，再发起强类型 nudge，并以 nudge 物理接受返回的 exact `PhysicalUserMessageId` 绑定第二判断。两次调用均要求不同的 ProviderRunIdentity 与 ToolCallId。challenge 与 nudge 文本仅用于模型阅读，控制逻辑严禁解析、匹配或哈希文本。
+单次 PERFECT 不构成完成态 witness，不持久化中间半态。工作流在首次判断持久化后注册后续等待，并触发仅包含质疑提示的 tool result。若 Reviewer 在同一会话内继续，第二次判断沿用首次的 `PhysicalUserMessageId`；若 Reviewer 在第二判断前正常结束，工作流必须在保留判断等待器的前提下，先注册下一次终止观察，再发起强类型 nudge，并以 nudge 物理接受返回的 exact `PhysicalUserMessageId` 绑定第二判断。只要 verdict gate 仍开放，nudge 后再次正常结束而仍未 `judge` 的 fresh ProviderRun 必须再次获得 nudge；仅同一 barrier + same terminal occasion 去重。两次有效 judgement 调用均要求不同的 ProviderRunIdentity 与 ToolCallId。challenge 与 nudge 文本仅用于模型阅读，控制逻辑严禁解析、匹配或哈希文本。
 
 ## REVIEW-ASSURANCE-003: attempt identity 五元组与同 run 额外 PERFECT 不计数
 

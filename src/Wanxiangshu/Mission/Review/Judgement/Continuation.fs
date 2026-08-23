@@ -22,35 +22,37 @@ open Wanxiangshu.Foundation.Identity
 /// Vocabulary: Reviewer continuation sends (rabbit §9.2).
 ///
 /// This vocabulary owns the business promise that a missing verdict is nudged
-/// exactly once while continuation capability is still open. Finality's
+/// once per exact terminal occasion while continuation capability is still open.
+/// A fresh terminal re-arms the gate until a judgement closes it. Finality's
 /// PERFECT→Challenge→PERFECT ordering belongs exclusively to the direct CE in
 /// ReviewBarrierWorkflow, never to continuation repair. Physical Host delivery
 /// is an injected port.
 module ReviewerContinuation =
 
     /// Ensure a reviewer who has not yet called `judge` receives the
-    /// missing-verdict nudge exactly once for the current review requirement.
-    /// The occasion identity is resolved by the Host from the durable barrier;
-    /// a provider run is deliberately not part of this capability. Closed
+    /// missing-verdict nudge for this exact terminal. The durable barrier and
+    /// terminal ProviderRun together identify the reminder occasion. Closed
     /// continuation capability is a no-op (Finality may have revoked the
     /// challenge after a sibling REVISE).
     let ensureVerdictSubmitted
         (port: ReviewerContinuationPort)
         (journal: AgentJournal option)
         (sessionId: SessionId)
+        (terminalProviderRun: ProviderRunIdentity)
         (reviewerKey: string)
         : Task<Result<unit, string>> =
         task {
             if not (ReviewerEvidence.continuationOpen journal reviewerKey) then
                 return Ok()
             else
-                return! port.NudgeMissingVerdict sessionId
+                return! port.NudgeMissingVerdict sessionId terminalProviderRun
         }
 
     let ensurePerfectConfirmed
         (port: ReviewerContinuationPort)
         (journal: AgentJournal option)
         (sessionId: SessionId)
+        (terminalProviderRun: ProviderRunIdentity)
         (reviewerKey: string)
         : Task<Result<unit, string>> =
-        ensureVerdictSubmitted port journal sessionId reviewerKey
+        ensureVerdictSubmitted port journal sessionId terminalProviderRun reviewerKey

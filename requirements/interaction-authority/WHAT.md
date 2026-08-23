@@ -43,9 +43,9 @@
 
 来源判定中的纯计算函数绝不推断返回 `HumanRoot`。`HumanRoot` 只能在激活 Profile 缺席且携带合法显式 agent 时由 Ingress 边界授予；处于活跃 Run 中的未知消息绝不可抬升为 Root。
 
-## INTERACTION-AUTHORITY-010: 自动 continuation 稳定 occasion identity 与有界 admission
+## INTERACTION-AUTHORITY-010: 自动 continuation 稳定 occasion identity 与精确 admission
 
-自动合成的 repair、nudge、review 提示与重试消息绝不可借机抬升权限。普通 repair 的持久化 admission 在单次 `(SessionId, LogicalRunId, repair family)` 作用域内严格限制为一次；第二次同 family claim 必须被幂等吸收，绝不能因此推断第一次 repair 已失败。Manager 的自动闲置提示及特定会话的专项诊断必须绑定精确的 ProviderRun 实例，确保重放幂等且不会产生无界提示循环。任何自动 continuation 的 duplicate admission 都属于幂等状态而非 transport/protocol failure；Dispatch 必须以 typed outcome 暴露该状态，调用方不得把它升级成 terminal failure。
+自动合成的 repair、nudge、review 提示与重试消息绝不可借机抬升权限。普通 gate nudge 的持久化幂等范围必须绑定 exact terminal occasion；同一 `(SessionId, LogicalRunId, continuation kind, gate kind, ProviderRunIdentity)` 若存在 Pending claim 或 PhysicalAccepted dispatch，则 duplicate observation 被幂等吸收；若 claim 已因明确的 pre-acceptance `SendFailed` Abandoned，则该 occasion 重新可 admission，历史 ClaimSequence 不得冒充“已经提醒”。新的 ProviderRun 是新的 reminder occasion，只要业务 gate 仍未满足就必须重新具备提醒资格。只有 Blogger nudge→AABB 等明确写入规范的升级协议可以拥有有限预算。任何 duplicate admission 都属于 typed 幂等状态而非 transport/protocol failure。
 
 ## INTERACTION-AUTHORITY-011: authority 是原子 profile 内的稳定子记录
 
@@ -61,7 +61,7 @@ degeneration-guard 自恢复消息（`DegenerationGuard`）等属于强类型 Co
 
 ## INTERACTION-AUTHORITY-014: Nudge 与 JoinGuard 是 Continuation
 
-JoinGuard、闲置 Nudge 等流转控制指令均为 Continuation，不产生新的 Authority。在存在未决后台任务时仅允许发送 JoinGuard 延续等待，禁止隐式创建新 Root。
+JoinGuard、闲置 Nudge 等流转控制指令均为 Continuation，不产生新的 Authority。在存在未决后台任务时仅允许发送 JoinGuard 延续等待，禁止隐式创建新 Root。Nudge 是 gate reminder 而不是一次性预算：只要对应业务 gate 仍未满足，每个新的合法 terminal occasion 都必须重新获得提醒资格；幂等范围只允许收窄到同一 exact `ProviderRunIdentity` occasion，禁止用 Session、LogicalRun、Life 或 barrier 本身永久压掉后续 fresh terminal。
 
 ## INTERACTION-AUTHORITY-015: external-user ingress 不授予 authority
 
@@ -79,6 +79,6 @@ Continuation 只能挂靠当前活跃的 `ActiveLogicalRun`，绝对禁止回退
 
 Manager 生命周期的 `LifeCompleted` 事实原子地将对应的 `ActiveLogicalRun` 清空并释放 run-scoped 映射，同时归档历史 Profile。旧 Run 终结后，后续消息仅能通过合法的显式外部输入建立全新 Root，禁止通过 Continuation 路径复活已终结的交互。
 
-## INTERACTION-AUTHORITY-019: repair admission、飞行态与耗尽态必须分型
+## INTERACTION-AUTHORITY-019: gate nudge admission、飞行态与 fresh-terminal re-arm 必须分型
 
-`InteractionRepair` 的 claim/Submitted/PhysicalAccepted 只建立一次 repair attempt 的 admission/物理落地证据，不建立 repair failure。当前 repair attempt 仍为 `finish=None`、`tool-calls` 或其它明确 in-progress 观测时，重复 idle/reconcile 必须保持等待，禁止发送第二次 repair，禁止产生 `INTERACTION_REPAIR_EXHAUSTED`。只有当前已确认属于 `InteractionRepair` 的 attempt 自身给出不可用的稳定终结材料（例如空/XML-only `stop` 或 `length`）时，Repair owner 才能发布 `INTERACTION_REPAIR_EXHAUSTED`。普通旧 turn 在 repair 已 admitted 后再次被观察，只能幂等吸收，不能替 repair 宣判失败。
+`InteractionRepair` 的 claim/Submitted/PhysicalAccepted 只建立一次 gate-nudge attempt 的 admission/物理落地证据，不建立 gate completion，更不建立“提醒预算耗尽”。当前 nudge attempt 仍为 `finish=None`、`tool-calls` 或其它明确 in-progress 观测时，重复 idle/reconcile 必须保持等待，禁止并发发送第二次 nudge。若该 attempt 自身到达新的稳定但仍不满足 gate 的 terminal（例如空/XML-only `stop` 或 `length`），该 fresh `ProviderRunIdentity` 必须重新获得一次 nudge 资格；同一 terminal 的重复观测仍严格幂等。普通旧 turn 在后续 nudge 已 admitted 后再次被观察，只能幂等吸收，不能替 fresh terminal 消耗提醒资格。普通 gate nudge 不发布 `INTERACTION_REPAIR_EXHAUSTED`。

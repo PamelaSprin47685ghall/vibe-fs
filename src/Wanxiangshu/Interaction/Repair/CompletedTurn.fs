@@ -67,7 +67,6 @@ module CompletedTurnClassifier =
     type RepairDefectDecision =
         | RequestRepair
         | AwaitRepairTerminal
-        | RepairExhausted
         | NoRepair
 
     let private supportsInteractionRepair =
@@ -195,7 +194,10 @@ module CompletedTurnClassifier =
         | false, _, _ -> RepairDefectDecision.RequestRepair
         | true, Some ReconcileProgram.TurnUnknown, _ -> RepairDefectDecision.AwaitRepairTerminal
         | true, None, ReconcileProgram.TurnInProgress -> RepairDefectDecision.AwaitRepairTerminal
-        | true, None, ReconcileProgram.TurnNeedsContinuation _ -> RepairDefectDecision.RepairExhausted
+        // A gate reminder that itself reaches another stable invalid terminal is
+        // not "exhausted". The gate is still unsatisfied, so the fresh terminal
+        // earns another reminder; exact-terminal admission dedupes replay.
+        | true, None, ReconcileProgram.TurnNeedsContinuation _ -> RepairDefectDecision.RequestRepair
         | true, None, (ReconcileProgram.TurnCompleted | ReconcileProgram.TurnAborted _ | ReconcileProgram.TurnFailed _) ->
             RepairDefectDecision.NoRepair
 

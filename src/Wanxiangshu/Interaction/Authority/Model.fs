@@ -456,9 +456,9 @@ module PromptAuthority =
     /// previous request on the same Session/LogicalRun from spending the next
     /// request's protocol budget.
     ///
-    /// Ordinary interaction repair MUST use `repairFamilyPayloadDigest` below;
-    /// otherwise each repair response's fresh ProviderRunIdentity would mint
-    /// another automatic repair forever.
+    /// This request+terminal digest is reserved for Blogger's explicit
+    /// nudge→AABB escalation protocol. Ordinary interaction nudges are gate
+    /// reminders and use `gateNudgePayloadDigest` instead.
     let repairPayloadDigest
         (requestId: BloggerRequestId)
         (terminalProviderRun: ProviderRunIdentity)
@@ -474,34 +474,64 @@ module PromptAuthority =
     let repairPayloadBelongsToRequest (requestId: BloggerRequestId) (payloadDigest: string) =
         payloadDigest.StartsWith(BloggerRequestId.value requestId + "\u001f", System.StringComparison.Ordinal)
 
-    /// Ordinary interaction-repair budget identity. The LogicalRunId is already
-    /// part of claimScopeDigest, so the repair family name alone makes the budget
-    /// one-per-logical-run instead of one-per-terminal. This prevents a repair
-    /// prompt's own bad terminal from minting another repair forever.
-    let repairFamilyPayloadDigest (repairKind: string) = repairKind
+    /// Gate nudges are not a finite repair budget. They are repeatable while the
+    /// guarded condition remains unsatisfied, but one exact terminal occasion is
+    /// idempotent across duplicate Host observations / restart replay.
+    let gateNudgePayloadDigest (gateKind: string) (terminalProviderRun: ProviderRunIdentity) =
+        String.Join("\u001f", [| gateKind; ProviderRunIdentity.value terminalProviderRun |])
 
-    [<RequireQualifiedAccess>]
-    type RepairFamilyAdmission =
-        | Available
-        | AlreadyAdmitted
-
-    let repairFamilyAdmission
+    let private exactOccasionIsAdmitted
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
-        (repairKind: string)
+        (origin: PromptOrigin)
+        (payloadDigest: string)
         (projection: PromptAuthorityProjection)
         =
-        let scope =
-            claimScopeDigest
-                sessionId
-                (Some logicalRunId)
-                (PromptOrigin.Continuation ContinuationKind.InteractionRepair)
-                (repairFamilyPayloadDigest repairKind)
+        let pending =
+            projection.PendingClaims
+            |> Map.exists (fun _ claim ->
+                claim.SessionId = sessionId
+                && claim.LogicalRunId = Some logicalRunId
+                && claim.Origin = origin
+                && claim.PayloadDigest = payloadDigest)
 
-        if nextClaimSequence scope projection > 1 then
-            RepairFamilyAdmission.AlreadyAdmitted
-        else
-            RepairFamilyAdmission.Available
+        let accepted =
+            projection.AcceptedDispatches
+            |> Map.tryFind (acceptedDispatchKey sessionId payloadDigest)
+            |> Option.exists (fun dispatch -> dispatch.Origin = origin)
+
+        pending || accepted
+
+    let gateNudgeAlreadyAdmitted
+        (sessionId: SessionId)
+        (logicalRunId: LogicalRunId)
+        (continuation: ContinuationKind)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (projection: PromptAuthorityProjection)
+        =
+        exactOccasionIsAdmitted
+            sessionId
+            logicalRunId
+            (PromptOrigin.Continuation continuation)
+            (gateNudgePayloadDigest gateKind terminalProviderRun)
+            projection
+
+    let gateNudgeAcceptedPhysical
+        (sessionId: SessionId)
+        (continuation: ContinuationKind)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (projection: PromptAuthorityProjection)
+        =
+        let payloadDigest = gateNudgePayloadDigest gateKind terminalProviderRun
+
+        projection.AcceptedDispatches
+        |> Map.tryFind (acceptedDispatchKey sessionId payloadDigest)
+        |> Option.filter (fun dispatch ->
+            dispatch.Origin = PromptOrigin.Continuation continuation
+            && dispatch.PayloadDigest = payloadDigest)
+        |> Option.map (fun dispatch -> dispatch.PhysicalUserMessageId)
 
     /// FALLBACK-008: has this Blogger request + terminal occasion already spent its one repair.
     /// Blogger protocol repair deliberately uses both axes: request identity
@@ -546,7 +576,7 @@ module PromptAuthority =
     /// GLORY-029: has this exact terminal occasion already received its Manager
     /// encouragement. A new ProviderRun is always a fresh occasion, even when the
     /// Life and pre/post-T1 condition are unchanged.
-    let idleAlreadyClaimed
+    let idleAlreadyAdmitted
         (sessionId: SessionId)
         (logicalRunId: LogicalRunId)
         (lifeId: ManagerLifeId)
@@ -554,14 +584,12 @@ module PromptAuthority =
         (terminalProviderRun: ProviderRunIdentity)
         (projection: PromptAuthorityProjection)
         =
-        let scope =
-            claimScopeDigest
-                sessionId
-                (Some logicalRunId)
-                (PromptOrigin.Continuation ContinuationKind.ManagerIdleEncouragement)
-                (idlePayloadDigest lifeId conditionKey terminalProviderRun)
-
-        nextClaimSequence scope projection > 1
+        exactOccasionIsAdmitted
+            sessionId
+            logicalRunId
+            (PromptOrigin.Continuation ContinuationKind.ManagerIdleEncouragement)
+            (idlePayloadDigest lifeId conditionKey terminalProviderRun)
+            projection
 
     /// AGENT-001: fast-ROLE and deep-ROLE share one system prompt, so the prompt
     /// identity is a function of CanonicalRole alone. Tier deliberately does not

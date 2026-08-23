@@ -224,7 +224,15 @@ module HostTurnObserver =
             do! TurnRuntimePreparation.prepare scope.DisposeExecutorRuntime turn
 
             let! fissionHandled =
-                FissionHost.observeLaneTurn sessionPort eventPort journal scope.Sessions.JoinGuardNudges abortCause turn
+                FissionHost.observeLaneTurn
+                    sessionPort
+                    eventPort
+                    journal
+                    scope.Sessions.JoinGuardNudges
+                    scope.Sessions.Quiescence
+                    context.Quiescence
+                    abortCause
+                    turn
 
             if not isFissionOwner && not fissionHandled then
                 do!

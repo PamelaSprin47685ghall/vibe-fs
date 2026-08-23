@@ -309,6 +309,12 @@ module DispatchSurface =
                                key = null
                                error = null
                                observation = adapter.LastObservation |}
+                    | PromptDispatcher.SendAttemptOutcome.NotSent error ->
+                        box
+                            {| outcome = "NotSent"
+                               key = null
+                               error = error
+                               observation = adapter.LastObservation |}
                     | PromptDispatcher.SendAttemptOutcome.Failed error ->
                         box
                             {| outcome = "Failed"
@@ -449,7 +455,6 @@ module DispatchSurface =
                    "SendAgentOwnerRootWithTools"
                    "SendContinuation"
                    "SendContinuationWithTools"
-                   "SendRepairFamily"
                    "SendInteractionRepair"
                    "SendManagerIdleEncouragement" |]
                standaloneFireAndForget = false |}

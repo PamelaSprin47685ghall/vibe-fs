@@ -136,16 +136,32 @@ module OrdinaryTurnWorkflow =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
-        (turn: ReconciledTurn)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
         =
         task {
-            match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
-            | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
-                |> ignore
-            | _ -> ()
+            let turn = context.Turn
+
+            match context.Quiescence with
+            | None -> ()
+            | Some permit ->
+                match!
+                    HostJoinGuard.nudge
+                        sessionPort
+                        journal
+                        joinGuardNudges
+                        (fun () -> quiescence.TryConsume permit)
+                        (fun () -> quiescence.TryRelease permit |> ignore)
+                        turn.SessionId
+                        turn.ProviderRun
+                        turn.Directory
+                with
+                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                    eventPort.NotifyTerminal
+                        turn.SessionId
+                        (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
+                    |> ignore
+                | _ -> ()
         }
 
     let private handleCompleted
@@ -154,10 +170,13 @@ module OrdinaryTurnWorkflow =
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (turn: ReconciledTurn)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
         (completeAgent: unit -> Task<bool * bool>)
         =
         task {
+            let turn = context.Turn
+
             let joinOutstanding =
                 TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId
 
@@ -173,7 +192,7 @@ module OrdinaryTurnWorkflow =
             if wasAborted || TerminalPolicy.sessionDead journal turn.SessionId then
                 return ()
             elif joinOutstanding then
-                return! applyJoinGuardNudge sessionPort eventPort journal joinGuardNudges turn
+                return! applyJoinGuardNudge sessionPort eventPort journal joinGuardNudges quiescence context
             else
                 return ()
         }
@@ -212,7 +231,7 @@ module OrdinaryTurnWorkflow =
                 error
                 (ProviderProse.documentFor turn.SessionId RuntimeNudge.ProviderRetry Map.empty)
         | ReconcileProgram.TurnCompleted ->
-            handleCompleted sessionPort eventPort journal joinGuardNudges hasLivePty turn completeAgent
+            handleCompleted sessionPort eventPort journal joinGuardNudges hasLivePty quiescence context completeAgent
 
     let observe
         (sessionPort: ISessionHostPort)

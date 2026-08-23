@@ -170,6 +170,159 @@ module HostSessionNudge =
             PromptDispatcher.AwaitMode.Detached
             None
 
+    [<RequireQualifiedAccess>]
+    type GateContinuationOutcome =
+        | Sent of PromptKey
+        | AlreadyAdmitted
+        | Retired
+        | Failed of string
+
+    let private sendGateContinuationWithProfile
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (onAccepted: (PhysicalUserMessageId -> unit) option)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<GateContinuationOutcome> =
+        let rt = PromptDispatcher.forJournal durable
+
+        if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
+            Task.FromResult GateContinuationOutcome.AlreadyAdmitted
+        else
+            let agent = agentForActiveCursor journal sessionId profile
+
+            rt.SendGateNudge
+                sessionPort
+                sessionId
+                prompt
+                continuation
+                gateKind
+                terminalProviderRun
+                profile
+                agent
+                (liveDirectory directory)
+                PromptDispatcher.AwaitMode.Await
+                onAccepted
+            |> TaskValue.map (function
+                | Ok key -> GateContinuationOutcome.Sent key
+                | Error error -> GateContinuationOutcome.Failed error)
+
+    /// Gate reminder for a terminal-driven protocol that is not idle-derived.
+    /// Durable dedupe is exact `(gate kind, ProviderRunIdentity)` only.
+    let trySendGateContinuation
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        : Task<GateContinuationOutcome> =
+        task {
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return GateContinuationOutcome.Retired
+            | false, None, _ -> return GateContinuationOutcome.Failed "No journal: a gate nudge cannot be claimed"
+            | false, Some _, None -> return GateContinuationOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendGateContinuationWithProfile
+                        sessionPort
+                        sessionId
+                        prompt
+                        continuation
+                        directory
+                        journal
+                        gateKind
+                        terminalProviderRun
+                        None
+                        durable
+                        profile
+        }
+
+    let private sendGateContinuationPhysicalWithProfile
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (durable: AgentJournal)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        : Task<Result<PhysicalUserMessageId, string>> =
+        let rt = PromptDispatcher.forJournal durable
+
+        let physicalResult outcome acceptedPhysical =
+            match outcome, acceptedPhysical with
+            | GateContinuationOutcome.Sent _, Some physical -> Ok physical
+            | GateContinuationOutcome.Sent _, None -> Error "gate nudge was admitted without a PhysicalUserMessageId"
+            | GateContinuationOutcome.AlreadyAdmitted, _ -> Error "gate nudge is pending physical acceptance"
+            | GateContinuationOutcome.Retired, _ -> Error "gate nudge target is retired"
+            | GateContinuationOutcome.Failed error, _ -> Error error
+
+        match rt.GateNudgeAcceptedPhysical profile continuation gateKind terminalProviderRun with
+        | Some physical -> Task.FromResult(Ok physical)
+        | None when rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun ->
+            Task.FromResult(Error "gate nudge is pending physical acceptance")
+        | None ->
+            task {
+                let acceptedPhysical = ref None
+
+                let! outcome =
+                    sendGateContinuationWithProfile
+                        sessionPort
+                        sessionId
+                        prompt
+                        continuation
+                        directory
+                        journal
+                        gateKind
+                        terminalProviderRun
+                        (Some(fun physical -> acceptedPhysical.Value <- Some physical))
+                        durable
+                        profile
+
+                return physicalResult outcome acceptedPhysical.Value
+            }
+
+    let trySendGateContinuationPhysical
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        : Task<Result<PhysicalUserMessageId, string>> =
+        task {
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return Error "gate nudge target is retired"
+            | false, None, _ -> return Error "No journal: a gate nudge cannot be claimed"
+            | false, Some _, None -> return Error "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendGateContinuationPhysicalWithProfile
+                        sessionPort
+                        sessionId
+                        prompt
+                        continuation
+                        directory
+                        journal
+                        gateKind
+                        terminalProviderRun
+                        durable
+                        profile
+        }
+
     let private interactionRepairOutcomeOfResult =
         function
         | Ok key -> InteractionRepairSendOutcome.Sent key
@@ -268,13 +421,24 @@ module HostSessionNudge =
         | AlreadyAdmitted
         /// The logical owner was replaced before this idle continuation could act.
         | Retired
+        /// Host definitively rejected before physical acceptance. The exact
+        /// quiescence permit has been returned to Idle and may be retried.
+        | NotSent of string
         | Failed of string
 
     let private idleOutcomeOfDispatch =
         function
         | PromptDispatcher.SendAttemptOutcome.Sent key -> IdleContinuationOutcome.Sent key
         | PromptDispatcher.SendAttemptOutcome.Superseded -> IdleContinuationOutcome.Superseded
+        | PromptDispatcher.SendAttemptOutcome.NotSent error -> IdleContinuationOutcome.NotSent error
         | PromptDispatcher.SendAttemptOutcome.Failed error -> IdleContinuationOutcome.Failed error
+
+    let private gateIdleOutcome (releaseAdmission: unit -> unit) (outcome: PromptDispatcher.SendAttemptOutcome) =
+        match outcome with
+        | PromptDispatcher.SendAttemptOutcome.NotSent _ -> releaseAdmission ()
+        | _ -> ()
+
+        idleOutcomeOfDispatch outcome
 
     /// HOST-004 + GLORY-029: idle-derived Manager encouragement with exact-terminal
     /// idempotency and no cross-terminal count limit.
@@ -294,7 +458,7 @@ module HostSessionNudge =
         : Task<IdleContinuationOutcome> =
         let rt = PromptDispatcher.forJournal durable
 
-        if rt.IdleAlreadyClaimed profile lifeId conditionKey terminalProviderRun then
+        if rt.IdleAlreadyAdmitted profile lifeId conditionKey terminalProviderRun then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
         else
             let agent = agentForActiveCursor journal sessionId profile
@@ -309,9 +473,9 @@ module HostSessionNudge =
                 profile
                 agent
                 (liveDirectory directory)
-                PromptDispatcher.AwaitMode.Detached
+                PromptDispatcher.AwaitMode.Await
                 (fun () -> quiescence.TryConsume permit)
-            |> TaskValue.map idleOutcomeOfDispatch
+            |> TaskValue.map (gateIdleOutcome (fun () -> quiescence.TryRelease permit |> ignore))
 
     let trySendIdleManagerEncouragement
         (quiescence: SessionQuiescenceGate)
@@ -348,40 +512,111 @@ module HostSessionNudge =
                         profile
         }
 
-    let private sendIdleRepairFamilyWithProfile
-        (quiescence: SessionQuiescenceGate)
-        (permit: QuiescencePermit)
+    let private sendGateContinuationWithAdmissionProfile
+        (physicalAdmission: unit -> bool)
+        (releaseAdmission: unit -> unit)
         (sessionPort: ISessionHostPort)
         (sessionId: SessionId)
         (prompt: string)
         (directory: string option)
         (journal: AgentJournal option)
-        (repairKind: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (awaitMode: PromptDispatcher.AwaitMode)
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleContinuationOutcome> =
         let rt = PromptDispatcher.forJournal durable
 
-        match rt.RepairFamilyAdmission profile repairKind with
-        | PromptAuthority.RepairFamilyAdmission.AlreadyAdmitted ->
+        if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
-        | PromptAuthority.RepairFamilyAdmission.Available ->
+        else
             let agent = agentForActiveCursor journal sessionId profile
 
-            rt.SendIdleRepairFamily
+            rt.SendIdleGateNudge
                 sessionPort
                 sessionId
                 prompt
-                repairKind
+                continuation
+                gateKind
+                terminalProviderRun
                 profile
                 agent
                 (liveDirectory directory)
-                PromptDispatcher.AwaitMode.Detached
-                (fun () -> quiescence.TryConsume permit)
-            |> TaskValue.map idleOutcomeOfDispatch
+                awaitMode
+                physicalAdmission
+            |> TaskValue.map (gateIdleOutcome releaseAdmission)
 
-    /// Ordinary idle-derived repair: one send per LogicalRun + repair family.
-    let trySendIdleRepairFamily
+    let trySendGateContinuationWithAdmission
+        (physicalAdmission: unit -> bool)
+        (releaseAdmission: unit -> unit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (awaitMode: PromptDispatcher.AwaitMode)
+        : Task<IdleContinuationOutcome> =
+        task {
+            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
+            | true, _, _ -> return IdleContinuationOutcome.Retired
+            | false, None, _ -> return IdleContinuationOutcome.Failed "No journal: a gate nudge cannot be claimed"
+            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
+            | false, Some durable, Some profile ->
+                return!
+                    sendGateContinuationWithAdmissionProfile
+                        physicalAdmission
+                        releaseAdmission
+                        sessionPort
+                        sessionId
+                        prompt
+                        directory
+                        journal
+                        continuation
+                        gateKind
+                        terminalProviderRun
+                        awaitMode
+                        durable
+                        profile
+        }
+
+    /// Shared gate-nudge transport: only duplicate observation of the same exact
+    /// terminal is suppressed. A fresh terminal remains eligible while the gate
+    /// owner still says the condition is unsatisfied.
+    let trySendIdleGateContinuation
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit)
+        (sessionPort: ISessionHostPort)
+        (sessionId: SessionId)
+        (prompt: string)
+        (continuation: PromptAuthority.ContinuationKind)
+        (directory: string option)
+        (journal: AgentJournal option)
+        (gateKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
+        (awaitMode: PromptDispatcher.AwaitMode)
+        : Task<IdleContinuationOutcome> =
+        trySendGateContinuationWithAdmission
+            (fun () -> quiescence.TryConsume permit)
+            (fun () -> quiescence.TryRelease permit |> ignore)
+            sessionPort
+            sessionId
+            prompt
+            continuation
+            directory
+            journal
+            gateKind
+            terminalProviderRun
+            awaitMode
+
+    /// Ordinary interaction nudges are gate reminders, not a finite repair
+    /// budget: duplicate delivery of one terminal is idempotent, while every
+    /// fresh terminal may remind again until the gate is satisfied.
+    let trySendIdleGateRepair
         (quiescence: SessionQuiescenceGate)
         (permit: QuiescencePermit)
         (sessionPort: ISessionHostPort)
@@ -390,27 +625,20 @@ module HostSessionNudge =
         (directory: string option)
         (journal: AgentJournal option)
         (repairKind: string)
+        (terminalProviderRun: ProviderRunIdentity)
         : Task<IdleContinuationOutcome> =
-        task {
-            match isFissionReplaced journal sessionId, journal, tryActiveProfile journal sessionId with
-            | true, _, _ -> return IdleContinuationOutcome.Retired
-            | false, None, _ ->
-                return IdleContinuationOutcome.Failed "No journal: an interaction repair cannot be claimed"
-            | false, Some _, None -> return IdleContinuationOutcome.Failed "No active authority profile"
-            | false, Some durable, Some profile ->
-                return!
-                    sendIdleRepairFamilyWithProfile
-                        quiescence
-                        permit
-                        sessionPort
-                        sessionId
-                        prompt
-                        directory
-                        journal
-                        repairKind
-                        durable
-                        profile
-        }
+        trySendIdleGateContinuation
+            quiescence
+            permit
+            sessionPort
+            sessionId
+            prompt
+            PromptAuthority.ContinuationKind.InteractionRepair
+            directory
+            journal
+            repairKind
+            terminalProviderRun
+            PromptDispatcher.AwaitMode.Await
 
     /// Blogger-request + terminal-scoped idle interaction repair. This narrower
     /// occasion identity distinguishes same-terminal re-entry from a new bad

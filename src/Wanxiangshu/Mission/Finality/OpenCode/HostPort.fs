@@ -190,32 +190,26 @@ module FinalityHostPort =
         let awaitTerminal (occasion: ReviewerTerminalOccasion) =
             ReviewerTerminalAwait.awaitFuture scope.Journal scope.Sessions occasion reviewerTimeoutMs
 
-        let sendMissingJudgementNudge (durable: AgentJournal) reviewerSessionId =
-            task {
-                let acceptedPhysical = ref None
-                let dispatcher = PromptDispatcher.forJournal durable
+        let sendMissingJudgementNudge
+            (durable: AgentJournal)
+            (reviewerSessionId: SessionId)
+            (barrierId: ReviewBarrierId)
+            (terminalProviderRun: ProviderRunIdentity)
+            =
+            HostSessionNudge.trySendGateContinuationPhysical
+                scope.Sessions
+                reviewerSessionId
+                (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
+                PromptAuthority.ContinuationKind.ReviewerGuard
+                (scope.DirectoryFor(SessionId.value reviewerSessionId))
+                (Some durable)
+                (RuntimeNudge.ReviewerVerdictRequired + ":" + ReviewBarrierId.value barrierId)
+                terminalProviderRun
 
-                let! sent =
-                    dispatcher.SendAgentOwnerRoot
-                        scope.Sessions
-                        reviewerSessionId
-                        (ProviderProse.documentFor reviewerSessionId RuntimeNudge.ReviewerVerdictRequired Map.empty)
-                        reviewerAgentName
-                        (scope.DirectoryFor(SessionId.value reviewerSessionId))
-                        PromptDispatcher.AwaitMode.Await
-                        (Some(fun physical -> acceptedPhysical.Value <- Some physical))
-
-                return
-                    match sent, acceptedPhysical.Value with
-                    | Error error, _ -> Error error
-                    | Ok _, Some physical -> Ok physical
-                    | Ok _, None -> Error "Finality reviewer nudge was admitted without a PhysicalUserMessageId"
-            }
-
-        let nudgeMissingJudgement reviewerSessionId =
+        let nudgeMissingJudgement reviewerSessionId barrierId terminalProviderRun =
             match scope.Journal with
             | None -> Task.FromResult(Error "No journal: a Finality reviewer nudge cannot be claimed")
-            | Some durable -> sendMissingJudgementNudge durable reviewerSessionId
+            | Some durable -> sendMissingJudgementNudge durable reviewerSessionId barrierId terminalProviderRun
 
         let sendRevisionSteer targetSessionId prompt =
             task {

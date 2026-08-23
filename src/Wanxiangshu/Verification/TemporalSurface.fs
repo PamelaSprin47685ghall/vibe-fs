@@ -718,7 +718,7 @@ module TemporalSurface =
                   StartReview = fun _ -> Task.FromResult(Error "unused")
                   OpenJudgementChannel = fun _ -> Error "unused"
                   AwaitTerminal = fun _ -> Task.FromResult(Error "unused")
-                  NudgeMissingJudgement = fun _ -> Task.FromResult(Error "unused")
+                  NudgeMissingJudgement = fun _ _ _ -> Task.FromResult(Error "unused")
                   SendRevisionSteer = fun _ _ -> Task.FromResult(Error "unused")
                   AbortReviewer = abort }
 

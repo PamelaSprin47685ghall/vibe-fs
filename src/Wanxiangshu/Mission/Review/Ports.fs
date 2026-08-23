@@ -59,10 +59,10 @@ type ReviewerTerminalOccasion =
 type ReviewHostPort =
     { StartReview: unit -> Task<Result<unit, string>>
       AwaitJudgement: unit -> Task<Result<ReviewJudgementDelivery, string>>
-      AwaitReviewer: unit -> Task<Result<unit, string>>
-      NudgeMissingJudgement: unit -> Task<Result<PhysicalUserMessageId, string>> }
+      AwaitReviewer: unit -> Task<Result<ProviderRunIdentity, string>>
+      NudgeMissingJudgement: ProviderRunIdentity -> Task<Result<PhysicalUserMessageId, string>> }
 
 /// Physical continuation capability retained for missing-judge repair.
 /// Finality challenge sequencing belongs exclusively to ReviewBarrierWorkflow.
 type ReviewerContinuationPort =
-    { NudgeMissingVerdict: SessionId -> Task<Result<unit, string>> }
+    { NudgeMissingVerdict: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>> }

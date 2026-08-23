@@ -36,11 +36,40 @@ test('WHAT[DISPATCH-PROTOCOL-007] JNGD_nudge_releases_the_key_when_send_fails_an
     const reservations = joinGuard.newReservations()
     const port = capturingPort(captured, { failFirst: true })
 
-    const first = await joinGuard.nudge(port, opened.journal, reservations, sid, null)
-    assert.equal(first.outcome, 'Failed', 'a refused port must surface as Failed')
+    const first = await joinGuard.nudge(port, opened.journal, reservations, sid, 'run-jg-1', null)
+    assert.equal(first.outcome, 'NotSent', 'a definite pre-acceptance refusal must surface as NotSent')
 
-    const second = await joinGuard.nudge(port, opened.journal, reservations, sid, null)
+    const second = await joinGuard.nudge(port, opened.journal, reservations, sid, 'run-jg-1', null)
     assert.equal(second.outcome, 'Sent', 'the key must be released after a failed send')
+    assert.equal(captured.length, 2)
+  } finally {
+    try { journal.JournalSurface_dispose(opened.journal) } catch {}
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[DISPATCH-PROTOCOL-007] JNGD_join_gate_dedupes_same_terminal_but_rearms_for_fresh_terminal', async () => {
+  const sid = 'ses_jg_repeat'
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-jngd-repeat-'))
+  const opened = await journal.JournalSurface_bootWithWriterId(dir, 'writer-jg-repeat', 'rt-jg-repeat', 4242, '2026-01-01T00:00:00Z')
+  assert.equal(opened.ok, true, opened.ok ? '' : JSON.stringify(opened.error))
+  assert.equal((await dispatch.appendAuthorityRoot(opened.journal, sid, 'fast-coder')).ok, true)
+  try {
+    const captured = []
+    const reservations = joinGuard.newReservations()
+    const port = capturingPort(captured)
+
+    assert.equal((await joinGuard.nudge(port, opened.journal, reservations, sid, 'run-jg-a', null)).outcome, 'Sent')
+    assert.equal(
+      (await joinGuard.nudge(port, opened.journal, reservations, sid, 'run-jg-a', null)).outcome,
+      'AlreadyOutstanding',
+      'duplicate observation of one terminal must not double-send',
+    )
+    assert.equal(
+      (await joinGuard.nudge(port, opened.journal, reservations, sid, 'run-jg-b', null)).outcome,
+      'Sent',
+      'outstanding work after a fresh terminal must receive another JoinGuard reminder',
+    )
     assert.equal(captured.length, 2)
   } finally {
     try { journal.JournalSurface_dispose(opened.journal) } catch {}

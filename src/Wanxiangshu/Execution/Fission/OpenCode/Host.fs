@@ -947,22 +947,34 @@ module FissionHost =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
         (turn: ReconciledTurn)
         =
         task {
-            if laneHasOutstandingExternal durable laneIndex group then
-                let! _ = HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory
+            match laneHasOutstandingExternal durable laneIndex group, permit, sharedInputsAccounted laneIndex group with
+            | true, None, _ -> return true
+            | true, Some idlePermit, _ ->
+                let! _ =
+                    HostJoinGuard.nudge
+                        sessionPort
+                        journal
+                        joinGuardNudges
+                        (fun () -> quiescence.TryConsume idlePermit)
+                        (fun () -> quiescence.TryRelease idlePermit |> ignore)
+                        turn.SessionId
+                        turn.ProviderRun
+                        turn.Directory
 
                 return true
-            elif not (sharedInputsAccounted laneIndex group) then
+            | false, _, false ->
                 // The shared completion broadcaster will send a same-run
                 // continuation when the missing fact arrives.
                 return true
-            else
-                return! materializeCompletedLane sessionPort eventPort durable group laneIndex turn
+            | false, _, true -> return! materializeCompletedLane sessionPort eventPort durable group laneIndex turn
         }
 
     let private observeCompletedLane
@@ -970,6 +982,8 @@ module FissionHost =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
@@ -979,7 +993,17 @@ module FissionHost =
         | FissionGroupTerminal.Converged _
         | FissionGroupTerminal.Failed _ -> task { return true }
         | FissionGroupTerminal.Open ->
-            observeOpenLaneCompletion sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
+            observeOpenLaneCompletion
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                quiescence
+                permit
+                durable
+                group
+                laneIndex
+                turn
 
     let private settlementObservation abortCause outcome =
         match outcome, abortCause with
@@ -1041,6 +1065,8 @@ module FissionHost =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
@@ -1051,13 +1077,25 @@ module FissionHost =
         | FissionLaneSettlementDecision.YieldToTurnWorkflow -> task { return false }
         | FissionLaneSettlementDecision.FailGroup reason -> failSettlement sessionPort eventPort durable group reason
         | FissionLaneSettlementDecision.MaterializeLane ->
-            observeCompletedLane sessionPort eventPort journal joinGuardNudges durable group laneIndex turn
+            observeCompletedLane
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                quiescence
+                permit
+                durable
+                group
+                laneIndex
+                turn
 
     let private observeLaneOutcome
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (durable: AgentJournal)
         (group: FissionGroupProjection)
         laneIndex
@@ -1070,13 +1108,26 @@ module FissionHost =
         | FissionGroupTerminal.Open, Some takeover ->
             observeTakeoverOutcome sessionPort eventPort durable group takeover abortCause turn
         | FissionGroupTerminal.Open, None ->
-            observeOpenLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex abortCause turn
+            observeOpenLaneOutcome
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                quiescence
+                permit
+                durable
+                group
+                laneIndex
+                abortCause
+                turn
 
     let private observeDurableLaneTurn
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (durable: AgentJournal)
         (abortCause: AbortCause)
         (turn: ReconciledTurn)
@@ -1088,7 +1139,18 @@ module FissionHost =
         with
         | None -> task { return false }
         | Some(group, laneIndex) ->
-            observeLaneOutcome sessionPort eventPort journal joinGuardNudges durable group laneIndex abortCause turn
+            observeLaneOutcome
+                sessionPort
+                eventPort
+                journal
+                joinGuardNudges
+                quiescence
+                permit
+                durable
+                group
+                laneIndex
+                abortCause
+                turn
 
     /// Returns true when this turn belongs to Fission and its terminal semantics
     /// were consumed here. Retired owner sessions are absorbed; non-terminal lane
@@ -1098,6 +1160,8 @@ module FissionHost =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
+        (quiescence: SessionQuiescenceGate)
+        (permit: QuiescencePermit option)
         (abortCause: AbortCause)
         (turn: ReconciledTurn)
         : Task<bool> =
@@ -1118,5 +1182,15 @@ module FissionHost =
                 return true
             | false, None -> return false
             | false, Some durable ->
-                return! observeDurableLaneTurn sessionPort eventPort journal joinGuardNudges durable abortCause turn
+                return!
+                    observeDurableLaneTurn
+                        sessionPort
+                        eventPort
+                        journal
+                        joinGuardNudges
+                        quiescence
+                        permit
+                        durable
+                        abortCause
+                        turn
         }

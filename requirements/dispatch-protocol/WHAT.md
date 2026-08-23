@@ -26,7 +26,7 @@
 
 ## DISPATCH-PROTOCOL-007: uncertain physical outcome 不自动重发
 
-在崩溃恢复或证据核对中若未能检索到物理落地证据，Claim 必须保持 `StillPending` 状态，绝对禁止系统自动重发，亦不得因进程重启次数累积而静默判定放弃。
+在崩溃恢复或证据核对中若未能检索到物理落地证据，Claim 必须保持 `StillPending` 状态，绝对禁止系统自动重发，亦不得因进程重启次数累积而静默判定放弃。反之，Host 若在物理 acceptance 之前给出确定的 `Retryable/Fatal` 拒绝，则该 attempt 可显式 `Abandoned(SendFailed)`；对 idle-derived gate nudge，只有这种“确定未发送”结果允许把 exact quiescence permit 归还为可重试，任何 acceptance-unknown / 持久化不确定性都不得 re-arm。业务层判断 exact occasion 是否已经提醒，只能依赖仍 Pending 或已 Accepted 的 dispatch evidence；历史 ClaimSequence 只区分重试 PromptKey，不是 effect/admission witness。
 
 ## DISPATCH-PROTOCOL-008: at-most-one logical effect 不虚构 exactly-once
 

@@ -185,9 +185,18 @@ module FissionHostSurface =
             let eventPort = DummyEventPort flags :> IEventObservationPort
             let owner = SessionId.create ownerSessionId
             let turn = dummyTurn owner
+            let quiescence = SessionQuiescenceGate()
 
             let! handled =
-                FissionHost.observeLaneTurn sessionPort eventPort None (HashSet<string>()) AbortCause.External turn
+                FissionHost.observeLaneTurn
+                    sessionPort
+                    eventPort
+                    None
+                    (HashSet<string>())
+                    quiescence
+                    None
+                    AbortCause.External
+                    turn
 
             let context =
                 { Turn = turn

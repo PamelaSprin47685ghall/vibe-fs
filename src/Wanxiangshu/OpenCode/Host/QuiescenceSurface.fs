@@ -27,6 +27,8 @@ module QuiescenceSurface =
 
     let tryConsume (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : bool = gate.TryConsume permit
 
+    let tryRelease (gate: SessionQuiescenceGate) (permit: QuiescencePermit) : bool = gate.TryRelease permit
+
     let revoke (gate: SessionQuiescenceGate) (sessionId: string) : unit =
         gate.RevokeCurrentAttempt(SessionId.create sessionId)
 

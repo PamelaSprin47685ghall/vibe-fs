@@ -104,8 +104,8 @@ module OrchestratorHostReview =
         (journal: AgentJournal option)
         (forkReviewer: ManagerJobId -> WorktreePath -> string -> Task<Result<SessionId, string>>)
         (startReviewer: ManagerJobId -> Task<Result<unit, string>>)
-        (awaitReviewer: ReviewerTerminalOccasion -> Task<Result<unit, string>>)
-        (nudgeReviewer: SessionId -> Task<Result<PhysicalUserMessageId, string>>)
+        (awaitReviewer: ReviewerTerminalOccasion -> Task<Result<ProviderRunIdentity, string>>)
+        (nudgeReviewer: SessionId -> ProviderRunIdentity -> Task<Result<PhysicalUserMessageId, string>>)
         (jobId: ManagerJobId)
         (managerSessionId: SessionId)
         (worktree: WorktreePath)
@@ -133,7 +133,7 @@ module OrchestratorHostReview =
                 { StartReview = fun () -> startReviewer jobId
                   AwaitJudgement = channel.AwaitJudgement
                   AwaitReviewer = fun () -> awaitReviewer terminalOccasion
-                  NudgeMissingJudgement = fun () -> nudgeReviewer reviewerSessionId }
+                  NudgeMissingJudgement = fun terminalProviderRun -> nudgeReviewer reviewerSessionId terminalProviderRun }
 
             let request =
                 { ManagerSessionId = managerSessionId

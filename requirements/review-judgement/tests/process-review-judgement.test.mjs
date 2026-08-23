@@ -98,13 +98,18 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
   )
   assert.match(
     terminalAwait,
-    /let hasDurablyClosedJudgement[\s\S]*?barrierId: ReviewBarrierId[\s\S]*?guard\.CurrentBarrierId = Some barrierId[\s\S]*?attempt\.ReviewBarrierId = barrierId/,
+    /let tryDurablyClosedJudgementRun[\s\S]*?barrierId: ReviewBarrierId[\s\S]*?guard\.CurrentBarrierId = Some barrierId[\s\S]*?attempt\.ReviewBarrierId = barrierId[\s\S]*?ReviewProjection\.closedAttemptOf attempt guard[\s\S]*?attempt\.ProviderRun/,
     'clean-abort evidence must be scoped to the exact current review barrier',
   )
   assert.match(
     terminalAwait,
-    /let private terminalResult[\s\S]*?TerminalOutcome\.Aborted _ when hasDurablyClosedJudgement journal reviewerSessionId barrierId[\s\S]*?return Ok\(\)/,
-    'the shared terminal interpreter must authorize Abort only from durable barrier-scoped closure',
+    /let hasDurablyClosedJudgement journal reviewerSessionId barrierId =[\s\S]*?tryDurablyClosedJudgementRun journal reviewerSessionId barrierId[\s\S]*?Option\.isSome/,
+    'the public closure predicate must delegate to the exact barrier-scoped run witness',
+  )
+  assert.match(
+    terminalAwait,
+    /let private terminalResult[\s\S]*?TerminalOutcome\.Completed run -> return Ok run\.ProviderRun[\s\S]*?TerminalOutcome\.Aborted _ -> return closedJudgementRunResult journal reviewerSessionId barrierId/,
+    'the shared terminal interpreter must preserve exact ProviderRun identity and authorize Abort only from durable barrier-scoped closure',
   )
   assert.match(
     terminalAwait,
@@ -112,7 +117,7 @@ test('WHAT[REVIEW-JUDGEMENT-008] REVIEW_013_first_terminal_receipt_is_physically
     'the physical wait must subscribe using the typed review occasion',
   )
   assert.match(finalityHost, /let awaitTerminal \(occasion: ReviewerTerminalOccasion\)[\s\S]*?ReviewerTerminalAwait\.awaitFuture scope\.Journal scope\.Sessions occasion reviewerTimeoutMs/)
-  assert.match(changeReview, /awaitReviewer: ReviewerTerminalOccasion -> Task<Result<unit, string>>[\s\S]*?let terminalOccasion =[\s\S]*?ReviewerSessionId = reviewerSessionId[\s\S]*?BarrierId = barrierId[\s\S]*?AwaitReviewer = fun \(\) -> awaitReviewer terminalOccasion/)
+  assert.match(changeReview, /awaitReviewer: ReviewerTerminalOccasion -> Task<Result<ProviderRunIdentity, string>>[\s\S]*?let terminalOccasion =[\s\S]*?ReviewerSessionId = reviewerSessionId[\s\S]*?BarrierId = barrierId[\s\S]*?AwaitReviewer = fun \(\) -> awaitReviewer terminalOccasion/)
   assert.match(changeHost, /fun \(occasion: ReviewerTerminalOccasion\) ->[\s\S]*?ReviewerTerminalAwait\.awaitFuture[\s\S]*?deps\.Journal[\s\S]*?deps\.Sessions[\s\S]*?occasion/)
 })
 

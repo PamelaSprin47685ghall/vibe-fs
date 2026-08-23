@@ -1,7 +1,7 @@
 // RVGD: Host review guard owner surface. Missing-verdict and confirmation
 // nudges use a durable JournalHandle and plain transport outcomes.
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -10,6 +10,26 @@ import * as reviewJournal from '../../../dist/Persistence/Journal/ReviewJournalS
 import * as reviewHost from '../../../dist/Mission/Review/OpenCode/ReviewHostSurface.js'
 
 const VERDICT_NUDGE = '# Your previous response did not call judge.'
+
+test('WHAT[REVIEW-ASSURANCE-002] reviewer terminal nudge remains a run-scoped ReviewerGuard continuation', () => {
+  const finalityHost = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs'), 'utf8')
+  const changeHost = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Change/Host/Host.fs'), 'utf8')
+  const reverify = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs'), 'utf8')
+  const terminalAwait = readFileSync(join(process.cwd(), 'src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs'), 'utf8')
+
+  const finalityNudge = finalityHost.match(/let sendMissingJudgementNudge([\s\S]*?)let nudgeMissingJudgement/)?.[1] ?? ''
+  const changeNudge = changeHost.match(/let sendReviewerNudge([\s\S]*?)let nudgeReviewer/)?.[1] ?? ''
+
+  for (const source of [finalityNudge, changeNudge]) {
+    assert.match(source, /trySendGateContinuationPhysical/)
+    assert.match(source, /ContinuationKind\.ReviewerGuard/)
+    assert.match(source, /terminalProviderRun/)
+    assert.doesNotMatch(source, /SendAgentOwnerRoot/)
+  }
+
+  assert.match(terminalAwait, /TerminalOutcome\.Completed run -> return Ok run\.ProviderRun/)
+  assert.match(reverify, /NudgeMissingJudgement terminalProviderRun/)
+})
 
 const capturingPort = (captured, physical = false) => ({
   SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -49,7 +69,7 @@ test('WHAT[REVIEW-ASSURANCE-010] review host rejects unknown or empty verdict te
 
 test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_closed_without_journal', async () => {
   reviewHost.clearGuardNudges()
-  const outcome = await reviewHost.nudgeReviewer(capturingPort([]), null, 'ses_rv')
+  const outcome = await reviewHost.nudgeReviewer(capturingPort([]), null, 'ses_rv', 'run-rv')
   assert.equal(outcome.outcome, 'Failed')
   assert.match(outcome.reason, /requires an AgentJournal/)
 })
@@ -147,7 +167,7 @@ test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_without_open_review_ba
     const root = await reviewJournal.appendAuthorityRoot(opened.journal, sid)
     assert.equal(root.ok, true)
     const captured = []
-    const outcome = await reviewHost.nudgeReviewer(capturingPort(captured), opened.journal, sid)
+    const outcome = await reviewHost.nudgeReviewer(capturingPort(captured), opened.journal, sid, 'run-rvgd-1')
     assert.equal(outcome.outcome, 'Failed')
     assert.match(outcome.reason, /open review barrier/)
     assert.equal(captured.length, 0)
@@ -164,7 +184,7 @@ test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_fails_without_active_authori
   try {
     const barrier = await reviewHost.openBarrier(opened.journal, 'ses_mgr_rvgd', 'ses_rv', 'bar-ses_rv', 'tree-ses_rv')
     assert.equal(barrier.ok, true)
-    const outcome = await reviewHost.nudgeReviewer(capturingPort([]), opened.journal, 'ses_rv')
+    const outcome = await reviewHost.nudgeReviewer(capturingPort([]), opened.journal, 'ses_rv', 'run-rv')
     assert.equal(outcome.outcome, 'Failed')
     assert.match(outcome.reason, /No active authority profile/)
   } finally {
@@ -179,7 +199,7 @@ test('WHAT[REVIEW-ASSURANCE-001] RVGD_nudgeReviewer_sends_verdict_guard_then_ded
   const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
-    const first = await reviewHost.nudgeReviewer(capturingPort(captured), opened.journal, sid)
+    const first = await reviewHost.nudgeReviewer(capturingPort(captured), opened.journal, sid, 'run-rvgd-1')
     assert.equal(first.outcome, 'Sent')
     assert.ok(first.promptKey)
     assert.equal(captured.length, 1)
@@ -188,8 +208,26 @@ test('WHAT[REVIEW-ASSURANCE-001] RVGD_nudgeReviewer_sends_verdict_guard_then_ded
     assert.match(captured[0].text, /verdict set to PERFECT or REVISE/)
     assert.doesNotMatch(captured[0].text, /verdict tool/)
     assert.equal(captured[0].session, sid)
-    const second = await reviewHost.nudgeReviewer(capturingPort([]), opened.journal, sid)
+    const second = await reviewHost.nudgeReviewer(capturingPort([]), opened.journal, sid, 'run-rvgd-1')
     assert.equal(second.outcome, 'AlreadyOutstanding')
+  } finally { cleanup() }
+})
+
+test('WHAT[REVIEW-ASSURANCE-001] RVGD_same_open_barrier_re_nudges_on_each_fresh_terminal', async () => {
+  const sid = 'ses_rv_repeat'
+  const { opened, cleanup } = await openSeeded(sid)
+  try {
+    const captured = []
+    assert.equal(
+      (await reviewHost.nudgeReviewer(capturingPort(captured, true), opened.journal, sid, 'run-rvgd-repeat-1')).outcome,
+      'Sent',
+    )
+    assert.equal(
+      (await reviewHost.nudgeReviewer(capturingPort(captured, true), opened.journal, sid, 'run-rvgd-repeat-2')).outcome,
+      'Sent',
+      'a still-open verdict gate must remind again on a fresh provider terminal',
+    )
+    assert.equal(captured.length, 2)
   } finally { cleanup() }
 })
 
@@ -202,9 +240,9 @@ test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_cross_instance_reservation_s
   await reviewHost.openBarrier(b.journal, 'ses_mgr_rvgd', sid, `bar-${sid}`, `tree-${sid}`)
   try {
     const captured = []
-    const first = await reviewHost.nudgeReviewer(capturingPort(captured), a.opened.journal, sid)
+    const first = await reviewHost.nudgeReviewer(capturingPort(captured), a.opened.journal, sid, 'run-rvgd-xinst')
     assert.equal(first.outcome, 'Sent')
-    const twin = await reviewHost.nudgeReviewer(capturingPort(captured), b.journal, sid)
+    const twin = await reviewHost.nudgeReviewer(capturingPort(captured), b.journal, sid, 'run-rvgd-xinst')
     assert.equal(twin.outcome, 'AlreadyOutstanding')
     assert.equal(captured.length, 1)
   } finally {
@@ -214,15 +252,15 @@ test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_cross_instance_reservation_s
   }
 })
 
-test('WHAT[REVIEW-ASSURANCE-006] RVGD_nudgeReviewer_new_barrier_receives_a_fresh_single_repair_budget', async () => {
+test('WHAT[REVIEW-ASSURANCE-006] RVGD_nudgeReviewer_new_barrier_receives_a_fresh_occasion', async () => {
   const sid = 'ses_rv_rearm'
   const { opened, cleanup } = await openSeeded(sid)
   try {
     const captured = []
-    assert.equal((await reviewHost.nudgeReviewer(capturingPort(captured, true), opened.journal, sid)).outcome, 'Sent')
+    assert.equal((await reviewHost.nudgeReviewer(capturingPort(captured, true), opened.journal, sid, 'run-rvgd-1')).outcome, 'Sent')
     const next = await reviewHost.openBarrier(opened.journal, 'ses_mgr_rvgd', sid, `${sid}-next`, `${sid}-next`)
     assert.equal(next.ok, true)
-    assert.equal((await reviewHost.nudgeReviewer(capturingPort(captured, true), opened.journal, sid)).outcome, 'Sent')
+    assert.equal((await reviewHost.nudgeReviewer(capturingPort(captured, true), opened.journal, sid, 'run-rvgd-2')).outcome, 'Sent')
     assert.equal(captured.length, 2)
   } finally { cleanup() }
 })
@@ -234,7 +272,7 @@ test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_no_longer_required_when_reco
   reviewHost.setSessionDirectory(sid, worktree)
   try {
     const captured = []
-    assert.equal((await reviewHost.nudgeReviewer(capturingPort(captured), opened.journal, sid)).outcome, 'NoLongerRequired')
+    assert.equal((await reviewHost.nudgeReviewer(capturingPort(captured), opened.journal, sid, 'run-rvgd-1')).outcome, 'NoLongerRequired')
     assert.equal(captured.length, 0)
   } finally { reviewHost.clearSessionDirectory(sid); rmSync(worktree, { recursive: true, force: true }); cleanup() }
 })
@@ -246,7 +284,7 @@ test('WHAT[REVIEW-ASSURANCE-010] RVGD_nudgeReviewer_sends_when_recorded_worktree
   writeFileSync(join(worktree, 'AGENTS.md'), 'instructions')
   reviewHost.setSessionDirectory(sid, worktree)
   try {
-    assert.equal((await reviewHost.nudgeReviewer(capturingPort([]), opened.journal, sid)).outcome, 'Sent')
+    assert.equal((await reviewHost.nudgeReviewer(capturingPort([]), opened.journal, sid, 'run-rvgd-1')).outcome, 'Sent')
   } finally { reviewHost.clearSessionDirectory(sid); rmSync(worktree, { recursive: true, force: true }); cleanup() }
 })
 

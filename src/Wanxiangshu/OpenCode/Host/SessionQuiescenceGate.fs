@@ -110,6 +110,21 @@ type SessionQuiescenceGate() =
                 true
             | _ -> false)
 
+    /// A Host rejection that definitively occurred before physical acceptance may
+    /// return the exact permit to Idle. This is safe only while the same serial is
+    /// still IdleConsumed; any newer provider attempt / physical user material has
+    /// already advanced the serial and makes release a no-op.
+    member _.TryRelease(permit: QuiescencePermit) : bool =
+        lock gate (fun () ->
+            let key = SessionId.value (QuiescencePermit.sessionId permit)
+            let serial = QuiescencePermit.attemptSerial permit
+
+            match Map.tryFind key activities with
+            | Some(Activity.IdleConsumed current) when current = serial ->
+                activities <- Map.add key (Activity.Idle serial) activities
+                true
+            | _ -> false)
+
     /// HOST-004: operator abort immediately and permanently
     /// revokes the current attempt's idle-derived continuation capability. All
     /// existing permits fail; a delayed SessionIdle does not re-mint a usable

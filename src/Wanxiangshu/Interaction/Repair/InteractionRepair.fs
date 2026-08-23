@@ -69,10 +69,9 @@ open Wanxiangshu.Strength
 /// time → zero physical prompt, zero claim, zero terminal.
 module InteractionRepairWorkflow =
 
-    /// Generic repair admission is bounded by LogicalRun + repair family, gated on
-    /// a fresh idle permit (HOST-004). Admission does not prove the admitted repair
-    /// has finished; duplicate observations are absorbed until typed terminal
-    /// evidence lets the Repair owner classify the attempt.
+    /// Generic interaction nudges are gate reminders, gated on a fresh idle permit
+    /// (HOST-004). The same terminal occasion is idempotent; a fresh terminal while
+    /// the interaction gate remains unsatisfied earns another reminder.
     ///
     /// The task is awaited rather than discarded. `|> ignore` on the task also
     /// discarded the claim/abandon bookkeeping inside it, so a failed repair left
@@ -92,7 +91,7 @@ module InteractionRepairWorkflow =
         : Task =
         task {
             let! outcome =
-                HostSessionNudge.trySendIdleRepairFamily
+                HostSessionNudge.trySendIdleGateRepair
                     quiescence
                     permit
                     sessionPort
@@ -101,12 +100,17 @@ module InteractionRepairWorkflow =
                     turn.Directory
                     journal
                     repairKind
+                    turn.ProviderRun
 
             match outcome with
             | HostSessionNudge.IdleContinuationOutcome.Sent _
             | HostSessionNudge.IdleContinuationOutcome.Superseded
             | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
             | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
+            | HostSessionNudge.IdleContinuationOutcome.NotSent error ->
+                Diagnostic.emit
+                    "interaction-gate-nudge-not-sent"
+                    [ "session_id", SessionId.value turn.SessionId; "result", error ]
             | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                 // Journal/authority/transport failures are Wanxiangshu invariant
                 // failures, not model behavior. In production fatal kills the
@@ -148,16 +152,6 @@ module InteractionRepairWorkflow =
     let private isInteractionRepairAttempt journal turn =
         continuationKindOf journal turn = Some PromptAuthority.ContinuationKind.InteractionRepair
 
-    let private exhaustRepair (eventPort: IEventObservationPort) (turn: ReconciledTurn) : Task =
-        eventPort.NotifyTerminal
-            turn.SessionId
-            (TerminalOutcome.Failed(
-                TerminalStop.forAuthority turn.AuthorityRootUserMessageId "INTERACTION_REPAIR_EXHAUSTED"
-            ))
-        |> ignore
-
-        AsyncSupport.completedTask ()
-
     let private repairDefect
         (quiescence: SessionQuiescenceGate)
         (context: ReconciledTurnContext)
@@ -177,7 +171,6 @@ module InteractionRepairWorkflow =
         with
         | CompletedTurnClassifier.RepairDefectDecision.RequestRepair ->
             trySendIdleRepair quiescence context sessionPort eventPort journal prompt repairKind
-        | CompletedTurnClassifier.RepairDefectDecision.RepairExhausted -> exhaustRepair eventPort turn
         | CompletedTurnClassifier.RepairDefectDecision.AwaitRepairTerminal
         | CompletedTurnClassifier.RepairDefectDecision.NoRepair -> AsyncSupport.completedTask ()
 
@@ -347,6 +340,7 @@ module InteractionRepairWorkflow =
                 | HostSessionNudge.IdleContinuationOutcome.Superseded
                 | HostSessionNudge.IdleContinuationOutcome.AlreadyAdmitted
                 | HostSessionNudge.IdleContinuationOutcome.Retired -> ()
+                | HostSessionNudge.IdleContinuationOutcome.NotSent error
                 | HostSessionNudge.IdleContinuationOutcome.Failed error ->
                     do!
                         sendBloggerAabbAfterPermitConsumed
@@ -479,9 +473,11 @@ module InteractionRepairWorkflow =
                 FissionProjection.tryActiveForOwner sessionId (AgentJournal.snapshot durable).AgentProjections.Fission
                 |> Option.isSome))
 
-    /// GLORY-070 / HOST-004 rev.3: a stable idle that never produced a final
-    /// report is repaired exactly once (reconcile maps dedupe the turn token),
-    /// and only when the pass carried idle evidence. ProviderRetryAttempt
+    /// GLORY-070 / HOST-004 rev.4: a stable idle that never produced a final
+    /// report is reminded once per exact terminal occasion, and only when the
+    /// pass carried idle evidence. If the reminder itself reaches another invalid
+    /// terminal, that fresh occasion may remind again until the closing-report
+    /// gate is satisfied. ProviderRetryAttempt
     /// continues own the recovery slot — suppress missing-final-report so the
     /// probe's own terminal can promote.
     let repairMissingFinalReport

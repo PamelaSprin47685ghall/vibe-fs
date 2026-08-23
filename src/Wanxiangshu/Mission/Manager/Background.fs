@@ -88,18 +88,34 @@ module ManagerBackground =
         (eventPort: IEventObservationPort)
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
-        (turn: ReconciledTurn)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
         =
         task {
-            match! HostJoinGuard.nudge sessionPort journal joinGuardNudges turn.SessionId turn.Directory with
-            | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                eventPort.NotifyTerminal
-                    turn.SessionId
-                    (Wanxiangshu.OpenCode.TerminalOutcome.Failed(
-                        Wanxiangshu.OpenCode.TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason
-                    ))
-                |> ignore
-            | _ -> ()
+            let turn = context.Turn
+
+            match context.Quiescence with
+            | None -> ()
+            | Some permit ->
+                match!
+                    HostJoinGuard.nudge
+                        sessionPort
+                        journal
+                        joinGuardNudges
+                        (fun () -> quiescence.TryConsume permit)
+                        (fun () -> quiescence.TryRelease permit |> ignore)
+                        turn.SessionId
+                        turn.ProviderRun
+                        turn.Directory
+                with
+                | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
+                    eventPort.NotifyTerminal
+                        turn.SessionId
+                        (Wanxiangshu.OpenCode.TerminalOutcome.Failed(
+                            Wanxiangshu.OpenCode.TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason
+                        ))
+                    |> ignore
+                | _ -> ()
         }
         :> Task
 
@@ -111,11 +127,14 @@ module ManagerBackground =
         (journal: AgentJournal option)
         (joinGuardNudges: HashSet<string>)
         (hasLivePty: string -> bool)
-        (turn: ReconciledTurn)
+        (quiescence: SessionQuiescenceGate)
+        (context: ReconciledTurnContext)
         : Task<BackgroundSettlement> =
         task {
+            let turn = context.Turn
+
             if TerminalPolicy.outstandingBackground journal hasLivePty turn.Role turn.SessionId then
-                do! sendJoinGuard sessionPort eventPort journal joinGuardNudges turn
+                do! sendJoinGuard sessionPort eventPort journal joinGuardNudges quiescence context
                 return BackgroundSettlement.Deferred
             else
                 return BackgroundSettlement.Settled

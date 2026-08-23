@@ -22,7 +22,7 @@
 
 ## CRASH-006: 没有 fresh evidence 就没有自动 effect
 
-恢复闭合后，所有副作用操作必须持有有效证明：持有 `FamilyRecoveryPermit` 才能执行 join；持有保持 fresh 的 `QuiescencePermit` 才能发送 idle-derived continuation。新的物理用户输入到达时立即幂等撤销旧的静止许可。
+恢复闭合后，所有副作用操作必须持有有效证明：持有 `FamilyRecoveryPermit` 才能执行 join；持有保持 fresh 的 `QuiescencePermit` 才能发送 idle-derived continuation。新的物理用户输入到达时立即幂等撤销旧的静止许可。permit 在物理发送边界被消费；若 Host 明确证明 acceptance 前拒绝、且同一 attempt serial 仍未被更新材料取代，则允许把该 exact permit 从 `IdleConsumed` 原子归还为 `Idle`，使仍未满足的 gate 可重试。任何更新的 provider attempt、物理用户材料或 acceptance-unknown 都使归还失败。
 
 ## CRASH-007: TurnUnknown 是 reconciliation 私有观测
 
