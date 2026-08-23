@@ -26,7 +26,7 @@ Canonical record 必须始终完整捕获 Opening。`includeOpening` 仅控制�
 
 ## WORK-RECORD-007: includeOpening 分向投影
 
-父→子 delegation 投影 `includeOpening=true`；子→父、同 session frozen prefix、process review、Finality 与 SyncDelegate caller 投影 `includeOpening=false`。
+父→子 delegation 投影 `includeOpening=true`；子→父、同 session frozen prefix、process review、Finality 与 SyncDelegate caller 投影 `includeOpening=false`。带 `ProviderRun` 的子→父 bounded 投影还必须从该 invocation 首个 assistant part 起算，caller 已发送的 user charge 属 receiver-known opening prefix，不得换名混入 Chronicle/Recent work。
 
 ## WORK-RECORD-008: Opening 是 preserved，不是 reconstructed
 

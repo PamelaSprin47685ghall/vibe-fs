@@ -102,6 +102,9 @@
 - 当前 F# control-pyramid、dead private binding、JS semantic-boundary debt 均为 0；这是零基线，不是未来可重新积累的 allowance。
 - durable store 已统一到 canonical EventStore spine；feature-owned durable backend/private ref、dual-write migrator、业务层 Git bypass 由 `unified-store-gate` 拒绝。
 - provider/context recovery 已切到 failure-driven + durable-event-driven + time-independent；任何重新引入 timeout/polling/process-local recovery proof 的改动都是回归。
+- managed provider → tool handoff 已是显式 capacity step 边界：tool body、role/capability gate 与同步 descendant provider work 之前必须先按 exact `ProviderRunIdentity + PhysicalUserMessageId` 结束当前 provider step；严禁把 `InFlight` capacity 持到 tool 返回或用 timeout 解死锁。Distiller cleanup 对同一 owned child 的物理 cancel 至多一次。
+- 子→父 run-bounded LWR 从本 invocation 首个 assistant part 起算；caller 已知的 user charge 不得伪装成 Chronicle/Recent work 回传。父→子普通 bounded delta 仍保留原语义。
+- Fable build 已收敛为跨进程 lock 下的一次真实 `Debug` compiler invocation；compiler 成功退出后才验 artifact/Surface Manifest，configuration 不得依赖 Fable 的 watch/one-shot 默认值。watch daemon、`FableBarrier.fs`、ack、source-touch barrier、artifact-exists fast path 均已删除；现存 `dist`、日志静默、mtime 与 wall-clock 不能证明构建成功。
 
 ## 交付门禁
 
@@ -127,7 +130,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。当前 migration DAG 仍有未闭合节点，所以第五十七章的 dependency-driven production cutover 路线继续保留。
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-23，migration ledger 的 22 个已建节点全部 `DONE`；未裁决 production coverage backlog 仍有 462 文件：CoverageA=99、CoverageB=33、CoverageD=86、CoverageE=121、CoverageG=123。第五十七章的 dependency-driven production cutover 路线继续保留，后续进度只以 backlog→node→cutover 闭合为准。
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 
@@ -1779,7 +1782,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
     都不得重新出现：
     
     ancestorDistance
-    CapacityTokenState
+    CapacityCreditState
     CapacityStepDemand
     ownedTokenByExecution
     

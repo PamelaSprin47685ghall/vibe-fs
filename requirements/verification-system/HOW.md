@@ -9,6 +9,7 @@
 `tests/proof-ladder.test.mjs` 对全局构建与测试命令链（`package.json` 中的 `format-build-test` 及 `scripts/check.mjs`）进行强约束：
 - 严格锁定第 0 层静态门禁、第 1–3 层纯逻辑与时序单元测试、第 4 层单入点物理 Long Stroke 与第 5 层 Release 构建的执行顺序。
 - 确保 `scripts/check.mjs` 中注册的所有门禁脚本路径在磁盘上真实存在，且任何门禁失败时其非零退出码均能正确向上传播（fail-closed）。
+- `scripts/build.mjs` 每次调用都持有跨进程 build lock，并以显式 `Debug` configuration 执行一次真实 Fable compile；compiler 成功退出后才验证 `dist` 与 Surface Manifest。configuration 不依赖 Fable 的 watch/one-shot 默认值。不存在 watch-daemon、source-touch barrier、ack、artifact-exists fast path 或 wall-clock freshness 猜测，因此旧 `dist` 不能冒充当前源码的编译结果。
 
 ### 2. 因果看门狗与静默监督（`e2e-watchdog-feed`）
 
@@ -47,7 +48,7 @@
 | VERIFICATION-SYSTEM-005 | `requirements/verification-system/tests/walk-fail-closed.test.mjs` |
 | VERIFICATION-SYSTEM-006 | `requirements/verification-system/tests/e2e-watchdog-feed.test.mjs` |
 | VERIFICATION-SYSTEM-007 | `requirements/verification-system/tests/temporal-harness.test.mjs` |
-| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs` |
+| VERIFICATION-SYSTEM-008 | `requirements/verification-system/tests/guide-contract.test.mjs`；`requirements/verification-system/tests/build-freshness.test.mjs` |
 | VERIFICATION-SYSTEM-009 | `requirements/verification-system/tests/integration-entry-coverage.test.mjs` |
 | VERIFICATION-SYSTEM-010 | `requirements/verification-system/tests/deadcode-scan.test.mjs` |
 | VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs` |

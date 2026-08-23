@@ -275,6 +275,36 @@ test('WHAT[EMR-010] EMR_010_lineage_credit_is_free_only_to_descendants_not_globa
   assert.equal((await stranger).kind, 'Superseded')
 })
 
+test('WHAT[EMR-010] EMR_010_provider_step_handoff_makes_the_same_credit_available_to_a_waiting_descendant', async () => {
+  const only = target('provider/only')
+  const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))
+
+  await acquireTarget(runtime, 'parent', 'msg-parent', 'parent')
+  bindCapacityChild(runtime, 'parent', 'child')
+  await enterProviderStep(runtime, 'parent', 'msg-parent', [])
+
+  assert.equal(
+    key(await acquireTarget(runtime, 'child', 'msg-child', 'child')),
+    key(only),
+    'the descendant may reserve the ancestor credit without creating another provider occurrence',
+  )
+
+  let childEntered = false
+  const childStep = enterProviderStep(runtime, 'child', 'msg-child', []).then(() => {
+    childEntered = true
+  })
+
+  await Promise.resolve()
+  assert.equal(childEntered, false, 'an actually in-flight ancestor provider step is not overbooked')
+  assert.equal(snapshotOccupied(runtime).length, 1)
+
+  endProviderStep(runtime, 'parent', 'msg-parent', 'run-parent')
+  await childStep
+
+  assert.equal(childEntered, true, 'the causal step boundary, not elapsed time, releases the descendant')
+  assert.equal(snapshotOccupied(runtime).length, 1, 'handoff reuses the same real provider credit')
+})
+
 test('WHAT[EMR-010] EMR_010_ancestor_recall_waits_for_descendant_step_end_without_overbooking', async () => {
   const only = target('provider/only')
   const runtime = createRuntime(providerLimited({ provider: 1 }, { parent: [only], child: [only] }))

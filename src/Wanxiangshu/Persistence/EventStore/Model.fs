@@ -71,14 +71,20 @@ type EventEnvelope =
 module EventParents =
     /// §5.0: dedupe, then EventId canonical text order (hex / lexicographic).
     let canonicalize (parents: EventId list) : EventId list =
-        parents
-        |> List.distinct
-        |> List.sortWith (fun a b -> compare (EventId.value a) (EventId.value b))
+        if List.isEmpty parents then
+            []
+        else
+            parents
+            |> List.distinct
+            |> List.sortWith (fun a b -> compare (EventId.value a) (EventId.value b))
 
 module PayloadRefs =
     /// §7.1 / §5.0: dedupe, then opaque-ref text order (OID text once Persist maps).
     let canonicalize (refs: PayloadRef list) : PayloadRef list =
-        refs |> List.distinct |> List.sortWith PayloadRef.compare
+        if List.isEmpty refs then
+            []
+        else
+            refs |> List.distinct |> List.sortWith PayloadRef.compare
 
 module EventEnvelope =
     /// Normalize set-shaped fields so identity bytes do not depend on caller order.

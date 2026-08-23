@@ -16,7 +16,6 @@ const repositoryTextEntries = (root = defaultRoot) => {
 
   const readable = []
   for (const relPath of paths) {
-    if (relPath === 'src/Wanxiangshu/FableBarrier.fs' || relPath.endsWith('/FableBarrier.fs')) continue
     const file = path.join(root, relPath)
     try {
       readable.push({ file, text: decoder.decode(readFileSync(file)) })

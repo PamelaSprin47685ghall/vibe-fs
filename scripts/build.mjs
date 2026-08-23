@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
 import path from 'node:path'
-import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 
@@ -12,17 +11,8 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
-const daemonDir = path.join(root, '.fable-daemon')
-const pidFile = path.join(daemonDir, 'pid')
-const logFile = path.join(daemonDir, 'log')
-const ackJson = path.join(daemonDir, 'ack.json')
-const buildLockFile = path.join(daemonDir, 'build.lock')
-const startLockFile = path.join(daemonDir, 'start.lock')
-const barrierFs = path.join(root, 'src/Wanxiangshu/FableBarrier.fs')
-
-const LOCK_STALE_TIMEOUT_MS = 150_000
-const COLD_START_TIMEOUT_MS = 120_000
-const WARM_BUILD_TIMEOUT_MS = 60_000
+const buildStateDir = path.join(root, '.fable-build')
+const buildLockFile = path.join(buildStateDir, 'build.lock')
 
 // ── Diagnostics & Output ─────────────────────────────────────────────────────
 
@@ -46,7 +36,7 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// ── Process & Lock Management ────────────────────────────────────────────────
+// ── Build Serialization ──────────────────────────────────────────────────────
 
 function isPidRunning(pid) {
   if (!pid || typeof pid !== 'number' || isNaN(pid) || pid <= 0) return false
@@ -58,40 +48,19 @@ function isPidRunning(pid) {
   }
 }
 
-function isFableDaemonProcess(pid) {
-  if (!isPidRunning(pid)) return false
-  if (process.platform === 'linux') {
-    try {
-      const cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8')
-      return cmdline.includes('fable') || cmdline.includes('dotnet')
-    } catch {
-      return true
-    }
-  }
-  return true
-}
-
 class CrossProcessMutex {
-  constructor(lockPath, name = 'lock', timeoutMs = LOCK_STALE_TIMEOUT_MS) {
+  constructor(lockPath, name = 'lock') {
     this.lockPath = lockPath
     this.name = name
-    this.timeoutMs = timeoutMs
     this.held = false
   }
 
   async acquire(waitTimeoutMs = 180_000) {
     fs.mkdirSync(path.dirname(this.lockPath), { recursive: true })
     const deadline = Date.now() + waitTimeoutMs
-    let attempt = 0
-
     while (Date.now() < deadline) {
-      attempt++
       try {
-        const payload = JSON.stringify({
-          pid: process.pid,
-          createdAt: Date.now(),
-          token: crypto.randomBytes(8).toString('hex'),
-        })
+        const payload = JSON.stringify({ pid: process.pid })
         fs.writeFileSync(this.lockPath, payload, { flag: 'wx', encoding: 'utf8' })
         this.held = true
         return true
@@ -102,10 +71,9 @@ class CrossProcessMutex {
         try {
           const raw = fs.readFileSync(this.lockPath, 'utf8')
           const info = JSON.parse(raw)
-          const isStale = Date.now() - (info.createdAt || 0) > this.timeoutMs
           const isDead = !isPidRunning(info.pid)
 
-          if (isDead || isStale) {
+          if (isDead) {
             try {
               fs.unlinkSync(this.lockPath)
               continue
@@ -118,8 +86,7 @@ class CrossProcessMutex {
           } catch {}
         }
 
-        const delay = Math.min(50 + attempt * 25 + Math.floor(Math.random() * 50), 300)
-        await sleep(delay)
+        await sleep(100)
       }
     }
 
@@ -141,238 +108,38 @@ class CrossProcessMutex {
   }
 }
 
-// ── Daemon Lifecycle ─────────────────────────────────────────────────────────
+// ── Fable Compile ─────────────────────────────────────────────────────────────
 
-function getDaemonPid() {
-  if (!fs.existsSync(pidFile)) return null
-  try {
-    const raw = fs.readFileSync(pidFile, 'utf8').trim()
-    const pid = parseInt(raw, 10)
-    if (isFableDaemonProcess(pid)) return pid
-    try {
-      fs.unlinkSync(pidFile)
-    } catch {}
-    return null
-  } catch {
-    return null
-  }
-}
+async function compileFable() {
+  fs.mkdirSync(dist, { recursive: true })
+  logInfo('Compiling F# with Fable...')
 
-async function stopDaemon() {
-  const pid = getDaemonPid()
-  if (pid) {
-    logInfo(`Stopping Fable daemon (PID ${pid})...`)
-    try {
-      process.kill(pid, 'SIGTERM')
-    } catch {}
+  const child = spawn(
+    'dotnet',
+    [
+      'tool',
+      'run',
+      'fable',
+      '--',
+      'src/Wanxiangshu/Wanxiangshu.fsproj',
+      '-c',
+      'Debug',
+      '-o',
+      'dist',
+      '--noGitignore',
+    ],
+    { cwd: root, stdio: 'inherit' },
+  )
 
-    const deadline = Date.now() + 3000
-    while (Date.now() < deadline && isPidRunning(pid)) {
-      await sleep(100)
-    }
+  const result = await new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('exit', (code, signal) => resolve({ code, signal }))
+  })
 
-    if (isPidRunning(pid)) {
-      try {
-        process.kill(pid, 'SIGKILL')
-      } catch {}
-    }
-  }
-
-  try {
-    if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile)
-  } catch {}
-  try {
-    if (fs.existsSync(buildLockFile)) fs.unlinkSync(buildLockFile)
-  } catch {}
-  try {
-    if (fs.existsSync(startLockFile)) fs.unlinkSync(startLockFile)
-  } catch {}
-}
-
-async function startDaemon() {
-  const startMutex = new CrossProcessMutex(startLockFile, 'daemon start lock', 30_000)
-  await startMutex.acquire(45_000)
-
-  try {
-    // Re-check if another process just started it while we were waiting
-    const existingPid = getDaemonPid()
-    if (existingPid) return existingPid
-
-    fs.mkdirSync(daemonDir, { recursive: true })
-    fs.mkdirSync(dist, { recursive: true })
-
-    if (!fs.existsSync(barrierFs)) {
-      fs.writeFileSync(
-        barrierFs,
-        `namespace Wanxiangshu\n\nmodule FableBarrier =\n    let token = "init"\n`,
-        'utf8',
-      )
-    }
-
-    // Truncate or initialize log file
-    const logFd = fs.openSync(logFile, 'a')
-    const child = spawn(
-      'dotnet',
-      [
-        'tool',
-        'run',
-        'fable',
-        'watch',
-        'src/Wanxiangshu/Wanxiangshu.fsproj',
-        '-o',
-        'dist',
-        '--noGitignore',
-        '--runWatch',
-        'node',
-        'scripts/fable-ack.mjs',
-      ],
-      {
-        cwd: root,
-        detached: true,
-        stdio: ['ignore', logFd, logFd],
-      },
+  if (result.code !== 0) {
+    fail(
+      `Fable compilation failed${result.signal ? ` by signal ${result.signal}` : ` with exit code ${result.code}`}`,
     )
-
-    child.unref()
-    fs.closeSync(logFd)
-
-    const pid = child.pid
-    fs.writeFileSync(pidFile, String(pid), 'utf8')
-    logInfo(`Spawned Fable watch daemon (PID ${pid})`)
-    return pid
-  } finally {
-    startMutex.release()
-  }
-}
-
-// ── Log Inspection & Compilation Error Extraction ────────────────────────────
-
-function readLogSlice(fromOffset) {
-  if (!fs.existsSync(logFile)) return { text: '', newOffset: fromOffset }
-  try {
-    const fd = fs.openSync(logFile, 'r')
-    const stat = fs.fstatSync(fd)
-    const currentSize = stat.size
-    if (currentSize <= fromOffset) {
-      fs.closeSync(fd)
-      return { text: '', newOffset: fromOffset }
-    }
-    const length = currentSize - fromOffset
-    const buffer = Buffer.alloc(length)
-    fs.readSync(fd, buffer, 0, length, fromOffset)
-    fs.closeSync(fd)
-    return { text: buffer.toString('utf8'), newOffset: currentSize }
-  } catch {
-    return { text: '', newOffset: fromOffset }
-  }
-}
-
-function extractCompilerErrors(logText) {
-  const errorLines = []
-  const lines = logText.split('\n')
-  let inException = false
-
-  for (const line of lines) {
-    if (
-      line.includes('error FSHARP:') ||
-      line.includes('error FABLE:') ||
-      line.includes('Compilation failed') ||
-      line.includes('error EXCEPTION:') ||
-      line.includes('Error:')
-    ) {
-      errorLines.push(line)
-      if (line.includes('error EXCEPTION:')) inException = true
-    } else if (inException) {
-      if (line.startsWith('   at ') || line.trim().length === 0) {
-        errorLines.push(line)
-      } else {
-        inException = false
-      }
-    }
-  }
-
-  return errorLines.length > 0 ? errorLines.join('\n') : null
-}
-
-// ── Barrier Synchronization ──────────────────────────────────────────────────
-
-async function barrierSync() {
-  const buildMutex = new CrossProcessMutex(buildLockFile, 'build lock')
-  await buildMutex.acquire(180_000)
-
-  try {
-    let pid = getDaemonPid()
-    const isCold = !pid
-    if (!pid) {
-      pid = await startDaemon()
-    }
-
-    const token = `barrier-${process.pid}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`
-    const startLogOffset = fs.existsSync(logFile) ? fs.statSync(logFile).size : 0
-    let logOffset = startLogOffset
-
-    const barrierContent = `namespace Wanxiangshu\n\nmodule FableBarrier =\n    let token = "${token}"\n`
-    fs.writeFileSync(barrierFs, barrierContent, 'utf8')
-
-    const timeoutMs = isCold ? COLD_START_TIMEOUT_MS : WARM_BUILD_TIMEOUT_MS
-    const deadline = Date.now() + timeoutMs
-    let accumulatedLogs = ''
-
-    while (Date.now() < deadline) {
-      if (!isFableDaemonProcess(pid)) {
-        const { text } = readLogSlice(startLogOffset)
-        const errorDetails = extractCompilerErrors(text) || text.slice(-2000)
-        fail(`Fable watch daemon (PID ${pid}) exited unexpectedly.`, errorDetails)
-      }
-
-      // Check ack.json for matching token
-      if (fs.existsSync(ackJson)) {
-        try {
-          const raw = fs.readFileSync(ackJson, 'utf8')
-          const ack = JSON.parse(raw)
-          if (ack.token === token && ack.status === 'ok') {
-            return
-          }
-        } catch {}
-      }
-
-      // Read new log bytes incrementally
-      const { text: newChunk, newOffset } = readLogSlice(logOffset)
-      if (newChunk) {
-        accumulatedLogs += newChunk
-        logOffset = newOffset
-
-        // Immediate fail-fast detection:
-        // When Fable finishes a cycle with errors, it prints error FSHARP / error EXCEPTION
-        // and ends with "Watching src/Wanxiangshu" or "Fable compilation finished".
-        const hasErrors =
-          accumulatedLogs.includes('error FSHARP:') ||
-          accumulatedLogs.includes('error FABLE:') ||
-          accumulatedLogs.includes('error EXCEPTION:') ||
-          accumulatedLogs.includes('Compilation failed')
-
-        const hasFinishedCycle =
-          accumulatedLogs.includes('Fable compilation finished') ||
-          (accumulatedLogs.includes('Watching ') && accumulatedLogs.includes('src/Wanxiangshu'))
-
-        if (hasErrors && hasFinishedCycle) {
-          // Give a tiny moment for full flush
-          await sleep(80)
-          const { text: finalChunk } = readLogSlice(startLogOffset)
-          const fullErrors = extractCompilerErrors(finalChunk) || finalChunk.slice(-3000)
-          fail(`Fable compilation failed with compiler errors:`, fullErrors)
-        }
-      }
-
-      await sleep(60)
-    }
-
-    // Timeout expired
-    const { text: timeoutLogs } = readLogSlice(startLogOffset)
-    const errorDetails = extractCompilerErrors(timeoutLogs) || timeoutLogs.slice(-2000)
-    fail(`Fable barrier synchronization timed out after ${timeoutMs}ms (token: ${token})`, errorDetails)
-  } finally {
-    buildMutex.release()
   }
 }
 
@@ -454,13 +221,6 @@ function registerSignalHandlers() {
         if (info.pid === process.pid) fs.unlinkSync(buildLockFile)
       }
     } catch {}
-    try {
-      if (fs.existsSync(startLockFile)) {
-        const raw = fs.readFileSync(startLockFile, 'utf8')
-        const info = JSON.parse(raw)
-        if (info.pid === process.pid) fs.unlinkSync(startLockFile)
-      }
-    } catch {}
   }
 
   process.on('SIGINT', () => {
@@ -481,40 +241,24 @@ async function main() {
 
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
     console.log(`
-Usage: node scripts/build.mjs [options]
+Usage: node scripts/build.mjs
 
 Options:
-  --stop       Stop the background Fable watch daemon
-  --restart    Restart the Fable watch daemon before building
-  --status     Print daemon status and exit
   --help, -h   Show this help message
 `)
     process.exit(0)
   }
 
-  if (process.argv.includes('--status')) {
-    const pid = getDaemonPid()
-    if (pid) {
-      console.log(`Fable daemon: RUNNING (PID ${pid})`)
-    } else {
-      console.log('Fable daemon: STOPPED')
-    }
-    process.exit(0)
-  }
+  const buildMutex = new CrossProcessMutex(buildLockFile, 'build lock')
+  await buildMutex.acquire()
 
-  if (process.argv.includes('--stop')) {
-    await stopDaemon()
-    logInfo('Fable daemon stopped')
-    process.exit(0)
+  try {
+    await compileFable()
+    verifyArtifacts()
+    logInfo('build ok')
+  } finally {
+    buildMutex.release()
   }
-
-  if (process.argv.includes('--restart')) {
-    await stopDaemon()
-  }
-
-  await barrierSync()
-  verifyArtifacts()
-  logInfo('build ok')
 }
 
 await main()

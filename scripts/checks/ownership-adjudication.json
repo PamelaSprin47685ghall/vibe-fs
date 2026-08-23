@@ -1984,12 +1984,6 @@
         ]
       }
     ],
-    "FableBarrier.fs": [
-      {
-        "path": "src/Wanxiangshu/FableBarrier.fs",
-        "owners": []
-      }
-    ],
     "Host": [
       {
         "path": "src/Wanxiangshu/Host/Digest.fs",

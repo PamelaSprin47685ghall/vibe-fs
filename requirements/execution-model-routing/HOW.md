@@ -25,6 +25,8 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 3. **Lineage 令牌借用与召回**：
    - 真实 Token Ledger 记录全局占用；Borrowing Decorator 维护 session 派生树。
    - 子节点在 step 级别借用祖先等待中的 token，并在祖先恢复或 step 终结时按序归还。
+   - `ToolRegistry` 在 managed tool invocation 的最外层先调用 `SessionExecutionBinding.endProviderStepAtToolBoundary`。后者只从当前 provider-attempt binding 取得冻结的 `PhysicalUserMessageId`，并结合 Host tool context 的 exact `ProviderRunIdentity` 调用 `ModelRouting.endProviderStep`；随后才进入 Strength/Role/Capability gate 与实际 tool body。这样同步 delegate、output distillation 等“工具内等待子模型”的路径不会把调用者 capacity 一起锁住。
+   - 该 handoff 纯因果、时间无关；测试只推进显式状态边界，不使用 sleep、deadline 或真实 timeout。真实 `InFlight` provider step 仍不可被 borrower 越权并发使用。
 
 4. **Physical terminal 证据收敛**：
    - `HostEventCodec` 把 assistant completion 分成 provider-step terminal 与 physical-execution terminal 两层。
@@ -43,4 +45,4 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 | EMR-007 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/host-boundary/tests/provider-retry-host-edge.test.mjs` |
 | EMR-008 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-009 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
-| EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs` |
+| EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/execution-model-routing/tests/tool-provider-step-boundary.test.mjs` |

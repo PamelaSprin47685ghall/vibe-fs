@@ -953,7 +953,7 @@ $$\begin{aligned}
 <h3>双语语义锚点（Semantic Anchors）一致性校验</h3>
 <p>通过 <code>scanSemanticAnchorParity</code> 自动化门禁，仓库对所有中英文 Role Law 及工具描述建立机器可红的测试守护：</p>
 <pre><code>// 语义锚点双语覆盖门禁
-[<Fact>]
+[&lt;Fact&gt;]
 let ``Semantic anchors must be parity-matched in both EN and zh-CN`` () =
     for anchor in RoleSemanticAnchors.all do
         assertAnchorPresentInEnglish(anchor)

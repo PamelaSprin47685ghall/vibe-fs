@@ -259,19 +259,34 @@ module ToolRegistry =
                     | None -> return! executeAfterEnsure args ctx
                 }
 
-            fun args (ctx: HostToolContext) ->
-                task {
-                    let isStrengthReplica =
-                        match strengthRuntime with
-                        | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
-                            strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
-                        | _ -> false
+            let providerToolBoundary (ctx: HostToolContext) =
+                if String.IsNullOrWhiteSpace ctx.SessionId then
+                    Ok()
+                else
+                    SessionExecutionBinding.endProviderStepAtToolBoundary
+                        (SessionId.create ctx.SessionId)
+                        ctx.ProviderRunId
 
-                    if isStrengthReplica then
+            let isStrengthReplica (ctx: HostToolContext) =
+                match strengthRuntime with
+                | Some strength when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
+                    strength.TryFindByReplica(SessionId.create ctx.SessionId) |> Option.isSome
+                | _ -> false
+
+            let executeAfterBoundary args (ctx: HostToolContext) =
+                task {
+                    if isStrengthReplica ctx then
                         // STRENGTH-004: Host-native read/glob/grep are the entire replica surface.
                         return denied ctx Path.DeniedStrength Map.empty
                     else
                         return! executeEstablished args ctx
+                }
+
+            fun args (ctx: HostToolContext) ->
+                task {
+                    match providerToolBoundary ctx with
+                    | Error error -> return raise (InvalidOperationException error)
+                    | Ok() -> return! executeAfterBoundary args ctx
                 }
 
         let specs =

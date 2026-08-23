@@ -37,7 +37,15 @@ test('WHAT[BD-006] CHRONICLE_no_live_cycle_aborts_then_host_adapter_exposes_sdk_
     await assert.rejects(
       () => hooks.tool.chronicle.execute(
         { entry: 'work', tip: 'primitive-obsession' },
-        { sessionID, agent: 'fast-blogger' },
+        {
+          sessionID,
+          agent: 'fast-blogger',
+          // HOST-011: a real OpenCode ToolContext always names the assistant
+          // message/provider run that emitted this tool call. Keep the fixture
+          // physical rather than bypassing the provider→tool capacity boundary.
+          messageID: `run-${sessionID}`,
+          callID: `call-${sessionID}`,
+        },
       ),
       (error) => error?.message === 'CHRONICLE_NO_LIVE_CYCLE',
     )

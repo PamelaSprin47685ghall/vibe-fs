@@ -46,8 +46,8 @@ async function getAllProductionFsFiles(dir) {
 const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   // Private types & DU states
   'CapacityStep',
-  'CapacityTokenState',
-  'CapacityToken',
+  'CapacityCreditState',
+  'CapacityCredit',
   'CapacityStepDemand',
   'CapacityCreditSource',
 

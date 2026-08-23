@@ -37,7 +37,11 @@ test('WHAT[DISTILL-007] EXEC_distillation_cancel_owned_on_failure', async () => 
     `CancelAgent must run for owned forked ids on map failure; forked=${forked.join(',')} cancelled=${cancelled.join(',')}`,
   )
   for (const id of forked) {
-    assert.ok(cancelled.includes(id), `owned agent ${id} must be cancelled`)
+    assert.equal(
+      cancelled.filter((cancelledId) => cancelledId === id).length,
+      1,
+      `owned agent ${id} must be cancelled exactly once even when several failure paths request cleanup`,
+    )
   }
 
   rmSync(dir, { recursive: true, force: true })

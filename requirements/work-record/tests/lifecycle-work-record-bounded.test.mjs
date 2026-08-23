@@ -126,6 +126,29 @@ test('WHAT[WORK-RECORD-016] COMPANION_015_bounded_review_consumes_request_range_
   })
 })
 
+test('WHAT[WORK-RECORD-007] child_to_parent_run_bounded_LWR_omits_caller_charge', async () => {
+  await withJournal(async (journal) => {
+    await workRecord.captureOpening(journal, SEM, 'assigned task', [])
+    const captured = await workRecord.captureProjection(journal, SEM, {
+      messages: [
+        { role: 'user', parts: [{ kind: 'text', text: 'assigned task' }] },
+        { role: 'assistant', parts: [{ kind: 'text', text: 'did child work' }] },
+      ],
+    })
+    assert.equal(captured.lastSequence, 2)
+
+    const bounded = await workRecord.lifecycleWorkRecordBounded(journal, SEM, {
+      StartInclusive: { Sequence: 0 },
+      EndExclusive: { Sequence: 3 },
+      ProviderRun: 'run-child',
+    })
+
+    assert.equal(typeof bounded, 'string')
+    assert.doesNotMatch(bounded, /assigned task/)
+    assert.match(bounded, /did child work/)
+  })
+})
+
 test('WHAT[WORK-RECORD-004] COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y', async () => {
   await withJournal(async (journal) => {
     const { s1, s2 } = await seedTwoInvocations(journal)

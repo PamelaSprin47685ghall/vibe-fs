@@ -313,6 +313,33 @@ module SessionExecutionBinding =
             | true, binding -> Some binding.Model
             | false, _ -> None)
 
+    /// EMR-010: a managed tool body is downstream of the provider step that
+    /// emitted its exact ProviderRunIdentity. Tool execution may synchronously
+    /// wait for descendant provider work (for example output distillation), so
+    /// carrying provider capacity across this boundary can deadlock the family.
+    ///
+    /// The physical execution identity is not present in HostToolContext; use the
+    /// provider-attempt binding frozen by messages.transform. Missing ProviderRun
+    /// on a bound managed attempt is unsafe because a later/stale tool call could
+    /// otherwise release the wrong step.
+    let endProviderStepAtToolBoundary
+        (sessionId: SessionId)
+        (providerRunId: ProviderRunIdentity option)
+        : Result<unit, string> =
+        let binding =
+            lock gate (fun () ->
+                match providerAttemptBindings.TryGetValue(SessionId.value sessionId) with
+                | true, current -> Some current
+                | false, _ -> None)
+
+        match binding, providerRunId with
+        | None, _ -> Ok()
+        | Some _, None ->
+            Error "EMR-010: managed tool execution has no exact ProviderRunIdentity for provider-step handoff"
+        | Some current, Some providerRun ->
+            ModelRouting.endProviderStep sessionId current.PhysicalUserMessageId providerRun
+            Ok()
+
     let private enterBoundProviderStep
         (sessionId: SessionId)
         (physicalUserMessageId: PhysicalUserMessageId option)

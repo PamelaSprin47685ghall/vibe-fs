@@ -10,27 +10,27 @@ open Wanxiangshu.Foundation
 type CapacityLedger<'target>() =
     let gate = obj ()
     let entries = Dictionary<int64, 'target>()
-    // DSL-MUTABLE: resource — monotonic opaque capacity-token identity
-    let mutable nextToken = 0L
+    // DSL-MUTABLE: resource — monotonic opaque capacity-credit identity
+    let mutable nextCredit = 0L
 
     member _.Acquire(target: 'target) =
         lock gate (fun () ->
-            nextToken <- nextToken + 1L
-            entries.[nextToken] <- target
-            nextToken)
+            nextCredit <- nextCredit + 1L
+            entries.[nextCredit] <- target
+            nextCredit)
 
-    member _.Retarget(token: int64, target: 'target) =
+    member _.Retarget(credit: int64, target: 'target) =
         lock gate (fun () ->
-            if entries.ContainsKey token then
-                entries.[token] <- target)
+            if entries.ContainsKey credit then
+                entries.[credit] <- target)
 
-    member _.Release(token: int64) =
-        lock gate (fun () -> entries.Remove token)
+    member _.Release(credit: int64) =
+        lock gate (fun () -> entries.Remove credit)
 
     member _.Entries() =
         lock gate (fun () ->
             entries
-            |> Seq.map (fun (KeyValue(token, target)) -> token, target)
+            |> Seq.map (fun (KeyValue(credit, target)) -> credit, target)
             |> Seq.toArray)
 
     member this.Snapshot() = this.Entries() |> Array.map snd
@@ -41,18 +41,18 @@ type private CapacityStep =
       Fence: Set<string> }
 
 [<RequireQualifiedAccess>]
-type private CapacityTokenState =
+type private CapacityCreditState =
     | Idle
     | InFlight of CapacityStep
     | Retiring of CapacityStep
 
-type private CapacityToken<'target> =
-    { Token: int64
+type private CapacityCredit<'target> =
+    { Credit: int64
       mutable OwnerKey: string
       OwnerSessionId: string
       Provider: string
       mutable OwnerTarget: 'target
-      mutable State: CapacityTokenState }
+      mutable State: CapacityCreditState }
 
 type private CapacityStepDemand<'target> =
     { Sequence: int64
@@ -64,7 +64,7 @@ type private CapacityStepDemand<'target> =
       Completion: TaskCompletionSource<unit> }
 
 type private CapacityCreditSource =
-    { Token: int64
+    { Credit: int64
       LenderSessionId: string
       Distance: int }
 
@@ -86,7 +86,7 @@ type BorrowingCapacity<'target>
     // DSL-MUTABLE: resource — at most one owned capacity token per execution
     let ownedTokenByExecution = Dictionary<string, int64>()
     // DSL-MUTABLE: resource — decorator metadata for ledger tokens
-    let tokens = Dictionary<int64, CapacityToken<'target>>()
+    let tokens = Dictionary<int64, CapacityCredit<'target>>()
     // DSL-MUTABLE: resource — provider-step admission waiters
     let waiters = ResizeArray<CapacityStepDemand<'target>>()
     let mutable nextDemand = 0L
@@ -118,7 +118,7 @@ type BorrowingCapacity<'target>
 
     let clearCreditSourcesForToken (tokenId: int64) =
         creditSourceByExecution
-        |> Seq.choose (fun (KeyValue(key, source)) -> if source.Token = tokenId then Some key else None)
+        |> Seq.choose (fun (KeyValue(key, source)) -> if source.Credit = tokenId then Some key else None)
         |> Seq.toArray
         |> Array.iter clearCreditSource
 
@@ -128,12 +128,12 @@ type BorrowingCapacity<'target>
         |> Seq.toArray
         |> Array.iter clearCreditSource
 
-    let rememberCreditSource key borrowerSessionId (token: CapacityToken<'target>) distance =
+    let rememberCreditSource key borrowerSessionId (token: CapacityCredit<'target>) distance =
         if distance <= 0 || token.OwnerSessionId = borrowerSessionId then
             clearCreditSource key
         else
             creditSourceByExecution.[key] <-
-                { Token = token.Token
+                { Credit = token.Credit
                   LenderSessionId = token.OwnerSessionId
                   Distance = distance }
 
@@ -209,24 +209,24 @@ type BorrowingCapacity<'target>
 
     let isRetiring token =
         match token.State with
-        | CapacityTokenState.Retiring _ -> true
-        | CapacityTokenState.Idle
-        | CapacityTokenState.InFlight _ -> false
+        | CapacityCreditState.Retiring _ -> true
+        | CapacityCreditState.Idle
+        | CapacityCreditState.InFlight _ -> false
 
-    let releaseToken (token: CapacityToken<'target>) =
-        clearCreditSourcesForToken token.Token
-        ledger.Release token.Token |> ignore
-        tokens.Remove token.Token |> ignore
+    let releaseToken (token: CapacityCredit<'target>) =
+        clearCreditSourcesForToken token.Credit
+        ledger.Release token.Credit |> ignore
+        tokens.Remove token.Credit |> ignore
 
         match ownedTokenByExecution.TryGetValue token.OwnerKey with
-        | true, current when current = token.Token -> ownedTokenByExecution.Remove token.OwnerKey |> ignore
+        | true, current when current = token.Credit -> ownedTokenByExecution.Remove token.OwnerKey |> ignore
         | _ -> ()
 
-    let retireToken (token: CapacityToken<'target>) =
+    let retireToken (token: CapacityCredit<'target>) =
         match token.State with
-        | CapacityTokenState.Idle -> releaseToken token
-        | CapacityTokenState.InFlight step -> token.State <- CapacityTokenState.Retiring step
-        | CapacityTokenState.Retiring _ -> ()
+        | CapacityCreditState.Idle -> releaseToken token
+        | CapacityCreditState.InFlight step -> token.State <- CapacityCreditState.Retiring step
+        | CapacityCreditState.Retiring _ -> ()
 
     let retireTokenId tokenId =
         match tokens.TryGetValue tokenId with
@@ -254,7 +254,7 @@ type BorrowingCapacity<'target>
         |> Seq.map (fun (provider, candidates) ->
             let token, _ =
                 candidates
-                |> Seq.sortBy (fun (token, distance) -> distance, token.Token)
+                |> Seq.sortBy (fun (token, distance) -> distance, token.Credit)
                 |> Seq.head
 
             provider, token)
@@ -268,19 +268,19 @@ type BorrowingCapacity<'target>
         let credits = creditTokens requester
 
         let hidden =
-            credits |> Seq.map (fun (KeyValue(_, token)) -> token.Token) |> Set.ofSeq
+            credits |> Seq.map (fun (KeyValue(_, token)) -> token.Credit) |> Set.ofSeq
 
         withoutTokens hidden, credits
 
-    let ordinaryDecision (route: 'target array -> 'target option) : ('target * CapacityToken<'target> option) option =
+    let ordinaryDecision (route: 'target array -> 'target option) : ('target * CapacityCredit<'target> option) option =
         route (ledger.Snapshot()) |> Option.map (fun target -> target, None)
 
-    let attributedDecision target (credit: CapacityToken<'target>) route =
-        match route (withoutTokens (Set.singleton credit.Token)) with
+    let attributedDecision target (credit: CapacityCredit<'target>) route =
+        match route (withoutTokens (Set.singleton credit.Credit)) with
         | Some attributable when sameTarget attributable target -> Some(target, Some credit)
         | _ -> ordinaryDecision route
 
-    let matchingCreditDecision target (credits: Map<string, CapacityToken<'target>>) route =
+    let matchingCreditDecision target (credits: Map<string, CapacityCredit<'target>>) route =
         match Map.tryFind (normalizeProvider target) credits with
         | None -> ordinaryDecision route
         | Some credit when credits.Count = 1 -> Some(target, Some credit)
@@ -290,7 +290,7 @@ type BorrowingCapacity<'target>
     /// provider credits were hidden, the chosen target must still be reproducible
     /// with exactly its own provider token hidden; otherwise no single token can
     /// legally pay for that decision.
-    let routeDecision requester route : ('target * CapacityToken<'target> option) option =
+    let routeDecision requester route : ('target * CapacityCredit<'target> option) option =
         let borrowedView, credits = schedulingView requester
         let borrowed = route borrowedView
 
@@ -308,52 +308,52 @@ type BorrowingCapacity<'target>
         let tokenId = ledger.Acquire target
 
         let token =
-            { Token = tokenId
+            { Credit = tokenId
               OwnerKey = key
               OwnerSessionId = sessionId
               Provider = normalizeProvider target
               OwnerTarget = target
-              State = CapacityTokenState.Idle }
+              State = CapacityCreditState.Idle }
 
         tokens.[tokenId] <- token
         ownedTokenByExecution.[key] <- tokenId
         token
 
-    let moveOwnedToken oldKey newKey target (token: CapacityToken<'target>) =
+    let moveOwnedToken oldKey newKey target (token: CapacityCredit<'target>) =
         ownedTokenByExecution.Remove oldKey |> ignore
         token.OwnerKey <- newKey
         token.OwnerTarget <- target
-        ownedTokenByExecution.[newKey] <- token.Token
+        ownedTokenByExecution.[newKey] <- token.Credit
 
         match token.State with
-        | CapacityTokenState.Idle -> ledger.Retarget(token.Token, target)
-        | CapacityTokenState.InFlight _
-        | CapacityTokenState.Retiring _ -> ()
+        | CapacityCreditState.Idle -> ledger.Retarget(token.Credit, target)
+        | CapacityCreditState.InFlight _
+        | CapacityCreditState.Retiring _ -> ()
 
-    let finishStep (token: CapacityToken<'target>) =
+    let finishStep (token: CapacityCredit<'target>) =
         match token.State with
-        | CapacityTokenState.Idle -> ()
-        | CapacityTokenState.InFlight _ ->
-            token.State <- CapacityTokenState.Idle
-            ledger.Retarget(token.Token, token.OwnerTarget)
-        | CapacityTokenState.Retiring _ -> releaseToken token
+        | CapacityCreditState.Idle -> ()
+        | CapacityCreditState.InFlight _ ->
+            token.State <- CapacityCreditState.Idle
+            ledger.Retarget(token.Credit, token.OwnerTarget)
+        | CapacityCreditState.Retiring _ -> releaseToken token
 
     let reconcileFence sessionId physicalUserMessageId fence =
         tokens.Values
         |> Seq.tryFind (fun token ->
             match token.State with
-            | CapacityTokenState.InFlight step
-            | CapacityTokenState.Retiring step ->
+            | CapacityCreditState.InFlight step
+            | CapacityCreditState.Retiring step ->
                 step.SessionId = sessionId && step.PhysicalUserMessageId = physicalUserMessageId
-            | CapacityTokenState.Idle -> false)
+            | CapacityCreditState.Idle -> false)
         |> Option.iter (fun token ->
             match token.State with
-            | CapacityTokenState.InFlight step
-            | CapacityTokenState.Retiring step when not (Set.isEmpty (Set.difference fence step.Fence)) ->
+            | CapacityCreditState.InFlight step
+            | CapacityCreditState.Retiring step when not (Set.isEmpty (Set.difference fence step.Fence)) ->
                 finishStep token
             | _ -> ())
 
-    let rememberGrantedCredit (token: CapacityToken<'target>) (demand: CapacityStepDemand<'target>) =
+    let rememberGrantedCredit (token: CapacityCredit<'target>) (demand: CapacityStepDemand<'target>) =
         match creditDistance token.OwnerSessionId demand.SessionId with
         | Some distance ->
             rememberCreditSource
@@ -363,14 +363,14 @@ type BorrowingCapacity<'target>
                 distance
         | None -> invalidOp "execution-model-routing: granted capacity token is not a legal credit source"
 
-    let grant (token: CapacityToken<'target>) (demand: CapacityStepDemand<'target>) =
+    let grant (token: CapacityCredit<'target>) (demand: CapacityStepDemand<'target>) =
         match token.State with
-        | CapacityTokenState.Idle ->
-            ledger.Retarget(token.Token, demand.Target)
+        | CapacityCreditState.Idle ->
+            ledger.Retarget(token.Credit, demand.Target)
             rememberGrantedCredit token demand
 
             token.State <-
-                CapacityTokenState.InFlight
+                CapacityCreditState.InFlight
                     { SessionId = demand.SessionId
                       PhysicalUserMessageId = demand.PhysicalUserMessageId
                       Fence = demand.Fence }
@@ -387,12 +387,12 @@ type BorrowingCapacity<'target>
             waiters.Remove demand |> ignore
             AsyncSupport.trySetCanceled demand.Completion |> ignore)
 
-    let borrowPair (demand: CapacityStepDemand<'target>) (token: CapacityToken<'target>) =
+    let borrowPair (demand: CapacityStepDemand<'target>) (token: CapacityCredit<'target>) =
         let provider = normalizeProvider demand.Target
 
         match token.State, creditDistance token.OwnerSessionId demand.SessionId with
-        | CapacityTokenState.Idle, Some distance when token.Provider = provider ->
-            Some(distance, demand.Sequence, token.Token, demand, token)
+        | CapacityCreditState.Idle, Some distance when token.Provider = provider ->
+            Some(distance, demand.Sequence, token.Credit, demand, token)
         | _ -> None
 
     let idleBorrowPairs () =
@@ -428,7 +428,7 @@ type BorrowingCapacity<'target>
         if tryGrantBorrowed () || tryGrantOrdinary () then
             drain ()
 
-    let acquireForRoute sessionId physicalUserMessageId target (credit: CapacityToken<'target> option) =
+    let acquireForRoute sessionId physicalUserMessageId target (credit: CapacityCredit<'target> option) =
         match credit with
         | Some _ -> ()
         | None -> acquireOwnedToken sessionId physicalUserMessageId target |> ignore
@@ -438,7 +438,7 @@ type BorrowingCapacity<'target>
         | Some distance -> distance
         | None -> invalidOp failure
 
-    let recordRoutedCredit sessionId key (credit: CapacityToken<'target> option) =
+    let recordRoutedCredit sessionId key (credit: CapacityCredit<'target> option) =
         match credit with
         | Some token ->
             requiredCreditDistance
@@ -454,7 +454,7 @@ type BorrowingCapacity<'target>
         newKey
         newPhysicalUserMessageId
         target
-        (credit: CapacityToken<'target> option)
+        (credit: CapacityCredit<'target> option)
         =
         match oldKey, credit with
         | Some previousKey, Some token when token.OwnerKey = previousKey ->
@@ -469,12 +469,12 @@ type BorrowingCapacity<'target>
         recordRoutedCredit sessionId newKey credit
         target
 
-    let ensureReservationToken sessionId target (credit: CapacityToken<'target> option) =
+    let ensureReservationToken sessionId target (credit: CapacityCredit<'target> option) =
         match credit with
         | Some _ -> ()
         | None -> acquireOwnedToken sessionId None target |> ignore
 
-    let recordReservationCredit sessionId key (credit: CapacityToken<'target> option) =
+    let recordReservationCredit sessionId key (credit: CapacityCredit<'target> option) =
         match credit with
         | Some token ->
             requiredCreditDistance
@@ -672,12 +672,12 @@ type BorrowingCapacity<'target>
             tokens.Values
             |> Seq.tryFind (fun token ->
                 match token.State with
-                | CapacityTokenState.InFlight step
-                | CapacityTokenState.Retiring step ->
+                | CapacityCreditState.InFlight step
+                | CapacityCreditState.Retiring step ->
                     step.SessionId = sessionId
                     && step.PhysicalUserMessageId = physicalUserMessageId
                     && not (Set.contains providerRun step.Fence)
-                | CapacityTokenState.Idle -> false)
+                | CapacityCreditState.Idle -> false)
             |> Option.iter finishStep
 
             drain ())
@@ -687,10 +687,10 @@ type BorrowingCapacity<'target>
             tokens.Values
             |> Seq.tryFind (fun token ->
                 match token.State with
-                | CapacityTokenState.InFlight step
-                | CapacityTokenState.Retiring step ->
+                | CapacityCreditState.InFlight step
+                | CapacityCreditState.Retiring step ->
                     step.SessionId = sessionId && step.PhysicalUserMessageId = physicalUserMessageId
-                | CapacityTokenState.Idle -> false)
+                | CapacityCreditState.Idle -> false)
             |> Option.iter finishStep
 
             drain ())

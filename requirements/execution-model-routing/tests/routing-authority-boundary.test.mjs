@@ -21,12 +21,12 @@ test('WHAT[EMR-010] EMR_010_borrowing_complexity_is_owned_only_by_the_capacity_d
   assert.match(capacity, /type CapacityLedger<'target>/)
   assert.match(capacity, /type BorrowingCapacity<'target>/)
   assert.match(capacity, /ancestorDistance/)
-  assert.match(capacity, /CapacityTokenState/)
+  assert.match(capacity, /CapacityCreditState/)
   assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
-  assert.doesNotMatch(routing, /let ancestorDistance|type private CapacityTokenState|type private CapacityStepDemand/)
+  assert.doesNotMatch(routing, /let ancestorDistance|type private CapacityCreditState|type private CapacityStepDemand/)
 
   for (const main of [sessions, binding, transform, host]) {
-    assert.doesNotMatch(main, /ancestorDistance|CapacityTokenState|CapacityStepDemand|ownedTokenByExecution/)
+    assert.doesNotMatch(main, /ancestorDistance|CapacityCreditState|CapacityStepDemand|ownedTokenByExecution/)
   }
   assert.doesNotMatch(scheduler, /borrow|recall|lineage|parentSession|childSession/i)
 })

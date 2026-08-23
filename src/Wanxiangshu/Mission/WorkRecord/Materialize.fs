@@ -212,6 +212,23 @@ module LifecycleWorkRecordProjection =
             part.Cursor.Sequence >= range.StartInclusive.Sequence
             && part.Cursor.Sequence < range.EndExclusive.Sequence)
 
+    let private boundedWorkRange
+        (providerRun: ProviderRunIdentity option)
+        (range: MagicTodoLwr.BoundedRange)
+        (xTrace: XTraceProjectionState)
+        =
+        match providerRun with
+        | None -> range
+        | Some _ ->
+            let workStart =
+                partsWithinRange range xTrace
+                |> List.tryFind (fun part -> part.Role = "assistant")
+                |> Option.map (fun part -> part.Cursor)
+                |> Option.defaultValue range.EndExclusive
+
+            { range with
+                StartInclusive = workStart }
+
     let private terminalForBoundedRange
         (providerRun: ProviderRunIdentity option)
         (range: MagicTodoLwr.BoundedRange)
@@ -373,24 +390,26 @@ module LifecycleWorkRecordProjection =
         task {
             let xTrace = session.XTrace |> Option.defaultValue XTraceProjection.empty
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+            let workRange = boundedWorkRange terminalProviderRun range xTrace
 
-            // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this invocation.
+            // COMPANION-015 ④/⑩: Chronicle = Y frames overlapping this work range.
             let! frames =
                 BlogProjection.frames blog
-                |> framesOverlappingRange range
+                |> framesOverlappingRange workRange
                 |> resolveFrames durable
 
-            // Recent-work TRACE sliced to the invocation's range so prior
-            // invocations never appear.
+            // Recent-work TRACE sliced to the receiver-visible work range so
+            // the caller's own charge and prior invocations never appear.
             let! resolvedTrace = resolveTrace durable xTrace
 
             let boundedTrace =
-                XTrace.sliceBetween range.StartInclusive range.EndExclusive resolvedTrace
+                XTrace.sliceBetween workRange.StartInclusive workRange.EndExclusive resolvedTrace
 
             let! trace =
                 match terminalForBoundedRange terminalProviderRun range xTrace with
                 | None -> Task.FromResult boundedTrace
-                | Some terminal -> appendTerminalFallback durable (partsWithinRange range xTrace) boundedTrace terminal
+                | Some terminal ->
+                    appendTerminalFallback durable (partsWithinRange workRange xTrace) boundedTrace terminal
 
             match xTrace.Opening with
             | None -> return None
@@ -400,7 +419,7 @@ module LifecycleWorkRecordProjection =
 
                 // Gap start inside the bounded window: max(coverage, range start),
                 // so an older coverage never pulls a prior invocation into view.
-                let coverageClamped = clampCoverageToRange coverage range
+                let coverageClamped = clampCoverageToRange coverage workRange
 
                 return
                     Some(
@@ -409,7 +428,7 @@ module LifecycleWorkRecordProjection =
                             frames
                             trace
                             coverageClamped
-                            range.StartInclusive
+                            workRange.StartInclusive
                             (* includeOpening = *) false
                     )
         }

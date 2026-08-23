@@ -1,18 +1,10 @@
 {
-  "total": 124,
+  "total": 123,
   "provenKeep": 0,
   "cutoverMove": [
     {
       "file": "src/Wanxiangshu/AssemblyInfo.fs",
       "currOwner": "distribution",
-      "ns": "Wanxiangshu",
-      "reason": "no_what_coverage",
-      "topWhatId": "NONE",
-      "openCount": 0
-    },
-    {
-      "file": "src/Wanxiangshu/FableBarrier.fs",
-      "currOwner": "host-boundary",
       "ns": "Wanxiangshu",
       "reason": "no_what_coverage",
       "topWhatId": "NONE",

@@ -916,10 +916,6 @@
       "owner": "causal-wait"
     },
     {
-      "path": "src/Wanxiangshu/FableBarrier.fs",
-      "owner": "host-boundary"
-    },
-    {
       "path": "src/Wanxiangshu/Foundation/AsyncSupport.fs",
       "owner": "intra-participant-parallelism"
     },

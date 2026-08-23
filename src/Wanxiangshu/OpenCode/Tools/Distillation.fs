@@ -416,6 +416,10 @@ module Distillation =
                         (Map [ "error", ex.Message; "raw_tail", rawTailText chunks ])
         }
 
+    let private cancelOwnedAgentOnce (runtime: IDistillationRuntime) (cancelledIds: HashSet<string>) (agentId: string) =
+        if cancelledIds.Add agentId then
+            runtime.CancelAgent agentId
+
     /// Maps bounded spool chunks concurrently (results sorted by chunk index),
     /// then reduces online. Map/reduce failures yield partial account plus the
     /// last 200KB raw tail instead of dropping ProcessResult.
@@ -424,10 +428,12 @@ module Distillation =
         task {
             // DSL-MUTABLE: cancellation — forked agent id list for cancel cleanup
             let forkedIds = ResizeArray<string>()
+            // DSL-MUTABLE: cancellation — physical cancel is at-most-once per owned child
+            let cancelledIds = HashSet<string>()
 
             let cancelOwned () =
                 for id in forkedIds do
-                    runtime.CancelAgent id
+                    cancelOwnedAgentOnce runtime cancelledIds id
 
             // DSL-MUTABLE: algorithm-scratch — spool chunk accumulator
             let chunks = ResizeArray<int * byte[]>()

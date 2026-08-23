@@ -25,9 +25,7 @@
 
 # Local delivery verification logs (not product)
 /.delivery-logs/
-/.fable-daemon/
-/.fable-ack
-src/Wanxiangshu/FableBarrier.fs
+/.fable-build/
 
 # Logs
 *.log

@@ -9,14 +9,19 @@ open Wanxiangshu.Foundation.Identity
 [<RequireQualifiedAccess>]
 module EventMergeSurface =
 
+    [<Emit("typeof($0)==='string'")>]
+    let private isString (value: obj) : bool = jsNative
+
     let private str (value: obj) : string =
         if isNull value then "" else string value
 
-    let private payloadJson (value: obj) : string =
-        match value with
-        | null -> "null"
-        | :? string as text -> text
-        | _ -> JS.JSON.stringify value
+    let private parsePayload (value: obj) : JsonValue =
+        if isNull value then
+            unbox<JsonValue> null
+        elif isString value then
+            unbox<JsonValue> (JS.JSON.parse (unbox<string> value))
+        else
+            unbox<JsonValue> value
 
     let private ids (value: obj) : EventId list =
         if isNull value then
@@ -35,23 +40,17 @@ module EventMergeSurface =
           StreamId = EventStreamId.create (str (value?stream))
           EventType = str (value?``type``)
           Parents = ids (value?parents)
-          Payload = unbox<JsonValue> (JS.JSON.parse (payloadJson (value?payload)))
+          Payload = parsePayload (value?payload)
           PayloadRefs = refs (value?payloadRefs) }
         |> EventEnvelope.normalize
 
     let private eventToJs (event: EventEnvelope) : obj =
-        let payload =
-            CanonicalEventCodec.encode event
-            |> (fun text -> text.TrimEnd('\n'))
-            |> JS.JSON.parse
-            |> fun eventObject -> eventObject?payload
-
         box
             {| id = EventId.value event.EventId
                stream = EventStreamId.value event.StreamId
                ``type`` = event.EventType
                parents = event.Parents |> List.map EventId.value |> List.toArray
-               payload = payload
+               payload = event.Payload
                payloadRefs = event.PayloadRefs |> List.map PayloadRef.value |> List.toArray |}
 
     let private invalidToJs (error: StorageInvalid) : obj =

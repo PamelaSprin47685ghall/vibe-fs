@@ -51,3 +51,4 @@ Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求 
 
 ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 请求发出前，`experimental.chat.messages.transform` 负责获取对应 provider 的 capacity token。
 子 session 可借用祖先在等待时的闲置 token；token 仅在 provider-step 边界转移，祖先召回时需等待子 step 结束。Blogger 伴侣执行使用与 Main 同源的平行 companion credit 借用机制。
+Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实 `InFlight` step 来绕过该边界。

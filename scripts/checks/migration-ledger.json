@@ -1395,7 +1395,6 @@
     ],
     "CoverageG": [
       "src/Wanxiangshu/AssemblyInfo.fs",
-      "src/Wanxiangshu/FableBarrier.fs",
       "src/Wanxiangshu/Foundation/AsyncSupport.fs",
       "src/Wanxiangshu/Foundation/FatalProcess.fs",
       "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",

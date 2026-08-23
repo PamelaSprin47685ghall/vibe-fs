@@ -77,6 +77,15 @@ module EventKWayMerge =
         | Continue
         | Finished of Result<EventEnvelope list, StorageInvalid>
 
+    type private HeapSinkAction =
+        | Sunk of nextParent: int
+        | Settled
+
+    type private MergeStepAction =
+        | Advanced
+        | MergeFailed of StorageInvalid
+        | MergeCompleted of EventEnvelope list
+
     let private currentHead (writers: WriterStream array) (cursors: Cursor array) index =
         let writer = writers.[index]
         let cursor = cursors.[index]
@@ -86,26 +95,27 @@ module EventKWayMerge =
         else
             None
 
+    let private collectStreamPendingIds (pending: HashSet<string>) (writer: WriterStream) (cursor: Cursor) =
+        for offset = cursor.Offset to writer.Events.Length - 1 do
+            pending.Add(eventKey writer.Events.[offset].EventId) |> ignore
+
     let private allPendingIds (writers: WriterStream array) (cursors: Cursor array) =
         let pending = HashSet<string>()
 
-        writers
-        |> Array.iteri (fun index writer ->
-            let writer = writers.[index]
-            let cursor = cursors.[index]
-
-            writer.Events
-            |> Array.skip cursor.Offset
-            |> Array.iter (fun envelope -> pending.Add(eventKey envelope.EventId) |> ignore))
+        for index = 0 to writers.Length - 1 do
+            collectStreamPendingIds pending writers.[index] cursors.[index]
 
         pending
+
+    let private addWriterKnownIds (known: HashSet<string>) (writer: WriterStream) =
+        for envelope in writer.Events do
+            known.Add(eventKey envelope.EventId) |> ignore
 
     let private allKnownIds (writers: WriterStream array) =
         let known = HashSet<string>()
 
-        writers
-        |> Array.collect _.Events
-        |> Array.iter (fun envelope -> known.Add(eventKey envelope.EventId) |> ignore)
+        for writer in writers do
+            addWriterKnownIds known writer
 
         known
 
@@ -154,18 +164,23 @@ module EventKWayMerge =
         heap.[left] <- heap.[right]
         heap.[right] <- value
 
+    let private bubbleParent (heap: ResizeArray<ReadyCursor>) child =
+        let parent = (child - 1) / 2
+        let shouldSwap = child > 0 && compareReadyCursor heap.[child] heap.[parent] < 0
+
+        if shouldSwap then
+            swapHeap heap child parent
+            Some parent
+        else
+            None
+
     let private heapPush (heap: ResizeArray<ReadyCursor>) readyCursor =
         heap.Add readyCursor
 
-        let parentOf child =
-            if child > 0 then Some((child - 1) / 2) else None
-
         let rec bubble child =
-            match parentOf child with
-            | Some parent when compareReadyCursor heap.[child] heap.[parent] < 0 ->
-                swapHeap heap child parent
-                bubble parent
-            | _ -> ()
+            match bubbleParent heap child with
+            | Some nextChild -> bubble nextChild
+            | None -> ()
 
         bubble (heap.Count - 1)
 
@@ -178,12 +193,17 @@ module EventKWayMerge =
         | true, true when compareReadyCursor heap.[right] heap.[left] < 0 -> Some right
         | true, _ -> Some left
 
-    let rec private sinkHeapRoot (heap: ResizeArray<ReadyCursor>) parent =
+    let private nextSinkAction (heap: ResizeArray<ReadyCursor>) parent =
         match smallerChild heap parent with
         | Some child when compareReadyCursor heap.[child] heap.[parent] < 0 ->
             swapHeap heap child parent
-            sinkHeapRoot heap child
-        | _ -> ()
+            Sunk child
+        | _ -> Settled
+
+    let rec private sinkHeapRoot (heap: ResizeArray<ReadyCursor>) (parent: int) =
+        match nextSinkAction heap parent with
+        | Sunk nextParent -> sinkHeapRoot heap nextParent
+        | Settled -> ()
 
     let private restoreHeapRoot (heap: ResizeArray<ReadyCursor>) last =
         if heap.Count > 0 then
@@ -231,6 +251,28 @@ module EventKWayMerge =
                   EventKey = eventKey head.EventId
                   WriterId = writers.[index].WriterId }
 
+    let private isMissingParent
+        allowExternalParents
+        (knownIds: HashSet<string>)
+        (seen: Dictionary<string, EventEnvelope>)
+        parentKey
+        =
+        not (seen.ContainsKey parentKey)
+        && (not allowExternalParents || knownIds.Contains parentKey)
+
+    let private tryMissingParentKey
+        allowExternalParents
+        (knownIds: HashSet<string>)
+        (seen: Dictionary<string, EventEnvelope>)
+        parent
+        =
+        let parentKey = eventKey parent
+
+        if isMissingParent allowExternalParents knownIds seen parentKey then
+            Some parentKey
+        else
+            None
+
     let private missingParentKeys
         allowExternalParents
         (knownIds: HashSet<string>)
@@ -238,12 +280,7 @@ module EventKWayMerge =
         (head: EventEnvelope)
         =
         head.Parents
-        |> List.map eventKey
-        |> List.filter (fun parentKey ->
-            not (seen.ContainsKey parentKey)
-            && (not allowExternalParents || knownIds.Contains parentKey))
-        |> Set.ofList
-        |> Set.toList
+        |> List.choose (tryMissingParentKey allowExternalParents knownIds seen)
 
     let private classifyUnseenHead
         allowExternalParents
@@ -472,6 +509,65 @@ module EventKWayMerge =
                 index
                 head)
 
+    let private popAndAdvance
+        allowExternalParents
+        (knownIds: HashSet<string>)
+        (seen: Dictionary<string, EventEnvelope>)
+        (parentWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
+        (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
+        (writers: WriterStream array)
+        (cursors: Cursor array)
+        (ready: ResizeArray<ReadyCursor>)
+        (ordered: ResizeArray<EventEnvelope>)
+        =
+        let readyCursor = heapPop ready
+
+        match
+            advanceCursor
+                allowExternalParents
+                knownIds
+                seen
+                parentWaiters
+                duplicateWaiters
+                writers
+                cursors
+                ready
+                ordered
+                readyCursor
+        with
+        | Ok() -> Advanced
+        | Error invalid -> MergeFailed invalid
+
+    let private nextMergeAction
+        allowExternalParents
+        (knownIds: HashSet<string>)
+        (seen: Dictionary<string, EventEnvelope>)
+        (parentWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
+        (duplicateWaiters: Dictionary<string, ResizeArray<WaiterToken>>)
+        (writers: WriterStream array)
+        (cursors: Cursor array)
+        (ready: ResizeArray<ReadyCursor>)
+        (ordered: ResizeArray<EventEnvelope>)
+        =
+        if ready.Count > 0 then
+            popAndAdvance
+                allowExternalParents
+                knownIds
+                seen
+                parentWaiters
+                duplicateWaiters
+                writers
+                cursors
+                ready
+                ordered
+        elif
+            [ 0 .. writers.Length - 1 ]
+            |> List.exists (fun index -> currentHead writers cursors index |> Option.isSome)
+        then
+            MergeFailed(frontierError allowExternalParents seen writers cursors)
+        else
+            MergeCompleted(ordered |> Seq.toList)
+
     /// Preserve each writer's append order. Among currently causally-ready heads,
     /// EventId text is the deterministic tie-break; writer name only breaks an
     /// impossible same-id/same-bytes duplicate tie.
@@ -511,31 +607,21 @@ module EventKWayMerge =
             scheduleCursor allowExternalParents knownIds seen parentWaiters duplicateWaiters writers cursors ready index
 
         let advance () =
-            if ready.Count > 0 then
-                let readyCursor = heapPop ready
-
-                match
-                    advanceCursor
-                        allowExternalParents
-                        knownIds
-                        seen
-                        parentWaiters
-                        duplicateWaiters
-                        writers
-                        cursors
-                        ready
-                        ordered
-                        readyCursor
-                with
-                | Ok() -> ()
-                | Error invalid -> progress <- MergeProgress.Finished(Error invalid)
-            elif
-                [ 0 .. writers.Length - 1 ]
-                |> List.exists (fun index -> currentHead writers cursors index |> Option.isSome)
-            then
-                progress <- MergeProgress.Finished(Error(frontierError allowExternalParents seen writers cursors))
-            else
-                progress <- MergeProgress.Finished(Ok(ordered |> Seq.toList))
+            match
+                nextMergeAction
+                    allowExternalParents
+                    knownIds
+                    seen
+                    parentWaiters
+                    duplicateWaiters
+                    writers
+                    cursors
+                    ready
+                    ordered
+            with
+            | Advanced -> ()
+            | MergeFailed invalid -> progress <- MergeProgress.Finished(Error invalid)
+            | MergeCompleted result -> progress <- MergeProgress.Finished(Ok result)
 
         let isContinuing () =
             match progress with

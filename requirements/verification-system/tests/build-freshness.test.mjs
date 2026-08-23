@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -54,4 +54,21 @@ test('WHAT[VERIFICATION-SYSTEM-008] local repository export shards are excluded 
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
+})
+
+test('WHAT[VERIFICATION-SYSTEM-008] Fable build compiles once and never accepts watch-daemon freshness guesses', () => {
+  const build = readFileSync(new URL('../../../scripts/build.mjs', import.meta.url), 'utf8')
+
+  assert.match(
+    build,
+    /'tool',[\s\S]*'run',[\s\S]*'fable',[\s\S]*'src\/Wanxiangshu\/Wanxiangshu\.fsproj'/,
+    'build must invoke the real Fable compiler for the current source tree',
+  )
+  assert.match(
+    build,
+    /['"]-c['"],[\s\S]*['"]Debug['"]/,
+    'one-shot compile must preserve the established watch-build Debug configuration',
+  )
+  assert.match(build, /child\.once\('exit',[\s\S]*result\.code !== 0/)
+  assert.doesNotMatch(build, /FableBarrier|fable-daemon|fable-cycle-ack|['"]watch['"]/)
 })
