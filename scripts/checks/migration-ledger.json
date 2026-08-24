@@ -1032,6 +1032,153 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "office-capability-keep",
+      "primary_owner": "office-capability",
+      "intent": "Office Capability Surface: consequence-model to JS-native label projection; single owner office-capability, five-way orthogonal offices, no capability persisted as durable fact; foreign consumers see only string array outcomes.",
+      "files": [
+        "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
+        "src/Wanxiangshu/Foundation/RolesSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "OfficeCapabilitySurface.Contract",
+        "RolesSurface.Contract"
+      ],
+      "consumes": [
+        "ParticipantIdentity.RoleVocabulary"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/office-capability/tests/office-capability-integrity.test.mjs",
+        "requirements/office-capability/tests/office-capability-gate.test.mjs",
+        "requirements/office-capability/tests/office-capability-role-law-contract.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs",
+        "js-surface-gate.mjs"
+      ],
+      "evidence": "semantic-owners / js-surface-gate / architecture all GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "verification-system-keep",
+      "primary_owner": "verification-system",
+      "intent": "Verification System Surfaces: proof-ladder temporal harness and EventStore writer scenarios; single owner verification-system, pure JS-native projection, no durable fact ownership.",
+      "files": [
+        "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs",
+        "src/Wanxiangshu/Verification/TemporalSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "VerificationSystem.TemporalSurface",
+        "VerificationSystem.EventStoreWriterSurface"
+      ],
+      "consumes": [
+        "DurableEvents.EventStore",
+        "TimeCapability.Ports"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/verification-system/tests/proof-ladder.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs",
+        "js-surface-gate.mjs",
+        "unified-store-gate.mjs"
+      ],
+      "evidence": "semantic-owners / architecture / js-surface-gate all GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "external-investigation-keep",
+      "primary_owner": "external-investigation",
+      "intent": "External Investigation Stealth Browser MCP: far-shore provenance contract with provenance; single owner external-investigation, pure command/config/surface, no durable fact ownership, no cross-owner private import.",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs",
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs",
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ExternalInvestigation.McpConfig",
+        "ExternalInvestigation.McpConfigSurface"
+      ],
+      "consumes": [
+        "Foundation.McpLaunch"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/external-investigation/tests/browser-provenance-canary.test.mjs",
+        "requirements/external-investigation/tests/stealth-browser-role-lock.test.mjs",
+        "requirements/external-investigation/tests/facts-not-obligations.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs",
+        "js-surface-gate.mjs"
+      ],
+      "evidence": "semantic-owners / architecture / js-surface-gate all GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "finality-review-cohort-keep",
+      "primary_owner": "finality",
+      "intent": "Finality Review Cohort: pure roster algebra for FinalityRequest; single owner finality, no second runtime, no durable fact ownership, pure cohort derivation from durable projections.",
+      "files": [
+        "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "FinalityReviewCohort.rosterOf",
+        "FinalityReviewCohort.graduatedReviewer",
+        "FinalityReviewCohort.CohortSlot",
+        "FinalityReviewCohort.ReviewerOutcome"
+      ],
+      "consumes": [
+        "Finality.LifeProjection",
+        "Finality.FinalityRequestProjection",
+        "Review.ReviewWitness",
+        "Review.ReviewerStanding"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/finality/tests/finality-cohort-law.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "evidence": "semantic-owners / architecture all GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
     }
   ],
   "debt_face": {
@@ -1117,9 +1264,6 @@
       "src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs",
       "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs",
       "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs",
-      "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs",
-      "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfigSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs",
       "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
       "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
@@ -1183,7 +1327,6 @@
       "src/Wanxiangshu/Interaction/Repair/Port.fs"
     ],
     "CoverageD": [
-      "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
       "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
       "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
       "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
@@ -1347,7 +1490,6 @@
       "src/Wanxiangshu/Enforcer/Surface.fs",
       "src/Wanxiangshu/Participant/Persona/Catalog.fs",
       "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
-      "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
       "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
       "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
       "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
@@ -1406,7 +1548,6 @@
       "src/Wanxiangshu/Foundation/Parallel.fs",
       "src/Wanxiangshu/Foundation/ParallelSurface.fs",
       "src/Wanxiangshu/Foundation/Roles.fs",
-      "src/Wanxiangshu/Foundation/RolesSurface.fs",
       "src/Wanxiangshu/Foundation/SyntheticToml.fs",
       "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
       "src/Wanxiangshu/Foundation/TaskResult.fs",
@@ -1514,9 +1655,7 @@
       "src/Wanxiangshu/Sphinx/Surface.fs",
       "src/Wanxiangshu/Sphinx/Types.fs",
       "src/Wanxiangshu/Sphinx/Value.fs",
-      "src/Wanxiangshu/Sphinx/WireEncode.fs",
-      "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs",
-      "src/Wanxiangshu/Verification/TemporalSurface.fs"
+      "src/Wanxiangshu/Sphinx/WireEncode.fs"
     ]
   }
 }

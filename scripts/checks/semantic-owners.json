@@ -1,12 +1,14 @@
 {
-  "total": 678,
+  "total": 668,
   "owners": [
     "action-affordance",
+    "attention-regulation",
     "behavior-diagnosis",
     "capability-enforcement",
     "causal-wait",
     "change-integration",
     "cognitive-environment",
+    "concern-routing",
     "context-compression",
     "degeneration-guard",
     "delegation",
@@ -20,6 +22,7 @@
     "finality",
     "guidance-delivery",
     "host-boundary",
+    "institutional-learning",
     "interaction-authority",
     "intra-participant-parallelism",
     "knowledge-reuse",
