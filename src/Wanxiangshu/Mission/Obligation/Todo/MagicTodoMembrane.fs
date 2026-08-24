@@ -764,27 +764,24 @@ module MagicTodoHostHooks =
             let sessionId = SessionId.create sessionText
             let callId = ToolCallId.create callText
             let args: obj = output?args
+            let submittedInput = MagicTodoHostCodec.decodeInputOrReject args
+            let obligations = submittedInput.Obligations
+            let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
 
-            match MagicTodoHostCodec.tryDecodeInput args with
-            | Error reason -> invalidOp reason
-            | Ok submittedInput ->
-                let obligations = submittedInput.Obligations
-                let providerInputCanonical = MagicTodoHostCodec.canonicalInput args
+            MagicTodoHostCodec.replaceCompatibilityArgs
+                output
+                (obligationsToCompatibilityRows submittedInput.WorkingOn obligations)
 
-                MagicTodoHostCodec.replaceCompatibilityArgs
-                    output
-                    (obligationsToCompatibilityRows submittedInput.WorkingOn obligations)
-
-                bridges[bridgeKey sessionText callText] <-
-                    prepareDeferredBridge
-                        durable
-                        snapshots
-                        sessionId
-                        sessionText
-                        callId
-                        providerInputCanonical
-                        submittedInput.PlanComplete
-                        obligations
+            bridges[bridgeKey sessionText callText] <-
+                prepareDeferredBridge
+                    durable
+                    snapshots
+                    sessionId
+                    sessionText
+                    callId
+                    providerInputCanonical
+                    submittedInput.PlanComplete
+                    obligations
         }
 
     let create (journal: AgentJournal option) (snapshot: ISessionSnapshotPort option) : HookSet =

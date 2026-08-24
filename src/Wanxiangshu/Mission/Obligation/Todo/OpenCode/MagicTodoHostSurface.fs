@@ -36,6 +36,12 @@ module MagicTodoHostSurface =
                    value = decodedInput input |}
         | Error error -> box {| ok = false; error = error |}
 
+    let decodeInputOrReject (args: obj) : obj =
+        MagicTodoHostCodec.decodeInputOrReject args |> decodedInput
+
+    let isProviderInputRejection (error: obj) =
+        MagicTodoHostCodec.isProviderInputRejection error
+
     let projectCompatibilityRows (workingOn: string) (obligations: obj array) : obj array =
         obligations
         |> Array.toList

@@ -72,6 +72,11 @@ open Wanxiangshu.Resources
 /// sink shape. New provider semantics never round-trip through that sink.
 module MagicTodoHostCodec =
 
+    type ProviderInputRejection(message: string) =
+        inherit Exception(message)
+
+    let isProviderInputRejection (error: obj) = error :? ProviderInputRejection
+
     [<Emit("Array.isArray($0)")>]
     let private isArray (value: obj) : bool = jsNative
 
@@ -190,6 +195,11 @@ module MagicTodoHostCodec =
             let rows = unbox<obj array> args?obligations
 
             decodeRows args workingOn (Array.toList rows) [] Set.empty
+
+    let decodeInputOrReject (args: obj) : MagicTodo.TodoWriteInput =
+        match tryDecodeInput args with
+        | Ok input -> input
+        | Error reason -> raise (ProviderInputRejection reason)
 
     let canonicalInput (args: obj) : string = CanonicalJson.canonicalJson args
 

@@ -127,6 +127,19 @@ test('WHAT[OBLIGATION-LEDGER-002] decodes required planComplete, workingOn, and 
   assert.equal(misspelledFarFocus.value.workingOn, 'ship')
 })
 
+test('WHAT[OBLIGATION-LEDGER-002] malformed provider wire is a typed provider rejection', () => {
+  let caught = null
+  try {
+    host.decodeInputOrReject({ workingOn: '', obligations: [] })
+  } catch (error) {
+    caught = error
+  }
+
+  assert.equal(caught?.message, 'todowrite.planComplete is required')
+  assert.equal(host.isProviderInputRejection(caught), true)
+  assert.equal(host.isProviderInputRejection(new Error('todowrite.planComplete is required')), false)
+})
+
 test('WHAT[OBLIGATION-LEDGER-015] workingOn projects to in_progress and every other obligation to pending', () => {
   assert.deepEqual(
     host.projectCompatibilityRows('proof', [

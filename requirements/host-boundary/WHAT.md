@@ -54,7 +54,7 @@
 
 ## HOST-BOUNDARY-014: 零 Host 源码修改与 Hook Fatal Membrane
 
-系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载的 Hook 函数必须包裹致命保护膜（fatal membrane），在捕获到不变量异常时立即安全熔断。
+系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载的 Hook 函数必须包裹致命保护膜（fatal membrane），在捕获到不变量异常时立即安全熔断。Provider/LLM 提交的工具参数未通过已声明 wire/schema 校验属于预期协议拒绝：必须把原拒绝原样返回 Host 以便 provider 修正，禁止因此触发 `Diagnostic.fatal`；只有未被 owner 明确分类为协议拒绝的 hook 异常才能进入 fatal membrane。
 
 ## HOST-BOUNDARY-015: Tool 文本返回结果有界截断
 

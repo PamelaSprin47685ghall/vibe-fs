@@ -7,5 +7,5 @@ module PluginHooksSurface =
     let fatalHook operation (adaptedHook: obj) : obj =
         PluginHostInterop.fatalHook operation adaptedHook
 
-    let expectedRejectionHook operation expected (adaptedHook: obj) : obj =
-        PluginHostInterop.expectedRejectionHook operation expected adaptedHook
+    let classifiedRejectionHook operation isExpected (adaptedHook: obj) : obj =
+        PluginHostInterop.classifiedRejectionHook operation isExpected adaptedHook

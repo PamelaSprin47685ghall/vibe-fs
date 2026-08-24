@@ -86,6 +86,42 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_fatal_membrane_calls_diagnostic_fatal_bef
   }
 })
 
+test('WHAT[HOST-BOUNDARY-014] provider input rejection rethrows without Diagnostic.fatal', async () => {
+  const originalWrite = process.stderr.write.bind(process.stderr)
+  const captured = []
+  process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
+  try {
+    const wrapped = PluginHooksSurface.classifiedRejectionHook(
+      'tool-before-test',
+      (error) => error?.message === 'provider-input-invalid',
+      () => Promise.reject(new Error('provider-input-invalid')),
+    )
+
+    await assert.rejects(() => wrapped('args', 'ctx'), /provider-input-invalid/)
+    assert.equal(captured.some((line) => line.includes('"operation":"tool-before-test"')), false)
+  } finally {
+    process.stderr.write = originalWrite
+  }
+})
+
+test('WHAT[HOST-BOUNDARY-014] unclassified hook rejection still enters Diagnostic.fatal', async () => {
+  const originalWrite = process.stderr.write.bind(process.stderr)
+  const captured = []
+  process.stderr.write = (chunk) => { captured.push(String(chunk)); return true }
+  try {
+    const wrapped = PluginHooksSurface.classifiedRejectionHook(
+      'tool-before-invariant-test',
+      () => false,
+      () => Promise.reject(new Error('invariant-broken')),
+    )
+
+    await assert.rejects(() => wrapped('args', 'ctx'), /invariant-broken/)
+    assert.equal(captured.some((line) => line.includes('"operation":"tool-before-invariant-test"')), true)
+  } finally {
+    process.stderr.write = originalWrite
+  }
+})
+
 test('WHAT[HOST-BOUNDARY-014] HOST_009_inherited_NODE_TEST_CONTEXT_never_disables_production_fatal', () => {
   // The FatalProcess.kill Emit in src has exactly one gate: WANXIANGSHU_NO_FATAL_EXIT.
   // There is no NODE_TEST_CONTEXT gate. Production fatal fires regardless of test context.
@@ -138,6 +174,13 @@ test('WHAT[HOST-BOUNDARY-014] HOST_009_every_hook_accepts_its_arguments_position
   const result = await wrapped('arg-val', 'ctx-val')
   assert.equal(result.args, 'arg-val')
   assert.equal(result.context, 'ctx-val')
+})
+
+test('WHAT[HOST-BOUNDARY-014] tool.execute.before classifies provider input rejection before fatal handling', () => {
+  assert.match(
+    pluginHooksSource,
+    /classifiedRejectionHook\s+"plugin-hook-tool-before-failed"\s+MagicTodoHostCodec\.isProviderInputRejection/,
+  )
 })
 
 test('WHAT[HOST-BOUNDARY-014] HOST_009_the_tool_registry_is_a_registry_not_a_triggered_hook', () => {

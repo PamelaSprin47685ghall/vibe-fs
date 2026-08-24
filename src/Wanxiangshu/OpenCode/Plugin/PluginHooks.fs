@@ -281,7 +281,12 @@ module PluginHooks =
                       "tool.definition",
                       box (fatalHook "plugin-hook-tool-definition-failed" (pairedHook (box toolDefinition)))
                       "tool.execute.before",
-                      box (fatalHook "plugin-hook-tool-before-failed" (pairedHook (box toolBefore)))
+                      box (
+                          classifiedRejectionHook
+                              "plugin-hook-tool-before-failed"
+                              MagicTodoHostCodec.isProviderInputRejection
+                              (pairedHook (box toolBefore))
+                      )
                       // CASE-003 shares the single after hook key with Magic Todo.
                       // The checkpoint result is enriched first; observation then
                       // sees the exact provider-visible result bytes.
