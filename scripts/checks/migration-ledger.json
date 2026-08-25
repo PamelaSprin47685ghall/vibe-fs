@@ -2770,14 +2770,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Enforcer/RepairSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageB",
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.Surface sole contract verified via RepairSurface.fs, proof bounds 5/5 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "speculative-investigation-core",
@@ -3465,13 +3469,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs"
+      ],
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProviderAttemptRecovery.Surface sole contract verified via Ledger.fs, proof cursor 6/6 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "provider-projection-core",
@@ -3600,15 +3608,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Projection/Model.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProviderProjection.Surface sole contract verified via Model.fs, proof join-result-renderer 4/4 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "requirement-grounding-core",
@@ -3786,14 +3798,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Authority/Model.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageB"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: InteractionAuthority.Surface sole contract verified via Model.fs, proof chat-params-hook 4/4 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "repository-investigation-core",
@@ -3876,14 +3892,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RepositoryInvestigation.Surface sole contract verified via Stdio.fs, proof repository-warm-start 3/3 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "time-capability-core",
@@ -3966,15 +3986,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: TimeCapability.Surface sole contract verified via PairProgrammingCalibrationSurface.fs, proof clock-port-virtual 3/3 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "participant-identity-core",
@@ -4056,15 +4080,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ParticipantIdentity.Surface sole contract verified via RoleIdentity.fs, proof persona-binding 4/4 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "semantic-trace-core",
@@ -4144,13 +4172,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Trace/Projection.fs"
+      ],
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: SemanticTrace.Surface sole contract verified via Projection.fs, proof x-trace-capture-hardening 4/4 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "prefix-stability-core",
@@ -4229,13 +4261,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Prefix/Projection.fs"
+      ],
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: PrefixStability.Surface sole contract verified via Projection.fs, proof g2-inspector-prefix 5/5 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "provider-language-core",
@@ -4315,15 +4351,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProviderLanguage.Surface sole contract verified via SessionLanguage.fs, proof provider-language 5/5 green",
+      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "session-ontology-core",
