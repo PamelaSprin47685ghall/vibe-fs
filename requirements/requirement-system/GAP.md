@@ -2,4 +2,4 @@
 
 | GAP | 命题 | 缺口 | 状态 | 承载 | 计划 | Owner |
 |---|---|---|---|---|---|---|
-| GAP-REQ-019 | REQUIREMENT-SYSTEM-019 migration ledger 门禁 | 新增门禁需 11 类可红落点 | CLOSED | `requirements/migration-ledger/tests/gate-rejection.test.mjs` 11 变异 + `scripts/checks/migration-ledger.mjs --self-test` 15 fixture + `scripts/checks/migration-ledger.mjs` 实现 PENDING/READY/DONE/闭合/基线 11 检查 | 已落地，当前 117 节点全量（以 1 DONE/116 PENDING 审计为例）HEAD 祖先与基线冻结绿 | requirement-system |
+| GAP-REQ-020 | REQUIREMENT-SYSTEM-020 migration ledger 永久退役 | 退役后不得复活：路径、wiring、规范面引用与 019 编号复用均须机械红 | CLOSED | `scripts/checks/ledger-retirement-gate.mjs`（退役路径/入口 wiring/全仓引用/019 复现四查）+ `requirements/requirement-system/tests/ledger-retirement.test.mjs` 三断言 | 已落地，gate 与测试对真实树绿 | requirement-system |

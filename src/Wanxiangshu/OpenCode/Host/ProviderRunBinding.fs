@@ -10,26 +10,6 @@ module ProviderRunBinding =
         | AmbiguousRun of count: int
         | NotLatestRun
 
-    [<RequireQualifiedAccess>]
-    type Observation =
-        | Bound of SessionMessage
-        | ProjectionNotVisibleYet
-        /// A sealed assistant child of the same physical user message exists:
-        /// the replica run already reached a terminal (cancel/complete), so no
-        /// unsealed candidate can ever appear again. Carries the sealed message
-        /// as evidence.
-        | RunTerminal of SessionMessage
-        | Rejected of Rejection
-
-    /// Maximum public-snapshot reads used by the physical Host seam when the
-    /// only evidence missing is the not-yet-projected assistant message.
-    /// First read is immediate; later reads wait on the session's
-    /// `message.updated` signal with the budget below as deadline backstop.
-    /// Identity rejections are never retried.
-    let projectionCatchupMaxReads = 6
-
-    let projectionCatchupDelayMilliseconds = 10
-
     let private confirmLatestRun single latest =
         if latest.Id = single.Id then
             Ok single
@@ -56,33 +36,3 @@ module ProviderRunBinding =
         | [] -> Error Rejection.NoBindableRun
         | [ single ] -> decideSingleRun single messages
         | many -> Error(Rejection.AmbiguousRun(List.length many))
-
-    /// Split a physical snapshot visibility gap from a genuine identity
-    /// rejection without weakening `bindableRun` itself. The Host can publish
-    /// the assistant message before its public session projection is readable;
-    /// only the zero-candidate case is eligible for a bounded reread.
-    let observeBindableRun (physicalUserMessage: string) (messages: SessionMessage list) =
-        let matchingCompaction =
-            messages
-            |> List.exists (fun message ->
-                message.Role = "assistant"
-                && not message.Completed
-                && message.IsCompaction
-                && message.ParentId = Some physicalUserMessage)
-
-        let sealedAssistant =
-            messages
-            |> List.tryFind (fun message ->
-                message.Role = "assistant"
-                && message.Completed
-                && not message.IsCompaction
-                && message.ParentId = Some physicalUserMessage)
-
-        match matchingCompaction, bindableRun physicalUserMessage messages with
-        | true, _ -> Observation.Rejected Rejection.NoBindableRun
-        | false, Ok run -> Observation.Bound run
-        | false, Error Rejection.NoBindableRun ->
-            sealedAssistant
-            |> Option.map Observation.RunTerminal
-            |> Option.defaultValue Observation.ProjectionNotVisibleYet
-        | false, Error rejection -> Observation.Rejected rejection

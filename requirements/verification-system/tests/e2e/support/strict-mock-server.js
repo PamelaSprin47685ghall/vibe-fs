@@ -9,7 +9,17 @@ import { sendJSON } from './strict-mock-sse.js';
 
 export function startHttpServer(handler) {
   return new Promise((resolve, reject) => {
-    const server = http.createServer((req, res) => handler(req, res));
+    const server = http.createServer((req, res) => {
+      res.setHeader('Connection', 'close');
+      handler(req, res);
+    });
+    // VERIFICATION-SYSTEM-014: the mock boundary owns its connection
+    // lifecycle explicitly. A default 5s idle keep-alive lets the host reuse
+    // a socket the server is closing at the same instant — the Long Stroke
+    // `TypeError: fetch failed` race. Disable idle reuse so every provider
+    // request opens a fresh connection; correctness never depends on which
+    // side times out first.
+    server.keepAliveTimeout = 0;
     server.on('error', reject);
     server.listen(0, '127.0.0.1', () => {
       const addr = server.address();

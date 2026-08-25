@@ -1619,14 +1619,6 @@
       "owner": "capability-enforcement"
     },
     {
-      "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
-      "owner": "participant-horizon"
-    },
-    {
-      "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs",
-      "owner": "participant-horizon"
-    },
-    {
       "path": "src/Wanxiangshu/OpenCode/Host/ModelCapacity.fs",
       "owner": "host-boundary"
     },

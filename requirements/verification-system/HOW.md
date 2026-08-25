@@ -54,3 +54,4 @@
 | VERIFICATION-SYSTEM-011 | `requirements/verification-system/tests/coverage-gate.test.mjs` |
 | VERIFICATION-SYSTEM-012 | `requirements/verification-system/tests/no-line-count-check.test.mjs` |
 | VERIFICATION-SYSTEM-013 | `requirements/verification-system/tests/js-boundary-gate.test.mjs` |
+| VERIFICATION-SYSTEM-014 | `requirements/verification-system/tests/mock-connection-lifecycle.test.mjs` |

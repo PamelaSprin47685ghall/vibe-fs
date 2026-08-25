@@ -75,7 +75,6 @@ package 的语义身份由包名唯一确定。包的物理目录布局、文件
 ## REQUIREMENT-SYSTEM-018: 可执行证明双向可追溯
 
 `requirements/**/tests/**/*.test.mjs` 中的每个有效可执行测试用例（`test()` 或 `t.test()`），必须在其标题显式声明恰好一个当前合法的命题标签 `WHAT[<PACKAGE-NNN>]`。每个有效的 WHAT 命题必须至少被一个处于激活状态的非 skip、非 todo 测试用例所证明。测试与规范之间严禁存在悬空引用、多重 primary 归属或无标签的孤立测试。
+## REQUIREMENT-SYSTEM-020: migration ledger 永久退役
 
-## REQUIREMENT-SYSTEM-019: migration ledger 门禁与状态机完整性
-
-`scripts/checks/migration-ledger.json` 的 DAG 与节点状态机必须由 `scripts/checks/migration-ledger.mjs` 的机械门禁守护，禁止 11 类非法状态：PENDING 声明成功证据（evidence 含 verified/complete/GREEN 大小写不敏感）、READY 缺 owner 图（publishes/consumes/depends_on/production_callers 全空）、READY 缺证明门禁（proofs/architecture_gates 全空）、DONE 结果仍 PENDING、分类/结果不兼容（KEEP→PROVEN-KEEP、DELETE→DELETED、MOVE/SPLIT/ADAPTER→CUTOVER、COMPOSITION-ROOT→CUTOVER|PROVEN-KEEP）、DONE 缺实现提交或提交非 HEAD 祖先（40 位哈希且 git merge-base --is-ancestor HEAD）、DONE 缺生产/测试变更（touched_paths 非空且含 src/或*.fs）、DONE 缺 proofs、DONE 缺 architecture_gates、closure 记录非法（closure 边目标非 DONE）、仅覆盖无 owner 图（仅 coverage_tags 无 owner 图）、基线/抑制增长（deadcode-baseline.json / provider-prose-ownership-baseline.json 不得无显式 admission 而增长）。所有门禁变更必须同步 WHY/WHAT/HOW/GAP 与自测，PENDING 证据、READY 条件、DONE 闭环、分类兼容、提交祖先、变更路径、证明门禁、闭合依赖、覆盖归属、基线冻结均需可红可绿的独立落点。
+施工账本 `scripts/checks/migration-ledger.json`、其门禁 `scripts/checks/migration-ledger.mjs` 与 requirement 包 `requirements/migration-ledger/` 已永久退役，编号 REQUIREMENT-SYSTEM-019 随之退役且不得复用。迁移的架构真相只存在于 production 代码、各 package 的 WHY/WHAT/HOW/GAP、executable proof 与 architecture gates；任何以账本状态（DONE/PROVEN-KEEP/closure record）、文档宣称或 CHANGELOG 记录替代门禁实测的行为都被禁止。机械不变量：上述退役路径不得重新出现；`scripts/check.mjs` 的 gate 清单不得引用已退役门禁；全仓 `src/`、`scripts/`、正式 requirements 文档不得包含 `migration-ledger` 引用。由 `ledger-retirement-gate` 机械执行，违反即红。

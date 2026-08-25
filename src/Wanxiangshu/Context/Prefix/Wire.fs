@@ -232,50 +232,6 @@ module XWire =
                         (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
         }
 
-    type private ReplicaBindOutcome =
-        | Bindable of SessionMessage
-        | RunAlreadyClosed
-        | Unbindable of ProviderRunBinding.Rejection
-
-    /// One bounded re-read pause: the session `message.updated` signal is the
-    /// causal hint, the catch-up delay is the deadline backstop.
-    let private awaitProjectionHint (visibility: MessageVisibilityHub option) (sessionId: SessionId) : Task<unit> =
-        task {
-            match visibility with
-            | Some hub -> do! hub.AwaitChange sessionId ProviderRunBinding.projectionCatchupDelayMilliseconds
-            | None -> ()
-        }
-
-    /// HOST-BOUNDARY-008 bounded observation for the replica request seam.
-    /// `ProjectionNotVisibleYet` waits on the session `message.updated` signal
-    /// and re-reads within the production catch-up budget. A sealed assistant
-    /// child is terminal evidence: the DryRun cancel race tail must be
-    /// absorbed, never raised. Identity rejections stay fail-closed.
-    let private observeReplicaBindOutcome
-        (snapshotPort: ISessionSnapshotPort)
-        (visibility: MessageVisibilityHub option)
-        (sessionId: SessionId)
-        (physical: PhysicalUserMessageId)
-        : Task<ReplicaBindOutcome> =
-        let rec attempt remainingReads =
-            task {
-                let! snapshotResult = snapshotPort.GetMessages sessionId
-                let messages = requireOk snapshotResult
-
-                match ProviderRunBinding.observeBindableRun (PhysicalUserMessageId.value physical) messages with
-                | ProviderRunBinding.Observation.Bound run -> return Bindable run
-                | ProviderRunBinding.Observation.RunTerminal _ -> return RunAlreadyClosed
-                | ProviderRunBinding.Observation.Rejected rejection -> return Unbindable rejection
-                | ProviderRunBinding.Observation.ProjectionNotVisibleYet when remainingReads > 0 ->
-                    do! awaitProjectionHint visibility sessionId
-
-                    return! attempt (remainingReads - 1)
-                | ProviderRunBinding.Observation.ProjectionNotVisibleYet ->
-                    return Unbindable ProviderRunBinding.Rejection.NoBindableRun
-            }
-
-        attempt ProviderRunBinding.projectionCatchupMaxReads
-
     let private requireStrengthReplicaAuthority
         (binding: StrengthReplicaBinding)
         (authority: PromptAuthority.AuthorityExecutionProfile option)
@@ -286,48 +242,16 @@ module XWire =
             raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
         | Some authority -> authority
 
-    /// Evidence → decision → effect for one admitted replica attempt: derive
-    /// the provider run from the bound assistant, freeze its authority profile,
-    /// and record the plan. Capability disagreement is a fatal invariant break.
-    let private applyReplicaPlan
-        (durable: AgentJournal)
-        (scope: PluginRuntimeScope)
-        (sessionId: SessionId)
-        (binding: StrengthReplicaBinding)
-        (physical: PhysicalUserMessageId)
-        (assistant: SessionMessage)
-        : Task<unit> =
-        task {
-            let providerRun = ProviderRunIdentity.create assistant.Id
-            let projections = AgentJournal.snapshot durable
-
-            let authority =
-                requireStrengthReplicaAuthority
-                    binding
-                    (PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections)
-
-            let plan =
-                AttemptPlanner.plan
-                    authority
-                    AgentPairCursor.initial
-                    physical
-                    providerRun
-                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-                    ProviderRequestKind.StrengthReplica
-                    RecoveryOpportunity.OrdinaryAttempt
-                    (fun () -> Error NoCandidateReason.NoCoverage)
-
-            if plan.Profile.ToolCapabilitySet <> binding.ToolCapabilitySet then
-                raise (
-                    InvalidOperationException
-                        "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
-                )
-
-            scope.RecordAttemptPlan sessionId providerRun plan
-        }
-
+    /// HOST-BOUNDARY-008: `experimental.chat.messages.transform` runs before the
+    /// Host creates the assistant run, so ProviderRunIdentity cannot be an input
+    /// here and no bounded wait may disguise a future run as projection lag.
+    /// The replica recovery decision is frozen as an UNBOUND attempt plan keyed
+    /// by the exact PhysicalUserMessageId; the exact ProviderRunIdentity binds
+    /// exactly once later from a complete Host observation
+    /// (`TryBindAttemptPlan` on the turn path). Capability agreement between the
+    /// frozen authority role and the live execution gate is checked now — it
+    /// depends only on session-scoped evidence, never on a future run.
     let private applyStrengthReplicaPlan
-        (snapshotPort: ISessionSnapshotPort)
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
@@ -342,11 +266,33 @@ module XWire =
                 | Some physical -> physical
                 | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
 
-            match! observeReplicaBindOutcome snapshotPort scope.MessageVisibility sessionId physical with
-            | RunAlreadyClosed -> return ()
-            | Unbindable rejection ->
-                return raise (InvalidOperationException(sprintf "StrengthReplica run binding failed: %A" rejection))
-            | Bindable assistant -> return! applyReplicaPlan durable scope sessionId binding physical assistant
+            let projections = AgentJournal.snapshot durable
+
+            let authority =
+                requireStrengthReplicaAuthority
+                    binding
+                    (PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections)
+
+            if
+                PromptAuthority.toolCapabilitiesFor authority.CanonicalRole ProviderRequestKind.StrengthReplica
+                <> binding.ToolCapabilitySet
+            then
+                raise (
+                    InvalidOperationException
+                        "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
+                )
+
+            let pendingPlan =
+                AttemptPlanner.freezePreInference
+                    authority
+                    AgentPairCursor.initial
+                    physical
+                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                    ProviderRequestKind.StrengthReplica
+                    RecoveryOpportunity.OrdinaryAttempt
+                    (fun () -> Error NoCandidateReason.NoCoverage)
+
+            scope.RecordPendingAttemptPlan sessionId physical pendingPlan
         }
 
     /// PROJ-008 Step6: reanchor 后 CommittedPrefix=None 且声明 ReanchorAfterCompaction（wire no-op）。
@@ -793,14 +739,11 @@ module XWire =
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
-            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId, snapshot with
-            | Some binding, Some snapshotPort ->
-                do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
+            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId with
+            | Some binding ->
+                do! applyStrengthReplicaPlan durable scope sessionId binding output
                 return PrefixPresentationHorizon.Current
-            | Some _, None ->
-                return
-                    raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
-            | None, _ -> return! applyNonReplicaTransform durable scope sessionId snapshot output
+            | None -> return! applyNonReplicaTransform durable scope sessionId snapshot output
         }
 
     let applyTransform

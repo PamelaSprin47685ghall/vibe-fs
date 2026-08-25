@@ -80,11 +80,6 @@ module HostSignalBootstrap =
             // recovery itself is causal and no longer uses a wall-clock deadline.
             let recoveryTimerPort = PtyTiming.nodeTimerPort ()
 
-            // HOST-BOUNDARY-008: projection catch-up wakes on the session's
-            // message.updated signal; recoveryTimerPort supplies the backstop.
-            let messageVisibility = MessageVisibilityHub(recoveryTimerPort)
-            scope.AttachMessageVisibility messageVisibility
-
             let reviewerContinuationPort = HostReviewGuard.continuationPort sessionPort journal
 
             let resolveProjection (sessionId: SessionId) : AgentProjectionSet option =
@@ -494,6 +489,5 @@ module HostSignalBootstrap =
                   ObserveEvent =
                     (fun raw ->
                         SyncDelegateHostObservation.observe scope.SyncDelegateRuntime raw
-                        MessageVisibilitySignal.observeEvent messageVisibility raw
                         signalRouter.ObserveLocal raw) }
         }

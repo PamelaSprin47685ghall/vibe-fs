@@ -8,7 +8,6 @@
 | `requirement-system` | 当前接受的产品真理必须有唯一 package owner、显式依赖与唯一 proof ownership。 |
 | `verification-system` | requirement acceptance 必须由分层、可失败、可重放的证据体系定义，而不是测试类型或人工印象。 |
 | `js-semantic-surface` | 语义测试只能经正式、稳定、JS-native 的 semantic surface 进入；Fable runtime representation 不属于 semantic contract。 |
-| `migration-ledger` | 63 节点 DAG 施工事实必须由机械门禁守护状态机、分类机、证据机、证明机、提交机、变更机、依赖机、覆盖机与基线机。 |
 ## 2. Programming / causality
 
 | Package | 一句话 WHY |
@@ -191,7 +190,6 @@ repository-programming   → office-capability, capability-enforcement, effect-a
 requirement-grounding    → requirement-system, host-boundary, participant-horizon, provider-projection, interaction-authority, semantic-trace, prefix-stability, repository-programming
 speculative-investigation→ repository-investigation, participant-identity, execution-model-routing, participant-horizon, provider-projection, semantic-trace
 epistemic-reasoning      → participant-horizon
-migration-ledger         → requirement-system, verification-system, semantic-trace
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
 ```
 

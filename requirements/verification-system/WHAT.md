@@ -81,3 +81,7 @@ Release gate 变成「最多 N 轮」或「重跑直到通过」
 ## VERIFICATION-SYSTEM-013: JS 语义边界终态清零
 
 所有产品语义测试对实现内部的越界依赖必须终态清零：严禁深层导入内部 dist 模块、严禁混淆导出探测（mangled names）、严禁直接消费编译器底层表示、严禁使用过渡期的兼容 facade 或私有 contract 适配器。所有被语义测试调用的模块必须在正式的 Surface Manifest 中完成注册，明确其所有权、关联命题与源码映射，确保测试世界与实现内部彻底解耦。
+
+## VERIFICATION-SYSTEM-014: e2e mock 边界连接生命周期显式化
+
+e2e 的 mock provider/LLM HTTP 边界必须显式声明连接生命周期：禁用服务端 idle keep-alive 超时（`server.keepAliveTimeout = 0`），并对每个响应发送 `Connection: close`，强制客户端每请求新建连接。禁止依赖宿主与 mock 双方超时赛跑的隐式行为——那是一类随负载与诊断开关翻转红绿的时序 race（Long Stroke `TypeError: fetch failed` 即此根因）。由 `mock-connection-lifecycle.test.mjs` 机械断言。

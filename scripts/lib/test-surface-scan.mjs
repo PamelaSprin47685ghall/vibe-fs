@@ -1282,14 +1282,6 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
-    module: 'OpenCode/Host/MessageVisibilitySurface.js',
-    owner: 'host-boundary',
-    laws: ['HOST-BOUNDARY-008'],
-    source: 'src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
-  {
     module: 'OpenCode/Host/PluginHooksSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-014'],
