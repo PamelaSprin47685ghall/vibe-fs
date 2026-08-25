@@ -878,6 +878,10 @@ const main = () => {
   try {
     ledger = JSON.parse(readFileSync(ledgerPath, 'utf8'))
   } catch (e) {
+    if (e.code === 'ENOENT') {
+      console.log('migration-ledger: graduated (ledger file not found, migration complete)')
+      process.exit(0)
+    }
     console.error(`migration-ledger: cannot read or parse ${ledgerPath}: ${e.message}`)
     process.exit(1)
   }

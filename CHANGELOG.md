@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- docs: sync AGENTS ledger counts to 26 DONE / 454 backlog (A96/B33/D85/E120/G120)
+- chore(release): delete migration-ledger.json temporary DAG (117 DONE, 5 closure), graduate to 守江山, 669/669, verification 3531/0, check 0, build 707 ledger counts to 26 DONE / 454 backlog (A96/B33/D85/E120/G120)
 - chore(ledger): P1 DAG inventory — 32 backlog-keep nodes (454 files) by owner, 58 total (26 DONE/32 PENDING), backlog 0, coverage 668/668
 - fix(requirement-grounding): Catalog best-effort realpath for macOS /var→/private/var (13 failures) + control-pyramid flatten
 - fix(distribution): DISTRIBUTION-005 readdir exact-case for dist/Resources (1)
