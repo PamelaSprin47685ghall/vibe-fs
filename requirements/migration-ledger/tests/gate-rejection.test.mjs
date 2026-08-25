@@ -49,7 +49,7 @@ const findDone = (ledger) => ledger.nodes.find(n => n.state === 'DONE')
 const headCommit = () => {
   try { return execSync('git rev-parse HEAD', { cwd: ROOT }).toString().trim() } catch { return '6d69d40dd161b8caec57018cc9f2a2673f32e496' }
 }
-test('WHAT[MIGRATION-LEDGER-002] GATE-01: PENDING with GREEN/verified success evidence must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-01: PENDING with GREEN/verified success evidence must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const pending = ensurePending(ledger)
   pending.evidence = 'semantic-owners / architecture all GREEN, KEEP verified'
@@ -58,7 +58,7 @@ test('WHAT[MIGRATION-LEDGER-002] GATE-01: PENDING with GREEN/verified success ev
   assert.ok(errors.some(e => /PENDING/i.test(e) && /evidence/i.test(e) || /GREEN|verified|complete/i.test(e)), `error should mention PENDING evidence / GREEN: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-003] GATE-02: READY without owner graph must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-02: READY without owner graph must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = ensurePending(ledger)
   node.state = 'READY'
@@ -74,7 +74,7 @@ test('WHAT[MIGRATION-LEDGER-003] GATE-02: READY without owner graph must be reje
   assert.ok(errors.some(e => /READY/i.test(e) && /owner|contract|publish|consume|depends/i.test(e) || /owner graph/i.test(e)), `error should mention READY owner graph: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-003] GATE-03: READY without proofs/architecture_gates must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-03: READY without proofs/architecture_gates must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = ensurePending(ledger)
   node.state = 'READY'
@@ -88,7 +88,7 @@ test('WHAT[MIGRATION-LEDGER-003] GATE-03: READY without proofs/architecture_gate
   assert.ok(errors.some(e => /READY/i.test(e) && /proof|gate/i.test(e)), `error should mention READY proofs/gates: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-04: DONE with result PENDING must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-04: DONE with result PENDING must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   node.result = 'PENDING'
@@ -97,7 +97,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-04: DONE with result PENDING must be rejec
   assert.ok(errors.some(e => /DONE/i.test(e) && /result/i.test(e) && /PENDING/i.test(e)), `error should mention DONE result PENDING: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-05: classification/result mismatch must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-05: classification/result mismatch must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   if (node.classification === 'KEEP') {
@@ -113,7 +113,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-05: classification/result mismatch must be
   assert.ok(errors.some(e => /classification/i.test(e) && /result/i.test(e) || /incompatible/i.test(e)), `error should mention classification/result: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-06: DONE without implementation_commit must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-06: DONE without implementation_commit must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   delete node.implementation_commit
@@ -125,7 +125,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-06: DONE without implementation_commit mus
   assert.ok(errors.some(e => /implementation_commit/i.test(e) || /commit/i.test(e)), `error should mention implementation_commit: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-07: DONE with non-existent or non-ancestor implementation_commit must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-07: DONE with non-existent or non-ancestor implementation_commit must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   node.implementation_commit = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
@@ -137,7 +137,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-07: DONE with non-existent or non-ancestor
   assert.ok(errors.some(e => /implementation_commit|ancestor|commit/i.test(e)), `error should mention commit ancestor: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-08: DONE without production/test touched_paths must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-08: DONE without production/test touched_paths must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   node.implementation_commit = headCommit()
@@ -147,7 +147,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-08: DONE without production/test touched_p
   assert.ok(errors.some(e => /touched_paths|production|implementation|changed/i.test(e)), `error should mention touched_paths: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-09: DONE without proofs must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-09: DONE without proofs must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   node.implementation_commit = headCommit()
@@ -158,7 +158,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-09: DONE without proofs must be rejected',
   assert.ok(errors.some(e => /proof/i.test(e)), `error should mention proofs: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-004] GATE-10: DONE without architecture_gates must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-10: DONE without architecture_gates must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   node.implementation_commit = headCommit()
@@ -169,7 +169,7 @@ test('WHAT[MIGRATION-LEDGER-004] GATE-10: DONE without architecture_gates must b
   assert.ok(errors.some(e => /gate/i.test(e) || /architecture/i.test(e)), `error should mention gates: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-005] GATE-11: closure dependency not DONE must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-11: closure dependency not DONE must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const pendingTarget = ensurePending(ledger)
   const depender = ledger.nodes.find(n => n.id !== pendingTarget.id)
@@ -190,7 +190,7 @@ test('WHAT[MIGRATION-LEDGER-005] GATE-11: closure dependency not DONE must be re
   assert.ok(errors.some(e => /closure/i.test(e)), `error should mention closure: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-005] GATE-12: DONE with only coverage without owner graph must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-12: DONE with only coverage without owner graph must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const node = findDone(ledger)
   node.implementation_commit = headCommit()
@@ -205,7 +205,7 @@ test('WHAT[MIGRATION-LEDGER-005] GATE-12: DONE with only coverage without owner 
   assert.ok(errors.some(e => /coverage|owner graph|publish/i.test(e)), `error should mention coverage/owner graph: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-006] GATE-13: baseline/suppression growth must be rejected', { timeout: 120000 }, () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-13: baseline/suppression growth must be rejected', { timeout: 120000 }, () => {
   const { ledger, owners } = loadValid()
   const baselinePath = join(ROOT, 'scripts/checks/deadcode-baseline.json')
   if (!existsSync(baselinePath)) return
@@ -247,7 +247,7 @@ test('WHAT[MIGRATION-LEDGER-001] GATE-14: DAG cycle must be rejected', { timeout
   assert.ok(errors.some(e => /cycle/i.test(e)), `error should mention cycle: ${errors.join(';')}`)
 })
 
-test('WHAT[MIGRATION-LEDGER-007] GATE-15: gate self-test must cover 11 illegal states', { timeout: 120000 }, async () => {
+test('WHAT[MIGRATION-LEDGER-001] GATE-15: gate self-test must cover 11 illegal states', { timeout: 120000 }, async () => {
   const { execSync } = await import('node:child_process')
   const out = execSync('node scripts/checks/migration-ledger.mjs --self-test 2>&1', { encoding: 'utf8' })
   assert.ok(out.includes('self-test passed') || out.includes('self-test'), `self-test should pass, got: ${out}`)
