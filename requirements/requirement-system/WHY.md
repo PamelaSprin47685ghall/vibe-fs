@@ -40,3 +40,8 @@ docs 说 A，gate 说 B，test 证明 C，code 实现 D —— 四者同时为�
 3. `requirements/` 目录下出现未经索引登记的外来包，或包文档结构残缺。
 4. 包声明了超出依赖骨架定义的非法依赖关系。
 5. WHAT.md 命题在 HOW.md 证明表中缺失，或引用的测试文件不存在。
+6. migration ledger 出现 11 类非法状态中任一：PENDING 冒充成功、READY 无 owner/证明、DONE 无闭环、分类/结果错配、提交非祖先、变更缺失、证明门禁缺失、闭合依赖未 DONE、覆盖无归属、基线增长。
+
+## 为什么需要 migration ledger 门禁
+
+`scripts/checks/migration-ledger.json` 是 63 节点 DAG 的施工事实，不是架构文档。没有机械门禁时，PENDING 节点可写 GREEN 证据冒充完成，READY 节点可无 owner 合同却宣称就绪，DONE 节点可无实现提交、无生产变更、无证明门禁却标记完成，分类与结果可错配，closure 依赖可指向未 DONE 节点，覆盖可无归属，基线可静默增长——每种都会让 ledger 从“可执行的施工图”退化为“文字报告”。门禁把 ledger 的状态机（PENDING→READY→DONE）、分类机（KEEP→PROVEN-KEEP 等）、证据机（verified/complete/GREEN 禁止）、证明机（proofs/gates）、提交机（HEAD 祖先）、变更机（touched_paths）、依赖机（closure DONE）、覆盖机（owner graph）、基线机（不得增长）全部变成可红可绿的机械断言，使每一次 ledger 变更都经历与代码同等的 fail-closed 校验。

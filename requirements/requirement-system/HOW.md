@@ -32,6 +32,21 @@
 
 `tests/change-lifecycle.test.mjs` 机械化验证变更文档边界，确保小型修复豁免规则、blocker 处理流程与历史已完成记录的只读性得到严格执行。
 
+### 5. migration ledger 门禁（`migration-ledger`）
+
+`scripts/checks/migration-ledger.mjs` 是 DAG migration ledger 的 fail-closed 架构门禁，执行 11 类非法状态拦截：
+- **PENDING 证据纯度**：大小写不敏感扫描 evidence 是否含 `verified`/`complete`/`green`，含则红。
+- **READY owner 图**：publishes/consumes/depends_on/production_callers 全空则红。
+- **READY 证明门禁**：proofs/architecture_gates 全空则红。
+- **DONE 结果**：result 仍 PENDING 则红。
+- **分类/结果兼容**：KEEP→PROVEN-KEEP、DELETE→DELETED、MOVE/SPLIT/ADAPTER→CUTOVER、COMPOSITION-ROOT→CUTOVER|PROVEN-KEEP；错配则红。
+- **实现提交**：DONE 必须含 40 位 `implementation_commit` 且为 HEAD 祖先（`git cat-file -e` 且 `merge-base --is-ancestor HEAD`），缺失/非法/非祖先则红。
+- **变更路径**：DONE 的 touched_paths 必须非空且含生产路径（src/或*.fs），空则红。
+- **证明门禁**：DONE 的 proofs 与 architecture_gates 必须各自非空，空则红。
+- **闭合依赖**：kind=closure 的边目标必须为 DONE，指向 PENDING 则红。
+- **覆盖归属**：仅 coverage_tags 无 owner 图则红。
+- **基线冻结**：deadcode-baseline.json / provider-prose-ownership-baseline.json 增长无显式 admission 则红。
+`requirements/migration-ledger/tests/gate-rejection.test.mjs` 以 11 个独立变异固化上述每类可红性，`scripts/checks/migration-ledger.mjs --self-test` 以 4 基础 + 11 扩展共 15 个 fixture 自检，`scripts/check.mjs` 将门禁纳入静态检查链，`node --test` 在 CI 中绿。
 ---
 
 ## 验证与测试落点
@@ -56,3 +71,4 @@
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
 | REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs` |
+| REQUIREMENT-SYSTEM-019 | `requirements/requirement-system/tests/migration-ledger-gate.test.mjs` |

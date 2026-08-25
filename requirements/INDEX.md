@@ -1,7 +1,6 @@
 # Package index
 
-当前设计得到 **52 张 boundary card**。52 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
-
+当前设计得到 **53 张 boundary card**。53 不是目标，也不是稳定 API；它只是当前按独立 WHY、failure meaning 与 independent-change test 得出的结果。后续全仓反向覆盖若发现 ORPHAN / OVERLAP / GARBAGE，应继续拆并。
 ## 1. Requirement system
 
 | Package | 一句话 WHY |
@@ -9,7 +8,7 @@
 | `requirement-system` | 当前接受的产品真理必须有唯一 package owner、显式依赖与唯一 proof ownership。 |
 | `verification-system` | requirement acceptance 必须由分层、可失败、可重放的证据体系定义，而不是测试类型或人工印象。 |
 | `js-semantic-surface` | 语义测试只能经正式、稳定、JS-native 的 semantic surface 进入；Fable runtime representation 不属于 semantic contract。 |
-
+| `migration-ledger` | 63 节点 DAG 施工事实必须由机械门禁守护状态机、分类机、证据机、证明机、提交机、变更机、依赖机、覆盖机与基线机。 |
 ## 2. Programming / causality
 
 | Package | 一句话 WHY |
@@ -138,7 +137,7 @@
 
 # 依赖骨架
 
-这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（130 edges，0 cycle，按本 code block 逐项机器计数）。
+这不是权威优先级，只表示定义所需 guarantee。精确 hard edge 以各 boundary card 的 `DEPENDS ON` 为准；本表是当前完整邻接清单（131 edges，0 cycle，按本 code block 逐项机器计数）。
 
 ```text
 requirement-system       → 无
@@ -192,6 +191,7 @@ repository-programming   → office-capability, capability-enforcement, effect-a
 requirement-grounding    → requirement-system, host-boundary, participant-horizon, provider-projection, interaction-authority, semantic-trace, prefix-stability, repository-programming
 speculative-investigation→ repository-investigation, participant-identity, execution-model-routing, participant-horizon, provider-projection, semantic-trace
 epistemic-reasoning      → participant-horizon
+migration-ledger         → requirement-system, verification-system, semantic-trace
 distribution             → 特殊：所有声明 runtime resource 的 semantic packages（不获其语义 ownership）
 ```
 
@@ -204,4 +204,4 @@ guidance-delivery    → provider-projection 删（渲染是下游机制）
 finality             → participant-horizon 保留（隐藏机制=信息准入边界，与 delegation 同型）
 ```
 
-当前 130 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；本轮以邻接表本身为准纠正计数漂移，并新增 18 edges。
+当前 131 edges 均为 semantic prerequisite（A 的 WHAT 定义需要 B 已提供的 guarantee），无 implementation/presentation/proof coupling。旧正文曾写“110 edges”，但旧邻接表实际已含 112；本轮以邻接表本身为准纠正计数漂移，并新增 19 edges。

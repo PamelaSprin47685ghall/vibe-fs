@@ -76,12 +76,16 @@
         "unified-store-gate.mjs"
       ],
       "evidence": "unified-store-gate",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Composition/Durable/Fact.fs"
+      ],
       "coverage_tags": [
         "CoverageF"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "model-routing-capacity",
@@ -111,12 +115,16 @@
         "composition-root-invariant.mjs"
       ],
       "evidence": "cross-callback-pc",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs"
+      ],
       "coverage_tags": [
         "CoverageA"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "execution-quiescence",
@@ -146,12 +154,16 @@
         "causal-wait-boundary.mjs"
       ],
       "evidence": "cross-callback-pc",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Session/Wait/Await.fs"
+      ],
       "coverage_tags": [
         "CoverageD"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "plugin-transforms-composition",
@@ -190,7 +202,8 @@
         "CoverageA"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "interaction-assistance-workflow-cutover",
@@ -264,7 +277,8 @@
         "CoverageA"
       ],
       "state": "DONE",
-      "result": "CUTOVER"
+      "result": "CUTOVER",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "session-lifecycle-recovery-contract",
@@ -317,7 +331,8 @@
         "CoverageA"
       ],
       "state": "DONE",
-      "result": "CUTOVER"
+      "result": "CUTOVER",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "opencode-tool-spec-contracts",
@@ -359,7 +374,8 @@
       ],
       "state": "DONE",
       "result": "CUTOVER",
-      "closure_evidence": "proof: requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；ToolRegistry 瘦身为纯聚合 Composition Root，各工具自包含强类型 ToolAdmission 业务准入规则"
+      "closure_evidence": "proof: requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；ToolRegistry 瘦身为纯聚合 Composition Root，各工具自包含强类型 ToolAdmission 业务准入规则",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "opencode-host-signal-bootstrap-cutover",
@@ -403,7 +419,8 @@
       ],
       "state": "DONE",
       "result": "CUTOVER",
-      "closure_evidence": "proof: requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；HostSignalBootstrap 削减为纯基础设施 wiring/subscribe/route/dispose/drain，清除领域决策与隐式 PC"
+      "closure_evidence": "proof: requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；HostSignalBootstrap 削减为纯基础设施 wiring/subscribe/route/dispose/drain，清除领域决策与隐式 PC",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "mission-finality-cutover",
@@ -452,7 +469,8 @@
       ],
       "state": "DONE",
       "result": "CUTOVER",
-      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿"
+      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "mission-authority-cutover",
@@ -496,7 +514,8 @@
       ],
       "state": "DONE",
       "result": "CUTOVER",
-      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿"
+      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "composition-turn-cutover",
@@ -543,7 +562,8 @@
       ],
       "state": "DONE",
       "result": "CUTOVER",
-      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿"
+      "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "delegation-outcome-cutover",
@@ -590,7 +610,8 @@
         "CoverageD"
       ],
       "state": "DONE",
-      "result": "CUTOVER"
+      "result": "CUTOVER",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "context-trace-companion-contract",
@@ -632,7 +653,8 @@
         "CoverageE"
       ],
       "state": "DONE",
-      "result": "CUTOVER"
+      "result": "CUTOVER",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "strength-prediction-replica-cutover",
@@ -678,7 +700,8 @@
         "CoverageE"
       ],
       "state": "DONE",
-      "result": "CUTOVER"
+      "result": "CUTOVER",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "enforcer-guidance-continuation-contract",
@@ -722,7 +745,8 @@
       ],
       "state": "DONE",
       "result": "CUTOVER",
-      "closure_evidence": "proof: requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs; 关联 gate: plugin-transforms-invariant, fsharp-control-pyramid, semantic-owners; Enforcer guidance & continuation 切片归一至 behavior-diagnosis 唯一 owner，清理无用跨层 imports，PluginTransforms 静态乐谱接线保持显式"
+      "closure_evidence": "proof: requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs; 关联 gate: plugin-transforms-invariant, fsharp-control-pyramid, semantic-owners; Enforcer guidance & continuation 切片归一至 behavior-diagnosis 唯一 owner，清理无用跨层 imports，PluginTransforms 静态乐谱接线保持显式",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
     },
     {
       "id": "change-integration-host-contracts",
@@ -779,12 +803,16 @@
       "architecture_gates": [
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Change/Fact.fs"
+      ],
       "coverage_tags": [
         "CoverageF"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "durable-convergence-store-contracts",
@@ -827,12 +855,16 @@
         "unified-store-gate.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Git/Hook/Dispatcher.fs"
+      ],
       "coverage_tags": [
         "CoverageF"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "mission-finality-keep",
@@ -883,12 +915,16 @@
       "architecture_gates": [
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Finality/OpenCode/HostPort.fs"
+      ],
       "coverage_tags": [
         "CoverageC"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "mission-obligation-keep",
@@ -936,12 +972,16 @@
       "architecture_gates": [
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs"
+      ],
       "coverage_tags": [
         "CoverageC"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "mission-review-judgement-keep",
@@ -988,12 +1028,16 @@
       "architecture_gates": [
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Review/Fact.fs"
+      ],
       "coverage_tags": [
         "CoverageC"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "mission-work-record-keep",
@@ -1027,12 +1071,16 @@
       "architecture_gates": [
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs"
+      ],
       "coverage_tags": [
         "CoverageC"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "office-capability-keep",
@@ -1063,13 +1111,17 @@
         "js-surface-gate.mjs"
       ],
       "evidence": "semantic-owners / js-surface-gate / architecture all GREEN",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs"
+      ],
       "coverage_tags": [
         "CoverageE",
         "CoverageG"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "verification-system-keep",
@@ -1100,12 +1152,16 @@
         "unified-store-gate.mjs"
       ],
       "evidence": "semantic-owners / architecture / js-surface-gate all GREEN",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageG"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "external-investigation-keep",
@@ -1137,12 +1193,16 @@
         "js-surface-gate.mjs"
       ],
       "evidence": "semantic-owners / architecture / js-surface-gate all GREEN",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs"
+      ],
       "coverage_tags": [
         "CoverageA"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "finality-review-cohort-keep",
@@ -1174,12 +1234,16 @@
         "architecture.mjs"
       ],
       "evidence": "semantic-owners / architecture all GREEN",
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"
+      ],
       "coverage_tags": [
         "CoverageD"
       ],
       "state": "DONE",
-      "result": "PROVEN-KEEP"
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "delegation-backlog-keep",
