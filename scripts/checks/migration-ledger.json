@@ -1440,13 +1440,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs"
+      ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Delegation.Handle sole contract verified via CompletionCodec/Controller, proof join-v2-mailbox 4/4 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "delegation-handoff",
@@ -1484,13 +1488,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Delegation/Handoff.fs"
+      ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Delegation.Handoff sole contract verified via Handoff.fs, proof reusable-work-unit 4/4 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "delegation-sync-delegate",
@@ -1542,13 +1550,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateLedger.fs"
+      ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Delegation.SyncDelegate sole contract verified via DelegatedToolEstimateLedger, proof sync-delegate-runtime 13/13 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "host-boundary-codec",
@@ -1707,14 +1719,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Host.Plugin sole contract verified via Plugin.fs/PluginBoot.fs, proof host-hooks 15/15 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "host-boundary-signals",
@@ -1748,14 +1764,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Host.Signals sole contract verified via HostSignal.fs, proof events-port 8/8 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "host-boundary-foundation",
@@ -1790,14 +1810,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/FatalProcess.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Host.Foundation sole contract verified via FatalProcess.fs, proof host-capability-observation 5/5 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "context-compression-blogger",
@@ -1954,15 +1978,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Host/CompactionPolicy.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Context.Compaction sole contract verified via CompactionPolicy.fs, proof host-compaction-policy 14/14 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "repository-programming-filesystem",
@@ -2099,14 +2127,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RepoProgramming.Toolhost sole contract verified via FileMutationSurface.fs, proof js-tool-host 4/4 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "repository-programming-bindings",
@@ -2360,15 +2392,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/Identity.fs"
+      ],
       "coverage_tags": [
         "CoverageB",
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Dispatch.Identity sole contract verified via Identity.fs, proof join-guard 2/2 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "epistemic-reasoning-core",
@@ -2496,13 +2532,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Sphinx/ObservationCodec.fs"
+      ],
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.Projection sole contract verified via ObservationCodec.fs, proof kernel 7/7 green",
+      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "epistemic-reasoning-surface",
