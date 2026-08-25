@@ -2562,9 +2562,31 @@
         "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs"
       ],
       "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: awaiting closure commit"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "pending: awaiting closure commit",
+      "implementation_commit": "9d65406756d8608c24b2884c7ad122d1eba6beab",
+      "closure_record": {
+        "implementation_commit": "9d65406756d8608c24b2884c7ad122d1eba6beab",
+        "changed_paths": [
+          "scripts/lib/test-surface-scan.mjs",
+          "src/Wanxiangshu/Mission/Manager/FinalitySurface.fs",
+          "src/Wanxiangshu/Wanxiangshu.fsproj"
+        ],
+        "what_ids": [
+          "FINALITY-002",
+          "FINALITY-016"
+        ],
+        "proof_anchors": [
+          "requirements/finality/tests/blessing-admission.test.mjs"
+        ],
+        "architecture_gates": [
+          "semantic-owners.mjs"
+        ],
+        "migrated_callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "attention-regulation",
