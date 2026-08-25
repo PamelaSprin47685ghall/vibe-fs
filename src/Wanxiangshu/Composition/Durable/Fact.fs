@@ -1,3 +1,4 @@
+// primary_owner: durable-events — DurableEvents.Contract + EventStore.CanonicalIntegrator (canonical-spine) — KEEP — sole history substrate via CanonicalIntegrator
 namespace Wanxiangshu.Composition.Durable
 
 open System

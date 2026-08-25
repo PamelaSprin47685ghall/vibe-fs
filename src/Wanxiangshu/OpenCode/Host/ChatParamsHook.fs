@@ -1,3 +1,4 @@
+// primary_owner: execution-model-routing — ModelRouting.Contract + ModelCapacity.BorrowingCapacity (model-routing-capacity) — KEEP — single authority capacity ledger
 namespace Wanxiangshu.OpenCode
 
 open System

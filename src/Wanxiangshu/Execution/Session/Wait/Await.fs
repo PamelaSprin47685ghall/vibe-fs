@@ -1,3 +1,4 @@
+// primary_owner: causal-wait — Session.Quiescence + CausalWait.Contract (execution-quiescence) — KEEP — opaque QuiescencePermit + single-flight causal wait
 namespace Wanxiangshu.Execution.Session.Wait
 
 open System

@@ -1,3 +1,4 @@
+// primary_owner: office-capability — OfficeCapabilitySurface.Contract + RolesSurface.Contract (office-capability-keep) — KEEP — consequence-model label projection
 namespace Wanxiangshu.Participant.Persona
 
 open Wanxiangshu.Foundation

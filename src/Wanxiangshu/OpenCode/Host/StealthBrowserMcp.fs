@@ -1,3 +1,4 @@
+// primary_owner: external-investigation — ExternalInvestigation.McpConfig + McpConfigSurface (external-investigation-keep) — KEEP — far-shore provenance MCP
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation
