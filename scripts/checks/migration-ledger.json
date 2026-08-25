@@ -3071,10 +3071,11 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: IntraParticipantParallelism.CoreSurface sole contract verified, HostSignalBootstrap via PluginTransforms.fs, proof and gates green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "intra-participant-parallelism-projection",
@@ -3208,10 +3209,11 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProcessExecution.CoreSurface sole contract verified, HostSignalBootstrap via PluginTransforms.fs, proof and gates green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "process-execution-projection",
@@ -3344,10 +3346,11 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProviderAttemptRecovery.CoreSurface sole contract verified via Cursor/CursorSurface/Evidence, PluginTransforms via Surface, proof abort-residue 2/2 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "provider-attempt-recovery-projection",
@@ -3480,10 +3483,11 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProviderProjection.CoreSurface sole contract verified via LlmFacing/SyntheticToml/TomlSurface, PluginTransforms via Surface, proof blogger-toml-surface 6/6 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "provider-projection-projection",
@@ -3618,10 +3622,11 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RequirementGrounding.CoreSurface sole contract verified via Fact/Facts/Gate/Projection/Runtime, PluginTransforms via Surface, proof grounding-delivery 6/6 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "requirement-grounding-surface",
@@ -3711,10 +3716,11 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: InteractionAuthority.CoreSurface sole contract verified via Child/Fact/Fold/Ledger, PluginTransforms via Surface, proof authority-root 13/13 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "interaction-authority-surface",
@@ -3803,10 +3809,11 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RepositoryInvestigation.CoreSurface sole contract verified via FetchTool/InspectorTool/Semble layers, PluginTransforms via Surface, proof investigation-resource-laws 8/8 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "repository-investigation-surface",
@@ -3895,10 +3902,11 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: TimeCapability.CoreSurface sole contract verified via SessionStartedAtLedger/Projection/Temporal, PluginTransforms via Surface, proof ambient-time-forbidden 2/2 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "time-capability-surface",
@@ -3988,10 +3996,11 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ParticipantIdentity.CoreSurface sole contract verified via Roles.fs/ManagedCatalog.fs, PluginTransforms via Surface, proof catalog.test.mjs 6/6 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "participant-identity-surface",
@@ -4078,10 +4087,11 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: SemanticTrace.CoreSurface sole contract verified via Capture.fs/Cursor.fs, PluginTransforms via Surface, proof x-trace-capture-boundary.test.mjs 3/3 green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "1db3a5d006f7599fc52def5fe1f91269e67edec6"
     },
     {
       "id": "semantic-trace-surface",
