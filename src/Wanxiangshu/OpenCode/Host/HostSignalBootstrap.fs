@@ -1,3 +1,4 @@
+// primary_owner: host-boundary — OpenCode.HostSignalBootstrap — COMPOSITION-ROOT — HostSignalBootstrap wiring composition root
 namespace Wanxiangshu.OpenCode
 
 open System
