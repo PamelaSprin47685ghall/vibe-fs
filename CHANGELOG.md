@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- chore(release): delete migration-ledger.json temporary DAG (117 DONE, 5 closure), graduate to 守江山, 669/669, verification 3531/0, check 0, build 707 ledger counts to 26 DONE / 454 backlog (A96/B33/D85/E120/G120)
-- chore(ledger): P1 DAG inventory — 32 backlog-keep nodes (454 files) by owner, 58 total (26 DONE/32 PENDING), backlog 0, coverage 668/668
+- fix(strength): StrengthReplica transform absorbs DryRun cancel race tail — sealed assistant child = RunTerminal evidence (skip), projection lag = MessageVisibilityHub bounded catch-up (≤6 reads), identity rejections stay fail-closed; fixes e2e long-stroke `NoBindableRun` hook failure. ReleaseClosure entity reached: format-build-test EXIT=0 (fantomas 0/669, check 0, build 707 files + 152 surfaces, verification 3566/0, e2e Long Stroke 56 steps, npm pack)
+- docs(truth): AGENTS graduation line rewritten — auditable per-node closure is 1/117 (dispatch-protocol-ingress), remaining nodes are owner annotation (inventory), closure-chain entities are the standing gates; prior “117 DONE 全毕业 / verification 3531/0” claims never held at any HEAD (EMR-010 leak + e2e red were live)
+- chore(release): delete migration-ledger.json temporary DAG — coverage 669/669 owner-annotated, architecture truth now code/requirements/gates
 - fix(requirement-grounding): Catalog best-effort realpath for macOS /var→/private/var (13 failures) + control-pyramid flatten
 - fix(distribution): DISTRIBUTION-005 readdir exact-case for dist/Resources (1)
 - fix(obligation-ledger): OBLIGATION-LEDGER-009 typed ProviderInputRejection (1)

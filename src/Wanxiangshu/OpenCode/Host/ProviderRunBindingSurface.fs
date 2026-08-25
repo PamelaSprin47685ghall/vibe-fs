@@ -89,6 +89,12 @@ module ProviderRunBindingSurface =
                         {| ok = true
                            id = run.Id
                            reads = index + 1 |}
+                | ProviderRunBinding.Observation.RunTerminal terminal ->
+                    box
+                        {| ok = false
+                           error = "RunTerminal"
+                           id = terminal.Id
+                           reads = index + 1 |}
                 | ProviderRunBinding.Observation.ProjectionNotVisibleYet -> loop (index + 1)
                 | ProviderRunBinding.Observation.Rejected rejection -> rejectionToJs (index + 1) rejection
 

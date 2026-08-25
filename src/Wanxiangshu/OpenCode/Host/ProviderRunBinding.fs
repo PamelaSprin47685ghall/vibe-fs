@@ -14,6 +14,11 @@ module ProviderRunBinding =
     type Observation =
         | Bound of SessionMessage
         | ProjectionNotVisibleYet
+        /// A sealed assistant child of the same physical user message exists:
+        /// the replica run already reached a terminal (cancel/complete), so no
+        /// unsealed candidate can ever appear again. Carries the sealed message
+        /// as evidence.
+        | RunTerminal of SessionMessage
         | Rejected of Rejection
 
     /// Maximum public-snapshot reads used by the physical Host seam when the
@@ -65,8 +70,19 @@ module ProviderRunBinding =
                 && message.IsCompaction
                 && message.ParentId = Some physicalUserMessage)
 
+        let sealedAssistant =
+            messages
+            |> List.tryFind (fun message ->
+                message.Role = "assistant"
+                && message.Completed
+                && not message.IsCompaction
+                && message.ParentId = Some physicalUserMessage)
+
         match matchingCompaction, bindableRun physicalUserMessage messages with
         | true, _ -> Observation.Rejected Rejection.NoBindableRun
         | false, Ok run -> Observation.Bound run
-        | false, Error Rejection.NoBindableRun -> Observation.ProjectionNotVisibleYet
+        | false, Error Rejection.NoBindableRun ->
+            sealedAssistant
+            |> Option.map Observation.RunTerminal
+            |> Option.defaultValue Observation.ProjectionNotVisibleYet
         | false, Error rejection -> Observation.Rejected rejection

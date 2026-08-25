@@ -132,3 +132,24 @@ test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 projection catch-up is bounded b
     reads: 6,
   })
 })
+
+test('WHAT[HOST-BOUNDARY-008] HOST-BOUNDARY-008 sealed assistant run is terminal evidence, not projector lag', () => {
+  const physical = 'msg_user_1'
+  const result = observeSequence(physical, [
+    projectMessages([
+      msg({ id: physical, role: 'user' }),
+      msg({ id: 'asst_sealed', role: 'assistant', parentID: physical, completed: true }),
+    ]),
+    projectMessages([
+      msg({ id: physical, role: 'user' }),
+      msg({ id: 'asst_sealed', role: 'assistant', parentID: physical, completed: true }),
+    ]),
+  ])
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: 'RunTerminal',
+    id: 'asst_sealed',
+    reads: 1,
+  })
+})

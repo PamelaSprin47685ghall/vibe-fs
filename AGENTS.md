@@ -107,7 +107,7 @@
 - 子→父 run-bounded LWR 从本 invocation 首个 assistant part 起算；caller 已知的 user charge 不得伪装成 Chronicle/Recent work 回传。父→子普通 bounded delta 仍保留原语义。
 - Fable build 已收敛为跨进程 lock 下先清空上一轮 `dist/`，再执行一次真实 `Debug` compiler invocation；compiler 成功退出后才验 artifact/Surface Manifest，configuration 不得依赖 Fable 的 watch/one-shot 默认值。源码删除不得留下可被 package 收走的陈旧 JS；watch daemon、`FableBarrier.fs`、ack、source-touch barrier、artifact-exists fast path 均已删除；现存 `dist`、日志静默、mtime 与 wall-clock 不能证明构建成功。
 
-- migration ledger 已毕业：117 节点全部 `DONE`（86 细拆 + 5 closure + 25 原 + 1 gate），`ReleaseClosure` 5 闭环 `fast-forward` 完成，`DAG` 无环 `669/669`，`verification 3531/0`、`check 0`、`build 707`、`control-pyramid 0` 全绿，临时 `migration-ledger.json` 已删除，架构真相回归 `代码/requirements/门禁`。
+- migration ledger 已退役：coverage `669/669` 全部标注 primary owner（47 owners），临时 `migration-ledger.json` 已删除，架构真相回归 `代码/requirements/gates`。逐节点三件套闭环仅 `dispatch-protocol-ingress` 一个；其余节点为 owner 标注（inventory），不构成 cutover+proof+gate 语义闭环；closure chain 五步的实体由既有机械 gates（semantic-owners / architecture / requirement-trace）承担。交付真相 = 机械梯度实测全绿：`fantomas 0/669`、`check 0`、`build 707 files + 152 surfaces`、verification `3566 pass / 0 fail`、e2e Long Stroke、`npm pack --dry-run`。禁止以账本状态或文档宣称替代门禁实测。
 
 ## 交付门禁
 

@@ -93,11 +93,6 @@ module XWire =
         | Ok value -> value
         | Error reason -> raise (InvalidOperationException reason)
 
-    let private requireOkMapped (mapError: 'e -> string) (result: Result<'a, 'e>) : 'a =
-        match result with
-        | Ok value -> value
-        | Error error -> raise (InvalidOperationException(mapError error))
-
     let private ensureFrameDigest (frame: BlogFrame) (text: string) : Result<unit, string> =
         if HostDigest.sha256Hex text = BlobDigest.value frame.Digest then
             Ok()
@@ -237,6 +232,50 @@ module XWire =
                         (ProjectionRenderer.cutoffDigest HostDigest.sha256Hex snapshot)
         }
 
+    type private ReplicaBindOutcome =
+        | Bindable of SessionMessage
+        | RunAlreadyClosed
+        | Unbindable of ProviderRunBinding.Rejection
+
+    /// One bounded re-read pause: the session `message.updated` signal is the
+    /// causal hint, the catch-up delay is the deadline backstop.
+    let private awaitProjectionHint (visibility: MessageVisibilityHub option) (sessionId: SessionId) : Task<unit> =
+        task {
+            match visibility with
+            | Some hub -> do! hub.AwaitChange sessionId ProviderRunBinding.projectionCatchupDelayMilliseconds
+            | None -> ()
+        }
+
+    /// HOST-BOUNDARY-008 bounded observation for the replica request seam.
+    /// `ProjectionNotVisibleYet` waits on the session `message.updated` signal
+    /// and re-reads within the production catch-up budget. A sealed assistant
+    /// child is terminal evidence: the DryRun cancel race tail must be
+    /// absorbed, never raised. Identity rejections stay fail-closed.
+    let private observeReplicaBindOutcome
+        (snapshotPort: ISessionSnapshotPort)
+        (visibility: MessageVisibilityHub option)
+        (sessionId: SessionId)
+        (physical: PhysicalUserMessageId)
+        : Task<ReplicaBindOutcome> =
+        let rec attempt remainingReads =
+            task {
+                let! snapshotResult = snapshotPort.GetMessages sessionId
+                let messages = requireOk snapshotResult
+
+                match ProviderRunBinding.observeBindableRun (PhysicalUserMessageId.value physical) messages with
+                | ProviderRunBinding.Observation.Bound run -> return Bindable run
+                | ProviderRunBinding.Observation.RunTerminal _ -> return RunAlreadyClosed
+                | ProviderRunBinding.Observation.Rejected rejection -> return Unbindable rejection
+                | ProviderRunBinding.Observation.ProjectionNotVisibleYet when remainingReads > 0 ->
+                    do! awaitProjectionHint visibility sessionId
+
+                    return! attempt (remainingReads - 1)
+                | ProviderRunBinding.Observation.ProjectionNotVisibleYet ->
+                    return Unbindable ProviderRunBinding.Rejection.NoBindableRun
+            }
+
+        attempt ProviderRunBinding.projectionCatchupMaxReads
+
     let private requireStrengthReplicaAuthority
         (binding: StrengthReplicaBinding)
         (authority: PromptAuthority.AuthorityExecutionProfile option)
@@ -247,30 +286,18 @@ module XWire =
             raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
         | Some authority -> authority
 
-    let private applyStrengthReplicaPlan
-        (snapshotPort: ISessionSnapshotPort)
+    /// Evidence → decision → effect for one admitted replica attempt: derive
+    /// the provider run from the bound assistant, freeze its authority profile,
+    /// and record the plan. Capability disagreement is a fatal invariant break.
+    let private applyReplicaPlan
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
         (binding: StrengthReplicaBinding)
-        (output: obj)
+        (physical: PhysicalUserMessageId)
+        (assistant: SessionMessage)
         : Task<unit> =
         task {
-            let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
-
-            let physical =
-                match ProviderWireCapture.lastUserMessageId rawMessages with
-                | Some physical -> physical
-                | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
-
-            let! snapshotResult = snapshotPort.GetMessages sessionId
-            let messages = requireOk snapshotResult
-
-            let assistant =
-                requireOkMapped
-                    (fun rejection -> sprintf "StrengthReplica run binding failed: %A" rejection)
-                    (ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages)
-
             let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable
 
@@ -297,6 +324,29 @@ module XWire =
                 )
 
             scope.RecordAttemptPlan sessionId providerRun plan
+        }
+
+    let private applyStrengthReplicaPlan
+        (snapshotPort: ISessionSnapshotPort)
+        (durable: AgentJournal)
+        (scope: PluginRuntimeScope)
+        (sessionId: SessionId)
+        (binding: StrengthReplicaBinding)
+        (output: obj)
+        : Task<unit> =
+        task {
+            let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
+
+            let physical =
+                match ProviderWireCapture.lastUserMessageId rawMessages with
+                | Some physical -> physical
+                | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
+
+            match! observeReplicaBindOutcome snapshotPort scope.MessageVisibility sessionId physical with
+            | RunAlreadyClosed -> return ()
+            | Unbindable rejection ->
+                return raise (InvalidOperationException(sprintf "StrengthReplica run binding failed: %A" rejection))
+            | Bindable assistant -> return! applyReplicaPlan durable scope sessionId binding physical assistant
         }
 
     /// PROJ-008 Step6: reanchor 后 CommittedPrefix=None 且声明 ReanchorAfterCompaction（wire no-op）。
