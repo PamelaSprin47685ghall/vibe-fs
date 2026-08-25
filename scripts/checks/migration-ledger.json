@@ -1339,13 +1339,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs"
+      ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Delegation.Fork.HostSurface sole contract verified via HostForkRunLifecycleSurface.fs/RunLifecycle.fs/Runtime.fs, HostSignalBootstrap via HostSurface only, proof fork-tool.test.mjs 9/9 green (DELEG-006, REUSE-024), build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "delegation-fork-opencode",
@@ -1654,14 +1658,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Host.HostBoundarySurface sole contract verified via HostBoundarySurface.fs/HostMessageProjection.fs, PluginHostWiring via HostBoundarySurface only, proof host001-fragment-events.test.mjs 3/3 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "host-boundary-plugin",
@@ -1898,15 +1906,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Context.CompanionSurface sole contract verified via CompressionSurface.fs/FoldSurface.fs/ProjectionSurface.fs, PluginTransforms via Companion surfaces only, proof companion-projection.test.mjs 30/30 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "context-compression-compaction",
@@ -2035,14 +2047,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RepoProgramming.TransactionSurface sole contract verified via TransactionSurface.fs/TransactionStore.fs, WorkflowSurface via TransactionSurface only, proof js-transaction.test.mjs 6/6 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "repository-programming-toolhost",
@@ -2299,15 +2315,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs"
+      ],
       "coverage_tags": [
         "CoverageB",
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Dispatch.RecoverySurface sole contract verified via RecoverySurface.fs/ReconcileSurface.fs, Recovery Workflow via RecoverySurface only, proof recovery-at-most-one.test.mjs 3/3 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "dispatch-protocol-identity",
@@ -2430,13 +2450,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Sphinx/McpContract.fs"
+      ],
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.CodecSurface sole contract verified via McpContract.fs/Mcp.fs/McpServer.fs, PluginTransforms via CodecSurface only, proof decoder-parity.test.mjs 5/5 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "epistemic-reasoning-projection",
@@ -2604,14 +2628,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Enforcer/Cycle/Commit.fs"
+      ],
       "coverage_tags": [
         "CoverageB",
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.CodecSurface sole contract verified via Commit.fs/Decode.fs/Model.fs, PluginTransforms via CodecSurface only, proof blog-tool.test.mjs 10/10 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "behavior-diagnosis-projection",
@@ -2779,13 +2807,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs"
+      ],
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: SpeculativeInvestigation.ProjectionSurface sole contract verified via Speculate.fs/BatchCollector.fs/CostModel.fs, PluginTransforms via ProjectionSurface only, proof batch-collector.test.mjs 2/2 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "speculative-investigation-surface",
@@ -2911,13 +2943,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs"
+      ],
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: KnowledgeReuse.ProjectionSurface sole contract verified via FetchSurface.fs/IndexSurface.fs/LifecycleSurface.fs, PluginTransforms via ProjectionSurface only, proof bookkeeper-session.test.mjs 3/3 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "knowledge-reuse-surface",
@@ -3044,14 +3080,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Fission/Runtime.fs"
+      ],
       "coverage_tags": [
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: IntraParticipantParallelism.ProjectionSurface sole contract verified via Runtime.fs/Projection.fs/OpenCode/Host.fs, PluginTransforms via ProjectionSurface only, proof fission-runtime.test.mjs 10/10 green, build/check green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "intra-participant-parallelism-surface",
@@ -3889,15 +3929,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Foundation/Roles.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ParticipantIdentity.CoreSurface sole contract verified via Roles.fs/ManagedCatalog.fs, PluginTransforms via Surface, proof catalog.test.mjs 6/6 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "participant-identity-surface",
@@ -3975,13 +4019,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Trace/Capture.fs"
+      ],
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: SemanticTrace.CoreSurface sole contract verified via Capture.fs/Cursor.fs, PluginTransforms via Surface, proof x-trace-capture-boundary.test.mjs 3/3 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "semantic-trace-surface",
@@ -4056,13 +4104,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Prefix/Candidate.fs"
+      ],
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: PrefixStability.CoreSurface sole contract verified via Candidate.fs/Epoch.fs, PluginTransforms via Surface, proof attempt-plan-prefix.test.mjs 7/7 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "prefix-stability-surface",
@@ -4137,15 +4189,19 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Language.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProviderLanguage.CoreSurface sole contract verified via Language.fs/LanguageSurface.fs, PluginTransforms via Surface, proof language-parity-gate.test.mjs 16/16 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "provider-language-surface",
@@ -4221,14 +4277,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Session/Association.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: SessionOntology.CoreSurface sole contract verified via Association.fs/Ownership.fs, PluginTransforms via Surface, proof satellite-kind.test.mjs 1/1 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "session-ontology-surface",
@@ -4303,14 +4363,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Tools/Distillation.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: OutputDistillation.CoreSurface sole contract verified via ToolResultBound.fs/Distillation.fs, PluginTransforms via Surface, proof distiller-fragment-humility.test.mjs 4/4 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "output-distillation-surface",
@@ -4385,14 +4449,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: InstitutionalLearning.CoreSurface sole contract verified via Enhancer.fs/Facts.fs, PluginTransforms via Surface, proof institutional-learning.test.mjs 8/8 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "institutional-learning-surface",
@@ -4467,13 +4535,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/AssemblyInfo.fs"
+      ],
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Distribution.CoreSurface sole contract verified via AssemblyInfo.fs/EnforcerCatalogResource.fs, Host boundary via PackageResources, proof cwd-independent-resources.test.mjs 4/4 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "distribution-surface",
@@ -4546,13 +4618,17 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs"
+      ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: CapabilityEnforcement.CoreSurface sole contract verified via ManagedAgentConfig.fs/Surface, PluginTransforms via Surface, proof agent-permission-gate.test.mjs 12/12 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "capability-enforcement-surface",
@@ -4625,14 +4701,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: GuidanceDelivery.CoreSurface sole contract verified via DeliverySurface.fs/TipSurface.fs, PluginTransforms via Surface, proof audience-separation.test.mjs 4/4 green",
+      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "guidance-delivery-surface",
