@@ -1496,10 +1496,35 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Delegation.HandleSurface sole contract verified via CompletionCodec.fs/Controller.fs/FoldSurface.fs, Fission/Runtime via surface only, proof join-v2-mailbox.test.mjs 4/4 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "DELEG-019"
+        ],
+        "proof_anchors": [
+          "requirements/delegation/tests/join-v2-mailbox.test.mjs:10 WHAT[DELEG-019] JOIN_MAILBOX_operator_abort_is_distinct",
+          "requirements/delegation/tests/join-v2-mailbox.test.mjs:14 WHAT[DELEG-019] JOIN_MAILBOX_user_message_signal_wakes_current_join",
+          "requirements/delegation/tests/join-v2-mailbox.test.mjs:22 WHAT[DELEG-019] JOIN_MAILBOX_completion_batch_preserves_order"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/Execution/Fission/Runtime.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "delegation-handoff",
@@ -1543,10 +1568,37 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Delegation.HandoffSurface sole contract verified via Handoff.fs/Ledger.fs/LinkageProjection.fs, Fork/Host/Runtime via surface only, proof reusable-work-unit.test.mjs 4/4 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "DELEG-026",
+          "DELEG-027",
+          "DELEG-025"
+        ],
+        "proof_anchors": [
+          "requirements/delegation/tests/reusable-work-unit.test.mjs:5 WHAT[DELEG-026] reusable delegation has no durable program-counter/state-machine vocabulary",
+          "requirements/delegation/tests/reusable-work-unit.test.mjs:17 WHAT[DELEG-026] fork admission bookkeeping that can fail happens before dispatch",
+          "requirements/delegation/tests/reusable-work-unit.test.mjs:40 WHAT[DELEG-025] reusable fork terminal failure is guarded by the accepted authority root"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "delegation-sync-delegate",
@@ -1747,10 +1799,35 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Host.HostBoundarySurface sole contract verified via HostBoundarySurface.fs/Events.fs, PluginHostWiring via surface only, proof host001-fragment-events.test.mjs 3/3 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "HOST-BOUNDARY-001",
+          "HOST-BOUNDARY-002"
+        ],
+        "proof_anchors": [
+          "requirements/host-boundary/tests/host001-fragment-events.test.mjs:10 WHAT[HOST-BOUNDARY-001] HOST_001_fragment_events_die_at_earliest_boundary",
+          "requirements/host-boundary/tests/host001-fragment-events.test.mjs:20 WHAT[HOST-BOUNDARY-002] HOST_001_only_coarse_session_lifecycle_signals_cross_the_boundary"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "host-boundary-plugin",
@@ -2028,10 +2105,35 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Context.CompanionSurface sole contract verified via CompressionSurface.fs/CompanionFactFold.fs, PluginTransforms via surface only, proof companion-projection.test.mjs 30/30 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "CONTEXT-COMPRESSION-012",
+          "CONTEXT-COMPRESSION-011"
+        ],
+        "proof_anchors": [
+          "requirements/context-compression/tests/companion-projection.test.mjs:30 WHAT[CONTEXT-COMPRESSION-012] COMPANION_004_request_instructions_require_exactly_one_blog_call",
+          "requirements/context-compression/tests/companion-projection.test.mjs:101 WHAT[CONTEXT-COMPRESSION-011] COMPANION_013_seal_root_is_derived_from_exactly_the_candidate_identity"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "context-compression-compaction",
@@ -2193,10 +2295,35 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RepoProgramming.TransactionSurface sole contract verified via TransactionSurface.fs/Transaction.fs, WorkflowSurface via surface only, proof js-transaction.test.mjs 6/6 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "REPOSITORY-PROGRAMMING-010",
+          "REPOSITORY-PROGRAMMING-013"
+        ],
+        "proof_anchors": [
+          "requirements/repository-programming/tests/js-transaction.test.mjs:23 WHAT[REPOSITORY-PROGRAMMING-010] JS026_same_path_once_rejects_duplicate_mutation_targets",
+          "requirements/repository-programming/tests/js-transaction.test.mjs:50 WHAT[REPOSITORY-PROGRAMMING-013] JS013_preflight_orders_rules_and_short_circuits"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "repository-programming-toolhost",
@@ -2490,10 +2617,35 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: Dispatch.RecoverySurface sole contract verified via RecoverySurface.fs/ReconcileSurface.fs, Session/Recovery/Workflow via surface only, proof recovery-at-most-one.test.mjs 3/3 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "DISPATCH-PROTOCOL-008",
+          "DISPATCH-PROTOCOL-004"
+        ],
+        "proof_anchors": [
+          "requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs:42 WHAT[DISPATCH-PROTOCOL-008] DP_008_unproven_outcome_stays_pending_never_resends",
+          "requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs:86 WHAT[DISPATCH-PROTOCOL-004] DP_004_physical_acceptance_is_proven_only_by_physical_message"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "dispatch-protocol-identity",
@@ -2650,10 +2802,34 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.CodecSurface sole contract verified via McpContract.fs/Mcp.fs, PluginTransforms via CoreSurface only, proof decoder-parity.test.mjs 5/5 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Sphinx/McpContract.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "EPI-004"
+        ],
+        "proof_anchors": [
+          "requirements/epistemic-reasoning/tests/decoder-parity.test.mjs:11 WHAT[EPI-004] decode and decodeSemanticAssessmentObservation produce same result for SemanticAssessment raw",
+          "requirements/epistemic-reasoning/tests/decoder-parity.test.mjs:21 WHAT[EPI-004] decode and decodeCandidatesObservation produce same result for Candidates raw"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "epistemic-reasoning-projection",
@@ -2860,10 +3036,35 @@
         "CoverageB",
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.CodecSurface sole contract verified via Commit.fs/Decode.fs/Model.fs, PluginTransforms via CoreSurface only, proof blog-tool.test.mjs 10/10 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "BD-006",
+          "BD-010"
+        ],
+        "proof_anchors": [
+          "requirements/behavior-diagnosis/tests/blog-tool.test.mjs:9 WHAT[BD-006] CHRONICLE_canonical_text_trims_and_rejects_empty",
+          "requirements/behavior-diagnosis/tests/blog-tool.test.mjs:23 WHAT[BD-010] CHRONICLE_live_cycle_requires_a_host_with_a_flight"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "behavior-diagnosis-projection",
@@ -3069,10 +3270,34 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: SpeculativeInvestigation.ProjectionSurface sole contract verified via Speculate.fs/BatchCollector.fs, PluginTransforms via CoreSurface only, proof batch-collector.test.mjs 2/2 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "SPEC-INV-003"
+        ],
+        "proof_anchors": [
+          "requirements/speculative-investigation/tests/batch-collector.test.mjs:10 WHAT[SPEC-INV-003] STRENGTH_003_005_collector_preserves_provider_request_batches_and_concurrent_order",
+          "requirements/speculative-investigation/tests/batch-collector.test.mjs:25 WHAT[SPEC-INV-003] STRENGTH_005_incomplete_batch_and_results_after_next_provider_message_are_not_collected"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "speculative-investigation-surface",
@@ -3231,10 +3456,35 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: KnowledgeReuse.ProjectionSurface sole contract verified via FetchSurface.fs/Index.fs, PluginTransforms via CoreSurface only, proof bookkeeper-session.test.mjs 3/3 green, build/check green",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+      "closure_record": {
+        "implementation_commit": "96b87d0a3285490d6aaa400224db6c5a012aa119",
+        "changed_paths": [
+          "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "KNOWLEDGE-REUSE-006",
+          "KNOWLEDGE-REUSE-005"
+        ],
+        "proof_anchors": [
+          "requirements/knowledge-reuse/tests/bookkeeper-session.test.mjs:62 WHAT[KNOWLEDGE-REUSE-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper",
+          "requirements/knowledge-reuse/tests/bookkeeper-session.test.mjs:125 WHAT[KNOWLEDGE-REUSE-005] CASE006_missing_session_port_keeps_old_case"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "knowledge-reuse-surface",
