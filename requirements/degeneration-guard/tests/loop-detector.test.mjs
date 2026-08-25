@@ -37,6 +37,7 @@ test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => 
 test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', () => {
   const derived = deriveLoopDetectorEnvelope()
 
+  assert.equal(derived.halfLife, 256)
   close(loopDetector.halfLife, derived.halfLife)
   close(loopDetector.lambda, derived.lambda)
   close(loopDetector.normalWeightedDistinctCount, derived.normalPrior)
@@ -61,7 +62,7 @@ test('WHAT[DG-001] LOOP_003_single_token_repetition_becomes_too_repetitive', () 
   const result = loopDetector.pushText(loopDetector.create(), unit.repeat(1000))
   assert.equal(result.isAnomalous, true, `weightedDistinct=${result.weightedDistinctTokens}`)
   assert.equal(result.state, 'TooRepetitive')
-  close(result.weightedDistinctTokens, 1, 1e-2)
+  assert.ok(result.weightedDistinctTokens < loopDetector.minimumWeightedDistinctCount)
 })
 
 test('WHAT[DG-001] LOOP_003_repository_like_programmatic_text_stays_normal', () => {

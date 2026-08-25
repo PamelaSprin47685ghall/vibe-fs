@@ -5,7 +5,8 @@
 ### 直接语料包络
 
 - `LoopDetector` 继续使用 `o200k_base` token 与指数衰减加权相异度 $D_t$；状态只有 `Normal | TooRepetitive | TooRandom`。
-- build 每次直接从 repository SSOT 派生：仓库行长 → half-life；第一遍 corpus replay → fresh prior；第二遍以该 prior + 空 `lastSeen` 重放 → 当前 `minimum` / `maximum`。生成文件只是 ephemeral runtime import，不是配置。
+- half-life 固定为 `256` 个 `o200k_base` token。该值定义 detector 的语言记忆尺度，不从源码物理行长、formatter 或文件布局推导。
+- build 每次直接从 repository SSOT 派生：全部 strict UTF-8 文本连接为单一连续 token stream；第一遍 corpus replay → fresh prior；第二遍以该 prior + 空 `lastSeen` 重放 → 当前 `minimum` / `maximum`。生成文件只是 ephemeral runtime import，不是配置。
 - 生产判定只比较 `D_t < minimum` 与 `D_t > maximum`。Beta、quantile、variance/std threshold 全部删除。
 - `lastSeen[token]` 是唯一算法 scratch；每 token 更新 $O(1)$，空间受 tokenizer vocabulary 上界约束。
 

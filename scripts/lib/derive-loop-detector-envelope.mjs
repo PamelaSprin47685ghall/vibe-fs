@@ -1,17 +1,11 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { countTokens, encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
+import { encode, vocabularySize } from 'gpt-tokenizer/encoding/o200k_base'
 import { loopDetectorRepositoryTexts } from './loop-detector-repository-corpus.mjs'
 
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-
-const nextPowerOfTwo = (value) => 2 ** Math.ceil(Math.log2(Math.max(1, value)))
-
-const percentile = (values, percentileValue) => {
-  const sorted = [...values].sort((left, right) => left - right)
-  return sorted[Math.floor((sorted.length - 1) * percentileValue)]
-}
+const halfLife = 256
 
 const replay = (tokens, lambda, initialValue) => {
   const lastSeen = new Map()
@@ -38,15 +32,6 @@ const replay = (tokens, lambda, initialValue) => {
 
 export const deriveLoopDetectorEnvelope = (root = defaultRoot) => {
   const texts = loopDetectorRepositoryTexts(root)
-  const lineLengths = []
-  for (const text of texts) {
-    for (const line of text.split(/\r?\n/)) {
-      if (line.trim().length > 0) lineLengths.push(countTokens(line))
-    }
-  }
-  if (lineLengths.length === 0) throw new Error('Loop detector repository corpus has no non-empty lines')
-
-  const halfLife = nextPowerOfTwo(percentile(lineLengths, 0.99))
   const lambda = 2 ** (-1 / halfLife)
   const maxSupport = 1 / (1 - lambda)
   const tokens = encode(texts.join('\n'))

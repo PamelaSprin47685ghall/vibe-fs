@@ -18,9 +18,9 @@ LoopSensor 仅从 Host 流式事件提取 assistant `text` 与 reasoning/thinkin
 
 边界值本身属于正常语料；判定必须使用严格不等式。
 
-## DG-004: Repository SSOT 即用即派生
+## DG-004: 固定时间尺度 + Repository SSOT 即用即派生
 
-Repository 本身是检测边界的唯一 SSOT。每次 build 直接读取当前 strict UTF-8 仓库语料，派生 half-life、fresh prior 以及实际 $D_t$ 极小/极大值；生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
+Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 直接读取当前 strict UTF-8 仓库语料，把全部文本连接成一条连续 `o200k_base` token 流，以固定 half-life 派生 fresh prior 以及实际 $D_t$ 极小/极大值；生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把 `normal/min/max` 数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
 
 ## DG-005: O(1) 更新与有界内存
 
