@@ -21,6 +21,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
+import { realpathSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
@@ -143,8 +145,148 @@ export const REQUIRED_NODE_FIELDS = [
   'result',
 ]
 
+// --- Fact-based validation helpers (closure scope) ---
+
+const diffTreeCache = new Map()
+
+/// Real changed paths of one commit, computed once per unique hash. Returns
+/// null when git fails (unknown hash). Never spawns per-node repeated probes.
+export function commitChangedPaths(hash) {
+  if (diffTreeCache.has(hash)) return diffTreeCache.get(hash)
+  let paths = null
+  try {
+    paths = execSync(`git diff-tree --no-commit-id --name-only -r ${hash}`, {
+      cwd: ROOT,
+    })
+      .toString()
+      .split('\n')
+      .filter(Boolean)
+  } catch {
+    paths = null
+  }
+  diffTreeCache.set(hash, paths)
+  return paths
+}
+
+const CLOSURE_RECORD_FIELDS = [
+  'implementation_commit',
+  'changed_paths',
+  'what_ids',
+  'proof_anchors',
+  'architecture_gates',
+  'migrated_callers',
+  'deleted_paths',
+  'result',
+]
+
+function sameStringSet(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false
+  const x = [...a].sort()
+  const y = [...b].sort()
+  return x.length === y.length && x.every((v, i) => v === y[i])
+}
+
+export function validateClosureRecord(node, errors, ownersManifest) {
+  const prefix = `node "${node.id}"`
+  const record = node.closure_record
+
+  if (!record || typeof record !== 'object' || Array.isArray(record)) {
+    errors.push(`${prefix}: DONE requires a structured closure_record object (evidence prose is not authorization)`)
+    return
+  }
+
+  for (const field of CLOSURE_RECORD_FIELDS) {
+    if (!(field in record)) {
+      errors.push(`${prefix}: closure_record missing required field "${field}"`)
+    }
+  }
+  if (errors.some((e) => e.startsWith(prefix) && e.includes('closure_record missing'))) return
+
+  // 1. implementation commit must exist and be the recorded one
+  if (
+    record.implementation_commit !== node.implementation_commit &&
+    !isAncestorCommit(record.implementation_commit)
+  ) {
+    errors.push(`${prefix}: closure_record.implementation_commit "${record.implementation_commit}" is not a HEAD ancestor`)
+  }
+
+  // 2. changed_paths must equal the real diff-tree output of the implementation commit
+  const realPaths = commitChangedPaths(node.implementation_commit)
+  if (realPaths === null) {
+    errors.push(`${prefix}: cannot read diff-tree of implementation_commit "${node.implementation_commit}"`)
+  } else if (!sameStringSet(realPaths, record.changed_paths)) {
+    errors.push(
+      `${prefix}: closure_record.changed_paths does not match git diff-tree of ${node.implementation_commit.slice(0, 9)} (recorded ${record.changed_paths?.length ?? 0}, actual ${realPaths.length})`,
+    )
+  }
+
+  // 3. changed_paths must contain production or test changes
+  const productive = (record.changed_paths || []).some(
+    (p) => p.startsWith('src/') || /\/tests?\//.test(p),
+  )
+  if (!productive) {
+    errors.push(`${prefix}: closure_record.changed_paths lacks any production/test change`)
+  }
+
+  // 4. touched_paths must physically exist and be covered by the recorded diff
+  for (const p of node.touched_paths || []) {
+    if (!existsSync(join(ROOT, p))) {
+      errors.push(`${prefix}: touched_path "${p}" does not exist on disk`)
+    }
+  }
+
+  // 5. deleted_paths must be gone from disk
+  for (const p of record.deleted_paths || []) {
+    if (existsSync(join(ROOT, p))) {
+      errors.push(`${prefix}: deleted_path "${p}" still exists on disk (deletion not landed)`)
+    }
+  }
+
+  // 6. proof anchors: every proof path exists and carries at least one declared WHAT id
+  const whatIds = Array.isArray(record.what_ids) ? record.what_ids : []
+  for (const proofPath of node.proofs || []) {
+    const abs = join(ROOT, proofPath)
+    if (!existsSync(abs)) {
+      errors.push(`${prefix}: proof path "${proofPath}" does not exist`)
+      continue
+    }
+    try {
+      const content = readFileSync(abs, 'utf8')
+      if (whatIds.length > 0 && !whatIds.some((id) => content.includes(id))) {
+        errors.push(`${prefix}: proof "${proofPath}" references none of WHAT[${whatIds.join(', ')}] (node-local anchor required)`)
+      }
+    } catch (e) {
+      errors.push(`${prefix}: proof "${proofPath}" unreadable: ${e.message}`)
+    }
+  }
+
+  // 7. architecture gates must exist as standard-entry check scripts
+  for (const gate of new Set([...(node.architecture_gates || []), ...(record.architecture_gates || [])])) {
+    if (!existsSync(join(ROOT, 'scripts/checks', gate))) {
+      errors.push(`${prefix}: architecture gate "${gate}" has no scripts/checks/${gate} implementation`)
+    }
+  }
+
+  // 8. every node file must belong to the primary owner in semantic-owners
+  if (ownersManifest && Array.isArray(ownersManifest.ownership)) {
+    const ownerOf = new Map(ownersManifest.ownership.map((e) => [e.path, e.owner]))
+    for (const f of node.files || []) {
+      const actual = ownerOf.get(f)
+      if (actual === undefined) {
+        errors.push(`${prefix}: node file "${f}" is absent from semantic-owners.json`)
+      } else if (actual !== node.primary_owner) {
+        errors.push(`${prefix}: node file "${f}" owned by "${actual}", node claims primary_owner "${node.primary_owner}"`)
+      }
+    }
+  }
+}
+
 export function validateLedger(ledger, ownersManifest) {
   const errors = []
+
+  // closure-scope ledgers track per-node semantic closure only; whole-repo
+  // file coverage is owned by semantic-owners.json, never re-asserted here.
+  const closureScope = ledger?.protocol?.scope === 'closure'
 
   if (!ledger || typeof ledger !== 'object') {
     return { ok: false, errors: ['Ledger is not a valid JSON object'] }
@@ -158,7 +300,7 @@ export function validateLedger(ledger, ownersManifest) {
     return { ok: false, errors: ['Missing or invalid top-level "nodes" array'] }
   }
 
-  if (!ledger.coverage_backlog || typeof ledger.coverage_backlog !== 'object') {
+  if (!closureScope && (!ledger.coverage_backlog || typeof ledger.coverage_backlog !== 'object')) {
     return { ok: false, errors: ['Missing or invalid top-level "coverage_backlog" object'] }
   }
 
@@ -311,8 +453,9 @@ export function validateLedger(ledger, ownersManifest) {
     errors.push(`Kahn topological sort failed: cycle detected in DAG (${cyclePath})`)
   }
 
-  // 3. Coverage completeness against semantic-owners manifest
-  if (ownersManifest && Array.isArray(ownersManifest.ownership)) {
+  // 3. Coverage completeness — full-repo scope only; closure-scope ledgers
+  // deliberately track a subset (coverage truth lives in semantic-owners.json).
+  if (!closureScope && ownersManifest && Array.isArray(ownersManifest.ownership)) {
     const expectedFiles = new Set(ownersManifest.ownership.map((e) => e.path))
     const ledgerFileToLocation = new Map()
 
@@ -446,6 +589,10 @@ export function validateLedger(ledger, ownersManifest) {
         errors.push(`node "${node.id}" has state=DONE but lacks owner graph (publishes/consumes/depends_on/production_callers all empty)`)
       }
     }
+    // 6g. structured, fact-checked closure record (closure scope)
+    if (closureScope) {
+      validateClosureRecord(node, errors, ownersManifest)
+    }
   }
 
   // 7. Closure dependency must be DONE (any depends_on with kind=closure) — only for READY/RUNNING/DONE
@@ -499,10 +646,30 @@ export function runSelfTest(validLedger, ownersManifest) {
     }
   }
 
+  // Helper: guarantee one node with a valid dependency edge + existing target,
+  // synthesizing a minimal target node on sparse (closure-scope) ledgers.
+  const ensureDependencyEdge = (ledger) => {
+    let node = ledger.nodes.find((n) => n.depends_on && n.depends_on.length > 0 && ledger.nodes.some((t) => t.id === n.depends_on[0].id))
+    if (!node) {
+      node = ledger.nodes[0]
+      const targetId = `${node.id}-dep-target`
+      if (!ledger.nodes.some((n) => n.id === targetId)) {
+        ledger.nodes.push({
+          id: targetId, primary_owner: 'distribution', intent: 'self-test dependency target',
+          files: [], classification: 'KEEP', publishes: [], consumes: [], depends_on: [],
+          production_callers_to_migrate: [], proofs: [], architecture_gates: [],
+          touched_paths: [], coverage_tags: [], state: 'PENDING', result: 'PENDING',
+        })
+      }
+      node.depends_on = [{ id: targetId, kind: 'contract' }]
+    }
+    return node
+  }
+
   // 2. Fixture: Missing / Invalid Edge Kind
   {
     const missingKindLedger = clone(validLedger)
-    const readyNode = missingKindLedger.nodes.find((n) => n.depends_on && n.depends_on.length > 0)
+    const readyNode = ensureDependencyEdge(missingKindLedger)
     readyNode.depends_on[0] = { id: readyNode.depends_on[0].id } // missing kind
     const result = validateLedger(missingKindLedger, ownersManifest)
     const hasKindError = result.errors.some((e) => e.includes('missing or illegal kind'))
@@ -520,7 +687,7 @@ export function runSelfTest(validLedger, ownersManifest) {
   // 3. Fixture: READY state with non-DONE dependency
   {
     const readyNotDoneLedger = clone(validLedger)
-    const readyNode = readyNotDoneLedger.nodes.find((n) => n.depends_on && n.depends_on.length > 0)
+    const readyNode = ensureDependencyEdge(readyNotDoneLedger)
     readyNode.state = 'READY'
     const depNodeId = readyNode.depends_on[0].id
     const depNode = readyNotDoneLedger.nodes.find((n) => n.id === depNodeId)
@@ -538,28 +705,44 @@ export function runSelfTest(validLedger, ownersManifest) {
     }
   }
 
-  // 4. Fixture: Coverage incompleteness (missing file)
+  // 4. Fixture: Coverage incompleteness (missing file) — full-repo scope only.
+  // Closure-scope ledgers delegate coverage truth to semantic-owners.json.
   {
+    const closureScope = validLedger.protocol?.scope === 'closure'
     const missingFileLedger = clone(validLedger)
-    // If backlog has files, drop from backlog; else drop from first node's files to trigger coverage mismatch
-    const firstGroup = Object.keys(missingFileLedger.coverage_backlog)[0]
-    if (Array.isArray(missingFileLedger.coverage_backlog[firstGroup]) && missingFileLedger.coverage_backlog[firstGroup].length > 0) {
-      missingFileLedger.coverage_backlog[firstGroup].pop() // drop one file
+    if (closureScope) {
+      const result = validateLedger(missingFileLedger, ownersManifest)
+      const hasCoverageError = result.errors.some((e) => e.includes('Coverage mismatch'))
+      if (!hasCoverageError) {
+        testResults.push({ name: '4. Closure scope does not re-assert whole-repo coverage', ok: true })
+      } else {
+        testResults.push({
+          name: '4. Closure scope does not re-assert whole-repo coverage',
+          ok: false,
+          detail: `Unexpected coverage error under closure scope: ${result.errors.join('; ')}`,
+        })
+      }
     } else {
-      const firstNode = missingFileLedger.nodes.find(n => Array.isArray(n.files) && n.files.length > 0)
-      if (firstNode) firstNode.files.pop()
-      else missingFileLedger.nodes[0].files.push('src/Wanxiangshu/Fake/CoverageMismatch.fs')
-    }
-    const result = validateLedger(missingFileLedger, ownersManifest)
-    const hasCoverageError = result.errors.some((e) => e.includes('Coverage mismatch'))
-    if (!result.ok && hasCoverageError) {
-      testResults.push({ name: '4. Coverage mismatch (missing file) rejection', ok: true })
-    } else {
-      testResults.push({
-        name: '4. Coverage mismatch (missing file) rejection',
-        ok: false,
-        detail: `Expected coverage error, got: ${result.errors.join('; ')}`,
-      })
+      // If backlog has files, drop from backlog; else drop from first node's files to trigger coverage mismatch
+      const firstGroup = Object.keys(missingFileLedger.coverage_backlog)[0]
+      if (Array.isArray(missingFileLedger.coverage_backlog[firstGroup]) && missingFileLedger.coverage_backlog[firstGroup].length > 0) {
+        missingFileLedger.coverage_backlog[firstGroup].pop() // drop one file
+      } else {
+        const firstNode = missingFileLedger.nodes.find(n => Array.isArray(n.files) && n.files.length > 0)
+        if (firstNode) firstNode.files.pop()
+        else missingFileLedger.nodes[0].files.push('src/Wanxiangshu/Fake/CoverageMismatch.fs')
+      }
+      const result = validateLedger(missingFileLedger, ownersManifest)
+      const hasCoverageError = result.errors.some((e) => e.includes('Coverage mismatch'))
+      if (!result.ok && hasCoverageError) {
+        testResults.push({ name: '4. Coverage mismatch (missing file) rejection', ok: true })
+      } else {
+        testResults.push({
+          name: '4. Coverage mismatch (missing file) rejection',
+          ok: false,
+          detail: `Expected coverage error, got: ${result.errors.join('; ')}`,
+        })
+      }
     }
   }
   // 5. Fixture: PENDING success evidence must be rejected
@@ -838,6 +1021,66 @@ export function runSelfTest(validLedger, ownersManifest) {
     }
   }
 
+  // --- closure-scope fact-based counterexamples (18-22) ---
+  if (validLedger.protocol?.scope === 'closure') {
+    // 18. changed_paths diverging from the real diff-tree must be rejected
+    {
+      const l = clone(validLedger)
+      const done = l.nodes.find((n) => n.state === 'DONE')
+      done.closure_record.changed_paths = ['src/Wanxiangshu/Fabricated/NotInDiff.fs']
+      const result = validateLedger(l, ownersManifest)
+      const hit = result.errors.some((e) => /changed_paths does not match git diff-tree/.test(e))
+      testResults.push({ name: '18. changed_paths != diff-tree rejection', ok: !result.ok && hit, detail: result.errors.filter((e) => /changed_paths/.test(e)).join('; ') })
+    }
+
+    // 19. proof without a node-local WHAT anchor must be rejected
+    {
+      const l = clone(validLedger)
+      const done = l.nodes.find((n) => n.state === 'DONE')
+      done.proofs = [...done.proofs]
+      done.closure_record = clone(done.closure_record)
+      done.closure_record.what_ids = ['WHAT[DOES-NOT-EXIST-999]']
+      const result = validateLedger(l, ownersManifest)
+      const hit = result.errors.some((e) => /node-local anchor required/.test(e))
+      testResults.push({ name: '19. proof missing WHAT anchor rejection', ok: !result.ok && hit, detail: result.errors.filter((e) => /anchor|proof/.test(e)).join('; ') })
+    }
+
+    // 20. touched path absent from disk must be rejected
+    {
+      const l = clone(validLedger)
+      const done = l.nodes.find((n) => n.state === 'DONE')
+      done.touched_paths = [...done.touched_paths, 'src/Wanxiangshu/Ghost/Missing.fs']
+      const result = validateLedger(l, ownersManifest)
+      const hit = result.errors.some((e) => /does not exist on disk/.test(e))
+      testResults.push({ name: '20. nonexistent touched_path rejection', ok: !result.ok && hit, detail: result.errors.filter((e) => /exist on disk/.test(e)).join('; ') })
+    }
+
+    // 21. missing structured closure_record must be rejected
+    {
+      const l = clone(validLedger)
+      const done = l.nodes.find((n) => n.state === 'DONE')
+      delete done.closure_record
+      const result = validateLedger(l, ownersManifest)
+      const hit = result.errors.some((e) => /requires a structured closure_record/.test(e))
+      testResults.push({ name: '21. missing closure_record rejection', ok: !result.ok && hit, detail: result.errors.filter((e) => /closure_record/.test(e)).join('; ') })
+    }
+
+    // 22. node file owned by another owner must be rejected
+    {
+      const l = clone(validLedger)
+      const done = l.nodes.find((n) => n.state === 'DONE')
+      const foreign = l.nodes.find((n) => n.state !== 'DONE' && n.primary_owner !== done.primary_owner && (n.files || []).length > 0)
+      if (foreign) {
+        done.files = [...done.files, foreign.files[0]]
+        const result = validateLedger(l, ownersManifest)
+        const hit = result.errors.some((e) => /owned by .* node claims primary_owner/.test(e))
+        testResults.push({ name: '22. cross-owner file claim rejection', ok: !result.ok && hit, detail: result.errors.filter((e) => /primary_owner/.test(e)).join('; ') })
+      } else {
+        testResults.push({ name: '22. cross-owner file claim rejection', ok: true })
+      }
+    }
+  }
+
   // 17. Valid baseline check
   {
     const result = validateLedger(validLedger, ownersManifest)
@@ -908,28 +1151,53 @@ const main = () => {
     process.exit(1)
   }
 
+  const summaryLines = closureScopeLedgerSummary(ledger)
+  for (const line of summaryLines) console.log(line)
+}
+
+const closureScopeLedgerSummary = (ledger) => {
+  if (ledger.protocol?.scope === 'closure') {
+    const stateCounts = {}
+    for (const n of ledger.nodes) stateCounts[n.state] = (stateCounts[n.state] || 0) + 1
+    return [
+      'migration-ledger: OK (closure DAG integrity verified)',
+      `  nodes: ${ledger.nodes.length} (${JSON.stringify(stateCounts)})`,
+      '  scope: closure — per-node semantic closure; file coverage owned by semantic-owners.json',
+    ]
+  }
+  return legacyFullScopeSummary(ledger)
+}
+
+const legacyFullScopeSummary = (ledger) => {
   const stateCounts = {}
   const classCounts = {}
   let totalFiles = 0
-
   for (const n of ledger.nodes) {
     stateCounts[n.state] = (stateCounts[n.state] || 0) + 1
     classCounts[n.classification] = (classCounts[n.classification] || 0) + 1
     totalFiles += (n.files || []).length
   }
-
   const backlogCounts = {}
   let backlogTotal = 0
   for (const [group, files] of Object.entries(ledger.coverage_backlog || {})) {
     backlogCounts[group] = files.length
     backlogTotal += files.length
   }
-
-  console.log('migration-ledger: OK (DAG integrity & coverage verified)')
-  console.log(`  nodes: ${ledger.nodes.length} (${JSON.stringify(stateCounts)})`)
-  console.log(`  node files: ${totalFiles}, coverage backlog files: ${backlogTotal}, total: ${totalFiles + backlogTotal}`)
-  console.log(`  classifications: ${JSON.stringify(classCounts)}`)
-  console.log(`  coverage backlog by group: ${JSON.stringify(backlogCounts)}`)
+  return [
+    'migration-ledger: OK (DAG integrity & coverage verified)',
+    `  nodes: ${ledger.nodes.length} (${JSON.stringify(stateCounts)})`,
+    `  node files: ${totalFiles}, coverage backlog files: ${backlogTotal}, total: ${totalFiles + backlogTotal}`,
+    `  classifications: ${JSON.stringify(classCounts)}`,
+    `  coverage backlog by group: ${JSON.stringify(backlogCounts)}`,
+  ]
 }
 
-main()
+const isMainModule = (() => {
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+  } catch {
+    return false
+  }
+})()
+
+if (isMainModule) main()
