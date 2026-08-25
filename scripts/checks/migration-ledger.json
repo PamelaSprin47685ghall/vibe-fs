@@ -209,8 +209,9 @@
       "coverage_tags": [
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "DELETED"
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: DELETE not yet proven via deletion commit + no-reference gate"
     },
     {
       "id": "review-assurance-witness-contract",
@@ -1265,7 +1266,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "host-boundary-backlog-keep",
@@ -1345,7 +1346,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "context-compression-backlog-keep",
@@ -1413,7 +1414,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "repository-programming-backlog-keep",
@@ -1464,7 +1465,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "dispatch-protocol-backlog-keep",
@@ -1513,7 +1514,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "epistemic-reasoning-backlog-keep",
@@ -1560,7 +1561,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "behavior-diagnosis-backlog-keep",
@@ -1607,7 +1608,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "speculative-investigation-backlog-keep",
@@ -1650,7 +1651,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "knowledge-reuse-backlog-keep",
@@ -1693,7 +1694,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "intra-participant-parallelism-backlog-keep",
@@ -1735,7 +1736,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "process-execution-backlog-keep",
@@ -1776,7 +1777,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "provider-attempt-recovery-backlog-keep",
@@ -1816,7 +1817,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "provider-projection-backlog-keep",
@@ -1856,7 +1857,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "requirement-grounding-backlog-keep",
@@ -1894,7 +1895,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "interaction-authority-backlog-keep",
@@ -1931,7 +1932,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "repository-investigation-backlog-keep",
@@ -1968,7 +1969,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "time-capability-backlog-keep",
@@ -2005,7 +2006,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "participant-identity-backlog-keep",
@@ -2041,7 +2042,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "semantic-trace-backlog-keep",
@@ -2075,7 +2076,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "prefix-stability-backlog-keep",
@@ -2108,7 +2109,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "provider-language-backlog-keep",
@@ -2142,7 +2143,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "session-ontology-backlog-keep",
@@ -2175,7 +2176,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "output-distillation-backlog-keep",
@@ -2208,7 +2209,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "institutional-learning-backlog-keep",
@@ -2241,7 +2242,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "distribution-backlog-keep",
@@ -2273,7 +2274,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "capability-enforcement-backlog-keep",
@@ -2304,7 +2305,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "guidance-delivery-backlog-keep",
@@ -2336,7 +2337,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "attention-regulation-backlog-keep",
@@ -2368,7 +2369,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "concern-routing-backlog-keep",
@@ -2400,7 +2401,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, KEEP verified"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "cognitive-environment-backlog-keep",
@@ -2431,7 +2432,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN, foreign consumers via surface only"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "degeneration-guard-backlog-keep",
@@ -2462,7 +2463,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "participant-horizon-backlog-keep",
@@ -2493,7 +2494,7 @@
       ],
       "state": "PENDING",
       "result": "PENDING",
-      "evidence": "semantic-owners / architecture all GREEN"
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
       "id": "owner-dependency-gate",

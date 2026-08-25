@@ -56,7 +56,8 @@ module GroundingCatalog =
 
     let private slash (value: string) = value.Replace('\\', '/')
 
-    let private isRootParent parent path = parent = path || parent = "." || parent = "/"
+    let private isRootParent parent path =
+        parent = path || parent = "." || parent = "/"
 
     let rec private tryRealpathBestEffort path =
         try
@@ -66,6 +67,7 @@ module GroundingCatalog =
 
     and private fallbackRealpath path =
         let parent = pathDirname path
+
         if isRootParent parent path then
             path
         else
@@ -87,6 +89,7 @@ module GroundingCatalog =
                 pathResolve path
             else
                 pathResolve (pathJoin (root, path))
+
         tryRealpathBestEffort resolved
 
 
