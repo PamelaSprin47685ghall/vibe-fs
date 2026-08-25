@@ -5822,12 +5822,23 @@
         }
       ],
       "production_callers_to_migrate": [],
-      "proofs": [],
-      "architecture_gates": [],
-      "touched_paths": [],
+      "proofs": [
+        "scripts/checks/migration-ledger.mjs",
+        "requirements/verification-system/tests/run.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [
+        "resources/verification-system/ProofGraphSync.md"
+      ],
       "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ProofGraphSync verified — proof ownership synced, each WHAT has lowest adequate proof level, owner verification-system, gates green",
+      "implementation_commit": "e41f49b1a71690ce98bcc7092800e4f175c55065",
+      "touched_paths_review": "KEEP verified: proof graph sync complete"
     },
     {
       "id": "release-closure",
