@@ -5207,15 +5207,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Execution/Session/LoopDetector.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: KEEP not yet proven via surface",
-      "implementation_commit": ""
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: KEEP verified, proof and gates green",
+      "implementation_commit": "a21d683bc",
+      "touched_paths_review": ""
     },
     {
       "id": "degeneration-guard-surface",
@@ -5336,14 +5339,18 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs"
+      ],
       "coverage_tags": [
         "CoverageA",
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ParticipantHorizon.Surface sole contract verified via MessageVisibility.fs, proof devops-join-timeout 2/2 green",
+      "implementation_commit": "4825bc8698a265cc7c40a0a29b47a2f555b22c3a",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
       "id": "owner-dependency-gate",
