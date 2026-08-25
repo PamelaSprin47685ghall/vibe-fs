@@ -4,6 +4,10 @@ import { encode } from 'gpt-tokenizer/encoding/o200k_base'
 
 import * as loopDetector from '../../../dist/Execution/Session/LoopDetectorSurface.js'
 import { deriveLoopDetectorEnvelope } from '../../../scripts/lib/derive-loop-detector-envelope.mjs'
+import {
+  loopDetectorRepositoryInputFiles,
+  loopDetectorRepositoryTexts,
+} from '../../../scripts/lib/loop-detector-repository-corpus.mjs'
 
 const close = (actual, expected, tolerance = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
@@ -26,6 +30,30 @@ const referenceScore = (text) => {
   return { weightedDistinctTokens, step }
 }
 
+const referenceEnvelope = (tokens, lambda, initialValue) => {
+  const lastSeen = new Map()
+  let weightedDistinctTokens = initialValue
+  let minimum = Number.POSITIVE_INFINITY
+  let maximum = Number.NEGATIVE_INFINITY
+  let sum = 0
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const step = index + 1
+    const token = tokens[index]
+    const previous = lastSeen.get(token)
+    weightedDistinctTokens =
+      lambda * weightedDistinctTokens +
+      1 -
+      (previous === undefined ? 0 : lambda ** (step - previous))
+    lastSeen.set(token, step)
+    minimum = Math.min(minimum, weightedDistinctTokens)
+    maximum = Math.max(maximum, weightedDistinctTokens)
+    sum += weightedDistinctTokens
+  }
+
+  return { mean: sum / tokens.length, minimum, maximum }
+}
+
 test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
   const result = loopDetector.evaluate(loopDetector.create())
   assert.equal(result.state, 'Normal')
@@ -43,6 +71,22 @@ test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current
   close(loopDetector.normalWeightedDistinctCount, derived.normalPrior)
   close(loopDetector.minimumWeightedDistinctCount, derived.minimum)
   close(loopDetector.maximumWeightedDistinctCount, derived.maximum)
+
+  const tokens = encode(loopDetectorRepositoryTexts().join('\n'))
+  const reference = referenceEnvelope(tokens, derived.lambda, derived.normalPrior)
+  close(reference.mean, derived.normalPrior)
+  close(reference.minimum, derived.minimum)
+  close(reference.maximum, derived.maximum)
+})
+
+test('WHAT[DG-004] LOOP_004_repository_corpus_contains_normal_source_documents_only', () => {
+  const files = loopDetectorRepositoryInputFiles().map((file) => file.replaceAll('\\', '/'))
+
+  assert.ok(files.some((file) => file.endsWith('/src/Wanxiangshu/Execution/Session/LoopDetector.fs')))
+  assert.ok(files.some((file) => file.endsWith('/requirements/degeneration-guard/WHAT.md')))
+  assert.ok(!files.some((file) => file.endsWith('/package-lock.json')))
+  assert.ok(!files.some((file) => file.endsWith('/scripts/checks/semantic-owners.json')))
+  assert.ok(!files.some((file) => file.endsWith('/docs/index.html')))
 })
 
 test('WHAT[DG-003] LOOP_003_push_text_is_o200k_token_based', () => {

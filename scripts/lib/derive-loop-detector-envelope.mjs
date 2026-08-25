@@ -7,37 +7,62 @@ import { loopDetectorRepositoryTexts } from './loop-detector-repository-corpus.m
 const defaultRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const halfLife = 256
 
-const replay = (tokens, lambda, initialValue) => {
+const replayAffine = (tokens, lambda) => {
+  if (tokens.length === 0) throw new Error('Loop detector repository corpus has no tokens')
+
   const lastSeen = new Map()
-  let weightedDistinct = initialValue
-  let minimum = Number.POSITIVE_INFINITY
-  let maximum = Number.NEGATIVE_INFINITY
-  let sum = 0
+  const offsets = new Float64Array(tokens.length)
+  let coefficient = 1
+  let offset = 0
+  let coefficientSum = 0
+  let offsetSum = 0
 
   for (let index = 0; index < tokens.length; index += 1) {
     const step = index + 1
     const token = tokens[index]
     const previous = lastSeen.get(token)
-    weightedDistinct =
-      lambda * weightedDistinct + 1 - (previous === undefined ? 0 : lambda ** (step - previous))
+    const replacement = 1 - (previous === undefined ? 0 : lambda ** (step - previous))
+    coefficient *= lambda
+    offset = lambda * offset + replacement
     lastSeen.set(token, step)
-    minimum = Math.min(minimum, weightedDistinct)
-    maximum = Math.max(maximum, weightedDistinct)
-    sum += weightedDistinct
+    offsets[index] = offset
+    coefficientSum += coefficient
+    offsetSum += offset
   }
 
-  if (tokens.length === 0) throw new Error('Loop detector repository corpus has no tokens')
-  return { mean: sum / tokens.length, minimum, maximum }
+  return { offsets, coefficientSum, offsetSum }
+}
+
+const solveNormalPrior = (replay) => {
+  const meanCoefficient = replay.coefficientSum / replay.offsets.length
+  const meanOffset = replay.offsetSum / replay.offsets.length
+  if (!(meanCoefficient < 1)) throw new Error('Loop detector repository corpus has invalid affine coefficient')
+  return meanOffset / (1 - meanCoefficient)
+}
+
+const evaluateEnvelope = (offsets, lambda, normalPrior) => {
+  let coefficient = 1
+  let minimum = Number.POSITIVE_INFINITY
+  let maximum = Number.NEGATIVE_INFINITY
+
+  for (const offset of offsets) {
+    coefficient *= lambda
+    const weightedDistinct = coefficient * normalPrior + offset
+    minimum = Math.min(minimum, weightedDistinct)
+    maximum = Math.max(maximum, weightedDistinct)
+  }
+
+  return { minimum, maximum }
 }
 
 export const deriveLoopDetectorEnvelope = (root = defaultRoot) => {
   const texts = loopDetectorRepositoryTexts(root)
   const lambda = 2 ** (-1 / halfLife)
-  const maxSupport = 1 / (1 - lambda)
   const tokens = encode(texts.join('\n'))
 
-  const normalPrior = replay(tokens, lambda, maxSupport).mean
-  const envelope = replay(tokens, lambda, normalPrior)
+  const replay = replayAffine(tokens, lambda)
+  const normalPrior = solveNormalPrior(replay)
+  const envelope = evaluateEnvelope(replay.offsets, lambda, normalPrior)
 
   return {
     vocabularySize,

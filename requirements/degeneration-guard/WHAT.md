@@ -20,7 +20,7 @@ LoopSensor 仅从 Host 流式事件提取 assistant `text` 与 reasoning/thinkin
 
 ## DG-004: 固定时间尺度 + Repository SSOT 即用即派生
 
-Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 直接读取当前 strict UTF-8 仓库语料，把全部文本连接成一条连续 `o200k_base` token 流，以固定 half-life 派生 fresh prior 以及实际 $D_t$ 极小/极大值；生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把 `normal/min/max` 数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
+Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 只读取 Git tracked、strict UTF-8、正常人工可读的 source/document text；corpus 采用正向 source/document 类型 allowlist，机器生成物、vendor/dependency、fixture/golden 与 JSON/JSONL/CSV 等结构化数据不得因可 UTF-8 decode 而进入语料。入选文本按 repository path 顺序连接成一条连续 `o200k_base` token 流。以 $D_0=X$ 做一次仿射 replay，令 normal prior 为 $X = mean(D_t(X))$ 的唯一自洽解，再以该解计算语料实际 $D_t$ 极小/极大值；不得用任意 seed 预热后再二次 replay。生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把 `normal/min/max` 数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
 
 ## DG-005: O(1) 更新与有界内存
 

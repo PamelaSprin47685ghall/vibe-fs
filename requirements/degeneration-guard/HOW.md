@@ -6,7 +6,7 @@
 
 - `LoopDetector` 继续使用 `o200k_base` token 与指数衰减加权相异度 $D_t$；状态只有 `Normal | TooRepetitive | TooRandom`。
 - half-life 固定为 `256` 个 `o200k_base` token。该值定义 detector 的语言记忆尺度，不从源码物理行长、formatter 或文件布局推导。
-- build 每次直接从 repository SSOT 派生：全部 strict UTF-8 文本连接为单一连续 token stream；第一遍 corpus replay → fresh prior；第二遍以该 prior + 空 `lastSeen` 重放 → 当前 `minimum` / `maximum`。生成文件只是 ephemeral runtime import，不是配置。
+- build 每次直接从 repository SSOT 派生：`git ls-files` 给出 tracked paths；corpus helper 只接受正常人工可读 source/document 类型，拒绝 vendor/dependency、generated、fixture/golden 与结构化数据，再以 fatal UTF-8 decode 作为必要条件。入选文本按 path 顺序连接为单一连续 token stream。令 $D_0=X$，一次 token/history replay 递推 $D_t(X)=\lambda^tX+b_t$ 并保存 $b_t$，由 $X=mean(D_t(X))$ 直接解出 self-consistent normal prior，再只扫描 $b_t$ 计算当前 `minimum` / `maximum`。没有任意启动 seed，也没有第二次 token/history replay。生成文件只是 ephemeral runtime import，不是配置。
 - 生产判定只比较 `D_t < minimum` 与 `D_t > maximum`。Beta、quantile、variance/std threshold 全部删除。
 - `lastSeen[token]` 是唯一算法 scratch；每 token 更新 $O(1)$，空间受 tokenizer vocabulary 上界约束。
 
