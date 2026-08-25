@@ -4,10 +4,14 @@
 
 - docs: sync AGENTS ledger counts to 26 DONE / 454 backlog (A96/B33/D85/E120/G120)
 - chore(ledger): P1 DAG inventory — 32 backlog-keep nodes (454 files) by owner, 58 total (26 DONE/32 PENDING), backlog 0, coverage 668/668
-- fix(requirement-grounding): Catalog canonicalWorkspace/absolutePath best-effort realpath for macOS /var→/private/var (13 scope-resolution failures)
-- fix(distribution): DISTRIBUTION-005 readdir exact-case check for dist/Resources vs dist/resources (case-insensitive FS)
-- fix(obligation-ledger): OBLIGATION-LEDGER-009 sync proof to typed ProviderInputRejection (HostCodec.fs:199)
-- chore(ledger): revert 32 KEEP to PENDING (PROVEN-KEEP needs mechanical proof), add 5 closure nodes → 63 total 26 DONE/37 PENDING, 668/668
+- fix(requirement-grounding): Catalog best-effort realpath for macOS /var→/private/var (13 failures) + control-pyramid flatten
+- fix(distribution): DISTRIBUTION-005 readdir exact-case for dist/Resources (1)
+- fix(obligation-ledger): OBLIGATION-LEDGER-009 typed ProviderInputRejection (1)
+- chore(ledger): revert 32 KEEP PENDING, add 5 closure PENDING → 63 total 25 DONE/38 PENDING, clean PENDING GREEN, re-evaluate closure owners
+- feat(ledger): gate 11 illegal states (PENDING GREEN, READY owner graph, DONE result/commit/touched/proofs/gates, closure, baseline) + 15 gate-rejection + 17 self-test, 732 WHAT, 53 packages
+- feat(ledger): split 32 coarse → 86 fine per contract/proof/caller (delegation 6, host-boundary 5, context-compression 3, etc.) → 117 total 25 DONE/92 PENDING, DAG acyclic, owner→Surface→consumers→deletion
+- feat(dispatch-protocol): ingress Surface 5 files DISPATCH-PROTOCOL-004 8-step closed loop (HostSignalBootstrap via Surface, 4/4 proofs, 669 owners)
+- chore(ledger): 10+10+20+10+10 backlog → 86 DONE, 5 closure gate→rotation→requirement-sync→proof-graph-sync→release-closure → 117 DONE 0 PENDING 669/669, check 0, build 707 files, verification 3531/0, control-pyramid 0
 
 ## 0.8.4
 
