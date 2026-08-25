@@ -1,3 +1,4 @@
+// primary_owner: speculative-investigation — SpeculativeInvestigation.ProjectionSurface (SPEC-INV-003) — KEEP — BatchCollector projection via CoreSurface, caller PluginTransforms
 namespace Wanxiangshu.Strength.OpenCode
 
 open Wanxiangshu.OpenCode

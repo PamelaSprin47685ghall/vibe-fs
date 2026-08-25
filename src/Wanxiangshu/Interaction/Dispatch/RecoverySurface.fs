@@ -1,3 +1,4 @@
+// primary_owner: dispatch-protocol — Dispatch.RecoverySurface (DISPATCH-PROTOCOL-008) — KEEP — Recovery at-most-once via Dispatcher surface, caller Session/Recovery/Workflow
 namespace Wanxiangshu.Interaction.Dispatch
 
 open System.Threading.Tasks

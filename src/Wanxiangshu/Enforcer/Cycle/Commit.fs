@@ -1,3 +1,4 @@
+// primary_owner: behavior-diagnosis — BehaviorDiagnosis.CodecSurface (BD-006/010) — KEEP — Cycle commit via CoreSurface, caller PluginTransforms
 namespace Wanxiangshu.Enforcer.Cycle
 
 open Wanxiangshu.Composition.Durable

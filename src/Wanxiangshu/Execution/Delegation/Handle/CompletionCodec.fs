@@ -1,3 +1,4 @@
+// primary_owner: delegation — Delegation.HandleSurface (DELEG-013/019) — KEEP — CompletionCodec sole join drain codec, JoinInterruptRegistry, caller Fission/Runtime via surface
 namespace Wanxiangshu.Execution.Delegation.Handle
 
 open Wanxiangshu.Context.Companion

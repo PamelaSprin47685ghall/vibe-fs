@@ -1,3 +1,4 @@
+// primary_owner: delegation — Delegation.HandoffSurface (DELEG-024/026) — KEEP — Handoff ledger & linkage, caller Fork/Host/Runtime via surface
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
