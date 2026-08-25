@@ -131,7 +131,7 @@ Proposal 的提出、讨论和裁决发生在 Agent 执行工作流之外，由�
 
 以下内容是仍在执行中的架构迁移提案，不是已经完成的 repository law。实施时必须继续受上方正式协议与 `requirements/` 约束。
 
-毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-25，migration ledger 已建 117 节点全部 `DONE`（25 原 + 86 细拆 + 5 closure + 1 gate 修复），coverage backlog 0，669/669 已纳入 DAG 并通过 `semantic-owners/architecture/migration-ledger` 门禁；`DONE` 均含 `implementation_commit` 祖先、`touched_paths`、`proofs`、`gates`、`closure record`，`5 closure` 按 `gate→rotation→requirement-sync→proof-graph-sync→release-closure` 顺序 `fast-forward` 关闭，`verification 3531/0`、`check 0`、`build 707 files`、`control-pyramid 0` 全绿，已满足 `ReleaseClosure` 前置，待删临时 `ledger`。
+毕业规则：production cutover + executable proof + hard gate 三者齐全才算完成。完成项立即从本提案缩掉，压成上方“守江山”一条；inventory / baseline / report-only / 文档宣称均不算毕业。截至 2026-08-25，migration ledger 已建 117 节点（1 `DONE` / 116 `PENDING`：`dispatch-protocol-ingress` 唯一真闭环，其余 86 细拆 + 5 closure + 25 原均回退为 `PENDING` 待 8 步重验），coverage backlog 0，669/669 已纳入 DAG；`DONE` 需 `implementation_commit` 祖先、`touched_paths`、`proofs`、`gates`、`closure record` 结构化且机械可验，禁止 `gate-only`；`5 closure` 全部 `PENDING`，`verification 2040/0` 前静默（`gate 15/15` 需 `120s` 超时）、`check 0`（`pyramid 0`）、`build 707` 全绿，未满足 `ReleaseClosure`（需 `117 DONE`），当前结论“未完成”。
 
 原提案第一章 / Phase 0 的“关键 trace 冻结”已毕业到守江山，不再保留施工长文。以下继续沿用原章节编号，未完成部分保持原意。
 

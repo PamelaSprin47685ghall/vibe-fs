@@ -11,7 +11,8 @@
 - feat(ledger): gate 11 illegal states (PENDING GREEN, READY owner graph, DONE result/commit/touched/proofs/gates, closure, baseline) + 15 gate-rejection + 17 self-test, 732 WHAT, 53 packages
 - feat(ledger): split 32 coarse → 86 fine per contract/proof/caller (delegation 6, host-boundary 5, context-compression 3, etc.) → 117 total 25 DONE/92 PENDING, DAG acyclic, owner→Surface→consumers→deletion
 - feat(dispatch-protocol): ingress Surface 5 files DISPATCH-PROTOCOL-004 8-step closed loop (HostSignalBootstrap via Surface, 4/4 proofs, 669 owners)
-- chore(ledger): 10+10+20+10+10 backlog → 86 DONE, 5 closure gate→rotation→requirement-sync→proof-graph-sync→release-closure → 117 DONE 0 PENDING 669/669, check 0, build 707 files, verification 3531/0, control-pyramid 0
+ - chore(ledger): 10+10+20+10+10 backlog → 86 DONE, 5 closure gate→rotation→requirement-sync→proof-graph-sync→release-closure → 117 DONE 0 PENDING 669/669, check 0, build 707 files, verification 3531/0, control-pyramid 0
+ - fix(ledger): revert false 117 DONE claim → 1 DONE (dispatch-protocol-ingress) / 116 PENDING per 14-point gate audit (116 invalid: no prod diff, no closure_record, owner mismatch, empty proofs/gates); 5 closure 0/5 valid, AGENTS 117→1 DONE, conclusion “未完成”
 
 ## 0.8.4
 

@@ -75,16 +75,15 @@
       "architecture_gates": [
         "unified-store-gate.mjs"
       ],
-      "evidence": "unified-store-gate",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/Composition/Durable/Fact.fs"
       ],
       "coverage_tags": [
         "CoverageF"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -114,16 +113,15 @@
         "cross-callback-pc.mjs",
         "composition-root-invariant.mjs"
       ],
-      "evidence": "cross-callback-pc",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs"
       ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -153,16 +151,15 @@
         "cross-callback-pc.mjs",
         "causal-wait-boundary.mjs"
       ],
-      "evidence": "cross-callback-pc",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/Execution/Session/Wait/Await.fs"
       ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -194,16 +191,15 @@
         "plugin-transforms-invariant.mjs",
         "composition-root-invariant.mjs"
       ],
-      "evidence": "plugin-transforms-invariant",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
       ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "state": "PENDING",
+      "result": "PENDING"
     },
     {
       "id": "interaction-assistance-workflow-cutover",
@@ -231,10 +227,9 @@
       "coverage_tags": [
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "DELETED",
-      "evidence": "DONE DELETED: AssistanceHost and NeedHelp capability uprooted, 0 src NeedHelp/AssistanceHost refs, no-reference gate green, 0 files",
-      "implementation_commit": "b7c7a7a5b995fb06b9da346e384de93b31f3e2e4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "DELETED verified: AssistanceHost/NeedHelpSensor removed, 0 src refs, owner stable"
     },
     {
@@ -287,9 +282,9 @@
         "CoverageD",
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "session-lifecycle-recovery-contract",
@@ -341,9 +336,9 @@
         "CoverageD",
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "opencode-tool-spec-contracts",
@@ -383,10 +378,10 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
+      "state": "PENDING",
+      "result": "PENDING",
       "closure_evidence": "proof: requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；ToolRegistry 瘦身为纯聚合 Composition Root，各工具自包含强类型 ToolAdmission 业务准入规则",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "opencode-host-signal-bootstrap-cutover",
@@ -428,10 +423,10 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
+      "state": "PENDING",
+      "result": "PENDING",
       "closure_evidence": "proof: requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；HostSignalBootstrap 削减为纯基础设施 wiring/subscribe/route/dispose/drain，清除领域决策与隐式 PC",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "mission-finality-cutover",
@@ -478,10 +473,10 @@
       "coverage_tags": [
         "CoverageC"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
+      "state": "PENDING",
+      "result": "PENDING",
       "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "mission-authority-cutover",
@@ -523,10 +518,10 @@
       "coverage_tags": [
         "CoverageC"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
+      "state": "PENDING",
+      "result": "PENDING",
       "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "composition-turn-cutover",
@@ -571,10 +566,10 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
+      "state": "PENDING",
+      "result": "PENDING",
       "closure_evidence": "verify_rounds: 9-14; symbol_rebinding=true; arity_eta_expansion=true（FissionHostSurface ignore 闭包化 + HostTurnObserver ArmRecovery/HasLivePty eta-expansion）; assertion_function_slice_narrowing=true（OBLIGATION-LEDGER-018）; 最终矩阵: build=0, check=0, 四包测试 28/28 绿",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "delegation-outcome-cutover",
@@ -620,9 +615,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "context-trace-companion-contract",
@@ -663,9 +658,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "strength-prediction-replica-cutover",
@@ -710,9 +705,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "enforcer-guidance-continuation-contract",
@@ -754,10 +749,10 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "CUTOVER",
+      "state": "PENDING",
+      "result": "PENDING",
       "closure_evidence": "proof: requirements/behavior-diagnosis/tests/tip-v2-contract.test.mjs; 关联 gate: plugin-transforms-invariant, fsharp-control-pyramid, semantic-owners; Enforcer guidance & continuation 切片归一至 behavior-diagnosis 唯一 owner，清理无用跨层 imports，PluginTransforms 静态乐谱接线保持显式",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496"
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "change-integration-host-contracts",
@@ -820,10 +815,10 @@
       "coverage_tags": [
         "CoverageF"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "PENDING",
+      "result": "PENDING",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "durable-convergence-store-contracts",
@@ -872,10 +867,10 @@
       "coverage_tags": [
         "CoverageF"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "PENDING",
+      "result": "PENDING",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "mission-finality-keep",
@@ -932,10 +927,10 @@
       "coverage_tags": [
         "CoverageC"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "PENDING",
+      "result": "PENDING",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "mission-obligation-keep",
@@ -989,10 +984,10 @@
       "coverage_tags": [
         "CoverageC"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "PENDING",
+      "result": "PENDING",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "mission-review-judgement-keep",
@@ -1045,10 +1040,10 @@
       "coverage_tags": [
         "CoverageC"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "PENDING",
+      "result": "PENDING",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "mission-work-record-keep",
@@ -1088,10 +1083,10 @@
       "coverage_tags": [
         "CoverageC"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "PENDING",
+      "result": "PENDING",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "evidence": "pending: not yet proven via 8-step closed loop"
     },
     {
       "id": "office-capability-keep",
@@ -1121,7 +1116,7 @@
         "architecture.mjs",
         "js-surface-gate.mjs"
       ],
-      "evidence": "semantic-owners / js-surface-gate / architecture all GREEN",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs"
       ],
@@ -1129,9 +1124,8 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1162,16 +1156,15 @@
         "js-surface-gate.mjs",
         "unified-store-gate.mjs"
       ],
-      "evidence": "semantic-owners / architecture / js-surface-gate all GREEN",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs"
       ],
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1203,16 +1196,15 @@
         "architecture.mjs",
         "js-surface-gate.mjs"
       ],
-      "evidence": "semantic-owners / architecture / js-surface-gate all GREEN",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs"
       ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1244,16 +1236,15 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "evidence": "semantic-owners / architecture all GREEN",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths": [
         "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"
       ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "6d69d40dd161b8caec57018cc9f2a2673f32e496",
+      "state": "PENDING",
+      "result": "PENDING",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1303,10 +1294,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Delegation.ChildRecoverySurface sole contract verified via ChildRecoverySurface.fs/ChildRecoveryWorkflow.fs, OrdinaryTurnWorkflow via ChildRecoverySurface only, proof sync-delegate-runtime.test.mjs 13/13 green, build/check green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1356,10 +1346,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Delegation.Fork.HostSurface sole contract verified via HostForkRunLifecycleSurface.fs/RunLifecycle.fs/Runtime.fs, HostSignalBootstrap via HostSurface only, proof fork-tool.test.mjs 9/9 green (DELEG-006, REUSE-024), build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1409,10 +1398,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Delegation.Fork.ToolSurface sole contract verified via ToolSurface/JoinGuard/JoinSurface, PluginHostWiring via ToolSurface only, proof join-v2-wire.test.mjs 7/7 green, 52 p0-recovery rules OK",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1457,10 +1445,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Delegation.Handle sole contract verified via CompletionCodec/Controller, proof join-v2-mailbox 4/4 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1505,10 +1492,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Delegation.Handoff sole contract verified via Handoff.fs, proof reusable-work-unit 4/4 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1567,10 +1553,9 @@
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Delegation.SyncDelegate sole contract verified via DelegatedToolEstimateLedger, proof sync-delegate-runtime 13/13 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1615,10 +1600,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Host.CodecSurface sole contract verified via CanonicalJsonSurface/ToolHostSurface, HostBoundarySurface via codec surfaces only, proof host-message-projection.test.mjs 10/10 green, build/check green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1688,10 +1672,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Host.HostBoundarySurface sole contract verified via HostBoundarySurface.fs/HostMessageProjection.fs, PluginHostWiring via HostBoundarySurface only, proof host001-fragment-events.test.mjs 3/3 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1737,10 +1720,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Host.Plugin sole contract verified via Plugin.fs/PluginBoot.fs, proof host-hooks 15/15 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1782,10 +1764,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Host.Signals sole contract verified via HostSignal.fs, proof events-port 8/8 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1828,10 +1809,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Host.Foundation sole contract verified via FatalProcess.fs, proof host-capability-observation 5/5 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1891,10 +1871,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Context.BloggerSurface sole contract verified via DeltaSurface/FrameSurface/TomlSurface, PluginTransforms via Blogger surfaces only, proof blogger-delta.test.mjs 19/19 green, build/check green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1949,10 +1928,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Context.CompanionSurface sole contract verified via CompressionSurface.fs/FoldSurface.fs/ProjectionSurface.fs, PluginTransforms via Companion surfaces only, proof companion-projection.test.mjs 30/30 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -1997,10 +1975,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Context.Compaction sole contract verified via CompactionPolicy.fs, proof host-compaction-policy 14/14 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2048,10 +2025,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RepoProgramming.FilesystemSurface sole contract verified, src/Wanxiangshu/Repository/Programming/Js/Surface.fs via surface, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2093,10 +2069,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RepoProgramming.TransactionSurface sole contract verified via TransactionSurface.fs/TransactionStore.fs, WorkflowSurface via TransactionSurface only, proof js-transaction.test.mjs 6/6 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2145,10 +2120,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RepoProgramming.Toolhost sole contract verified via FileMutationSurface.fs, proof js-tool-host 4/4 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2189,10 +2163,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RepoProgramming.Bindings sole contract verified via Surface.fs, proof js-bindings 5/5 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2317,10 +2290,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Dispatch.DispatcherSurface sole contract verified via DispatchSurface.fs (Send/Accept), OrdinaryTurnWorkflow via DispatchSurface only, proof send-format.test.mjs 4/4 green, dispatch package 30/30 green, build/check green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2370,10 +2342,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Dispatch.RecoverySurface sole contract verified via RecoverySurface.fs/ReconcileSurface.fs, Recovery Workflow via RecoverySurface only, proof recovery-at-most-one.test.mjs 3/3 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2415,10 +2386,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Dispatch.Identity sole contract verified via Identity.fs, proof join-guard 2/2 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2461,10 +2431,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.CoreSurface sole contract verified, src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs via surface, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2507,10 +2476,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.CodecSurface sole contract verified via McpContract.fs/Mcp.fs/McpServer.fs, PluginTransforms via CodecSurface only, proof decoder-parity.test.mjs 5/5 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2553,10 +2521,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.Projection sole contract verified via ObservationCodec.fs, proof kernel 7/7 green",
-      "implementation_commit": "5531bedd8c1dfa02a253821ba9258fd7044934a3",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2600,10 +2567,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: EpistemicReasoning.Surface sole contract verified via Session.fs, proof mcp-contract 4/4 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2647,10 +2613,9 @@
         "CoverageB",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.CoreSurface sole contract verified, src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs via surface, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2694,10 +2659,9 @@
         "CoverageB",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.CodecSurface sole contract verified via Commit.fs/Decode.fs/Model.fs, PluginTransforms via CodecSurface only, proof blog-tool.test.mjs 10/10 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2741,10 +2705,9 @@
         "CoverageB",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.Projection sole contract verified via Observation.fs, proof blogger-cycle-atomic-fact 6/6 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2788,10 +2751,9 @@
         "CoverageB",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: BehaviorDiagnosis.Surface sole contract verified via RepairSurface.fs, proof bounds 5/5 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2834,10 +2796,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SpeculativeInvestigation.CoreSurface sole contract verified, HostSignalBootstrap via PluginTransforms.fs, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2880,10 +2841,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SpeculativeInvestigation.ProjectionSurface sole contract verified via Speculate.fs/BatchCollector.fs/CostModel.fs, PluginTransforms via ProjectionSurface only, proof batch-collector.test.mjs 2/2 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2928,10 +2888,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SpeculativeInvestigation.Surface sole contract verified via Promotion.fs, proof commit-promotion 7/7 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -2974,10 +2933,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: KnowledgeReuse.CoreSurface sole contract verified, HostSignalBootstrap via PluginTransforms.fs, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3020,10 +2978,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: KnowledgeReuse.ProjectionSurface sole contract verified via FetchSurface.fs/IndexSurface.fs/LifecycleSurface.fs, PluginTransforms via ProjectionSurface only, proof bookkeeper-session.test.mjs 3/3 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3068,10 +3025,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: KnowledgeReuse.Surface sole contract verified via Model.fs, proof bookkeeper-synthesis 7/7 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3115,10 +3071,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: IntraParticipantParallelism.CoreSurface sole contract verified, HostSignalBootstrap via PluginTransforms.fs, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3162,10 +3117,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: IntraParticipantParallelism.ProjectionSurface sole contract verified via Runtime.fs/Projection.fs/OpenCode/Host.fs, PluginTransforms via ProjectionSurface only, proof fission-runtime.test.mjs 10/10 green, build/check green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3209,10 +3163,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: IntraParticipantParallelism.Surface sole contract verified via AsyncSupport.fs, proof fission-source-ratchet 5/5 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3255,10 +3208,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProcessExecution.CoreSurface sole contract verified, HostSignalBootstrap via PluginTransforms.fs, proof and gates green",
-      "implementation_commit": "09dda97fce75276474e108a268317dc4eb618164",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3301,10 +3253,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProcessExecution.ProjectionSurface sole contract verified via ProcessOutput/ProcessRunner/Pty, PluginTransforms via ProjectionMessage? actually Process Surface, proof handle-process 3/3 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3349,10 +3300,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProcessExecution.Surface sole contract verified via PtyApi.fs, proof join-v2-mailbox-drain 4/4 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3394,10 +3344,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderAttemptRecovery.CoreSurface sole contract verified via Cursor/CursorSurface/Evidence, PluginTransforms via Surface, proof abort-residue 2/2 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3439,10 +3388,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderAttemptRecovery.Projection sole contract verified via Fact.fs, proof attempt-plan-profile 8/8 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3486,10 +3434,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderAttemptRecovery.Surface sole contract verified via Ledger.fs, proof cursor 6/6 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3533,10 +3480,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderProjection.CoreSurface sole contract verified via LlmFacing/SyntheticToml/TomlSurface, PluginTransforms via Surface, proof blogger-toml-surface 6/6 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3580,10 +3526,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderProjection.Projection sole contract verified via ProviderProjectionSurface.fs, proof blogger-toml 3/3 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3627,10 +3572,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderProjection.Surface sole contract verified via Model.fs, proof join-result-renderer 4/4 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3674,10 +3618,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RequirementGrounding.CoreSurface sole contract verified via Fact/Facts/Gate/Projection/Runtime, PluginTransforms via Surface, proof grounding-delivery 6/6 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3722,10 +3665,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RequirementGrounding.Surface sole contract verified via Transform.fs, proof opencode-gate 4/4 green",
-      "implementation_commit": "8ed1f82c5c582d5f7f54bfd8d34a001b5fd12166",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3769,10 +3711,9 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: InteractionAuthority.CoreSurface sole contract verified via Child/Fact/Fold/Ledger, PluginTransforms via Surface, proof authority-root 13/13 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3816,10 +3757,9 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: InteractionAuthority.Surface sole contract verified via Model.fs, proof chat-params-hook 4/4 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3863,10 +3803,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RepositoryInvestigation.CoreSurface sole contract verified via FetchTool/InspectorTool/Semble layers, PluginTransforms via Surface, proof investigation-resource-laws 8/8 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3910,10 +3849,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RepositoryInvestigation.Surface sole contract verified via Stdio.fs, proof repository-warm-start 3/3 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -3957,10 +3895,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: TimeCapability.CoreSurface sole contract verified via SessionStartedAtLedger/Projection/Temporal, PluginTransforms via Surface, proof ambient-time-forbidden 2/2 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4005,10 +3942,9 @@
         "CoverageD",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: TimeCapability.Surface sole contract verified via PairProgrammingCalibrationSurface.fs, proof clock-port-virtual 3/3 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4052,10 +3988,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ParticipantIdentity.CoreSurface sole contract verified via Roles.fs/ManagedCatalog.fs, PluginTransforms via Surface, proof catalog.test.mjs 6/6 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4099,10 +4034,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ParticipantIdentity.Surface sole contract verified via RoleIdentity.fs, proof persona-binding 4/4 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4144,10 +4078,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SemanticTrace.CoreSurface sole contract verified via Capture.fs/Cursor.fs, PluginTransforms via Surface, proof x-trace-capture-boundary.test.mjs 3/3 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4189,10 +4122,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SemanticTrace.Surface sole contract verified via Projection.fs, proof x-trace-capture-hardening 4/4 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4233,10 +4165,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: PrefixStability.CoreSurface sole contract verified via Candidate.fs/Epoch.fs, PluginTransforms via Surface, proof attempt-plan-prefix.test.mjs 7/7 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4278,10 +4209,9 @@
       "coverage_tags": [
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: PrefixStability.Surface sole contract verified via Projection.fs, proof g2-inspector-prefix 5/5 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4324,10 +4254,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderLanguage.CoreSurface sole contract verified via Language.fs/LanguageSurface.fs, PluginTransforms via Surface, proof language-parity-gate.test.mjs 16/16 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4370,10 +4299,9 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProviderLanguage.Surface sole contract verified via SessionLanguage.fs, proof provider-language 5/5 green",
-      "implementation_commit": "a21d683bcd30d65e3e4bda49f821bd984b179e18",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4415,10 +4343,9 @@
         "CoverageA",
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SessionOntology.CoreSurface sole contract verified via Association.fs/Ownership.fs, PluginTransforms via Surface, proof satellite-kind.test.mjs 1/1 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4460,10 +4387,9 @@
         "CoverageA",
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: SessionOntology.Surface sole contract verified via SessionBindingSurface.fs, proof session-association 15/15 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4505,10 +4431,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: OutputDistillation.CoreSurface sole contract verified via ToolResultBound.fs/Distillation.fs, PluginTransforms via Surface, proof distiller-fragment-humility.test.mjs 4/4 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4550,10 +4475,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: OutputDistillation.Surface sole contract verified via DistillationSurface.fs, proof distiller-role-contract 2/2 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4595,10 +4519,9 @@
         "CoverageA",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: InstitutionalLearning.CoreSurface sole contract verified via Enhancer.fs/Facts.fs, PluginTransforms via Surface, proof institutional-learning.test.mjs 8/8 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4640,10 +4563,9 @@
         "CoverageA",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: InstitutionalLearning.Surface sole contract verified via Projection.fs, proof institutional-learning 8/8 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4684,10 +4606,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Distribution.CoreSurface sole contract verified via AssemblyInfo.fs/EnforcerCatalogResource.fs, Host boundary via PackageResources, proof cwd-independent-resources.test.mjs 4/4 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4728,10 +4649,9 @@
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: Distribution.Surface sole contract verified via PackageMetadata.fs, proof pack-closure 7/7 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4771,10 +4691,9 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: CapabilityEnforcement.CoreSurface sole contract verified via ManagedAgentConfig.fs/Surface, PluginTransforms via Surface, proof agent-permission-gate.test.mjs 12/12 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4815,10 +4734,9 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: CapabilityEnforcement.Surface sole contract verified via ManagerConfig.fs, proof attempt-plan-authority 3/3 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4859,10 +4777,9 @@
         "CoverageA",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: GuidanceDelivery.CoreSurface sole contract verified via DeliverySurface.fs/TipSurface.fs, PluginTransforms via Surface, proof audience-separation.test.mjs 4/4 green",
-      "implementation_commit": "765287f8cbecc9570db714b6e3ed603f94983196",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4904,10 +4821,9 @@
         "CoverageA",
         "CoverageE"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: GuidanceDelivery.Surface sole contract verified via GuidelineProjection.fs, proof guideline-projection 7/7 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4948,10 +4864,9 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: AttentionRegulation.CoreSurface sole contract verified via Facts/Projection/AttentionTools, PluginTransforms via Surface, proof attention-regulation 6/6 green",
-      "implementation_commit": "2748527de4e9e63a6d10bbe19310d43f677a98b4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -4993,10 +4908,9 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: AttentionRegulation.Surface sole contract verified via Projection.fs, proof attention-regulation 6/6 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5037,10 +4951,9 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ConcernRouting.Core sole contract verified via Facts.fs, proof concern-routing 7/7 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5082,10 +4995,9 @@
         "CoverageA",
         "CoverageB"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ConcernRouting.Surface sole contract verified via Projection.fs, proof concern-routing 7/7 green",
-      "implementation_commit": "b7c7a7a5b995fb06b9da346e384de93b31f3e2e4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5126,10 +5038,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: CognitiveEnvironment.Core sole contract verified via BloggerChronicleText.fs, proof blogger-chronicle-text 4/4 green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5170,10 +5081,9 @@
         "CoverageA",
         "CoverageG"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: CognitiveEnvironment.Surface sole contract verified via PromptResources.fs, proof cognitive-environment 19/19 green",
-      "implementation_commit": "b7c7a7a5b995fb06b9da346e384de93b31f3e2e4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5214,10 +5124,9 @@
         "CoverageA",
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: KEEP verified, proof and gates green",
-      "implementation_commit": "e9e0aef4d8e03bb1434470c2576c7a3e686df658",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5258,10 +5167,9 @@
         "CoverageA",
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: DegenerationGuard.Surface sole contract verified via LoopSensor.fs, proof loop-detector 7/7 green",
-      "implementation_commit": "b7c7a7a5b995fb06b9da346e384de93b31f3e2e4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5302,10 +5210,9 @@
         "CoverageA",
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ParticipantHorizon.CoreSurface sole contract verified via HorizonSurface.fs, proof admission-law 5/5 green",
-      "implementation_commit": "b7c7a7a5b995fb06b9da346e384de93b31f3e2e4",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5346,10 +5253,9 @@
         "CoverageA",
         "CoverageD"
       ],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ParticipantHorizon.Surface sole contract verified via MessageVisibility.fs, proof devops-join-timeout 2/2 green",
-      "implementation_commit": "4825bc8698a265cc7c40a0a29b47a2f555b22c3a",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
@@ -5724,10 +5630,9 @@
         "src/Wanxiangshu/RequirementSystem/OwnerDependencyGate.fs"
       ],
       "coverage_tags": [],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "implementation_commit": "e2f90c66ff5bf2783501b872c0f3c6f9302239d6",
-      "evidence": "DONE PROVEN-KEEP: OwnerDependencyGate verified single owner per file, cross-owner via published contract, zero cycles, zero baseline via semantic-owners + architecture green",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: OwnerDependencyGate GREEN, 669 files single owner, 47 owners, 86 closure deps DONE"
     },
     {
@@ -5761,10 +5666,9 @@
         "src/Wanxiangshu/Composition/TreeRotation.fs"
       ],
       "coverage_tags": [],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: TreeRotation verified per-owner local rotation, move/split by primary owner + locality, fsproj updated, old paths deleted, zero old refs",
-      "implementation_commit": "2813f88f6a67b76102030d0607f4e769c91f5394",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: TreeRotation GREEN, per-owner rotation complete"
     },
     {
@@ -5797,10 +5701,9 @@
         "requirements/requirement-grounding/WHY.md"
       ],
       "coverage_tags": [],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: RequirementSync verified — per-owner WHY/WHAT/HOW/proof sync, APPLIES-TO governance scope, each WHAT has proof, 732 WHAT /3531 tests",
-      "implementation_commit": "45a41ecbf4dc553d5140db9b5fdfaa366bc9af6e",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: requirement sync complete"
     },
     {
@@ -5834,10 +5737,9 @@
         "resources/verification-system/ProofGraphSync.md"
       ],
       "coverage_tags": [],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ProofGraphSync verified — proof ownership synced, each WHAT has lowest adequate proof level, owner verification-system, gates green",
-      "implementation_commit": "e41f49b1a71690ce98bcc7092800e4f175c55065",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: proof graph sync complete"
     },
     {
@@ -5873,10 +5775,9 @@
         "src/Wanxiangshu/Distribution/ReleaseClosure.fs"
       ],
       "coverage_tags": [],
-      "state": "DONE",
-      "result": "PROVEN-KEEP",
-      "evidence": "DONE PROVEN-KEEP: ReleaseClosure verified — all 117 nodes DONE, all gates green, build 707 files 152 surfaces OK, check 669 OK, verification 732 WHAT /3531 tests, format-build-test green, ledger deletable",
-      "implementation_commit": "a0ef53a5f0fd457a6b6eac0fcf98fa1824d2768d",
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: not yet proven via 8-step closed loop",
       "touched_paths_review": "KEEP verified: release closure complete, all gates green, ledger deletable"
     }
   ],
