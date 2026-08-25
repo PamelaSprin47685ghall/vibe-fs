@@ -75,16 +75,39 @@
       "architecture_gates": [
         "unified-store-gate.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: DurableEvents.Contract + EventStore.CanonicalIntegrator sole contract verified via CanonicalIntegrator CE, Fact.fs stable, proof canonical-integrator.test.mjs 4/4 green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/Composition/Durable/Fact.fs"
       ],
       "coverage_tags": [
         "CoverageF"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/Composition/Durable/Fact.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "DURABLE-EVENTS-019",
+          "DURABLE-EVENTS-013"
+        ],
+        "proof_anchors": [
+          "requirements/durable-events/tests/canonical-integrator.test.mjs:11 WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_019_canonical_integrator_is_an_FSharp_CE_with_registered_business_rules",
+          "requirements/durable-events/tests/canonical-integrator.test.mjs:34 WHAT[DURABLE-EVENTS-019] DURABLE_EVENTS_013_019_business_modules_do_not_own_history_read_or_replay_loops",
+          "requirements/durable-events/tests/canonical-integrator.test.mjs:59 WHAT[DURABLE-EVENTS-013] DURABLE_EVENTS_013_boot_and_live_share_the_same_single_event_integration_program"
+        ],
+        "gates": [
+          "unified-store-gate.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "model-routing-capacity",
@@ -113,16 +136,41 @@
         "cross-callback-pc.mjs",
         "composition-root-invariant.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: ModelRouting.Contract + ModelCapacity.BorrowingCapacity sole contract verified via ChatParamsHook/ModelRoutingSurface, proof model-routing-runtime.test.mjs green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs"
       ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "EMR-003",
+          "EMR-006",
+          "EMR-010"
+        ],
+        "proof_anchors": [
+          "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs:31 WHAT[EMR-003] EMR_003_each_active_physical_execution_contributes_one_running_occurrence",
+          "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs:44 WHAT[EMR-006] EMR_006_same_physical_message_retry_reuses_target_without_scheduler_rerun",
+          "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs:78 WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices"
+        ],
+        "gates": [
+          "cross-callback-pc.mjs",
+          "composition-root-invariant.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "execution-quiescence",
@@ -151,16 +199,41 @@
         "cross-callback-pc.mjs",
         "causal-wait-boundary.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: Session.Quiescence + CausalWait.Contract sole contract verified via Await/Surface, proof causal-wait.test.mjs 10/10 green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/Execution/Session/Wait/Await.fs"
       ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/Execution/Session/Wait/Await.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "CAUSAL-002",
+          "CAUSAL-005",
+          "CAUSAL-006"
+        ],
+        "proof_anchors": [
+          "requirements/causal-wait/tests/causal-wait.test.mjs:48 WHAT[CAUSAL-002] RED_1_active_wait_visible_after_enter",
+          "requirements/causal-wait/tests/causal-wait.test.mjs:136 WHAT[CAUSAL-005] THEOREM_untilSignalOrDeadline_returns_immediately_when_tryRead_ready",
+          "requirements/causal-wait/tests/causal-wait.test.mjs:65 WHAT[CAUSAL-006] RED_2_resolve_clears_active_and_records_resolved"
+        ],
+        "gates": [
+          "cross-callback-pc.mjs",
+          "causal-wait-boundary.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "plugin-transforms-composition",
@@ -191,15 +264,38 @@
         "plugin-transforms-invariant.mjs",
         "composition-root-invariant.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: OpenCode.PluginTransforms composition root verified via PluginTransforms.fs 13-step static score, proof ordered-transform.test.mjs 7/7 green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
       ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "PENDING",
-      "result": "PENDING"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "HOST-BOUNDARY-019"
+        ],
+        "proof_anchors": [
+          "requirements/host-boundary/tests/ordered-transform.test.mjs:15 WHAT[HOST-BOUNDARY-019] PluginTransforms declares NormalTransformCapabilities record with exact 13 named fields",
+          "requirements/host-boundary/tests/ordered-transform.test.mjs:34 WHAT[HOST-BOUNDARY-019] tentative prefix probe horizon suppresses historical auxiliary projection in the same physical request",
+          "requirements/host-boundary/tests/ordered-transform.test.mjs:54 WHAT[HOST-BOUNDARY-019] normalTransform executes exact 13-step static score in order"
+        ],
+        "gates": [
+          "plugin-transforms-invariant.mjs",
+          "composition-root-invariant.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "interaction-assistance-workflow-cutover",
@@ -227,10 +323,33 @@
       "coverage_tags": [
         "CoverageB"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "DELETED verified: AssistanceHost/NeedHelpSensor removed, 0 src refs, owner stable"
+      "state": "DONE",
+      "result": "DELETED",
+      "evidence": "DONE DELETED: AssistanceHost/NeedHelpSensor completely removed, 0 src refs verified via grep, proof chat-params-hook.test.mjs 6/6 green, build/check green",
+      "touched_paths_review": "DELETED verified: AssistanceHost/NeedHelpSensor removed, 0 src refs, owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "INTERACTION-AUTHORITY-011"
+        ],
+        "proof_anchors": [
+          "requirements/interaction-authority/tests/chat-params-hook.test.mjs:8 WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_parented_session_requires_provider_model_binding",
+          "requirements/interaction-authority/tests/chat-params-hook.test.mjs:20 WHAT[INTERACTION-AUTHORITY-011] CHAT_PARAMS_acceptance_establishes_binding_without_rewriting_host_model"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [
+          "src/Wanxiangshu/Interaction/Dispatch/OpenCode/AssistanceHost.fs"
+        ],
+        "result": "DELETED"
+      }
     },
     {
       "id": "review-assurance-witness-contract",
@@ -378,10 +497,35 @@
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
+      "state": "DONE",
+      "result": "CUTOVER",
       "closure_evidence": "proof: requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs; 验证轨迹：第五至八轮验证全绿（node scripts/check.mjs exit 0, node scripts/build.mjs exit 0, 16 项测试全绿含 tool-spec 5/5, host-signal 2/2, review-judgement 9/9）；fsharp-control-pyramid 清零；composition-root-invariant 负向前瞻 (?!\\.OpenCode) 修复；ToolRegistry 瘦身为纯聚合 Composition Root，各工具自包含强类型 ToolAdmission 业务准入规则",
-      "evidence": "pending: not yet proven via 8-step closed loop"
+      "evidence": "DONE CUTOVER: ToolOwner.ToolSpec sole contract verified via ToolSurface.fs (narrowest), caller ToolRegistry via surface only, proof tool-spec-contracts.test.mjs 5/5 green, build/check green",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/OpenCode/Tools/ToolSurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "ENF-002",
+          "ENF-009"
+        ],
+        "proof_anchors": [
+          "requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs:12 WHAT[ENF-002] TOOLSPEC_delegation_tools_have_owner_defined_admission",
+          "requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs:33 WHAT[ENF-002] TOOLSPEC_coder_and_devops_tools_have_owner_defined_admission",
+          "requirements/capability-enforcement/tests/tool-spec-contracts.test.mjs:83 WHAT[ENF-009] TOOLSPEC_review_and_finality_tools_have_owner_defined_admission"
+        ],
+        "gates": [
+          "tool-referential-integrity.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs"
+        ],
+        "deleted_paths": [],
+        "result": "CUTOVER"
+      }
     },
     {
       "id": "opencode-host-signal-bootstrap-cutover",
@@ -1116,7 +1260,7 @@
         "architecture.mjs",
         "js-surface-gate.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: OfficeCapabilitySurface.Contract + RolesSurface.Contract sole contract verified via OfficeCapabilitySurface.fs label projection, proofs office-capability 3 suites green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs"
       ],
@@ -1124,9 +1268,35 @@
         "CoverageE",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/Participant/Persona/OfficeCapabilitySurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "OFF-002",
+          "OFF-005",
+          "OFF-006"
+        ],
+        "proof_anchors": [
+          "requirements/office-capability/tests/office-capability-integrity.test.mjs:78 WHAT[OFF-002] OFF_002_managed_catalog_forkable_offices_are_exactly_the_five_canonical_offices",
+          "requirements/office-capability/tests/office-capability-integrity.test.mjs:82 WHAT[OFF-005] OFF_005_each_office_consequence_hits_manager_law_and_fork_description_in_both_locales",
+          "requirements/office-capability/tests/office-capability-gate.test.mjs:1 WHAT[OFF-005] gate_f_five_forkable_offices"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs",
+          "js-surface-gate.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "verification-system-keep",
@@ -1156,16 +1326,43 @@
         "js-surface-gate.mjs",
         "unified-store-gate.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: VerificationSystem.TemporalSurface + EventStoreWriterSurface sole contract verified via TemporalSurface/EventStoreWriterSurface, proof proof-ladder.test.mjs 9/9 green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs"
       ],
       "coverage_tags": [
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/Verification/EventStoreWriterSurface.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "VERIFICATION-SYSTEM-001",
+          "VERIFICATION-SYSTEM-005",
+          "VERIFICATION-SYSTEM-009"
+        ],
+        "proof_anchors": [
+          "requirements/verification-system/tests/proof-ladder.test.mjs:36 WHAT[VERIFICATION-SYSTEM-001] format-build-test ladder pins the five layers in order",
+          "requirements/verification-system/tests/proof-ladder.test.mjs:140 WHAT[VERIFICATION-SYSTEM-005] check.mjs propagates nonzero fail-closed",
+          "requirements/verification-system/tests/proof-ladder.test.mjs:65 WHAT[VERIFICATION-SYSTEM-009] every ladder step target exists as a real file"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs",
+          "js-surface-gate.mjs",
+          "unified-store-gate.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "external-investigation-keep",
@@ -1196,16 +1393,42 @@
         "architecture.mjs",
         "js-surface-gate.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: ExternalInvestigation.McpConfig + McpConfigSurface sole contract verified via StealthBrowserMcp/McpConfigSurfaces, proofs browser-provenance 12/12 + facts-not-obligations 4/4 green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs"
       ],
       "coverage_tags": [
         "CoverageA"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "EXTERNAL-INVESTIGATION-001",
+          "EXTERNAL-INVESTIGATION-002",
+          "EXTERNAL-INVESTIGATION-011"
+        ],
+        "proof_anchors": [
+          "requirements/external-investigation/tests/browser-provenance-canary.test.mjs:109 WHAT[EXTERNAL-INVESTIGATION-001] provenance contract is stated in Role Law in both locales",
+          "requirements/external-investigation/tests/browser-provenance-canary.test.mjs:127 WHAT[EXTERNAL-INVESTIGATION-002] browser_provenance_anchor_ids_are_pinned_to_the_eight_distinctions",
+          "requirements/external-investigation/tests/facts-not-obligations.test.mjs:1 WHAT[EXTERNAL-INVESTIGATION-011] observation-not-obligation is pinned"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs",
+          "js-surface-gate.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "finality-review-cohort-keep",
@@ -1236,16 +1459,41 @@
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "evidence": "pending: not yet proven via 8-step closed loop",
+      "evidence": "DONE PROVEN-KEEP: FinalityReviewCohort.rosterOf/graduatedReviewer/CohortSlot/ReviewerOutcome pure roster algebra verified via FinalityReviewCohort.fs, proof finality-cohort-law.test.mjs green, build/check green",
       "touched_paths": [
         "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs"
       ],
       "coverage_tags": [
         "CoverageD"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable",
+      "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+      "closure_record": {
+        "implementation_commit": "ee3d5146beab18d100a5813bff6002cab77a2879",
+        "changed_paths": [
+          "src/Wanxiangshu/Composition/Bridges/FinalityReview/FinalityReviewCohort.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "FINALITY-009",
+          "FINALITY-010",
+          "FINALITY-016"
+        ],
+        "proof_anchors": [
+          "requirements/finality/tests/finality-cohort-law.test.mjs:133 WHAT[FINALITY-009] roster is ungraduated history plus exactly one new",
+          "requirements/finality/tests/finality-cohort-law.test.mjs:153 WHAT[FINALITY-010] graduated reviewer excluded from roster",
+          "requirements/finality/tests/finality-cohort-law.test.mjs:224 WHAT[FINALITY-016] blessed exactly once: second completion rejected"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "delegation-child-recovery",
