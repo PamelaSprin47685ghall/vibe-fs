@@ -2498,7 +2498,7 @@
     },
     {
       "id": "owner-dependency-gate",
-      "primary_owner": "host-boundary",
+      "primary_owner": "requirement-system",
       "intent": "OwnerDependencyGate: verify each production file exactly one primary owner, cross-owner only via published contract, no Stage/Step, zero cycles, zero baseline",
       "files": [],
       "classification": "KEEP",
@@ -2655,7 +2655,7 @@
     },
     {
       "id": "owner-tree-rotation",
-      "primary_owner": "host-boundary",
+      "primary_owner": "verification-system",
       "intent": "OwnerTreeRotation: per-owner local rotation, move/split by primary owner + runtime locality, update fsproj, delete old paths, 0 old refs",
       "files": [],
       "classification": "KEEP",
@@ -2681,7 +2681,7 @@
     },
     {
       "id": "requirement-sync",
-      "primary_owner": "requirement-grounding",
+      "primary_owner": "requirement-system",
       "intent": "RequirementSync: per-owner WHY/WHAT/HOW/proof sync, APPLIES-TO = governance scope, each WHAT has proof, delete stale prose",
       "files": [],
       "classification": "KEEP",
@@ -2733,7 +2733,7 @@
     },
     {
       "id": "release-closure",
-      "primary_owner": "host-boundary",
+      "primary_owner": "distribution",
       "intent": "ReleaseClosure: global sink, all nodes DONE, all gates green, build green, verification 0 failures, format-build-test green, ledger deletable",
       "files": [],
       "classification": "KEEP",
