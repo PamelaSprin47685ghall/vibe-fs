@@ -1,0 +1,379 @@
+{
+  "protocol": {
+    "name": "wanxiangshu-migration-closure-ledger",
+    "version": 2,
+    "scope": "closure",
+    "law": "A node may be DONE only with a structured closure_record whose changed_paths equal the real git diff-tree of a HEAD-ancestor implementation commit, whose proofs exist and carry the declared WHAT anchors, and whose files belong to the primary owner. Evidence prose is never authorization.",
+    "owner_reference": "requirement-system: REQUIREMENT-SYSTEM-019"
+  },
+  "nodes": [
+    {
+      "id": "dispatch-protocol-ingress",
+      "primary_owner": "dispatch-protocol",
+      "intent": "Dispatch ingress Surface closed loop: IngressSurface owns protocol ingress; HostSignalBootstrap consumes via published Surface only",
+      "files": [
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs"
+      ],
+      "classification": "COMPOSITION-ROOT",
+      "publishes": [
+        "Interaction.Dispatch.IngressSurface"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/ingress-surface.test.mjs",
+        "requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs",
+        "requirements/dispatch-protocol/tests/ingress-surface.test.mjs"
+      ],
+      "coverage_tags": [],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "a2a208979c92644f36b3f01622f1d03168632cac",
+      "closure_record": {
+        "implementation_commit": "a2a208979c92644f36b3f01622f1d03168632cac",
+        "changed_paths": [
+          "requirements/dispatch-protocol/HOW.md",
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs",
+          "scripts/checks/migration-ledger.json",
+          "scripts/checks/semantic-owners.json",
+          "scripts/lib/test-surface-scan.mjs",
+          "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs",
+          "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs",
+          "src/Wanxiangshu/Wanxiangshu.fsproj"
+        ],
+        "what_ids": [
+          "DISPATCH-PROTOCOL-004"
+        ],
+        "proof_anchors": [
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs",
+          "requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs"
+        ],
+        "architecture_gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "migrated_callers": [
+          "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      },
+      "evidence": "closed loop: IngressSurface created and wired in a2a208979; proofs assert ingress surface law and at-most-one recovery"
+    },
+    {
+      "id": "execution-model-routing-capacity",
+      "primary_owner": "execution-model-routing",
+      "intent": "Model routing capacity knowledge exclusivity: BorrowingCapacity/CapacityLedger vocabulary confined to permitted zones, gate proven red on leaks",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "OpenCode.Host.ModelRouting.Contract"
+      ],
+      "consumes": [
+        "OpenCode.Host.ModelCapacity.BorrowingCapacity"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+        "src/Wanxiangshu/OpenCode/Host/ModelRoutingSurface.fs",
+        "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs"
+      ],
+      "coverage_tags": [],
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "pending: exclusivity gate exists (EMR-010 fail-closed, proven red by ChatParamsHook leak incident); awaiting node-local closure review",
+      "implementation_commit": "a088628172fa733dcf3ab83f1cc5cb92efa57638",
+      "closure_record": {
+        "implementation_commit": "a088628172fa733dcf3ab83f1cc5cb92efa57638",
+        "changed_paths": [
+          "requirements/GAP.md",
+          "requirements/capability-enforcement/tests/managed-agent-config.test.mjs",
+          "requirements/delegation/tests/g2-inspector-prompt-model.test.mjs",
+          "requirements/delegation/tests/sync-delegate-ce-collapse.test.mjs",
+          "requirements/delegation/tests/sync-delegate-runtime.test.mjs",
+          "requirements/delegation/tests/sync-delegate-tools.test.mjs",
+          "requirements/execution-model-routing/HOW.md",
+          "requirements/execution-model-routing/PROOF.md",
+          "requirements/execution-model-routing/README.md",
+          "requirements/execution-model-routing/WHAT.md",
+          "requirements/execution-model-routing/WHY.md",
+          "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs",
+          "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs",
+          "requirements/execution-model-routing/tests/recommended-template.test.mjs",
+          "requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs",
+          "requirements/execution-model-routing/tests/scheduler-module-config.test.mjs",
+          "requirements/host-boundary/PROOF.md",
+          "requirements/host-boundary/WHAT.md",
+          "requirements/host-boundary/tests/chat-params-hook.test.mjs",
+          "requirements/host-boundary/tests/host-hooks.test.mjs",
+          "requirements/host-boundary/tests/session-execution-binding.test.mjs",
+          "requirements/knowledge-reuse/tests/g6-host-reuse-finalize.test.mjs",
+          "requirements/knowledge-reuse/tests/g6-inspector-tool-finalize-fetch.test.mjs",
+          "requirements/managed-session-lifecycle/tests/sync-delegate-lifecycle.test.mjs",
+          "requirements/participant-identity/tests/session-execution-binding.test.mjs",
+          "requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs",
+          "requirements/speculative-investigation/tests/authority-policy.test.mjs",
+          "requirements/speculative-investigation/tests/host-canary-k0.test.mjs",
+          "requirements/verification-system/tests/e2e/support/isolated-env.js",
+          "requirements/verification-system/tests/e2e/support/managed-model-routing-canary.mjs",
+          "requirements/verification-system/tests/e2e/support/process-host-utils.js",
+          "requirements/verification-system/tests/e2e/support/process-host.js",
+          "requirements/verification-system/tests/support/plugin-fixture.mjs",
+          "resources/wanxiangshu.mjs",
+          "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+          "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
+          "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs",
+          "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs",
+          "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+          "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs",
+          "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs",
+          "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+          "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+          "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",
+          "src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs",
+          "src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs",
+          "src/Wanxiangshu/Strength/OpenCode/PluginScope.fs",
+          "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+          "src/Wanxiangshu/Strength/Policy.fs",
+          "src/Wanxiangshu/Strength/Replica/Runtime.fs",
+          "src/Wanxiangshu/Wanxiangshu.fsproj"
+        ],
+        "what_ids": [
+          "EMR-010",
+          "EMR-009"
+        ],
+        "proof_anchors": [
+          "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs"
+        ],
+        "architecture_gates": [
+          "semantic-owners.mjs"
+        ],
+        "migrated_callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
+    },
+    {
+      "id": "host-boundary-run-binding",
+      "primary_owner": "review-assurance",
+      "intent": "Provider run binding law: unsealed assistant child of one physical user message binds to exactly one run; projection lag bounded, sealed runs terminal, identity rejections fail-closed",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "OpenCode.ProviderRunBinding"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
+        "requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs"
+      ],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: binding taxonomy extended with RunTerminal evidence case and wire absorption landed eb2ca79; awaiting closure review"
+    },
+    {
+      "id": "participant-horizon-message-visibility",
+      "primary_owner": "participant-horizon",
+      "intent": "Event-driven projection catch-up: message.updated signal wakes per-session one-shot waiters with timer backstop; over-wake costs one extra bounded re-read",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "OpenCode.MessageVisibilityHub",
+        "OpenCode.MessageVisibilitySignal"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/participant-horizon/tests/message-visibility.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
+        "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs"
+      ],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: hub now consumed by replica bind seam; awaiting proof existence review"
+    },
+    {
+      "id": "review-assurance-seal",
+      "primary_owner": "review-assurance",
+      "intent": "Review seal binding: completed assistant runs bind through typed rejection algebra before verdict admission",
+      "files": [
+        "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Mission.Review.Assurance.Surface"
+      ],
+      "consumes": [
+        "OpenCode.ProviderRunBinding"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/review-assurance/tests/seal-bind.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Mission/Review/Assurance/Surface.fs",
+        "requirements/review-assurance/tests/seal-bind.test.mjs"
+      ],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: typed NoBindableRun rejection surface asserted across five bind shapes; awaiting closure review"
+    },
+    {
+      "id": "context-companion-projection",
+      "primary_owner": "context-compression",
+      "intent": "Companion projection: blogger companion material projects into context within trace contract",
+      "files": [],
+      "classification": "KEEP",
+      "publishes": [],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/context-compression/tests/companion-projection.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: files list under owner adjudication"
+    },
+    {
+      "id": "delegation-sync-runtime",
+      "primary_owner": "delegation",
+      "intent": "Synchronous delegation runtime contract: child run identity, join and recovery via durable facts",
+      "files": [],
+      "classification": "KEEP",
+      "publishes": [],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/delegation/tests/sync-delegate-runtime.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: files list under owner adjudication"
+    },
+    {
+      "id": "finality-blessing-admission",
+      "primary_owner": "finality",
+      "intent": "Finality blessing admission: dual PERFECT witness admits blessing; stale or single witnesses rejected",
+      "files": [],
+      "classification": "KEEP",
+      "publishes": [],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/finality/tests/blessing-admission.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: files list under owner adjudication"
+    },
+    {
+      "id": "attention-regulation",
+      "primary_owner": "attention-regulation",
+      "intent": "Attention regulation law suite",
+      "files": [],
+      "classification": "KEEP",
+      "publishes": [],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: files list under owner adjudication"
+    },
+    {
+      "id": "concern-routing",
+      "primary_owner": "concern-routing",
+      "intent": "Concern routing law suite",
+      "files": [],
+      "classification": "KEEP",
+      "publishes": [],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: files list under owner adjudication"
+    }
+  ]
+}
