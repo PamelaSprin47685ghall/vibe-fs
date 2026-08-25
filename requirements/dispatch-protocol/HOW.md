@@ -18,6 +18,8 @@
    - 未找到物理消息 → 保持 `StillPending`，绝不自动补发；
    - 物理读取失败 → 标记 `Unreadable` 并中止，保留现场供人工审计。
 
+4. **Ingress 唯一 Surface（DISPATCH-PROTOCOL-004）**：
+   `Dispatch.IngressSurface`（`src/Wanxiangshu/Interaction/Dispatch/IngressSurface.fs`）是唯一的 Host → Authority  ingress 合约，聚合 `PromptIngressCodec` 解码、`PromptMetadataCodec` 元数据构造与 `PromptIngress.createHook` 物理落地钩子。`src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs` 仅通过该 Surface 消费 ingress（`decodeMessage`/`createHook`/`tryActiveProfile`/`sendContinuationResult`），禁止直接 `open Wanxiangshu.Interaction.Dispatch.OpenCode` 或直调 `PromptIngressCodec`/`HostSessionNudge`。
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -25,7 +27,7 @@
 | DISPATCH-PROTOCOL-001 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | DISPATCH-PROTOCOL-002 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | DISPATCH-PROTOCOL-003 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
-| DISPATCH-PROTOCOL-004 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |
+| DISPATCH-PROTOCOL-004 | `requirements/dispatch-protocol/tests/ingress-surface.test.mjs`（`Dispatch.IngressSurface` sole contract, physical evidence only） + `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |
 | DISPATCH-PROTOCOL-005 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | DISPATCH-PROTOCOL-006 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | DISPATCH-PROTOCOL-007 | `requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs` |

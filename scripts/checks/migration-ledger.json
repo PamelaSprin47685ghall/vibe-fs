@@ -2120,7 +2120,8 @@
         "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
         "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
         "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs"
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs"
       ],
       "classification": "KEEP",
       "publishes": [

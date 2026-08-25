@@ -1426,6 +1426,14 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
+    module: 'Interaction/Dispatch/OpenCode/IngressSurface.js',
+    owner: 'dispatch-protocol',
+    laws: ['DISPATCH-PROTOCOL-004'],
+    source: 'src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Execution/Session/LoopDetectorSurface.js',
     owner: 'degeneration-guard',
     laws: ['DG-001', 'DG-003', 'DG-004', 'DG-005', 'DG-006'],

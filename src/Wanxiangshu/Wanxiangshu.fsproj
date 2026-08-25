@@ -476,6 +476,7 @@
     <Compile Include="OpenCode/Host/PluginSessionScope.fs"/>
     <Compile Include="OpenCode/Host/PluginRecoveryScope.fs"/>
     <Compile Include="Interaction/Dispatch/OpenCode/SessionNudge.fs"/>
+    <Compile Include="Interaction/Dispatch/OpenCode/IngressSurface.fs"/>
     <Compile Include="OpenCode/Host/PluginRuntimeScope.fs"/>
     <Compile Include="Context/Companion/RuntimeSurface.fs"/>
     <Compile Include="Composition/Turn/Binding.fs"/>
