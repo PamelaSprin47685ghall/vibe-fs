@@ -2,4 +2,4 @@
 
 | GAP | 命题 | 缺口 | 状态 | 承载 | 计划 | Owner |
 |---|---|---|---|---|---|---|
-| GAP-ML-001 | MIGRATION-LEDGER-001..007 | 初始门禁仅覆盖 schema/DAG/coverage，11 类非法态未拦截 | CLOSED | `scripts/checks/migration-ledger.mjs` 11 检查 + `requirements/migration-ledger/tests/gate-rejection.test.mjs` 13 变异 + `scripts/checks/migration-ledger.mjs --self-test` 扩展 fixture | 已落地，63 节点 ledger 绿，25 DONE 均含 implementation_commit 祖先与 touched_paths 生产路径 | migration-ledger |
+| GAP-ML-001 | MIGRATION-LEDGER-001 | 施工账本引用 requirement-system 019 | CLOSED | 本包 `WHAT 001` 改为引用 `requirement-system:019`，`WHY/HOW` 仅说明临时格式，`gate-rejection` 15 变异与 `self-test` 15 夹具以 117 节点全量（1 DONE/116 PENDING 审计）验证引用与基线 | 已落地，`requirement-system` 为唯一 `normative owner`，本包为临时施工契约，`ledger 117` 全量绿 | migration-ledger |
