@@ -5749,12 +5749,23 @@
         }
       ],
       "production_callers_to_migrate": [],
-      "proofs": [],
-      "architecture_gates": [],
-      "touched_paths": [],
+      "proofs": [
+        "scripts/checks/migration-ledger.mjs",
+        "scripts/checks/semantic-owners.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Composition/TreeRotation.fs"
+      ],
       "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: TreeRotation verified per-owner local rotation, move/split by primary owner + locality, fsproj updated, old paths deleted, zero old refs",
+      "implementation_commit": "2813f88f6a67b76102030d0607f4e769c91f5394",
+      "touched_paths_review": "KEEP verified: TreeRotation GREEN, per-owner rotation complete"
     },
     {
       "id": "requirement-sync",
