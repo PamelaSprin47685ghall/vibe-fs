@@ -17,14 +17,57 @@ const clone = (o) => JSON.parse(JSON.stringify(o))
 
 test('WHAT[REQUIREMENT-SYSTEM-019] migration ledger gate rejects PENDING with GREEN evidence and READY without owner graph', () => {
   const { ledger, owners } = loadValid()
-  const pending = ledger.nodes.find(n => n.state === 'PENDING')
+  // Find existing PENDING or synthesize one for post-ReleaseClosure (117 DONE) case
+  let pending = ledger.nodes.find(n => n.state === 'PENDING')
+  if (!pending) {
+    pending = {
+      id: 'synthetic-pending-test',
+      primary_owner: 'distribution',
+      intent: 'synthetic PENDING for gate test',
+      files: [],
+      classification: 'KEEP',
+      publishes: [],
+      consumes: [],
+      depends_on: [],
+      production_callers_to_migrate: [],
+      proofs: [],
+      architecture_gates: [],
+      touched_paths: [],
+      coverage_tags: [],
+      state: 'PENDING',
+      result: 'PENDING',
+      evidence: 'pending: inventory only'
+    }
+    ledger.nodes.push(pending)
+  }
   pending.evidence = 'all GREEN verified'
   let res = validateLedger(ledger, owners)
   assert.equal(res.ok, false)
   assert.ok(res.errors.some(e => /PENDING.*evidence|GREEN|verified/i.test(e)))
 
   const { ledger: ledger2, owners: owners2 } = loadValid()
-  const ready = ledger2.nodes.find(n => n.state === 'PENDING')
+  let ready = ledger2.nodes.find(n => n.state === 'PENDING')
+  if (!ready) {
+    ready = {
+      id: 'synthetic-ready-test',
+      primary_owner: 'distribution',
+      intent: 'synthetic READY for gate test',
+      files: [],
+      classification: 'KEEP',
+      publishes: [],
+      consumes: [],
+      depends_on: [],
+      production_callers_to_migrate: [],
+      proofs: ['requirements/some/tests/foo.test.mjs'],
+      architecture_gates: ['semantic-owners.mjs'],
+      touched_paths: [],
+      coverage_tags: [],
+      state: 'PENDING',
+      result: 'PENDING',
+      evidence: 'pending: inventory only'
+    }
+    ledger2.nodes.push(ready)
+  }
   ready.state = 'READY'
   ready.publishes = []
   ready.consumes = []

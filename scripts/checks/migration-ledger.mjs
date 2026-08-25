@@ -565,48 +565,105 @@ export function runSelfTest(validLedger, ownersManifest) {
   // 5. Fixture: PENDING success evidence must be rejected
   {
     const pLedger = clone(validLedger)
-    const pending = pLedger.nodes.find(n => n.state === 'PENDING')
-    if (pending) {
-      pending.evidence = 'all GREEN verified'
-      const result = validateLedger(pLedger, ownersManifest)
-      const hasPendingError = result.errors.some(e => /PENDING.*evidence/i.test(e) || /GREEN|verified/i.test(e))
-      if (!result.ok && hasPendingError) {
-        testResults.push({ name: '5. PENDING success evidence rejection', ok: true })
-      } else {
-        testResults.push({ name: '5. PENDING success evidence rejection', ok: false, detail: `Expected PENDING evidence error, got: ${result.errors.join('; ')}` })
+    let pending = pLedger.nodes.find(n => n.state === 'PENDING')
+    if (!pending) {
+      pending = {
+        id: 'synthetic-pending-selftest-5',
+        primary_owner: 'distribution',
+        intent: 'synthetic PENDING for self-test',
+        files: [],
+        classification: 'KEEP',
+        publishes: [],
+        consumes: [],
+        depends_on: [],
+        production_callers_to_migrate: [],
+        proofs: [],
+        architecture_gates: [],
+        touched_paths: [],
+        coverage_tags: [],
+        state: 'PENDING',
+        result: 'PENDING',
+        evidence: 'pending: inventory only'
       }
+      pLedger.nodes.push(pending)
+    }
+    pending.evidence = 'all GREEN verified'
+    const result = validateLedger(pLedger, ownersManifest)
+    const hasPendingError = result.errors.some(e => /PENDING.*evidence/i.test(e) || /GREEN|verified/i.test(e))
+    if (!result.ok && hasPendingError) {
+      testResults.push({ name: '5. PENDING success evidence rejection', ok: true })
     } else {
-      testResults.push({ name: '5. PENDING success evidence rejection', ok: false, detail: 'no PENDING node in fixture' })
+      testResults.push({ name: '5. PENDING success evidence rejection', ok: false, detail: `Expected PENDING evidence error, got: ${result.errors.join('; ')}` })
     }
   }
 
   // 6. Fixture: READY without owner graph
   {
     const rLedger = clone(validLedger)
-    const node = rLedger.nodes.find(n => n.state === 'PENDING')
-    if (node) {
-      node.state = 'READY'
-      node.publishes = []
-      node.consumes = []
-      node.depends_on = []
-      node.production_callers_to_migrate = []
-      node.proofs = ['requirements/some/tests/foo.test.mjs']
-      node.architecture_gates = ['semantic-owners.mjs']
-      const result = validateLedger(rLedger, ownersManifest)
-      const hasReadyOwnerError = result.errors.some(e => /READY.*owner graph/i.test(e))
-      if (!result.ok && hasReadyOwnerError) {
-        testResults.push({ name: '6. READY without owner graph rejection', ok: true })
-      } else {
-        testResults.push({ name: '6. READY without owner graph rejection', ok: false, detail: `Expected READY owner error, got: ${result.errors.join('; ')}` })
+    let node = rLedger.nodes.find(n => n.state === 'PENDING')
+    if (!node) {
+      node = {
+        id: 'synthetic-pending-selftest-6',
+        primary_owner: 'distribution',
+        intent: 'synthetic PENDING for self-test 6',
+        files: [],
+        classification: 'KEEP',
+        publishes: [],
+        consumes: [],
+        depends_on: [],
+        production_callers_to_migrate: [],
+        proofs: [],
+        architecture_gates: [],
+        touched_paths: [],
+        coverage_tags: [],
+        state: 'PENDING',
+        result: 'PENDING',
+        evidence: 'pending: inventory only'
       }
+      rLedger.nodes.push(node)
+    }
+    node.state = 'READY'
+    node.publishes = []
+    node.consumes = []
+    node.depends_on = []
+    node.production_callers_to_migrate = []
+    node.proofs = ['requirements/some/tests/foo.test.mjs']
+    node.architecture_gates = ['semantic-owners.mjs']
+    const result = validateLedger(rLedger, ownersManifest)
+    const hasReadyOwnerError = result.errors.some(e => /READY.*owner graph/i.test(e))
+    if (!result.ok && hasReadyOwnerError) {
+      testResults.push({ name: '6. READY without owner graph rejection', ok: true })
+    } else {
+      testResults.push({ name: '6. READY without owner graph rejection', ok: false, detail: `Expected READY owner error, got: ${result.errors.join('; ')}` })
     }
   }
 
   // 7. Fixture: READY without proofs/gates
   {
     const rLedger = clone(validLedger)
-    const node = rLedger.nodes.find(n => n.state === 'PENDING')
+    let node = rLedger.nodes.find(n => n.state === 'PENDING')
     const done = rLedger.nodes.find(n => n.state === 'DONE')
+    if (!node) {
+      node = {
+        id: 'synthetic-pending-selftest-7',
+        primary_owner: 'distribution',
+        intent: 'synthetic PENDING for self-test 7',
+        files: [],
+        classification: 'KEEP',
+        publishes: [],
+        consumes: [],
+        depends_on: [],
+        production_callers_to_migrate: [],
+        proofs: [],
+        architecture_gates: [],
+        touched_paths: [],
+        coverage_tags: [],
+        state: 'PENDING',
+        result: 'PENDING',
+        evidence: 'pending: inventory only'
+      }
+      rLedger.nodes.push(node)
+    }
     if (node && done) {
       node.state = 'READY'
       node.publishes = ['Some.Contract']
@@ -726,7 +783,28 @@ export function runSelfTest(validLedger, ownersManifest) {
   // 15. Fixture: closure dependency not DONE
   {
     const cLedger = clone(validLedger)
-    const pendingTarget = cLedger.nodes.find(n => n.state === 'PENDING')
+    let pendingTarget = cLedger.nodes.find(n => n.state === 'PENDING')
+    if (!pendingTarget) {
+      pendingTarget = {
+        id: 'synthetic-pending-selftest-15',
+        primary_owner: 'distribution',
+        intent: 'synthetic PENDING for self-test 15',
+        files: [],
+        classification: 'KEEP',
+        publishes: [],
+        consumes: [],
+        depends_on: [],
+        production_callers_to_migrate: [],
+        proofs: [],
+        architecture_gates: [],
+        touched_paths: [],
+        coverage_tags: [],
+        state: 'PENDING',
+        result: 'PENDING',
+        evidence: 'pending: inventory only'
+      }
+      cLedger.nodes.push(pendingTarget)
+    }
     const depender = cLedger.nodes.find(n => n.id !== pendingTarget.id)
     depender.state = 'READY'
     depender.publishes = ['Some.Contract']
