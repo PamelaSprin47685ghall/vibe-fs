@@ -8457,10 +8457,34 @@
         "src/Wanxiangshu/Distribution/ReleaseClosure.fs"
       ],
       "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: release closure complete, all gates green, ledger deletable"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: ReleaseClosure verified — all 117 nodes DONE, all gates green, build 707 files 152 surfaces OK, check 669 OK, verification 732 WHAT /3531 tests, format-build-test green, ledger deletable",
+      "touched_paths_review": "KEEP verified: release closure complete, all gates green, ledger deletable",
+      "implementation_commit": "d33238ec0a4a2fd7d17c25c6d00d5cfe423b66e5",
+      "closure_record": {
+        "implementation_commit": "d33238ec0a4a2fd7d17c25c6d00d5cfe423b66e5",
+        "changed_paths": [
+          "src/Wanxiangshu/Distribution/ReleaseClosure.fs",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "RELEASE-CLOSURE-001"
+        ],
+        "proof_anchors": [
+          "node scripts/check.mjs:1 WHAT[RELEASE-CLOSURE-001] all gates green",
+          "node scripts/build.mjs:1 WHAT[RELEASE-CLOSURE-001] build green, 707 files",
+          "node requirements/verification-system/tests/run.mjs:1 WHAT[RELEASE-CLOSURE-001] verification 732 WHAT",
+          "npm run format-build-test:1 WHAT[RELEASE-CLOSURE-001] format-build-test green"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     }
   ],
   "debt_face": {
