@@ -359,9 +359,39 @@
         "requirements/review-assurance/tests/seal-bind.test.mjs"
       ],
       "coverage_tags": [],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: typed NoBindableRun rejection surface asserted across five bind shapes; awaiting closure review"
+    },
+    {
+      "id": "context-companion-projection",
+      "primary_owner": "context-compression",
+      "intent": "Companion projection: blogger companion material projects into context within trace contract",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Context.Companion.ProjectionSurface"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/context-compression/tests/companion-projection.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs"
+      ],
+      "touched_paths": [
+        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs"
+      ],
+      "coverage_tags": [],
       "state": "DONE",
       "result": "PROVEN-KEEP",
-      "evidence": "pending: typed NoBindableRun rejection surface asserted across five bind shapes; awaiting closure review",
+      "evidence": "pending: awaiting closure commit",
       "implementation_commit": "3e8804565f32d18de771a14e992fd414a00ea18e",
       "closure_record": {
         "implementation_commit": "3e8804565f32d18de771a14e992fd414a00ea18e",
@@ -1045,10 +1075,11 @@
           "src/Wanxiangshu/Wanxiangshu.fsproj"
         ],
         "what_ids": [
-          "REVIEW-ASSURANCE-007"
+          "CONTEXT-COMPRESSION-001",
+          "CONTEXT-COMPRESSION-012"
         ],
         "proof_anchors": [
-          "requirements/review-assurance/tests/seal-bind.test.mjs"
+          "requirements/context-compression/tests/companion-projection.test.mjs"
         ],
         "architecture_gates": [
           "semantic-owners.mjs"
@@ -1057,36 +1088,6 @@
         "deleted_paths": [],
         "result": "PROVEN-KEEP"
       }
-    },
-    {
-      "id": "context-companion-projection",
-      "primary_owner": "context-compression",
-      "intent": "Companion projection: blogger companion material projects into context within trace contract",
-      "files": [
-        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
-        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs"
-      ],
-      "classification": "KEEP",
-      "publishes": [
-        "Context.Companion.ProjectionSurface"
-      ],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
-      "proofs": [
-        "requirements/context-compression/tests/companion-projection.test.mjs"
-      ],
-      "architecture_gates": [
-        "semantic-owners.mjs"
-      ],
-      "touched_paths": [
-        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
-        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs"
-      ],
-      "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: awaiting closure commit"
     },
     {
       "id": "delegation-sync-runtime",
