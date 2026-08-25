@@ -1246,79 +1246,41 @@
       "touched_paths_review": "KEEP verified: no migration needed, proof and gates green, production owner stable"
     },
     {
-      "id": "delegation-backlog-keep",
+      "id": "delegation-child-recovery",
       "primary_owner": "delegation",
-      "intent": "delegation: backlog keep — 61 files CoverageD single owner, foreign consumers via published contracts only",
+      "intent": "delegation: ChildRecovery & recovery workflow (DELEG-023)",
       "files": [
         "src/Wanxiangshu/Execution/Agent/Errors.fs",
         "src/Wanxiangshu/Execution/Agent/Program.fs",
         "src/Wanxiangshu/Execution/Delegation/ChildRecoveryWorkflow.fs",
-        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateLedger.fs",
-        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
-        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/DelegationFactFold.fs",
-        "src/Wanxiangshu/Execution/Delegation/ExecutionFactFold.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fact.fs",
-        "src/Wanxiangshu/Execution/Delegation/Facts.fs",
         "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecovery.fs",
         "src/Wanxiangshu/Execution/Delegation/Fork/ChildRecoverySurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/LifecycleSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Model.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs",
         "src/Wanxiangshu/Execution/Delegation/Fork/Recovery.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
-        "src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs",
-        "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
-        "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
-        "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
-        "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/HostTurnObservedSurface.fs",
-        "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
-        "src/Wanxiangshu/Execution/Delegation/OpenCode/DelegatedToolEstimate.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
-        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs",
         "src/Wanxiangshu/Execution/Session/AgentCompletion.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "Delegation.ChildRecoverySurface"
+      ],
+      "consumes": [
+        "Session.Quiescence",
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs"
+      ],
       "proofs": [
-        "requirements/delegation/tests/delegated-tool-estimate-facts.test.mjs"
+        "requirements/delegation/tests/sync-delegate-runtime.test.mjs"
       ],
       "architecture_gates": [
         "semantic-owners.mjs",
@@ -1333,13 +1295,254 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "host-boundary-backlog-keep",
-      "primary_owner": "host-boundary",
-      "intent": "host-boundary: backlog keep — 53 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "id": "delegation-fork-host",
+      "primary_owner": "delegation",
+      "intent": "delegation: Fork Host run lifecycle & dispatch (DELEG-006)",
       "files": [
-        "src/Wanxiangshu/Foundation/FatalProcess.fs",
-        "src/Wanxiangshu/Foundation/McpLaunch.fs",
-        "src/Wanxiangshu/Host/Digest.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/AgentOwner.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/BusyNudge.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Join.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/JoinSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Pty.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Restart.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Delegation.Fork.HostSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/fork-tool.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "delegation-fork-opencode",
+      "primary_owner": "delegation",
+      "intent": "delegation: Fork OpenCode tool & join guard (DELEG-005)",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/Fork/CleanBreakSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/LifecycleSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Model.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinGuard.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fork/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Delegation.Fork.ToolSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/PluginHostWiring.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/join-v2-wire.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "delegation-handle",
+      "primary_owner": "delegation",
+      "intent": "delegation: Handle join drain, codec & interrupt (DELEG-013)",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/Handle/CompletionCodec.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/Controller.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/FoldSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/JoinInterruptRegistry.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/JoinWake.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/OpenCode/OneShotTool.fs",
+        "src/Wanxiangshu/Execution/Delegation/Handle/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Delegation.HandleSurface"
+      ],
+      "consumes": [
+        "Delegation.Fork.HostSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "delegation-fork-host",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Execution/Fission/Runtime.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/join-v2-mailbox.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "delegation-handoff",
+      "primary_owner": "delegation",
+      "intent": "delegation: Handoff ledger & linkage projection (DELEG-024)",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/Handoff.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffIdentity.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffLedger.fs",
+        "src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/HostTurnObservedSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs",
+        "src/Wanxiangshu/Execution/Delegation/OpenCode/DelegatedToolEstimate.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Delegation.HandoffSurface"
+      ],
+      "consumes": [
+        "Delegation.Fork.HostSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "delegation-fork-host",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/reusable-work-unit.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "delegation-sync-delegate",
+      "primary_owner": "delegation",
+      "intent": "delegation: SyncDelegate batching & wait (DELEG-008)",
+      "files": [
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateLedger.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateProjection.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegatedToolEstimateSurface.fs",
+        "src/Wanxiangshu/Execution/Delegation/DelegationFactFold.fs",
+        "src/Wanxiangshu/Execution/Delegation/ExecutionFactFold.fs",
+        "src/Wanxiangshu/Execution/Delegation/Fact.fs",
+        "src/Wanxiangshu/Execution/Delegation/Facts.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Model.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Batching.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/OpenCode/Observation.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Prompt.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Store.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Wait.fs",
+        "src/Wanxiangshu/Execution/Delegation/SyncDelegate/Workflow.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Delegation.SyncDelegateSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "Delegation.Fork.HostSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "delegation-fork-host",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/delegation/tests/sync-delegate-runtime.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "host-boundary-codec",
+      "primary_owner": "host-boundary",
+      "intent": "host-boundary: Codec canonical & wire codecs (HOST-BOUNDARY-009)",
+      "files": [
         "src/Wanxiangshu/OpenCode/Codec/CanonicalJson.fs",
         "src/Wanxiangshu/OpenCode/Codec/CanonicalJsonSurface.fs",
         "src/Wanxiangshu/OpenCode/Codec/HostEventCodec.fs",
@@ -1347,7 +1550,43 @@
         "src/Wanxiangshu/OpenCode/Codec/LoopEventCodec.fs",
         "src/Wanxiangshu/OpenCode/Codec/OpencodeTypes.fs",
         "src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs",
-        "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ToolHostSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Host.CodecSurface"
+      ],
+      "consumes": [],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/host-message-projection.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "host-boundary-host",
+      "primary_owner": "host-boundary",
+      "intent": "host-boundary: Host session, signals & boundary surfaces (HOST-BOUNDARY-001)",
+      "files": [
         "src/Wanxiangshu/OpenCode/Host/ChatParamsSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/Diagnostic.fs",
         "src/Wanxiangshu/OpenCode/Host/Events.fs",
@@ -1378,24 +1617,110 @@
         "src/Wanxiangshu/OpenCode/Host/SharedStateSurface.fs",
         "src/Wanxiangshu/OpenCode/Host/SharedTerminalBus.fs",
         "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfig.fs",
-        "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs",
-        "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/SphinxMcpConfigSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Host.HostBoundarySurface"
+      ],
+      "consumes": [
+        "Host.CodecSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "host-boundary-codec",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/host001-fragment-events.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "host-boundary-plugin",
+      "primary_owner": "host-boundary",
+      "intent": "host-boundary: Plugin boot & wiring (HOST-BOUNDARY-014)",
+      "files": [
         "src/Wanxiangshu/OpenCode/Plugin/Plugin.fs",
         "src/Wanxiangshu/OpenCode/Plugin/PluginBoot.fs",
         "src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs",
         "src/Wanxiangshu/OpenCode/Plugin/PluginHostWiring.fs",
         "src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs",
         "src/Wanxiangshu/OpenCode/Plugin/PluginSessionWiring.fs",
-        "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs",
+        "src/Wanxiangshu/OpenCode/Plugin/SpikePlugin.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Host.PluginSurface"
+      ],
+      "consumes": [
+        "Host.HostBoundarySurface"
+      ],
+      "depends_on": [
+        {
+          "id": "host-boundary-host",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/PluginHost.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/host-hooks.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "host-boundary-signals",
+      "primary_owner": "host-boundary",
+      "intent": "host-boundary: Host signals adapter & subscription (HOST-BOUNDARY-016)",
+      "files": [
         "src/Wanxiangshu/OpenCode/Signals/HostSignal.fs",
         "src/Wanxiangshu/OpenCode/Signals/HostSignalAdapter.fs",
         "src/Wanxiangshu/OpenCode/Signals/HostSignalSubscribe.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "Host.HostSignalSurface"
+      ],
+      "consumes": [
+        "Host.HostBoundarySurface"
+      ],
+      "depends_on": [
+        {
+          "id": "host-boundary-host",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
       "proofs": [
         "requirements/host-boundary/tests/events-port.test.mjs"
       ],
@@ -1413,9 +1738,51 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "context-compression-backlog-keep",
+      "id": "host-boundary-foundation",
+      "primary_owner": "host-boundary",
+      "intent": "host-boundary: Foundation fatal & mcp launch (HOST-BOUNDARY-002)",
+      "files": [
+        "src/Wanxiangshu/Foundation/FatalProcess.fs",
+        "src/Wanxiangshu/Foundation/McpLaunch.fs",
+        "src/Wanxiangshu/Host/Digest.fs",
+        "src/Wanxiangshu/OpenCode/JoinResultRendererSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Host.FoundationSurface"
+      ],
+      "consumes": [
+        "Host.HostBoundarySurface"
+      ],
+      "depends_on": [
+        {
+          "id": "host-boundary-host",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
+      "proofs": [
+        "requirements/host-boundary/tests/host-capability-observation.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "context-compression-blogger",
       "primary_owner": "context-compression",
-      "intent": "context-compression: backlog keep — 40 files CoverageA,CoverageE,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "context-compression: Blogger delta, frame & runtime (CONTEXT-COMPRESSION-003)",
       "files": [
         "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
@@ -1436,35 +1803,26 @@
         "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
         "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
-        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
-        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
-        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
-        "src/Wanxiangshu/Context/Companion/Errors.fs",
-        "src/Wanxiangshu/Context/Companion/Fact.fs",
-        "src/Wanxiangshu/Context/Companion/Facts.fs",
-        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
-        "src/Wanxiangshu/Context/Companion/Host.fs",
-        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
-        "src/Wanxiangshu/Context/Companion/Identity.fs",
-        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
-        "src/Wanxiangshu/Context/Companion/Projection.fs",
-        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
-        "src/Wanxiangshu/Context/Companion/Prompt.fs",
-        "src/Wanxiangshu/Context/Companion/Runtime.fs",
-        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs",
-        "src/Wanxiangshu/Host/CompactionPolicy.fs",
-        "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
-        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
-        "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs"
+        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "Context.BloggerSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
-        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs"
+        "requirements/context-compression/tests/blogger-delta.test.mjs"
       ],
       "architecture_gates": [
         "semantic-owners.mjs",
@@ -1481,42 +1839,136 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "repository-programming-backlog-keep",
-      "primary_owner": "repository-programming",
-      "intent": "repository-programming: backlog keep — 24 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "id": "context-compression-companion",
+      "primary_owner": "context-compression",
+      "intent": "context-compression: Companion projection & fold surfaces (CONTEXT-COMPRESSION-001)",
       "files": [
-        "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
-        "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
-        "src/Wanxiangshu/Process/JsSandbox.fs",
+        "src/Wanxiangshu/Context/Companion/CompanionFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/CompressionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Errors.fs",
+        "src/Wanxiangshu/Context/Companion/Fact.fs",
+        "src/Wanxiangshu/Context/Companion/Facts.fs",
+        "src/Wanxiangshu/Context/Companion/FoldSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Host.fs",
+        "src/Wanxiangshu/Context/Companion/HostBlogger.fs",
+        "src/Wanxiangshu/Context/Companion/Identity.fs",
+        "src/Wanxiangshu/Context/Companion/JournalPort.fs",
+        "src/Wanxiangshu/Context/Companion/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/ProjectionSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Prompt.fs",
+        "src/Wanxiangshu/Context/Companion/Runtime.fs",
+        "src/Wanxiangshu/Context/Companion/RuntimeSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Context.CompanionSurface"
+      ],
+      "consumes": [
+        "Context.BloggerSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "context-compression-blogger",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/companion-projection.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "context-compression-compaction",
+      "primary_owner": "context-compression",
+      "intent": "context-compression: Compaction policy & gate observation (CONTEXT-COMPRESSION-007)",
+      "files": [
+        "src/Wanxiangshu/Host/CompactionPolicy.fs",
+        "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Context.CompactionSurface"
+      ],
+      "consumes": [
+        "Context.CompanionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "context-compression-companion",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs"
+      ],
+      "proofs": [
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "repository-programming-filesystem",
+      "primary_owner": "repository-programming",
+      "intent": "repository-programming: Filesystem & anchor algebra (REPOSITORY-PROGRAMMING-007)",
+      "files": [
         "src/Wanxiangshu/Repository/Programming/Js/Anchor.fs",
         "src/Wanxiangshu/Repository/Programming/Js/AnchorFs.fs",
         "src/Wanxiangshu/Repository/Programming/Js/Capability.fs",
         "src/Wanxiangshu/Repository/Programming/Js/Description.fs",
         "src/Wanxiangshu/Repository/Programming/Js/Failure.fs",
         "src/Wanxiangshu/Repository/Programming/Js/FilesystemSurface.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs",
         "src/Wanxiangshu/Repository/Programming/Js/GlobFs.fs",
         "src/Wanxiangshu/Repository/Programming/Js/MutationFs.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/Surface.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/Transaction.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/Utf8Fs.fs",
-        "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+        "src/Wanxiangshu/Repository/Programming/Js/Utf8Fs.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "RepoProgramming.FilesystemSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Repository/Programming/Js/Surface.fs"
+      ],
       "proofs": [
-        "requirements/repository-programming/tests/file-mutation-tools.test.mjs"
+        "requirements/repository-programming/tests/js-anchors.test.mjs"
       ],
       "architecture_gates": [
         "semantic-owners.mjs",
@@ -1532,37 +1984,160 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "dispatch-protocol-backlog-keep",
-      "primary_owner": "dispatch-protocol",
-      "intent": "dispatch-protocol: backlog keep — 21 files CoverageB,CoverageD,CoverageG single owner, foreign consumers via published contracts only",
+      "id": "repository-programming-transaction",
+      "primary_owner": "repository-programming",
+      "intent": "repository-programming: Transaction staging & store (REPOSITORY-PROGRAMMING-012)",
       "files": [
-        "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
-        "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
-        "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
-        "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
-        "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
-        "src/Wanxiangshu/Foundation/Identity.fs",
-        "src/Wanxiangshu/Foundation/Outcome.fs",
-        "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs",
-        "src/Wanxiangshu/Interaction/Dispatch/Send.fs",
-        "src/Wanxiangshu/Interaction/Repair/Port.fs"
+        "src/Wanxiangshu/Repository/Programming/Js/Transaction.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "RepoProgramming.TransactionSurface"
+      ],
+      "consumes": [
+        "RepoProgramming.FilesystemSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "repository-programming-filesystem",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+      ],
+      "proofs": [
+        "requirements/repository-programming/tests/js-transaction.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "repository-programming-toolhost",
+      "primary_owner": "repository-programming",
+      "intent": "repository-programming: ToolHost & workflow surface (REPOSITORY-PROGRAMMING-010)",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs",
+        "src/Wanxiangshu/Process/JsSandbox.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/BookkeeperTool.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHostSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "RepoProgramming.ToolHostSurface"
+      ],
+      "consumes": [
+        "RepoProgramming.TransactionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "repository-programming-transaction",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Tools/FileMutationTools.fs"
+      ],
+      "proofs": [
+        "requirements/repository-programming/tests/js-tool-host.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "repository-programming-bindings",
+      "primary_owner": "repository-programming",
+      "intent": "repository-programming: Tools bindings & surface (REPOSITORY-PROGRAMMING-008)",
+      "files": [
+        "src/Wanxiangshu/Repository/Programming/Js/Surface.fs",
+        "src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "RepoProgramming.BindingsSurface"
+      ],
+      "consumes": [
+        "RepoProgramming.ToolHostSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "repository-programming-toolhost",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs"
+      ],
+      "proofs": [
+        "requirements/repository-programming/tests/js-bindings.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "dispatch-protocol-ingress",
+      "primary_owner": "dispatch-protocol",
+      "intent": "dispatch-protocol: Ingress & dispatch codec (DISPATCH-PROTOCOL-004)",
+      "files": [
+        "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressCodec.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/MetadataCodec.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Dispatch.IngressSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
       "proofs": [
         "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs"
       ],
@@ -1581,37 +2156,166 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "epistemic-reasoning-backlog-keep",
+      "id": "dispatch-protocol-dispatcher",
+      "primary_owner": "dispatch-protocol",
+      "intent": "dispatch-protocol: Dispatcher & send (DISPATCH-PROTOCOL-002)",
+      "files": [
+        "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/JoinGuardSurface.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Nudge.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Send.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Dispatch.DispatcherSurface"
+      ],
+      "consumes": [
+        "Dispatch.IngressSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "dispatch-protocol-ingress",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/send-format.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB",
+        "CoverageD",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "dispatch-protocol-recovery",
+      "primary_owner": "dispatch-protocol",
+      "intent": "dispatch-protocol: Recovery & reconcile (DISPATCH-PROTOCOL-007)",
+      "files": [
+        "src/Wanxiangshu/Composition/Turn/ReconcilePass.fs",
+        "src/Wanxiangshu/Composition/Turn/ReconcileSurface.fs",
+        "src/Wanxiangshu/Composition/Turn/TurnReconcile.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Model.fs",
+        "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs",
+        "src/Wanxiangshu/Foundation/Outcome.fs",
+        "src/Wanxiangshu/Foundation/OutcomeSurface.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/PhysicalAcceptance.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/Recovery.fs",
+        "src/Wanxiangshu/Interaction/Dispatch/RecoverySurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Dispatch.RecoverySurface"
+      ],
+      "consumes": [
+        "Dispatch.DispatcherSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "dispatch-protocol-dispatcher",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Execution/Session/Recovery/Workflow.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/recovery-at-most-one.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB",
+        "CoverageD",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "dispatch-protocol-identity",
+      "primary_owner": "dispatch-protocol",
+      "intent": "dispatch-protocol: Identity & port (DISPATCH-PROTOCOL-005)",
+      "files": [
+        "src/Wanxiangshu/Foundation/Identity.fs",
+        "src/Wanxiangshu/Interaction/Repair/Port.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Dispatch.IdentitySurface"
+      ],
+      "consumes": [
+        "Dispatch.RecoverySurface"
+      ],
+      "depends_on": [
+        {
+          "id": "dispatch-protocol-recovery",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs"
+      ],
+      "proofs": [
+        "requirements/dispatch-protocol/tests/join-guard.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB",
+        "CoverageD",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "epistemic-reasoning-core",
       "primary_owner": "epistemic-reasoning",
-      "intent": "epistemic-reasoning: backlog keep — 21 files CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "epistemic-reasoning: core EPI-001 — Absorb slice",
       "files": [
         "src/Wanxiangshu/Sphinx/Absorb.fs",
         "src/Wanxiangshu/Sphinx/Bayes.fs",
         "src/Wanxiangshu/Sphinx/Closure.fs",
         "src/Wanxiangshu/Sphinx/Codec.fs",
-        "src/Wanxiangshu/Sphinx/DecodePrimitives.fs",
-        "src/Wanxiangshu/Sphinx/Mcp.fs",
-        "src/Wanxiangshu/Sphinx/McpContract.fs",
-        "src/Wanxiangshu/Sphinx/McpServer.fs",
-        "src/Wanxiangshu/Sphinx/Methodology.fs",
-        "src/Wanxiangshu/Sphinx/MonteCarlo.fs",
-        "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
-        "src/Wanxiangshu/Sphinx/Policy.fs",
-        "src/Wanxiangshu/Sphinx/Representation.fs",
-        "src/Wanxiangshu/Sphinx/RuntimeTypes.fs",
-        "src/Wanxiangshu/Sphinx/Search.fs",
-        "src/Wanxiangshu/Sphinx/Session.fs",
-        "src/Wanxiangshu/Sphinx/State.fs",
-        "src/Wanxiangshu/Sphinx/Surface.fs",
-        "src/Wanxiangshu/Sphinx/Types.fs",
-        "src/Wanxiangshu/Sphinx/Value.fs",
-        "src/Wanxiangshu/Sphinx/WireEncode.fs"
+        "src/Wanxiangshu/Sphinx/DecodePrimitives.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "EpistemicReasoning.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/epistemic-reasoning/tests/bayes.test.mjs"
       ],
@@ -1628,36 +2332,159 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "behavior-diagnosis-backlog-keep",
+      "id": "epistemic-reasoning-codec",
+      "primary_owner": "epistemic-reasoning",
+      "intent": "epistemic-reasoning: codec EPI-002 — Mcp slice",
+      "files": [
+        "src/Wanxiangshu/Sphinx/Mcp.fs",
+        "src/Wanxiangshu/Sphinx/McpContract.fs",
+        "src/Wanxiangshu/Sphinx/McpServer.fs",
+        "src/Wanxiangshu/Sphinx/Methodology.fs",
+        "src/Wanxiangshu/Sphinx/MonteCarlo.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "EpistemicReasoning.CodecSurface"
+      ],
+      "consumes": [
+        "EpistemicReasoning.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "epistemic-reasoning-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/epistemic-reasoning/tests/decoder-parity.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "epistemic-reasoning-projection",
+      "primary_owner": "epistemic-reasoning",
+      "intent": "epistemic-reasoning: projection EPI-003 — ObservationCodec slice",
+      "files": [
+        "src/Wanxiangshu/Sphinx/ObservationCodec.fs",
+        "src/Wanxiangshu/Sphinx/Policy.fs",
+        "src/Wanxiangshu/Sphinx/Representation.fs",
+        "src/Wanxiangshu/Sphinx/RuntimeTypes.fs",
+        "src/Wanxiangshu/Sphinx/Search.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "EpistemicReasoning.ProjectionSurface"
+      ],
+      "consumes": [
+        "EpistemicReasoning.CodecSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "epistemic-reasoning-codec",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/epistemic-reasoning/tests/kernel.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "epistemic-reasoning-surface",
+      "primary_owner": "epistemic-reasoning",
+      "intent": "epistemic-reasoning: surface EPI-004 — Session slice",
+      "files": [
+        "src/Wanxiangshu/Sphinx/Session.fs",
+        "src/Wanxiangshu/Sphinx/State.fs",
+        "src/Wanxiangshu/Sphinx/Surface.fs",
+        "src/Wanxiangshu/Sphinx/Types.fs",
+        "src/Wanxiangshu/Sphinx/Value.fs",
+        "src/Wanxiangshu/Sphinx/WireEncode.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "EpistemicReasoning.SurfaceSurface"
+      ],
+      "consumes": [
+        "EpistemicReasoning.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "epistemic-reasoning-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/epistemic-reasoning/tests/mcp-contract.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "behavior-diagnosis-core",
       "primary_owner": "behavior-diagnosis",
-      "intent": "behavior-diagnosis: backlog keep — 20 files CoverageB,CoverageE single owner, foreign consumers via published contracts only",
+      "intent": "behavior-diagnosis: core BD-001 — BlogSurface slice",
       "files": [
         "src/Wanxiangshu/Enforcer/BlogSurface.fs",
         "src/Wanxiangshu/Enforcer/Catalog.fs",
         "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",
         "src/Wanxiangshu/Enforcer/Codec.fs",
-        "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs",
-        "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
-        "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
-        "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
-        "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
-        "src/Wanxiangshu/Enforcer/Host.fs",
-        "src/Wanxiangshu/Enforcer/Observation.fs",
-        "src/Wanxiangshu/Enforcer/ObservationCollector.fs",
-        "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
-        "src/Wanxiangshu/Enforcer/Projection.fs",
-        "src/Wanxiangshu/Enforcer/Repair.fs",
-        "src/Wanxiangshu/Enforcer/RepairSurface.fs",
-        "src/Wanxiangshu/Enforcer/Surface.fs",
-        "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
-        "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
-        "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
+        "src/Wanxiangshu/Enforcer/Cycle/BloggerProbe.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "BehaviorDiagnosis.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/behavior-diagnosis/tests/blog-entry-committed.test.mjs"
       ],
@@ -1675,33 +2502,161 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "speculative-investigation-backlog-keep",
+      "id": "behavior-diagnosis-codec",
+      "primary_owner": "behavior-diagnosis",
+      "intent": "behavior-diagnosis: codec BD-002 — Commit slice",
+      "files": [
+        "src/Wanxiangshu/Enforcer/Cycle/Commit.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Decode.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Model.fs",
+        "src/Wanxiangshu/Enforcer/Cycle/Recovery.fs",
+        "src/Wanxiangshu/Enforcer/Host.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "BehaviorDiagnosis.CodecSurface"
+      ],
+      "consumes": [
+        "BehaviorDiagnosis.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "behavior-diagnosis-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/behavior-diagnosis/tests/blog-tool.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB",
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "behavior-diagnosis-projection",
+      "primary_owner": "behavior-diagnosis",
+      "intent": "behavior-diagnosis: projection BD-003 — Observation slice",
+      "files": [
+        "src/Wanxiangshu/Enforcer/Observation.fs",
+        "src/Wanxiangshu/Enforcer/ObservationCollector.fs",
+        "src/Wanxiangshu/Enforcer/ObservationSurface.fs",
+        "src/Wanxiangshu/Enforcer/Projection.fs",
+        "src/Wanxiangshu/Enforcer/Repair.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "BehaviorDiagnosis.ProjectionSurface"
+      ],
+      "consumes": [
+        "BehaviorDiagnosis.CodecSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "behavior-diagnosis-codec",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/behavior-diagnosis/tests/blogger-cycle-atomic-fact.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB",
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "behavior-diagnosis-surface",
+      "primary_owner": "behavior-diagnosis",
+      "intent": "behavior-diagnosis: surface BD-004 — RepairSurface slice",
+      "files": [
+        "src/Wanxiangshu/Enforcer/RepairSurface.fs",
+        "src/Wanxiangshu/Enforcer/Surface.fs",
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurn.fs",
+        "src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs",
+        "src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "BehaviorDiagnosis.SurfaceSurface"
+      ],
+      "consumes": [
+        "BehaviorDiagnosis.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "behavior-diagnosis-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/behavior-diagnosis/tests/bounds.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB",
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "speculative-investigation-core",
       "primary_owner": "speculative-investigation",
-      "intent": "speculative-investigation: backlog keep — 17 files CoverageE single owner, foreign consumers via published contracts only",
+      "intent": "speculative-investigation: core SPEC-INV-001 — Frame slice",
       "files": [
         "src/Wanxiangshu/Strength/Frame.fs",
         "src/Wanxiangshu/Strength/Lifecycle.fs",
         "src/Wanxiangshu/Strength/OpenCode/PluginScope.fs",
         "src/Wanxiangshu/Strength/OpenCode/Replay.fs",
-        "src/Wanxiangshu/Strength/OpenCode/Settings.fs",
-        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
-        "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
-        "src/Wanxiangshu/Strength/Prediction/CostModel.fs",
-        "src/Wanxiangshu/Strength/Projection/Model.fs",
-        "src/Wanxiangshu/Strength/Replica/Commit.fs",
-        "src/Wanxiangshu/Strength/Replica/Promotion.fs",
-        "src/Wanxiangshu/Strength/Replica/Runtime.fs",
-        "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
-        "src/Wanxiangshu/Strength/Rollout.fs",
-        "src/Wanxiangshu/Strength/Runtime.fs",
-        "src/Wanxiangshu/Strength/Surface.fs",
-        "src/Wanxiangshu/Strength/TurnEvidence.fs"
+        "src/Wanxiangshu/Strength/OpenCode/Settings.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "SpeculativeInvestigation.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/speculative-investigation/tests/authority-policy.test.mjs"
       ],
@@ -1718,33 +2673,118 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "knowledge-reuse-backlog-keep",
+      "id": "speculative-investigation-projection",
+      "primary_owner": "speculative-investigation",
+      "intent": "speculative-investigation: projection SPEC-INV-002 — Speculate slice",
+      "files": [
+        "src/Wanxiangshu/Strength/OpenCode/Speculate.fs",
+        "src/Wanxiangshu/Strength/Prediction/BatchCollector.fs",
+        "src/Wanxiangshu/Strength/Prediction/CostModel.fs",
+        "src/Wanxiangshu/Strength/Projection/Model.fs",
+        "src/Wanxiangshu/Strength/Replica/Commit.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "SpeculativeInvestigation.ProjectionSurface"
+      ],
+      "consumes": [
+        "SpeculativeInvestigation.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "speculative-investigation-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/speculative-investigation/tests/batch-collector.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "speculative-investigation-surface",
+      "primary_owner": "speculative-investigation",
+      "intent": "speculative-investigation: surface SPEC-INV-003 — Promotion slice",
+      "files": [
+        "src/Wanxiangshu/Strength/Replica/Promotion.fs",
+        "src/Wanxiangshu/Strength/Replica/Runtime.fs",
+        "src/Wanxiangshu/Strength/Replica/TraceRecovery.fs",
+        "src/Wanxiangshu/Strength/Rollout.fs",
+        "src/Wanxiangshu/Strength/Runtime.fs",
+        "src/Wanxiangshu/Strength/Surface.fs",
+        "src/Wanxiangshu/Strength/TurnEvidence.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "SpeculativeInvestigation.SurfaceSurface"
+      ],
+      "consumes": [
+        "SpeculativeInvestigation.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "speculative-investigation-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/speculative-investigation/tests/commit-promotion.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "knowledge-reuse-core",
       "primary_owner": "knowledge-reuse",
-      "intent": "knowledge-reuse: backlog keep — 17 files CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "knowledge-reuse: core KNOWLEDGE-REUSE-001 — Bookkeeper slice",
       "files": [
         "src/Wanxiangshu/Repository/Knowledge/Casebook/Bookkeeper.fs",
         "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperRuntime.fs",
         "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperStaging.fs",
         "src/Wanxiangshu/Repository/Knowledge/Casebook/BookkeeperSurface.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Capture.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Model.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Replay.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs",
-        "src/Wanxiangshu/Repository/Knowledge/Casebook/Workflow.fs"
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Capture.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "KnowledgeReuse.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/knowledge-reuse/tests/bookkeeper-mechanical.test.mjs"
       ],
@@ -1761,31 +2801,118 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "intra-participant-parallelism-backlog-keep",
+      "id": "knowledge-reuse-projection",
+      "primary_owner": "knowledge-reuse",
+      "intent": "knowledge-reuse: projection KNOWLEDGE-REUSE-002 — FetchSurface slice",
+      "files": [
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/FetchSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Index.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/IndexSurface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Lifecycle.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/LifecycleSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "KnowledgeReuse.ProjectionSurface"
+      ],
+      "consumes": [
+        "KnowledgeReuse.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "knowledge-reuse-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/knowledge-reuse/tests/bookkeeper-session.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "knowledge-reuse-surface",
+      "primary_owner": "knowledge-reuse",
+      "intent": "knowledge-reuse: surface KNOWLEDGE-REUSE-003 — Model slice",
+      "files": [
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Model.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/OpenCode/Tools.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Replay.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/SessionDraft.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Store.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Surface.fs",
+        "src/Wanxiangshu/Repository/Knowledge/Casebook/Workflow.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "KnowledgeReuse.SurfaceSurface"
+      ],
+      "consumes": [
+        "KnowledgeReuse.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "knowledge-reuse-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/knowledge-reuse/tests/bookkeeper-synthesis.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "intra-participant-parallelism-core",
       "primary_owner": "intra-participant-parallelism",
-      "intent": "intra-participant-parallelism: backlog keep — 15 files CoverageD,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "intra-participant-parallelism: core INTRA-PARTICIPANT-PARALLELISM-001 — Admission slice",
       "files": [
         "src/Wanxiangshu/Execution/Fission/Admission.fs",
         "src/Wanxiangshu/Execution/Fission/Fact.fs",
         "src/Wanxiangshu/Execution/Fission/Facts.fs",
         "src/Wanxiangshu/Execution/Fission/Fold.fs",
-        "src/Wanxiangshu/Execution/Fission/Model.fs",
-        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
-        "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
-        "src/Wanxiangshu/Execution/Fission/Projection.fs",
-        "src/Wanxiangshu/Execution/Fission/Runtime.fs",
-        "src/Wanxiangshu/Execution/Fission/Surface.fs",
-        "src/Wanxiangshu/Foundation/AsyncSupport.fs",
-        "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
-        "src/Wanxiangshu/Foundation/Parallel.fs",
-        "src/Wanxiangshu/Foundation/ParallelSurface.fs",
-        "src/Wanxiangshu/Foundation/TaskResult.fs"
+        "src/Wanxiangshu/Execution/Fission/Model.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "IntraParticipantParallelism.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/intra-participant-parallelism/tests/fission-domain.test.mjs"
       ],
@@ -1803,30 +2930,117 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "process-execution-backlog-keep",
+      "id": "intra-participant-parallelism-projection",
+      "primary_owner": "intra-participant-parallelism",
+      "intent": "intra-participant-parallelism: projection INTRA-PARTICIPANT-PARALLELISM-002 — Host slice",
+      "files": [
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Host.fs",
+        "src/Wanxiangshu/Execution/Fission/OpenCode/Tool.fs",
+        "src/Wanxiangshu/Execution/Fission/Projection.fs",
+        "src/Wanxiangshu/Execution/Fission/Runtime.fs",
+        "src/Wanxiangshu/Execution/Fission/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "IntraParticipantParallelism.ProjectionSurface"
+      ],
+      "consumes": [
+        "IntraParticipantParallelism.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "intra-participant-parallelism-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/intra-participant-parallelism/tests/fission-runtime.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "intra-participant-parallelism-surface",
+      "primary_owner": "intra-participant-parallelism",
+      "intent": "intra-participant-parallelism: surface INTRA-PARTICIPANT-PARALLELISM-003 — AsyncSupport slice",
+      "files": [
+        "src/Wanxiangshu/Foundation/AsyncSupport.fs",
+        "src/Wanxiangshu/Foundation/FsToolkitFableCompat.fs",
+        "src/Wanxiangshu/Foundation/Parallel.fs",
+        "src/Wanxiangshu/Foundation/ParallelSurface.fs",
+        "src/Wanxiangshu/Foundation/TaskResult.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "IntraParticipantParallelism.SurfaceSurface"
+      ],
+      "consumes": [
+        "IntraParticipantParallelism.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "intra-participant-parallelism-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/intra-participant-parallelism/tests/fission-source-ratchet.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageD",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "process-execution-core",
       "primary_owner": "process-execution",
-      "intent": "process-execution: backlog keep — 14 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "process-execution: core PROC-001 — ExecutorTool slice",
       "files": [
         "src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs",
         "src/Wanxiangshu/OpenCode/Tools/PtyTool.fs",
         "src/Wanxiangshu/Process/NodeProcessHost.fs",
-        "src/Wanxiangshu/Process/NodeProcessWait.fs",
-        "src/Wanxiangshu/Process/ProcessOutput.fs",
-        "src/Wanxiangshu/Process/ProcessRequest.fs",
-        "src/Wanxiangshu/Process/ProcessRunner.fs",
-        "src/Wanxiangshu/Process/Pty.fs",
-        "src/Wanxiangshu/Process/PtyApi.fs",
-        "src/Wanxiangshu/Process/PtyBackend.fs",
-        "src/Wanxiangshu/Process/PtySession.fs",
-        "src/Wanxiangshu/Process/PtySupervisor.fs",
-        "src/Wanxiangshu/Process/PtyTypes.fs",
-        "src/Wanxiangshu/Process/Spool.fs"
+        "src/Wanxiangshu/Process/NodeProcessWait.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "ProcessExecution.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/process-execution/tests/executor-tool.test.mjs"
       ],
@@ -1844,30 +3058,117 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "provider-attempt-recovery-backlog-keep",
+      "id": "process-execution-projection",
+      "primary_owner": "process-execution",
+      "intent": "process-execution: projection PROC-002 — ProcessOutput slice",
+      "files": [
+        "src/Wanxiangshu/Process/ProcessOutput.fs",
+        "src/Wanxiangshu/Process/ProcessRequest.fs",
+        "src/Wanxiangshu/Process/ProcessRunner.fs",
+        "src/Wanxiangshu/Process/Pty.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProcessExecution.ProjectionSurface"
+      ],
+      "consumes": [
+        "ProcessExecution.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "process-execution-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/process-execution/tests/handle-process.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "process-execution-surface",
+      "primary_owner": "process-execution",
+      "intent": "process-execution: surface PROC-003 — PtyApi slice",
+      "files": [
+        "src/Wanxiangshu/Process/PtyApi.fs",
+        "src/Wanxiangshu/Process/PtyBackend.fs",
+        "src/Wanxiangshu/Process/PtySession.fs",
+        "src/Wanxiangshu/Process/PtySupervisor.fs",
+        "src/Wanxiangshu/Process/PtyTypes.fs",
+        "src/Wanxiangshu/Process/Spool.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProcessExecution.SurfaceSurface"
+      ],
+      "consumes": [
+        "ProcessExecution.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "process-execution-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/process-execution/tests/join-v2-mailbox-drain.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "provider-attempt-recovery-core",
       "primary_owner": "provider-attempt-recovery",
-      "intent": "provider-attempt-recovery: backlog keep — 14 files CoverageE single owner, foreign consumers via published contracts only",
+      "intent": "provider-attempt-recovery: core PAR-001 — Cursor slice",
       "files": [
         "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
         "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
-        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs"
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "ProviderAttemptRecovery.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/provider-attempt-recovery/tests/abort-residue.test.mjs"
       ],
@@ -1884,28 +3185,115 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "provider-projection-backlog-keep",
+      "id": "provider-attempt-recovery-projection",
+      "primary_owner": "provider-attempt-recovery",
+      "intent": "provider-attempt-recovery: projection PAR-002 — Fact slice",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProviderAttemptRecovery.ProjectionSurface"
+      ],
+      "consumes": [
+        "ProviderAttemptRecovery.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "provider-attempt-recovery-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "provider-attempt-recovery-surface",
+      "primary_owner": "provider-attempt-recovery",
+      "intent": "provider-attempt-recovery: surface PAR-003 — Ledger slice",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProviderAttemptRecovery.SurfaceSurface"
+      ],
+      "consumes": [
+        "ProviderAttemptRecovery.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "provider-attempt-recovery-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/cursor.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "provider-projection-core",
       "primary_owner": "provider-projection",
-      "intent": "provider-projection: backlog keep — 12 files CoverageA,CoverageE,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "provider-projection: core PROVIDER-PROJECTION-001 — LlmFacing slice",
       "files": [
         "src/Wanxiangshu/Foundation/LlmFacing.fs",
         "src/Wanxiangshu/Foundation/SyntheticToml.fs",
         "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
-        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs",
-        "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
-        "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
-        "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
-        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
-        "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
-        "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
-        "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
-        "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs"
+        "src/Wanxiangshu/OpenCode/Codec/ProjectionMessageEdit.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "ProviderProjection.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/provider-projection/tests/blogger-toml-surface.test.mjs"
       ],
@@ -1924,27 +3312,118 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "requirement-grounding-backlog-keep",
+      "id": "provider-projection-projection",
+      "primary_owner": "provider-projection",
+      "intent": "provider-projection: projection PROVIDER-PROJECTION-002 — ProviderProjectionSurface slice",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Codec/ProviderProjectionSurface.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireCapture.fs",
+        "src/Wanxiangshu/OpenCode/Codec/ProviderWireDecode.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProviderProjection.ProjectionSurface"
+      ],
+      "consumes": [
+        "ProviderProjection.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "provider-projection-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/provider-projection/tests/blogger-toml.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "provider-projection-surface",
+      "primary_owner": "provider-projection",
+      "intent": "provider-projection: surface PROVIDER-PROJECTION-003 — Model slice",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
+        "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProviderProjection.SurfaceSurface"
+      ],
+      "consumes": [
+        "ProviderProjection.ProjectionSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "provider-projection-projection",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/provider-projection/tests/join-result-renderer-entry-comment.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "requirement-grounding-core",
       "primary_owner": "requirement-grounding",
-      "intent": "requirement-grounding: backlog keep — 11 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "requirement-grounding: core REQUIREMENT-GROUNDING-001 — Fact slice",
       "files": [
         "src/Wanxiangshu/Host/Fact.fs",
         "src/Wanxiangshu/Host/Facts.fs",
         "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
         "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Projection.fs",
-        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs",
-        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
-        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
-        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
-        "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
-        "src/Wanxiangshu/Requirement/Grounding/Model.fs",
-        "src/Wanxiangshu/Requirement/Grounding/Surface.fs"
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Runtime.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "RequirementGrounding.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/requirement-grounding/tests/grounding-delivery.test.mjs"
       ],
@@ -1962,26 +3441,76 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "interaction-authority-backlog-keep",
+      "id": "requirement-grounding-surface",
+      "primary_owner": "requirement-grounding",
+      "intent": "requirement-grounding: surface REQUIREMENT-GROUNDING-002 — Transform slice",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Transform.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingRepositorySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/RequirementGroundingSurface.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Catalog.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Model.fs",
+        "src/Wanxiangshu/Requirement/Grounding/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "RequirementGrounding.SurfaceSurface"
+      ],
+      "consumes": [
+        "RequirementGrounding.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "requirement-grounding-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/requirement-grounding/tests/opencode-gate.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "interaction-authority-core",
       "primary_owner": "interaction-authority",
-      "intent": "interaction-authority: backlog keep — 10 files CoverageA,CoverageB single owner, foreign consumers via published contracts only",
+      "intent": "interaction-authority: core INTERACTION-AUTHORITY-001 — Child slice",
       "files": [
         "src/Wanxiangshu/Interaction/Authority/Child.fs",
         "src/Wanxiangshu/Interaction/Authority/Fact.fs",
         "src/Wanxiangshu/Interaction/Authority/Facts.fs",
         "src/Wanxiangshu/Interaction/Authority/Fold.fs",
-        "src/Wanxiangshu/Interaction/Authority/Ledger.fs",
-        "src/Wanxiangshu/Interaction/Authority/Model.fs",
-        "src/Wanxiangshu/Interaction/Authority/Run.fs",
-        "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
-        "src/Wanxiangshu/Interaction/Authority/Surface.fs",
-        "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs"
+        "src/Wanxiangshu/Interaction/Authority/Ledger.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "InteractionAuthority.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/interaction-authority/tests/authority-root.test.mjs"
       ],
@@ -1999,26 +3528,75 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "repository-investigation-backlog-keep",
+      "id": "interaction-authority-surface",
+      "primary_owner": "interaction-authority",
+      "intent": "interaction-authority: surface INTERACTION-AUTHORITY-002 — Model slice",
+      "files": [
+        "src/Wanxiangshu/Interaction/Authority/Model.fs",
+        "src/Wanxiangshu/Interaction/Authority/Run.fs",
+        "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
+        "src/Wanxiangshu/Interaction/Authority/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Host/TerminalPolicy.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "InteractionAuthority.SurfaceSurface"
+      ],
+      "consumes": [
+        "InteractionAuthority.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "interaction-authority-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/interaction-authority/tests/chat-params-hook.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageB"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "repository-investigation-core",
       "primary_owner": "repository-investigation",
-      "intent": "repository-investigation: backlog keep — 10 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "repository-investigation: core REPOSITORY-INVESTIGATION-001 — FetchTool slice",
       "files": [
         "src/Wanxiangshu/OpenCode/Tools/FetchTool.fs",
         "src/Wanxiangshu/OpenCode/Tools/InspectorTool.fs",
         "src/Wanxiangshu/Repository/Investigation/Semble/Client.fs",
         "src/Wanxiangshu/Repository/Investigation/Semble/Mcp.fs",
-        "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs",
-        "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
-        "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
-        "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
-        "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
-        "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs"
+        "src/Wanxiangshu/Repository/Investigation/Semble/SearchCodec.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "RepositoryInvestigation.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/repository-investigation/tests/investigation-resource-laws.test.mjs"
       ],
@@ -2036,25 +3614,74 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "time-capability-backlog-keep",
+      "id": "repository-investigation-surface",
+      "primary_owner": "repository-investigation",
+      "intent": "repository-investigation: surface REPOSITORY-INVESTIGATION-002 — Stdio slice",
+      "files": [
+        "src/Wanxiangshu/Repository/Investigation/Semble/Stdio.fs",
+        "src/Wanxiangshu/Repository/Investigation/SembleSurface.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Prompt.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStart/Runtime.fs",
+        "src/Wanxiangshu/Repository/Investigation/WarmStartSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "RepositoryInvestigation.SurfaceSurface"
+      ],
+      "consumes": [
+        "RepositoryInvestigation.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "repository-investigation-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/repository-investigation/tests/repository-warm-start.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "time-capability-core",
       "primary_owner": "time-capability",
-      "intent": "time-capability: backlog keep — 9 files CoverageA,CoverageD,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "time-capability: core TIME-001 — SessionStartedAtLedger slice",
       "files": [
         "src/Wanxiangshu/Execution/Session/SessionStartedAtLedger.fs",
         "src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs",
         "src/Wanxiangshu/Foundation/Temporal.fs",
-        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs",
-        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
-        "src/Wanxiangshu/Process/Deadline.fs",
-        "src/Wanxiangshu/Process/DeadlineSurface.fs",
-        "src/Wanxiangshu/Process/PtyTiming.fs",
-        "src/Wanxiangshu/Process/Surface.fs"
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibration.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "TimeCapability.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/time-capability/tests/ambient-time-forbidden.test.mjs"
       ],
@@ -2073,24 +3700,75 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "participant-identity-backlog-keep",
+      "id": "time-capability-surface",
+      "primary_owner": "time-capability",
+      "intent": "time-capability: surface TIME-002 — PairProgrammingCalibrationSurface slice",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingCalibrationSurface.fs",
+        "src/Wanxiangshu/Process/Deadline.fs",
+        "src/Wanxiangshu/Process/DeadlineSurface.fs",
+        "src/Wanxiangshu/Process/PtyTiming.fs",
+        "src/Wanxiangshu/Process/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "TimeCapability.SurfaceSurface"
+      ],
+      "consumes": [
+        "TimeCapability.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "time-capability-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/time-capability/tests/clock-port-virtual.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageD",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "participant-identity-core",
       "primary_owner": "participant-identity",
-      "intent": "participant-identity: backlog keep — 8 files CoverageA,CoverageE,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "participant-identity: core PID-001 — Roles slice",
       "files": [
         "src/Wanxiangshu/Foundation/Roles.fs",
         "src/Wanxiangshu/OpenCode/Host/PersonaBinding.fs",
         "src/Wanxiangshu/Participant/Persona/Catalog.fs",
-        "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs",
-        "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
-        "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
-        "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
-        "src/Wanxiangshu/Participant/Persona/Surface.fs"
+        "src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "ParticipantIdentity.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/participant-identity/tests/catalog.test.mjs"
       ],
@@ -2109,24 +3787,74 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "semantic-trace-backlog-keep",
+      "id": "participant-identity-surface",
+      "primary_owner": "participant-identity",
+      "intent": "participant-identity: surface PID-002 — RoleIdentity slice",
+      "files": [
+        "src/Wanxiangshu/Participant/Persona/RoleIdentity.fs",
+        "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
+        "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
+        "src/Wanxiangshu/Participant/Persona/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ParticipantIdentity.SurfaceSurface"
+      ],
+      "consumes": [
+        "ParticipantIdentity.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "participant-identity-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/participant-identity/tests/persona-binding.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "semantic-trace-core",
       "primary_owner": "semantic-trace",
-      "intent": "semantic-trace: backlog keep — 8 files CoverageE single owner, foreign consumers via published contracts only",
+      "intent": "semantic-trace: core SEMANTIC-TRACE-001 — Capture slice",
       "files": [
         "src/Wanxiangshu/Context/Trace/Capture.fs",
         "src/Wanxiangshu/Context/Trace/Cursor.fs",
         "src/Wanxiangshu/Context/Trace/Materialization.fs",
-        "src/Wanxiangshu/Context/Trace/Model.fs",
-        "src/Wanxiangshu/Context/Trace/Projection.fs",
-        "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
-        "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
-        "src/Wanxiangshu/Context/Trace/XTraceSurface.fs"
+        "src/Wanxiangshu/Context/Trace/Model.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "SemanticTrace.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/semantic-trace/tests/x-trace-capture-boundary.test.mjs"
       ],
@@ -2143,23 +3871,71 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "prefix-stability-backlog-keep",
+      "id": "semantic-trace-surface",
+      "primary_owner": "semantic-trace",
+      "intent": "semantic-trace: surface SEMANTIC-TRACE-002 — Projection slice",
+      "files": [
+        "src/Wanxiangshu/Context/Trace/Projection.fs",
+        "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+        "src/Wanxiangshu/Context/Trace/XTracePipeline.fs",
+        "src/Wanxiangshu/Context/Trace/XTraceSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "SemanticTrace.SurfaceSurface"
+      ],
+      "consumes": [
+        "SemanticTrace.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "semantic-trace-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/semantic-trace/tests/x-trace-capture-hardening.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "prefix-stability-core",
       "primary_owner": "prefix-stability",
-      "intent": "prefix-stability: backlog keep — 7 files CoverageE single owner, foreign consumers via published contracts only",
+      "intent": "prefix-stability: core PREFIX-STABILITY-001 — Candidate slice",
       "files": [
         "src/Wanxiangshu/Context/Prefix/Candidate.fs",
         "src/Wanxiangshu/Context/Prefix/Epoch.fs",
-        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
-        "src/Wanxiangshu/Context/Prefix/Projection.fs",
-        "src/Wanxiangshu/Context/Prefix/Surface.fs",
-        "src/Wanxiangshu/Context/Prefix/Wire.fs",
-        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+        "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "PrefixStability.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs"
       ],
@@ -2176,22 +3952,71 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "provider-language-backlog-keep",
+      "id": "prefix-stability-surface",
+      "primary_owner": "prefix-stability",
+      "intent": "prefix-stability: surface PREFIX-STABILITY-002 — Projection slice",
+      "files": [
+        "src/Wanxiangshu/Context/Prefix/Projection.fs",
+        "src/Wanxiangshu/Context/Prefix/Surface.fs",
+        "src/Wanxiangshu/Context/Prefix/Wire.fs",
+        "src/Wanxiangshu/Context/Prefix/XWireSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "PrefixStability.SurfaceSurface"
+      ],
+      "consumes": [
+        "PrefixStability.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "prefix-stability-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/prefix-stability/tests/g2-inspector-provider-wire-prefix.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "provider-language-core",
       "primary_owner": "provider-language",
-      "intent": "provider-language: backlog keep — 6 files CoverageA,CoverageE,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "provider-language: core PROVIDER-LANGUAGE-001 — ProviderLanguageBinding slice",
       "files": [
         "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
         "src/Wanxiangshu/Participant/Provider/Language.fs",
-        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
-        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
-        "src/Wanxiangshu/Resources/ProviderProse.fs",
-        "src/Wanxiangshu/Resources/ProviderResources.fs"
+        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "ProviderLanguage.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/provider-language/tests/language-parity-gate.test.mjs"
       ],
@@ -2210,22 +4035,72 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "session-ontology-backlog-keep",
+      "id": "provider-language-surface",
+      "primary_owner": "provider-language",
+      "intent": "provider-language: surface PROVIDER-LANGUAGE-002 — SessionLanguage slice",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+        "src/Wanxiangshu/Resources/ProviderProse.fs",
+        "src/Wanxiangshu/Resources/ProviderResources.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ProviderLanguage.SurfaceSurface"
+      ],
+      "consumes": [
+        "ProviderLanguage.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "provider-language-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/provider-language/tests/provider-language.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "session-ontology-core",
       "primary_owner": "session-ontology",
-      "intent": "session-ontology: backlog keep — 6 files CoverageA,CoverageD single owner, foreign consumers via published contracts only",
+      "intent": "session-ontology: core SESSION-ONTOLOGY-001 — Association slice",
       "files": [
         "src/Wanxiangshu/Execution/Session/Association.fs",
         "src/Wanxiangshu/Execution/Session/AssociationSurface.fs",
-        "src/Wanxiangshu/Execution/Session/Ownership.fs",
-        "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
-        "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
-        "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs"
+        "src/Wanxiangshu/Execution/Session/Ownership.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "SessionOntology.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/session-ontology/tests/satellite-kind.test.mjs"
       ],
@@ -2243,22 +4118,71 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "output-distillation-backlog-keep",
+      "id": "session-ontology-surface",
+      "primary_owner": "session-ontology",
+      "intent": "session-ontology: surface SESSION-ONTOLOGY-002 — SessionBindingSurface slice",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/SessionBindingSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/Sessions.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionsSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "SessionOntology.SurfaceSurface"
+      ],
+      "consumes": [
+        "SessionOntology.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "session-ontology-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/session-ontology/tests/session-association.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "output-distillation-core",
       "primary_owner": "output-distillation",
-      "intent": "output-distillation: backlog keep — 6 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "output-distillation: core DISTILL-001 — ToolResultBound slice",
       "files": [
         "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
         "src/Wanxiangshu/OpenCode/Tools/Distillation.fs",
-        "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs",
-        "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
-        "src/Wanxiangshu/Process/LargeGate.fs",
-        "src/Wanxiangshu/Process/LargeGateSurface.fs"
+        "src/Wanxiangshu/OpenCode/Tools/DistillationRuntime.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "OutputDistillation.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/output-distillation/tests/distiller-fragment-humility.test.mjs"
       ],
@@ -2276,22 +4200,71 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "institutional-learning-backlog-keep",
+      "id": "output-distillation-surface",
+      "primary_owner": "output-distillation",
+      "intent": "output-distillation: surface DISTILL-002 — DistillationSurface slice",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Tools/DistillationSurface.fs",
+        "src/Wanxiangshu/Process/LargeGate.fs",
+        "src/Wanxiangshu/Process/LargeGateSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "OutputDistillation.SurfaceSurface"
+      ],
+      "consumes": [
+        "OutputDistillation.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "output-distillation-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/output-distillation/tests/distiller-role-contract.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "institutional-learning-core",
       "primary_owner": "institutional-learning",
-      "intent": "institutional-learning: backlog keep — 6 files CoverageA,CoverageE single owner, foreign consumers via published contracts only",
+      "intent": "institutional-learning: core INSTITUTIONAL-LEARNING-001 — Enhancer slice",
       "files": [
         "src/Wanxiangshu/Enforcer/InstitutionalLearning/Enhancer.fs",
         "src/Wanxiangshu/Enforcer/InstitutionalLearning/Facts.fs",
-        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs",
-        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
-        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
-        "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs"
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Fold.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "InstitutionalLearning.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/institutional-learning/tests/institutional-learning.test.mjs"
       ],
@@ -2309,22 +4282,71 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "distribution-backlog-keep",
+      "id": "institutional-learning-surface",
+      "primary_owner": "institutional-learning",
+      "intent": "institutional-learning: surface INSTITUTIONAL-LEARNING-002 — Projection slice",
+      "files": [
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Projection.fs",
+        "src/Wanxiangshu/Enforcer/InstitutionalLearning/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/InstitutionalLearningTools.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "InstitutionalLearning.SurfaceSurface"
+      ],
+      "consumes": [
+        "InstitutionalLearning.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "institutional-learning-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/institutional-learning/tests/institutional-learning.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "distribution-core",
       "primary_owner": "distribution",
-      "intent": "distribution: backlog keep — 6 files CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "distribution: core DISTRIBUTION-001 — AssemblyInfo slice",
       "files": [
         "src/Wanxiangshu/AssemblyInfo.fs",
         "src/Wanxiangshu/Resources/EnforcerCatalogResource.fs",
-        "src/Wanxiangshu/Resources/ModelRoutingResource.fs",
-        "src/Wanxiangshu/Resources/PackageMetadata.fs",
-        "src/Wanxiangshu/Resources/PackageResources.fs",
-        "src/Wanxiangshu/Resources/RuntimeResources.fs"
+        "src/Wanxiangshu/Resources/ModelRoutingResource.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "Distribution.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/distribution/tests/cwd-independent-resources.test.mjs"
       ],
@@ -2341,21 +4363,69 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "capability-enforcement-backlog-keep",
-      "primary_owner": "capability-enforcement",
-      "intent": "capability-enforcement: backlog keep — 5 files CoverageA single owner, foreign consumers via published contracts only",
+      "id": "distribution-surface",
+      "primary_owner": "distribution",
+      "intent": "distribution: surface DISTRIBUTION-002 — PackageMetadata slice",
       "files": [
-        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs",
-        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs",
-        "src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs",
-        "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs",
-        "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
+        "src/Wanxiangshu/Resources/PackageMetadata.fs",
+        "src/Wanxiangshu/Resources/PackageResources.fs",
+        "src/Wanxiangshu/Resources/RuntimeResources.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "Distribution.SurfaceSurface"
+      ],
+      "consumes": [
+        "Distribution.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "distribution-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/distribution/tests/pack-closure.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "capability-enforcement-core",
+      "primary_owner": "capability-enforcement",
+      "intent": "capability-enforcement: core ENF-001 — ManagedAgentConfig slice",
+      "files": [
+        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs",
+        "src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "CapabilityEnforcement.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/capability-enforcement/tests/agent-permission-gate.test.mjs"
       ],
@@ -2372,21 +4442,69 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "guidance-delivery-backlog-keep",
-      "primary_owner": "guidance-delivery",
-      "intent": "guidance-delivery: backlog keep — 5 files CoverageA,CoverageE single owner, foreign consumers via published contracts only",
+      "id": "capability-enforcement-surface",
+      "primary_owner": "capability-enforcement",
+      "intent": "capability-enforcement: surface ENF-002 — ManagerConfig slice",
       "files": [
-        "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs",
-        "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs",
-        "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs",
-        "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineSurface.fs",
-        "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs"
+        "src/Wanxiangshu/OpenCode/Host/ManagerConfig.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "CapabilityEnforcement.SurfaceSurface"
+      ],
+      "consumes": [
+        "CapabilityEnforcement.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "capability-enforcement-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/capability-enforcement/tests/attempt-plan-authority.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "guidance-delivery-core",
+      "primary_owner": "guidance-delivery",
+      "intent": "guidance-delivery: core GD-001 — DeliverySurface slice",
+      "files": [
+        "src/Wanxiangshu/Enforcer/Guidance/DeliverySurface.fs",
+        "src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "GuidanceDelivery.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/guidance-delivery/tests/audience-separation.test.mjs"
       ],
@@ -2404,21 +4522,70 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "attention-regulation-backlog-keep",
-      "primary_owner": "attention-regulation",
-      "intent": "attention-regulation: backlog keep — 5 files CoverageA,CoverageB single owner, foreign consumers via published contracts only",
+      "id": "guidance-delivery-surface",
+      "primary_owner": "guidance-delivery",
+      "intent": "guidance-delivery: surface GD-002 — GuidelineProjection slice",
       "files": [
-        "src/Wanxiangshu/Interaction/Attention/Facts.fs",
-        "src/Wanxiangshu/Interaction/Attention/Fold.fs",
-        "src/Wanxiangshu/Interaction/Attention/Projection.fs",
-        "src/Wanxiangshu/Interaction/Attention/Surface.fs",
-        "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs"
+        "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineProjection.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgramming/GuidelineSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "GuidanceDelivery.SurfaceSurface"
+      ],
+      "consumes": [
+        "GuidanceDelivery.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "guidance-delivery-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/guidance-delivery/tests/guideline-projection.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "attention-regulation-core",
+      "primary_owner": "attention-regulation",
+      "intent": "attention-regulation: core ATTENTION-REGULATION-001 — Facts slice",
+      "files": [
+        "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+        "src/Wanxiangshu/Interaction/Attention/Fold.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "AttentionRegulation.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/attention-regulation/tests/attention-regulation.test.mjs"
       ],
@@ -2436,21 +4603,70 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "concern-routing-backlog-keep",
-      "primary_owner": "concern-routing",
-      "intent": "concern-routing: backlog keep — 5 files CoverageA,CoverageB single owner, foreign consumers via published contracts only",
+      "id": "attention-regulation-surface",
+      "primary_owner": "attention-regulation",
+      "intent": "attention-regulation: surface ATTENTION-REGULATION-002 — Projection slice",
       "files": [
-        "src/Wanxiangshu/Interaction/Concern/Facts.fs",
-        "src/Wanxiangshu/Interaction/Concern/Fold.fs",
-        "src/Wanxiangshu/Interaction/Concern/Projection.fs",
-        "src/Wanxiangshu/Interaction/Concern/Surface.fs",
-        "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs"
+        "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+        "src/Wanxiangshu/Interaction/Attention/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/AttentionTools.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "AttentionRegulation.SurfaceSurface"
+      ],
+      "consumes": [
+        "AttentionRegulation.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "attention-regulation-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageB"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "concern-routing-core",
+      "primary_owner": "concern-routing",
+      "intent": "concern-routing: core CONCERN-ROUTING-001 — Facts slice",
+      "files": [
+        "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+        "src/Wanxiangshu/Interaction/Concern/Fold.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ConcernRouting.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/concern-routing/tests/concern-routing.test.mjs"
       ],
@@ -2468,20 +4684,110 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "cognitive-environment-backlog-keep",
+      "id": "concern-routing-surface",
+      "primary_owner": "concern-routing",
+      "intent": "concern-routing: surface CONCERN-ROUTING-002 — Projection slice",
+      "files": [
+        "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+        "src/Wanxiangshu/Interaction/Concern/Surface.fs",
+        "src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ConcernRouting.SurfaceSurface"
+      ],
+      "consumes": [
+        "ConcernRouting.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "concern-routing-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageB"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "cognitive-environment-core",
       "primary_owner": "cognitive-environment",
-      "intent": "cognitive-environment: backlog keep — 4 files CoverageA,CoverageG single owner, foreign consumers via published contracts only",
+      "intent": "cognitive-environment: core COGNITIVE-ENVIRONMENT-001 — BloggerChronicleText slice",
       "files": [
         "src/Wanxiangshu/OpenCode/Host/BloggerChronicleText.fs",
-        "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs",
+        "src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "CognitiveEnvironment.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/cognitive-environment/tests/blogger-chronicle-text.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "cognitive-environment-surface",
+      "primary_owner": "cognitive-environment",
+      "intent": "cognitive-environment: surface COGNITIVE-ENVIRONMENT-002 — PromptResources slice",
+      "files": [
         "src/Wanxiangshu/Resources/PromptResources.fs",
         "src/Wanxiangshu/Resources/PromptSurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "CognitiveEnvironment.SurfaceSurface"
+      ],
+      "consumes": [
+        "CognitiveEnvironment.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "cognitive-environment-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/cognitive-environment/tests/cognitive-environment.test.mjs"
       ],
@@ -2499,20 +4805,69 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "degeneration-guard-backlog-keep",
+      "id": "degeneration-guard-core",
       "primary_owner": "degeneration-guard",
-      "intent": "degeneration-guard: backlog keep — 4 files CoverageA,CoverageD single owner, foreign consumers via published contracts only",
+      "intent": "degeneration-guard: core DG-001 — LoopDetector slice",
       "files": [
         "src/Wanxiangshu/Execution/Session/LoopDetector.fs",
-        "src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs",
+        "src/Wanxiangshu/Execution/Session/LoopDetectorSurface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "DegenerationGuard.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/degeneration-guard/tests/loop-detector-memory.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "degeneration-guard-surface",
+      "primary_owner": "degeneration-guard",
+      "intent": "degeneration-guard: surface DG-002 — LoopSensor slice",
+      "files": [
         "src/Wanxiangshu/OpenCode/Host/LoopSensor.fs",
         "src/Wanxiangshu/OpenCode/Host/LoopSensorSurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "DegenerationGuard.SurfaceSurface"
+      ],
+      "consumes": [
+        "DegenerationGuard.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "degeneration-guard-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
         "requirements/degeneration-guard/tests/loop-detector.test.mjs"
       ],
@@ -2530,22 +4885,71 @@
       "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
     },
     {
-      "id": "participant-horizon-backlog-keep",
+      "id": "participant-horizon-core",
       "primary_owner": "participant-horizon",
-      "intent": "participant-horizon: backlog keep — 4 files CoverageA,CoverageD single owner, foreign consumers via published contracts only",
+      "intent": "participant-horizon: core PARTICIPANT-HORIZON-001 — HorizonSurface slice",
       "files": [
         "src/Wanxiangshu/Execution/Session/OpenCode/HorizonSurface.fs",
-        "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs",
+        "src/Wanxiangshu/Execution/Session/OpenCode/HorizonTool.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ParticipantHorizon.CoreSurface"
+      ],
+      "consumes": [
+        "DurableEvents.Contract"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
+      "proofs": [
+        "requirements/participant-horizon/tests/admission-law.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageD"
+      ],
+      "state": "PENDING",
+      "result": "PENDING",
+      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+    },
+    {
+      "id": "participant-horizon-surface",
+      "primary_owner": "participant-horizon",
+      "intent": "participant-horizon: surface PARTICIPANT-HORIZON-002 — MessageVisibility slice",
+      "files": [
         "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
         "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs"
       ],
       "classification": "KEEP",
-      "publishes": [],
-      "consumes": [],
-      "depends_on": [],
-      "production_callers_to_migrate": [],
+      "publishes": [
+        "ParticipantHorizon.SurfaceSurface"
+      ],
+      "consumes": [
+        "ParticipantHorizon.CoreSurface"
+      ],
+      "depends_on": [
+        {
+          "id": "participant-horizon-core",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [
+        "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs"
+      ],
       "proofs": [
-        "requirements/participant-horizon/tests/horizon-surface.test.mjs"
+        "requirements/participant-horizon/tests/devops-join-timeout.test.mjs"
       ],
       "architecture_gates": [
         "semantic-owners.mjs",
@@ -2575,131 +4979,347 @@
       ],
       "depends_on": [
         {
-          "id": "delegation-backlog-keep",
+          "id": "attention-regulation-core",
           "kind": "closure"
         },
         {
-          "id": "host-boundary-backlog-keep",
+          "id": "attention-regulation-surface",
           "kind": "closure"
         },
         {
-          "id": "context-compression-backlog-keep",
+          "id": "behavior-diagnosis-codec",
           "kind": "closure"
         },
         {
-          "id": "repository-programming-backlog-keep",
+          "id": "behavior-diagnosis-core",
           "kind": "closure"
         },
         {
-          "id": "dispatch-protocol-backlog-keep",
+          "id": "behavior-diagnosis-projection",
           "kind": "closure"
         },
         {
-          "id": "epistemic-reasoning-backlog-keep",
+          "id": "behavior-diagnosis-surface",
           "kind": "closure"
         },
         {
-          "id": "behavior-diagnosis-backlog-keep",
+          "id": "capability-enforcement-core",
           "kind": "closure"
         },
         {
-          "id": "speculative-investigation-backlog-keep",
+          "id": "capability-enforcement-surface",
           "kind": "closure"
         },
         {
-          "id": "knowledge-reuse-backlog-keep",
+          "id": "cognitive-environment-core",
           "kind": "closure"
         },
         {
-          "id": "intra-participant-parallelism-backlog-keep",
+          "id": "cognitive-environment-surface",
           "kind": "closure"
         },
         {
-          "id": "process-execution-backlog-keep",
+          "id": "concern-routing-core",
           "kind": "closure"
         },
         {
-          "id": "provider-attempt-recovery-backlog-keep",
+          "id": "concern-routing-surface",
           "kind": "closure"
         },
         {
-          "id": "provider-projection-backlog-keep",
+          "id": "context-compression-blogger",
           "kind": "closure"
         },
         {
-          "id": "requirement-grounding-backlog-keep",
+          "id": "context-compression-compaction",
           "kind": "closure"
         },
         {
-          "id": "interaction-authority-backlog-keep",
+          "id": "context-compression-companion",
           "kind": "closure"
         },
         {
-          "id": "repository-investigation-backlog-keep",
+          "id": "degeneration-guard-core",
           "kind": "closure"
         },
         {
-          "id": "time-capability-backlog-keep",
+          "id": "degeneration-guard-surface",
           "kind": "closure"
         },
         {
-          "id": "participant-identity-backlog-keep",
+          "id": "delegation-child-recovery",
           "kind": "closure"
         },
         {
-          "id": "semantic-trace-backlog-keep",
+          "id": "delegation-fork-host",
           "kind": "closure"
         },
         {
-          "id": "prefix-stability-backlog-keep",
+          "id": "delegation-fork-opencode",
           "kind": "closure"
         },
         {
-          "id": "provider-language-backlog-keep",
+          "id": "delegation-handle",
           "kind": "closure"
         },
         {
-          "id": "session-ontology-backlog-keep",
+          "id": "delegation-handoff",
           "kind": "closure"
         },
         {
-          "id": "output-distillation-backlog-keep",
+          "id": "delegation-sync-delegate",
           "kind": "closure"
         },
         {
-          "id": "institutional-learning-backlog-keep",
+          "id": "dispatch-protocol-dispatcher",
           "kind": "closure"
         },
         {
-          "id": "distribution-backlog-keep",
+          "id": "dispatch-protocol-identity",
           "kind": "closure"
         },
         {
-          "id": "capability-enforcement-backlog-keep",
+          "id": "dispatch-protocol-ingress",
           "kind": "closure"
         },
         {
-          "id": "guidance-delivery-backlog-keep",
+          "id": "dispatch-protocol-recovery",
           "kind": "closure"
         },
         {
-          "id": "attention-regulation-backlog-keep",
+          "id": "distribution-core",
           "kind": "closure"
         },
         {
-          "id": "concern-routing-backlog-keep",
+          "id": "distribution-surface",
           "kind": "closure"
         },
         {
-          "id": "cognitive-environment-backlog-keep",
+          "id": "epistemic-reasoning-codec",
           "kind": "closure"
         },
         {
-          "id": "degeneration-guard-backlog-keep",
+          "id": "epistemic-reasoning-core",
           "kind": "closure"
         },
         {
-          "id": "participant-horizon-backlog-keep",
+          "id": "epistemic-reasoning-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "epistemic-reasoning-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "guidance-delivery-core",
+          "kind": "closure"
+        },
+        {
+          "id": "guidance-delivery-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "host-boundary-codec",
+          "kind": "closure"
+        },
+        {
+          "id": "host-boundary-foundation",
+          "kind": "closure"
+        },
+        {
+          "id": "host-boundary-host",
+          "kind": "closure"
+        },
+        {
+          "id": "host-boundary-plugin",
+          "kind": "closure"
+        },
+        {
+          "id": "host-boundary-signals",
+          "kind": "closure"
+        },
+        {
+          "id": "institutional-learning-core",
+          "kind": "closure"
+        },
+        {
+          "id": "institutional-learning-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "interaction-authority-core",
+          "kind": "closure"
+        },
+        {
+          "id": "interaction-authority-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "intra-participant-parallelism-core",
+          "kind": "closure"
+        },
+        {
+          "id": "intra-participant-parallelism-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "intra-participant-parallelism-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "knowledge-reuse-core",
+          "kind": "closure"
+        },
+        {
+          "id": "knowledge-reuse-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "knowledge-reuse-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "output-distillation-core",
+          "kind": "closure"
+        },
+        {
+          "id": "output-distillation-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "participant-horizon-core",
+          "kind": "closure"
+        },
+        {
+          "id": "participant-horizon-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "participant-identity-core",
+          "kind": "closure"
+        },
+        {
+          "id": "participant-identity-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "prefix-stability-core",
+          "kind": "closure"
+        },
+        {
+          "id": "prefix-stability-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "process-execution-core",
+          "kind": "closure"
+        },
+        {
+          "id": "process-execution-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "process-execution-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-attempt-recovery-core",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-attempt-recovery-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-attempt-recovery-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-language-core",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-language-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-projection-core",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-projection-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "provider-projection-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "repository-investigation-core",
+          "kind": "closure"
+        },
+        {
+          "id": "repository-investigation-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "repository-programming-bindings",
+          "kind": "closure"
+        },
+        {
+          "id": "repository-programming-filesystem",
+          "kind": "closure"
+        },
+        {
+          "id": "repository-programming-toolhost",
+          "kind": "closure"
+        },
+        {
+          "id": "repository-programming-transaction",
+          "kind": "closure"
+        },
+        {
+          "id": "requirement-grounding-core",
+          "kind": "closure"
+        },
+        {
+          "id": "requirement-grounding-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "semantic-trace-core",
+          "kind": "closure"
+        },
+        {
+          "id": "semantic-trace-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "session-ontology-core",
+          "kind": "closure"
+        },
+        {
+          "id": "session-ontology-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "speculative-investigation-core",
+          "kind": "closure"
+        },
+        {
+          "id": "speculative-investigation-projection",
+          "kind": "closure"
+        },
+        {
+          "id": "speculative-investigation-surface",
+          "kind": "closure"
+        },
+        {
+          "id": "time-capability-core",
+          "kind": "closure"
+        },
+        {
+          "id": "time-capability-surface",
           "kind": "closure"
         }
       ],
