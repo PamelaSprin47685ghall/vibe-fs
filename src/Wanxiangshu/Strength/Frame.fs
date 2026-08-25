@@ -1,3 +1,4 @@
+// primary_owner: speculative-investigation — SpeculativeInvestigation.CoreSurface (SPEC-INV-004) — KEEP — core frame & prediction
 namespace Wanxiangshu.Strength
 
 open Wanxiangshu.Composition.Turn

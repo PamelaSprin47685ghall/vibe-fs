@@ -1,3 +1,4 @@
+// primary_owner: context-compression — Context.BloggerSurface (CONTEXT-COMPRESSION-012) — KEEP — sole delta contract
 namespace Wanxiangshu.Context.Companion.Blogger
 
 open Fable.Core

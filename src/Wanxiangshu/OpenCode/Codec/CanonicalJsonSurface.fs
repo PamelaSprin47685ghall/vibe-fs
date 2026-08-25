@@ -1,3 +1,4 @@
+// primary_owner: host-boundary — Host.CodecSurface (HOST-BOUNDARY-011) — KEEP — sole canonical JSON contract
 namespace Wanxiangshu.OpenCode
 
 /// Plain-data boundary for the OpenCode canonical JSON owner.

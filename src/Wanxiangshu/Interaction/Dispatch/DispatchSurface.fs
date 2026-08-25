@@ -1,3 +1,4 @@
+// primary_owner: dispatch-protocol — Dispatch.DispatcherSurface (DISPATCH-PROTOCOL-011) — KEEP — sole dispatch send/continuation contract
 namespace Wanxiangshu.Interaction.Dispatch
 
 open System
