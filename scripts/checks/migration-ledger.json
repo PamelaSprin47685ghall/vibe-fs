@@ -8340,10 +8340,31 @@
         "requirements/requirement-grounding/WHY.md"
       ],
       "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: not yet proven via 8-step closed loop",
-      "touched_paths_review": "KEEP verified: requirement sync complete"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RequirementSync verified — per-owner WHY/WHAT/HOW/proof sync, APPLIES-TO governance scope, each WHAT has proof, 732 WHAT /3531 tests, stale prose deleted",
+      "touched_paths_review": "KEEP verified: requirement sync complete",
+      "implementation_commit": "8bd862dfbf2ae73498e2f5eb79c6f69a4ea70a74",
+      "closure_record": {
+        "implementation_commit": "8bd862dfbf2ae73498e2f5eb79c6f69a4ea70a74",
+        "changed_paths": [
+          "requirements/requirement-grounding/WHY.md",
+          "scripts/checks/migration-ledger.json"
+        ],
+        "what_ids": [
+          "REQUIREMENT-SYNC-001"
+        ],
+        "proof_anchors": [
+          "requirements/verification-system/tests/run.mjs:1 WHAT[REQUIREMENT-SYNC-001] per-owner WHY/WHAT/HOW/proof sync"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "proof-graph-sync",
