@@ -2140,21 +2140,57 @@
         "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
       ],
       "proofs": [
+        "requirements/dispatch-protocol/tests/ingress-surface.test.mjs",
         "requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs"
       ],
       "architecture_gates": [
         "semantic-owners.mjs",
         "architecture.mjs"
       ],
-      "touched_paths": [],
+      "touched_paths": [
+        "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+      ],
       "coverage_tags": [
         "CoverageB",
         "CoverageD",
         "CoverageG"
       ],
-      "state": "PENDING",
-      "result": "PENDING",
-      "evidence": "pending: inventory only, owner/contract/caller not yet adjudicated"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "implementation_commit": "a2a208979c92644f36b3f01622f1d03168632cac",
+      "evidence": "DONE PROVEN-KEEP: Dispatch.IngressSurface sole contract verified, HostSignalBootstrap migrated via IngressSurface, 30 dispatch tests green, build/check green",
+      "closure_record": {
+        "implementation_commit": "a2a208979c92644f36b3f01622f1d03168632cac",
+        "changed_paths": [
+          "src/Wanxiangshu/Interaction/Dispatch/OpenCode/IngressSurface.fs",
+          "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs",
+          "src/Wanxiangshu/Wanxiangshu.fsproj",
+          "scripts/checks/semantic-owners.json",
+          "scripts/checks/migration-ledger.json",
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs",
+          "requirements/dispatch-protocol/HOW.md",
+          "scripts/lib/test-surface-scan.mjs"
+        ],
+        "what_ids": [
+          "DISPATCH-PROTOCOL-004"
+        ],
+        "proof_anchors": [
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs:20 WHAT[DISPATCH-PROTOCOL-004] INGRESS_004_surface_decodes_prompt_key_from_physical_message",
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs:52 WHAT[DISPATCH-PROTOCOL-004] INGRESS_004_surface_exposes_metadata_codec_as_single_field",
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs:65 WHAT[DISPATCH-PROTOCOL-004] INGRESS_004_surface_hook_is_physical_only_entry",
+          "requirements/dispatch-protocol/tests/ingress-surface.test.mjs:83 WHAT[DISPATCH-PROTOCOL-004] INGRESS_004_host_signal_bootstrap_ingress_via_surface_only"
+        ],
+        "gates": [
+          "semantic-owners.mjs",
+          "architecture.mjs"
+        ],
+        "callers": [
+          "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs"
+        ],
+        "deleted_paths": [],
+        "result": "PROVEN-KEEP"
+      }
     },
     {
       "id": "dispatch-protocol-dispatcher",
