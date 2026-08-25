@@ -2,7 +2,12 @@
 
 ## Unreleased
 
-- （空）
+- docs: sync AGENTS ledger counts to 26 DONE / 454 backlog (A96/B33/D85/E120/G120)
+- chore(ledger): P1 DAG inventory — 32 backlog-keep nodes (454 files) by owner, 58 total (26 DONE/32 PENDING), backlog 0, coverage 668/668
+- fix(requirement-grounding): Catalog canonicalWorkspace/absolutePath best-effort realpath for macOS /var→/private/var (13 scope-resolution failures)
+- fix(distribution): DISTRIBUTION-005 readdir exact-case check for dist/Resources vs dist/resources (case-insensitive FS)
+- fix(obligation-ledger): OBLIGATION-LEDGER-009 sync proof to typed ProviderInputRejection (HostCodec.fs:199)
+- chore(ledger): revert 32 KEEP to PENDING (PROVEN-KEEP needs mechanical proof), add 5 closure nodes → 63 total 26 DONE/37 PENDING, 668/668
 
 ## 0.8.4
 
