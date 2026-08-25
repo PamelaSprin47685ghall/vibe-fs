@@ -48,19 +48,21 @@ export function isValidCommitHash(hash) {
   return typeof hash === 'string' && /^[0-9a-f]{40}$/i.test(hash)
 }
 
+const ancestorCache = new Map()
+
 export function isAncestorCommit(hash) {
   if (!isValidCommitHash(hash)) return false
+  if (ancestorCache.has(hash)) return ancestorCache.get(hash)
+  let ok = false
   try {
     execSync(`git cat-file -e ${hash} 2>/dev/null`)
-  } catch {
-    return false
-  }
-  try {
     execSync(`git merge-base --is-ancestor ${hash} HEAD`, { stdio: 'ignore' })
-    return true
+    ok = true
   } catch {
-    return false
+    ok = false
   }
+  ancestorCache.set(hash, ok)
+  return ok
 }
 
 export function hasOwnerGraph(node) {
