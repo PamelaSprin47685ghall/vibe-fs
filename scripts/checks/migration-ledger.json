@@ -5786,12 +5786,22 @@
         }
       ],
       "production_callers_to_migrate": [],
-      "proofs": [],
-      "architecture_gates": [],
-      "touched_paths": [],
+      "proofs": [
+        "requirements/verification-system/tests/run.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "touched_paths": [
+        "requirements/requirement-grounding/WHY.md"
+      ],
       "coverage_tags": [],
-      "state": "PENDING",
-      "result": "PENDING"
+      "state": "DONE",
+      "result": "PROVEN-KEEP",
+      "evidence": "DONE PROVEN-KEEP: RequirementSync verified — per-owner WHY/WHAT/HOW/proof sync, APPLIES-TO governance scope, each WHAT has proof, 732 WHAT /3531 tests",
+      "implementation_commit": "45a41ecbf4dc553d5140db9b5fdfaa366bc9af6e",
+      "touched_paths_review": "KEEP verified: requirement sync complete"
     },
     {
       "id": "proof-graph-sync",
