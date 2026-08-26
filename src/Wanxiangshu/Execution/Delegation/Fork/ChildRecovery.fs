@@ -1,3 +1,5 @@
+// primary_owner: delegation — Delegation.ChildRecoverySurface sole contract (DELEG-023) — KEEP
+// Surface: ChildRecoverySurface.fs (narrowest formal, JS-delegates via plain strings), caller: OrdinaryTurnWorkflow via surface only
 namespace Wanxiangshu.Execution.Delegation.Fork
 
 open Wanxiangshu.Composition.Durable

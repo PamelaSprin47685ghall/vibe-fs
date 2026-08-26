@@ -1,3 +1,4 @@
+// primary_owner: managed-session-lifecycle — Session.Lifecycle/Session.RecoveryContract — MOVE — FamilyRecoveryCoordinator single-flight surface
 namespace Wanxiangshu.Execution.Session.Recovery
 
 open System.Collections.Generic

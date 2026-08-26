@@ -39,7 +39,7 @@
 | HOST-BOUNDARY-005 | `requirements/host-boundary/tests/reconcile-idle-early.test.mjs` |
 | HOST-BOUNDARY-006 | `requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-007 | `requirements/host-boundary/tests/host-capability-observation.test.mjs` |
-| HOST-BOUNDARY-008 | `requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs` |
+| HOST-BOUNDARY-008 | `requirements/host-boundary/tests/host010-run-id-equivalence.test.mjs`（typed fail-closed 判定）· `requirements/host-boundary/tests/xwire.test.mjs`（pre-inference 冻结未绑定 plan，无 snapshot 输入）· `scripts/checks/transform-causality-gate.mjs`（seam 函数边界 + 有序因果 + wait/retry 禁令，20 fixtures 自证可红） |
 | HOST-BOUNDARY-009 | `requirements/host-boundary/tests/tool-host-codec.test.mjs` |
 | HOST-BOUNDARY-010 | `requirements/host-boundary/tests/shared-state.test.mjs` |
 | HOST-BOUNDARY-011 | `requirements/host-boundary/tests/host-message-projection.test.mjs`, `requirements/host-boundary/tests/host-message-sanitize-surface.test.mjs` |

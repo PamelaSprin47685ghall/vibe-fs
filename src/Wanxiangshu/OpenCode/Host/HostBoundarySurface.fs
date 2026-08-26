@@ -1,3 +1,4 @@
+// primary_owner: host-boundary — Host.HostBoundarySurface (HOST-BOUNDARY-001) — KEEP — Host boundary coarse signals, caller PluginHostWiring via surface
 namespace Wanxiangshu.OpenCode
 
 open Fable.Core.JsInterop

@@ -177,7 +177,6 @@ module XWireSurface =
     ///   prefixEpoch:   current durable prefix epoch (the probe's base epoch).
     ///   offset:        fallback cursor offset (0-3). Recovery slots are 1 and 3.
     ///   physicalUser:  the physical user message id (required when armed).
-    ///   snapshotPort:  truthy = the public session snapshot port is available.
     ///   currentProjection: X provider-visible semantic projection (messages array).
     ///   committedSnapshot: committed prefix snapshot (or null).
     ///   coverableCutoff:  Companion's coverable turn cutoff.

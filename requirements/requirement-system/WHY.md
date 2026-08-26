@@ -40,3 +40,8 @@ docs 说 A，gate 说 B，test 证明 C，code 实现 D —— 四者同时为�
 3. `requirements/` 目录下出现未经索引登记的外来包，或包文档结构残缺。
 4. 包声明了超出依赖骨架定义的非法依赖关系。
 5. WHAT.md 命题在 HOW.md 证明表中缺失，或引用的测试文件不存在。
+6. migration ledger 出现 11 类非法状态中任一：PENDING 冒充成功、READY 无 owner/证明、DONE 无闭环、分类/结果错配、提交非祖先、变更缺失、证明门禁缺失、闭合依赖未 DONE、覆盖无归属、基线增长。
+
+## 为什么 migration ledger 必须永久退役
+
+施工账本的历史证明了单一事实源定律：当"完成"可以写在账本里，它就会被写进账本——117 个 DONE 中只有 1 个经得起逐项审计，格式门禁无法阻止自我填报的闭环。迁移的架构真相只能由 production 代码、各 package 规范、executable proof 与 architecture gates 承载，四者互为对账。因此账本连同其门禁与 requirement 包整体退役（REQUIREMENT-SYSTEM-020），并由 `ledger-retirement-gate` 机械禁止复活：任何以账本状态或文档宣称替代门禁实测的行为，都是同一错误命题的复发。

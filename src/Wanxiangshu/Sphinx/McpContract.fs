@@ -1,3 +1,4 @@
+// primary_owner: epistemic-reasoning — EpistemicReasoning.CodecSurface (EPI-004) — KEEP — McpContract decoder parity, caller PluginTransforms via CoreSurface
 namespace Wanxiangshu.Sphinx
 
 open System

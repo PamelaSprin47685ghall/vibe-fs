@@ -1,3 +1,5 @@
+// primary_owner: delegation — Delegation.Fork.HostSurface (DELEG-006) — KEEP
+// Surface: HostForkRunLifecycleSurface.fs / JoinSurface.fs, caller: HostSignalBootstrap via HostSurface only
 namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
 open Wanxiangshu.Composition.Durable

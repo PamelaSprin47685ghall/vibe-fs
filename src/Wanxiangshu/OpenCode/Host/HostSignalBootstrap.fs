@@ -1,3 +1,4 @@
+// primary_owner: host-boundary — OpenCode.HostSignalBootstrap — COMPOSITION-ROOT — HostSignalBootstrap wiring composition root
 namespace Wanxiangshu.OpenCode
 
 open System
@@ -18,7 +19,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
-open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Review.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -79,11 +79,6 @@ module HostSignalBootstrap =
             // Host visibility catch-up still owns a Node timer backstop. Provider
             // recovery itself is causal and no longer uses a wall-clock deadline.
             let recoveryTimerPort = PtyTiming.nodeTimerPort ()
-
-            // HOST-BOUNDARY-008: projection catch-up wakes on the session's
-            // message.updated signal; recoveryTimerPort supplies the backstop.
-            let messageVisibility = MessageVisibilityHub(recoveryTimerPort)
-            scope.AttachMessageVisibility messageVisibility
 
             let reviewerContinuationPort = HostReviewGuard.continuationPort sessionPort journal
 
@@ -182,7 +177,7 @@ module HostSignalBootstrap =
                                 ProviderProse.documentFor sessionId (LoopSensor.continuationPath kind) Map.empty
 
                             let! outcome =
-                                HostSessionNudge.sendContinuationResult
+                                IngressSurface.sendContinuationResult
                                     sessionPort
                                     sessionId
                                     prompt
@@ -265,7 +260,7 @@ module HostSignalBootstrap =
                     scope.Sessions.UserMessageBindings.[sessionId] <- physical
 
                     let agentRole =
-                        HostSessionNudge.tryActiveProfile journal sid
+                        IngressSurface.tryActiveProfile journal sid
                         |> Option.bind (fun profile ->
                             profile.CanonicalRole
                             |> PromptAuthority.roleLabel
@@ -325,7 +320,7 @@ module HostSignalBootstrap =
                 | _ -> ()
 
             let promptIngressHook =
-                PromptIngress.createHook
+                IngressSurface.createHook
                     journal
                     bindUserMessage
                     bindContinuationMessage
@@ -366,7 +361,7 @@ module HostSignalBootstrap =
             let hasPhysicalParent sessionId =
                 scope.Sessions.SessionParents.ContainsKey(SessionId.value sessionId)
 
-            let continueRoutedChatMessage routedExecution (decoded: PromptIngressCodec.DecodedMessage) input output =
+            let continueRoutedChatMessage routedExecution (decoded: IngressSurface.DecodedMessage) input output =
                 task {
                     ModelRouting.projectRoutedModel output routedExecution
                     FissionHostRequestProjection.projectRouted hasPhysicalParent routedExecution output
@@ -386,7 +381,7 @@ module HostSignalBootstrap =
                     SessionExecutionBinding.acceptRoutedExecution dispatchAccepted routedExecution
                 }
 
-            let continueOrdinaryChatMessage (decoded: PromptIngressCodec.DecodedMessage) input output =
+            let continueOrdinaryChatMessage (decoded: IngressSurface.DecodedMessage) input output =
                 task {
                     let tryPendingClaim
                         (j: AgentJournal option)
@@ -424,7 +419,7 @@ module HostSignalBootstrap =
                         // Decode once up front so Host compaction stays entirely outside
                         // execution-model-routing. The authority path re-decodes inside
                         // createHook; this local value only gates routing + join wake.
-                        let decoded = PromptIngressCodec.decode input output
+                        let decoded = IngressSurface.decodeMessage input output
 
                         match decoded.SessionId with
                         | Some sessionId -> do! ensurePhysicalParentDiscovered sessionId
@@ -494,6 +489,5 @@ module HostSignalBootstrap =
                   ObserveEvent =
                     (fun raw ->
                         SyncDelegateHostObservation.observe scope.SyncDelegateRuntime raw
-                        MessageVisibilitySignal.observeEvent messageVisibility raw
                         signalRouter.ObserveLocal raw) }
         }

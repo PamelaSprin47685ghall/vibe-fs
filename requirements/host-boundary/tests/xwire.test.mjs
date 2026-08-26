@@ -27,7 +27,6 @@ const armedInput = (overrides = {}) => ({
   offset: 1, // Fork1 — a recovery slot
   physicalUser: 'user-1',
   armedPhysicalUser: 'user-1',
-  snapshotPort: true,
   currentProjection: baseProjection,
   committedSnapshot: null,
   coverableCutoff: 2, // material exists (coverage ahead of request)
@@ -110,8 +109,15 @@ test('WHAT[PAR-011] XWIRE_missing_current_physical_user_cannot_consume_the_accep
   assert.equal(result.consumed, false)
 })
 
-test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_retry_does_not_require_a_public_session_snapshot', () => {
-  const result = XWireSurface.transform(armedInput({ snapshotPort: false }))
+test('WHAT[HOST-BOUNDARY-008] XWIRE_pre_inference_retry_freezes_an_unbound_plan_without_any_snapshot_input', () => {
+  // The armed retry carries no snapshot handle at all — the pre-inference
+  // decision consumes only session-scoped evidence and freezes the plan for a
+  // later exact-run bind. A ghost `snapshotPort` input would prove nothing:
+  // the production seam signature no longer accepts one (enforced by
+  // transform-causality-gate on src/Wanxiangshu/Context/Prefix/Wire.fs).
+  const input = armedInput()
+  assert.equal('snapshotPort' in input, false, 'no snapshot handle exists to fake')
+  const result = XWireSurface.transform(input)
   assert.equal(result.ok, true)
   assert.equal(result.noop, false)
   assert.equal(result.consumed, true)

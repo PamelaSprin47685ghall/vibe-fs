@@ -1,3 +1,4 @@
+// primary_owner: durable-convergence — DurableConvergence.Contract/EventStore.MergeSurface — KEEP — Hook dispatcher convergence surface
 namespace Wanxiangshu.Git.Hook
 
 open Wanxiangshu.Change

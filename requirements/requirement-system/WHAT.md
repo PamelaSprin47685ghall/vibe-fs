@@ -75,3 +75,6 @@ package 的语义身份由包名唯一确定。包的物理目录布局、文件
 ## REQUIREMENT-SYSTEM-018: 可执行证明双向可追溯
 
 `requirements/**/tests/**/*.test.mjs` 中的每个有效可执行测试用例（`test()` 或 `t.test()`），必须在其标题显式声明恰好一个当前合法的命题标签 `WHAT[<PACKAGE-NNN>]`。每个有效的 WHAT 命题必须至少被一个处于激活状态的非 skip、非 todo 测试用例所证明。测试与规范之间严禁存在悬空引用、多重 primary 归属或无标签的孤立测试。
+## REQUIREMENT-SYSTEM-020: migration ledger 永久退役
+
+施工账本 `scripts/checks/migration-ledger.json`、其门禁 `scripts/checks/migration-ledger.mjs` 与 requirement 包 `requirements/migration-ledger/` 已永久退役，编号 REQUIREMENT-SYSTEM-019 随之退役且不得复用。迁移的架构真相只存在于 production 代码、各 package 的 WHY/WHAT/HOW/GAP、executable proof 与 architecture gates；任何以账本状态（DONE/PROVEN-KEEP/closure record）、文档宣称或 CHANGELOG 记录替代门禁实测的行为都被禁止。机械不变量：上述退役路径不得重新出现；`scripts/check.mjs` 的 gate 清单不得引用已退役门禁；全仓 `src/`、`scripts/`、正式 requirements 文档不得包含 `migration-ledger` 引用。由 `ledger-retirement-gate` 机械执行，违反即红。

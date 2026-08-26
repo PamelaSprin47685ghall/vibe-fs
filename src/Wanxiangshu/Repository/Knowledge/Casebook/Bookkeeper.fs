@@ -1,3 +1,4 @@
+// primary_owner: knowledge-reuse — KnowledgeReuse.CoreSurface (KNOWLEDGE-REUSE-006) — KEEP — casebook synthesis & refresh
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open Wanxiangshu.Change

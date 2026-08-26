@@ -312,7 +312,14 @@ module private StrengthReplicaRuntimeLogic =
             let replica = SessionId.create sessionIdText
 
             match tryState replica with
-            | None -> return false
+            | None ->
+                // A live registry binding with no decision state means the
+                // replica was already closed (owner cancel / terminal retire):
+                // the in-flight provider request is a race tail. Absorb it —
+                // the original abort owns physical interruption — instead of
+                // failing the host transform hook. A session that was never a
+                // replica stays unhandled (fail-closed upstream).
+                return liveRegistry.TryFindByReplica replica |> Option.isSome
             | Some state when state.SemanticTerminal |> Option.isSome ->
                 // Semantic completion may precede physical Host terminal. Keep
                 // the Replica branch closed over this already-cancelled tail;

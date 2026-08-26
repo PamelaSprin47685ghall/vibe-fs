@@ -1,3 +1,4 @@
+// primary_owner: participant-identity — ParticipantIdentity.SurfaceSurface — KEEP — agent role identity surface
 namespace Wanxiangshu.Participant.Persona
 
 open Wanxiangshu.Context.Companion.Blogger.Runtime

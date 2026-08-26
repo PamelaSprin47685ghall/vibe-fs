@@ -1,3 +1,4 @@
+// primary_owner: host-boundary — OpenCode.PluginTransforms (plugin-transforms-composition) — COMPOSITION-ROOT — 13-step static score, no dynamic pipeline
 namespace Wanxiangshu.OpenCode
 
 #nowarn "3511"

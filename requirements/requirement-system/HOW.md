@@ -32,6 +32,11 @@
 
 `tests/change-lifecycle.test.mjs` 机械化验证变更文档边界，确保小型修复豁免规则、blocker 处理流程与历史已完成记录的只读性得到严格执行。
 
+### 5. migration ledger 永久退役（`ledger-retirement-gate`）
+
+施工账本已按 REQUIREMENT-SYSTEM-020 永久退役：`scripts/checks/migration-ledger.json`、`scripts/checks/migration-ledger.mjs` 与 `requirements/migration-ledger/` 全部删除，REQUIREMENT-SYSTEM-019 编号退役且不复用。迁移的架构真相只存在于 production 代码、各 package 规范文档、executable proof 与 architecture gates；任何以账本状态或文档宣称替代门禁实测的行为都被机械拒绝。
+
+`scripts/checks/ledger-retirement-gate.mjs` 机械执行退役不变量：退役路径不得重现、`scripts/check.mjs` 不得引用已退役门禁、全仓 `src/`/`scripts/` 与正式 requirements 文档不得含 `migration-ledger` 引用。`requirements/requirement-system/tests/ledger-retirement.test.mjs` 以三个独立断言固化可红性（路径缺席、入口无 wiring、规范面零引用）。
 ---
 
 ## 验证与测试落点
@@ -56,3 +61,4 @@
 | REQUIREMENT-SYSTEM-016 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
 | REQUIREMENT-SYSTEM-017 | `requirements/requirement-system/tests/meta-verifier.test.mjs` |
 | REQUIREMENT-SYSTEM-018 | `requirements/requirement-system/tests/requirement-trace.test.mjs` |
+| REQUIREMENT-SYSTEM-020 | `requirements/requirement-system/tests/ledger-retirement.test.mjs` |

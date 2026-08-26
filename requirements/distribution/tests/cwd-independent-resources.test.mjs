@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -91,8 +91,11 @@ test('WHAT[DISTRIBUTION-005] DISTRIBUTION_lookup_is_single_fixed_relative_path_n
   }
 
   // DISTRIBUTION-005：资源单份发布——resources/ 只存在于包根，不得复制进 dist/ 形成双副本。
+  // 大小写不敏感文件系统上 `dist/Resources` 与 `dist/resources` 同 inode，`existsSync` 不可作大小写区分 oracle。
+  // 改用 `readdirSync` 精确匹配目录项大小写。
+  const distEntries = existsSync(path.join(root, 'dist')) ? readdirSync(path.join(root, 'dist')) : []
   assert.equal(
-    existsSync(path.join(root, 'dist', 'resources')),
+    distEntries.includes('resources'),
     false,
     'resources must not be duplicated into dist/ (single-copy publish)',
   )

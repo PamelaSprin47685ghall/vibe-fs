@@ -1,3 +1,4 @@
+// primary_owner: action-affordance — ToolOwner.ToolSpec (opencode-tool-spec-contracts) — ADAPTER — ToolSpec + admission contract, decoupled from ToolRegistry
 namespace Wanxiangshu.OpenCode
 
 /// JS-native static contracts for capability-owned tools. Dynamic Host schemas

@@ -1,3 +1,4 @@
+// primary_owner: host-boundary — Host.HostSignalSurface — KEEP — HostSignal host-boundary surface
 namespace Wanxiangshu.OpenCode
 
 open Wanxiangshu.Foundation

@@ -35,6 +35,12 @@ module GroundingCatalog =
     [<Import("isAbsolute", "node:path")>]
     let private pathIsAbsolute (path: string) : bool = jsNative
 
+    [<Import("dirname", "node:path")>]
+    let private pathDirname (path: string) : string = jsNative
+
+    [<Import("basename", "node:path")>]
+    let private pathBasename (path: string) : string = jsNative
+
     [<Emit("$0.isDirectory()")>]
     let private isDirectory (stat: obj) : bool = jsNative
 
@@ -50,19 +56,44 @@ module GroundingCatalog =
 
     let private slash (value: string) = value.Replace('\\', '/')
 
+    let private isRootParent parent path =
+        parent = path || parent = "." || parent = "/"
+
+    let rec private tryRealpathBestEffort path =
+        try
+            realpathSync path
+        with _ ->
+            fallbackRealpath path
+
+    and private fallbackRealpath path =
+        let parent = pathDirname path
+
+        if isRootParent parent path then
+            path
+        else
+            withRealParent path parent (tryRealpathBestEffort parent)
+
+    and private withRealParent path parent realParent =
+        if realParent = parent then
+            path
+        else
+            pathJoin (realParent, pathBasename path)
+
     let canonicalWorkspace (workspace: string) =
         let resolved = pathResolve workspace
-
-        try
-            realpathSync resolved
-        with _ ->
-            resolved
+        tryRealpathBestEffort resolved
 
     let private absolutePath root path =
-        if pathIsAbsolute path then
-            pathResolve path
-        else
-            pathResolve (pathJoin (root, path))
+        let resolved =
+            if pathIsAbsolute path then
+                pathResolve path
+            else
+                pathResolve (pathJoin (root, path))
+
+        tryRealpathBestEffort resolved
+
+
+
 
     let private workspaceRelative root path =
         let relative = pathRelative (root, absolutePath root path) |> slash

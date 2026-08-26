@@ -134,20 +134,6 @@
         ]
       },
       {
-        "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibility.fs",
-        "owners": [
-          "host-boundary",
-          "participant-horizon"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/OpenCode/Host/MessageVisibilitySurface.fs",
-        "owners": [
-          "host-boundary",
-          "participant-horizon"
-        ]
-      },
-      {
         "path": "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
         "owners": [
           "execution-model-routing",

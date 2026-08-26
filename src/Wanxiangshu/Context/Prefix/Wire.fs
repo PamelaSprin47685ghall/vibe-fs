@@ -93,11 +93,6 @@ module XWire =
         | Ok value -> value
         | Error reason -> raise (InvalidOperationException reason)
 
-    let private requireOkMapped (mapError: 'e -> string) (result: Result<'a, 'e>) : 'a =
-        match result with
-        | Ok value -> value
-        | Error error -> raise (InvalidOperationException(mapError error))
-
     let private ensureFrameDigest (frame: BlogFrame) (text: string) : Result<unit, string> =
         if HostDigest.sha256Hex text = BlobDigest.value frame.Digest then
             Ok()
@@ -247,8 +242,16 @@ module XWire =
             raise (InvalidOperationException "StrengthReplica Authority Root role changed after binding")
         | Some authority -> authority
 
+    /// HOST-BOUNDARY-008: `experimental.chat.messages.transform` runs before the
+    /// Host creates the assistant run, so ProviderRunIdentity cannot be an input
+    /// here and no bounded wait may disguise a future run as projection lag.
+    /// The replica recovery decision is frozen as an UNBOUND attempt plan keyed
+    /// by the exact PhysicalUserMessageId; the exact ProviderRunIdentity binds
+    /// exactly once later from a complete Host observation
+    /// (`TryBindAttemptPlan` on the turn path). Capability agreement between the
+    /// frozen authority role and the live execution gate is checked now — it
+    /// depends only on session-scoped evidence, never on a future run.
     let private applyStrengthReplicaPlan
-        (snapshotPort: ISessionSnapshotPort)
         (durable: AgentJournal)
         (scope: PluginRuntimeScope)
         (sessionId: SessionId)
@@ -263,15 +266,6 @@ module XWire =
                 | Some physical -> physical
                 | None -> raise (InvalidOperationException "StrengthReplica request has no physical user message")
 
-            let! snapshotResult = snapshotPort.GetMessages sessionId
-            let messages = requireOk snapshotResult
-
-            let assistant =
-                requireOkMapped
-                    (fun rejection -> sprintf "StrengthReplica run binding failed: %A" rejection)
-                    (ProviderRunBinding.bindableRun (PhysicalUserMessageId.value physical) messages)
-
-            let providerRun = ProviderRunIdentity.create assistant.Id
             let projections = AgentJournal.snapshot durable
 
             let authority =
@@ -279,24 +273,26 @@ module XWire =
                     binding
                     (PromptAuthorityLedger.activeProfile sessionId projections.AgentProjections)
 
-            let plan =
-                AttemptPlanner.plan
-                    authority
-                    AgentPairCursor.initial
-                    physical
-                    providerRun
-                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
-                    ProviderRequestKind.StrengthReplica
-                    RecoveryOpportunity.OrdinaryAttempt
-                    (fun () -> Error NoCandidateReason.NoCoverage)
-
-            if plan.Profile.ToolCapabilitySet <> binding.ToolCapabilitySet then
+            if
+                PromptAuthority.toolCapabilitiesFor authority.CanonicalRole ProviderRequestKind.StrengthReplica
+                <> binding.ToolCapabilitySet
+            then
                 raise (
                     InvalidOperationException
                         "StrengthReplica PromptAuthority capabilities disagree with live execution gate"
                 )
 
-            scope.RecordAttemptPlan sessionId providerRun plan
+            let pendingPlan =
+                AttemptPlanner.freezePreInference
+                    authority
+                    AgentPairCursor.initial
+                    physical
+                    (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot)
+                    ProviderRequestKind.StrengthReplica
+                    RecoveryOpportunity.OrdinaryAttempt
+                    (fun () -> Error NoCandidateReason.NoCoverage)
+
+            scope.RecordPendingAttemptPlan sessionId physical pendingPlan
         }
 
     /// PROJ-008 Step6: reanchor 后 CommittedPrefix=None 且声明 ReanchorAfterCompaction（wire no-op）。
@@ -743,14 +739,11 @@ module XWire =
         (output: obj)
         : Task<PrefixPresentationHorizon> =
         task {
-            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId, snapshot with
-            | Some binding, Some snapshotPort ->
-                do! applyStrengthReplicaPlan snapshotPort durable scope sessionId binding output
+            match scope.Strength.StrengthRuntime.TryFindByReplica sessionId with
+            | Some binding ->
+                do! applyStrengthReplicaPlan durable scope sessionId binding output
                 return PrefixPresentationHorizon.Current
-            | Some _, None ->
-                return
-                    raise (InvalidOperationException "StrengthReplica cannot plan without the public session snapshot")
-            | None, _ -> return! applyNonReplicaTransform durable scope sessionId snapshot output
+            | None -> return! applyNonReplicaTransform durable scope sessionId snapshot output
         }
 
     let applyTransform

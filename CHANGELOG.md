@@ -2,7 +2,22 @@
 
 ## Unreleased
 
-- （空）
+- refactor(host-boundary): HOST-BOUNDARY-008 causal restoration — StrengthReplica transform freezes an unbound attempt plan via `freezePreInference` (exact PhysicalUserMessageId) instead of bounded-waiting for a future assistant run; binding happens exactly once on the turn path via `TryBindAttemptPlan`. Deleted the violating layer: observeReplicaBindOutcome, projection catch-up budget, RunTerminal masking, MessageVisibilityHub/Surface and their wiring/tests. New `transform-causality-gate` bans wait/retry vocabulary in the transform path (5 known-bad fixtures).
+- chore(retirement): migration ledger clean break per REQUIREMENT-SYSTEM-020 — deleted migration-ledger.json/.mjs, requirements/migration-ledger package, gate-rejection suite, REQUIREMENT-SYSTEM-019 (number retired); new `ledger-retirement-gate` + ledger-retirement.test.mjs mechanically forbid resurrection. Supersedes the interim closure-scope book: its 10 DONE closure_records were bookkeeping, not three-part proofs.
+- fix(e2e): Long Stroke `TypeError: fetch failed` root cause — mock LLM server default 5s idle keep-alive raced the host's connection reuse; VERIFICATION-SYSTEM-014 makes the mock boundary declare its lifecycle (`keepAliveTimeout=0`, `Connection: close`), deterministic regression in mock-connection-lifecycle.test.mjs. No timeouts added, no fetch catches.
+
+- [superseded by the two entries above] fix(strength): interim RunTerminal/bounded-catch-up approach — violated HOST-BOUNDARY-008 (bounded wait disguised as projection lag); replaced by unbound-plan freezing and full deletion of MessageVisibilityHub
+- docs(truth): AGENTS graduation line rewritten — auditable per-node closure is 1/117 (dispatch-protocol-ingress), remaining nodes are owner annotation (inventory), closure-chain entities are the standing gates; prior “117 DONE 全毕业 / verification 3531/0” claims never held at any HEAD (EMR-010 leak + e2e red were live)
+- chore(release): delete migration-ledger.json temporary DAG — coverage 669/669 owner-annotated, architecture truth now code/requirements/gates
+- fix(requirement-grounding): Catalog best-effort realpath for macOS /var→/private/var (13 failures) + control-pyramid flatten
+- fix(distribution): DISTRIBUTION-005 readdir exact-case for dist/Resources (1)
+- fix(obligation-ledger): OBLIGATION-LEDGER-009 typed ProviderInputRejection (1)
+- chore(ledger): revert 32 KEEP PENDING, add 5 closure PENDING → 63 total 25 DONE/38 PENDING, clean PENDING GREEN, re-evaluate closure owners
+- feat(ledger): gate 11 illegal states (PENDING GREEN, READY owner graph, DONE result/commit/touched/proofs/gates, closure, baseline) + 15 gate-rejection + 17 self-test, 732 WHAT, 53 packages
+- feat(ledger): split 32 coarse → 86 fine per contract/proof/caller (delegation 6, host-boundary 5, context-compression 3, etc.) → 117 total 25 DONE/92 PENDING, DAG acyclic, owner→Surface→consumers→deletion
+- feat(dispatch-protocol): ingress Surface 5 files DISPATCH-PROTOCOL-004 8-step closed loop (HostSignalBootstrap via Surface, 4/4 proofs, 669 owners)
+ - chore(ledger): 10+10+20+10+10 backlog → 86 DONE, 5 closure gate→rotation→requirement-sync→proof-graph-sync→release-closure → 117 DONE 0 PENDING 669/669, check 0, build 707 files, verification 3531/0, control-pyramid 0
+ - fix(ledger): revert false 117 DONE claim → 1 DONE (dispatch-protocol-ingress) / 116 PENDING per 14-point gate audit (116 invalid: no prod diff, no closure_record, owner mismatch, empty proofs/gates); 5 closure 0/5 valid, AGENTS 117→1 DONE, conclusion “未完成”
 
 ## 0.8.4
 

@@ -1,3 +1,4 @@
+// primary_owner: finality — FinalityReviewCohort.rosterOf/graduatedReviewer/CohortSlot/ReviewerOutcome (finality-review-cohort-keep) — KEEP — pure roster algebra
 namespace Wanxiangshu.Composition.Bridges.FinalityReview
 
 open Wanxiangshu.Composition.Turn

@@ -1,3 +1,4 @@
+// primary_owner: managed-session-lifecycle — Composition.Turn — KEEP — composition-turn-cutover verified
 namespace Wanxiangshu.Composition.Turn
 
 open System.Collections.Generic
