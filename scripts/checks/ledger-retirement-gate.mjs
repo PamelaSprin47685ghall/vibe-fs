@@ -26,7 +26,6 @@ export const RETIRED_PATHS = [
   'requirements/migration-ledger',
 ]
 
-const DOC_EXTENSIONS = new Set(['.md'])
 
 function walk(dir, out) {
   for (const entry of readdirSync(dir)) {
@@ -88,7 +87,7 @@ function scanRepository() {
     // retired artifact it forbids; every other package stays under the ban.
     const isOwner = pkg === 'requirement-system'
     for (const entry of readdirSync(p)) {
-      const isDoc = DOC_EXTENSIONS.has(entry.split('.').pop() ?? '')
+      const isDoc = entry.endsWith('.md') || entry.endsWith('.markdown')
       const isAppliesTo = entry === 'APPLIES-TO'
       if (isOwner ? isAppliesTo : isDoc || isAppliesTo) reqDocs.push(join(p, entry))
     }
@@ -125,20 +124,20 @@ const isMainModule = (() => {
   }
 })()
 
-if (!isMainModule) process.exit(0)
+if (isMainModule) {
+  const facts = scanRepository()
 
-const facts = scanRepository()
+  const errors = analyzeRetirement({
+    retiredPathsExisting: facts.retiredPathsExisting,
+    checkWiring: facts.checkWiring,
+    offendingReferences: facts.offendingReferences,
+    whatIds: facts.whatIds,
+  })
 
-const errors = analyzeRetirement({
-  retiredPathsExisting: facts.retiredPathsExisting,
-  checkWiring: facts.checkWiring,
-  offendingReferences: facts.offendingReferences,
-  whatIds: facts.whatIds,
-})
-
-if (errors.length > 0) {
-  console.error(`ledger-retirement-gate: ${errors.length} violation(s)`)
-  for (const e of errors) console.error(`  ${e}`)
-  process.exit(1)
+  if (errors.length > 0) {
+    console.error(`ledger-retirement-gate: ${errors.length} violation(s)`)
+    for (const e of errors) console.error(`  ${e}`)
+    process.exit(1)
+  }
+  console.log('ledger-retirement-gate: OK — migration ledger stays retired; no resurrection paths')
 }
-console.log('ledger-retirement-gate: OK — migration ledger stays retired; no resurrection paths')
