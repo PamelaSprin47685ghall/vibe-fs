@@ -28,6 +28,9 @@ module LoopDetectorSurface =
     let halfLife = LoopDetector.HalfLife
     let lambda = LoopDetector.Lambda
     let normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount
+    let centralProbability = LoopDetector.CentralProbability
+    let lowerQuantileProbability = LoopDetector.LowerQuantileProbability
+    let upperQuantileProbability = LoopDetector.UpperQuantileProbability
     let minimumWeightedDistinctCount = LoopDetector.MinimumWeightedDistinctCount
     let maximumWeightedDistinctCount = LoopDetector.MaximumWeightedDistinctCount
 
@@ -37,6 +40,9 @@ module LoopDetectorSurface =
                halfLife = LoopDetector.HalfLife
                lambda = LoopDetector.Lambda
                normalWeightedDistinctCount = LoopDetector.NormalWeightedDistinctCount
+               centralProbability = LoopDetector.CentralProbability
+               lowerQuantileProbability = LoopDetector.LowerQuantileProbability
+               upperQuantileProbability = LoopDetector.UpperQuantileProbability
                minimumWeightedDistinctCount = LoopDetector.MinimumWeightedDistinctCount
                maximumWeightedDistinctCount = LoopDetector.MaximumWeightedDistinctCount |}
 

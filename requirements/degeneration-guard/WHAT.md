@@ -2,7 +2,7 @@
 
 ## DG-001: 双侧退化与非目标
 
-检测目标为流式输出的两种异常：加权相异度低于仓库正常语料极小值时为 `TooRepetitive`，高于仓库正常语料极大值时为 `TooRandom`。非目标包括上下文窗口估算、按错误文本分类失败、AABB/fallback 重试、角色/语言动态阈值，以及把 delta 内容拼装为 durable 业务事实。
+检测目标为流式输出的两种异常：加权相异度低于仓库正常语料双侧经验分位数极小值时为 `TooRepetitive`，高于极大值时为 `TooRandom`。非目标包括上下文窗口估算、按错误文本分类失败、AABB/fallback 重试、角色/语言动态阈值，以及把 delta 内容拼装为 durable 业务事实。
 
 ## DG-002: 传感器只观察文本流
 
@@ -10,7 +10,7 @@ LoopSensor 仅从 Host 流式事件提取 assistant `text` 与 reasoning/thinkin
 
 ## DG-003: 判定指标与正常包络
 
-观测单位由 `gpt-tokenizer/o200k_base` 定义。对 token 流维护指数衰减加权相异计数 $D_t$。构建产物提供仓库语料实测 `MIN_WEIGHTED_DISTINCT` 与 `MAX_WEIGHTED_DISTINCT`：
+观测单位由 `gpt-tokenizer/o200k_base` 定义。对 token 流维护指数衰减加权相异计数 $D_t$。构建产物提供仓库语料实测双侧 95% 经验分位数 `MIN_WEIGHTED_DISTINCT`（lower quantile $p=0.025$）与 `MAX_WEIGHTED_DISTINCT`（upper quantile $p=0.975$），中央概率固定为 $0.95$：
 
 - $D_t < MIN$ → `TooRepetitive`；
 - $D_t > MAX$ → `TooRandom`；
@@ -20,7 +20,7 @@ LoopSensor 仅从 Host 流式事件提取 assistant `text` 与 reasoning/thinkin
 
 ## DG-004: 固定时间尺度 + Repository SSOT 即用即派生
 
-Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 只读取 Git tracked、strict UTF-8、正常人工可读的 source/document text；corpus 采用正向 source/document 类型 allowlist，机器生成物、vendor/dependency、fixture/golden 与 JSON/JSONL/CSV 等结构化数据不得因可 UTF-8 decode 而进入语料。入选文本按 repository path 顺序连接成一条连续 `o200k_base` token 流。以 $D_0=X$ 做一次仿射 replay，令 normal prior 为 $X = mean(D_t(X))$ 的唯一自洽解，再以该解计算语料实际 $D_t$ 极小/极大值；不得用任意 seed 预热后再二次 replay。生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把 `normal/min/max` 数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、方差/标准差阈值、置信区间、分位数阈值及其它概率外推。
+Detector 的时间尺度固定为 `256` 个 `o200k_base` token；half-life 不由源码换行、formatter 或文件布局推导。Repository 本身是正常包络的唯一 SSOT。每次 build 只读取 Git tracked、strict UTF-8、正常人工可读的 source/document text；corpus 采用正向 source/document 类型 allowlist，机器生成物、vendor/dependency、fixture/golden 与 JSON/JSONL/CSV 等结构化数据不得因可 UTF-8 decode 而进入语料。入选文本按 repository path 顺序连接成一条连续文本流。多线程编码在安全换行边界（`\n` 后紧跟可打印非 `/` ASCII 字符）分块，分块结果与单流全量编码完全位等价。以 $D_0=X$ 做一次仿射 replay，令 normal prior 为 $X = mean(D_t(X))$ 的唯一自洽解，再以前向投影序列 $D_t(X)=\lambda^t X + b_t$ 的双侧经验分位数（$p=0.025$ 与 $p=0.975$）计算 `minimum` 与 `maximum`；不得用任意 seed 预热后再二次 replay。生成 JS 仅是编译后 runtime import 所需的临时 artifact，不是配置源，也不得把 `normal/min/max` 数值复制回 tracked 源码。min/max 不设数值快照测试。禁止 Beta 拟合、连续分布拟合、运行期动态分位数及其它概率外推。
 
 ## DG-005: O(1) 更新与有界内存
 

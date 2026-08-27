@@ -24,6 +24,7 @@ test('WHAT[VERIFICATION-SYSTEM-008] build freshness includes repository-derived 
   writeFileSync(repositoryInput, 'new repository corpus\n', 'utf8')
   writeFileSync(artifact, 'export {}\n', 'utf8')
   writeFileSync(gitignore, 'dist/\n', 'utf8')
+  execFileSync('git', ['-C', root, 'add', 'requirements.md'])
 
   utimesSync(productionSource, 10, 10)
   utimesSync(artifact, 20, 20)

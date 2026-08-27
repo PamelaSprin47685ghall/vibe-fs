@@ -12,6 +12,16 @@ import {
 const close = (actual, expected, tolerance = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`)
 
+const centralProbability = 0.95
+const lowerQuantileProbability = (1 - centralProbability) / 2
+const upperQuantileProbability = 1 - lowerQuantileProbability
+
+const empiricalQuantile = (values, probability) => {
+  const rank = Math.ceil(probability * values.length)
+  const index = Math.min(values.length - 1, rank - 1)
+  return Float64Array.from(values).sort()[index]
+}
+
 const referenceScore = (text) => {
   const lastSeen = new Map()
   let weightedDistinctTokens = loopDetector.normalWeightedDistinctCount
@@ -33,9 +43,8 @@ const referenceScore = (text) => {
 const referenceEnvelope = (tokens, lambda, initialValue) => {
   const lastSeen = new Map()
   let weightedDistinctTokens = initialValue
-  let minimum = Number.POSITIVE_INFINITY
-  let maximum = Number.NEGATIVE_INFINITY
   let sum = 0
+  const trajectory = new Float64Array(tokens.length)
 
   for (let index = 0; index < tokens.length; index += 1) {
     const step = index + 1
@@ -46,12 +55,15 @@ const referenceEnvelope = (tokens, lambda, initialValue) => {
       1 -
       (previous === undefined ? 0 : lambda ** (step - previous))
     lastSeen.set(token, step)
-    minimum = Math.min(minimum, weightedDistinctTokens)
-    maximum = Math.max(maximum, weightedDistinctTokens)
+    trajectory[index] = weightedDistinctTokens
     sum += weightedDistinctTokens
   }
 
-  return { mean: sum / tokens.length, minimum, maximum }
+  return {
+    mean: sum / tokens.length,
+    minimum: empiricalQuantile(trajectory, lowerQuantileProbability),
+    maximum: empiricalQuantile(trajectory, upperQuantileProbability),
+  }
 }
 
 test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => {
@@ -62,13 +74,19 @@ test('WHAT[DG-003] LOOP_003_fresh_detector_uses_repository_normal_prior', () => 
   close(result.weightedDistinctTokens, loopDetector.normalWeightedDistinctCount)
 })
 
-test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', () => {
-  const derived = deriveLoopDetectorEnvelope()
+test('WHAT[DG-004] LOOP_004_runtime_envelope_is_freshly_derived_from_the_current_repository_without_numeric_snapshots', async () => {
+  const derived = await deriveLoopDetectorEnvelope()
 
   assert.equal(derived.halfLife, 256)
+  assert.equal(derived.centralProbability, 0.95)
+  close(derived.lowerQuantileProbability, 0.025)
+  close(derived.upperQuantileProbability, 0.975)
   close(loopDetector.halfLife, derived.halfLife)
   close(loopDetector.lambda, derived.lambda)
   close(loopDetector.normalWeightedDistinctCount, derived.normalPrior)
+  close(loopDetector.centralProbability, derived.centralProbability)
+  close(loopDetector.lowerQuantileProbability, derived.lowerQuantileProbability)
+  close(loopDetector.upperQuantileProbability, derived.upperQuantileProbability)
   close(loopDetector.minimumWeightedDistinctCount, derived.minimum)
   close(loopDetector.maximumWeightedDistinctCount, derived.maximum)
 

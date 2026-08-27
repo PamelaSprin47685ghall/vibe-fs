@@ -141,7 +141,7 @@ test('WHAT[OBLIGATION-LEDGER-009] failure triage keeps red for syntax and kills 
   const hostCodec = read('src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs')
 
   assert.match(membrane, /Diagnostic\.fatal "magic-todo-infrastructure-failed"/)
-  assert.match(membrane, /\| Error reason -> invalidOp reason/, 'schema decode is allowed to reject the tool call')
+  assert.match(membrane, /MagicTodoHostCodec\.decodeInputOrReject args/, 'schema decode is allowed to reject the tool call')
   assert.match(membrane, /\| Error syntaxReason -> invalidOp syntaxReason/, 'deferred Error is syntax-only')
   assert.doesNotMatch(membrane, /Magic Todo deferred prepare failed/)
   assert.match(hostCodec, /output\.args is required[\s\S]*Diagnostic\.fatal|Diagnostic\.fatal[\s\S]*output\.args is required/)

@@ -146,11 +146,11 @@ async function compileFable() {
 
 // ── Resource & Artifact Verification ─────────────────────────────────────────
 
-function verifyArtifacts() {
+async function verifyArtifacts() {
   // DG-004: repository is the SSOT. Derive the current envelope on every build;
   // materialize it only as an ephemeral runtime import.
   try {
-    writeLoopDetectorEnvelopeArtifact(root)
+    await writeLoopDetectorEnvelopeArtifact(root)
   } catch (err) {
     fail(`Failed to derive loop detector repository envelope: ${err.message}`)
   }
@@ -255,7 +255,7 @@ Options:
 
   try {
     await compileFable()
-    verifyArtifacts()
+    await verifyArtifacts()
     logInfo('build ok')
   } finally {
     buildMutex.release()

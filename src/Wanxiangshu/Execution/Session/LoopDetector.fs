@@ -25,6 +25,15 @@ module LoopDetector =
         [<Import("normalWeightedDistinctCount", "#wanxiangshu-loop-detector-envelope")>]
         let normalWeightedDistinctCount: float = jsNative
 
+        [<Import("centralProbability", "#wanxiangshu-loop-detector-envelope")>]
+        let centralProbability: float = jsNative
+
+        [<Import("lowerQuantileProbability", "#wanxiangshu-loop-detector-envelope")>]
+        let lowerQuantileProbability: float = jsNative
+
+        [<Import("upperQuantileProbability", "#wanxiangshu-loop-detector-envelope")>]
+        let upperQuantileProbability: float = jsNative
+
         [<Import("minimumWeightedDistinctCount", "#wanxiangshu-loop-detector-envelope")>]
         let minimumWeightedDistinctCount: float = jsNative
 
@@ -35,6 +44,9 @@ module LoopDetector =
     let HalfLife = RepositoryEnvelope.halfLife
     let Lambda = RepositoryEnvelope.lambda
     let NormalWeightedDistinctCount = RepositoryEnvelope.normalWeightedDistinctCount
+    let CentralProbability = RepositoryEnvelope.centralProbability
+    let LowerQuantileProbability = RepositoryEnvelope.lowerQuantileProbability
+    let UpperQuantileProbability = RepositoryEnvelope.upperQuantileProbability
     let MinimumWeightedDistinctCount = RepositoryEnvelope.minimumWeightedDistinctCount
     let MaximumWeightedDistinctCount = RepositoryEnvelope.maximumWeightedDistinctCount
 
