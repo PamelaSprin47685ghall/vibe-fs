@@ -8,6 +8,38 @@
     },
     "concurrency_policy": "同文件冲突=edit mutex 不造永久边；READY 节点 touched_paths 正交即可并行",
     "acyclic_invariant": "新节点/边入账即查环，Kahn 拓扑排序校验",
+    "completion_credit": "只有 production cutover + executable proof + hard gate 三件套同时成立，节点才可 DONE；inventory/report/baseline/manifest/gate-only 不得计为迁移进度",
+    "constitutional_scope": [
+      {
+        "chapters": "2-8",
+        "obligation": "Evidence/Decision/Witness/Capability、proof-carrying authority、Decorator trace relation、CE 与 semantic vocabulary 准入"
+      },
+      {
+        "chapters": "10-55",
+        "obligation": "owner dependency/exclusivity、shallow composition roots、single canonical history integration、crash reconciliation 与 proof portfolio"
+      },
+      {
+        "chapters": "57-92",
+        "obligation": "READY-frontier semantic cutovers、owner-local hard cut/tree rotation/requirement-proof sync，以及 Chapter 92 Definition of Done"
+      },
+      {
+        "chapters": "93",
+        "obligation": "Chapter 57 是唯一施工调度来源；禁止第二套线性 wave 计划"
+      }
+    ],
+    "sole_release_sink": {
+      "id": "ReleaseClosure",
+      "depends_on": [
+        "all production coverage nodes DONE",
+        "all owner dependency closures DONE",
+        "all required tree rotations DONE",
+        "all requirement/proof sync DONE",
+        "migration baseline and temporary allowlist zero",
+        "old namespace/path/deleted symbol references zero",
+        "migration TODO/FIXME/compatibility shim zero",
+        "Chapter 92 Definition of Done"
+      ]
+    },
     "legal_edge_kinds": [
       "contract",
       "ownership",
@@ -1179,6 +1211,70 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "concern-routing-proven-keep",
+      "primary_owner": "concern-routing",
+      "intent": "Concern routing proven-keep: 4 Interaction/Concern files single owner concern-routing, no cross-owner private import, surface contract hardened",
+      "files": [
+        "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+        "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+        "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+        "src/Wanxiangshu/Interaction/Concern/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "ConcernRouting.Contract"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/concern-routing/tests/concern-routing.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "evidence": "2026-08-30: concern-routing.test.mjs 7/7; semantic-owners.mjs and architecture.mjs GREEN; migration-ledger coverage mutation RED then restored GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "attention-regulation-proven-keep",
+      "primary_owner": "attention-regulation",
+      "intent": "Attention regulation proven-keep: 4 Interaction/Attention files single owner attention-regulation, no cross-owner private import, surface contract hardened",
+      "files": [
+        "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+        "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+        "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+        "src/Wanxiangshu/Interaction/Attention/Surface.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "AttentionRegulation.Contract"
+      ],
+      "consumes": [],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/attention-regulation/tests/attention-regulation.test.mjs"
+      ],
+      "architecture_gates": [
+        "semantic-owners.mjs",
+        "architecture.mjs"
+      ],
+      "evidence": "2026-08-30: attention-regulation.test.mjs 6/6; semantic-owners.mjs and architecture.mjs GREEN; migration-ledger coverage mutation RED then restored GREEN",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageB"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
     }
   ],
   "debt_face": {
@@ -1292,10 +1388,6 @@
       "src/Wanxiangshu/OpenCode/Tools/ToolRegistrySurface.fs"
     ],
     "CoverageB": [
-      "src/Wanxiangshu/Interaction/Attention/Facts.fs",
-      "src/Wanxiangshu/Interaction/Attention/Fold.fs",
-      "src/Wanxiangshu/Interaction/Attention/Projection.fs",
-      "src/Wanxiangshu/Interaction/Attention/Surface.fs",
       "src/Wanxiangshu/Interaction/Authority/Child.fs",
       "src/Wanxiangshu/Interaction/Authority/Fact.fs",
       "src/Wanxiangshu/Interaction/Authority/Facts.fs",
@@ -1305,10 +1397,6 @@
       "src/Wanxiangshu/Interaction/Authority/Run.fs",
       "src/Wanxiangshu/Interaction/Authority/RuntimeSurface.fs",
       "src/Wanxiangshu/Interaction/Authority/Surface.fs",
-      "src/Wanxiangshu/Interaction/Concern/Facts.fs",
-      "src/Wanxiangshu/Interaction/Concern/Fold.fs",
-      "src/Wanxiangshu/Interaction/Concern/Projection.fs",
-      "src/Wanxiangshu/Interaction/Concern/Surface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/DispatchSurface.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs",
       "src/Wanxiangshu/Interaction/Dispatch/Ingress.fs",
