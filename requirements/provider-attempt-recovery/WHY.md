@@ -20,6 +20,9 @@
 
 ## DEPENDS ON
 
-- `participant-identity`
-- `execution-model-routing`
-- `interaction-authority`
+- `canonical-spine`
+- `semantic-trace-replayable-contract-cutover`
+- `prefix-stability-cutover`
+- `context-compression-blogger-compaction-keep`
+- `interaction-assistance-workflow-cutover`
+- `session-lifecycle-recovery-contract`

@@ -47,16 +47,9 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
-[<RequireQualifiedAccess>]
-type ConfirmedFailureOutcome =
-    | RecoveryAdvanced of RecoveryOpportunity
-    | RecoveryExhausted
-    | AlreadyRecorded
-    | NoActiveRun
-
 /// FALLBACK-003 single writer: confirmed provider failure → durable dedupe →
 /// cursor advance/exhaust. Callers may retain the precise single-attempt outcome
-/// or project it to host-facing RecoveryAdmission.
+/// without collapsing duplicate or missing-run states into permission to continue.
 module FallbackLedger =
 
     let private invalidOffsetMessage decodeError =
@@ -215,17 +208,4 @@ module FallbackLedger =
             match FallbackEvidence.tryCurrentState sessionId (AgentJournal.snapshot journal) with
             | None -> return Error "NoActiveRun: no cursor for session"
             | Some current -> return! recordSuccessForCurrent journal sessionId providerRun current
-        }
-
-    let admitConfirmedFailure journal budget sessionId providerRun reason =
-        task {
-            let! outcome = recordConfirmedFailure journal budget sessionId providerRun reason
-
-            return
-                outcome
-                |> Result.map (function
-                    | ConfirmedFailureOutcome.RecoveryExhausted -> RecoveryAdmission.RecoveryExhausted
-                    | ConfirmedFailureOutcome.RecoveryAdvanced _
-                    | ConfirmedFailureOutcome.AlreadyRecorded
-                    | ConfirmedFailureOutcome.NoActiveRun -> RecoveryAdmission.ContinueRecovery)
         }

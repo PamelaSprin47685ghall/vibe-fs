@@ -13,7 +13,7 @@ import * as cursorOwner from '../../../dist/Participant/Provider/Attempt/Fallbac
 
 const planner = compression.attemptPlanner
 const cursor = cursorOwner.cursor
-const requestKind = prefix.requestKind
+const requestKind = compression.requestKind
 const slot = compression
 
 const source = (relative) => readFileSync(new URL(`../../../${relative}`, import.meta.url), 'utf8')
@@ -30,6 +30,14 @@ const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
 
 const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) =>
   ({ probeId: id, basedOnEpoch: 0, candidate: snapshotAt(cutoff) })
+
+test('WHAT[PAR-010] PAR_010_provider_request_kind_has_one_provider_attempt_owner', () => {
+  const cursorSource = source('src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs')
+  const oldPrefixOwner = source('src/Wanxiangshu/Context/Prefix/Candidate.fs')
+
+  assert.match(cursorSource, /type ProviderRequestKind =/)
+  assert.doesNotMatch(oldPrefixOwner, /type ProviderRequestKind =/)
+})
 
 test('WHAT[PAR-013] FALLBACK_002_the_cursor_is_the_only_thing_that_moves_the_effective_agent', () => {
   const at = (offset) =>
@@ -180,10 +188,11 @@ test('WHAT[PAR-011] PAR_011_arming_is_a_control_flow_fact_not_a_position', () =>
 })
 
 test('WHAT[PAR-011] PAR_011_fallback_advance_returns_the_fresh_opportunity_and_workflow_never_rebuilds_it_from_cursor_parity', () => {
+  const failurePort = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs')
   const ledger = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs')
   const workflow = source('src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs')
 
-  assert.match(ledger, /RecoveryAdvanced of RecoveryOpportunity/)
+  assert.match(failurePort, /RecoveryAdvanced of RecoveryOpportunity/)
   assert.match(ledger, /RecoverySlot\.opportunity RecoverySlot\.afterFailureAdvance next\.Offset/)
   assert.match(workflow, /RecoveryAdvanced opportunity/)
   assert.doesNotMatch(workflow, /opportunityAfterAdvance/)

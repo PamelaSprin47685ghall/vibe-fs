@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 
-open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
@@ -329,7 +328,7 @@ module CursorSurface =
 
         { RuntimeId = RuntimeId.create "rt-fallback-surface"
           LocalSeq = LocalSeq.create sequence
-          ObservedAt = DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+          ObservedAt = Unchecked.defaultof<_>
           EventId = EventId.create ($"fallback-{sequence}")
           Stream = StreamId.Session session
           ProviderRun = providerRun
@@ -372,6 +371,51 @@ module CursorSurface =
 
     let fallbackFactCaseNames: string array =
         [| "FallbackCursorAdvanced"; "FallbackExhausted"; "FallbackSucceeded" |]
+
+    let private outcomeName outcome =
+        match outcome with
+        | ConfirmedFailureOutcome.RecoveryAdvanced _ -> "Advanced"
+        | ConfirmedFailureOutcome.RecoveryExhausted -> "Exhausted"
+        | ConfirmedFailureOutcome.AlreadyRecorded -> "AlreadyRecorded"
+        | ConfirmedFailureOutcome.NoActiveRun -> "NoActiveRun"
+
+    /// Record one confirmed provider failure through the production ledger.
+    /// The opaque journal resource and typed outcome stay inside this boundary.
+    let recordConfirmedFailure
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (budget: int)
+        (session: string)
+        (providerRun: string)
+        (reason: string)
+        : Task<obj> =
+        task {
+            let! result =
+                FallbackLedger.recordConfirmedFailure
+                    handle.Journal
+                    budget
+                    (SessionId.create session)
+                    (ProviderRunIdentity.create providerRun)
+                    reason
+
+            return
+                match result with
+                | Ok outcome ->
+                    box
+                        {| ok = true
+                           outcome = outcomeName outcome |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
+    /// Read one session's durable fallback cursor without exposing the typed
+    /// projection, map, or fallback offset representation.
+    let snapshot (handle: Wanxiangshu.Persistence.Journal.JournalHandle) (session: string) : obj =
+        match FallbackEvidence.tryCurrentState (SessionId.create session) (AgentJournal.snapshot handle.Journal) with
+        | None -> null
+        | Some current ->
+            box
+                {| offset = AgentPairCursor.FallbackOffsetCodec.toByte current.Cursor.Offset
+                   failures = current.Cursor.ConsecutiveFailureCount
+                   exhausted = current.Exhausted |}
 
     /// Open the first logical run through the existing PromptDispatcher owner.
     /// The JournalHandle is opaque to callers; only this fallback boundary unwraps

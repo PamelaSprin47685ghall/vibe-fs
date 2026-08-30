@@ -83,6 +83,35 @@ module CompressionSurface =
         | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
         | _ -> None
 
+    let private requestKindLabels: string array =
+        [| ProviderRequestKind.WorkMain
+           ProviderRequestKind.BloggerMain
+           ProviderRequestKind.BloggerSquash
+           ProviderRequestKind.InteractionRepair
+           ProviderRequestKind.StrengthReplica |]
+        |> Array.map ProviderRequestKind.label
+
+    let private requestKindMayCarryProbe (kind: string) : bool =
+        requestKindOf kind
+        |> Option.map ProviderRequestKind.mayCarryProbe
+        |> Option.defaultValue false
+
+    let private requestKindLabel (kind: string) : string =
+        requestKindOf kind
+        |> Option.map ProviderRequestKind.label
+        |> Option.defaultValue ""
+
+    let requestKind =
+        box
+            {| workMain = "work-main"
+               bloggerMain = "blogger-main"
+               bloggerSquash = "blogger-squash"
+               interactionRepair = "interaction-repair"
+               strengthReplica = "strength-replica"
+               all = requestKindLabels
+               mayCarryProbe = (fun kind -> requestKindMayCarryProbe kind)
+               label = (fun kind -> requestKindLabel kind) |}
+
     let private requestKindResult value : Result<ProviderRequestKind, string> =
         if isNullish value then
             Ok ProviderRequestKind.WorkMain
@@ -129,6 +158,11 @@ module CompressionSurface =
         | RecoveryOpportunity.OrdinaryAttempt -> "OrdinaryAttempt"
         | RecoveryOpportunity.RecoveryAttempt -> "RecoveryAttempt"
 
+    let private bloggerDispatchErrorName (error: BloggerSlotDispatchError) : string =
+        match error with
+        | BloggerSlotDispatchError.MissingProjection -> "MissingProjection"
+        | BloggerSlotDispatchError.NoActiveBloggerRun -> "NoActiveBloggerRun"
+
     let nextBloggerRequest (failedKind: string) (opportunity: string) (hasSquashMaterial: bool) : string =
         let nextOpportunity =
             if opportunity = "RecoveryAttempt" then
@@ -137,11 +171,11 @@ module CompressionSurface =
                 RecoveryOpportunity.OrdinaryAttempt
 
         match requestKindOf failedKind with
-        | None -> "Error"
+        | None -> bloggerDispatchErrorName BloggerSlotDispatchError.MissingProjection
         | Some kind ->
             match RecoverySlot.nextBloggerRequest kind nextOpportunity hasSquashMaterial with
             | Ok next -> ProviderRequestKind.label next
-            | Error _ -> "Error"
+            | Error error -> bloggerDispatchErrorName error
 
     let private outcomeResult (value: obj) : Result<AttemptOutcome, string> =
         match text value with

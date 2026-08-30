@@ -1164,16 +1164,12 @@
       "law": "WHAT[PREFIX-STABILITY-003]",
       "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
       "consumers": [
-        "capability-enforcement",
         "context-compression",
-        "delegation",
         "durable-events",
-        "execution-model-routing",
         "interaction-authority",
         "obligation-ledger",
         "provider-attempt-recovery",
-        "provider-projection",
-        "speculative-investigation"
+        "provider-projection"
       ],
       "symbols": [
         "Wanxiangshu.Context.Prefix.PrefixProbe",
@@ -1187,20 +1183,11 @@
         "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixRef",
         "Wanxiangshu.Context.Prefix.PrefixSnapshot.SealRoot",
         "Wanxiangshu.Context.Prefix.PrefixSnapshot.SyntheticMessageId",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerMain",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerSquash",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.InteractionRepair",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.StrengthReplica",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.WorkMain",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.clearsFailureCountOnSuccess",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.label",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.mayCarryProbe",
         "Wanxiangshu.Context.Prefix.XProjectionChoice",
         "Wanxiangshu.Context.Prefix.XProjectionChoice.UseCommittedEpoch",
         "Wanxiangshu.Context.Prefix.XProjectionChoice.UsePrefixProbe"
       ],
-      "justification": "PrefixStability.Contract publishes the observed candidate identity and request-kind symbols to the listed production consumers; the cutover node binds their PREFIX-STABILITY vocabulary and proofs, and every unlisted sibling remains private to prefix-stability."
+      "justification": "PrefixStability.Contract publishes the compiler-observed candidate identity symbols to the listed production consumers; provider request-kind ownership belongs to Provider.AttemptRecovery, and every unlisted sibling remains private to prefix-stability."
     },
     {
       "path": "src/Wanxiangshu/Context/Prefix/Epoch.fs",
@@ -3090,6 +3077,257 @@
         "Wanxiangshu.OpenCode.ToolRuntimeScope.WorkspaceDirectory"
       ],
       "justification": "The action-affordance adapters consume only these exact process runtime capabilities at the physical tool boundary; session lifecycle policy remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "semantic-evidence",
+      "law": "WHAT[PAR-016]",
+      "proof": "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
+      "consumers": [
+        "behavior-diagnosis",
+        "capability-enforcement",
+        "context-compression",
+        "delegation",
+        "execution-model-routing",
+        "interaction-authority",
+        "prefix-stability",
+        "speculative-investigation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair.PeerAgent",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.AuthorityAgentPair.SelectedAgent",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.DefaultAutoRecoveryBudget",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor.ConsecutiveFailureCount",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackCursor.Offset",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork0",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork1",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork2",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffset.Fork3",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffsetCodec.ofByte",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.FallbackOffsetCodec.toByte",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.effectiveAgent",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.initial",
+        "Wanxiangshu.Participant.Provider.Attempt.AgentPairCursor.isRecoverySlot",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.BloggerMain",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.BloggerSquash",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.InteractionRepair",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.StrengthReplica",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKind.WorkMain",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKindModule.clearsFailureCountOnSuccess",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKindModule.label",
+        "Wanxiangshu.Participant.Provider.Attempt.ProviderRequestKindModule.mayCarryProbe"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Cursor symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "ConfirmedFailurePort",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.AlreadyRecorded",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.NoActiveRun",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryAdvanced",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.ConfirmedFailureOutcome.RecoveryExhausted"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed ConfirmedFailurePort symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "dispatch-protocol",
+        "prefix-stability",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.effectiveAgent",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.mayContinue",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackEvidence.tryCurrentState"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Evidence symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "verification-system"
+      ],
+      "symbols": [
+        "AuthorityRootUserMessageId",
+        "ConsecutiveFailureCount",
+        "FinalConsecutiveFailureCount",
+        "FinalOffset",
+        "LogicalRunId",
+        "NextOffset",
+        "PreviousOffset",
+        "ProviderRun",
+        "Reason",
+        "SessionId",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackCursorAdvanced",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactCases.FallbackExhausted"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Facts symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackFactFold.fold"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed FallbackFactFold symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "finality",
+        "prefix-stability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackLedger.recordConfirmedFailure",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackLedger.recordConfirmedSuccess"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Ledger symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "interaction-authority",
+        "prefix-stability",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.AlreadyExhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.AlreadyObserved",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.DifferentRun",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.InvalidFallbackOffset",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.InvalidTransition",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackAdvanceRejection.NoCursor",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.AuthorityRootUserMessageId",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.Cursor",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.Exhausted",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.LogicalRunId",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjection.RecentFailureKeys",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjectionModule.applyAdvance",
+        "Wanxiangshu.Participant.Provider.Attempt.Fallback.FallbackProjectionModule.forAuthority"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Projection symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "execution-model-routing",
+        "host-boundary",
+        "managed-session-lifecycle",
+        "prefix-stability",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlan",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlan.NoProbeReason",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlan.Profile",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.bindProviderRun",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.freezePreInference",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.pendingProbeOf",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.plan",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.probeOf",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptPlanner.promotableProbe",
+        "Wanxiangshu.Participant.Provider.Attempt.PendingAttemptPlan",
+        "Wanxiangshu.Participant.Provider.Attempt.PendingAttemptPlan.ProjectionChoice"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed Planner symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "provider-attempt-recovery-cutover",
+      "contract": "Provider.AttemptRecovery",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "execution-model-routing",
+        "host-boundary",
+        "prefix-stability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Aborted",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Completed",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.CompletedInvalid",
+        "Wanxiangshu.Participant.Provider.Attempt.AttemptOutcome.Failed",
+        "Wanxiangshu.Participant.Provider.Attempt.BloggerSlotDispatchError",
+        "Wanxiangshu.Participant.Provider.Attempt.BloggerSlotDispatchError.MissingProjection",
+        "Wanxiangshu.Participant.Provider.Attempt.BloggerSlotDispatchError.NoActiveBloggerRun",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoveryOpportunity",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoveryOpportunity.OrdinaryAttempt",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoveryOpportunity.RecoveryAttempt",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.advancesCursor",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.afterFailureAdvance",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.isArmed",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.mayRecover",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.nextArming",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.nextBloggerRequest",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.onMainOutcome",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.onSquashOutcome",
+        "Wanxiangshu.Participant.Provider.Attempt.RecoverySlot.opportunity",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotArming",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotArming.ArmedByAdvance",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotArming.NotArmed",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.AbandonRoundProduct",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.CommitMain",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.CommitSquashThenMain",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.FailSlot",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.MainWithoutSquash",
+        "Wanxiangshu.Participant.Provider.Attempt.SlotDecision.RepairOnce"
+      ],
+      "justification": "Provider.AttemptRecovery publishes exactly these compiler-observed RecoverySlot symbols to the listed production consumers; every unlisted symbol remains private to provider-attempt-recovery."
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",

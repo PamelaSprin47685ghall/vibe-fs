@@ -10,6 +10,8 @@ import test from 'node:test'
 import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
+const requestKind = planner.requestKind
+
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
   prefix.snapshot({
     ref: `blob-frozen-${cutoff}`,
@@ -31,7 +33,7 @@ const probeFor = ({ cutoff = 5, id = 'probe-1' } = {}) => ({
 test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_non_recovery_slot_never_asks_for_a_probe', () => {
   // `selectProbe` throws if called. A slot that may not recover must not pay for a
   // digest recomputation or a blob read to discover it has nothing to do.
-  const plan = planner.attemptPlan({ kind: 'work-main', mayRecover: false })
+  const plan = planner.attemptPlan({ kind: requestKind.workMain, mayRecover: false })
 
   assert.equal(plan.choice, 'UseCommittedEpoch')
   assert.equal(plan.probeId, null)
@@ -42,7 +44,12 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a
   // Enforced in the planner, not left to the caller. A Companion request has no prefix
   // to probe — its history is the frame sequence — and a repair reuses whatever the
   // attempt it repairs already sent.
-  for (const kind of ['blogger-main', 'blogger-squash', 'interaction-repair', 'strength-replica']) {
+  for (const kind of [
+    requestKind.bloggerMain,
+    requestKind.bloggerSquash,
+    requestKind.interactionRepair,
+    requestKind.strengthReplica,
+  ]) {
     const plan = planner.attemptPlan({ kind, mayRecover: true })
 
     assert.equal(plan.choice, 'UseCommittedEpoch', `${kind} must not carry a probe`)
@@ -52,7 +59,7 @@ test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_a_companion_request_never_asks_for_a
 
 test('WHAT[CONTEXT-COMPRESSION-008] CTX_010_an_armed_work_main_carries_the_probe_it_selected', () => {
   const plan = planner.attemptPlan({
-    kind: 'work-main',
+    kind: requestKind.workMain,
     mayRecover: true,
     probe: probeFor({ id: 'probe-abc' }),
   })
@@ -74,7 +81,7 @@ test('WHAT[CONTEXT-COMPRESSION-009] CTX_011_a_refused_candidate_falls_back_to_th
   // The ordinary outcome when an armed slot has nothing to work with. The request still
   // goes out; only the reason is recorded, for diagnostics.
   const plan = planner.attemptPlan({
-    kind: 'work-main',
+    kind: requestKind.workMain,
     mayRecover: true,
     noCandidateReason: 'NoCoverage',
   })

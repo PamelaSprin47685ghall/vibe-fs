@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Participant.Provider.Attempt
 
 /// JS-native execution-gate surface. ToolRegistry remains the owner of the
 /// role predicate; callers provide labels and receive only a boolean decision.

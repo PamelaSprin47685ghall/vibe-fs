@@ -496,7 +496,6 @@
     <Compile Include="OpenCode/Host/TerminalPolicy.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Ledger.fs"/>
     <Compile Include="Enforcer/Continuation.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/Surface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/Workflow.fs"/>
     <Compile Include="Interaction/Repair/InteractionRepair.fs"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fs"/>
@@ -624,7 +623,6 @@
     <Compile Include="Persistence/Journal/Surface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingRepositorySurface.fs"/>
     <Compile Include="OpenCode/Host/RequirementGroundingSurface.fs"/>
-    <Compile Include="Participant/Provider/Attempt/Fallback/HandleSurface.fs"/>
     <Compile Include="Participant/Provider/Attempt/Fallback/CursorSurface.fs"/>
     <Compile Include="OpenCode/Host/PairProgrammingThoughtSurface.fs"/>
     <Compile Include="Persistence/Journal/ObligationJournalSurface.fs"/>

@@ -17,22 +17,21 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Strength
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-/// rabbit §13.1 / S9.1: admission after a confirmed provider failure.
-///
-/// Callers (EnforcerHost) only learn whether automatic recovery may continue —
-/// not cursor shape, budget arithmetic, or which module writes the facts.
 [<RequireQualifiedAccess>]
-type RecoveryAdmission =
-    | ContinueRecovery
+type ConfirmedFailureOutcome =
+    | RecoveryAdvanced of RecoveryOpportunity
     | RecoveryExhausted
+    | AlreadyRecorded
+    | NoActiveRun
 
-/// Injected capability: record one confirmed failure and return admission.
+/// Injected capability: record one confirmed failure and preserve its exact outcome.
 ///
 /// Journal + auto-recovery budget are closed at the wiring site so Session hosts
 /// stay free of Application FallbackLedger details (dependency inversion).
-type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Task<Result<RecoveryAdmission, string>>
+type ConfirmedFailurePort = SessionId -> ProviderRunIdentity -> string -> Task<Result<ConfirmedFailureOutcome, string>>

@@ -4,9 +4,10 @@
 
 ### Cursor 代数与写入口
 
-- **AgentPairCursor**：模 4 游标（Offset 0..3 映射到 SideA/SideA'/SideB/SideB'），维护连续失败计数与有限自动恢复预算（默认 12）。
+- **ProviderRequestKind + AgentPairCursor**：`src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs` 同时拥有可证明的请求种类与模 4 游标（Offset 0..3 映射到 SideA/SideA'/SideB/SideB'），维护连续失败计数与有限自动恢复预算（默认 12）；`Context/Prefix/Candidate.fs` 不再拥有请求种类。
 - **FallbackLedger**：唯一写入口。负责对 `ProviderRunIdentity` 进行有界去重，追加 `FallbackCursorAdvanced`、`FallbackSucceeded` 或 `FallbackExhausted`。
-- **RecoverySlot 槽决策**：把刚完成的 failure advance + primed Offset 归约为一次 `RecoveryOpportunity`；维护子请求失败与主请求失败均收敛为单次失败槽推进，维护成功不清零计数，主业务成功清零计数并把 A′/B′ 归一到同侧 A/B 普通槽。
+- **ConfirmedFailurePort**：`src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs` 拥有 `ConfirmedFailureOutcome`，端口返回 `Task<Result<ConfirmedFailureOutcome,string>>`；所有消费者穷尽处理 `RecoveryAdvanced | RecoveryExhausted | AlreadyRecorded | NoActiveRun`，且 `NoActiveRun` 必须停止，不能继续恢复。
+- **RecoverySlot 槽决策**：`src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs` 把刚完成的 failure advance + primed Offset 归约为一次 `RecoveryOpportunity`；`nextBloggerRequest` 以 `BloggerSlotDispatchError` 返回 typed dispatch failure。维护子请求失败与主请求失败均收敛为单次失败槽推进，维护成功不清零计数，主业务成功清零计数并把 A′/B′ 归一到同侧 A/B 普通槽。
 - **历史 replay 边界**：PAR-004 改为成功关闭 A′/B′ 后，旧 journal 中已落盘的 `FallbackSucceeded → A′→B` / `FallbackSucceeded → B′→A` 仍必须可重放。fold 只吸收这一种“成功归一化后 previousOffset 比 canonical cursor 多一步”的历史形状；新 writer 永远从归一化后的 A/B 写 `A→A′` / `B→B′`，不得继续生产旧形状。
 
 ### 恢复编排
@@ -15,17 +16,37 @@
 2. **Admission 裁决**：先写 `FallbackCursorAdvanced`；只有预算允许的 `RecoveryAdvanced` 才继续。WorkMain 在新 primed 槽获得一次 X opportunity；BloggerMain 在新 primed 槽且有 frames 时先发送 BloggerSquash。
 3. **WorkMain retry 物理所有权**：recovery continuation 先按正常 Prompt admission 发送；只有 `PromptIngress` 已把该 `ProviderRetryAttempt` 持久化为 `PhysicalAccepted` 后，才用 exact `PhysicalUserMessageId` 建立一次性 recovery permit。`messages.transform` 只允许消费 physical id 完全相等的 permit；同 session 的 tool continuation、旧 retry 或普通 user material 均不得误领。
 4. **ProviderRun 延迟绑定**：`messages.transform` 发生在 provider inference 之前，只冻结由 authority/cursor/physical id/request kind/prefix choice 构成的 pending attempt plan，不读取未来 assistant run。后续 tool-continuation 可见性或 reconciled turn 提供 `PhysicalUserMessageId + ProviderRunIdentity` 时，把 pending plan 一次性绑定成 `AttemptExecutionProfile`，再执行 prefix promotion / success accounting。
-5. **Blogger retry 所有权**：失败 open request 先 abandon；下一 typed request 在物理发送前 materialize，并在 send 后绑定该次 PromptKey。Main→Main、Main→Squash、Squash→Main 共用同一规则。
+5. **Blogger retry 所有权**：失败 open request 先 abandon；下一 typed request 在物理发送前 materialize，并在 send 后绑定该次 PromptKey。Main→Main、Main→Squash、Squash→Main 共用同一规则。`Fallback/Workflow.fs` 与 `Interaction/Repair/InteractionRepair.fs` 在追加失败账本前都必须先从 Blogger 身份解析 exact main session；禁止把 Blogger session 自身当作主 session 记账。
 6. **事件解锁**：WorkMain recovery 只在 linked Blogger 存在 durable open request 时通过 `AgentJournal.awaitChangeFromOrCancel` 订阅 committed journal change；`BlogObservationCommitted`、`BlogObservationsSquashed`、`BloggerRequestAbandoned` 等 fact 到达后重新求值，plugin shutdown 显式注销订阅。无 open producer 立即 retry，不读取 flight/pending，不存在 timeout/polling。
 7. **成功记账**：RequestKind 从 typed request / durable receipt / accepted continuation evidence 证明。Squash/repair success 不写 FallbackSucceeded；WorkMain/BloggerMain success 才清零失败计数。
 8. **身份隔离**：游标变更仅影响下一次派发的 `EffectiveAgent`，不改写 Persona、语言或 system prompt 字节。
 
+## 最终 production 路径
+
+- `src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs`
+- `src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs`
+
+`Fallback/CursorSurface.fs` 是唯一 recovery JS proof surface；两个旧 proof surface 已删除，不是合同路径。
+
 ## 依赖关系
 
 DEPENDS ON:
-- `participant-identity`
-- `execution-model-routing`
-- `interaction-authority`
+- `canonical-spine`
+- `semantic-trace-replayable-contract-cutover`
+- `prefix-stability-cutover`
+- `context-compression-blogger-compaction-keep`
+- `interaction-assistance-workflow-cutover`
+- `session-lifecycle-recovery-contract`
 
 ## 验证与测试落点
 
@@ -49,3 +70,5 @@ DEPENDS ON:
 | PAR-016 | `requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs::WHAT[PAR-016] PAR_016_success_accounting_requires_proven_request_kind` |
 | PAR-017 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_new_prompt` |
 | PAR-018 | `requirements/context-compression/tests/companion-recovery-slot.test.mjs::WHAT[PAR-018] recovery_continuation_waits_only_on_durable_open_producer_events` |
+
+P0 recovery re-entry proof：`requirements/structured-workflow/tests/recovery-reentry.test.mjs`；hard gate：`scripts/checks/p0-recovery-join.mjs`。该 gate 同时约束 Blogger failure 在追加 ledger 前解析 exact main session，以及 `NoActiveRun` 不得继续 recovery。

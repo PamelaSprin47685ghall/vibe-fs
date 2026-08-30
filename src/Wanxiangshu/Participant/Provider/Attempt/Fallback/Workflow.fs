@@ -187,10 +187,8 @@ module ProviderRecoveryWorkflow =
         | None -> Task.FromResult(()) :> Task
         | Some bloggerSessionId -> awaitLinkedProducer host durable mainSessionId bloggerSessionId
 
-    let private mainSessionOfBlogger (durable: AgentJournal) (bloggerSessionId: SessionId) =
-        SessionAssociationProjection.tryMainSessionOf
-            bloggerSessionId
-            (AgentJournal.snapshot durable).AgentProjections.Associations
+    let private mainSessionOfBlogger (projection: ProjectionSet) (bloggerSessionId: SessionId) =
+        SessionAssociationProjection.tryMainSessionOf bloggerSessionId projection.AgentProjections.Associations
 
     let private recoverySquashContext (durable: AgentJournal) (mainSessionId: SessionId) (bloggerSessionId: SessionId) =
         let session =
@@ -475,11 +473,12 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (mainSessionId: SessionId option)
         (continuationPrompt: string)
         (error: string)
         (opportunity: RecoveryOpportunity)
         : Task =
-        match mainSessionOfBlogger durable turn.SessionId with
+        match mainSessionId with
         | Some mainSessionId ->
             continueBlogger sessionPort eventPort durable scope turn mainSessionId continuationPrompt error opportunity
         | None -> continueWorkMain sessionPort eventPort durable scope turn continuationPrompt error opportunity
@@ -490,6 +489,7 @@ module ProviderRecoveryWorkflow =
         (durable: AgentJournal)
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
+        (mainSessionId: SessionId option)
         (continuationPrompt: string)
         (error: string)
         admission
@@ -501,10 +501,21 @@ module ProviderRecoveryWorkflow =
         | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
             notifyFailure eventPort turn error
             Task.FromResult(()) :> Task
-        | Ok ConfirmedFailureOutcome.AlreadyRecorded
-        | Ok ConfirmedFailureOutcome.NoActiveRun -> Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.AlreadyRecorded -> Task.FromResult(()) :> Task
+        | Ok ConfirmedFailureOutcome.NoActiveRun ->
+            notifyFailure eventPort turn "Confirmed provider failure has no active fallback run"
+            Task.FromResult(()) :> Task
         | Ok(ConfirmedFailureOutcome.RecoveryAdvanced opportunity) ->
-            continueAdvancedFailure sessionPort eventPort durable scope turn continuationPrompt error opportunity
+            continueAdvancedFailure
+                sessionPort
+                eventPort
+                durable
+                scope
+                turn
+                mainSessionId
+                continuationPrompt
+                error
+                opportunity
 
     let private continueDurableFailure
         (sessionPort: ISessionHostPort)
@@ -516,15 +527,38 @@ module ProviderRecoveryWorkflow =
         (error: string)
         : Task =
         task {
-            let! admission =
-                FallbackLedger.recordConfirmedFailure
-                    durable
-                    AgentPairCursor.DefaultAutoRecoveryBudget
-                    turn.SessionId
-                    turn.ProviderRun
-                    error
+            let projection = AgentJournal.snapshot durable
+            let mainSessionId = mainSessionOfBlogger projection turn.SessionId
 
-            return! settleFailureAdmission sessionPort eventPort durable scope turn continuationPrompt error admission
+            let ownerSessionId =
+                match mainSessionId with
+                | Some owner -> Some owner
+                | None ->
+                    FallbackEvidence.tryCurrentState turn.SessionId projection
+                    |> Option.map (fun _ -> turn.SessionId)
+
+            match ownerSessionId with
+            | None -> notifyFailure eventPort turn "Confirmed provider failure has no durable fallback owner"
+            | Some ownerSessionId ->
+                let! admission =
+                    FallbackLedger.recordConfirmedFailure
+                        durable
+                        AgentPairCursor.DefaultAutoRecoveryBudget
+                        ownerSessionId
+                        turn.ProviderRun
+                        error
+
+                return!
+                    settleFailureAdmission
+                        sessionPort
+                        eventPort
+                        durable
+                        scope
+                        turn
+                        mainSessionId
+                        continuationPrompt
+                        error
+                        admission
         }
 
     /// FALLBACK-003 + FALLBACK-004: a settled failed turn.

@@ -12,7 +12,7 @@ import { walk } from '../lib/walk.mjs'
 
 export const PRODUCTION_ROOT = 'src/Wanxiangshu'
 
-/** @typedef {{ id: string, fileHint: string | null, pattern: RegExp, label: string, positive?: boolean }} Rule */
+/** @typedef {{ id: string, fileHint?: string | null, pathHint?: string | null, allowedPathPrefix?: string, pattern: RegExp, label: string, positive?: boolean }} Rule */
 
 /** Pure rules: each id is one CI-checked invariant. */
 export const RULES = [
@@ -387,6 +387,101 @@ export const RULES = [
     label: 'AgentFact must retain ParentJoinCorrectionRequested for legacy false-abort compensation replay (EXEC-022)',
     positive: true,
   },
+  // —— Task 10: provider-attempt recovery ownership and proof closure ——
+  {
+    id: 'provider-request-kind-owner',
+    pathHint: 'src/Wanxiangshu/',
+    allowedPathPrefix: 'src/Wanxiangshu/Participant/Provider/Attempt/',
+    pattern: /\btype\s+ProviderRequestKind\b/,
+    label: 'ProviderRequestKind may only be defined under Participant/Provider/Attempt',
+  },
+  {
+    id: 'provider-recovery-role-classification',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    pattern: /\b(?:Provider|Participant|Persona)?Role\b|\.Role\b/,
+    label: 'provider recovery must use typed attempt identity, not role classification',
+  },
+  {
+    id: 'provider-recovery-error-string-classification',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    pattern:
+      /\b(?:error|reason)\b\s*\.\s*(?:Contains|StartsWith|EndsWith|IndexOf)\b|\b(?:Regex\.)?IsMatch\s*\(\s*(?:error|reason)\b|\bmatch\s+(?:error|reason)\s+with\b|\bif\s+(?:error|reason)\s*=\s*["']/i,
+    label: 'provider recovery must not classify attempts from error strings',
+  },
+  {
+    id: 'no-active-run-continues-recovery',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    fileHint: 'Workflow.fs|Ledger.fs|ConfirmedFailurePort.fs',
+    pattern:
+      /\|\s*(?:Ok\s+)?(?:ConfirmedFailureOutcome\.)?NoActiveRun\b(?:(?!\n\s*\|)[\s\S]){0,300}->(?:(?!\n\s*\|)[\s\S]){0,300}\bContinueRecovery\b/,
+    label: 'ConfirmedFailureOutcome.NoActiveRun must never continue recovery',
+  },
+  {
+    id: 'provider-recovery-time-control',
+    pathHint: 'Participant/Provider/Attempt/',
+    pattern:
+      /\b(?:DateTime|DateTimeOffset|TimeSpan|PeriodicTimer|Timer|time|deadline|sleep|poll(?:ing)?)\b|\bTask\.Delay\b|\bThread\.Sleep\b/i,
+    label: 'provider recovery must be durable-fact-driven, never time/timer/deadline/sleep/poll driven',
+  },
+  {
+    id: 'provider-recovery-process-local-success',
+    pathHint: 'Participant/Provider/Attempt/',
+    pattern:
+      /\b\w*(?:registry|waiter|flight)\w*\b[\s\S]{0,180}\b(?:FallbackSucceeded|recordConfirmedSuccess|RecoveryAdvanced|ContinueRecovery|success|succeeded)\b|\b(?:FallbackSucceeded|recordConfirmedSuccess|RecoveryAdvanced|ContinueRecovery|success|succeeded)\b[\s\S]{0,180}\b\w*(?:registry|waiter|flight)\w*\b/i,
+    label: 'process-local registry/waiter/flight state must not prove provider recovery success',
+  },
+  {
+    id: 'old-fallback-surface-import',
+    pathHint: 'src/Wanxiangshu/',
+    pattern:
+      /(?:\bopen\s+|\bimport\s+.*?from\s+["']|\brequire\s*\(\s*["'])[^\n"']*Participant[./\\]Provider[./\\]Attempt[./\\]Fallback[./\\](?:HandleSurface|Surface)\b/,
+    label: 'old Fallback HandleSurface/Surface imports are forbidden; use CursorSurface',
+  },
+  {
+    id: 'old-fallback-surface-compile-entry',
+    fileHint: 'Wanxiangshu.fsproj',
+    pattern:
+      /<Compile\s+Include=["'][^"']*Participant[\\/]Provider[\\/]Attempt[\\/]Fallback[\\/](?:HandleSurface|Surface)\.fs["']/,
+    label: 'old Fallback HandleSurface/Surface compile entries are forbidden; compile CursorSurface only',
+  },
+  {
+    id: 'confirmed-failure-outcome-contract',
+    fileHint: 'ConfirmedFailurePort.fs',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    pattern:
+      /type\s+ConfirmedFailureOutcome\s*=\s*\r?\n\s*\|\s*RecoveryAdvanced\s+of\s+RecoveryOpportunity\s*\r?\n\s*\|\s*RecoveryExhausted\s*\r?\n\s*\|\s*AlreadyRecorded\s*\r?\n\s*\|\s*NoActiveRun\s*\r?\n(?:\s*\r?\n|\s*\/\/\/[^\n]*\r?\n)*\s*type\s+ConfirmedFailurePort\s*=[^\n]*Task\s*<\s*Result\s*<\s*ConfirmedFailureOutcome\s*,\s*string\s*>\s*>/,
+    label: 'ConfirmedFailurePort must own the exact typed four-case ConfirmedFailureOutcome contract',
+    positive: true,
+  },
+  {
+    id: 'workflow-confirmed-failure-exhaustive',
+    fileHint: 'Workflow.fs',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    pattern:
+      /\bmatch\s+\w+\s+with\b[\s\S]{0,1200}\bConfirmedFailureOutcome\.RecoveryExhausted\b[\s\S]{0,500}\bConfirmedFailureOutcome\.AlreadyRecorded\b[\s\S]{0,500}\bConfirmedFailureOutcome\.NoActiveRun\b[\s\S]{0,500}\bConfirmedFailureOutcome\.RecoveryAdvanced\b/,
+    label: 'Fallback Workflow must exhaustively handle every ConfirmedFailureOutcome case',
+    positive: true,
+  },
+  {
+    id: 'workflow-main-session-failure-owner',
+    fileHint: 'Workflow.fs',
+    pathHint: 'Participant/Provider/Attempt/Fallback/',
+    pattern:
+      /\blet\s+mainSessionId\s*=\s*mainSessionOfBlogger\s+projection\s+turn\.SessionId\b[\s\S]{0,500}\blet\s+ownerSessionId\s*=\s*match\s+mainSessionId\s+with\s*\|\s*Some\s+\w+\s*->\s*Some\s+\w+\s*\|\s*None\s*->[\s\S]{0,300}\bFallbackEvidence\.tryCurrentState\s+turn\.SessionId\s+projection\b[\s\S]{0,200}\bOption\.map\s*\(fun\s+_\s*->\s*turn\.SessionId\)[\s\S]{0,500}\bmatch\s+ownerSessionId\s+with\s*\|\s*None\s*->(?:(?!FallbackLedger\.recordConfirmedFailure)[\s\S]){1,500}\|\s*Some\s+(\w+)\s*->[\s\S]{0,500}\bFallbackLedger\.recordConfirmedFailure\s+durable\s+AgentPairCursor\.DefaultAutoRecoveryBudget\s+\1\b/,
+    label: 'Fallback Workflow must append only to a resolved Blogger main or durably proven WorkMain owner',
+    positive: true,
+  },
+  {
+    id: 'interaction-repair-main-session-failure-owner',
+    fileHint: 'InteractionRepair.fs',
+    pathHint: 'Interaction/Repair/',
+    pattern:
+      /\bSessionAssociationProjection\.tryMainSessionOf\b[\s\S]{0,2500}\bmatch\s+mainSessionId\s+with\b[\s\S]{0,500}\|\s*Some\s+mainSessionId\s*->[\s\S]{0,500}\bFallbackLedger\.recordConfirmedFailure\s+journal\s+AgentPairCursor\.DefaultAutoRecoveryBudget\s+mainSessionId\b/,
+    label: 'InteractionRepair must resolve the exact main-session owner before recording failure',
+    positive: true,
+  },
 ]
 
 export const RULE_IDS = RULES.map((r) => r.id)
@@ -428,6 +523,7 @@ export const scanText = (text, file = '<synthetic>') => {
   const hits = []
 
   for (const rule of RULES) {
+    if (rule.pathHint && file !== '<synthetic>' && !norm(file).includes(rule.pathHint)) continue
     if (rule.fileHint && file !== '<synthetic>') {
       const hints = rule.fileHint.split('|')
       if (!hints.some((h) => base === h || file.endsWith(h))) continue
@@ -450,6 +546,10 @@ export const scanText = (text, file = '<synthetic>') => {
     let found = false
     for (let i = 0; i < codeLines.length; i++) {
       if (rule.pattern.test(codeLines[i])) {
+        if (rule.allowedPathPrefix && norm(file).startsWith(rule.allowedPathPrefix)) {
+          found = true
+          break
+        }
         // Sole-owner rule: exact owner paths only (definition + ChildRecoveryWorkflow).
         if (
           rule.id === 'record-completion-single-owner' &&
@@ -480,6 +580,9 @@ export const scanText = (text, file = '<synthetic>') => {
       }
     }
     if (!found && rule.pattern.test(joined)) {
+      if (rule.allowedPathPrefix && norm(file).startsWith(rule.allowedPathPrefix)) {
+        continue
+      }
       if (
         rule.id === 'record-completion-single-owner' &&
         RECORD_COMPLETION_OWNER_PATHS.has(norm(file))
@@ -520,7 +623,7 @@ export const scanFiles = (entries) => {
 }
 
 const runCli = () => {
-  const productionFiles = walk(PRODUCTION_ROOT, ['.fs']).map(norm)
+  const productionFiles = walk(PRODUCTION_ROOT, ['.fs', '.fsproj']).map(norm)
   const entries = productionFiles.map((file) => ({
     file,
     text: readFileSync(file, 'utf8'),

@@ -1,5 +1,5 @@
 {
-  "total": 668,
+  "total": 662,
   "owners": [
     "action-affordance",
     "attention-regulation",
@@ -2003,19 +2003,11 @@
       "owner": "provider-attempt-recovery"
     },
     {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
-      "owner": "provider-attempt-recovery"
-    },
-    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
       "owner": "provider-attempt-recovery"
     },
     {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
-      "owner": "provider-attempt-recovery"
-    },
-    {
-      "path": "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
       "owner": "provider-attempt-recovery"
     },
     {

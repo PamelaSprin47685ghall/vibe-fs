@@ -16,6 +16,7 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Resources
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
@@ -1047,12 +1048,7 @@ module StrengthSurface =
 
         task {
             let! result =
-                StrengthLifecycle.replayPlans
-                    (SessionId.create owner)
-                    id
-                    messageIds
-                    load
-                    (projectionOf projection)
+                StrengthLifecycle.replayPlans (SessionId.create owner) id messageIds load (projectionOf projection)
 
             return
                 match result with
@@ -1084,20 +1080,14 @@ module StrengthSurface =
                 |> Array.tryFind (fun response -> textOf response?decisionId = decisionId)
             with
             | None -> Task.FromResult(Error(sprintf "Strength bundle load unavailable: decision=%s" decisionId))
-            | Some response when not (isNullish response?error) ->
-                Task.FromResult(Error(textOf response?error))
+            | Some response when not (isNullish response?error) -> Task.FromResult(Error(textOf response?error))
             | Some response when isNullish response?bundle ->
                 Task.FromResult(Error(sprintf "Strength bundle load unavailable: decision=%s" decisionId))
             | Some response -> Task.FromResult(Ok(bundleOf response?bundle))
 
         task {
             let! result =
-                StrengthLifecycle.replayPlans
-                    (SessionId.create owner)
-                    id
-                    messageIds
-                    load
-                    (projectionOf projection)
+                StrengthLifecycle.replayPlans (SessionId.create owner) id messageIds load (projectionOf projection)
 
             let loads = loadedDecisionIds.ToArray()
 

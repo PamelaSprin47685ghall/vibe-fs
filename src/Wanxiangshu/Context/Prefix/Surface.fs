@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Participant.Provider.Projection
 
 /// Prefix-stability owner surface. Prefix epoch state, rebase and reanchor
@@ -259,8 +260,7 @@ module PrefixSurface =
             else
                 Some(snapshotOfJs snapshot)
 
-        XPrefixProjection.forSnapshot value memoryPreamble memoryBody
-        |> intentToJs
+        XPrefixProjection.forSnapshot value memoryPreamble memoryBody |> intentToJs
 
     let private choiceOfJs (choice: obj) : XProjectionChoice =
         if text choice?kind = "probe" then

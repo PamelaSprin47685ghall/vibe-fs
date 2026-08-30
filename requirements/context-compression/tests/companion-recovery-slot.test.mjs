@@ -43,6 +43,11 @@ test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_failed_squash_always_leaves_the_slot
   assert.equal(slot.nextBloggerRequest('blogger-squash', 'RecoveryAttempt', true), 'blogger-main')
 })
 
+test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_blogger_dispatch_distinguishes_missing_projection_from_no_active_run', () => {
+  assert.equal(slot.nextBloggerRequest('missing', 'RecoveryAttempt', true), 'MissingProjection')
+  assert.equal(slot.nextBloggerRequest('work-main', 'RecoveryAttempt', true), 'NoActiveBloggerRun')
+})
+
 test('WHAT[CONTEXT-COMPRESSION-021] CTX_021_future_X_material_waiter_is_deleted_from_production', () => {
   const forbidden = /StartRecoveryOpportunity|OfferRecoveryMaterial|recoveryWaiter|ReArmRecovery/
   const hits = production

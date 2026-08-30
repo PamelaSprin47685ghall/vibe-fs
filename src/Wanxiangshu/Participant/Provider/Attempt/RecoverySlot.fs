@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -31,6 +30,14 @@ type SlotArming =
 type RecoveryOpportunity =
     | OrdinaryAttempt
     | RecoveryAttempt
+
+/// PAR-010/017: why a Blogger recovery request cannot be selected.
+[<RequireQualifiedAccess>]
+type BloggerSlotDispatchError =
+    /// The boundary could not project a physical request kind.
+    | MissingProjection
+    /// The projected request does not belong to an active Blogger run.
+    | NoActiveBloggerRun
 
 /// CTX-007: what one provider attempt produced.
 ///
@@ -144,13 +151,13 @@ module RecoverySlot =
         (failedKind: ProviderRequestKind)
         (nextOpportunity: RecoveryOpportunity)
         (hasSquashMaterial: bool)
-        : Result<ProviderRequestKind, string> =
+        : Result<ProviderRequestKind, BloggerSlotDispatchError> =
         match failedKind, nextOpportunity, hasSquashMaterial with
         | ProviderRequestKind.BloggerMain, RecoveryOpportunity.RecoveryAttempt, true ->
             Ok ProviderRequestKind.BloggerSquash
         | ProviderRequestKind.BloggerMain, _, _ -> Ok ProviderRequestKind.BloggerMain
         | ProviderRequestKind.BloggerSquash, _, _ -> Ok ProviderRequestKind.BloggerMain
-        | _ -> Error "Blogger recovery received a non-Blogger request kind"
+        | _ -> Error BloggerSlotDispatchError.NoActiveBloggerRun
 
     /// CTX-007 for a `BloggerSquash` sub-request.
     ///

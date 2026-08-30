@@ -230,6 +230,10 @@ module InteractionRepairWorkflow =
         : Task =
         task {
             let turn = context.Turn
+            let snapshot = AgentJournal.snapshot journal
+
+            let mainSessionId =
+                SessionAssociationProjection.tryMainSessionOf turn.SessionId snapshot.AgentProjections.Associations
 
             let sendAabb () =
                 task {
@@ -251,39 +255,39 @@ module InteractionRepairWorkflow =
                         notifyBloggerProtocolFailure eventPort turn ("blogger AABB send failed: " + error)
                 }
 
-            let fallbackStillOpen () =
-                FallbackEvidence.mayContinue
-                    AgentPairCursor.DefaultAutoRecoveryBudget
-                    turn.SessionId
-                    (AgentJournal.snapshot journal)
+            match mainSessionId with
+            | None -> notifyBloggerProtocolFailure eventPort turn "blogger AABB has no durable main owner"
+            | Some mainSessionId ->
+                let fallbackStillOpen () =
+                    FallbackEvidence.mayContinue AgentPairCursor.DefaultAutoRecoveryBudget mainSessionId snapshot
 
-            match!
-                FallbackLedger.recordConfirmedFailure
-                    journal
-                    AgentPairCursor.DefaultAutoRecoveryBudget
-                    turn.SessionId
-                    turn.ProviderRun
-                    reason
-            with
-            | Error error -> notifyBloggerProtocolFailure eventPort turn error
-            | Ok ConfirmedFailureOutcome.NoActiveRun ->
-                notifyBloggerProtocolFailure eventPort turn "blogger AABB has no active logical run"
-            | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb ->
-                // The nudge failure has already earned one protocol AABB attempt.
-                // A generic fallback boundary reached by this same failure may not
-                // retroactively steal that first send.
-                do! sendAabb ()
-            | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
-                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-            | Ok ConfirmedFailureOutcome.AlreadyRecorded when guaranteedFirstAabb -> do! sendAabb ()
-            | Ok ConfirmedFailureOutcome.AlreadyRecorded when fallbackStillOpen () ->
-                // A racing observer may have advanced this exact terminal before
-                // the request-scoped AABB claim became visible. The claim itself
-                // dedupes the physical send.
-                do! sendAabb ()
-            | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
-                do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
-            | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> do! sendAabb ()
+                match!
+                    FallbackLedger.recordConfirmedFailure
+                        journal
+                        AgentPairCursor.DefaultAutoRecoveryBudget
+                        mainSessionId
+                        turn.ProviderRun
+                        reason
+                with
+                | Error error -> notifyBloggerProtocolFailure eventPort turn error
+                | Ok ConfirmedFailureOutcome.NoActiveRun ->
+                    notifyBloggerProtocolFailure eventPort turn "blogger AABB has no active logical run"
+                | Ok ConfirmedFailureOutcome.RecoveryExhausted when guaranteedFirstAabb ->
+                    // The nudge failure has already earned one protocol AABB attempt.
+                    // A generic fallback boundary reached by this same failure may not
+                    // retroactively steal that first send.
+                    do! sendAabb ()
+                | Ok ConfirmedFailureOutcome.RecoveryExhausted ->
+                    do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
+                | Ok ConfirmedFailureOutcome.AlreadyRecorded when guaranteedFirstAabb -> do! sendAabb ()
+                | Ok ConfirmedFailureOutcome.AlreadyRecorded when fallbackStillOpen () ->
+                    // A racing observer may have advanced this exact terminal before
+                    // the request-scoped AABB claim became visible. The claim itself
+                    // dedupes the physical send.
+                    do! sendAabb ()
+                | Ok ConfirmedFailureOutcome.AlreadyRecorded ->
+                    do! exhaustBloggerProtocol host eventPort journal context "blogger protocol repair exhausted"
+                | Ok(ConfirmedFailureOutcome.RecoveryAdvanced _) -> do! sendAabb ()
         }
         :> Task
 

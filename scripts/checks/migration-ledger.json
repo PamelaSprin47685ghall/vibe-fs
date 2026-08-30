@@ -1706,6 +1706,101 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "provider-attempt-recovery-cutover",
+      "primary_owner": "provider-attempt-recovery",
+      "intent": "Provider attempt recovery clean cutover: typed request-kind and failure outcomes, a single durable ledger/cursor, exact Blogger main-session ownership, and one canonical recovery proof surface.",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Provider.AttemptRecovery"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "SemanticTrace.Contract",
+        "PrefixStability.Contract",
+        "Context.CompanionContract",
+        "Interaction.AuthorityWorkflow",
+        "Session.RecoveryReconciliation"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "prefix-stability-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "context-compression-blogger-compaction-keep",
+          "kind": "contract"
+        },
+        {
+          "id": "interaction-assistance-workflow-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "session-lifecycle-recovery-contract",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/provider-attempt-recovery/tests/abort-residue.test.mjs",
+        "requirements/provider-attempt-recovery/tests/attempt-plan-profile.test.mjs",
+        "requirements/provider-attempt-recovery/tests/cursor.test.mjs",
+        "requirements/provider-attempt-recovery/tests/fallback-aabb-confluence.test.mjs",
+        "requirements/provider-attempt-recovery/tests/fallback-ledger.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/structured-workflow/tests/recovery-reentry.test.mjs"
+      ],
+      "architecture_gates": [
+        "p0-recovery-join.mjs",
+        "requirement-trace.mjs",
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "closure_evidence": "All 12 surviving paths are owned by provider-attempt-recovery; both obsolete proof surfaces are deleted, CursorSurface.fs is the sole recovery JS proof surface, and all provider-attempt-recovery laws are bound to exact executable proofs and the p0 recovery re-entry gate.",
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs"
+      ],
+      "coverage_tags": [
+        "CoverageE"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
     }
   ],
   "debt_face": {
@@ -1961,20 +2056,6 @@
       "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
       "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
       "src/Wanxiangshu/Participant/Persona/Surface.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ConfirmedFailurePort.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/CursorSurface.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Evidence.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Fact.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Facts.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/FallbackFactFold.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/HandleSurface.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Ledger.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Projection.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Surface.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
       "src/Wanxiangshu/Participant/Provider/Language.fs",
       "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
