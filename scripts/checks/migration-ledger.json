@@ -136,7 +136,9 @@
       "depends_on": [],
       "production_callers_to_migrate": [],
       "proofs": [
-        "requirements/execution-model-routing/tests/model-routing.test.mjs"
+        "requirements/execution-model-routing/tests/model-routing-runtime.test.mjs",
+        "requirements/execution-model-routing/tests/model-capacity-exclusivity.test.mjs",
+        "requirements/execution-model-routing/tests/open-code-port-routing.test.mjs"
       ],
       "architecture_gates": [
         "cross-callback-pc.mjs",
@@ -208,7 +210,7 @@
       "depends_on": [],
       "production_callers_to_migrate": [],
       "proofs": [
-        "requirements/host-boundary/tests/plugin-transforms.test.mjs"
+        "requirements/host-boundary/tests/ordered-transform.test.mjs"
       ],
       "architecture_gates": [
         "plugin-transforms-invariant.mjs",

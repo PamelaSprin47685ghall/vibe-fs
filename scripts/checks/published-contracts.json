@@ -1,0 +1,3453 @@
+{
+  "schema_version": 1,
+  "contracts": [
+    {
+      "path": "src/Wanxiangshu/Change/Facts.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Change.Host.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Change.OrchestratorFactCases",
+        "Wanxiangshu.Change.OrchestratorFactCases.JobAbandoned",
+        "Wanxiangshu.Change.OrchestratorFactCases.JobFailed",
+        "Wanxiangshu.Change.OrchestratorFactCases.ManagerJobCreated",
+        "Wanxiangshu.Change.OrchestratorFactCases.PublishClaimed",
+        "Wanxiangshu.Change.OrchestratorFactCases.Published",
+        "Wanxiangshu.Change.OrchestratorFactCases.RebasedCandidateReady",
+        "Wanxiangshu.Change.OrchestratorFactCases.WorktreeCreateRequested",
+        "Wanxiangshu.Change.OrchestratorFactCases.WorktreeCreated"
+      ],
+      "justification": "Change.Host.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/Host.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Change.Host.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Change.Host.OrchestratorHost",
+        "Wanxiangshu.Change.Host.OrchestratorHost.CancelAndDrain",
+        "Wanxiangshu.Change.Host.OrchestratorHost.ContinueManagerJob",
+        "Wanxiangshu.Change.Host.OrchestratorHost.DetachAndDrain",
+        "Wanxiangshu.Change.Host.OrchestratorHost.ForkManagerJob",
+        "Wanxiangshu.Change.Host.OrchestratorHost.JoinPublishedAvailable",
+        "byname",
+        "expectedToolCalls"
+      ],
+      "justification": "Change.Host.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Host/Types.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Change.Host.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.ChildWorkRecordFor",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.Journal",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.OnChildCreated",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.OnRunStarted",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.ParentWorkRecordFor",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.RegisterChildDirectory",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.RegisterReviewerTree",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.RepoPath",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.SessionSnapshot",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.Sessions",
+        "Wanxiangshu.Change.Host.OrchestratorHostDeps.TargetBranch"
+      ],
+      "justification": "Change.Host.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Projection.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Change.Host.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "interaction-authority",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "RebasedCommit",
+        "Wanxiangshu.Change.ManagerJobProjection",
+        "Wanxiangshu.Change.ManagerJobProjection.Byname",
+        "Wanxiangshu.Change.ManagerJobProjection.CandidateReady",
+        "Wanxiangshu.Change.ManagerJobProjection.ConflictDetected",
+        "Wanxiangshu.Change.ManagerJobProjection.ManagerAgent",
+        "Wanxiangshu.Change.ManagerJobProjection.ManagerJobId",
+        "Wanxiangshu.Change.ManagerJobProjection.ManagerSessionId",
+        "Wanxiangshu.Change.ManagerJobProjection.PublishClaimed",
+        "Wanxiangshu.Change.ManagerJobProjection.RebasedCandidateReady",
+        "Wanxiangshu.Change.ManagerJobProjection.TargetBranchFrozen",
+        "Wanxiangshu.Change.ManagerJobProjection.TargetRef",
+        "Wanxiangshu.Change.ManagerJobProjection.Terminal",
+        "Wanxiangshu.Change.ManagerJobProjection.WorktreeIdentity",
+        "Wanxiangshu.Change.ManagerJobProjection.WorktreePath",
+        "Wanxiangshu.Change.OrchestratorProjection",
+        "Wanxiangshu.Change.OrchestratorProjection.Jobs",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.activeJobs",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.createJob",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.empty",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.recordCandidateReady",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.recordConflictDetected",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.recordPublishClaimed",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.recordRebasedCandidateReady",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.recordTerminal",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.tryFind",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.tryFindByByname",
+        "Wanxiangshu.Change.OrchestratorProjectionModule.tryFindByManagerSession",
+        "Wanxiangshu.Change.TerminalOutcome",
+        "Wanxiangshu.Change.TerminalOutcome.Abandoned",
+        "Wanxiangshu.Change.TerminalOutcome.Failed",
+        "Wanxiangshu.Change.TerminalOutcome.Published"
+      ],
+      "justification": "Change.Host.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Change/Types.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Change.Host.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Change.ManagerPort",
+        "Wanxiangshu.Change.ManagerPort.Reverify",
+        "Wanxiangshu.Change.OrchestratorVerdict",
+        "Wanxiangshu.Change.OrchestratorVerdict.Empty",
+        "Wanxiangshu.Change.OrchestratorVerdict.IntegrationFailed",
+        "Wanxiangshu.Change.OrchestratorVerdict.NeedsReview",
+        "Wanxiangshu.Change.OrchestratorVerdict.Published",
+        "Wanxiangshu.Change.OrchestratorVerdict.RejectedDirty"
+      ],
+      "justification": "Change.Host.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/Fact.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "attention-regulation",
+        "behavior-diagnosis",
+        "change-integration",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "provider-attempt-recovery",
+        "requirement-grounding",
+        "review-judgement",
+        "semantic-trace",
+        "verification-system"
+      ],
+      "symbols": [
+        "ProcessId",
+        "RuntimeId",
+        "StartedAt",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Attention",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Companion",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Concern",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Context",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Delegation",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Execution",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Fallback",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Fission",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Host",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.InstitutionalLearning",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Orchestrator",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Prompt",
+        "Wanxiangshu.Composition.Durable.Fact.AgentFact.Review",
+        "Wanxiangshu.Composition.Durable.Fact.Fact",
+        "Wanxiangshu.Composition.Durable.Fact.Fact.Agent",
+        "Wanxiangshu.Composition.Durable.Fact.Fact.ManagerLifecycle",
+        "Wanxiangshu.Composition.Durable.Fact.Fact.Runtime",
+        "Wanxiangshu.Composition.Durable.Fact.RuntimeFact",
+        "Wanxiangshu.Composition.Durable.Fact.RuntimeFact.RuntimeStarted"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/Fold.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "durable-convergence",
+        "finality",
+        "host-boundary",
+        "provider-attempt-recovery",
+        "semantic-trace",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Durable.Fold.empty",
+        "Wanxiangshu.Composition.Durable.Fold.foldAgentFact",
+        "Wanxiangshu.Composition.Durable.Fold.foldEnvelope",
+        "Wanxiangshu.Composition.Durable.Fold.foldFact"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/FoldRejection.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "durable-convergence",
+        "host-boundary",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "provider-attempt-recovery",
+        "review-judgement",
+        "semantic-trace",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Durable.FoldRejection",
+        "Wanxiangshu.Composition.Durable.FoldRejection.Fact",
+        "Wanxiangshu.Composition.Durable.FoldRejection.Reason",
+        "Wanxiangshu.Composition.Durable.FoldRejectionModule.reject"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/Projection.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "attention-regulation",
+        "behavior-diagnosis",
+        "change-integration",
+        "cognitive-environment",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "obligation-ledger",
+        "participant-horizon",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "requirement-grounding",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "speculative-investigation",
+        "time-capability",
+        "verification-system",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Durable.AgentProjection.empty",
+        "Wanxiangshu.Composition.Durable.AgentProjection.emptySession",
+        "Wanxiangshu.Composition.Durable.AgentProjection.mainSealedForBlogger",
+        "Wanxiangshu.Composition.Durable.AgentProjection.tryFind",
+        "Wanxiangshu.Composition.Durable.AgentProjection.tryUpdate",
+        "Wanxiangshu.Composition.Durable.AgentProjection.update",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.Associations",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.Attention",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.Concern",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.DelegationCompletedHandoffs",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.Fission",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.HandleByChildSession",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.InstitutionalLearning",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.MagicTodo",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.Orchestrator",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.RuntimeStartCount",
+        "Wanxiangshu.Composition.Durable.AgentProjectionSet.Sessions",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.Blog",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.BloggerCycles",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.Companion",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.DelegatedToolEstimate",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.Enforcement",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.Fallback",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.Guidelines",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.Handles",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.ManagerLife",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.PrefixEpoch",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.PromptAuthority",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.RequirementGrounding",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.ReviewGuard",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.SessionStartedAt",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.TipDelivery",
+        "Wanxiangshu.Composition.Durable.SessionAgentProjection.XTrace"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/ProjectionState.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "attention-regulation",
+        "behavior-diagnosis",
+        "change-integration",
+        "cognitive-environment",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "durable-convergence",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "obligation-ledger",
+        "participant-horizon",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "requirement-grounding",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "speculative-investigation",
+        "time-capability",
+        "verification-system",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Durable.ProjectionSet",
+        "Wanxiangshu.Composition.Durable.ProjectionSet.AgentProjections"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "context-compression",
+        "interaction-authority",
+        "provider-attempt-recovery",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.bindTerminalFrontier",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.prefixOutcome",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.retireAuxiliaryInjectionVisibility",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.tryUpdateBlog",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateAuthority",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateCompanion",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateOrchestrator",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateRequirements",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateReviewGuard",
+        "Wanxiangshu.Composition.Durable.ProjectionUpdate.updateSession"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/Binding.fs",
+      "owner": "dispatch-protocol",
+      "node": "composition-turn-cutover",
+      "contract": "Composition.Turn",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.ActiveRunBinding",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.BindActiveRun",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.BindContinuationUserMessage",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.BindPhysicalUserMaterial",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.BindUserMessage",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.ClearSession",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.TryPhysicalUserMessage",
+        "Wanxiangshu.Composition.Turn.TurnBinding.Store.UserMessageBindings",
+        "agentRole",
+        "projection"
+      ],
+      "justification": "Composition.Turn publishes exactly these symbols to the listed owners; every unlisted sibling remains private to dispatch-protocol."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/Observation.fs",
+      "owner": "dispatch-protocol",
+      "node": "composition-turn-cutover",
+      "contract": "Composition.Turn",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "speculative-investigation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Turn.ActiveRunBinding",
+        "Wanxiangshu.Composition.Turn.ActiveRunBinding.PhysicalUserMessageId",
+        "Wanxiangshu.Composition.Turn.ActiveRunBinding.SessionId",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.AuthorityRootUserMessageId",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Directory",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.ErrorName",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Finish",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Model",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Observation",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Outcome",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Parts",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.PhysicalUserMessageId",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.ProviderRun",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.Role",
+        "Wanxiangshu.Composition.Turn.ReconciledTurn.SessionId",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnContext",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Delivery",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Quiescence",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Turn",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnDelivery",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnDelivery.IdleRevisit",
+        "Wanxiangshu.Composition.Turn.ReconciledTurnDelivery.Observation"
+      ],
+      "justification": "Composition.Turn publishes exactly these symbols to the listed owners; every unlisted sibling remains private to dispatch-protocol."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "composition-turn-cutover",
+      "contract": "Composition.Turn",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Turn.OrdinaryTurnWorkflow.observe",
+        "Wanxiangshu.Composition.Turn.OrdinaryTurnWorkflow.observeIdle"
+      ],
+      "justification": "Composition.Turn publishes exactly these symbols to the listed owners; every unlisted sibling remains private to provider-attempt-recovery."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/Program.fs",
+      "owner": "dispatch-protocol",
+      "node": "composition-turn-cutover",
+      "contract": "Composition.Turn",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "review-assurance",
+        "speculative-investigation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.PublishMaps",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake.AbortWake",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake.FailureWake",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake.IdleWake",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake.RetryWake",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.SnapshotObservation",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.SnapshotObservation.TurnUnknown",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnAborted",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnCompleted",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnFailed",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnInProgress",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnNeedsContinuation",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.isTerminalOutcome",
+        "Wanxiangshu.Composition.Turn.ReconcileProgram.publishMapsEmpty"
+      ],
+      "justification": "Composition.Turn publishes exactly these symbols to the listed owners; every unlisted sibling remains private to dispatch-protocol."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/Scheduler.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol",
+        "host-boundary",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Turn.Reconciler.Scheduler",
+        "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Kick",
+        "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.NotifyProjectionChanged",
+        "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Signal",
+        "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.SignalIdle",
+        "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.StopAndDrain",
+        "durableUnavailable",
+        "onSnapshot"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/Workflow.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Composition.Turn.TurnWorkflow.observe"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Builder.fs",
+      "owner": "context-compression",
+      "node": "context-trace-companion-contract",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "provider-projection"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionProjectedMessage.IsPhysical",
+        "Wanxiangshu.Context.Companion.CompanionProjectedMessage.MessageId",
+        "Wanxiangshu.Context.Companion.CompanionProjectedMessage.Role",
+        "Wanxiangshu.Context.Companion.CompanionProjectedMessage.Text",
+        "Wanxiangshu.Context.Companion.CompanionProjectionBuilder.build",
+        "Wanxiangshu.Context.Companion.CompanionProjectionBuilder.isFirstTurnShape",
+        "Wanxiangshu.Context.Companion.CompanionProjectionPlan.Messages",
+        "Wanxiangshu.Context.Companion.CompanionRequestKind",
+        "Wanxiangshu.Context.Companion.CompanionRequestKind.Normal",
+        "Wanxiangshu.Context.Companion.CompanionRequestKind.Squash"
+      ],
+      "justification": "Context.CompanionContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Transform.fs",
+      "owner": "context-compression",
+      "node": "context-trace-companion-contract",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "output-distillation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.CompanionTransform.allowsBloggerCompanionForAgentName"
+      ],
+      "justification": "Context.CompanionContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
+      "owner": "guidance-delivery",
+      "node": "enforcer-guidance-continuation-contract",
+      "contract": "PairGuidance.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Enforcer.Guidance.TipDeliveryProjection.apply",
+        "Wanxiangshu.Enforcer.Guidance.TipDeliveryProjection.applyReanchor",
+        "Wanxiangshu.Enforcer.Guidance.TipDeliveryProjection.empty"
+      ],
+      "justification": "PairGuidance.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to guidance-delivery."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/AttachedRuntime.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.Clear",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.GetOrCreate",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.Remove",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.RemoveByDelegateSession",
+        "Wanxiangshu.Execution.Session.Attachment.AttachedSessionRuntime.TryFind",
+        "isUsable",
+        "registerParent"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/ReuseScope.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Attachment.ReuseScope.ofSession"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Attachment/SatelliteRuntime.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteLease.SessionId",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteRuntime",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteRuntime.Ensure",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteRuntime.Invalidate",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteRuntime.Retire",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.Agent",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.Close",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.Directory",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.Kind",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.Link",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.RestoredSessionId",
+        "Wanxiangshu.Execution.Session.Attachment.SatelliteSpec.Title"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/RecoveryClosureProjection.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.RecoveryClosureProjection.discover"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/Await.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CausalAwait.awaitTask"
+      ],
+      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/CausalWait.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CausalOwner.create",
+        "Wanxiangshu.Execution.Session.Wait.CausalProducerRef.ExternalProducer",
+        "Wanxiangshu.Execution.Session.Wait.CausalProducerRef.WorkflowProducer",
+        "Wanxiangshu.Execution.Session.Wait.DiagnosticWait",
+        "Wanxiangshu.Execution.Session.Wait.DiagnosticWaitModule.create",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.CancelledBy",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.DeadlineAt",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.OpenEndedExternal",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.ProcessLifetime",
+        "Wanxiangshu.Execution.Session.Wait.WaitEscape.SessionLifetime"
+      ],
+      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/CompletionMailbox.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "host-boundary",
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.Cancel",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.DrainAgentWakes",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.DrainPtyCompletions",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.IsCancelled",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PendingCount",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PendingPtyCount",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PublishPtyCompletion",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PulseAgentHandle",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.PulseWake",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.WaitForSignal",
+        "Wanxiangshu.Execution.Session.Wait.CompletionMailbox.WaitForWake",
+        "Wanxiangshu.Execution.Session.Wait.JoinBatch.Max",
+        "Wanxiangshu.Execution.Session.Wait.JoinBatch.MaxJoinBatch",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterrupt",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterrupt.Signal",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterrupt.Wait",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterruptModule.create",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.DeadlineExpired",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.OperatorAbort",
+        "Wanxiangshu.Execution.Session.Wait.JoinInterruptReason.UserMessageArrived",
+        "Wanxiangshu.Execution.Session.Wait.JoinWaitOutcome<_>.Interrupted",
+        "Wanxiangshu.Execution.Session.Wait.JoinWaitOutcome<_>.ResultsAvailable",
+        "Wanxiangshu.Execution.Session.Wait.JoinWaitOutcome`1",
+        "Wanxiangshu.Execution.Session.Wait.MailboxWakeReason",
+        "Wanxiangshu.Execution.Session.Wait.MailboxWakeReason.CompletionMayBeAvailable",
+        "Wanxiangshu.Execution.Session.Wait.MailboxWakeReason.LocalInterrupt",
+        "Wanxiangshu.Execution.Session.Wait.MailboxWakeReason.MailboxCancelled",
+        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.ofHeadTail",
+        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.toList",
+        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch.tryOfList",
+        "Wanxiangshu.Execution.Session.Wait.NonEmptyBatch`1"
+      ],
+      "justification": "Session.Quiescence publishes exactly these symbols to the listed owners; every unlisted sibling remains private to causal-wait."
+    },
+    {
+      "path": "src/Wanxiangshu/Execution/Session/Wait/Registry.fs",
+      "owner": "causal-wait",
+      "node": "execution-quiescence",
+      "contract": "Session.Quiescence",
+      "kind": "physical-port",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "finality",
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitHub.observer",
+        "Wanxiangshu.Execution.Session.Wait.CausalWaitHub.setWorkspace"
+      ],
+      "justification": "The listed owners consume this exact process-local causal-wait port; it carries no durable business state."
+    },
+    {
+      "path": "src/Wanxiangshu/Foundation/RolesSurface.fs",
+      "owner": "office-capability",
+      "node": "office-capability-keep",
+      "contract": "RolesSurface.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality",
+        "output-distillation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Foundation.RolesSurface.isAllowed",
+        "Wanxiangshu.Foundation.RolesSurface.permissions"
+      ],
+      "justification": "RolesSurface.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to office-capability."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/Gateway.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Git.Gateway",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Git.GitGateway.converge",
+        "Wanxiangshu.Git.GitGateway.createDefaultRunner"
+      ],
+      "justification": "Git.Gateway publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Git/Subject.fs",
+      "owner": "change-integration",
+      "node": "change-integration-host-contracts",
+      "contract": "Git.Gateway",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence",
+        "durable-events",
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Git.GitSubject.diffHeadBinary",
+        "Wanxiangshu.Git.GitSubject.execIn",
+        "Wanxiangshu.Git.GitSubject.lsFilesUntracked",
+        "Wanxiangshu.Git.GitSubject.revParseGitCommonDir",
+        "Wanxiangshu.Git.GitSubject.revParseHeadTree"
+      ],
+      "justification": "Git.Gateway publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+      "owner": "attention-regulation",
+      "node": "attention-regulation-proven-keep",
+      "contract": "AttentionRegulation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Attention.AttentionFactCases"
+      ],
+      "justification": "AttentionRegulation.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to attention-regulation."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+      "owner": "attention-regulation",
+      "node": "attention-regulation-proven-keep",
+      "contract": "AttentionRegulation.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "institutional-learning"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Attention.AttentionProjection.pending",
+        "Wanxiangshu.Interaction.Attention.DeferredWorkItem",
+        "Wanxiangshu.Interaction.Attention.DeferredWorkItem.OccurrenceId",
+        "Wanxiangshu.Interaction.Attention.DeferredWorkItem.Text"
+      ],
+      "justification": "AttentionRegulation.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to attention-regulation."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+      "owner": "concern-routing",
+      "node": "concern-routing-proven-keep",
+      "contract": "ConcernRouting.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "guidance-delivery",
+        "requirement-grounding"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Concern.ConcernFactCases",
+        "Wanxiangshu.Interaction.Concern.ConcernPlacementBatch"
+      ],
+      "justification": "ConcernRouting.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to concern-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+      "owner": "concern-routing",
+      "node": "concern-routing-proven-keep",
+      "contract": "ConcernRouting.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "guidance-delivery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Interaction.Concern.ConcernPreparedFragments",
+        "Wanxiangshu.Interaction.Concern.ConcernPreparedFragments.Announcements",
+        "Wanxiangshu.Interaction.Concern.ConcernPreparedFragments.Batch",
+        "Wanxiangshu.Interaction.Concern.ConcernPreparedFragments.Messages",
+        "Wanxiangshu.Interaction.Concern.ConcernProjection.applyPlacement",
+        "Wanxiangshu.Interaction.Concern.ConcernProjection.prepareFragments"
+      ],
+      "justification": "ConcernRouting.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to concern-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/OpenCode/Tool.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Finality.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Finality.OpenCode.FinalityTool.admission",
+        "Wanxiangshu.Mission.Finality.OpenCode.FinalityTool.spec"
+      ],
+      "justification": "Finality.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Ports.fs",
+      "owner": "finality",
+      "node": "mission-finality-cutover",
+      "contract": "Finality.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.AbortReviewer",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.AwaitTerminal",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.NudgeMissingJudgement",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.OpenJudgementChannel",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.PrepareSession",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.SendRevisionSteer",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPort.StartReview",
+        "Wanxiangshu.Mission.Finality.FinalityReviewerPortModule.abortAll"
+      ],
+      "justification": "Finality.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Finality/Types.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Finality.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Finality.EnlistedMember.AgentId",
+        "Wanxiangshu.Mission.Finality.EnlistedMember.BarrierId",
+        "Wanxiangshu.Mission.Finality.EnlistedMember.IsNew",
+        "Wanxiangshu.Mission.Finality.EnlistedMember.ReviewerOrdinal",
+        "Wanxiangshu.Mission.Finality.EnlistedMember.ReviewerSessionId"
+      ],
+      "justification": "Finality.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Mission.Manager.Life",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "LastWordsDigest",
+        "LastWordsRef",
+        "OpeningTextDigest",
+        "OpeningTextRef",
+        "TerminalDigest",
+        "TerminalRef",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityBlessed",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityRejected",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityRequested",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityReviewerEnlisted",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalitySiblingSteered",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityUndecided",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.LifeCompleted",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.LifeOpened",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.WorkActivated",
+        "WorkRecordBundleDigest",
+        "WorkRecordBundleRef",
+        "WorkRecordDigest",
+        "WorkRecordRef"
+      ],
+      "justification": "Mission.Manager.Life publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Life/OpeningFloor.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "Obligation.LedgerContract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Manager.Life.ManagerOpeningFloor.floorSequence",
+        "Wanxiangshu.Mission.Manager.Life.ManagerOpeningFloor.workRecordStart"
+      ],
+      "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Mission.Manager.Life",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "obligation-ledger",
+        "review-judgement",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Manager.Life.FinalityRequestProjection",
+        "Wanxiangshu.Mission.Manager.Life.FinalityRequestProjection.Members",
+        "Wanxiangshu.Mission.Manager.Life.LifeProjection",
+        "Wanxiangshu.Mission.Manager.Life.LifeProjection.ActiveFinality",
+        "Wanxiangshu.Mission.Manager.Life.LifeProjection.Completed",
+        "Wanxiangshu.Mission.Manager.Life.LifeProjection.LifeId",
+        "Wanxiangshu.Mission.Manager.Life.LifeProjection.OpeningCursor",
+        "Wanxiangshu.Mission.Manager.Life.LifeProjection.ProtectedPrefixEnd",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifeProjection.CurrentLife",
+        "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleProjection.isOpen",
+        "Wanxiangshu.Mission.Manager.Life.ReviewMemberRef.BarrierId"
+      ],
+      "justification": "Mission.Manager.Life publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Narrative.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Finality.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "obligation-ledger"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Manager.ManagerNarrative.Path.T1Revelation",
+        "Wanxiangshu.Mission.Manager.ManagerNarrative.wrapT1AcceptedResult"
+      ],
+      "justification": "Finality.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/OpenCode/NarrativeTransform.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Finality.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Manager.OpenCode.ManagerNarrativeTransform.tryTransform"
+      ],
+      "justification": "Finality.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Manager/Workflow.fs",
+      "owner": "finality",
+      "node": "mission-finality-keep",
+      "contract": "Finality.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Manager.ManagerWorkflow.observe",
+        "Wanxiangshu.Mission.Manager.ManagerWorkflow.observeIdle"
+      ],
+      "justification": "Finality.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to finality."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-authority-cutover",
+      "contract": "Mission.Authority",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "prefix-stability",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact.TodoWriteAccepted",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact.TodoWritePrepared",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PhysicalSuccessEvidence",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PhysicalSuccessEvidence.LiveAfterSuccess",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PhysicalSuccessEvidence.RecoveredCompletedToolPart",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixEvidenceKind",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixEvidenceKind.TodoCheckpoint",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.CoveredPrefixDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.CutoffExclusive",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.EvidenceKind",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.FrozenRecordPrefixDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.FrozenRecordPrefixRef",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.ManagerLifeId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.NextEpochId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.PreviousEpochId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.ProviderPrefixDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SealRoot",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SessionId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SolvingProviderRun",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SyntheticMessageId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.YBundleDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.YBundleRef",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.InputDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.ManagerLifeId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.OutputDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.PhysicalSuccessEvidence",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.PreparedFactRef",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.SemanticVersion",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.TodoWriteId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWriteAccepted.ToolCallId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.BaseTodoDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.BaseTodoRef",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ManagerLifeId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ManagerSessionId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.PlanCompleteDeclared",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ProposedTodoDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ProposedTodoRef",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ProviderInputDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ReviewFrontier",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.SemanticVersion",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.TodoWriteId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ToolCallId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.TodoWritePrepared.ToolPartOrdinal"
+      ],
+      "justification": "Mission.Authority publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Lwr.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "Obligation.LedgerContract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "semantic-trace",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange.EndExclusive",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLwr.BoundedRange.StartInclusive"
+      ],
+      "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoFactCodec.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "MagicTodo.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.encode",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.payloadRefOfBlobDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.payloadRefOfBlobRef",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.payloadRefs",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFactCodec.tryDecode"
+      ],
+      "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoLocality.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "MagicTodo.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.Snapshot",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.XTraceAmbiguous",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.XTraceMissing",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalityRejection.XTraceUnavailable",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.HostToolPartId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.InputCanonical",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ProviderRun",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.Range",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ReviewFrontier",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.State",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.TodowriteCallIdsInMessage",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ToolCallId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ToolName",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.LocalizedToolCall.ToolPartOrdinal",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.XTraceRange.EndExclusive",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.XTraceRange.Start",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoLocality.resolve"
+      ],
+      "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoMembrane.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "MagicTodo.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoHostHooks.HookSet.After",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoHostHooks.HookSet.Before",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoHostHooks.HookSet.Definition",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoHostHooks.create"
+      ],
+      "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/MagicTodoProjectionSurface.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "MagicTodo.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionHandle",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.create",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.fold",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.lifeView",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjectionSurface.view"
+      ],
+      "justification": "MagicTodo.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Model.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-authority-cutover",
+      "contract": "Mission.Authority",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "prefix-stability",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TodoWriteId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TodoWriteIdModule.create",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TodoWriteIdModule.value",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TracePartAnchor.Cursor",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TracePartAnchor.Kind",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.TracePartAnchor.ToolCallId",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.bloggerEffectiveStart",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.effectiveOpeningFloor",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodo.todoWriteId"
+      ],
+      "justification": "Mission.Authority publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/OpenCode/HostCodec.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "Obligation.LedgerContract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.OpenCode.MagicTodoHostCodec.isProviderInputRejection"
+      ],
+      "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/PrefixEpoch.fs",
+      "owner": "prefix-stability",
+      "node": "mission-obligation-keep",
+      "contract": "Obligation.LedgerContract",
+      "kind": "published-contract",
+      "consumers": [
+        "obligation-ledger"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch.buildTodoCheckpointCommit",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch.requiresLag1Rebase",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch.todoCheckpointEvidence"
+      ],
+      "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to prefix-stability."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+      "owner": "obligation-ledger",
+      "node": "mission-obligation-keep",
+      "contract": "Obligation.LedgerContract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "finality",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.CheckpointRecord.ProposedTodoDigest",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.LifeMagicTodoState.Checkpoints",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.MagicTodoProjectionState.ByLife",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.isPlanCommitted",
+        "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.tryLife"
+      ],
+      "justification": "Obligation.LedgerContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to obligation-ledger."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "durable-events",
+        "finality",
+        "interaction-authority",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Barrier.ClosedAttempt",
+        "Wanxiangshu.Mission.Review.Barrier.ClosedAttempt.Attempt",
+        "Wanxiangshu.Mission.Review.Barrier.ClosedAttempt.FrozenFrontier",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection.ClosedAttempts",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection.CurrentBarrierId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection.CurrentManagerSessionId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection.TerminalFrontier",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection.Witness",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.applyAttemptClosed",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.applyConfirmedWitness",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.applyVerdict",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.closedAttemptOf",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.empty",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.latestObservedAttempt",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.recordClosedAttemptFrontier",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.recordTerminalFrontier",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewProjection.startBarrier",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementInput",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementInput.AuthorityRootUserMessageId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementInput.SourceSessionId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.addRequirement",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.clearOnConfirmation",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.empty",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjectionModule.inputs",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.BarrierId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.Sequence",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.TerminalDigest",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewTerminalFrontier.TerminalRef",
+        "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.DuplicateAttempt",
+        "Wanxiangshu.Mission.Review.Barrier.VerdictRejection.NotDistinctAttempt"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Barrier/Reverify.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.CannotAwaitJudgement",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.CannotAwaitReviewer",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.CannotNudgeReviewer",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.CannotRecordJudgement",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.CannotStartReviewer",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.InvalidJudgement",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierFailure.JournalUnavailable",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierOutcome",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierOutcome.Confirmed",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierOutcome.RevisionRequired",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest.BarrierId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest.GitTreeHash",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest.ManagerJobId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest.ManagerSessionId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest.ReviewerSessionId",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierRequest.WorktreeIdentity",
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrierWorkflow.reverify"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Barrier/Workflow.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Barrier.ReviewBarrier.openBarrier"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Fact.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.ReviewFact.ConfirmedReviewWitness",
+        "Wanxiangshu.Mission.Review.ReviewFact.ReviewAttemptClosed",
+        "Wanxiangshu.Mission.Review.ReviewFact.ReviewBarrierStarted",
+        "Wanxiangshu.Mission.Review.ReviewFact.ReviewVerdictRecorded"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Facts.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "finality",
+        "review-assurance"
+      ],
+      "symbols": [
+        "ReviewerSessionId",
+        "Wanxiangshu.Mission.Review.ReviewFactCases",
+        "Wanxiangshu.Mission.Review.ReviewFactCases.ConfirmedReviewWitness",
+        "Wanxiangshu.Mission.Review.ReviewFactCases.ReviewBarrierStarted",
+        "Wanxiangshu.Mission.Review.ReviewGuardVerdict",
+        "Wanxiangshu.Mission.Review.ReviewGuardVerdict.Perfect",
+        "Wanxiangshu.Mission.Review.ReviewGuardVerdict.Revise"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Facts.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.ReviewGuardVerdict",
+        "Wanxiangshu.Mission.Review.ReviewGuardVerdict.Perfect",
+        "Wanxiangshu.Mission.Review.ReviewGuardVerdict.Revise"
+      ],
+      "justification": "Review.Judgement.Workflow publishes only the stable review-verdict vocabulary consumed by the static tool specification; review policy remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Challenge.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.Path",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewChallenge.promptOf"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/RequestIdentity.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.belongsTo",
+        "Wanxiangshu.Mission.Review.Judgement.JudgementRequestIdentity.key"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Verdict.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.BarrierId",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.GitTreeHash",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.ManagerSessionId",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.ProviderRun",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.ReviewerSessionId",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.ToolCallId",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictSubmission.Verdict",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWorkflow.recordConfirmation",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWorkflow.recordJudgement"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Witness.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "finality",
+        "review-assurance"
+      ],
+      "symbols": [
+        "BarrierId",
+        "First",
+        "FirstPhysicalUserMessageId",
+        "GitTreeHash",
+        "Report",
+        "Second",
+        "SecondPhysicalUserMessageId",
+        "Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure",
+        "Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure.IncompleteCohort",
+        "Wanxiangshu.Mission.Review.Judgement.CandidateVerificationFailure.StaleWitness",
+        "Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitness",
+        "Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.create",
+        "Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.gitTreeHash",
+        "Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.lifeId",
+        "Wanxiangshu.Mission.Review.Judgement.ConfirmedReviewWitnessModule.requestId",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewCandidate.isWitnessValidForTree",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewCandidate.verifyCandidate",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitness",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitness.Confirmed",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitness.NoReview",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitness.RevisionWitness",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.attemptIdentity",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.confirm",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.confirmedReviewer",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.gitTreeHash",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isConfirmed",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isDistinctAttempt",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isRevision",
+        "Wanxiangshu.Mission.Review.Judgement.ReviewWitnessModule.isValidForTree",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWitness",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWitness.GitTreeHash",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ProviderRun",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ReviewerSessionId",
+        "Wanxiangshu.Mission.Review.Judgement.VerdictWitness.ToolCallId"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Judgement/Workflow.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.Judgement.ReviewerWorkflow.observe"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "finality",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.OpenCode.ReviewJudgementInbox.acquire",
+        "Wanxiangshu.Mission.Review.OpenCode.ReviewJudgementInbox.isOwned",
+        "Wanxiangshu.Mission.Review.OpenCode.ReviewJudgementInbox.tryDeliver"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.JudgeTool",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.admission",
+        "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.spec"
+      ],
+      "justification": "Review.JudgeTool publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.JudgeTool",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.OpenCode.ReviewerTerminalAwait.awaitFuture"
+      ],
+      "justification": "Review.JudgeTool publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Ports.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement",
+        "change-integration",
+        "finality",
+        "host-boundary",
+        "managed-session-lifecycle",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.GitTreePort",
+        "Wanxiangshu.Mission.Review.GitTreePort.GetTreeHash",
+        "Wanxiangshu.Mission.Review.ReviewHostPort",
+        "Wanxiangshu.Mission.Review.ReviewHostPort.AwaitJudgement",
+        "Wanxiangshu.Mission.Review.ReviewHostPort.AwaitReviewer",
+        "Wanxiangshu.Mission.Review.ReviewHostPort.NudgeMissingJudgement",
+        "Wanxiangshu.Mission.Review.ReviewHostPort.StartReview",
+        "Wanxiangshu.Mission.Review.ReviewJudgement",
+        "Wanxiangshu.Mission.Review.ReviewJudgement.PhysicalUserMessageId",
+        "Wanxiangshu.Mission.Review.ReviewJudgement.ProviderRun",
+        "Wanxiangshu.Mission.Review.ReviewJudgement.ReviewerSessionId",
+        "Wanxiangshu.Mission.Review.ReviewJudgement.ToolCallId",
+        "Wanxiangshu.Mission.Review.ReviewJudgement.Verdict",
+        "Wanxiangshu.Mission.Review.ReviewJudgementChannel",
+        "Wanxiangshu.Mission.Review.ReviewJudgementChannel.AwaitJudgement",
+        "Wanxiangshu.Mission.Review.ReviewJudgementChannel.Dispose",
+        "Wanxiangshu.Mission.Review.ReviewJudgementDelivery",
+        "Wanxiangshu.Mission.Review.ReviewJudgementDelivery.Accept",
+        "Wanxiangshu.Mission.Review.ReviewJudgementDelivery.Challenge",
+        "Wanxiangshu.Mission.Review.ReviewJudgementDelivery.Judgement",
+        "Wanxiangshu.Mission.Review.ReviewJudgementDelivery.Reject",
+        "Wanxiangshu.Mission.Review.ReviewerContinuationPort",
+        "Wanxiangshu.Mission.Review.ReviewerContinuationPort.NudgeMissingVerdict",
+        "Wanxiangshu.Mission.Review.ReviewerTerminalOccasion",
+        "Wanxiangshu.Mission.Review.ReviewerTerminalOccasion.BarrierId",
+        "Wanxiangshu.Mission.Review.ReviewerTerminalOccasion.ReviewerSessionId"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/Review/Prompt.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.Judgement.Workflow",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "finality"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.HostReviewPrompt.Opening"
+      ],
+      "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/WorkRecord/Materialize.fs",
+      "owner": "work-record",
+      "node": "mission-work-record-keep",
+      "contract": "WorkRecord.Surface",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecord",
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBounded",
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun",
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordFromSnapshot"
+      ],
+      "justification": "WorkRecord.Surface publishes exactly these symbols to the listed owners; every unlisted sibling remains private to work-record."
+    },
+    {
+      "path": "src/Wanxiangshu/Mission/WorkRecord/Model.fs",
+      "owner": "work-record",
+      "node": "mission-work-record-keep",
+      "contract": "WorkRecord.Model",
+      "kind": "published-contract",
+      "consumers": [
+        "finality",
+        "prefix-stability",
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecord.Frames",
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecord.Gap",
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecord.Opening",
+        "Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordModule.render",
+        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial",
+        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial.AssignmentText",
+        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial.AuthoritativeRequirements",
+        "Wanxiangshu.Mission.WorkRecord.OpeningMaterial.ConstitutiveBody"
+      ],
+      "justification": "WorkRecord.Model publishes exactly these symbols to the listed owners; every unlisted sibling remains private to work-record."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ChatParamsHook.fs",
+      "owner": "execution-model-routing",
+      "node": "model-routing-capacity",
+      "contract": "ModelRouting.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChatParamsHook.create"
+      ],
+      "justification": "ModelRouting.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+      "owner": "execution-model-routing",
+      "node": "model-routing-capacity",
+      "contract": "ModelRouting.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "cognitive-environment",
+        "context-compression",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "session-ontology"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution",
+        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.ExternalManaged",
+        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.NoRoute",
+        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.PluginManaged",
+        "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.Superseded",
+        "Wanxiangshu.OpenCode.ModelRouting.bindCapacityChild",
+        "Wanxiangshu.OpenCode.ModelRouting.bindCapacityCompanion",
+        "Wanxiangshu.OpenCode.ModelRouting.cancelUnacquiredExecution",
+        "Wanxiangshu.OpenCode.ModelRouting.dropCapacityLineage",
+        "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
+        "Wanxiangshu.OpenCode.ModelRouting.enterProviderStep",
+        "Wanxiangshu.OpenCode.ModelRouting.hasRuntime",
+        "Wanxiangshu.OpenCode.ModelRouting.initialize",
+        "Wanxiangshu.OpenCode.ModelRouting.managedAgentForAdmission",
+        "Wanxiangshu.OpenCode.ModelRouting.releaseExecution",
+        "Wanxiangshu.OpenCode.ModelRouting.releasePhysicalExecution",
+        "Wanxiangshu.OpenCode.ModelRouting.sameTarget",
+        "Wanxiangshu.OpenCode.ModelRouting.suppressProviderStep",
+        "Wanxiangshu.OpenCode.ModelRouting.toOpenCodeModel",
+        "Wanxiangshu.OpenCode.ModelRouting.tryLease",
+        "Wanxiangshu.OpenCode.ModelRouting.tryReserveManaged"
+      ],
+      "justification": "ModelRouting.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/OpenCodePort.fs",
+      "owner": "execution-model-routing",
+      "node": "model-routing-capacity",
+      "contract": "ModelRouting.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "cognitive-environment",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "knowledge-reuse",
+        "managed-session-lifecycle",
+        "session-ontology",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.IOpenCodePort",
+        "Wanxiangshu.OpenCode.IOpenCodePort.AbortSession",
+        "Wanxiangshu.OpenCode.IOpenCodePort.CreateChildSession",
+        "Wanxiangshu.OpenCode.IOpenCodePort.CreateSession",
+        "Wanxiangshu.OpenCode.IOpenCodePort.GetSessionParent",
+        "Wanxiangshu.OpenCode.IOpenCodePort.ListChildren",
+        "Wanxiangshu.OpenCode.IPromptPort.SendPrompt",
+        "Wanxiangshu.OpenCode.OpenCodeChildInfo",
+        "Wanxiangshu.OpenCode.OpenCodeChildInfo.Agent",
+        "Wanxiangshu.OpenCode.OpenCodeChildInfo.ParentSessionId",
+        "Wanxiangshu.OpenCode.OpenCodeChildInfo.SessionId",
+        "Wanxiangshu.OpenCode.OpenCodeChildInfo.Title",
+        "Wanxiangshu.OpenCode.OpenCodeChildOptions",
+        "Wanxiangshu.OpenCode.OpenCodeChildOptions.Agent",
+        "Wanxiangshu.OpenCode.OpenCodeChildOptions.Directory",
+        "Wanxiangshu.OpenCode.OpenCodeChildOptions.Title",
+        "Wanxiangshu.OpenCode.OpenCodePort.create",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions.Agent",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions.BindingIntent",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions.Directory",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions.Metadata",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions.Model",
+        "Wanxiangshu.OpenCode.OpenCodePromptOptions.Tools",
+        "Wanxiangshu.OpenCode.SessionBindingIntent",
+        "Wanxiangshu.OpenCode.SessionBindingIntent.ExplicitExecutionOverride",
+        "Wanxiangshu.OpenCode.SessionBindingIntent.Preserve"
+      ],
+      "justification": "ModelRouting.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "context-compression",
+        "host-boundary",
+        "prefix-stability",
+        "speculative-investigation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ISessionRuntimeOwner",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachDurabilityActivation",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachSatelliteRuntime",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachSharedTerminal",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachSyncDelegateRuntime",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachToolRuntime",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.BloggerRuntimeHost",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.CompactionSettingGap",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.ConsumeAttemptPlan",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.DisposeAsync",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.EnsureRecoveryDone",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.IsStartupProbeOpen",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.RecordAttemptPlan",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.RecordCompactionSettingGap",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.RecordPendingAttemptPlan",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.RequireFamilyRecovery",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.RunOwnedWork",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.Satellites",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.Strength",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.SyncDelegateRuntime",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackReconcileShutdown",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryAttemptPlan",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryBindAttemptPlan",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryClaimStartupProbe",
+        "Wanxiangshu.OpenCode.PluginRuntimeScope.TryTakeRecoveryPermit"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/ProviderRunBinding.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "prefix-stability",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection",
+        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.AmbiguousRun",
+        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.NoBindableRun",
+        "Wanxiangshu.OpenCode.ProviderRunBinding.Rejection.NotLatestRun",
+        "Wanxiangshu.OpenCode.ProviderRunBinding.bindableRun"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
+      "owner": "review-assurance",
+      "node": "review-assurance-witness-contract",
+      "contract": "Review.Witness",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "dispatch-protocol",
+        "host-boundary",
+        "managed-session-lifecycle",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.SharedState.BloggerFlightGate",
+        "Wanxiangshu.OpenCode.SharedState.BloggerFlights",
+        "Wanxiangshu.OpenCode.SharedState.BloggerMaterializationAdmission",
+        "Wanxiangshu.OpenCode.SharedState.ReviewGuardNudges",
+        "Wanxiangshu.OpenCode.SharedState.RootWorkspace",
+        "Wanxiangshu.OpenCode.SharedState.SessionDirectories",
+        "Wanxiangshu.OpenCode.SharedState.SessionParents",
+        "Wanxiangshu.OpenCode.SharedState.VerdictSubmissions",
+        "Wanxiangshu.OpenCode.SharedState.clearBloggerFlightsForTests",
+        "Wanxiangshu.OpenCode.SharedState.clearReviewGuardNudgesForTests"
+      ],
+      "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcp.fs",
+      "owner": "external-investigation",
+      "node": "external-investigation-keep",
+      "contract": "ExternalInvestigation.McpConfig",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.StealthBrowserMcp.permissionKey"
+      ],
+      "justification": "ExternalInvestigation.McpConfig publishes only the stable browser permission key consumed by the static tool specification; launch policy remains private to external-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/StealthBrowserMcpConfig.fs",
+      "owner": "external-investigation",
+      "node": "external-investigation-keep",
+      "contract": "ExternalInvestigation.McpConfig",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.StealthBrowserMcpConfig.apply",
+        "Wanxiangshu.OpenCode.StealthBrowserMcpConfig.launchFromEnvironment"
+      ],
+      "justification": "ExternalInvestigation.McpConfig publishes exactly these symbols to the listed owners; every unlisted sibling remains private to external-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.WorkspaceEventStore.acquire",
+        "Wanxiangshu.OpenCode.WorkspaceEventStore.bootPort",
+        "Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/AssumeTool.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "contract": "ToolOwner.ToolSpec",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.AssumeTool.admission",
+        "Wanxiangshu.OpenCode.AssumeTool.spec"
+      ],
+      "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/BashHoneypotTool.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "contract": "ToolOwner.ToolSpec",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.BashHoneypotTool.admission",
+        "Wanxiangshu.OpenCode.BashHoneypotTool.spec"
+      ],
+      "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "contract": "ToolOwner.ToolSpec",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ChronicleTool.EmptyTextError",
+        "Wanxiangshu.OpenCode.ChronicleTool.NoLiveCycleError",
+        "Wanxiangshu.OpenCode.ChronicleTool.admission",
+        "Wanxiangshu.OpenCode.ChronicleTool.spec",
+        "Wanxiangshu.OpenCode.ChronicleTool.tryCanonicalText"
+      ],
+      "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/CoderTool.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "contract": "ToolOwner.ToolSpec",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.CoderTool.behaviorAdmission",
+        "Wanxiangshu.OpenCode.CoderTool.establishSpec",
+        "Wanxiangshu.OpenCode.CoderTool.repairSpec"
+      ],
+      "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ManagedAgent.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "contract": "ToolOwner.ToolSpec",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement",
+        "change-integration",
+        "context-compression",
+        "delegation",
+        "execution-model-routing",
+        "finality",
+        "host-boundary",
+        "managed-session-lifecycle",
+        "output-distillation",
+        "participant-horizon",
+        "participant-identity",
+        "process-execution",
+        "speculative-investigation",
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ManagedAgent",
+        "Wanxiangshu.OpenCode.ManagedAgent.Name",
+        "Wanxiangshu.OpenCode.ManagedAgent.Role",
+        "Wanxiangshu.OpenCode.ManagedAgent.Tier",
+        "Wanxiangshu.OpenCode.ManagedAgentModule.formatParseError",
+        "Wanxiangshu.OpenCode.ManagedAgentModule.make",
+        "Wanxiangshu.OpenCode.ManagedAgentModule.nameOf",
+        "Wanxiangshu.OpenCode.ManagedAgentModule.parse",
+        "Wanxiangshu.OpenCode.ManagedAgentModule.requiredNames",
+        "Wanxiangshu.OpenCode.ManagedAgentModule.tryParse"
+      ],
+      "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/StaticTools.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "contract": "ToolOwner.ToolSpec",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement",
+        "delegation",
+        "review-assurance",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.StaticTools.bloggerAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.bookkeeperAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.browserAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.coderAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.devopsAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.distillerAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.inquiryAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.inspectorAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.managerAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.orchestratorAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.requestToolMap",
+        "Wanxiangshu.OpenCode.StaticTools.reviewerAgentConfig",
+        "Wanxiangshu.OpenCode.StaticTools.reviewerVerdictOfString",
+        "Wanxiangshu.OpenCode.StaticTools.reviewerVerdictSchemaJson",
+        "Wanxiangshu.OpenCode.StaticTools.toolNames"
+      ],
+      "justification": "ToolOwner.ToolSpec publishes exactly these symbols to the listed owners; every unlisted sibling remains private to action-affordance."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "participant-horizon",
+        "process-execution",
+        "repository-investigation",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ToolRuntimeScope",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.ActiveProfileFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.AdoptExistingChild",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.AttachFamilyRecovery",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.AttachJoinAttempts",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.CancelSessionChildren",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.ChildWorkRecordFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.CurrentPhysicalUserMessage",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.DirectoryFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.DisposeAsync",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.EnsureRoleFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.EventPort",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.ExecutorRuntimeFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.FinalityReviewerTimeoutMs",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.HasLivePty",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.HasVerdictSubmitted",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.IsRole",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.JoinAttempts",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.Journal",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.LogicalOwnerFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.ManagedAgentFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.MarkVerdictSubmitted",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.OrchestratorHostFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.ParentWorkRecordFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.ProcessHardLimit",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RegisterDirectory",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RegisterPhysicalParent",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RequireFamilyRecovery",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RoleFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RunOwnedWork",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RunStarted",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.RuntimeFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.SessionParents",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.Sessions",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.Snapshot",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.TreePortFor",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.WorkspaceDirectory",
+        "eventPort",
+        "finalityReviewerTimeoutMs"
+      ],
+      "justification": "Session.Lifecycle publishes exactly these symbols to the listed owners; every unlisted sibling remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
+      "owner": "managed-session-lifecycle",
+      "node": "session-lifecycle-recovery-contract",
+      "contract": "Session.Lifecycle",
+      "kind": "physical-port",
+      "consumers": [
+        "action-affordance"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ToolRuntimeScope",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.AttachFamilyRecovery",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.TerminateSession",
+        "Wanxiangshu.OpenCode.ToolRuntimeScope.WorkspaceDirectory"
+      ],
+      "justification": "The action-affordance adapters consume only these exact process runtime capabilities at the physical tool boundary; session lifecycle policy remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.checkIdentity",
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.encode",
+        "Wanxiangshu.Persistence.EventStore.CanonicalEventCodec.tryDecode"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/CanonicalIntegrator.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "durable-events",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.CanonicalIntegrator.create"
+      ],
+      "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.EventKWayMerge.merge"
+      ],
+      "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/EventStoreHandle.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "knowledge-reuse",
+        "repository-programming"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.EventStoreHandle",
+        "Wanxiangshu.Persistence.EventStore.EventStoreHandle.Store"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/EventVocabulary.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.AuthoritativeEventTypes.isKnown",
+        "Wanxiangshu.Persistence.EventStore.ProjectionCutTailEvent.EventType",
+        "Wanxiangshu.Persistence.EventStore.ProjectionCutTailEvent.streamId"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Model.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence",
+        "knowledge-reuse",
+        "obligation-ledger",
+        "repository-programming",
+        "speculative-investigation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.EventId",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.EventType",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.Parents",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.Payload",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.PayloadRefs",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelope.StreamId",
+        "Wanxiangshu.Persistence.EventStore.EventEnvelopeModule.normalize",
+        "Wanxiangshu.Persistence.EventStore.EventStreamId",
+        "Wanxiangshu.Persistence.EventStore.EventStreamIdModule.create",
+        "Wanxiangshu.Persistence.EventStore.EventStreamIdModule.value",
+        "Wanxiangshu.Persistence.EventStore.PayloadRef",
+        "Wanxiangshu.Persistence.EventStore.PayloadRefModule.create",
+        "Wanxiangshu.Persistence.EventStore.PayloadRefModule.value",
+        "Wanxiangshu.Persistence.EventStore.PayloadRefs.canonicalize"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.ProcessEventLogModule.readStreams"
+      ],
+      "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/ProcessGitRawStore.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.ProcessGitRawStoreModule.create"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/Store.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "durable-events",
+        "knowledge-reuse",
+        "repository-investigation",
+        "repository-programming",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.EventStore.createLocal",
+        "Wanxiangshu.Persistence.EventStore.IEventStore",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.AllHeads",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.Append",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.ReadPayload",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.TryCurrent",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.TryEvent",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.TryHead",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.TryHeads",
+        "Wanxiangshu.Persistence.EventStore.IEventStore.WritePayload"
+      ],
+      "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/StoreTypes.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "durable-convergence",
+        "knowledge-reuse",
+        "repository-programming",
+        "speculative-investigation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.AppendError",
+        "Wanxiangshu.Persistence.EventStore.AppendError.AppendFailed",
+        "Wanxiangshu.Persistence.EventStore.AppendError.SemanticCut",
+        "Wanxiangshu.Persistence.EventStore.AppendError.StorageInvalid",
+        "Wanxiangshu.Persistence.EventStore.AppendReceipt",
+        "Wanxiangshu.Persistence.EventStore.AppendReceipt.Cuts",
+        "Wanxiangshu.Persistence.EventStore.AppendReceiptModule.cutFor",
+        "Wanxiangshu.Persistence.EventStore.AppendReceiptModule.empty",
+        "Wanxiangshu.Persistence.EventStore.ConvergeError",
+        "Wanxiangshu.Persistence.EventStore.ConvergeError.ConvergeCasRejected",
+        "Wanxiangshu.Persistence.EventStore.ConvergeError.ConvergeRetryExhausted",
+        "Wanxiangshu.Persistence.EventStore.ConvergeError.StorageInvalid",
+        "Wanxiangshu.Persistence.EventStore.ConvergeError.Transport",
+        "Wanxiangshu.Persistence.EventStore.GitObjectId",
+        "Wanxiangshu.Persistence.EventStore.GitObjectIdModule.create",
+        "Wanxiangshu.Persistence.EventStore.GitObjectIdModule.value",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore.ReadObject",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore.ReadRef",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore.ReadTree",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore.WriteBlob",
+        "Wanxiangshu.Persistence.EventStore.IGitRawStore.WriteTree",
+        "Wanxiangshu.Persistence.EventStore.RootOidModule.create",
+        "Wanxiangshu.Persistence.EventStore.RootOidModule.value",
+        "Wanxiangshu.Persistence.EventStore.SemanticCut",
+        "Wanxiangshu.Persistence.EventStore.SemanticCut.CutEventId",
+        "Wanxiangshu.Persistence.EventStore.SemanticCut.FailedEventId",
+        "Wanxiangshu.Persistence.EventStore.SemanticCut.Reason",
+        "Wanxiangshu.Persistence.EventStore.SemanticCut.Rule",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.CyclicParents",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.IdentityCollision",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.MalformedEnvelope",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.MissingParent",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.MissingPayload",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.NonCanonical",
+        "Wanxiangshu.Persistence.EventStore.StorageInvalid.UnknownEventType",
+        "Wanxiangshu.Persistence.EventStore.StoreRef.canonical",
+        "Wanxiangshu.Persistence.EventStore.StoreRef.remoteTracking",
+        "Wanxiangshu.Persistence.EventStore.StoreRef.tryRemoteFromTracking",
+        "Wanxiangshu.Persistence.EventStore.StoreSnapshot",
+        "Wanxiangshu.Persistence.EventStore.StoreSnapshot.RootOid",
+        "Wanxiangshu.Persistence.EventStore.TreeEntry",
+        "Wanxiangshu.Persistence.EventStore.TreeEntry.Mode",
+        "Wanxiangshu.Persistence.EventStore.TreeEntry.Name",
+        "Wanxiangshu.Persistence.EventStore.TreeEntry.Oid"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/StrengthSurface.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.EventStoreStrengthSurface.current",
+        "Wanxiangshu.Persistence.EventStore.EventStoreStrengthSurface.durability",
+        "Wanxiangshu.Persistence.EventStore.EventStoreStrengthSurface.readPayload",
+        "Wanxiangshu.Persistence.EventStore.EventStoreStrengthSurface.storeOf",
+        "Wanxiangshu.Persistence.EventStore.EventStoreStrengthSurface.writePayload"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs",
+      "owner": "durable-convergence",
+      "node": "durable-convergence-store-contracts",
+      "contract": "DurableConvergence.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.EventStore.WriterStreamSync.syncWriterStreams",
+        "Wanxiangshu.Persistence.EventStore.WriterStreamSync.tryCachedLocalSnapshot"
+      ],
+      "justification": "DurableConvergence.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-convergence."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "attention-regulation",
+        "behavior-diagnosis",
+        "capability-enforcement",
+        "change-integration",
+        "cognitive-environment",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "interaction-authority",
+        "intra-participant-parallelism",
+        "managed-session-lifecycle",
+        "obligation-ledger",
+        "output-distillation",
+        "participant-horizon",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "requirement-grounding",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "speculative-investigation",
+        "time-capability",
+        "verification-system",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.AgentJournal",
+        "Wanxiangshu.Persistence.Journal.AgentJournal.AwaitChangeFrom",
+        "Wanxiangshu.Persistence.Journal.AgentJournal.IsPoisoned",
+        "Wanxiangshu.Persistence.Journal.AgentJournal.SnapshotWithRevision",
+        "Wanxiangshu.Persistence.Journal.AgentJournal.WriteBlob",
+        "Wanxiangshu.Persistence.Journal.AgentJournal.Writer",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.appendAgent",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.appendMagicTodo",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.appendManagerLifecycle",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.awaitChangeFrom",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.awaitChangeFromOrCancel",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.createFromProjection",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.handleProjection",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.pendingReviewRequirements",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.revision",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.runtimeId",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot",
+        "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshotWithRevision",
+        "Wanxiangshu.Persistence.Journal.JournalAppendFailure",
+        "Wanxiangshu.Persistence.Journal.JournalAppendFailure.FactRejected",
+        "Wanxiangshu.Persistence.Journal.JournalAppendFailure.WriteUnknown",
+        "Wanxiangshu.Persistence.Journal.JournalAppendFailure.WriterUnavailable",
+        "Wanxiangshu.Persistence.Journal.JournalAppendFailureModule.describe",
+        "Wanxiangshu.Persistence.Journal.JournalChange",
+        "Wanxiangshu.Persistence.Journal.MagicTodoAppendReceipt.EventId"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/Envelope.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "attention-regulation",
+        "behavior-diagnosis",
+        "change-integration",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "intra-participant-parallelism",
+        "obligation-ledger",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "requirement-grounding",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "time-capability",
+        "verification-system",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.Envelope",
+        "Wanxiangshu.Persistence.Journal.Envelope.EventId",
+        "Wanxiangshu.Persistence.Journal.Envelope.Fact",
+        "Wanxiangshu.Persistence.Journal.Envelope.LocalSeq",
+        "Wanxiangshu.Persistence.Journal.Envelope.ObservedAt",
+        "Wanxiangshu.Persistence.Journal.Envelope.ProviderRun",
+        "Wanxiangshu.Persistence.Journal.Envelope.RuntimeId",
+        "Wanxiangshu.Persistence.Journal.Envelope.Stream",
+        "Wanxiangshu.Persistence.Journal.EnvelopeModule.deserialize",
+        "Wanxiangshu.Persistence.Journal.EnvelopeModule.serialize",
+        "Wanxiangshu.Persistence.Journal.StreamId",
+        "Wanxiangshu.Persistence.Journal.StreamId.Child",
+        "Wanxiangshu.Persistence.Journal.StreamId.Process",
+        "Wanxiangshu.Persistence.Journal.StreamId.Session",
+        "Wanxiangshu.Persistence.Journal.StreamId.Workspace"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/EventStoreJournalCodec.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalCodec.JournalEnvelopeEventType",
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalCodec.tryDecode"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "verification-system"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter",
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.create",
+        "Wanxiangshu.Persistence.Journal.EventStoreJournalWriter.resumeOrCreate"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/FactCodec.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "delegation",
+        "durable-convergence"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.FactCodec.containsLegacyScoreVectorEntry",
+        "Wanxiangshu.Persistence.Journal.FactCodec.deserializeFact",
+        "Wanxiangshu.Persistence.Journal.FactCodec.isIgnoredLegacyDecodeError",
+        "Wanxiangshu.Persistence.Journal.FactCodec.serializeFact",
+        "Wanxiangshu.Persistence.Journal.FactCodec.tipV2CleanBreakMessage"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/JournalEventStoreBoot.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.IJournalEventStoreBoot.ResumeOrCreate"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "obligation-ledger"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.appendMagicTodo",
+        "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.appendManagerLifecycle",
+        "Wanxiangshu.Persistence.Journal.ObligationJournalSurface.snapshotMagicTodo"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/RuntimePath.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "host-boundary",
+        "knowledge-reuse"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.RuntimePath.forWorkspace",
+        "Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/SharedAgentJournal.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.SharedAgentJournal.acquire",
+        "Wanxiangshu.Persistence.Journal.SharedAgentJournal.releaseAsync"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/Surface.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "change-integration",
+        "dispatch-protocol",
+        "guidance-delivery",
+        "host-boundary",
+        "obligation-ledger",
+        "provider-attempt-recovery",
+        "requirement-grounding",
+        "review-assurance",
+        "review-judgement",
+        "semantic-trace",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.JournalHandle",
+        "Wanxiangshu.Persistence.Journal.JournalHandle.Journal",
+        "Wanxiangshu.Persistence.Journal.JournalSurface.boot",
+        "Wanxiangshu.Persistence.Journal.JournalSurface.dispose"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Persistence/Journal/Writer.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "context-compression",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "obligation-ledger",
+        "participant-horizon",
+        "prefix-stability",
+        "semantic-trace",
+        "speculative-investigation",
+        "verification-system",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Persistence.Journal.BlobWriteReceipt",
+        "Wanxiangshu.Persistence.Journal.BlobWriteReceipt.BlobDigest",
+        "Wanxiangshu.Persistence.Journal.BlobWriteReceipt.BlobRef",
+        "Wanxiangshu.Persistence.Journal.IBlobWriter.Read",
+        "Wanxiangshu.Persistence.Journal.IJournalWriter.Append",
+        "Wanxiangshu.Persistence.Journal.IJournalWriter.BlobWriter",
+        "Wanxiangshu.Persistence.Journal.IJournalWriter.Release",
+        "Wanxiangshu.Persistence.Journal.IJournalWriter.ReleaseAsync"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Budget.fs",
+      "owner": "speculative-investigation",
+      "node": "strength-prediction-replica-cutover",
+      "contract": "Strength.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events",
+        "execution-model-routing"
+      ],
+      "symbols": [
+        "Wanxiangshu.Strength.StrengthBudget",
+        "Wanxiangshu.Strength.StrengthBudget.K0",
+        "Wanxiangshu.Strength.StrengthBudget.K1",
+        "Wanxiangshu.Strength.StrengthBudget.K2",
+        "Wanxiangshu.Strength.StrengthBudgetModule.parse",
+        "Wanxiangshu.Strength.StrengthBudgetModule.wire"
+      ],
+      "justification": "Strength.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to speculative-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Events.fs",
+      "owner": "speculative-investigation",
+      "node": "strength-prediction-replica-cutover",
+      "contract": "Strength.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence",
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Strength.StrengthCandidateAbandoned.DecisionId",
+        "Wanxiangshu.Strength.StrengthCandidateAbandoned.TargetProviderRun",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.AnchorDigest",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.Budget",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.ByteLength",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.DecisionId",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.FrameDigest",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.MaterialPayloads",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.OwnerSessionId",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.ReplicaSessionId",
+        "Wanxiangshu.Strength.StrengthCandidatePrepared.TargetProviderRun",
+        "Wanxiangshu.Strength.StrengthCandidatePromoted.DecisionId",
+        "Wanxiangshu.Strength.StrengthCandidatePromoted.FrameDigest",
+        "Wanxiangshu.Strength.StrengthCandidatePromoted.MaterialPayloads",
+        "Wanxiangshu.Strength.StrengthCandidatePromoted.OwnerSessionId",
+        "Wanxiangshu.Strength.StrengthCandidatePromoted.TargetProviderRun",
+        "Wanxiangshu.Strength.StrengthEvent",
+        "Wanxiangshu.Strength.StrengthEvent.Abandoned",
+        "Wanxiangshu.Strength.StrengthEvent.Prepared",
+        "Wanxiangshu.Strength.StrengthEvent.Promoted",
+        "Wanxiangshu.Strength.StrengthEvent.Traced",
+        "Wanxiangshu.Strength.StrengthEventTypes.CandidateAbandoned",
+        "Wanxiangshu.Strength.StrengthEventTypes.CandidatePrepared",
+        "Wanxiangshu.Strength.StrengthEventTypes.CandidatePromoted",
+        "Wanxiangshu.Strength.StrengthEventTypes.FramesTraced",
+        "Wanxiangshu.Strength.StrengthEventTypes.isStrengthEvent",
+        "Wanxiangshu.Strength.StrengthEvents.abandoned",
+        "Wanxiangshu.Strength.StrengthEvents.prepared",
+        "Wanxiangshu.Strength.StrengthEvents.promoted",
+        "Wanxiangshu.Strength.StrengthEvents.traced",
+        "Wanxiangshu.Strength.StrengthFramesTraced.DecisionId",
+        "Wanxiangshu.Strength.StrengthFramesTraced.EndExclusive",
+        "Wanxiangshu.Strength.StrengthFramesTraced.StartInclusive"
+      ],
+      "justification": "Strength.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to speculative-investigation."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Persistence/Durability.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Strength.Persistence.StrengthDurability.create"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Persistence/DurabilityPort.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle",
+        "semantic-trace",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Strength.Persistence.StrengthDurabilityPort",
+        "Wanxiangshu.Strength.Persistence.StrengthDurabilityPort.Append",
+        "Wanxiangshu.Strength.Persistence.StrengthDurabilityPort.LoadFrameBundle",
+        "Wanxiangshu.Strength.Persistence.StrengthDurabilityPort.LoadProjection",
+        "Wanxiangshu.Strength.Persistence.StrengthDurabilityPort.PublishPrepared",
+        "Wanxiangshu.Strength.Persistence.StrengthDurableAppend",
+        "Wanxiangshu.Strength.Persistence.StrengthDurableAppend.Applied",
+        "Wanxiangshu.Strength.Persistence.StrengthDurableAppend.SemanticRejected",
+        "Wanxiangshu.Strength.Persistence.StrengthDurableAppend.StorageFailed",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedPublish",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedPublish.Published",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedPublish.Rejected",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedPublish.StorageInvalid",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.AnchorDigest",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.Budget",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.Bundle",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.DecisionId",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.OwnerSessionId",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.ReplicaSessionId",
+        "Wanxiangshu.Strength.Persistence.StrengthPreparedRequest.TargetProviderRun"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Persistence/Store.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "contract": "DurableEvents.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-convergence",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Strength.Persistence.StrengthStore.append",
+        "Wanxiangshu.Strength.Persistence.StrengthStore.toEnvelope",
+        "Wanxiangshu.Strength.Persistence.StrengthStore.tryDecodeEnvelope"
+      ],
+      "justification": "DurableEvents.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to durable-events."
+    },
+    {
+      "path": "src/Wanxiangshu/Strength/Policy.fs",
+      "owner": "execution-model-routing",
+      "node": "model-routing-capacity",
+      "contract": "ModelCapacity.BorrowingCapacity",
+      "kind": "published-contract",
+      "consumers": [
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Strength.StrengthDecision",
+        "Wanxiangshu.Strength.StrengthDecision.ControlHoldout",
+        "Wanxiangshu.Strength.StrengthDecision.Skip",
+        "Wanxiangshu.Strength.StrengthDecision.Speculate",
+        "Wanxiangshu.Strength.StrengthEligibility",
+        "Wanxiangshu.Strength.StrengthEligibility.Eligible",
+        "Wanxiangshu.Strength.StrengthEligibility.Ineligible",
+        "Wanxiangshu.Strength.StrengthOpportunity",
+        "Wanxiangshu.Strength.StrengthOpportunity.CanonicalRole",
+        "Wanxiangshu.Strength.StrengthOpportunity.CostModelAvailable",
+        "Wanxiangshu.Strength.StrengthOpportunity.EffectiveAgent",
+        "Wanxiangshu.Strength.StrengthOpportunity.EventStoreHealthy",
+        "Wanxiangshu.Strength.StrengthOpportunity.FastPeerAvailable",
+        "Wanxiangshu.Strength.StrengthOpportunity.HasPrefixProbe",
+        "Wanxiangshu.Strength.StrengthOpportunity.HostCanaryHealthy",
+        "Wanxiangshu.Strength.StrengthOpportunity.IsAttachedOrInternalLeaf",
+        "Wanxiangshu.Strength.StrengthOpportunity.IsFallbackRetry",
+        "Wanxiangshu.Strength.StrengthOpportunity.IsReviewerOrFinality",
+        "Wanxiangshu.Strength.StrengthOpportunity.IsRootWork",
+        "Wanxiangshu.Strength.StrengthOpportunity.OwnerCancelled",
+        "Wanxiangshu.Strength.StrengthOpportunity.RequestKind",
+        "Wanxiangshu.Strength.StrengthOpportunity.SelectedAgent",
+        "Wanxiangshu.Strength.StrengthOpportunity.SelectedTier",
+        "Wanxiangshu.Strength.StrengthOpportunity.TargetProviderRunBound",
+        "Wanxiangshu.Strength.StrengthPolicy.controlBucket",
+        "Wanxiangshu.Strength.StrengthPolicy.decideFromFacts",
+        "Wanxiangshu.Strength.StrengthPolicy.eligibility",
+        "Wanxiangshu.Strength.StrengthPolicy.eligibleRoles",
+        "Wanxiangshu.Strength.StrengthPolicy.isControlHoldout",
+        "Wanxiangshu.Strength.StrengthPolicyConfig",
+        "Wanxiangshu.Strength.StrengthPolicyConfig.K1Margin",
+        "Wanxiangshu.Strength.StrengthPolicyConfig.K2Margin",
+        "Wanxiangshu.Strength.StrengthPolicyConfig.K2MinimumEvidence",
+        "Wanxiangshu.Strength.StrengthPrediction",
+        "Wanxiangshu.Strength.StrengthPrediction.EvidenceCount",
+        "Wanxiangshu.Strength.StrengthPrediction.P1",
+        "Wanxiangshu.Strength.StrengthPrediction.P2"
+      ],
+      "justification": "ModelCapacity.BorrowingCapacity publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    }
+  ],
+  "physical_adapters": [
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "ports": [
+        {
+          "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.ToolRuntimeScope",
+            "Wanxiangshu.OpenCode.ToolRuntimeScope.TerminateSession"
+          ]
+        }
+      ],
+      "justification": "action-affordance adapts only the listed foreign symbols at the tool/physical boundary; it owns no provider policy."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/CoderTool.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "ports": [
+        {
+          "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.ToolRuntimeScope",
+            "Wanxiangshu.OpenCode.ToolRuntimeScope.WorkspaceDirectory"
+          ]
+        }
+      ],
+      "justification": "action-affordance adapts only the listed foreign symbols at the tool/physical boundary; it owns no provider policy."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs",
+      "owner": "action-affordance",
+      "node": "opencode-tool-spec-contracts",
+      "ports": [
+        {
+          "path": "src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.ToolRuntimeScope",
+            "Wanxiangshu.OpenCode.ToolRuntimeScope.AttachFamilyRecovery"
+          ]
+        }
+      ],
+      "justification": "action-affordance adapts only the listed foreign symbols at the tool/physical boundary; it owns no provider policy."
+    }
+  ],
+  "composition_roots": [
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/Fact.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Change/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Change.OrchestratorFactCases"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Interaction/Attention/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Interaction.Attention.AttentionFactCases"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Interaction/Concern/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Interaction.Concern.ConcernFactCases"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Review/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Review.ReviewFactCases"
+          ]
+        }
+      ],
+      "justification": "durable-events wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/Fold.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Change/Fold.fs",
+          "symbols": [
+            "Wanxiangshu.Change.OrchestratorFactFold.fold"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Interaction/Attention/Fold.fs",
+          "symbols": [
+            "Wanxiangshu.Interaction.Attention.AttentionFactFold.fold",
+            "Wanxiangshu.Interaction.Attention.AttentionFactFold.foldLearning"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Interaction/Concern/Fold.fs",
+          "symbols": [
+            "Wanxiangshu.Interaction.Concern.ConcernFactFold.fold"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Manager/Life/Facts.fs",
+          "symbols": [
+            "SessionId",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityBlessed",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityRejected",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityRequested",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityReviewerEnlisted",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalitySiblingSteered",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.FinalityUndecided",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.LifeCompleted",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.LifeOpened",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleFact.WorkActivated"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleProjection.empty",
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifecycleProjection.fold"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Obligation/Todo/Facts.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.MagicTodoFact.PrefixRebaseCommittedV2",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.CoveredPrefixDigest",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.CutoffExclusive",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.FrozenRecordPrefixDigest",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.FrozenRecordPrefixRef",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.NextEpochId",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.PreviousEpochId",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SealRoot",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SessionId",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts.PrefixRebaseCommittedV2.SyntheticMessageId"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.fold"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Review/ReviewFactFold.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Review.ReviewFactFold.fold"
+          ]
+        }
+      ],
+      "justification": "durable-events wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Durable/Projection.fs",
+      "owner": "durable-events",
+      "node": "canonical-spine",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Change/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Change.OrchestratorProjection",
+            "Wanxiangshu.Change.OrchestratorProjectionModule.empty"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
+          "symbols": [
+            "Wanxiangshu.Enforcer.Guidance.TipDeliveryProjectionState"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Interaction/Attention/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Interaction.Attention.AttentionProjection.empty",
+            "Wanxiangshu.Interaction.Attention.AttentionProjectionState"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Interaction/Concern/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Interaction.Concern.ConcernProjection.empty",
+            "Wanxiangshu.Interaction.Concern.ConcernProjectionState"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Manager/Life/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Manager.Life.ManagerLifeProjection"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Obligation/Todo/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.MagicTodoProjectionState",
+            "Wanxiangshu.Mission.Obligation.Todo.MagicTodoProjection.empty"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Review/Barrier/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Review.Barrier.ReviewGuardProjection",
+            "Wanxiangshu.Mission.Review.Barrier.ReviewRequirementProjection"
+          ]
+        }
+      ],
+      "justification": "durable-events wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/Binding.fs",
+      "owner": "dispatch-protocol",
+      "node": "composition-turn-cutover",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Composition/Durable/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet",
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet.Sessions",
+            "Wanxiangshu.Composition.Durable.SessionAgentProjection.PromptAuthority"
+          ]
+        }
+      ],
+      "justification": "dispatch-protocol wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    },
+    {
+      "path": "src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs",
+      "owner": "provider-attempt-recovery",
+      "node": "composition-turn-cutover",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Composition/Durable/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet.Fission",
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet.Sessions",
+            "Wanxiangshu.Composition.Durable.SessionAgentProjection.BloggerCycles",
+            "Wanxiangshu.Composition.Durable.SessionAgentProjection.PromptAuthority"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Durable/ProjectionState.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Durable.ProjectionSet.AgentProjections"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Turn/Observation.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Turn.ReconciledTurn",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.AuthorityRootUserMessageId",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.Directory",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.Observation",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.Outcome",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.PhysicalUserMessageId",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.ProviderRun",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.Role",
+            "Wanxiangshu.Composition.Turn.ReconciledTurn.SessionId",
+            "Wanxiangshu.Composition.Turn.ReconciledTurnContext",
+            "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Quiescence",
+            "Wanxiangshu.Composition.Turn.ReconciledTurnContext.Turn"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Turn/Program.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.SnapshotObservation.TurnUnknown",
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnAborted",
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnCompleted",
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnFailed",
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnInProgress",
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.TurnOutcome.TurnNeedsContinuation"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+          "symbols": [
+            "Wanxiangshu.Persistence.Journal.AgentJournal",
+            "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot"
+          ]
+        }
+      ],
+      "justification": "provider-attempt-recovery wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs",
+      "owner": "host-boundary",
+      "node": "opencode-host-signal-bootstrap-cutover",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Composition/Durable/Projection.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet",
+            "Wanxiangshu.Composition.Durable.AgentProjectionSet.Associations"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Durable/ProjectionState.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Durable.ProjectionSet.AgentProjections"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Turn/Binding.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Turn.TurnBinding.Store"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Turn/Observation.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.AuthorityRootUserMessageId",
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.ContinuationMessageIds",
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.Directory",
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.PhysicalUserMessageId",
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.Role",
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.RunId",
+            "Wanxiangshu.Composition.Turn.ActiveRunBinding.SessionId"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Turn/Program.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake",
+            "Wanxiangshu.Composition.Turn.ReconcileProgram.ReconcileWake.RetryWake"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Composition/Turn/Scheduler.fs",
+          "symbols": [
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindActiveRun",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindContinuationUserMessage",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindPhysicalUserMaterial",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.BindUserMessage",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Kick",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.NotifyProjectionChanged",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.Signal",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.SignalIdle",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.StopAndDrain",
+            "Wanxiangshu.Composition.Turn.Reconciler.Scheduler.TryPhysicalUserMessage",
+            "agentRole",
+            "durableUnavailable",
+            "onSnapshot",
+            "projection"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Git/Hook/Dispatcher.fs",
+          "symbols": [
+            "Wanxiangshu.Git.Hook.HookDispatcher.ensure"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Review/OpenCode/HostGuard.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Review.OpenCode.HostReviewGuard.continuationPort"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/OpenCode/Host/HostSessionDeletion.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.HostSessionDeletion.handle"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/OpenCode/Host/HostTurnObserver.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.HostTurnObserver.observe"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution",
+            "Wanxiangshu.OpenCode.ModelRouting.RoutedChatExecution.Superseded",
+            "Wanxiangshu.OpenCode.ModelRouting.chatExecutionAdmission",
+            "Wanxiangshu.OpenCode.ModelRouting.endProviderStep",
+            "Wanxiangshu.OpenCode.ModelRouting.projectRoutedModel",
+            "Wanxiangshu.OpenCode.ModelRouting.releasePhysicalExecution",
+            "Wanxiangshu.OpenCode.ModelRouting.routeChatExecution"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.PluginRuntimeScope",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.ActivateDurability",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.ArmRecovery",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachLoopSensor",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.AttachMessageVisibility",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.BloggerRuntimeHost",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.LoopSensor",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.Strength",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.SyncDelegateRuntime",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackReconcileShutdown",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.TrackSubscription"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Persistence/Journal/AgentJournal.fs",
+          "symbols": [
+            "Wanxiangshu.Persistence.Journal.AgentJournal",
+            "Wanxiangshu.Persistence.Journal.AgentJournalModule.isPoisoned",
+            "Wanxiangshu.Persistence.Journal.AgentJournalModule.snapshot"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Strength/Persistence/DurabilityPort.fs",
+          "symbols": [
+            "Wanxiangshu.Strength.Persistence.StrengthDurabilityPort"
+          ]
+        }
+      ],
+      "justification": "host-boundary wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs",
+      "owner": "host-boundary",
+      "node": "plugin-transforms-composition",
+      "wires": [
+        {
+          "path": "src/Wanxiangshu/Context/Companion/Transform.fs",
+          "symbols": [
+            "Wanxiangshu.Context.Companion.CompanionTransform.applyCompanionForOrdinaryMaterial"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Enforcer/Continuation.fs",
+          "symbols": [
+            "Wanxiangshu.Enforcer.EnforcerContinuation.applyContinuation"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+          "symbols": [
+            "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.interruptAfterSubmittedJudgement"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/OpenCode/Host/PluginRuntimeScope.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.BloggerRuntimeHost",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.CancelSessionChildren",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.RunBackground",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.Sessions",
+            "Wanxiangshu.OpenCode.PluginRuntimeScope.Strength"
+          ]
+        },
+        {
+          "path": "src/Wanxiangshu/OpenCode/Host/SharedState.fs",
+          "symbols": [
+            "Wanxiangshu.OpenCode.SharedState.RootWorkspace"
+          ]
+        }
+      ],
+      "justification": "host-boundary wires only the listed foreign symbols in this composition root; it owns no foreign decision law."
+    }
+  ],
+  "requirement_dependencies": [],
+  "owner_cycle_justifications": [
+    {
+      "owners": [
+        "action-affordance",
+        "attention-regulation",
+        "change-integration",
+        "concern-routing",
+        "dispatch-protocol",
+        "durable-convergence",
+        "durable-events",
+        "execution-model-routing",
+        "finality",
+        "guidance-delivery",
+        "managed-session-lifecycle",
+        "obligation-ledger",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "review-assurance",
+        "review-judgement",
+        "speculative-investigation",
+        "work-record"
+      ],
+      "justification": "These exact owners form the live mutual bridge between canonical durable aggregation and the feature oracles that consume durable facts and projections, then publish decisions and outcomes back into that canonical aggregation path. This records the current SCC rather than permitting new dependencies: exact membership must shrink on cutover, and any removed bridge edge makes the declaration stale."
+    }
+  ]
+}

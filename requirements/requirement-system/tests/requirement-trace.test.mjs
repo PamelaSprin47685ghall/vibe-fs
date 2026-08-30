@@ -13,6 +13,7 @@ import test from 'node:test'
 import { buildTraceGraph, packageOf, scanTestSource, whatHeadings } from '../../../scripts/lib/requirement-trace.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+const REQUIREMENTS = join(ROOT, 'requirements')
 
 test('WHAT[REQUIREMENT-SYSTEM-018] scanner skips strings, comments, and template literals', () => {
   const src = [
@@ -180,7 +181,7 @@ test('WHAT[REQUIREMENT-SYSTEM-018] graph closes exact proof anchors and rejects 
 
 
 test('WHAT[REQUIREMENT-SYSTEM-018] buildTraceGraph classifies orphan / unknown / multi-primary / unproved', () => {
-  const graph = buildTraceGraph(ROOT)
+  const graph = buildTraceGraph(REQUIREMENTS)
   assert.ok(graph.whats.size > 0, 'requirements tree must define WHAT propositions')
   assert.ok(graph.tests.length > 0, 'requirements tree must contain tests')
   for (const t of graph.tests) {

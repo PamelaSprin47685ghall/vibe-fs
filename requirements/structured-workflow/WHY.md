@@ -22,6 +22,7 @@
 - **状态标签仅表达真实事物**：DU（联合类型）与字段仅用于表达封闭的领域词汇、已发生的持久事实或单次函数的返回结果，严禁充当程序计数器。
 - **组合具有结构闭包（Compositional Closure）**：父 workflow 组合子 workflow 时，只能观察子流程的类型化输入、领域结果与能力证明，严禁读取或驱动子流程的内部执行位置。
 - **以可观察效果证明流程**：流程的正确性完全由领域事实、端口交互与最终状态证明，不由内部解释器运行到了哪一步来定义。
+- **依赖必须穿过 owner 海关**：编译引用只说明实现依赖，requirement 引用只说明命题前提；两张图不可混同。跨 owner 的生产依赖必须落到 owner 明确承诺的 published contract、physical port/adapter 或 composition-root wiring。语言层面的 `public`、目录位置和 `Surface.fs` 文件名都不构成授权。
 
 ## 核心不变量与违约状态（RED）
 
@@ -32,3 +33,4 @@
 4. 控制流决策形成第二层及更深的嵌套控制金字塔（lexical pyramid），手写短路样板而未使用标准的 Result/Option 组合子。
 5. 模块接缝处暴露内部阶段或运行槽位，导致父模块需要探测子模块状态以驱动下一步业务动作。
 6. 使用无界并发或无界重试作为业务流程的默认行为。
+7. foreign owner 直接读取 private implementation、Stage/Step/cursor/registry presence，或 composition root 匹配 foreign policy DU。

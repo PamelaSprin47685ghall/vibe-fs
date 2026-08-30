@@ -47,3 +47,11 @@ Protocol-boundary exemption（外部协议边界豁免条件）：若存在外�
 ## STRUCTURED-WORKFLOW-010: 有界循环与有界扇出
 
 所有业务循环与并发扇出必须有界。业务并发扇出必须通过 `Parallel.mapBounded` 进行，明确指定正有限的并发上限、保持输入下标顺序、支持取消传递并在异常时立即拒绝与归还许可。严禁在业务层使用无界并发或无界重试作为默认机制。
+
+## STRUCTURED-WORKFLOW-011: 跨 owner 依赖必须携带显式架构授权
+
+每个 production `.fs` 必须拥有恰一个 primary owner。production source dependency graph 必须由 `.fsproj` 编译集合上的 FCS checked symbol-use 证据独立投影，覆盖 alias、fully-qualified reference、经 `open` 解析的具体符号、pattern 与 type-only use；严禁用生成 JS/TS import、源码词法命中或文件命名猜测代替编译器语义。project symbol 无 declaration location、存在多个 production declaration location、FCS production set 与 `.fsproj` 不一致时必须 fail closed。requirement dependency graph 独立记录命题前提，严禁要求两图一一相等。
+
+跨 owner source edge 只能终止于 provider owner 在 `scripts/checks/published-contracts.json` 中声明的 exact path + exact symbol contract / physical port，或由 physical adapter / composition root 的 exact consumer path + exact target path + exact target symbol wiring 建立。contract 必须列出被授权的 foreign consumer owner；一个文件被登记不授权 sibling symbol，一个 symbol 被登记不授权 sibling consumer。provider contract 必须绑定 provider path 所在的真实 DONE migration node、该 node 已发布 vocabulary 与 executable proof；physical adapter / composition root 必须绑定其 consumer path 所在的真实 DONE node。未 cutover provider 只形成可见 pending edge，不能提前获得完成信用。目录、namespace 前缀、文件名、F# 可见性和 `Surface.fs` 命名均不构成授权。每个声明与 requirement edge 必须携带非空架构理由；禁止 wildcard、baseline、allowlist 与目录 public heuristic。
+
+门禁必须拒绝：unowned/duplicate ownership、missing/ambiguous declaration、foreign private/internal import、未登记 contract、unauthorized symbol/consumer、stale contract/target/cycle declaration、foreign Stage/Step/cursor/registry consumption、composition root 对未发布 foreign DU case 的 policy match，以及没有精确书面理由的 live owner SCC。cycle 只统计 semantic contract；composition root 只允许 construct/wire/order，physical adapter 只允许通过声明的 port edge 收敛物理现实。

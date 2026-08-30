@@ -46,6 +46,14 @@
 
 `scripts/checks/cross-callback-pc.mjs` 守卫异步交互边界，拦截在回调 A 中写入、在回调 B 中读取并用于驱动业务分支的伪 PC 模式（如 `TryTake*`、`IsArmed` 探测），确保回调间传递的是不透明物理能力或不可伪造的许可（permit）。
 
+### 5. Owner contract 与 dependency 门禁（`owner-dependencies`）
+
+`scripts/checks/owner-symbol-uses.fsx` 从仓库固定的 Fable tool manifest 载入同版本 FCS，按 `Wanxiangshu.fsproj` 做一次真实 project check。它只输出带 production declaration location 的具体 symbol use，覆盖 alias、fully-qualified reference、经 `open` 解析的真实符号、pattern 与 type-only use；raw `open`、namespace/module container、definition、same-file 与 framework symbol 不形成依赖。project symbol 缺声明位置、同一 symbol 落到多个 production 文件、FCS production set 与 `.fsproj` 不一致均 fail closed。门禁不读取生成 JS/TS，也没有词法 fallback。
+
+`scripts/checks/owner-dependencies.mjs` 将 FCS file edge 投影到 `semantic-owners.json`。DONE migration node 的 provider edge 立即进入 strict graph；未完成 provider edge 保留为 `pendingEdges`，不能提前登记为已发布 contract。`scripts/checks/published-contracts.json` 只允许 exact path + exact `symbols` / `symbol_roots`：provider contract 明确 consumer owner，physical adapter 与 composition root 明确 consumer file、target file 与 target symbol。每个声明绑定真实 DONE node、该 node 的 published vocabulary、executable proof 与架构理由；stale symbol、stale consumer、stale target、stale SCC justification 均失败。不存在 wildcard、目录 public、文件名 public、baseline 或 allowlist 通道。
+
+cycle 只从已授权 semantic-contract edge 构建；physical adapter 与 composition-root wiring 不伪装成领域依赖。门禁同时拒绝 foreign execution-position vocabulary 与 composition-root 对未发布 foreign DU case 的 pattern match。source graph 与 requirement graph 分别输出、分别验证，只共享 owner identity，不要求边集合相等。
+
 ---
 
 ## 验证与测试落点
@@ -62,3 +70,4 @@
 | STRUCTURED-WORKFLOW-008 | `requirements/structured-workflow/tests/semantic-vocabulary.test.mjs` |
 | STRUCTURED-WORKFLOW-009 | `requirements/structured-workflow/tests/reconcile-program.test.mjs` |
 | STRUCTURED-WORKFLOW-010 | `requirements/structured-workflow/tests/parallel.test.mjs` |
+| STRUCTURED-WORKFLOW-011 | `requirements/structured-workflow/tests/owner-dependencies.test.mjs`; `requirements/structured-workflow/tests/integration/owner-dependencies-fcs.test.mjs` |

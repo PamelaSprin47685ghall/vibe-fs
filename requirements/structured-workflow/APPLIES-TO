@@ -15,4 +15,7 @@
 /scripts/checks/g4r-ce-vocabulary.mjs
 /scripts/checks/test-boundary.mjs
 /scripts/checks/cross-callback-pc.mjs
+/scripts/checks/owner-dependencies.mjs
+/scripts/checks/owner-symbol-uses.fsx
+/scripts/checks/published-contracts.json
 /scripts/lib/walk.mjs
