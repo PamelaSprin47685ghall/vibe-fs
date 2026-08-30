@@ -11,12 +11,35 @@ open Wanxiangshu.Host
 /// semantic tests observe the real policy without touching Fable representation.
 module CompactionPolicySurface =
 
+    let private settingPath (setting: CompactionSetting) = setting.Path |> String.concat "."
+
+    let private verdictToJs (verdict: CompactionGateVerdict) : obj =
+        let message = HostCompactionPolicy.describeVerdict verdict
+
+        match verdict with
+        | CompactionGateVerdict.Satisfied ->
+            box {| kind = "Satisfied"; message = message |}
+        | CompactionGateVerdict.SettingUnavailable setting ->
+            box
+                {| kind = "SettingUnavailable"
+                   path = settingPath setting
+                   required = setting.Required
+                   clause = setting.Clause
+                   reason = setting.Reason
+                   message = message |}
+        | CompactionGateVerdict.CompactedDespiteSettings(session, runs) ->
+            box
+                {| kind = "CompactedDespiteSettings"
+                   session = SessionId.value session
+                   runs = runs
+                   message = message |}
+
     /// Required prevention settings as JSON: `{ path, required, clause, reason }`.
     let requiredSettings () : obj =
         HostCompactionPolicy.requiredSettings
         |> List.map (fun setting ->
             box
-                {| path = setting.Path |> String.concat "."
+                {| path = settingPath setting
                    required = setting.Required
                    clause = setting.Clause
                    reason = setting.Reason |})
@@ -46,22 +69,25 @@ module CompactionPolicySurface =
         | None -> null
 
     /// HOST-006 startup probe verdict as JSON:
-    ///   `{ kind: "Satisfied" }`
-    ///   `{ kind: "SettingUnavailable", path, required, clause, reason }`
-    ///   `{ kind: "CompactedDespiteSettings", session, runs }`
+    ///   `{ kind: "Satisfied", message }`
+    ///   `{ kind: "SettingUnavailable", path, required, clause, reason, message }`
+    ///   `{ kind: "CompactedDespiteSettings", session, runs, message }`
     let judgeFirstTurn (session: string) (pseudoRunsOnFirstTurn: int) : obj =
         HostCompactionPolicy.judgeFirstTurn None (SessionId.create session) pseudoRunsOnFirstTurn
-        |> function
-            | CompactionGateVerdict.Satisfied -> box {| kind = "Satisfied" |}
-            | CompactionGateVerdict.SettingUnavailable setting ->
-                box
-                    {| kind = "SettingUnavailable"
-                       path = setting.Path |> String.concat "."
-                       required = setting.Required
-                       clause = setting.Clause
-                       reason = setting.Reason |}
-            | CompactionGateVerdict.CompactedDespiteSettings(session, runs) ->
-                box
-                    {| kind = "CompactedDespiteSettings"
-                       session = SessionId.value session
-                       runs = runs |}
+        |> verdictToJs
+
+    /// HOST-006 startup verdict when one required setting could not be established.
+    let judgeFirstTurnWithUnavailable
+        (unavailablePath: string)
+        (session: string)
+        (pseudoRunsOnFirstTurn: int)
+        : obj =
+        let unavailable =
+            HostCompactionPolicy.requiredSettings
+            |> List.find (settingPath >> (=) unavailablePath)
+
+        HostCompactionPolicy.judgeFirstTurn
+            (Some unavailable)
+            (SessionId.create session)
+            pseudoRunsOnFirstTurn
+        |> verdictToJs

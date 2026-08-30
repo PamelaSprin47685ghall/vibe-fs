@@ -450,7 +450,7 @@ module EnforcerContinuation =
                 |> Result.requireSome "next Blogger provider step has no physical PromptKey"
 
             do!
-                BloggerCoordinator.stageContinuationContext ctx.Scope ctx.Durable live
+                BloggerCoordinator.materializeContinuationContext ctx.Scope ctx.Durable live
                 |> TaskResult.mapError (fun reason -> "Blogger context materialize failed: " + reason)
 
             do!

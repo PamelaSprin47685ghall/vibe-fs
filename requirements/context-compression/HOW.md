@@ -28,6 +28,25 @@ DEPENDS ON:
 - `semantic-trace`
 - `provider-projection`
 
+## Task 8 final-path closure
+
+`scripts/checks/migration-ledger.json` 的 DONE 节点
+`context-compression-blogger-compaction-keep` 是本包 Blogger/runtime/Host-compaction
+闭包的唯一清单：其中恰有 25 个 final production paths，全部由
+`context-compression` 单一拥有。Host-boundary 与 provider-attempt-recovery 只消费
+compiler-observed contract；`HostCompactionGate`、`HostCompactionObserver`、
+`CompactionPolicy`、`CompactionPolicySurface` 与 `TerminalValidity` 不存在共同 owner。
+本次为 PROVEN-KEEP，没有删除、移动或重命名 production path，因此没有 deleted
+alias、旧 namespace 或兼容 facade。
+
+该节点绑定本包现存全部 24 个 `requirements/context-compression/tests/*.test.mjs`
+proof files，并补充跨包的 crash、Host adapter 与 external-adapter proofs：
+`requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs`、
+`requirements/host-boundary/tests/host-capability-observation.test.mjs`、
+`requirements/effect-accounting/tests/external-adapter-boundary.test.mjs`。因此下表的
+24 条 WHAT 语义与 crash reconciliation、typed park、Host compaction 和 terminal
+validity 证明共同落在同一个 closure 上。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |

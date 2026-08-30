@@ -105,6 +105,14 @@ module CompanionTransform =
         |> List.choose tryMessageRole
         |> List.forall allowsBloggerCompanionForAgentName
 
+    let coordinateBloggerContext
+        (scope: PluginRuntimeScope)
+        (companion: CompanionHost)
+        (journal: AgentJournal option)
+        (context: BloggerRequestContext)
+        : Task<BloggerCoordinator.DecisionEffect> =
+        BloggerCoordinator.onMainContext scope.BloggerRuntimeHost companion journal context
+
     let private updateMaterializedBlogger
         (scope: PluginRuntimeScope)
         (companion: CompanionHost)
@@ -134,7 +142,7 @@ module CompanionTransform =
                 with
                 | None -> return ()
                 | Some context ->
-                    let! _ = BloggerCoordinator.onMainContext scope.BloggerRuntimeHost companion journal context
+                    let! _ = coordinateBloggerContext scope companion journal context
 
                     return ()
         }

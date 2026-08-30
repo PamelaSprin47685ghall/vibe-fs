@@ -1583,6 +1583,129 @@
       ],
       "state": "DONE",
       "result": "PROVEN-KEEP"
+    },
+    {
+      "id": "context-compression-blogger-compaction-keep",
+      "primary_owner": "context-compression",
+      "intent": "Proven-keep closure for the event-driven Blogger domain/runtime, canonical Host compaction policy and adapters, and provider terminal-validity seam.",
+      "files": [
+        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Projection.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Request.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Abandon.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
+        "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
+        "src/Wanxiangshu/Host/CompactionPolicy.fs",
+        "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+        "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
+        "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs"
+      ],
+      "classification": "KEEP",
+      "publishes": [
+        "Context.CompanionContract",
+        "Host.CompactionPolicy",
+        "Provider.TerminalValidity"
+      ],
+      "consumes": [
+        "DurableEvents.Contract",
+        "Context.TraceContract",
+        "SemanticTrace.Contract",
+        "PrefixStability.Contract",
+        "ModelRouting.Contract",
+        "Session.Quiescence"
+      ],
+      "depends_on": [
+        {
+          "id": "canonical-spine",
+          "kind": "contract"
+        },
+        {
+          "id": "context-trace-companion-contract",
+          "kind": "contract"
+        },
+        {
+          "id": "context-compression-companion-core-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "semantic-trace-replayable-contract-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "prefix-stability-cutover",
+          "kind": "contract"
+        },
+        {
+          "id": "model-routing-capacity",
+          "kind": "contract"
+        },
+        {
+          "id": "execution-quiescence",
+          "kind": "contract"
+        }
+      ],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/context-compression/tests/attempt-plan-probe-eligibility.test.mjs",
+        "requirements/context-compression/tests/blog-entry-committed.test.mjs",
+        "requirements/context-compression/tests/blog-projection.test.mjs",
+        "requirements/context-compression/tests/blogger-convergence-gaps.test.mjs",
+        "requirements/context-compression/tests/blogger-delta.test.mjs",
+        "requirements/context-compression/tests/blogger-runtime.test.mjs",
+        "requirements/context-compression/tests/blogger-seal-reactivate.test.mjs",
+        "requirements/context-compression/tests/companion-ordinary-material-surface.test.mjs",
+        "requirements/context-compression/tests/companion-projection.test.mjs",
+        "requirements/context-compression/tests/companion-recovery-slot.test.mjs",
+        "requirements/context-compression/tests/ctx-capacity-observation-forbidden.test.mjs",
+        "requirements/context-compression/tests/ctx-opening-floor.test.mjs",
+        "requirements/context-compression/tests/ctx014.test.mjs",
+        "requirements/context-compression/tests/enforcer-cycle-commit-convergence.test.mjs",
+        "requirements/context-compression/tests/enforcer-cycle-convergence.test.mjs",
+        "requirements/context-compression/tests/enforcer-frame-loader.test.mjs",
+        "requirements/context-compression/tests/enforcer-open-reload.test.mjs",
+        "requirements/context-compression/tests/host-compaction-policy.test.mjs",
+        "requirements/context-compression/tests/injected-context-reanchor.test.mjs",
+        "requirements/context-compression/tests/parked-transform.test.mjs",
+        "requirements/context-compression/tests/probe-selection.test.mjs",
+        "requirements/context-compression/tests/projection-algebra-blogframes.test.mjs",
+        "requirements/context-compression/tests/recovery-slot.test.mjs",
+        "requirements/context-compression/tests/terminal-validity.test.mjs",
+        "requirements/crash-reconciliation/tests/blogger-crash-recovery.test.mjs",
+        "requirements/effect-accounting/tests/external-adapter-boundary.test.mjs",
+        "requirements/host-boundary/tests/host-capability-observation.test.mjs"
+      ],
+      "architecture_gates": [
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs",
+        "cross-callback-pc.mjs",
+        "fsharp-control-pyramid.mjs"
+      ],
+      "closure_evidence": "All 25 final paths are singularly owned by context-compression; Blogger crash, replay, park, compaction, and terminal laws are bound to executable proofs. No path was deleted or renamed, so there are no deleted aliases or legacy final-path references.",
+      "touched_paths": [],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageE",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "PROVEN-KEEP"
     }
   ],
   "debt_face": {
@@ -1621,8 +1744,6 @@
       "src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/GitTree.fs",
       "src/Wanxiangshu/OpenCode/Host/HostBoundarySurface.fs",
-      "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
-      "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
       "src/Wanxiangshu/OpenCode/Host/HostMessageProjection.fs",
       "src/Wanxiangshu/OpenCode/Host/HostSessionContext.fs",
       "src/Wanxiangshu/OpenCode/Host/HostSessionContextSurface.fs",
@@ -1810,26 +1931,6 @@
       "src/Wanxiangshu/Execution/Session/SessionStartedAtProjection.fs"
     ],
     "CoverageE": [
-      "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/DeltaSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/FrameSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Projection.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Request.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Abandon.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleSurface.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
-      "src/Wanxiangshu/Context/Companion/Blogger/TomlSurface.fs",
       "src/Wanxiangshu/Enforcer/BlogSurface.fs",
       "src/Wanxiangshu/Enforcer/Catalog.fs",
       "src/Wanxiangshu/Enforcer/ChronicleExecution.fs",
@@ -1874,7 +1975,6 @@
       "src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Workflow.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/Planner.fs",
       "src/Wanxiangshu/Participant/Provider/Attempt/RecoverySlot.fs",
-      "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",
       "src/Wanxiangshu/Participant/Provider/Language.fs",
       "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
@@ -1918,8 +2018,6 @@
       "src/Wanxiangshu/Foundation/SyntheticTomlSurface.fs",
       "src/Wanxiangshu/Foundation/TaskResult.fs",
       "src/Wanxiangshu/Foundation/Temporal.fs",
-      "src/Wanxiangshu/Host/CompactionPolicy.fs",
-      "src/Wanxiangshu/Host/Contract/CompactionPolicySurface.fs",
       "src/Wanxiangshu/Host/Contract/ToolResultBound.fs",
       "src/Wanxiangshu/Host/Digest.fs",
       "src/Wanxiangshu/Host/Fact.fs",

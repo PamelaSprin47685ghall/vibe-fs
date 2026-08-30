@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Context.Companion
 
-open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion.Blogger
@@ -8,7 +7,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
@@ -370,59 +368,6 @@ module CompressionSurface =
         | BloggerTerminalRequestOwnership.Current -> "Current"
         | BloggerTerminalRequestOwnership.Superseded -> "Superseded"
         | BloggerTerminalRequestOwnership.Unproven -> "Unproven"
-
-    let compactionSettingPaths: string array =
-        HostCompactionPolicy.requiredSettings
-        |> List.map (fun setting -> String.concat "." setting.Path)
-        |> List.toArray
-
-    let compactionSettings: obj array =
-        HostCompactionPolicy.requiredSettings
-        |> List.map (fun setting ->
-            box
-                {| path = String.concat "." setting.Path
-                   required = setting.Required
-                   clause = setting.Clause
-                   reason = setting.Reason |})
-        |> List.toArray
-
-    let compactionAutoContinueEnabled = HostCompactionPolicy.autoContinueEnabled
-
-    let compactionJudgeFirstTurn (value: obj) : obj =
-        let unavailable =
-            if isNullish value?unavailable then
-                None
-            else
-                HostCompactionPolicy.requiredSettings
-                |> List.tryFind (fun setting -> String.concat "." setting.Path = text value?unavailable)
-
-        let verdict =
-            HostCompactionPolicy.judgeFirstTurn
-                unavailable
-                (SessionId.create (text value?session))
-                (intValue value?pseudoRuns)
-
-        let name, message =
-            match verdict with
-            | CompactionGateVerdict.Satisfied -> "Satisfied", HostCompactionPolicy.describeVerdict verdict
-            | CompactionGateVerdict.SettingUnavailable _ ->
-                "SettingUnavailable", HostCompactionPolicy.describeVerdict verdict
-            | CompactionGateVerdict.CompactedDespiteSettings _ ->
-                "CompactedDespiteSettings", HostCompactionPolicy.describeVerdict verdict
-
-        box {| name = name; message = message |}
-
-    let compactionIsContainable (isCompaction: bool) : bool =
-        HostCompactionPolicy.isContainableCompaction isCompaction
-
-    let compactionNextReanchor (observed: string array) (reanchored: string array) : obj =
-        let handled =
-            reanchored |> Array.toList |> List.map ProviderRunIdentity.create |> Set.ofList
-
-        HostCompactionPolicy.nextReanchor (observed |> Array.toList |> List.map ProviderRunIdentity.create) (fun run ->
-            Set.contains run handled)
-        |> Option.map ProviderRunIdentity.value
-        |> optionObj
 
     let diagnosticEmit (operation: string) (fields: obj array) : unit =
         let pairs =

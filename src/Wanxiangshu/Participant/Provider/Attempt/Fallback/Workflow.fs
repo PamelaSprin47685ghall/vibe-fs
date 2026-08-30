@@ -259,7 +259,7 @@ module ProviderRecoveryWorkflow =
             let! outcome =
                 taskResult {
                     do!
-                        BloggerCoordinator.stageContinuationContext scope durable ctx
+                        BloggerCoordinator.materializeContinuationContext scope durable ctx
                         |> TaskResult.mapError BloggerContinuationFailure.Materialize
 
                     let! promptKey =

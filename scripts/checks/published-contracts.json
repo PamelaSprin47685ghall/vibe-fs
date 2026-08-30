@@ -557,6 +557,372 @@
       "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
     },
     {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/BloggerCrashRecovery.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "dispatch-protocol"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.AbandonedUnsent",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.AlreadyLive",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.PendingMaterial",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.ReceiptedIdle",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.Recommitted",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.RestoredInFlight",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.Superseded",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.WindowOutcome.Unreadable",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerCrashRecovery.reconcile"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/ContextFactFold.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "durable-events"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.ContextFactFold.fold"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Delta.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaChunk",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaChunk.Items",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaChunk.NextCoverableTurnCutoffExclusive",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaChunk.NextCursor",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaChunk.Toml",
+        "Wanxiangshu.Context.Companion.Blogger.SemanticCursor",
+        "Wanxiangshu.Context.Companion.Blogger.SemanticCursor.PartIndex",
+        "Wanxiangshu.Context.Companion.Blogger.SemanticCursor.TurnIndex"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/ItemWire.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "provider-projection"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaItemWireModule.tryListOfJs"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainContext.fromJournal"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/OpenCode/PluginScope.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope",
+        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.BeginShutdown",
+        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.Dispose",
+        "Wanxiangshu.Context.Companion.Blogger.OpenCode.PluginBloggerScope.DropDrainWindow"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Projection.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "durable-events",
+        "participant-horizon",
+        "prefix-stability",
+        "provider-attempt-recovery",
+        "review-judgement",
+        "speculative-investigation",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BlogCoverage.CoverableFrameCount",
+        "Wanxiangshu.Context.Companion.Blogger.BlogCoverage.CoverableTurnCutoffExclusive",
+        "Wanxiangshu.Context.Companion.Blogger.BlogCoverage.CoveredPrefixDigest",
+        "Wanxiangshu.Context.Companion.Blogger.BlogCoverage.IngestedThroughSequence",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrame",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrame.CoveredFromSequence",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrame.CoveredThroughSequence",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrame.Digest",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrame.Kind",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrame.TextRef",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrameKind",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrameKind.Entry",
+        "Wanxiangshu.Context.Companion.Blogger.BlogFrameKind.Squash",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.applyEntry",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.applySquash",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.coverableFrames",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.empty",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.frameCount",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.frames",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjection.hasCoverage",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjectionState",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjectionState.Coverage",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjectionState.FrameEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.BlogProjectionState.Frames"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Request.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "host-boundary",
+        "provider-attempt-recovery",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.BloggerSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.DeltaDigest",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.FrameEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.Items",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.MainSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.NextCoverableTurnCutoffExclusive",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.NextCoveredPrefixDigest",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.NextIngestedThroughSequence",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.ObservedPrefixEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.PreviousCoverableTurnCutoffExclusive",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.PreviousIngestedThroughSequence",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.RequestId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerMainRequestContext.Toml",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext.Main",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerRequestContext.Squash",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerRequestContextModule.mainSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerRequestContextModule.requestId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerRequestOwnership.decide",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.BloggerSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.CoveredFrameCount",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.FrameDigests",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.FrameEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.MainSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.ObservedPrefixEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerSquashRequestContext.RequestId",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerTerminalParentEvidence.IsRequestScopedRepair",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerTerminalParentEvidence.PromptKey",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership.Current",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership.Superseded",
+        "Wanxiangshu.Context.Companion.Blogger.BloggerTerminalRequestOwnership.Unproven"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Abandon.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerAbandon.openRequest"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Coordinator.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "host-boundary",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.MaterializeFailed",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.NoMaterial",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.OfferedParked",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.Sealed",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.SkippedInFlight",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.StartFailed",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.Started",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.DecisionEffect.StartedSquash",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.abandonContinuationContext",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.bindContinuationContext",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.materializeContinuationContext",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCoordinator.reactivateAfterNewRoot"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/CycleProjection.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "durable-events",
+        "managed-session-lifecycle",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCycleProjection.tryOpenByBlogger",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCycleProjection.tryReceipt",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCycleProjectionState",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCycleProjectionState.OpenByRequestId",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerCycleReceipt.Kind",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.BloggerSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.ContextDigest",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.ContextRef",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.FrameEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.MainSessionId",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.NextIngestedThroughSequence",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.ObservedPrefixEpochId",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.PreviousIngestedThroughSequence",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.PromptKey",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.RequestId",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.RequestKind",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.OpenBloggerRequest.SelectedFrameDigests"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/Host.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.ProducerSettlement",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.ProducerSettlement.Abandoned",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.ProducerSettlement.Cancelled",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.ProducerSettlement.Committed",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.ProducerSettlement.NoOpenProducer",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.awaitOpenProducerSettlement",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.blocksNew",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.forceSealCellDropOffer",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.forceSealRuntime",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.requireCurrentRequest",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.requireReleaseCurrentRequest",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerRuntimeHost.requireReleaseObservedCurrentRequest"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/ParkedTransform.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "behavior-diagnosis",
+        "capability-enforcement",
+        "dispatch-protocol",
+        "host-boundary",
+        "managed-session-lifecycle",
+        "provider-attempt-recovery",
+        "review-assurance"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerMaterializationAdmission",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.CancelParked",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.Cancellation",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.HasFlight",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.IsDrainOpen",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.ParkTransform",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.TryPeekCurrentRequest",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.IBloggerRuntimeHost.TryTakePendingOffer",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.ParkWake",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.ParkWake.Cancelled",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.ParkWake.MaterialAvailable"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Runtime/State.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery.AabbRepairIssued",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery.InteractionNudgeIssued",
+        "Wanxiangshu.Context.Companion.Blogger.Runtime.BloggerToolRecovery.NoRecovery"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Companion/Blogger/Toml.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "provider-projection"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.Blogger.BloggerDeltaItem"
+      ],
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
       "path": "src/Wanxiangshu/Context/Companion/Builder.fs",
       "owner": "context-compression",
       "node": "context-trace-companion-contract",
@@ -723,6 +1089,20 @@
       "justification": "Context.CompanionContract publishes the concrete journal-backed Companion port only to final host composition."
     },
     {
+      "path": "src/Wanxiangshu/Context/Companion/Model.fs",
+      "owner": "context-compression",
+      "node": "context-trace-companion-contract",
+      "contract": "Context.CompanionContract",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Companion.ICompanionDurablePort"
+      ],
+      "justification": "Context.CompanionContract publishes the companion durability port to host-boundary for final plugin composition; companion persistence policy remains private to context-compression."
+    },
+    {
       "path": "src/Wanxiangshu/Context/Companion/Projection.fs",
       "owner": "context-compression",
       "node": "context-compression-companion-core-cutover",
@@ -760,32 +1140,359 @@
       "justification": "Context.CompanionContract publishes exact prompt keys and render operations observed by prefix and recovery owners; JS proof exports are excluded."
     },
     {
-      "path": "src/Wanxiangshu/Context/Companion/Model.fs",
-      "owner": "context-compression",
-      "node": "context-trace-companion-contract",
-      "contract": "Context.CompanionContract",
-      "kind": "published-contract",
-      "consumers": [
-        "host-boundary"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Companion.ICompanionDurablePort"
-      ],
-      "justification": "Context.CompanionContract publishes the companion durability port to host-boundary for final plugin composition; companion persistence policy remains private to context-compression."
-    },
-    {
       "path": "src/Wanxiangshu/Context/Companion/Transform.fs",
       "owner": "context-compression",
       "node": "context-trace-companion-contract",
       "contract": "Context.CompanionContract",
       "kind": "published-contract",
       "consumers": [
+        "host-boundary",
         "output-distillation"
       ],
       "symbols": [
-        "Wanxiangshu.Context.Companion.CompanionTransform.allowsBloggerCompanionForAgentName"
+        "Wanxiangshu.Context.Companion.CompanionTransform.allowsBloggerCompanionForAgentName",
+        "Wanxiangshu.Context.Companion.CompanionTransform.coordinateBloggerContext"
       ],
-      "justification": "Context.CompanionContract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to context-compression."
+      "justification": "Context.CompanionContract publishes exactly the compiler-observed owner operations to the listed production owners; every unlisted sibling remains private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-003]",
+      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+      "consumers": [
+        "capability-enforcement",
+        "context-compression",
+        "delegation",
+        "durable-events",
+        "execution-model-routing",
+        "interaction-authority",
+        "obligation-ledger",
+        "provider-attempt-recovery",
+        "provider-projection",
+        "speculative-investigation"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.PrefixProbe",
+        "Wanxiangshu.Context.Prefix.PrefixProbe.BasedOnEpochId",
+        "Wanxiangshu.Context.Prefix.PrefixProbe.Candidate",
+        "Wanxiangshu.Context.Prefix.PrefixProbe.ProbeId",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.CoveredPrefixDigest",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.CutoffExclusive",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixDigest",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixRef",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.SealRoot",
+        "Wanxiangshu.Context.Prefix.PrefixSnapshot.SyntheticMessageId",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerMain",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerSquash",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.InteractionRepair",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.StrengthReplica",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKind.WorkMain",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.clearsFailureCountOnSuccess",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.label",
+        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.mayCarryProbe",
+        "Wanxiangshu.Context.Prefix.XProjectionChoice",
+        "Wanxiangshu.Context.Prefix.XProjectionChoice.UseCommittedEpoch",
+        "Wanxiangshu.Context.Prefix.XProjectionChoice.UsePrefixProbe"
+      ],
+      "justification": "PrefixStability.Contract publishes the observed candidate identity and request-kind symbols to the listed production consumers; the cutover node binds their PREFIX-STABILITY vocabulary and proofs, and every unlisted sibling remains private to prefix-stability."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Epoch.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-002]",
+      "proof": "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
+      "consumers": [
+        "context-compression",
+        "durable-events",
+        "provider-attempt-recovery",
+        "semantic-trace"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch",
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.EpochId",
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.ReanchoredRuns",
+        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.Snapshot",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.applyReanchor",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.applyRebase",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.empty",
+        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.isReanchored",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CandidateNotNew",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CompactionAlreadyReanchored",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CutoffRetreated",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.NonSequentialPrefixEpoch",
+        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.StalePrefixEpoch"
+      ],
+      "justification": "PrefixStability.Contract publishes the observed epoch state and fold decisions to context compression and durable aggregation; the cutover node binds the epoch proof and vocabulary."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-009]",
+      "proof": "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
+      "consumers": [
+        "context-compression",
+        "execution-model-routing",
+        "provider-attempt-recovery"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.NoCandidateReason",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.CoverageNotAheadOfRequest",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.CutoffProofFailed",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.NoCoverage",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.NotNewerThanCommitted",
+        "Wanxiangshu.Context.Prefix.NoCandidateReason.WouldRetreat"
+      ],
+      "justification": "PrefixStability.Contract publishes only the typed probe refusal vocabulary observed by attempt planning; the selector remains inside prefix-stability and the cutoff proof is bound to the cutover node."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-003]",
+      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
+      "consumers": [
+        "provider-projection"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts",
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ContainsTodoWrite",
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ToolCallIds",
+        "Wanxiangshu.Context.Prefix.XPrefixProjection.retainTodoWriteRounds"
+      ],
+      "justification": "PrefixStability.Contract publishes the observed prefix projection decisions and todo-round retention predicate to provider projection; the attempt-plan proof is bound to the cutover node."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Prefix/Wire.fs",
+      "owner": "prefix-stability",
+      "node": "prefix-stability-cutover",
+      "contract": "PrefixStability.Contract",
+      "kind": "published-contract",
+      "law": "WHAT[PREFIX-STABILITY-001]",
+      "proof": "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs",
+      "consumers": [
+        "host-boundary",
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Prefix.PrefixPresentationHorizon",
+        "Wanxiangshu.Context.Prefix.PrefixPresentationHorizon.Current",
+        "Wanxiangshu.Context.Prefix.XWire.applyTransform",
+        "Wanxiangshu.Context.Prefix.XWire.reconcileAttempt"
+      ],
+      "justification": "PrefixStability.Contract publishes the exact X-wire orchestration entry points and Current presentation horizon observed by Host composition; all other decisions remain inside prefix-stability."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Capture.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "dispatch-protocol",
+        "finality",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "obligation-ledger",
+        "review-judgement",
+        "speculative-investigation",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureLastWordsWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureOpeningWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureObservedMessagesWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureProjectionWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalBlobWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalTextWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalWithReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCapture.stableCaptureEligibility",
+        "Wanxiangshu.Context.Trace.XTraceCaptureError",
+        "Wanxiangshu.Context.Trace.XTraceCaptureError.Refused",
+        "Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed",
+        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt",
+        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt.CurrentHead",
+        "Wanxiangshu.Context.Trace.XTraceMessageCapture.Current",
+        "Wanxiangshu.Context.Trace.XTraceMessageObservation.HostMessageId",
+        "Wanxiangshu.Context.Trace.XTraceMessageObservation.Message",
+        "Wanxiangshu.Context.Trace.XTraceMessageObservation.Origin",
+        "Wanxiangshu.Context.Trace.XTraceStableCaptureEligibility",
+        "Wanxiangshu.Context.Trace.XTraceStableCaptureEligibility.Eligible"
+      ],
+      "justification": "SemanticTrace.Contract publishes typed capture decisions, failures, and receipts implemented at the append owner; raw projection mutation does not cross the contract."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "semantic-evidence",
+      "law": "WHAT[SEMANTIC-TRACE-003]",
+      "proof": "requirements/semantic-trace/tests/x-trace.test.mjs",
+      "consumers": [
+        "behavior-diagnosis",
+        "context-compression",
+        "delegation",
+        "durable-events",
+        "finality",
+        "obligation-ledger",
+        "prefix-stability",
+        "review-assurance",
+        "review-judgement",
+        "speculative-investigation",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.RecordCoverage",
+        "Wanxiangshu.Context.Trace.RecordCoverageModule.create",
+        "Wanxiangshu.Context.Trace.RecordCoverageModule.ingestedThrough",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.AssignmentText",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.AuthoritativeRequirements",
+        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.ConstitutiveBody",
+        "Wanxiangshu.Context.Trace.XTraceCursor",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.create",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.isAfter",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.isAtOrAfter",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.isBefore",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.nextCursor",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.originCursor",
+        "Wanxiangshu.Context.Trace.XTraceCursorModule.sequence",
+        "Wanxiangshu.Context.Trace.XTraceRange",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.create",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.endExclusive",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.isEmpty",
+        "Wanxiangshu.Context.Trace.XTraceRangeModule.startInclusive"
+      ],
+      "justification": "SemanticTrace.Contract publishes opaque cursor, coverage, and half-open range operations; record representation fields remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Materialization.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "context-compression",
+        "prefix-stability",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.currentProjection",
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.empty",
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.renderRange",
+        "Wanxiangshu.Context.Trace.XTraceMaterialization.renderWorkRecordRange"
+      ],
+      "justification": "SemanticTrace.Contract publishes canonical current-generation and bounded WorkRecord materialization; blob/ref decoding remains in the trace owner."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/Projection.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "context-compression",
+        "delegation",
+        "durable-events",
+        "finality",
+        "host-boundary",
+        "obligation-ledger",
+        "prefix-stability",
+        "review-judgement",
+        "speculative-investigation",
+        "work-record"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection",
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection.CursorNotAfterHead",
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection.OpeningAlreadyCaptured",
+        "Wanxiangshu.Context.Trace.XTraceFoldRejection.TerminalAlreadyCaptured",
+        "Wanxiangshu.Context.Trace.XTraceProjection.applyOpening",
+        "Wanxiangshu.Context.Trace.XTraceProjection.applyPart",
+        "Wanxiangshu.Context.Trace.XTraceProjection.applyTerminal",
+        "Wanxiangshu.Context.Trace.XTraceProjection.currentGenerationSemanticParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.empty",
+        "Wanxiangshu.Context.Trace.XTraceProjection.frontierAfter",
+        "Wanxiangshu.Context.Trace.XTraceProjection.headCursor",
+        "Wanxiangshu.Context.Trace.XTraceProjection.hostMessageIdsBeforeTurn",
+        "Wanxiangshu.Context.Trace.XTraceProjection.hasSemanticParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.latestPartCursor",
+        "Wanxiangshu.Context.Trace.XTraceProjection.latestTerminalEvidence",
+        "Wanxiangshu.Context.Trace.XTraceProjection.openingEvidence",
+        "Wanxiangshu.Context.Trace.XTraceProjection.orderedSemanticParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.partKinds",
+        "Wanxiangshu.Context.Trace.XTraceProjection.providerRunParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.rangeFrom",
+        "Wanxiangshu.Context.Trace.XTraceProjection.rangeOfPart",
+        "Wanxiangshu.Context.Trace.XTraceProjection.semanticCursorAfterCoverage",
+        "Wanxiangshu.Context.Trace.XTraceProjection.slice",
+        "Wanxiangshu.Context.Trace.XTraceProjection.terminalEvidenceForProviderRun",
+        "Wanxiangshu.Context.Trace.XTraceProjection.toolPartsForHostIdentity",
+        "Wanxiangshu.Context.Trace.XTraceProjection.toolResultParts",
+        "Wanxiangshu.Context.Trace.XTraceProjection.tryContiguousHostRange",
+        "Wanxiangshu.Context.Trace.XTraceProjection.tryOpeningHostMessageId",
+        "Wanxiangshu.Context.Trace.XTraceProjection.tryTurnOfHostMessageId",
+        "Wanxiangshu.Context.Trace.XTraceProjectionState",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Cursor",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Generation",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.HostToolPartId",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Kind",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.PartIndex",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Provenance",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Role",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.TextDigest",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.TextRef",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.ToolCallId",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.ToolName",
+        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Turn",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.Frontier",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.ProviderRun",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextDigest",
+        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextRef"
+      ],
+      "justification": "SemanticTrace.Contract publishes the opaque projection plus copied semantic/opening/terminal evidence and owner queries; append storage fields and raw refs remain private."
+    },
+    {
+      "path": "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
+      "owner": "semantic-trace",
+      "node": "semantic-trace-replayable-contract-cutover",
+      "contract": "SemanticTrace.Contract",
+      "kind": "published-contract",
+      "consumers": [
+        "finality",
+        "intra-participant-parallelism",
+        "provider-attempt-recovery",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Context.Trace.TerminalReporter.completeWithEvidence",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.CaptureFailed",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.Published",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.RejectedEmptyOutput",
+        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.RejectedMissingRole"
+      ],
+      "justification": "SemanticTrace.Contract publishes one typed terminal completion operation; tuple projection and event-port mechanics remain owner implementation details."
     },
     {
       "path": "src/Wanxiangshu/Enforcer/Guidance/DeliveryProjection.fs",
@@ -1043,6 +1750,20 @@
         "Wanxiangshu.Git.GitSubject.revParseHeadTree"
       ],
       "justification": "Git.Gateway publishes exactly these symbols to the listed owners; every unlisted sibling remains private to change-integration."
+    },
+    {
+      "path": "src/Wanxiangshu/Host/CompactionPolicy.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Host.CompactionPolicy",
+      "kind": "published-contract",
+      "consumers": [
+        "managed-session-lifecycle"
+      ],
+      "symbols": [
+        "Wanxiangshu.Host.CompactionSetting"
+      ],
+      "justification": "Host.CompactionPolicy publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
     {
       "path": "src/Wanxiangshu/Interaction/Attention/Facts.fs",
@@ -1743,6 +2464,21 @@
       "justification": "Review.Judgement.Workflow publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
     },
     {
+      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
+      "owner": "review-judgement",
+      "node": "mission-review-judgement-keep",
+      "contract": "Review.JudgeTool",
+      "kind": "published-contract",
+      "consumers": [
+        "capability-enforcement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.admission",
+        "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.spec"
+      ],
+      "justification": "Review.JudgeTool publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
+    },
+    {
       "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgementInbox.fs",
       "owner": "review-assurance",
       "node": "review-assurance-witness-contract",
@@ -1759,21 +2495,6 @@
         "Wanxiangshu.Mission.Review.OpenCode.ReviewJudgementInbox.tryDeliver"
       ],
       "justification": "Review.Witness publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-assurance."
-    },
-    {
-      "path": "src/Wanxiangshu/Mission/Review/OpenCode/JudgeTool.fs",
-      "owner": "review-judgement",
-      "node": "mission-review-judgement-keep",
-      "contract": "Review.JudgeTool",
-      "kind": "published-contract",
-      "consumers": [
-        "capability-enforcement"
-      ],
-      "symbols": [
-        "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.admission",
-        "Wanxiangshu.Mission.Review.OpenCode.JudgeTool.spec"
-      ],
-      "justification": "Review.JudgeTool publishes exactly these symbols to the listed owners; every unlisted sibling remains private to review-judgement."
     },
     {
       "path": "src/Wanxiangshu/Mission/Review/OpenCode/TerminalAwait.fs",
@@ -1901,6 +2622,36 @@
         "Wanxiangshu.OpenCode.ChatParamsHook.create"
       ],
       "justification": "ModelRouting.Contract publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostCompactionGate.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Host.CompactionPolicy",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.HostCompactionGate.enforceSettings",
+        "Wanxiangshu.OpenCode.HostCompactionGate.onCompactionAutoContinue",
+        "Wanxiangshu.OpenCode.HostCompactionGate.onSessionCompacting"
+      ],
+      "justification": "Host.CompactionPolicy publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
+    },
+    {
+      "path": "src/Wanxiangshu/OpenCode/Host/HostCompactionObserver.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Host.CompactionPolicy",
+      "kind": "published-contract",
+      "consumers": [
+        "host-boundary"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.HostCompactionObserver.observe"
+      ],
+      "justification": "Host.CompactionPolicy publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
     {
       "path": "src/Wanxiangshu/OpenCode/Host/ModelRouting.fs",
@@ -2339,6 +3090,21 @@
         "Wanxiangshu.OpenCode.ToolRuntimeScope.WorkspaceDirectory"
       ],
       "justification": "The action-affordance adapters consume only these exact process runtime capabilities at the physical tool boundary; session lifecycle policy remains private to managed-session-lifecycle."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",
+      "owner": "context-compression",
+      "node": "context-compression-blogger-compaction-keep",
+      "contract": "Provider.TerminalValidity",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.Attempt.TerminalValidity.check",
+        "Wanxiangshu.Participant.Provider.Attempt.TerminalValidity.describe"
+      ],
+      "justification": "Provider.TerminalValidity publishes exactly the compiler-observed symbols required by the listed production owners; unlisted symbols remain private to context-compression."
     },
     {
       "path": "src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs",
@@ -3080,315 +3846,6 @@
         "Wanxiangshu.Strength.StrengthPrediction.P2"
       ],
       "justification": "ModelCapacity.BorrowingCapacity publishes exactly these symbols to the listed owners; every unlisted sibling remains private to execution-model-routing."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/Candidate.fs",
-      "owner": "prefix-stability",
-      "node": "prefix-stability-cutover",
-      "contract": "PrefixStability.Contract",
-      "kind": "published-contract",
-      "law": "WHAT[PREFIX-STABILITY-003]",
-      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
-      "consumers": [
-        "capability-enforcement",
-        "context-compression",
-        "delegation",
-        "durable-events",
-        "execution-model-routing",
-        "interaction-authority",
-        "obligation-ledger",
-        "provider-attempt-recovery",
-        "provider-projection",
-        "speculative-investigation"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Prefix.PrefixProbe",
-        "Wanxiangshu.Context.Prefix.PrefixProbe.BasedOnEpochId",
-        "Wanxiangshu.Context.Prefix.PrefixProbe.Candidate",
-        "Wanxiangshu.Context.Prefix.PrefixProbe.ProbeId",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot.CoveredPrefixDigest",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot.CutoffExclusive",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixDigest",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot.FrozenRecordPrefixRef",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot.SealRoot",
-        "Wanxiangshu.Context.Prefix.PrefixSnapshot.SyntheticMessageId",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerMain",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.BloggerSquash",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.InteractionRepair",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.StrengthReplica",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKind.WorkMain",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.clearsFailureCountOnSuccess",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.label",
-        "Wanxiangshu.Context.Prefix.ProviderRequestKindModule.mayCarryProbe",
-        "Wanxiangshu.Context.Prefix.XProjectionChoice",
-        "Wanxiangshu.Context.Prefix.XProjectionChoice.UseCommittedEpoch",
-        "Wanxiangshu.Context.Prefix.XProjectionChoice.UsePrefixProbe"
-      ],
-      "justification": "PrefixStability.Contract publishes the observed candidate identity and request-kind symbols to the listed production consumers; the cutover node binds their PREFIX-STABILITY vocabulary and proofs, and every unlisted sibling remains private to prefix-stability."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/Epoch.fs",
-      "owner": "prefix-stability",
-      "node": "prefix-stability-cutover",
-      "contract": "PrefixStability.Contract",
-      "kind": "published-contract",
-      "law": "WHAT[PREFIX-STABILITY-002]",
-      "proof": "requirements/prefix-stability/tests/prefix-epoch.test.mjs",
-      "consumers": [
-        "context-compression",
-        "durable-events",
-        "provider-attempt-recovery",
-        "semantic-trace"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch",
-        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.EpochId",
-        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.ReanchoredRuns",
-        "Wanxiangshu.Context.Prefix.ActivePrefixEpoch.Snapshot",
-        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.applyReanchor",
-        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.applyRebase",
-        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.empty",
-        "Wanxiangshu.Context.Prefix.PrefixEpochProjection.isReanchored",
-        "Wanxiangshu.Context.Prefix.PrefixFoldRejection",
-        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CandidateNotNew",
-        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CompactionAlreadyReanchored",
-        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.CutoffRetreated",
-        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.NonSequentialPrefixEpoch",
-        "Wanxiangshu.Context.Prefix.PrefixFoldRejection.StalePrefixEpoch"
-      ],
-      "justification": "PrefixStability.Contract publishes the observed epoch state and fold decisions to context compression and durable aggregation; the cutover node binds the epoch proof and vocabulary."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/ProbeSelection.fs",
-      "owner": "prefix-stability",
-      "node": "prefix-stability-cutover",
-      "contract": "PrefixStability.Contract",
-      "kind": "published-contract",
-      "law": "WHAT[PREFIX-STABILITY-009]",
-      "proof": "requirements/prefix-stability/tests/projection-algebra-step5-digest.test.mjs",
-      "consumers": [
-        "context-compression",
-        "execution-model-routing",
-        "provider-attempt-recovery"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Prefix.NoCandidateReason",
-        "Wanxiangshu.Context.Prefix.NoCandidateReason.CoverageNotAheadOfRequest",
-        "Wanxiangshu.Context.Prefix.NoCandidateReason.CutoffProofFailed",
-        "Wanxiangshu.Context.Prefix.NoCandidateReason.NoCoverage",
-        "Wanxiangshu.Context.Prefix.NoCandidateReason.NotNewerThanCommitted",
-        "Wanxiangshu.Context.Prefix.NoCandidateReason.WouldRetreat"
-      ],
-      "justification": "PrefixStability.Contract publishes only the typed probe refusal vocabulary observed by attempt planning; the selector remains inside prefix-stability and the cutoff proof is bound to the cutover node."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/Projection.fs",
-      "owner": "prefix-stability",
-      "node": "prefix-stability-cutover",
-      "contract": "PrefixStability.Contract",
-      "kind": "published-contract",
-      "law": "WHAT[PREFIX-STABILITY-003]",
-      "proof": "requirements/prefix-stability/tests/attempt-plan-prefix.test.mjs",
-      "consumers": [
-        "provider-projection"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts",
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ContainsTodoWrite",
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.RawPrefixMessageFacts.ToolCallIds",
-        "Wanxiangshu.Context.Prefix.XPrefixProjection.retainTodoWriteRounds"
-      ],
-      "justification": "PrefixStability.Contract publishes the observed prefix projection decisions and todo-round retention predicate to provider projection; the attempt-plan proof is bound to the cutover node."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Prefix/Wire.fs",
-      "owner": "prefix-stability",
-      "node": "prefix-stability-cutover",
-      "contract": "PrefixStability.Contract",
-      "kind": "published-contract",
-      "law": "WHAT[PREFIX-STABILITY-001]",
-      "proof": "requirements/prefix-stability/tests/xwire-transform-surface.test.mjs",
-      "consumers": [
-        "host-boundary",
-        "managed-session-lifecycle"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Prefix.PrefixPresentationHorizon",
-        "Wanxiangshu.Context.Prefix.PrefixPresentationHorizon.Current",
-        "Wanxiangshu.Context.Prefix.XWire.applyTransform",
-        "Wanxiangshu.Context.Prefix.XWire.reconcileAttempt"
-      ],
-      "justification": "PrefixStability.Contract publishes the exact X-wire orchestration entry points and Current presentation horizon observed by Host composition; all other decisions remain inside prefix-stability."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/Cursor.fs",
-      "owner": "semantic-trace",
-      "node": "semantic-trace-replayable-contract-cutover",
-      "contract": "SemanticTrace.Contract",
-      "kind": "semantic-evidence",
-      "law": "WHAT[SEMANTIC-TRACE-003]",
-      "proof": "requirements/semantic-trace/tests/x-trace.test.mjs",
-      "consumers": [
-        "behavior-diagnosis", "context-compression", "delegation", "durable-events", "finality", "obligation-ledger",
-        "prefix-stability", "review-assurance", "review-judgement", "speculative-investigation", "work-record"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Trace.RecordCoverage",
-        "Wanxiangshu.Context.Trace.RecordCoverageModule.create",
-        "Wanxiangshu.Context.Trace.RecordCoverageModule.ingestedThrough",
-        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence",
-        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.AssignmentText",
-        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.AuthoritativeRequirements",
-        "Wanxiangshu.Context.Trace.XTraceOpeningEvidence.ConstitutiveBody",
-        "Wanxiangshu.Context.Trace.XTraceCursor",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.create",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.isAfter",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.isAtOrAfter",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.isBefore",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.nextCursor",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.originCursor",
-        "Wanxiangshu.Context.Trace.XTraceCursorModule.sequence",
-        "Wanxiangshu.Context.Trace.XTraceRange",
-        "Wanxiangshu.Context.Trace.XTraceRangeModule.create",
-        "Wanxiangshu.Context.Trace.XTraceRangeModule.endExclusive",
-        "Wanxiangshu.Context.Trace.XTraceRangeModule.isEmpty",
-        "Wanxiangshu.Context.Trace.XTraceRangeModule.startInclusive"
-      ],
-      "justification": "SemanticTrace.Contract publishes opaque cursor, coverage, and half-open range operations; record representation fields remain private."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/Projection.fs",
-      "owner": "semantic-trace",
-      "node": "semantic-trace-replayable-contract-cutover",
-      "contract": "SemanticTrace.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "behavior-diagnosis", "context-compression", "delegation", "durable-events", "finality", "host-boundary",
-        "obligation-ledger", "prefix-stability", "review-judgement", "speculative-investigation", "work-record"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Trace.XTraceFoldRejection",
-        "Wanxiangshu.Context.Trace.XTraceFoldRejection.CursorNotAfterHead",
-        "Wanxiangshu.Context.Trace.XTraceFoldRejection.OpeningAlreadyCaptured",
-        "Wanxiangshu.Context.Trace.XTraceFoldRejection.TerminalAlreadyCaptured",
-        "Wanxiangshu.Context.Trace.XTraceProjection.applyOpening",
-        "Wanxiangshu.Context.Trace.XTraceProjection.applyPart",
-        "Wanxiangshu.Context.Trace.XTraceProjection.applyTerminal",
-        "Wanxiangshu.Context.Trace.XTraceProjection.currentGenerationSemanticParts",
-        "Wanxiangshu.Context.Trace.XTraceProjection.empty",
-        "Wanxiangshu.Context.Trace.XTraceProjection.frontierAfter",
-        "Wanxiangshu.Context.Trace.XTraceProjection.headCursor",
-        "Wanxiangshu.Context.Trace.XTraceProjection.hostMessageIdsBeforeTurn",
-        "Wanxiangshu.Context.Trace.XTraceProjection.hasSemanticParts",
-        "Wanxiangshu.Context.Trace.XTraceProjection.latestPartCursor",
-        "Wanxiangshu.Context.Trace.XTraceProjection.latestTerminalEvidence",
-        "Wanxiangshu.Context.Trace.XTraceProjection.openingEvidence",
-        "Wanxiangshu.Context.Trace.XTraceProjection.orderedSemanticParts",
-        "Wanxiangshu.Context.Trace.XTraceProjection.partKinds",
-        "Wanxiangshu.Context.Trace.XTraceProjection.providerRunParts",
-        "Wanxiangshu.Context.Trace.XTraceProjection.rangeFrom",
-        "Wanxiangshu.Context.Trace.XTraceProjection.rangeOfPart",
-        "Wanxiangshu.Context.Trace.XTraceProjection.semanticCursorAfterCoverage",
-        "Wanxiangshu.Context.Trace.XTraceProjection.slice",
-        "Wanxiangshu.Context.Trace.XTraceProjection.terminalEvidenceForProviderRun",
-        "Wanxiangshu.Context.Trace.XTraceProjection.toolPartsForHostIdentity",
-        "Wanxiangshu.Context.Trace.XTraceProjection.toolResultParts",
-        "Wanxiangshu.Context.Trace.XTraceProjection.tryContiguousHostRange",
-        "Wanxiangshu.Context.Trace.XTraceProjection.tryOpeningHostMessageId",
-        "Wanxiangshu.Context.Trace.XTraceProjection.tryTurnOfHostMessageId",
-        "Wanxiangshu.Context.Trace.XTraceProjectionState",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Cursor",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Generation",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.HostToolPartId",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Kind",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.PartIndex",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Provenance",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Role",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.TextDigest",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.TextRef",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.ToolCallId",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.ToolName",
-        "Wanxiangshu.Context.Trace.XTraceSemanticPartView.Turn",
-        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence",
-        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.Frontier",
-        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.ProviderRun",
-        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextDigest",
-        "Wanxiangshu.Context.Trace.XTraceTerminalEvidence.TextRef"
-      ],
-      "justification": "SemanticTrace.Contract publishes the opaque projection plus copied semantic/opening/terminal evidence and owner queries; append storage fields and raw refs remain private."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/Capture.fs",
-      "owner": "semantic-trace",
-      "node": "semantic-trace-replayable-contract-cutover",
-      "contract": "SemanticTrace.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "delegation", "dispatch-protocol", "finality", "host-boundary", "intra-participant-parallelism",
-        "obligation-ledger", "review-judgement", "speculative-investigation", "work-record"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureLastWordsWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureOpeningWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureObservedMessagesWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureProjectionWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalBlobWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalTextWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.captureTerminalWithReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCapture.stableCaptureEligibility",
-        "Wanxiangshu.Context.Trace.XTraceCaptureError",
-        "Wanxiangshu.Context.Trace.XTraceCaptureError.Refused",
-        "Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed",
-        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt",
-        "Wanxiangshu.Context.Trace.XTraceCaptureReceipt.CurrentHead",
-        "Wanxiangshu.Context.Trace.XTraceMessageCapture.Current",
-        "Wanxiangshu.Context.Trace.XTraceMessageObservation.HostMessageId",
-        "Wanxiangshu.Context.Trace.XTraceMessageObservation.Message",
-        "Wanxiangshu.Context.Trace.XTraceMessageObservation.Origin",
-        "Wanxiangshu.Context.Trace.XTraceStableCaptureEligibility",
-        "Wanxiangshu.Context.Trace.XTraceStableCaptureEligibility.Eligible"
-      ],
-      "justification": "SemanticTrace.Contract publishes typed capture decisions, failures, and receipts implemented at the append owner; raw projection mutation does not cross the contract."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/Materialization.fs",
-      "owner": "semantic-trace",
-      "node": "semantic-trace-replayable-contract-cutover",
-      "contract": "SemanticTrace.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "context-compression", "prefix-stability", "work-record"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Trace.XTraceMaterialization.currentProjection",
-        "Wanxiangshu.Context.Trace.XTraceMaterialization.empty",
-        "Wanxiangshu.Context.Trace.XTraceMaterialization.renderRange",
-        "Wanxiangshu.Context.Trace.XTraceMaterialization.renderWorkRecordRange"
-      ],
-      "justification": "SemanticTrace.Contract publishes canonical current-generation and bounded WorkRecord materialization; blob/ref decoding remains in the trace owner."
-    },
-    {
-      "path": "src/Wanxiangshu/Context/Trace/TerminalReporter.fs",
-      "owner": "semantic-trace",
-      "node": "semantic-trace-replayable-contract-cutover",
-      "contract": "SemanticTrace.Contract",
-      "kind": "published-contract",
-      "consumers": [
-        "finality", "intra-participant-parallelism", "provider-attempt-recovery", "review-judgement"
-      ],
-      "symbols": [
-        "Wanxiangshu.Context.Trace.TerminalReporter.completeWithEvidence",
-        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion",
-        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.CaptureFailed",
-        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.Published",
-        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.RejectedEmptyOutput",
-        "Wanxiangshu.Context.Trace.XTraceTerminalCompletion.RejectedMissingRole"
-      ],
-      "justification": "SemanticTrace.Contract publishes one typed terminal completion operation; tuple projection and event-port mechanics remain owner implementation details."
     }
   ],
   "physical_adapters": [

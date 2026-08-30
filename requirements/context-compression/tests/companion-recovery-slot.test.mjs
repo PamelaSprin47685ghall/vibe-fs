@@ -98,7 +98,7 @@ test('WHAT[PAR-017] PAR_017_blogger_retry_abandons_then_materializes_then_binds_
   )
   assert.match(
     workflow,
-    /sendStagedBloggerContinuation[\s\S]*taskResult[\s\S]*stageContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/,
+    /sendStagedBloggerContinuation[\s\S]*taskResult[\s\S]*materializeContinuationContext[\s\S]*sendContinuation[\s\S]*bindContinuationContext/,
   )
 })
 
@@ -112,7 +112,7 @@ test('WHAT[CONTEXT-COMPRESSION-024] CTX_024_all_materialization_owners_share_adm
   assert.match(coordinator, /let private withMaterialization[\s\S]*AcquireMaterialization/)
   assert.match(
     coordinator,
-    /stageContinuationContext[\s\S]*withMaterialization[\s\S]*foreignFlightReason[\s\S]*materializeRequest/,
+    /materializeContinuationContext[\s\S]*withMaterialization[\s\S]*foreignFlightReason[\s\S]*materializeRequest/,
   )
   assert.match(
     coordinator,

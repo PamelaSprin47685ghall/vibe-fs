@@ -72,10 +72,10 @@ module PluginHooksSurface =
                       ObservedPrefixEpochId = PrefixEpochId.create 1L }
 
             let! first =
-                BloggerCoordinator.onMainContext scope.BloggerRuntimeHost host (Some handle.Journal) context
+                CompanionTransform.coordinateBloggerContext scope host (Some handle.Journal) context
 
             let! second =
-                BloggerCoordinator.onMainContext scope.BloggerRuntimeHost host (Some handle.Journal) context
+                CompanionTransform.coordinateBloggerContext scope host (Some handle.Journal) context
 
             return BloggerAdapterObservation.Create(effectLabel first, effectLabel second)
         }
