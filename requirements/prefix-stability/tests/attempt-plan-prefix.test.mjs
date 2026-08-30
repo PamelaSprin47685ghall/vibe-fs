@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import * as planner from '../../../dist/Context/Companion/CompressionSurface.js'
+import * as companion from '../../../dist/Context/Companion/ProjectionSurface.js'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 
 const snapshotAt = (cutoff, { seal = `seal-${cutoff}` } = {}) =>
@@ -48,14 +49,14 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_discarded_probe_leaves_the_committed_
 
   // The next, unarmed slot projects the committed prefix — cutoff 4, not the
   // candidate's 9.
-  const next = prefix.forChoice({ kind: 'committed' }, committed, 'B BODY')
+  const next = prefix.forChoice({ kind: 'committed' }, committed, companion.memoryPreamble, 'B BODY')
   assert.equal(next.dropLeading, 4)
 })
 
 // ── COMPANION-009 / CTX-010: the prefix plan ──────────────────────────────
 
 test('WHAT[PREFIX-STABILITY-002] COMPANION_009_no_snapshot_means_send_raw_history', () => {
-  const plan = prefix.forSnapshot(null, 'unused')
+  const plan = prefix.forSnapshot(null, companion.memoryPreamble, 'unused')
 
   assert.equal(plan.replacesPrefix, false)
   assert.equal(plan.dropLeading, 0)
@@ -74,11 +75,14 @@ test('WHAT[PREFIX-STABILITY-006] HOST_006_a_retired_snapshot_and_a_never_promote
     rebased,
   ).value
 
-  assert.deepEqual(prefix.forSnapshot(retired.snapshot, 'x'), prefix.forSnapshot(null, 'x'))
+  assert.deepEqual(
+    prefix.forSnapshot(retired.snapshot, companion.memoryPreamble, 'x'),
+    prefix.forSnapshot(null, companion.memoryPreamble, 'x'),
+  )
 })
 
 test('WHAT[PREFIX-STABILITY-008] COMPANION_010_the_memory_returns_same_session_responsibility_as_instruction', () => {
-  const plan = prefix.forSnapshot(snapshotAt(3), 'THE WORK LOG')
+  const plan = prefix.forSnapshot(snapshotAt(3), companion.memoryPreamble, 'THE WORK LOG')
 
   assert.equal(plan.replacesPrefix, true)
   assert.equal(plan.dropLeading, 3)
@@ -93,7 +97,7 @@ test('WHAT[PREFIX-STABILITY-015] COMPANION_013_the_plan_reuses_the_snapshot_s_ow
   // drift a cold boundary on every later request.
   const snapshot = snapshotAt(3, { seal: 'seal-fixed' })
 
-  assert.equal(prefix.forSnapshot(snapshot, 'body').memoryId, 'synthetic-seal-fixed')
+  assert.equal(prefix.forSnapshot(snapshot, companion.memoryPreamble, 'body').memoryId, 'synthetic-seal-fixed')
 })
 
 test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_built_the_same_way', () => {
@@ -102,8 +106,8 @@ test('WHAT[PREFIX-STABILITY-003] CTX_010_a_probe_plan_and_a_committed_plan_are_b
   // a promoted probe to be byte-identical to what the successful attempt sent.
   const candidate = snapshotAt(7, { seal: 'seal-candidate' })
 
-  const asProbe = prefix.forChoice({ kind: 'probe', candidate }, null, 'BODY')
-  const asCommitted = prefix.forSnapshot(candidate, 'BODY')
+  const asProbe = prefix.forChoice({ kind: 'probe', candidate }, null, companion.memoryPreamble, 'BODY')
+  const asCommitted = prefix.forSnapshot(candidate, companion.memoryPreamble, 'BODY')
 
   assert.deepEqual(asProbe, asCommitted)
 })

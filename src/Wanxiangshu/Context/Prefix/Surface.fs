@@ -252,14 +252,14 @@ module PrefixSurface =
                    memoryId = null
                    memoryText = null |}
 
-    let forSnapshot (snapshot: obj) (memoryBody: string) : obj =
+    let forSnapshot (snapshot: obj) (memoryPreamble: string) (memoryBody: string) : obj =
         let value =
             if isNullish snapshot then
                 None
             else
                 Some(snapshotOfJs snapshot)
 
-        XPrefixProjection.forSnapshot value CompanionPrompt.MemoryPreamble memoryBody
+        XPrefixProjection.forSnapshot value memoryPreamble memoryBody
         |> intentToJs
 
     let private choiceOfJs (choice: obj) : XProjectionChoice =
@@ -279,14 +279,14 @@ module PrefixSurface =
         else
             XProjectionChoice.UseCommittedEpoch
 
-    let forChoice (choice: obj) (committed: obj) (memoryBody: string) : obj =
+    let forChoice (choice: obj) (committed: obj) (memoryPreamble: string) (memoryBody: string) : obj =
         let value =
             if isNullish committed then
                 None
             else
                 Some(snapshotOfJs committed)
 
-        XPrefixProjection.forChoice (choiceOfJs choice) value CompanionPrompt.MemoryPreamble memoryBody
+        XPrefixProjection.forChoice (choiceOfJs choice) value memoryPreamble memoryBody
         |> intentToJs
 
     let requiredBlob (choice: obj) (committed: obj) : obj =

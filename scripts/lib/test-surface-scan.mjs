@@ -1627,7 +1627,7 @@ export const SURFACE_CONSUMERS = {
   'Context/Companion/Blogger/TomlSurface.js': ['context-compression', 'guidance-delivery'],
   'Context/Companion/CompressionSurface.js': ['context-compression', 'prefix-stability', 'provider-attempt-recovery'],
   'Context/Companion/FoldSurface.js': ['durable-events', 'verification-system'],
-  'Context/Companion/ProjectionSurface.js': ['guidance-delivery'],
+  'Context/Companion/ProjectionSurface.js': ['guidance-delivery', 'prefix-stability'],
   'Context/Prefix/Surface.js': ['context-compression', 'provider-attempt-recovery'],
   'Context/Prefix/XWireSurface.js': ['context-compression', 'host-boundary', 'participant-horizon'],
   'Context/Trace/SemanticTraceSurface.js': ['obligation-ledger', 'work-record'],
