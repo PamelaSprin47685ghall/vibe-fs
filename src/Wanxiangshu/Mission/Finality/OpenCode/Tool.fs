@@ -60,8 +60,6 @@ open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Mission.Finality
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Mission.Manager.Life
 open Wanxiangshu.Mission.Obligation.Todo
@@ -126,17 +124,14 @@ module FinalityTool =
         let WrongRole = "tool/suicide/wrong-role"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private refuse (ctx: HostToolContext) path =
         ToolHostCodec.tomlObjectWithInstructions (ProviderProse.instructionLines (lang ctx) path Map.empty) []
 
     /// GLORY-062/076 + §9.2.4: at-rest second-suicide tool result (session language).
     let private restInPeaceInstructions (sessionId: SessionId) =
-        ProviderProse.instructionLines (ProviderProse.languageOf sessionId) FinalityPrompt.Path.Rest Map.empty
+        ProviderProse.instructionLines (SessionProviderLanguage.languageOf sessionId) FinalityPrompt.Path.Rest Map.empty
 
     let private tString = ToolHostCodec.TString
 

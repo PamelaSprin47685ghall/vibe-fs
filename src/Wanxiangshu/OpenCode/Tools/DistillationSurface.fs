@@ -55,8 +55,7 @@ module DistillationSurface =
                permissions = permissionLabels
                executionTool = executionToolName |}
 
-    let private languageOf (raw: string) =
-        ProviderLanguage.tryParse raw |> Option.defaultValue ProviderLanguage.English
+    let private languageOf (raw: string) = ProviderLanguage.parse raw
 
     [<Emit("$0 == null")>]
     let private isNullish (value: obj) : bool = jsNative

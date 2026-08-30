@@ -2487,6 +2487,10 @@
       "owner": "distribution"
     },
     {
+      "path": "src/Wanxiangshu/Resources/ProviderResourceBytes.fs",
+      "owner": "distribution"
+    },
+    {
       "path": "src/Wanxiangshu/Resources/PromptResources.fs",
       "owner": "cognitive-environment"
     },
@@ -2495,11 +2499,11 @@
       "owner": "cognitive-environment"
     },
     {
-      "path": "src/Wanxiangshu/Resources/ProviderProse.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/Prose.fs",
       "owner": "provider-language"
     },
     {
-      "path": "src/Wanxiangshu/Resources/ProviderResources.fs",
+      "path": "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
       "owner": "provider-language"
     },
     {

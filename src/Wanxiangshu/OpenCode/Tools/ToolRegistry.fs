@@ -83,10 +83,10 @@ module ToolRegistry =
         let DeniedUnestablished = "tool/registry/denied-unestablished"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        let sessionText = ctx.SessionId
+
+        ProviderLanguageBinding.forSessionText
+            sessionText
 
     let private staticAdmissions (bloggerHost: IBloggerRuntimeHost option) : (string * ToolAdmission) list =
         [ "fork", ForkTool.managerAdmission

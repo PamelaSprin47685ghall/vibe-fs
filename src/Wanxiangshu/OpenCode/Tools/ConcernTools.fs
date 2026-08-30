@@ -52,10 +52,7 @@ module ConcernTools =
         let DurableUnavailable = "concern-routing/durable-unavailable"
 
     let private languageOf (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private render (ctx: HostToolContext) path substitutions =
         ProviderProse.instructionLines (languageOf ctx) path substitutions
@@ -164,7 +161,6 @@ module ConcernTools =
         fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
 
     let specs factory journal =
-        let language = ProviderLanguageBinding.readGlobalPreference ()
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         [ { Name = "subscribe"

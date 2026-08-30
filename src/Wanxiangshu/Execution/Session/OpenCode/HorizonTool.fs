@@ -26,8 +26,6 @@ open Wanxiangshu.Strength.Persistence
 open System
 open System.Threading.Tasks
 open Wanxiangshu.Host
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
@@ -99,10 +97,7 @@ module HorizonTool =
         let LatestWorkUnavailable = "tool/horizon/latest-work-unavailable"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private labeled language path label =
         ProviderProse.render language path (Map [ "label", label ])

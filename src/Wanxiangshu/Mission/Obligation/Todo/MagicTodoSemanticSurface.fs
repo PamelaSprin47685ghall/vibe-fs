@@ -11,6 +11,7 @@ open Wanxiangshu.Mission.Obligation.Todo.MagicTodo
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoAdmission
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoFacts
 open Wanxiangshu.Mission.Obligation.Todo.MagicTodoPrefixEpoch
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// JS-native semantic entry points for Magic Todo's pure owner modules.

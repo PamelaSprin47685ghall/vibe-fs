@@ -10,12 +10,7 @@ open Wanxiangshu.Participant.Provider
 [<RequireQualifiedAccess>]
 module PromptSurface =
 
-    let private languageOf (raw: string) : ProviderLanguage =
-        match raw with
-        | "English" -> ProviderLanguage.English
-        | "SimplifiedChinese"
-        | "zh-CN" -> ProviderLanguage.SimplifiedChinese
-        | _ -> ProviderLanguage.parse raw
+    let private languageOf (raw: string) : ProviderLanguage = ProviderLanguage.parse raw
 
     let private catalogToJs (catalog: PromptCatalog) : obj =
         box

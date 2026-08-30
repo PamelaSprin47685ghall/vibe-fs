@@ -1514,9 +1514,9 @@
           "column": 32,
           "endLine": 182,
           "endColumn": 112,
-          "resolvedTarget": "Wanxiangshu.Resources.ProviderProse.documentFor",
+          "resolvedTarget": "Wanxiangshu.Participant.Provider.ProviderProse.documentFor",
           "declarationPaths": [
-            "src/Wanxiangshu/Resources/ProviderProse.fs"
+            "src/Wanxiangshu/Participant/Provider/Prose.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -3692,6 +3692,21 @@
         },
         {
           "kind": "application",
+          "anchor": "ProviderLanguageBinding.readGlobalPreference",
+          "occurrence": 1,
+          "line": 134,
+          "column": 18,
+          "endLine": 134,
+          "endColumn": 65,
+          "resolvedTarget": "Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference",
+          "declarationPaths": [
+            "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs"
+          ],
+          "classification": "representation",
+          "ownerLaw": "STRUCTURED-WORKFLOW-004"
+        },
+        {
+          "kind": "application",
           "anchor": "not",
           "occurrence": 1,
           "line": 145,
@@ -4912,10 +4927,10 @@
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
-          "kind": "if",
-          "anchor": "if String.IsNullOrWhiteSpace ctx.SessionId then",
+          "kind": "declaration",
+          "anchor": "let sessionText = ctx.SessionId",
           "occurrence": 1,
-          "classification": "wiring",
+          "classification": "representation",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
         {
@@ -5131,7 +5146,7 @@
         {
           "kind": "if",
           "anchor": "if String.IsNullOrWhiteSpace ctx.SessionId then",
-          "occurrence": 2,
+          "occurrence": 1,
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
         },
@@ -5193,58 +5208,15 @@
         },
         {
           "kind": "application",
-          "anchor": "String.IsNullOrWhiteSpace",
+          "anchor": "ProviderLanguageBinding.forSessionText",
           "occurrence": 1,
-          "line": 86,
-          "column": 11,
-          "endLine": 86,
-          "endColumn": 50,
-          "resolvedTarget": "System.String.IsNullOrWhiteSpace",
-          "declarationPaths": [],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ProviderLanguageBinding.readGlobalPreference",
-          "occurrence": 1,
-          "line": 87,
-          "column": 12,
-          "endLine": 87,
-          "endColumn": 59,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference",
+          "line": 88,
+          "column": 8,
+          "endLine": 89,
+          "endColumn": 23,
+          "resolvedTarget": "Wanxiangshu.OpenCode.ProviderLanguageBinding.forSessionText",
           "declarationPaths": [
             "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "ProviderLanguageBinding.ensureRoot",
-          "occurrence": 1,
-          "line": 89,
-          "column": 12,
-          "endLine": 89,
-          "endColumn": 79,
-          "resolvedTarget": "Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot",
-          "declarationPaths": [
-            "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs"
-          ],
-          "classification": "wiring",
-          "ownerLaw": "STRUCTURED-WORKFLOW-004"
-        },
-        {
-          "kind": "application",
-          "anchor": "SessionId.create",
-          "occurrence": 1,
-          "line": 89,
-          "column": 48,
-          "endLine": 89,
-          "endColumn": 78,
-          "resolvedTarget": "Wanxiangshu.Foundation.Identity.SessionIdModule.create",
-          "declarationPaths": [
-            "src/Wanxiangshu/Foundation/Identity.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -5390,7 +5362,7 @@
         {
           "kind": "application",
           "anchor": "ProviderLanguageBinding.readGlobalPreference",
-          "occurrence": 2,
+          "occurrence": 1,
           "line": 164,
           "column": 31,
           "endLine": 164,
@@ -5893,9 +5865,9 @@
           "column": 59,
           "endLine": 235,
           "endColumn": 100,
-          "resolvedTarget": "Wanxiangshu.Resources.ProviderProse.render",
+          "resolvedTarget": "Wanxiangshu.Participant.Provider.ProviderProse.render",
           "declarationPaths": [
-            "src/Wanxiangshu/Resources/ProviderProse.fs"
+            "src/Wanxiangshu/Participant/Provider/Prose.fs"
           ],
           "classification": "wiring",
           "ownerLaw": "STRUCTURED-WORKFLOW-004"
@@ -6079,7 +6051,7 @@
         {
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
-          "occurrence": 2,
+          "occurrence": 1,
           "line": 263,
           "column": 19,
           "endLine": 263,
@@ -6107,7 +6079,7 @@
         {
           "kind": "application",
           "anchor": "SessionId.create",
-          "occurrence": 2,
+          "occurrence": 1,
           "line": 267,
           "column": 25,
           "endLine": 267,
@@ -6135,7 +6107,7 @@
         {
           "kind": "application",
           "anchor": "String.IsNullOrWhiteSpace",
-          "occurrence": 3,
+          "occurrence": 2,
           "line": 272,
           "column": 42,
           "endLine": 272,
@@ -6176,7 +6148,7 @@
         {
           "kind": "application",
           "anchor": "SessionId.create",
-          "occurrence": 3,
+          "occurrence": 2,
           "line": 273,
           "column": 46,
           "endLine": 273,

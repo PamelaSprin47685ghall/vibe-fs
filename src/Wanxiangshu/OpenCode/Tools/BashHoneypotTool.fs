@@ -6,6 +6,7 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider
 open ToolHostCodec
 
 /// Coder-visible bash honeypot: no parameters, no shell, only a hard denial.
@@ -23,10 +24,7 @@ module BashHoneypotTool =
         let Denial = "tool/bash-honeypot/denial"
 
     let private languageOf (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private execute (_args: HostToolArguments) (ctx: HostToolContext) =
         task {

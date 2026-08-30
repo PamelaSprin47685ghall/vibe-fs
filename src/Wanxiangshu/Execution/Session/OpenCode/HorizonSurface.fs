@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Session.OpenCode
 open Fable.Core.JsInterop
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
-open Wanxiangshu.Resources
 
 /// Horizon-owned output surface. It translates plain roster observations into
 /// provider prose/TOML while keeping Handle, Journal and PTY representations out

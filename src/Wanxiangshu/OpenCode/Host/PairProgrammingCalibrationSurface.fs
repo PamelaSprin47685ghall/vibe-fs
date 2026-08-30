@@ -16,12 +16,7 @@ module PairProgrammingCalibrationSurface =
     let private optionalText (value: obj) : string option =
         if isNullish value then None else Some(string value)
 
-    let private languageOf (raw: string) : ProviderLanguage =
-        match raw with
-        | "SimplifiedChinese"
-        | "zh-CN" -> ProviderLanguage.SimplifiedChinese
-        | "English" -> ProviderLanguage.English
-        | _ -> ProviderLanguage.parse raw
+    let private languageOf (raw: string) : ProviderLanguage = ProviderLanguage.parse raw
 
     let compose (tip: obj) (toolEstimate: obj) (guideline: string) : string =
         PairProgrammingCalibration.compose (optionalText tip) (optionalText toolEstimate) guideline

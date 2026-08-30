@@ -1801,6 +1801,61 @@
       ],
       "state": "DONE",
       "result": "CUTOVER"
+    },
+    {
+      "id": "provider-language-cutover",
+      "primary_owner": "provider-language",
+      "intent": "Provider language clean cutover: owner-local language policy, session bind/inherit/lookup, resource addressing and prose rendering, with Resources/ProviderResourceBytes.fs as the byte-only physical adapter and ProviderLanguageBinding as the raw-observation Host boundary.",
+      "files": [
+        "src/Wanxiangshu/Participant/Provider/Language.fs",
+        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+        "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+        "src/Wanxiangshu/Resources/ProviderResourceBytes.fs"
+      ],
+      "classification": "MOVE",
+      "publishes": [
+        "Provider.Language",
+        "Distribution.ProviderResourceBytes"
+      ],
+      "consumes": [
+        "Distribution.ProviderResourceBytes"
+      ],
+      "depends_on": [],
+      "production_callers_to_migrate": [],
+      "proofs": [
+        "requirements/provider-language/tests/provider-language.test.mjs",
+        "requirements/provider-language/tests/provider-prose-and-preference.test.mjs",
+        "requirements/provider-language/tests/provider-prose-ownership.test.mjs",
+        "requirements/provider-language/tests/language-parity-gate.test.mjs"
+      ],
+      "architecture_gates": [
+        "language-parity-gate.mjs",
+        "provider-prose-ownership.mjs",
+        "provider-leak-gate.mjs",
+        "migration-ledger.mjs",
+        "owner-dependencies.mjs",
+        "semantic-owners.mjs",
+        "js-surface-manifest.mjs"
+      ],
+      "closure_evidence": "All seven final paths reached their owner boundary: policy, resource addressing, pair laws, and prose are owner-local; Resources/ProviderResourceBytes.fs is the byte-only adapter that delegates physical reads to PackageResources; ProviderLanguageBinding remains provider-language-owned under host-boundary governance; all 11 laws retain executable proof links; and the two legacy Resources paths are absent except from the explicit negative legacy gate.",
+      "touched_paths": [
+        "src/Wanxiangshu/Participant/Provider/Language.fs",
+        "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
+        "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+        "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+        "src/Wanxiangshu/Resources/ProviderResourceBytes.fs"
+      ],
+      "coverage_tags": [
+        "CoverageA",
+        "CoverageG"
+      ],
+      "state": "DONE",
+      "result": "CUTOVER"
     }
   ],
   "debt_face": {
@@ -1864,7 +1919,6 @@
       "src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs",
       "src/Wanxiangshu/OpenCode/Host/PluginRecoveryScope.fs",
       "src/Wanxiangshu/OpenCode/Host/PluginSessionScope.fs",
-      "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
       "src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs",
       "src/Wanxiangshu/OpenCode/Host/QuiescenceSurface.fs",
       "src/Wanxiangshu/OpenCode/Host/RequirementGrounding/Gate.fs",
@@ -2056,14 +2110,11 @@
       "src/Wanxiangshu/Participant/Persona/SessionPersona.fs",
       "src/Wanxiangshu/Participant/Persona/SessionSurface.fs",
       "src/Wanxiangshu/Participant/Persona/Surface.fs",
-      "src/Wanxiangshu/Participant/Provider/Language.fs",
-      "src/Wanxiangshu/Participant/Provider/LanguageSurface.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Intent.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Model.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Planner.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Renderer.fs",
       "src/Wanxiangshu/Participant/Provider/Projection/Surface.fs",
-      "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
       "src/Wanxiangshu/Strength/Frame.fs",
       "src/Wanxiangshu/Strength/Lifecycle.fs",
       "src/Wanxiangshu/Strength/OpenCode/PluginScope.fs",
@@ -2177,8 +2228,6 @@
       "src/Wanxiangshu/Resources/PackageResources.fs",
       "src/Wanxiangshu/Resources/PromptResources.fs",
       "src/Wanxiangshu/Resources/PromptSurface.fs",
-      "src/Wanxiangshu/Resources/ProviderProse.fs",
-      "src/Wanxiangshu/Resources/ProviderResources.fs",
       "src/Wanxiangshu/Resources/RuntimeResources.fs",
       "src/Wanxiangshu/Sphinx/Absorb.fs",
       "src/Wanxiangshu/Sphinx/Bayes.fs",

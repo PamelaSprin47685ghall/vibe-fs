@@ -3079,6 +3079,169 @@
       "justification": "The action-affordance adapters consume only these exact process runtime capabilities at the physical tool boundary; session lifecycle policy remains private to managed-session-lifecycle."
     },
     {
+      "path": "src/Wanxiangshu/OpenCode/Host/ProviderLanguageBinding.fs",
+      "owner": "provider-language",
+      "node": "provider-language-cutover",
+      "contract": "Provider.Language",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "attention-regulation",
+        "capability-enforcement",
+        "concern-routing",
+        "delegation",
+        "finality",
+        "host-boundary",
+        "institutional-learning",
+        "intra-participant-parallelism",
+        "obligation-ledger",
+        "participant-horizon",
+        "process-execution",
+        "repository-investigation",
+        "repository-programming",
+        "review-judgement",
+        "session-ontology"
+      ],
+      "symbols": [
+        "Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureInherited",
+        "Wanxiangshu.OpenCode.ProviderLanguageBinding.ensureRoot",
+        "Wanxiangshu.OpenCode.ProviderLanguageBinding.forSessionText",
+        "Wanxiangshu.OpenCode.ProviderLanguageBinding.readGlobalPreference"
+      ],
+      "justification": "Provider.Language publishes only the raw-observation Host adapter operations required by these compiler-observed production consumers; provider language policy remains owner-local."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Language.fs",
+      "owner": "provider-language",
+      "node": "provider-language-cutover",
+      "contract": "Provider.Language",
+      "kind": "published-contract",
+      "consumers": [
+        "behavior-diagnosis",
+        "cognitive-environment",
+        "context-compression",
+        "delegation",
+        "distribution",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "intra-participant-parallelism",
+        "obligation-ledger",
+        "output-distillation",
+        "participant-horizon",
+        "process-execution",
+        "repository-investigation",
+        "repository-programming",
+        "review-assurance",
+        "review-judgement",
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.ProviderLanguage",
+        "Wanxiangshu.Participant.Provider.ProviderLanguage.English",
+        "Wanxiangshu.Participant.Provider.ProviderLanguage.SimplifiedChinese",
+        "Wanxiangshu.Participant.Provider.ProviderLanguageModule.parse"
+      ],
+      "justification": "Provider.Language publishes only the language value and parsing policy required by these compiler-observed production consumers; preference interpretation and locale metadata remain owner-local."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/SessionLanguage.fs",
+      "owner": "provider-language",
+      "node": "provider-language-cutover",
+      "contract": "Provider.Language",
+      "kind": "published-contract",
+      "consumers": [
+        "delegation",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "obligation-ledger"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.SessionProviderLanguage.drop",
+        "Wanxiangshu.Participant.Provider.SessionProviderLanguage.languageOf"
+      ],
+      "justification": "Provider.Language publishes only the session lookup and lifecycle operation required by these compiler-observed production consumers; bind and inherit policy stay behind the owner and its Host adapter."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+      "owner": "provider-language",
+      "node": "provider-language-cutover",
+      "contract": "Provider.Language",
+      "kind": "published-contract",
+      "consumers": [
+        "cognitive-environment",
+        "distribution",
+        "finality",
+        "repository-programming",
+        "review-assurance",
+        "review-judgement"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.ProviderResources.languageRootsPresent",
+        "Wanxiangshu.Participant.Provider.ProviderResources.readText",
+        "Wanxiangshu.Participant.Provider.ProviderResources.requireLanguagePair"
+      ],
+      "justification": "Provider.Language publishes only the resource pair/read operations and root observation required by these compiler-observed production consumers; src/Wanxiangshu/Resources/ProviderResourceBytes.fs is the byte-only physical adapter and publishes no language semantics."
+    },
+    {
+      "path": "src/Wanxiangshu/Participant/Provider/Prose.fs",
+      "owner": "provider-language",
+      "node": "provider-language-cutover",
+      "contract": "Provider.Language",
+      "kind": "published-contract",
+      "consumers": [
+        "action-affordance",
+        "attention-regulation",
+        "behavior-diagnosis",
+        "capability-enforcement",
+        "change-integration",
+        "concern-routing",
+        "context-compression",
+        "delegation",
+        "finality",
+        "guidance-delivery",
+        "host-boundary",
+        "institutional-learning",
+        "intra-participant-parallelism",
+        "knowledge-reuse",
+        "obligation-ledger",
+        "output-distillation",
+        "participant-horizon",
+        "prefix-stability",
+        "process-execution",
+        "provider-attempt-recovery",
+        "repository-investigation",
+        "repository-programming",
+        "review-assurance",
+        "review-judgement",
+        "time-capability"
+      ],
+      "symbols": [
+        "Wanxiangshu.Participant.Provider.ProviderProse.document",
+        "Wanxiangshu.Participant.Provider.ProviderProse.documentFor",
+        "Wanxiangshu.Participant.Provider.ProviderProse.instructionLines",
+        "Wanxiangshu.Participant.Provider.ProviderProse.languageOf",
+        "Wanxiangshu.Participant.Provider.ProviderProse.render"
+      ],
+      "justification": "Provider.Language publishes only the prose rendering operations required by these compiler-observed production consumers; substitution policy remains owner-local behind render."
+    },
+    {
+      "path": "src/Wanxiangshu/Resources/ProviderResourceBytes.fs",
+      "owner": "distribution",
+      "node": "provider-language-cutover",
+      "contract": "Distribution.ProviderResourceBytes",
+      "kind": "physical-port",
+      "consumers": [
+        "provider-language"
+      ],
+      "symbols": [
+        "Wanxiangshu.Resources.ProviderResourceBytes.exists",
+        "Wanxiangshu.Resources.ProviderResourceBytes.readText"
+      ],
+      "justification": "The provider-language owner supplies an approved relative path; this distribution adapter alone performs the packaged-byte existence and read operations without language policy."
+    },
+    {
       "path": "src/Wanxiangshu/Participant/Provider/Attempt/Cursor.fs",
       "owner": "provider-attempt-recovery",
       "node": "provider-attempt-recovery-cutover",

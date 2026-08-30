@@ -1392,6 +1392,22 @@
     ],
     "Participant": [
       {
+        "path": "src/Wanxiangshu/Participant/Provider/Prose.fs",
+        "owners": [
+          "cognitive-environment",
+          "distribution",
+          "provider-language"
+        ]
+      },
+      {
+        "path": "src/Wanxiangshu/Participant/Provider/ProviderResources.fs",
+        "owners": [
+          "cognitive-environment",
+          "distribution",
+          "provider-language"
+        ]
+      },
+      {
         "path": "src/Wanxiangshu/Participant/Provider/Attempt/TerminalValidity.fs",
         "owners": [
           "context-compression"
@@ -1886,22 +1902,6 @@
         "owners": [
           "cognitive-environment",
           "distribution"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/Resources/ProviderProse.fs",
-        "owners": [
-          "cognitive-environment",
-          "distribution",
-          "provider-language"
-        ]
-      },
-      {
-        "path": "src/Wanxiangshu/Resources/ProviderResources.fs",
-        "owners": [
-          "cognitive-environment",
-          "distribution",
-          "provider-language"
         ]
       },
       {

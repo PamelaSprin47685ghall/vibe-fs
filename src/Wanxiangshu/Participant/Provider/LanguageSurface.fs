@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Participant.Provider
 
-open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
@@ -12,16 +11,9 @@ open Wanxiangshu.Resources
 /// SessionProviderLanguage and host/runtime state stay private.
 module ProviderLanguageSurface =
 
-    let private languageOf (raw: string) : ProviderLanguage =
-        match raw with
-        | "English" -> ProviderLanguage.English
-        | "SimplifiedChinese" -> ProviderLanguage.SimplifiedChinese
-        | _ -> ProviderLanguage.parse raw
+    let private languageOf (raw: string) : ProviderLanguage = ProviderLanguage.parse raw
 
-    let private languageName =
-        function
-        | ProviderLanguage.English -> "English"
-        | ProviderLanguage.SimplifiedChinese -> "SimplifiedChinese"
+    let private languageName language = ProviderLanguage.externalName language
 
     let private resultOf result =
         match result with

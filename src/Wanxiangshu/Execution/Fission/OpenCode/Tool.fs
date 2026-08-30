@@ -59,8 +59,6 @@ open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Host
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
@@ -121,10 +119,7 @@ module FissionTool =
         let SharedCompletion = "tool/fission/shared-completion"
 
     let private languageOf (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private consequence language path =
         tomlObjectWithInstructions (ProviderProse.instructionLines language path Map.empty) []

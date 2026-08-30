@@ -28,10 +28,9 @@ open Wanxiangshu.Strength.Persistence
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider
 
 [<RequireQualifiedAccess>]
 module SyncDelegateBatching =

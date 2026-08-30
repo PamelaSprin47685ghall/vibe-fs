@@ -429,7 +429,7 @@ module MagicTodoMembrane =
                 LlmFacing.combine
                     [ LlmFacing.instructions (
                           ProviderProse.instructionLines
-                              (ProviderProse.languageOf managerSessionId)
+                              (SessionProviderLanguage.languageOf managerSessionId)
                               ManagerNarrative.Path.T1Revelation
                               Map.empty
                       )
@@ -466,7 +466,7 @@ module MagicTodoMembrane =
                   PhysicalSuccessEvidence = physical
                   SemanticVersion = bridge.Prepared.SemanticVersion }
 
-            let lang = ProviderProse.languageOf bridge.ManagerSessionId
+            let lang = SessionProviderLanguage.languageOf bridge.ManagerSessionId
 
             let rendered =
                 LlmFacing.instructions (
@@ -565,11 +565,7 @@ module MagicTodoHostHooks =
             string input?sessionID
 
     let private languageForSession (sessionText: string) =
-        if String.IsNullOrWhiteSpace sessionText then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            SessionProviderLanguage.tryGet (SessionId.create sessionText)
-            |> Option.defaultWith ProviderLanguageBinding.readGlobalPreference
+        ProviderLanguageBinding.forSessionText sessionText
 
     let private requirePort (reason: string) (port: 'a option) =
         match port with
@@ -655,9 +651,7 @@ module MagicTodoHostHooks =
             // the unmaterialized call itself.
             match! XTraceCapture.captureSessionMessagesWithReceipt (Some durable) sessionId priorMessages with
             | Error error ->
-                fatalInfrastructure
-                    sessionText
-                    (sprintf "XTrace transcript-prefix capture failed: %A" error)
+                fatalInfrastructure sessionText (sprintf "XTrace transcript-prefix capture failed: %A" error)
             | Ok _ -> ()
 
             let locality =

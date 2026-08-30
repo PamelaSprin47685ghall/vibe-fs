@@ -8,6 +8,7 @@ open Wanxiangshu.Resources
 open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Participant.Provider
 
 /// mv / rm — Coder-only file mutation tools (AGENT-016/017/018).
 ///
@@ -71,10 +72,7 @@ module FileMutationTools =
         let existsSync (path: string) : bool = jsNative
 
     let private languageOf (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private specDescription path =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty

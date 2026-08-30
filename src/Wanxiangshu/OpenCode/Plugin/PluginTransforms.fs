@@ -131,7 +131,7 @@ module PluginTransforms =
     let private languageFor (projectionSessionIdOpt: string option) : ProviderLanguage =
         match projectionSessionIdOpt with
         | Some sessionId -> ProviderLanguageBinding.ensureRoot (SessionId.create sessionId)
-        | None -> ProviderLanguage.English
+        | None -> ProviderLanguageBinding.readGlobalPreference ()
 
     // Explicit composition mode — replaces the previous implicit helper dispatch
     // (strengthReplicaRuntime / isExplicitResumeProviderMaterial / ordinaryProviderTransform).

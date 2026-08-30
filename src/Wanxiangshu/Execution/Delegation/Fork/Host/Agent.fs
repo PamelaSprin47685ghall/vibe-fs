@@ -53,8 +53,6 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Interaction.Authority
@@ -109,7 +107,7 @@ module HostForkBinding =
 module HostForkAgent =
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
-        let lang = ProviderProse.languageOf sessionId
+        let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
@@ -329,6 +327,7 @@ module HostForkAgent =
                 let! _ =
                     XTraceCapture.captureOpeningWithReceipt runtime.Journal childId prompt requirements
                     |> TaskResult.mapError (fun error -> sprintf "fork opening trace capture failed: %A" error)
+
                 ()
 
             do!

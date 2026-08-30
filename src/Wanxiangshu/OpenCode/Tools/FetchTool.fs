@@ -94,10 +94,7 @@ module FetchTool =
         System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>>()
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private prose language path =
         ProviderProse.render language path Map.empty

@@ -22,10 +22,9 @@ open Wanxiangshu.Strength.OpenCode
 open Wanxiangshu.Strength.Persistence
 
 open System.Threading.Tasks
-open Wanxiangshu.Resources
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Resources
+open Wanxiangshu.Participant.Provider
 
 [<RequireQualifiedAccess>]
 module DelegatedToolEstimate =

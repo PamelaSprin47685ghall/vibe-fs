@@ -83,10 +83,7 @@ module ChronicleTool =
     let NoLiveCycleError = "CHRONICLE_NO_LIVE_CYCLE"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private prose language path =
         ProviderProse.render language path Map.empty

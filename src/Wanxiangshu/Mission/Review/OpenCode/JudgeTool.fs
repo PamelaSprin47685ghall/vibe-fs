@@ -11,8 +11,8 @@ open Wanxiangshu.Mission.Obligation.Todo
 open Wanxiangshu.Mission.Review
 open Wanxiangshu.Mission.Review.Judgement
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
-open Wanxiangshu.Resources
 
 /// judge(verdict) — Reviewer judgment surface. Finality sequencing belongs to
 /// ReviewBarrierWorkflow; this tool only emits one typed judgement delivery.
@@ -51,10 +51,7 @@ module JudgeTool =
         let JudgmentCouldNotBeRecorded = "tool/judge/judgment-could-not-be-recorded"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private line (ctx: HostToolContext) path =
         ProviderProse.render (lang ctx) path Map.empty

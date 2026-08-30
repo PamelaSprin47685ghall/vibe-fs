@@ -4,8 +4,8 @@
 
 /resources/provider/role/**
 /resources/provider/library/**
-/src/Wanxiangshu/Resources/ProviderResources.fs
-/src/Wanxiangshu/Resources/ProviderProse.fs
+/src/Wanxiangshu/Participant/Provider/ProviderResources.fs
+/src/Wanxiangshu/Participant/Provider/Prose.fs
 /src/Wanxiangshu/Resources/PromptResources.fs
 /src/Wanxiangshu/Resources/PromptSurface.fs
 /src/Wanxiangshu/Participant/Persona/**

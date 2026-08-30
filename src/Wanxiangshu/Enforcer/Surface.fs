@@ -156,11 +156,7 @@ module EnforcerSurface =
     /// Compose the derived Blogger rulebook prompt for a base and locale.
     /// Locale values are semantic strings, not ProviderLanguage wire cases.
     let composeBloggerSystemPrompt (basePrompt: string) (locale: string) : string =
-        let lang =
-            match locale with
-            | "zh-CN"
-            | "simplifiedChinese" -> ProviderLanguage.SimplifiedChinese
-            | _ -> ProviderLanguage.English
+        let lang = ProviderLanguage.parse locale
 
         let baseInstructions =
             if System.String.IsNullOrWhiteSpace basePrompt then
@@ -172,11 +168,7 @@ module EnforcerSurface =
 
     /// Load a localized catalog through the same fail-fast resource owner.
     let loadFor (locale: string) : obj array =
-        let lang =
-            match locale with
-            | "zh-CN"
-            | "simplifiedChinese" -> ProviderLanguage.SimplifiedChinese
-            | _ -> ProviderLanguage.English
+        let lang = ProviderLanguage.parse locale
 
         EnforcerCatalogResource.loadFor lang |> ruleArray
 

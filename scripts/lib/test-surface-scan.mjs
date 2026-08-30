@@ -482,7 +482,7 @@ export const SURFACE_MANIFEST = [
     ],
     source: 'src/Wanxiangshu/Participant/Provider/LanguageSurface.fs',
     representation: 'json',
-    kind: 'pure',
+    kind: 'resource',
   },
   {
     module: 'Sphinx/Surface.js',

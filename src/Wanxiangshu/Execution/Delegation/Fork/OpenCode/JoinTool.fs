@@ -26,8 +26,6 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
@@ -55,8 +53,6 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Strength
 
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
-open Wanxiangshu.Resources
-open Wanxiangshu.Resources
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
@@ -111,10 +107,7 @@ module JoinTool =
         let UnavailableFromContext = "tool/join/unavailable-from-context"
 
     let private lang (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private consequence lines =
         ToolHostCodec.tomlObjectWithInstructions lines []

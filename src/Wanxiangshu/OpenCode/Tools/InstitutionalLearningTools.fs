@@ -45,10 +45,7 @@ module InstitutionalLearningTools =
         let DurableUnavailable = "institutional-learning/durable-unavailable"
 
     let private languageOf (ctx: HostToolContext) =
-        if String.IsNullOrWhiteSpace ctx.SessionId then
-            ProviderLanguageBinding.readGlobalPreference ()
-        else
-            ProviderLanguageBinding.ensureRoot (SessionId.create ctx.SessionId)
+        ProviderLanguageBinding.forSessionText ctx.SessionId
 
     let private trim (value: string) =
         if isNull value then "" else value.Trim()
@@ -145,7 +142,6 @@ module InstitutionalLearningTools =
         fun _ (r: Role) -> r <> Role.Blogger && r <> Role.Distiller
 
     let specs factory journal =
-        let language = ProviderLanguageBinding.readGlobalPreference ()
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         let argument =

@@ -67,7 +67,6 @@ open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Strength.Prediction
 open Wanxiangshu.Strength.Projection
 open Wanxiangshu.Strength.Replica
-open Wanxiangshu.Resources
 open Wanxiangshu.Process
 open Wanxiangshu.Context.Trace
 
@@ -76,7 +75,7 @@ open Wanxiangshu.Context.Trace
 module OneShotAgentTool =
 
     let private forkInstructions (sessionId: SessionId) : ForkChildInstructions =
-        let lang = ProviderProse.languageOf sessionId
+        let lang = SessionProviderLanguage.languageOf sessionId
 
         { Base = ProviderProse.instructionLines lang ForkChildPayload.BasePath Map.empty
           CommissionerRecord = ProviderProse.render lang ForkChildPayload.CommissionerRecordPath Map.empty
@@ -240,9 +239,7 @@ module OneShotAgentTool =
             with
             | Error error ->
                 latch.Finish(fun () ->
-                    completion.SetResult(
-                        Error(sprintf "EXEC-028: terminal trace capture failed: %A" error)
-                    ))
+                    completion.SetResult(Error(sprintf "EXEC-028: terminal trace capture failed: %A" error)))
             | Ok _ ->
                 let! workRecord = childWorkRecord scope childId
 
