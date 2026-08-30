@@ -52,3 +52,15 @@ Host 的 `opencode.json` 不作为 managed model 的真相源。系统不要求 
 ModelTarget 物理绑定与 provider capacity token 严格解耦。在 provider 请求发出前，`experimental.chat.messages.transform` 负责获取对应 provider 的 capacity token。
 子 session 可借用祖先在等待时的闲置 token；token 仅在 provider-step 边界转移，祖先召回时需等待子 step 结束。Blogger 伴侣执行使用与 Main 同源的平行 companion credit 借用机制。
 Host 开始执行某个 managed tool 时，tool context 的 exact `ProviderRunIdentity` 构成 provider→tool 的因果 step 边界：在任何 capability/role gate 与 tool body 运行前，必须用当前冻结的 `PhysicalUserMessageId` 结束该 provider step，使 token 进入可借用的 idle 状态。工具体可以同步等待 descendant provider work，因此严禁把 provider capacity 持有到 tool body 返回、严禁以 wall-clock timeout 猜测何时释放，也严禁通过允许借用真实 `InFlight` step 来绕过该边界。
+
+## EMR-011: 物理 admission 顺序固定为 accept → acquire → bind → project
+
+Managed chat execution 必须先为 exact `(SessionId, PhysicalUserMessageId)` durable 写入 `Accepted`，路由器随后才可排队或获取容量。一次执行的顺序严格为：resolve target → durable accept → exact capacity acquire → execution binding → Host projection。任一步失败只能交给 `execution-failure-policy` 结算已拥有的事实与资源；严禁 acquire-before-accept、先改 Host message 后补 binding，或让未接受的发送意图预占容量。
+
+## EMR-012: Capacity 是 exact opaque fenced capability
+
+每次成功 acquire 返回不可伪造、单次结算的 capacity fence，至少因果绑定 target、physical message、owner lineage 与 fence epoch。borrow/recall 只转移同一 fence 的合法 custody，不复制 token。release、retain 与 transfer 必须携带 exact fence 并验证当前 custody；旧 epoch、重复 settlement、错误 physical id 或按计数/session 猜测释放均 fail closed。capacity settlement 的选择由 `execution-failure-policy` 输出，路由器只验证并原子执行。
+
+## EMR-013: Pending demand 是 bounded typed queue
+
+`null` 或暂不可 acquire 的已接受 demand 只能进入有明确上限的 typed queue；entry 必须携带 exact `(SessionId, PhysicalUserMessageId)`、resolved target、lineage 与 supersession identity。队列满返回 typed `CapacityQueueFull` 并交给 failure policy，绝不得丢弃、无限扩容、解析错误文本后 retry/fallback，或借 wall-clock timeout 清退。capacity release、exact supersede、session deletion 与 shutdown 是队列重算/移除事件；队列 correctness 不依赖 polling、sleep 或 elapsed time。

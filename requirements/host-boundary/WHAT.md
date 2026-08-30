@@ -52,9 +52,9 @@
 
 流式传感器（如 LoopSensor）仅识别对应分段中的专属标识与模式，普通正文与工具输出均不触发；每个运行周期内至多触发一次，且仅限中断当前子会话的物理尝试。
 
-## HOST-BOUNDARY-014: 零 Host 源码修改与 Hook Fatal Membrane
+## HOST-BOUNDARY-014: 零 Host 源码修改与 Typed Hook Membrane
 
-系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载的 Hook 函数必须包裹致命保护膜（fatal membrane），在捕获到不变量异常时立即安全熔断。Provider/LLM 提交的工具参数未通过已声明 wire/schema 校验属于预期协议拒绝：必须把原拒绝原样返回 Host 以便 provider 修正，禁止因此触发 `Diagnostic.fatal`；只有未被 owner 明确分类为协议拒绝的 hook 异常才能进入 fatal membrane。
+系统完全基于公开的宿主 Hook 与 SDK 集成，不修改宿主源码。所有挂载 Hook 必须经过同一个 typed membrane：边界用公开 evidence 将失败穷尽归一为 `execution-failure-policy` 的 closed algebra，再解释其完整 decision。Provider/LLM 工具参数未通过已声明 wire/schema 属于 `ProtocolRejection`，原 typed rejection 返回 Host 供 provider 修正，不触发 fatal。membrane 禁止 wildcard catch 后直接 retry/fatal，禁止按 exception/error text 路由；未分类物理形状必须 fail closed 并扩展代数。
 
 ## HOST-BOUNDARY-015: Tool 文本返回结果有界截断
 
@@ -68,18 +68,26 @@
 
 宿主边界负责将原始事件解析为规范的会话与角色身份，并单向将托管配置投影到底层宿主，宿主适配逻辑不反向生成业务权威。
 
-## HOST-BOUNDARY-018: 默认不 Fork Host 且扩展另立需求
+## HOST-BOUNDARY-018: Host 源码零 Fork
 
-系统默认维持与官方宿主的无侵入集成；若未来涉及宿主底层代码分叉，必须作为独立架构需求重新立项。
+系统只通过受支持的公开 Hook 与 SDK 无侵入集成。Host 源码修改、补丁、私有模块 import、运行时 monkey patch 与 vendored fork 均不属于合法实现路径，严禁作为能力缺口的补偿方案。
 
 ## HOST-BOUNDARY-019: Host 物理能力缺口必有 Canary 与 Contract 证明
 
-业务所依赖的全部宿主物理能力（包括时序、快照解析、模型路由等）必须具备严格的契约测试与金丝雀（canary）测试验证，缺少证明则判定环境不支持。一次 provider transform 内若 XWire 选择未提交的 prefix probe，必须以 typed `PrefixPresentationHorizon.TentativeCold` 直接返回给同一静态组合根；组合根据此在当前调用中抑制会重放旧历史 horizon 的后置 auxiliary projectors。该事实不得通过跨 callback mutable registry/flag 传播。
+业务所依赖的全部宿主物理能力（包括时序、快照解析、模型路由等）必须同时具备契约测试与真实 canary：canary 必须启动受支持的真实 Host build，经公开 Hook/SDK 发起实际场景并观察公开结果；mock adapter、源码/类型形状检查、伪造 callback 与 UI 截图均不算 canary。缺少任一级证明即判定环境不支持。一次 provider transform 内若 XWire 选择未提交的 prefix probe，必须以 typed `PrefixPresentationHorizon.TentativeCold` 直接返回给同一静态组合根；组合根据此在当前调用中抑制会重放旧历史 horizon 的后置 auxiliary projectors。该事实不得通过跨 callback mutable registry/flag 传播。
 
 ## HOST-BOUNDARY-020: 观测不足或多解严格 Fail-Closed
 
-宿主边界在面临任何观察证据不足、查询超时、多重冲突或数据不一致的情形时，一律执行安全失败（fail closed），严禁妥协猜测。
+宿主边界在面临任何观察证据不足、查询返回 typed failure、多重冲突或数据不一致的情形时，一律执行安全失败（fail closed），严禁妥协猜测；elapsed time 本身不构成业务结论。
 
 ## HOST-BOUNDARY-021: Plugin Load Phase 纯洁性与 Activation 分界
 
 插件加载初始化阶段仅允许执行资源解析、静态校验与 Hook 注册，严禁调用宿主业务接口、执行崩溃恢复或追加业务持久化事实。
+
+## HOST-BOUNDARY-022: Fatal 前必须完成 exact settlement
+
+Typed hook membrane 收到 `FatalAfterSettlement` 后，必须先按同一个 policy decision 完成 exact opaque capacity fence settlement，并把 typed message disposition 交给 `managed-chat-execution` durable 提交；提交未知必须写成显式 unknown。只有所有已持有 ownership 均取得 committed/unknown settlement evidence 后才可调用 `FatalProcess`。严禁先退出再依赖 `finally`、Host cleanup、session deletion、UI 提示或 best-effort count decrement 收尾。
+
+## HOST-BOUNDARY-023: 业务承诺只建立在公开 Host contract
+
+Requirement、领域状态与恢复策略只能依赖受支持的公开 Hook/SDK 输入输出及真实 canary 已证明的物理行为。private Host field/module、未公开 callback ordering、内部 retry counter、DOM/UI text、toast、spinner 或渲染时机均不得成为 identity、acceptance、provider start、terminal、capacity 或 fatal settlement 的证明；无法由公开 contract 观察的能力视为不存在并 fail closed。

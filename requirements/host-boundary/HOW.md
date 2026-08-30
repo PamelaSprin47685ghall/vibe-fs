@@ -23,10 +23,17 @@
 - 依赖因果事件驱动推进，快照未决时保持挂起，杜绝全局墙钟轮询。
 - 维护物理执行租约与完成状态，确保失败步骤与最终执行完成明确区分。
 
-### 4. 致命保护膜与加载纯洁性
+### 4. Typed Hook Membrane、结算与加载纯洁性
 
-- **Hook Fatal Membrane**：所有交付给宿主的 Hook 函数统一包裹异常熔断包装器，同步或异步抛出的不变量异常直接触发进程级致命退出。
+- **一次 typed normalization**：所有交付 Host 的 Hook 先从公开 Hook/SDK evidence 归一为 `ExecutionFailure`；wire/schema rejection 直接形成 `ProtocolRejection`。diagnostic text 不进入决策输入，未识别结构 fail closed，不存在 catch-all retry/fatal。
+- **单一 decision interpreter**：membrane 只解释 `execution-failure-policy` 返回的六维 decision。`FatalAfterSettlement` 路径严格执行 exact capacity fence settlement → managed-chat typed disposition durable submission → settlement committed/unknown evidence → `FatalProcess`，任一步不得委托 Host/UI 私有 cleanup。
 - **阶段划分**：严格分离 Load Phase 与 Activation Phase。加载期严禁调用宿主会话 API 或触碰持久化日志，确保插件初始化的无副作用。
+
+### 5. 公开 contract 与真实 canary
+
+- contract adapter 只 import 受支持公开 Hook/SDK surface；architecture proof 拒绝 Host fork、private module、monkey patch 与 UI/DOM 依赖。
+- canary 启动声明支持的真实 Host build，通过公开入口执行 Hook ordering、snapshot identity、routing projection、terminal observation 与 fatal settlement 场景，并从公开输出断言结果。mock/fixture tests 仍可做低层 contract proof，但不能标记为 canary。
+- canary failure 或能力不可观察时环境 fail closed；不得以版本猜测、wall-clock wait 或 UI 文案推定支持。
 
 ## 验证与测试落点
 
@@ -50,6 +57,8 @@
 | HOST-BOUNDARY-016 | `requirements/host-boundary/tests/events-port.test.mjs` |
 | HOST-BOUNDARY-017 | `requirements/host-boundary/tests/host-session-context.test.mjs` |
 | HOST-BOUNDARY-018 | `requirements/host-boundary/tests/host018-no-fork.test.mjs` |
-| HOST-BOUNDARY-019 | `requirements/host-boundary/tests/host-capability-observation.test.mjs`, `requirements/host-boundary/tests/ordered-transform.test.mjs` |
+| HOST-BOUNDARY-019 | `requirements/host-boundary/tests/real-host-capability-canary.test.mjs` |
 | HOST-BOUNDARY-020 | `requirements/host-boundary/tests/session-snapshot-locality.test.mjs` |
 | HOST-BOUNDARY-021 | `requirements/host-boundary/tests/plugin-load-purity.test.mjs`, `requirements/host-boundary/tests/host-signal-bootstrap-composition.test.mjs` |
+| HOST-BOUNDARY-022 | `requirements/host-boundary/tests/pre-fatal-exact-settlement.test.mjs` |
+| HOST-BOUNDARY-023 | `requirements/host-boundary/tests/public-host-contract-only.test.mjs` |

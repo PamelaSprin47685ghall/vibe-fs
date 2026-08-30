@@ -2,7 +2,7 @@
 
 ## MANAGED-SESSION-001: Attached 会话单一生命周期 Owner
 
-`AttachedSessionRuntime` 是所有 Attached 会话的唯一创建、恢复、注册、级联取消与回收所有者；各具体 `AttachmentKind` 仅提供参数与终态策略，严禁各自实现生命周期框架。
+`AttachedSessionRuntime` 是所有 Attached 会话的唯一创建、恢复、注册、级联取消与回收所有者；各具体 `AttachmentKind` 仅提供参数与终态策略，严禁各自实现生命周期框架。该 session lifecycle owner 不拥有 durable chat execution transition；后者必须委托 `managed-chat-execution`。
 
 ## MANAGED-SESSION-002: 创建协议先写关联后发首 Prompt
 
@@ -71,3 +71,11 @@ Agent 子会话的 handle 即为其运行时的 Agent ID，重启后必须保证
 ## MANAGED-SESSION-018: Abandon 需要不可逆丢失授权，Process/Attempt 生命周期无权宣判
 
 `HandleAbandoned` 是“该 child 不会再沿当前 handle 返回”的不可逆业务终态，不是 cleanup 标记。生产写入必须具有明确的不可逆丢失授权：仅允许已确认的 logical parent/session 终止（例如 session deletion、显式 successor-less termination）或恢复流程对 child 永久丢失的证明。`AttemptAborted` / `TurnAborted`、provider failure/retry、degeneration-guard、Fission、插件卸载/进程 shutdown、runtime dispose 都不构成该授权；这些路径只能结束当前物理观察者/attempt 或执行 process-local detach，必须保留 durable `Active` handle 供恢复与后续 Join/Horizon 使用。模糊或无法证明的停止信号一律不得升级为 `ParentCancelled`。
+
+## MANAGED-SESSION-019: Cancel/Delete 通过 execution owner 精确排空
+
+logical session cancel 或 delete 获得终止授权后，lifecycle owner 必须调用 `managed-chat-execution` 的 exact settlement barrier，并等待其报告该作用域内所有已准入 execution 均 durable terminal 且 exact capacity 已归还，随后才可发布 session 删除/取消完成。lifecycle 不复制 execution transition law，不执行 session-wide blind release，不以 timer、deadline、sleep 或 polling 推断排空。process/plugin shutdown 仍只执行 detach，不得借该 barrier 升级为 logical cancel。
+
+## MANAGED-SESSION-020: Fresh identity 等待 durable exact prior-run closure
+
+同一 `SessionId` 被复用于 fresh logical participant run 前，lifecycle 必须先完成 exact execution settlement 与受权 child drain，再由 `interaction-authority` 持久化 exact prior-run closure 并取得 closure witness，最后才把容器开放给 `participant-identity` 安装新 evidence。association removal、detach、idle、timeout、Host observation 或 process restart 均不能代替该 witness；缺失或 run 不匹配必须 fail closed。

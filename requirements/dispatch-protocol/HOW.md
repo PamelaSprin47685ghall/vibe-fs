@@ -18,6 +18,11 @@
    - 未找到物理消息 → 保持 `StillPending`，绝不自动补发；
    - 物理读取失败 → 标记 `Unreadable` 并中止，保留现场供人工审计。
 
+4. **Durability activation 与 execution handoff**：
+   - plugin construction 只装配 dispatcher、physical evidence reader 与 handoff ports；不读取 journal，不启动 recovery。
+   - durable substrate activation 成功后才启动 claim reconciliation；它只由 durable claim 或 Host physical evidence 事件推进。
+   - `PhysicalAccepted` 建立后，把 exact `(SessionId, PhysicalUserMessageId)`、`PromptKey` 与原子 `AttemptExecutionProfile`（含完整版本化 `ParticipantIdentityEvidence`）交给 `managed-chat-execution`。容量、execution binding、provider start、failure disposition 与 settlement 均由其 owner 处理，dispatch 不保存镜像状态。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -33,3 +38,5 @@
 | DISPATCH-PROTOCOL-009 | `requirements/dispatch-protocol/tests/fire-and-forget.test.mjs` |
 | DISPATCH-PROTOCOL-010 | `requirements/dispatch-protocol/tests/claim-lifecycle.test.mjs` |
 | DISPATCH-PROTOCOL-011 | `requirements/dispatch-protocol/tests/send-format.test.mjs` |
+| DISPATCH-PROTOCOL-012 | `requirements/dispatch-protocol/tests/managed-chat-execution-handoff.test.mjs`（计划） |
+| DISPATCH-PROTOCOL-013 | `requirements/dispatch-protocol/tests/durability-activation.test.mjs`（计划） |

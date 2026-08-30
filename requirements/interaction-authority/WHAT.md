@@ -12,24 +12,24 @@
 
 `AuthorityRoot` 具有独占权限：
 1. 创建新的 Logical Run；
-2. 选定或变更 SelectedAgent（并推导 PeerAgent、CanonicalRole 与 SelectedTier）；
+2. 提交显式 managed-agent 选择，并绑定 `participant-identity` owner 为该 exact run 准备的版本化 `ParticipantIdentityEvidence`；
 3. 成为新的 Fallback 根节点；
 4. 重置 Interaction Repair 预算；
-5. 成为后续默认 SelectedAgent 的延续基准。
+5. 成为后续 execution binding 的延续基准。
 
-新 Root 生效时原子清空全部 run-scoped 状态（包括待决 claims、已接受 continuation 映射与序列号），并重置 Fallback 游标。
+`AuthorityRootAccepted { SessionId; LogicalRunId; AuthorityRootId; RootKind; ParticipantIdentityEvidence; initial execution selection }` 是 root acceptance 与 identity installation 的唯一 durable fact payload，必须以一次原子 append 接受或拒绝。Authority 不得先持久化 identity 再接受 root，也不得从 agent 名称推导或拥有 canonical SelectedAgent/PeerAgent、Role、initial Tier、Persona 或 provenance/version；它只校验 evidence 的 exact key/owner witness 并保管 payload。append 成功后的同一 fold 原子建立新 active root、绑定 exact evidence、清空已关闭 prior run 的 claims/continuation 映射/序列号并重置 Fallback 游标；append 未提交则两者均不存在。
 
 ## INTERACTION-AUTHORITY-004: Continuation 禁区
 
-所有类型的 Continuation 仅用于延续已存在的 Logical Run，绝对禁止执行 Root 独占操作：不得新建 RunId、不得修改 SelectedAgent/CanonicalRole、不得更新底层 AuthorityProfile、不得重置 Fallback 或 repair 预算。Continuation 必须完整继承宿主 Run 与 Root 标识。
+所有类型的 Continuation 仅用于延续已存在的 Logical Run，绝对禁止执行 Root 独占操作：不得新建 RunId、不得替换或字段级修改 `ParticipantIdentityEvidence`、不得更新底层 AuthorityProfile、不得重置 Fallback 或 repair 预算。Continuation 必须完整继承宿主 Run、Root 标识与 exact identity evidence；必要的 EffectiveAgent 变化只属于 execution binding。
 
 ## INTERACTION-AUTHORITY-005: 四类 provenance 与两种 Root
 
-系统严格区分四类来源形式：`AuthorityRoot`（包含 `HumanRoot` 与 `AgentOwnerRoot`）、`Continuation`、`HostInternal` 与 `UnknownOrigin`。该分类为闭集合，任何 Continuation 类型均不可被解析为 Root，反之亦然。未能匹配到合法类型的来源一律归入 `UnknownOrigin`。
+系统严格区分四类来源形式：`AuthorityRoot`（包含 `HumanRoot` 与 `AgentOwnerRoot`）、`Continuation`、`HostInternal` 与 `UnknownOrigin`。该分类为闭集合；`AgentOwnerRoot` 必须携带 participant-identity owner 为 exact child/attached/InternalLeaf run 准备的 typed owner-derived identity evidence，且 OwnerLogicalRunId、LogicalRunId 与 root key 必须精确匹配。任何 Continuation 均不可被解析为 Root，反之亦然；缺失、wrong-owner 或 wrong-run evidence 一律归入 `UnknownOrigin`。
 
 ## INTERACTION-AUTHORITY-006: HumanRoot 必须显式命名 managed agent
 
-`HumanRoot` 必须显式指定合法的 managed agent 名称。省略名称、使用废弃裸名或格式错误必须 fail-closed 显式拒绝，禁止系统静默猜测或隐式补全 agent。
+`HumanRoot` 必须显式指定合法的 managed agent 名称。该名称只是交给 participant-identity owner 的 root identity 请求，不是 Authority 自行推导 Persona/Role 的依据。省略名称、使用废弃裸名、格式错误或缺少 owner 返回的版本化 identity evidence 必须 fail-closed，禁止静默猜测或从 Session cache 补全。
 
 ## INTERACTION-AUTHORITY-007: UnknownOrigin fail-closed
 
@@ -49,7 +49,7 @@
 
 ## INTERACTION-AUTHORITY-011: authority 是原子 profile 内的稳定子记录
 
-单次执行的权威身份必须封装在不可变的 `AttemptExecutionProfile` 内原子携带，包含 SessionId、LogicalRunId、AuthorityRootId、SelectedAgent 及关联角色，在整个 Logical Run 期间保持不可变。禁止从会话缓存或分散的消息碎片中临时拼接权威状态。
+每次执行的 `AttemptExecutionProfile` 必须原子携带 exact SessionId、LogicalRunId、AuthorityRootId、当前 `ExecutionBinding` selection，以及 `AuthorityRootAccepted` 中 participant-identity owner 准备的完整版本化 `ParticipantIdentityEvidence`。Authority fold 向 Host/execution 消费者逐字段精确暴露 stable SelectedAgent/PeerAgent、Role、initial Tier、稳定 Persona 与 provenance/version，但不拥有、重新解析或修改这些字段；当前 EffectiveAgent/provider/model/lease 只来自 execution binding。禁止从 Session cache、物理 parent、agent 名称或分散消息拼装 profile。
 
 ## INTERACTION-AUTHORITY-012: degeneration-guard 是 continuation 而非 fallback 失败
 
@@ -57,7 +57,7 @@ degeneration-guard 自恢复消息（`DegenerationGuard`）等属于强类型 Co
 
 ## INTERACTION-AUTHORITY-013: 显式 continuation 绑定保持 authority continuity
 
-同会话与同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅执行绑定的 EffectiveAgent 发生必要变更，其余 Root、Profile 与游标位置全部保持不变。
+同一 LogicalRun 下的强类型 continuation 推进属于权限连续演进：仅 execution binding 的 EffectiveAgent 可按规则变化；Root、identity evidence、Profile 关联与游标位置全部保持不变。SessionId 相同但 LogicalRun 不同不构成 continuity。
 
 ## INTERACTION-AUTHORITY-014: Nudge 与 JoinGuard 是 Continuation
 
@@ -75,9 +75,11 @@ JoinGuard、闲置 Nudge 等流转控制指令均为 Continuation，不产生新
 
 Continuation 只能挂靠当前活跃的 `ActiveLogicalRun`，绝对禁止回退挂靠已归档或结束的历史 Profile。
 
-## INTERACTION-AUTHORITY-018: HumanRoot Manager 的 LifeCompleted 原子释放 active run
+## INTERACTION-AUTHORITY-018: 每种 AuthorityRoot lifecycle 都收敛为 exact durable closure
 
-Manager 生命周期的 `LifeCompleted` 事实原子地将对应的 `ActiveLogicalRun` 清空并释放 run-scoped 映射，同时归档历史 Profile。旧 Run 终结后，后续消息仅能通过合法的显式外部输入建立全新 Root，禁止通过 Continuation 路径复活已终结的交互。
+每个 `AuthorityRootAccepted` 必须原子记录唯一 `ExpectedClosureKind`。闭集合为 `HumanRootManagerLife`、`HumanRootManagedRun`、`AgentOwnerChildWork`、`AgentOwnerAttachedWork`、`AgentOwnerInternalLeaf`；前两种按 HumanRoot 的实际 lifecycle 穷尽，InternalLeaf 无论物理 Ownership 为 Root 或 Attached 都只能使用最后一种。各 kind 唯一合法 source witness 分别是 exact Manager `LifeCompleted(LifeId, FactId)`、`ManagedLogicalRunTerminal(LogicalRunId, FactId)`、`ChildLogicalRunTerminal(OwnerLogicalRunId, ChildLogicalRunId, FactId)`、`AttachedLogicalRunTerminal(OwnerLogicalRunId, ChildLogicalRunId, AttachmentKind, AssociationGeneration, FactId)`、`InternalLeafTerminal(OwnerLogicalRunId, LeafLogicalRunId, DecisionOrTransactionId, FactId)`。每个 `*Terminal` 是该 lifecycle 对 `Completed | Cancelled | Failed` 合法结果的 durable closed outcome，不包含 request、signal 或 observation。任一 HumanRoot 或 AgentOwnerRoot 缺少或无法唯一归入该闭集合时不得被接受。
+
+Authority 的 durable terminal interpreter 校验 source witness 与 accepted root 的 kind、owner、SessionId、LogicalRunId、AuthorityRootId 全部精确匹配后，幂等追加唯一 `AuthorityLogicalRunClosed { SessionId; LogicalRunId; AuthorityRootId; RootKind; ClosureWitness }`。append 成功后的同一 fold 清空对应 `ActiveLogicalRun` 与 run-scoped mappings，释放 active identity-evidence binding并归档历史 Profile；重复相同 closure 幂等，冲突 closure fail-closed。source terminal 已 durable 但 closure append 尚未确认时，reconciliation 只能重放该 typed source 并重试相同 closure append；不得释放 binding 或允许 SessionId 复用。lifecycle terminal 本身、association removal、cancel request、idle/timeout、wall clock、Host observation 或旧 Profile 均不得推断 closure。
 
 ## INTERACTION-AUTHORITY-019: gate nudge admission、飞行态与 fresh-terminal re-arm 必须分型
 

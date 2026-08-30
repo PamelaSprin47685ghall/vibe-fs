@@ -20,12 +20,17 @@
 - **后继闭合**：内部中断必须显式挂接恢复后继（如求助处理、重试等）或直接发布 `Failed` 终态唤醒父级等待。
 - **Abandon 授权闸门**：`HandleController.recordAbandon/cancelChildren` 只能由已确认的 logical parent/session 终止或 child 永久丢失恢复证明调用。`TurnAborted` 只描述当前 attempt，不拥有 child logical-cancel capability；process/plugin shutdown 也只拥有 observer detach capability。
 - **双排空语义**：logical cancel 使用 `CancelAndDrain`，允许 durable `HandleAbandoned` + 物理 child teardown；process/plugin shutdown 使用 `DetachAndDrain`，只排空 callback、解绑订阅与本地 runtime/PTY 资源，绝不写 `HandleAbandoned`、绝不 `AbortSession` live agent child。重启后由 durable `HandleLinked(Active)` 恢复。
-- **有序清理**：明确会话终止时遵循严格的异步排空序列，先切断新工作准入，依次排空后台调和、经授权的子会话级联取消与持久化写入，最后释放底层资源；仅 process shutdown 时则执行无业务终态的 detach 后释放 durable substrate。
+- **Execution settlement barrier**：logical cancel/delete 在切断新工作准入后，把终止授权交给 `managed-chat-execution` 的 settlement port；该 owner 从 durable projection 选择 exact keys，并以事件完成 barrier。lifecycle 只等待 owner 返回的 durable drained witness，不维护 execution 镜像，不 blind-release session，不运行 timer 或 polling。process/plugin shutdown 不调用该 port。
+- **Run closure barrier**：容器复用路径在 execution settlement 与受权 child drain 完成后，调用 `interaction-authority` 持久化 exact LogicalRun closure；只有 run-matched durable closure witness 才允许 `participant-identity` 为同一 `SessionId` 安装 fresh evidence。detach、idle 与 association removal 不参与此判断。
+- **有序清理**：明确会话终止时遵循严格的异步排空序列，先切断新工作准入，依次等待 execution settlement barrier、后台调和、经授权的子会话级联取消与持久化写入，再建立 exact run closure，最后发布 lifecycle terminal 并释放或复用底层容器；仅 process shutdown 时则执行无业务终态的 detach 后释放 durable substrate。
 
 ## DEPENDS ON
 
 - `session-ontology`
 - `crash-reconciliation`
+- `managed-chat-execution`
+- `interaction-authority`
+- `participant-identity`
 
 ## 验证与测试落点
 
@@ -49,6 +54,8 @@
 | MANAGED-SESSION-016 | `requirements/managed-session-lifecycle/tests/interrupt-boundary.test.mjs` |
 | MANAGED-SESSION-017 | `requirements/managed-session-lifecycle/tests/interrupt-successor.test.mjs` |
 | MANAGED-SESSION-018 | `requirements/managed-session-lifecycle/tests/shutdown-drain-contract.test.mjs` + `requirements/delegation/tests/fork-tool.test.mjs` |
+| MANAGED-SESSION-019 | `requirements/managed-session-lifecycle/tests/exact-execution-settlement.test.mjs`（计划） |
+| MANAGED-SESSION-020 | `requirements/managed-session-lifecycle/tests/reused-session-run-closure.test.mjs`（计划） |
 
 ## GAP
 

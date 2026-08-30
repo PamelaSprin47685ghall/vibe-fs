@@ -32,6 +32,12 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
    - `HostEventCodec` 把 assistant completion 分成 provider-step terminal 与 physical-execution terminal 两层。
    - physical terminal 只接受明确最终 `finish`：`stop | length | content-filter`；`tool-calls | unknown | error` 与显式 assistant error 仅结束 step。OpenCode 的 upstream stream failure 可落盘为 `completed + finish="unknown"` 且无 `error`，因此禁止用“非 tool-calls”反推 physical completion。
 
+5. **Durable admission 与 fenced capacity**：
+   - `managed-chat-execution` 提供 exact `Accepted` witness 后，runtime 才建立 bounded `PendingDemand` 或调用 acquire。
+   - acquire 原子签发 opaque `CapacityFence`；execution binding 保存同一 fence identity，Host projection 只读取已建立 binding。
+   - queue 以 typed capacity/supersession/session events 推进；满载产生 `CapacityQueueFull`，不产生 provider retry/fallback。
+   - settlement 解释 `execution-failure-policy` 的 typed command，并以 exact fence 做 retain/release/transfer 的单次原子比较；不提供 count-based cleanup、timer expiry 或 session-wide release。
+
 ## 验证与测试落点
 
 | 命题 | 落点测试 |
@@ -46,3 +52,6 @@ ModelRoutingRuntime (进程单例，管理 Lease multiset 与 Capacity Token)
 | EMR-008 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-009 | `requirements/execution-model-routing/tests/routing-authority-boundary.test.mjs` |
 | EMR-010 | `requirements/execution-model-routing/tests/model-routing-runtime.test.mjs`；`requirements/execution-model-routing/tests/tool-provider-step-boundary.test.mjs` |
+| EMR-011 | `requirements/execution-model-routing/tests/durable-admission-order.test.mjs` |
+| EMR-012 | `requirements/execution-model-routing/tests/capacity-fence.test.mjs` |
+| EMR-013 | `requirements/execution-model-routing/tests/bounded-demand-queue.test.mjs` |

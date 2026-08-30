@@ -2,7 +2,7 @@
 
 ## SESSION-ONTOLOGY-001: Session 分类由 ExecutionClass 与 Ownership 正交决定
 
-长期 session 的本体分类由 `SessionExecutionClass`（`Work | InternalLeaf`）与 `SessionOwnership`（`Root | Attached`）两个正交维度联合决定，彻底杜绝单轴分类对长期工作会话与短期叶子节点的混淆。
+物理 managed session 的本体分类由 `SessionExecutionClass`（`Work | InternalLeaf`）与 `SessionOwnership`（`Root | Attached`）两个正交维度联合决定。该分类描述容器能力与 durable association，不描述 logical participant run 或 `ParticipantIdentity`。
 
 ## SESSION-ONTOLOGY-002: ExecutionClass 与 Ownership 为穷尽正交组合
 
@@ -22,11 +22,11 @@ Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`；In
 
 ## SESSION-ONTOLOGY-006: 物理 Host Parent 恒为 Family Root 且逻辑归属由 Journal 承载
 
-所有 managed child 在 Host 物理层均挂在 family root 下（物理树深度恒为 2）；层级归属关系完全由持久化 journal 事实承载，不得依据物理 parentID 推断逻辑归属。
+所有 managed child 在 Host 物理层均挂在 family root 下（物理树深度恒为 2）；层级归属完全由持久化 journal association 承载。物理 parentID 既不得推断 logical ownership，也不得作为 child/attached/InternalLeaf 的 Role、Persona、Peer、identity provenance 或 owner-derived identity evidence。
 
 ## SESSION-ONTOLOGY-007: Durable 关联事实与正交分类派生视图解耦
 
-持久化 `SessionAssociation` 保持向后兼容的最小事实编码；`ExecutionClass × Ownership` 为纯派生视图（`SessionOwnershipClassification`），派生逻辑为纯增量只读，不得反向破坏 durable codec 稳定性。
+持久化 `SessionAssociation` 是关联关系的最小事实编码；`ExecutionClass × Ownership` 为纯派生视图（`SessionOwnershipClassification`）。派生逻辑只读且由 durable facts 决定，不得反向改写 association 或另建身份状态。
 
 ## SESSION-ONTOLOGY-008: 关联写操作不变量与原子拒绝集
 
@@ -38,7 +38,7 @@ Companion、Bookkeeper 与 StrengthReplica 属于 `InternalLeaf + Attached`；In
 
 ## SESSION-ONTOLOGY-010: Runtime 拓扑不决定业务分类与角色
 
-Session 的本体分类严格仅由 `ExecutionClass × Ownership` 决定，不得受 Role、Tier、工具暴露面或 Logical Run 影响；Companion 资格不设角色白名单。
+Session 的物理本体分类严格仅由 `ExecutionClass × Ownership` 决定，不得受 Role、Tier、Persona、工具暴露面或 Logical Run 影响；Companion 资格不设角色白名单。反向亦然：classification、association、Session cache 与 Host parent 均不得生成或修改 `ParticipantIdentity`。
 
 ## SESSION-ONTOLOGY-011: StrengthReplica 为 Universal 内部叶子且不跨决策复用
 
@@ -55,3 +55,7 @@ Bookkeeper attachment 必须显式携带目标 transactionId，专用于临时�
 ## SESSION-ONTOLOGY-014: Student 与 Teacher 角色及拓扑彻底消除
 
 系统内不存在 Student / Teacher 角色及对应绑定机制；任何解析、映射及运行时均严格拒绝旧式 Teacher 拓扑与未预期 kind。
+
+## SESSION-ONTOLOGY-015: SessionId 是可复用物理容器，不是 identity scope
+
+`SessionId` 只命名物理容器；logical participant run identity 由 exact run 与 `AuthorityRootAccepted` 内 participant-identity owner 的版本化 evidence 命名。同一 SessionId 只有在 `interaction-authority` 已为 exact `(SessionId, LogicalRunId, AuthorityRootId)` 持久化 `AuthorityLogicalRunClosed` 并释放 active identity binding 后，才可承载 fresh root 与不同 identity。Session ontology 只发布容器分类与 durable association；它不缓存或解析 identity，不发布 run closure，也不把 association removal、detach/attach、classification、idle/timeout 或 Host 观察冒充 lifecycle terminal 或 closure。
